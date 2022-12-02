@@ -1,8 +1,8 @@
 using System;
 using System.Buffers;
 using System.Collections.Concurrent;
+using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
-using System.Numerics;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 
@@ -162,7 +162,7 @@ public struct PooledArrayBufferWriter : IBufferWriter<byte>, IDisposable
     private SequenceSegment Grow(int sizeHint)
     {
         Commit();
-        var newBuffer = SequenceSegmentPool.Shared.Rent(sizeHint);
+        var newBuffer = SequenceSegment.Rent(sizeHint);
         return _current = newBuffer;
     }
 
@@ -190,65 +190,18 @@ public struct PooledArrayBufferWriter : IBufferWriter<byte>, IDisposable
         _currentPosition = 0;
     }
 
-    private sealed class SequenceSegmentPool
-    {
-        public static SequenceSegmentPool Shared { get; } = new();
-        public const int MinimumBlockSize = 4096;
-        private readonly ConcurrentQueue<SequenceSegment> _blocks = new();
-        private readonly ConcurrentQueue<SequenceSegment> _largeBlocks = new();
-
-        private SequenceSegmentPool() { }
-
-        public SequenceSegment Rent(int size = -1)
-        {
-            SequenceSegment block;
-            if (size <= MinimumBlockSize)
-            {
-                if (!_blocks.TryDequeue(out block))
-                {
-                    block = new SequenceSegment(size);
-                }
-            }
-            else if (_largeBlocks.TryDequeue(out block))
-            {
-                block.InitializeLargeSegment(size);
-                return block;
-            }
-
-            return block ?? new SequenceSegment(size);
-        }
-
-        internal void Return(SequenceSegment block)
-        {
-            if (block.IsStandardSize)
-            {
-                _blocks.Enqueue(block);
-            }
-            else
-            {
-                _largeBlocks.Enqueue(block);
-            }
-        }
-    }
-
     private sealed class SequenceSegment : ReadOnlySequenceSegment<byte>
     {
-        internal SequenceSegment(int length)
-        {
-            InitializeSegment(length);
-        }
+        private const int MinimumBlockSize = 4096;
+        private static readonly ConcurrentBag<SequenceSegment> Blocks = new();
 
-        public void InitializeLargeSegment(int length)
-        {
-            InitializeSegment((int)BitOperations.RoundUpToPowerOf2((uint)length));
-        }
+        public static SequenceSegment Rent(int size = -1) => size <= MinimumBlockSize && Blocks.TryTake(out var block) ? block : new(size);
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private void InitializeSegment(int length)
+        private SequenceSegment(int length)
         {
-            if (length <= SequenceSegmentPool.MinimumBlockSize)
+            if (length <= MinimumBlockSize)
             {
-                var pinnedArray = GC.AllocateUninitializedArray<byte>(SequenceSegmentPool.MinimumBlockSize, pinned: true);
+                var pinnedArray = GC.AllocateUninitializedArray<byte>(MinimumBlockSize, pinned: true);
                 Array = pinnedArray;
             }
             else
@@ -261,7 +214,7 @@ public struct PooledArrayBufferWriter : IBufferWriter<byte>, IDisposable
 
         public ReadOnlyMemory<byte> CommittedMemory => base.Memory;
 
-        public bool IsStandardSize => Array.Length == SequenceSegmentPool.MinimumBlockSize;
+        private bool IsStandardSize => Array.Length == MinimumBlockSize;
 
         public Memory<byte> AsMemory(int offset)
         {
@@ -299,7 +252,7 @@ public struct PooledArrayBufferWriter : IBufferWriter<byte>, IDisposable
 
             if (IsStandardSize)
             {
-                SequenceSegmentPool.Shared.Return(this);
+                Blocks.Add(this);
             }
             else
             {

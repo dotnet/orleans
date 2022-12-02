@@ -9,8 +9,6 @@ namespace Orleans.Serialization
 {
     internal sealed class SerializationEntryCodec : IFieldCodec<SerializationEntrySurrogate>
     {
-        public static readonly Type SerializationEntryType = typeof(SerializationEntrySurrogate);
-
         [SecurityCritical]
         public void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer,
             uint fieldIdDelta,
@@ -18,12 +16,12 @@ namespace Orleans.Serialization
             SerializationEntrySurrogate value) where TBufferWriter : IBufferWriter<byte>
         {
             ReferenceCodec.MarkValueField(writer.Session);
-            writer.WriteFieldHeader(fieldIdDelta, expectedType, SerializationEntryType, WireType.TagDelimited);
-            StringCodec.WriteField(ref writer, 0, typeof(string), value.Name);
-            ObjectCodec.WriteField(ref writer, 1, typeof(object), value.Value);
+            writer.WriteFieldHeader(fieldIdDelta, expectedType, typeof(SerializationEntrySurrogate), WireType.TagDelimited);
+            StringCodec.WriteField(ref writer, 0, value.Name);
+            ObjectCodec.WriteField(ref writer, 1, value.Value);
             if (value.ObjectType is { } objectType)
             {
-                TypeSerializerCodec.WriteField(ref writer, 1, typeof(Type), objectType);
+                TypeSerializerCodec.WriteField(ref writer, 1, objectType);
             }
 
             writer.WriteEndObject();

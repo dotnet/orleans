@@ -2383,6 +2383,8 @@ namespace Orleans.Serialization.UnitTests
         {
         }
 
+        protected override int[] MaxSegmentSizes => new[] { 32 };
+
         protected override IPAddress[] TestValues => new[] { null, IPAddress.Any, IPAddress.IPv6Any, IPAddress.IPv6Loopback, IPAddress.IPv6None, IPAddress.Loopback, IPAddress.Parse("123.123.10.3"), CreateValue() };
 
         protected override IPAddress CreateValue()

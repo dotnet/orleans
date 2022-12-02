@@ -1,7 +1,7 @@
 using System;
 using System.Buffers;
+using System.Runtime.CompilerServices;
 using Orleans.Serialization.Buffers;
-using Orleans.Serialization.Cloning;
 using Orleans.Serialization.WireProtocol;
 
 namespace Orleans.Serialization.Codecs
@@ -12,36 +12,44 @@ namespace Orleans.Serialization.Codecs
     [RegisterSerializer]
     public sealed class TypeSerializerCodec : IFieldCodec<Type>, IDerivedTypeCodec
     {
-        private static readonly Type ByteType = typeof(byte);
-        private static readonly Type TypeType = typeof(Type);
-        private static readonly Type UIntType = typeof(uint);
-
-        /// <inheritdoc />
-        void IFieldCodec<Type>.WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, Type value) => WriteField(ref writer, fieldIdDelta, expectedType, value);
-
-        /// <summary>
-        /// Writes a field.
-        /// </summary>
-        /// <typeparam name="TBufferWriter">The buffer writer type.</typeparam>
-        /// <param name="writer">The writer.</param>
-        /// <param name="fieldIdDelta">The field identifier delta.</param>
-        /// <param name="expectedType">The expected type.</param>
-        /// <param name="value">The value.</param>
-        public static void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, Type value) where TBufferWriter : IBufferWriter<byte>
+        void IFieldCodec<Type>.WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, Type value)
         {
-            if (ReferenceCodec.TryWriteReferenceField(ref writer, fieldIdDelta, expectedType, TypeType, value))
+            if (ReferenceCodec.TryWriteReferenceField(ref writer, fieldIdDelta, expectedType, typeof(Type), value))
             {
                 return;
             }
 
-            writer.WriteStartObject(fieldIdDelta, expectedType, TypeType);
+            writer.WriteStartObject(fieldIdDelta, expectedType, typeof(Type));
+            WriteField(ref writer, value);
+        }
 
+        /// <summary>
+        /// Writes a field without type info (expected type is statically known).
+        /// </summary>
+        /// <typeparam name="TBufferWriter">The buffer writer type.</typeparam>
+        /// <param name="writer">The writer.</param>
+        /// <param name="fieldIdDelta">The field identifier delta.</param>
+        /// <param name="value">The value.</param>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type value) where TBufferWriter : IBufferWriter<byte>
+        {
+            if (ReferenceCodec.TryWriteReferenceFieldExpected(ref writer, fieldIdDelta, value))
+            {
+                return;
+            }
+
+            writer.WriteFieldHeaderExpected(fieldIdDelta, WireType.TagDelimited);
+            WriteField(ref writer, value);
+        }
+
+        private static void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, Type value) where TBufferWriter : IBufferWriter<byte>
+        {
             var schemaType = writer.Session.WellKnownTypes.TryGetWellKnownTypeId(value, out var id) ? SchemaType.WellKnown
                 : writer.Session.ReferencedTypes.TryGetTypeReference(value, out id) ? SchemaType.Referenced
                 : SchemaType.Encoded;
 
             // Write the encoding type.
-            ByteCodec.WriteField(ref writer, 0, ByteType, (byte)schemaType);
+            ByteCodec.WriteField(ref writer, 0, (byte)schemaType);
 
             if (schemaType == SchemaType.Encoded)
             {
@@ -53,7 +61,7 @@ namespace Orleans.Serialization.Codecs
             else
             {
                 // If the type is referenced or well-known, write it as a varint.
-                UInt32Codec.WriteField(ref writer, 2, UIntType, id);
+                UInt32Codec.WriteField(ref writer, 2, id);
             }
 
             writer.WriteEndObject();

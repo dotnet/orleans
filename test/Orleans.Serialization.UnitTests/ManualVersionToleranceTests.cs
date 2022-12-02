@@ -351,8 +351,8 @@ namespace Orleans.Serialization.UnitTests
             public void Serialize<TBufferWriter>(ref Writer<TBufferWriter> writer, ObjectWithNewField obj) where TBufferWriter : IBufferWriter<byte>
             {
                 // not serializing newField to simulate a binary that's created from a previous version of the object
-                StringCodec.WriteField(ref writer, 0, typeof(string), obj.Blah);
-                Int32Codec.WriteField(ref writer, 2, typeof(int), obj.Version);
+                StringCodec.WriteField(ref writer, 0, obj.Blah);
+                Int32Codec.WriteField(ref writer, 2, obj.Version);
             }
 
             // using a generated deserializer for deserialization
@@ -383,10 +383,10 @@ namespace Orleans.Serialization.UnitTests
         {
             public void Serialize<TBufferWriter>(ref Writer<TBufferWriter> writer, ObjectWithoutNewField obj) where TBufferWriter : IBufferWriter<byte>
             {
-                StringCodec.WriteField(ref writer, 0, typeof(string), obj.Blah);
-                Int32Codec.WriteField(ref writer, 1, typeof(int), obj.Version);
+                StringCodec.WriteField(ref writer, 0, obj.Blah);
+                Int32Codec.WriteField(ref writer, 1, obj.Version);
                 // serializing a new field to simulate a binary that's created from a newer version of the object
-                ObjectCodec.WriteField(ref writer, 6, typeof(object), "I will be stuck in binary limbo! (I shouldn't be part of the deserialized object)");
+                ObjectCodec.WriteField(ref writer, 6, "I will be stuck in binary limbo! (I shouldn't be part of the deserialized object)");
             }
 
             // using a generated deserializer for deserialization
@@ -527,8 +527,8 @@ namespace Orleans.Serialization.UnitTests
         {
             public void Serialize<TBufferWriter>(ref Writer<TBufferWriter> writer, BaseType obj) where TBufferWriter : IBufferWriter<byte>
             {
-                StringCodec.WriteField(ref writer, 0, typeof(string), obj.BaseTypeString);
-                StringCodec.WriteField(ref writer, 234, typeof(string), obj.AddedLaterString);
+                StringCodec.WriteField(ref writer, 0, obj.BaseTypeString);
+                StringCodec.WriteField(ref writer, 234, obj.AddedLaterString);
             }
 
             public void Deserialize<TInput>(ref Reader<TInput> reader, BaseType obj)

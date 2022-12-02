@@ -60,7 +60,7 @@ namespace Orleans.Serialization.Codecs
             }
 
             writer.WriteFieldHeader(fieldIdDelta, expectedType, value.GetType(), WireType.TagDelimited);
-            StringCodec.WriteField(ref writer, 0, StringCodec.CodecFieldType, value.Name);
+            StringCodec.WriteField(ref writer, 0, value.Name);
             writer.WriteEndObject();
         }
     }

@@ -1,7 +1,7 @@
 using System;
 using System.Buffers;
+using System.Runtime.CompilerServices;
 using Orleans.Serialization.Buffers;
-using Orleans.Serialization.Cloning;
 using Orleans.Serialization.WireProtocol;
 
 namespace Orleans.Serialization.Codecs
@@ -12,16 +12,25 @@ namespace Orleans.Serialization.Codecs
     [RegisterSerializer]
     public sealed class DateTimeOffsetCodec : IFieldCodec<DateTimeOffset>
     {
-        /// <inheritdoc/>
-        void IFieldCodec<DateTimeOffset>.WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, DateTimeOffset value) => WriteField(ref writer, fieldIdDelta, expectedType, value);
-
-        /// <inheritdoc/>
-        public static void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, DateTimeOffset value) where TBufferWriter : IBufferWriter<byte>
+        void IFieldCodec<DateTimeOffset>.WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, DateTimeOffset value)
         {
             ReferenceCodec.MarkValueField(writer.Session);
             writer.WriteFieldHeader(fieldIdDelta, expectedType, typeof(DateTimeOffset), WireType.TagDelimited);
-            DateTimeCodec.WriteField(ref writer, 0, typeof(DateTime), value.DateTime);
-            TimeSpanCodec.WriteField(ref writer, 1, typeof(TimeSpan), value.Offset);
+            DateTimeCodec.WriteField(ref writer, 0, value.DateTime);
+            TimeSpanCodec.WriteField(ref writer, 1, value.Offset);
+            writer.WriteEndObject();
+        }
+
+        /// <summary>
+        /// Writes a field without type info (expected type is statically known).
+        /// </summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, DateTimeOffset value) where TBufferWriter : IBufferWriter<byte>
+        {
+            ReferenceCodec.MarkValueField(writer.Session);
+            writer.WriteFieldHeaderExpected(fieldIdDelta, WireType.TagDelimited);
+            DateTimeCodec.WriteField(ref writer, 0, value.DateTime);
+            TimeSpanCodec.WriteField(ref writer, 1, value.Offset);
             writer.WriteEndObject();
         }
 

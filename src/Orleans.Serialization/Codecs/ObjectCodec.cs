@@ -13,8 +13,6 @@ namespace Orleans.Serialization.Codecs
     [RegisterSerializer]
     public sealed class ObjectCodec : IFieldCodec<object>
     {
-        private static readonly Type ObjectType = typeof(object);
-
         /// <inheritdoc/>
         object IFieldCodec<object>.ReadValue<TInput>(ref Reader<TInput> reader, Field field) => ReadValue(ref reader, field);
 
@@ -29,10 +27,10 @@ namespace Orleans.Serialization.Codecs
         {
             if (field.IsReference)
             {
-                return ReferenceCodec.ReadReference(ref reader, field.FieldType ?? ObjectType);
+                return ReferenceCodec.ReadReference(ref reader, field.FieldType ?? typeof(object));
             }
 
-            if (field.FieldType is null || field.FieldType == ObjectType)
+            if (field.FieldType is null || field.FieldType == typeof(object))
                 return ReadObject(ref reader, field);
 
             var specificSerializer = reader.Session.CodecProvider.GetCodec(field.FieldType);
@@ -76,6 +74,17 @@ namespace Orleans.Serialization.Codecs
             specificSerializer.WriteField(ref writer, fieldIdDelta, expectedType, value);
         }
 
+        /// <summary>
+        /// Writes a field.
+        /// </summary>
+        /// <typeparam name="TBufferWriter">The buffer writer type.</typeparam>
+        /// <param name="writer">The writer.</param>
+        /// <param name="fieldIdDelta">The field identifier delta.</param>
+        /// <param name="value">The value.</param>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, object value) where TBufferWriter : IBufferWriter<byte>
+            => WriteField(ref writer, fieldIdDelta, null, value);
+
         void IFieldCodec.WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, object value)
         {
             // only the untyped writer will need to support actual object type values
@@ -86,8 +95,8 @@ namespace Orleans.Serialization.Codecs
                     return;
                 }
 
-                writer.WriteFieldHeader(fieldIdDelta, expectedType, ObjectType, WireType.LengthPrefixed);
-                writer.WriteVarUInt32(0U);
+                writer.WriteFieldHeader(fieldIdDelta, expectedType, typeof(object), WireType.LengthPrefixed);
+                writer.WriteVarUInt7(0U);
                 return;
             }
 

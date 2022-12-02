@@ -20,6 +20,23 @@ namespace Orleans.Serialization.Codecs
         public static void MarkValueField(SerializerSession session) => session.ReferencedObjects.MarkValueField();
 
         /// <summary>
+        /// Write an object reference if <paramref name="value"/> has already been written.
+        /// This overload is suitable only for static codecs where expected type is statically known.
+        /// </summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        internal static bool TryWriteReferenceFieldExpected<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldId, object value) where TBufferWriter : IBufferWriter<byte>
+        {
+            if (!writer.Session.ReferencedObjects.GetOrAddReference(value, out var reference))
+            {
+                return false;
+            }
+
+            writer.WriteFieldHeaderExpected(fieldId, WireType.Reference);
+            writer.WriteVarUInt32(reference);
+            return true;
+        }
+
+        /// <summary>
         /// Write an object reference if <paramref name="value"/> has already been written and has been tracked via <see cref="RecordObject(SerializerSession, object)"/>.
         /// </summary>
         /// <typeparam name="TBufferWriter">The buffer writer type.</typeparam>

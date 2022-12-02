@@ -18,7 +18,7 @@ namespace Orleans.Serialization.Codecs
         {
             ReferenceCodec.MarkValueField(writer.Session);
             writer.WriteFieldHeader(fieldIdDelta, expectedType, value.GetType(), WireType.VarInt);
-            writer.WriteVarUInt32(0);
+            writer.WriteVarUInt7(0);
         }
 
         /// <inheritdoc />
@@ -27,7 +27,8 @@ namespace Orleans.Serialization.Codecs
             field.EnsureWireType(WireType.VarInt);
 
             ReferenceCodec.MarkValueField(reader.Session);
-            _ = reader.ReadVarUInt64();
+            var length = reader.ReadVarUInt32();
+            if (length != 0) throw new UnexpectedLengthPrefixValueException(nameof(ValueTuple), 0, length);
 
             return default;
         }

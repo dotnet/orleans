@@ -125,7 +125,7 @@ namespace Benchmarks
         [Benchmark]
         public void OrleansMessageSerializerStructRoundTrip()
         {
-            _messageSerializer.Write(_pipe.Writer, _message);
+            _messageSerializer.Write(_pipe.Writer, _structMessage);
             _pipe.Writer.FlushAsync().AsTask().GetAwaiter().GetResult();
 
             _pipe.Reader.TryRead(out var readResult);

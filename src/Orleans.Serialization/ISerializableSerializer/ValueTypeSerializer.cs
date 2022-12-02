@@ -56,7 +56,7 @@ namespace Orleans.Serialization
             var info = new SerializationInfo(Type, _formatterConverter);
             ((ISerializable)value).GetObjectData(info, _streamingContext);
 
-            TypeSerializerCodec.WriteField(ref writer, 0, typeof(Type), info.ObjectType);
+            TypeSerializerCodec.WriteField(ref writer, 0, info.ObjectType);
 
             var first = true;
             foreach (var field in info)
@@ -68,7 +68,7 @@ namespace Orleans.Serialization
                     ObjectType = field.ObjectType
                 };
 
-                _entrySerializer.WriteField(ref writer, first ? 1 : (uint)0, SerializationEntryCodec.SerializationEntryType, surrogate);
+                _entrySerializer.WriteField(ref writer, first ? 1 : (uint)0, typeof(SerializationEntrySurrogate), surrogate);
                 if (first)
                 {
                     first = false;

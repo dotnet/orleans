@@ -1,14 +1,11 @@
-using Orleans.Serialization.Buffers;
-using Orleans.Serialization.Cloning;
-using Orleans.Serialization.Serializers;
-using Orleans.Serialization.WireProtocol;
 using System;
 using System.Buffers;
 using System.Diagnostics;
-using System.Diagnostics.CodeAnalysis;
 using System.Numerics;
 using System.Runtime.CompilerServices;
-using System.Security.Cryptography;
+using System.Runtime.InteropServices;
+using Orleans.Serialization.Buffers;
+using Orleans.Serialization.WireProtocol;
 
 namespace Orleans.Serialization.Codecs
 {
@@ -18,27 +15,26 @@ namespace Orleans.Serialization.Codecs
     [RegisterSerializer]
     public sealed class BoolCodec : IFieldCodec<bool>
     {
-        private static readonly Type CodecFieldType = typeof(bool);
-
-        /// <inheritdoc/>
-        void IFieldCodec<bool>.WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer,
-            uint fieldIdDelta,
-            Type expectedType,
-            bool value) => WriteField(ref writer, fieldIdDelta, expectedType, value);
+        void IFieldCodec<bool>.WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, bool value)
+        {
+            ReferenceCodec.MarkValueField(writer.Session);
+            writer.WriteFieldHeader(fieldIdDelta, expectedType, typeof(bool), WireType.VarInt);
+            writer.WriteByte(value ? (byte)3 : (byte)1); // writer.WriteVarUInt32(value ? 1U : 0U);
+        }
 
         /// <summary>
-        /// Writes a field.
+        /// Writes a field without type info (expected type is statically known).
         /// </summary>
         /// <typeparam name="TBufferWriter">The buffer writer type.</typeparam>
         /// <param name="writer">The writer.</param>
         /// <param name="fieldIdDelta">The field identifier delta.</param>
-        /// <param name="expectedType">The expected type.</param>
         /// <param name="value">The value.</param>
-        public static void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, bool value) where TBufferWriter : IBufferWriter<byte>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, bool value) where TBufferWriter : IBufferWriter<byte>
         {
             ReferenceCodec.MarkValueField(writer.Session);
-            writer.WriteFieldHeader(fieldIdDelta, expectedType, CodecFieldType, WireType.VarInt);
-            writer.WriteVarUInt32(value ? 1U : 0U);
+            writer.WriteFieldHeaderExpected(fieldIdDelta, WireType.VarInt);
+            writer.WriteByte(value ? (byte)3 : (byte)1); // writer.WriteVarUInt32(value ? 1U : 0U);
         }
 
         /// <inheritdoc/>
@@ -55,7 +51,7 @@ namespace Orleans.Serialization.Codecs
         public static bool ReadValue<TInput>(ref Reader<TInput> reader, Field field)
         {
             ReferenceCodec.MarkValueField(reader.Session);
-            return reader.ReadUInt8(field.WireType) == 1;
+            return reader.ReadUInt8(field.WireType) != 0;
         }
     }
 
@@ -65,27 +61,26 @@ namespace Orleans.Serialization.Codecs
     [RegisterSerializer]
     public sealed class CharCodec : IFieldCodec<char>
     {
-        private static readonly Type CodecFieldType = typeof(char);
-
-        /// <inheritdoc/>
-        void IFieldCodec<char>.WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer,
-            uint fieldIdDelta,
-            Type expectedType,
-            char value) => WriteField(ref writer, fieldIdDelta, expectedType, value);
+        void IFieldCodec<char>.WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, char value)
+        {
+            ReferenceCodec.MarkValueField(writer.Session);
+            writer.WriteFieldHeader(fieldIdDelta, expectedType, typeof(char), WireType.VarInt);
+            writer.WriteVarUInt28(value);
+        }
 
         /// <summary>
-        /// Writes a field.
+        /// Writes a field without type info (expected type is statically known).
         /// </summary>
         /// <typeparam name="TBufferWriter">The buffer writer type.</typeparam>
         /// <param name="writer">The writer.</param>
         /// <param name="fieldIdDelta">The field identifier delta.</param>
-        /// <param name="expectedType">The expected type.</param>
         /// <param name="value">The value.</param>
-        public static void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, char value) where TBufferWriter : IBufferWriter<byte>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, char value) where TBufferWriter : IBufferWriter<byte>
         {
             ReferenceCodec.MarkValueField(writer.Session);
-            writer.WriteFieldHeader(fieldIdDelta, expectedType, CodecFieldType, WireType.VarInt);
-            writer.WriteVarUInt32(value);
+            writer.WriteFieldHeaderExpected(fieldIdDelta, WireType.VarInt);
+            writer.WriteVarUInt28(value);
         }
 
         /// <inheritdoc/>
@@ -112,27 +107,26 @@ namespace Orleans.Serialization.Codecs
     [RegisterSerializer]
     public sealed class ByteCodec : IFieldCodec<byte>
     {
-        private static readonly Type CodecFieldType = typeof(byte);
-
-        /// <inheritdoc/>
-        void IFieldCodec<byte>.WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer,
-            uint fieldIdDelta,
-            Type expectedType,
-            byte value) => WriteField(ref writer, fieldIdDelta, expectedType, value);
+        void IFieldCodec<byte>.WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, byte value)
+        {
+            ReferenceCodec.MarkValueField(writer.Session);
+            writer.WriteFieldHeader(fieldIdDelta, expectedType, typeof(byte), WireType.VarInt);
+            writer.WriteVarUInt28(value);
+        }
 
         /// <summary>
-        /// Writes a field.
+        /// Writes a field without type info (expected type is statically known).
         /// </summary>
         /// <typeparam name="TBufferWriter">The buffer writer type.</typeparam>
         /// <param name="writer">The writer.</param>
         /// <param name="fieldIdDelta">The field identifier delta.</param>
-        /// <param name="expectedType">The expected type.</param>
         /// <param name="value">The value.</param>
-        public static void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, byte value) where TBufferWriter : IBufferWriter<byte>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, byte value) where TBufferWriter : IBufferWriter<byte>
         {
             ReferenceCodec.MarkValueField(writer.Session);
-            writer.WriteFieldHeader(fieldIdDelta, expectedType, CodecFieldType, WireType.VarInt);
-            writer.WriteVarUInt32(value);
+            writer.WriteFieldHeaderExpected(fieldIdDelta, WireType.VarInt);
+            writer.WriteVarUInt28(value);
         }
 
         /// <summary>
@@ -145,11 +139,7 @@ namespace Orleans.Serialization.Codecs
         /// <param name="value">The value.</param>
         /// <param name="actualType">The actual type.</param>
         public static void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, byte value, Type actualType) where TBufferWriter : IBufferWriter<byte>
-        {
-            ReferenceCodec.MarkValueField(writer.Session);
-            writer.WriteFieldHeader(fieldIdDelta, expectedType, actualType, WireType.VarInt);
-            writer.WriteVarUInt32(value);
-        }
+            => UInt16Codec.WriteField(ref writer, fieldIdDelta, expectedType, value, actualType);
 
         /// <inheritdoc/>
         byte IFieldCodec<byte>.ReadValue<TInput>(ref Reader<TInput> reader, Field field) => ReadValue(ref reader, field);
@@ -175,26 +165,25 @@ namespace Orleans.Serialization.Codecs
     [RegisterSerializer]
     public sealed class SByteCodec : IFieldCodec<sbyte>
     {
-        private static readonly Type CodecFieldType = typeof(sbyte);
-
-        /// <inheritdoc/>
-        void IFieldCodec<sbyte>.WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer,
-            uint fieldIdDelta,
-            Type expectedType,
-            sbyte value) => WriteField(ref writer, fieldIdDelta, expectedType, value);
+        void IFieldCodec<sbyte>.WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, sbyte value)
+        {
+            ReferenceCodec.MarkValueField(writer.Session);
+            writer.WriteFieldHeader(fieldIdDelta, expectedType, typeof(sbyte), WireType.VarInt);
+            writer.WriteVarInt8(value);
+        }
 
         /// <summary>
-        /// Writes a field.
+        /// Writes a field without type info (expected type is statically known).
         /// </summary>
         /// <typeparam name="TBufferWriter">The buffer writer type.</typeparam>
         /// <param name="writer">The writer.</param>
         /// <param name="fieldIdDelta">The field identifier delta.</param>
-        /// <param name="expectedType">The expected type.</param>
         /// <param name="value">The value.</param>
-        public static void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, sbyte value) where TBufferWriter : IBufferWriter<byte>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, sbyte value) where TBufferWriter : IBufferWriter<byte>
         {
             ReferenceCodec.MarkValueField(writer.Session);
-            writer.WriteFieldHeader(fieldIdDelta, expectedType, CodecFieldType, WireType.VarInt);
+            writer.WriteFieldHeaderExpected(fieldIdDelta, WireType.VarInt);
             writer.WriteVarInt8(value);
         }
 
@@ -208,11 +197,7 @@ namespace Orleans.Serialization.Codecs
         /// <param name="value">The value.</param>
         /// <param name="actualType">The actual type.</param>
         public static void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, sbyte value, Type actualType) where TBufferWriter : IBufferWriter<byte>
-        {
-            ReferenceCodec.MarkValueField(writer.Session);
-            writer.WriteFieldHeader(fieldIdDelta, expectedType, actualType, WireType.VarInt);
-            writer.WriteVarInt8(value);
-        }
+            => Int16Codec.WriteField(ref writer, fieldIdDelta, expectedType, value, actualType);
 
         /// <inheritdoc/>
         sbyte IFieldCodec<sbyte>.ReadValue<TInput>(ref Reader<TInput> reader, Field field) => ReadValue(ref reader, field);
@@ -238,11 +223,6 @@ namespace Orleans.Serialization.Codecs
     [RegisterSerializer]
     public sealed class UInt16Codec : IFieldCodec<ushort>
     {
-        /// <summary>
-        /// The codec field type
-        /// </summary>
-        public static readonly Type CodecFieldType = typeof(ushort);
-
         /// <inheritdoc/>
         ushort IFieldCodec<ushort>.ReadValue<TInput>(ref Reader<TInput> reader, Field field) => ReadValue(ref reader, field);
 
@@ -260,25 +240,26 @@ namespace Orleans.Serialization.Codecs
             return reader.ReadUInt16(field.WireType);
         }
 
-        /// <inheritdoc/>
-        void IFieldCodec<ushort>.WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer,
-            uint fieldIdDelta,
-            Type expectedType,
-            ushort value) => WriteField(ref writer, fieldIdDelta, expectedType, value);
+        void IFieldCodec<ushort>.WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, ushort value)
+        {
+            ReferenceCodec.MarkValueField(writer.Session);
+            writer.WriteFieldHeader(fieldIdDelta, expectedType, typeof(ushort), WireType.VarInt);
+            writer.WriteVarUInt28(value);
+        }
 
         /// <summary>
-        /// Writes a field.
+        /// Writes a field without type info (expected type is statically known).
         /// </summary>
         /// <typeparam name="TBufferWriter">The buffer writer type.</typeparam>
         /// <param name="writer">The writer.</param>
         /// <param name="fieldIdDelta">The field identifier delta.</param>
-        /// <param name="expectedType">The expected type.</param>
         /// <param name="value">The value.</param>
-        public static void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, ushort value) where TBufferWriter : IBufferWriter<byte>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, ushort value) where TBufferWriter : IBufferWriter<byte>
         {
             ReferenceCodec.MarkValueField(writer.Session);
-            writer.WriteFieldHeader(fieldIdDelta, expectedType, CodecFieldType, WireType.VarInt);
-            writer.WriteVarUInt32(value);
+            writer.WriteFieldHeaderExpected(fieldIdDelta, WireType.VarInt);
+            writer.WriteVarUInt28(value);
         }
 
         /// <summary>
@@ -294,7 +275,7 @@ namespace Orleans.Serialization.Codecs
         {
             ReferenceCodec.MarkValueField(writer.Session);
             writer.WriteFieldHeader(fieldIdDelta, expectedType, actualType, WireType.VarInt);
-            writer.WriteVarUInt32(value);
+            writer.WriteVarUInt28(value);
         }
     }
 
@@ -304,26 +285,25 @@ namespace Orleans.Serialization.Codecs
     [RegisterSerializer]
     public sealed class Int16Codec : IFieldCodec<short>
     {
-        private static readonly Type CodecFieldType = typeof(short);
-
-        /// <inheritdoc/>
-        void IFieldCodec<short>.WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer,
-            uint fieldIdDelta,
-            Type expectedType,
-            short value) => WriteField(ref writer, fieldIdDelta, expectedType, value);
+        void IFieldCodec<short>.WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, short value)
+        {
+            ReferenceCodec.MarkValueField(writer.Session);
+            writer.WriteFieldHeader(fieldIdDelta, expectedType, typeof(short), WireType.VarInt);
+            writer.WriteVarInt16(value);
+        }
 
         /// <summary>
-        /// Writes a field.
+        /// Writes a field without type info (expected type is statically known).
         /// </summary>
         /// <typeparam name="TBufferWriter">The buffer writer type.</typeparam>
         /// <param name="writer">The writer.</param>
         /// <param name="fieldIdDelta">The field identifier delta.</param>
-        /// <param name="expectedType">The expected type.</param>
         /// <param name="value">The value.</param>
-        public static void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, short value) where TBufferWriter : IBufferWriter<byte>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, short value) where TBufferWriter : IBufferWriter<byte>
         {
             ReferenceCodec.MarkValueField(writer.Session);
-            writer.WriteFieldHeader(fieldIdDelta, expectedType, CodecFieldType, WireType.VarInt);
+            writer.WriteFieldHeaderExpected(fieldIdDelta, WireType.VarInt);
             writer.WriteVarInt16(value);
         }
 
@@ -367,35 +347,30 @@ namespace Orleans.Serialization.Codecs
     [RegisterSerializer]
     public sealed class UInt32Codec : IFieldCodec<uint>
     {
-        public static readonly Type CodecFieldType = typeof(uint);
+        void IFieldCodec<uint>.WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, uint value)
+        {
+            ReferenceCodec.MarkValueField(writer.Session);
+            writer.WriteFieldHeader(fieldIdDelta, expectedType, typeof(uint), value < 1 << 21 ? WireType.VarInt : WireType.Fixed32);
 
-        /// <inheritdoc/>
-        void IFieldCodec<uint>.WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer,
-            uint fieldIdDelta,
-            Type expectedType,
-            uint value) => WriteField(ref writer, fieldIdDelta, expectedType, value);
+            if (value < 1 << 21) writer.WriteVarUInt28(value);
+            else writer.WriteUInt32(value);
+        }
 
         /// <summary>
-        /// Writes a field.
+        /// Writes a field without type info (expected type is statically known).
         /// </summary>
         /// <typeparam name="TBufferWriter">The buffer writer type.</typeparam>
         /// <param name="writer">The writer.</param>
         /// <param name="fieldIdDelta">The field identifier delta.</param>
-        /// <param name="expectedType">The expected type.</param>
         /// <param name="value">The value.</param>
-        public static void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, uint value) where TBufferWriter : IBufferWriter<byte>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, uint value) where TBufferWriter : IBufferWriter<byte>
         {
             ReferenceCodec.MarkValueField(writer.Session);
-            if (value > 1U << 20)
-            {
-                writer.WriteFieldHeader(fieldIdDelta, expectedType, CodecFieldType, WireType.Fixed32);
-                writer.WriteUInt32(value);
-            }
-            else
-            {
-                writer.WriteFieldHeader(fieldIdDelta, expectedType, CodecFieldType, WireType.VarInt);
-                writer.WriteVarUInt32(value);
-            }
+            writer.WriteFieldHeaderExpected(fieldIdDelta, value < 1 << 21 ? WireType.VarInt : WireType.Fixed32);
+
+            if (value < 1 << 21) writer.WriteVarUInt28(value);
+            else writer.WriteUInt32(value);
         }
 
         /// <summary>
@@ -410,16 +385,10 @@ namespace Orleans.Serialization.Codecs
         public static void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, uint value, Type actualType) where TBufferWriter : IBufferWriter<byte>
         {
             ReferenceCodec.MarkValueField(writer.Session);
-            if (value > 1U << 20)
-            {
-                writer.WriteFieldHeader(fieldIdDelta, expectedType, actualType, WireType.Fixed32);
-                writer.WriteUInt32(value);
-            }
-            else
-            {
-                writer.WriteFieldHeader(fieldIdDelta, expectedType, actualType, WireType.VarInt);
-                writer.WriteVarUInt32(value);
-            }
+            writer.WriteFieldHeader(fieldIdDelta, expectedType, actualType, value < 1 << 21 ? WireType.VarInt : WireType.Fixed32);
+
+            if (value < 1 << 21) writer.WriteVarUInt28(value);
+            else writer.WriteUInt32(value);
         }
 
         /// <inheritdoc/>
@@ -446,55 +415,32 @@ namespace Orleans.Serialization.Codecs
     [RegisterSerializer]
     public sealed class Int32Codec : IFieldCodec<int>
     {
-        /// <summary>
-        /// The codec field type
-        /// </summary>
-        public static readonly Type CodecFieldType = typeof(int);
-
-        /// <inheritdoc/>
-        void IFieldCodec<int>.WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer,
-            uint fieldIdDelta,
-            Type expectedType,
-            int value)
+        void IFieldCodec<int>.WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, int value)
         {
             ReferenceCodec.MarkValueField(writer.Session);
-            if (value > 1 << 20 || -value > 1 << 20)
-            {
-                writer.WriteFieldHeader(fieldIdDelta, expectedType, CodecFieldType, WireType.Fixed32);
-                writer.WriteInt32(value);
-            }
-            else
-            {
-                writer.WriteFieldHeader(fieldIdDelta, expectedType, CodecFieldType, WireType.VarInt);
-                writer.WriteVarInt32(value);
-            }
+            var wireType = value < 1 << 20 && value > -1 << 20 ? WireType.VarInt : WireType.Fixed32;
+            writer.WriteFieldHeader(fieldIdDelta, expectedType, typeof(int), wireType);
+
+            if (wireType == WireType.VarInt) writer.WriteVarUInt28(Writer<TBufferWriter>.ZigZagEncode(value));
+            else writer.WriteInt32(value);
         }
 
         /// <summary>
-        /// Writes a field.
+        /// Writes a field without type info (expected type is statically known).
         /// </summary>
         /// <typeparam name="TBufferWriter">The buffer writer type.</typeparam>
         /// <param name="writer">The writer.</param>
         /// <param name="fieldIdDelta">The field identifier delta.</param>
-        /// <param name="expectedType">The expected type.</param>
         /// <param name="value">The value.</param>
-        public static void WriteField<TBufferWriter>(
-            ref Writer<TBufferWriter> writer,
-            uint fieldIdDelta,
-            Type expectedType,
-            int value) where TBufferWriter : IBufferWriter<byte>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, int value) where TBufferWriter : IBufferWriter<byte>
         {
             ReferenceCodec.MarkValueField(writer.Session);
-            if (value > 1 << 20 || -value > 1 << 20)
-            {
-                writer.WriteFieldHeader(fieldIdDelta, expectedType, CodecFieldType, WireType.Fixed32);
-                writer.WriteInt32(value);
-            }
-            else
-            {
-                writer.WriteFieldHeader(fieldIdDelta, expectedType, CodecFieldType, WireType.VarInt);
-                writer.WriteVarInt32(value);
-            }
+            var wireType = value < 1 << 20 && value > -1 << 20 ? WireType.VarInt : WireType.Fixed32;
+            writer.WriteFieldHeaderExpected(fieldIdDelta, wireType);
+
+            if (wireType == WireType.VarInt) writer.WriteVarUInt28(Writer<TBufferWriter>.ZigZagEncode(value));
+            else writer.WriteInt32(value);
         }
 
         /// <summary>
@@ -506,24 +452,14 @@ namespace Orleans.Serialization.Codecs
         /// <param name="expectedType">The expected type.</param>
         /// <param name="value">The value.</param>
         /// <param name="actualType">The actual type.</param>
-        public static void WriteField<TBufferWriter>(
-            ref Writer<TBufferWriter> writer,
-            uint fieldIdDelta,
-            Type expectedType,
-            int value,
-            Type actualType) where TBufferWriter : IBufferWriter<byte>
+        public static void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, int value, Type actualType) where TBufferWriter : IBufferWriter<byte>
         {
             ReferenceCodec.MarkValueField(writer.Session);
-            if (value > 1 << 20 || -value > 1 << 20)
-            {
-                writer.WriteFieldHeader(fieldIdDelta, expectedType, actualType, WireType.Fixed32);
-                writer.WriteInt32(value);
-            }
-            else
-            {
-                writer.WriteFieldHeader(fieldIdDelta, expectedType, actualType, WireType.VarInt);
-                writer.WriteVarInt32(value);
-            }
+            var wireType = value < 1 << 20 && value > -1 << 20 ? WireType.VarInt : WireType.Fixed32;
+            writer.WriteFieldHeader(fieldIdDelta, expectedType, actualType, wireType);
+
+            if (wireType == WireType.VarInt) writer.WriteVarUInt28(Writer<TBufferWriter>.ZigZagEncode(value));
+            else writer.WriteInt32(value);
         }
 
         /// <inheritdoc/>
@@ -550,45 +486,46 @@ namespace Orleans.Serialization.Codecs
     [RegisterSerializer]
     public sealed class Int64Codec : IFieldCodec<long>
     {
-        private static readonly Type CodecFieldType = typeof(long);
+        void IFieldCodec<long>.WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, long value)
+        {
+            ReferenceCodec.MarkValueField(writer.Session);
+            var wireType = value switch
+            {
+                < 1 << 20 and > -1 << 20 => WireType.VarInt,
+                <= int.MaxValue and >= int.MinValue => WireType.Fixed32,
+                < 1L << 48 and > -1L << 48 => WireType.VarInt,
+                _ => WireType.Fixed64,
+            };
+            writer.WriteFieldHeader(fieldIdDelta, expectedType, typeof(long), wireType);
 
-        /// <inheritdoc/>
-        void IFieldCodec<long>.WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, long value) => WriteField(ref writer, fieldIdDelta, expectedType, value);
+            if (wireType == WireType.VarInt) writer.WriteVarUInt56(Writer<TBufferWriter>.ZigZagEncode(value));
+            else if (wireType == WireType.Fixed32) writer.WriteInt32((int)value);
+            else writer.WriteInt64(value);
+        }
 
         /// <summary>
-        /// Writes a field.
+        /// Writes a field without type info (expected type is statically known).
         /// </summary>
         /// <typeparam name="TBufferWriter">The buffer writer type.</typeparam>
         /// <param name="writer">The writer.</param>
         /// <param name="fieldIdDelta">The field identifier delta.</param>
-        /// <param name="expectedType">The expected type.</param>
         /// <param name="value">The value.</param>
-        public static void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, long value) where TBufferWriter : IBufferWriter<byte>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, long value) where TBufferWriter : IBufferWriter<byte>
         {
             ReferenceCodec.MarkValueField(writer.Session);
-            if (value is <= int.MaxValue and >= int.MinValue)
+            var wireType = value switch
             {
-                if (value > 1L << 20 || -value > 1L << 20)
-                {
-                    writer.WriteFieldHeader(fieldIdDelta, expectedType, CodecFieldType, WireType.Fixed32);
-                    writer.WriteInt32((int)value);
-                }
-                else
-                {
-                    writer.WriteFieldHeader(fieldIdDelta, expectedType, CodecFieldType, WireType.VarInt);
-                    writer.WriteVarInt64(value);
-                }
-            }
-            else if (value > 1L << 41 || -value > 1L << 41)
-            {
-                writer.WriteFieldHeader(fieldIdDelta, expectedType, CodecFieldType, WireType.Fixed64);
-                writer.WriteInt64(value);
-            }
-            else
-            {
-                writer.WriteFieldHeader(fieldIdDelta, expectedType, CodecFieldType, WireType.VarInt);
-                writer.WriteVarInt64(value);
-            }
+                < 1 << 20 and > -1 << 20 => WireType.VarInt,
+                <= int.MaxValue and >= int.MinValue => WireType.Fixed32,
+                < 1L << 48 and > -1L << 48 => WireType.VarInt,
+                _ => WireType.Fixed64,
+            };
+            writer.WriteFieldHeaderExpected(fieldIdDelta, wireType);
+
+            if (wireType == WireType.VarInt) writer.WriteVarUInt56(Writer<TBufferWriter>.ZigZagEncode(value));
+            else if (wireType == WireType.Fixed32) writer.WriteInt32((int)value);
+            else writer.WriteInt64(value);
         }
 
         /// <summary>
@@ -603,29 +540,18 @@ namespace Orleans.Serialization.Codecs
         public static void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, long value, Type actualType) where TBufferWriter : IBufferWriter<byte>
         {
             ReferenceCodec.MarkValueField(writer.Session);
-            if (value is <= int.MaxValue and >= int.MinValue)
+            var wireType = value switch
             {
-                if (value > 1L << 20 || -value > 1L << 20)
-                {
-                    writer.WriteFieldHeader(fieldIdDelta, expectedType, actualType, WireType.Fixed32);
-                    writer.WriteInt32((int)value);
-                }
-                else
-                {
-                    writer.WriteFieldHeader(fieldIdDelta, expectedType, actualType, WireType.VarInt);
-                    writer.WriteVarInt64(value);
-                }
-            }
-            else if (value > 1L << 41 || -value > 1L << 41)
-            {
-                writer.WriteFieldHeader(fieldIdDelta, expectedType, actualType, WireType.Fixed64);
-                writer.WriteInt64(value);
-            }
-            else
-            {
-                writer.WriteFieldHeader(fieldIdDelta, expectedType, actualType, WireType.VarInt);
-                writer.WriteVarInt64(value);
-            }
+                < 1 << 20 and > -1 << 20 => WireType.VarInt,
+                <= int.MaxValue and >= int.MinValue => WireType.Fixed32,
+                < 1L << 48 and > -1L << 48 => WireType.VarInt,
+                _ => WireType.Fixed64,
+            };
+            writer.WriteFieldHeader(fieldIdDelta, expectedType, actualType, wireType);
+
+            if (wireType == WireType.VarInt) writer.WriteVarUInt56(Writer<TBufferWriter>.ZigZagEncode(value));
+            else if (wireType == WireType.Fixed32) writer.WriteInt32((int)value);
+            else writer.WriteInt64(value);
         }
 
         /// <inheritdoc/>
@@ -652,48 +578,46 @@ namespace Orleans.Serialization.Codecs
     [RegisterSerializer]
     public sealed class UInt64Codec : IFieldCodec<ulong>
     {
-        private static readonly Type CodecFieldType = typeof(ulong);
+        void IFieldCodec<ulong>.WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, ulong value)
+        {
+            ReferenceCodec.MarkValueField(writer.Session);
+            var wireType = value switch
+            {
+                < 1 << 21 => WireType.VarInt,
+                <= uint.MaxValue => WireType.Fixed32,
+                < 1UL << 49 => WireType.VarInt,
+                _ => WireType.Fixed64,
+            };
+            writer.WriteFieldHeader(fieldIdDelta, expectedType, typeof(ulong), wireType);
 
-        /// <inheritdoc/>
-        void IFieldCodec<ulong>.WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer,
-            uint fieldIdDelta,
-            Type expectedType,
-            ulong value) => WriteField(ref writer, fieldIdDelta, expectedType, value);
+            if (wireType == WireType.VarInt) writer.WriteVarUInt56(value);
+            else if (wireType == WireType.Fixed32) writer.WriteUInt32((uint)value);
+            else writer.WriteUInt64(value);
+        }
 
         /// <summary>
-        /// Writes a field.
+        /// Writes a field without type info (expected type is statically known).
         /// </summary>
         /// <typeparam name="TBufferWriter">The buffer writer type.</typeparam>
         /// <param name="writer">The writer.</param>
         /// <param name="fieldIdDelta">The field identifier delta.</param>
-        /// <param name="expectedType">The expected type.</param>
         /// <param name="value">The value.</param>
-        public static void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, ulong value) where TBufferWriter : IBufferWriter<byte>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, ulong value) where TBufferWriter : IBufferWriter<byte>
         {
             ReferenceCodec.MarkValueField(writer.Session);
-            if (value <= uint.MaxValue)
+            var wireType = value switch
             {
-                if (value > 1UL << 20)
-                {
-                    writer.WriteFieldHeader(fieldIdDelta, expectedType, CodecFieldType, WireType.Fixed32);
-                    writer.WriteUInt32((uint)value);
-                }
-                else
-                {
-                    writer.WriteFieldHeader(fieldIdDelta, expectedType, CodecFieldType, WireType.VarInt);
-                    writer.WriteVarUInt32((uint)value);
-                }
-            }
-            else if (value > 1UL << 41)
-            {
-                writer.WriteFieldHeader(fieldIdDelta, expectedType, CodecFieldType, WireType.Fixed64);
-                writer.WriteUInt64(value);
-            }
-            else
-            {
-                writer.WriteFieldHeader(fieldIdDelta, expectedType, CodecFieldType, WireType.VarInt);
-                writer.WriteVarUInt64(value);
-            }
+                < 1 << 21 => WireType.VarInt,
+                <= uint.MaxValue => WireType.Fixed32,
+                < 1UL << 49 => WireType.VarInt,
+                _ => WireType.Fixed64,
+            };
+            writer.WriteFieldHeaderExpected(fieldIdDelta, wireType);
+
+            if (wireType == WireType.VarInt) writer.WriteVarUInt56(value);
+            else if (wireType == WireType.Fixed32) writer.WriteUInt32((uint)value);
+            else writer.WriteUInt64(value);
         }
 
         /// <summary>
@@ -708,29 +632,18 @@ namespace Orleans.Serialization.Codecs
         public static void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, ulong value, Type actualType) where TBufferWriter : IBufferWriter<byte>
         {
             ReferenceCodec.MarkValueField(writer.Session);
-            if (value <= uint.MaxValue)
+            var wireType = value switch
             {
-                if (value > 1UL << 20)
-                {
-                    writer.WriteFieldHeader(fieldIdDelta, expectedType, actualType, WireType.Fixed32);
-                    writer.WriteUInt32((uint)value);
-                }
-                else
-                {
-                    writer.WriteFieldHeader(fieldIdDelta, expectedType, actualType, WireType.VarInt);
-                    writer.WriteVarUInt32((uint)value);
-                }
-            }
-            else if (value > 1UL << 41)
-            {
-                writer.WriteFieldHeader(fieldIdDelta, expectedType, actualType, WireType.Fixed64);
-                writer.WriteUInt64(value);
-            }
-            else
-            {
-                writer.WriteFieldHeader(fieldIdDelta, expectedType, actualType, WireType.VarInt);
-                writer.WriteVarUInt64(value);
-            }
+                < 1 << 21 => WireType.VarInt,
+                <= uint.MaxValue => WireType.Fixed32,
+                < 1UL << 49 => WireType.VarInt,
+                _ => WireType.Fixed64,
+            };
+            writer.WriteFieldHeader(fieldIdDelta, expectedType, actualType, wireType);
+
+            if (wireType == WireType.VarInt) writer.WriteVarUInt56(value);
+            else if (wireType == WireType.Fixed32) writer.WriteUInt32((uint)value);
+            else writer.WriteUInt64(value);
         }
 
         /// <inheritdoc/>
@@ -757,35 +670,43 @@ namespace Orleans.Serialization.Codecs
     [RegisterSerializer]
     public sealed class Int128Codec : IFieldCodec<Int128>
     {
-        private static readonly Type CodecFieldType = typeof(Int128);
-
         /// <inheritdoc/>
         void IFieldCodec<Int128>.WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, Int128 value) => WriteField(ref writer, fieldIdDelta, expectedType, value);
 
         /// <summary>
-        /// Writes a field.
+        /// Writes a field without type info (expected type is statically known).
         /// </summary>
         /// <typeparam name="TBufferWriter">The buffer writer type.</typeparam>
         /// <param name="writer">The writer.</param>
         /// <param name="fieldIdDelta">The field identifier delta.</param>
-        /// <param name="expectedType">The expected type.</param>
         /// <param name="value">The value.</param>
-        public static void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, Int128 value) where TBufferWriter : IBufferWriter<byte>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Int128 value) where TBufferWriter : IBufferWriter<byte>
+            => WriteField(ref writer, fieldIdDelta, typeof(Int128), value);
+
+        private static void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, Int128 value) where TBufferWriter : IBufferWriter<byte>
         {
             if (value <= (Int128)long.MaxValue && value >= (Int128)long.MinValue)
             {
-                Int64Codec.WriteField(ref writer, fieldIdDelta, expectedType, (long)value, CodecFieldType);
+                Int64Codec.WriteField(ref writer, fieldIdDelta, expectedType, (long)value, typeof(Int128));
             }
             else
             {
                 ReferenceCodec.MarkValueField(writer.Session);
-                var byteCount = ((IBinaryInteger<Int128>)value).GetByteCount();
-                writer.WriteFieldHeader(fieldIdDelta, expectedType, CodecFieldType, WireType.LengthPrefixed);
-                writer.WriteVarUInt32((uint)byteCount);
-                Span<byte> bytes = byteCount < 64 ? stackalloc byte[64].Slice(0, byteCount) : new byte[byteCount];
-                ((IBinaryInteger<Int128>)value).TryWriteLittleEndian(bytes, out var bytesWritten);
-                Debug.Assert(bytesWritten == byteCount);
-                writer.Write(bytes);
+                const int byteCount = 128 / 8;
+                writer.WriteFieldHeader(fieldIdDelta, expectedType, typeof(Int128), WireType.LengthPrefixed);
+                writer.WriteVarUInt7(byteCount);
+                if (BitConverter.IsLittleEndian)
+                {
+                    writer.Write(MemoryMarshal.AsBytes(new Span<Int128>(ref value)));
+                }
+                else
+                {
+                    writer.EnsureContiguous(byteCount);
+                    ((IBinaryInteger<Int128>)value).TryWriteLittleEndian(writer.WritableSpan, out var bytesWritten);
+                    Debug.Assert(bytesWritten == byteCount);
+                    writer.AdvanceSpan(byteCount);
+                }
             }
         }
 
@@ -820,25 +741,21 @@ namespace Orleans.Serialization.Codecs
         internal static Int128 ReadRaw<TInput>(ref Reader<TInput> reader)
         {
             var byteCount = reader.ReadVarUInt32();
-            ReadOnlySpan<byte> bytes;
-            if (!reader.TryReadBytes((int)byteCount, out bytes))
-            {
-                bytes = reader.ReadBytes(byteCount);
-            }
+            if (byteCount != 128 / 8) throw new UnexpectedLengthPrefixValueException(nameof(Int128), 128 / 8, byteCount);
+            Unsafe.SkipInit(out Int128 res);
+            var bytes = MemoryMarshal.AsBytes(new Span<Int128>(ref res));
+            reader.ReadBytes(bytes);
 
-            if (!TryReadLittleEndian<Int128>(bytes, out var value))
-            {
-                ThrowReadFailure();
-            }
+            if (BitConverter.IsLittleEndian)
+                return res;
 
+            var done = TryReadLittleEndian<Int128>(bytes, out var value);
+            Debug.Assert(done);
             return value;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private static bool TryReadLittleEndian<T>(ReadOnlySpan<byte> source, out T value) where T : IBinaryInteger<T> => T.TryReadLittleEndian(source, isUnsigned: false, out value);
-
-        [DoesNotReturn]
-        private static void ThrowReadFailure() => throw new ArgumentException($"Failed to read {nameof(Int128)} value");
     }
 
     /// <summary>
@@ -847,35 +764,43 @@ namespace Orleans.Serialization.Codecs
     [RegisterSerializer]
     public sealed class UInt128Codec : IFieldCodec<UInt128>
     {
-        private static readonly Type CodecFieldType = typeof(UInt128);
-
         /// <inheritdoc/>
         void IFieldCodec<UInt128>.WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, UInt128 value) => WriteField(ref writer, fieldIdDelta, expectedType, value);
 
         /// <summary>
-        /// Writes a field.
+        /// Writes a field without type info (expected type is statically known).
         /// </summary>
         /// <typeparam name="TBufferWriter">The buffer writer type.</typeparam>
         /// <param name="writer">The writer.</param>
         /// <param name="fieldIdDelta">The field identifier delta.</param>
-        /// <param name="expectedType">The expected type.</param>
         /// <param name="value">The value.</param>
-        public static void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, UInt128 value) where TBufferWriter : IBufferWriter<byte>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, UInt128 value) where TBufferWriter : IBufferWriter<byte>
+            => WriteField(ref writer, fieldIdDelta, typeof(UInt128), value);
+
+        private static void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, UInt128 value) where TBufferWriter : IBufferWriter<byte>
         {
             if (value <= (UInt128)ulong.MaxValue)
             {
-                UInt64Codec.WriteField(ref writer, fieldIdDelta, expectedType, (ulong)value, CodecFieldType);
+                UInt64Codec.WriteField(ref writer, fieldIdDelta, expectedType, (ulong)value, typeof(UInt128));
             }
             else
             {
                 ReferenceCodec.MarkValueField(writer.Session);
-                var byteCount = ((IBinaryInteger<UInt128>)value).GetByteCount();
-                writer.WriteFieldHeader(fieldIdDelta, expectedType, CodecFieldType, WireType.LengthPrefixed);
-                writer.WriteVarUInt32((uint)byteCount);
-                Span<byte> bytes = byteCount < 64 ? stackalloc byte[64].Slice(0, byteCount) : new byte[byteCount];
-                ((IBinaryInteger<UInt128>)value).TryWriteLittleEndian(bytes, out var bytesWritten);
-                Debug.Assert(bytesWritten == byteCount);
-                writer.Write(bytes);
+                const int byteCount = 128 / 8;
+                writer.WriteFieldHeader(fieldIdDelta, expectedType, typeof(UInt128), WireType.LengthPrefixed);
+                writer.WriteVarUInt7(byteCount);
+                if (BitConverter.IsLittleEndian)
+                {
+                    writer.Write(MemoryMarshal.AsBytes(new Span<UInt128>(ref value)));
+                }
+                else
+                {
+                    writer.EnsureContiguous(byteCount);
+                    ((IBinaryInteger<UInt128>)value).TryWriteLittleEndian(writer.WritableSpan, out var bytesWritten);
+                    Debug.Assert(bytesWritten == byteCount);
+                    writer.AdvanceSpan(byteCount);
+                }
             }
         }
 
@@ -910,24 +835,20 @@ namespace Orleans.Serialization.Codecs
         internal static UInt128 ReadRaw<TInput>(ref Reader<TInput> reader)
         {
             var byteCount = reader.ReadVarUInt32();
-            ReadOnlySpan<byte> bytes;
-            if (!reader.TryReadBytes((int)byteCount, out bytes))
-            {
-                bytes = reader.ReadBytes(byteCount);
-            }
+            if (byteCount != 128 / 8) throw new UnexpectedLengthPrefixValueException(nameof(UInt128), 128 / 8, byteCount);
+            Unsafe.SkipInit(out UInt128 res);
+            var bytes = MemoryMarshal.AsBytes(new Span<UInt128>(ref res));
+            reader.ReadBytes(bytes);
 
-            if (!TryReadLittleEndian<UInt128>(bytes, out var value))
-            {
-                ThrowReadFailure();
-            }
+            if (BitConverter.IsLittleEndian)
+                return res;
 
+            var done = TryReadLittleEndian<UInt128>(bytes, out var value);
+            Debug.Assert(done);
             return value;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private static bool TryReadLittleEndian<T>(ReadOnlySpan<byte> source, out T value) where T : IBinaryInteger<T> => T.TryReadLittleEndian(source, isUnsigned: true, out value);
-
-        [DoesNotReturn]
-        private static void ThrowReadFailure() => throw new ArgumentException($"Failed to read {nameof(UInt128)} value");
     }
 }

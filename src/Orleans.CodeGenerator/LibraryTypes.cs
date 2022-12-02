@@ -118,6 +118,7 @@ namespace Orleans.CodeGenerator
                     new(Type("System.UInt128"), Type("Orleans.Serialization.Codecs.UInt128Codec")),
                     new(Type("System.Int128"), Type("Orleans.Serialization.Codecs.Int128Codec")),
                     new(Type("System.Half"), Type("Orleans.Serialization.Codecs.HalfCodec")),
+                    new(Type("System.Uri"), Type("Orleans.Serialization.Codecs.UriCodec")),
                 },
                 WellKnownCodecs = new WellKnownCodecDescription[]
                 {
@@ -126,7 +127,6 @@ namespace Orleans.CodeGenerator
                     new(Type("System.Collections.Generic.List`1"), Type("Orleans.Serialization.Codecs.ListCodec`1")),
                     new(Type("System.Collections.Generic.HashSet`1"), Type("Orleans.Serialization.Codecs.HashSetCodec`1")),
                     new(compilation.GetSpecialType(SpecialType.System_Nullable_T), Type("Orleans.Serialization.Codecs.NullableCodec`1")),
-                    new(Type("System.Uri"), Type("Orleans.Serialization.Codecs.UriCodec")),
                 },
                 StaticCopiers = new WellKnownCopierDescription[]
                 {
