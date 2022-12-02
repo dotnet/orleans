@@ -347,7 +347,7 @@ namespace Orleans.Runtime.Messaging
         {
             if (value is null)
             {
-                writer.WriteByte(1); // writer.WriteVarUInt32(0);
+                writer.WriteByte(1); // Equivalent to `writer.WriteVarUInt32(0);`
                 return;
             }
 
