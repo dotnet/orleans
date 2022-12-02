@@ -1,21 +1,22 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <PackageId>Microsoft.Orleans.GrainDirectory.Redis</PackageId>
-    <Title>Microsoft Orleans Grain Directory Redis Provider</Title>
-    <Description>Microsoft Orleans Grain Directory implementation that uses Redis</Description>
-    <PackageTags>$(PackageTags) Redis Grain Directory</PackageTags>
+    <PackageId>Microsoft.Orleans.Reminders.Redis</PackageId>
+    <Title>Microsoft Orleans Reminders Redis Provider</Title>
+    <Description>Microsoft Orleans Reminders implementation that uses Redis</Description>
+    <PackageTags>$(PackageTags) Redis Reminders</PackageTags>
     <TargetFrameworks>$(DefaultTargetFrameworks)</TargetFrameworks>
     <VersionSuffix Condition="$(VersionSuffix) == ''">beta1</VersionSuffix>
   </PropertyGroup>
 
   <ItemGroup>
     <PackageReference Include="StackExchange.Redis" />
-    <PackageReference Include="System.Diagnostics.PerformanceCounter" />
+    <PackageReference Include="Newtonsoft.Json" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="$(SourceRoot)src\Orleans.Runtime\Orleans.Runtime.csproj" />
+    <ProjectReference Include="$(SourceRoot)src\Orleans.Reminders\Orleans.Reminders.csproj" />
   </ItemGroup>
 
 </Project>
