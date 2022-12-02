@@ -81,11 +81,10 @@ namespace Orleans.Configuration
         public IPEndPoint SiloListeningEndpoint { get; set; }
 
         /// <summary>
-        /// Gets or sets the endpoint used to listen for silo to silo communication. 
+        /// Gets or sets the endpoint used to listen for client to silo communication. 
         /// If not set will default to <see cref="AdvertisedIPAddress"/> + <see cref="GatewayPort"/>
         /// </summary>
         public IPEndPoint GatewayListeningEndpoint { get; set; }
-
 
         internal IPEndPoint GetPublicSiloEndpoint() => new(AdvertisedIPAddress, SiloPort);
 
