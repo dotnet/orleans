@@ -5,6 +5,7 @@ using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 using Orleans.Serialization.Buffers;
 using Orleans.Serialization.Cloning;
+using Orleans.Serialization.GeneratedCodeHelpers;
 using Orleans.Serialization.Serializers;
 using Orleans.Serialization.WireProtocol;
 
@@ -192,12 +193,12 @@ namespace Orleans.Serialization.Codecs
             ReferenceCodec.MarkValueField(writer.Session);
             writer.WriteFieldHeader(fieldIdDelta, expectedType, typeof(WellKnownStringComparerCodec), WireType.TagDelimited);
 
-            UInt32Codec.WriteField(ref writer, 0, UInt32Codec.CodecFieldType, type);
-            UInt32Codec.WriteField(ref writer, 1, UInt32Codec.CodecFieldType, (uint)compareOptions);
+            UInt32Codec.WriteField(ref writer, 0, type);
+            UInt32Codec.WriteField(ref writer, 1, (uint)compareOptions);
 
             if (compareInfo is not null)
             {
-                Int32Codec.WriteField(ref writer, 1, typeof(int), compareInfo.LCID);
+                Int32Codec.WriteField(ref writer, 1, compareInfo.LCID);
             }
 
             writer.WriteEndObject();
@@ -249,25 +250,13 @@ namespace Orleans.Serialization.Codecs
     /// <typeparam name="T">The element type.</typeparam>
     [RegisterCopier]
     [RegisterSerializer]
-    public class EqualityComparerBaseCodec<T> : IBaseCodec<EqualityComparer<T>>, IBaseCopier<EqualityComparer<T>>
+    internal sealed class EqualityComparerBaseCodec<T> : IBaseCodec<EqualityComparer<T>>, IBaseCopier<EqualityComparer<T>>
     {
         /// <inheritdoc />
         public void DeepCopy(EqualityComparer<T> input, EqualityComparer<T> output, CopyContext context) { }
 
         /// <inheritdoc />
-        public void Deserialize<TInput>(ref Reader<TInput> reader, EqualityComparer<T> value)
-        {
-            while (true)
-            {
-                var header = reader.ReadFieldHeader();
-                if (header.IsEndBaseOrEndObject)
-                {
-                    break;
-                }
-
-                reader.ConsumeUnknownField(header);
-            }
-        }
+        public void Deserialize<TInput>(ref Reader<TInput> reader, EqualityComparer<T> value) => reader.ConsumeEndBaseOrEndObject();
 
         /// <inheritdoc />
         public void Serialize<TBufferWriter>(ref Writer<TBufferWriter> writer, EqualityComparer<T> value) where TBufferWriter : IBufferWriter<byte>
@@ -281,25 +270,13 @@ namespace Orleans.Serialization.Codecs
     /// <typeparam name="T">The element type.</typeparam>
     [RegisterCopier]
     [RegisterSerializer]
-    public class ComparerBaseCodec<T> : IBaseCodec<Comparer<T>>, IBaseCopier<Comparer<T>>
+    internal sealed class ComparerBaseCodec<T> : IBaseCodec<Comparer<T>>, IBaseCopier<Comparer<T>>
     {
         /// <inheritdoc />
         public void DeepCopy(Comparer<T> input, Comparer<T> output, CopyContext context) { }
 
         /// <inheritdoc />
-        public void Deserialize<TInput>(ref Reader<TInput> reader, Comparer<T> value)
-        {
-            while (true)
-            {
-                var header = reader.ReadFieldHeader();
-                if (header.IsEndBaseOrEndObject)
-                {
-                    break;
-                }
-
-                reader.ConsumeUnknownField(header);
-            }
-        }
+        public void Deserialize<TInput>(ref Reader<TInput> reader, Comparer<T> value) => reader.ConsumeEndBaseOrEndObject();
 
         /// <inheritdoc />
         public void Serialize<TBufferWriter>(ref Writer<TBufferWriter> writer, Comparer<T> value) where TBufferWriter : IBufferWriter<byte>

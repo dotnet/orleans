@@ -339,18 +339,7 @@ namespace Orleans.Runtime.Messaging
                 return string.Empty;
             }
 
-            string result;
-            if (reader.TryReadBytes(length, out var span))
-            {
-                result = Encoding.UTF8.GetString(span);
-            }
-            else
-            {
-                var bytes = reader.ReadBytes((uint)length);
-                result = Encoding.UTF8.GetString(bytes);
-            }
-
-            return result;
+            return StringCodec.ReadRaw(ref reader, (uint)length);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -358,32 +347,13 @@ namespace Orleans.Runtime.Messaging
         {
             if (value is null)
             {
-                writer.WriteVarUInt32(0);
+                writer.WriteByte(1); // Equivalent to `writer.WriteVarUInt32(0);`
                 return;
             }
 
             var numBytes = Encoding.UTF8.GetByteCount(value);
             writer.WriteVarUInt32((uint)numBytes + 1);
-            if (numBytes < 512)
-            {
-                writer.EnsureContiguous(numBytes);
-            }
-
-            var currentSpan = writer.WritableSpan;
-
-            // If there is enough room in the current span for the encoded data,
-            // then encode directly into the output buffer.
-            if (numBytes <= currentSpan.Length)
-            {
-                Encoding.UTF8.GetBytes(value, currentSpan);
-                writer.AdvanceSpan(numBytes);
-            }
-            else
-            {
-                // Note: there is room for optimization here.
-                Span<byte> bytes = Encoding.UTF8.GetBytes(value);
-                writer.Write(bytes);
-            }
+            StringCodec.WriteRaw(ref writer, value, numBytes);
         }
 
         private static void WriteRequestContext<TBufferWriter>(ref Writer<TBufferWriter> writer, Dictionary<string, object> value) where TBufferWriter : IBufferWriter<byte>
@@ -392,7 +362,7 @@ namespace Orleans.Runtime.Messaging
             foreach (var entry in value)
             {
                 WriteString(ref writer, entry.Key);
-                ObjectCodec.WriteField(ref writer, 0, null, entry.Value);
+                ObjectCodec.WriteField(ref writer, 0, entry.Value);
             }
         }
 

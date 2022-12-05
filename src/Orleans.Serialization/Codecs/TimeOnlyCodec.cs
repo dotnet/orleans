@@ -1,5 +1,6 @@
 using System;
 using System.Buffers;
+using System.Runtime.CompilerServices;
 using Orleans.Serialization.Buffers;
 using Orleans.Serialization.WireProtocol;
 
@@ -11,19 +12,21 @@ namespace Orleans.Serialization.Codecs;
 [RegisterSerializer]
 public sealed class TimeOnlyCodec : IFieldCodec<TimeOnly>
 {
-    /// <summary>
-    /// The codec field type
-    /// </summary>
-    public static readonly Type CodecFieldType = typeof(TimeOnly);
-
-    /// <inheritdoc/>
-    void IFieldCodec<TimeOnly>.WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, TimeOnly value) => WriteField(ref writer, fieldIdDelta, expectedType, value);
-
-    /// <inheritdoc/>
-    public static void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, TimeOnly value) where TBufferWriter : IBufferWriter<byte>
+    void IFieldCodec<TimeOnly>.WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, TimeOnly value)
     {
         ReferenceCodec.MarkValueField(writer.Session);
-        writer.WriteFieldHeader(fieldIdDelta, expectedType, CodecFieldType, WireType.Fixed64);
+        writer.WriteFieldHeader(fieldIdDelta, expectedType, typeof(TimeOnly), WireType.Fixed64);
+        writer.WriteInt64(value.Ticks);
+    }
+
+    /// <summary>
+    /// Writes a field without type info (expected type is statically known).
+    /// </summary>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, TimeOnly value) where TBufferWriter : IBufferWriter<byte>
+    {
+        ReferenceCodec.MarkValueField(writer.Session);
+        writer.WriteFieldHeaderExpected(fieldIdDelta, WireType.Fixed64);
         writer.WriteInt64(value.Ticks);
     }
 

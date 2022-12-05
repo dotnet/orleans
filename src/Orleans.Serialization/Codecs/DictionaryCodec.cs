@@ -50,14 +50,14 @@ namespace Orleans.Serialization.Codecs
 
             writer.WriteFieldHeader(fieldIdDelta, expectedType, value.GetType(), WireType.TagDelimited);
 
-            if (value.Comparer != EqualityComparer<TKey>.Default)
+            if (value.Comparer is var comparer && comparer != EqualityComparer<TKey>.Default)
             {
-                _comparerCodec.WriteField(ref writer, 0, typeof(IEqualityComparer<TKey>), value.Comparer);
+                _comparerCodec.WriteField(ref writer, 0, null, comparer);
             }
 
             if (value.Count > 0)
             {
-                UInt32Codec.WriteField(ref writer, 1, UInt32Codec.CodecFieldType, (uint)value.Count);
+                UInt32Codec.WriteField(ref writer, 1, (uint)value.Count);
                 uint innerFieldIdDelta = 1;
                 foreach (var element in value)
                 {

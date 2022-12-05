@@ -739,7 +739,7 @@ namespace Orleans.Serialization.Buffers
         /// Fills <paramref name="destination"/> with bytes read from the input.
         /// </summary>
         /// <param name="destination">The destination.</param>
-        public void ReadBytes(Span<byte> destination)
+        public void ReadBytes(scoped Span<byte> destination)
         {
             if (IsReadOnlySequenceInput || IsSpanInput)
             {
@@ -762,7 +762,7 @@ namespace Orleans.Serialization.Buffers
             }
         }
 
-        private void ReadBytesMultiSegment(Span<byte> dest)
+        private void ReadBytesMultiSegment(scoped Span<byte> dest)
         {
             while (true)
             {

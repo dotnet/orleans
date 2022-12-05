@@ -16,8 +16,6 @@ namespace Orleans.Runtime.Serialization
     [RegisterSerializer]
     public sealed class SiloAddressCodec : IFieldCodec<SiloAddress>
     {
-        private static readonly Type _codecFieldType = typeof(SiloAddress);
-
         /// <inheritdoc />
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, SiloAddress? value) where TBufferWriter : IBufferWriter<byte>
@@ -29,11 +27,11 @@ namespace Orleans.Runtime.Serialization
             }
 
             ReferenceCodec.MarkValueField(writer.Session);
-            writer.WriteStartObject(fieldIdDelta, expectedType, _codecFieldType);
-            IPAddressCodec.WriteField(ref writer, 0, IPAddressCodec.CodecFieldType, value.Endpoint.Address);
+            writer.WriteStartObject(fieldIdDelta, expectedType, typeof(SiloAddress));
+            IPAddressCodec.WriteField(ref writer, 0, value.Endpoint.Address);
             uint delta = 2;
-            if (value.Endpoint.Port != 0) UInt16Codec.WriteField(ref writer, delta = 1, UInt16Codec.CodecFieldType, (ushort)value.Endpoint.Port);
-            if (value.Generation != 0) Int32Codec.WriteField(ref writer, delta, Int32Codec.CodecFieldType, value.Generation);
+            if (value.Endpoint.Port != 0) UInt16Codec.WriteField(ref writer, delta = 1, (ushort)value.Endpoint.Port);
+            if (value.Generation != 0) Int32Codec.WriteField(ref writer, delta, value.Generation);
             writer.WriteEndObject();
         }
 

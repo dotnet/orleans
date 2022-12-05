@@ -49,7 +49,7 @@ namespace Orleans.Serialization.Codecs
 
             if (value.Count > 0)
             {
-                UInt32Codec.WriteField(ref writer, 1, UInt32Codec.CodecFieldType, (uint)value.Count);
+                UInt32Codec.WriteField(ref writer, 1, (uint)value.Count);
                 uint innerFieldIdDelta = 1;
                 foreach (var element in value)
                 {

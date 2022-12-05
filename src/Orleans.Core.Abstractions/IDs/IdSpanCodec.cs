@@ -28,7 +28,7 @@ public sealed class IdSpanCodec : IFieldCodec<IdSpan>
         ReferenceCodec.MarkValueField(writer.Session);
         writer.WriteFieldHeader(fieldIdDelta, expectedType, _codecType, WireType.LengthPrefixed);
         var bytes = value.AsSpan();
-        if (bytes.IsEmpty) writer.WriteVarUInt32(0);
+        if (bytes.IsEmpty) writer.WriteByte(1); // Equivalent to `writer.WriteVarUInt32(0);`
         else
         {
             writer.WriteVarUInt32((uint)(sizeof(int) + bytes.Length));
