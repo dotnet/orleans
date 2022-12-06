@@ -7,47 +7,15 @@ using Orleans.Hosting;
 using Orleans.TestingHost;
 using StackExchange.Redis;
 using Tester.Directories;
+using Tester.Redis.Utility;
 using TestExtensions;
 using UnitTests.Grains.Directories;
 using Xunit;
 using Xunit.Abstractions;
 
-namespace Tester.Redis
+namespace Tester.Redis.GrainDirectory
 {
-    [TestCategory("Redis"), TestCategory("Directory")]
-    public class RedisGrainDirectoryTests : GrainDirectoryTests<RedisGrainDirectory>
-    {
-        public RedisGrainDirectoryTests(ITestOutputHelper testOutput)
-            : base(testOutput)
-        {
-        }
-
-        protected override RedisGrainDirectory GetGrainDirectory()
-        {
-            var configuration = TestDefaultConfiguration.RedisConnectionString;
-
-            if (string.IsNullOrWhiteSpace(configuration))
-            {
-                throw new SkipException("No connection string found. Skipping");
-            }
-
-            var directoryOptions = new RedisGrainDirectoryOptions
-            {
-                ConfigurationOptions = ConfigurationOptions.Parse(configuration),
-                EntryExpiry = TimeSpan.FromMinutes(1),
-            };
-
-            var clusterOptions = Options.Create(new ClusterOptions { ServiceId = "SomeServiceId", ClusterId = Guid.NewGuid().ToString("N") });
-            var directory = new RedisGrainDirectory(
-                directoryOptions,
-                clusterOptions,
-                this.loggerFactory.CreateLogger<RedisGrainDirectory>());
-            directory.Initialize().GetAwaiter().GetResult();
-            return directory;
-        }
-    }
-
-    [TestCategory("Redis")]
+    [TestCategory("Redis"), TestCategory("Directory"), TestCategory("Functional")]
     public class RedisMultipleGrainDirectoriesTests : MultipleGrainDirectoriesTests
     {
         public class SiloConfigurator : ISiloConfigurator
@@ -63,7 +31,6 @@ namespace Tester.Redis
                             options.EntryExpiry = TimeSpan.FromMinutes(5);
                         })
                     .ConfigureLogging(builder => builder.AddFilter(typeof(RedisGrainDirectory).FullName, LogLevel.Debug));
-
             }
         }
 
