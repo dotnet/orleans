@@ -15,7 +15,7 @@ using Xunit.Abstractions;
 
 namespace Tester.Redis.Persistence
 {
-    public partial class RedisPersistenceGrainTests : GrainPersistenceTestsRunner, IClassFixture<RedisPersistenceGrainTests.Fixture>
+    public partial class RedisPersistenceGrainTests
     {
         [Fact]
         public async Task InitializeWithNoStateTest()
