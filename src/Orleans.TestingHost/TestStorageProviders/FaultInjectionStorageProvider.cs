@@ -9,6 +9,7 @@ using Orleans.Storage;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using System.Collections.Generic;
+using System.Threading;
 
 namespace Orleans.TestingHost
 {
@@ -121,7 +122,7 @@ namespace Orleans.TestingHost
             (realStorageProvider as ILifecycleParticipant<ISiloLifecycle>)?.Participate(lifecycle);
         }
 
-        public Task<IEnumerable<StorageEntry>> GetAll(CancellationToken cancellationToken) => throw new NotImplementedException();
+        public IAsyncEnumerable<StorageEntry> GetAll(CancellationToken cancellationToken) => throw new NotImplementedException();
     }
 
     /// <summary>

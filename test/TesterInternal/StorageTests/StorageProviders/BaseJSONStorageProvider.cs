@@ -16,6 +16,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Threading;
 using System.Threading.Tasks;
 using Newtonsoft.Json;
 using Orleans;
@@ -133,7 +134,7 @@ namespace Samples.StorageProviders
             grainState.State = data;
         }
 
-        public Task<IEnumerable<StorageEntry>> GetAll(CancellationToken cancellationToken) => throw new NotImplementedException();
+        public IAsyncEnumerable<StorageEntry> GetAll(CancellationToken cancellationToken) => throw new NotImplementedException();
     }
 
 }

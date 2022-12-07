@@ -17,4 +17,8 @@
     <ProjectReference Include="..\Orleans.Runtime\Orleans.Runtime.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <PackageReference Include="System.Memory.Data" Version="7.0.0" />
+  </ItemGroup>
+
 </Project>

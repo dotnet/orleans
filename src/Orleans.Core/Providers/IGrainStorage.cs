@@ -5,6 +5,7 @@ using Orleans.Runtime;
 using System.Net;
 using System.Collections.Generic;
 using System.Threading;
+using System.Runtime.CompilerServices;
 
 namespace Orleans.Storage
 {
@@ -13,6 +14,13 @@ namespace Orleans.Storage
         public string Name { get; }
         public GrainReference GrainReference { get; }
         public IGrainState GrainState { get; }
+
+        public StorageEntry(string name, GrainReference grainReference, IGrainState grainState)
+        {
+            this.Name = name;
+            this.GrainReference = grainReference;
+            this.GrainState = grainState;
+        }
     }
 
     /// <summary>
@@ -45,7 +53,7 @@ namespace Orleans.Storage
         /// Get all entries in storage
         /// </summary>
         /// <returns>The entries in storage</returns>
-        Task<IEnumerable<StorageEntry>> GetAll(CancellationToken cancellationToken);
+        IAsyncEnumerable<StorageEntry> GetAll(CancellationToken cancellationToken);
     }
 
     /// <summary>

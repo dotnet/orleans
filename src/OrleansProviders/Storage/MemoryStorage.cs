@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -133,7 +134,7 @@ namespace Orleans.Storage
         }
 
         public void Dispose() => storageGrains = null;
-        public Task<IEnumerable<StorageEntry>> GetAll(CancellationToken cancellationToken) => throw new NotImplementedException();
+        public IAsyncEnumerable<StorageEntry> GetAll(CancellationToken cancellationToken) => throw new NotImplementedException();
     }
 
     /// <summary>

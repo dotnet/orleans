@@ -18,6 +18,7 @@ using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 using Orleans.Configuration.Overrides;
 using Orleans.Runtime.Configuration;
+using System.Runtime.CompilerServices;
 
 namespace Orleans.Storage
 {
@@ -615,6 +616,6 @@ namespace Orleans.Storage
             return serializers;
         }
 
-        public Task<IEnumerable<StorageEntry>> GetAll(CancellationToken cancellationToken) => throw new NotImplementedException();
+        public IAsyncEnumerable<StorageEntry> GetAll(CancellationToken cancellationToken) => throw new NotImplementedException();
     }
 }
