@@ -15,6 +15,7 @@
 //*********************************************************
 
 using System;
+using System.Collections.Generic;
 using System.Threading.Tasks;
 using Newtonsoft.Json;
 using Orleans;
@@ -131,6 +132,8 @@ namespace Samples.StorageProviders
             object data = JsonConvert.DeserializeObject(entityData, grainState.State.GetType());
             grainState.State = data;
         }
+
+        public Task<IEnumerable<StorageEntry>> GetAll(CancellationToken cancellationToken) => throw new NotImplementedException();
     }
 
 }

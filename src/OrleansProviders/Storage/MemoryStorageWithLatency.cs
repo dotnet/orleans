@@ -7,6 +7,7 @@ using Orleans.Runtime;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Orleans.Configuration;
+using System.Collections.Generic;
 
 namespace Orleans.Storage
 {
@@ -39,7 +40,7 @@ namespace Orleans.Storage
     /// </code>
     /// </example>
     [DebuggerDisplay("MemoryStore:{Name},WithLatency:{latency}")]
-    public class MemoryGrainStorageWithLatency :IGrainStorage
+    public class MemoryGrainStorageWithLatency : IGrainStorage
     {
         private const int NUM_STORE_GRAINS = 1;
         private MemoryGrainStorage baseGranStorage;
@@ -111,5 +112,7 @@ namespace Orleans.Storage
                 throw new AggregateException(error);
             }
         }
+
+        public Task<IEnumerable<StorageEntry>> GetAll(CancellationToken cancellationToken) => throw new NotImplementedException();
     }
 }

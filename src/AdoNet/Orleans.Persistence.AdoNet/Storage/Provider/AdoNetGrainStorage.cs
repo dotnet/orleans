@@ -614,5 +614,7 @@ namespace Orleans.Storage
 
             return serializers;
         }
+
+        public Task<IEnumerable<StorageEntry>> GetAll(CancellationToken cancellationToken) => throw new NotImplementedException();
     }
 }
