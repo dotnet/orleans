@@ -17,7 +17,7 @@ namespace Tester.Directories
             builder.Options.InitialSilosCount = 2;
         }
 
-        [SkippableFact, TestCategory("Directory"), TestCategory("Functionals")]
+        [SkippableFact, TestCategory("Directory"), TestCategory("Functional")]
         public async Task PingGrain()
         {
             var grainOnPrimary = await GetGrainOnPrimary().WithTimeout(TimeSpan.FromSeconds(5), "Could not get a grain on the primary silo");

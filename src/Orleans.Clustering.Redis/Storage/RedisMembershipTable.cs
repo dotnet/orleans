@@ -62,15 +62,10 @@ namespace Orleans.Clustering.Redis
 
             if (updateTableVersion)
             {
-                if (tableVersion.Version == 0 && "0".Equals(tableVersion.VersionEtag, StringComparison.Ordinal))
-                {
-                    await _db.HashSetAsync(_clusterKey, TableVersionKey, SerializeVersion(tableVersion), When.NotExists);
-                }
-
                 tx.HashSetAsync(_clusterKey, TableVersionKey, SerializeVersion(tableVersion)).Ignore();
             }
-
             var versionCondition = tx.AddCondition(Condition.HashEqual(_clusterKey, TableVersionKey, SerializeVersion(Predeccessor(tableVersion))));
+
             ConditionResult insertCondition = null;
             if (allowInsertOnly)
             {
@@ -183,7 +178,7 @@ namespace Orleans.Clustering.Redis
             var entries = await this.ReadAll();
             foreach (var (entry, _) in entries.Members)
             {
-                if (entry.Status == SiloStatus.Dead
+                if (entry.Status != SiloStatus.Active
                     && new DateTime(Math.Max(entry.IAmAliveTime.Ticks, entry.StartTime.Ticks), DateTimeKind.Utc) < beforeDate)
                 {
                     await _db.HashDeleteAsync(_clusterKey, entry.SiloAddress.ToString());
