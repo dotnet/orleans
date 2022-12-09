@@ -314,7 +314,7 @@ namespace Orleans.Storage
 
         public async IAsyncEnumerable<StorageEntry> GetAll([EnumeratorCancellation] CancellationToken cancellationToken)
         {
-            var regex = new Regex("(?<name>\\w+)-(?<reference>\\w+).json");
+            var regex = new Regex("(?<name>[^-]+)-(?<reference>[^-]+).json");
             await foreach (var item in this.container.GetBlobsAsync(cancellationToken: cancellationToken))
             {
                 var match = regex.Match(item.Name);

@@ -55,32 +55,41 @@ namespace Orleans.Persistence.Migration
             Type grainType = LookupType(grainClass) ?? throw new ArgumentException("Grain type not found");
             var type = _grainTypeResolver.GetGrainType(grainType);
 
-            // Get GrainInterfaceType
-            Type iface = null;
-            if (_grainTypeManager.GrainTypeResolver.TryGetInterfaceData(grainReference.InterfaceId, out var interfaceData))
+            GrainInterfaceType interfaceType;
+            try
             {
-                if (interfaceData.Interface.IsGenericType)
+                // Get GrainInterfaceType
+                Type iface = null;
+                if (_grainTypeManager.GrainTypeResolver.TryGetInterfaceData(grainReference.InterfaceId, out var interfaceData))
                 {
-                    // We cannot use grainReference.InterfaceName because it doesn't match
-                    foreach (var candidate in grainType.GetInterfaces())
+                    if (interfaceData.Interface.IsGenericType)
                     {
-                        if (candidate.Name.Equals(interfaceData.Interface.Name, StringComparison.OrdinalIgnoreCase))
+                        // We cannot use grainReference.InterfaceName because it doesn't match
+                        foreach (var candidate in grainType.GetInterfaces())
                         {
-                            iface = candidate;
-                            break;
+                            if (candidate.Name.Equals(interfaceData.Interface.Name, StringComparison.OrdinalIgnoreCase))
+                            {
+                                iface = candidate;
+                                break;
+                            }
                         }
                     }
+                    else
+                    {
+                        iface = interfaceData.Interface;
+                    }
                 }
-                else
+                if (iface == null)
                 {
-                    iface = interfaceData.Interface;
+                    throw new ArgumentException("Grain interface type not found");
                 }
+                interfaceType = _grainInterfaceTypeResolver.GetGrainInterfaceType(iface);
             }
-            if (iface == null)
+            catch (InvalidOperationException)
             {
-                throw new ArgumentException("Grain interface type not found");
+                // The GrainReference doesn't include the interface. It's fine, ignore it and let interfaceType to be blank
+                interfaceType = default;
             }
-            var interfaceType = _grainInterfaceTypeResolver.GetGrainInterfaceType(iface);
 
             // Extract Key
             IdSpan key;

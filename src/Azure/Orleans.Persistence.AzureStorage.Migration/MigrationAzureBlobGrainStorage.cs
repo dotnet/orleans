@@ -351,7 +351,7 @@ namespace Orleans.Storage.Migration.AzureStorage
         public IAsyncEnumerable<StorageEntry> GetAll(CancellationToken cancellationToken) => throw new NotImplementedException();
     }
 
-    public static class AzureBlobGrainStorageFactory
+    public static class MigrationAzureBlobGrainStorageFactory
     {
         public static IGrainStorage Create(IServiceProvider services, string name)
         {
