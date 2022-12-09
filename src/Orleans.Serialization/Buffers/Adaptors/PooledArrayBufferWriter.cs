@@ -195,51 +195,18 @@ public struct PooledArrayBufferWriter : IBufferWriter<byte>, IDisposable
         private const int MinimumBlockSize = 4096;
         private static readonly ConcurrentBag<SequenceSegment> Blocks = new();
 
-<<<<<<< HEAD
         public static SequenceSegment Rent(int size = -1) => size <= MinimumBlockSize && Blocks.TryTake(out var block) ? block : new(size);
-=======
-#if NET6_0_OR_GREATER
-        public void InitializeLargeSegment(int length)
-        {
-            InitializeSegment((int)BitOperations.RoundUpToPowerOf2((uint)length));
-        }
-#else
-        public void InitializeLargeSegment(int length)
-        {
-            InitializeSegment(NextPowerOf2(length));
-
-            int NextPowerOf2(int n)
-            {
-                if (n < 0) return 0;
-
-                n--;
-                n |= n >> 1;
-                n |= n >> 2;
-                n |= n >> 4;
-                n |= n >> 8;
-                n |= n >> 16;
-                n++;
-
-                return n;
-            }
-        }
-#endif
->>>>>>> netstandard2.1 compatible serialization
 
         private SequenceSegment(int length)
         {
             if (length <= MinimumBlockSize)
             {
-<<<<<<< HEAD
-                var pinnedArray = GC.AllocateUninitializedArray<byte>(MinimumBlockSize, pinned: true);
-=======
 #if NET6_0_OR_GREATER
-                var pinnedArray = GC.AllocateUninitializedArray<byte>(SequenceSegmentPool.MinimumBlockSize, pinned: true);
+                var pinnedArray = GC.AllocateUninitializedArray<byte>(MinimumBlockSize, pinned: true);
 #else
-                var pinnedArray = new byte[SequenceSegmentPool.MinimumBlockSize];
+                var pinnedArray = new byte[MinimumBlockSize];
                 GCHandle.Alloc(pinnedArray, GCHandleType.Pinned);
 #endif
->>>>>>> netstandard2.1 compatible serialization
                 Array = pinnedArray;
             }
             else

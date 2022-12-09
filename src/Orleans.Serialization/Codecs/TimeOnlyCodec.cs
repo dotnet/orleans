@@ -1,3 +1,4 @@
+#if NET6_0_OR_GREATER
 using System;
 using System.Buffers;
 using System.Runtime.CompilerServices;
@@ -41,3 +42,4 @@ public sealed class TimeOnlyCodec : IFieldCodec<TimeOnly>
         return new TimeOnly(reader.ReadInt64());
     }
 }
+#endif

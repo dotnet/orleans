@@ -664,6 +664,7 @@ namespace Orleans.Serialization.Codecs
         }
     }
 
+#if NET7_0_OR_GREATER
     /// <summary>
     /// Serializer for <see cref="Int128"/>.
     /// </summary>
@@ -851,4 +852,5 @@ namespace Orleans.Serialization.Codecs
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private static bool TryReadLittleEndian<T>(ReadOnlySpan<byte> source, out T value) where T : IBinaryInteger<T> => T.TryReadLittleEndian(source, isUnsigned: true, out value);
     }
+#endif
 }

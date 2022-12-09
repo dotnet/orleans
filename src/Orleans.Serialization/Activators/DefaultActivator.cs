@@ -21,7 +21,7 @@ namespace Orleans.Serialization.Activators
             var il = method.GetILGenerator();
             il.Emit(OpCodes.Newobj, ctor);
             il.Emit(OpCodes.Ret);
-            return method.CreateDelegate<Func<T>>();
+            return (Func<T>)method.CreateDelegate(typeof(Func<T>));
         }
 
         public T Create() => _constructor is { } ctor ? ctor() : Unsafe.As<T>(FormatterServices.GetUninitializedObject(_type));

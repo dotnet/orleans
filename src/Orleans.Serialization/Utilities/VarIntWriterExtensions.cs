@@ -1,10 +1,4 @@
 using System.Runtime.CompilerServices;
-<<<<<<< HEAD
-=======
-using System.Runtime.InteropServices;
-using Orleans.Serialization.Buffers;
-using Orleans.Serialization.Utilities;
->>>>>>> netstandard2.1 compatible serialization
 
 namespace Orleans.Serialization.Buffers
 {

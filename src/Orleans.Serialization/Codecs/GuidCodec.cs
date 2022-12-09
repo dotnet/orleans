@@ -41,7 +41,7 @@ namespace Orleans.Serialization.Codecs
 
         /// <inheritdoc/>
         Guid IFieldCodec<Guid>.ReadValue<TInput>(ref Reader<TInput> reader, Field field) => ReadValue(ref reader, field);
-                
+
         /// <summary>
         /// Reads a value.
         /// </summary>
@@ -72,7 +72,17 @@ namespace Orleans.Serialization.Codecs
         {
             if (BitConverter.IsLittleEndian)
             {
+#if NET7_0_OR_GREATER
                 writer.Write(MemoryMarshal.AsBytes(new Span<Guid>(ref value)));
+#else
+                writer.EnsureContiguous(Width);
+                if (value.TryWriteBytes(writer.WritableSpan))
+                {
+                    writer.AdvanceSpan(Width);
+                    return;
+                }
+                writer.Write(value.ToByteArray());
+#endif
             }
             else
             {
@@ -89,6 +99,7 @@ namespace Orleans.Serialization.Codecs
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static Guid ReadRaw<TInput>(ref Reader<TInput> reader)
         {
+#if NET7_0_OR_GREATER
             Unsafe.SkipInit(out Guid res);
             var bytes = MemoryMarshal.AsBytes(new Span<Guid>(ref res));
             reader.ReadBytes(bytes);
@@ -97,6 +108,20 @@ namespace Orleans.Serialization.Codecs
                 return res;
 
             return new Guid(bytes);
+#else
+            if (reader.TryReadBytes(Width, out var readOnly))
+            {
+                return new Guid(readOnly);
+            }
+
+            Span<byte> bytes = stackalloc byte[Width];
+            for (var i = 0; i < Width; i++)
+            {
+                bytes[i] = reader.ReadByte();
+            }
+
+            return new Guid(bytes);
+#endif
         }
     }
 }

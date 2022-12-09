@@ -27,7 +27,11 @@ namespace Orleans.Serialization.Codecs
 
         /// <inheritdoc/>
         public override void ConvertToSurrogate(ConcurrentDictionary<TKey, TValue> value, ref ConcurrentDictionarySurrogate<TKey, TValue> surrogate)
+#if NET6_0_OR_GREATER
             => surrogate.Values = new(value, value.Comparer);
+#else
+            => surrogate.Values = new(value);
+#endif
     }
 
     /// <summary>
@@ -81,7 +85,11 @@ namespace Orleans.Serialization.Codecs
                 return context.DeepCopy(input);
             }
 
+#if NET6_0_OR_GREATER
             result = new(input.Comparer);
+#else
+            result = new();
+#endif
             context.RecordCopy(input, result);
             foreach (var pair in input)
             {
