@@ -64,7 +64,7 @@ namespace Orleans.BroadcastChannel
         public static IBroadcastChannelProvider Create(IServiceProvider sp, string name)
         {
             var opt = sp.GetOptionsByName<BroadcastChannelOptions>(name);
-            return ActivatorUtilities.CreateInstance<BroadcastChannelProvider>(sp, name, sp.GetOptionsByName<BroadcastChannelOptions>(name));
+            return ActivatorUtilities.CreateInstance<BroadcastChannelProvider>(sp, name, opt);
         }
     }
 }
