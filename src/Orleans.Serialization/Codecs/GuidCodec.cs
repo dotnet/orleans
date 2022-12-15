@@ -115,10 +115,7 @@ namespace Orleans.Serialization.Codecs
             }
 
             Span<byte> bytes = stackalloc byte[Width];
-            for (var i = 0; i < Width; i++)
-            {
-                bytes[i] = reader.ReadByte();
-            }
+            reader.ReadBytes(bytes);
 
             return new Guid(bytes);
 #endif
