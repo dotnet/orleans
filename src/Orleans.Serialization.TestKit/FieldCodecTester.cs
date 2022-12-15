@@ -26,7 +26,11 @@ namespace Orleans.Serialization.TestKit
 
         protected FieldCodecTester(ITestOutputHelper output)
         {
+#if NET6_0_OR_GREATER
             var seed = Random.Shared.Next();
+#else
+            var seed = new Random().Next();
+#endif
             output.WriteLine($"Random seed: {seed}");
             Random = new(seed);
             var services = new ServiceCollection();
@@ -121,7 +125,7 @@ namespace Orleans.Serialization.TestKit
         public void CorrectlyAdvancesReferenceCounter()
         {
             var pipe = new Pipe();
-            using var writerSession = _sessionPool.GetSession(); 
+            using var writerSession = _sessionPool.GetSession();
             var writer = Writer.Create(pipe.Writer, writerSession);
             var writerCodec = CreateCodec();
             var beforeReference = writer.Session.ReferencedObjects.CurrentReferenceId;
@@ -139,7 +143,7 @@ namespace Orleans.Serialization.TestKit
             pipe.Writer.Complete();
 
             _ = pipe.Reader.TryRead(out var readResult);
-            using var readerSession = _sessionPool.GetSession(); 
+            using var readerSession = _sessionPool.GetSession();
             var reader = Reader.Create(readResult.Buffer, readerSession);
 
             var previousPos = reader.Position;
