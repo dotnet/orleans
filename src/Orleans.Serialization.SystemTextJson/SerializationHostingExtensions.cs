@@ -45,8 +45,8 @@ public static class SerializationHostingExtensions
     /// <param name="configureOptions">A delegate used to configure the options for the JSON serializer.</param>
     public static ISerializerBuilder AddJsonSerializer(
         this ISerializerBuilder serializerBuilder,
-        Func<Type, bool> isSerializable = null,
-        Func<Type, bool> isCopyable = null,
+        Func<Type, bool> isSerializable,
+        Func<Type, bool> isCopyable,
         Action<OptionsBuilder<JsonCodecOptions>> configureOptions = null)
     {
         var services = serializerBuilder.Services;
