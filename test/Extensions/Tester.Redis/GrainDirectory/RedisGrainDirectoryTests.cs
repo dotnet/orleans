@@ -18,8 +18,7 @@ namespace Tester.Redis.GrainDirectory
     [TestCategory("Redis"), TestCategory("Directory"), TestCategory("Functional")]
     public class RedisGrainDirectoryTests : GrainDirectoryTests<RedisGrainDirectory>
     {
-        public RedisGrainDirectoryTests(ITestOutputHelper testOutput)
-            : base(testOutput)
+        public RedisGrainDirectoryTests(ITestOutputHelper testOutput) : base(testOutput)
         {
         }
 

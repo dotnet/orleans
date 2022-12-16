@@ -5,17 +5,19 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 using Orleans.Reminders.Redis;
+using Orleans.Runtime;
 using Orleans.TestingHost;
 using Tester.Redis.Utility;
 using TestExtensions;
 using UnitTests;
+using UnitTests.GrainInterfaces;
 using UnitTests.RemindersTest;
 using Xunit;
 
 namespace Tester.Redis.Reminders
 {
     [TestCategory("Redis"), TestCategory("Reminders"), TestCategory("Functional")]
-    public partial class RedisRemindersTableTests : ReminderTableTestsBase
+    public class RedisRemindersTableTests : ReminderTableTestsBase
     {
         public RedisRemindersTableTests(ConnectionStringFixture fixture, TestEnvironmentFixture clusterFixture) : base (fixture, clusterFixture, CreateFilters())
         {
