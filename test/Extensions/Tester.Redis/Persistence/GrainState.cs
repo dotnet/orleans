@@ -15,6 +15,6 @@ namespace Tester.Redis.Persistence
         [Id(3)]
         public Guid GuidValue { get; set; }
         [Id(4)]
-        public ITestGrain GrainValue { get; set; }
+        public IGrainStorageGenericGrain<GrainState> GrainValue { get; set; }
     }
 }

@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
 using Orleans.TestingHost;
+using StackExchange.Redis;
 using Tester.Redis.Utility;
 using TestExtensions;
 using TestExtensions.Runners;
@@ -61,6 +62,19 @@ namespace Tester.Redis.Persistence
         {
             this.fixture = fixture;
             this.fixture.EnsurePreconditionsMet();
+
+            var redisOptions = ConfigurationOptions.Parse(TestDefaultConfiguration.RedisConnectionString);
+            var redis = ConnectionMultiplexer.ConnectAsync(redisOptions).Result;
+            this.database = redis.GetDatabase();
+
+            this.state = new()
+            {
+                DateTimeValue = DateTime.UtcNow,
+                GuidValue = Guid.NewGuid(),
+                IntValue = 12345,
+                StringValue = "string value",
+                GrainValue = fixture.GrainFactory.GetGrain<IGrainStorageGenericGrain<GrainState>>(999)
+            };
         }
     }
 }

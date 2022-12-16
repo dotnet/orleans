@@ -17,8 +17,13 @@ namespace Tester.Redis.Persistence
 {
     public partial class RedisPersistenceGrainTests
     {
+        // Redis specific tests
+
+        private GrainState state;
+        private IDatabase database;
+
         [Fact]
-        public async Task InitializeWithNoStateTest()
+        public async Task Redis_InitializeWithNoStateTest()
         {
             var grain = fixture.GrainFactory.GetGrain<IGrainStorageGenericGrain<GrainState>>(0);
             var result = await grain.DoRead();
@@ -33,16 +38,26 @@ namespace Tester.Redis.Persistence
         }
 
         [Fact]
-        public async Task TestStaticIdentifierGrains()
+        public async Task Redis_TestStaticIdentifierGrains()
         {
             var grain = fixture.GrainFactory.GetGrain<IGrainStorageGenericGrain<GrainState>>(12345);
-            GrainState state = new() {
-                DateTimeValue=DateTime.UtcNow,
-                GuidValue=Guid.NewGuid(),
-                IntValue=12345,
-                StringValue="string value",
-                GrainValue=fixture.GrainFactory.GetGrain<ITestGrain>(2222)
-            };
+            await grain.DoWrite(state);
+
+            var grain2 = fixture.GrainFactory.GetGrain<IGrainStorageGenericGrain<GrainState>>(12345);
+            var result = await grain2.DoRead();
+            Assert.Equal(result.StringValue, state.StringValue);
+            Assert.Equal(result.IntValue, state.IntValue);
+            Assert.Equal(result.DateTimeValue, state.DateTimeValue);
+            Assert.Equal(result.GuidValue, state.GuidValue);
+            Assert.Equal(result.GrainValue, state.GrainValue);
+        }
+
+        [Fact]
+        public async Task Redis_TestRedisScriptCacheClearBeforeGrainWriteState()
+        {
+            var grain = fixture.GrainFactory.GetGrain<IGrainStorageGenericGrain<GrainState>>(1111);
+
+            await database.ExecuteAsync("SCRIPT", "FLUSH", "SYNC");
             await grain.DoWrite(state);
 
             var result = await grain.DoRead();
@@ -53,41 +68,17 @@ namespace Tester.Redis.Persistence
             Assert.Equal(result.GrainValue, state.GrainValue);
         }
 
-        //[Fact]
-        //public async Task TestRedisScriptCacheClearBeforeGrainWriteState()
-        //{
-        //    var grain = fixture.GrainFactory.GetGrain<ITestGrain>(1111);
-        //    var now = DateTime.UtcNow;
-        //    var guid = Guid.NewGuid();
+        [Fact]
+        public async Task Redis_DoubleActivationETagConflictSimulation()
+        {
+            var grain = fixture.GrainFactory.GetGrain<IGrainStorageGenericGrain<GrainState>>(54321);
+            var data = await grain.DoRead();
 
-        //    await _fixture.Database.ExecuteAsync("SCRIPT", "FLUSH", "SYNC");
-        //    await grain.Set("string value", 12345, now, guid, fixture.GrainFactory.GetGrain<ITestGrain>(2222));
+            var key = grain.GetGrainId().ToString();
+            await database.HashSetAsync(key, new[] { new HashEntry("etag", "derp") });
 
-        //    var result = await grain.Get();
-        //    Assert.Equal("string value", result.Item1);
-        //    Assert.Equal(12345, result.Item2);
-        //    Assert.Equal(now, result.Item3);
-        //    Assert.Equal(guid, result.Item4);
-        //    Assert.Equal(2222, result.Item5.GetPrimaryKeyLong());
-        //}
-
-        //[Fact]
-        //public async Task Double_Activation_ETag_Conflict_Simulation()
-        //{
-        //    var now = DateTime.UtcNow;
-        //    var guid = Guid.NewGuid();
-        //    var grain = fixture.GrainFactory.GetGrain<ITestGrain>(54321);
-        //    var grainId = grain.GetGrainId();
-
-        //    var stuff = await grain.Get();
-        //    var scheduler = TaskScheduler.Current;
-
-        //    var key = grainId.ToString();
-        //    await _fixture.Database.HashSetAsync(key, new[] { new HashEntry("etag", "derp") });
-
-        //    var otherGrain = fixture.GrainFactory.GetGrain<ITestGrain>(2222);
-        //    await Assert.ThrowsAsync<InconsistentStateException>(() => grain.Set("string value", 12345, now, guid, otherGrain));
-        //}
+            await Assert.ThrowsAsync<InconsistentStateException>(() => grain.DoWrite(state));
+        }
 
     }
 }
