@@ -152,10 +152,6 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Orleans.Connections.Securit
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Orleans.GrainDirectory.AzureStorage", "src\Azure\Orleans.GrainDirectory.AzureStorage\Orleans.GrainDirectory.AzureStorage.csproj", "{16B9B850-ED3B-4B45-B0F2-3F802D44F382}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Orleans.GrainDirectory.Redis", "src\Orleans.GrainDirectory.Redis\Orleans.GrainDirectory.Redis.csproj", "{CCEF897C-F4F8-48F0-8F95-CC1487EE2936}"
-EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Tester.Redis", "test\Extensions\Tester.Redis\Tester.Redis.csproj", "{F13247A0-70C9-4200-9CB1-2002CB8105E0}"
-EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Orleans.Hosting.Kubernetes", "src\Orleans.Hosting.Kubernetes\Orleans.Hosting.Kubernetes.csproj", "{D1214CD3-EB99-4420-9E30-A50ACFD66A48}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Orleans.Streaming", "src\Orleans.Streaming\Orleans.Streaming.csproj", "{65D8F6B3-DEE2-412B-95F2-77274461D58C}"
@@ -206,11 +202,15 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Orleans.Reminders", "src\Or
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Redis", "Redis", "{A734945A-36DC-485E-B84D-3C2D395BC7BE}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Orleans.Clustering.Redis", "src\Orleans.Clustering.Redis\Orleans.Clustering.Redis.csproj", "{671AE42C-974A-467B-BE89-0A3F706B5B21}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Orleans.Clustering.Redis", "src\Redis\Orleans.Clustering.Redis\Orleans.Clustering.Redis.csproj", "{671AE42C-974A-467B-BE89-0A3F706B5B21}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Orleans.Persistence.Redis", "src\Orleans.Persistence.Redis\Orleans.Persistence.Redis.csproj", "{28B35216-0C6E-4CF1-8C14-7D9A4BE161A5}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Orleans.Persistence.Redis", "src\Redis\Orleans.Persistence.Redis\Orleans.Persistence.Redis.csproj", "{28B35216-0C6E-4CF1-8C14-7D9A4BE161A5}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Orleans.Reminders.Redis", "src\Orleans.Reminders.Redis\Orleans.Reminders.Redis.csproj", "{2268B639-02B8-4903-B719-65F7EBD05D52}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Orleans.Reminders.Redis", "src\Redis\Orleans.Reminders.Redis\Orleans.Reminders.Redis.csproj", "{2268B639-02B8-4903-B719-65F7EBD05D52}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Orleans.GrainDirectory.Redis", "src\Redis\Orleans.GrainDirectory.Redis\Orleans.GrainDirectory.Redis.csproj", "{CCEF897C-F4F8-48F0-8F95-CC1487EE2936}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Tester.Redis", "test\Extensions\Tester.Redis\Tester.Redis.csproj", "{F13247A0-70C9-4200-9CB1-2002CB8105E0}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
