@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
+using Orleans.Runtime;
 using Orleans.Storage;
 using Orleans.TestingHost;
 using StackExchange.Redis;
@@ -51,13 +52,26 @@ namespace Tester.Redis.Persistence
                     });
                 }
             }
+
+            protected override void CheckPreconditionsOrThrow()
+            {
+                if (string.IsNullOrWhiteSpace(TestDefaultConfiguration.RedisConnectionString))
+                {
+                    throw new SkipException("TestDefaultConfiguration.RedisConnectionString is empty");
+                }
+            }
         }
 
         private Fixture fixture;
 
         public RedisPersistenceGrainTests(ITestOutputHelper output, Fixture fixture) : base(output, fixture)
         {
-            this.fixture = fixture;
+            try
+            {
+                this.fixture = fixture;
+            }
+            catch(OrleansConfigurationException) { }
+
             this.fixture.EnsurePreconditionsMet();
 
             var redisOptions = ConfigurationOptions.Parse(TestDefaultConfiguration.RedisConnectionString);
@@ -79,7 +93,7 @@ namespace Tester.Redis.Persistence
         private GrainState state;
         private IDatabase database;
 
-        [Fact]
+        [SkippableFact]
         public async Task Redis_InitializeWithNoStateTest()
         {
             var grain = fixture.GrainFactory.GetGrain<IGrainStorageGenericGrain<GrainState>>(0);
@@ -94,7 +108,7 @@ namespace Tester.Redis.Persistence
             //Assert.Equal(default(ITestGrain), result.GrainValue);
         }
 
-        [Fact]
+        [SkippableFact]
         public async Task Redis_TestStaticIdentifierGrains()
         {
             var grain = fixture.GrainFactory.GetGrain<IGrainStorageGenericGrain<GrainState>>(12345);
@@ -109,7 +123,7 @@ namespace Tester.Redis.Persistence
             Assert.Equal(result.GrainValue, state.GrainValue);
         }
 
-        [Fact]
+        [SkippableFact]
         public async Task Redis_TestRedisScriptCacheClearBeforeGrainWriteState()
         {
             var grain = fixture.GrainFactory.GetGrain<IGrainStorageGenericGrain<GrainState>>(1111);
@@ -125,7 +139,7 @@ namespace Tester.Redis.Persistence
             Assert.Equal(result.GrainValue, state.GrainValue);
         }
 
-        [Fact]
+        [SkippableFact]
         public async Task Redis_DoubleActivationETagConflictSimulation()
         {
             var grain = fixture.GrainFactory.GetGrain<IGrainStorageGenericGrain<GrainState>>(54321);

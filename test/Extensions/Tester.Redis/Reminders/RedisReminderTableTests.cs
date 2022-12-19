@@ -32,6 +32,8 @@ namespace Tester.Redis.Reminders
 
         protected override IReminderTable CreateRemindersTable()
         {
+            TestUtils.CheckForRedis();
+
             RedisReminderTable reminderTable = new(
                 this.loggerFactory.CreateLogger<RedisReminderTable>(),
                 this.clusterOptions,
@@ -47,24 +49,24 @@ namespace Tester.Redis.Reminders
         }
         protected override Task<string> GetConnectionString() => Task.FromResult(TestDefaultConfiguration.RedisConnectionString);
 
-        [Fact]
+        [SkippableFact]
         public void RemindersTable_Redis_Init()
         {
         }
 
-        [Fact]
+        [SkippableFact]
         public async Task RemindersTable_Redis_RemindersRange()
         {
             await RemindersRange(iterations: 50);
         }
 
-        [Fact]
+        [SkippableFact]
         public async Task RemindersTable_Redis_RemindersParallelUpsert()
         {
             await RemindersParallelUpsert();
         }
 
-        [Fact]
+        [SkippableFact]
         public async Task RemindersTable_Redis_ReminderSimple()
         {
             await ReminderSimple();

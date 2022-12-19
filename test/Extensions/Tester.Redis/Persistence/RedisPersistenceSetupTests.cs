@@ -9,13 +9,15 @@ namespace Tester.Redis.Persistence
     [TestCategory("Redis"), TestCategory("Persistence"), TestCategory("Functional")]
     public class RedisPersistenceSetupTests
     {
-        [Theory]
+        [SkippableTheory]
         [InlineData(null)]
         [InlineData("")]
         [InlineData("  ")]
         [InlineData("123")]
         public void StorageOptionsValidator(string connectionString)
         {
+            TestUtils.CheckForRedis();
+
             var siloPort = 11111;
             int gatewayPort = 30000;
             var siloAddress = IPAddress.Loopback;

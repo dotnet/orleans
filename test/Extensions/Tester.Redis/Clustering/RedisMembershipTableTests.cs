@@ -1,18 +1,11 @@
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using Orleans;
 using Orleans.Clustering.Redis;
-using Orleans.Configuration;
 using Orleans.Messaging;
-using System.Threading.Tasks;
-using Tester.Redis.Utility;
 using Xunit;
-using Xunit.Abstractions;
 using UnitTests.MembershipTests;
-using System;
 using TestExtensions;
 using UnitTests;
-using Tester.Redis.Persistence;
 
 namespace Tester.Redis.Clustering
 {
@@ -36,6 +29,8 @@ namespace Tester.Redis.Clustering
 
         protected override IMembershipTable CreateMembershipTable(ILogger logger)
         {
+            TestUtils.CheckForRedis();
+
             membershipTable = new RedisMembershipTable(
                 Options.Create(new RedisClusteringOptions() { ConnectionString = GetConnectionString().Result }),
                 this.clusterOptions);
@@ -53,55 +48,55 @@ namespace Tester.Redis.Clustering
 
         protected override Task<string> GetConnectionString() => Task.FromResult(TestDefaultConfiguration.RedisConnectionString);
 
-        [Fact]
+        [SkippableFact]
         public async Task GetGateways()
         {
             await MembershipTable_GetGateways();
         }
 
-        [Fact]
+        [SkippableFact]
         public async Task ReadAll_EmptyTable()
         {
             await MembershipTable_ReadAll_EmptyTable();
         }
 
-        [Fact]
+        [SkippableFact]
         public async Task InsertRow()
         {
             await MembershipTable_InsertRow();
         }
 
-        [Fact]
+        [SkippableFact]
         public async Task ReadRow_Insert_Read()
         {
             await MembershipTable_ReadRow_Insert_Read();
         }
 
-        [Fact]
+        [SkippableFact]
         public async Task ReadAll_Insert_ReadAll()
         {
             await MembershipTable_ReadAll_Insert_ReadAll();
         }
 
-        [Fact]
+        [SkippableFact]
         public async Task UpdateRow()
         {
             await MembershipTable_UpdateRow();
         }
 
-        [Fact]
+        [SkippableFact]
         public async Task UpdateRowInParallel()
         {
             await MembershipTable_UpdateRowInParallel(false);
         }
 
-        [Fact]
+        [SkippableFact]
         public async Task UpdateIAmAlive()
         {
             await MembershipTable_UpdateIAmAlive();
         }
 
-        [Fact]
+        [SkippableFact]
         public async Task CleanupDefunctSiloEntries()
         {
             await MembershipTable_CleanupDefunctSiloEntries(false);

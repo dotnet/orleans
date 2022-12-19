@@ -22,6 +22,8 @@ namespace Tester.Redis.GrainDirectory
         {
             public void Configure(ISiloBuilder siloBuilder)
             {
+                TestUtils.CheckForRedis();
+
                 siloBuilder
                     .AddRedisGrainDirectory(
                         CustomDirectoryGrain.DIRECTORY,
