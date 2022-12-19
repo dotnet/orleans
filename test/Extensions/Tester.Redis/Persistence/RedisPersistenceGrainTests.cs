@@ -53,13 +53,7 @@ namespace Tester.Redis.Persistence
                 }
             }
 
-            protected override void CheckPreconditionsOrThrow()
-            {
-                if (string.IsNullOrWhiteSpace(TestDefaultConfiguration.RedisConnectionString))
-                {
-                    throw new SkipException("TestDefaultConfiguration.RedisConnectionString is empty");
-                }
-            }
+            protected override void CheckPreconditionsOrThrow() => TestUtils.CheckForRedis();
         }
 
         private Fixture fixture;

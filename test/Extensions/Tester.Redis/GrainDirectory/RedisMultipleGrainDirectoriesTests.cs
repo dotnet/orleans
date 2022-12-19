@@ -36,13 +36,7 @@ namespace Tester.Redis.GrainDirectory
             }
         }
 
-        protected override void CheckPreconditionsOrThrow()
-        {
-            if (string.IsNullOrWhiteSpace(TestDefaultConfiguration.RedisConnectionString))
-            {
-                throw new SkipException("TestDefaultConfiguration.RedisConnectionString is empty");
-            }
-        }
+        protected override void CheckPreconditionsOrThrow() => TestUtils.CheckForRedis();
 
         protected override void ConfigureTestCluster(TestClusterBuilder builder)
         {

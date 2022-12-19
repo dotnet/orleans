@@ -24,13 +24,9 @@ namespace Tester.Redis.GrainDirectory
 
         protected override RedisGrainDirectory GetGrainDirectory()
         {
+            TestUtils.CheckForRedis();
+
             var configuration = TestDefaultConfiguration.RedisConnectionString;
-
-            if (string.IsNullOrWhiteSpace(configuration))
-            {
-                throw new SkipException("No connection string found. Skipping");
-            }
-
             var directoryOptions = new RedisGrainDirectoryOptions
             {
                 ConfigurationOptions = ConfigurationOptions.Parse(configuration),
