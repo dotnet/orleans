@@ -50,6 +50,15 @@ namespace Tester
             ForceTlsVersion();
         }
 
+        public static void CheckForRedis()
+        {
+            if (string.IsNullOrWhiteSpace(RedisConnectionString))
+            {
+                throw new SkipException("No connection string found. Skipping");
+            }
+            ForceTlsVersion();
+        }
+
         private static void ForceTlsVersion()
         {
             // Force TLS 1.2

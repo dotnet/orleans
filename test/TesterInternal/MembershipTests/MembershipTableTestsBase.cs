@@ -112,7 +112,7 @@ namespace UnitTests.MembershipTests
             var version = data.Version;
             foreach (var membershipEntry in membershipEntries)
             {
-                Assert.True(await membershipTable.InsertRow(membershipEntry, version));
+                Assert.True(await membershipTable.InsertRow(membershipEntry, version.Next()));
                 version = (await membershipTable.ReadRow(membershipEntry.SiloAddress)).Version;
             }
 

@@ -1270,7 +1270,7 @@ namespace Orleans.Runtime
                 try
                 {
                     var result = await _shared.InternalRuntime.GrainLocator.Register(Address);
-                    if (Address.Equals(result))
+                    if (Address.Matches(result))
                     {
                         success = true;
                     }

@@ -32,7 +32,7 @@ namespace TestExtensions.Runners
 
         public IGrainFactory GrainFactory => fixture.GrainFactory;
 
-        [Fact]
+        [SkippableFact]
         public async Task Grain_GrainStorage_Delete()
         {
             Guid id = Guid.NewGuid();
@@ -51,7 +51,7 @@ namespace TestExtensions.Runners
             Assert.Equal(2, val);  // "Value after Delete + New Write"
         }
 
-        [Fact]
+        [SkippableFact]
         public async Task Grain_GrainStorage_Read()
         {
             Guid id = Guid.NewGuid();
@@ -62,7 +62,7 @@ namespace TestExtensions.Runners
             Assert.Equal(0, val);  // "Initial value"
         }
 
-        [Fact]
+        [SkippableFact]
         public async Task Grain_GuidKey_GrainStorage_Read_Write()
         {
             Guid id = Guid.NewGuid();
@@ -85,7 +85,7 @@ namespace TestExtensions.Runners
             Assert.Equal(2, val);  // "Value after Re-Read"
         }
 
-        [Fact]
+        [SkippableFact]
         public async Task Grain_LongKey_GrainStorage_Read_Write()
         {
             long id = Random.Shared.Next();
@@ -108,7 +108,7 @@ namespace TestExtensions.Runners
             Assert.Equal(2, val);  // "Value after Re-Read"
         }
 
-        [Fact]
+        [SkippableFact]
         public async Task Grain_LongKeyExtended_GrainStorage_Read_Write()
         {
             long id = Random.Shared.Next();
@@ -139,7 +139,7 @@ namespace TestExtensions.Runners
             Assert.Equal(extKey, extKeyValue);  // "Extended Key"
         }
 
-        [Fact]
+        [SkippableFact]
         public async Task Grain_GuidKeyExtended_GrainStorage_Read_Write()
         {
             var id = Guid.NewGuid();
@@ -170,7 +170,7 @@ namespace TestExtensions.Runners
             Assert.Equal(extKey, extKeyValue);  // "Extended Key"
         }
 
-        [Fact]
+        [SkippableFact]
         public async Task Grain_Generic_GrainStorage_Read_Write()
         {
             long id = Random.Shared.Next();
@@ -194,7 +194,7 @@ namespace TestExtensions.Runners
             Assert.Equal(2, val);  // "Value after Re-Read"
         }
 
-        [Fact]
+        [SkippableFact]
         public async Task Grain_NestedGeneric_GrainStorage_Read_Write()
         {
             long id = Random.Shared.Next();
@@ -218,7 +218,7 @@ namespace TestExtensions.Runners
             Assert.Equal(new List<int> { 1, 2 }, val);  // "Value after Re-Read"
         }
 
-        [Fact]
+        [SkippableFact]
         public async Task Grain_Generic_GrainStorage_DiffTypes()
         {
             long id1 = Random.Shared.Next();
@@ -283,7 +283,7 @@ namespace TestExtensions.Runners
             Assert.Equal(expected3, val3);  // "Value after Re-Read - 3"
         }
         
-        [Fact]
+        [SkippableFact]
         public async Task Grain_GrainStorage_SiloRestart()
         {
             var initialServiceId = fixture.GetClientServiceId();

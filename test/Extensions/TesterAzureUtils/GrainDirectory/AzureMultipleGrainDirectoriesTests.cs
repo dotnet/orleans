@@ -1,4 +1,4 @@
-﻿using Orleans.Hosting;
+using Orleans.Hosting;
 using Orleans.TestingHost;
 using TestExtensions;
 using UnitTests.Grains.Directories;
@@ -22,6 +22,8 @@ namespace Tester.Directories
 
         protected override void ConfigureTestCluster(TestClusterBuilder builder)
         {
+            EnsurePreconditionsMet();
+
             base.ConfigureTestCluster(builder);
             builder.AddSiloBuilderConfigurator<SiloConfigurator>();
         }

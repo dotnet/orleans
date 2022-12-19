@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <PackageId>Microsoft.Orleans.Persistance.Redis</PackageId>
+    <Title>Microsoft Orleans Persistance Redis Provider</Title>
+    <Description>Microsoft Orleans Persistance implementation that uses Redis</Description>
+    <PackageTags>$(PackageTags) Redis Persistance</PackageTags>
+    <TargetFrameworks>$(DefaultTargetFrameworks)</TargetFrameworks>
+    <VersionSuffix Condition="$(VersionSuffix) == ''">beta1</VersionSuffix>
+  </PropertyGroup>
+
+	<ItemGroup>
+		<PackageReference Include="StackExchange.Redis" />
+	</ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="$(SourceRoot)src\Orleans.Runtime\Orleans.Runtime.csproj" />
+  </ItemGroup>
+
+</Project>
