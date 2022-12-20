@@ -1,0 +1,35 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <PackageId>Microsoft.Orleans.Persistence.AzureCosmos</PackageId>
+    <Title>Microsoft Orleans Persistence Azure Cosmos DB</Title>
+    <Description>Microsoft Orleans persistence providers for Azure Cosmos DB</Description>
+    <PackageTags>$(PackageTags) Azure Cosmos DB Storage</PackageTags>
+    <TargetFrameworks>$(DefaultTargetFrameworks)</TargetFrameworks>
+    <AssemblyName>Orleans.Persistence.AzureCosmos</AssemblyName>
+    <RootNamespace>Orleans.Persistence.AzureCosmos</RootNamespace>
+    <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
+    <DefineConstants>$(DefineConstants);ORLEANS_PERSISTENCE</DefineConstants>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="..\Shared\Cosmos\AzureCosmosOptions.cs" Link="Storage\AzureCosmosOptions.cs" />
+    <Compile Include="..\Shared\Cosmos\AzureCosmosOptionsValidator.cs" Link="Storage\AzureCosmosOptionsValidator.cs" />
+    <Compile Include="..\Shared\Cosmos\AzureCosmosSystemTextJsonSerializer.cs" Link="Storage\AzureCosmosSystemTextJsonSerializer.cs" />
+    <Compile Include="..\Shared\Cosmos\BaseEntity.cs" Link="Storage\BaseEntity.cs" />
+    <Compile Include="..\Shared\Cosmos\Usings.cs" Link="Storage\Usings.cs" />
+    <Compile Include="..\Shared\Cosmos\AzureCosmosThroughputMode.cs" Link="Storage\AzureCosmosThroughputMode.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="$(SourceRoot)src\Orleans.Runtime\Orleans.Runtime.csproj" />
+    <PackageReference Include="Azure.Core" />
+    <PackageReference Include="Microsoft.Azure.Cosmos" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleToAttribute">
+      <_Parameter1>Tester.AzureCosmos</_Parameter1>
+    </AssemblyAttribute>
+  </ItemGroup>
+</Project>

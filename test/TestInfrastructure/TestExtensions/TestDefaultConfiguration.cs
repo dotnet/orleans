@@ -74,7 +74,7 @@ namespace TestExtensions
         {
             builder.AddInMemoryCollection(new Dictionary<string, string>
             {
-                { nameof(ZooKeeperConnectionString), "127.0.0.1:2181" },
+                { nameof(ZooKeeperConnectionString), "127.0.0.1:2181" }
             });
             if (!TryAddJsonFileFromEnvironmentVariable(builder, "ORLEANS_SECRETFILE"))
             {
