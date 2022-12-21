@@ -29,6 +29,8 @@ public class PersistenceProviderTests_AzureCosmos
     private readonly Dictionary<string, string> providerCfgProps = new Dictionary<string, string>();
     private readonly ITestOutputHelper output;
     private readonly TestEnvironmentFixture fixture;
+    private readonly string _clusterId;
+    private readonly string _serviceId;
 
     public PersistenceProviderTests_AzureCosmos(ITestOutputHelper output, TestEnvironmentFixture fixture)
     {
@@ -41,6 +43,8 @@ public class PersistenceProviderTests_AzureCosmos
             fixture.Services,
             fixture.Services.GetRequiredService<ClientGrainContext>());
         providerCfgProps.Clear();
+        _clusterId = Guid.NewGuid().ToString("N");
+        _serviceId = Guid.NewGuid().ToString("N");
     }
 
     private async Task<AzureCosmosStorage> InitAzureCosmosDBGrainStorage()
@@ -50,7 +54,7 @@ public class PersistenceProviderTests_AzureCosmos
         options.ConfigureTestDefaults();
 
         var pkProvider = new DefaultPartitionKeyProvider();
-        var clusterOptions = providerRuntime.ServiceProvider.GetRequiredService<IOptions<ClusterOptions>>().Value;
+        var clusterOptions = new ClusterOptions { ClusterId = _clusterId, ServiceId = _serviceId };
 
         var store = ActivatorUtilities.CreateInstance<AzureCosmosStorage>(providerRuntime.ServiceProvider, options, clusterOptions, "TestStorage", pkProvider);
         var lifecycle = ActivatorUtilities.CreateInstance<SiloLifecycleSubject>(providerRuntime.ServiceProvider);
@@ -65,7 +69,7 @@ public class PersistenceProviderTests_AzureCosmos
         const string testName = nameof(PersistenceProvider_Azure_Read);
 
         var store = await InitAzureCosmosDBGrainStorage();
-        await Test_PersistenceProvider_Read(testName, store);
+        await Test_PersistenceProvider_Read(testName, store, null, grainId: GrainId.Create("testgrain", Guid.NewGuid().ToString()));
     }
 
     [SkippableTheory, TestCategory("Functional")]
@@ -82,7 +86,7 @@ public class PersistenceProviderTests_AzureCosmos
 
         var store = await InitAzureCosmosDBGrainStorage();
 
-        await Test_PersistenceProvider_WriteRead(testName, store, grainState);
+        await Test_PersistenceProvider_WriteRead(testName, store, grainState, GrainId.Create("testgrain", Guid.NewGuid().ToString()));
     }
 
     [SkippableTheory, TestCategory("Functional")]
@@ -112,12 +116,11 @@ public class PersistenceProviderTests_AzureCosmos
             nameof(stringLength), stringLength == null ? "default" : stringLength.ToString());
 
         var grainState = TestStoreGrainState.NewRandomState(stringLength);
-        var grainId = LegacyGrainId.NewId();
+        var grainId = GrainId.Create("testgrain", Guid.NewGuid().ToString());
 
         var store = await InitAzureCosmosDBGrainStorage();
 
-        grainState = await Test_PersistenceProvider_WriteRead(testName, store,
-            grainState, grainId);
+        grainState = await Test_PersistenceProvider_WriteRead(testName, store, grainState, grainId);
 
         store = await InitAzureCosmosDBGrainStorage();
 
@@ -135,7 +138,7 @@ public class PersistenceProviderTests_AzureCosmos
 
         var grainState = TestStoreGrainState.NewRandomState(stringLength);
 
-        var grainId = LegacyGrainId.NewId();
+        var grainId = GrainId.Create("testgrain", Guid.NewGuid().ToString());
 
         var store = await InitAzureCosmosDBGrainStorage();
 
@@ -149,15 +152,10 @@ public class PersistenceProviderTests_AzureCosmos
         await Test_PersistenceProvider_WriteRead(testName, store, grainState, grainId);
     }
 
-    private async Task Test_PersistenceProvider_Read(string grainTypeName, IGrainStorage store,
-        GrainState<TestStoreGrainState> grainState = null, GrainId grainId = default)
+    private async Task Test_PersistenceProvider_Read(string grainTypeName, IGrainStorage store, GrainState<TestStoreGrainState> grainState, GrainId grainId)
     {
-        grainId = fixture.InternalGrainFactory.GetGrain(grainId.IsDefault ? LegacyGrainId.NewId().ToGrainId() : grainId).GetGrainId();
+        grainState ??= new GrainState<TestStoreGrainState>(new TestStoreGrainState());
 
-        if (grainState == null)
-        {
-            grainState = new GrainState<TestStoreGrainState>(new TestStoreGrainState());
-        }
         var storedGrainState = new GrainState<TestStoreGrainState>(new TestStoreGrainState());
 
         Stopwatch sw = new Stopwatch();
@@ -175,14 +173,9 @@ public class PersistenceProviderTests_AzureCosmos
     }
 
     private async Task<GrainState<TestStoreGrainState>> Test_PersistenceProvider_WriteRead(string grainTypeName,
-        IGrainStorage store, GrainState<TestStoreGrainState> grainState = null, GrainId grainId = default)
+        IGrainStorage store, GrainState<TestStoreGrainState> grainState, GrainId grainId)
     {
-        grainId = fixture.InternalGrainFactory.GetGrain(grainId.IsDefault ? LegacyGrainId.NewId().ToGrainId() : grainId).GetGrainId();
-
-        if (grainState == null)
-        {
-            grainState = TestStoreGrainState.NewRandomState();
-        }
+        grainState ??= TestStoreGrainState.NewRandomState();
 
         Stopwatch sw = new Stopwatch();
         sw.Start();

@@ -8,6 +8,7 @@ namespace Orleans.Persistence.AzureCosmos;
 
 internal class AzureCosmosStorage : IGrainStorage, ILifecycleParticipant<ISiloLifecycle>
 {
+    private const string ANY_ETAG = "*";
     private const string KEY_STRING_SEPARATOR = "__";
     private const string DEFAULT_PARTITION_KEY_PATH = "/PartitionKey";
     private const string GRAINTYPE_PARTITION_KEY_PATH = "/GrainType";
@@ -50,8 +51,13 @@ internal class AzureCosmosStorage : IGrainStorage, ILifecycleParticipant<ISiloLi
 
         try
         {
-            var entity = await ExecuteWithRetries(async () => await _container.ReadItemAsync<GrainStateEntity<T>>(
-                id, new PartitionKey(partitionKey))).ConfigureAwait(false);
+            var pk = new PartitionKey(partitionKey);
+            var entity = await ExecuteWithRetries(static (self, args) =>
+            {
+                var (id, pk) = args;
+                return self._container.ReadItemAsync<GrainStateEntity<T>>(id, pk);
+            },
+            (id, pk)).ConfigureAwait(false);
 
             if (entity.Resource.State != null)
             {
@@ -111,22 +117,41 @@ internal class AzureCosmosStorage : IGrainStorage, ILifecycleParticipant<ISiloLi
                 PartitionKey = partitionKey
             };
 
+            var pk = new PartitionKey(partitionKey);
             if (string.IsNullOrWhiteSpace(grainState.ETag))
             {
-                response = await ExecuteWithRetries(() => _container.CreateItemAsync(
-                   entity,
-                   new PartitionKey(partitionKey))).ConfigureAwait(false);
+                response = await ExecuteWithRetries(
+                    static (self, args) =>
+                    {
+                        var (entity, pk) = args;
+                        return self._container.CreateItemAsync(entity, pk);
+                    },
+                    (entity, pk)).ConfigureAwait(false);
 
+                grainState.ETag = response.Resource.ETag;
+            }
+            else if (grainState.ETag == ANY_ETAG)
+            {
+                var requestOptions = new ItemRequestOptions { IfMatchEtag = grainState.ETag };
+                response = await ExecuteWithRetries(
+                    static (self, args) =>
+                    {
+                        var (entity, pk, requestOptions) = args;
+                        return self._container.UpsertItemAsync(entity, pk, requestOptions);
+                    },
+                    (entity, pk, requestOptions)).ConfigureAwait(false);
                 grainState.ETag = response.Resource.ETag;
             }
             else
             {
-                response = await ExecuteWithRetries(() =>
-                    _container.ReplaceItemAsync(
-                        entity, entity.Id,
-                        new PartitionKey(partitionKey),
-                        new ItemRequestOptions { IfMatchEtag = grainState.ETag }))
-                    .ConfigureAwait(false);
+                var requestOptions = new ItemRequestOptions { IfMatchEtag = grainState.ETag };
+                response = await ExecuteWithRetries(
+                    static (self, args) =>
+                    {
+                        var (entity, pk, requestOptions) = args;
+                        return self._container.ReplaceItemAsync(entity, entity.Id, pk, requestOptions);
+                    },
+                    (entity, pk, requestOptions)).ConfigureAwait(false);
                 grainState.ETag = response.Resource.ETag;
             }
 
@@ -161,8 +186,12 @@ internal class AzureCosmosStorage : IGrainStorage, ILifecycleParticipant<ISiloLi
                 if (string.IsNullOrWhiteSpace(grainState.ETag))
                     return;  //state not written
 
-                await ExecuteWithRetries(() => _container.DeleteItemAsync<GrainStateEntity<T>>(
-                    id, pk, requestOptions));
+                await ExecuteWithRetries(static (self, args) =>
+                {
+                    var (id, pk, requestOptions) = args;
+                    return self._container.DeleteItemAsync<GrainStateEntity<T>>(id, pk, requestOptions);
+                },
+                (id, pk, requestOptions));
 
                 grainState.ETag = null;
                 grainState.RecordExists = false;
@@ -178,11 +207,17 @@ internal class AzureCosmosStorage : IGrainStorage, ILifecycleParticipant<ISiloLi
                     PartitionKey = partitionKey
                 };
 
-                var response = await ExecuteWithRetries(() =>
-                    string.IsNullOrWhiteSpace(grainState.ETag) ?
-                        _container.CreateItemAsync(entity, pk) :
-                        _container.ReplaceItemAsync(entity, entity.Id, pk, requestOptions))
-                    .ConfigureAwait(false);
+                var response = await ExecuteWithRetries(static (self, args) =>
+                {
+                    var (grainState, entity, pk, requestOptions) = args;
+                    return grainState.ETag switch
+                    {
+                        null or { Length: 0 } => self._container.CreateItemAsync(entity, pk),
+                        ANY_ETAG => self._container.ReplaceItemAsync(entity, entity.Id, pk, requestOptions),
+                        _ => self._container.ReplaceItemAsync(entity, entity.Id, pk, requestOptions),
+                    };
+                },
+                (grainState, entity, pk, requestOptions)).ConfigureAwait(false);
 
                 grainState.ETag = response.Resource.ETag;
                 grainState.RecordExists = true;
@@ -333,7 +368,7 @@ internal class AzureCosmosStorage : IGrainStorage, ILifecycleParticipant<ISiloLi
         }
     }
 
-    private static async Task<TResult> ExecuteWithRetries<TResult>(Func<Task<TResult>> clientFunc)
+    private async Task<TResult> ExecuteWithRetries<TArg1, TResult>(Func<AzureCosmosStorage, TArg1, Task<TResult>> clientFunc, TArg1 arg1)
     {
         // From:  https://blogs.msdn.microsoft.com/bigdatasupport/2015/09/02/dealing-with-requestratetoolarge-errors-in-azure-documentdb-and-testing-performance/
         while (true)
@@ -341,7 +376,7 @@ internal class AzureCosmosStorage : IGrainStorage, ILifecycleParticipant<ISiloLi
             TimeSpan sleepTime;
             try
             {
-                return await clientFunc();
+                return await clientFunc(this, arg1).ConfigureAwait(false);
             }
             catch (CosmosException dce) when (dce.StatusCode == TOO_MANY_REQUESTS)
             {

@@ -1,4 +1,5 @@
 using Azure.Identity;
+using Microsoft.Extensions.Options;
 using TestExtensions;
 
 namespace Tester.AzureCosmos;
@@ -17,7 +18,7 @@ public static class AzureCosmosOptionsExtensions
         }
 
         options.IsResourceCreationEnabled = true;
-        options.CleanResourcesOnInitialization = true;
+        options.DatabaseThroughput = 4000;
 
         return options;
     }
@@ -34,6 +35,7 @@ public static class AzureCosmosOptionsExtensions
         }
 
         options.IsResourceCreationEnabled = true;
+        options.DatabaseThroughput = 4000;
 
         return options;
     }
@@ -50,7 +52,7 @@ public static class AzureCosmosOptionsExtensions
         }
 
         options.IsResourceCreationEnabled = true;
-        options.CleanResourcesOnInitialization = true;
+        options.DatabaseThroughput = 4000;
 
         return options;
     }
