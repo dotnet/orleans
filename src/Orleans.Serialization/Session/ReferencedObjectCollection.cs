@@ -121,8 +121,7 @@ namespace Orleans.Serialization.Session
                 }
                 else
                 {
-                    reference = nextReference;
-                    overflow[value] = reference;
+                    overflow[value] = nextReference;
                     Unsafe.SkipInit(out reference);
                     return false;
                 }
@@ -204,18 +203,13 @@ namespace Orleans.Serialization.Session
 
                 refValue = value;
 #else
-                if (overflow.TryGetValue(reference, out var existing))
+                if (overflow.TryGetValue(reference, out var existing) && value is not UnknownFieldMarker && existing is not UnknownFieldMarker)
                 {
-                    if (value is not UnknownFieldMarker && existing is not UnknownFieldMarker)
-                    {
-                        // Unknown field markers can be replaced once the type is known.
-                        ThrowReferenceExistsException(reference);
-                    }
+                    // Unknown field markers can be replaced once the type is known.
+                    ThrowReferenceExistsException(reference);
                 }
-                else
-                {
-                    overflow[reference] = value;
-                }
+
+                overflow[reference] = value;
 #endif
             }
             else
@@ -260,6 +254,7 @@ namespace Orleans.Serialization.Session
             }
         }
 
+        [DoesNotReturn]
         private static void ThrowReferenceExistsException(uint reference) => throw new InvalidOperationException($"Reference {reference} already exists");
 
         /// <summary>

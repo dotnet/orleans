@@ -115,33 +115,11 @@ namespace Orleans.Serialization.Buffers
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public override void ReadBytes(Span<byte> destination)
         {
-#if NETCOREAPP3_1_OR_GREATER
             var count = _stream.Read(destination);
             if (count < destination.Length)
             {
                 ThrowInsufficientData();
             }
-#else
-            byte[] array = default;
-            try
-            {
-                array = _memoryPool.Rent(destination.Length);
-                var count = _stream.Read(array, 0, destination.Length);
-                if (count < destination.Length)
-                {
-                    ThrowInsufficientData();
-                }
-
-                array.CopyTo(destination);
-            }
-            finally
-            {
-                if (array is object)
-                {
-                    _memoryPool.Return(array);
-                }
-            }
-#endif
         }
 
         public override void ReadBytes(byte[] destination, int offset, int length)
@@ -158,15 +136,9 @@ namespace Orleans.Serialization.Buffers
 #endif
         public override uint ReadUInt32()
         {
-#if NETCOREAPP3_1_OR_GREATER
             Span<byte> buffer = stackalloc byte[sizeof(uint)];
             ReadBytes(buffer);
             return BinaryPrimitives.ReadUInt32LittleEndian(buffer);
-#else
-            var buffer = GetScratchBuffer();
-            ReadBytes(buffer, 0, sizeof(uint));
-            return BinaryPrimitives.ReadUInt32LittleEndian(buffer.AsSpan(0, sizeof(uint)));
-#endif
         }
 
 #if NET5_0_OR_GREATER
@@ -174,15 +146,9 @@ namespace Orleans.Serialization.Buffers
 #endif
         public override ulong ReadUInt64()
         {
-#if NETCOREAPP3_1_OR_GREATER
             Span<byte> buffer = stackalloc byte[sizeof(ulong)];
             ReadBytes(buffer);
             return BinaryPrimitives.ReadUInt64LittleEndian(buffer);
-#else
-            var buffer = GetScratchBuffer();
-            ReadBytes(buffer, 0, sizeof(ulong));
-            return BinaryPrimitives.ReadUInt64LittleEndian(buffer.AsSpan(0, sizeof(ulong)));
-#endif
         }
 
         public override void Skip(long count) => _ = _stream.Seek(count, SeekOrigin.Current);
