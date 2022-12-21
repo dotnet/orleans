@@ -78,7 +78,7 @@ public class ReminderTests_AzureCosmos : ReminderTests_Base, IClassFixture<Remin
     public async Task Rem_Azure_Basic()
     {
         // start up a test grain and get the period that it's programmed to use.
-        IReminderTestGrain2 grain = this.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
+        IReminderTestGrain2 grain = GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
         TimeSpan period = await grain.GetReminderPeriod(DR);
         // start up the 'DR' reminder and wait for two ticks to pass.
         await grain.StartReminder(DR);
@@ -98,7 +98,7 @@ public class ReminderTests_AzureCosmos : ReminderTests_Base, IClassFixture<Remin
     [SkippableFact, TestCategory("Functional")]
     public async Task Rem_Azure_Basic_Restart()
     {
-        IReminderTestGrain2 grain = this.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
+        IReminderTestGrain2 grain = GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
         TimeSpan period = await grain.GetReminderPeriod(DR);
         await grain.StartReminder(DR);
         Thread.Sleep(period.Multiply(2) + LEEWAY); // giving some leeway
@@ -124,18 +124,18 @@ public class ReminderTests_AzureCosmos : ReminderTests_Base, IClassFixture<Remin
     [SkippableFact, TestCategory("Functional")]
     public async Task Rem_Azure_MultipleReminders()
     {
-        IReminderTestGrain2 grain = this.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
+        IReminderTestGrain2 grain = GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
         await PerGrainMultiReminderTest(grain);
     }
 
     [SkippableFact, TestCategory("Functional")]
     public async Task Rem_Azure_2J_MultiGrainMultiReminders()
     {
-        IReminderTestGrain2 g1 = this.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
-        IReminderTestGrain2 g2 = this.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
-        IReminderTestGrain2 g3 = this.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
-        IReminderTestGrain2 g4 = this.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
-        IReminderTestGrain2 g5 = this.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
+        IReminderTestGrain2 g1 = GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
+        IReminderTestGrain2 g2 = GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
+        IReminderTestGrain2 g3 = GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
+        IReminderTestGrain2 g4 = GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
+        IReminderTestGrain2 g5 = GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
 
         TimeSpan period = await g1.GetReminderPeriod(DR);
 
@@ -153,8 +153,8 @@ public class ReminderTests_AzureCosmos : ReminderTests_Base, IClassFixture<Remin
         // start two extra silos ... although it will take it a while before they stabilize
         log.LogInformation("Starting 2 extra silos");
 
-        await this.HostedCluster.StartAdditionalSilosAsync(2, true);
-        await this.HostedCluster.WaitForLivenessToStabilizeAsync();
+        await HostedCluster.StartAdditionalSilosAsync(2, true);
+        await HostedCluster.WaitForLivenessToStabilizeAsync();
 
         //Block until all tasks complete.
         await Task.WhenAll(tasks).WithTimeout(ENDWAIT);
@@ -163,11 +163,11 @@ public class ReminderTests_AzureCosmos : ReminderTests_Base, IClassFixture<Remin
     [SkippableFact, TestCategory("Functional")]
     public async Task Rem_Azure_MultiGrainMultiReminders()
     {
-        IReminderTestGrain2 g1 = this.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
-        IReminderTestGrain2 g2 = this.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
-        IReminderTestGrain2 g3 = this.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
-        IReminderTestGrain2 g4 = this.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
-        IReminderTestGrain2 g5 = this.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
+        IReminderTestGrain2 g1 = GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
+        IReminderTestGrain2 g2 = GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
+        IReminderTestGrain2 g3 = GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
+        IReminderTestGrain2 g4 = GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
+        IReminderTestGrain2 g5 = GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
 
         Task<bool>[] tasks =
         {
@@ -185,7 +185,7 @@ public class ReminderTests_AzureCosmos : ReminderTests_Base, IClassFixture<Remin
     [SkippableFact, TestCategory("Functional")]
     public async Task Rem_Azure_1F_Basic()
     {
-        IReminderTestGrain2 g1 = this.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
+        IReminderTestGrain2 g1 = GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
 
         TimeSpan period = await g1.GetReminderPeriod(DR);
 
@@ -194,7 +194,7 @@ public class ReminderTests_AzureCosmos : ReminderTests_Base, IClassFixture<Remin
         Thread.Sleep(period.Multiply(failAfter));
         // stop the secondary silo
         log.LogInformation("Stopping secondary silo");
-        await this.HostedCluster.StopSiloAsync(this.HostedCluster.SecondarySilos.First());
+        await HostedCluster.StopSiloAsync(HostedCluster.SecondarySilos.First());
 
         await test; // Block until test completes.
     }
@@ -202,13 +202,13 @@ public class ReminderTests_AzureCosmos : ReminderTests_Base, IClassFixture<Remin
     [SkippableFact, TestCategory("Functional")]
     public async Task Rem_Azure_2F_MultiGrain()
     {
-        List<SiloHandle> silos = await this.HostedCluster.StartAdditionalSilosAsync(2, true);
+        List<SiloHandle> silos = await HostedCluster.StartAdditionalSilosAsync(2, true);
 
-        IReminderTestGrain2 g1 = this.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
-        IReminderTestGrain2 g2 = this.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
-        IReminderTestGrain2 g3 = this.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
-        IReminderTestGrain2 g4 = this.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
-        IReminderTestGrain2 g5 = this.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
+        IReminderTestGrain2 g1 = GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
+        IReminderTestGrain2 g2 = GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
+        IReminderTestGrain2 g3 = GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
+        IReminderTestGrain2 g4 = GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
+        IReminderTestGrain2 g5 = GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
 
         TimeSpan period = await g1.GetReminderPeriod(DR);
 
@@ -226,9 +226,9 @@ public class ReminderTests_AzureCosmos : ReminderTests_Base, IClassFixture<Remin
         // stop a couple of silos
         log.LogInformation("Stopping 2 silos");
         int i = Random.Shared.Next(silos.Count);
-        await this.HostedCluster.StopSiloAsync(silos[i]);
+        await HostedCluster.StopSiloAsync(silos[i]);
         silos.RemoveAt(i);
-        await this.HostedCluster.StopSiloAsync(silos[Random.Shared.Next(silos.Count)]);
+        await HostedCluster.StopSiloAsync(silos[Random.Shared.Next(silos.Count)]);
 
         await Task.WhenAll(tasks).WithTimeout(ENDWAIT); // Block until all tasks complete.
     }
@@ -236,14 +236,14 @@ public class ReminderTests_AzureCosmos : ReminderTests_Base, IClassFixture<Remin
     [SkippableFact, TestCategory("Functional")]
     public async Task Rem_Azure_1F1J_MultiGrain()
     {
-        List<SiloHandle> silos = await this.HostedCluster.StartAdditionalSilosAsync(1);
-        await this.HostedCluster.WaitForLivenessToStabilizeAsync();
+        List<SiloHandle> silos = await HostedCluster.StartAdditionalSilosAsync(1);
+        await HostedCluster.WaitForLivenessToStabilizeAsync();
 
-        IReminderTestGrain2 g1 = this.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
-        IReminderTestGrain2 g2 = this.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
-        IReminderTestGrain2 g3 = this.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
-        IReminderTestGrain2 g4 = this.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
-        IReminderTestGrain2 g5 = this.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
+        IReminderTestGrain2 g1 = GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
+        IReminderTestGrain2 g2 = GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
+        IReminderTestGrain2 g3 = GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
+        IReminderTestGrain2 g4 = GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
+        IReminderTestGrain2 g5 = GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
 
         TimeSpan period = await g1.GetReminderPeriod(DR);
 
@@ -261,8 +261,8 @@ public class ReminderTests_AzureCosmos : ReminderTests_Base, IClassFixture<Remin
         var siloToKill = silos[Random.Shared.Next(silos.Count)];
         // stop a silo and join a new one in parallel
         log.LogInformation("Stopping a silo and joining a silo");
-        Task t1 = Task.Factory.StartNew(async () => await this.HostedCluster.StopSiloAsync(siloToKill));
-        Task t2 = this.HostedCluster.StartAdditionalSilosAsync(1, true).ContinueWith(t =>
+        Task t1 = Task.Factory.StartNew(async () => await HostedCluster.StopSiloAsync(siloToKill));
+        Task t2 = HostedCluster.StartAdditionalSilosAsync(1, true).ContinueWith(t =>
         {
             t.GetAwaiter().GetResult();
         });
@@ -275,7 +275,7 @@ public class ReminderTests_AzureCosmos : ReminderTests_Base, IClassFixture<Remin
     [SkippableFact, TestCategory("Functional")]
     public async Task Rem_Azure_RegisterSameReminderTwice()
     {
-        IReminderTestGrain2 grain = this.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
+        IReminderTestGrain2 grain = GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
         Task<IGrainReminder> promise1 = grain.StartReminder(DR);
         Task<IGrainReminder> promise2 = grain.StartReminder(DR);
         Task<IGrainReminder>[] tasks = { promise1, promise2 };
@@ -287,8 +287,8 @@ public class ReminderTests_AzureCosmos : ReminderTests_Base, IClassFixture<Remin
     [SkippableFact, TestCategory("Functional")]
     public async Task Rem_Azure_GT_Basic()
     {
-        IReminderTestGrain2 g1 = this.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
-        IReminderTestCopyGrain g2 = this.GrainFactory.GetGrain<IReminderTestCopyGrain>(Guid.NewGuid());
+        IReminderTestGrain2 g1 = GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
+        IReminderTestCopyGrain g2 = GrainFactory.GetGrain<IReminderTestCopyGrain>(Guid.NewGuid());
         TimeSpan period = await g1.GetReminderPeriod(DR); // using same period
 
         await g1.StartReminder(DR);
@@ -312,13 +312,13 @@ public class ReminderTests_AzureCosmos : ReminderTests_Base, IClassFixture<Remin
     [SkippableFact(Skip = "https://github.com/dotnet/orleans/issues/4319"), TestCategory("Functional")]
     public async Task Rem_Azure_GT_1F1J_MultiGrain()
     {
-        List<SiloHandle> silos = await this.HostedCluster.StartAdditionalSilosAsync(1);
-        await this.HostedCluster.WaitForLivenessToStabilizeAsync();
+        List<SiloHandle> silos = await HostedCluster.StartAdditionalSilosAsync(1);
+        await HostedCluster.WaitForLivenessToStabilizeAsync();
 
-        IReminderTestGrain2 g1 = this.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
-        IReminderTestGrain2 g2 = this.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
-        IReminderTestCopyGrain g3 = this.GrainFactory.GetGrain<IReminderTestCopyGrain>(Guid.NewGuid());
-        IReminderTestCopyGrain g4 = this.GrainFactory.GetGrain<IReminderTestCopyGrain>(Guid.NewGuid());
+        IReminderTestGrain2 g1 = GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
+        IReminderTestGrain2 g2 = GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
+        IReminderTestCopyGrain g3 = GrainFactory.GetGrain<IReminderTestCopyGrain>(Guid.NewGuid());
+        IReminderTestCopyGrain g4 = GrainFactory.GetGrain<IReminderTestCopyGrain>(Guid.NewGuid());
 
         TimeSpan period = await g1.GetReminderPeriod(DR);
 
@@ -335,8 +335,8 @@ public class ReminderTests_AzureCosmos : ReminderTests_Base, IClassFixture<Remin
         var siloToKill = silos[Random.Shared.Next(silos.Count)];
         // stop a silo and join a new one in parallel
         log.LogInformation("Stopping a silo and joining a silo");
-        Task t1 = Task.Run(async () => await this.HostedCluster.StopSiloAsync(siloToKill));
-        Task t2 = Task.Run(async () => await this.HostedCluster.StartAdditionalSilosAsync(1));
+        Task t1 = Task.Run(async () => await HostedCluster.StopSiloAsync(siloToKill));
+        Task t2 = Task.Run(async () => await HostedCluster.StartAdditionalSilosAsync(1));
         await Task.WhenAll(new[] { t1, t2 }).WithTimeout(ENDWAIT);
 
         await Task.WhenAll(tasks).WithTimeout(ENDWAIT); // Block until all tasks complete.
@@ -345,7 +345,7 @@ public class ReminderTests_AzureCosmos : ReminderTests_Base, IClassFixture<Remin
     [SkippableFact, TestCategory("Functional")]
     public async Task Rem_Azure_Wrong_LowerThanAllowedPeriod()
     {
-        IReminderTestGrain2 grain = this.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
+        IReminderTestGrain2 grain = GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
         await Assert.ThrowsAsync<ArgumentException>(() =>
             grain.StartReminder(DR, TimeSpan.FromMilliseconds(3000), true));
     }
@@ -353,7 +353,7 @@ public class ReminderTests_AzureCosmos : ReminderTests_Base, IClassFixture<Remin
     [SkippableFact, TestCategory("Functional")]
     public async Task Rem_Azure_Wrong_Grain()
     {
-        IReminderGrainWrong grain = this.GrainFactory.GetGrain<IReminderGrainWrong>(0);
+        IReminderGrainWrong grain = GrainFactory.GetGrain<IReminderGrainWrong>(0);
 
         await Assert.ThrowsAsync<InvalidOperationException>(() =>
             grain.StartReminder(DR));

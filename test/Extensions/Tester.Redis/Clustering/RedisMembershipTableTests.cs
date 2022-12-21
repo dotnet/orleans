@@ -34,12 +34,8 @@ namespace Tester.Redis.Clustering
             TestUtils.CheckForRedis();
 
             membershipTable = new RedisMembershipTable(
-                Options.Create(new RedisClusteringOptions()
-                {
-                    ConfigurationOptions = ConfigurationOptions.Parse(GetConnectionString().Result),
-                    EntryExpiry = TimeSpan.FromHours(1)
-                }),
-                this.clusterOptions);
+                Options.Create(new RedisClusteringOptions() { ConnectionString = GetConnectionString().Result }),
+                this._clusterOptions);
 
             return membershipTable;
         }
@@ -49,7 +45,7 @@ namespace Tester.Redis.Clustering
             return new RedisGatewayListProvider(
                 //(RedisMembershipTable)this.membershipTable,
                 (RedisMembershipTable)CreateMembershipTable(logger),
-                this.gatewayOptions);
+                this._gatewayOptions);
         }
 
         protected override Task<string> GetConnectionString() => Task.FromResult(TestDefaultConfiguration.RedisConnectionString);

@@ -32,12 +32,12 @@ public class ReminderTests_AzureCosmos_Standalone
     {
         AzureCosmosTestUtils.CheckCosmosDbStorage();
 
-        this._output = output;
-        this._fixture = fixture;
-        this._loggerFactory = TestingUtils.CreateDefaultLoggerFactory($"{GetType().Name}.log");
-        this._log = this._loggerFactory.CreateLogger<ReminderTests_AzureCosmos_Standalone>();
+        _output = output;
+        _fixture = fixture;
+        _loggerFactory = TestingUtils.CreateDefaultLoggerFactory($"{GetType().Name}.log");
+        _log = _loggerFactory.CreateLogger<ReminderTests_AzureCosmos_Standalone>();
 
-        this._serviceId = Guid.NewGuid().ToString();
+        _serviceId = Guid.NewGuid().ToString();
 
         TestUtils.ConfigureClientThreadPoolSettingsForStorageTests(1000);
     }
@@ -45,11 +45,11 @@ public class ReminderTests_AzureCosmos_Standalone
     [SkippableFact, TestCategory("Reminders"), TestCategory("Performance")]
     public async Task Reminders_AzureTable_InsertRate()
     {
-        var clusterOptions = Options.Create(new ClusterOptions { ClusterId = "TMSLocalTesting", ServiceId = this._serviceId });
+        var clusterOptions = Options.Create(new ClusterOptions { ClusterId = "TMSLocalTesting", ServiceId = _serviceId });
         var storageOptions = Options.Create(new AzureCosmosReminderTableOptions());
         storageOptions.Value.ConfigureTestDefaults();
 
-        IReminderTable table = new AzureCosmosReminderTable(this._loggerFactory, this._fixture.Services, storageOptions, clusterOptions);
+        IReminderTable table = new AzureCosmosReminderTable(_loggerFactory, _fixture.Services, storageOptions, clusterOptions);
         await table.Init();
 
         await TestTableInsertRate(table, 10);
@@ -60,10 +60,10 @@ public class ReminderTests_AzureCosmos_Standalone
     public async Task Reminders_AzureTable_InsertNewRowAndReadBack()
     {
         string clusterId = NewClusterId();
-        var clusterOptions = Options.Create(new ClusterOptions { ClusterId = clusterId, ServiceId = this._serviceId });
+        var clusterOptions = Options.Create(new ClusterOptions { ClusterId = clusterId, ServiceId = _serviceId });
         var storageOptions = Options.Create(new AzureCosmosReminderTableOptions());
         storageOptions.Value.ConfigureTestDefaults();
-        IReminderTable table = new AzureCosmosReminderTable(this._loggerFactory, this._fixture.Services, storageOptions, clusterOptions);
+        IReminderTable table = new AzureCosmosReminderTable(_loggerFactory, _fixture.Services, storageOptions, clusterOptions);
         await table.Init();
 
         ReminderEntry[] rows = (await GetAllRows(table)).ToArray();
@@ -80,7 +80,7 @@ public class ReminderTests_AzureCosmos_Standalone
         Assert.Equal(expected.Period, actual.Period); // "The newly inserted reminder table (sid={0}, did={1}) row did not have the expected period.", ServiceId, clusterId);
                                                       // the following assertion fails but i don't know why yet-- the timestamps appear identical in the error message. it's not really a priority to hunt down the reason, however, because i have high confidence it is working well enough for the moment.
         /*Assert.Equal(expected.StartAt,  actual.StartAt); // "The newly inserted reminder table (sid={0}, did={1}) row did not contain the correct start time.", ServiceId, clusterId);*/
-        Assert.False(string.IsNullOrWhiteSpace(actual.ETag), $"The newly inserted reminder table (sid={this._serviceId}, did={clusterId}) row contains an invalid etag.");
+        Assert.False(string.IsNullOrWhiteSpace(actual.ETag), $"The newly inserted reminder table (sid={_serviceId}, did={clusterId}) row contains an invalid etag.");
     }
 
     private async Task TestTableInsertRate(IReminderTable reminderTable, double numOfInserts)
@@ -98,7 +98,7 @@ public class ReminderTests_AzureCosmos_Standalone
                 var e = new ReminderEntry
                 {
                     //GrainId = LegacyGrainId.GetGrainId(new Guid(s)),
-                    GrainId = this._fixture.InternalGrainFactory.GetGrain(LegacyGrainId.NewId()).GetGrainId(),
+                    GrainId = _fixture.InternalGrainFactory.GetGrain(LegacyGrainId.NewId()).GetGrainId(),
                     ReminderName = "MY_REMINDER_" + i,
                     Period = TimeSpan.FromSeconds(5),
                     StartAt = DateTime.UtcNow
@@ -108,21 +108,21 @@ public class ReminderTests_AzureCosmos_Standalone
                 Task<bool> promise = Task.Run(async () =>
                 {
                     await reminderTable.UpsertRow(e);
-                    this._output.WriteLine("Done " + capture);
+                    _output.WriteLine("Done " + capture);
                     return true;
                 });
                 promises.Add(promise);
-                this._log.LogInformation("Started {Capture}", capture);
+                _log.LogInformation("Started {Capture}", capture);
             }
-            this._log.LogInformation("Started all, now waiting...");
+            _log.LogInformation("Started all, now waiting...");
             await Task.WhenAll(promises).WithTimeout(TimeSpan.FromSeconds(500));
         }
         catch (Exception exc)
         {
-            this._log.LogInformation(exc, "Exception caught");
+            _log.LogInformation(exc, "Exception caught");
         }
         TimeSpan dur = DateTime.UtcNow - startedAt;
-        this._log.LogInformation(
+        _log.LogInformation(
             "Inserted {InsertCount} rows in {Duration}, i.e., {Rate} upserts/sec",
             numOfInserts,
             dur,
@@ -134,7 +134,7 @@ public class ReminderTests_AzureCosmos_Standalone
         Guid guid = Guid.NewGuid();
         return new ReminderEntry
         {
-            GrainId = this._fixture.InternalGrainFactory.GetGrain(LegacyGrainId.NewId()).GetGrainId(),
+            GrainId = _fixture.InternalGrainFactory.GetGrain(LegacyGrainId.NewId()).GetGrainId(),
             ReminderName = string.Format("TestReminder.{0}", guid),
             Period = TimeSpan.FromSeconds(5),
             StartAt = DateTime.UtcNow

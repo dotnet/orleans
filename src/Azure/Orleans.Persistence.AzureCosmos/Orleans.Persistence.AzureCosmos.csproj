@@ -15,7 +15,6 @@
   <ItemGroup>
     <Compile Include="..\Shared\Cosmos\AzureCosmosOptions.cs" Link="Storage\AzureCosmosOptions.cs" />
     <Compile Include="..\Shared\Cosmos\AzureCosmosOptionsValidator.cs" Link="Storage\AzureCosmosOptionsValidator.cs" />
-    <Compile Include="..\Shared\Cosmos\AzureCosmosSystemTextJsonSerializer.cs" Link="Storage\AzureCosmosSystemTextJsonSerializer.cs" />
     <Compile Include="..\Shared\Cosmos\BaseEntity.cs" Link="Storage\BaseEntity.cs" />
     <Compile Include="..\Shared\Cosmos\Usings.cs" Link="Storage\Usings.cs" />
     <Compile Include="..\Shared\Cosmos\AzureCosmosThroughputMode.cs" Link="Storage\AzureCosmosThroughputMode.cs" />

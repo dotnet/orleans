@@ -77,11 +77,13 @@ internal class AzureCosmosStorage : IGrainStorage, ILifecycleParticipant<ISiloLi
             }
 
             _logger.LogError(dce, "Failure reading state for Grain Type {GrainType} with Id {id}", grainType, id);
+            WrappedException.CreateAndRethrow(dce);
             throw;
         }
         catch (Exception exc)
         {
             _logger.LogError(exc, "Failure reading state for Grain Type {GrainType} with Id {Id}", grainType, id);
+            WrappedException.CreateAndRethrow(exc);
             throw;
         }
     }
@@ -132,11 +134,12 @@ internal class AzureCosmosStorage : IGrainStorage, ILifecycleParticipant<ISiloLi
         }
         catch (CosmosException dce) when (dce.StatusCode == HttpStatusCode.PreconditionFailed)
         {
-            throw new CosmosConditionNotSatisfiedException(grainType, grainId, _options.Container, "Unknown", grainState.ETag, dce);
+            throw new CosmosConditionNotSatisfiedException(grainType, grainId, _options.Container, "Unknown", grainState.ETag);
         }
         catch (Exception exc)
         {
             _logger.LogError(exc, "Failure writing state for Grain Type {GrainType} with Id {Id}", grainType, id);
+            WrappedException.CreateAndRethrow(exc);
             throw;
         }
     }
@@ -188,6 +191,7 @@ internal class AzureCosmosStorage : IGrainStorage, ILifecycleParticipant<ISiloLi
         catch (Exception exc)
         {
             _logger.LogError(exc, "Failure clearing state for Grain Type {GrainType} with Id {Id}", grainType, id);
+            WrappedException.CreateAndRethrow(exc);
             throw;
         }
     }
@@ -245,6 +249,7 @@ internal class AzureCosmosStorage : IGrainStorage, ILifecycleParticipant<ISiloLi
                 GetType().Name,
                 _options.InitStage,
                 stopWatch.ElapsedMilliseconds);
+            WrappedException.CreateAndRethrow(ex);
             throw;
         }
     }
@@ -258,6 +263,7 @@ internal class AzureCosmosStorage : IGrainStorage, ILifecycleParticipant<ISiloLi
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error initializing Azure Cosmos DB client for grain storage provider");
+            WrappedException.CreateAndRethrow(ex);
             throw;
         }
     }
@@ -322,6 +328,7 @@ internal class AzureCosmosStorage : IGrainStorage, ILifecycleParticipant<ISiloLi
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error deleting Azure Cosmos DB database");
+            WrappedException.CreateAndRethrow(ex);
             throw;
         }
     }

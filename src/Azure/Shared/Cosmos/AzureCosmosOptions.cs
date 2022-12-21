@@ -59,6 +59,11 @@ public abstract class AzureCosmosOptions
     public AzureCosmosThroughputMode ThroughputMode { get; set; } = AzureCosmosThroughputMode.Manual;
 
     /// <summary>
+    /// The options passed to the Cosmos DB client, or <see langword="null"/> to use default options.
+    /// </summary>
+    public CosmosClientOptions? ClientOptions { get; set; }
+
+    /// <summary>
     /// Configures the Cosmos DB client.
     /// </summary>
     /// <param name="connectionString">The connection string.</param>
@@ -111,11 +116,6 @@ public abstract class AzureCosmosOptions
     }
 
     /// <summary>
-    /// The options passed to the Cosmos DB client, or <see langword="null"/> to use default options.
-    /// </summary>
-    public CosmosClientOptions? ClientOptions { get; set; }
-
-    /// <summary>
     /// Factory method for creating a <see cref="CosmosClient"/>.
     /// </summary>
     internal Func<IServiceProvider, ValueTask<CosmosClient>> CreateClient { get; private set; } = null!;
@@ -129,33 +129,4 @@ public abstract class AzureCosmosOptions
             AzureCosmosThroughputMode.Serverless => null,
             _ => throw new ArgumentOutOfRangeException(nameof(ThroughputMode), $"There is no setup for throughput mode {ThroughputMode}")
         };
-
-    /// <summary>
-    /// Creates a default <see cref="CosmosClientOptions"/> instance.
-    /// </summary>
-    /// <param name="serviceProvider">The service provider</param>
-    /// <returns>
-    /// A default <see cref="CosmosClientOptions"/> instance.
-    /// </returns>
-    internal CosmosClientOptions CreateDefaultOptions(IServiceProvider serviceProvider)
-    {
-        var clusterOptions = serviceProvider.GetRequiredService<IOptions<ClusterOptions>>().Value;
-        var jsonSerializerOptions = new JsonSerializerOptions
-        {
-            Converters = { new JsonStringEnumConverter() },
-            DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
-            PropertyNameCaseInsensitive = true,
-            ReadCommentHandling = JsonCommentHandling.Skip,
-            WriteIndented = false,
-        };
-
-        var clientOptions = new CosmosClientOptions
-        {
-            ConnectionMode = ConnectionMode.Direct,
-            ApplicationName = clusterOptions.ServiceId,
-            Serializer = new AzureCosmosSystemTextJsonSerializer(jsonSerializerOptions)
-        };
-
-        return clientOptions;
-    }
 }

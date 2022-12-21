@@ -39,7 +39,7 @@ namespace Consul.Tests
 
             options.ConfigureConsulClient(address);
             
-            return new ConsulBasedMembershipTable(loggerFactory.CreateLogger<ConsulBasedMembershipTable>(), Options.Create(options), this.clusterOptions);
+            return new ConsulBasedMembershipTable(loggerFactory.CreateLogger<ConsulBasedMembershipTable>(), Options.Create(options), this._clusterOptions);
         }
 
         protected override IGatewayListProvider CreateGatewayListProvider(ILogger logger)
@@ -50,7 +50,7 @@ namespace Consul.Tests
 
             options.ConfigureConsulClient(address);
             
-            return new ConsulGatewayListProvider(loggerFactory.CreateLogger<ConsulGatewayListProvider>(), Options.Create(options), this.gatewayOptions, this.clusterOptions);
+            return new ConsulGatewayListProvider(loggerFactory.CreateLogger<ConsulGatewayListProvider>(), Options.Create(options), this._gatewayOptions, this._clusterOptions);
         }
 
         protected override async Task<string> GetConnectionString()

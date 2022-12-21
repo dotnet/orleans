@@ -398,16 +398,9 @@ namespace UnitTests.TimerTests
                     await function(reminderName).WithTimeout(TestConstants.InitTimeout);
                     return; // success ... no need to retry
                 }
-                catch (AggregateException aggEx)
+                catch (Exception exception)
                 {
-                    foreach (var exception in aggEx.InnerExceptions)
-                    {
-                        await HandleError(exception, i);
-                    }
-                }
-                catch (ReminderException exc)
-                {
-                    await HandleError(exc, i);
+                    await HandleError(exception, i);
                 }
             }
 

@@ -36,11 +36,27 @@ public class PersistenceProviderTests_AzureCosmos
 
         this.output = output;
         this.fixture = fixture;
-        this.providerRuntime = new ClientProviderRuntime(
+        providerRuntime = new ClientProviderRuntime(
             fixture.InternalGrainFactory,
             fixture.Services,
             fixture.Services.GetRequiredService<ClientGrainContext>());
-        this.providerCfgProps.Clear();
+        providerCfgProps.Clear();
+    }
+
+    private async Task<AzureCosmosStorage> InitAzureCosmosDBGrainStorage()
+    {
+        var options = new AzureCosmosGrainStorageOptions();
+
+        options.ConfigureTestDefaults();
+
+        var pkProvider = new DefaultPartitionKeyProvider();
+        var clusterOptions = providerRuntime.ServiceProvider.GetRequiredService<IOptions<ClusterOptions>>().Value;
+
+        var store = ActivatorUtilities.CreateInstance<AzureCosmosStorage>(providerRuntime.ServiceProvider, options, clusterOptions, "TestStorage", pkProvider);
+        var lifecycle = ActivatorUtilities.CreateInstance<SiloLifecycleSubject>(providerRuntime.ServiceProvider);
+        store.Participate(lifecycle);
+        await lifecycle.OnStart();
+        return store;
     }
 
     [SkippableFact, TestCategory("Functional")]
@@ -133,26 +149,10 @@ public class PersistenceProviderTests_AzureCosmos
         await Test_PersistenceProvider_WriteRead(testName, store, grainState, grainId);
     }
 
-    private async Task<AzureCosmosStorage> InitAzureCosmosDBGrainStorage()
-    {
-        var options = new AzureCosmosGrainStorageOptions();
-
-        options.ConfigureTestDefaults();
-
-        var pkProvider = new DefaultPartitionKeyProvider();
-        var clusterOptions = this.providerRuntime.ServiceProvider.GetRequiredService<IOptions<ClusterOptions>>().Value;
-
-        var store = ActivatorUtilities.CreateInstance<AzureCosmosStorage>(this.providerRuntime.ServiceProvider, options, clusterOptions, "TestStorage", pkProvider);
-        var lifecycle = ActivatorUtilities.CreateInstance<SiloLifecycleSubject>(this.providerRuntime.ServiceProvider);
-        store.Participate(lifecycle);
-        await lifecycle.OnStart();
-        return store;
-    }
-
     private async Task Test_PersistenceProvider_Read(string grainTypeName, IGrainStorage store,
         GrainState<TestStoreGrainState> grainState = null, GrainId grainId = default)
     {
-        grainId = this.fixture.InternalGrainFactory.GetGrain(grainId.IsDefault ? LegacyGrainId.NewId().ToGrainId() : grainId).GetGrainId();
+        grainId = fixture.InternalGrainFactory.GetGrain(grainId.IsDefault ? LegacyGrainId.NewId().ToGrainId() : grainId).GetGrainId();
 
         if (grainState == null)
         {
@@ -166,7 +166,7 @@ public class PersistenceProviderTests_AzureCosmos
         await store.ReadStateAsync(grainTypeName, grainId, storedGrainState);
 
         TimeSpan readTime = sw.Elapsed;
-        this.output.WriteLine("{0} - Read time = {1}", store.GetType().FullName, readTime);
+        output.WriteLine("{0} - Read time = {1}", store.GetType().FullName, readTime);
 
         var storedState = storedGrainState.State;
         Assert.Equal(grainState.State.A, storedState.A);
@@ -177,7 +177,7 @@ public class PersistenceProviderTests_AzureCosmos
     private async Task<GrainState<TestStoreGrainState>> Test_PersistenceProvider_WriteRead(string grainTypeName,
         IGrainStorage store, GrainState<TestStoreGrainState> grainState = null, GrainId grainId = default)
     {
-        grainId = this.fixture.InternalGrainFactory.GetGrain(grainId.IsDefault ? LegacyGrainId.NewId().ToGrainId() : grainId).GetGrainId();
+        grainId = fixture.InternalGrainFactory.GetGrain(grainId.IsDefault ? LegacyGrainId.NewId().ToGrainId() : grainId).GetGrainId();
 
         if (grainState == null)
         {
@@ -198,7 +198,7 @@ public class PersistenceProviderTests_AzureCosmos
         };
         await store.ReadStateAsync(grainTypeName, grainId, storedGrainState);
         TimeSpan readTime = sw.Elapsed;
-        this.output.WriteLine("{0} - Write time = {1} Read time = {2}", store.GetType().FullName, writeTime, readTime);
+        output.WriteLine("{0} - Write time = {1} Read time = {2}", store.GetType().FullName, writeTime, readTime);
         Assert.Equal(grainState.State.A, storedGrainState.State.A);
         Assert.Equal(grainState.State.B, storedGrainState.State.B);
         Assert.Equal(grainState.State.C, storedGrainState.State.C);
@@ -209,7 +209,7 @@ public class PersistenceProviderTests_AzureCosmos
     private async Task<GrainState<TestStoreGrainState>> Test_PersistenceProvider_WriteClearRead(string grainTypeName,
         IGrainStorage store, GrainState<TestStoreGrainState> grainState = null, GrainId grainId = default)
     {
-        grainId = this.fixture.InternalGrainFactory.GetGrain(grainId.IsDefault ? LegacyGrainId.NewId().ToGrainId() : grainId).GetGrainId();
+        grainId = fixture.InternalGrainFactory.GetGrain(grainId.IsDefault ? LegacyGrainId.NewId().ToGrainId() : grainId).GetGrainId();
 
         if (grainState == null)
         {
@@ -232,7 +232,7 @@ public class PersistenceProviderTests_AzureCosmos
         };
         await store.ReadStateAsync(grainTypeName, grainId, storedGrainState);
         TimeSpan readTime = sw.Elapsed;
-        this.output.WriteLine("{0} - Write time = {1} Read time = {2}", store.GetType().FullName, writeTime, readTime);
+        output.WriteLine("{0} - Write time = {1} Read time = {2}", store.GetType().FullName, writeTime, readTime);
         Assert.NotNull(storedGrainState.State);
         Assert.Equal(default(string), storedGrainState.State.A);
         Assert.Equal(default(int), storedGrainState.State.B);

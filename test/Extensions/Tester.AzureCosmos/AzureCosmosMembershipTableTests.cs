@@ -1,16 +1,12 @@
-using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using TestExtensions;
 using UnitTests.MembershipTests;
-using Xunit;
-using Orleans;
 using Orleans.Messaging;
 using Orleans.Clustering.AzureCosmos;
 using UnitTests;
-using Tester.AzureCosmos;
 
-namespace Tester.AzureCosmos;
+namespace Tester.AzureCosmos.Clustering;
 
 /// <summary>
 /// Tests for operation of Orleans Membership Table using Azure Cosmos DB - Requires access to external Azure Cosmos DB account
@@ -35,14 +31,14 @@ public class AzureCosmosMembershipTableTests : MembershipTableTestsBase
         AzureCosmosTestUtils.CheckCosmosDbStorage();
         var options = new AzureCosmosClusteringOptions();
         options.ConfigureTestDefaults();
-        return new AzureCosmosMembershipTable(loggerFactory, this.Services, Options.Create(options), this.clusterOptions);
+        return new AzureCosmosMembershipTable(loggerFactory, Services, Options.Create(options), _clusterOptions);
     }
 
     protected override IGatewayListProvider CreateGatewayListProvider(ILogger logger)
     {
         var options = new AzureCosmosClusteringOptions();
         options.ConfigureTestDefaults();
-        return new AzureCosmosGatewayListProvider(loggerFactory, this.Services, Options.Create(options), this.clusterOptions, this.gatewayOptions);
+        return new AzureCosmosGatewayListProvider(loggerFactory, Services, Options.Create(options), _clusterOptions, _gatewayOptions);
     }
 
     protected override Task<string> GetConnectionString()

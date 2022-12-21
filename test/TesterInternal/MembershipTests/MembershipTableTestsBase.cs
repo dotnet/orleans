@@ -41,9 +41,9 @@ namespace UnitTests.MembershipTests
         protected readonly string connectionString;
         protected ILoggerFactory loggerFactory;
         protected IOptions<SiloOptions> siloOptions;
-        protected IOptions<ClusterOptions> clusterOptions;
+        protected IOptions<ClusterOptions> _clusterOptions;
         protected const string testDatabaseName = "OrleansMembershipTest";//for relational storage
-        protected readonly IOptions<GatewayOptions> gatewayOptions;
+        protected readonly IOptions<GatewayOptions> _gatewayOptions;
 
         private static int generation;
 
@@ -63,13 +63,13 @@ namespace UnitTests.MembershipTests
             {
                 throw new SkipException("No connection string configured");
             }
-            this.clusterOptions = Options.Create(new ClusterOptions { ClusterId = this.clusterId });
+            this._clusterOptions = Options.Create(new ClusterOptions { ClusterId = this.clusterId });
             var adoVariant = GetAdoInvariant();
 
             membershipTable = CreateMembershipTable(logger);
             membershipTable.InitializeMembershipTable(true).WithTimeout(TimeSpan.FromMinutes(1)).Wait();
 
-            this.gatewayOptions = Options.Create(new GatewayOptions());
+            this._gatewayOptions = Options.Create(new GatewayOptions());
             gatewayListProvider = CreateGatewayListProvider(logger);
             gatewayListProvider.InitializeGatewayListProvider().WithTimeout(TimeSpan.FromMinutes(1)).Wait();
         }

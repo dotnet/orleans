@@ -12,15 +12,19 @@ namespace Orleans.GrainDirectory.AzureCosmos;
 // No default namespace intentionally to cause compile errors if something is not defined
 #endif
 
+/// <summary>
+/// Validates instances of <see cref="AzureCosmosOptions"/>.
+/// </summary>
+/// <typeparam name="TOptions">The options type.</typeparam>
 public class AzureCosmosOptionsValidator<TOptions> : IConfigurationValidator where TOptions : AzureCosmosOptions
 {
     private readonly TOptions _options;
     private readonly string _name;
 
     /// <summary>
-    /// Constructor
+    /// Initializes a new instance of the <see cref="AzureCosmosOptionsValidator{TOptions}"/> type.
     /// </summary>
-    /// <param name="options">The option to be validated.</param>
+    /// <param name="options">The instance to be validated.</param>
     /// <param name="name">The option name to be validated.</param>
     public AzureCosmosOptionsValidator(TOptions options, string name)
     {
@@ -28,6 +32,7 @@ public class AzureCosmosOptionsValidator<TOptions> : IConfigurationValidator whe
         _name = name;
     }
 
+    /// <inheritdoc/>
     public void ValidateConfiguration()
     {
         if (string.IsNullOrWhiteSpace(_options.Database))
@@ -47,20 +52,5 @@ public class AzureCosmosOptionsValidator<TOptions> : IConfigurationValidator whe
             throw new OrleansConfigurationException(
                 $"Configuration for Azure Cosmos DB provider {_name} is invalid. You must call {nameof(_options.ConfigureCosmosClient)} to configure access to Azure Cosmos DB.");
         }
-    }
-}
-
-public class AzureCosmosPostConfigureOptions<TOptions> : IPostConfigureOptions<TOptions> where TOptions : AzureCosmosOptions
-{
-    private readonly IServiceProvider _serviceProvider;
-
-    public AzureCosmosPostConfigureOptions(IServiceProvider serviceProvider)
-    {
-        _serviceProvider = serviceProvider;
-    }
-
-    public void PostConfigure(string? name, TOptions options)
-    {
-        options.ClientOptions ??= options.CreateDefaultOptions(_serviceProvider);
     }
 }

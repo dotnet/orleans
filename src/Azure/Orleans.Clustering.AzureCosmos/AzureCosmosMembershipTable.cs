@@ -97,7 +97,7 @@ internal class AzureCosmosMembershipTable : IMembershipTable
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error deleting membership table entries.");
-            throw;
+            WrappedException.CreateAndRethrow(ex);
         }
     }
 
@@ -120,7 +120,7 @@ internal class AzureCosmosMembershipTable : IMembershipTable
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error cleaning up defunct silo entries.");
-            throw;
+            WrappedException.CreateAndRethrow(ex);
         }
     }
 
@@ -158,6 +158,7 @@ internal class AzureCosmosMembershipTable : IMembershipTable
         catch (Exception exc)
         {
             _logger.LogWarning(exc, "Failure reading silo entry {Key} for cluster {Cluster}", key, _clusterId);
+            WrappedException.CreateAndRethrow(exc);
             throw;
         }
     }
@@ -195,6 +196,7 @@ internal class AzureCosmosMembershipTable : IMembershipTable
                 catch (Exception exc)
                 {
                     _logger.LogError(exc, "Failure reading all membership records.");
+                    WrappedException.CreateAndRethrow(exc);
                     throw;
                 }
             }
@@ -204,6 +206,7 @@ internal class AzureCosmosMembershipTable : IMembershipTable
         catch (Exception exc)
         {
             _logger.LogWarning(exc, "Failure reading entries for cluster {Cluster}", _clusterId);
+            WrappedException.CreateAndRethrow(exc);
             throw;
         }
     }
@@ -225,6 +228,7 @@ internal class AzureCosmosMembershipTable : IMembershipTable
         catch (CosmosException exc)
         {
             if (exc.StatusCode == HttpStatusCode.PreconditionFailed) return false;
+            WrappedException.CreateAndRethrow(exc);
             throw;
         }
     }
@@ -248,6 +252,7 @@ internal class AzureCosmosMembershipTable : IMembershipTable
         catch (CosmosException exc)
         {
             if (exc.StatusCode == HttpStatusCode.PreconditionFailed) return false;
+            WrappedException.CreateAndRethrow(exc);
             throw;
         }
     }
@@ -280,9 +285,10 @@ internal class AzureCosmosMembershipTable : IMembershipTable
                 new ItemRequestOptions { IfMatchEtag = selfRow.ETag }).ConfigureAwait(false);
             _self = replaceResponse.Resource;
         }
-        catch
+        catch (Exception exc)
         {
             _self = null;
+            WrappedException.CreateAndRethrow(exc);
             throw;
         }
     }
@@ -296,6 +302,7 @@ internal class AzureCosmosMembershipTable : IMembershipTable
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error initializing Azure Cosmos DB Client for membership table provider.");
+            WrappedException.CreateAndRethrow(ex);
             throw;
         }
     }
@@ -313,6 +320,7 @@ internal class AzureCosmosMembershipTable : IMembershipTable
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error deleting Azure Cosmos DB database.");
+            WrappedException.CreateAndRethrow(ex);
             throw;
         }
     }
@@ -371,6 +379,7 @@ internal class AzureCosmosMembershipTable : IMembershipTable
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error reading Cluster Version entity.");
+            WrappedException.CreateAndRethrow(ex);
             throw;
         }
     }
@@ -399,9 +408,10 @@ internal class AzureCosmosMembershipTable : IMembershipTable
 
             return silos;
         }
-        catch (Exception ex)
+        catch (Exception exc)
         {
-            _logger.LogError(ex, "Error reading Silo entities.");
+            _logger.LogError(exc, "Error reading Silo entities.");
+            WrappedException.CreateAndRethrow(exc);
             throw;
         }
     }

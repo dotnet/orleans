@@ -21,9 +21,8 @@ public class CosmosConditionNotSatisfiedException : InconsistentStateException
         GrainId grainId,
         string collection,
         string storedEtag,
-        string currentEtag,
-        Exception storageException)
-        : base(errorMsg, storedEtag, currentEtag, storageException)
+        string currentEtag)
+        : base(errorMsg, storedEtag, currentEtag)
     {
         GrainType = grainType;
         GrainId = grainId.ToString();
@@ -38,9 +37,8 @@ public class CosmosConditionNotSatisfiedException : InconsistentStateException
         GrainId grainId,
         string collection,
         string storedEtag,
-        string currentEtag,
-        Exception storageException)
-        : this(CreateDefaultMessage(grainType, grainId, collection, storedEtag, currentEtag), grainType, grainId, collection, storedEtag, currentEtag, storageException)
+        string currentEtag)
+        : this(CreateDefaultMessage(grainType, grainId, collection, storedEtag, currentEtag), grainType, grainId, collection, storedEtag, currentEtag)
     {
     }
 
