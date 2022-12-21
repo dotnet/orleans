@@ -156,7 +156,7 @@ namespace Orleans.CodeGenerator
                 return baseClassType;
             }
 
-            if (namedMethodReturnType.ConstructedFrom is { } constructedFrom)
+            if (namedMethodReturnType.ConstructedFrom is { IsGenericType: true, IsUnboundGenericType: false } constructedFrom)
             {
                 var unbound = constructedFrom.ConstructUnboundGenericType();
                 if (method.InvokableBaseTypes.TryGetValue(unbound, out baseClassType))
