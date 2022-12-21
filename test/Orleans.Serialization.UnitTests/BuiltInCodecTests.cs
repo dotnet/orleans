@@ -1978,6 +1978,48 @@ namespace Orleans.Serialization.UnitTests
         protected override List<int>[] TestValues => new[] { null, new List<int>(), CreateValue(), CreateValue(), CreateValue() };
     }
 
+    public class CollectionCodecTests : FieldCodecTester<Collection<int>, CollectionCodec<int>>
+    {
+        public CollectionCodecTests(ITestOutputHelper output) : base(output)
+        {
+        }
+
+        protected override Collection<int> CreateValue()
+        {
+            var result = new Collection<int>();
+            for (var i = 0; i < Random.Next(17) + 5; i++)
+            {
+                result.Add(Random.Next());
+            }
+
+            return result;
+        }
+
+        protected override bool Equals(Collection<int> left, Collection<int> right) => object.ReferenceEquals(left, right) || left.SequenceEqual(right);
+        protected override Collection<int>[] TestValues => new[] { null, new Collection<int>(), CreateValue(), CreateValue(), CreateValue() };
+    }
+
+    public class CollectionCopierTests : CopierTester<Collection<int>, CollectionCopier<int>>
+    {
+        public CollectionCopierTests(ITestOutputHelper output) : base(output)
+        {
+        }
+
+        protected override Collection<int> CreateValue()
+        {
+            var result = new Collection<int>();
+            for (var i = 0; i < Random.Next(17) + 5; i++)
+            {
+                result.Add(Random.Next());
+            }
+
+            return result;
+        }
+
+        protected override bool Equals(Collection<int> left, Collection<int> right) => object.ReferenceEquals(left, right) || left.SequenceEqual(right);
+        protected override Collection<int>[] TestValues => new[] { null, new Collection<int>(), CreateValue(), CreateValue(), CreateValue() };
+    }
+
     public class QueueCodecTests : FieldCodecTester<Queue<int>, QueueCodec<int>>
     {
         public QueueCodecTests(ITestOutputHelper output) : base(output)
