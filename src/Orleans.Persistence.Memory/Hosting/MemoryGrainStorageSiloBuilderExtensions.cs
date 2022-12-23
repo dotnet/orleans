@@ -61,6 +61,7 @@ namespace Orleans.Hosting
                 .ConfigureServices(services =>
                 {
                     configureOptions?.Invoke(services.AddOptions<MemoryGrainStorageOptions>(name));
+                    services.AddTransient<IPostConfigureOptions<MemoryGrainStorageOptions>, DefaultStorageProviderSerializerOptionsConfigurator<MemoryGrainStorageOptions>>();
                     services.ConfigureNamedOptionForLogging<MemoryGrainStorageOptions>(name);
                     if (string.Equals(name, ProviderConstants.DEFAULT_STORAGE_PROVIDER_NAME, StringComparison.Ordinal))
                     {
