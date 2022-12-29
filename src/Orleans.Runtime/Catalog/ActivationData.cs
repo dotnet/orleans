@@ -12,6 +12,7 @@ using Orleans.Configuration;
 using Orleans.Core.Internal;
 using Orleans.GrainDirectory;
 using Orleans.Internal;
+using Orleans.Runtime.Messaging;
 using Orleans.Runtime.Scheduler;
 using Orleans.Serialization.Invocation;
 using Orleans.Serialization.TypeSystem;
@@ -180,7 +181,7 @@ namespace Orleans.Runtime
 
         public TimeSpan CollectionAgeLimit => _shared.CollectionAgeLimit;
 
-        public TTarget GetTarget<TTarget>() where TTarget : class => (TTarget)GrainInstance; 
+        public TTarget GetTarget<TTarget>() where TTarget : class => (TTarget)GrainInstance;
 
         TComponent ITargetHolder.GetComponent<TComponent>()
         {

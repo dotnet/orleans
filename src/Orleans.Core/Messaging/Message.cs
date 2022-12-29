@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
+using Orleans.Runtime.Messaging;
 
 namespace Orleans.Runtime
 {
@@ -13,10 +14,12 @@ namespace Orleans.Runtime
 
         [NonSerialized]
         private short _retryCount;
+        [NonSerialized]
+        private object _body;
 
         public CoarseStopwatch _timeToExpiry;
 
-        public object BodyObject { get; set; }
+        public byte[] RawBody { get; set; }
 
         public PackedHeaders _headers;
         public CorrelationId _id;
@@ -244,7 +247,7 @@ namespace Orleans.Runtime
             // don't set expiration for one way, system target and system grain messages.
             return Direction != Directions.OneWay && !id.IsSystemTarget();
         }
-        
+
         internal void AddToCacheInvalidationHeader(GrainAddress address)
         {
             var list = new List<GrainAddress>();
@@ -256,6 +259,15 @@ namespace Orleans.Runtime
             list.Add(address);
             CacheInvalidationHeader = list;
         }
+
+        public object GetBody(MessageSerializer serializer)
+        {
+            if (_body is null && serializer is not null)
+                _body = serializer.ReadBodyObject(this);
+            return _body;
+        }
+
+        public void SetBody(object body) => _body = body;
 
         public override string ToString() => $"{this}";
 
@@ -269,11 +281,12 @@ namespace Orleans.Runtime
             if (IsReadOnly && !Append(ref dst, "ReadOnly ")) goto grow;
             if (IsAlwaysInterleave && !Append(ref dst, "IsAlwaysInterleave ")) goto grow;
 
+            var body = GetBody(null);
             if (Direction == Directions.Response)
             {
                 switch (Result)
                 {
-                    case ResponseTypes.Rejection when BodyObject is RejectionResponse rejection:
+                    case ResponseTypes.Rejection when body is RejectionResponse rejection:
                         if (!dst.TryWrite($"{rejection.RejectionType} Rejection (info: {rejection.RejectionInfo}) ", out len)) goto grow;
                         dst = dst[len..];
                         break;
@@ -291,7 +304,7 @@ namespace Orleans.Runtime
             if (!dst.TryWrite($"{Direction} [{SendingSilo} {SendingGrain}]->[{TargetSilo} {TargetGrain}]", out len)) goto grow;
             dst = dst[len..];
 
-            if (BodyObject is { } request)
+            if (body is { } request)
             {
                 if (!dst.TryWrite($" {request}", out len)) goto grow;
                 dst = dst[len..];

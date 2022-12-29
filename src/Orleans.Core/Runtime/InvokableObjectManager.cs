@@ -3,9 +3,11 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Orleans.CodeGeneration;
 using Orleans.Runtime;
+using Orleans.Runtime.Messaging;
 using Orleans.Serialization;
 using Orleans.Serialization.Invocation;
 
@@ -37,7 +39,8 @@ namespace Orleans
 
         public bool TryRegister(IAddressable obj, ObserverGrainId objectId)
         {
-            return this.localObjects.TryAdd(objectId, new LocalObjectData(obj, objectId, this));
+            return this.localObjects.TryAdd(objectId, new LocalObjectData(obj, objectId, this,
+                runtimeClient.ServiceProvider.GetRequiredService<MessageSerializer>()));
         }
 
         public bool TryDeregister(ObserverGrainId objectId)
@@ -81,14 +84,16 @@ namespace Orleans
         {
             private static readonly Func<object, Task> HandleFunc = self => ((LocalObjectData)self).LocalObjectMessagePumpAsync();
             private readonly InvokableObjectManager _manager;
+            private readonly MessageSerializer _messageSerializer;
 
-            internal LocalObjectData(IAddressable obj, ObserverGrainId observerId, InvokableObjectManager manager)
+            internal LocalObjectData(IAddressable obj, ObserverGrainId observerId, InvokableObjectManager manager, MessageSerializer messageSerializer)
             {
                 this.LocalObject = new WeakReference(obj);
                 this.ObserverId = observerId;
                 this.Messages = new Queue<Message>();
                 this.Running = false;
                 _manager = manager;
+                _messageSerializer = messageSerializer;
             }
 
             internal WeakReference LocalObject { get; }
@@ -228,7 +233,7 @@ namespace Orleans
                         IInvokable request = null;
                         try
                         {
-                            request = (IInvokable)message.BodyObject;
+                            request = (IInvokable)message.GetBody(_messageSerializer);
                         }
                         catch (Exception deserializationException)
                         {
@@ -298,7 +303,7 @@ namespace Orleans
             [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Design", "CA1031:DoNotCatchGeneralExceptionTypes")]
             private void ReportException(Message message, Exception exception)
             {
-                var request = (IInvokable)message.BodyObject;
+                var request = (IInvokable)message.GetBody(_messageSerializer);
                 switch (message.Direction)
                 {
                     case Message.Directions.OneWay:

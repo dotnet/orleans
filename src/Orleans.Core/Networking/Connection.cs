@@ -468,7 +468,7 @@ namespace Orleans.Runtime.Messaging
                     // Send a fast fail to the caller.
                     var response = this.MessageFactory.CreateResponseMessage(message);
                     response.Result = Message.ResponseTypes.Error;
-                    response.BodyObject = Response.FromException(exception);
+                    response.SetBody(Response.FromException(exception));
 
                     // Send the error response and continue processing the next message.
                     this.Send(response);
@@ -477,7 +477,7 @@ namespace Orleans.Runtime.Messaging
                 {
                     // If the message was a response, propagate the exception to the intended recipient.
                     message.Result = Message.ResponseTypes.Error;
-                    message.BodyObject = Response.FromException(exception);
+                    message.SetBody(Response.FromException(exception));
                     this.MessageCenter.DispatchLocalMessage(message);
                 }
             }
@@ -503,7 +503,7 @@ namespace Orleans.Runtime.Messaging
             {
                 var response = this.MessageFactory.CreateResponseMessage(message);
                 response.Result = Message.ResponseTypes.Error;
-                response.BodyObject = Response.FromException(exception);
+                response.SetBody(Response.FromException(exception));
 
                 this.MessageCenter.DispatchLocalMessage(response);
             }
@@ -512,7 +512,7 @@ namespace Orleans.Runtime.Messaging
                 // If we failed sending an original response, turn the response body into an error and reply with it.
                 // unless we have already tried sending the response multiple times.
                 message.Result = Message.ResponseTypes.Error;
-                message.BodyObject = Response.FromException(exception);
+                message.SetBody(Response.FromException(exception));
                 ++message.RetryCount;
 
                 this.Send(message);

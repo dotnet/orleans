@@ -47,6 +47,7 @@ namespace Orleans.Runtime
         private IGrainReferenceRuntime grainReferenceRuntime;
         private readonly MessagingTrace messagingTrace;
         private readonly DeepCopier<Response> responseCopier;
+        private readonly MessageSerializer _messageSerializer;
 
         public InsideRuntimeClient(
             ILocalSiloDetails siloDetails,
@@ -86,6 +87,8 @@ namespace Orleans.Runtime
                 this.loggerFactory.CreateLogger<CallbackData>(),
                 this.messagingOptions,
                 this.messagingOptions.SystemResponseTimeout);
+
+            _messageSerializer = ServiceProvider.GetRequiredService<MessageSerializer>();
         }
 
         public IServiceProvider ServiceProvider { get; }
@@ -260,7 +263,8 @@ namespace Orleans.Runtime
                 Response response;
                 try
                 {
-                    switch (message.BodyObject)
+                    var bodyObject = message.GetBody(_messageSerializer);
+                    switch (bodyObject)
                     {
                         case IInvokable invokable:
                             {
@@ -280,7 +284,7 @@ namespace Orleans.Runtime
                                 break;
                             }
                         default:
-                            throw new NotSupportedException($"Request {message.BodyObject} of type {message.BodyObject?.GetType()} is not supported");
+                            throw new NotSupportedException($"Request {bodyObject} of type {bodyObject?.GetType()} is not supported");
                     }
                 }
                 catch (Exception exc1)
@@ -387,7 +391,7 @@ namespace Orleans.Runtime
                 }
 
                 if (logger.IsEnabled(LogLevel.Debug)) this.logger.LogDebug((int)ErrorCode.Dispatcher_HandleMsg, "HandleMessage {Message}", message);
-                var rejection = (RejectionResponse)message.BodyObject;
+                var rejection = (RejectionResponse)message.GetBody(_messageSerializer);
                 switch (rejection.RejectionType)
                 {
                     case Message.RejectionTypes.Overloaded:
@@ -416,7 +420,7 @@ namespace Orleans.Runtime
             }
             else if (message.Result == Message.ResponseTypes.Status)
             {
-                var status = (StatusResponse)message.BodyObject;
+                var status = (StatusResponse)message.GetBody(_messageSerializer);
                 callbacks.TryGetValue((message.TargetGrain, message.Id), out var callback);
                 var request = callback?.Message;
                 if (!(request is null))
@@ -446,7 +450,7 @@ namespace Orleans.Runtime
             {
                 // IMPORTANT: we do not schedule the response callback via the scheduler, since the only thing it does
                 // is to resolve/break the resolver. The continuations/waits that are based on this resolution will be scheduled as work items.
-                callbackData.DoCallback(message);
+                callbackData.DoCallback(message, _messageSerializer);
             }
             else
             {

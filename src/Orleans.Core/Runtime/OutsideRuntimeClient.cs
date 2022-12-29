@@ -14,6 +14,7 @@ using Orleans.Configuration;
 using Orleans.Messaging;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
+using Orleans.Runtime.Messaging;
 using Orleans.Serialization;
 using Orleans.Serialization.Invocation;
 
@@ -42,6 +43,8 @@ namespace Orleans
 
         private readonly SharedCallbackData sharedCallbackData;
         private SafeTimer callbackTimer;
+        private readonly MessageSerializer _messageSerializer;
+
         public GrainAddress CurrentActivationAddress
         {
             get;
@@ -79,6 +82,8 @@ namespace Orleans
                 this.loggerFactory.CreateLogger<CallbackData>(),
                 this.clientMessagingOptions,
                 this.clientMessagingOptions.ResponseTimeout);
+
+            _messageSerializer = ServiceProvider.GetRequiredService<MessageSerializer>();
         }
 
         internal void ConsumeServices()
@@ -222,7 +227,7 @@ namespace Orleans
             ThrowIfDisposed();
             var message = this.messageFactory.CreateResponseMessage(request);
             OrleansOutsideRuntimeClientEvent.Log.SendResponse(message);
-            message.BodyObject = response;
+            message.SetBody(response);
 
             MessageCenter.SendMessage(message);
         }
@@ -279,7 +284,7 @@ namespace Orleans
 
             if (response.Result is Message.ResponseTypes.Status)
             {
-                var status = (StatusResponse)response.BodyObject;
+                var status = (StatusResponse)response.GetBody(_messageSerializer);
                 callbacks.TryGetValue(response.Id, out var callback);
                 var request = callback?.Message;
                 if (!(request is null))
@@ -311,7 +316,7 @@ namespace Orleans
                 // We need to import the RequestContext here as well.
                 // Unfortunately, it is not enough, since CallContext.LogicalGetData will not flow "up" from task completion source into the resolved task.
                 // RequestContextExtensions.Import(response.RequestContextData);
-                callbackData.DoCallback(response);
+                callbackData.DoCallback(response, _messageSerializer);
             }
             else
             {

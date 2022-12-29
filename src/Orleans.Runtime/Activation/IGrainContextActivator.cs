@@ -13,6 +13,7 @@ using Orleans.Concurrency;
 using Orleans.Configuration;
 using Orleans.GrainReferences;
 using Orleans.Metadata;
+using Orleans.Runtime.Messaging;
 using Orleans.Runtime.Placement;
 using Orleans.Serialization.Invocation;
 
@@ -120,7 +121,7 @@ namespace Orleans.Runtime
         /// <returns><see langword="true"/> if an appropriate activator was found, otherwise <see langword="false"/>.</returns>
         bool TryGet(GrainType grainType, [NotNullWhen(true)] out IGrainContextActivator activator);
     }
-   
+
     /// <summary>
     /// Creates a grain context for the given grain address.
     /// </summary>
@@ -291,10 +292,12 @@ namespace Orleans.Runtime
     internal class MayInterleaveConfiguratorProvider : IConfigureGrainContextProvider
     {
         private readonly GrainClassMap _grainClassMap;
+        private readonly MessageSerializer _messageSerializer;
 
-        public MayInterleaveConfiguratorProvider(GrainClassMap grainClassMap)
+        public MayInterleaveConfiguratorProvider(GrainClassMap grainClassMap, MessageSerializer messageSerializer)
         {
             _grainClassMap = grainClassMap;
+            _messageSerializer = messageSerializer;
         }
 
         public bool TryGetConfigurator(GrainType grainType, GrainProperties properties, out IConfigureGrainContext configurator)
@@ -303,7 +306,7 @@ namespace Orleans.Runtime
                 && _grainClassMap.TryGetGrainClass(grainType, out var grainClass))
             {
                 var predicate = GetMayInterleavePredicate(grainClass);
-                configurator = new MayInterleaveConfigurator(message => predicate(message.BodyObject as IInvokable));
+                configurator = new MayInterleaveConfigurator(message => predicate(message.GetBody(_messageSerializer) as IInvokable));
                 return true;
             }
 

@@ -2,6 +2,7 @@ using System;
 using System.Text;
 using System.Threading;
 using Microsoft.Extensions.Logging;
+using Orleans.Runtime.Messaging;
 using Orleans.Serialization.Invocation;
 
 namespace Orleans.Runtime
@@ -93,7 +94,7 @@ namespace Orleans.Runtime
             this.context.Complete(Response.FromException(exception));
         }
 
-        public void DoCallback(Message response)
+        public void DoCallback(Message response, MessageSerializer messageSerializer)
         {
             if (Interlocked.CompareExchange(ref this.completed, 1, 0) != 0)
             {
@@ -106,14 +107,15 @@ namespace Orleans.Runtime
             ApplicationRequestInstruments.OnAppRequestsEnd((long)this.stopwatch.Elapsed.TotalMilliseconds);
 
             // do callback outside the CallbackData lock. Just not a good practice to hold a lock for this unrelated operation.
-            ResponseCallback(response, this.context);
+            ResponseCallback(response, this.context, messageSerializer);
         }
 
-        public static void ResponseCallback(Message message, IResponseCompletionSource context)
+        public static void ResponseCallback(Message message, IResponseCompletionSource context,
+            MessageSerializer messageSerializer)
         {
             try
             {
-                var body = message.BodyObject;
+                var body = message.GetBody(messageSerializer);
                 if (body is Response response)
                 {
                     context.Complete(response);

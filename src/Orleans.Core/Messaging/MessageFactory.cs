@@ -1,4 +1,3 @@
-
 using System;
 using System.Collections.Generic;
 using Microsoft.Extensions.Logging;
@@ -29,9 +28,9 @@ namespace Orleans.Runtime
                 IsReadOnly = (options & InvokeMethodOptions.ReadOnly) != 0,
                 IsUnordered = (options & InvokeMethodOptions.Unordered) != 0,
                 IsAlwaysInterleave = (options & InvokeMethodOptions.AlwaysInterleave) != 0,
-                BodyObject = body,
                 RequestContextData = RequestContextExtensions.Export(this.deepCopier),
             };
+            message.SetBody(body);
 
             messagingTrace.OnCreateMessage(message);
             return message;
@@ -63,12 +62,12 @@ namespace Orleans.Runtime
         {
             var response = this.CreateResponseMessage(request);
             response.Result = Message.ResponseTypes.Rejection;
-            response.BodyObject = new RejectionResponse
+            response.SetBody(new RejectionResponse
             {
                 RejectionType = type,
                 RejectionInfo = info,
                 Exception = ex,
-            };
+            });
             if (this.logger.IsEnabled(LogLevel.Debug))
                 this.logger.LogDebug(
                     ex,
@@ -83,7 +82,7 @@ namespace Orleans.Runtime
         {
             var response = this.CreateResponseMessage(request);
             response.Result = Message.ResponseTypes.Status;
-            response.BodyObject = new StatusResponse(isExecuting, isWaiting, diagnostics);
+            response.SetBody(new StatusResponse(isExecuting, isWaiting, diagnostics));
 
             if (this.logger.IsEnabled(LogLevel.Debug)) this.logger.LogDebug("Creating {RequestMessage} status update with diagnostics {Diagnostics}", request, diagnostics);
 

@@ -99,22 +99,7 @@ namespace Orleans.Runtime.Messaging
                 }
 
                 if (bodyLength != 0)
-                {
-                    _deserializationSession.PartialReset();
-
-                    // Body deserialization is more likely to fail than header deserialization.
-                    // Separating the two allows for these kinds of errors to be propagated back to the caller.
-                    if (body.IsSingleSegment)
-                    {
-                        var reader = Reader.Create(body.First.Span, _deserializationSession);
-                        ReadBodyObject(message, ref reader);
-                    }
-                    else
-                    {
-                        var reader = Reader.Create(body, _deserializationSession);
-                        ReadBodyObject(message, ref reader);
-                    }
-                }
+                    message.RawBody = body.ToArray();
 
                 return (0, headerLength, bodyLength);
             }
@@ -125,8 +110,9 @@ namespace Orleans.Runtime.Messaging
             }
         }
 
-        private void ReadBodyObject<TInput>(Message message, ref Reader<TInput> reader)
+        public object ReadBodyObject(Message message)
         {
+            var reader = Reader.Create(message.RawBody, _deserializationSession);
             var field = reader.ReadFieldHeader();
 
             if (message.Result == ResponseTypes.Success)
@@ -134,13 +120,11 @@ namespace Orleans.Runtime.Messaging
                 message.Result = ResponseTypes.None; // reset raw response indicator
                 if (!_rawResponseCodecs.TryGetValue(field.FieldType, out var rawCodec))
                     rawCodec = GetRawCodec(field.FieldType);
-                message.BodyObject = rawCodec.ReadRaw(ref reader, ref field);
+                return rawCodec.ReadRaw(ref reader, ref field);
             }
-            else
-            {
-                var bodyCodec = _codecProvider.GetCodec(field.FieldType);
-                message.BodyObject = bodyCodec.ReadValue(ref reader, field);
-            }
+
+            var bodyCodec = _codecProvider.GetCodec(field.FieldType);
+            return bodyCodec.ReadValue(ref reader, field);
         }
 
         private ResponseCodec GetRawCodec(Type fieldType)
@@ -155,9 +139,9 @@ namespace Orleans.Runtime.Messaging
             var headers = message.Headers;
             IFieldCodec? bodyCodec = null;
             ResponseCodec? rawCodec = null;
-            if (message.BodyObject is not null)
+            if (message.GetBody(this) is not null)
             {
-                bodyCodec = _codecProvider.GetCodec(message.BodyObject.GetType());
+                bodyCodec = _codecProvider.GetCodec(message.GetBody(this).GetType());
                 if (headers.ResponseType is ResponseTypes.None && bodyCodec is ResponseCodec responseCodec)
                 {
                     rawCodec = responseCodec;
@@ -183,8 +167,8 @@ namespace Orleans.Runtime.Messaging
                 if (bodyCodec is not null)
                 {
                     innerWriter = Writer.Create(new MessageBufferWriter(bufferWriter), _serializationSession);
-                    if (rawCodec != null) rawCodec.WriteRaw(ref innerWriter, message.BodyObject);
-                    else bodyCodec.WriteField(ref innerWriter, 0, null, message.BodyObject);
+                    if (rawCodec != null) rawCodec.WriteRaw(ref innerWriter, message.GetBody(this));
+                    else bodyCodec.WriteField(ref innerWriter, 0, null, message.GetBody(this));
                     innerWriter.Commit();
                 }
 
