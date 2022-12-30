@@ -1,4 +1,5 @@
 using System;
+using System.Buffers;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
@@ -16,6 +17,7 @@ namespace Orleans.Runtime
         private short _retryCount;
         [NonSerialized]
         private object _body;
+        private byte[] _rawBody;
         [NonSerialized]
         private readonly MessageSerializer _serializer;
 
@@ -28,9 +30,31 @@ namespace Orleans.Runtime
             _body = body;
         }
 
-        public Message(byte[] body, MessageSerializer serializer)
+        public Message(ReadOnlySequence<byte> body, MessageSerializer serializer)
         {
-            RawBody = body;
+            var i = 0;
+            if (body.IsSingleSegment)
+            {
+                _rawBody = ArrayPool<byte>.Shared.Rent(body.First.Span.Length);
+                foreach (var b in body.First.Span)
+                {
+                    _rawBody[i] = b;
+                    i++;
+                }
+            }
+            else
+            {
+                _rawBody = ArrayPool<byte>.Shared.Rent((int)body.Length);
+                foreach (var readOnlyMemory in body)
+                {
+                    foreach (var b in readOnlyMemory.Span)
+                    {
+                        _rawBody[i] = b;
+                        i++;
+                    }
+                }
+            }
+
             _serializer = serializer;
         }
 
@@ -53,11 +77,19 @@ namespace Orleans.Runtime
         public List<GrainAddress> _cacheInvalidationHeader;
 
         public PackedHeaders Headers { get => _headers; set => _headers = value; }
-        public byte[] RawBody { get; private set; }
 
         public object BodyObject
         {
-            get => _body ??= _serializer.ReadBodyObject(this);
+            get
+            {
+                if (_body == null)
+                {
+                    _body = _serializer.ReadBodyObject(this, _rawBody);
+                    ArrayPool<byte>.Shared.Return(_rawBody);
+                }
+
+                return _body;
+            }
             set => _body = value;
         }
 

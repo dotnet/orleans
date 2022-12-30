@@ -87,7 +87,7 @@ namespace Orleans.Runtime.Messaging
 
                 // Build message
                 message = bodyLength != 0
-                    ? new Message(body.ToArray(), this)
+                    ? new Message(body, this)
                     : new Message();
                 if (header.IsSingleSegment)
                 {
@@ -109,9 +109,9 @@ namespace Orleans.Runtime.Messaging
             }
         }
 
-        public object ReadBodyObject(Message message)
+        public object ReadBodyObject(Message message, byte[] rawBody)
         {
-            var reader = Reader.Create(message.RawBody, _deserializationSession);
+            var reader = Reader.Create(rawBody, _deserializationSession);
             var field = reader.ReadFieldHeader();
 
             if (message.Result == ResponseTypes.Success)
