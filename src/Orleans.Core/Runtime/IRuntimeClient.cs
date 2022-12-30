@@ -1,7 +1,6 @@
 using System;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.CodeGeneration;
-using Orleans.Runtime.Messaging;
 using Orleans.Serialization;
 using Orleans.Serialization.Invocation;
 

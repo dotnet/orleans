@@ -21,7 +21,7 @@ namespace Orleans.Runtime
 
         public Message CreateMessage(object body, InvokeMethodOptions options)
         {
-            var message = new Message
+            var message = new Message(body)
             {
                 Direction = (options & InvokeMethodOptions.OneWay) != 0 ? Message.Directions.OneWay : Message.Directions.Request,
                 Id = CorrelationId.GetNext(),
@@ -30,15 +30,14 @@ namespace Orleans.Runtime
                 IsAlwaysInterleave = (options & InvokeMethodOptions.AlwaysInterleave) != 0,
                 RequestContextData = RequestContextExtensions.Export(this.deepCopier),
             };
-            message.SetBody(body);
 
             messagingTrace.OnCreateMessage(message);
             return message;
         }
 
-        public Message CreateResponseMessage(Message request)
+        public Message CreateResponseMessage(Message request, object body)
         {
-            var response = new Message
+            var response = new Message(body)
             {
                 IsSystemMessage = request.IsSystemMessage,
                 Direction = Message.Directions.Response,
@@ -60,14 +59,13 @@ namespace Orleans.Runtime
 
         public Message CreateRejectionResponse(Message request, Message.RejectionTypes type, string info, Exception ex = null)
         {
-            var response = this.CreateResponseMessage(request);
-            response.Result = Message.ResponseTypes.Rejection;
-            response.SetBody(new RejectionResponse
+            var response = this.CreateResponseMessage(request, new RejectionResponse
             {
                 RejectionType = type,
                 RejectionInfo = info,
                 Exception = ex,
             });
+            response.Result = Message.ResponseTypes.Rejection;
             if (this.logger.IsEnabled(LogLevel.Debug))
                 this.logger.LogDebug(
                     ex,
@@ -80,9 +78,8 @@ namespace Orleans.Runtime
 
         internal Message CreateDiagnosticResponseMessage(Message request, bool isExecuting, bool isWaiting, List<string> diagnostics)
         {
-            var response = this.CreateResponseMessage(request);
+            var response = this.CreateResponseMessage(request,new StatusResponse(isExecuting, isWaiting, diagnostics));
             response.Result = Message.ResponseTypes.Status;
-            response.SetBody(new StatusResponse(isExecuting, isWaiting, diagnostics));
 
             if (this.logger.IsEnabled(LogLevel.Debug)) this.logger.LogDebug("Creating {RequestMessage} status update with diagnostics {Diagnostics}", request, diagnostics);
 

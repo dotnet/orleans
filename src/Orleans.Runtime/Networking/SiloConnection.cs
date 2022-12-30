@@ -167,8 +167,7 @@ namespace Orleans.Runtime.Messaging
             else
             {
                 this.probeMonitor.OnReceivedProbeRequest();
-                var response = this.MessageFactory.CreateResponseMessage(msg);
-                response.SetBody(PingResponse);
+                var response = this.MessageFactory.CreateResponseMessage(msg, PingResponse);
                 this.Send(response);
             }
         }

@@ -5,7 +5,6 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Orleans.GrainReferences;
-using Orleans.Runtime.Messaging;
 using Orleans.Runtime.Scheduler;
 using Orleans.Serialization.Invocation;
 
@@ -61,7 +60,7 @@ namespace Orleans.Runtime
         GrainAddress IGrainContext.Address => this.ActivationAddress;
 
         private RuntimeMessagingTrace MessagingTrace => this.messagingTrace ??= this.RuntimeClient.ServiceProvider.GetRequiredService<RuntimeMessagingTrace>();
-
+        
         /// <summary>Only needed to make Reflection happy.</summary>
         protected SystemTarget()
         {

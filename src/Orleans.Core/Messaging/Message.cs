@@ -16,10 +16,25 @@ namespace Orleans.Runtime
         private short _retryCount;
         [NonSerialized]
         private object _body;
+        [NonSerialized]
+        private readonly MessageSerializer _serializer;
+
+        public Message()
+        {
+        }
+
+        public Message(object body)
+        {
+            _body = body;
+        }
+
+        public Message(byte[] body, MessageSerializer serializer)
+        {
+            RawBody = body;
+            _serializer = serializer;
+        }
 
         public CoarseStopwatch _timeToExpiry;
-
-        public byte[] RawBody { get; set; }
 
         public PackedHeaders _headers;
         public CorrelationId _id;
@@ -38,6 +53,13 @@ namespace Orleans.Runtime
         public List<GrainAddress> _cacheInvalidationHeader;
 
         public PackedHeaders Headers { get => _headers; set => _headers = value; }
+        public byte[] RawBody { get; private set; }
+
+        public object BodyObject
+        {
+            get => _body ??= _serializer.ReadBodyObject(this);
+            set => _body = value;
+        }
 
         [GenerateSerializer]
         public enum Directions : byte
@@ -260,15 +282,6 @@ namespace Orleans.Runtime
             CacheInvalidationHeader = list;
         }
 
-        public object GetBody(MessageSerializer serializer)
-        {
-            if (_body is null && serializer is not null)
-                _body = serializer.ReadBodyObject(this);
-            return _body;
-        }
-
-        public void SetBody(object body) => _body = body;
-
         public override string ToString() => $"{this}";
 
         string IFormattable.ToString(string format, IFormatProvider formatProvider) => ToString();
@@ -281,12 +294,11 @@ namespace Orleans.Runtime
             if (IsReadOnly && !Append(ref dst, "ReadOnly ")) goto grow;
             if (IsAlwaysInterleave && !Append(ref dst, "IsAlwaysInterleave ")) goto grow;
 
-            var body = GetBody(null);
             if (Direction == Directions.Response)
             {
                 switch (Result)
                 {
-                    case ResponseTypes.Rejection when body is RejectionResponse rejection:
+                    case ResponseTypes.Rejection when BodyObject is RejectionResponse rejection:
                         if (!dst.TryWrite($"{rejection.RejectionType} Rejection (info: {rejection.RejectionInfo}) ", out len)) goto grow;
                         dst = dst[len..];
                         break;
@@ -304,7 +316,7 @@ namespace Orleans.Runtime
             if (!dst.TryWrite($"{Direction} [{SendingSilo} {SendingGrain}]->[{TargetSilo} {TargetGrain}]", out len)) goto grow;
             dst = dst[len..];
 
-            if (body is { } request)
+            if (BodyObject is { } request)
             {
                 if (!dst.TryWrite($" {request}", out len)) goto grow;
                 dst = dst[len..];

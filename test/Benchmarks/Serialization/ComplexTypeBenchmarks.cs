@@ -57,8 +57,7 @@ namespace Benchmarks
                 //MultiDimensionalArray = new[,] {{0, 2, 4}, {1, 5, 6}}
             };
             _value.AlsoSelf = _value.BaseSelf = _value.Self = _value;
-            _message = new();
-            _message.SetBody(new Response<ComplexClass> { TypedResult = _value });
+            _message = new(new Response<ComplexClass> { TypedResult = _value });
 
             _structValue = new SimpleStruct
             {
@@ -66,8 +65,7 @@ namespace Benchmarks
                 Bool = true,
                 Guid = Guid.NewGuid()
             };
-            _structMessage = new();
-            _structMessage.SetBody(new Response<SimpleStruct> { TypedResult = _structValue });
+            _structMessage = new(new Response<SimpleStruct> { TypedResult = _structValue });
 
             _session = _sessionPool.GetSession();
             var writer = Buffer.CreateWriter(_session);
@@ -134,7 +132,7 @@ namespace Benchmarks
             var reader = readResult.Buffer;
             _messageSerializer.TryRead(ref reader, out var result);
 
-            ((Response<SimpleStruct>)result.GetBody(_messageSerializer)).Dispose();
+            ((Response<SimpleStruct>)result.BodyObject).Dispose();
 
             _pipe.Writer.Complete();
             _pipe.Reader.Complete();
@@ -167,7 +165,7 @@ namespace Benchmarks
             var reader = readResult.Buffer;
             _messageSerializer.TryRead(ref reader, out var result);
 
-            ((Response<ComplexClass>)result.GetBody(_messageSerializer)).Dispose();
+            ((Response<ComplexClass>)result.BodyObject).Dispose();
 
             _pipe.Writer.Complete();
             _pipe.Reader.Complete();

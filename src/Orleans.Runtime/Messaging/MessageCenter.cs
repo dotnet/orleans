@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
-using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
@@ -458,8 +457,7 @@ namespace Orleans.Runtime.Messaging
         internal void SendResponse(Message request, Response response)
         {
             // create the response
-            var message = this.messageFactory.CreateResponseMessage(request);
-            message.SetBody(response);
+            var message = this.messageFactory.CreateResponseMessage(request, response);
 
             if (message.TargetGrain.IsSystemTarget())
             {

@@ -86,7 +86,9 @@ namespace Orleans.Runtime.Messaging
                 var body = input.Slice(bodyOffset, bodyLength);
 
                 // Build message
-                message = new();
+                message = bodyLength != 0
+                    ? new Message(body.ToArray(), this)
+                    : new Message();
                 if (header.IsSingleSegment)
                 {
                     var headersReader = Reader.Create(header.First.Span, _deserializationSession);
@@ -97,9 +99,6 @@ namespace Orleans.Runtime.Messaging
                     var headersReader = Reader.Create(header, _deserializationSession);
                     Deserialize(ref headersReader, message);
                 }
-
-                if (bodyLength != 0)
-                    message.RawBody = body.ToArray();
 
                 return (0, headerLength, bodyLength);
             }
@@ -139,9 +138,9 @@ namespace Orleans.Runtime.Messaging
             var headers = message.Headers;
             IFieldCodec? bodyCodec = null;
             ResponseCodec? rawCodec = null;
-            if (message.GetBody(this) is not null)
+            if (message.BodyObject is not null)
             {
-                bodyCodec = _codecProvider.GetCodec(message.GetBody(this).GetType());
+                bodyCodec = _codecProvider.GetCodec(message.BodyObject.GetType());
                 if (headers.ResponseType is ResponseTypes.None && bodyCodec is ResponseCodec responseCodec)
                 {
                     rawCodec = responseCodec;
@@ -167,8 +166,8 @@ namespace Orleans.Runtime.Messaging
                 if (bodyCodec is not null)
                 {
                     innerWriter = Writer.Create(new MessageBufferWriter(bufferWriter), _serializationSession);
-                    if (rawCodec != null) rawCodec.WriteRaw(ref innerWriter, message.GetBody(this));
-                    else bodyCodec.WriteField(ref innerWriter, 0, null, message.GetBody(this));
+                    if (rawCodec != null) rawCodec.WriteRaw(ref innerWriter, message.BodyObject);
+                    else bodyCodec.WriteField(ref innerWriter, 0, null, message.BodyObject);
                     innerWriter.Commit();
                 }
 
