@@ -359,7 +359,7 @@ namespace Orleans.CodeGenerator
 
             if (type.IsValueType)
             {
-                parameters[1] = parameters[1].WithModifiers(TokenList(Token(SyntaxKind.ScopedKeyword), Token(SyntaxKind.RefKeyword)));
+                parameters[1] = parameters[1].WithModifiers(libraryTypes.UseScopedKeyword ? TokenList(Token(SyntaxKind.ScopedKeyword), Token(SyntaxKind.RefKeyword)) : TokenList(Token(SyntaxKind.RefKeyword)));
             }
 
             var res = MethodDeclaration(returnType, SerializeMethodName)
@@ -529,7 +529,7 @@ namespace Orleans.CodeGenerator
 
             if (type.IsValueType)
             {
-                parameters[1] = parameters[1].WithModifiers(TokenList(Token(SyntaxKind.ScopedKeyword), Token(SyntaxKind.RefKeyword)));
+                parameters[1] = parameters[1].WithModifiers(libraryTypes.UseScopedKeyword ? TokenList(Token(SyntaxKind.ScopedKeyword), Token(SyntaxKind.RefKeyword)) : TokenList(Token(SyntaxKind.RefKeyword)));
             }
 
             var res = MethodDeclaration(returnType, DeserializeMethodName)
@@ -709,7 +709,7 @@ namespace Orleans.CodeGenerator
                                     })))),
                                 ReturnStatement()))
                     );
-                    
+
                     // C#: ReferenceCodec.MarkValueField(reader.Session);
                     innerBody.Add(ExpressionStatement(InvocationExpression(IdentifierName("ReferenceCodec").Member("MarkValueField"), ArgumentList(SingletonSeparatedList(Argument(writerParam.Member("Session")))))));
                 }
@@ -1015,7 +1015,7 @@ namespace Orleans.CodeGenerator
             public override bool IsInjected { get; }
         }
 
-        internal sealed class ActivatorFieldDescription : GeneratedFieldDescription 
+        internal sealed class ActivatorFieldDescription : GeneratedFieldDescription
         {
             public ActivatorFieldDescription(TypeSyntax fieldType, string fieldName) : base(fieldType, fieldName)
             {
@@ -1040,7 +1040,7 @@ namespace Orleans.CodeGenerator
             public TypeFieldDescription(TypeSyntax fieldType, string fieldName, TypeSyntax underlyingTypeSyntax, ITypeSymbol underlyingType) : base(fieldType, fieldName)
             {
                 UnderlyingType = underlyingType;
-                UnderlyingTypeSyntax = underlyingTypeSyntax; 
+                UnderlyingTypeSyntax = underlyingTypeSyntax;
             }
 
             public TypeSyntax UnderlyingTypeSyntax { get; }
@@ -1216,22 +1216,22 @@ namespace Orleans.CodeGenerator
             private bool IsProperty => Member.Symbol is IPropertySymbol;
 
             /// <summary>
-            /// Gets a value indicating whether or not this member represents an accessible field. 
+            /// Gets a value indicating whether or not this member represents an accessible field.
             /// </summary>
             private bool IsGettableField => Field is { } field && _model.IsAccessible(0, field) && !IsObsolete;
 
             /// <summary>
-            /// Gets a value indicating whether or not this member represents an accessible, mutable field. 
+            /// Gets a value indicating whether or not this member represents an accessible, mutable field.
             /// </summary>
             private bool IsSettableField => Field is { } field && IsGettableField && !field.IsReadOnly;
 
             /// <summary>
-            /// Gets a value indicating whether or not this member represents a property with an accessible, non-obsolete getter. 
+            /// Gets a value indicating whether or not this member represents a property with an accessible, non-obsolete getter.
             /// </summary>
             private bool IsGettableProperty => Property?.GetMethod is { } getMethod && _model.IsAccessible(0, getMethod) && !IsObsolete;
 
             /// <summary>
-            /// Gets a value indicating whether or not this member represents a property with an accessible, non-obsolete setter. 
+            /// Gets a value indicating whether or not this member represents a property with an accessible, non-obsolete setter.
             /// </summary>
             private bool IsSettableProperty => Property?.SetMethod is { } setMethod && _model.IsAccessible(0, setMethod) && !setMethod.IsInitOnly && !IsObsolete;
 
@@ -1239,7 +1239,7 @@ namespace Orleans.CodeGenerator
             /// Gets syntax representing the type of this field.
             /// </summary>
             public TypeSyntax TypeSyntax => Member.Type.TypeKind == TypeKind.Dynamic
-                ? PredefinedType(Token(SyntaxKind.ObjectKeyword)) 
+                ? PredefinedType(Token(SyntaxKind.ObjectKeyword))
                 : _member.GetTypeSyntax(Member.Type);
 
             /// <summary>

@@ -60,6 +60,15 @@ namespace Orleans.CodeGenerator
                         options.GenerateFieldIds = fieldIdOption;
                 }
 
+                if (context.AnalyzerConfigOptions.GlobalOptions.TryGetValue("build_property.orleans_usescopedkeyword",
+                        out var useScopedKeyword) && useScopedKeyword is { Length: > 0 })
+                {
+                    if (bool.TryParse(useScopedKeyword, out var useScopedKeywordOption))
+                    {
+                        options.UseScopedKeyword = useScopedKeywordOption;
+                    }
+                }
+
                 var codeGenerator = new CodeGenerator(context.Compilation, options);
                 var syntax = codeGenerator.GenerateCode(context.CancellationToken);
                 var sourceString = syntax.NormalizeWhitespace().ToFullString();

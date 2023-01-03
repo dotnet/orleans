@@ -9,6 +9,7 @@
     <CompilerVisibleProperty Include="Orleans_AliasAttributes" />
     <CompilerVisibleProperty Include="Orleans_GenerateSerializerAttributes" />
     <CompilerVisibleProperty Include="Orleans_ConstructorAttributes" />
+    <CompilerVisibleProperty Include="Orleans_UseScopedKeyword" />
   </ItemGroup>
 
   <PropertyGroup>
@@ -19,6 +20,7 @@
     <Orleans_AliasAttributes>$(OrleansAliasAttributes)</Orleans_AliasAttributes>
     <Orleans_GenerateSerializerAttributes>$(OrleansGenerateSerializerAttributes)</Orleans_GenerateSerializerAttributes>
     <Orleans_ConstructorAttributes>$(OrleansConstructorAttributes)</Orleans_ConstructorAttributes>
+    <Orleans_UseScopedKeyword>$(OrleansUseScopedKeyword)</Orleans_UseScopedKeyword>
   </PropertyGroup>
 
 </Project>

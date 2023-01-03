@@ -178,6 +178,7 @@ namespace Orleans.CodeGenerator
                     Type("System.Collections.Immutable.ImmutableSortedSet`1"),
                     Type("System.Collections.Immutable.ImmutableStack`1"),
                 },
+                UseScopedKeyword = options.UseScopedKeyword,
             };
 
             INamedTypeSymbol Type(string metadataName)
@@ -302,6 +303,7 @@ namespace Orleans.CodeGenerator
         public INamedTypeSymbol FSharpCompilationMappingAttributeOrDefault { get; private set; }
         public INamedTypeSymbol FSharpSourceConstructFlagsOrDefault { get; private set; }
         public INamedTypeSymbol FormatterServices { get; private set; }
+        public bool UseScopedKeyword { get; private set; }
 
         private readonly ConcurrentDictionary<ITypeSymbol, bool> _shallowCopyableTypes = new(SymbolEqualityComparer.Default);
 

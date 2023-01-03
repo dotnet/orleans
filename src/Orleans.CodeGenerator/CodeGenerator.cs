@@ -23,6 +23,7 @@ namespace Orleans.CodeGenerator
         public List<string> ImmutableAttributes { get; } = new() { "Orleans.ImmutableAttribute" };
         public List<string> ConstructorAttributes { get; } = new() { "Orleans.OrleansConstructorAttribute", "Microsoft.Extensions.DependencyInjection.ActivatorUtilitiesConstructorAttribute" };
         public GenerateFieldIds GenerateFieldIds { get; set; }
+        public bool UseScopedKeyword { get; set; } = true;
     }
 
     public class CodeGenerator
