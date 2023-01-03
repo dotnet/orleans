@@ -1,5 +1,9 @@
 using k8s;
+#if NETSTANDARD2_0
 using Microsoft.Rest;
+#else
+using k8s.Autorest;
+#endif
 using System;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
