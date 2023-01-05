@@ -74,7 +74,7 @@ namespace Orleans.Storage
             if (logger.IsEnabled(LogLevel.Trace)) logger.LogTrace("Read Keys={Keys}", key);
 
             IMemoryStorageGrain storageGrain = GetStorageGrain(key);
-            var state = await storageGrain.ReadStateAsync<BinaryData>(key);
+            var state = await storageGrain.ReadStateAsync<ReadOnlyMemory<byte>>(key);
             if (state != null)
             {
                 var loadedState = ConvertFromStorageFormat<T>(state.State);
@@ -93,7 +93,7 @@ namespace Orleans.Storage
             try
             {
                 var data = ConvertToStorageFormat<T>(grainState.State);
-                var binaryGrainState = new GrainState<BinaryData>(data, grainState.ETag)
+                var binaryGrainState = new GrainState<ReadOnlyMemory<byte>>(data, grainState.ETag)
                 {
                     RecordExists = grainState.RecordExists
                 };
@@ -139,7 +139,7 @@ namespace Orleans.Storage
         /// Deserialize from binary data
         /// </summary>
         /// <param name="data">The serialized stored data</param>
-        internal T ConvertFromStorageFormat<T>(BinaryData data)
+        internal T ConvertFromStorageFormat<T>(ReadOnlyMemory<byte> data)
         {
 
             T dataValue = default;
@@ -168,7 +168,7 @@ namespace Orleans.Storage
         }
 
         /// <summary>
-        /// Serialize to Azure storage format in either binary or JSON format.
+        /// Serialize to the storage format.
         /// </summary>
         /// <param name="grainState">The grain state data to be serialized</param>
         /// <remarks>
@@ -176,7 +176,7 @@ namespace Orleans.Storage
         /// http://msdn.microsoft.com/en-us/library/system.web.script.serialization.javascriptserializer.aspx
         /// for more on the JSON serializer.
         /// </remarks>
-        internal BinaryData ConvertToStorageFormat<T>(T grainState)
+        internal ReadOnlyMemory<byte> ConvertToStorageFormat<T>(T grainState)
         {
             // Convert to binary format
             return this.storageSerializer.Serialize<T>(grainState);
