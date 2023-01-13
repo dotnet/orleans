@@ -1,10 +1,9 @@
-using k8s;
+using System;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 using Orleans.Hosting.Kubernetes;
 using Orleans.Runtime;
-using System;
 
 namespace Orleans.Hosting
 {
@@ -49,25 +48,6 @@ namespace Orleans.Hosting
             services.AddSingleton<IValidateOptions<KubernetesHostingOptions>, KubernetesHostingOptionsValidator>();
 
             services.AddSingleton<ILifecycleParticipant<ISiloLifecycle>, KubernetesClusterAgent>();
-
-            // Configure the Kubernetes client.
-            services.AddHttpClient("Orleans.Kubernetes.Agent")
-                .AddTypedClient<IKubernetes>((httpClient, serviceProvider) =>
-                {
-                    var config = serviceProvider.GetRequiredService<KubernetesHostingOptions>().ClientConfiguration;
-                    return new k8s.Kubernetes(
-                        config,
-                        httpClient);
-                }).ConfigurePrimaryHttpMessageHandler(serviceProvider =>
-                {
-                    var config = serviceProvider.GetRequiredService<KubernetesHostingOptions>().ClientConfiguration;
-                    return config.CreateDefaultHttpClientHandler();
-                })
-#if NETSTANDARD2_0
-                .AddHttpMessageHandler(KubernetesClientConfiguration.CreateWatchHandler);
-#else
-                ;
-#endif
 
             return services;
         }

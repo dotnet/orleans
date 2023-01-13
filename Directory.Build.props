@@ -131,7 +131,7 @@
     <ZooKeeperNetExVersion>3.4.12.4</ZooKeeperNetExVersion>
     <StackExchangeRedis>2.2.88</StackExchangeRedis>
     <Netstandard20KubernetesClientVersion>4.0.5</Netstandard20KubernetesClientVersion>
-    <KubernetesClientVersion>6.0.23</KubernetesClientVersion>
+    <KubernetesClientVersion>9.0.38</KubernetesClientVersion>
 
     <!-- Test related packages -->
     <FluentAssertionsVersion>6.2.0</FluentAssertionsVersion>
