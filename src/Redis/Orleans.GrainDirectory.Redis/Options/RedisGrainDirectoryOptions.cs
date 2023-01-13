@@ -1,4 +1,5 @@
 using System;
+using System.Threading.Tasks;
 using Orleans.GrainDirectory.Redis;
 using Orleans.Runtime;
 using StackExchange.Redis;
@@ -11,37 +12,51 @@ namespace Orleans.Configuration
     public class RedisGrainDirectoryOptions 
     {
         /// <summary>
-        /// Configure the Redis client
+        /// Gets or sets the Redis client configuration.
         /// </summary>
         [RedactRedisConfigurationOptions]
         public ConfigurationOptions ConfigurationOptions { get; set; }
+
+        /// <summary>
+        /// The delegate used to create a Redis connection multiplexer.
+        /// </summary>
+        public Func<RedisGrainDirectoryOptions, Task<IConnectionMultiplexer>> CreateMultiplexer { get; set; } = DefaultCreateMultiplexer;
 
         /// <summary>
         /// Entry expiry, null by default. A value should be set ONLY for ephemeral environments (like in tests).
         /// Setting a value different from null will cause duplicate activations in the cluster.
         /// </summary>
         public TimeSpan? EntryExpiry { get; set; } = null;
+
+        /// <summary>
+        /// The default multiplexer creation delegate.
+        /// </summary>
+        public static async Task<IConnectionMultiplexer> DefaultCreateMultiplexer(RedisGrainDirectoryOptions options) => await ConnectionMultiplexer.ConnectAsync(options.ConfigurationOptions);
     }
 
-    public class RedactRedisConfigurationOptions : RedactAttribute
+    internal class RedactRedisConfigurationOptions : RedactAttribute
     {
         public override string Redact(object value) => value is ConfigurationOptions cfg ? cfg.ToString(includePassword: false) : base.Redact(value);
     }
 
+    /// <summary>
+    /// Configuration validator for <see cref="RedisGrainDirectoryOptions"/>.
+    /// </summary>
     public class RedisGrainDirectoryOptionsValidator : IConfigurationValidator
     {
-        private readonly RedisGrainDirectoryOptions options;
+        private readonly RedisGrainDirectoryOptions _options;
 
         public RedisGrainDirectoryOptionsValidator(RedisGrainDirectoryOptions options)
         {
-            this.options = options;
+            _options = options;
         }
 
+        /// <inheritdoc/>
         public void ValidateConfiguration()
         {
-            if (this.options.ConfigurationOptions == null)
+            if (_options.ConfigurationOptions == null)
             {
-                throw new OrleansConfigurationException($"Invalid {nameof(RedisGrainDirectoryOptions)} values for {nameof(RedisGrainDirectory)}. {nameof(options.ConfigurationOptions)} is required.");
+                throw new OrleansConfigurationException($"Invalid {nameof(RedisGrainDirectoryOptions)} values for {nameof(RedisGrainDirectory)}. {nameof(_options.ConfigurationOptions)} is required.");
             }
         }
     }

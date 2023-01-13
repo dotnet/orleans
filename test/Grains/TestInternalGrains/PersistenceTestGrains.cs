@@ -356,7 +356,7 @@ namespace UnitTests.Grains
 
         public Task DoDelete()
         {
-            return ClearStateAsync(); // Automatically marks this grain as DeactivateOnIdle
+            return ClearStateAsync();
         }
     }
 
@@ -388,7 +388,7 @@ namespace UnitTests.Grains
 
         public Task DoDelete()
         {
-            return ClearStateAsync(); // Automatically marks this grain as DeactivateOnIdle
+            return ClearStateAsync();
         }
     }
 
@@ -427,7 +427,7 @@ namespace UnitTests.Grains
 
         public Task DoDelete()
         {
-            return ClearStateAsync(); // Automatically marks this grain as DeactivateOnIdle
+            return ClearStateAsync();
         }
     }
 
@@ -463,7 +463,7 @@ namespace UnitTests.Grains
 
         public Task DoDelete()
         {
-            return ClearStateAsync(); // Automatically marks this grain as DeactivateOnIdle
+            return ClearStateAsync();
         }
     }
 
@@ -495,7 +495,7 @@ namespace UnitTests.Grains
 
         public Task DoDelete()
         {
-            return ClearStateAsync(); // Automatically marks this grain as DeactivateOnIdle
+            return ClearStateAsync();
         }
     }
 
@@ -534,7 +534,7 @@ namespace UnitTests.Grains
 
         public Task DoDelete()
         {
-            return ClearStateAsync(); // Automatically marks this grain as DeactivateOnIdle
+            return ClearStateAsync();
         }
     }
 

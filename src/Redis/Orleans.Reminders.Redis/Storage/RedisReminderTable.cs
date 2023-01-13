@@ -1,7 +1,8 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
+using System.Text;
 using System.Threading.Tasks;
 
 using Microsoft.Extensions.Logging;
@@ -13,12 +14,13 @@ using Orleans.Configuration;
 using Orleans.Runtime;
 
 using StackExchange.Redis;
+using static System.FormattableString;
 
 namespace Orleans.Reminders.Redis
 {
     internal class RedisReminderTable : IReminderTable
     {
-        private readonly RedisKey RemindersRedisKey;
+        private readonly RedisKey _hashSetKey;
         private readonly RedisReminderTableOptions _redisOptions;
         private readonly ClusterOptions _clusterOptions;
         private readonly ILogger _logger;
@@ -42,98 +44,147 @@ namespace Orleans.Reminders.Redis
             _clusterOptions = clusterOptions.Value;
             _logger = logger;
 
-            RemindersRedisKey = $"{_clusterOptions.ServiceId}_Reminders";
+            _hashSetKey = Encoding.UTF8.GetBytes($"{_clusterOptions.ServiceId}/reminders");
         }
 
         public async Task Init()
         {
-            _muxer = await _redisOptions.CreateMultiplexer(_redisOptions);
-            _db = _redisOptions.DatabaseNumber.HasValue
-                ? _muxer.GetDatabase(_redisOptions.DatabaseNumber.Value)
-                : _muxer.GetDatabase();
+            try
+            {
+                _muxer = await _redisOptions.CreateMultiplexer(_redisOptions);
+                _db = _muxer.GetDatabase();
+
+                await _db.KeyExpireAsync(_hashSetKey, _redisOptions.EntryExpiry);
+            }
+            catch (Exception exception)
+            {
+                throw new RedisRemindersException(Invariant($"{exception.GetType()}: {exception.Message}"));
+            }
         }
 
         public async Task<ReminderEntry> ReadRow(GrainId grainId, string reminderName)
         {
-            (string from, string to) = GetFilter(grainId, reminderName);
-            RedisValue[] values = await _db.SortedSetRangeByValueAsync(RemindersRedisKey, from, to);
-            if (values.Length == 0)
+            try
             {
-                return null;
+                (string from, string to) = GetFilter(grainId, reminderName);
+                RedisValue[] values = await _db.SortedSetRangeByValueAsync(_hashSetKey, from, to);
+                if (values.Length == 0)
+                {
+                    return null;
+                }
+                else
+                {
+                    return ConvertToEntry(values.SingleOrDefault());
+                }
             }
-            else
+            catch (Exception exception)
             {
-                return ConvertToEntry(values.SingleOrDefault());
+                throw new RedisRemindersException(Invariant($"{exception.GetType()}: {exception.Message}"));
             }
         }
 
         public async Task<ReminderTableData> ReadRows(GrainId grainId)
         {
-            (string from, string to) = GetFilter(grainId);
-            RedisValue[] values = await _db.SortedSetRangeByValueAsync(RemindersRedisKey, from, to);
-            IEnumerable<ReminderEntry> records = values.Select(v => ConvertToEntry(v));
-            return new ReminderTableData(records);
+            try
+            {
+                (string from, string to) = GetFilter(grainId);
+                RedisValue[] values = await _db.SortedSetRangeByValueAsync(_hashSetKey, from, to);
+                IEnumerable<ReminderEntry> records = values.Select(v => ConvertToEntry(v));
+                return new ReminderTableData(records);
+            }
+            catch (Exception exception)
+            {
+                throw new RedisRemindersException(Invariant($"{exception.GetType()}: {exception.Message}"));
+            }
         }
 
         public async Task<ReminderTableData> ReadRows(uint begin, uint end)
         {
-            (string _, string from) = GetFilter(begin);
-            (string _, string to) = GetFilter(end);
-            IEnumerable<RedisValue> values;
-            if (begin < end)
+            try
             {
-                // -----begin******end-----
-                values = await _db.SortedSetRangeByValueAsync(RemindersRedisKey, from, to);
-            }
-            else
-            {
-                // *****end------begin*****
-                RedisValue[] values1 = await _db.SortedSetRangeByValueAsync(RemindersRedisKey, from, "[\"FFFFFFFF\",#");
-                RedisValue[] values2 = await _db.SortedSetRangeByValueAsync(RemindersRedisKey, "[\"00000000\",\"", to);
-                values = values1.Concat(values2);
-            }
+                (string _, string from) = GetFilter(begin);
+                (string _, string to) = GetFilter(end);
+                IEnumerable<RedisValue> values;
+                if (begin < end)
+                {
+                    // -----begin******end-----
+                    values = await _db.SortedSetRangeByValueAsync(_hashSetKey, from, to);
+                }
+                else
+                {
+                    // *****end------begin*****
+                    RedisValue[] values1 = await _db.SortedSetRangeByValueAsync(_hashSetKey, from, "[\"FFFFFFFF\",#");
+                    RedisValue[] values2 = await _db.SortedSetRangeByValueAsync(_hashSetKey, "[\"00000000\",\"", to);
+                    values = values1.Concat(values2);
+                }
 
-            IEnumerable<ReminderEntry> records = values.Select(v => ConvertToEntry(v));
-            return new ReminderTableData(records);
+                IEnumerable<ReminderEntry> records = values.Select(v => ConvertToEntry(v));
+                return new ReminderTableData(records);
+            }
+            catch (Exception exception)
+            {
+                throw new RedisRemindersException(Invariant($"{exception.GetType()}: {exception.Message}"));
+            }
         }
 
         public async Task<bool> RemoveRow(GrainId grainId, string reminderName, string eTag)
         {
-            (RedisValue from, RedisValue to) = GetFilter(grainId, reminderName, eTag);
-            long removed = await _db.SortedSetRemoveRangeByValueAsync(RemindersRedisKey, from, to);
-            return removed > 0;
+            try
+            {
+                (RedisValue from, RedisValue to) = GetFilter(grainId, reminderName, eTag);
+                long removed = await _db.SortedSetRemoveRangeByValueAsync(_hashSetKey, from, to);
+                return removed > 0;
+            }
+            catch (Exception exception)
+            {
+                throw new RedisRemindersException(Invariant($"{exception.GetType()}: {exception.Message}"));
+            }
         }
 
         public async Task TestOnlyClearTable()
         {
-            await _db.ExecuteAsync("FLUSHDB");
+            try
+            {
+                await _db.KeyDeleteAsync(_hashSetKey);
+            }
+            catch (Exception exception)
+            {
+                throw new RedisRemindersException(Invariant($"{exception.GetType()}: {exception.Message}"));
+            }
         }
 
         public async Task<string> UpsertRow(ReminderEntry entry)
         {
-            if (_logger.IsEnabled(LogLevel.Debug))
+            try
             {
-                _logger.LogDebug("UpsertRow entry = {Entry}, ETag = {ETag}", entry.ToString(), entry.ETag);
-            }
+                if (_logger.IsEnabled(LogLevel.Debug))
+                {
+                    _logger.LogDebug("UpsertRow entry = {Entry}, ETag = {ETag}", entry.ToString(), entry.ETag);
+                }
 
-            (string etag, string value) = ConvertFromEntry(entry);
-            (string from, string to) = GetFilter(entry.GrainId, entry.ReminderName);
+                (string etag, string value) = ConvertFromEntry(entry);
+                (string from, string to) = GetFilter(entry.GrainId, entry.ReminderName);
 
-            ITransaction tx = _db.CreateTransaction();
-            _db.SortedSetRemoveRangeByValueAsync(RemindersRedisKey, from, to).Ignore();
-            _db.SortedSetAddAsync(RemindersRedisKey, value, 0).Ignore();
-            bool success = await tx.ExecuteAsync();
-            if (success)
-            {
-                return etag;
+                ITransaction tx = _db.CreateTransaction();
+                _db.SortedSetRemoveRangeByValueAsync(_hashSetKey, from, to).Ignore();
+                _db.SortedSetAddAsync(_hashSetKey, value, 0).Ignore();
+                bool success = await tx.ExecuteAsync();
+                if (success)
+                {
+                    return etag;
+                }
+                else
+                {
+                    _logger.LogWarning(
+                        (int)ErrorCode.ReminderServiceBase,
+                        "Intermediate error updating entry {Entry} to Redis.",
+                        entry);
+                    throw new ReminderException("Failed to upsert reminder");
+                }
             }
-            else
+            catch (Exception exception) when (exception is not ReminderException)
             {
-                _logger.LogWarning(
-                    (int)ErrorCode.ReminderServiceBase,
-                    "Intermediate error updating entry {Entry} to Redis.",
-                    entry);
-                throw new ReminderException("Failed to upsert reminder");
+                throw new RedisRemindersException(Invariant($"{exception.GetType()}: {exception.Message}"));
             }
         }
 

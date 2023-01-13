@@ -17,7 +17,7 @@ namespace Orleans.Hosting
     public static class RedisGrainStorageServiceCollectionExtensions
     {
         /// <summary>
-        /// Configure silo to use Redis as the default grain storage.
+        /// Configures Redis as the default grain storage provider.
         /// </summary>
         public static IServiceCollection AddRedisGrainStorageAsDefault(this IServiceCollection services, Action<RedisStorageOptions> configureOptions)
         {
@@ -25,7 +25,7 @@ namespace Orleans.Hosting
         }
 
         /// <summary>
-        /// Configure silo to use Redis for grain storage.
+        /// Configures Redis as a grain storage provider.
         /// </summary>
         public static IServiceCollection AddRedisGrainStorage(this IServiceCollection services, string name, Action<RedisStorageOptions> configureOptions)
         {
@@ -33,7 +33,7 @@ namespace Orleans.Hosting
         }
 
         /// <summary>
-        /// Configure silo to use Redis as the default grain storage.
+        /// Configures Redis as the default grain storage provider.
         /// </summary>
         public static IServiceCollection AddRedisGrainStorageAsDefault(this IServiceCollection services, Action<OptionsBuilder<RedisStorageOptions>> configureOptions = null)
         {
@@ -41,7 +41,7 @@ namespace Orleans.Hosting
         }
 
         /// <summary>
-        /// Configure silo to use Redis for grain storage.
+        /// Configures Redis as a grain storage provider.
         /// </summary>
         public static IServiceCollection AddRedisGrainStorage(this IServiceCollection services, string name,
             Action<OptionsBuilder<RedisStorageOptions>> configureOptions = null)

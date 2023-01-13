@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Text;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
@@ -16,8 +17,9 @@ namespace Orleans.GrainDirectory.Redis
         private readonly RedisGrainDirectoryOptions directoryOptions;
         private readonly ClusterOptions clusterOptions;
         private readonly ILogger<RedisGrainDirectory> logger;
+        private readonly RedisKey _keyPrefix;
 
-        private ConnectionMultiplexer redis;
+        private IConnectionMultiplexer redis;
         private IDatabase database;
         private LuaScript deleteScript;
 
@@ -29,6 +31,7 @@ namespace Orleans.GrainDirectory.Redis
             this.directoryOptions = directoryOptions;
             this.logger = logger;
             this.clusterOptions = clusterOptions.Value;
+            _keyPrefix = Encoding.UTF8.GetBytes($"{this.clusterOptions.ClusterId}/directory/");
         }
 
         public async Task<GrainAddress> Lookup(GrainId grainId)
@@ -121,7 +124,7 @@ namespace Orleans.GrainDirectory.Redis
 
         public async Task Initialize(CancellationToken ct = default)
         {
-            this.redis = await ConnectionMultiplexer.ConnectAsync(this.directoryOptions.ConfigurationOptions);
+            this.redis = await directoryOptions.CreateMultiplexer(directoryOptions);
 
             // Configure logging
             this.redis.ConnectionRestored += this.LogConnectionRestored;
@@ -132,16 +135,16 @@ namespace Orleans.GrainDirectory.Redis
             this.database = this.redis.GetDatabase();
 
             this.deleteScript = LuaScript.Prepare(
-    @"	
-local cur = redis.call('GET', @key)
-if cur ~= false then
-    local typedCur = cjson.decode(cur)
-    if typedCur.ActivationId == @val  then	
-        return redis.call('DEL', @key)	
-    end
-end
-return 0	
-                ");
+                """
+                local cur = redis.call('GET', @key)
+                if cur ~= false then
+                    local typedCur = cjson.decode(cur)
+                    if typedCur.ActivationId == @val then	
+                        return redis.call('DEL', @key)	
+                    end
+                end
+                return 0	
+                """);
         }
 
         private async Task Uninitialize(CancellationToken arg)
@@ -155,7 +158,7 @@ return 0
             }
         }
 
-        private string GetKey(GrainId grainId) => $"{this.clusterOptions.ClusterId}-{grainId}";
+        private string GetKey(GrainId grainId) => _keyPrefix.Append(grainId.ToString());
 
         #region Logging
         private void LogConnectionRestored(object sender, ConnectionFailedEventArgs e)

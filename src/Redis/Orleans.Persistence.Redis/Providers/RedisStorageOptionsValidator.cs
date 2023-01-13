@@ -1,4 +1,4 @@
-﻿using Orleans.Runtime;
+using Orleans.Runtime;
 
 namespace Orleans.Persistence
 {
@@ -9,27 +9,15 @@ namespace Orleans.Persistence
 
         public RedisStorageOptionsValidator(RedisStorageOptions options, string name)
         {
-            this._options = options;
-            this._name = name;
+            _options = options;
+            _name = name;
         }
 
         public void ValidateConfiguration()
         {
-            var msg = $"Configuration for {nameof(RedisGrainStorage)} - {_name} is invalid";
-
-            if (_options == null)
+            if (_options.ConfigurationOptions == null)
             {
-                throw new OrleansConfigurationException($"{msg} - {nameof(RedisStorageOptions)} is null");
-            }
-
-            if (string.IsNullOrWhiteSpace(_options.ConnectionString))
-            {
-                throw new OrleansConfigurationException($"{msg} - {nameof(_options.ConnectionString)} is null or empty");
-            }
-
-            if (!_options.ConnectionString.Contains(':')) // host:port delimiter
-            {
-                throw new OrleansConfigurationException($"{msg} - {nameof(_options.ConnectionString)} invalid format: {_options.ConnectionString}, should contain host and port delimited by ':'");
+                throw new OrleansConfigurationException($"Invalid {nameof(RedisStorageOptions)} values for {nameof(RedisGrainStorage)} with name {_name}. {nameof(_options.ConfigurationOptions)} is required.");
             }
         }
     }

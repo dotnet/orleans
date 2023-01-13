@@ -8,10 +8,13 @@ using Orleans.Runtime;
 
 namespace Orleans.Hosting
 {
+    /// <summary>
+    /// Extensions for configuring Redis as a grain directory provider.
+    /// </summary>
     public static class RedisGrainDirectoryExtensions
     {
         /// <summary>
-        /// Use a Redis data-store as the default Grain Directory
+        /// Adds a default grain directory which persists entries in Redis.
         /// </summary>
         public static ISiloBuilder UseRedisGrainDirectoryAsDefault(
             this ISiloBuilder builder,
@@ -21,7 +24,7 @@ namespace Orleans.Hosting
         }
 
         /// <summary>
-        /// Use a Redis data-store as the default Grain Directory
+        /// Adds a default grain directory which persists entries in Redis.
         /// </summary>
         public static ISiloBuilder UseRedisGrainDirectoryAsDefault(
             this ISiloBuilder builder,
@@ -31,7 +34,7 @@ namespace Orleans.Hosting
         }
 
         /// <summary>
-        /// Add a Redis data-store as a named Grain Directory
+        /// Adds a named grain directory which persists entries in Redis.
         /// </summary>
         public static ISiloBuilder AddRedisGrainDirectory(
             this ISiloBuilder builder,
@@ -42,7 +45,7 @@ namespace Orleans.Hosting
         }
 
         /// <summary>
-        /// Add a Redis data-store as a named Grain Directory
+        /// Adds a named grain directory which persists entries in Redis.
         /// </summary>
         public static ISiloBuilder AddRedisGrainDirectory(
             this ISiloBuilder builder,

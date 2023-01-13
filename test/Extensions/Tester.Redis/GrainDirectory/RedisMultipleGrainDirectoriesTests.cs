@@ -1,17 +1,10 @@
-using System;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
-using Orleans.Configuration;
 using Orleans.GrainDirectory.Redis;
-using Orleans.Hosting;
 using Orleans.TestingHost;
 using StackExchange.Redis;
 using Tester.Directories;
-using Tester.Redis.Utility;
 using TestExtensions;
 using UnitTests.Grains.Directories;
-using Xunit;
-using Xunit.Abstractions;
 
 namespace Tester.Redis.GrainDirectory
 {

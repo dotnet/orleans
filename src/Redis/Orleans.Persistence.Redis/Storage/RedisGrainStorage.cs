@@ -1,6 +1,8 @@
-﻿using System;
+using System;
 using System.Diagnostics;
+using System.Globalization;
 using System.Linq;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
@@ -17,20 +19,33 @@ namespace Orleans.Persistence
     /// <summary>
     /// Redis-based grain storage provider
     /// </summary>
-    public class RedisGrainStorage : IGrainStorage, ILifecycleParticipant<ISiloLifecycle>
+    internal class RedisGrainStorage : IGrainStorage, ILifecycleParticipant<ISiloLifecycle>
     {
-        private const string WriteScript = "local etag = redis.call('HGET', KEYS[1], 'etag')\nif etag == false or etag == ARGV[1] then return redis.call('HMSET', KEYS[1], 'etag', ARGV[2], 'data', ARGV[3]) else return false end";
+        private const string WriteScript =
+            """
+            local etag = redis.call('HGET', KEYS[1], 'etag')
+            if etag == false or etag == ARGV[1] then
+              local result = redis.call('HMSET', KEYS[1], 'etag', ARGV[2], 'data', ARGV[3])
+              if ARGV[4] ~= '-1' then
+                redis.call('EXPIRE', KEYS[1], ARGV[4])
+              end
+              return result
+            else
+              return false
+            end
+            """;
         private const int ReloadWriteScriptMaxCount = 3;
 
         private readonly string _serviceId;
+        private readonly RedisValue _ttl;
+        private readonly RedisKey _keyPrefix;
         private readonly string _name;
         private readonly ILogger _logger;
         private readonly RedisStorageOptions _options;
         private readonly IGrainStorageSerializer _grainStorageSerializer;
 
-        private ConnectionMultiplexer _connection;
+        private IConnectionMultiplexer _connection;
         private IDatabase _db;
-        private ConfigurationOptions _redisOptions;
         private LuaScript _preparedWriteScript;
         private byte[] _preparedWriteScriptHash;
 
@@ -49,6 +64,8 @@ namespace Orleans.Persistence
             _options = options;
             _grainStorageSerializer = options.GrainStorageSerializer ?? grainStorageSerializer;
             _serviceId = clusterOptions.Value.ServiceId;
+            _ttl = options.EntryExpiry is { } ts ? ts.TotalSeconds.ToString(CultureInfo.InvariantCulture) : "-1";
+            _keyPrefix = Encoding.UTF8.GetBytes($"{_serviceId}/state/");
         }
 
         /// <inheritdoc />
@@ -67,24 +84,14 @@ namespace Orleans.Persistence
                 if (_logger.IsEnabled(LogLevel.Debug))
                 {
                     _logger.LogDebug(
-                        "RedisGrainStorage {Name} is initializing: ServiceId={ServiceId} DatabaseNumber={DatabaseNumber} DeleteOnClear={DeleteOnClear}",
+                        "RedisGrainStorage {Name} is initializing: ServiceId={ServiceId} DeleteOnClear={DeleteOnClear}",
                          _name,
                          _serviceId,
-                         _options.DatabaseNumber,
                          _options.DeleteOnClear);
                 }
 
-                _redisOptions = ConfigurationOptions.Parse(_options.ConnectionString);
-                _connection = await ConnectionMultiplexer.ConnectAsync(_redisOptions).ConfigureAwait(false);
-
-                if (_options.DatabaseNumber.HasValue)
-                {
-                    _db = _connection.GetDatabase(_options.DatabaseNumber.Value);
-                }
-                else
-                {
-                    _db = _connection.GetDatabase();
-                }
+                _connection = await _options.CreateMultiplexer(_options).ConfigureAwait(false);
+                _db = _connection.GetDatabase();
 
                 _preparedWriteScript = LuaScript.Prepare(WriteScript);
                 _preparedWriteScriptHash = await LoadWriteScriptAsync().ConfigureAwait(false);
@@ -108,7 +115,8 @@ namespace Orleans.Persistence
                     _name,
                     _serviceId,
                     timer.Elapsed.TotalMilliseconds.ToString("0.00"));
-                throw;
+
+                throw new RedisStorageException(Invariant($"{ex.GetType()}: {ex.Message}"));
             }
         }
 
@@ -116,7 +124,6 @@ namespace Orleans.Persistence
         {
             Debug.Assert(_connection is not null);
             Debug.Assert(_preparedWriteScript is not null);
-            Debug.Assert(_redisOptions.EndPoints.Count > 0);
 
             System.Net.EndPoint[] endPoints = _connection.GetEndPoints();
             var loadTasks = new Task<LoadedLuaScript>[endPoints.Length];
@@ -134,7 +141,7 @@ namespace Orleans.Persistence
         /// <inheritdoc />
         public async Task ReadStateAsync<T>(string grainType, GrainId grainId, IGrainState<T> grainState)
         {
-            var key = grainId.ToString();
+            var key = GetKey(grainId);
 
             try
             {
@@ -168,18 +175,18 @@ namespace Orleans.Persistence
         public async Task WriteStateAsync<T>(string grainType, GrainId grainId, IGrainState<T> grainState)
         {
             var etag = grainState.ETag ?? "null";
-            var key = grainId.ToString();
-            var newEtag = Guid.NewGuid().ToString();
+            var key = GetKey(grainId);
+            var newEtag = Guid.NewGuid().ToString("N");
 
-            RedisValue payload = default;
-            RedisResult writeWithScriptResponse = null;
+            RedisResult writeWithScriptResponse;
             try
             {
-                payload = new RedisValue(_grainStorageSerializer.Serialize<T>(grainState.State).ToString());
-                writeWithScriptResponse = await WriteToRedisUsingPreparedScriptAsync(payload,
-                        etag: etag,
-                        key: key,
-                        newEtag: newEtag)
+                var payload = new RedisValue(_grainStorageSerializer.Serialize<T>(grainState.State).ToString());
+                writeWithScriptResponse = await WriteToRedisUsingPreparedScriptAsync(
+                    payload,
+                    etag: etag,
+                    key: key,
+                    newEtag: newEtag)
                     .ConfigureAwait(false);
             }
             catch (Exception e)
@@ -195,18 +202,17 @@ namespace Orleans.Persistence
 
             if (writeWithScriptResponse is not null && writeWithScriptResponse.IsNull)
             {
-                throw new InconsistentStateException($"ETag mismatch - tried with ETag: {grainState.ETag}");
+                throw new InconsistentStateException(Invariant($"ETag mismatch - tried with ETag: {grainState.ETag}"));
             }
 
             grainState.ETag = newEtag;
         }
 
-        private Task<RedisResult> WriteToRedisUsingPreparedScriptAsync(RedisValue payload, string etag, string key, string newEtag)
+        private Task<RedisResult> WriteToRedisUsingPreparedScriptAsync(RedisValue payload, string etag, RedisKey key, string newEtag)
         {
             var keys = new RedisKey[] { key };
-            var args = new RedisValue[] { etag, newEtag, payload };
+            var args = new RedisValue[] { etag, newEtag, payload, _ttl };
             return WriteToRedisUsingPreparedScriptAsync(attemptNum: 0);
-
 
             async Task<RedisResult> WriteToRedisUsingPreparedScriptAsync(int attemptNum)
             {
@@ -228,14 +234,26 @@ namespace Orleans.Persistence
                     return await WriteToRedisUsingPreparedScriptAsync(attemptNum: attemptNum + 1)
                         .ConfigureAwait(false);
                 }
+                catch (Exception exception)
+                {
+                    throw new RedisStorageException(Invariant($"{exception.GetType()}: {exception.Message}"));
+                }
             }
         }
+
+        private RedisKey GetKey(GrainId grainId) => _keyPrefix.Append(grainId.ToString());
 
         /// <inheritdoc />
         public async Task ClearStateAsync<T>(string grainType, GrainId grainId, IGrainState<T> grainState)
         {
-            var key = grainId.ToString();
-            await _db.KeyDeleteAsync(key).ConfigureAwait(false);
+            try
+            {
+                await _db.KeyDeleteAsync(GetKey(grainId)).ConfigureAwait(false);
+            }
+            catch (Exception exception)
+            {
+                throw new RedisStorageException(Invariant($"{exception.GetType()}: {exception.Message}"));
+            }
         }
 
         private async Task Close(CancellationToken cancellationToken)

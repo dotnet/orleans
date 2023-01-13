@@ -1,16 +1,10 @@
-using System;
-using System.Threading.Tasks;
-using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 using Orleans.Reminders.Redis;
-using Orleans.Runtime;
-using Orleans.TestingHost;
-using Tester.Redis.Utility;
+using StackExchange.Redis;
 using TestExtensions;
 using UnitTests;
-using UnitTests.GrainInterfaces;
 using UnitTests.RemindersTest;
 using Xunit;
 
@@ -37,8 +31,11 @@ namespace Tester.Redis.Reminders
             RedisReminderTable reminderTable = new(
                 this.loggerFactory.CreateLogger<RedisReminderTable>(),
                 this.clusterOptions,
-                Options.Create(new RedisReminderTableOptions() {  ConnectionString = GetConnectionString().Result })
-                );
+                Options.Create(new RedisReminderTableOptions()
+                {
+                    ConfigurationOptions = ConfigurationOptions.Parse(GetConnectionString().Result),
+                    EntryExpiry = TimeSpan.FromHours(1)
+                })); 
 
             if (reminderTable == null)
             {

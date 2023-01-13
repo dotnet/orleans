@@ -1,9 +1,10 @@
-﻿using System;
+using System;
 using Orleans;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Hosting;
 using Orleans.Messaging;
 using Orleans.Clustering.Redis;
+using StackExchange.Redis;
 
 namespace Microsoft.Extensions.Hosting
 {
@@ -25,7 +26,7 @@ namespace Microsoft.Extensions.Hosting
                 }
 
                 services
-                    .AddRedis()
+                    .AddRedisClustering()
                     .AddSingleton<IGatewayListProvider, RedisGatewayListProvider>();
             });
         }
@@ -38,10 +39,10 @@ namespace Microsoft.Extensions.Hosting
             return builder.ConfigureServices(services => services
                 .Configure<RedisClusteringOptions>(opt =>
                 {
-                    opt.ConnectionString = redisConnectionString;
-                    opt.Database = db;
+                    opt.ConfigurationOptions = ConfigurationOptions.Parse(redisConnectionString);
+                    opt.ConfigurationOptions.DefaultDatabase = db;
                 })
-                .AddRedis()
+                .AddRedisClustering()
                 .AddSingleton<IGatewayListProvider, RedisGatewayListProvider>());
         }
 

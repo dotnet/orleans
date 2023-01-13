@@ -1,6 +1,7 @@
-﻿using System;
+using System;
 using System.Threading.Tasks;
-
+using Orleans.Reminders.Redis;
+using Orleans.Runtime;
 using StackExchange.Redis;
 
 namespace Orleans.Configuration
@@ -10,16 +11,11 @@ namespace Orleans.Configuration
     /// </summary>
     public class RedisReminderTableOptions
     {
-
         /// <summary>
-        /// The connection string.
+        /// Gets or sets the Redis client options.
         /// </summary>
-        public string ConnectionString { get; set; } = "localhost:6379";
-
-        /// <summary>
-        /// The database number.
-        /// </summary>
-        public int? DatabaseNumber { get; set; }
+        [RedactRedisConfigurationOptions]
+        public ConfigurationOptions ConfigurationOptions { get; set; }
 
         /// <summary>
         /// The delegate used to create a Redis connection multiplexer.
@@ -27,12 +23,40 @@ namespace Orleans.Configuration
         public Func<RedisReminderTableOptions, Task<IConnectionMultiplexer>> CreateMultiplexer { get; set; } = DefaultCreateMultiplexer;
 
         /// <summary>
+        /// Entry expiry, null by default. A value should be set ONLY for ephemeral environments (like in tests).
+        /// Setting a value different from null will cause reminder entries to be deleted after some period of time.
+        /// </summary>
+        public TimeSpan? EntryExpiry { get; set; } = null;
+
+        /// <summary>
         /// The default multiplexer creation delegate.
         /// </summary>
-        public static async Task<IConnectionMultiplexer> DefaultCreateMultiplexer(RedisReminderTableOptions options)
+        public static async Task<IConnectionMultiplexer> DefaultCreateMultiplexer(RedisReminderTableOptions options) => await ConnectionMultiplexer.ConnectAsync(options.ConfigurationOptions);
+    }
+
+    internal class RedactRedisConfigurationOptions : RedactAttribute
+    {
+        public override string Redact(object value) => value is ConfigurationOptions cfg ? cfg.ToString(includePassword: false) : base.Redact(value);
+    }
+
+    /// <summary>
+    /// Configuration validator for <see cref="RedisReminderTableOptions"/>.
+    /// </summary>
+    public class RedisReminderTableOptionsValidator : IConfigurationValidator
+    {
+        private readonly RedisReminderTableOptions _options;
+
+        public RedisReminderTableOptionsValidator(RedisReminderTableOptions options)
         {
-            return await ConnectionMultiplexer.ConnectAsync(options.ConnectionString);
+            _options = options;
         }
 
+        public void ValidateConfiguration()
+        {
+            if (_options.ConfigurationOptions == null)
+            {
+                throw new OrleansConfigurationException($"Invalid {nameof(RedisReminderTableOptions)} values for {nameof(RedisReminderTable)}. {nameof(_options.ConfigurationOptions)} is required.");
+            }
+        }
     }
 }

@@ -6,6 +6,7 @@ using Xunit;
 using UnitTests.MembershipTests;
 using TestExtensions;
 using UnitTests;
+using StackExchange.Redis;
 
 namespace Tester.Redis.Clustering
 {
@@ -32,7 +33,11 @@ namespace Tester.Redis.Clustering
             TestUtils.CheckForRedis();
 
             membershipTable = new RedisMembershipTable(
-                Options.Create(new RedisClusteringOptions() { ConnectionString = GetConnectionString().Result }),
+                Options.Create(new RedisClusteringOptions()
+                {
+                    ConfigurationOptions = ConfigurationOptions.Parse(GetConnectionString().Result),
+                    EntryExpiry = TimeSpan.FromHours(1)
+                }),
                 this.clusterOptions);
 
             return membershipTable;

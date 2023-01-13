@@ -1,12 +1,10 @@
-using System;
-using System.Collections.Generic;
+using System.Text.RegularExpressions;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
 using Orleans.Runtime;
 using Orleans.Storage;
 using Orleans.TestingHost;
 using StackExchange.Redis;
-using Tester.Redis.Utility;
 using TestExtensions;
 using TestExtensions.Runners;
 using UnitTests.GrainInterfaces;
@@ -18,8 +16,8 @@ namespace Tester.Redis.Persistence
     [TestCategory("Redis"), TestCategory("Persistence"), TestCategory("Functional")]
     public class RedisPersistenceGrainTests : GrainPersistenceTestsRunner, IClassFixture<RedisPersistenceGrainTests.Fixture>
     {
-        public static Guid ServiceId = Guid.NewGuid();
-        public static string ConnectionStringKey = "ConnectionString";
+        public static readonly string ServiceId = Guid.NewGuid().ToString("N");
+        public const string ConnectionStringKey = "ConnectionString";
         public class Fixture : BaseTestClusterFixture
         {
             protected override void ConfigureTestCluster(TestClusterBuilder builder)
@@ -31,7 +29,7 @@ namespace Tester.Redis.Persistence
                     {
                         {ConnectionStringKey, TestDefaultConfiguration.RedisConnectionString}
                     }));
-                builder.Options.ServiceId = ServiceId.ToString();
+                builder.Options.ServiceId = ServiceId;
                 builder.AddSiloBuilderConfigurator<MySiloBuilderConfigurator>();
                 builder.AddClientBuilderConfigurator<GatewayConnectionTests.ClientBuilderConfigurator>();
             }
@@ -46,7 +44,8 @@ namespace Tester.Redis.Persistence
                         siloBuilder
                             .AddRedisGrainStorage("GrainStorageForTest", options =>
                             {
-                                options.ConnectionString = connectionString;
+                                options.ConfigurationOptions = ConfigurationOptions.Parse(connectionString);
+                                options.EntryExpiry = TimeSpan.FromHours(1);
                             })
                             .AddMemoryGrainStorage("MemoryStore");
                     });
@@ -122,7 +121,18 @@ namespace Tester.Redis.Persistence
         {
             var grain = fixture.GrainFactory.GetGrain<IGrainStorageGenericGrain<GrainState>>(1111);
 
-            await database.ExecuteAsync("SCRIPT", "FLUSH", "SYNC");
+            var info = (string)await database.ExecuteAsync("INFO");
+            var versionString = Regex.Match(info, @"redis_version:[\s]*([^\s]+)").Groups[1].Value;
+            var version = Version.Parse(versionString);
+            if (version >= Version.Parse("6.2.0"))
+            {
+                await database.ExecuteAsync("SCRIPT", "FLUSH", "SYNC");
+            }
+            else
+            {
+                await database.ExecuteAsync("SCRIPT", "FLUSH");
+            }
+
             await grain.DoWrite(state);
 
             var result = await grain.DoRead();
@@ -139,7 +149,7 @@ namespace Tester.Redis.Persistence
             var grain = fixture.GrainFactory.GetGrain<IGrainStorageGenericGrain<GrainState>>(54321);
             var data = await grain.DoRead();
 
-            var key = grain.GetGrainId().ToString();
+            var key = $"{ServiceId}/state/{grain.GetGrainId()}";
             await database.HashSetAsync(key, new[] { new HashEntry("etag", "derp") });
 
             await Assert.ThrowsAsync<InconsistentStateException>(() => grain.DoWrite(state));
