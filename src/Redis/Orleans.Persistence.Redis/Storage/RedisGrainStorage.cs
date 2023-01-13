@@ -47,8 +47,7 @@ namespace Orleans.Persistence
             _name = name;
             _logger = logger;
             _options = options;
-            _grainStorageSerializer = grainStorageSerializer;
-
+            _grainStorageSerializer = options.GrainStorageSerializer ?? grainStorageSerializer;
             _serviceId = clusterOptions.Value.ServiceId;
         }
 
