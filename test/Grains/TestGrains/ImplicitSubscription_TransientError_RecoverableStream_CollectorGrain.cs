@@ -10,6 +10,7 @@ using Orleans.Providers.Streams.Generator;
 using Orleans.Runtime;
 using Orleans.Streams;
 using TestGrainInterfaces;
+using UnitTests.GrainInterfaces;
 using UnitTests.Grains;
 
 namespace TestGrains
@@ -84,7 +85,7 @@ namespace TestGrains
         {
             logger.LogInformation("OnActivateAsync");
 
-            Faults.onActivateFault.TryFire(InjectFault);
+            Faults.onActivateFault.TryFire(() => InjectFault(activating: true));
             await ReadStateAsync();
 
             Guid streamGuid = this.GetPrimaryKey();
@@ -160,7 +161,9 @@ namespace TestGrains
             return Task.CompletedTask;
         }
 
-        private void InjectFault()
+        private void InjectFault() => InjectFault(activating: false);
+
+        private void InjectFault(bool activating)
         {
             logger.LogInformation(
                 "InjectingFault: StreamGuid: {StreamGuid}, StreamNamespace: {StreamNamespace}, SequenceToken: {SequenceToken}, Accumulator: {Accumulator}.",
@@ -168,7 +171,12 @@ namespace TestGrains
                 State.StreamNamespace,
                 State.RecoveryToken,
                 State.Accumulator);
-            DeactivateOnIdle(); // kill grain and reaload from checkpoint
+
+            if (!activating)
+            {
+                DeactivateOnIdle(); // kill grain and reaload from checkpoint
+            }
+
             throw new ApplicationException("Injecting Fault");
         }
     }

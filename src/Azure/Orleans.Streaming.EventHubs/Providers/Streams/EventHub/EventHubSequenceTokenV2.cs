@@ -1,6 +1,4 @@
 using System;
-using Orleans.CodeGeneration;
-using Orleans.Serialization;
 
 namespace Orleans.Streaming.EventHubs
 {
@@ -18,13 +16,23 @@ namespace Orleans.Streaming.EventHubs
     public class EventHubSequenceTokenV2 : EventHubSequenceToken
     {
         /// <summary>
-        /// Constructor
+        /// Initializes a new instance of the <see cref="EventHubSequenceTokenV2" /> class.
         /// </summary>
         /// <param name="eventHubOffset">EventHub offset within the partition from which this message came.</param>
         /// <param name="sequenceNumber">EventHub sequenceNumber for this message.</param>
         /// <param name="eventIndex">Index into a batch of events, if multiple events were delivered within a single EventHub message.</param>
         public EventHubSequenceTokenV2(string eventHubOffset, long sequenceNumber, int eventIndex)
             : base(eventHubOffset, sequenceNumber, eventIndex)
+        {
+        }
+
+        /// <summary>
+        /// Initializes a new instance of the <see cref="EventHubSequenceTokenV2" /> class.
+        /// </summary>
+        /// <remarks>
+        /// This constructor is exposed for serializer use only.
+        /// </remarks>
+        public EventHubSequenceTokenV2() : base()
         {
         }
     }

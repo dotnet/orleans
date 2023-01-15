@@ -1,5 +1,6 @@
 using System;
 using System.Globalization;
+using Newtonsoft.Json;
 using Orleans.Streams;
 
 namespace Orleans.Providers.Streams.Common
@@ -15,12 +16,14 @@ namespace Orleans.Providers.Streams.Common
         /// Gets the number of event batches in stream prior to this event batch
         /// </summary>
         [Id(0)]
+        [JsonProperty]
         public override long SequenceNumber { get; protected set; }
 
         /// <summary>
         /// Gets the number of events in batch prior to this event
         /// </summary>
         [Id(1)]
+        [JsonProperty]
         public override int EventIndex { get; protected set; }
 
         /// <summary>
@@ -42,6 +45,16 @@ namespace Orleans.Providers.Streams.Common
         {
             SequenceNumber = seqNumber;
             EventIndex = eventInd;
+        }
+
+        /// <summary>
+        /// Initializes a new instance of the <see cref="EventSequenceTokenV2"/> class.
+        /// </summary>
+        /// <remarks>
+        /// This constructor is for serializer use only.
+        /// </remarks>
+        public EventSequenceTokenV2()
+        {
         }
 
         /// <summary>
