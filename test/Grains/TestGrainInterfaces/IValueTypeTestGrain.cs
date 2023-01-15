@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Text.Json.Serialization;
 using System.Threading.Tasks;
 using Orleans;
 using Orleans.Concurrency;
@@ -12,16 +13,12 @@ namespace UnitTests.GrainInterfaces
     public struct ValueTypeTestData
     {
         [Id(0)]
-        private readonly int intValue;
+        [Newtonsoft.Json.JsonProperty]
+        public int Value { get; set; }
 
         public ValueTypeTestData(int i)
         {
-            intValue = i;
-        }
-
-        public int GetValue()
-        {
-            return intValue;
+            Value = i;
         }
     }
 

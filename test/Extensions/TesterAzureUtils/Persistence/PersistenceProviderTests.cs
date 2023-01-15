@@ -223,11 +223,16 @@ namespace Tester.AzureUtils.Persistence
         {
             const string testName = nameof(PersistenceProvider_Memory_FixedLatency_WriteRead);
             TimeSpan expectedLatency = TimeSpan.FromMilliseconds(200);
-            MemoryGrainStorageWithLatency store = new MemoryGrainStorageWithLatency(testName, new MemoryStorageWithLatencyOptions()
-            {
-                Latency = expectedLatency,
-                MockCallsOnly = true
-            }, NullLoggerFactory.Instance, this.providerRuntime.ServiceProvider.GetService<IGrainFactory>());
+            MemoryGrainStorageWithLatency store = new MemoryGrainStorageWithLatency(
+                testName,
+                new MemoryStorageWithLatencyOptions()
+                {
+                    Latency = expectedLatency,
+                    MockCallsOnly = true
+                },
+                NullLoggerFactory.Instance,
+                this.providerRuntime.ServiceProvider.GetService<IGrainFactory>(),
+                this.providerRuntime.ServiceProvider.GetService<IGrainStorageSerializer>());
 
             var reference = (GrainId)LegacyGrainId.NewId();
             var state = TestStoreGrainState.NewRandomState();

@@ -1,6 +1,7 @@
 using System;
 using System.Globalization;
 using Orleans.Streams;
+using Newtonsoft.Json;
 
 namespace Orleans.Providers.Streams.Common
 {
@@ -15,34 +16,46 @@ namespace Orleans.Providers.Streams.Common
         /// Gets the number of event batches in stream prior to this event batch
         /// </summary>
         [Id(0)]
+        [JsonProperty]
         public override long SequenceNumber { get; protected set; }
 
         /// <summary>
         /// Gets the number of events in batch prior to this event
         /// </summary>
         [Id(1)]
+        [JsonProperty]
         public override int EventIndex { get; protected set; }
 
         /// <summary>
         /// Initializes a new instance of the <see cref="EventSequenceToken"/> class.
         /// </summary>
-        /// <param name="seqNumber">The sequence number.</param>
-        public EventSequenceToken(long seqNumber)
+        /// <param name="sequenceNumber">The sequence number.</param>
+        public EventSequenceToken(long sequenceNumber)
         {
-            SequenceNumber = seqNumber;
+            SequenceNumber = sequenceNumber;
             EventIndex = 0;
         }
 
         /// <summary>
         /// Initializes a new instance of the <see cref="EventSequenceToken" /> class.
         /// </summary>
-        /// <param name="seqNumber">The sequence number.</param>
-        /// <param name="eventInd">The event index, for events which are part of a batch.</param>
-        public EventSequenceToken(long seqNumber, int eventInd)
+        /// <param name="sequenceNumber">The sequence number.</param>
+        /// <param name="eventIndex">The event index, for events which are part of a batch.</param>
+        public EventSequenceToken(long sequenceNumber, int eventIndex)
         {
-            SequenceNumber = seqNumber;
-            EventIndex = eventInd;
+            SequenceNumber = sequenceNumber;
+            EventIndex = eventIndex;
         }
+
+        /// <summary>
+        /// Initializes a new instance of the <see cref="EventSequenceToken" /> class.
+        /// </summary>
+        /// <remarks>
+        /// This constructor is exposed for serializer use only.
+        /// </remarks>
+        [JsonConstructor]
+        public EventSequenceToken()
+        { }
 
         /// <summary>
         /// Creates a sequence token for a specific event in the current batch.

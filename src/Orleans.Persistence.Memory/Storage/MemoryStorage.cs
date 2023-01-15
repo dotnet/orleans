@@ -49,11 +49,12 @@ namespace Orleans.Storage
         /// <param name="options">The options.</param>
         /// <param name="logger">The logger.</param>
         /// <param name="grainFactory">The grain factory.</param>
-        public MemoryGrainStorage(string name, MemoryGrainStorageOptions options, ILogger<MemoryGrainStorage> logger, IGrainFactory grainFactory)
+        /// <param name="defaultGrainStorageSerializer">The default grain storage serializer.</param>
+        public MemoryGrainStorage(string name, MemoryGrainStorageOptions options, ILogger<MemoryGrainStorage> logger, IGrainFactory grainFactory, IGrainStorageSerializer defaultGrainStorageSerializer)
         {
             this.name = name;
             this.logger = logger;
-            this.storageSerializer = options.GrainStorageSerializer;
+            this.storageSerializer = options.GrainStorageSerializer ?? defaultGrainStorageSerializer;
 
             //Init
             logger.LogInformation("Init: Name={Name} NumStorageGrains={NumStorageGrains}", name, options.NumStorageGrains);

@@ -19,7 +19,7 @@ namespace DefaultCluster.Tests.TimerTests
             this.output = output;
         }
 
-        [Fact, TestCategory("SlowBVT"), TestCategory("Functional"), TestCategory("Timers")]
+        [Fact, TestCategory("SlowBVT"), TestCategory("Timers")]
         public async Task TimerOrleansTest_Basic()
         {
             for (int i = 0; i < 10; i++)
@@ -133,7 +133,7 @@ namespace DefaultCluster.Tests.TimerTests
                 ". Actual ticks = " + last);
         }
 
-        [Fact, TestCategory("SlowBVT"), TestCategory("Functional"), TestCategory("Timers")]
+        [Fact, TestCategory("SlowBVT"), TestCategory("Timers")]
         public async Task AsyncTimerTest_GrainCall()
         {
             const string testName = "AsyncTimerTest_GrainCall";

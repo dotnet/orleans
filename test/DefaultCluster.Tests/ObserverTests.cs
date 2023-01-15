@@ -108,7 +108,7 @@ namespace DefaultCluster.Tests.General
             }
         }
 
-        [Fact, TestCategory("SlowBVT"), TestCategory("Functional")]
+        [Fact, TestCategory("SlowBVT")]
         public async Task ObserverTest_DoubleSubscriptionSameReference()
         {
             TestInitialize();
@@ -156,7 +156,7 @@ namespace DefaultCluster.Tests.General
             }
         }
 
-        [Fact, TestCategory("SlowBVT"), TestCategory("Functional")]
+        [Fact, TestCategory("SlowBVT")]
         public async Task ObserverTest_SubscribeUnsubscribe()
         {
             TestInitialize();
@@ -249,7 +249,7 @@ namespace DefaultCluster.Tests.General
                 result.Done = true;
         }
 
-        [Fact, TestCategory("SlowBVT"), TestCategory("Functional")]
+        [Fact, TestCategory("SlowBVT")]
         public async Task ObserverTest_DeleteObject()
         {
             TestInitialize();
