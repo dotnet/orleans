@@ -54,7 +54,10 @@ namespace Orleans.Reminders.Redis
                 _muxer = await _redisOptions.CreateMultiplexer(_redisOptions);
                 _db = _muxer.GetDatabase();
 
-                await _db.KeyExpireAsync(_hashSetKey, _redisOptions.EntryExpiry);
+                if (_redisOptions.EntryExpiry is { } expiry)
+                {
+                    await _db.KeyExpireAsync(_hashSetKey, expiry);
+                }
             }
             catch (Exception exception)
             {
@@ -230,7 +233,6 @@ namespace Orleans.Reminders.Redis
             string to = prefix + ",#";
             return (from, to);
         }
-
 
         private (string eTag, string value) ConvertFromEntry(ReminderEntry entry)
         {

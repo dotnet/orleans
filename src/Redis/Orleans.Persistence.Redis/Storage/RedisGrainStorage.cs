@@ -34,7 +34,6 @@ namespace Orleans.Persistence
               return false
             end
             """;
-        private const int ReloadWriteScriptMaxCount = 3;
 
         private readonly string _serviceId;
         private readonly RedisValue _ttl;
@@ -46,8 +45,6 @@ namespace Orleans.Persistence
 
         private IConnectionMultiplexer _connection;
         private IDatabase _db;
-        private LuaScript _preparedWriteScript;
-        private byte[] _preparedWriteScriptHash;
 
         /// <summary>
         /// Creates a new instance of the <see cref="RedisGrainStorage"/> type.
@@ -93,9 +90,6 @@ namespace Orleans.Persistence
                 _connection = await _options.CreateMultiplexer(_options).ConfigureAwait(false);
                 _db = _connection.GetDatabase();
 
-                _preparedWriteScript = LuaScript.Prepare(WriteScript);
-                _preparedWriteScriptHash = await LoadWriteScriptAsync().ConfigureAwait(false);
-
                 if (_logger.IsEnabled(LogLevel.Debug))
                 {
                     timer.Stop();
@@ -118,24 +112,6 @@ namespace Orleans.Persistence
 
                 throw new RedisStorageException(Invariant($"{ex.GetType()}: {ex.Message}"));
             }
-        }
-
-        private async Task<byte[]> LoadWriteScriptAsync()
-        {
-            Debug.Assert(_connection is not null);
-            Debug.Assert(_preparedWriteScript is not null);
-
-            System.Net.EndPoint[] endPoints = _connection.GetEndPoints();
-            var loadTasks = new Task<LoadedLuaScript>[endPoints.Length];
-            for (int i = 0; i < endPoints.Length; i++)
-            {
-                var endpoint = endPoints.ElementAt(i);
-                var server = _connection.GetServer(endpoint);
-
-                loadTasks[i] = _preparedWriteScript.LoadAsync(server);
-            }
-            await Task.WhenAll(loadTasks).ConfigureAwait(false);
-            return loadTasks[0].Result.Hash;
         }
 
         /// <inheritdoc />
@@ -178,16 +154,13 @@ namespace Orleans.Persistence
             var key = GetKey(grainId);
             var newEtag = Guid.NewGuid().ToString("N");
 
-            RedisResult writeWithScriptResponse;
+            RedisResult response;
             try
             {
                 var payload = new RedisValue(_grainStorageSerializer.Serialize<T>(grainState.State).ToString());
-                writeWithScriptResponse = await WriteToRedisUsingPreparedScriptAsync(
-                    payload,
-                    etag: etag,
-                    key: key,
-                    newEtag: newEtag)
-                    .ConfigureAwait(false);
+                var keys = new RedisKey[] { key };
+                var args = new RedisValue[] { etag, newEtag, payload, _ttl };
+                response = await _db.ScriptEvaluateAsync(WriteScript, keys, args).ConfigureAwait(false);
             }
             catch (Exception e)
             {
@@ -197,48 +170,15 @@ namespace Orleans.Persistence
                     grainId,
                     key);
                 throw new RedisStorageException(
-                    Invariant($"Failed to write grain state for {grainType} grain with ID: {grainId} with redis key {key}."), e);
+                    Invariant($"Failed to write grain state for {grainType} grain with ID: {grainId} with redis key {key}. {e.GetType()}: {e.Message}"));
             }
 
-            if (writeWithScriptResponse is not null && writeWithScriptResponse.IsNull)
+            if (response is not null && response.IsNull)
             {
                 throw new InconsistentStateException(Invariant($"ETag mismatch - tried with ETag: {grainState.ETag}"));
             }
 
             grainState.ETag = newEtag;
-        }
-
-        private Task<RedisResult> WriteToRedisUsingPreparedScriptAsync(RedisValue payload, string etag, RedisKey key, string newEtag)
-        {
-            var keys = new RedisKey[] { key };
-            var args = new RedisValue[] { etag, newEtag, payload, _ttl };
-            return WriteToRedisUsingPreparedScriptAsync(attemptNum: 0);
-
-            async Task<RedisResult> WriteToRedisUsingPreparedScriptAsync(int attemptNum)
-            {
-                try
-                {
-                    return await _db.ScriptEvaluateAsync(_preparedWriteScriptHash, keys, args).ConfigureAwait(false);
-                }
-                catch (RedisServerException rse) when (rse.Message is not null && rse.Message.StartsWith("NOSCRIPT ", StringComparison.Ordinal))
-                {
-                    // EVALSHA returned error 'NOSCRIPT No matching script. Please use EVAL.'.
-                    // This means that SHA1 cache of Lua scripts is cleared at server side, possibly because of Redis server rebooted after Init() method was called. Need to reload Lua script.
-                    // Several attempts are made just in case (e.g. if Redis server is rebooted right after previous script reload).
-                    if (attemptNum >= ReloadWriteScriptMaxCount)
-                    {
-                        throw;
-                    }
-
-                    await LoadWriteScriptAsync().ConfigureAwait(false);
-                    return await WriteToRedisUsingPreparedScriptAsync(attemptNum: attemptNum + 1)
-                        .ConfigureAwait(false);
-                }
-                catch (Exception exception)
-                {
-                    throw new RedisStorageException(Invariant($"{exception.GetType()}: {exception.Message}"));
-                }
-            }
         }
 
         private RedisKey GetKey(GrainId grainId) => _keyPrefix.Append(grainId.ToString());

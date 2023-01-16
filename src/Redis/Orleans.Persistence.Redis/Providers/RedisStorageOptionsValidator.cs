@@ -17,7 +17,7 @@ namespace Orleans.Persistence
         {
             if (_options.ConfigurationOptions == null)
             {
-                throw new OrleansConfigurationException($"Invalid {nameof(RedisStorageOptions)} values for {nameof(RedisGrainStorage)} with name {_name}. {nameof(_options.ConfigurationOptions)} is required.");
+                throw new OrleansConfigurationException($"Invalid configuration for {nameof(RedisGrainStorage)} with name {_name}. {nameof(RedisStorageOptions)}.{nameof(_options.ConfigurationOptions)} is required.");
             }
         }
     }

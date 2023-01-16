@@ -55,7 +55,7 @@ namespace Orleans.Configuration
         {
             if (_options.ConfigurationOptions == null)
             {
-                throw new OrleansConfigurationException($"Invalid {nameof(RedisReminderTableOptions)} values for {nameof(RedisReminderTable)}. {nameof(_options.ConfigurationOptions)} is required.");
+                throw new OrleansConfigurationException($"Invalid configuration for {nameof(RedisReminderTable)}. {nameof(RedisReminderTableOptions)}.{nameof(_options.ConfigurationOptions)} is required.");
             }
         }
     }

@@ -58,7 +58,7 @@ namespace Orleans.Clustering.Redis
         {
             if (_options.ConfigurationOptions == null)
             {
-                throw new OrleansConfigurationException($"Invalid {nameof(RedisClusteringOptions)} values for {nameof(RedisMembershipTable)}. {nameof(_options.ConfigurationOptions)} is required.");
+                throw new OrleansConfigurationException($"Invalid configuration for {nameof(RedisMembershipTable)}. {nameof(RedisClusteringOptions)}.{nameof(_options.ConfigurationOptions)} is required.");
             }
         }
     }

@@ -45,7 +45,11 @@ namespace Orleans.Clustering.Redis
             if (tryInitTableVersion)
             {
                 await _db.HashSetAsync(_clusterKey, TableVersionKey, SerializeVersion(DefaultTableVersion), When.NotExists);
-                await _db.KeyExpireAsync(_clusterKey, _redisOptions.EntryExpiry);
+
+                if (_redisOptions.EntryExpiry is { } expiry)
+                {
+                    await _db.KeyExpireAsync(_clusterKey, expiry);
+                }
             }
 
             this.IsInitialized = true;

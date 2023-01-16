@@ -45,10 +45,12 @@ namespace Orleans.Configuration
     public class RedisGrainDirectoryOptionsValidator : IConfigurationValidator
     {
         private readonly RedisGrainDirectoryOptions _options;
+        private readonly string _name;
 
-        public RedisGrainDirectoryOptionsValidator(RedisGrainDirectoryOptions options)
+        public RedisGrainDirectoryOptionsValidator(RedisGrainDirectoryOptions options, string name)
         {
             _options = options;
+            _name = name;
         }
 
         /// <inheritdoc/>
@@ -56,7 +58,7 @@ namespace Orleans.Configuration
         {
             if (_options.ConfigurationOptions == null)
             {
-                throw new OrleansConfigurationException($"Invalid {nameof(RedisGrainDirectoryOptions)} values for {nameof(RedisGrainDirectory)}. {nameof(_options.ConfigurationOptions)} is required.");
+                throw new OrleansConfigurationException($"Invalid configuration for {nameof(RedisGrainDirectory)} with name {_name}. {nameof(RedisGrainDirectoryOptions)}.{nameof(_options.ConfigurationOptions)} is required.");
             }
         }
     }

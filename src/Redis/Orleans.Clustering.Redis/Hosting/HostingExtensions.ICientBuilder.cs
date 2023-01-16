@@ -34,13 +34,12 @@ namespace Microsoft.Extensions.Hosting
         /// <summary>
         /// Configures Redis as the clustering provider.
         /// </summary>
-        public static IClientBuilder UseRedisClustering(this IClientBuilder builder, string redisConnectionString, int db = 0)
+        public static IClientBuilder UseRedisClustering(this IClientBuilder builder, string redisConnectionString)
         {
             return builder.ConfigureServices(services => services
                 .Configure<RedisClusteringOptions>(opt =>
                 {
                     opt.ConfigurationOptions = ConfigurationOptions.Parse(redisConnectionString);
-                    opt.ConfigurationOptions.DefaultDatabase = db;
                 })
                 .AddRedisClustering()
                 .AddSingleton<IGatewayListProvider, RedisGatewayListProvider>());
