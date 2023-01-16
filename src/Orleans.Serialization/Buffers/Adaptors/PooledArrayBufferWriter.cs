@@ -201,7 +201,12 @@ public struct PooledArrayBufferWriter : IBufferWriter<byte>, IDisposable
         {
             if (length <= MinimumBlockSize)
             {
+#if NET6_0_OR_GREATER
                 var pinnedArray = GC.AllocateUninitializedArray<byte>(MinimumBlockSize, pinned: true);
+#else
+                // Note: Not actually pinned in this case since it just a potential fragmentation optimization
+                var pinnedArray = new byte[MinimumBlockSize];
+#endif
                 Array = pinnedArray;
             }
             else
@@ -218,20 +223,24 @@ public struct PooledArrayBufferWriter : IBufferWriter<byte>, IDisposable
 
         public Memory<byte> AsMemory(int offset)
         {
+#if NET6_0_OR_GREATER
             if (IsStandardSize)
             {
                 return MemoryMarshal.CreateFromPinnedArray(Array, offset, Array.Length);
             }
+#endif
 
             return Array.AsMemory(offset);
         }
 
         public Memory<byte> AsMemory(int offset, int length)
         {
+#if NET6_0_OR_GREATER
             if (IsStandardSize)
             {
                 return MemoryMarshal.CreateFromPinnedArray(Array, offset, length);
             }
+#endif
 
             return Array.AsMemory(offset, length);
         }

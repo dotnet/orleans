@@ -274,8 +274,10 @@ namespace Orleans.Serialization.Cloning
         {
             [typeof(decimal)] = true,
             [typeof(DateTime)] = true,
+#if NET6_0_OR_GREATER
             [typeof(DateOnly)] = true,
             [typeof(TimeOnly)] = true,
+#endif
             [typeof(DateTimeOffset)] = true,
             [typeof(TimeSpan)] = true,
             [typeof(IPAddress)] = true,
@@ -288,9 +290,13 @@ namespace Orleans.Serialization.Cloning
             [typeof(CultureInfo)] = true,
             [typeof(Version)] = true,
             [typeof(Uri)] = true,
+#if NET7_0_OR_GREATER
             [typeof(UInt128)] = true,
             [typeof(Int128)] = true,
+#endif
+#if NET5_0_OR_GREATER
             [typeof(Half)] = true,
+#endif
         };
 
         public static bool Contains(Type type)
@@ -365,7 +371,7 @@ namespace Orleans.Serialization.Cloning
     /// <summary>
     /// Object pool for <see cref="CopyContext"/> instances.
     /// </summary>
-    public sealed class CopyContextPool 
+    public sealed class CopyContextPool
     {
         private readonly ConcurrentObjectPool<CopyContext, PoolPolicy> _pool;
 

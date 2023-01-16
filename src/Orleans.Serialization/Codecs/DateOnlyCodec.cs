@@ -1,3 +1,4 @@
+#if NET6_0_OR_GREATER
 using System;
 using System.Buffers;
 using System.Runtime.CompilerServices;
@@ -41,3 +42,4 @@ public sealed class DateOnlyCodec : IFieldCodec<DateOnly>
         return DateOnly.FromDayNumber(reader.ReadInt32());
     }
 }
+#endif

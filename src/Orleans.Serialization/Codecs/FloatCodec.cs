@@ -19,7 +19,11 @@ namespace Orleans.Serialization.Codecs
         {
             ReferenceCodec.MarkValueField(writer.Session);
             writer.WriteFieldHeader(fieldIdDelta, expectedType, typeof(float), WireType.Fixed32);
+#if NET6_0_OR_GREATER
             writer.WriteUInt32(BitConverter.SingleToUInt32Bits(value));
+#else
+            writer.WriteUInt32((uint)BitConverter.SingleToInt32Bits(value));
+#endif
         }
 
         /// <summary>
@@ -34,7 +38,11 @@ namespace Orleans.Serialization.Codecs
         {
             ReferenceCodec.MarkValueField(writer.Session);
             writer.WriteFieldHeaderExpected(fieldIdDelta, WireType.Fixed32);
+#if NET6_0_OR_GREATER
             writer.WriteUInt32(BitConverter.SingleToUInt32Bits(value));
+#else
+            writer.WriteUInt32((uint)BitConverter.SingleToInt32Bits(value));
+#endif
         }
 
         /// <inheritdoc/>
@@ -67,9 +75,10 @@ namespace Orleans.Serialization.Codecs
 
                 case WireType.LengthPrefixed:
                     return (float)DecimalCodec.ReadDecimalRaw(ref reader);
-
+#if NET6_0_OR_GREATER
                 case WireType.VarInt:
                     return (float)HalfCodec.ReadHalfRaw(ref reader);
+#endif
                 default:
                     ThrowWireTypeOutOfRange(field.WireType);
                     return 0;
@@ -83,7 +92,11 @@ namespace Orleans.Serialization.Codecs
         /// <param name="reader">The reader.</param>
         /// <returns>The value.</returns>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
+#if NET6_0_OR_GREATER
         public static float ReadFloatRaw<TInput>(ref Reader<TInput> reader) => BitConverter.UInt32BitsToSingle(reader.ReadUInt32());
+#else
+        public static float ReadFloatRaw<TInput>(ref Reader<TInput> reader) => BitConverter.Int32BitsToSingle((int)reader.ReadUInt32());
+#endif
 
         private static void ThrowWireTypeOutOfRange(WireType wireType) => throw new UnsupportedWireTypeException(
             $"WireType {wireType} is not supported by this codec.");
@@ -102,7 +115,11 @@ namespace Orleans.Serialization.Codecs
         {
             ReferenceCodec.MarkValueField(writer.Session);
             writer.WriteFieldHeader(fieldIdDelta, expectedType, typeof(double), WireType.Fixed64);
+#if NET6_0_OR_GREATER
             writer.WriteUInt64(BitConverter.DoubleToUInt64Bits(value));
+#else
+            writer.WriteUInt64((ulong)BitConverter.DoubleToInt64Bits(value));
+#endif
         }
 
         /// <summary>
@@ -117,7 +134,11 @@ namespace Orleans.Serialization.Codecs
         {
             ReferenceCodec.MarkValueField(writer.Session);
             writer.WriteFieldHeaderExpected(fieldIdDelta, WireType.Fixed64);
+#if NET6_0_OR_GREATER
             writer.WriteUInt64(BitConverter.DoubleToUInt64Bits(value));
+#else
+            writer.WriteUInt64((ulong)BitConverter.DoubleToInt64Bits(value));
+#endif
         }
 
         /// <inheritdoc/>
@@ -141,8 +162,10 @@ namespace Orleans.Serialization.Codecs
                     return ReadDoubleRaw(ref reader);
                 case WireType.LengthPrefixed:
                     return (double)DecimalCodec.ReadDecimalRaw(ref reader);
+#if NET6_0_OR_GREATER
                 case WireType.VarInt:
                     return (double)HalfCodec.ReadHalfRaw(ref reader);
+#endif
                 default:
                     ThrowWireTypeOutOfRange(field.WireType);
                     return 0;
@@ -156,7 +179,11 @@ namespace Orleans.Serialization.Codecs
         /// <param name="reader">The reader.</param>
         /// <returns>The value.</returns>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
+#if NET6_0_OR_GREATER
         public static double ReadDoubleRaw<TInput>(ref Reader<TInput> reader) => BitConverter.UInt64BitsToDouble(reader.ReadUInt64());
+#else
+        public static double ReadDoubleRaw<TInput>(ref Reader<TInput> reader) => BitConverter.Int64BitsToDouble((long)reader.ReadUInt64());
+#endif
 
         private static void ThrowWireTypeOutOfRange(WireType wireType) => throw new UnsupportedWireTypeException(
             $"WireType {wireType} is not supported by this codec.");
@@ -197,11 +224,13 @@ namespace Orleans.Serialization.Codecs
         {
             writer.WriteVarUInt7(Width);
 
+#if NET6_0_OR_GREATER
             if (BitConverter.IsLittleEndian)
             {
                 writer.Write(MemoryMarshal.AsBytes(new Span<decimal>(ref value)));
                 return;
             }
+#endif
 
             ref var holder = ref Unsafe.As<decimal, DecimalConverter>(ref value);
             writer.WriteUInt32(holder.Flags);
@@ -246,8 +275,10 @@ namespace Orleans.Serialization.Codecs
                     }
                 case WireType.LengthPrefixed:
                     return ReadDecimalRaw(ref reader);
+#if NET6_0_OR_GREATER
                 case WireType.VarInt:
                     return (decimal)HalfCodec.ReadHalfRaw(ref reader);
+#endif
                 default:
                     ThrowWireTypeOutOfRange(field.WireType);
                     return 0;
@@ -268,12 +299,14 @@ namespace Orleans.Serialization.Codecs
                 throw new UnexpectedLengthPrefixValueException("decimal", Width, length);
             }
 
+#if NET6_0_OR_GREATER
             if (BitConverter.IsLittleEndian)
             {
                 Unsafe.SkipInit(out decimal res);
                 reader.ReadBytes(MemoryMarshal.AsBytes(new Span<decimal>(ref res)));
                 return res;
             }
+#endif
 
             DecimalConverter holder;
             holder.Flags = reader.ReadUInt32();
@@ -296,6 +329,7 @@ namespace Orleans.Serialization.Codecs
             $"The {typeof(T)} value has a magnitude too high {value} to be converted to {typeof(decimal)}.");
     }
 
+#if NET6_0_OR_GREATER
     /// <summary>
     /// Serializer for <see cref="Half"/>.
     /// </summary>
@@ -392,4 +426,5 @@ namespace Orleans.Serialization.Codecs
         private static void ThrowValueOutOfRange<T>(T value) => throw new OverflowException(
             $"The {typeof(T)} value has a magnitude too high {value} to be converted to {typeof(Half)}.");
     }
+#endif
 }

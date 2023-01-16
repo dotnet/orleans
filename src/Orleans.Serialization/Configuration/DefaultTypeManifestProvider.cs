@@ -37,8 +37,10 @@ namespace Orleans.Serialization.Configuration
             wellKnownTypes[25] = typeof(int[]);
             wellKnownTypes[26] = typeof(string[]);
             wellKnownTypes[27] = typeof(Type);
+#if NET6_0_OR_GREATER
             wellKnownTypes[28] = typeof(DateOnly);
             wellKnownTypes[29] = typeof(TimeOnly);
+#endif
             wellKnownTypes[30] = typeof(DayOfWeek);
             wellKnownTypes[31] = typeof(Uri);
             wellKnownTypes[32] = typeof(Version);
@@ -46,9 +48,13 @@ namespace Orleans.Serialization.Configuration
             wellKnownTypes[34] = typeof(IPEndPoint);
             wellKnownTypes[35] = typeof(ExceptionResponse);
             wellKnownTypes[36] = typeof(CompletedResponse);
+#if NET7_0_OR_GREATER
             wellKnownTypes[37] = typeof(Int128);
             wellKnownTypes[38] = typeof(UInt128);
+#endif
+#if NET5_0_OR_GREATER
             wellKnownTypes[39] = typeof(Half);
+#endif
 
             var allowedTypes = typeManifest.AllowedTypes;
             allowedTypes.Add("System.Globalization.CompareOptions");

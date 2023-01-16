@@ -4,7 +4,9 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using System.Linq;
+#if NET6_0_OR_GREATER
 using System.Reflection.Metadata;
+#endif
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 
@@ -100,6 +102,7 @@ namespace Orleans.Serialization.Session
 
             if (_objectToReferenceOverflow is { } overflow)
             {
+#if NET6_0_OR_GREATER
                 ref var refValue = ref CollectionsMarshal.GetValueRefOrAddDefault(overflow, value, out var exists);
                 if (exists)
                 {
@@ -110,6 +113,19 @@ namespace Orleans.Serialization.Session
                 refValue = nextReference;
                 Unsafe.SkipInit(out reference);
                 return false;
+#else
+                if (overflow.TryGetValue(value, out var existing))
+                {
+                    reference = existing;
+                    return true;
+                }
+                else
+                {
+                    overflow[value] = nextReference;
+                    Unsafe.SkipInit(out reference);
+                    return false;
+                }
+#endif
             }
 
             // Add the reference.
@@ -177,6 +193,7 @@ namespace Orleans.Serialization.Session
         {
             if (_referenceToObjectOverflow is { } overflow)
             {
+#if NET6_0_OR_GREATER
                 ref var refValue = ref CollectionsMarshal.GetValueRefOrAddDefault(overflow, reference, out var exists);
                 if (exists && value is not UnknownFieldMarker && refValue is not UnknownFieldMarker)
                 {
@@ -185,6 +202,15 @@ namespace Orleans.Serialization.Session
                 }
 
                 refValue = value;
+#else
+                if (overflow.TryGetValue(reference, out var existing) && value is not UnknownFieldMarker && existing is not UnknownFieldMarker)
+                {
+                    // Unknown field markers can be replaced once the type is known.
+                    ThrowReferenceExistsException(reference);
+                }
+
+                overflow[reference] = value;
+#endif
             }
             else
             {
@@ -228,6 +254,7 @@ namespace Orleans.Serialization.Session
             }
         }
 
+        [DoesNotReturn]
         private static void ThrowReferenceExistsException(uint reference) => throw new InvalidOperationException($"Reference {reference} already exists");
 
         /// <summary>

@@ -18,7 +18,11 @@ namespace Orleans.Serialization.TestKit
 
         protected CopierTester(ITestOutputHelper output)
         {
+#if NET6_0_OR_GREATER
             var seed = Random.Shared.Next();
+#else
+            var seed = new Random().Next();
+#endif
             output.WriteLine($"Random seed: {seed}");
             Random = new(seed);
             var services = new ServiceCollection();
@@ -51,7 +55,7 @@ namespace Orleans.Serialization.TestKit
         protected virtual bool Equals(TValue left, TValue right) => EqualityComparer<TValue>.Default.Equals(left, right);
 
         protected virtual Action<Action<TValue>> ValueProvider { get; }
-        
+
         [Fact]
         public void CopiedValuesAreEqual()
         {

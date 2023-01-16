@@ -56,11 +56,22 @@ namespace Orleans.Serialization.Session
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public uint GetOrAddTypeReference(Type type)
         {
+#if NET6_0_OR_GREATER
             ref var refValue = ref CollectionsMarshal.GetValueRefOrAddDefault(_referencedTypeToIdMap, type, out var exists);
             if (exists)
                 return refValue;
 
             refValue = ++_currentReferenceId;
+#else
+            if (_referencedTypeToIdMap.TryGetValue(type, out var existing))
+            {
+                return existing;
+            }
+            else
+            {
+                _referencedTypeToIdMap[type] = ++_currentReferenceId;
+            }
+#endif
             return 0;
         }
 

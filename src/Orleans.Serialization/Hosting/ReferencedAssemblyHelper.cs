@@ -83,7 +83,7 @@ namespace Orleans.Serialization
                 if (!asm.IsDefined(typeof(ApplicationPartAttribute)) || !assemblies.Add(asm))
                 {
                     continue;
-                } 
+                }
 
                 AddAssembly(parts, asm);
             }
