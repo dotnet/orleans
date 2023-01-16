@@ -47,10 +47,14 @@ namespace Orleans.Storage
         private MemoryGrainStorage baseGranStorage;
         private MemoryStorageWithLatencyOptions options;
         /// <summary> Default constructor. </summary>
-        public MemoryGrainStorageWithLatency(string name, MemoryStorageWithLatencyOptions options,
-            ILoggerFactory loggerFactory, IGrainFactory grainFactory)
+        public MemoryGrainStorageWithLatency(
+            string name,
+            MemoryStorageWithLatencyOptions options,
+            ILoggerFactory loggerFactory,
+            IGrainFactory grainFactory,
+            IGrainStorageSerializer defaultGrainStorageSerialzier)
         {
-            this.baseGranStorage = new MemoryGrainStorage(name, options, loggerFactory.CreateLogger<MemoryGrainStorage>(), grainFactory);
+            this.baseGranStorage = new MemoryGrainStorage(name, options, loggerFactory.CreateLogger<MemoryGrainStorage>(), grainFactory, defaultGrainStorageSerialzier);
             this.options = options;
         }
 

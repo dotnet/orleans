@@ -9,7 +9,7 @@ using Xunit;
 
 namespace Tester.HeterogeneousSilosTests.UpgradeTests
 {
-    [TestCategory("Versioning"), TestCategory("ExcludeXAML"), TestCategory("SlowBVT"), TestCategory("Functional")]
+    [TestCategory("Versioning"), TestCategory("ExcludeXAML"), TestCategory("SlowBVT")]
     public class RuntimeStrategyChangeTests : UpgradeTestsBase
     {
         protected override Type VersionSelectorStrategy => typeof(LatestVersion);

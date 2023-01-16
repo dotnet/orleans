@@ -1,6 +1,7 @@
 
 using System;
 using System.Globalization;
+using Newtonsoft.Json;
 using Orleans.Providers.Streams.Common;
 
 namespace Orleans.Streaming.EventHubs
@@ -38,10 +39,11 @@ namespace Orleans.Streaming.EventHubs
         /// Offset of the message within an EventHub partition
         /// </summary>
         [Id(0)]
+        [JsonProperty]
         public string EventHubOffset { get; }
 
         /// <summary>
-        /// Constructor
+        /// Initializes a new instance of the <see cref="EventHubSequenceToken" /> class.
         /// </summary>
         /// <param name="eventHubOffset">EventHub offset within the partition from which this message came.</param>
         /// <param name="sequenceNumber">EventHub sequenceNumber for this message.</param>
@@ -50,6 +52,16 @@ namespace Orleans.Streaming.EventHubs
             : base(sequenceNumber, eventIndex)
         {
             EventHubOffset = eventHubOffset;
+        }
+
+        /// <summary>
+        /// Initializes a new instance of the <see cref="EventHubSequenceToken" /> class.
+        /// </summary>
+        /// <remarks>
+        /// This constructor is exposed for serializer use only.
+        /// </remarks>
+        public EventHubSequenceToken() : base()
+        {
         }
 
         /// <summary>Returns a string that represents the current object.</summary>

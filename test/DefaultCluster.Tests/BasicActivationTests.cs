@@ -214,7 +214,7 @@ namespace DefaultCluster.Tests.General
             this.Logger.LogInformation("GetMultipleGrainInterfaces_Array() worked");
         }
 
-        [Fact, TestCategory("SlowBVT"), TestCategory("Functional"), TestCategory("ActivateDeactivate"),
+        [Fact, TestCategory("SlowBVT"), TestCategory("ActivateDeactivate"),
          TestCategory("Reentrancy")]
         public void BasicActivation_Reentrant_RecoveryAfterExpiredMessage()
         {

@@ -7,7 +7,7 @@ using Orleans.TestingHost;
 
 namespace Tester.StreamingTests
 {
-    [TestCategory("Functional"), TestCategory("Streaming"), TestCategory("StreamingResume")]
+    [TestCategory("SlowBVT"), TestCategory("Streaming"), TestCategory("StreamingResume")]
     public class MemoryStreamResumeTests : StreamingResumeTests
     {
         protected override void ConfigureTestCluster(TestClusterBuilder builder)

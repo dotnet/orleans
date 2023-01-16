@@ -1,5 +1,7 @@
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
+using System.Text;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -35,6 +37,7 @@ namespace Orleans.Storage
     {
         private Lazy<IMemoryStorageGrain>[] storageGrains;
         private readonly ILogger logger;
+        private readonly IGrainStorageSerializer storageSerializer;
 
         /// <summary> Name of this storage provider instance. </summary>
         private readonly string name;
@@ -46,10 +49,12 @@ namespace Orleans.Storage
         /// <param name="options">The options.</param>
         /// <param name="logger">The logger.</param>
         /// <param name="grainFactory">The grain factory.</param>
-        public MemoryGrainStorage(string name, MemoryGrainStorageOptions options, ILogger<MemoryGrainStorage> logger, IGrainFactory grainFactory)
+        /// <param name="defaultGrainStorageSerializer">The default grain storage serializer.</param>
+        public MemoryGrainStorage(string name, MemoryGrainStorageOptions options, ILogger<MemoryGrainStorage> logger, IGrainFactory grainFactory, IGrainStorageSerializer defaultGrainStorageSerializer)
         {
             this.name = name;
             this.logger = logger;
+            this.storageSerializer = options.GrainStorageSerializer ?? defaultGrainStorageSerializer;
 
             //Init
             logger.LogInformation("Init: Name={Name} NumStorageGrains={NumStorageGrains}", name, options.NumStorageGrains);
@@ -70,11 +75,12 @@ namespace Orleans.Storage
             if (logger.IsEnabled(LogLevel.Trace)) logger.LogTrace("Read Keys={Keys}", key);
 
             IMemoryStorageGrain storageGrain = GetStorageGrain(key);
-            var state = await storageGrain.ReadStateAsync<T>(key);
+            var state = await storageGrain.ReadStateAsync<ReadOnlyMemory<byte>>(key);
             if (state != null)
             {
+                var loadedState = ConvertFromStorageFormat<T>(state.State);
                 grainState.ETag = state.ETag;
-                grainState.State = (T)state.State;
+                grainState.State = loadedState ?? Activator.CreateInstance<T>();
                 grainState.RecordExists = true;
             }
         }
@@ -87,7 +93,12 @@ namespace Orleans.Storage
             IMemoryStorageGrain storageGrain = GetStorageGrain(key);
             try
             {
-                grainState.ETag = await storageGrain.WriteStateAsync(key, grainState);
+                var data = ConvertToStorageFormat<T>(grainState.State);
+                var binaryGrainState = new GrainState<ReadOnlyMemory<byte>>(data, grainState.ETag)
+                {
+                    RecordExists = grainState.RecordExists
+                };
+                grainState.ETag = await storageGrain.WriteStateAsync(key, binaryGrainState);
                 grainState.RecordExists = true;
             }
             catch (MemoryStorageEtagMismatchException e)
@@ -104,7 +115,7 @@ namespace Orleans.Storage
             IMemoryStorageGrain storageGrain = GetStorageGrain(key);
             try
             {
-                await storageGrain.DeleteStateAsync<T>(key, grainState.ETag);
+                await storageGrain.DeleteStateAsync<ReadOnlyMemory<byte>>(key, grainState.ETag);
                 grainState.ETag = null;
                 grainState.RecordExists = false;
             }
@@ -124,6 +135,53 @@ namespace Orleans.Storage
 
         /// <inheritdoc/>
         public void Dispose() => storageGrains = null;
+
+        /// <summary>
+        /// Deserialize from binary data
+        /// </summary>
+        /// <param name="data">The serialized stored data</param>
+        internal T ConvertFromStorageFormat<T>(ReadOnlyMemory<byte> data)
+        {
+
+            T dataValue = default;
+            try
+            {
+                dataValue = this.storageSerializer.Deserialize<T>(data);
+            }
+            catch (Exception exc)
+            {
+                var sb = new StringBuilder();
+                if (data.ToArray().Length > 0)
+                {
+                    sb.AppendFormat("Unable to convert from storage format GrainStateEntity.Data={0}", data);
+                }
+
+                if (dataValue != null)
+                {
+                    sb.AppendFormat("Data Value={0} Type={1}", dataValue, dataValue.GetType());
+                }
+
+                logger.LogError(exc, "{Message}", sb.ToString());
+                throw new AggregateException(sb.ToString(), exc);
+            }
+
+            return dataValue;
+        }
+
+        /// <summary>
+        /// Serialize to the storage format.
+        /// </summary>
+        /// <param name="grainState">The grain state data to be serialized</param>
+        /// <remarks>
+        /// See:
+        /// http://msdn.microsoft.com/en-us/library/system.web.script.serialization.javascriptserializer.aspx
+        /// for more on the JSON serializer.
+        /// </remarks>
+        internal ReadOnlyMemory<byte> ConvertToStorageFormat<T>(T grainState)
+        {
+            // Convert to binary format
+            return this.storageSerializer.Serialize<T>(grainState);
+        }
     }
 
     /// <summary>

@@ -6,7 +6,7 @@ namespace Orleans.Configuration
     /// <summary>
     /// Options for MemoryGrainStorage
     /// </summary>
-    public class MemoryGrainStorageOptions
+    public class MemoryGrainStorageOptions : IStorageProviderSerializerOptions
     {
         /// <summary>
         /// Default number of queue storage grains.
@@ -22,6 +22,9 @@ namespace Orleans.Configuration
         /// Gets or sets the stage of silo lifecycle where storage should be initialized.  Storage must be initialized prior to use.
         /// </summary>
         public int InitStage { get; set; } = DEFAULT_INIT_STAGE;
+
+        /// <inheritdoc/>
+        public IGrainStorageSerializer GrainStorageSerializer { get; set; }
 
         /// <summary>
         /// Default init stage

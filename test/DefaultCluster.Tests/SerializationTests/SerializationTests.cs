@@ -39,7 +39,7 @@ namespace DefaultCluster.Tests
             object obj = this.HostedCluster.DeepCopy(data);
 
             Assert.IsAssignableFrom<ValueTypeTestData>(obj);
-            Assert.Equal<int>(4, ((ValueTypeTestData)obj).GetValue());
+            Assert.Equal<int>(4, ((ValueTypeTestData)obj).Value);
         }
 
         [Fact, TestCategory("Serialization")]
@@ -50,7 +50,7 @@ namespace DefaultCluster.Tests
             object copy = this.HostedCluster.RoundTripSerializationForTesting(data);
 
             Assert.IsAssignableFrom<ValueTypeTestData>(copy);
-            Assert.Equal<int>(4, ((ValueTypeTestData)copy).GetValue());
+            Assert.Equal<int>(4, ((ValueTypeTestData)copy).Value);
         }
     }
 }
