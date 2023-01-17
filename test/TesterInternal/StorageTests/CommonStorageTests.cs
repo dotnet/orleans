@@ -20,7 +20,7 @@ namespace UnitTests.StorageTests.Relational
     /// </remarks>
     internal class CommonStorageTests
     {
-        public CommonStorageTests(IGrainStorage storage) => Storage = storage;
+        public CommonStorageTests(IGrainStorage storage) => Storage = storage ?? throw new ArgumentNullException(nameof(storage));
 
         /// <summary>
         /// The storage provider under test.
