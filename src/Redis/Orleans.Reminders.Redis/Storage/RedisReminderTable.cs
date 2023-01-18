@@ -1,4 +1,5 @@
 using System;
+using System.Buffers;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
@@ -69,7 +70,7 @@ namespace Orleans.Reminders.Redis
         {
             try
             {
-                (string from, string to) = GetFilter(grainId, reminderName);
+                var (from, to) = GetFilter(grainId, reminderName);
                 RedisValue[] values = await _db.SortedSetRangeByValueAsync(_hashSetKey, from, to);
                 if (values.Length == 0)
                 {
@@ -90,9 +91,9 @@ namespace Orleans.Reminders.Redis
         {
             try
             {
-                (string from, string to) = GetFilter(grainId);
+                var (from, to) = GetFilter(grainId);
                 RedisValue[] values = await _db.SortedSetRangeByValueAsync(_hashSetKey, from, to);
-                IEnumerable<ReminderEntry> records = values.Select(v => ConvertToEntry(v));
+                IEnumerable<ReminderEntry> records = values.Select(static v => ConvertToEntry(v));
                 return new ReminderTableData(records);
             }
             catch (Exception exception)
@@ -105,8 +106,8 @@ namespace Orleans.Reminders.Redis
         {
             try
             {
-                (string _, string from) = GetFilter(begin);
-                (string _, string to) = GetFilter(end);
+                var (_, from) = GetFilter(begin);
+                var (_, to) = GetFilter(end);
                 IEnumerable<RedisValue> values;
                 if (begin < end)
                 {
@@ -116,12 +117,12 @@ namespace Orleans.Reminders.Redis
                 else
                 {
                     // *****end------begin*****
-                    RedisValue[] values1 = await _db.SortedSetRangeByValueAsync(_hashSetKey, from, "[\"FFFFFFFF\",#");
-                    RedisValue[] values2 = await _db.SortedSetRangeByValueAsync(_hashSetKey, "[\"00000000\",\"", to);
+                    RedisValue[] values1 = await _db.SortedSetRangeByValueAsync(_hashSetKey, from, "\"FFFFFFFF\",#");
+                    RedisValue[] values2 = await _db.SortedSetRangeByValueAsync(_hashSetKey, "\"00000000\",\"", to);
                     values = values1.Concat(values2);
                 }
 
-                IEnumerable<ReminderEntry> records = values.Select(v => ConvertToEntry(v));
+                IEnumerable<ReminderEntry> records = values.Select(static v => ConvertToEntry(v));
                 return new ReminderTableData(records);
             }
             catch (Exception exception)
@@ -134,7 +135,7 @@ namespace Orleans.Reminders.Redis
         {
             try
             {
-                (RedisValue from, RedisValue to) = GetFilter(grainId, reminderName, eTag);
+                var (from, to) = GetFilter(grainId, reminderName, eTag);
                 long removed = await _db.SortedSetRemoveRangeByValueAsync(_hashSetKey, from, to);
                 return removed > 0;
             }
@@ -158,6 +159,21 @@ namespace Orleans.Reminders.Redis
 
         public async Task<string> UpsertRow(ReminderEntry entry)
         {
+            const string UpsertScript =
+                """
+                local key = KEYS[1]
+                local from = '[' .. ARGV[1] -- start of the conditional (with etag) key range
+                local to = '[' .. ARGV[2] -- end of the conditional (with etag) key range
+                local value = ARGV[3]
+
+                -- Remove all entries for this reminder
+                local remRes = redis.call('ZREMRANGEBYLEX', key, from, to);
+
+                -- Add the new reminder entry
+                local addRes = redis.call('ZADD', key, 0, value);
+                return { key, from, to, value, remRes, addRes }
+                """;
+
             try
             {
                 if (_logger.IsEnabled(LogLevel.Debug))
@@ -165,25 +181,10 @@ namespace Orleans.Reminders.Redis
                     _logger.LogDebug("UpsertRow entry = {Entry}, ETag = {ETag}", entry.ToString(), entry.ETag);
                 }
 
-                (string etag, string value) = ConvertFromEntry(entry);
-                (string from, string to) = GetFilter(entry.GrainId, entry.ReminderName);
-
-                ITransaction tx = _db.CreateTransaction();
-                _db.SortedSetRemoveRangeByValueAsync(_hashSetKey, from, to).Ignore();
-                _db.SortedSetAddAsync(_hashSetKey, value, 0).Ignore();
-                bool success = await tx.ExecuteAsync();
-                if (success)
-                {
-                    return etag;
-                }
-                else
-                {
-                    _logger.LogWarning(
-                        (int)ErrorCode.ReminderServiceBase,
-                        "Intermediate error updating entry {Entry} to Redis.",
-                        entry);
-                    throw new ReminderException("Failed to upsert reminder");
-                }
+                var (newETag, value) = ConvertFromEntry(entry);
+                var (from, to) = GetFilter(entry.GrainId, entry.ReminderName);
+                var res = await _db.ScriptEvaluateAsync(UpsertScript, keys: new[] { _hashSetKey }, values: new[] { from, to, value });
+                return newETag;
             }
             catch (Exception exception) when (exception is not ReminderException)
             {
@@ -191,9 +192,9 @@ namespace Orleans.Reminders.Redis
             }
         }
 
-        private ReminderEntry ConvertToEntry(string reminderValue)
+        private static ReminderEntry ConvertToEntry(string reminderValue)
         {
-            string[] segments = JsonConvert.DeserializeObject<string[]>(reminderValue);
+            string[] segments = JsonConvert.DeserializeObject<string[]>($"[{reminderValue}]");
 
             return new ReminderEntry
             {
@@ -205,36 +206,33 @@ namespace Orleans.Reminders.Redis
             };
         }
 
-        private (string from, string to) GetFilter(uint grainHash)
+        private (RedisValue from, RedisValue to) GetFilter(uint grainHash)
         {
             return GetFilter(grainHash.ToString("X8"));
         }
 
-        private (string from, string to) GetFilter(GrainId grainId)
+        private (RedisValue from, RedisValue to) GetFilter(GrainId grainId)
         {
             return GetFilter(grainId.GetUniformHashCode().ToString("X8"), grainId.ToString());
         }
 
-        private (string from, string to) GetFilter(GrainId grainId, string reminderName)
+        private (RedisValue from, RedisValue to) GetFilter(GrainId grainId, string reminderName)
         {
             return GetFilter(grainId.GetUniformHashCode().ToString("X8"), grainId.ToString(), reminderName);
         }
 
-        private (string from, string to) GetFilter(GrainId grainId, string reminderName, string eTag)
+        private (RedisValue from, RedisValue to) GetFilter(GrainId grainId, string reminderName, string eTag)
         {
             return GetFilter(grainId.GetUniformHashCode().ToString("X8"), grainId.ToString(), reminderName, eTag);
         }
 
-        private (string from, string to) GetFilter(params string[] segments)
+        private (RedisValue from, RedisValue to) GetFilter(params string[] segments)
         {
             string prefix = JsonConvert.SerializeObject(segments, _jsonSettings);
-            prefix = prefix.Remove(prefix.Length - 1);
-            string from = prefix + ",\"";
-            string to = prefix + ",#";
-            return (from, to);
+            return ($"{prefix[1..^1]},\"", $"{prefix[1..^1]},#");
         }
 
-        private (string eTag, string value) ConvertFromEntry(ReminderEntry entry)
+        private (RedisValue eTag, RedisValue value) ConvertFromEntry(ReminderEntry entry)
         {
             string grainHash = entry.GrainId.GetUniformHashCode().ToString("X8");
             string eTag = Guid.NewGuid().ToString();
@@ -248,7 +246,7 @@ namespace Orleans.Reminders.Redis
                 entry.Period.ToString()
             };
 
-            return (eTag, JsonConvert.SerializeObject(segments, _jsonSettings));
+            return (eTag, JsonConvert.SerializeObject(segments, _jsonSettings)[1..^1]);
         }
     }
 }
