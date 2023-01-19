@@ -21,20 +21,6 @@ namespace Orleans.Persistence
     /// </summary>
     internal class RedisGrainStorage : IGrainStorage, ILifecycleParticipant<ISiloLifecycle>
     {
-        private const string WriteScript =
-            """
-            local etag = redis.call('HGET', KEYS[1], 'etag')
-            if etag == false or etag == ARGV[1] then
-              local result = redis.call('HMSET', KEYS[1], 'etag', ARGV[2], 'data', ARGV[3])
-              if ARGV[4] ~= '-1' then
-                redis.call('EXPIRE', KEYS[1], ARGV[4])
-              end
-              return result
-            else
-              return false
-            end
-            """;
-
         private readonly string _serviceId;
         private readonly RedisValue _ttl;
         private readonly RedisKey _keyPrefix;
@@ -130,10 +116,12 @@ namespace Orleans.Persistence
                     grainState.State = _grainStorageSerializer.Deserialize<T>(valueEntry.Value);
 
                     grainState.ETag = etagEntry.Value;
+                    grainState.RecordExists = true;
                 }
                 else
                 {
-                    grainState.ETag = Guid.NewGuid().ToString();
+                    grainState.ETag = null;
+                    grainState.RecordExists = false;
                 }
             }
             catch (Exception e)
@@ -150,19 +138,40 @@ namespace Orleans.Persistence
         /// <inheritdoc />
         public async Task WriteStateAsync<T>(string grainType, GrainId grainId, IGrainState<T> grainState)
         {
-            var etag = grainState.ETag ?? "null";
-            var key = GetKey(grainId);
-            var newEtag = Guid.NewGuid().ToString("N");
+            const string WriteScript =
+                """
+                local etag = redis.call('HGET', KEYS[1], 'etag')
+                if (not etag and (ARGV[1] == nil or ARGV[1] == '')) or etag == ARGV[1] then
+                  redis.call('HMSET', KEYS[1], 'etag', ARGV[2], 'data', ARGV[3])
+                  if ARGV[4] ~= '-1' then
+                    redis.call('EXPIRE', KEYS[1], ARGV[4])
+                  end
+                  return 0
+                else
+                  return -1
+                end
+                """;
 
-            RedisResult response;
+            var key = GetKey(grainId);
+            RedisValue etag = grainState.ETag ?? "";
+            RedisValue newEtag = Guid.NewGuid().ToString("N");
+
             try
             {
                 var payload = new RedisValue(_grainStorageSerializer.Serialize<T>(grainState.State).ToString());
                 var keys = new RedisKey[] { key };
                 var args = new RedisValue[] { etag, newEtag, payload, _ttl };
-                response = await _db.ScriptEvaluateAsync(WriteScript, keys, args).ConfigureAwait(false);
+                var response = await _db.ScriptEvaluateAsync(WriteScript, keys, args).ConfigureAwait(false);
+
+                if (response is not null && (int)response == -1)
+                {
+                    throw new InconsistentStateException($"Version conflict ({nameof(WriteStateAsync)}): ServiceId={_serviceId} ProviderName={_name} GrainType={grainType} GrainId={grainId} ETag={grainState.ETag}.");
+                }
+
+                grainState.ETag = newEtag;
+                grainState.RecordExists = true;
             }
-            catch (Exception e)
+            catch (Exception exception) when (exception is not InconsistentStateException)
             {
                 _logger.LogError(
                     "Failed to write grain state for {GrainType} grain with ID: {GrainId} with redis key {Key}.",
@@ -170,15 +179,8 @@ namespace Orleans.Persistence
                     grainId,
                     key);
                 throw new RedisStorageException(
-                    Invariant($"Failed to write grain state for {grainType} grain with ID: {grainId} with redis key {key}. {e.GetType()}: {e.Message}"));
+                    Invariant($"Failed to write grain state for {grainType} grain with ID: {grainId} with redis key {key}. {exception.GetType()}: {exception.Message}"));
             }
-
-            if (response is not null && response.IsNull)
-            {
-                throw new InconsistentStateException(Invariant($"ETag mismatch - tried with ETag: {grainState.ETag}"));
-            }
-
-            grainState.ETag = newEtag;
         }
 
         private RedisKey GetKey(GrainId grainId) => _keyPrefix.Append(grainId.ToString());
@@ -186,11 +188,30 @@ namespace Orleans.Persistence
         /// <inheritdoc />
         public async Task ClearStateAsync<T>(string grainType, GrainId grainId, IGrainState<T> grainState)
         {
+            const string ClearScript =
+                """
+                local etag = redis.call('HGET', KEYS[1], 'etag')
+                if (not etag and not ARGV[1]) or etag == ARGV[1] then
+                  redis.call('DEL', KEYS[1])
+                  return 0
+                else
+                  return -1
+                end
+                """;
             try
             {
-                await _db.KeyDeleteAsync(GetKey(grainId)).ConfigureAwait(false);
+                RedisValue etag = grainState.ETag ?? "";
+                var response = await _db.ScriptEvaluateAsync(ClearScript, keys: new[] { GetKey(grainId) }, values: new[] { etag }).ConfigureAwait(false);
+
+                if (response is not null && (int)response == -1)
+                {
+                    throw new InconsistentStateException($"Version conflict ({nameof(ClearStateAsync)}): ServiceId={_serviceId} ProviderName={_name} GrainType={grainType} GrainId={grainId} ETag={grainState.ETag}.");
+                }
+
+                grainState.ETag = null;
+                grainState.RecordExists = false;
             }
-            catch (Exception exception)
+            catch (Exception exception) when (exception is not InconsistentStateException)
             {
                 throw new RedisStorageException(Invariant($"{exception.GetType()}: {exception.Message}"));
             }
