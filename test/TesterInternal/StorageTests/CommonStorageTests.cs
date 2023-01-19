@@ -20,7 +20,7 @@ namespace UnitTests.StorageTests.Relational
     /// </remarks>
     internal class CommonStorageTests
     {
-        public CommonStorageTests(IGrainStorage storage) => Storage = storage;
+        public CommonStorageTests(IGrainStorage storage) => Storage = storage ?? throw new ArgumentNullException(nameof(storage));
 
         /// <summary>
         /// The storage provider under test.
@@ -187,18 +187,18 @@ namespace UnitTests.StorageTests.Relational
             await Storage.WriteStateAsync(grainTypeName, grainId, grainState);
             var writtenStateVersion = grainState.ETag;
             var recordExitsAfterWriting = grainState.RecordExists;
+            Assert.True(recordExitsAfterWriting);
 
             await Storage.ClearStateAsync(grainTypeName, grainId, grainState).ConfigureAwait(false);
             var clearedStateVersion = grainState.ETag;
-            var recordExitsAfterClearing = grainState.RecordExists;
-
-            var storedGrainState = new GrainState<T> { State = new T() };
-            await Storage.ReadStateAsync(grainTypeName, grainId, storedGrainState).ConfigureAwait(false);
-
             Assert.NotEqual(writtenStateVersion, clearedStateVersion);
-            Assert.Equal(storedGrainState.State, Activator.CreateInstance<T>());
-            Assert.True(recordExitsAfterWriting);
+
+            var recordExitsAfterClearing = grainState.RecordExists;
             Assert.False(recordExitsAfterClearing);
+
+            var storedGrainState = new GrainState<T> { State = new T(), ETag = clearedStateVersion };
+            await Storage.WriteStateAsync(grainTypeName, grainId, storedGrainState).ConfigureAwait(false);
+            Assert.Equal(storedGrainState.State, Activator.CreateInstance<T>());
             Assert.True(storedGrainState.RecordExists);
         }
 

@@ -5,10 +5,12 @@ using StackExchange.Redis;
 using Tester.Directories;
 using TestExtensions;
 using UnitTests.Grains.Directories;
+using Xunit;
 
 namespace Tester.Redis.GrainDirectory
 {
     [TestCategory("Redis"), TestCategory("Directory"), TestCategory("Functional")]
+    [Collection(TestEnvironmentFixture.DefaultCollection)]
     public class RedisMultipleGrainDirectoriesTests : MultipleGrainDirectoriesTests
     {
         public class SiloConfigurator : ISiloConfigurator

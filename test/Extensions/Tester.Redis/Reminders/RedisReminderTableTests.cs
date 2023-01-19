@@ -11,10 +11,12 @@ using Xunit;
 namespace Tester.Redis.Reminders
 {
     [TestCategory("Redis"), TestCategory("Reminders"), TestCategory("Functional")]
+    [Collection(TestEnvironmentFixture.DefaultCollection)]
     public class RedisRemindersTableTests : ReminderTableTestsBase
     {
-        public RedisRemindersTableTests(ConnectionStringFixture fixture, TestEnvironmentFixture clusterFixture) : base (fixture, clusterFixture, CreateFilters())
+        public RedisRemindersTableTests(ConnectionStringFixture fixture, CommonFixture clusterFixture) : base (fixture, clusterFixture, CreateFilters())
         {
+            TestUtils.CheckForRedis();
         }
 
         private static LoggerFilterOptions CreateFilters()
@@ -44,6 +46,7 @@ namespace Tester.Redis.Reminders
 
             return reminderTable;
         }
+
         protected override Task<string> GetConnectionString() => Task.FromResult(TestDefaultConfiguration.RedisConnectionString);
 
         [SkippableFact]

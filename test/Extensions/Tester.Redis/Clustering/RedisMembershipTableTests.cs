@@ -14,9 +14,10 @@ namespace Tester.Redis.Clustering
     // Tests for operation of Orleans Membership Table using Redis
     // </summary>
     [TestCategory("Redis"), TestCategory("Clustering"), TestCategory("Functional")]
+    [Collection(TestEnvironmentFixture.DefaultCollection)]
     public class RedisMembershipTableTests : MembershipTableTestsBase
     {
-        public RedisMembershipTableTests(ConnectionStringFixture fixture, TestEnvironmentFixture environment) : base(fixture, environment, CreateFilters())
+        public RedisMembershipTableTests(ConnectionStringFixture fixture, CommonFixture environment) : base(fixture, environment, CreateFilters())
         {
         }
 

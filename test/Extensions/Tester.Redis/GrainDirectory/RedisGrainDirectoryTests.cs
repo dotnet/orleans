@@ -6,11 +6,13 @@ using Orleans.GrainDirectory.Redis;
 using StackExchange.Redis;
 using Tester.Directories;
 using TestExtensions;
+using Xunit;
 using Xunit.Abstractions;
 
 namespace Tester.Redis.GrainDirectory
 {
     [TestCategory("Redis"), TestCategory("Directory"), TestCategory("Functional")]
+    [Collection(TestEnvironmentFixture.DefaultCollection)]
     public class RedisGrainDirectoryTests : GrainDirectoryTests<RedisGrainDirectory>
     {
         public RedisGrainDirectoryTests(ITestOutputHelper testOutput) : base(testOutput)
@@ -20,7 +22,6 @@ namespace Tester.Redis.GrainDirectory
         protected override RedisGrainDirectory GetGrainDirectory()
         {
             TestUtils.CheckForRedis();
-
             var configuration = TestDefaultConfiguration.RedisConnectionString;
             var directoryOptions = new RedisGrainDirectoryOptions
             {
