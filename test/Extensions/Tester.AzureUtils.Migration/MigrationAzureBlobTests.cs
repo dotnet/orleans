@@ -1,4 +1,5 @@
-﻿using Orleans.Hosting;
+#if NET70
+using Orleans.Hosting;
 using Orleans.Persistence.Migration;
 using Orleans.TestingHost;
 using Xunit;
@@ -47,3 +48,4 @@ namespace Tester.AzureUtils.Migration
         }
     }
 }
+#endif
