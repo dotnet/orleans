@@ -14,6 +14,7 @@ namespace Tester.Redis.Persistence
 
         public RedisStorageTestsOrleansSerializer(ITestOutputHelper output, CommonFixture commonFixture)
         {
+            TestUtils.CheckForRedis();
             this.fixture = commonFixture;
         }
 

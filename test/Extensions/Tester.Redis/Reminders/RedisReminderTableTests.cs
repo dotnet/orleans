@@ -16,6 +16,7 @@ namespace Tester.Redis.Reminders
     {
         public RedisRemindersTableTests(ConnectionStringFixture fixture, CommonFixture clusterFixture) : base (fixture, clusterFixture, CreateFilters())
         {
+            TestUtils.CheckForRedis();
         }
 
         private static LoggerFilterOptions CreateFilters()
@@ -45,6 +46,7 @@ namespace Tester.Redis.Reminders
 
             return reminderTable;
         }
+
         protected override Task<string> GetConnectionString() => Task.FromResult(TestDefaultConfiguration.RedisConnectionString);
 
         [SkippableFact]

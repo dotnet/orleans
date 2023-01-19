@@ -24,7 +24,6 @@ public class CommonFixture : TestEnvironmentFixture
     /// </summary>
     public CommonFixture()
     {
-        TestUtils.CheckForRedis();
         _ = this.Services.GetRequiredService<IOptions<ClusterOptions>>();
         DefaultProviderRuntime = new ClientProviderRuntime(
             this.InternalGrainFactory,
@@ -39,7 +38,7 @@ public class CommonFixture : TestEnvironmentFixture
     /// a <em>null</em> value will be provided.</remarks>
     public async Task<IGrainStorage> GetStorageProvider(bool useOrleansSerializer = false)
     {
-
+        TestUtils.CheckForRedis();
         IGrainStorageSerializer grainStorageSerializer = useOrleansSerializer ? new OrleansGrainStorageSerializer(this.DefaultProviderRuntime.ServiceProvider.GetService<Serializer>())
                                                                               : new JsonGrainStorageSerializer(this.DefaultProviderRuntime.ServiceProvider.GetService<OrleansJsonSerializer>());
         var options = new RedisStorageOptions()
