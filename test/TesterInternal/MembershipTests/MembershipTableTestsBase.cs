@@ -369,16 +369,24 @@ namespace UnitTests.MembershipTests
 
             await Task.WhenAll(Enumerable.Range(1, 19).Select(async i =>
             {
-                bool done;
+                var done = false;
                 do
                 {
                     var updatedTableData = await membershipTable.ReadAll();
                     var updatedRow = updatedTableData.TryGet(data.SiloAddress);
 
-                    TableVersion tableVersion = updatedTableData.Version.Next();
-
                     await Task.Delay(10);
-                    try { done = await membershipTable.UpdateRow(updatedRow.Item1, updatedRow.Item2, tableVersion); } catch { done = false; }
+                    if (updatedRow is null) continue;
+
+                    TableVersion tableVersion = updatedTableData.Version.Next();
+                    try
+                    {
+                        done = await membershipTable.UpdateRow(updatedRow.Item1, updatedRow.Item2, tableVersion);
+                    }
+                    catch
+                    {
+                        done = false;
+                    }
                 } while (!done);
             })).WithTimeout(TimeSpan.FromSeconds(30));
 

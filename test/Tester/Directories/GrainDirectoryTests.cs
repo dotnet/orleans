@@ -30,7 +30,7 @@ namespace Tester.Directories
             var expected = new GrainAddress
             {
                 ActivationId = ActivationId.NewId(),
-                GrainId = GrainId.Parse("user/someraondomuser_" + Guid.NewGuid().ToString("N")),
+                GrainId = GrainId.Parse("user/somerandomuser_" + Guid.NewGuid().ToString("N")),
                 SiloAddress = SiloAddress.FromParsableString("10.0.23.12:1000@5678"),
                 MembershipVersion = new MembershipVersion(51)
             };
@@ -50,7 +50,7 @@ namespace Tester.Directories
             var expected = new GrainAddress
             {
                 ActivationId = ActivationId.NewId(),
-                GrainId = GrainId.Parse("user/someraondomuser_" + Guid.NewGuid().ToString("N")),
+                GrainId = GrainId.Parse("user/somerandomuser_" + Guid.NewGuid().ToString("N")),
                 SiloAddress = SiloAddress.FromParsableString("10.0.23.12:1000@5678"),
                 MembershipVersion = new MembershipVersion(51)
             };
@@ -84,7 +84,7 @@ namespace Tester.Directories
             var expected = new GrainAddress
             {
                 ActivationId = ActivationId.NewId(),
-                GrainId = GrainId.Parse("user/someraondomuser_" + Guid.NewGuid().ToString("N")),
+                GrainId = GrainId.Parse("user/somerandomuser_" + Guid.NewGuid().ToString("N")),
                 SiloAddress = SiloAddress.FromParsableString("10.0.23.12:1000@5678"),
                 MembershipVersion = new MembershipVersion(51)
             };
@@ -105,7 +105,7 @@ namespace Tester.Directories
         [SkippableFact]
         public async Task LookupNotFound()
         {
-            Assert.Null(await this.grainDirectory.Lookup(GrainId.Parse("user/someraondomuser_" + Guid.NewGuid().ToString("N"))));
+            Assert.Null(await this.grainDirectory.Lookup(GrainId.Parse("user/somerandomuser_" + Guid.NewGuid().ToString("N"))));
         }
     }
 }

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Text;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
@@ -13,13 +14,25 @@ namespace Orleans.GrainDirectory.Redis
 {
     public class RedisGrainDirectory : IGrainDirectory, ILifecycleParticipant<ISiloLifecycle>
     {
+        private const string DeleteScript =
+            """
+            local cur = redis.call('GET', KEYS[1]) 
+            if cur ~= false then
+                local typedCur = cjson.decode(cur)
+                if typedCur.ActivationId == ARGV[1] then
+                    return redis.call('DEL', KEYS[1])
+                end
+            end
+            return 0
+            """;
+
         private readonly RedisGrainDirectoryOptions directoryOptions;
         private readonly ClusterOptions clusterOptions;
         private readonly ILogger<RedisGrainDirectory> logger;
+        private readonly RedisKey _keyPrefix;
 
-        private ConnectionMultiplexer redis;
+        private IConnectionMultiplexer redis;
         private IDatabase database;
-        private LuaScript deleteScript;
 
         public RedisGrainDirectory(
             RedisGrainDirectoryOptions directoryOptions,
@@ -29,6 +42,7 @@ namespace Orleans.GrainDirectory.Redis
             this.directoryOptions = directoryOptions;
             this.logger = logger;
             this.clusterOptions = clusterOptions.Value;
+            _keyPrefix = Encoding.UTF8.GetBytes($"{this.clusterOptions.ClusterId}/directory/");
         }
 
         public async Task<GrainAddress> Lookup(GrainId grainId)
@@ -91,7 +105,10 @@ namespace Orleans.GrainDirectory.Redis
         {
             try
             {
-                var result = (int) await this.database.ScriptEvaluateAsync(this.deleteScript, new { key = GetKey(address.GrainId), val = address.ActivationId.ToParsableString() });
+                var result = (int) await this.database.ScriptEvaluateAsync(
+                    DeleteScript,
+                    keys: new RedisKey[] { GetKey(address.GrainId) },
+                    values: new RedisValue[] { address.ActivationId.ToParsableString() });
 
                 if (this.logger.IsEnabled(LogLevel.Debug))
                     this.logger.LogDebug("Unregister {GrainId} ({Address}): {Result}", address.GrainId, JsonSerializer.Serialize(address), (result != 0) ? "OK" : "Conflict");
@@ -121,7 +138,7 @@ namespace Orleans.GrainDirectory.Redis
 
         public async Task Initialize(CancellationToken ct = default)
         {
-            this.redis = await ConnectionMultiplexer.ConnectAsync(this.directoryOptions.ConfigurationOptions);
+            this.redis = await directoryOptions.CreateMultiplexer(directoryOptions);
 
             // Configure logging
             this.redis.ConnectionRestored += this.LogConnectionRestored;
@@ -130,18 +147,6 @@ namespace Orleans.GrainDirectory.Redis
             this.redis.InternalError += this.LogInternalError;
 
             this.database = this.redis.GetDatabase();
-
-            this.deleteScript = LuaScript.Prepare(
-    @"	
-local cur = redis.call('GET', @key)
-if cur ~= false then
-    local typedCur = cjson.decode(cur)
-    if typedCur.ActivationId == @val  then	
-        return redis.call('DEL', @key)	
-    end
-end
-return 0	
-                ");
         }
 
         private async Task Uninitialize(CancellationToken arg)
@@ -155,7 +160,7 @@ return 0
             }
         }
 
-        private string GetKey(GrainId grainId) => $"{this.clusterOptions.ClusterId}-{grainId}";
+        private RedisKey GetKey(GrainId grainId) => _keyPrefix.Append(grainId.ToString());
 
         #region Logging
         private void LogConnectionRestored(object sender, ConnectionFailedEventArgs e)

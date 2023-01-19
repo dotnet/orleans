@@ -110,7 +110,7 @@ namespace UnitTests.RemindersTest
             Assert.False(removeRowRes, "should have failed. reminder shouldn't exist");
         }
 
-        protected async Task RemindersRange(int iterations=1000)
+        protected async Task RemindersRange(int iterations = 1000)
         {
             await Task.WhenAll(Enumerable.Range(1, iterations).Select(async i =>
             {
@@ -119,7 +119,7 @@ namespace UnitTests.RemindersTest
                 await RetryHelper.RetryOnExceptionAsync(10, RetryOperation.Sigmoid, async () =>
                 {
                     await remindersTable.UpsertRow(CreateReminder(grainRef, i.ToString()));
-                    return Task.CompletedTask;
+                    return 0;
                 });
             }));
 

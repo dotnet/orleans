@@ -1,7 +1,7 @@
-﻿using System;
+using System;
 
 using Microsoft.Extensions.DependencyInjection;
-
+using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 using Orleans.Hosting;
 using Orleans.Reminders.Redis;
@@ -47,6 +47,7 @@ namespace Orleans.Hosting
         {
             services.AddSingleton<IReminderTable, RedisReminderTable>();
             services.Configure<RedisReminderTableOptions>(configure);
+            services.AddSingleton<IConfigurationValidator, RedisReminderTableOptionsValidator>();
             services.ConfigureFormatter<RedisReminderTableOptions>();
             return services;
         }

@@ -1,8 +1,9 @@
-﻿using System;
+using System;
 using Orleans;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Hosting;
 using Orleans.Clustering.Redis;
+using StackExchange.Redis;
 
 namespace Microsoft.Extensions.Hosting
 {
@@ -23,23 +24,27 @@ namespace Microsoft.Extensions.Hosting
                     services.Configure(configuration);
                 }
 
-                services.AddRedis();
+                services.AddRedisClustering();
             });
         }
 
         /// <summary>
         /// Configures Redis as the clustering provider.
         /// </summary>
-        public static ISiloBuilder UseRedisClustering(this ISiloBuilder builder, string redisConnectionString, int db = 0)
+        public static ISiloBuilder UseRedisClustering(this ISiloBuilder builder, string redisConnectionString)
         {
             return builder.ConfigureServices(services => services
-                .Configure<RedisClusteringOptions>(options => { options.Database = db; options.ConnectionString = redisConnectionString; })
-                .AddRedis());
+                .Configure<RedisClusteringOptions>(options =>
+                {
+                    options.ConfigurationOptions = ConfigurationOptions.Parse(redisConnectionString);
+                })
+                .AddRedisClustering());
         }
 
-        internal static IServiceCollection AddRedis(this IServiceCollection services)
+        internal static IServiceCollection AddRedisClustering(this IServiceCollection services)
         {
             services.AddSingleton<RedisMembershipTable>();
+            services.AddSingleton<IConfigurationValidator, RedisClusteringOptionsValidator>();
             services.AddSingleton<IMembershipTable>(sp => sp.GetRequiredService<RedisMembershipTable>());
             return services;
         }

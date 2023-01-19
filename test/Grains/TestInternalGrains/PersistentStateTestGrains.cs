@@ -38,7 +38,7 @@ namespace UnitTests.PersistentState.Grains
 
         public Task DoDelete()
         {
-            return this.persistentState.ClearStateAsync(); // Automatically marks this grain as DeactivateOnIdle 
+            return this.persistentState.ClearStateAsync();
         }
     }
 
@@ -82,7 +82,7 @@ namespace UnitTests.PersistentState.Grains
 
         public Task DoDelete()
         {
-            return this.persistentState.ClearStateAsync(); // Automatically marks this grain as DeactivateOnIdle 
+            return this.persistentState.ClearStateAsync();
         }
     }
 }

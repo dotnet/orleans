@@ -6,8 +6,8 @@ using Orleans.Configuration;
 using Newtonsoft.Json;
 using System.Linq;
 using Microsoft.Extensions.Options;
-using System.Runtime.CompilerServices;
 using System.Globalization;
+using System.Text;
 
 namespace Orleans.Clustering.Redis
 {
@@ -26,7 +26,7 @@ namespace Orleans.Clustering.Redis
         {
             _redisOptions = redisOptions.Value;
             _clusterOptions = clusterOptions.Value;
-            _clusterKey = $"{_clusterOptions.ServiceId}/{_clusterOptions.ClusterId}";
+            _clusterKey = Encoding.UTF8.GetBytes($"{_clusterOptions.ServiceId}/members/{_clusterOptions.ClusterId}");
             _jsonSerializerSettings = JsonSettings.JsonSerializerSettings;
         }
 
@@ -40,11 +40,16 @@ namespace Orleans.Clustering.Redis
         public async Task InitializeMembershipTable(bool tryInitTableVersion)
         {
             _muxer = await _redisOptions.CreateMultiplexer(_redisOptions);
-            _db = _muxer.GetDatabase(_redisOptions.Database);
+            _db = _muxer.GetDatabase();
 
             if (tryInitTableVersion)
             {
                 await _db.HashSetAsync(_clusterKey, TableVersionKey, SerializeVersion(DefaultTableVersion), When.NotExists);
+
+                if (_redisOptions.EntryExpiry is { } expiry)
+                {
+                    await _db.KeyExpireAsync(_clusterKey, expiry);
+                }
             }
 
             this.IsInitialized = true;

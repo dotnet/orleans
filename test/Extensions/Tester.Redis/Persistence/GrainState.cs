@@ -1,4 +1,3 @@
-using System;
 using UnitTests.GrainInterfaces;
 
 namespace Tester.Redis.Persistence

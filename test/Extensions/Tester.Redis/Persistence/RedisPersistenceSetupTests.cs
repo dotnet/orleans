@@ -3,6 +3,7 @@ using Microsoft.Extensions.Hosting;
 using Xunit;
 using Orleans.Configuration;
 using Orleans.Runtime;
+using StackExchange.Redis;
 
 namespace Tester.Redis.Persistence
 {
@@ -11,9 +12,7 @@ namespace Tester.Redis.Persistence
     {
         [SkippableTheory]
         [InlineData(null)]
-        [InlineData("")]
-        [InlineData("  ")]
-        [InlineData("123")]
+        [InlineData("localhost:1234")]
         public void StorageOptionsValidator(string connectionString)
         {
             TestUtils.CheckForRedis();
@@ -29,11 +28,17 @@ namespace Tester.Redis.Persistence
                         .ConfigureEndpoints(siloAddress, siloPort, gatewayPort)
                         .AddRedisGrainStorage("Redis", optionsBuilder => optionsBuilder.Configure(options =>
                         {
-                            options.ConnectionString = connectionString;
+                            if (connectionString is not null)
+                            {
+                                options.ConfigurationOptions = ConfigurationOptions.Parse(connectionString);
+                            }
                         }));
                 }).Build();
 
-            Assert.Throws<OrleansConfigurationException>(() => host.Start());
+            if (string.IsNullOrWhiteSpace(connectionString))
+            {
+                Assert.Throws<OrleansConfigurationException>(() => host.Start());
+            }
         }
     }
 }
