@@ -11,9 +11,10 @@ using Xunit;
 namespace Tester.Redis.Reminders
 {
     [TestCategory("Redis"), TestCategory("Reminders"), TestCategory("Functional")]
+    [Collection(TestEnvironmentFixture.DefaultCollection)]
     public class RedisRemindersTableTests : ReminderTableTestsBase
     {
-        public RedisRemindersTableTests(ConnectionStringFixture fixture, TestEnvironmentFixture clusterFixture) : base (fixture, clusterFixture, CreateFilters())
+        public RedisRemindersTableTests(ConnectionStringFixture fixture, CommonFixture clusterFixture) : base (fixture, clusterFixture, CreateFilters())
         {
         }
 

@@ -1,3 +1,4 @@
+using TestExtensions;
 using UnitTests.StorageTests.Relational;
 using UnitTests.StorageTests.Relational.TestDataSets;
 using Xunit;
@@ -6,7 +7,8 @@ using Xunit.Abstractions;
 namespace Tester.Redis.Persistence
 {
     [TestCategory("Redis"), TestCategory("Persistence"), TestCategory("Functional")]
-    public class RedisStorageTests : IClassFixture<CommonFixture>
+    [Collection(TestEnvironmentFixture.DefaultCollection)]
+    public class RedisStorageTests
     {
         private readonly CommonFixture fixture;
         private readonly CommonStorageTests commonStorageTests;

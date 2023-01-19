@@ -4,10 +4,12 @@ using Xunit;
 using Orleans.Configuration;
 using Orleans.Runtime;
 using StackExchange.Redis;
+using TestExtensions;
 
 namespace Tester.Redis.Persistence
 {
     [TestCategory("Redis"), TestCategory("Persistence"), TestCategory("Functional")]
+    [Collection(TestEnvironmentFixture.DefaultCollection)]
     public class RedisPersistenceSetupTests
     {
         [SkippableTheory]

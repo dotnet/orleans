@@ -14,6 +14,7 @@ using Xunit.Abstractions;
 namespace Tester.Redis.Persistence
 {
     [TestCategory("Redis"), TestCategory("Persistence"), TestCategory("Functional")]
+    [Collection(TestEnvironmentFixture.DefaultCollection)]
     public class RedisPersistenceGrainTests : GrainPersistenceTestsRunner, IClassFixture<RedisPersistenceGrainTests.Fixture>
     {
         public static readonly string ServiceId = Guid.NewGuid().ToString("N");
