@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics.Metrics;
 using System.Linq;
@@ -22,7 +23,7 @@ namespace Orleans.Streams
         private readonly string streamProviderName;
         private readonly IStreamPubSub pubSub;
         private readonly IStreamFilter streamFilter;
-        private readonly Dictionary<QualifiedStreamId, StreamConsumerCollection> pubSubCache;
+        private readonly ConcurrentDictionary<QualifiedStreamId, StreamConsumerCollection> pubSubCache;
         private readonly StreamPullingAgentOptions options;
         private readonly ILogger logger;
         private readonly IQueueAdapterCache queueAdapterCache;
@@ -60,7 +61,7 @@ namespace Orleans.Streams
             streamProviderName = strProviderName;
             pubSub = streamPubSub;
             this.streamFilter = streamFilter;
-            pubSubCache = new Dictionary<QualifiedStreamId, StreamConsumerCollection>();
+            pubSubCache = new ConcurrentDictionary<QualifiedStreamId, StreamConsumerCollection>();
             this.options = options;
             this.queueAdapter = queueAdapter ?? throw new ArgumentNullException(nameof(queueAdapter));
             this.streamFailureHandler = streamFailureHandler ?? throw new ArgumentNullException(nameof(streamFailureHandler));
@@ -363,7 +364,7 @@ namespace Orleans.Streams
                     streamId);
 
             if (streamData.Count == 0)
-                pubSubCache.Remove(streamId);
+                pubSubCache.TryRemove(streamId, out _);
         }
 
         private async Task AsyncTimerCallback(object state)
@@ -478,7 +479,12 @@ namespace Orleans.Streams
             // Retrieve one multiBatch from the queue. Every multiBatch has an IEnumerable of IBatchContainers, each IBatchContainer may have multiple events.
             IList<IBatchContainer> multiBatch = await rcvr.GetQueueMessagesAsync(maxCacheAddCount);
 
-            if (multiBatch == null || multiBatch.Count == 0) return false; // queue is empty. Exit the loop. Will attempt again in the next timer callback.
+            
+
+            if (multiBatch == null || multiBatch.Count == 0)
+            {
+                return false;
+            } // queue is empty. Exit the loop. Will attempt again in the next timer callback.
 
             queueCache?.AddToCache(multiBatch);
             numMessages += multiBatch.Count;
@@ -504,8 +510,7 @@ namespace Orleans.Streams
                     streamData.RefreshActivity(now);
                     if (streamData.StreamRegistered)
                     {
-                        StartInactiveCursors(streamData,
-                            startToken); // if this is an existing stream, start any inactive cursors
+                        StartInactiveCursors(streamData, startToken).Ignore(); // if this is an existing stream, start any inactive cursors
                     }
                     else
                     {
@@ -530,7 +535,7 @@ namespace Orleans.Streams
             {
                 if (tuple.Value.IsInactive(now, options.StreamInactivityPeriod))
                 {
-                    pubSubCache.Remove(tuple.Key);
+                    pubSubCache.TryRemove(tuple.Key, out _);
                     tuple.Value.DisposeAll(logger);
                 }
             }
@@ -539,7 +544,7 @@ namespace Orleans.Streams
         private async Task RegisterStream(QualifiedStreamId streamId, StreamSequenceToken firstToken, DateTime now)
         {
             var streamData = new StreamConsumerCollection(now);
-            pubSubCache.Add(streamId, streamData);
+            pubSubCache.TryAdd(streamId, streamData);
             // Create a fake cursor to point into a cache.
             // That way we will not purge the event from the cache, until we talk to pub sub.
             // This will help ensure the "casual consistency" between pre-existing subscripton (of a potentially new already subscribed consumer)
@@ -558,107 +563,138 @@ namespace Orleans.Streams
             }
         }
 
-        private void StartInactiveCursors(StreamConsumerCollection streamData, StreamSequenceToken startToken)
+        private async Task StartInactiveCursors(StreamConsumerCollection streamData, StreamSequenceToken startToken)
         {
-            foreach (StreamConsumerData consumerData in streamData.AllConsumers())
+            foreach (var consumerData in streamData.AllConsumers())
             {
+                await consumerData.Semaphore.WaitAsync();
                 consumerData.Cursor?.Refresh(startToken);
                 if (consumerData.State == StreamConsumerDataState.Inactive)
                 {
                     // wake up inactive consumers
                     RunConsumerCursor(consumerData).Ignore();
                 }
+
+                consumerData.Semaphore.Release();
             }
         }
 
         private async Task RunConsumerCursor(StreamConsumerData consumerData)
         {
-            try
-            {
-                // double check in case of interleaving
-                if (consumerData.State == StreamConsumerDataState.Active ||
-                    consumerData.Cursor == null) return;
-
-                consumerData.State = StreamConsumerDataState.Active;
-                while (consumerData.Cursor != null)
+                try
                 {
-                    IBatchContainer batch = null;
-                    Exception exceptionOccured = null;
-                    try
-                    {
-                        batch = GetBatchForConsumer(consumerData.Cursor, consumerData.StreamId, consumerData.FilterData);
-                        if (batch == null)
-                        {
-                            break;
-                        }
-                    }
-                    catch (Exception exc)
-                    {
-                        exceptionOccured = exc;
-                        consumerData.SafeDisposeCursor(logger);
-                        consumerData.Cursor = queueCache.GetCacheCursor(consumerData.StreamId, null);
-                    }
+                    // double check in case of interleaving
+                    if (consumerData.State == StreamConsumerDataState.Active ||
+                        consumerData.Cursor == null) return;
 
-                    if (batch != null)
+                    consumerData.State = StreamConsumerDataState.Active;
+                    while (consumerData.Cursor != null)
                     {
-                        if (!ShouldDeliverBatch(consumerData.StreamId, batch, consumerData.FilterData))
-                            continue;
-                    }
-
-                    try
-                    {
-                        StreamInstruments.PersistentStreamSentMessages.Add(1);
-                        if (batch != null)
+                        IBatchContainer batch = null;
+                        Exception exceptionOccured = null;
+                        try
                         {
-                            StreamHandshakeToken newToken = await AsyncExecutorWithRetries.ExecuteWithRetries(
-                                i => DeliverBatchToConsumer(consumerData, batch),
-                                AsyncExecutorWithRetries.INFINITE_RETRIES,
-                                // Do not retry if the agent is shutting down, or if the exception is ClientNotAvailableException
-                                (exception, i) => exception is not ClientNotAvailableException && !IsShutdown,
-                                this.options.MaxEventDeliveryTime,
-                                DeliveryBackoffProvider);
-                            if (newToken != null)
+                            batch = GetBatchForConsumer(consumerData.Cursor, consumerData.StreamId, consumerData.FilterData);
+                            if (batch == null)
                             {
-                                consumerData.LastToken = newToken;
-                                IQueueCacheCursor newCursor = queueCache.GetCacheCursor(consumerData.StreamId, newToken.Token);
-                                // The handshake token points to an already processed event, we need to advance the cursor to
-                                // the next event.
-                                newCursor.MoveNext();
-                                consumerData.SafeDisposeCursor(logger);
-                                consumerData.Cursor = newCursor;
+                                await RestartOrInactivateConsumer(consumerData);
+                                return;
                             }
                         }
-                    }
-                    catch (Exception exc)
-                    {
-                        consumerData.Cursor?.RecordDeliveryFailure();
-                        logger.LogError(
-                            (int)ErrorCode.PersistentStreamPullingAgent_14,
-                            exc,
-                            "Exception while trying to deliver msgs to stream {StreamId} in PersistentStreamPullingAgentGrain.RunConsumerCursor",
-                            consumerData.StreamId);
+                        catch (Exception exc)
+                        {
+                            exceptionOccured = exc;
+                            consumerData.SafeDisposeCursor(logger);
+                            consumerData.Cursor = queueCache.GetCacheCursor(consumerData.StreamId, null);
+                        }
 
-                        exceptionOccured = exc is ClientNotAvailableException
-                            ? exc
-                            : new StreamEventDeliveryFailureException(consumerData.StreamId);
+                        if (batch != null)
+                        {
+                            if (!ShouldDeliverBatch(consumerData.StreamId, batch, consumerData.FilterData))
+                                continue;
+                        }
+
+                        try
+                        {
+                            StreamInstruments.PersistentStreamSentMessages.Add(1);
+                            if (batch != null)
+                            {
+                                StreamHandshakeToken newToken = await AsyncExecutorWithRetries.ExecuteWithRetries(
+                                    i => DeliverBatchToConsumer(consumerData, batch),
+                                    AsyncExecutorWithRetries.INFINITE_RETRIES,
+                                    // Do not retry if the agent is shutting down, or if the exception is ClientNotAvailableException
+                                    (exception, i) => exception is not ClientNotAvailableException && !IsShutdown,
+                                    this.options.MaxEventDeliveryTime,
+                                    DeliveryBackoffProvider);
+
+                                if (newToken != null &&
+                                    newToken.Token.SequenceNumber == batch.SequenceToken.SequenceNumber)
+                                {
+
+                                }
+
+                                if (newToken != null)
+                                {
+                                    consumerData.LastToken = newToken;
+                                    IQueueCacheCursor newCursor = queueCache.GetCacheCursor(consumerData.StreamId, newToken.Token);
+                                    // The handshake token points to an already processed event, we need to advance the cursor to
+                                    // the next event.
+                                    newCursor.MoveNext();
+                                    consumerData.SafeDisposeCursor(logger);
+                                    consumerData.Cursor = newCursor;
+                                }
+                            }
+                        }
+                        catch (Exception exc)
+                        {
+                            consumerData.Cursor?.RecordDeliveryFailure();
+                            logger.LogError(
+                                (int)ErrorCode.PersistentStreamPullingAgent_14,
+                                exc,
+                                "Exception while trying to deliver msgs to stream {StreamId} in PersistentStreamPullingAgentGrain.RunConsumerCursor",
+                                consumerData.StreamId);
+
+                            exceptionOccured = exc is ClientNotAvailableException
+                                ? exc
+                                : new StreamEventDeliveryFailureException(consumerData.StreamId);
+                        }
+                        // if we failed to deliver a batch
+                        if (exceptionOccured != null)
+                        {
+                            bool faultedSubscription = await ErrorProtocol(consumerData, exceptionOccured, true, batch, batch?.SequenceToken);
+                            if (faultedSubscription) return;
+                        }
                     }
-                    // if we failed to deliver a batch
-                    if (exceptionOccured != null)
-                    {
-                        bool faultedSubscription = await ErrorProtocol(consumerData, exceptionOccured, true, batch, batch?.SequenceToken);
-                        if (faultedSubscription) return;
-                    }
+
+                    await RestartOrInactivateConsumer(consumerData);
+
                 }
-                consumerData.State = StreamConsumerDataState.Inactive;
-            }
-            catch (Exception exc)
+                catch (Exception exc)
+                {
+                    // RunConsumerCursor is fired with .Ignore so we should log if anything goes wrong, because there is no one to catch the exception
+                    logger.LogError(
+                        (int)ErrorCode.PersistentStreamPullingAgent_15, exc, "Ignored RunConsumerCursor error");
+                    await RestartOrInactivateConsumer(consumerData);
+                    throw;
+                }
+           
+        }
+
+        private async Task RestartOrInactivateConsumer(StreamConsumerData consumerData, StreamSequenceToken lastRefreshedToken = null)
+        {
+            await consumerData.Semaphore.WaitAsync();
+            var cursorRefreshed = consumerData.Cursor?.LastRefreshToken is not null;
+
+            if (cursorRefreshed && consumerData.LastToken?.Token.SequenceNumber < consumerData.Cursor.LastRefreshToken.SequenceNumber)
             {
-                // RunConsumerCursor is fired with .Ignore so we should log if anything goes wrong, because there is no one to catch the exception
-                logger.LogError(
-                    (int)ErrorCode.PersistentStreamPullingAgent_15, exc, "Ignored RunConsumerCursor error");
                 consumerData.State = StreamConsumerDataState.Inactive;
-                throw;
+                RunConsumerCursor(consumerData).Ignore();
+                consumerData.Semaphore.Release();
+                return;
             }
+
+            consumerData.State = StreamConsumerDataState.Inactive;
+            consumerData.Semaphore.Release();
         }
 
         private IBatchContainer GetBatchForConsumer(IQueueCacheCursor cursor, StreamId streamId, string filterData)

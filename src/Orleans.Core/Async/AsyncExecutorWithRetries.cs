@@ -323,7 +323,7 @@ namespace Orleans.Internal
     /// with and exponentially increases its delay by two raised to the power of the attempt number until
     /// the maximum backoff delay is reached.
     /// </summary>
-    internal class ExponentialBackoff : IBackoffProvider
+    public class ExponentialBackoff : IBackoffProvider
     {
         private readonly TimeSpan minDelay;
         private readonly TimeSpan maxDelay;
