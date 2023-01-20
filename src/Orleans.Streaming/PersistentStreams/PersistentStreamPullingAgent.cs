@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics.Metrics;
 using System.IO;
@@ -27,7 +28,7 @@ namespace Orleans.Streams
         private readonly string streamProviderName;
         private readonly IStreamPubSub pubSub;
         private readonly IStreamFilter streamFilter;
-        private readonly Dictionary<QualifiedStreamId, StreamConsumerCollection> pubSubCache;
+        private readonly ConcurrentDictionary<QualifiedStreamId, StreamConsumerCollection> pubSubCache;
         private readonly StreamPullingAgentOptions options;
         private readonly ILogger logger;
         private readonly IQueueAdapterCache queueAdapterCache;
@@ -83,7 +84,7 @@ namespace Orleans.Streams
             streamProviderName = strProviderName;
             pubSub = streamPubSub;
             this.streamFilter = streamFilter;
-            pubSubCache = new Dictionary<QualifiedStreamId, StreamConsumerCollection>();
+            pubSubCache = new ConcurrentDictionary<QualifiedStreamId, StreamConsumerCollection>();
             this.options = options;
             options.InitialSubscriptionStartPosition.Validate();
             this.queueAdapter = queueAdapter ?? throw new ArgumentNullException(nameof(queueAdapter));
@@ -617,7 +618,7 @@ namespace Orleans.Streams
             }
 
             if (streamData.Count == 0)
-                pubSubCache.Remove(streamId);
+                pubSubCache.TryRemove(streamId, out _);
         }
 
         private Task RunQueuePump(QueueId queueId, CancellationToken cancellationToken)
@@ -894,8 +895,13 @@ namespace Orleans.Streams
             // This will help ensure the "casual consistency" between pre-existing subscripton (of a potentially new already subscribed consumer)
             // and later production.
             var pinCursor = queueCache?.GetCacheCursor(streamId, firstToken);
+            if (!pubSubCache.TryAdd(streamId, streamData))
+            {
+                pinCursor?.Dispose();
+                return;
+            }
+
             streamData.RegistrationTask = RegisterStreamAsync();
-            pubSubCache.Add(streamId, streamData);
 
             async Task RegisterStreamAsync()
             {
@@ -971,7 +977,7 @@ namespace Orleans.Streams
                 if (pubSubCache.TryGetValue(streamId, out var cachedStreamData)
                     && ReferenceEquals(cachedStreamData, streamData))
                 {
-                    pubSubCache.Remove(streamId);
+                    pubSubCache.TryRemove(streamId, out _);
                 }
 
                 streamData.DisposeAll(logger);
@@ -1220,7 +1226,7 @@ namespace Orleans.Streams
                         if (faultedSubscription) return;
                     }
                 }
-                consumerData.State = StreamConsumerDataState.Inactive;
+                await RestartOrInactivateConsumer(consumerData);
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
             {
@@ -1230,8 +1236,28 @@ namespace Orleans.Streams
             {
                 // RunConsumerCursor is fired with .Ignore so we should log if anything goes wrong, because there is no one to catch the exception
                 LogErrorRunConsumerCursor(exc);
-                consumerData.State = StreamConsumerDataState.Inactive;
+                await RestartOrInactivateConsumer(consumerData);
                 throw;
+            }
+        }
+
+        private async Task RestartOrInactivateConsumer(StreamConsumerData consumerData)
+        {
+            await consumerData.Semaphore.WaitAsync();
+            try
+            {
+                consumerData.State = StreamConsumerDataState.Inactive;
+
+                if (!IsShutdown
+                    && consumerData.Cursor?.LastRefreshToken is { } lastRefreshToken
+                    && (consumerData.LastProcessedToken is null || IsBefore(consumerData.LastProcessedToken, lastRefreshToken)))
+                {
+                    RunConsumerCursor(consumerData).Ignore();
+                }
+            }
+            finally
+            {
+                consumerData.Semaphore.Release();
             }
         }
 

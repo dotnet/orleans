@@ -1,0 +1,32 @@
+<Project Sdk="Microsoft.NET.Sdk.Worker">
+
+  <PropertyGroup>
+    <TargetFramework>net7.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <UserSecretsId>dotnet-Server-45b6f158-f1bc-4f71-a931-5d78d3dbc314</UserSecretsId>
+    <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="MediatR.Extensions.Microsoft.DependencyInjection" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+    <PackageReference Include="Microsoft.Extensions.Hosting" />
+    <PackageReference Include="OrleansDashboard" />
+    <PackageReference Include="System.Data.SqlClient" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\OrleanseShop\eShop.Data\eShop.Data.csproj" />
+    <ProjectReference Include="..\GrainsAbstraction\GrainsAbstraction.csproj" />
+    <ProjectReference Include="..\src\AdoNet\Orleans.Clustering.AdoNet\Orleans.Clustering.AdoNet.csproj" />
+    <ProjectReference Include="..\src\AdoNet\Orleans.Persistence.AdoNet\Orleans.Persistence.AdoNet.csproj" />
+    <ProjectReference Include="..\src\Orleans.Persistence.Memory\Orleans.Persistence.Memory.csproj" />
+    <ProjectReference Include="..\src\Orleans.Runtime\Orleans.Runtime.csproj" />
+    <ProjectReference Include="..\src\Orleans.Sdk\Orleans.Sdk.csproj" />
+    <ProjectReference Include="..\src\RabbitMQ\Orleans.Streaming.RabbitMQ\Orleans.Streaming.RabbitMQ.csproj" />
+  </ItemGroup>
+</Project>

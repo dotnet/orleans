@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using System.Linq;
@@ -12,7 +13,7 @@ namespace Orleans.Streams
     internal sealed class StreamConsumerCollection
     {
         [Id(0)]
-        private readonly Dictionary<GuidId, StreamConsumerData> queueData; // map of consumers for one stream: from Guid ConsumerId to StreamConsumerData
+        private readonly ConcurrentDictionary<GuidId, StreamConsumerData> queueData; // map of consumers for one stream: from Guid ConsumerId to StreamConsumerData
         [Id(1)]
         private DateTime lastActivityTime;
 
@@ -25,16 +26,20 @@ namespace Orleans.Streams
 
         public StreamConsumerCollection(DateTime now)
         {
-            queueData = new Dictionary<GuidId, StreamConsumerData>();
+            queueData = new ConcurrentDictionary<GuidId, StreamConsumerData>();
             lastActivityTime = now;
         }
 
         public StreamConsumerData AddConsumer(GuidId subscriptionId, QualifiedStreamId streamId, IStreamConsumerExtension streamConsumer, string? filterData, DateTime now)
         {
             var consumerData = new StreamConsumerData(subscriptionId, streamId, streamConsumer, filterData);
-            queueData.Add(subscriptionId, consumerData);
-            lastActivityTime = now;
-            return consumerData;
+            var result = queueData.GetOrAdd(subscriptionId, consumerData);
+            if (ReferenceEquals(result, consumerData))
+            {
+                lastActivityTime = now;
+            }
+
+            return result;
         }
 
         public bool RemoveConsumer(GuidId subscriptionId, ILogger logger)
