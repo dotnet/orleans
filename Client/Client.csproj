@@ -1,0 +1,23 @@
+﻿<Project Sdk="Microsoft.NET.Sdk.Worker">
+
+  <PropertyGroup>
+    <TargetFramework>net7.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <UserSecretsId>dotnet-Client-cfda2108-b061-416e-9ac6-53f9fe01c1d0</UserSecretsId>
+    <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Hosting" />
+    <PackageReference Include="System.Data.SqlClient" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\OrleanseShop\eShop.Domain\eShop.Domain.csproj" />
+    <ProjectReference Include="..\GrainsAbstraction\GrainsAbstraction.csproj" />
+    <ProjectReference Include="..\src\AdoNet\Orleans.Clustering.AdoNet\Orleans.Clustering.AdoNet.csproj" />
+    <ProjectReference Include="..\src\Orleans.Client\Orleans.Client.csproj" />
+    <ProjectReference Include="..\src\Orleans.Sdk\Orleans.Sdk.csproj" />
+  </ItemGroup>
+</Project>
