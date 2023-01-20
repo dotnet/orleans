@@ -102,6 +102,7 @@
     <PackageVersion Include="Polly" Version="8.6.4" />
     <PackageVersion Include="Polly.Extensions" Version="8.6.5" />
     <PackageVersion Include="protobuf-net" Version="3.2.56" />
+    <PackageVersion Include="RabbitMQ.Stream.Client" Version="1.2.0" />
     <PackageVersion Include="SSH.NET" Version="2026.0.0" />
     <PackageVersion Include="SpanJson" Version="4.2.1" />
     <PackageVersion Include="SQLitePCLRaw.bundle_e_sqlite3" Version="2.1.12" />
