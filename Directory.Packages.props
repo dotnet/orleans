@@ -58,7 +58,7 @@
     <PackageVersion Include="protobuf-net" Version="3.1.22" />
     <PackageVersion Include="Newtonsoft.Json" Version="13.0.1" />
     <PackageVersion Include="ZooKeeperNetEx" Version="3.4.12.4" />
-    <PackageVersion Include="StackExchange.Redis" Version="2.6.86" />
+    <PackageVersion Include="StackExchange.Redis" Version="2.6.90" />
     <PackageVersion Include="KubernetesClient" Version="10.0.16" />
     <!-- Test related packages -->
     <PackageVersion Include="FluentAssertions" Version="6.7.0" />
