@@ -97,7 +97,7 @@ public class MyValue : IEquatable<MyValue>
     }
 
     public override int GetHashCode() => Value;
-} 
+}
 
 [GenerateSerializer]
 [Immutable]
@@ -378,6 +378,17 @@ namespace Orleans.Serialization.UnitTests
         public int UnmarkedProperty { get; set; }
 
         public override string ToString() => $"{nameof(IntField)}: {IntField}, {nameof(IntProperty)}: {IntProperty}";
+    }
+
+    [GenerateSerializer]
+    [Id(8286)]
+    public abstract record TestType2(string TestString)
+    {
+        [GenerateSerializer]
+        public sealed record TestType2A(string TestString) : TestType2(TestString);
+
+        [GenerateSerializer]
+        public sealed record TestType2B(string TestString) : TestType2(TestString);
     }
 
     [GenerateSerializer]

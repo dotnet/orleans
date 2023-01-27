@@ -32,6 +32,16 @@ namespace Orleans.Serialization.UnitTests
         }
 
         [Fact]
+        public void GeneratedSerializersRoundTripPolymorphicCollectionThroughCodec()
+        {
+            var original = new TestType2[] { new TestType2.TestType2A("test1"), new TestType2.TestType2B("test2") };
+            var result = RoundTripThroughCodec(original);
+
+            Assert.Equal(original[0].TestString, result[0].TestString);
+            Assert.Equal(original[1].TestString, result[1].TestString);
+        }
+
+        [Fact]
         public void GeneratedSerializersRoundTripThroughCodec()
         {
             var original = new SomeClassWithSerializers { IntField = 2, IntProperty = 30, OtherObject = MyCustomEnum.Two };
@@ -351,7 +361,7 @@ namespace Orleans.Serialization.UnitTests
 
             original.StringProperty = "bananas";
             result = RoundTripThroughCodec(original);
- 
+
             Assert.Equal(default(Guid), result.GuidProperty);
             Assert.Equal(original.GuidProperty, result.GuidProperty);
             Assert.Equal("bananas", result.StringProperty);
