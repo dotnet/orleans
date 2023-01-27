@@ -314,6 +314,7 @@ namespace Orleans.CodeGenerator
             var instanceParam = "instance".ToIdentifierName();
 
             var body = new List<StatementSyntax>();
+            var writeEndBaseInvocationExpression = ExpressionStatement(InvocationExpression(writerParam.Member("WriteEndBase"), ArgumentList()));
             if (type.HasComplexBaseType)
             {
                 body.Add(
@@ -321,7 +322,7 @@ namespace Orleans.CodeGenerator
                         InvocationExpression(
                             BaseTypeSerializerFieldName.ToIdentifierName().Member(SerializeMethodName),
                             ArgumentList(SeparatedList(new[] { Argument(writerParam).WithRefOrOutKeyword(Token(SyntaxKind.RefKeyword)), Argument(instanceParam) })))));
-                body.Add(ExpressionStatement(InvocationExpression(writerParam.Member("WriteEndBase"), ArgumentList())));
+                body.Add(writeEndBaseInvocationExpression);
             }
 
             AddSerializationCallbacks(type, instanceParam, "OnSerializing", body);
@@ -341,7 +342,10 @@ namespace Orleans.CodeGenerator
             if (type.SupportsPrimaryConstructorParameters)
             {
                 AddSerializationMembers(type, serializerFields, members.Where(m => m.IsPrimaryConstructorParameter), libraryTypes, writerParam, instanceParam, previousFieldIdVar, body);
-                body.Add(ExpressionStatement(InvocationExpression(writerParam.Member("WriteEndBase"), ArgumentList())));
+                if (body.LastOrDefault() != writeEndBaseInvocationExpression)
+                {
+                    body.Add(writeEndBaseInvocationExpression);
+                }
             }
 
             AddSerializationMembers(type, serializerFields, members.Where(m => !m.IsPrimaryConstructorParameter), libraryTypes, writerParam, instanceParam, previousFieldIdVar, body);
