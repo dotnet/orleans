@@ -9,7 +9,7 @@ namespace Orleans.CodeGenerator
         Accessibility Accessibility { get; }
         TypeSyntax TypeSyntax { get; }
         bool HasComplexBaseType { get; }
-        bool SupportsPrimaryConstructorParameters { get; }
+        bool IncludePrimaryConstructorParameters { get; }
         INamedTypeSymbol BaseType { get; }
         TypeSyntax BaseTypeSyntax { get; }
         string Namespace { get; }
