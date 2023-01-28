@@ -6,7 +6,7 @@ namespace Orleans.Runtime;
 
 internal static class CatalogInstruments
 {
-    internal static Counter<int> ActivationWorkingSet = Instruments.Meter.CreateCounter<int>(InstrumentNames.CATALOG_ACTIVATION_WORKING_SET);
+    internal static UpDownCounter<int> ActivationWorkingSet = Instruments.Meter.CreateUpDownCounter<int>(InstrumentNames.CATALOG_ACTIVATION_WORKING_SET);
 
     internal static Counter<int> ActivationFailedToActivate = Instruments.Meter.CreateCounter<int>(InstrumentNames.CATALOG_ACTIVATION_FAILED_TO_ACTIVATE);
 
