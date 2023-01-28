@@ -40,6 +40,7 @@ internal static class InstrumentNames
 
     // Catalog
     public const string CATALOG_ACTIVATION_COUNT = "orleans-catalog-activations";
+    public const string CATALOG_ACTIVATION_WORKING_SET = "orleans-catalog-activation-working-set";
     public const string CATALOG_ACTIVATION_CREATED = "orleans-catalog-activation-created";
     public const string CATALOG_ACTIVATION_DESTROYED = "orleans-catalog-activation-destroyed";
     public const string CATALOG_ACTIVATION_FAILED_TO_ACTIVATE = "orleans-catalog-activation-failed-to-activate";

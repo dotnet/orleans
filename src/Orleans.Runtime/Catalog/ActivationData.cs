@@ -1151,6 +1151,8 @@ namespace Orleans.Runtime
                     return;
                 }
 
+                CatalogInstruments.ActivationWorkingSet.Add(1);
+                
                 _shared.InternalRuntime.ActivationWorkingSet.OnActivated(this);
                 if (_shared.Logger.IsEnabled(LogLevel.Debug))
                 {
@@ -1202,7 +1204,7 @@ namespace Orleans.Runtime
                 {
                     CatalogInstruments.ActivationFailedToActivate.Add(1);
 
-                    // Capture the exeption so that it can be propagated to rejection messages
+                    // Capture the exception so that it can be propagated to rejection messages
                     var sourceException = (exception as OrleansLifecycleCanceledException)?.InnerException ?? exception;
                     _shared.Logger.LogError((int)ErrorCode.Catalog_ErrorCallingActivate, sourceException, "Error activating grain {Grain}", this);
 
@@ -1409,6 +1411,8 @@ namespace Orleans.Runtime
             {
                 CatalogInstruments.ActiviationShutdownViaCollection();
             }
+
+            CatalogInstruments.ActivationWorkingSet.Add(-1);
 
             _shared.InternalRuntime.ActivationWorkingSet.OnDeactivated(this);
 
