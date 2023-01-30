@@ -24,8 +24,15 @@ internal static class CatalogInstruments
     internal static readonly Counter<int> ActivationsDestroyed = Instruments.Meter.CreateCounter<int>(InstrumentNames.CATALOG_ACTIVATION_DESTROYED);
 
     internal static ObservableGauge<int> ActivationCount;
+    
     internal static void RegisterActivationCountObserve(Func<int> observeValue)
     {
         ActivationCount = Instruments.Meter.CreateObservableGauge(InstrumentNames.CATALOG_ACTIVATION_COUNT, observeValue);
+    }
+
+    internal static ObservableGauge<int> ActivationWorkingSet;
+    internal static void RegisterActivationWorkingSetObserve(Func<int> observeValue)
+    {
+        ActivationWorkingSet = Instruments.Meter.CreateObservableGauge(InstrumentNames.CATALOG_ACTIVATION_WORKING_SET, observeValue);
     }
 }

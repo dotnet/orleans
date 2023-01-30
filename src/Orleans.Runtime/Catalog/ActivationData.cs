@@ -180,7 +180,7 @@ namespace Orleans.Runtime
 
         public TimeSpan CollectionAgeLimit => _shared.CollectionAgeLimit;
 
-        public TTarget GetTarget<TTarget>() where TTarget : class => (TTarget)GrainInstance; 
+        public TTarget GetTarget<TTarget>() where TTarget : class => (TTarget)GrainInstance;
 
         TComponent ITargetHolder.GetComponent<TComponent>()
         {
@@ -1202,7 +1202,7 @@ namespace Orleans.Runtime
                 {
                     CatalogInstruments.ActivationFailedToActivate.Add(1);
 
-                    // Capture the exeption so that it can be propagated to rejection messages
+                    // Capture the exception so that it can be propagated to rejection messages
                     var sourceException = (exception as OrleansLifecycleCanceledException)?.InnerException ?? exception;
                     _shared.Logger.LogError((int)ErrorCode.Catalog_ErrorCallingActivate, sourceException, "Error activating grain {Grain}", this);
 

@@ -22,7 +22,7 @@ namespace Orleans.Runtime
         internal static readonly Counter<int> ReroutedMessagesCounter = Instruments.Meter.CreateCounter<int>(InstrumentNames.MESSAGING_REROUTED);
         internal static readonly Counter<int> ExpiredMessagesCounter = Instruments.Meter.CreateCounter<int>(InstrumentNames.MESSAGING_EXPIRED);
 
-        internal static readonly Counter<int> ConnectedClient = Instruments.Meter.CreateCounter<int>(InstrumentNames.GATEWAY_CONNECTED_CLIENTS);
+        internal static readonly UpDownCounter<int> ConnectedClient = Instruments.Meter.CreateUpDownCounter<int>(InstrumentNames.GATEWAY_CONNECTED_CLIENTS);
         internal static readonly Counter<int> PingSendCounter = Instruments.Meter.CreateCounter<int>(InstrumentNames.MESSAGING_PINGS_SENT);
         internal static readonly Counter<int> PingReceivedCounter = Instruments.Meter.CreateCounter<int>(InstrumentNames.MESSAGING_PINGS_RECEIVED);
         internal static readonly Counter<int> PingReplyReceivedCounter = Instruments.Meter.CreateCounter<int>(InstrumentNames.MESSAGING_PINGS_REPLYRECEIVED);
