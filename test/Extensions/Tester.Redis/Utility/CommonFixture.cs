@@ -36,7 +36,7 @@ public class CommonFixture : TestEnvironmentFixture
     /// </summary>
     /// <remarks>If the environment invariants have failed to hold upon creation of the storage provider,
     /// a <em>null</em> value will be provided.</remarks>
-    public async Task<IGrainStorage> GetStorageProvider(bool useOrleansSerializer = false)
+    public async Task<IGrainStorage> CreateRedisGrainStorage(bool useOrleansSerializer = false, bool deleteStateOnClear = false)
     {
         TestUtils.CheckForRedis();
         IGrainStorageSerializer grainStorageSerializer = useOrleansSerializer ? new OrleansGrainStorageSerializer(this.DefaultProviderRuntime.ServiceProvider.GetService<Serializer>())
@@ -44,7 +44,8 @@ public class CommonFixture : TestEnvironmentFixture
         var options = new RedisStorageOptions()
         {
             ConfigurationOptions = ConfigurationOptions.Parse(TestDefaultConfiguration.RedisConnectionString),
-            GrainStorageSerializer = grainStorageSerializer
+            GrainStorageSerializer = grainStorageSerializer,
+            DeleteStateOnClear = deleteStateOnClear,
         };
 
         var clusterOptions = new ClusterOptions()

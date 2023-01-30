@@ -8,16 +8,17 @@ namespace Tester.Redis.Persistence
 {
     [TestCategory("Redis"), TestCategory("Persistence"), TestCategory("Functional")]
     [Collection(TestEnvironmentFixture.DefaultCollection)]
-    public class RedisStorageTests
+    public class RedisStorageTests_OrleansSerializer
     {
         private readonly CommonFixture fixture;
         private readonly CommonStorageTests commonStorageTests;
-    
-        public RedisStorageTests(ITestOutputHelper output, CommonFixture commonFixture) 
+
+        public RedisStorageTests_OrleansSerializer(ITestOutputHelper output, CommonFixture commonFixture)
         {
             TestUtils.CheckForRedis();
             this.fixture = commonFixture;
-            this.commonStorageTests = new CommonStorageTests(commonFixture.CreateRedisGrainStorage(false).GetAwaiter().GetResult());      
+            var storageProvider = fixture.CreateRedisGrainStorage(true).Result;
+            this.commonStorageTests = new CommonStorageTests(storageProvider);
         }
 
         [SkippableFact]
