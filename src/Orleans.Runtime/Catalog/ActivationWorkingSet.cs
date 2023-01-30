@@ -35,6 +35,7 @@ namespace Orleans.Runtime
             _logger = logger;
             _scanPeriodTimer = asyncTimerFactory.Create(TimeSpan.FromMilliseconds(100), nameof(ActivationWorkingSet) + "." + nameof(MonitorWorkingSet));
             _observers = observers.ToList();
+            CatalogInstruments.RegisterActivationWorkingSetObserve(() => Count);
         }
 
         public int Count => _activeCount;

@@ -6,8 +6,6 @@ namespace Orleans.Runtime;
 
 internal static class CatalogInstruments
 {
-    internal static UpDownCounter<int> ActivationWorkingSet = Instruments.Meter.CreateUpDownCounter<int>(InstrumentNames.CATALOG_ACTIVATION_WORKING_SET);
-
     internal static Counter<int> ActivationFailedToActivate = Instruments.Meter.CreateCounter<int>(InstrumentNames.CATALOG_ACTIVATION_FAILED_TO_ACTIVATE);
 
     internal static Counter<int> ActivationCollections = Instruments.Meter.CreateCounter<int>(InstrumentNames.CATALOG_ACTIVATION_COLLECTION_NUMBER_OF_COLLECTIONS);
@@ -26,8 +24,15 @@ internal static class CatalogInstruments
     internal static readonly Counter<int> ActivationsDestroyed = Instruments.Meter.CreateCounter<int>(InstrumentNames.CATALOG_ACTIVATION_DESTROYED);
 
     internal static ObservableGauge<int> ActivationCount;
+    
     internal static void RegisterActivationCountObserve(Func<int> observeValue)
     {
         ActivationCount = Instruments.Meter.CreateObservableGauge(InstrumentNames.CATALOG_ACTIVATION_COUNT, observeValue);
+    }
+
+    internal static ObservableGauge<int> ActivationWorkingSet;
+    internal static void RegisterActivationWorkingSetObserve(Func<int> observeValue)
+    {
+        ActivationWorkingSet = Instruments.Meter.CreateObservableGauge(InstrumentNames.CATALOG_ACTIVATION_WORKING_SET, observeValue);
     }
 }

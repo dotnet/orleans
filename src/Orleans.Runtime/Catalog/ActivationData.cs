@@ -180,7 +180,7 @@ namespace Orleans.Runtime
 
         public TimeSpan CollectionAgeLimit => _shared.CollectionAgeLimit;
 
-        public TTarget GetTarget<TTarget>() where TTarget : class => (TTarget)GrainInstance; 
+        public TTarget GetTarget<TTarget>() where TTarget : class => (TTarget)GrainInstance;
 
         TComponent ITargetHolder.GetComponent<TComponent>()
         {
@@ -1151,8 +1151,6 @@ namespace Orleans.Runtime
                     return;
                 }
 
-                CatalogInstruments.ActivationWorkingSet.Add(1);
-                
                 _shared.InternalRuntime.ActivationWorkingSet.OnActivated(this);
                 if (_shared.Logger.IsEnabled(LogLevel.Debug))
                 {
@@ -1411,8 +1409,6 @@ namespace Orleans.Runtime
             {
                 CatalogInstruments.ActiviationShutdownViaCollection();
             }
-
-            CatalogInstruments.ActivationWorkingSet.Add(-1);
 
             _shared.InternalRuntime.ActivationWorkingSet.OnDeactivated(this);
 

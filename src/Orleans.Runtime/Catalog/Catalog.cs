@@ -63,7 +63,6 @@ namespace Orleans.Runtime
 
             GC.GetTotalMemory(true); // need to call once w/true to ensure false returns OK value
 
-            CatalogInstruments.RegisterActivationCountObserve(() => activations.Count);
             MessagingProcessingInstruments.RegisterActivationDataAllObserve(() =>
             {
                 long counter = 0;
