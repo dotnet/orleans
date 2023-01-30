@@ -16,7 +16,7 @@ internal sealed class ActivationDirectory : IEnumerable<KeyValuePair<GrainId, IG
         CatalogInstruments.RegisterActivationCountObserve(() => Count);
     }
 
-    public int Count => Volatile.Read(ref _activationsCount);
+    public int Count => _activationsCount;
 
     public IGrainContext FindTarget(GrainId key)
     {
