@@ -70,7 +70,7 @@ namespace Orleans.Persistence
                         "RedisGrainStorage {Name} is initializing: ServiceId={ServiceId} DeleteOnClear={DeleteOnClear}",
                          _name,
                          _serviceId,
-                         _options.DeleteOnClear);
+                         _options.DeleteStateOnClear);
                 }
 
                 _connection = await _options.CreateMultiplexer(_options).ConfigureAwait(false);
@@ -110,12 +110,19 @@ namespace Orleans.Persistence
                 var hashEntries = await _db.HashGetAllAsync(key).ConfigureAwait(false);
                 if (hashEntries.Length == 2)
                 {
-                    var etagEntry = hashEntries.Single(e => e.Name == "etag");
-                    var valueEntry = hashEntries.Single(e => e.Name == "data");
+                    string eTag = hashEntries.Single(e => e.Name == "etag").Value;
+                    ReadOnlyMemory<byte> data = hashEntries.Single(e => e.Name == "data").Value;
 
-                    grainState.State = _grainStorageSerializer.Deserialize<T>(valueEntry.Value);
+                    if (data.Length > 0)
+                    {
+                        grainState.State = _grainStorageSerializer.Deserialize<T>(data);
+                    }
+                    else
+                    {
+                        grainState.State = Activator.CreateInstance<T>();
+                    }
 
-                    grainState.ETag = etagEntry.Value;
+                    grainState.ETag = eTag;
                     grainState.RecordExists = true;
                 }
                 else
@@ -124,14 +131,14 @@ namespace Orleans.Persistence
                     grainState.RecordExists = false;
                 }
             }
-            catch (Exception e)
+            catch (Exception exception)
             {
                 _logger.LogError(
-                    "Failed to read grain state for {GrainType} grain with id {GrainId} and storage key {Key}.",
+                    "Failed to read grain state for {GrainType} grain with ID {GrainId} and storage key {Key}.",
                     grainType,
                     grainId,
                     key);
-                throw new RedisStorageException(Invariant($"Failed to read grain state for {grainType} grain with id {grainId} and storage key {key}."), e);
+                throw new RedisStorageException(Invariant($"Failed to read grain state for {grainType} with ID {grainId} and storage key {key}. {exception.GetType()}: {exception.Message}"));
             }
         }
 
@@ -174,12 +181,13 @@ namespace Orleans.Persistence
             catch (Exception exception) when (exception is not InconsistentStateException)
             {
                 _logger.LogError(
-                    "Failed to write grain state for {GrainType} grain with ID: {GrainId} with redis key {Key}.",
+                    "Failed to write grain state for {GrainType} grain with ID {GrainId} and storage key {Key}.",
                     grainType,
                     grainId,
                     key);
                 throw new RedisStorageException(
-                    Invariant($"Failed to write grain state for {grainType} grain with ID: {grainId} with redis key {key}. {exception.GetType()}: {exception.Message}"));
+                    Invariant($"Failed to write grain state for {grainType} grain with ID {grainId} and storage key {key}. {exception.GetType()}: {exception.Message}"));
+
             }
         }
 
@@ -188,32 +196,53 @@ namespace Orleans.Persistence
         /// <inheritdoc />
         public async Task ClearStateAsync<T>(string grainType, GrainId grainId, IGrainState<T> grainState)
         {
-            const string ClearScript =
-                """
-                local etag = redis.call('HGET', KEYS[1], 'etag')
-                if (not etag and not ARGV[1]) or etag == ARGV[1] then
-                  redis.call('DEL', KEYS[1])
-                  return 0
-                else
-                  return -1
-                end
-                """;
             try
             {
                 RedisValue etag = grainState.ETag ?? "";
-                var response = await _db.ScriptEvaluateAsync(ClearScript, keys: new[] { GetKey(grainId) }, values: new[] { etag }).ConfigureAwait(false);
+                RedisResult response;
+                string newETag;
+                if (_options.DeleteStateOnClear)
+                {
+                    const string DeleteScript =
+                        """
+                        local etag = redis.call('HGET', KEYS[1], 'etag')
+                        if (not etag and not ARGV[1]) or etag == ARGV[1] then
+                          redis.call('DEL', KEYS[1])
+                          return 0
+                        else
+                          return -1
+                        end
+                        """;
+                    response = await _db.ScriptEvaluateAsync(DeleteScript, keys: new[] { GetKey(grainId) }, values: new[] { etag }).ConfigureAwait(false);
+                    newETag = null;
+                }
+                else
+                {
+                    const string ClearScript =
+                        """
+                        local etag = redis.call('HGET', KEYS[1], 'etag')
+                        if (not etag and not ARGV[1]) or etag == ARGV[1] then
+                          redis.call('HMSET', KEYS[1], 'etag', ARGV[2], 'data', '')
+                          return 0
+                        else
+                          return -1
+                        end
+                        """;
+                    newETag = Guid.NewGuid().ToString("N");
+                    response = await _db.ScriptEvaluateAsync(ClearScript, keys: new[] { GetKey(grainId) }, values: new RedisValue[] { etag, newETag }).ConfigureAwait(false);
+                }
 
                 if (response is not null && (int)response == -1)
                 {
                     throw new InconsistentStateException($"Version conflict ({nameof(ClearStateAsync)}): ServiceId={_serviceId} ProviderName={_name} GrainType={grainType} GrainId={grainId} ETag={grainState.ETag}.");
                 }
 
-                grainState.ETag = null;
+                grainState.ETag = newETag;
                 grainState.RecordExists = false;
             }
             catch (Exception exception) when (exception is not InconsistentStateException)
             {
-                throw new RedisStorageException(Invariant($"{exception.GetType()}: {exception.Message}"));
+                throw new RedisStorageException(Invariant($"Failed to clear grain state for grain {grainType} with ID {grainId}. {exception.GetType()}: {exception.Message}"));
             }
         }
 
