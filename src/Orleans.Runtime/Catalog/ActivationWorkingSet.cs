@@ -38,7 +38,7 @@ namespace Orleans.Runtime
             CatalogInstruments.RegisterActivationWorkingSetObserve(() => Count);
         }
 
-        public int Count => _activeCount;
+        public int Count => Volatile.Read(ref _activeCount);
 
         public void OnActivated(IActivationWorkingSetMember member)
         {

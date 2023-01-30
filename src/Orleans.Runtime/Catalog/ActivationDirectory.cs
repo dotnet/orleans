@@ -7,7 +7,7 @@ namespace Orleans.Runtime;
 
 internal sealed class ActivationDirectory : IEnumerable<KeyValuePair<GrainId, IGrainContext>>
 {
-    private volatile int _activationsCount;
+    private int _activationsCount;
 
     private readonly ConcurrentDictionary<GrainId, IGrainContext> _activations = new();
 
@@ -16,7 +16,7 @@ internal sealed class ActivationDirectory : IEnumerable<KeyValuePair<GrainId, IG
         CatalogInstruments.RegisterActivationCountObserve(() => Count);
     }
 
-    public int Count => _activationsCount;
+    public int Count => Volatile.Read(ref _activationsCount);
 
     public IGrainContext FindTarget(GrainId key)
     {
