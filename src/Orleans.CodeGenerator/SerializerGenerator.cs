@@ -338,7 +338,7 @@ namespace Orleans.CodeGenerator
                             .WithInitializer(EqualsValueClause(LiteralExpression(SyntaxKind.NumericLiteralExpression, Literal(0))))))));
             }
 
-            if (type.SupportsPrimaryConstructorParameters)
+            if (type.IncludePrimaryConstructorParameters)
             {
                 AddSerializationMembers(type, serializerFields, members.Where(m => m.IsPrimaryConstructorParameter), libraryTypes, writerParam, instanceParam, previousFieldIdVar, body);
                 body.Add(ExpressionStatement(InvocationExpression(writerParam.Member("WriteEndBase"), ArgumentList())));
@@ -480,8 +480,8 @@ namespace Orleans.CodeGenerator
             AddSerializationCallbacks(type, instanceParam, "OnDeserializing", body);
 
             int emptyBodyCount;
-            var normalMembers = members.FindAll(m => !m.IsPrimaryConstructorParameter);
-            if (members.Count == 0 || normalMembers.Count == 0 && !type.SupportsPrimaryConstructorParameters)
+            var nonCtorMembers = type.IncludePrimaryConstructorParameters ? members.FindAll(static m => !m.IsPrimaryConstructorParameter) : members;
+            if ((members.Count == 0 || nonCtorMembers.Count == 0) && !type.IncludePrimaryConstructorParameters)
             {
                 // C#: reader.ConsumeEndBaseOrEndObject();
                 body.Add(ExpressionStatement(InvocationExpression(readerParam.Member("ConsumeEndBaseOrEndObject"))));
@@ -490,10 +490,13 @@ namespace Orleans.CodeGenerator
             else
             {
                 // C#: uint id = 0;
-                body.Add(LocalDeclarationStatement(
-                    VariableDeclaration(
-                        PredefinedType(Token(SyntaxKind.UIntKeyword)),
-                        SingletonSeparatedList(VariableDeclarator(idVar.Identifier, null, EqualsValueClause(LiteralExpression(SyntaxKind.NumericLiteralExpression, Literal(0))))))));
+                if (members.Count > 0)
+                {
+                    body.Add(LocalDeclarationStatement(
+                        VariableDeclaration(
+                            PredefinedType(Token(SyntaxKind.UIntKeyword)),
+                            SingletonSeparatedList(VariableDeclarator(idVar.Identifier, null, EqualsValueClause(LiteralExpression(SyntaxKind.NumericLiteralExpression, Literal(0))))))));
+                }
 
                 // C#: Field header = default;
                 body.Add(LocalDeclarationStatement(
@@ -503,15 +506,20 @@ namespace Orleans.CodeGenerator
 
                 emptyBodyCount = 2;
 
-                if (type.SupportsPrimaryConstructorParameters)
+                if (type.IncludePrimaryConstructorParameters)
                 {
-                    body.Add(GetDeserializerLoop(members.FindAll(m => m.IsPrimaryConstructorParameter)));
-                    body.Add(ExpressionStatement(AssignmentExpression(SyntaxKind.SimpleAssignmentExpression, idVar, LiteralExpression(SyntaxKind.NumericLiteralExpression, Literal(0)))));
-                    body.Add(IfStatement(headerVar.Member("IsEndBaseFields"), GetDeserializerLoop(normalMembers)));
+                    var constructorParameterMembers = members.FindAll(m => m.IsPrimaryConstructorParameter);
+                    body.Add(GetDeserializerLoop(constructorParameterMembers));
+                    if (members.Count > 0)
+                    {
+                        body.Add(ExpressionStatement(AssignmentExpression(SyntaxKind.SimpleAssignmentExpression, idVar, LiteralExpression(SyntaxKind.NumericLiteralExpression, Literal(0)))));
+                    }
+
+                    body.Add(IfStatement(headerVar.Member("IsEndBaseFields"), GetDeserializerLoop(nonCtorMembers)));
                 }
                 else
                 {
-                    body.Add(GetDeserializerLoop(normalMembers));
+                    body.Add(GetDeserializerLoop(nonCtorMembers));
                 }
             }
 

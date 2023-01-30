@@ -214,9 +214,9 @@ namespace Orleans.CodeGenerator
                         else
                         {
                             // Regular type
-                            var supportsPrimaryConstructorParameters = ShouldSupportPrimaryConstructorParameters(symbol);
+                            var includePrimaryConstructorParameters = IncludePrimaryConstructorParameters(symbol);
                             var constructorParameters = ImmutableArray<IParameterSymbol>.Empty;
-                            if (supportsPrimaryConstructorParameters)
+                            if (includePrimaryConstructorParameters)
                             {
                                 if (symbol.IsRecord)
                                 {
@@ -251,7 +251,7 @@ namespace Orleans.CodeGenerator
                                 throw new OrleansGeneratorDiagnosticAnalysisException(CanNotGenerateImplicitFieldIdsDiagnostic.CreateDiagnostic(symbol, fieldIdAssignmentHelper.FailureReason));
                             }
 
-                            var typeDescription = new SerializableTypeDescription(semanticModel, symbol, supportsPrimaryConstructorParameters && constructorParameters.Length > 0, GetDataMembers(fieldIdAssignmentHelper), LibraryTypes);
+                            var typeDescription = new SerializableTypeDescription(semanticModel, symbol, includePrimaryConstructorParameters, GetDataMembers(fieldIdAssignmentHelper), LibraryTypes);
                             metadataModel.SerializableTypes.Add(typeDescription);
                         }
                     }
@@ -358,9 +358,9 @@ namespace Orleans.CodeGenerator
                         return false;
                     }
 
-                    bool ShouldSupportPrimaryConstructorParameters(INamedTypeSymbol t)
+                    bool IncludePrimaryConstructorParameters(INamedTypeSymbol t)
                     {
-                        static bool TestGenerateSerializerAttribute(INamedTypeSymbol t, INamedTypeSymbol at)
+                        static bool? TestGenerateSerializerAttribute(INamedTypeSymbol t, INamedTypeSymbol at)
                         {
                             var attribute = t.GetAttribute(at);
                             if (attribute != null)
@@ -369,31 +369,33 @@ namespace Orleans.CodeGenerator
                                 {
                                     if (namedArgument.Key == "IncludePrimaryConstructorParameters")
                                     {
-                                        if (namedArgument.Value.Kind == TypedConstantKind.Primitive && namedArgument.Value.Value is bool b && b == false)
+                                        if (namedArgument.Value.Kind == TypedConstantKind.Primitive && namedArgument.Value.Value is bool b)
                                         {
-                                            return false;
+                                            return b;
                                         }
                                     }
                                 }
                             }
 
-                            return true;
+                            // If there is no such named argument, return null so that other attributes have a chance to apply and defaults can be applied.
+                            return null;
                         }
 
-                        if (!TestGenerateSerializerAttribute(t, LibraryTypes.GenerateSerializerAttribute))
+                        if (TestGenerateSerializerAttribute(t, LibraryTypes.GenerateSerializerAttribute) is bool result)
                         {
-                            return false;
+                            return result;
                         }
 
                         foreach (var attr in _generateSerializerAttributes)
                         {
-                            if (!TestGenerateSerializerAttribute(t, attr))
+                            if (TestGenerateSerializerAttribute(t, attr) is bool res)
                             {
-                                return false;
+                                return res;
                             }
                         }
 
-                        return true;
+                        // Default to true for records, false otherwise.
+                        return t.IsRecord;
                     }
                 }
             }

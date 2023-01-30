@@ -12,9 +12,9 @@ namespace Orleans
     {
         /// <summary>
         /// Get or sets if primary constructor parameters should automatically be included as Serializable fields.
-        /// Defaults to <see langword="true"/> for record types.
+        /// Defaults to <see langword="true"/> for <see langword="record"/> types, <see langword="false"/> otherwise.
         /// </summary>
-        public bool IncludePrimaryConstructorParameters { get; init; } = true;
+        public bool IncludePrimaryConstructorParameters { get; init; }
 
         /// <summary>
         /// Get or sets when Orleans should auto-assign field ids. The default behavior is to not auto-assign field ids.
