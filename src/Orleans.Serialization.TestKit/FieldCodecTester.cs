@@ -521,7 +521,7 @@ namespace Orleans.Serialization.TestKit
             var writer = Writer.CreatePooled(writerSession);
             serializer.Serialize(original, ref writer);
             using var readerSession = _sessionPool.GetSession();
-            var reader = Reader.Create(writer.Output, readerSession);
+            var reader = Reader.Create(writer.Output.AsReadOnlySequence(), readerSession);
             var deserialized = serializer.Deserialize(ref reader);
 
             Assert.Equal(original.Count, deserialized.Count);
@@ -655,7 +655,7 @@ namespace Orleans.Serialization.TestKit
             var writer = Writer.CreatePooled(writerSession);
             serializer.Serialize(original, ref writer);
             using var readerSession = _sessionPool.GetSession();
-            var reader = Reader.Create(writer.Output, readerSession);
+            var reader = Reader.Create(writer.Output.AsReadOnlySequence(), readerSession);
             var deserialized = serializer.Deserialize(ref reader);
 
             var isEqual = Equals(original.Item1, deserialized.Item1);
