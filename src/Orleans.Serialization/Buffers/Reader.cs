@@ -1,13 +1,16 @@
 using System;
 using System.Buffers;
 using System.Buffers.Binary;
+using System.Diagnostics.CodeAnalysis;
 using System.IO;
 #if NETCOREAPP3_1_OR_GREATER
 using System.Numerics;
 #endif
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
+using Orleans.Serialization.Buffers.Adaptors;
 using Orleans.Serialization.Session;
+using static Orleans.Serialization.Buffers.PooledArrayBufferWriter;
 #if !NETCOREAPP3_1_OR_GREATER
 using Orleans.Serialization.Utilities;
 #endif
@@ -175,6 +178,33 @@ namespace Orleans.Serialization.Buffers
         /// <summary>
         /// Creates a reader for the provided input stream.
         /// </summary>
+        /// <param name="input">The input.</param>
+        /// <param name="session">The session.</param>
+        /// <returns>A new <see cref="Reader{TInput}"/>.</returns>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static Reader<BufferSliceReaderInput> Create(PooledArrayBufferWriter input, SerializerSession session) => Create(input.Slice(), session);
+
+        /// <summary>
+        /// Creates a reader for the provided input stream.
+        /// </summary>
+        /// <param name="input">The input.</param>
+        /// <param name="session">The session.</param>
+        /// <returns>A new <see cref="Reader{TInput}"/>.</returns>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static Reader<BufferSliceReaderInput> Create(BufferSlice input, SerializerSession session) => Create(new BufferSliceReaderInput(in input), session);
+
+        /// <summary>
+        /// Creates a reader for the provided input stream.
+        /// </summary>
+        /// <param name="input">The input.</param>
+        /// <param name="session">The session.</param>
+        /// <returns>A new <see cref="Reader{TInput}"/>.</returns>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static Reader<BufferSliceReaderInput> Create(BufferSliceReaderInput input, SerializerSession session) => new Reader<BufferSliceReaderInput>(input, session, 0);
+
+        /// <summary>
+        /// Creates a reader for the provided input stream.
+        /// </summary>
         /// <param name="stream">The stream.</param>
         /// <param name="session">The session.</param>
         /// <returns>A new <see cref="Reader{TInput}"/>.</returns>
@@ -188,7 +218,7 @@ namespace Orleans.Serialization.Buffers
         /// <param name="session">The session.</param>
         /// <returns>A new <see cref="Reader{TInput}"/>.</returns>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static Reader<ReadOnlySequence<byte>> Create(ReadOnlySequence<byte> sequence, SerializerSession session) => new Reader<ReadOnlySequence<byte>>(sequence, session, 0);
+        public static Reader<ReadOnlySequenceInput> Create(ReadOnlySequence<byte> sequence, SerializerSession session) => new Reader<ReadOnlySequenceInput>(new ReadOnlySequenceInput { Sequence = sequence }, session, 0);
 
         /// <summary>
         /// Creates a reader for the provided input data.
@@ -226,20 +256,29 @@ namespace Orleans.Serialization.Buffers
     }
 
     /// <summary>
+    /// Input type for <see cref="Reader{TInput}"/> to support <see cref="ReadOnlySequence{Byte}"/> buffers.
+    /// </summary>
+    public struct ReadOnlySequenceInput
+    {
+        internal ReadOnlySequence<byte> Sequence;
+        internal SequencePosition NextSequencePosition;
+        internal long PreviousBuffersSize;
+    }
+
+    /// <summary>
     /// Provides functionality for parsing data from binary input.
     /// </summary>
     /// <typeparam name="TInput">The underlying buffer reader type.</typeparam>
     public ref struct Reader<TInput>
     {
         private readonly static bool IsSpanInput = typeof(TInput) == typeof(SpanReaderInput);
-        private readonly static bool IsReadOnlySequenceInput = typeof(TInput) == typeof(ReadOnlySequence<byte>);
+        private readonly static bool IsReadOnlySequenceInput = typeof(TInput) == typeof(ReadOnlySequenceInput);
         private readonly static bool IsReaderInput = typeof(ReaderInput).IsAssignableFrom(typeof(TInput));
+        private readonly static bool IsBufferSliceInput = typeof(BufferSliceReaderInput).IsAssignableFrom(typeof(TInput));
         
         private ReadOnlySpan<byte> _currentSpan;
-        private SequencePosition _nextSequencePosition;
         private int _bufferPos;
         private int _bufferSize;
-        private long _previousBuffersSize;
         private readonly long _sequenceOffset;
         private TInput _input;
         
@@ -248,23 +287,30 @@ namespace Orleans.Serialization.Buffers
         {
             if (IsReadOnlySequenceInput)
             {
-                ref var sequence = ref Unsafe.As<TInput, ReadOnlySequence<byte>>(ref input);
+                ref var typedInput = ref Unsafe.As<TInput, ReadOnlySequenceInput>(ref input);
+                var sequence = typedInput.Sequence;
+                typedInput.NextSequencePosition = sequence.Start;
                 _input = input;
-                _nextSequencePosition = sequence.Start;
                 _currentSpan = sequence.First.Span;
                 _bufferPos = 0;
                 _bufferSize = _currentSpan.Length;
-                _previousBuffersSize = 0;
+                _sequenceOffset = globalOffset;
+            }
+            else if (IsBufferSliceInput)
+            {
+                _input = input;
+                ref var slice = ref Unsafe.As<TInput, BufferSliceReaderInput>(ref _input);
+                _currentSpan = slice.GetNext();
+                _bufferPos = 0;
+                _bufferSize = _currentSpan.Length;
                 _sequenceOffset = globalOffset;
             }
             else if (IsReaderInput)
             {
                 _input = input;
-                _nextSequencePosition = default;
                 _currentSpan = default;
                 _bufferPos = 0;
                 _bufferSize = default;
-                _previousBuffersSize = 0;
                 _sequenceOffset = globalOffset;
             }
             else
@@ -281,11 +327,9 @@ namespace Orleans.Serialization.Buffers
             if (IsSpanInput)
             {
                 _input = default;
-                _nextSequencePosition = default;
                 _currentSpan = input; 
                 _bufferPos = 0;
                 _bufferSize = _currentSpan.Length;
-                _previousBuffersSize = 0;
                 _sequenceOffset = globalOffset;
             }
             else
@@ -313,7 +357,13 @@ namespace Orleans.Serialization.Buffers
             {
                 if (IsReadOnlySequenceInput)
                 {
-                    return _sequenceOffset + _previousBuffersSize + _bufferPos;
+                    var previousBuffersSize = Unsafe.As<TInput, ReadOnlySequenceInput>(ref _input).PreviousBuffersSize;
+                    return _sequenceOffset + previousBuffersSize + _bufferPos;
+                }
+                else if (IsBufferSliceInput)
+                {
+                    var previousBuffersSize = Unsafe.As<TInput, BufferSliceReaderInput>(ref _input).PreviousBuffersSize;
+                    return _sequenceOffset + previousBuffersSize + _bufferPos;
                 }
                 else if (IsSpanInput)
                 {
@@ -340,7 +390,11 @@ namespace Orleans.Serialization.Buffers
             {
                 if (IsReadOnlySequenceInput)
                 {
-                    return Unsafe.As<TInput, ReadOnlySequence<byte>>(ref _input).Length;
+                    return Unsafe.As<TInput, ReadOnlySequenceInput>(ref _input).Sequence.Length;
+                }
+                else if (IsBufferSliceInput)
+                {
+                    return Unsafe.As<TInput, BufferSliceReaderInput>(ref _input).Length;
                 }
                 else if (IsSpanInput)
                 {
@@ -363,14 +417,31 @@ namespace Orleans.Serialization.Buffers
         /// <param name="count">The number of bytes to skip.</param>
         public void Skip(long count)
         {
-            if (IsReadOnlySequenceInput)
+            if (IsReadOnlySequenceInput || IsBufferSliceInput)
             {
+                var previousBuffersSize = Unsafe.As<TInput, ReadOnlySequenceInput>(ref _input).PreviousBuffersSize;
                 var end = Position + count;
                 while (Position < end)
                 {
                     if (Position + _bufferSize >= end)
                     {
-                        _bufferPos = (int)(end - _previousBuffersSize);
+                        _bufferPos = (int)(end - previousBuffersSize);
+                    }
+                    else
+                    {
+                        MoveNext();
+                    }
+                }
+            }
+            else if (IsBufferSliceInput)
+            {
+                var previousBuffersSize = Unsafe.As<TInput, BufferSliceReaderInput>(ref _input).PreviousBuffersSize;
+                var end = Position + count;
+                while (Position < end)
+                {
+                    if (Position + _bufferSize >= end)
+                    {
+                        _bufferPos = (int)(end - previousBuffersSize);
                     }
                     else
                     {
@@ -409,9 +480,24 @@ namespace Orleans.Serialization.Buffers
         {
             if (IsReadOnlySequenceInput)
             {
-                ref var sequence = ref Unsafe.As<TInput, ReadOnlySequence<byte>>(ref _input);
-                var slicedSequence = sequence.Slice(position - _sequenceOffset);
-                forked = new Reader<TInput>(Unsafe.As<ReadOnlySequence<byte>, TInput>(ref slicedSequence), Session, position);
+                ref var typedInput = ref Unsafe.As<TInput, ReadOnlySequenceInput>(ref _input);
+                var slicedSequence = typedInput.Sequence.Slice(position - _sequenceOffset);
+                var newInput = new ReadOnlySequenceInput
+                {
+                    Sequence = slicedSequence
+                };
+                forked = new Reader<TInput>(Unsafe.As<ReadOnlySequenceInput, TInput>(ref newInput), Session, position);
+
+                if (forked.Position != position)
+                {
+                    ThrowInvalidPosition(position, forked.Position);
+                }
+            }
+            else if (IsBufferSliceInput)
+            {
+                ref var input = ref Unsafe.As<TInput, BufferSliceReaderInput>(ref _input);
+                var newInput = input.ForkFrom(checked((int)position));
+                forked = new Reader<TInput>(Unsafe.As<BufferSliceReaderInput, TInput>(ref newInput), Session, position);
 
                 if (forked.Position != position)
                 {
@@ -459,6 +545,10 @@ namespace Orleans.Serialization.Buffers
             {
                 // Nothing is required.
             }
+            else if (IsBufferSliceInput)
+            {
+                // Nothing is required.
+            }
             else if (IsSpanInput)
             {
                 // Nothing is required.
@@ -489,22 +579,30 @@ namespace Orleans.Serialization.Buffers
         {
             if (IsReadOnlySequenceInput)
             {
-                ref var sequence = ref Unsafe.As<TInput, ReadOnlySequence<byte>>(ref _input);
-                _previousBuffersSize += _bufferSize;
+                ref var typedInput = ref Unsafe.As<TInput, ReadOnlySequenceInput>(ref _input);
+                typedInput.PreviousBuffersSize += _bufferSize;
 
                 // If this is the first call to MoveNext then nextSequencePosition is invalid and must be moved to the second position.
-                if (_nextSequencePosition.Equals(sequence.Start))
+                if (typedInput.NextSequencePosition.Equals(typedInput.Sequence.Start))
                 {
-                    _ = sequence.TryGet(ref _nextSequencePosition, out _);
+                    _ = typedInput.Sequence.TryGet(ref typedInput.NextSequencePosition, out _);
                 }
 
-                if (!sequence.TryGet(ref _nextSequencePosition, out var memory))
+                if (!typedInput.Sequence.TryGet(ref typedInput.NextSequencePosition, out var memory))
                 {
                     _currentSpan = memory.Span;
                     ThrowInsufficientData();
                 }
 
                 _currentSpan = memory.Span;
+                _bufferPos = 0;
+                _bufferSize = _currentSpan.Length;
+            }
+            else if (IsBufferSliceInput)
+            {
+                ref var slice = ref Unsafe.As<TInput, BufferSliceReaderInput>(ref _input);
+                slice.PreviousBuffersSize += _bufferSize;
+                _currentSpan = slice.GetNext();
                 _bufferPos = 0;
                 _bufferSize = _currentSpan.Length;
             }
@@ -525,7 +623,7 @@ namespace Orleans.Serialization.Buffers
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public byte ReadByte()
         {
-            if (IsReadOnlySequenceInput || IsSpanInput)
+            if (IsReadOnlySequenceInput || IsSpanInput || IsBufferSliceInput)
             {
                 var pos = _bufferPos;
                 if ((uint)pos < (uint)_currentSpan.Length)
@@ -567,7 +665,7 @@ namespace Orleans.Serialization.Buffers
         /// <returns>The <see cref="uint"/> which was read.</returns>
         public uint ReadUInt32()
         {
-            if (IsReadOnlySequenceInput || IsSpanInput)
+            if (IsReadOnlySequenceInput || IsSpanInput || IsBufferSliceInput)
             {
                 const int width = 4;
                 if (_bufferPos + width > _bufferSize)
@@ -611,7 +709,7 @@ namespace Orleans.Serialization.Buffers
         /// <returns>The <see cref="ulong"/> which was read.</returns>
         public ulong ReadUInt64()
         {
-            if (IsReadOnlySequenceInput || IsSpanInput)
+            if (IsReadOnlySequenceInput || IsSpanInput || IsBufferSliceInput)
             {
                 const int width = 8;
                 if (_bufferPos + width > _bufferSize)
@@ -648,6 +746,7 @@ namespace Orleans.Serialization.Buffers
             }
         }
 
+        [DoesNotReturn]
         private static void ThrowInsufficientData() => throw new InvalidOperationException("Insufficient data present in buffer.");
 
         /// <summary>
@@ -688,7 +787,7 @@ namespace Orleans.Serialization.Buffers
             }
 
             var bytes = new byte[count];
-            if (IsReadOnlySequenceInput || IsSpanInput)
+            if (IsReadOnlySequenceInput || IsSpanInput || IsBufferSliceInput)
             {
                 var destination = new Span<byte>(bytes);
                 ReadBytes(destination);
@@ -707,7 +806,7 @@ namespace Orleans.Serialization.Buffers
         /// <param name="destination">The destination.</param>
         public void ReadBytes(scoped Span<byte> destination)
         {
-            if (IsReadOnlySequenceInput || IsSpanInput)
+            if (IsReadOnlySequenceInput || IsSpanInput || IsBufferSliceInput)
             {
                 if (_bufferPos + destination.Length <= _bufferSize)
                 {
@@ -755,7 +854,7 @@ namespace Orleans.Serialization.Buffers
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool TryReadBytes(int length, out ReadOnlySpan<byte> bytes)
         {
-            if (IsReadOnlySequenceInput || IsSpanInput)
+            if (IsReadOnlySequenceInput || IsSpanInput || IsBufferSliceInput)
             {
                 if (_bufferPos + length <= _bufferSize)
                 {
@@ -788,7 +887,7 @@ namespace Orleans.Serialization.Buffers
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public unsafe uint ReadVarUInt32()
         {
-            if (IsReadOnlySequenceInput || IsSpanInput)
+            if (IsReadOnlySequenceInput || IsSpanInput || IsBufferSliceInput)
             {
                 var pos = _bufferPos;
 
@@ -846,7 +945,7 @@ namespace Orleans.Serialization.Buffers
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public ulong ReadVarUInt64()
         {
-            if (IsReadOnlySequenceInput || IsSpanInput)
+            if (IsReadOnlySequenceInput || IsSpanInput || IsBufferSliceInput)
             {
                 var pos = _bufferPos;
 
