@@ -1,6 +1,9 @@
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
+using System.Linq.Expressions;
+using System.Text.Json;
 using System.Text.Json.Serialization;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.FSharp.Core;
@@ -334,10 +337,105 @@ namespace Orleans.Serialization.UnitTests
         [JsonProperty]
         public string SubTypeProperty { get; set; }
 
+        [JsonProperty]
+        public TestId Id { get; set; }
+
         public override string ToString() => $"{nameof(SubTypeProperty)}: {SubTypeProperty}, {base.ToString()}";
-        public bool Equals(MyJsonClass other) => other is not null && base.Equals(other) && string.Equals(SubTypeProperty, other.SubTypeProperty, StringComparison.Ordinal);
+        public bool Equals(MyJsonClass other) => other is not null && base.Equals(other) && string.Equals(SubTypeProperty, other.SubTypeProperty, StringComparison.Ordinal) && EqualityComparer<TestId>.Default.Equals(Id, other.Id);
         public override bool Equals(object obj) => Equals(obj as MyJsonClass);
         public override int GetHashCode() => HashCode.Combine(base.GetHashCode(), SubTypeProperty);
+    }
+
+    [System.Text.Json.Serialization.JsonConverter(typeof(StronglyTypedIdJsonConverter<TestId, Guid>))]
+    public record TestId(Guid Id) : StronglyTypedId<Guid>(Id);
+
+    public abstract record StronglyTypedId<TValue>(TValue Value)
+        where TValue : notnull
+    {
+        public override string ToString() => Value.ToString() ?? typeof(TValue).ToString();
+    }
+
+    file class StronglyTypedIdJsonConverter<TStronglyTypedId, TValue> : System.Text.Json.Serialization.JsonConverter<TStronglyTypedId>
+        where TStronglyTypedId : StronglyTypedId<TValue>
+        where TValue : notnull
+    {
+        public override TStronglyTypedId Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+        {
+            if (reader.TokenType is JsonTokenType.Null)
+            {
+                return null;
+            }
+
+            var value = System.Text.Json.JsonSerializer.Deserialize<TValue>(ref reader, options);
+            var factory = StronglyTypedIdHelper.GetFactory<TValue>(typeToConvert);
+            return (TStronglyTypedId)factory(value);
+        }
+
+        public override void Write(Utf8JsonWriter writer, TStronglyTypedId value, JsonSerializerOptions options)
+        {
+            if (value is null)
+            {
+                writer.WriteNullValue();
+            }
+            else
+            {
+                System.Text.Json.JsonSerializer.Serialize(writer, value.Value, options);
+            }
+        }
+    }
+
+    file static class StronglyTypedIdHelper
+    {
+        private static readonly ConcurrentDictionary<Type, Delegate> StronglyTypedIdFactories = new();
+
+        public static Func<TValue, object> GetFactory<TValue>(Type stronglyTypedIdType)
+            where TValue : notnull
+        {
+            return (Func<TValue, object>)StronglyTypedIdFactories.GetOrAdd(
+                stronglyTypedIdType,
+                CreateFactory<TValue>);
+        }
+
+        private static Func<TValue, object> CreateFactory<TValue>(Type stronglyTypedIdType)
+            where TValue : notnull
+        {
+            if (!IsStronglyTypedId(stronglyTypedIdType))
+            {
+                throw new ArgumentException($"Type '{stronglyTypedIdType}' is not a strongly-typed id type", nameof(stronglyTypedIdType));
+            }
+
+            var ctor = stronglyTypedIdType.GetConstructor(new[] { typeof(TValue) });
+            if (ctor is null)
+            {
+                throw new ArgumentException($"Type '{stronglyTypedIdType}' doesn't have a constructor with one parameter of type '{typeof(TValue)}'", nameof(stronglyTypedIdType));
+            }
+
+            var param = Expression.Parameter(typeof(TValue), "value");
+            var body = Expression.New(ctor, param);
+            var lambda = Expression.Lambda<Func<TValue, object>>(body, param);
+            return lambda.Compile();
+        }
+
+        public static bool IsStronglyTypedId(Type type) => IsStronglyTypedId(type, out _);
+
+        public static bool IsStronglyTypedId(Type type, out Type idType)
+        {
+            if (type is null)
+            {
+                throw new ArgumentNullException(nameof(type));
+            }
+
+            if (type.BaseType is Type baseType &&
+                baseType.IsGenericType &&
+                baseType.GetGenericTypeDefinition() == typeof(StronglyTypedId<>))
+            {
+                idType = baseType.GetGenericArguments()[0];
+                return true;
+            }
+
+            idType = null;
+            return false;
+        }
     }
 
     [GenerateSerializer]
