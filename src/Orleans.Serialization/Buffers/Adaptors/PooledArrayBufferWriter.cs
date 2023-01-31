@@ -226,7 +226,7 @@ public struct PooledArrayBufferWriter : IBufferWriter<byte>, IDisposable
 #if NET6_0_OR_GREATER
             if (IsStandardSize)
             {
-                return MemoryMarshal.CreateFromPinnedArray(Array, offset, Array.Length);
+                return MemoryMarshal.CreateFromPinnedArray(Array, offset, Array.Length - offset);
             }
 #endif
 
