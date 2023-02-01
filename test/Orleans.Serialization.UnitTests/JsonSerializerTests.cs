@@ -1,4 +1,11 @@
+#nullable enable
+using System;
+using System.Collections.Concurrent;
+using System.Diagnostics.CodeAnalysis;
+using System.Linq.Expressions;
 using System.Reflection;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Serialization.Cloning;
 using Orleans.Serialization.Codecs;
@@ -10,7 +17,7 @@ using Xunit.Abstractions;
 namespace Orleans.Serialization.UnitTests
 {
     [Trait("Category", "BVT")]
-    public class JsonCodecTests : FieldCodecTester<MyJsonClass, IFieldCodec<MyJsonClass>>
+    public class JsonCodecTests : FieldCodecTester<MyJsonClass?, IFieldCodec<MyJsonClass?>>
     {
         public JsonCodecTests(ITestOutputHelper output) : base(output)
         {
@@ -21,20 +28,20 @@ namespace Orleans.Serialization.UnitTests
             builder.AddJsonSerializer(isSupported: type => type.GetCustomAttribute<MyJsonSerializableAttribute>(inherit: false) is not null);
         }
 
-        protected override MyJsonClass CreateValue() => new MyJsonClass { IntProperty = 30, SubTypeProperty = "hello" };
+        protected override MyJsonClass? CreateValue() => new MyJsonClass { IntProperty = 30, SubTypeProperty = "hello", Id = new(Guid.NewGuid()) };
 
-        protected override MyJsonClass[] TestValues => new MyJsonClass[]
+        protected override MyJsonClass?[] TestValues => new MyJsonClass?[]
         {
             null,
-            new MyJsonClass(),
-            new MyJsonClass() { IntProperty = 150, SubTypeProperty = new string('c', 20) },
-            new MyJsonClass() { IntProperty = -150_000, SubTypeProperty = new string('c', 6_000) },
+            new MyJsonClass() { Id = new(Guid.NewGuid()) },
+            new MyJsonClass() { IntProperty = 150, SubTypeProperty = new string('c', 20), Id = new(Guid.NewGuid()) },
+            new MyJsonClass() { IntProperty = -150_000, SubTypeProperty = new string('c', 6_000), Id = new(Guid.NewGuid()) },
         };
 
         [Fact]
         public void JsonSerializerDeepCopyTyped()
         {
-            var original = new MyJsonClass { IntProperty = 30, SubTypeProperty = "hi" };
+            var original = new MyJsonClass { IntProperty = 30, SubTypeProperty = "hi", Id = new(Guid.NewGuid()) };
             var copier = ServiceProvider.GetRequiredService<DeepCopier<MyJsonClass>>();
             var result = copier.Copy(original);
 
@@ -45,7 +52,7 @@ namespace Orleans.Serialization.UnitTests
         [Fact]
         public void JsonSerializerDeepCopyUntyped()
         {
-            var original = new MyJsonClass { IntProperty = 30, SubTypeProperty = "hi" };
+            var original = new MyJsonClass { IntProperty = 30, SubTypeProperty = "hi", Id = new(Guid.NewGuid()) };
             var copier = ServiceProvider.GetRequiredService<DeepCopier>();
             var result = (MyJsonClass)copier.Copy((object)original);
 
@@ -56,7 +63,7 @@ namespace Orleans.Serialization.UnitTests
         [Fact]
         public void JsonSerializerRoundTripThroughCodec()
         {
-            var original = new MyJsonClass { IntProperty = 30, SubTypeProperty = "hi" };
+            var original = new MyJsonClass { IntProperty = 30, SubTypeProperty = "hi", Id = new(Guid.NewGuid()) };
             var result = RoundTripThroughCodec(original);
 
             Assert.Equal(original.IntProperty, result.IntProperty);
@@ -66,7 +73,7 @@ namespace Orleans.Serialization.UnitTests
         [Fact]
         public void JsonSerializerRoundTripThroughUntypedSerializer()
         {
-            var original = new MyJsonClass { IntProperty = 30, SubTypeProperty = "hi" };
+            var original = new MyJsonClass { IntProperty = 30, SubTypeProperty = "hi", Id = new(Guid.NewGuid()) };
             var untypedResult = RoundTripThroughUntypedSerializer(original, out _);
 
             var result = Assert.IsType<MyJsonClass>(untypedResult);
@@ -76,7 +83,7 @@ namespace Orleans.Serialization.UnitTests
     }
 
     [Trait("Category", "BVT")]
-    public class JsonCodecCopierTests : CopierTester<MyJsonClass, IDeepCopier<MyJsonClass>>
+    public class JsonCodecCopierTests : CopierTester<MyJsonClass?, IDeepCopier<MyJsonClass?>>
     {
         public JsonCodecCopierTests(ITestOutputHelper output) : base(output)
         {
@@ -86,17 +93,17 @@ namespace Orleans.Serialization.UnitTests
         {
             builder.AddJsonSerializer(isSupported: type => type.GetCustomAttribute<MyJsonSerializableAttribute>(inherit: false) is not null);
         }
-        protected override IDeepCopier<MyJsonClass> CreateCopier() => ServiceProvider.GetRequiredService<ICodecProvider>().GetDeepCopier<MyJsonClass>();
+        protected override IDeepCopier<MyJsonClass?> CreateCopier() => ServiceProvider.GetRequiredService<ICodecProvider>().GetDeepCopier<MyJsonClass?>();
 
 
-        protected override MyJsonClass CreateValue() => new MyJsonClass { IntProperty = 30, SubTypeProperty = "hello" };
+        protected override MyJsonClass? CreateValue() => new MyJsonClass { IntProperty = 30, SubTypeProperty = "hello", Id = new(Guid.NewGuid()) };
 
-        protected override MyJsonClass[] TestValues => new MyJsonClass[]
+        protected override MyJsonClass?[] TestValues => new MyJsonClass?[]
         {
             null,
-            new MyJsonClass(),
-            new MyJsonClass() { IntProperty = 150, SubTypeProperty = new string('c', 20) },
-            new MyJsonClass() { IntProperty = -150_000, SubTypeProperty = new string('c', 6_000) },
+            new MyJsonClass() { Id = new(Guid.NewGuid()) },
+            new MyJsonClass() { IntProperty = 150, SubTypeProperty = new string('c', 20), Id = new(Guid.NewGuid()) },
+            new MyJsonClass() { IntProperty = -150_000, SubTypeProperty = new string('c', 6_000), Id = new(Guid.NewGuid()) },
         };
     }
 }
