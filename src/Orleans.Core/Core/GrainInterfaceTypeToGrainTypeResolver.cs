@@ -97,7 +97,21 @@ namespace Orleans
         /// </summary>
         public GrainType GetGrainType(GrainInterfaceType interfaceType)
         {
-            GrainType result = default;
+            if (!TryGetGrainType(interfaceType, out var result))
+            {
+                throw new ArgumentException($"Could not find an implementation for interface {interfaceType}");
+            }
+
+            return result;
+        }
+
+        /// <summary>
+        /// Resolves a <see cref="GrainType"/> which implements the provided <see cref="GrainInterfaceType"/>, returning <see langword="true"/> if an implementation was found; otherwise <see langword="false"/>.
+        /// </summary>
+        /// <returns><see langword="true"/> if an implementation was found; otherwise <see langword="false"/>.</returns>
+        public bool TryGetGrainType(GrainInterfaceType interfaceType, out GrainType result)
+        {
+            result = default;
             var cache = GetCache();
             if (cache.Map.TryGetValue(interfaceType, out var entry))
             {
@@ -122,34 +136,32 @@ namespace Orleans
             else if (_genericMapping.TryGetValue(interfaceType, out result))
             {
             }
-            else if (GenericGrainInterfaceType.TryParse(interfaceType, out var genericInterface))
+            else if (GenericGrainInterfaceType.TryParse(interfaceType, out var genericInterface) && genericInterface.IsConstructed)
             {
                 var unconstructedInterface = genericInterface.GetGenericGrainType();
-                var unconstructed = GetGrainType(unconstructedInterface.Value);
-                if (GenericGrainType.TryParse(unconstructed, out var genericGrainType))
+                if (TryGetGrainType(unconstructedInterface.Value, out var unconstructed))
                 {
-                    if (genericGrainType.IsConstructed)
+                    if (GenericGrainType.TryParse(unconstructed, out var genericGrainType))
                     {
-                        result = genericGrainType.GrainType;
+                        if (genericGrainType.IsConstructed)
+                        {
+                            result = genericGrainType.GrainType;
+                        }
+                        else
+                        {
+                            result = genericGrainType.GrainType.GetConstructed(genericInterface.Value);
+                        }
                     }
                     else
                     {
-                        result = genericGrainType.GrainType.GetConstructed(genericInterface.Value);
+                        result = unconstructed;
                     }
                 }
-                else
-                {
-                    result = unconstructed;
-                }
+
                 _genericMapping[interfaceType] = result;
             }
 
-            if (result.IsDefault)
-            {
-                throw new ArgumentException($"Could not find an implementation for interface {interfaceType}");
-            }
-
-            return result;
+            return !result.IsDefault;
         }
 
         /// <summary>
