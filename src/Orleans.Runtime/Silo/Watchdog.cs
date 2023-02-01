@@ -13,6 +13,10 @@ namespace Orleans.Runtime
         private readonly TimeSpan healthCheckPeriod;
         private DateTime lastHeartbeat;
         private DateTime lastWatchdogCheck;
+
+        // GC pause duration since process start.
+        private TimeSpan cumulativeGCPauseDuration;
+
         private readonly List<IHealthCheckParticipant> participants;
         private readonly ILogger logger;
         private Thread thread;
@@ -27,10 +31,17 @@ namespace Orleans.Runtime
         public void Start()
         {
             logger.LogInformation("Starting Silo Watchdog.");
+
+            if (thread is not null)
+            {
+                throw new InvalidOperationException("Watchdog.Start may not be called more than once");
+            }
+
             var now = DateTime.UtcNow;
             lastHeartbeat = now;
             lastWatchdogCheck = now;
-            if (thread is not null) throw new InvalidOperationException("Watchdog.Start may not be called more than once");
+            cumulativeGCPauseDuration = GC.GetTotalPauseDuration();
+
             this.thread = new Thread(this.Run)
             {
                 IsBackground = true,
@@ -68,15 +79,19 @@ namespace Orleans.Runtime
         {
             try
             {
-                CheckYourOwnHealth(lastHeartbeat, logger);
+                CheckYourOwnHealth(lastHeartbeat, cumulativeGCPauseDuration, logger);
             }
             finally
             {
                 lastHeartbeat = DateTime.UtcNow;
+                cumulativeGCPauseDuration = GC.GetTotalPauseDuration();
             }
 
-            var timeSinceLastWatchdogCheck = (DateTime.UtcNow - lastWatchdogCheck);
-            if (timeSinceLastWatchdogCheck <= healthCheckPeriod) return;
+            var timeSinceLastWatchdogCheck = DateTime.UtcNow - lastWatchdogCheck;
+            if (timeSinceLastWatchdogCheck <= healthCheckPeriod)
+            {
+                return;
+            }
 
             WatchdogInstruments.HealthChecks.Add(1);
             int numFailedChecks = 0;
@@ -91,7 +106,7 @@ namespace Orleans.Runtime
                         reasons ??= new StringBuilder();
                         if (reasons.Length > 0)
                         {
-                            reasons.Append(" ");
+                            reasons.Append(' ');
                         }
 
                         reasons.Append($"{participant.GetType()} failed health check with reason \"{reason}\".");
@@ -107,24 +122,28 @@ namespace Orleans.Runtime
                         participant.GetType());
                 }
             }
+
             if (numFailedChecks > 0)
             {
                 WatchdogInstruments.FailedHealthChecks.Add(1);
                 logger.LogWarning((int)ErrorCode.Watchdog_HealthCheckFailure, "Watchdog had {FailedChecks} health Check failure(s) out of {ParticipantCount} health Check participants: {Reasons}", numFailedChecks, participants.Count, reasons.ToString());
             }
+
             lastWatchdogCheck = DateTime.UtcNow;
         }
 
-        private static void CheckYourOwnHealth(DateTime lastCheckt, ILogger logger)
+        private static void CheckYourOwnHealth(DateTime lastCheckTime, TimeSpan lastCumulativeGCPauseDuration, ILogger logger)
         {
-            var timeSinceLastTick = (DateTime.UtcNow - lastCheckt);
+            var timeSinceLastTick = DateTime.UtcNow - lastCheckTime;
+            var pauseDurationSinceLastTick = GC.GetTotalPauseDuration() - lastCumulativeGCPauseDuration;
             if (timeSinceLastTick > heartbeatPeriod.Multiply(2))
             {
                 var gc = new[] { GC.CollectionCount(0), GC.CollectionCount(1), GC.CollectionCount(2) };
                 logger.LogWarning(
                     (int)ErrorCode.SiloHeartbeatTimerStalled,
-                    ".NET Runtime Platform stalled for {TimeSinceLastTick} - possibly GC? We are now using total of {TotalMemory}MB memory. gc={GCGen0Count}, {GCGen1Count}, {GCGen2Count}",
+                    ".NET Runtime Platform stalled for {TimeSinceLastTick}. Total GC Pause duration during that period: {pauseDurationSinceLastTick}. We are now using a total of {TotalMemory}MB memory. gc={GCGen0Count}, {GCGen1Count}, {GCGen2Count}",
                     timeSinceLastTick,
+                    pauseDurationSinceLastTick,
                     GC.GetTotalMemory(false) / (1024 * 1024),
                     gc[0],
                     gc[1],
