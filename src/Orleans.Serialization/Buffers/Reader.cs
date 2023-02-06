@@ -176,7 +176,7 @@ namespace Orleans.Serialization.Buffers
     public static class Reader
     {
         /// <summary>
-        /// Creates a reader for the provided input stream.
+        /// Creates a reader for the provided buffer.
         /// </summary>
         /// <param name="input">The input.</param>
         /// <param name="session">The session.</param>
@@ -185,22 +185,13 @@ namespace Orleans.Serialization.Buffers
         public static Reader<BufferSliceReaderInput> Create(PooledBuffer input, SerializerSession session) => Create(input.Slice(), session);
 
         /// <summary>
-        /// Creates a reader for the provided input stream.
+        /// Creates a reader for the provided buffer.
         /// </summary>
         /// <param name="input">The input.</param>
         /// <param name="session">The session.</param>
         /// <returns>A new <see cref="Reader{TInput}"/>.</returns>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static Reader<BufferSliceReaderInput> Create(BufferSlice input, SerializerSession session) => Create(new BufferSliceReaderInput(in input), session);
-
-        /// <summary>
-        /// Creates a reader for the provided input stream.
-        /// </summary>
-        /// <param name="input">The input.</param>
-        /// <param name="session">The session.</param>
-        /// <returns>A new <see cref="Reader{TInput}"/>.</returns>
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static Reader<BufferSliceReaderInput> Create(BufferSliceReaderInput input, SerializerSession session) => new Reader<BufferSliceReaderInput>(input, session, 0);
+        public static Reader<BufferSliceReaderInput> Create(BufferSlice input, SerializerSession session) => new(new BufferSliceReaderInput(in input), session, 0);
 
         /// <summary>
         /// Creates a reader for the provided input stream.
@@ -209,43 +200,43 @@ namespace Orleans.Serialization.Buffers
         /// <param name="session">The session.</param>
         /// <returns>A new <see cref="Reader{TInput}"/>.</returns>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static Reader<ReaderInput> Create(Stream stream, SerializerSession session) => new Reader<ReaderInput>(new StreamReaderInput(stream, ArrayPool<byte>.Shared), session, 0);
+        public static Reader<ReaderInput> Create(Stream stream, SerializerSession session) => new(new StreamReaderInput(stream, ArrayPool<byte>.Shared), session, 0);
 
         /// <summary>
-        /// Creates a reader for the provided input data.
+        /// Creates a reader for the provided buffer.
         /// </summary>
-        /// <param name="sequence">The input data.</param>
+        /// <param name="sequence">The buffer.</param>
         /// <param name="session">The session.</param>
         /// <returns>A new <see cref="Reader{TInput}"/>.</returns>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static Reader<ReadOnlySequenceInput> Create(ReadOnlySequence<byte> sequence, SerializerSession session) => new Reader<ReadOnlySequenceInput>(new ReadOnlySequenceInput { Sequence = sequence }, session, 0);
+        public static Reader<ReadOnlySequenceInput> Create(ReadOnlySequence<byte> sequence, SerializerSession session) => new(new ReadOnlySequenceInput { Sequence = sequence }, session, 0);
 
         /// <summary>
-        /// Creates a reader for the provided input data.
+        /// Creates a reader for the provided buffer.
         /// </summary>
-        /// <param name="buffer">The input data.</param>
+        /// <param name="buffer">The buffer.</param>
         /// <param name="session">The session.</param>
         /// <returns>A new <see cref="Reader{TInput}"/>.</returns>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static Reader<SpanReaderInput> Create(ReadOnlySpan<byte> buffer, SerializerSession session) => new Reader<SpanReaderInput>(buffer, session, 0);
+        public static Reader<SpanReaderInput> Create(ReadOnlySpan<byte> buffer, SerializerSession session) => new(buffer, session, 0);
 
         /// <summary>
-        /// Creates a reader for the provided input data.
+        /// Creates a reader for the provided buffer.
         /// </summary>
-        /// <param name="buffer">The input data.</param>
+        /// <param name="buffer">The buffer.</param>
         /// <param name="session">The session.</param>
         /// <returns>A new <see cref="Reader{TInput}"/>.</returns>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static Reader<SpanReaderInput> Create(byte[] buffer, SerializerSession session) => new Reader<SpanReaderInput>(buffer, session, 0);
+        public static Reader<SpanReaderInput> Create(byte[] buffer, SerializerSession session) => new(buffer, session, 0);
 
         /// <summary>
-        /// Creates a reader for the provided input data.
+        /// Creates a reader for the provided buffer.
         /// </summary>
-        /// <param name="buffer">The input data.</param>
+        /// <param name="buffer">The buffer.</param>
         /// <param name="session">The session.</param>
         /// <returns>A new <see cref="Reader{TInput}"/>.</returns>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static Reader<SpanReaderInput> Create(ReadOnlyMemory<byte> buffer, SerializerSession session) => new Reader<SpanReaderInput>(buffer.Span, session, 0);
+        public static Reader<SpanReaderInput> Create(ReadOnlyMemory<byte> buffer, SerializerSession session) => new(buffer.Span, session, 0);
     }
 
     /// <summary>
@@ -274,7 +265,7 @@ namespace Orleans.Serialization.Buffers
         private readonly static bool IsSpanInput = typeof(TInput) == typeof(SpanReaderInput);
         private readonly static bool IsReadOnlySequenceInput = typeof(TInput) == typeof(ReadOnlySequenceInput);
         private readonly static bool IsReaderInput = typeof(ReaderInput).IsAssignableFrom(typeof(TInput));
-        private readonly static bool IsBufferSliceInput = typeof(BufferSliceReaderInput).IsAssignableFrom(typeof(TInput));
+        private readonly static bool IsBufferSliceInput = typeof(TInput) == typeof(BufferSliceReaderInput);
         
         private ReadOnlySpan<byte> _currentSpan;
         private int _bufferPos;

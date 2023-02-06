@@ -1,11 +1,13 @@
 using System;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
-using System.Net.NetworkInformation;
-
-namespace Orleans.Serialization.Buffers.Adaptors;
 using static Orleans.Serialization.Buffers.PooledBuffer;
 
+namespace Orleans.Serialization.Buffers.Adaptors;
+
+/// <summary>
+/// Input type for <see cref="Reader{TInput}"/> to support <see cref="BufferSlice"/> buffers.
+/// </summary>
 public struct BufferSliceReaderInput
 {
     private static readonly SequenceSegment InitialSegmentSentinel = new();
@@ -14,6 +16,10 @@ public struct BufferSliceReaderInput
     private SequenceSegment _segment;
     private int _position;
 
+    /// <summary>
+    /// Initializes a new instance of the <see cref="BufferSliceReaderInput"/> type.
+    /// </summary>
+    /// <param name="slice">The underlying buffer.</param>
     public BufferSliceReaderInput(in BufferSlice slice)
     {
         _slice = slice;
@@ -26,13 +32,13 @@ public struct BufferSliceReaderInput
     internal readonly int Length => _slice._length;
     internal long PreviousBuffersSize;
 
-    public BufferSliceReaderInput ForkFrom(int position)
+    internal BufferSliceReaderInput ForkFrom(int position)
     {
         var sliced = _slice.Slice(position);
         return new BufferSliceReaderInput(in sliced);
     }
 
-    public ReadOnlySpan<byte> GetNext()
+    internal ReadOnlySpan<byte> GetNext()
     {
         if (ReferenceEquals(_segment, InitialSegmentSentinel))
         {
@@ -70,7 +76,7 @@ public struct BufferSliceReaderInput
             if (segmentLength == 0)
             {
                 ThrowInsufficientData();
-                return ReadOnlySpan<byte>.Empty;
+                return default;
             }
 
             var result = segment.Slice(segmentOffset, segmentLength);
@@ -86,7 +92,7 @@ public struct BufferSliceReaderInput
             if (finalLength == 0)
             {
                 ThrowInsufficientData();
-                return ReadOnlySpan<byte>.Empty;
+                return default;
             }
 
             var result = head.Array.AsSpan(finalOffset, finalLength);
@@ -97,7 +103,7 @@ public struct BufferSliceReaderInput
         }
 
         ThrowInsufficientData();
-        return ReadOnlySpan<byte>.Empty;
+        return default;
     }
 
     [DoesNotReturn]
