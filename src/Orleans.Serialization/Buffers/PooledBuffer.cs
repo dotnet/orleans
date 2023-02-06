@@ -362,18 +362,6 @@ public partial struct PooledBuffer : IBufferWriter<byte>, IDisposable
     }
 
     /// <summary>
-    /// Returns an enumerable sequence of <see cref="Memory{T}"/> values which represent the data which has been written to this buffer.
-    /// </summary>
-    /// <returns>An enumerable sequence of <see cref="Memory{T}"/> values.</returns>
-    public BufferSlice.MemorySequence AsMemorySequence() => Slice().AsMemorySequence();
-
-    /// <summary>
-    /// Returns an enumerable sequence of <see cref="Span{T}"/> values which represent the data which has been written to this buffer.
-    /// </summary>
-    /// <returns>An enumerable sequence of <see cref="Span{T}"/> values.</returns>
-    public BufferSlice.SpanSequence AsSpanSequence() => Slice().AsSpanSequence();
-
-    /// <summary>
     /// Represents a slice of a <see cref="PooledBuffer"/>.
     /// </summary>
     public readonly struct BufferSlice
@@ -470,62 +458,10 @@ public partial struct PooledBuffer : IBufferWriter<byte>, IDisposable
         }
 
         /// <summary>
-        /// Returns an enumerable sequence of <see cref="Memory{T}"/> values which represent the data which has been written to this buffer.
-        /// </summary>
-        /// <returns>An enumerable sequence of <see cref="Memory{T}"/> values.</returns>
-        public readonly MemorySequence AsMemorySequence() => new(this);
-
-        /// <summary>
-        /// Returns an enumerable sequence of <see cref="Span{T}"/> values which represent the data which has been written to this buffer.
-        /// </summary>
-        /// <returns>An enumerable sequence of <see cref="Span{T}"/> values.</returns>
-        public readonly SpanSequence AsSpanSequence() => new(this);
-
-        /// <summary>
         /// Returns an enumerator which can be used to enumerate the data referenced by this instance.
         /// </summary>
         /// <returns>An enumerator for the data contained in this instance.</returns>
         public readonly SpanEnumerator GetEnumerator() => new(this);
-
-        /// <summary>
-        /// Represents a sequence of <see cref="Memory{T}"/> values from a <see cref="BufferSlice"/>.
-        /// </summary>
-        public readonly ref struct MemorySequence
-        {
-            private readonly BufferSlice _slice;
-
-            /// <summary>
-            /// Initializes a new instance of the <see cref="MemorySequence"/> type.
-            /// </summary>
-            /// <param name="slice">The slice.</param>
-            public MemorySequence(BufferSlice slice) => _slice = slice;
-
-            /// <summary>
-            /// Returns an enumerator for the underlying buffers.
-            /// </summary>
-            /// <returns>An enumerator.</returns>
-            public MemoryEnumerator GetEnumerator() => new(_slice);
-        }
-
-        /// <summary>
-        /// Represents a sequence of <see cref="Span{T}"/> values from a <see cref="BufferSlice"/>.
-        /// </summary>
-        public readonly ref struct SpanSequence
-        {
-            private readonly BufferSlice _slice;
-
-            /// <summary>
-            /// Initializes a new instance of the <see cref="SpanSequence"/> type.
-            /// </summary>
-            /// <param name="slice">The slice.</param>
-            public SpanSequence(BufferSlice slice) => _slice = slice;
-
-            /// <summary>
-            /// Returns an enumerator for the underlying buffers.
-            /// </summary>
-            /// <returns>An enumerator.</returns>
-            public SpanEnumerator GetEnumerator() => new(_slice);
-        }
 
         /// <summary>
         /// Enumerates over spans of bytes in a <see cref="BufferSlice"/>.
@@ -622,109 +558,6 @@ public partial struct PooledBuffer : IBufferWriter<byte>, IDisposable
                     }
 
                     Current = head.Array.AsSpan(finalOffset, finalLength);
-                    _position += finalLength;
-                    Debug.Assert(_position == endPosition);
-                    _segment = FinalSegmentSentinel;
-                    return true;
-                }
-
-                return false;
-            }
-        }
-
-        /// <summary>
-        /// Enumerates over sequences of bytes in a <see cref="BufferSlice"/>.
-        /// </summary>
-        public ref struct MemoryEnumerator
-        {
-            private static readonly SequenceSegment InitialSegmentSentinel = new();
-            private static readonly SequenceSegment FinalSegmentSentinel = new();
-            private readonly BufferSlice _slice;
-            private int _position;
-            private SequenceSegment _segment;
-
-            /// <summary>
-            /// Initializes a new instance of the <see cref="MemoryEnumerator"/> type.
-            /// </summary>
-            /// <param name="slice">The slice to enumerate.</param>
-            public MemoryEnumerator(BufferSlice slice)
-            {
-                _slice = slice;
-                _segment = InitialSegmentSentinel;
-                Current = Memory<byte>.Empty;
-            }
-
-            internal readonly PooledBuffer Buffer => _slice._buffer;
-            internal readonly int Offset => _slice._offset;
-            internal readonly int Length => _slice._length;
-
-            /// <summary>
-            /// Gets the element in the collection at the current position of the enumerator.
-            /// </summary>
-            public ReadOnlyMemory<byte> Current { get; private set; }
-
-            /// <summary>
-            /// Advances the enumerator to the next element of the collection.
-            /// </summary>
-            /// <returns><see langword="true"/> if the enumerator was successfully advanced to the next element; <see langword="false"/> if the enumerator has passed the end of the collection.</returns>
-            public bool MoveNext()
-            {
-                if (ReferenceEquals(_segment, InitialSegmentSentinel))
-                {
-                    _segment = _slice._buffer._first;
-                }
-
-                var endPosition = Offset + Length;
-                while (_segment != null && _segment != FinalSegmentSentinel)
-                {
-                    var segment = _segment.CommittedMemory;
-
-                    // Find the starting segment and the offset to copy from.
-                    int segmentOffset;
-                    if (_position < Offset)
-                    {
-                        if (_position + segment.Length <= Offset)
-                        {
-                            // Start is in a subsequent segment
-                            _position += segment.Length;
-                            _segment = _segment.Next as SequenceSegment;
-                            continue;
-                        }
-                        else
-                        {
-                            // Start is in this segment
-                            segmentOffset = Offset;
-                        }
-                    }
-                    else
-                    {
-                        segmentOffset = 0;
-                    }
-
-                    var segmentLength = Math.Min(segment.Length - segmentOffset, endPosition - (_position + segmentOffset));
-                    if (segmentLength == 0)
-                    {
-                        Current = Memory<byte>.Empty;
-                        return false;
-                    }
-
-                    Current = segment.Slice(segmentOffset, segmentLength);
-                    _position += segmentOffset + segmentLength;
-                    _segment = _segment.Next as SequenceSegment;
-                    return true;
-                }
-
-                if (_segment != FinalSegmentSentinel && Buffer._currentPosition > 0 && Buffer._writeHead is { } head && _position < endPosition)
-                {
-                    var finalOffset = Math.Max(Offset - _position, 0);
-                    var finalLength = Math.Min(Buffer._currentPosition, endPosition - (_position + finalOffset));
-                    if (finalLength == 0)
-                    {
-                        Current = Memory<byte>.Empty;
-                        return false;
-                    }
-
-                    Current = head.Array.AsMemory(finalOffset, finalLength);
                     _position += finalLength;
                     Debug.Assert(_position == endPosition);
                     _segment = FinalSegmentSentinel;
