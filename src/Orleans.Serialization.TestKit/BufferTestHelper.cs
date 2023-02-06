@@ -94,7 +94,7 @@ namespace Orleans.Serialization.TestKit
 
         private struct PooledOutputBuffer : IBufferWriter<byte>, IOutputBuffer, IDisposable
         {
-            private PooledArrayBufferWriter _buffer;
+            private PooledBuffer _buffer;
 
             public PooledOutputBuffer()
             {

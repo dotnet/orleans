@@ -34,7 +34,7 @@ namespace Orleans.Serialization.Utilities
         /// <param name="slice">The array.</param>
         /// <param name="session">The session.</param>
         /// <returns>The formatted input.</returns>
-        public static string Format(PooledArrayBufferWriter.BufferSlice slice, SerializerSession session)
+        public static string Format(PooledBuffer.BufferSlice slice, SerializerSession session)
         {
             var reader = Reader.Create(slice, session);
             return Format(ref reader);

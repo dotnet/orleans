@@ -131,7 +131,7 @@ namespace Orleans.Runtime.Messaging
                 return;
             }
 
-            var innerWriter = Writer.Create(new PooledArrayBufferWriter(), null);
+            var innerWriter = Writer.Create(new PooledBuffer(), null);
             innerWriter.WriteInt32(value.GetConsistentHashCode());
             WriteSiloAddressInner(ref innerWriter, value);
             innerWriter.Commit();

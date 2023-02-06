@@ -4,7 +4,7 @@ using System.Diagnostics.CodeAnalysis;
 using System.Net.NetworkInformation;
 
 namespace Orleans.Serialization.Buffers.Adaptors;
-using static Orleans.Serialization.Buffers.PooledArrayBufferWriter;
+using static Orleans.Serialization.Buffers.PooledBuffer;
 
 public struct BufferSliceReaderInput
 {
@@ -20,7 +20,7 @@ public struct BufferSliceReaderInput
         _segment = InitialSegmentSentinel;
     }
 
-    internal readonly PooledArrayBufferWriter Buffer => _slice._buffer;
+    internal readonly PooledBuffer Buffer => _slice._buffer;
     internal readonly int Position => _position;
     internal readonly int Offset => _slice._offset;
     internal readonly int Length => _slice._length;

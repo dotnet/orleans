@@ -17,7 +17,7 @@ namespace Orleans.Serialization.Buffers;
 /// A <see cref="IBufferWriter{T}"/> implementation implemented using pooled arrays which is specialized for creating <see cref="ReadOnlySequence{T}"/> instances.
 /// </summary>
 [StructLayout(LayoutKind.Auto)]
-public partial struct PooledArrayBufferWriter : IBufferWriter<byte>, IDisposable
+public partial struct PooledBuffer : IBufferWriter<byte>, IDisposable
 {
     internal SequenceSegment _first;
     internal SequenceSegment _last;
@@ -26,9 +26,9 @@ public partial struct PooledArrayBufferWriter : IBufferWriter<byte>, IDisposable
     internal int _currentPosition;
 
     /// <summary>
-    /// Initializes a new instance of the <see cref="PooledArrayBufferWriter"/> struct.
+    /// Initializes a new instance of the <see cref="PooledBuffer"/> struct.
     /// </summary>
-    public PooledArrayBufferWriter()
+    public PooledBuffer()
     {
         _first = _last = null;
         _writeHead = null;
@@ -374,11 +374,11 @@ public partial struct PooledArrayBufferWriter : IBufferWriter<byte>, IDisposable
     public BufferSlice.SpanSequence AsSpanSequence() => Slice().AsSpanSequence();
 
     /// <summary>
-    /// Represents a slice of a <see cref="PooledArrayBufferWriter"/>.
+    /// Represents a slice of a <see cref="PooledBuffer"/>.
     /// </summary>
     public readonly struct BufferSlice
     {
-        internal readonly PooledArrayBufferWriter _buffer;
+        internal readonly PooledBuffer _buffer;
         internal readonly int _offset;
         internal readonly int _length;
 
@@ -388,7 +388,7 @@ public partial struct PooledArrayBufferWriter : IBufferWriter<byte>, IDisposable
         /// <param name="buffer">The buffer.</param>
         /// <param name="offset">The offet into the buffer at which this slice begins.</param>
         /// <param name="length">The length of this slice.</param>
-        public BufferSlice(in PooledArrayBufferWriter buffer, int offset, int length)
+        public BufferSlice(in PooledBuffer buffer, int offset, int length)
         {
             _buffer = buffer;
             _offset = offset;
@@ -396,9 +396,9 @@ public partial struct PooledArrayBufferWriter : IBufferWriter<byte>, IDisposable
         }
 
         /// <summary>
-        /// Gets the underlying <see cref="PooledArrayBufferWriter"/>.
+        /// Gets the underlying <see cref="PooledBuffer"/>.
         /// </summary>
-        public readonly PooledArrayBufferWriter Buffer => _buffer;
+        public readonly PooledBuffer Buffer => _buffer;
 
         /// <summary>
         /// Gets the offset into the underlying buffer at which this slice begins.
@@ -441,7 +441,7 @@ public partial struct PooledArrayBufferWriter : IBufferWriter<byte>, IDisposable
         }
 
         /// <summary>Copies the contents of this writer to a pooled buffer.</summary>
-        public readonly void CopyTo(ref PooledArrayBufferWriter output)
+        public readonly void CopyTo(ref PooledBuffer output)
         {
             foreach (var span in this)
             {
@@ -549,7 +549,7 @@ public partial struct PooledArrayBufferWriter : IBufferWriter<byte>, IDisposable
                 Current = Span<byte>.Empty;
             }
 
-            internal readonly PooledArrayBufferWriter Buffer => _slice._buffer;
+            internal readonly PooledBuffer Buffer => _slice._buffer;
             internal readonly int Offset => _slice._offset;
             internal readonly int Length => _slice._length;
 
@@ -654,7 +654,7 @@ public partial struct PooledArrayBufferWriter : IBufferWriter<byte>, IDisposable
                 Current = Memory<byte>.Empty;
             }
 
-            internal readonly PooledArrayBufferWriter Buffer => _slice._buffer;
+            internal readonly PooledBuffer Buffer => _slice._buffer;
             internal readonly int Offset => _slice._offset;
             internal readonly int Length => _slice._length;
 

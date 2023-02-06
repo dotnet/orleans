@@ -10,7 +10,7 @@ using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using Orleans.Serialization.Buffers.Adaptors;
 using Orleans.Serialization.Session;
-using static Orleans.Serialization.Buffers.PooledArrayBufferWriter;
+using static Orleans.Serialization.Buffers.PooledBuffer;
 #if !NETCOREAPP3_1_OR_GREATER
 using Orleans.Serialization.Utilities;
 #endif
@@ -182,7 +182,7 @@ namespace Orleans.Serialization.Buffers
         /// <param name="session">The session.</param>
         /// <returns>A new <see cref="Reader{TInput}"/>.</returns>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static Reader<BufferSliceReaderInput> Create(PooledArrayBufferWriter input, SerializerSession session) => Create(input.Slice(), session);
+        public static Reader<BufferSliceReaderInput> Create(PooledBuffer input, SerializerSession session) => Create(input.Slice(), session);
 
         /// <summary>
         /// Creates a reader for the provided input stream.
