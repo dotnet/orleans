@@ -244,9 +244,14 @@ jobs:
         image: mcr.microsoft.com/cosmosdb/linux/azure-cosmos-emulator:latest
         ports:
           - 8081:8081
-          - 10250-10255:10250-10255
+          - 10250:10250
+          - 10251:10251
+          - 10252:10252
+          - 10253:10253
+          - 10254:10254
+          - 10255:10255
         env:
-          AZURE_COSMOS_EMULATOR_PARTITION_COUNT: 1
+          AZURE_COSMOS_EMULATOR_PARTITION_COUNT: 10
           AZURE_COSMOS_EMULATOR_ENABLE_DATA_PERSISTENCE: false
           AZURE_COSMOS_EMULATOR_IP_ADDRESS_OVERRIDE: 127.0.0.1
     steps:
@@ -255,20 +260,20 @@ jobs:
       uses: actions/setup-dotnet@v1
       with:
         include-prerelease: true
-    - name: Install emulator certificate
-      run: |
-        sleep 90s
-        mkdir /tmp/emulatorcerts
-        sudo sh -c "curl -k https://127.0.0.1:${{ job.services.cosmosdb-emulator.ports[8081] }}/_explorer/emulator.pem > /tmp/emulatorcert.crt"
-        cat /tmp/emulatorcert.crt
-        awk 'BEGIN {c=0;} /BEGIN CERT/{c++} { print > "emulatorcert." c ".crt"}' < /tmp/emulatorcert.crt
-        sudo cp emulatorcert.*.crt /usr/local/share/ca-certificates/
-        sudo update-ca-certificates
+    # - name: Install emulator certificate
+    #   run: |
+    #     sleep 90s
+    #     mkdir /tmp/emulatorcerts
+    #     sudo sh -c "curl -k https://127.0.0.1:${{ job.services.cosmosdb-emulator.ports[8081] }}/_explorer/emulator.pem > /tmp/emulatorcert.crt"
+    #     cat /tmp/emulatorcert.crt
+    #     awk 'BEGIN {c=0;} /BEGIN CERT/{c++} { print > "emulatorcert." c ".crt"}' < /tmp/emulatorcert.crt
+    #     sudo cp emulatorcert.*.crt /usr/local/share/ca-certificates/
+    #     sudo update-ca-certificates
     - name: Test
       run: dotnet test --filter "Category=${{ matrix.provider }}&(Category=BVT|Category=SlowBVT|Category=Functional)" --framework ${{ matrix.framework }} --blame-hang-timeout 10m --logger "trx" -- -parallel none -noshadow
       env:
 # [SuppressMessage("Microsoft.Security", "CS002:SecretInNextLine", Justification="Not a secret")]
-        ORLEANSCOSMOSDBACCOUNTENDPOINT: "https://localhost:${{ job.services.cosmosdb-emulator.ports[8081] }}/"
+        ORLEANSCOSMOSDBACCOUNTENDPOINT: "https://127.0.0.1:${{ job.services.cosmosdb-emulator.ports[8081] }}/"
 # [SuppressMessage("Microsoft.Security", "CS002:SecretInNextLine", Justification="Not a secret")]
         ORLEANSCOSMOSDBACCOUNTKEY: "C2y6yDjf5/R+ob0N8A7Cgv30VRDJIWEHLM+4QDU5DE2nQ9nDuVTqobD4b8mGGyPMbIZnqyMsEcaGQy67XIw/Jw=="
     - name: Archive Test Results

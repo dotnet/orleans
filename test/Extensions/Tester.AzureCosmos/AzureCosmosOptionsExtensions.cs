@@ -1,5 +1,5 @@
 using Azure.Identity;
-using Microsoft.Extensions.Options;
+using Microsoft.Azure.Cosmos;
 using TestExtensions;
 
 namespace Tester.AzureCosmos;
@@ -14,7 +14,23 @@ public static class AzureCosmosOptionsExtensions
         }
         else
         {
-            options.ConfigureCosmosClient(TestDefaultConfiguration.CosmosDBAccountEndpoint, TestDefaultConfiguration.CosmosDBAccountKey);
+            options.ConfigureCosmosClient(_ =>
+            {
+                var cosmosClientOptions = new CosmosClientOptions()
+                {
+                    HttpClientFactory = () =>
+                    {
+                        HttpMessageHandler httpMessageHandler = new HttpClientHandler()
+                        {
+                            ServerCertificateCustomValidationCallback = (req, cert, chain, errors) => true
+                        };
+                        return new HttpClient(httpMessageHandler);
+                    },
+                    ConnectionMode = ConnectionMode.Gateway
+                };
+
+                return new(new CosmosClient(TestDefaultConfiguration.CosmosDBAccountEndpoint, TestDefaultConfiguration.CosmosDBAccountKey, cosmosClientOptions));
+            });
         }
 
         options.IsResourceCreationEnabled = true;
@@ -31,7 +47,23 @@ public static class AzureCosmosOptionsExtensions
         }
         else
         {
-            options.ConfigureCosmosClient(TestDefaultConfiguration.CosmosDBAccountEndpoint, TestDefaultConfiguration.CosmosDBAccountKey);
+            options.ConfigureCosmosClient(_ =>
+            {
+                var cosmosClientOptions = new CosmosClientOptions()
+                {
+                    HttpClientFactory = () =>
+                    {
+                        HttpMessageHandler httpMessageHandler = new HttpClientHandler()
+                        {
+                            ServerCertificateCustomValidationCallback = (req, cert, chain, errors) => true
+                        };
+                        return new HttpClient(httpMessageHandler);
+                    },
+                    ConnectionMode = ConnectionMode.Gateway
+                };
+
+                return new(new CosmosClient(TestDefaultConfiguration.CosmosDBAccountEndpoint, TestDefaultConfiguration.CosmosDBAccountKey, cosmosClientOptions));
+            });
         }
 
         options.IsResourceCreationEnabled = true;
@@ -48,7 +80,23 @@ public static class AzureCosmosOptionsExtensions
         }
         else
         {
-            options.ConfigureCosmosClient(TestDefaultConfiguration.CosmosDBAccountEndpoint, TestDefaultConfiguration.CosmosDBAccountKey);
+            options.ConfigureCosmosClient(_ =>
+            {
+                var cosmosClientOptions = new CosmosClientOptions()
+                {
+                    HttpClientFactory = () =>
+                    {
+                        HttpMessageHandler httpMessageHandler = new HttpClientHandler()
+                        {
+                            ServerCertificateCustomValidationCallback = (req, cert, chain, errors) => true
+                        };
+                        return new HttpClient(httpMessageHandler);
+                    },
+                    ConnectionMode = ConnectionMode.Gateway
+                };
+
+                return new(new CosmosClient(TestDefaultConfiguration.CosmosDBAccountEndpoint, TestDefaultConfiguration.CosmosDBAccountKey, cosmosClientOptions));
+            });
         }
 
         options.IsResourceCreationEnabled = true;
