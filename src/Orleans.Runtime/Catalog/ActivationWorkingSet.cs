@@ -6,6 +6,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Orleans.Internal;
+using Orleans.Runtime.Internal;
 
 namespace Orleans.Runtime
 {
@@ -16,7 +17,7 @@ namespace Orleans.Runtime
     {
         private class MemberState
         {
-            public bool IsMarkedForRemoval { get; set; }
+            public bool IsIdle { get; set; }
         }
 
         private readonly ConcurrentDictionary<IActivationWorkingSetMember, MemberState> _members = new();
@@ -33,7 +34,7 @@ namespace Orleans.Runtime
             IEnumerable<IActivationWorkingSetObserver> observers)
         {
             _logger = logger;
-            _scanPeriodTimer = asyncTimerFactory.Create(TimeSpan.FromMilliseconds(100), nameof(ActivationWorkingSet) + "." + nameof(MonitorWorkingSet));
+            _scanPeriodTimer = asyncTimerFactory.Create(TimeSpan.FromMilliseconds(5_000), nameof(ActivationWorkingSet) + "." + nameof(MonitorWorkingSet));
             _observers = observers.ToList();
             CatalogInstruments.RegisterActivationWorkingSetObserve(() => Count);
         }
@@ -42,23 +43,25 @@ namespace Orleans.Runtime
 
         public void OnActivated(IActivationWorkingSetMember member)
         {
-            if (!_members.TryAdd(member, new MemberState()))
+            if (_members.TryAdd(member, new MemberState()))
             {
-                throw new InvalidOperationException($"Member {member} is already a member of the working set");
+                Interlocked.Increment(ref _activeCount);
+                foreach (var observer in _observers)
+                {
+                    observer.OnAdded(member);
+                }
+
+                return;
             }
 
-            Interlocked.Increment(ref _activeCount);
-            foreach (var observer in _observers)
-            {
-                observer.OnAdded(member);
-            }
+            throw new InvalidOperationException($"Member {member} is already a member of the working set");
         }
 
         public void OnActive(IActivationWorkingSetMember member)
         {
             if (_members.TryGetValue(member, out var state))
             {
-                state.IsMarkedForRemoval = false;
+                state.IsIdle = false;
             }
             else if (_members.TryAdd(member, new()))
             {
@@ -101,34 +104,6 @@ namespace Orleans.Runtime
             }
         }
 
-        private void VisitMember(IActivationWorkingSetMember member, MemberState state)
-        {
-            var wouldRemove = state.IsMarkedForRemoval;
-            if (member.IsCandidateForRemoval(wouldRemove))
-            {
-                if (wouldRemove)
-                {
-                    OnEvicted(member);
-                }
-                else
-                {
-                    state.IsMarkedForRemoval = true;
-                    foreach (var observer in _observers)
-                    {
-                        observer.OnIdle(member);
-                    }
-                }
-            }
-            else
-            {
-                state.IsMarkedForRemoval = false;
-                foreach (var observer in _observers)
-                {
-                    observer.OnActive(member);
-                }
-            }
-        }
-
         private async Task MonitorWorkingSet()
         {
             while (await _scanPeriodTimer.NextTick())
@@ -147,6 +122,34 @@ namespace Orleans.Runtime
             }
         }
 
+        private void VisitMember(IActivationWorkingSetMember member, MemberState state)
+        {
+            var wouldRemove = state.IsIdle;
+            if (member.IsCandidateForRemoval(wouldRemove))
+            {
+                if (wouldRemove)
+                {
+                    OnEvicted(member);
+                }
+                else
+                {
+                    state.IsIdle = true;
+                    foreach (var observer in _observers)
+                    {
+                        observer.OnIdle(member);
+                    }
+                }
+            }
+            else
+            {
+                state.IsIdle = false;
+                foreach (var observer in _observers)
+                {
+                    observer.OnActive(member);
+                }
+            }
+        }
+
         void ILifecycleParticipant<ISiloLifecycle>.Participate(ISiloLifecycle lifecycle)
         {
             lifecycle.Subscribe(
@@ -154,7 +157,8 @@ namespace Orleans.Runtime
                 ServiceLifecycleStage.BecomeActive,
                 ct =>
                 {
-                    _runTask = Task.Run(this.MonitorWorkingSet);
+                    using var _ = new ExecutionContextSuppressor();
+                    _runTask = Task.Run(MonitorWorkingSet);
                     return Task.CompletedTask;
                 },
                 async ct =>
