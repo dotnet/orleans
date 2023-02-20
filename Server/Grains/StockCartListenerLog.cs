@@ -39,7 +39,7 @@ public class StockCartListenerLog : Grain, IGrainWithGuidKey
 
         await AsyncExecutorWithRetries.ExecuteWithRetries(async _ =>
         {
-            var lastOffsetFromDatabase = await _offsetRepository.Find(this.GetPrimaryKey(), cancellationToken, false);
+            var lastOffsetFromDatabase = await _offsetRepository.FindByOffsetNameAndId(nameof(StockCartListenerLog), this.GetPrimaryKey(), cancellationToken, false);
 
             var lastToken = lastOffsetFromDatabase?.LastTokenRead;
             var token = lastToken.HasValue ? new EventSequenceTokenV2(lastToken.Value) : null;
@@ -47,7 +47,7 @@ public class StockCartListenerLog : Grain, IGrainWithGuidKey
                 new StockCartGrainObserver(_scope.ServiceProvider.GetRequiredService<IUnitOfWork>(),
                     _scope.ServiceProvider.GetRequiredService<IOffsetRepository>(),
                     _scope.ServiceProvider.GetRequiredService<ILogger<StockCartGrainObserver>>(),
-                    _scope.ServiceProvider.GetRequiredService<IMediator>(), this.GetPrimaryKey()), token);
+                    _scope.ServiceProvider.GetRequiredService<IMediator>(), this.GetPrimaryKey(), nameof(StockCartListenerLog)), token);
         }, AsyncExecutorWithRetries.INFINITE_RETRIES, (_, _) => !cancellationToken.IsCancellationRequested, TimeSpan.MaxValue, new ExponentialBackoff(TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(30), TimeSpan.FromSeconds(1)));
 
 

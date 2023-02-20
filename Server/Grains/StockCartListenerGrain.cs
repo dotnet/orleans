@@ -22,34 +22,41 @@ public class StockCartGrainObserver : IAsyncObserver<(ShoppingCartResponse, Item
     private readonly ILogger<StockCartGrainObserver> _logger;
     private readonly IMediator _mediator;
     private readonly Guid _id;
+    private readonly string _offsetName;
     private (ShoppingCartResponse, ItemResponse) _lastMesage;
     private bool _lastTimeFailed = false;
     private OffsetRead? _lastOffset = null;
 
-    public StockCartGrainObserver(IUnitOfWork unitOfWork, IOffsetRepository offsetRepository, ILogger<StockCartGrainObserver> logger, IMediator mediator, Guid id)
+    public StockCartGrainObserver(IUnitOfWork unitOfWork, IOffsetRepository offsetRepository, ILogger<StockCartGrainObserver> logger, IMediator mediator, Guid id, string offsetName)
     {
         _unitOfWork = unitOfWork;
         _offsetRepository = offsetRepository;
         _logger = logger;
         _mediator = mediator;
         _id = id;
+        _offsetName = offsetName;
     }
 
     public async Task OnNextAsync((ShoppingCartResponse, ItemResponse) message, StreamSequenceToken? token = null)
     {
         try
         {
-            _lastOffset = await _offsetRepository.Find(_id, default);
+            _lastOffset = await _offsetRepository.FindByOffsetNameAndId(_offsetName, _id, default);
             _lastMesage = message;
 
             if (_lastTimeFailed && _lastOffset?.LastTokenRead == token!.SequenceNumber)
                 return;
+            
+            //if (_lastOffset is { Name: nameof(StockCartListenerLog) })
+            //{
+            //    throw new Exception("This consumer is failing");
+            //}
 
 
             _lastTimeFailed = false;
             if (_lastOffset is null)
             {
-                _lastOffset = new OffsetRead { LastTokenRead = token?.SequenceNumber, Id = _id };
+                _lastOffset = new OffsetRead { LastTokenRead = token?.SequenceNumber, Id = _id, Name = _offsetName };
                 _offsetRepository.Add(_lastOffset);
             }
 
@@ -79,7 +86,6 @@ public class StockCartGrainObserver : IAsyncObserver<(ShoppingCartResponse, Item
     {
         _logger.LogError(ex, "An error happened while trying to update the stock.");
         return Task.CompletedTask;
-        //return _itemAddedToCartStream.OnNextAsync(_lastMesage);
     }
 }
 
@@ -113,7 +119,7 @@ public class StockCartListenerGrain : Grain, IGrainWithGuidKey
 
         await AsyncExecutorWithRetries.ExecuteWithRetries(async _ =>
         {
-            var lastOffsetFromDatabase = await _offsetRepository.Find(this.GetPrimaryKey(), cancellationToken, false);
+            var lastOffsetFromDatabase = await _offsetRepository.FindByOffsetNameAndId(nameof(StockCartListenerGrain), this.GetPrimaryKey(), cancellationToken, false);
 
             var lastToken = lastOffsetFromDatabase?.LastTokenRead;
             var token = lastToken.HasValue ? new EventSequenceTokenV2(lastToken.Value) : null;
@@ -121,7 +127,7 @@ public class StockCartListenerGrain : Grain, IGrainWithGuidKey
                 new StockCartGrainObserver(_scope.ServiceProvider.GetRequiredService<IUnitOfWork>(),
                     _scope.ServiceProvider.GetRequiredService<IOffsetRepository>(),
                     _scope.ServiceProvider.GetRequiredService<ILogger<StockCartGrainObserver>>(),
-                    _scope.ServiceProvider.GetRequiredService<IMediator>(), this.GetPrimaryKey()), token);
+                    _scope.ServiceProvider.GetRequiredService<IMediator>(), this.GetPrimaryKey(), nameof(StockCartListenerGrain)), token);
         }, AsyncExecutorWithRetries.INFINITE_RETRIES, (_, _) => !cancellationToken.IsCancellationRequested, TimeSpan.MaxValue, new ExponentialBackoff(TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(30), TimeSpan.FromSeconds(1)));
 
 
