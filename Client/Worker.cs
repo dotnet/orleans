@@ -80,16 +80,25 @@ public class Worker : BackgroundService
         //Console.WriteLine("no more messages");
 
 
-        for (int i = 0; i < 1; i++)
+        var cartId = Guid.NewGuid();
+        while (true)
         {
-            var cartId = Guid.NewGuid();
             await _clusterClient.GetGrain<IShoppingCartGrain>(cartId)
                 .AddItem(token.Token, Guid.Parse("56e98e59-076a-41ac-b4c3-cefbc3806396"));
-            //await _clusterClient.GetGrain<IShoppingCartGrain>(cartId)
-            //    .AddItem(token.Token, Guid.Parse("56e98e59-076a-41ac-b4c3-cefbc3806396"));
-            //await _clusterClient.GetGrain<IShoppingCartGrain>(cartId)
-            //    .AddItem(token.Token, Guid.Parse("56e98e59-076a-41ac-b4c3-cefbc3806396"));
+            Console.WriteLine("Message sent");
+            Console.ReadLine();
         }
+
+        //for (int i = 0; i < 1; i++)
+        //{
+        //    var cartId = Guid.NewGuid();
+        //    await _clusterClient.GetGrain<IShoppingCartGrain>(cartId)
+        //        .AddItem(token.Token, Guid.Parse("56e98e59-076a-41ac-b4c3-cefbc3806396"));
+        //    //await _clusterClient.GetGrain<IShoppingCartGrain>(cartId)
+        //    //    .AddItem(token.Token, Guid.Parse("56e98e59-076a-41ac-b4c3-cefbc3806396"));
+        //    //await _clusterClient.GetGrain<IShoppingCartGrain>(cartId)
+        //    //    .AddItem(token.Token, Guid.Parse("56e98e59-076a-41ac-b4c3-cefbc3806396"));
+        //}
 
 
         //while (true)
