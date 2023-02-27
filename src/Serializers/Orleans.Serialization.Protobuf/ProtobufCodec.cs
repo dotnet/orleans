@@ -7,6 +7,8 @@ using Orleans.Serialization.Serializers;
 using Orleans.Serialization.WireProtocol;
 using System;
 using System.Collections.Concurrent;
+using System.Collections.Generic;
+using System.Linq;
 using System.Reflection;
 
 namespace Orleans.Serialization;
@@ -17,6 +19,22 @@ public sealed class ProtobufCodec : IGeneralizedCodec, IGeneralizedCopier, IType
     public const string WellKnownAlias = "protobuf";
 
     private static readonly ConcurrentDictionary<RuntimeTypeHandle, MessageParser> Parsers = new();
+
+    private readonly ICodecSelector[] _serializableTypeSelectors;
+    private readonly ICopierSelector[] _copyableTypeSelectors;
+
+    /// <summary>
+    /// Initializes a new instance of the <see cref="ProtobufCodec"/> class.
+    /// </summary>
+    /// <param name="serializableTypeSelectors">Filters used to indicate which types should be serialized by this codec.</param>
+    /// <param name="copyableTypeSelectors">Filters used to indicate which types should be copied by this codec.</param>
+    public ProtobufCodec(
+        IEnumerable<ICodecSelector> serializableTypeSelectors,
+        IEnumerable<ICopierSelector> copyableTypeSelectors)
+    {
+        _serializableTypeSelectors = serializableTypeSelectors.Where(t => string.Equals(t.CodecName, WellKnownAlias, StringComparison.Ordinal)).ToArray();
+        _copyableTypeSelectors = copyableTypeSelectors.Where(t => string.Equals(t.CopierName, WellKnownAlias, StringComparison.Ordinal)).ToArray();
+    }
 
     public object DeepCopy(object input, CopyContext context)
     {
@@ -32,10 +50,32 @@ public sealed class ProtobufCodec : IGeneralizedCodec, IGeneralizedCopier, IType
     }
 
     /// <inheritdoc/>
-    bool IGeneralizedCodec.IsSupportedType(Type type) => IsMessageParser(type);
+    bool IGeneralizedCodec.IsSupportedType(Type type)
+    {
+        foreach (var selector in _serializableTypeSelectors)
+        {
+            if (selector.IsSupportedType(type))
+            {
+                return IsMessageParser(type);
+            }
+        }
+
+        return false;
+    }
 
     /// <inheritdoc/>
-    bool IGeneralizedCopier.IsSupportedType(Type type) => IsMessageParser(type);
+    bool IGeneralizedCopier.IsSupportedType(Type type)
+    {
+        foreach (var selector in _copyableTypeSelectors)
+        {
+            if (selector.IsSupportedType(type))
+            {
+                return IsMessageParser(type);
+            }
+        }
+
+        return false;
+    }
 
     /// <inheritdoc/>
     bool? ITypeFilter.IsTypeAllowed(Type type)
@@ -48,7 +88,7 @@ public sealed class ProtobufCodec : IGeneralizedCodec, IGeneralizedCopier, IType
         return ((IGeneralizedCodec)this).IsSupportedType(type) || ((IGeneralizedCopier)this).IsSupportedType(type);
     } 
 
-    bool IsMessageParser(Type type)
+    static bool IsMessageParser(Type type)
     {
         if (!Parsers.ContainsKey(type.TypeHandle))
         {
