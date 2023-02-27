@@ -1,20 +1,20 @@
 <Project Sdk="Microsoft.NET.Sdk">
-  <PropertyGroup>
-    <PackageId>Microsoft.Orleans.OrleansGoogleUtils</PackageId>
-    <Title>Microsoft Orleans Google Utilities</Title>
-    <Description>Library of utility types for Google of Microsoft Orleans.</Description>
-    <PackageTags>$(PackageTags) ProtoBuf</PackageTags>
-    <TargetFrameworks>$(DefaultTargetFrameworks)</TargetFrameworks>
-  </PropertyGroup>
 
   <PropertyGroup>
-    <AssemblyName>Orleans.Serialization.Protobuf</AssemblyName>
-    <RootNamespace>OrleansGoogleUtils</RootNamespace>
+    <PackageId>Microsoft.Orleans.Serialization.Protobuf</PackageId>
+    <TargetFrameworks>$(DefaultTargetFrameworks);netstandard2.1</TargetFrameworks>
+    <PackageDescription>Google.Protobuf integration for Orleans.Serialization</PackageDescription>
+    <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
+    <IsOrleansFrameworkPart>false</IsOrleansFrameworkPart>
   </PropertyGroup>
 
   <ItemGroup>
     <PackageReference Include="Google.Protobuf" Version="$(GoogleProtobufVersion)" />
     <PackageReference Include="Microsoft.CSharp" Version="$(MicrosoftCSharpVersion)" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\Orleans.Serialization\Orleans.Serialization.csproj" />
   </ItemGroup>
 
 </Project>
