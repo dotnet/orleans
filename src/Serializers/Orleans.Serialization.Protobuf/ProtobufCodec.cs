@@ -9,7 +9,6 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
-using System.Reflection;
 
 namespace Orleans.Serialization;
 
@@ -18,7 +17,8 @@ public sealed class ProtobufCodec : IGeneralizedCodec, IGeneralizedCopier, IType
 {
     public const string WellKnownAlias = "protobuf";
 
-    private static readonly ConcurrentDictionary<RuntimeTypeHandle, MessageParser> Parsers = new();
+    private static readonly Type SelfType = typeof(ProtobufCodec);
+    private static readonly ConcurrentDictionary<RuntimeTypeHandle, MessageParser> MessageParsers = new();
 
     private readonly ICodecSelector[] _serializableTypeSelectors;
     private readonly ICopierSelector[] _copyableTypeSelectors;
@@ -36,12 +36,22 @@ public sealed class ProtobufCodec : IGeneralizedCodec, IGeneralizedCopier, IType
         _copyableTypeSelectors = copyableTypeSelectors.Where(t => string.Equals(t.CopierName, WellKnownAlias, StringComparison.Ordinal)).ToArray();
     }
 
+    /// <inheritdoc/>
     public object DeepCopy(object input, CopyContext context)
     {
         if (!context.TryGetCopy(input, out object result))
         {
-            dynamic dynamicSource = input;
-            result = dynamicSource.Clone();
+            if (input is not IMessage protobufMessage)
+            {
+                throw new InvalidOperationException("Input is not a protobuf message");
+            }
+
+            var messageSize = protobufMessage.CalculateSize();
+            using var buffer = new PooledArrayBufferWriter();
+            var spanBuffer = buffer.GetSpan(messageSize)[..messageSize];
+            protobufMessage.WriteTo(spanBuffer);
+
+            result = protobufMessage.Descriptor.Parser.ParseFrom(spanBuffer);
 
             context.RecordCopy(input, result);
         }
@@ -52,11 +62,16 @@ public sealed class ProtobufCodec : IGeneralizedCodec, IGeneralizedCopier, IType
     /// <inheritdoc/>
     bool IGeneralizedCodec.IsSupportedType(Type type)
     {
+        if (type == SelfType)
+        {
+            return true;
+        }
+
         foreach (var selector in _serializableTypeSelectors)
         {
             if (selector.IsSupportedType(type))
             {
-                return IsMessageParser(type);
+                return IsProtobufMessage(type);
             }
         }
 
@@ -70,7 +85,7 @@ public sealed class ProtobufCodec : IGeneralizedCodec, IGeneralizedCopier, IType
         {
             if (selector.IsSupportedType(type))
             {
-                return IsMessageParser(type);
+                return IsProtobufMessage(type);
             }
         }
 
@@ -88,22 +103,16 @@ public sealed class ProtobufCodec : IGeneralizedCodec, IGeneralizedCopier, IType
         return ((IGeneralizedCodec)this).IsSupportedType(type) || ((IGeneralizedCopier)this).IsSupportedType(type);
     } 
 
-    static bool IsMessageParser(Type type)
+    private static bool IsProtobufMessage(Type type)
     {
-        if (!Parsers.ContainsKey(type.TypeHandle))
+        if (!MessageParsers.ContainsKey(type.TypeHandle))
         {
-            var prop = type.GetProperty("Parser", BindingFlags.Public | BindingFlags.Static);
-            if (prop is null)
+            if (Activator.CreateInstance(type) is not IMessage protobufMessageInstance)
             {
                 return false;
             }
 
-            if (prop.GetValue(null, null) is not MessageParser parser)
-            {
-                throw new ArgumentNullException(nameof(parser));
-            }
-
-            Parsers.TryAdd(type.TypeHandle, parser);
+            MessageParsers.TryAdd(type.TypeHandle, protobufMessageInstance.Descriptor.Parser);
         }
 
         return true;
@@ -118,11 +127,6 @@ public sealed class ProtobufCodec : IGeneralizedCodec, IGeneralizedCopier, IType
         }
 
         field.EnsureWireTypeTagDelimited();
-
-        if (!Parsers.TryGetValue(field.FieldType.TypeHandle, out var parser))
-        {
-            throw new ArgumentException($"No parser found for the expected type {field.FieldType}", nameof(TInput));
-        }
 
         var placeholderReferenceId = ReferenceCodec.CreateRecordPlaceholder(reader.Session);
         object result = null;
@@ -150,6 +154,11 @@ public sealed class ProtobufCodec : IGeneralizedCodec, IGeneralizedCopier, IType
                         ThrowTypeFieldMissing();
                     }
 
+                    if (!MessageParsers.TryGetValue(type.TypeHandle, out var messageParser))
+                    {
+                        throw new ArgumentException($"No parser found for the expected type {type.Name}", nameof(TInput));
+                    }
+
                     ReferenceCodec.MarkValueField(reader.Session);
                     var length = (int)reader.ReadVarUInt32();
 
@@ -157,7 +166,7 @@ public sealed class ProtobufCodec : IGeneralizedCodec, IGeneralizedCopier, IType
                     {
                         var spanBuffer = buffer.GetSpan(length)[..length];
                         reader.ReadBytes(spanBuffer);
-                        result = parser.ParseFrom(spanBuffer);
+                        result = messageParser.ParseFrom(spanBuffer);
                     }
                     break;
                 default:
@@ -185,7 +194,7 @@ public sealed class ProtobufCodec : IGeneralizedCodec, IGeneralizedCopier, IType
             throw new ArgumentException("The provided value for serialization in not an instance of IMessage");
         }
 
-        writer.WriteFieldHeader(fieldIdDelta, expectedType, protobufMessage.GetType(), WireType.TagDelimited);
+        writer.WriteFieldHeader(fieldIdDelta, expectedType, SelfType, WireType.TagDelimited);
 
         // Write the type name
         ReferenceCodec.MarkValueField(writer.Session);
