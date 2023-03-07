@@ -34,7 +34,11 @@ namespace Tester.Redis.Clustering
             TestUtils.CheckForRedis();
 
             membershipTable = new RedisMembershipTable(
-                Options.Create(new RedisClusteringOptions() { ConnectionString = GetConnectionString().Result }),
+                Options.Create(new RedisClusteringOptions()
+                {
+                    ConfigurationOptions = ConfigurationOptions.Parse(GetConnectionString().Result),
+                    EntryExpiry = TimeSpan.FromHours(1)
+                }),
                 this._clusterOptions);
 
             return membershipTable;
