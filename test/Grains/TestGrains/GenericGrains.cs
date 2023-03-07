@@ -768,6 +768,16 @@ namespace UnitTests.Grains
         }
     }
 
+    public class GenericArrayRegisterGrain<T> : Grain, IGenericArrayRegisterGrain<T>
+    {
+        private T[] _value;
+        public Task<T[]> Get() => Task.FromResult(_value);
+        public Task Set(T[] value)
+        {
+            _value = value;
+            return Task.CompletedTask;
+        }
+    }
 
     public class IndepedentlyConcretizedGenericGrain : Grain, IIndependentlyConcretizedGenericGrain<string>, IIndependentlyConcretizedGrain
     {
@@ -903,7 +913,6 @@ namespace UnitTests.Grains
 
         public class GrainSupplyingGenArgSpecializedIntoArray<T> : BasicGrain, IInterfaceTakingFurtherSpecializedGenArg<T[]>
         { }
-
 
         public class GrainForCastingBetweenInterfacesOfFurtherSpecializedGenArgs<T>
             : BasicGrain, IAnotherReceivingFurtherSpecializedGenArg<List<T>>, IYetOneMoreReceivingFurtherSpecializedGenArg<T[]>

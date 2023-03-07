@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
 using System.Collections.Specialized;
+using System.Reflection;
+using Castle.DynamicProxy.Internal;
 using Orleans.Runtime;
 using Orleans.Serialization.TypeSystem;
 using Orleans.Utilities;
@@ -15,8 +17,10 @@ namespace NonSilo.Tests
     [TestCategory("BVT")]
     public class RuntimeTypeNameFormatterTests
     {
-        private readonly ITestOutputHelper output;
-        private readonly Type[] types = new[]
+        public interface IMyBaseType<T> { }
+        public interface IMyArrayType<T> : IMyBaseType <T[]> { }
+        private readonly ITestOutputHelper _output;
+        private readonly List<Type> _types = new()
             {
                 typeof(NameValueCollection),
                 typeof(int),
@@ -41,7 +45,11 @@ namespace NonSilo.Tests
 
         public RuntimeTypeNameFormatterTests(ITestOutputHelper output)
         {
-            this.output = output;
+            _output = output;
+            _types.Add(typeof(List<>).MakeGenericType(typeof(Inner<int>.Middle).MakeArrayType()));
+            _types.Add(typeof(List<>).MakeGenericType(typeof(Inner<>.Middle).MakeArrayType()));
+            typeof(IMyArrayType<>).MakeGenericType(typeof(Inner<>.Middle)).GetInterfaces().ToList().ForEach(_types.Add);
+            typeof(IMyArrayType<>).GetInterfaces().ToList().ForEach(_types.Add);
         }
 
         /// <summary>
@@ -50,13 +58,16 @@ namespace NonSilo.Tests
         [Fact]
         public void FormattedTypeNamesAreRecoverable()
         {
-            foreach (var type in types)
+            var resolver = new CachedTypeResolver();
+            foreach (var type in _types)
             {
+                if (string.IsNullOrWhiteSpace(type.FullName)) continue;
                 var formatted = RuntimeTypeNameFormatter.Format(type);
-                this.output.WriteLine($"Full Name: {type.FullName}");
-                this.output.WriteLine($"Formatted: {formatted}");
-                var isRecoverable = new CachedTypeResolver().TryResolveType(formatted, out var resolved) && resolved == type;
-                Assert.True(isRecoverable, $"Type.GetType(\"{formatted}\") must be equal to the original type.");
+                _output.WriteLine($"Full Name: {type.FullName}");
+                _output.WriteLine($"Formatted: {formatted}");
+                var isRecoverable = resolver.TryResolveType(formatted, out var resolved) && resolved == type;
+                var resolvedFormatted = resolved is not null ? RuntimeTypeNameFormatter.Format(resolved) : "null";
+                Assert.True(isRecoverable, $"Type.GetType(\"{formatted}\") must be equal to the original type. Got: {resolvedFormatted}");
             }
         }
 
@@ -65,24 +76,26 @@ namespace NonSilo.Tests
         /// </summary>
         [Fact]
         public void ParsedTypeNamesAreIdenticalToFormattedNames()
+
         {
-            foreach (var type in types)
+            foreach (var type in _types)
             {
                 var formatted = RuntimeTypeNameFormatter.Format(type);
                 var parsed = RuntimeTypeNameParser.Parse(formatted);
-                this.output.WriteLine($"Type.FullName: {type.FullName}");
-                this.output.WriteLine($"Formatted    : {formatted}");
-                this.output.WriteLine($"Parsed       : {parsed}");
+                _output.WriteLine($"Type.FullName: {type.FullName}");
+                _output.WriteLine($"Formatted    : {formatted}");
+                _output.WriteLine($"Parsed       : {parsed}");
                 Assert.Equal(formatted, parsed.Format());
 
                 var reparsed = RuntimeTypeNameParser.Parse(parsed.Format());
-                this.output.WriteLine($"Reparsed     : {reparsed}");
+                _output.WriteLine($"Reparsed     : {reparsed}");
                 Assert.Equal(formatted, reparsed.Format());
             }
         } 
         
         public class Inner<T>
         {
+            public class Middle { }
             public class InnerInner<U, V>
             {
                 public class Bottom { }

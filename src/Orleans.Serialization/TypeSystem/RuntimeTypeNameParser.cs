@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Text;
 
 namespace Orleans.Serialization.TypeSystem;
 
@@ -134,10 +135,9 @@ public static class RuntimeTypeNameParser
         }
 
         // Parse generic type parameters
-        if (input.TotalGenericArity > 0 && input.TryPeek(out c) && c == ArrayStartIndicator)
+        if (input.TotalGenericArity > 0 && input.TryPeek(out c, out var d) && c == ArrayStartIndicator && d == ArrayStartIndicator)
         {
             input.ConsumeCharacter(ArrayStartIndicator);
-
             var arguments = new TypeSpec[input.TotalGenericArity];
             for (var i = 0; i < input.TotalGenericArity; i++)
             {
@@ -341,6 +341,25 @@ public static class RuntimeTypeNameParser
             return false;
         }
 
+        public bool TryPeek(out char c, out char d)
+        {
+            var result = TryPeek(out c);
+            result &= TryPeek(Index + 1, out d);
+            return result;
+        }
+
+        public bool TryPeek(int index, out char c)
+        {
+            if (index < Input.Length)
+            {
+                c = Input[index];
+                return true;
+            }
+
+            c = default;
+            return false;
+        }
+
         public void Consume(int chars)
         {
             if (Index < Input.Length)
@@ -380,5 +399,29 @@ public static class RuntimeTypeNameParser
         private static void ThrowUnexpectedCharacter(char expected, char actual) => throw new InvalidOperationException($"Encountered unexpected character. Expected '{expected}', actual '{actual}'.");
 
         private static void ThrowEndOfInput() => throw new InvalidOperationException("Tried to read past the end of the input");
+
+        public override string ToString()
+        {
+            var result = new StringBuilder();
+            var i = 0;
+            foreach (var c in Input)
+            {
+                if (i == Index)
+                {
+                    result.Append("^^^");
+                }
+
+                result.Append(c);
+
+                if (i == Index)
+                {
+                    result.Append("^^^");
+                }
+
+                ++i;
+            }
+
+            return result.ToString();
+        }
     }
 }
