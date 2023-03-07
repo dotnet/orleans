@@ -1,0 +1,12 @@
+syntax = "proto3";
+option csharp_namespace = "Orleans.Serialization.UnitTests";
+
+message MyProtobufClass {
+    int32 int_property = 1;
+    string string_property = 2;
+    SubClass sub_class = 3;
+
+    message SubClass {
+        bytes id = 1;
+    }
+}
