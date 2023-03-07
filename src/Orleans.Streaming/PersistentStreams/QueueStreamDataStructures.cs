@@ -1,4 +1,5 @@
 using System;
+using System.Threading;
 using Microsoft.Extensions.Logging;
 using Orleans.Runtime;
 
@@ -30,6 +31,9 @@ namespace Orleans.Streams
         public StreamHandshakeToken? LastToken;
         [Id(6)]
         public string FilterData;
+
+        [field: NonSerialized]
+        public SemaphoreSlim Semaphore { get; } = new (1);
 
         public StreamConsumerData(GuidId subscriptionId, QualifiedStreamId streamId, IStreamConsumerExtension streamConsumer, string filterData)
         {

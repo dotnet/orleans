@@ -33,6 +33,9 @@ namespace Orleans.Streams
         /// <param name="token">The token.</param>
         void Refresh(StreamSequenceToken token);
 
+
+        StreamSequenceToken LastRefreshToken { get; }
+
         /// <summary>
         /// Records that delivery of the current event has failed
         /// </summary>

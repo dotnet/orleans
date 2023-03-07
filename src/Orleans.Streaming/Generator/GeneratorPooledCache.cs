@@ -140,7 +140,10 @@ namespace Orleans.Providers.Streams.Generator
 
             public void Refresh(StreamSequenceToken token)
             {
+                LastRefreshToken = token;
             }
+
+            public StreamSequenceToken LastRefreshToken { get; private set; }
 
             public void RecordDeliveryFailure()
             {

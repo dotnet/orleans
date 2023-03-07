@@ -105,8 +105,10 @@ namespace Orleans.Streams
             // we validate expectedToken only for ordered (rewindable) streams
             if (this.expectedToken != null)
             {
+
                 if (!this.expectedToken.Equals(handshakeToken))
                     return this.expectedToken;
+
             }
 
             if (batch is IBatchContainerBatch)
