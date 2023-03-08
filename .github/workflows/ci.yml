@@ -234,26 +234,11 @@ jobs:
           **/logs/*
   test-azure-cosmosdb:
     name: Azure CosmosDB provider tests
-    runs-on: ubuntu-latest
+    runs-on: windows-latest
     strategy:
       matrix:
         framework: ["net7.0"]
-        provider: ["AzureCosmosDB"]
-    services:
-      cosmosdb-emulator:
-        image: mcr.microsoft.com/cosmosdb/linux/azure-cosmos-emulator:latest
-        ports:
-          - 8081:8081
-          - 10250:10250
-          - 10251:10251
-          - 10252:10252
-          - 10253:10253
-          - 10254:10254
-          - 10255:10255
-        env:
-          AZURE_COSMOS_EMULATOR_PARTITION_COUNT: 10
-          AZURE_COSMOS_EMULATOR_ENABLE_DATA_PERSISTENCE: false
-          AZURE_COSMOS_EMULATOR_IP_ADDRESS_OVERRIDE: 127.0.0.1
+        provider: ["AzureCosmosDB"]    
     steps:
     - uses: actions/checkout@v2
     - name: Setup .NET
@@ -269,6 +254,11 @@ jobs:
     #     awk 'BEGIN {c=0;} /BEGIN CERT/{c++} { print > "emulatorcert." c ".crt"}' < /tmp/emulatorcert.crt
     #     sudo cp emulatorcert.*.crt /usr/local/share/ca-certificates/
     #     sudo update-ca-certificates
+    - name: Start Cosmos DB emulator
+      run: |
+        Write-Host "Launching Cosmos DB Emulator"
+        Import-Module "$env:ProgramFiles\Azure Cosmos DB Emulator\PSModules\Microsoft.Azure.CosmosDB.Emulator"
+        Start-CosmosDbEmulator
     - name: Test
       run: dotnet test --filter "Category=${{ matrix.provider }}&(Category=BVT|Category=SlowBVT|Category=Functional)" --framework ${{ matrix.framework }} --blame-hang-timeout 10m --logger "trx" -- -parallel none -noshadow
       env:
