@@ -13,6 +13,7 @@ namespace Orleans.Analyzers
         {
             IdentifierNameSyntax id => id.Identifier.Text,
             QualifiedNameSyntax qualified => qualified.Right.Identifier.Text,
+			GenericNameSyntax generic => generic.Identifier.Text,
             _ => throw new NotSupportedException()
         };
 
