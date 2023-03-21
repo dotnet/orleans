@@ -10,6 +10,7 @@ using UnitTests.GrainInterfaces;
 using Xunit;
 using System.Diagnostics;
 using Orleans.Runtime;
+using UnitTests.Grains;
 
 namespace UnitTests.StuckGrainTests
 {
@@ -108,6 +109,8 @@ namespace UnitTests.StuckGrainTests
             var id = Guid.NewGuid();
             var stuckGrain = this.fixture.GrainFactory.GetGrain<IStuckGrain>(id);
             await stuckGrain.BlockingDeactivation();
+
+            await StuckGrain.WaitForDeactivationStart(stuckGrain.GetGrainId());
 
             for (var i = 0; i < 3; i++)
             {
