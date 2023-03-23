@@ -28,7 +28,7 @@ $Platform = $null
  if ($env:BuildConfiguration -eq "Debug")
  {
     $dateSuffix = Get-Date -Format "yyyyMMddHHmm"
-    $AdditionalConfigurationProperties=";VersionDateSuffix=$dateSuffix"
+    $AdditionalConfigurationProperties=" /p:VersionDateSuffix=$dateSuffix"
  }
 
 Write-Output "===== Building $solution ====="
