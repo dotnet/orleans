@@ -41,7 +41,7 @@ public abstract class D { [global::Orleans.Id(0)] public abstract int F { get; s
 """);
 
     [Fact]
-    public Task GenericAttribute()
+    public Task UnrelatedGenericAttribute()
         => VerifyGeneratedDiagnostic("""
 public class GenericAttribute<T> : Attribute { }
 [GenerateSerializer]
