@@ -14,6 +14,7 @@ namespace Orleans.Analyzers
             IdentifierNameSyntax id => id.Identifier.Text,
             QualifiedNameSyntax qualified => qualified.Right.Identifier.Text,
 			GenericNameSyntax generic => generic.Identifier.Text,
+            AliasQualifiedNameSyntax aliased => aliased.Name.Identifier.Text,
             _ => throw new NotSupportedException()
         };
 
@@ -71,7 +72,7 @@ namespace Orleans.Analyzers
 
             return null;
         }
-        
+
         public static bool IsAbstract(this MemberDeclarationSyntax member) => member.HasModifier(SyntaxKind.AbstractKeyword);
 
         public static bool IsStatic(this MemberDeclarationSyntax member) => member.HasModifier(SyntaxKind.StaticKeyword);
@@ -81,7 +82,7 @@ namespace Orleans.Analyzers
             foreach (var modifier in member.Modifiers)
             {
                 var kind = modifier.Kind();
-                if (kind == modifierKind) 
+                if (kind == modifierKind)
                 {
                     return true;
                 }
