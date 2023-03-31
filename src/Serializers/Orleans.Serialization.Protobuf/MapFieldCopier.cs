@@ -4,7 +4,7 @@ using Orleans.Serialization.Cloning;
 namespace Orleans.Serialization;
 
 /// <summary>
-/// Copier for <see cref="MapFieldCopier{TKey, TValue}"/>.
+/// Copier for <see cref="MapField{TKey, TValue}"/>.
 /// </summary>
 /// <typeparam name="TKey">The type of the t key.</typeparam>
 /// <typeparam name="TValue">The type of the t value.</typeparam>
