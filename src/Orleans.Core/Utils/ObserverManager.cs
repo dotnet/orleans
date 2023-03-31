@@ -59,7 +59,7 @@ namespace Orleans.Utilities
         public ObserverManager(TimeSpan expiration, ILogger log)
         {
             ExpirationDuration = expiration;
-            _log = log;
+            _log = _log ?? throw new ArgumentNullException(nameof(_log));
             GetDateTime = () => DateTime.UtcNow;
         }
 
