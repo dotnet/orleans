@@ -18,6 +18,8 @@ public sealed class ProtobufCodec : IGeneralizedCodec, IGeneralizedCopier, IType
     public const string WellKnownAlias = "protobuf";
 
     private static readonly Type SelfType = typeof(ProtobufCodec);
+    private static readonly Type MessageType = typeof(IMessage);
+    private static readonly Type MessageGenericType = typeof(IMessage<>);
     private static readonly ConcurrentDictionary<RuntimeTypeHandle, MessageParser> MessageParsers = new();
 
     private readonly ICodecSelector[] _serializableTypeSelectors;
@@ -95,16 +97,34 @@ public sealed class ProtobufCodec : IGeneralizedCodec, IGeneralizedCopier, IType
     /// <inheritdoc/>
     bool? ITypeFilter.IsTypeAllowed(Type type)
     {
-        if (!typeof(IMessage).IsAssignableFrom(type))
+        if (!MessageType.IsAssignableFrom(type))
         {
             return null;
         }
 
+        if (type == MessageType)
+        {
+            // While IMessage is the basis of all supported types, it isn't directly supported
+            return null;
+        }
+
         return ((IGeneralizedCodec)this).IsSupportedType(type) || ((IGeneralizedCopier)this).IsSupportedType(type);
-    } 
+    }
 
     private static bool IsProtobufMessage(Type type)
     {
+        if (type == MessageType)
+        {
+            // Not a concrete implementation, so not directly serializable
+            return false;
+        }
+
+        if (type == MessageGenericType)
+        {
+            // Not a concrete implementation, but the generic type does give the concrete type
+            type = type.GenericTypeArguments[0];
+        }
+
         if (!MessageParsers.ContainsKey(type.TypeHandle))
         {
             if (Activator.CreateInstance(type) is not IMessage protobufMessageInstance)
