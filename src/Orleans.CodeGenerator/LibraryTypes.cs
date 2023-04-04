@@ -39,7 +39,7 @@ namespace Orleans.CodeGenerator
                 AliasAttribute = Type("Orleans.AliasAttribute"),
                 IInvokable = Type("Orleans.Serialization.Invocation.IInvokable"),
                 InvokeMethodNameAttribute = Type("Orleans.InvokeMethodNameAttribute"),
-                FormatterServices = Type("System.Runtime.Serialization.FormatterServices"),
+                RuntimeHelpers = Type("System.Runtime.CompilerServices.RuntimeHelpers"),
                 InvokableCustomInitializerAttribute = Type("Orleans.InvokableCustomInitializerAttribute"),
                 DefaultInvokableBaseTypeAttribute = Type("Orleans.DefaultInvokableBaseTypeAttribute"),
                 GenerateCodeForDeclaringAssemblyAttribute = Type("Orleans.GenerateCodeForDeclaringAssemblyAttribute"),
@@ -301,7 +301,7 @@ namespace Orleans.CodeGenerator
         public INamedTypeSymbol SerializerTransparentAttribute { get; private set; }
         public INamedTypeSymbol FSharpCompilationMappingAttributeOrDefault { get; private set; }
         public INamedTypeSymbol FSharpSourceConstructFlagsOrDefault { get; private set; }
-        public INamedTypeSymbol FormatterServices { get; private set; }
+        public INamedTypeSymbol RuntimeHelpers { get; private set; }
 
         private readonly ConcurrentDictionary<ITypeSymbol, bool> _shallowCopyableTypes = new(SymbolEqualityComparer.Default);
 

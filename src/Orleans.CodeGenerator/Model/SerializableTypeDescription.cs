@@ -226,7 +226,7 @@ namespace Orleans.CodeGenerator
             {
                 return CastExpression(
                     TypeSyntax,
-                    InvocationExpression(libraryTypes.FormatterServices.ToTypeSyntax().Member("GetUninitializedObject"))
+                    InvocationExpression(libraryTypes.RuntimeHelpers.ToTypeSyntax().Member("GetUninitializedObject"))
                         .AddArgumentListArguments(
                             Argument(TypeOfExpression(TypeSyntax))));
             }
