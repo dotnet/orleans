@@ -63,7 +63,7 @@ namespace Orleans.Streams
         private static IdSpan GetIntegerKey(StreamId streamId, bool includeNamespaceInGrainId)
         {
             var key = streamId.Key.Span;
-            if (!Utf8Parser.TryParse(key, out int intKey, out var len) || len < key.Length) throw new ArgumentException(nameof(streamId));
+            if (!Utf8Parser.TryParse(key, out long intKey, out var len) || len < key.Length) throw new ArgumentException(nameof(streamId));
 
             return includeNamespaceInGrainId
                 ? GrainIdKeyExtensions.CreateIntegerKey(intKey, streamId.Namespace.Span)
