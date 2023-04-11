@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
 using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
 using Orleans.CodeGenerator.SyntaxGeneration;
 
 namespace Orleans.CodeGenerator
@@ -178,6 +179,8 @@ namespace Orleans.CodeGenerator
                     Type("System.Collections.Immutable.ImmutableSortedSet`1"),
                     Type("System.Collections.Immutable.ImmutableStack`1"),
                 },
+
+                LanguageVersion = (compilation.SyntaxTrees.FirstOrDefault()?.Options as CSharpParseOptions)?.LanguageVersion
             };
 
             INamedTypeSymbol Type(string metadataName)
@@ -302,6 +305,8 @@ namespace Orleans.CodeGenerator
         public INamedTypeSymbol FSharpCompilationMappingAttributeOrDefault { get; private set; }
         public INamedTypeSymbol FSharpSourceConstructFlagsOrDefault { get; private set; }
         public INamedTypeSymbol RuntimeHelpers { get; private set; }
+
+        public LanguageVersion? LanguageVersion { get; private set; }
 
         private readonly ConcurrentDictionary<ITypeSymbol, bool> _shallowCopyableTypes = new(SymbolEqualityComparer.Default);
 
@@ -445,5 +450,7 @@ namespace Orleans.CodeGenerator
 
             return null;
         }
+
+        public static bool HasScopedKeyword(this LibraryTypes libraryTypes) => libraryTypes.LanguageVersion is null or >= LanguageVersion.CSharp11;
     }
 }
