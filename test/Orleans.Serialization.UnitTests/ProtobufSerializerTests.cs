@@ -1,6 +1,8 @@
 #nullable enable
 using System;
+using System.Linq;
 using Google.Protobuf;
+using Google.Protobuf.Collections;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Serialization.Cloning;
 using Orleans.Serialization.Codecs;
@@ -98,6 +100,134 @@ public class ProtobufCodecCopierTests : CopierTester<MyProtobufClass?, IDeepCopi
         new () { SubClass = new MyProtobufClass.Types.SubClass { Id = Guid.NewGuid().ToByteString() } },
         new () { IntProperty = 150, StringProperty = new string('c', 20), SubClass = new MyProtobufClass.Types.SubClass { Id = Guid.NewGuid().ToByteString() } },
         new () { IntProperty = -150_000, StringProperty = new string('c', 6_000), SubClass = new MyProtobufClass.Types.SubClass { Id = Guid.NewGuid().ToByteString() } },
+    };
+}
+
+[Trait("Category", "BVT")]
+public class ProtobufRepeatedFieldCodecTests : FieldCodecTester<RepeatedField<int>, RepeatedFieldCodec<int>>
+{
+    public ProtobufRepeatedFieldCodecTests(ITestOutputHelper output) : base(output)
+    {
+    }
+
+    protected override RepeatedField<int> CreateValue()
+    {
+        var result = new RepeatedField<int>();
+        for (var i = 0; i < Random.Next(17) + 5; i++)
+        {
+            result.Add(Random.Next());
+        }
+
+        return result;
+    }
+
+    protected override bool Equals(RepeatedField<int> left, RepeatedField<int> right) => object.ReferenceEquals(left, right) || left.SequenceEqual(right);
+    protected override RepeatedField<int>[] TestValues => new[] { new RepeatedField<int>(), CreateValue(), CreateValue(), CreateValue() };
+}
+
+[Trait("Category", "BVT")]
+public class ProtobufRepeatedFieldCopierTests : CopierTester<RepeatedField<int>, IDeepCopier<RepeatedField<int>>>
+{
+    public ProtobufRepeatedFieldCopierTests(ITestOutputHelper output) : base(output)
+    {
+    }
+
+    protected override IDeepCopier<RepeatedField<int>> CreateCopier() => ServiceProvider.GetRequiredService<ICodecProvider>().GetDeepCopier<RepeatedField<int>>();
+
+    protected override RepeatedField<int> CreateValue()
+    {
+        var result = new RepeatedField<int>();
+        for (var i = 0; i < Random.Next(17) + 5; i++)
+        {
+            result.Add(Random.Next());
+        }
+
+        return result;
+    }
+
+    protected override bool Equals(RepeatedField<int> left, RepeatedField<int> right) => object.ReferenceEquals(left, right) || left.SequenceEqual(right);
+    protected override RepeatedField<int>[] TestValues => new[] { new RepeatedField<int>(), CreateValue(), CreateValue(), CreateValue() };
+}
+
+[Trait("Category", "BVT")]
+public class MapFieldCodecTests : FieldCodecTester<MapField<string, int>, MapFieldCodec<string, int>>
+{
+    public MapFieldCodecTests(ITestOutputHelper output) : base(output)
+    {
+    }
+
+    protected override MapField<string, int> CreateValue()
+    {
+        var result = new MapField<string, int>();
+        for (var i = 0; i < Random.Next(17) + 5; i++)
+        {
+            result[Random.Next().ToString()] = Random.Next();
+        }
+
+        return result;
+    }
+
+    protected override MapField<string, int>[] TestValues => new[] { new MapField<string, int>(), CreateValue(), CreateValue(), CreateValue() };
+    protected override bool Equals(MapField<string, int> left, MapField<string, int> right) => object.ReferenceEquals(left, right) || left.SequenceEqual(right);
+}
+
+[Trait("Category", "BVT")]
+public class MapFieldCopierTests : CopierTester<MapField<string, int>, MapFieldCopier<string, int>>
+{
+    public MapFieldCopierTests(ITestOutputHelper output) : base(output)
+    {
+    }
+
+    protected override MapField<string, int> CreateValue()
+    {
+        var result = new MapField<string, int>();
+        for (var i = 0; i < Random.Next(17) + 5; i++)
+        {
+            result[Random.Next().ToString()] = Random.Next();
+        }
+
+        return result;
+    }
+
+    protected override MapField<string, int>[] TestValues => new[] { new MapField<string, int>(), CreateValue(), CreateValue(), CreateValue() };
+    protected override bool Equals(MapField<string, int> left, MapField<string, int> right) => object.ReferenceEquals(left, right) || left.SequenceEqual(right);
+}
+
+[Trait("Category", "BVT")]
+public class ByteStringCodecTests : FieldCodecTester<ByteString, ByteStringCodec>
+{
+    public ByteStringCodecTests(ITestOutputHelper output) : base(output)
+    {
+    }
+
+    protected override ByteString CreateValue() => Guid.NewGuid().ToByteString();
+
+    protected override bool Equals(ByteString left, ByteString right) => ReferenceEquals(left, right) || left.SequenceEqual(right);
+
+    protected override ByteString[] TestValues => new[]
+    {
+        ByteString.Empty,
+        ByteString.CopyFrom(Enumerable.Range(0, 4097).Select(b => unchecked((byte)b)).ToArray()),
+        CreateValue()
+    };
+}
+
+[Trait("Category", "BVT")]
+public class ByteStringCopierTests : CopierTester<ByteString, ByteStringCopier>
+{
+    public ByteStringCopierTests(ITestOutputHelper output) : base(output)
+    {
+    }
+
+    protected override ByteString CreateValue() => Guid.NewGuid().ToByteString();
+
+    protected override bool Equals(ByteString left, ByteString right) => ReferenceEquals(left, right) || left.SequenceEqual(right);
+
+    protected override ByteString[] TestValues => new[]
+    {
+        ByteString.Empty,
+        ByteString.CopyFrom(Enumerable.Range(0, 4097).Select(b => unchecked((byte)b)).ToArray()),
+        CreateValue()
     };
 }
 
