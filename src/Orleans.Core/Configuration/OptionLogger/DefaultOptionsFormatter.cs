@@ -10,7 +10,7 @@ namespace Orleans
     /// Default implementation of <see cref="IOptionFormatter{T}"/>.
     /// </summary>
     /// <typeparam name="T">The options type.</typeparam>
-    internal sealed class DefaultOptionsFormatter<T> : IOptionFormatter<T> where T : class, new()
+    internal sealed class DefaultOptionsFormatter<T> : IOptionFormatter<T> where T : class
     {
         private readonly T _options;
 
@@ -130,7 +130,7 @@ namespace Orleans
         }
     }
 
-    internal class DefaultOptionsFormatterResolver<T> : IOptionFormatterResolver<T> where T: class, new()
+    internal class DefaultOptionsFormatterResolver<T> : IOptionFormatterResolver<T> where T: class
     {
         private readonly IOptionsMonitor<T> _optionsMonitor;
 
