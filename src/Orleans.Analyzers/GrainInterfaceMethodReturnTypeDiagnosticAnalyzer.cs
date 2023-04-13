@@ -43,6 +43,10 @@ namespace Orleans.Analyzers
 
             if (symbol.ContainingType.TypeKind != TypeKind.Interface) return;
 
+            // allow static interface methods to return any type
+            if (symbol.IsStatic)
+                return;
+
             var isIAddressableInterface = false;
             foreach (var implementedInterface in symbol.ContainingType.AllInterfaces)
             {

@@ -66,4 +66,18 @@ public class GrainInterfaceMethodReturnTypeDiagnosticAnalyzerTest : DiagnosticAn
         Assert.Equal(DiagnosticSeverity.Error, diagnostic.Severity);
         Assert.Equal(MessageFormat, diagnostic.GetMessage());
     }
+
+    [Fact]
+    public async Task StaticInterfaceMethodsWithRegularReturnsAreAllowed()
+    {
+        var code = """
+                    public interface I : Orleans.IGrain
+                    {
+                        public static int GetSomeOtherThing(int a) => 0;
+                    }
+                    """;
+
+        var (diagnostics, _) = await this.GetDiagnosticsAsync(code, new string[0]);
+        Assert.Empty(diagnostics);
+    }
 }
