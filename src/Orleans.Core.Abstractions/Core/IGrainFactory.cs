@@ -10,53 +10,6 @@ namespace Orleans
     public interface IGrainFactory
     {
         /// <summary>
-        /// Gets a reference to a grain.
-        /// </summary>
-        /// <typeparam name="TGrainInterface">The interface type.</typeparam>
-        /// <param name="primaryKey">The primary key of the grain.</param>
-        /// <param name="grainClassNamePrefix">An optional class name prefix used to find the runtime type of the grain.</param>
-        /// <returns>A reference to the specified grain.</returns>
-        TGrainInterface GetGrain<TGrainInterface>(Guid primaryKey, string grainClassNamePrefix = null) where TGrainInterface : IGrainWithGuidKey;
-
-        /// <summary>
-        /// Gets a reference to a grain.
-        /// </summary>
-        /// <typeparam name="TGrainInterface">The interface type.</typeparam>
-        /// <param name="primaryKey">The primary key of the grain.</param>
-        /// <param name="grainClassNamePrefix">An optional class name prefix used to find the runtime type of the grain.</param>
-        /// <returns>A reference to the specified grain.</returns>
-        TGrainInterface GetGrain<TGrainInterface>(long primaryKey, string grainClassNamePrefix = null) where TGrainInterface : IGrainWithIntegerKey;
-
-        /// <summary>
-        /// Gets a reference to a grain.
-        /// </summary>
-        /// <typeparam name="TGrainInterface">The interface type.</typeparam>
-        /// <param name="primaryKey">The primary key of the grain.</param>
-        /// <param name="grainClassNamePrefix">An optional class name prefix used to find the runtime type of the grain.</param>
-        /// <returns>A reference to the specified grain.</returns>
-        TGrainInterface GetGrain<TGrainInterface>(string primaryKey, string grainClassNamePrefix = null) where TGrainInterface : IGrainWithStringKey;
-
-        /// <summary>
-        /// Gets a reference to a grain.
-        /// </summary>
-        /// <typeparam name="TGrainInterface">The interface type.</typeparam>
-        /// <param name="primaryKey">The primary key of the grain.</param>
-        /// <param name="keyExtension">The key extension of the grain.</param>
-        /// <param name="grainClassNamePrefix">An optional class name prefix used to find the runtime type of the grain.</param>
-        /// <returns>A reference to the specified grain.</returns>
-        TGrainInterface GetGrain<TGrainInterface>(Guid primaryKey, string keyExtension, string grainClassNamePrefix = null) where TGrainInterface : IGrainWithGuidCompoundKey;
-
-        /// <summary>
-        /// Gets a reference to a grain.
-        /// </summary>
-        /// <typeparam name="TGrainInterface">The interface type.</typeparam>
-        /// <param name="primaryKey">The primary key of the grain.</param>
-        /// <param name="keyExtension">The key extension of the grain.</param>
-        /// <param name="grainClassNamePrefix">An optional class name prefix used to find the runtime type of the grain.</param>
-        /// <returns>A reference to the specified grain.</returns>
-        TGrainInterface GetGrain<TGrainInterface>(long primaryKey, string keyExtension, string grainClassNamePrefix = null) where TGrainInterface : IGrainWithIntegerCompoundKey;
-
-        /// <summary>
         /// Creates a reference to the provided <paramref name="obj"/>.
         /// </summary>
         /// <typeparam name="TGrainObserverInterface">
@@ -77,82 +30,6 @@ namespace Orleans
         void DeleteObjectReference<TGrainObserverInterface>(IGrainObserver obj) where TGrainObserverInterface : IGrainObserver;
 
         /// <summary>
-        /// Returns a reference to the grain which is the primary implementation of the provided interface type and has the provided primary key.
-        /// </summary>
-        /// <param name="grainInterfaceType">
-        /// The grain interface type which the returned grain reference must implement.
-        /// </param>
-        /// <param name="grainPrimaryKey">
-        /// The primary key of the grain
-        /// </param>
-        /// <returns>
-        /// A reference to the grain which is the primary implementation of the provided interface type and has the provided primary key.
-        /// </returns>
-        IGrain GetGrain(Type grainInterfaceType, Guid grainPrimaryKey);
-
-        /// <summary>
-        /// Returns a reference to the grain which is the primary implementation of the provided interface type and has the provided primary key.
-        /// </summary>
-        /// <param name="grainInterfaceType">
-        /// The grain interface type which the returned grain reference must implement.
-        /// </param>
-        /// <param name="grainPrimaryKey">
-        /// The primary key of the grain
-        /// </param>
-        /// <returns>
-        /// A reference to the grain which is the primary implementation of the provided interface type and has the provided primary key.
-        /// </returns>
-        IGrain GetGrain(Type grainInterfaceType, long grainPrimaryKey);
-
-        /// <summary>
-        /// Returns a reference to the grain which is the primary implementation of the provided interface type and has the provided primary key.
-        /// </summary>
-        /// <param name="grainInterfaceType">
-        /// The grain interface type which the returned grain reference must implement.
-        /// </param>
-        /// <param name="grainPrimaryKey">
-        /// The primary key of the grain
-        /// </param>
-        /// <returns>
-        /// A reference to the grain which is the primary implementation of the provided interface type and has the provided primary key.
-        /// </returns>
-        IGrain GetGrain(Type grainInterfaceType, string grainPrimaryKey);
-
-        /// <summary>
-        /// Returns a reference to the grain which is the primary implementation of the provided interface type and has the provided primary key.
-        /// </summary>
-        /// <param name="grainInterfaceType">
-        /// The grain interface type which the returned grain reference must implement.
-        /// </param>
-        /// <param name="grainPrimaryKey">
-        /// The primary key of the grain
-        /// </param>
-        /// <param name="keyExtension">
-        /// The grain key extension component.
-        /// </param>
-        /// <returns>
-        /// A reference to the grain which is the primary implementation of the provided interface type and has the provided primary key.
-        /// </returns>
-        IGrain GetGrain(Type grainInterfaceType, Guid grainPrimaryKey, string keyExtension);
-
-        /// <summary>
-        /// Returns a reference to the grain which is the primary implementation of the provided interface type and has the provided primary key.
-        /// </summary>
-        /// <param name="grainInterfaceType">
-        /// The grain interface type which the returned grain reference must implement.
-        /// </param>
-        /// <param name="grainPrimaryKey">
-        /// The primary key of the grain
-        /// </param>
-        /// <param name="keyExtension">
-        /// The grain key extension component.
-        /// </param>
-        /// <returns>
-        /// A reference to the grain which is the primary implementation of the provided interface type and has the provided primary key.
-        /// </returns>
-        IGrain GetGrain(Type grainInterfaceType, long grainPrimaryKey, string keyExtension);
-
-        /// <summary>
         /// Returns a reference to the specified grain which implements the specified interface.
         /// </summary>
         /// <param name="grainId">
@@ -167,17 +44,6 @@ namespace Orleans
         TGrainInterface GetGrain<TGrainInterface>(GrainId grainId) where TGrainInterface : IAddressable;
 
         /// <summary>
-        /// Returns an untyped reference for the provided grain id.
-        /// </summary>
-        /// <param name="grainId">
-        /// The grain id.
-        /// </param>
-        /// <returns>
-        /// An untyped reference for the provided grain id.
-        /// </returns>
-        IAddressable GetGrain(GrainId grainId);
-
-        /// <summary>
         /// Returns a reference for the provided grain id which implements the specified interface type.
         /// </summary>
         /// <param name="grainId">
@@ -189,6 +55,18 @@ namespace Orleans
         /// <returns>
         /// A reference for the provided grain id which implements the specified interface type.
         /// </returns>
-        IAddressable GetGrain(GrainId grainId, GrainInterfaceType interfaceType);
+        IAddressable GetGrain(GrainId grainId, GrainInterfaceType interfaceType = default);
+
+        /// <summary>
+        /// Gets a grain reference which implements the specified grain interface type and has the specified grain key, without specifying the grain type directly.
+        /// </summary>
+        /// <remarks>
+        /// This method infers the most appropriate <see cref="GrainId.Type"/> value based on the <paramref name="interfaceType"/> argument and optional <paramref name="grainClassNamePrefix"/> argument.
+        /// </remarks>
+        /// <param name="interfaceType">The interface type which the returned grain reference will implement.</param>
+        /// <param name="grainKey">The <see cref="GrainId.Key"/> portion of the grain id.</param>
+        /// <param name="grainClassNamePrefix">An optional grain class name prefix.</param>
+        /// <returns>A grain reference which implements the provided interface.</returns>
+        IAddressable GetGrain(Type interfaceType, IdSpan grainKey, string grainClassNamePrefix);
     }
 }

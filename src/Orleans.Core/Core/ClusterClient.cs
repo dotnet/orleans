@@ -91,26 +91,6 @@ namespace Orleans
         }
 
         /// <inheritdoc />
-        public TGrainInterface GetGrain<TGrainInterface>(Guid primaryKey, string grainClassNamePrefix = null)
-            where TGrainInterface : IGrainWithGuidKey => _runtimeClient.InternalGrainFactory.GetGrain<TGrainInterface>(primaryKey, grainClassNamePrefix);
-
-        /// <inheritdoc />
-        public TGrainInterface GetGrain<TGrainInterface>(long primaryKey, string grainClassNamePrefix = null)
-            where TGrainInterface : IGrainWithIntegerKey => _runtimeClient.InternalGrainFactory.GetGrain<TGrainInterface>(primaryKey, grainClassNamePrefix);
-
-        /// <inheritdoc />
-        public TGrainInterface GetGrain<TGrainInterface>(string primaryKey, string grainClassNamePrefix = null)
-            where TGrainInterface : IGrainWithStringKey => _runtimeClient.InternalGrainFactory.GetGrain<TGrainInterface>(primaryKey, grainClassNamePrefix);
-
-        /// <inheritdoc />
-        public TGrainInterface GetGrain<TGrainInterface>(Guid primaryKey, string keyExtension, string grainClassNamePrefix = null)
-            where TGrainInterface : IGrainWithGuidCompoundKey => _runtimeClient.InternalGrainFactory.GetGrain<TGrainInterface>(primaryKey, keyExtension, grainClassNamePrefix);
-
-        /// <inheritdoc />
-        public TGrainInterface GetGrain<TGrainInterface>(long primaryKey, string keyExtension, string grainClassNamePrefix = null)
-            where TGrainInterface : IGrainWithIntegerCompoundKey => _runtimeClient.InternalGrainFactory.GetGrain<TGrainInterface>(primaryKey, keyExtension, grainClassNamePrefix);
-
-        /// <inheritdoc />
         public TGrainObserverInterface CreateObjectReference<TGrainObserverInterface>(IGrainObserver obj)
             where TGrainObserverInterface : IGrainObserver => ((IGrainFactory)_runtimeClient.InternalGrainFactory).CreateObjectReference<TGrainObserverInterface>(obj);
 
@@ -133,34 +113,14 @@ namespace Orleans
         TGrainInterface IGrainFactory.GetGrain<TGrainInterface>(GrainId grainId) => _runtimeClient.InternalGrainFactory.GetGrain<TGrainInterface>(grainId);
 
         /// <inheritdoc />
-        IAddressable IGrainFactory.GetGrain(GrainId grainId) => _runtimeClient.InternalGrainFactory.GetGrain(grainId);
-
-        /// <inheritdoc />
-        public IGrain GetGrain(Type grainInterfaceType, string grainPrimaryKey)
-            => _runtimeClient.InternalGrainFactory.GetGrain(grainInterfaceType, grainPrimaryKey);
-
-        /// <inheritdoc />
-        public IGrain GetGrain(Type grainInterfaceType, Guid grainPrimaryKey)
-            => _runtimeClient.InternalGrainFactory.GetGrain(grainInterfaceType, grainPrimaryKey);
-
-        /// <inheritdoc />
-        public IGrain GetGrain(Type grainInterfaceType, long grainPrimaryKey)
-            => _runtimeClient.InternalGrainFactory.GetGrain(grainInterfaceType, grainPrimaryKey);
-
-        /// <inheritdoc />
-        public IGrain GetGrain(Type grainInterfaceType, Guid grainPrimaryKey, string keyExtension)
-            => _runtimeClient.InternalGrainFactory.GetGrain(grainInterfaceType, grainPrimaryKey, keyExtension);
-
-        /// <inheritdoc />
-        public IGrain GetGrain(Type grainInterfaceType, long grainPrimaryKey, string keyExtension)
-            => _runtimeClient.InternalGrainFactory.GetGrain(grainInterfaceType, grainPrimaryKey, keyExtension);
-
-        /// <inheritdoc />
         public object Cast(IAddressable grain, Type outputGrainInterfaceType)
             => _runtimeClient.InternalGrainFactory.Cast(grain, outputGrainInterfaceType);
 
         /// <inheritdoc />
         public IAddressable GetGrain(GrainId grainId, GrainInterfaceType interfaceType)
             => _runtimeClient.InternalGrainFactory.GetGrain(grainId, interfaceType);
+
+        /// <inheritdoc />
+        public IAddressable GetGrain(Type interfaceType, IdSpan grainKey, string grainClassNamePrefix) => _runtimeClient.InternalGrainFactory.GetGrain(interfaceType, grainKey, grainClassNamePrefix);
     }
 }
