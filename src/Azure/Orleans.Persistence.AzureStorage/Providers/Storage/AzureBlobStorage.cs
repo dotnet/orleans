@@ -1,7 +1,5 @@
 using System;
 using System.Diagnostics;
-using System.IO;
-using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using Azure;
@@ -50,7 +48,7 @@ namespace Orleans.Storage
             var container = this.blobContainerFactory.GetBlobContainerClient(grainId);
 
             if (this.logger.IsEnabled(LogLevel.Trace)) this.logger.LogTrace((int)AzureProviderErrorCode.AzureBlobProvider_Storage_Reading,
-                "Reading: GrainType={GrainType} Grainid={GrainId} ETag={ETag} from BlobName={BlobName} in Container={ContainerName}",
+                "Reading: GrainType={GrainType} GrainId={GrainId} ETag={ETag} from BlobName={BlobName} in Container={ContainerName}",
                 grainType,
                 grainId,
                 grainState.ETag,
@@ -71,7 +69,7 @@ namespace Orleans.Storage
                 catch (RequestFailedException exception) when (exception.IsBlobNotFound())
                 {
                     if (this.logger.IsEnabled(LogLevel.Trace)) this.logger.LogTrace((int)AzureProviderErrorCode.AzureBlobProvider_BlobNotFound,
-                        "BlobNotFound reading: GrainType={GrainType} Grainid={GrainId} ETag={ETag} from BlobName={BlobName} in Container={ContainerName}",
+                        "BlobNotFound reading: GrainType={GrainType} GrainId={GrainId} ETag={ETag} from BlobName={BlobName} in Container={ContainerName}",
                         grainType,
                         grainId,
                         grainState.ETag,
@@ -82,7 +80,7 @@ namespace Orleans.Storage
                 catch (RequestFailedException exception) when (exception.IsContainerNotFound())
                 {
                     if (this.logger.IsEnabled(LogLevel.Trace)) this.logger.LogTrace((int)AzureProviderErrorCode.AzureBlobProvider_ContainerNotFound,
-                        "ContainerNotFound reading: GrainType={GrainType} Grainid={GrainId} ETag={ETag} from BlobName={BlobName} in Container={ContainerName}",
+                        "ContainerNotFound reading: GrainType={GrainType} GrainId={GrainId} ETag={ETag} from BlobName={BlobName} in Container={ContainerName}",
                         grainType,
                         grainId,
                         grainState.ETag,
@@ -94,7 +92,7 @@ namespace Orleans.Storage
                 if (contents == null) // TODO bpetit
                 {
                     if (this.logger.IsEnabled(LogLevel.Trace)) this.logger.LogTrace((int)AzureProviderErrorCode.AzureBlobProvider_BlobEmpty,
-                        "BlobEmpty reading: GrainType={GrainType} Grainid={GrainId} ETag={ETag} from BlobName={BlobName} in Container={ContainerName}",
+                        "BlobEmpty reading: GrainType={GrainType} GrainId={GrainId} ETag={ETag} from BlobName={BlobName} in Container={ContainerName}",
                         grainType,
                         grainId,
                         grainState.ETag,
@@ -112,7 +110,7 @@ namespace Orleans.Storage
                 grainState.State = loadedState ?? Activator.CreateInstance<T>();
 
                 if (this.logger.IsEnabled(LogLevel.Trace)) this.logger.LogTrace((int)AzureProviderErrorCode.AzureBlobProvider_Storage_DataRead,
-                    "Read: GrainType={GrainType} Grainid={GrainId} ETag={ETag} from BlobName={BlobName} in Container={ContainerName}",
+                    "Read: GrainType={GrainType} GrainId={GrainId} ETag={ETag} from BlobName={BlobName} in Container={ContainerName}",
                     grainType,
                     grainId,
                     grainState.ETag,
@@ -123,7 +121,7 @@ namespace Orleans.Storage
             {
                 logger.LogError((int)AzureProviderErrorCode.AzureBlobProvider_ReadError,
                     ex,
-                    "Error reading: GrainType={GrainType} Grainid={GrainId} ETag={ETag} from BlobName={BlobName} in Container={ContainerName}",
+                    "Error reading: GrainType={GrainType} GrainId={GrainId} ETag={ETag} from BlobName={BlobName} in Container={ContainerName}",
                     grainType,
                     grainId,
                     grainState.ETag,
