@@ -24,24 +24,21 @@ namespace Orleans.Storage
     {
         private ILogger logger;
         private readonly string name;
-        private AzureBlobStorageOptions options;
         private readonly IBlobContainerFactory blobContainerFactory;
+        private readonly AzureBlobStorageOptions options;
         private IGrainStorageSerializer grainStorageSerializer;
-        private readonly IServiceProvider services;
 
         /// <summary> Default constructor </summary>
         public AzureBlobGrainStorage(
             string name,
             AzureBlobStorageOptions options,
             IBlobContainerFactory blobContainerFactory,
-            IServiceProvider services,
             ILogger<AzureBlobGrainStorage> logger)
         {
             this.name = name;
             this.options = options;
             this.blobContainerFactory = blobContainerFactory;
             this.grainStorageSerializer = options.GrainStorageSerializer;
-            this.services = services;
             this.logger = logger;
         }
 
@@ -359,7 +356,7 @@ namespace Orleans.Storage
 
             var containerFactory = options.BuildContainerFactory(services, options);
 
-            return ActivatorUtilities.CreateInstance<AzureBlobGrainStorage>(services, name, containerFactory);
+            return ActivatorUtilities.CreateInstance<AzureBlobGrainStorage>(services, name, options, containerFactory);
         }
     }
 }
