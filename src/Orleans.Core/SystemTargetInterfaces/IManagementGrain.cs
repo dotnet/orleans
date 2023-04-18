@@ -30,7 +30,7 @@ namespace Orleans.Runtime
         /// Perform a run of the .NET garbage collector in the specified silos.
         /// </summary>
         /// <param name="hostsIds">List of silos this command is to be sent to.</param>
-        /// <returns>A <see cref="Task"/> represesnting the work performed.</returns>
+        /// <returns>A <see cref="Task"/> representing the work performed.</returns>
         Task ForceGarbageCollection(SiloAddress[] hostsIds);
 
         /// <summary>Perform a run of the Orleans activation collector in the specified silos.</summary>

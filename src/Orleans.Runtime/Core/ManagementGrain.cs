@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
+using Orleans.Concurrency;
 using Orleans.Metadata;
 using Orleans.Runtime.GrainDirectory;
 using Orleans.Runtime.MembershipService;
@@ -15,6 +16,7 @@ namespace Orleans.Runtime.Management
     /// <summary>
     /// Implementation class for the Orleans management grain.
     /// </summary>
+    [StatelessWorker, Reentrant]
     internal class ManagementGrain : Grain, IManagementGrain
     {
         private readonly IInternalGrainFactory internalGrainFactory;
