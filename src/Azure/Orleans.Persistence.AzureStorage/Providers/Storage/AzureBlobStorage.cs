@@ -1,7 +1,5 @@
 using System;
 using System.Diagnostics;
-using System.IO;
-using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using Azure;
@@ -24,24 +22,21 @@ namespace Orleans.Storage
     {
         private ILogger logger;
         private readonly string name;
-        private AzureBlobStorageOptions options;
         private readonly IBlobContainerFactory blobContainerFactory;
+        private readonly AzureBlobStorageOptions options;
         private IGrainStorageSerializer grainStorageSerializer;
-        private readonly IServiceProvider services;
 
         /// <summary> Default constructor </summary>
         public AzureBlobGrainStorage(
             string name,
             AzureBlobStorageOptions options,
             IBlobContainerFactory blobContainerFactory,
-            IServiceProvider services,
             ILogger<AzureBlobGrainStorage> logger)
         {
             this.name = name;
             this.options = options;
             this.blobContainerFactory = blobContainerFactory;
             this.grainStorageSerializer = options.GrainStorageSerializer;
-            this.services = services;
             this.logger = logger;
         }
 
@@ -53,7 +48,7 @@ namespace Orleans.Storage
             var container = this.blobContainerFactory.GetBlobContainerClient(grainId);
 
             if (this.logger.IsEnabled(LogLevel.Trace)) this.logger.LogTrace((int)AzureProviderErrorCode.AzureBlobProvider_Storage_Reading,
-                "Reading: GrainType={GrainType} Grainid={GrainId} ETag={ETag} from BlobName={BlobName} in Container={ContainerName}",
+                "Reading: GrainType={GrainType} GrainId={GrainId} ETag={ETag} from BlobName={BlobName} in Container={ContainerName}",
                 grainType,
                 grainId,
                 grainState.ETag,
@@ -74,7 +69,7 @@ namespace Orleans.Storage
                 catch (RequestFailedException exception) when (exception.IsBlobNotFound())
                 {
                     if (this.logger.IsEnabled(LogLevel.Trace)) this.logger.LogTrace((int)AzureProviderErrorCode.AzureBlobProvider_BlobNotFound,
-                        "BlobNotFound reading: GrainType={GrainType} Grainid={GrainId} ETag={ETag} from BlobName={BlobName} in Container={ContainerName}",
+                        "BlobNotFound reading: GrainType={GrainType} GrainId={GrainId} ETag={ETag} from BlobName={BlobName} in Container={ContainerName}",
                         grainType,
                         grainId,
                         grainState.ETag,
@@ -85,7 +80,7 @@ namespace Orleans.Storage
                 catch (RequestFailedException exception) when (exception.IsContainerNotFound())
                 {
                     if (this.logger.IsEnabled(LogLevel.Trace)) this.logger.LogTrace((int)AzureProviderErrorCode.AzureBlobProvider_ContainerNotFound,
-                        "ContainerNotFound reading: GrainType={GrainType} Grainid={GrainId} ETag={ETag} from BlobName={BlobName} in Container={ContainerName}",
+                        "ContainerNotFound reading: GrainType={GrainType} GrainId={GrainId} ETag={ETag} from BlobName={BlobName} in Container={ContainerName}",
                         grainType,
                         grainId,
                         grainState.ETag,
@@ -97,7 +92,7 @@ namespace Orleans.Storage
                 if (contents == null) // TODO bpetit
                 {
                     if (this.logger.IsEnabled(LogLevel.Trace)) this.logger.LogTrace((int)AzureProviderErrorCode.AzureBlobProvider_BlobEmpty,
-                        "BlobEmpty reading: GrainType={GrainType} Grainid={GrainId} ETag={ETag} from BlobName={BlobName} in Container={ContainerName}",
+                        "BlobEmpty reading: GrainType={GrainType} GrainId={GrainId} ETag={ETag} from BlobName={BlobName} in Container={ContainerName}",
                         grainType,
                         grainId,
                         grainState.ETag,
@@ -115,7 +110,7 @@ namespace Orleans.Storage
                 grainState.State = loadedState ?? Activator.CreateInstance<T>();
 
                 if (this.logger.IsEnabled(LogLevel.Trace)) this.logger.LogTrace((int)AzureProviderErrorCode.AzureBlobProvider_Storage_DataRead,
-                    "Read: GrainType={GrainType} Grainid={GrainId} ETag={ETag} from BlobName={BlobName} in Container={ContainerName}",
+                    "Read: GrainType={GrainType} GrainId={GrainId} ETag={ETag} from BlobName={BlobName} in Container={ContainerName}",
                     grainType,
                     grainId,
                     grainState.ETag,
@@ -126,7 +121,7 @@ namespace Orleans.Storage
             {
                 logger.LogError((int)AzureProviderErrorCode.AzureBlobProvider_ReadError,
                     ex,
-                    "Error reading: GrainType={GrainType} Grainid={GrainId} ETag={ETag} from BlobName={BlobName} in Container={ContainerName}",
+                    "Error reading: GrainType={GrainType} GrainId={GrainId} ETag={ETag} from BlobName={BlobName} in Container={ContainerName}",
                     grainType,
                     grainId,
                     grainState.ETag,
@@ -359,7 +354,7 @@ namespace Orleans.Storage
 
             var containerFactory = options.BuildContainerFactory(services, options);
 
-            return ActivatorUtilities.CreateInstance<AzureBlobGrainStorage>(services, name, containerFactory);
+            return ActivatorUtilities.CreateInstance<AzureBlobGrainStorage>(services, name, options, containerFactory);
         }
     }
 }
