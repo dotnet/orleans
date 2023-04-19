@@ -236,9 +236,9 @@ In-memory clustering example where everything is written in F#:
 
 - How to develop Orleans-based applications using F# end to end
 
-## [F# Reminder grain](https://github.com/PiotrJustyna/road-to-orleans/tree/main/1b#readme)
+## [F# Reminder](https://github.com/PiotrJustyna/road-to-orleans/tree/main/1b#readme)
 
-A silo with a reminder grain on a timer of 60s
+- How to use grain reminders in an F# grain
 
 ### Demonstrates
 
