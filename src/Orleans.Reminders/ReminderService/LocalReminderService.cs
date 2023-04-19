@@ -145,6 +145,19 @@ namespace Orleans.Runtime.ReminderService
             throw new ReminderException($"Could not register reminder {entry} to reminder table due to a race. Please try again later.");
         }
 
+        public async Task<bool> TryRegisterReminder(GrainId grainId, string reminderName, TimeSpan dueTime, TimeSpan period)
+        {
+
+            var reminderEntry = await reminderTable.ReadRow(grainId, reminderName);
+            if (reminderEntry == null)
+            {
+                await RegisterOrUpdateReminder(grainId, reminderName,  dueTime, period);
+                return true;
+            }
+
+            return false;
+        }
+
         /// <summary>
         /// Stop the reminder locally, and remove it from the external storage system
         /// </summary>

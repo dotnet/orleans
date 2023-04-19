@@ -25,6 +25,20 @@ namespace Orleans.Runtime.ReminderService
 
         public Task<IGrainReminder> RegisterOrUpdateReminder(GrainId callingGrainId, string reminderName, TimeSpan dueTime, TimeSpan period)
         {
+            ValidateParameters(reminderName, dueTime, period);
+            EnsureReminderServiceRegistered();
+            return GetGrainService(callingGrainId).RegisterOrUpdateReminder(callingGrainId, reminderName, dueTime, period);
+        }
+
+        public Task<bool> TryRegisterReminder(GrainId callingGrainId, string reminderName, TimeSpan dueTime, TimeSpan period)
+        {
+            ValidateParameters(reminderName, dueTime, period);
+            EnsureReminderServiceRegistered();
+            return GetGrainService(callingGrainId).TryRegisterReminder(callingGrainId, reminderName, dueTime, period);
+        }
+
+        private void ValidateParameters(string reminderName, TimeSpan dueTime, TimeSpan period)
+        {
             // Perform input volatility checks that are consistent with System.Threading.Timer
             // http://referencesource.microsoft.com/#mscorlib/system/threading/timer.cs,c454f2afe745d4d3,references
             if (dueTime.Ticks < 0 && dueTime != Timeout.InfiniteTimeSpan)
@@ -44,8 +58,6 @@ namespace Orleans.Runtime.ReminderService
             if (string.IsNullOrEmpty(reminderName))
                 throw new ArgumentException("Cannot use null or empty name for the reminder", nameof(reminderName));
 
-            EnsureReminderServiceRegistered();
-            return GetGrainService(callingGrainId).RegisterOrUpdateReminder(callingGrainId, reminderName, dueTime, period);
         }
 
         public Task UnregisterReminder(GrainId callingGrainId, IGrainReminder reminder)
