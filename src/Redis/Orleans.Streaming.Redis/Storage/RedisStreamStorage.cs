@@ -40,10 +40,13 @@ internal sealed class RedisStreamStorage
     {
         try
         {
-            _db = (await _redisOptions.CreateMultiplexer.Invoke(_redisOptions)).GetDatabase();
-            if (_redisOptions.EntryExpiry is { } expiry)
+            if (_db is null)
             {
-                await _db.KeyExpireAsync(_key, expiry);
+                _db = (await _redisOptions.CreateMultiplexer.Invoke(_redisOptions)).GetDatabase();
+                if (_redisOptions.EntryExpiry is { } expiry)
+                {
+                    await _db.KeyExpireAsync(_key, expiry);
+                }
             }
         }
         catch (Exception ex)
