@@ -26,13 +26,13 @@ internal sealed class RedisStreamAdapterReceiver : IQueueAdapterReceiver
         _queue = queue;
     }
 
-    public Task Initialize(TimeSpan timeout)
+    public async Task Initialize(TimeSpan timeout)
     {
         if (_queue != null) // check in case we already shut it down.
         {
-            return _queue.CreateGroupAsync();
+            await _queue.ConnectAsync();
+            await _queue.CreateGroupAsync();
         }
-        return Task.CompletedTask;
     }
 
     public async Task<IList<IBatchContainer>> GetQueueMessagesAsync(int maxCount)
