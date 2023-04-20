@@ -172,7 +172,7 @@ public sealed class RedisStreamTests : TestClusterPerTest
                     options.ConfigurationOptions = ConfigurationOptions.Parse(TestDefaultConfiguration.RedisConnectionString);
                     options.EntryExpiry = TimeSpan.FromHours(1);
                 })
-                .AddMemoryGrainStorage("ms", op => op.NumStorageGrains = 1);
+                .AddMemoryGrainStorage("MemoryStore", op => op.NumStorageGrains = 1);
         }
     }
 
