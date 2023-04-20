@@ -8,7 +8,7 @@ using Xunit;
 
 namespace Tester.Redis.Streaming;
 
-[TestCategory("Redis"), TestCategory("Streaming")]
+[TestCategory("Redis"), TestCategory("Streaming"), TestCategory("Functional")]
 public sealed class RedisStreamTests : TestClusterPerTest
 {
     public const string STREAM_PROVIDER_NAME = "RedisProvider";
