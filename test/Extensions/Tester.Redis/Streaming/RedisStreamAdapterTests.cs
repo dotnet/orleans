@@ -99,7 +99,7 @@ public sealed class RedisStreamTests : TestClusterPerTest
             var connection = await ConnectionMultiplexer.ConnectAsync(TestDefaultConfiguration.RedisConnectionString);
             foreach (var server in connection.GetServers())
             {
-                await foreach (var key in server.KeysAsync(pattern: $"{serviceId}/streaming/*"))
+                await foreach (var key in server.KeysAsync(pattern: $"{serviceId}/*"))
                 {
                     await connection.GetDatabase().KeyDeleteAsync(key);
                 }
@@ -127,16 +127,8 @@ public sealed class RedisStreamTests : TestClusterPerTest
                     options.ConfigurationOptions = ConfigurationOptions.Parse(TestDefaultConfiguration.RedisConnectionString);
                     options.EntryExpiry = TimeSpan.FromHours(1);
                 })
-                .AddRedisGrainStorage("MemoryStore", options =>
-                {
-                    options.ConfigurationOptions = ConfigurationOptions.Parse(TestDefaultConfiguration.RedisConnectionString);
-                    options.EntryExpiry = TimeSpan.FromHours(1);
-                })
-                .AddRedisGrainStorage("PubSubStore", options =>
-                {
-                    options.ConfigurationOptions = ConfigurationOptions.Parse(TestDefaultConfiguration.RedisConnectionString);
-                    options.EntryExpiry = TimeSpan.FromHours(1);
-                });
+                .AddMemoryGrainStorage("MemoryStore")
+                .AddMemoryGrainStorage("PubSubStore");
         }
     }
 
