@@ -107,8 +107,8 @@ internal sealed class RedisStreamStorage
     {
         const string DeliveredScript =
             """
-            local ack = redis.call('XACK', KEYS[1], ARGV[1], table.unpack(ARGV, 2))
-            local delete = redis.call('XDEL', KEYS[1], table.unpack(ARGV, 2))
+            local ack = redis.call('XACK', KEYS[1], ARGV[1], unpack(ARGV, 2))
+            local delete = redis.call('XDEL', KEYS[1], unpack(ARGV, 2))
             return { ack, delete }
             """;
 
