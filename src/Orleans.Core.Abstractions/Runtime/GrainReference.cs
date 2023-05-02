@@ -9,6 +9,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Orleans.CodeGeneration;
 using System.Text;
 using System.Diagnostics;
+using System.Collections.Generic;
 
 namespace Orleans.Runtime
 {
@@ -248,6 +249,7 @@ namespace Orleans.Runtime
     [DefaultInvokableBaseType(typeof(Task<>), typeof(TaskRequest<>))]
     [DefaultInvokableBaseType(typeof(Task), typeof(TaskRequest))]
     [DefaultInvokableBaseType(typeof(void), typeof(VoidRequest))]
+    [DefaultInvokableBaseType(typeof(IAsyncEnumerable<>), typeof(AsyncEnumerableRequest<>))]
     public class GrainReference : IAddressable, IEquatable<GrainReference>, ISpanFormattable
     {
         /// <summary>

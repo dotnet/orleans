@@ -310,6 +310,7 @@ namespace Orleans.Hosting
             services.AddTransient<IConfigurationValidator, DevelopmentClusterMembershipOptionsValidator>();
             services.AddTransient<IConfigurationValidator, GrainTypeOptionsValidator>();
             services.AddTransient<IValidateOptions<SiloMessagingOptions>, SiloMessagingOptionsValidator>();
+            services.AddTransient<IOptions<MessagingOptions>>(static sp => sp.GetRequiredService<IOptions<SiloMessagingOptions>>());
 
             // Enable hosted client.
             services.TryAddSingleton<HostedClient>();
@@ -344,6 +345,12 @@ namespace Orleans.Hosting
             services.TryAddSingleton<IGrainStorageSerializer, JsonGrainStorageSerializer>();
             services.TryAddSingleton<IPersistentStateFactory, PersistentStateFactory>();
             services.TryAddSingleton(typeof(IAttributeToFactoryMapper<PersistentStateAttribute>), typeof(PersistentStateAttributeMapper));
+
+            // IAsyncEnumerable support
+            services.AddScoped<IAsyncEnumerableGrainExtension, AsyncEnumerableGrainExtension>();
+            services.AddTransientKeyedService<Type, IGrainExtension>(
+                typeof(IAsyncEnumerableGrainExtension),
+                (sp, _) => sp.GetRequiredService<IAsyncEnumerableGrainExtension>());
 
             // Networking
             services.TryAddSingleton<ConnectionCommon>();

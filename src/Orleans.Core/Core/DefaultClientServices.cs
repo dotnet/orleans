@@ -86,6 +86,7 @@ namespace Orleans
             services.TryAddFromExisting<IClusterClient, ClusterClient>();
             services.TryAddFromExisting<IInternalClusterClient, ClusterClient>();
             services.AddFromExisting<IHostedService, ClusterClient>();
+            services.AddTransient<IOptions<MessagingOptions>>(static sp => sp.GetRequiredService<IOptions<ClientMessagingOptions>>());
 
             services.AddSingleton<IConfigureOptions<GrainTypeOptions>, DefaultGrainTypeOptionsProvider>();
             services.TryAddSingleton(typeof(IKeyedServiceCollection<,>), typeof(KeyedServiceCollection<,>));
