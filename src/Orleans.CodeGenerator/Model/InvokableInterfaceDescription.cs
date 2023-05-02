@@ -156,11 +156,25 @@ namespace Orleans.CodeGenerator
                         continue;
                     }
 
-                    if (!SymbolEqualityComparer.Default.Equals(method.Parameters[0].Type, l.IInvokable))
+                    var paramType = method.Parameters[0].Type;
+                    if (!SymbolEqualityComparer.Default.Equals(paramType, l.IInvokable))
                     {
-                        complaintMember = member;
-                        complaint = $"incorrect parameter type (found {method.Parameters[0].Type}, expected {l.IInvokable})";
-                        continue;
+                        var implementsIInvokable = false;
+                        foreach (var @interface in paramType.AllInterfaces)
+                        {
+                            if (SymbolEqualityComparer.Default.Equals(@interface, l.IInvokable))
+                            {
+                                implementsIInvokable = true;
+                                break;
+                            }
+                        }
+
+                        if (!implementsIInvokable)
+                        {
+                            complaintMember = member;
+                            complaint = $"incorrect parameter type (found {paramType}, expected {l.IInvokable} or a type which implements {l.IInvokable})";
+                            continue;
+                        }
                     }
 
                     var expectedReturnType = l.ValueTask_1.Construct(method.TypeParameters[0]);
@@ -216,11 +230,25 @@ namespace Orleans.CodeGenerator
                         continue;
                     }
 
-                    if (!SymbolEqualityComparer.Default.Equals(method.Parameters[0].Type, l.IInvokable))
+                    var paramType = method.Parameters[0].Type;
+                    if (!SymbolEqualityComparer.Default.Equals(paramType, l.IInvokable))
                     {
-                        complaintMember = member;
-                        complaint = $"incorrect parameter type (found {method.Parameters[0].Type}, expected {l.IInvokable})";
-                        continue;
+                        var implementsIInvokable = false;
+                        foreach (var @interface in paramType.AllInterfaces)
+                        {
+                            if (SymbolEqualityComparer.Default.Equals(@interface, l.IInvokable))
+                            {
+                                implementsIInvokable = true;
+                                break;
+                            }
+                        }
+
+                        if (!implementsIInvokable)
+                        {
+                            complaintMember = member;
+                            complaint = $"incorrect parameter type (found {method.Parameters[0].Type}, expected {l.IInvokable})";
+                            continue;
+                        }
                     }
 
                     if (!SymbolEqualityComparer.Default.Equals(method.ReturnType, l.ValueTask))

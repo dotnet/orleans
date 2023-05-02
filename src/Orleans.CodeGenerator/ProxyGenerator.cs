@@ -98,10 +98,16 @@ namespace Orleans.CodeGenerator
             MethodDeclarationSyntax CreateProxyMethod(MethodDescription methodDescription)
             {
                 var method = methodDescription.Method;
+                var (isAsync, body) = CreateAsyncProxyMethodBody(libraryTypes, fieldDescriptions, metadataModel, methodDescription);
                 var declaration = MethodDeclaration(method.ReturnType.ToTypeSyntax(methodDescription.TypeParameterSubstitutions), method.Name.EscapeIdentifier())
                     .AddParameterListParameters(method.Parameters.Select((p, i) => GetParameterSyntax(i, p, methodDescription.TypeParameterSubstitutions)).ToArray())
-                    .WithBody(
-                        CreateAsyncProxyMethodBody(libraryTypes, fieldDescriptions, metadataModel, methodDescription));
+                    .WithBody(body);
+
+                if (isAsync)
+                {
+                    declaration = declaration.WithModifiers(TokenList(Token(SyntaxKind.AsyncKeyword)));
+                }
+
                 if (methodDescription.HasCollision)
                 {
                     declaration = declaration.WithModifiers(TokenList(Token(SyntaxKind.PublicKeyword)));
@@ -133,7 +139,7 @@ namespace Orleans.CodeGenerator
             }
         }
 
-        private static BlockSyntax CreateAsyncProxyMethodBody(
+        private static (bool IsAsync, BlockSyntax body) CreateAsyncProxyMethodBody(
             LibraryTypes libraryTypes,
             List<GeneratedFieldDescription> fieldDescriptions,
             MetadataModel metadataModel,
@@ -248,24 +254,40 @@ namespace Orleans.CodeGenerator
                              ArgumentList(SeparatedList(new[] { Argument(requestVar) })));
 
             var rt = namedMethodReturnType.ConstructedFrom;
+            bool isAsync;
             if (SymbolEqualityComparer.Default.Equals(rt, libraryTypes.Task_1) || SymbolEqualityComparer.Default.Equals(methodReturnType, libraryTypes.Task))
             {
                 // C#: return <invocation>.AsTask()
                 statements.Add(ReturnStatement(InvocationExpression(invocationExpression.Member("AsTask"), ArgumentList())));
+                isAsync = false;
             }
             else if (SymbolEqualityComparer.Default.Equals(rt, libraryTypes.ValueTask_1) || SymbolEqualityComparer.Default.Equals(methodReturnType, libraryTypes.ValueTask))
             {
                 // ValueTask<T> / ValueTask
                 // C#: return <invocation>
                 statements.Add(ReturnStatement(invocationExpression));
+                isAsync = false;
+            }
+            else if (requestDescription.ReturnValueInitializerMethod is { } returnValueInitializerMethod)
+            {
+                // C#: return request.<returnValueInitializerMethod>(this);
+                statements.Add(ReturnStatement(InvocationExpression(requestVar.Member(returnValueInitializerMethod), ArgumentList(SingletonSeparatedList(Argument(ThisExpression()))))));
+                isAsync = false;
+            }
+            else if (rt.Arity == 0)
+            {
+                // C#: await <invocation>
+                statements.Add(ExpressionStatement(AwaitExpression(invocationExpression)));
+                isAsync = true;
             }
             else
             {
-                // C#: _ = <invocation>
-                statements.Add(ExpressionStatement(AssignmentExpression(SyntaxKind.SimpleAssignmentExpression, IdentifierName("_"), invocationExpression)));
+                // C#: return await <invocation>
+                statements.Add(ReturnStatement(AwaitExpression(invocationExpression)));
+                isAsync = true;
             }
 
-            return Block(statements);
+            return (isAsync, Block(statements));
         }
 
         private static MemberDeclarationSyntax[] GenerateConstructors(

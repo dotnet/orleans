@@ -536,7 +536,7 @@ namespace Orleans
         TValue ConvertFromSurrogate(in TSurrogate surrogate);
 
         /// <summary>
-        /// Converts a value to the valuetype.
+        /// Converts a value to the value type.
         /// </summary>
         /// <param name="value">The value.</param>
         /// <returns>The surrogate.</returns>
@@ -554,5 +554,27 @@ namespace Orleans
         /// <param name="surrogate">The surrogate.</param>
         /// <param name="value">The value.</param>
         void Populate(in TSurrogate surrogate, TValue value);
+    }
+}
+
+namespace Orleans.Invocation
+{
+    /// <summary>
+    /// Applied to invokable base types to indicate that instances of this type should be returned directly from generated proxy methods rather than being passed to
+    /// the proxy invoke method.
+    /// </summary>
+    /// <remarks>
+    /// This is used for types which should not be submitted to the remote target immediately, such as durable tasks, possibly async enumerables, and other types
+    /// which do not follow the typical request-response pattern.
+    /// </remarks>
+    [AttributeUsage(AttributeTargets.Class)]
+    public sealed class ReturnValueProxyAttribute : Attribute
+    {
+        public ReturnValueProxyAttribute(string initializerMethodName)
+        {
+            InitializerMethodName = initializerMethodName;
+        }
+
+        public string InitializerMethodName { get; }
     }
 }
