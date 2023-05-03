@@ -419,6 +419,15 @@ namespace Orleans.Runtime
         {
             return this.Runtime.InvokeMethodAsync(this, methodDescription, methodDescription.Options);
         }
+
+        /// <summary>
+        /// Invokes the provided method.
+        /// </summary>
+        /// <param name="methodDescription">The method description.</param>
+        protected void Invoke(IRequest methodDescription)
+        {
+            this.Runtime.InvokeMethod(this, methodDescription, methodDescription.Options);
+        }
     }
 
     public interface IRequest : IInvokable
