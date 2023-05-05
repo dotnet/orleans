@@ -448,11 +448,14 @@ namespace Orleans.Runtime
                     }
                 }
 
-                logger.LogInformation(
-                    (int)ErrorCode.Catalog_SiloStatusChangeNotification,
-                    "Catalog is deactivating {Count} activations due to a failure of silo {Silo}, since it is a primary directory partition to these grain ids.",
-                    activationsToShutdown.Count,
-                    updatedSilo.ToStringWithHashCode());
+                if (activationsToShutdown.Count > 0)
+                {
+                    logger.LogInformation(
+                        (int)ErrorCode.Catalog_SiloStatusChangeNotification,
+                        "Catalog is deactivating {Count} activations due to a failure of silo {Silo}, since it is a primary directory partition to these grain ids.",
+                        activationsToShutdown.Count,
+                        updatedSilo.ToStringWithHashCode());
+                }
             }
             finally
             {

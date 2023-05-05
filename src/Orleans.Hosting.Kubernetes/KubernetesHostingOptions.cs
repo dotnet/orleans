@@ -69,6 +69,11 @@ namespace Orleans.Hosting.Kubernetes
         public int MaxAgents { get; set; } = 2;
 
         /// <summary>
+        /// Gets or sets the maximum number of attempts to retry Kubernetes API calls.
+        /// </summary>
+        public int MaxKubernetesApiRetryAttempts { get; set; } = 10;
+
+        /// <summary>
         /// Whether or not to delete pods which correspond to silos which have become defunct since this silo became active.
         /// </summary>
         public bool DeleteDefunctSiloPods { get; set; } = false;
