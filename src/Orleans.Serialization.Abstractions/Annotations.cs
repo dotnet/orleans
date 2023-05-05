@@ -560,13 +560,9 @@ namespace Orleans
 namespace Orleans.Invocation
 {
     /// <summary>
-    /// Applied to invokable base types to indicate that instances of this type should be returned directly from generated proxy methods rather than being passed to
-    /// the proxy invoke method.
+    /// Applied to invokable base types (see TaskRequest) to indicate that instances of derived types should be returned directly from generated proxy methods rather than being passed to
+    /// the runtime for invocation. This is used to support calling patterns other than request-response, such as streaming.
     /// </summary>
-    /// <remarks>
-    /// This is used for types which should not be submitted to the remote target immediately, such as durable tasks, possibly async enumerables, and other types
-    /// which do not follow the typical request-response pattern.
-    /// </remarks>
     [AttributeUsage(AttributeTargets.Class)]
     public sealed class ReturnValueProxyAttribute : Attribute
     {
@@ -575,6 +571,9 @@ namespace Orleans.Invocation
             InitializerMethodName = initializerMethodName;
         }
 
+        /// <summary>
+        /// The name of the method to 
+        /// </summary>
         public string InitializerMethodName { get; }
     }
 }

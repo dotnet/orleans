@@ -430,6 +430,9 @@ namespace Orleans.Runtime
         }
     }
 
+    /// <summary>
+    /// Represents a request to invoke a method on a grain.
+    /// </summary>
     public interface IRequest : IInvokable
     {
         /// <summary>
