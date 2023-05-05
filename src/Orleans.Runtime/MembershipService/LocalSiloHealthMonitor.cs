@@ -166,7 +166,7 @@ namespace Orleans.Runtime.MembershipService
                 if (membershipEntry.Status != SiloStatus.Active)
                 {
                     _log.LogWarning("This silo is not active (Status: {Status}) and is therefore not healthy.", membershipEntry.Status);
-                    complaints?.Add($"This silo is not active (Status: {membershipEntry.Status} and is therefore not healthy.");
+                    complaints?.Add($"This silo is not active (Status: {membershipEntry.Status}) and is therefore not healthy.");
 
                     score = MaxScore;
                 }
