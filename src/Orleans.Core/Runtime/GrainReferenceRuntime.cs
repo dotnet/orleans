@@ -5,6 +5,7 @@ using Orleans.Serialization;
 using Orleans.Serialization.Invocation;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Threading.Tasks;
 
@@ -64,6 +65,22 @@ namespace Orleans.Runtime
             else
             {
                 return InvokeMethodWithFiltersAsync(reference, request, options);
+            }
+        }
+
+        public void InvokeMethod(GrainReference reference, IInvokable request, InvokeMethodOptions options)
+        {
+            Debug.Assert((options & InvokeMethodOptions.OneWay) != 0);
+
+            // TODO: Remove expensive interface type check
+            if (filters.Length == 0 && request is not IOutgoingGrainCallFilter)
+            {
+                SetGrainCancellationTokensTarget(reference, request);
+                this.RuntimeClient.SendRequest(reference, request, context: null, options);
+            }
+            else
+            {
+                InvokeMethodWithFiltersAsync(reference, request, options).AsTask().Ignore();
             }
         }
 

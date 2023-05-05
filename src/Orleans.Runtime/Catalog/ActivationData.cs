@@ -215,6 +215,11 @@ namespace Orleans.Runtime
             {
                 result = (TComponent)resultObj;
             }
+            else if (ActivationServices.GetService<TComponent>() is { } component)
+            {
+                SetComponent(component);
+                result = component;
+            }
             else
             {
                 result = _shared.GetComponent<TComponent>();

@@ -5,7 +5,6 @@
     <TargetFrameworks>$(TestTargetFrameworks);netcoreapp3.1</TargetFrameworks>
     <GenerateBindingRedirectsOutputType>true</GenerateBindingRedirectsOutputType>
     <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
-    <EmitCompilerGeneratedFiles>true</EmitCompilerGeneratedFiles>
     <ImplicitUsings>disable</ImplicitUsings>
   </PropertyGroup>
 

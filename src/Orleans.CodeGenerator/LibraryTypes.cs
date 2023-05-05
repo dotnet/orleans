@@ -45,6 +45,7 @@ namespace Orleans.CodeGenerator
                 DefaultInvokableBaseTypeAttribute = Type("Orleans.DefaultInvokableBaseTypeAttribute"),
                 GenerateCodeForDeclaringAssemblyAttribute = Type("Orleans.GenerateCodeForDeclaringAssemblyAttribute"),
                 InvokableBaseTypeAttribute = Type("Orleans.InvokableBaseTypeAttribute"),
+                ReturnValueProxyAttribute = Type("Orleans.Invocation.ReturnValueProxyAttribute"),
                 RegisterSerializerAttribute = Type("Orleans.RegisterSerializerAttribute"),
                 GeneratedActivatorConstructorAttribute = Type("Orleans.GeneratedActivatorConstructorAttribute"),
                 SerializerTransparentAttribute = Type("Orleans.SerializerTransparentAttribute"),
@@ -297,6 +298,7 @@ namespace Orleans.CodeGenerator
         public INamedTypeSymbol InvokeMethodNameAttribute { get; private set; }
         public INamedTypeSymbol InvokableCustomInitializerAttribute { get; private set; }
         public INamedTypeSymbol InvokableBaseTypeAttribute { get; private set; }
+        public INamedTypeSymbol ReturnValueProxyAttribute { get; private set; }
         public INamedTypeSymbol DefaultInvokableBaseTypeAttribute { get; private set; }
         public INamedTypeSymbol GenerateCodeForDeclaringAssemblyAttribute { get; private set; }
         public INamedTypeSymbol SerializationCallbacksAttribute { get; private set; }
