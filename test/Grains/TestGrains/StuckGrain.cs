@@ -20,6 +20,9 @@ namespace UnitTests.Grains
         private readonly ILogger<StuckGrain> _log;
         private bool isDeactivatingBlocking = false;
 
+        private static ConcurrentDictionary<GrainId, ManualResetEventSlim> blockingMREMap =
+            new ConcurrentDictionary<GrainId, ManualResetEventSlim>();
+
         public StuckGrain(ILogger<StuckGrain> log)
         {
             _log = log;
@@ -36,6 +39,33 @@ namespace UnitTests.Grains
                 tcss.Remove(key);
                 return true;
             }
+        }
+
+        public static Task WaitForDeactivationStart(GrainId key)
+        {
+            if (!blockingMREMap.TryGetValue(key, out var mre) || mre == null)
+                throw new InvalidOperationException();
+
+
+            return Task.Run(() => mre.Wait(1000));
+        }
+
+        public static void SetDeactivationStarted(GrainId key)
+        {
+            if (!blockingMREMap.TryGetValue(key, out var mre) || mre == null)
+                return;
+
+            mre.Set();
+        }
+
+        public static void BlockCallingTestUntilDeactivation(GrainId key)
+        {
+            if (!blockingMREMap.TryGetValue(key, out var mre) || mre == null)
+                mre = new ManualResetEventSlim(false);
+            else if (mre != null)
+                mre.Reset();
+
+            blockingMREMap[key] = mre;
         }
 
         public static bool IsActivated(Guid key)
@@ -77,6 +107,7 @@ namespace UnitTests.Grains
         public Task BlockingDeactivation()
         {
             isDeactivatingBlocking = true;
+            BlockCallingTestUntilDeactivation(this.GetGrainId());
             DeactivateOnIdle();
             return Task.CompletedTask;
         }
@@ -116,6 +147,7 @@ namespace UnitTests.Grains
         {
             _log.LogInformation(reason.Exception, "Deactivating ReasonCode: {ReasonCode} Description: {ReasonText}", reason.ReasonCode, reason.Description);
 
+            SetDeactivationStarted(this.GetGrainId());
             if (isDeactivatingBlocking) return RunForever();
 
             var key = this.GetPrimaryKey();

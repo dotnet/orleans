@@ -2,7 +2,7 @@
   <PropertyGroup>
     <PackageId>Microsoft.Orleans.Reminders</PackageId>
     <Title>Microsoft Orleans Reminders Library</Title>
-    <Description>Reminders library for Microsoft Orleans used both on the server.</Description>
+    <Description>Reminders library for Microsoft Orleans used on the server.</Description>
     <TargetFrameworks>$(DefaultTargetFrameworks)</TargetFrameworks>
     <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
     <ProduceReferenceAssembly>false</ProduceReferenceAssembly>

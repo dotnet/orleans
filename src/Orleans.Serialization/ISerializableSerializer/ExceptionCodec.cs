@@ -3,6 +3,7 @@ using System.Buffers;
 using System.Collections;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.Runtime.CompilerServices;
 using System.Runtime.ExceptionServices;
 using System.Runtime.Serialization;
 using Microsoft.Extensions.Options;
@@ -378,7 +379,7 @@ namespace Orleans.Serialization
                     }
                     else
                     {
-                        result = (Exception)FormatterServices.GetUninitializedObject(type);
+                        result = (Exception)RuntimeHelpers.GetUninitializedObject(type);
                     }
                 }
                 catch (Exception constructorException)

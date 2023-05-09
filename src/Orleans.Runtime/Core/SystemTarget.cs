@@ -60,7 +60,7 @@ namespace Orleans.Runtime
         GrainAddress IGrainContext.Address => this.ActivationAddress;
 
         private RuntimeMessagingTrace MessagingTrace => this.messagingTrace ??= this.RuntimeClient.ServiceProvider.GetRequiredService<RuntimeMessagingTrace>();
-        
+
         /// <summary>Only needed to make Reflection happy.</summary>
         protected SystemTarget()
         {
@@ -276,6 +276,7 @@ namespace Orleans.Runtime
             switch (msg.Direction)
             {
                 case Message.Directions.Request:
+                case Message.Directions.OneWay:
                     {
                         this.MessagingTrace.OnEnqueueMessageOnActivation(msg, this);
                         var workItem = new RequestWorkItem(this, msg);

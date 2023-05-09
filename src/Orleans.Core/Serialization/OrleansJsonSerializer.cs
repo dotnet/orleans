@@ -292,7 +292,7 @@ namespace Orleans.Serialization
         /// <inheritdoc/>
         public override void WriteJson(JsonWriter writer, object value, JsonSerializer serializer)
         {
-            var val = (GrainReference)value;
+            var val = ((IAddressable)value).AsReference();  
             writer.WriteStartObject();
             writer.WritePropertyName("Id");
             writer.WriteStartObject();

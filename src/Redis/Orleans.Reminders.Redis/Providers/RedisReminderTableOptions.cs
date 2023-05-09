@@ -1,5 +1,6 @@
 using System;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Options;
 using Orleans.Reminders.Redis;
 using Orleans.Runtime;
 using StackExchange.Redis;
@@ -46,9 +47,9 @@ namespace Orleans.Configuration
     {
         private readonly RedisReminderTableOptions _options;
 
-        public RedisReminderTableOptionsValidator(RedisReminderTableOptions options)
+        public RedisReminderTableOptionsValidator(IOptions<RedisReminderTableOptions> options)
         {
-            _options = options;
+            _options = options.Value;
         }
 
         public void ValidateConfiguration()

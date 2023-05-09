@@ -6,6 +6,7 @@ using Orleans.Serialization.WireProtocol;
 using System;
 using System.Buffers;
 using System.Collections.Concurrent;
+using System.Runtime.CompilerServices;
 using System.Runtime.Serialization;
 using System.Security;
 
@@ -124,7 +125,7 @@ namespace Orleans.Serialization
             var callbacks = _serializationCallbacks.GetReferenceTypeCallbacks(type);
 
             var info = new SerializationInfo(type, _formatterConverter);
-            var result = FormatterServices.GetUninitializedObject(type);
+            var result = RuntimeHelpers.GetUninitializedObject(type);
             ReferenceCodec.RecordObject(reader.Session, result, placeholderReferenceId);
             callbacks.OnDeserializing?.Invoke(result, _streamingContext);
 

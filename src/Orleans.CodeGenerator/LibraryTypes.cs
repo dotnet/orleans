@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
 using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
 using Orleans.CodeGenerator.SyntaxGeneration;
 
 namespace Orleans.CodeGenerator
@@ -39,11 +40,12 @@ namespace Orleans.CodeGenerator
                 AliasAttribute = Type("Orleans.AliasAttribute"),
                 IInvokable = Type("Orleans.Serialization.Invocation.IInvokable"),
                 InvokeMethodNameAttribute = Type("Orleans.InvokeMethodNameAttribute"),
-                FormatterServices = Type("System.Runtime.Serialization.FormatterServices"),
+                RuntimeHelpers = Type("System.Runtime.CompilerServices.RuntimeHelpers"),
                 InvokableCustomInitializerAttribute = Type("Orleans.InvokableCustomInitializerAttribute"),
                 DefaultInvokableBaseTypeAttribute = Type("Orleans.DefaultInvokableBaseTypeAttribute"),
                 GenerateCodeForDeclaringAssemblyAttribute = Type("Orleans.GenerateCodeForDeclaringAssemblyAttribute"),
                 InvokableBaseTypeAttribute = Type("Orleans.InvokableBaseTypeAttribute"),
+                ReturnValueProxyAttribute = Type("Orleans.Invocation.ReturnValueProxyAttribute"),
                 RegisterSerializerAttribute = Type("Orleans.RegisterSerializerAttribute"),
                 GeneratedActivatorConstructorAttribute = Type("Orleans.GeneratedActivatorConstructorAttribute"),
                 SerializerTransparentAttribute = Type("Orleans.SerializerTransparentAttribute"),
@@ -178,6 +180,8 @@ namespace Orleans.CodeGenerator
                     Type("System.Collections.Immutable.ImmutableSortedSet`1"),
                     Type("System.Collections.Immutable.ImmutableStack`1"),
                 },
+
+                LanguageVersion = (compilation.SyntaxTrees.FirstOrDefault()?.Options as CSharpParseOptions)?.LanguageVersion
             };
 
             INamedTypeSymbol Type(string metadataName)
@@ -294,6 +298,7 @@ namespace Orleans.CodeGenerator
         public INamedTypeSymbol InvokeMethodNameAttribute { get; private set; }
         public INamedTypeSymbol InvokableCustomInitializerAttribute { get; private set; }
         public INamedTypeSymbol InvokableBaseTypeAttribute { get; private set; }
+        public INamedTypeSymbol ReturnValueProxyAttribute { get; private set; }
         public INamedTypeSymbol DefaultInvokableBaseTypeAttribute { get; private set; }
         public INamedTypeSymbol GenerateCodeForDeclaringAssemblyAttribute { get; private set; }
         public INamedTypeSymbol SerializationCallbacksAttribute { get; private set; }
@@ -301,7 +306,9 @@ namespace Orleans.CodeGenerator
         public INamedTypeSymbol SerializerTransparentAttribute { get; private set; }
         public INamedTypeSymbol FSharpCompilationMappingAttributeOrDefault { get; private set; }
         public INamedTypeSymbol FSharpSourceConstructFlagsOrDefault { get; private set; }
-        public INamedTypeSymbol FormatterServices { get; private set; }
+        public INamedTypeSymbol RuntimeHelpers { get; private set; }
+
+        public LanguageVersion? LanguageVersion { get; private set; }
 
         private readonly ConcurrentDictionary<ITypeSymbol, bool> _shallowCopyableTypes = new(SymbolEqualityComparer.Default);
 
@@ -445,5 +452,7 @@ namespace Orleans.CodeGenerator
 
             return null;
         }
+
+        public static bool HasScopedKeyword(this LibraryTypes libraryTypes) => libraryTypes.LanguageVersion is null or >= LanguageVersion.CSharp11;
     }
 }

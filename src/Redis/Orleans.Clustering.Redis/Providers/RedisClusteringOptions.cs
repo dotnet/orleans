@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Options;
 using Orleans.Runtime;
 using StackExchange.Redis;
 using System;
@@ -48,9 +49,9 @@ namespace Orleans.Clustering.Redis
     {
         private readonly RedisClusteringOptions _options;
 
-        public RedisClusteringOptionsValidator(RedisClusteringOptions options)
+        public RedisClusteringOptionsValidator(IOptions<RedisClusteringOptions> options)
         {
-            _options = options;
+            _options = options.Value;
         }
 
         /// <inheritdoc/>

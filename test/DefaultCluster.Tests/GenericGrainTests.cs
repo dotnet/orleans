@@ -92,6 +92,35 @@ namespace DefaultCluster.Tests.General
             Assert.Equal(setValue, result);            
         }
 
+        [Fact, TestCategory("BVT"), TestCategory("Generics")]
+        public async Task GenericGrainTests_SimpleGenericGrainGetGrain_ArrayTypeParameter()
+        {
+            var grain = GetGrain<ISimpleGenericGrain<int[]>>();
+
+            var expected = new[] { 1, 2, 3 };
+            await grain.Set(expected);
+
+            // generic grain implementation does not change the set value:
+            await grain.Transform();
+            
+            var result = await grain.Get();
+            
+            Assert.Equal(expected, result);            
+        }
+
+        [Fact, TestCategory("BVT"), TestCategory("Generics")]
+        public async Task GenericGrainTests_GenericGrainInheritingArray()
+        {
+            var grain = GetGrain<IGenericArrayRegisterGrain<int>>();
+
+            var expected = new[] { 1, 2, 3 };
+            await grain.Set(expected);
+
+            var result = await grain.Get();
+            
+            Assert.Equal(expected, result);            
+        }
+
         /// Can instantiate grains that implement generic interfaces with generic type parameters
         [Fact, TestCategory("BVT"), TestCategory("Generics")]
         public async Task GenericGrainTests_GenericInterfaceWithGenericParametersGetGrain()

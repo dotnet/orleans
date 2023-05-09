@@ -10,7 +10,7 @@ namespace Orleans.Internal
         public static TimeSpan Next(TimeSpan timeSpan)
         {
             if (timeSpan.Ticks <= 0) throw new ArgumentOutOfRangeException(nameof(timeSpan), timeSpan, "TimeSpan must be positive.");
-            return timeSpan.Multiply(Random.Shared.NextDouble());
+            return TimeSpan.FromTicks(Random.Shared.NextInt64(timeSpan.Ticks));
         }
 
         public static TimeSpan Next(TimeSpan minValue, TimeSpan maxValue)

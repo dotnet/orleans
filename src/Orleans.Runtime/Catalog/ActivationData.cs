@@ -215,6 +215,11 @@ namespace Orleans.Runtime
             {
                 result = (TComponent)resultObj;
             }
+            else if (ActivationServices.GetService<TComponent>() is { } component)
+            {
+                SetComponent(component);
+                result = component;
+            }
             else
             {
                 result = _shared.GetComponent<TComponent>();
@@ -657,9 +662,10 @@ namespace Orleans.Runtime
 
         bool IActivationWorkingSetMember.IsCandidateForRemoval(bool wouldRemove)
         {
+            const int IdlenessLowerBound = 10_000;
             lock (this)
             {
-                var inactive = IsInactive;
+                var inactive = IsInactive && _idleDuration.ElapsedMilliseconds > IdlenessLowerBound;
 
                 // This instance will remain in the working set if it is either not pending removal or if it is currently active.
                 _isInWorkingSet = !wouldRemove || !inactive;

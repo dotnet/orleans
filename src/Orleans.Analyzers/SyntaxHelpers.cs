@@ -9,19 +9,24 @@ namespace Orleans.Analyzers
 {
     internal static class SyntaxHelpers
     {
-        public static string GetTypeName(this AttributeSyntax attributeSyntax) => attributeSyntax.Name switch
+        public static bool TryGetTypeName(this AttributeSyntax attributeSyntax, out string typeName)
         {
-            IdentifierNameSyntax id => id.Identifier.Text,
-            QualifiedNameSyntax qualified => qualified.Right.Identifier.Text,
-            _ => throw new NotSupportedException()
-        };
+            typeName = attributeSyntax.Name switch
+            {
+                IdentifierNameSyntax id => id.Identifier.Text,
+                QualifiedNameSyntax qualified => qualified.Right.Identifier.Text,
+                GenericNameSyntax generic => generic.Identifier.Text,
+                AliasQualifiedNameSyntax aliased => aliased.Name.Identifier.Text,
+                _ => null
+            };
 
-        public static bool IsAttribute(this AttributeSyntax attributeSyntax, string attributeName)
-        {
-            var name = attributeSyntax.GetTypeName();
-            return string.Equals(name, attributeName, StringComparison.Ordinal)
-                || (name.StartsWith(attributeName, StringComparison.Ordinal) && name.EndsWith(nameof(Attribute), StringComparison.Ordinal) && name.Length == attributeName.Length + nameof(Attribute).Length);
+            return typeName != null;
         }
+
+        public static bool IsAttribute(this AttributeSyntax attributeSyntax, string attributeName) =>
+            attributeSyntax.TryGetTypeName(out var name) &&
+            (string.Equals(name, attributeName, StringComparison.Ordinal)
+             || (name.StartsWith(attributeName, StringComparison.Ordinal) && name.EndsWith(nameof(Attribute), StringComparison.Ordinal) && name.Length == attributeName.Length + nameof(Attribute).Length));
 
         public static bool HasAttribute(this MemberDeclarationSyntax member, string attributeName)
         {
@@ -70,7 +75,7 @@ namespace Orleans.Analyzers
 
             return null;
         }
-        
+
         public static bool IsAbstract(this MemberDeclarationSyntax member) => member.HasModifier(SyntaxKind.AbstractKeyword);
 
         public static bool IsStatic(this MemberDeclarationSyntax member) => member.HasModifier(SyntaxKind.StaticKeyword);
@@ -80,7 +85,7 @@ namespace Orleans.Analyzers
             foreach (var modifier in member.Modifiers)
             {
                 var kind = modifier.Kind();
-                if (kind == modifierKind) 
+                if (kind == modifierKind)
                 {
                     return true;
                 }

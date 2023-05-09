@@ -231,7 +231,15 @@ namespace UnitTests.GrainInterfaces
     public interface IGenericCastableGrain<T> : IGrainWithGuidKey
     { }
 
+    public interface IGenericRegisterGrain<T> : IGrainWithIntegerKey
+    {
+        Task Set(T value);
+        Task<T> Get();
+    }
 
+    public interface IGenericArrayRegisterGrain<T> : IGenericRegisterGrain<T[]>
+    {
+    }
 
     public interface IGrainSayingHello : IGrainWithGuidKey
     {
@@ -253,8 +261,6 @@ namespace UnitTests.GrainInterfaces
     { }
 
 
-
-
     namespace Generic.EdgeCases
     {
         public interface IBasicGrain : IGrainWithGuidKey
@@ -273,14 +279,11 @@ namespace UnitTests.GrainInterfaces
         public interface IGrainReceivingRepeatedGenArgs<T1, T2> : IBasicGrain
         { }
 
-
         public interface IPartiallySpecifyingInterface<T> : IGrainWithTwoGenArgs<T, int>
         { }
 
-
         public interface IReceivingRepeatedGenArgsAmongstOthers<T1, T2, T3> : IBasicGrain
         { }
-
 
         public interface IReceivingRepeatedGenArgsFromOtherInterface<T1, T2, T3> : IBasicGrain
         { }
@@ -288,11 +291,8 @@ namespace UnitTests.GrainInterfaces
         public interface ISpecifyingGenArgsRepeatedlyToParentInterface<T> : IReceivingRepeatedGenArgsFromOtherInterface<T, T, T>
         { }
 
-
         public interface IReceivingRearrangedGenArgs<T1, T2> : IBasicGrain
         { }
-
-
 
         public interface IReceivingRearrangedGenArgsViaCast<T1, T2> : IBasicGrain
         { }
@@ -300,13 +300,11 @@ namespace UnitTests.GrainInterfaces
         public interface ISpecifyingRearrangedGenArgsToParentInterface<T1, T2> : IReceivingRearrangedGenArgsViaCast<T2, T1>
         { }
 
-
         public interface IArbitraryInterface<T1, T2> : IBasicGrain
         { }
 
         public interface IInterfaceUnrelatedToConcreteGenArgs<T> : IBasicGrain
         { }
-
 
         public interface IInterfaceTakingFurtherSpecializedGenArg<T> : IBasicGrain
         { }
