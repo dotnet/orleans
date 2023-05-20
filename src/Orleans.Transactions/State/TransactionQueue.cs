@@ -9,6 +9,7 @@ using Orleans.Transactions.Abstractions;
 using Orleans.Storage;
 using Orleans.Configuration;
 using Orleans.Timers.Internal;
+using System.Runtime.CompilerServices;
 
 namespace Orleans.Transactions.State
 {
@@ -426,7 +427,23 @@ namespace Orleans.Transactions.State
         /// <returns></returns>
         public Task Ready()
         {
-            return this.readyTask;
+            if (this.readyTask.Status == TaskStatus.RanToCompletion)
+            {
+                return readyTask;
+            }
+            return ReadyAsync();
+            async Task ReadyAsync()
+            {
+                try
+                {
+                    await readyTask;
+                }
+                catch (Exception exception)
+                {
+                    logger.LogWarning(exception, "Exception in TransactionQueue");
+                    await AbortAndRestore(TransactionalStatus.UnknownException, exception);
+                }
+            }
         }
 
         private async Task Restore()
