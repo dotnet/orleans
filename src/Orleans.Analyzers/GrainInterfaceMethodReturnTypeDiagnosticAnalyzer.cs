@@ -17,6 +17,7 @@ namespace Orleans.Analyzers
             (new [] { "System", "Threading", "Tasks" }, "Task`1"),
             (new [] { "System", "Threading", "Tasks" }, "ValueTask"),
             (new [] { "System", "Threading", "Tasks" }, "ValueTask`1"),
+            (new [] { "System", "Collections", "Generic" }, "IAsyncEnumerable`1"),
             (new [] { "System" }, "Void")
         };
         public const string DiagnosticId = "ORLEANS0009";

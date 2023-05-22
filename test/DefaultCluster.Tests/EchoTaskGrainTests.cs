@@ -7,6 +7,7 @@ using Orleans.Runtime;
 using TestExtensions;
 using UnitTests.GrainInterfaces;
 using Xunit;
+using Xunit.Sdk;
 
 namespace DefaultCluster.Tests.General
 {

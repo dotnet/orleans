@@ -22,7 +22,7 @@ namespace Orleans.Timers
         /// </param>
         /// <param name="period">
         /// The time interval between invocations of <paramref name="asyncCallback"/>.
-        /// Specify <see cref="System.Threading.Timeout.InfiniteTimeSpan"/> to disable periodic signalling.
+        /// Specify <see cref="System.Threading.Timeout.InfiniteTimeSpan"/> to disable periodic signaling.
         /// </param>
         /// <returns>
         /// An <see cref="IDisposable"/> object which will cancel the timer upon disposal.
