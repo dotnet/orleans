@@ -91,7 +91,7 @@ namespace UnitTests.Directory
             throw new NotImplementedException();
         }
 
-        public Task<AddressAndTag> RegisterAsync(GrainAddress address, int hopCount = 0)
+        public Task<AddressAndTag> RegisterAsync(GrainAddress address, GrainAddress previousAddress, int hopCount = 0)
         {
             throw new NotImplementedException();
         }

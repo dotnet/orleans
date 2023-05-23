@@ -17,5 +17,20 @@ namespace Orleans.Runtime
         /// <param name="reasonText"></param>
         /// <returns></returns>
         Task DeleteActivations(List<GrainAddress> activationAddresses, DeactivationReasonCode reasonCode, string reasonText);
+
+        /// <summary>
+        /// Accepts migrating grains.
+        /// </summary>
+        ValueTask AcceptMigratingGrains(List<GrainMigrationPackage> migratingGrains);
+    }
+
+    [GenerateSerializer, Immutable]
+    internal struct GrainMigrationPackage
+    {
+        [Id(0)]
+        public GrainId GrainId { get; set; }
+
+        [Id(1)]
+        public MigrationContext MigrationContext { get; set; }
     }
 }

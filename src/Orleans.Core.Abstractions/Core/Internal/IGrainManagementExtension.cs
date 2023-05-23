@@ -12,6 +12,12 @@ namespace Orleans.Core.Internal
         /// Deactivates the current instance once it becomes idle.
         /// </summary>
         /// <returns>A <see cref="Task"/> which represents the method call.</returns>
-        Task DeactivateOnIdle();
+        ValueTask DeactivateOnIdle();
+
+        /// <summary>
+        /// Attempts to migrate the current instance to a new location once it becomes idle.
+        /// </summary>
+        /// <returns>A <see cref="Task"/> which represents the method call.</returns>
+        ValueTask MigrateOnIdle();
     }
 }

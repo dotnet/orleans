@@ -73,11 +73,11 @@ namespace UnitTests.Directory
 
             var expected = GenerateGrainAddress(silo);
 
-            this.grainDirectory.Register(expected).Returns(expected);
+            this.grainDirectory.Register(expected, previousAddress: null).Returns(expected);
 
-            var actual = await this.grainLocator.Register(expected);
+            var actual = await this.grainLocator.Register(expected, previousAddress: null);
             Assert.Equal(expected, actual);
-            await this.grainDirectory.Received(1).Register(expected);
+            await this.grainDirectory.Received(1).Register(expected, previousAddress: null);
 
             // Now should be in cache
             Assert.True(this.grainLocator.TryLookupInCache(expected.GrainId, out var result));
@@ -99,11 +99,11 @@ namespace UnitTests.Directory
             var expectedAddr = GenerateGrainAddress(expectedSilo);
             var otherAddr = GenerateGrainAddress(otherSilo);
 
-            this.grainDirectory.Register(otherAddr).Returns(expectedAddr);
+            this.grainDirectory.Register(otherAddr, previousAddress: null).Returns(expectedAddr);
 
-            var actual = await this.grainLocator.Register(otherAddr);
+            var actual = await this.grainLocator.Register(otherAddr, previousAddress: null);
             Assert.Equal(expectedAddr, actual);
-            await this.grainDirectory.Received(1).Register(otherAddr);
+            await this.grainDirectory.Received(1).Register(otherAddr, previousAddress: null);
 
             // Now should be in cache
             Assert.True(this.grainLocator.TryLookupInCache(expectedAddr.GrainId, out var result));
@@ -127,11 +127,11 @@ namespace UnitTests.Directory
             var outdatedAddr = GenerateGrainAddress(outdatedSilo);
 
             // First returns the outdated entry, then the new one
-            this.grainDirectory.Register(expectedAddr).Returns(outdatedAddr, expectedAddr);
+            this.grainDirectory.Register(expectedAddr, previousAddress: null).Returns(outdatedAddr, expectedAddr);
 
-            var actual = await this.grainLocator.Register(expectedAddr);
+            var actual = await this.grainLocator.Register(expectedAddr, previousAddress: null);
             Assert.Equal(expectedAddr, actual);
-            await this.grainDirectory.Received(2).Register(expectedAddr);
+            await this.grainDirectory.Received(2).Register(expectedAddr, previousAddress: null);
             await this.grainDirectory.Received(1).Unregister(outdatedAddr);
 
             // Now should be in cache
@@ -232,11 +232,11 @@ namespace UnitTests.Directory
             var outdatedAddr = GenerateGrainAddress(outdatedSilo);
 
             // Register two entries
-            this.grainDirectory.Register(expectedAddr).Returns(expectedAddr);
-            this.grainDirectory.Register(outdatedAddr).Returns(outdatedAddr);
+            this.grainDirectory.Register(expectedAddr, previousAddress: null).Returns(expectedAddr);
+            this.grainDirectory.Register(outdatedAddr, previousAddress: null).Returns(outdatedAddr);
 
-            await this.grainLocator.Register(expectedAddr);
-            await this.grainLocator.Register(outdatedAddr);
+            await this.grainLocator.Register(expectedAddr, previousAddress: null);
+            await this.grainLocator.Register(outdatedAddr, previousAddress: null);
 
             // Simulate a dead silo
             this.mockMembershipService.UpdateSiloStatus(outdatedAddr.SiloAddress, SiloStatus.Dead, "old");
@@ -272,10 +272,10 @@ namespace UnitTests.Directory
 
             var expectedAddr = GenerateGrainAddress(expectedSilo);
 
-            this.grainDirectory.Register(expectedAddr).Returns(expectedAddr);
+            this.grainDirectory.Register(expectedAddr, previousAddress: null).Returns(expectedAddr);
 
             // Register to populate cache
-            await this.grainLocator.Register(expectedAddr);
+            await this.grainLocator.Register(expectedAddr, previousAddress: null);
 
             // Unregister and check if cache was cleaned
             await this.grainLocator.Unregister(expectedAddr, UnregistrationCause.Force);

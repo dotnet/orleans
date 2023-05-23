@@ -35,7 +35,7 @@ namespace Tester.Directories
                 MembershipVersion = new MembershipVersion(51)
             };
 
-            Assert.Equal(expected, await this.grainDirectory.Register(expected));
+            Assert.Equal(expected, await this.grainDirectory.Register(expected, null));
 
             Assert.Equal(expected, await this.grainDirectory.Lookup(expected.GrainId));
 
@@ -71,9 +71,9 @@ namespace Tester.Directories
                 MembershipVersion = new MembershipVersion(51)
             };
 
-            Assert.Equal(expected, await this.grainDirectory.Register(expected));
-            Assert.Equal(expected, await this.grainDirectory.Register(differentActivation));
-            Assert.Equal(expected, await this.grainDirectory.Register(differentSilo));
+            Assert.Equal(expected, await this.grainDirectory.Register(expected, null));
+            Assert.Equal(expected, await this.grainDirectory.Register(differentActivation, null));
+            Assert.Equal(expected, await this.grainDirectory.Register(differentSilo, null));
 
             Assert.Equal(expected, await this.grainDirectory.Lookup(expected.GrainId));
         }
@@ -97,7 +97,7 @@ namespace Tester.Directories
                 MembershipVersion = new MembershipVersion(51)
             };
 
-            Assert.Equal(expected, await this.grainDirectory.Register(expected));
+            Assert.Equal(expected, await this.grainDirectory.Register(expected, null));
             await this.grainDirectory.Unregister(otherEntry);
             Assert.Equal(expected, await this.grainDirectory.Lookup(expected.GrainId));
         }

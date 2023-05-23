@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics.Metrics;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
@@ -248,14 +249,17 @@ namespace Orleans.Runtime
         /// <returns></returns>
         public IGrainContext GetOrCreateActivation(
             in GrainId grainId,
-            Dictionary<string, object> requestContextData)
+            Dictionary<string, object> requestContextData,
+            MigrationContext rehydrationContext)
         {
             if (TryGetGrainContext(grainId, out var result))
             {
+                rehydrationContext?.Dispose();
                 return result;
             }
             else if (grainId.IsSystemTarget())
             {
+                rehydrationContext?.Dispose();
                 return null;
             }
 
@@ -264,6 +268,7 @@ namespace Orleans.Runtime
             {
                 if (TryGetGrainContext(grainId, out result))
                 {
+                    rehydrationContext?.Dispose();
                     return result;
                 }
 
@@ -277,31 +282,49 @@ namespace Orleans.Runtime
 
             if (result is null)
             {
+                rehydrationContext?.Dispose();
+                return UnableToCreateActivation(this, grainId);
+            }
+
+            // Rehydration occurs before activation.
+            if (rehydrationContext is not null)
+            {
+                result.Rehydrate(rehydrationContext);
+            }
+
+            // Initialize the new activation asynchronously.
+            var cancellation = new CancellationTokenSource(collectionOptions.Value.ActivationTimeout);
+            result.Activate(requestContextData, cancellation.Token);
+            return result;
+
+            [MethodImpl(MethodImplOptions.NoInlining)]
+            static IGrainContext UnableToCreateActivation(Catalog self, GrainId grainId)
+            {
                 // Did not find and did not start placing new
-                if (logger.IsEnabled(LogLevel.Debug))
+                if (self.logger.IsEnabled(LogLevel.Debug))
                 {
-                    logger.LogDebug((int)ErrorCode.CatalogNonExistingActivation2, "Non-existent activation for grain {GrainId}", grainId);
+                    if (self.SiloStatusOracle.CurrentStatus.IsTerminating())
+                    {
+                        self.logger.LogDebug((int)ErrorCode.CatalogNonExistingActivation2, "Unable to create activation for grain {GrainId} because this silo is terminating", grainId);
+                    }
+                    else
+                    {
+                        self.logger.LogDebug((int)ErrorCode.CatalogNonExistingActivation2, "Unable to create activation for grain {GrainId}", grainId);
+                    }
                 }
 
                 CatalogInstruments.NonExistentActivations.Add(1);
 
-                this.directory.InvalidateCacheEntry(grainId);
+                self.directory.InvalidateCacheEntry(grainId);
 
                 // Unregister the target activation so we don't keep getting spurious messages.
                 // The time delay (one minute, as of this writing) is to handle the unlikely but possible race where
                 // this request snuck ahead of another request, with new placement requested, for the same activation.
                 // If the activation registration request from the new placement somehow sneaks ahead of this unregistration,
                 // we want to make sure that we don't unregister the activation we just created.
-                var address = new GrainAddress { SiloAddress = Silo, GrainId = grainId };
-                _ = this.UnregisterNonExistentActivation(address);
+                var address = new GrainAddress { SiloAddress = self.Silo, GrainId = grainId };
+                _ = self.UnregisterNonExistentActivation(address);
                 return null;
-            }
-            else
-            {
-                // Initialize the new activation asynchronously.
-                var cancellation = new CancellationTokenSource(collectionOptions.Value.ActivationTimeout);
-                result.Activate(requestContextData, cancellation.Token);
-                return result;
             }
         }
 
@@ -467,6 +490,18 @@ namespace Orleans.Runtime
                     StartDeactivatingActivations(reason, activationsToShutdown);
                 }
             }
+        }
+
+        public ValueTask AcceptMigratingGrains(List<GrainMigrationPackage> migratingGrains)
+        {
+            foreach (var package in migratingGrains)
+            {
+                // If the activation does not exist, create it and provide it with the migration context while doing so.
+                // If the activation already exists or cannot be created, it is too late to perform migration, so ignore the request.
+                GetOrCreateActivation(package.GrainId, requestContextData: null, package.MigrationContext);
+            }
+
+            return default;
         }
     }
 }

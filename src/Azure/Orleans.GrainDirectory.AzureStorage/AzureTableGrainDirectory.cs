@@ -80,10 +80,28 @@ namespace Orleans.GrainDirectory.AzureStorage
             return result.Item1.ToGrainAddress();
         }
 
-        public async Task<GrainAddress> Register(GrainAddress address)
+        public async Task<GrainAddress> Register(GrainAddress address, GrainAddress previousAddress)
         {
-            var entry = GrainDirectoryEntity.FromGrainAddress(this.clusterId, address);
-            var result = await this.tableDataManager.InsertTableEntryAsync(entry);
+            (bool isSuccess, string eTag) result;
+            if (previousAddress is not null)
+            {
+                var previousEntry = GrainDirectoryEntity.FromGrainAddress(this.clusterId, previousAddress);
+                var (storedEntry, eTag) = await tableDataManager.ReadSingleTableEntryAsync(previousEntry.PartitionKey, previousEntry.RowKey);
+                if (storedEntry.ActivationId != previousEntry.ActivationId || storedEntry.SiloAddress != previousEntry.SiloAddress)
+                {
+                    return await Lookup(address.GrainId);
+                }
+
+                var entry = GrainDirectoryEntity.FromGrainAddress(this.clusterId, address);
+                _ = await tableDataManager.UpdateTableEntryAsync(entry, eTag);
+                return address;
+            }
+            else
+            {
+                var entry = GrainDirectoryEntity.FromGrainAddress(this.clusterId, address);
+                result = await this.tableDataManager.InsertTableEntryAsync(entry);
+            }
+
             // Possible race condition?
             return result.isSuccess ? address : await Lookup(address.GrainId);
         }

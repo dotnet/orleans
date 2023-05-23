@@ -1,4 +1,4 @@
-using System;
+#nullable enable
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using Orleans.Runtime;
@@ -17,7 +17,7 @@ namespace Orleans.GrainDirectory
         /// </summary>
         /// <param name="address">The <see cref="GrainAddress"/> to register</param>
         /// <returns>The <see cref="GrainAddress"/> that is effectively registered in the directory.</returns>
-        Task<GrainAddress> Register(GrainAddress address);
+        Task<GrainAddress> Register(GrainAddress address, GrainAddress? previousAddress);
 
         /// <summary>
         /// Unregisters the specified <see cref="GrainAddress"/> entry from the directory.

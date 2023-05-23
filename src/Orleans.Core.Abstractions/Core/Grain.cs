@@ -125,6 +125,17 @@ namespace Orleans
         }
 
         /// <summary>
+        /// Starts an attempt to migrating this instance to another location.
+        /// Migration captures the current <see cref="RequestContext"/>, making it available to the activation's placement director so that it can consider it when selecting a new location.
+        /// Migration will occur asynchronously, when no requests are executing, and will not occur if the activation's placement director does not select an alternative location.
+        /// </summary>
+        protected void MigrateOnIdle()
+        {
+            EnsureRuntime();
+            ((IGrainBase)this).MigrateOnIdle();
+        }
+
+        /// <summary>
         /// Delay Deactivation of this activation at least for the specified time duration.
         /// A positive <c>timeSpan</c> value means “prevent GC of this activation for that time span”.
         /// A negative <c>timeSpan</c> value means “cancel the previous setting of the DelayDeactivation call and make this activation behave based on the regular Activation Garbage Collection settings”.

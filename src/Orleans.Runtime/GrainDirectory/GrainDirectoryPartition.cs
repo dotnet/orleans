@@ -43,9 +43,10 @@ namespace Orleans.Runtime.GrainDirectory
             }
         }
 
-        public GrainAddress TryAddSingleActivation(GrainAddress address)
+        public GrainAddress TryAddSingleActivation(GrainAddress address, GrainAddress? previousAddress)
         {
-            if (Activation is { } existing)
+            // If there is an existing address which does not match the 'previousAddress' then we cannot add the new address.
+            if (Activation is { } existing && (previousAddress is null || !previousAddress.Equals(existing)))
             {
                 return existing;
             }
@@ -104,7 +105,7 @@ namespace Orleans.Runtime.GrainDirectory
     internal sealed class GrainDirectoryPartition
     {
         // Should we change this to SortedList<> or SortedDictionary so we can extract chunks better for shipping the full
-        // parition to a follower, or should we leave it as a Dictionary to get O(1) lookups instead of O(log n), figuring we do
+        // partition to a follower, or should we leave it as a Dictionary to get O(1) lookups instead of O(log n), figuring we do
         // a lot more lookups and so can sort periodically?
         /// <summary>
         /// contains a map from grain to its list of activations along with the version (etag) counter for the list
@@ -126,7 +127,7 @@ namespace Orleans.Runtime.GrainDirectory
             this.grainDirectoryOptions = grainDirectoryOptions;
         }
 
-        private bool IsValidSilo(SiloAddress? silo) => siloStatusOracle.IsFunctionalDirectory(silo);
+        private bool IsValidSilo(SiloAddress? silo) => silo is not null && siloStatusOracle.IsFunctionalDirectory(silo);
 
         internal void Clear()
         {
@@ -152,7 +153,7 @@ namespace Orleans.Runtime.GrainDirectory
         /// Adds a new activation to the directory partition
         /// </summary>
         /// <returns>The registered ActivationAddress and version associated with this directory mapping</returns>
-        internal AddressAndTag AddSingleActivation(GrainAddress address)
+        internal AddressAndTag AddSingleActivation(GrainAddress address, GrainAddress? previousAddress)
         {
             if (log.IsEnabled(LogLevel.Trace)) log.LogTrace("Adding single activation for grain {SiloAddress} {GrainId} {ActivationId}", address.SiloAddress, address.GrainId, address.ActivationId);
 
@@ -171,6 +172,7 @@ namespace Orleans.Runtime.GrainDirectory
                 else
                 {
                     var siloAddress = grainInfo.Activation?.SiloAddress;
+
                     // If there is an existing entry pointing to an invalid silo then remove it 
                     if (siloAddress != null && !IsValidSilo(siloAddress))
                     {
@@ -178,10 +180,9 @@ namespace Orleans.Runtime.GrainDirectory
                     }
                 }
 
-                return new(grainInfo.TryAddSingleActivation(address), grainInfo.VersionTag);
+                return new(grainInfo.TryAddSingleActivation(address, previousAddress), grainInfo.VersionTag);
             }
         }
-
 
         /// <summary>
         /// Removes an activation of the given grain from the partition
@@ -231,7 +232,7 @@ namespace Orleans.Runtime.GrainDirectory
                 result = new(grainInfo.Activation, grainInfo.VersionTag);
             }
 
-            if (!IsValidSilo(result.Address.SiloAddress))
+            if (!IsValidSilo(result.Address?.SiloAddress))
             {
                 result = new(null, result.VersionTag);
             }

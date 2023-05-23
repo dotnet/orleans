@@ -38,14 +38,14 @@ public class GrainDirectoryPartitionTests
         var firstGrainAddress = GrainAddress.NewActivationAddress(OtherSiloAddress, grainId);
 
         // Insert valid entry, pointing to valid silo
-        var firstRegister = _target.AddSingleActivation(firstGrainAddress);
+        var firstRegister = _target.AddSingleActivation(firstGrainAddress, previousAddress: null);
         Assert.Equal(firstGrainAddress, firstRegister.Address);
 
         _siloStatusOracle.SetSiloStatus(OtherSiloAddress, SiloStatus.Dead);
 
         // Previous entry is now pointing to a dead silo, it should be possible to override it now
         var secondGrainAddress = GrainAddress.NewActivationAddress(LocalSiloAddress, grainId);
-        var secondRegister = _target.AddSingleActivation(secondGrainAddress);
+        var secondRegister = _target.AddSingleActivation(secondGrainAddress, previousAddress: null);
         Assert.Equal(secondGrainAddress, secondRegister.Address);
     }
 
@@ -58,7 +58,7 @@ public class GrainDirectoryPartitionTests
         var grainAddress = GrainAddress.NewActivationAddress(OtherSiloAddress, grainId);
 
         // Insert invalid entry, pointing to dead silo
-       Assert.Throws<OrleansException>(() => _target.AddSingleActivation(grainAddress));
+       Assert.Throws<OrleansException>(() => _target.AddSingleActivation(grainAddress, previousAddress: null));
     }
 
     [Fact]
@@ -70,12 +70,12 @@ public class GrainDirectoryPartitionTests
         var grainAddress = GrainAddress.NewActivationAddress(OtherSiloAddress, grainId);
 
         // Insert valid entry, pointing to valid silo
-        var register = _target.AddSingleActivation(grainAddress);
+        var register = _target.AddSingleActivation(grainAddress, previousAddress: null);
         Assert.Equal(grainAddress, register.Address);
 
         // Previous entry is still valid, it should not be possible to override it
         var newGrainAddress = GrainAddress.NewActivationAddress(LocalSiloAddress, grainId);
-        var newRegister = _target.AddSingleActivation(newGrainAddress);
+        var newRegister = _target.AddSingleActivation(newGrainAddress, previousAddress: null);
         Assert.Equal(grainAddress, newRegister.Address);
     }
 
@@ -88,7 +88,7 @@ public class GrainDirectoryPartitionTests
         var grainAddress1 = GrainAddress.NewActivationAddress(OtherSiloAddress, grainId);
 
         // Insert valid entry, pointing to valid silo
-        var register1 = _target.AddSingleActivation(grainAddress1);
+        var register1 = _target.AddSingleActivation(grainAddress1, previousAddress: null);
         Assert.Equal(grainAddress1, register1.Address);
 
         _siloStatusOracle.SetSiloStatus(OtherSiloAddress, SiloStatus.Dead);

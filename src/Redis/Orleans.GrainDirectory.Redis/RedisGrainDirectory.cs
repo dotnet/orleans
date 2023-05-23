@@ -26,6 +26,19 @@ namespace Orleans.GrainDirectory.Redis
             return 0
             """;
 
+        private const string UpdateScript =
+            """
+            local cur = redis.call('GET', KEYS[1]) 
+            if cur ~= false then
+                local typedCur = cjson.decode(cur)
+                if typedCur.ActivationId == ARGV[2] then
+                    redis.call('SET', KEYS[1], ARGV[1])
+                    return nil
+                end
+            end
+            return cur
+            """;
+
         private readonly RedisGrainDirectoryOptions directoryOptions;
         private readonly ClusterOptions clusterOptions;
         private readonly ILogger<RedisGrainDirectory> logger;
@@ -70,25 +83,44 @@ namespace Orleans.GrainDirectory.Redis
             }
         }
 
-        public async Task<GrainAddress> Register(GrainAddress address)
+        public async Task<GrainAddress> Register(GrainAddress address, GrainAddress previousAddress)
         {
             var value = JsonSerializer.Serialize(address);
 
             try
             {
-                var success = await this.database.StringSetAsync(
-                    this.GetKey(address.GrainId),
-                    value,
-                    this.directoryOptions.EntryExpiry,
-                    When.NotExists);
+                if (previousAddress is not null)
+                {
+                    var result = (string)await this.database.ScriptEvaluateAsync(
+                        UpdateScript,
+                        keys: new RedisKey[] { GetKey(address.GrainId) },
+                        values: new RedisValue[] { value, address.ActivationId.ToString() });
 
-                if (this.logger.IsEnabled(LogLevel.Debug))
-                    this.logger.LogDebug("Register {GrainId} ({Address}): {Result}", address.GrainId, value, success ? "OK" : "Conflict");
+                    // This indicates success
+                    if (string.IsNullOrWhiteSpace(result))
+                    {
+                        return address;
+                    }
 
-                if (success)
-                    return address;
+                    // This indicates failures
+                    return JsonSerializer.Deserialize<GrainAddress>(result);
+                }
+                else
+                {
+                    var success = await this.database.StringSetAsync(
+                        this.GetKey(address.GrainId),
+                        value,
+                        this.directoryOptions.EntryExpiry,
+                        When.NotExists);
 
-                return await Lookup(address.GrainId);
+                    if (this.logger.IsEnabled(LogLevel.Debug))
+                        this.logger.LogDebug("Register {GrainId} ({Address}): {Result}", address.GrainId, value, success ? "OK" : "Conflict");
+
+                    if (success)
+                        return address;
+
+                    return await Lookup(address.GrainId);
+                }
             }
             catch (Exception ex)
             {

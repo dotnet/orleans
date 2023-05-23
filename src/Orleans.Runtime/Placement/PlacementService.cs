@@ -7,6 +7,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 using Orleans.Runtime.GrainDirectory;
+using Orleans.Runtime.Internal;
 using Orleans.Runtime.Versions;
 
 namespace Orleans.Runtime.Placement
@@ -190,12 +191,28 @@ namespace Orleans.Runtime.Placement
             }
         }
 
+        /// <summary>
+        /// Places a grain without considering the grain's existing location, if any.
+        /// </summary>
+        /// <param name="grainId">The grain id of the grain being placed.</param>
+        /// <param name="requestContextData">The request context, which will be available to the placement strategy.</param>
+        /// <param name="placementStrategy">The placement strategy to use.</param>
+        /// <returns>A location for the new activation.</returns>
+        public Task<SiloAddress> PlaceGrainAsync(GrainId grainId, Dictionary<string, object> requestContextData, PlacementStrategy placementStrategy)
+        {
+            var target = new PlacementTarget(grainId, requestContextData, default, 0);
+            var director = _directorResolver.GetPlacementDirector(placementStrategy);
+            return director.OnAddActivation(placementStrategy, target, this);
+        }
+
         private class PlacementWorker
         {
             private readonly Dictionary<GrainId, GrainPlacementWorkItem> _inProgress = new();
             private readonly SingleWaiterAutoResetEvent _workSignal = new();
             private readonly ILogger _logger;
+#pragma warning disable IDE0052 // Remove unread private members. Justification: retained for debugging purposes
             private readonly Task _processLoopTask;
+#pragma warning restore IDE0052 // Remove unread private members
             private readonly object _lockObj = new();
             private readonly PlacementService _placementService;
             private List<(Message Message, TaskCompletionSource<bool> Completion)> _messages = new();
@@ -204,6 +221,8 @@ namespace Orleans.Runtime.Placement
             {
                 _logger = placementService._logger;
                 _placementService = placementService;
+
+                using var _ = new ExecutionContextSuppressor();
                 _processLoopTask = Task.Run(ProcessLoop);
             }
 
@@ -258,7 +277,7 @@ namespace Orleans.Runtime.Placement
                                 if (workItem.Result is null)
                                 {
                                     // Note that the first message is used as the target to place the message,
-                                    // so if subsequent messsages do not agree with the first message's interface
+                                    // so if subsequent messages do not agree with the first message's interface
                                     // type or version, then they may be sent to an incompatible silo, which is
                                     // fine since the remote silo will handle that incompatibility.
                                     workItem.Result = GetOrPlaceActivationAsync(message.Message);
