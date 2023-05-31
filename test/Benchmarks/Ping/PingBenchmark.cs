@@ -1,19 +1,10 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Net;
-using System.Threading;
-using System.Threading.Tasks;
 using BenchmarkDotNet.Attributes;
 using BenchmarkGrainInterfaces.Ping;
 using BenchmarkGrains.Ping;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
-using Microsoft.Extensions.Logging;
-using Orleans;
 using Orleans.Configuration;
-using Orleans.Hosting;
-using Orleans.Runtime;
 
 namespace Benchmarks.Ping
 {
@@ -44,9 +35,7 @@ namespace Benchmarks.Ping
                     {
                         siloBuilder.Configure<GrainTypeOptions>(options => options.Classes.Remove(typeof(PingGrain)));
                     }
-                })
-                    //.ConfigureLogging(logging => logging.AddConsole().SetMinimumLevel(LogLevel.Debug).AddFilter("Orleans.Runtime.Placement.PlacementService", LogLevel.Information))
-                    ;
+                });
 
                 var host = hostBuilder.Build();
 
@@ -71,7 +60,6 @@ namespace Benchmarks.Ping
                     }
                 });
 
-                //hostBuilder.ConfigureLogging(logging => logging.AddConsole().SetMinimumLevel(LogLevel.Debug));
                 this.clientHost = hostBuilder.Build();
                 this.clientHost.StartAsync().GetAwaiter().GetResult();
 

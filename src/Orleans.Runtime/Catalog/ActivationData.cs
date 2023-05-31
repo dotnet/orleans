@@ -428,7 +428,7 @@ namespace Orleans.Runtime
             var newLocation = await placementService.PlaceGrainAsync(GrainId, requestContext, PlacementStrategy);
             if (newLocation == Address.SiloAddress || newLocation is null)
             {
-                // No more appropriate silo was selected for this grain, but we cannot cancel migration now, so we must continue to deactivate and reactivate the grain.
+                // No more appropriate silo was selected for this grain. The migration attempt will be aborted.
                 // This could be because this is the only (compatible) silo for the grain or because the placement director chose this
                 // silo for some other reason.
                 if (_shared.Logger.IsEnabled(LogLevel.Debug))
