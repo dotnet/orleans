@@ -1,4 +1,5 @@
 using Orleans.Serialization.Buffers;
+using Orleans.Serialization.Buffers.Adaptors;
 using Orleans.Serialization.Codecs;
 using Orleans.Serialization.Session;
 using Orleans.Serialization.WireProtocol;
@@ -25,6 +26,18 @@ namespace Orleans.Serialization.Utilities
             var res = new StringBuilder();
             Format(ref reader, res);
             return res.ToString();
+        }
+
+        /// <summary>
+        /// Formats the specified array.
+        /// </summary>
+        /// <param name="slice">The array.</param>
+        /// <param name="session">The session.</param>
+        /// <returns>The formatted input.</returns>
+        public static string Format(PooledBuffer.BufferSlice slice, SerializerSession session)
+        {
+            var reader = Reader.Create(slice, session);
+            return Format(ref reader);
         }
 
         /// <summary>

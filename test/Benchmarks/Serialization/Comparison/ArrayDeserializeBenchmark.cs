@@ -124,7 +124,7 @@ public class ArraySerializeBenchmark
         finally
         {
             writer.Dispose();
-            _session.FullReset();
+            _session.Reset();
         }
     }
 
@@ -141,7 +141,7 @@ public class ArraySerializeBenchmark
         finally
         {
             writer.Dispose();
-            _session.FullReset();
+            _session.Reset();
         }
 
         _arrayBufferWriter.Clear(); // clear ArrayBufferWriter<byte>
@@ -153,7 +153,7 @@ public class ArraySerializeBenchmark
     {
         var writer = _pipe.Writer.CreateWriter(_session);
         _orleansSerializer.Serialize(_value, ref writer);
-        _session.FullReset();
+        _session.Reset();
 
         _pipe.Writer.Complete();
         _pipe.Reader.Complete();

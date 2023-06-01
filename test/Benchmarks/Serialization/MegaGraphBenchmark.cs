@@ -50,7 +50,7 @@ namespace Benchmarks
         [Benchmark]
         public object Deserialize()
         {
-            Session.FullReset();
+            Session.Reset();
             var instance = Serializer.Deserialize(Input, Session);
             return instance;
         }
@@ -59,7 +59,7 @@ namespace Benchmarks
         [Benchmark]
         public int Serialize()
         {
-            Session.FullReset();
+            Session.Reset();
             var writer = Writer.CreatePooled(Session);
             Serializer.Serialize(Value, ref writer);
             writer.Output.Dispose();
