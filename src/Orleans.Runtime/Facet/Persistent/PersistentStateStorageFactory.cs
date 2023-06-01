@@ -1,9 +1,13 @@
+using System;
 using System.Diagnostics.CodeAnalysis;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Orleans.Core;
+using Orleans.Serialization.Codecs;
+using Orleans.Serialization.Serializers;
 using Orleans.Storage;
 
 #nullable enable
@@ -53,44 +57,10 @@ namespace Orleans.Runtime
             throw new BadProviderConfigException(errMsg);
         }
 
-        private sealed class PersistentStateBridge<TState> : IPersistentState<TState>, ILifecycleParticipant<IGrainLifecycle>
+        private sealed class PersistentStateBridge<TState> : StateStorageBridge<TState>, IPersistentState<TState>, ILifecycleParticipant<IGrainLifecycle>
         {
-            private readonly string stateName;
-            private readonly IGrainContext context;
-            private readonly IGrainStorage storageProvider;
-            private StateStorageBridge<TState> storage;
-
-            public PersistentStateBridge(string stateName, IGrainContext context, IGrainStorage storageProvider)
+            public PersistentStateBridge(string stateName, IGrainContext context, IGrainStorage storageProvider) : base(stateName, context, storageProvider, context.ActivationServices.GetRequiredService<ILoggerFactory>())
             {
-                this.stateName = stateName;
-                this.context = context;
-                this.storageProvider = storageProvider;
-                storage = null!;
-            }
-
-            public TState State
-            {
-                get { return this.storage.State; }
-                set { this.storage.State = value; }
-            }
-
-            public string Etag => this.storage.Etag;
-
-            public bool RecordExists => this.storage.RecordExists;
-
-            public Task ClearStateAsync()
-            {
-                return this.storage.ClearStateAsync();
-            }
-
-            public Task ReadStateAsync()
-            {
-                return this.storage.ReadStateAsync();
-            }
-
-            public Task WriteStateAsync()
-            {
-                return this.storage.WriteStateAsync();
             }
 
             public void Participate(IGrainLifecycle lifecycle)
@@ -101,8 +71,16 @@ namespace Orleans.Runtime
             private Task OnSetupState(CancellationToken ct)
             {
                 if (ct.IsCancellationRequested)
+                {
                     return Task.CompletedTask;
-                storage = new(stateName, context.GrainId, storageProvider, context.ActivationServices.GetRequiredService<ILoggerFactory>());
+                }
+
+                // No need to load state if it has been loaded already via rehydration.
+                if (IsStateInitialized)
+                {
+                    return Task.CompletedTask;
+                }
+
                 return this.ReadStateAsync();
             }
         }

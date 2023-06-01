@@ -47,7 +47,7 @@ namespace Orleans.Streams
 
                 storage = _serviceProvider.GetRequiredServiceByName<IGrainStorage>(ProviderConstants.DEFAULT_PUBSUB_PROVIDER_NAME);
             }
-            return new(nameof(PubSubRendezvousGrain), grain.GrainId, storage, _loggerFactory);
+            return new(nameof(PubSubRendezvousGrain), grain.GrainContext, storage, _loggerFactory);
         }
     }
 

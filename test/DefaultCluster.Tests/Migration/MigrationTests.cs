@@ -1,5 +1,3 @@
-using System.Buffers;
-using System.Buffers.Binary;
 using Orleans.Core.Internal;
 using Orleans.Runtime;
 using TestExtensions;
@@ -60,17 +58,12 @@ namespace DefaultCluster.Tests.General
 
         public void OnDehydrate(IDehydrationContext migrationContext)
         {
-            Span<byte> bytes = stackalloc byte[sizeof(int)];
-            BinaryPrimitives.WriteInt32LittleEndian(bytes, _state);
-            migrationContext.Add("state", bytes);
+            migrationContext.TryAddValue("state", _state);
         }
 
         public void OnRehydrate(IRehydrationContext migrationContext)
         {
-            if (migrationContext.TryGetValue("state", out var bytes))
-            {
-                _state = BinaryPrimitives.ReadInt32LittleEndian(bytes.ToArray());
-            }
+            migrationContext.TryGetValue("state", out _state);
         }
     }
 }

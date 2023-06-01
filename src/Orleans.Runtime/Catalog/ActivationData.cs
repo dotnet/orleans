@@ -16,6 +16,7 @@ using Orleans.Runtime.Placement;
 using Orleans.Runtime.Scheduler;
 using Orleans.Serialization;
 using Orleans.Serialization.Invocation;
+using Orleans.Serialization.Session;
 using Orleans.Serialization.TypeSystem;
 
 namespace Orleans.Runtime
@@ -451,13 +452,13 @@ namespace Orleans.Runtime
             {
                 if (DehydrationContext is not null)
                 {
-                    // Migration has already occurred.
+                    // Migration has already started.
                     return;
                 }
 
                 // Set a migration context to capture any state which should be transferred.
                 // Doing this signals to the deactivation process that a migration is occurring, so it is important that this happens before we begin deactivation.
-                DehydrationContext = new(requestContext);
+                DehydrationContext = new(_shared.SerializerSessionPool, requestContext);
                 ForwardingAddress = newLocation;
             }
 
@@ -1055,18 +1056,13 @@ namespace Orleans.Runtime
                         throw new InvalidOperationException($"Attempted to rehydrate a grain in the {State} state");
                     }
 
-                    if (context.TryGetValue("sys.addr", out var directoryRegistrationData))
+                    if (context.TryGetValue("sys.addr", out GrainAddress previousRegistration) && previousRegistration is not null)
                     {
                         // Propagate the previous registration, so that the new activation can atomically replace it with its new address.
-                        var serializer = _shared.Runtime.ServiceProvider.GetRequiredService<Serializer<GrainAddress>>();
-                        var previousRegistration = serializer.Deserialize(directoryRegistrationData);
-                        if (previousRegistration is not null)
+                        (_extras ??= new()).PreviousRegistration = previousRegistration;
+                        if (_shared.Logger.IsEnabled(LogLevel.Debug))
                         {
-                            (_extras ??= new()).PreviousRegistration = previousRegistration;
-                            if (_shared.Logger.IsEnabled(LogLevel.Debug))
-                            {
-                                _shared.Logger.LogDebug("Previous activation address was {PreviousRegistration}", previousRegistration);
-                            }
+                            _shared.Logger.LogDebug("Previous activation address was {PreviousRegistration}", previousRegistration);
                         }
                     }
 
@@ -1120,15 +1116,7 @@ namespace Orleans.Runtime
 
                 if (IsUsingGrainDirectory)
                 {
-                    context.Add(
-                        "sys.addr",
-                        static (state, bufferWriter) =>
-                        {
-                            var self = (ActivationData)state;
-                            var serializer = self._shared.Runtime.ServiceProvider.GetRequiredService<Serializer<GrainAddress>>();
-                            serializer.Serialize(self.Address, bufferWriter);
-                        },
-                        this);
+                    context.TryAddValue("sys.addr", Address);
                 }
             }
 
@@ -1980,9 +1968,13 @@ namespace Orleans.Runtime
 
         private class DehydrationContextHolder
         {
-            public readonly MigrationContext Value = new();
+            public readonly MigrationContext Value;
             public readonly Dictionary<string, object> RequestContext;
-            public DehydrationContextHolder(Dictionary<string, object> requestContext) { RequestContext = requestContext; }
+            public DehydrationContextHolder(SerializerSessionPool sessionPool, Dictionary<string, object> requestContext)
+            {
+                RequestContext = requestContext;
+                Value = new MigrationContext(sessionPool);
+            }
         }
     }
 }

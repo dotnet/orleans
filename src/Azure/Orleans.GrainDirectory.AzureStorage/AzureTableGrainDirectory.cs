@@ -80,6 +80,8 @@ namespace Orleans.GrainDirectory.AzureStorage
             return result.Item1.ToGrainAddress();
         }
 
+        public Task<GrainAddress> Register(GrainAddress address) => Register(address, null);
+
         public async Task<GrainAddress> Register(GrainAddress address, GrainAddress previousAddress)
         {
             (bool isSuccess, string eTag) result;

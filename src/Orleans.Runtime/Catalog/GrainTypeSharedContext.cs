@@ -8,8 +8,8 @@ using Orleans.Configuration;
 using Orleans.GrainReferences;
 using Orleans.Metadata;
 using Orleans.Runtime.Placement;
+using Orleans.Serialization.Session;
 using Orleans.Serialization.TypeSystem;
-using Orleans.Statistics;
 
 namespace Orleans.Runtime
 {
@@ -34,13 +34,15 @@ namespace Orleans.Runtime
             IGrainRuntime grainRuntime,
             ILogger logger,
             GrainReferenceActivator grainReferenceActivator,
-            IServiceProvider serviceProvider)
+            IServiceProvider serviceProvider,
+            SerializerSessionPool serializerSessionPool)
         {
             if (!grainClassMap.TryGetGrainClass(grainType, out var grainClass))
             {
                 throw new KeyNotFoundException($"Could not find corresponding grain class for grain of type {grainType.ToString()}");
             }
 
+            SerializerSessionPool = serializerSessionPool;
             _grainTypeName = RuntimeTypeNameFormatter.Format(grainClass);
             Logger = logger;
             MessagingOptions = messagingOptions.Value;
@@ -116,6 +118,7 @@ namespace Orleans.Runtime
 
         public TimeSpan CollectionAgeLimit { get; }
         public ILogger Logger { get; }
+        public SerializerSessionPool SerializerSessionPool { get; }
 
         public SiloMessagingOptions MessagingOptions { get; }
         public GrainReferenceActivator GrainReferenceActivator { get; }

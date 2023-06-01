@@ -83,6 +83,8 @@ namespace Orleans.GrainDirectory.Redis
             }
         }
 
+        public Task<GrainAddress> Register(GrainAddress address) => Register(address, null);
+        
         public async Task<GrainAddress> Register(GrainAddress address, GrainAddress previousAddress)
         {
             var value = JsonSerializer.Serialize(address);
