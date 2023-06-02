@@ -419,58 +419,80 @@ namespace Orleans.Runtime
                 cancellationToken = new CancellationTokenSource(_shared.InternalRuntime.CollectionOptions.Value.DeactivationTimeout).Token;
             }
 
-            ScheduleOperation(new Command.Migrate(requestContext, cancellationToken.Value));
+            // We use a named work item since it is cheaper than allocating a Task and has the benefit of being named.
+            _workItemGroup.QueueWorkItem(new MigrateWorkItem(this, requestContext, cancellationToken.Value));
         }
 
         private async Task StartMigratingAsync(Dictionary<string, object> requestContext, CancellationToken cancellationToken)
         {
-            // Run placement to select a new host. If a new (different) host is not selected, do not migrate.
-            var placementService = _shared.Runtime.ServiceProvider.GetRequiredService<PlacementService>();
-            var newLocation = await placementService.PlaceGrainAsync(GrainId, requestContext, PlacementStrategy);
-            if (newLocation == Address.SiloAddress || newLocation is null)
-            {
-                // No more appropriate silo was selected for this grain. The migration attempt will be aborted.
-                // This could be because this is the only (compatible) silo for the grain or because the placement director chose this
-                // silo for some other reason.
-                if (_shared.Logger.IsEnabled(LogLevel.Debug))
-                {
-                    if (newLocation is null)
-                    {
-                        _shared.Logger.LogDebug("Placement strategy {PlacementStrategy} failed to select a destination for migration of {GrainId}", PlacementStrategy, GrainId);
-                    }
-                    else
-                    {
-                        _shared.Logger.LogDebug("Placement strategy {PlacementStrategy} selected the current silo as the destination for migration of {GrainId}", PlacementStrategy, GrainId);
-                    }
-                }
-
-                // Will not deactivate/migrate.
-                return;
-            }
-
             lock (this)
             {
-                if (DehydrationContext is not null)
+                // Avoid the cost of selecting a new location if the activation is not currently valid.
+                if (State is not ActivationState.Valid)
                 {
-                    // Migration has already started.
+                    return;
+                }
+            }
+
+            SiloAddress newLocation;
+            try
+            {
+                // Run placement to select a new host. If a new (different) host is not selected, do not migrate.
+                var placementService = _shared.Runtime.ServiceProvider.GetRequiredService<PlacementService>();
+                newLocation = await placementService.PlaceGrainAsync(GrainId, requestContext, PlacementStrategy);
+                if (newLocation == Address.SiloAddress || newLocation is null)
+                {
+                    // No more appropriate silo was selected for this grain. The migration attempt will be aborted.
+                    // This could be because this is the only (compatible) silo for the grain or because the placement director chose this
+                    // silo for some other reason.
+                    if (_shared.Logger.IsEnabled(LogLevel.Debug))
+                    {
+                        if (newLocation is null)
+                        {
+                            _shared.Logger.LogDebug("Placement strategy {PlacementStrategy} failed to select a destination for migration of {GrainId}", PlacementStrategy, GrainId);
+                        }
+                        else
+                        {
+                            _shared.Logger.LogDebug("Placement strategy {PlacementStrategy} selected the current silo as the destination for migration of {GrainId}", PlacementStrategy, GrainId);
+                        }
+                    }
+
+                    // Will not deactivate/migrate.
                     return;
                 }
 
-                // Set a migration context to capture any state which should be transferred.
-                // Doing this signals to the deactivation process that a migration is occurring, so it is important that this happens before we begin deactivation.
-                DehydrationContext = new(_shared.SerializerSessionPool, requestContext);
-                ForwardingAddress = newLocation;
-            }
+                lock (this)
+                {
+                    if (!StartDeactivating(new DeactivationReason(DeactivationReasonCode.Migrating, "Migrating to a new location")))
+                    {
+                        // Grain is already deactivating, ignore the migration request.
+                        return;
+                    }
 
-            if (_shared.Logger.IsEnabled(LogLevel.Debug))
-            {
-                _shared.Logger.LogDebug("Migrating {GrainId} to {SiloAddress}", GrainId, newLocation);
-            }
+                    if (DehydrationContext is not null)
+                    {
+                        // Migration has already started.
+                        return;
+                    }
 
-            // Start deactivation to prevent any other.
-            if (StartDeactivating(new DeactivationReason(DeactivationReasonCode.Migrating, "Migrating to a new location")))
-            {
+                    // Set a migration context to capture any state which should be transferred.
+                    // Doing this signals to the deactivation process that a migration is occurring, so it is important that this happens before we begin deactivation.
+                    DehydrationContext = new(_shared.SerializerSessionPool, requestContext);
+                    ForwardingAddress = newLocation;
+                }
+
+                if (_shared.Logger.IsEnabled(LogLevel.Debug))
+                {
+                    _shared.Logger.LogDebug("Migrating {GrainId} to {SiloAddress}", GrainId, newLocation);
+                }
+
+                // Start deactivation to prevent any other.
                 ScheduleOperation(new Command.Deactivate(cancellationToken));
+            }
+            catch (Exception exception)
+            {
+                _shared.Logger.LogError(exception, "Error while selecting a migration destination for {GrainId}", GrainId);
+                return;
             }
         }
 
@@ -1019,9 +1041,6 @@ namespace Orleans.Runtime
                             case Command.Deactivate command:
                                 await FinishDeactivating(command.CancellationToken);
                                 break;
-                            case Command.Migrate command:
-                                await StartMigratingAsync(command.RequestContext, command.CancellationToken);
-                                break;
                             case Command.Delay command:
                                 await Task.Delay(command.Duration);
                                 break;
@@ -1542,6 +1561,8 @@ namespace Orleans.Runtime
                     throw new InvalidOperationException("Calling DeactivateOnIdle from within OnActivateAsync is not supported");
                 }
 
+                // If State is Valid, then begin deactivation.
+
                 if (DeactivationReason.ReasonCode == DeactivationReasonCode.None)
                 {
                     DeactivationReason = reason;
@@ -1921,18 +1942,6 @@ namespace Orleans.Runtime
             public class UnregisterFromCatalog : Command
             {
             }
-
-            public class Migrate
-            {
-                public Migrate(Dictionary<string, object> requestContext, CancellationToken cancellationToken)
-                {
-                    RequestContext = requestContext;
-                    CancellationToken = cancellationToken;
-                }
-
-                public Dictionary<string, object> RequestContext { get; }
-                public CancellationToken CancellationToken { get; }
-            }
         }
 
         internal class ReentrantRequestTracker : Dictionary<Guid, int>
@@ -1975,6 +1984,24 @@ namespace Orleans.Runtime
                 RequestContext = requestContext;
                 Value = new MigrationContext(sessionPool);
             }
+        }
+
+        private class MigrateWorkItem : IWorkItem
+        {
+            private readonly ActivationData _activation;
+            private readonly Dictionary<string, object> _requestContext;
+            private readonly CancellationToken _cancellationToken;
+
+            public MigrateWorkItem(ActivationData activation, Dictionary<string, object> requestContext, CancellationToken cancellationToken)
+            {
+                _activation = activation;
+                _requestContext = requestContext;
+                _cancellationToken = cancellationToken;
+            }
+
+            public string Name => "Migrate";
+            public IGrainContext GrainContext => _activation;
+            public void Execute() => _activation.StartMigratingAsync(_requestContext, _cancellationToken).Ignore();
         }
     }
 }
