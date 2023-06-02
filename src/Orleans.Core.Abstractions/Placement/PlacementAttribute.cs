@@ -28,11 +28,12 @@ namespace Orleans.Placement
     }
 
     /// <summary>
-    /// Marks a grain class as using the <c>RandomPlacement</c> policy.
+    /// Marks a grain class as using the <see cref="RandomPlacement"/> policy.
     /// </summary>
     /// <remarks>
     /// This is the default placement policy, so this attribute does not need to be used for normal grains.
     /// </remarks>
+    /// <inheritdoc cref="RandomPlacement"/>
     [AttributeUsage(AttributeTargets.Class, AllowMultiple = false)]
     public sealed class RandomPlacementAttribute : PlacementAttribute
     {
@@ -43,8 +44,9 @@ namespace Orleans.Placement
     }
 
     /// <summary>
-    /// Marks a grain class as using the <c>HashBasedPlacement</c> policy.
+    /// Marks a grain class as using the <see cref="HashBasedPlacement"/> policy.
     /// </summary>
+    /// <inheritdoc cref="HashBasedPlacement"/>
     [AttributeUsage(AttributeTargets.Class, AllowMultiple = false)]
     public sealed class HashBasedPlacementAttribute : PlacementAttribute
     {
@@ -54,8 +56,9 @@ namespace Orleans.Placement
     }
 
     /// <summary>
-    /// Marks a grain class as using the <c>PreferLocalPlacement</c> policy.
+    /// Marks a grain class as using the <see cref="PreferLocalPlacement"/> policy.
     /// </summary>
+    /// <inheritdoc cref="PreferLocalPlacement"/>
     [AttributeUsage(AttributeTargets.Class, AllowMultiple = false)]
     public sealed class PreferLocalPlacementAttribute : PlacementAttribute
     {
@@ -70,11 +73,9 @@ namespace Orleans.Placement
 
     /// <summary>
     /// Marks a grain class as using the <see cref="ActivationCountBasedPlacement"/> policy, which attempts to balance
-    /// grain placment across servers based upon the relative number of recently active grains on each one.
+    /// grain placement across servers based upon the relative number of recently active grains on each one.
     /// </summary>
-    /// <remarks>
-    /// See the documentation for <seealso cref="ActivationCountBasedPlacement"/> for more information.
-    /// </remarks>
+    /// <inheritdoc cref="ActivationCountBasedPlacement"/>
     [AttributeUsage(AttributeTargets.Class, AllowMultiple = false)]
     public sealed class ActivationCountBasedPlacementAttribute : PlacementAttribute
     {
@@ -88,8 +89,9 @@ namespace Orleans.Placement
     }
 
     /// <summary>
-    /// Marks a grain class as using the <c>SiloRoleBasedPlacement</c> policy.
+    /// Marks a grain class as using the <see cref="SiloRoleBasedPlacement"/> policy.
     /// </summary>
+    /// <inheritdoc cref="SiloRoleBasedPlacement"/>
     [AttributeUsage(AttributeTargets.Class, AllowMultiple = false)]
     public sealed class SiloRoleBasedPlacementAttribute : PlacementAttribute
     {
