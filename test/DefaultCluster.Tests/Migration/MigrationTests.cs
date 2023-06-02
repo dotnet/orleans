@@ -1,5 +1,6 @@
 using Orleans.Core.Internal;
 using Orleans.Runtime;
+using Orleans.Runtime.Placement;
 using TestExtensions;
 using Xunit;
 
@@ -20,12 +21,14 @@ namespace DefaultCluster.Tests.General
                 var expectedState = Random.Shared.Next();
                 await grain.SetState(expectedState);
                 var originalHost = await grain.GetHostAddress();
-                SiloAddress newHost;
-                do
-                {
-                    await grain.Cast<IGrainManagementExtension>().MigrateOnIdle();
-                    newHost = await grain.GetHostAddress();
-                } while (newHost == originalHost);
+                var targetHost = Fixture.HostedCluster.GetActiveSilos().Select(s => s.SiloAddress).First(address => address != originalHost);
+
+                // Trigger migration, setting a placement hint to coerce the placement director to use the target silo
+                RequestContext.Set(IPlacementDirector.PlacementHintKey, targetHost);
+                await grain.Cast<IGrainManagementExtension>().MigrateOnIdle();
+
+                var newHost = await grain.GetHostAddress();
+                Assert.Equal(targetHost, newHost);
 
                 var newState = await grain.GetState();
                 Assert.Equal(expectedState, newState);
