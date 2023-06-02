@@ -19,7 +19,6 @@ namespace Orleans.Runtime
     /// <seealso cref="Orleans.Runtime.IPersistentStateFactory" />
     public class PersistentStateFactory : IPersistentStateFactory
     {
-
         /// <inheritdoc/>
         public IPersistentState<TState> Create<TState>(IGrainContext context, IPersistentStateConfiguration cfg)
         {

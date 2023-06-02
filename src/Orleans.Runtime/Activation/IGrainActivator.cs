@@ -18,7 +18,7 @@ namespace Orleans.Runtime
         /// Disposes the provided grain instance which is associated with the provided grain context.
         /// </summary>
         /// <param name="context">The grain context.</param>
-        /// <param name="instance">The graininstance.</param>
+        /// <param name="instance">The grain instance.</param>
         /// <returns>A <see cref="ValueTask"/> representing the work performed.</returns>
         ValueTask DisposeInstance(IGrainContext context, object instance);
     }

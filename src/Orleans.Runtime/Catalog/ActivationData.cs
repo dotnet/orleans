@@ -14,7 +14,6 @@ using Orleans.GrainDirectory;
 using Orleans.Internal;
 using Orleans.Runtime.Placement;
 using Orleans.Runtime.Scheduler;
-using Orleans.Serialization;
 using Orleans.Serialization.Invocation;
 using Orleans.Serialization.Session;
 using Orleans.Serialization.TypeSystem;
@@ -698,7 +697,12 @@ namespace Orleans.Runtime
         private string GetActivationInfoString()
         {
             var placement = PlacementStrategy?.GetType().Name;
-            return GrainInstance is null ? $"#Placement={placement}" : $"#GrainType={RuntimeTypeNameFormatter.Format(GrainInstance?.GetType())} Placement={placement}";
+            var grainTypeName = _shared.GrainTypeName ?? GrainInstance switch
+            {
+                { } grainInstance => RuntimeTypeNameFormatter.Format(grainInstance.GetType()),
+                _ => null
+            };
+            return grainTypeName is null ? $"#Placement={placement}" : $"#GrainType={grainTypeName} Placement={placement}";
         }
 
         public async ValueTask DisposeAsync()
