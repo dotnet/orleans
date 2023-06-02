@@ -8,6 +8,7 @@ using Microsoft.Extensions.Logging;
 using Orleans.Core;
 using Orleans.Serialization.Codecs;
 using Orleans.Serialization.Serializers;
+using Orleans.Serialization.TypeSystem;
 using Orleans.Storage;
 
 #nullable enable
@@ -29,10 +30,9 @@ namespace Orleans.Runtime
             {
                 ThrowMissingProviderException(context, cfg);
             }
-            string fullStateName = GetFullStateName(context, cfg);
-            var bridge = new PersistentStateBridge<TState>(fullStateName, context, storageProvider);
-            bridge.Participate(context.ObservableLifecycle);
-            return bridge;
+
+            var fullStateName = GetFullStateName(context, cfg);
+            return new PersistentState<TState>(fullStateName, context, storageProvider);
         }
 
         protected virtual string GetFullStateName(IGrainContext context, IPersistentStateConfiguration cfg)
@@ -55,33 +55,33 @@ namespace Orleans.Runtime
 
             throw new BadProviderConfigException(errMsg);
         }
+    }
 
-        private sealed class PersistentStateBridge<TState> : StateStorageBridge<TState>, IPersistentState<TState>, ILifecycleParticipant<IGrainLifecycle>
+    internal sealed class PersistentState<TState> : StateStorageBridge<TState>, IPersistentState<TState>, ILifecycleObserver
+    {
+        public PersistentState(string stateName, IGrainContext context, IGrainStorage storageProvider) : base(stateName, context, storageProvider, context.ActivationServices.GetRequiredService<ILoggerFactory>())
         {
-            public PersistentStateBridge(string stateName, IGrainContext context, IGrainStorage storageProvider) : base(stateName, context, storageProvider, context.ActivationServices.GetRequiredService<ILoggerFactory>())
-            {
-            }
-
-            public void Participate(IGrainLifecycle lifecycle)
-            {
-                lifecycle.Subscribe(this.GetType().FullName, GrainLifecycleStage.SetupState, OnSetupState);
-            }
-
-            private Task OnSetupState(CancellationToken ct)
-            {
-                if (ct.IsCancellationRequested)
-                {
-                    return Task.CompletedTask;
-                }
-
-                // No need to load state if it has been loaded already via rehydration.
-                if (IsStateInitialized)
-                {
-                    return Task.CompletedTask;
-                }
-
-                return this.ReadStateAsync();
-            }
+            var lifecycle = context.ObservableLifecycle;
+            lifecycle.Subscribe(RuntimeTypeNameFormatter.Format(GetType()), GrainLifecycleStage.SetupState, this);
+            lifecycle.AddMigrationParticipant(this);
         }
+
+        public Task OnStart(CancellationToken cancellationToken = default) 
+        {
+            if (cancellationToken.IsCancellationRequested)
+            {
+                return Task.CompletedTask;
+            }
+
+            // No need to load state if it has been loaded already via rehydration.
+            if (IsStateInitialized)
+            {
+                return Task.CompletedTask;
+            }
+
+            return ReadStateAsync();
+        }
+
+        public Task OnStop(CancellationToken cancellationToken = default) => Task.CompletedTask;
     }
 }

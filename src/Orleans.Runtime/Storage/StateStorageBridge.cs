@@ -1,6 +1,5 @@
 #nullable enable
 using System;
-using System.Buffers;
 using System.Diagnostics.CodeAnalysis;
 using System.Runtime.ExceptionServices;
 using System.Threading.Tasks;
@@ -55,7 +54,6 @@ namespace Orleans.Core
             ArgumentNullException.ThrowIfNull(grainContext);
             ArgumentNullException.ThrowIfNull(store);
             ArgumentNullException.ThrowIfNull(loggerFactory);
-            grainContext.ObservableLifecycle.AddMigrationParticipant(this);
 
             _logger = loggerFactory.CreateLogger(store.GetType());
             _name = name;
