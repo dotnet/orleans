@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <PackageId>Microsoft.Orleans.Clustering.GoogleFirestore</PackageId>
+    <Title>Microsoft Orleans Google Firestore Clustering Provider</Title>
+    <Description>Microsoft Orleans clustering provider backed by Google Firestore</Description>
+    <PackageTags>$(PackageTags) Google Firestore</PackageTags>
+    <TargetFrameworks>$(DefaultTargetFrameworks)</TargetFrameworks>
+    <AssemblyName>Orleans.Clustering.GoogleFirestore</AssemblyName>
+    <RootNamespace>Orleans.Clustering.GoogleFirestore</RootNamespace>
+    <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
+    <DefineConstants>$(DefineConstants);ORLEANS_CLUSTERING</DefineConstants>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="$(SourceRoot)src\Orleans.Runtime\Orleans.Runtime.csproj" />
+    <PackageReference Include="Google.Cloud.Firestore" />
+    <PackageReference Include="System.Net.NameResolution" />
+  </ItemGroup>
+</Project>
