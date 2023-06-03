@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <PackageId>Microsoft.Orleans.Clustering.GoogleCloudStorage</PackageId>
+    <Title>Microsoft Orleans Google Cloud Storage Clustering Provider</Title>
+    <Description>Microsoft Orleans clustering provider backed by Google Cloud Storage</Description>
+    <PackageTags>$(PackageTags) Google Cloud Storage</PackageTags>
+    <TargetFrameworks>$(DefaultTargetFrameworks)</TargetFrameworks>
+    <AssemblyName>Orleans.Clustering.GoogleCloudStorage</AssemblyName>
+    <RootNamespace>Orleans.Clustering.GoogleCloudStorage</RootNamespace>
+    <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
+    <DefineConstants>$(DefineConstants);ORLEANS_CLUSTERING</DefineConstants>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="$(SourceRoot)src\Orleans.Runtime\Orleans.Runtime.csproj" />
+    <PackageReference Include="Google.Cloud.Storage.V1" />
+    <PackageReference Include="System.Net.NameResolution" />
+  </ItemGroup>
+</Project>
