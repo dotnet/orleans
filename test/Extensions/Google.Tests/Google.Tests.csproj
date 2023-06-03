@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFrameworks>$(TestTargetFrameworks)</TargetFrameworks>
+    <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="$(MicrosoftTestSdkVersion)" />
+    <PackageReference Include="Testcontainers" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="$(SourceRoot)src\Google\Orleans.Clustering.GoogleCloudStorage\Orleans.Clustering.GoogleCloudStorage.csproj" />
+    <ProjectReference Include="$(SourceRoot)src\Google\Orleans.Clustering.GoogleFirestore\Orleans.Clustering.GoogleFirestore.csproj" />
+    <ProjectReference Include="$(SourceRoot)src\Google\Orleans.Persistence.GoogleCloudStorage\Orleans.Persistence.GoogleCloudStorage.csproj" />
+    <ProjectReference Include="$(SourceRoot)src\Google\Orleans.Persistence.GoogleFirestore\Orleans.Persistence.GoogleFirestore.csproj" />
+    <ProjectReference Include="$(SourceRoot)src\Google\Orleans.Reminders.GoogleCloudStorage\Orleans.Reminders.GoogleCloudStorage.csproj" />
+    <ProjectReference Include="$(SourceRoot)src\Google\Orleans.Reminders.GoogleFirestore\Orleans.Reminders.GoogleFirestore.csproj" />
+    <ProjectReference Include="$(SourceRoot)src\Google\Orleans.Streaming.GooglePubSub\Orleans.Streaming.GooglePubSub.csproj" />
+    <ProjectReference Include="$(SourceRoot)test\TesterInternal\TesterInternal.csproj" />
+  </ItemGroup>
+  
+</Project>

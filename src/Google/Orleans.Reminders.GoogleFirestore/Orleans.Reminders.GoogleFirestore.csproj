@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <PackageId>Microsoft.Orleans.Reminders.GoogleFirestore</PackageId>
+    <Title>Microsoft Orleans Google Cloud Storage Reminders Provider</Title>
+    <Description>Microsoft Orleans reminders provider backed by Google Cloud Storage</Description>
+    <PackageTags>$(PackageTags) Google Cloud Storage</PackageTags>
+    <TargetFrameworks>$(DefaultTargetFrameworks)</TargetFrameworks>
+    <AssemblyName>Orleans.Reminders.GoogleFirestore</AssemblyName>
+    <RootNamespace>Orleans.Reminders.GoogleFirestore</RootNamespace>
+    <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
+    <DefineConstants>$(DefineConstants);ORLEANS_REMINDERS</DefineConstants>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="$(SourceRoot)src\Orleans.Runtime\Orleans.Runtime.csproj" />
+    <ProjectReference Include="$(SourceRoot)src\Orleans.Reminders\Orleans.Reminders.csproj" />
+    <PackageReference Include="Google.Cloud.Firestore" />
+    <PackageReference Include="System.Net.NameResolution" />
+  </ItemGroup>
+</Project>

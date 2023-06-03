@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <PackageId>Microsoft.Orleans.Persistence.GoogleFirestore</PackageId>
+    <Title>Microsoft Orleans Google Firestore Persistence Provider</Title>
+    <Description>Microsoft Orleans persistence providers backed by Google Firestore</Description>
+    <PackageTags>$(PackageTags) Google Firestore</PackageTags>
+    <TargetFrameworks>$(DefaultTargetFrameworks)</TargetFrameworks>
+    <AssemblyName>Orleans.Persistence.GoogleFirestore</AssemblyName>
+    <RootNamespace>Orleans.Persistence.GoogleFirestore</RootNamespace>
+    <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
+    <DefineConstants>$(DefineConstants);ORLEANS_PERSISTENCE</DefineConstants>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="$(SourceRoot)src\Orleans.Runtime\Orleans.Runtime.csproj" />
+    <PackageReference Include="Google.Cloud.Firestore" />
+    <PackageReference Include="System.Net.NameResolution" />
+  </ItemGroup>
+</Project>
