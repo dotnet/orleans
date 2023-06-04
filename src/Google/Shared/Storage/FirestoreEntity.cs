@@ -1,3 +1,7 @@
+using System;
+using System.Collections.Generic;
+using Google.Cloud.Firestore;
+
 #if ORLEANS_CLUSTERING
 namespace Orleans.Clustering.GoogleFirestore;
 #elif ORLEANS_PERSISTENCE
@@ -11,3 +15,14 @@ namespace Orleans.GrainDirectory.GoogleFirestore;
 #else
 // No default namespace intentionally to cause compile errors if something is not defined
 #endif
+
+public abstract class FirestoreEntity
+{
+    [FirestoreDocumentId]
+    public string Id { get; set; } = default!;
+
+    [FirestoreDocumentUpdateTimestamp]
+    public DateTimeOffset ETag { get; set; }
+
+    public abstract IDictionary<string, object?> GetFields();
+}

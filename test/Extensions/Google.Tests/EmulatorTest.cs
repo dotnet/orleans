@@ -2,8 +2,9 @@ using Google.Api.Gax;
 using Google.Protobuf;
 using Google.Cloud.Firestore;
 using Google.Cloud.PubSub.V1;
+using Google.Cloud.Storage.V1;
 
-namespace Google.Tests;
+namespace Orleans.Tests.Google;
 
 [TestCategory("GoogleCloud")]
 public class GoogleEmulatorTest : IClassFixture<GoogleCloudFixture>
@@ -99,7 +100,7 @@ public class GoogleEmulatorTest : IClassFixture<GoogleCloudFixture>
     //     var bucketName = Guid.NewGuid().ToString();
     //     await client.CreateBucketAsync(GoogleEmulatorHost.GOOGLE_PROJECT_ID, bucketName);
 
-    //     var content = Encoding.UTF8.GetBytes("hello, world");
+    //     var content = System.Text.Encoding.UTF8.GetBytes("hello, world");
 
     //     using var ms = new MemoryStream(content);
     //     var file1 = "file1.txt";

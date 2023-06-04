@@ -2,6 +2,10 @@
   <PropertyGroup>
     <TargetFrameworks>$(TestTargetFrameworks)</TargetFrameworks>
     <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
+    <DefineConstants>$(DefineConstants);GOOGLE_TESTS</DefineConstants>
+    <Nullable>enable</Nullable>
+    <RootNamespace>Orleans.Tests.Google</RootNamespace>
+    <AssemblyName>Orleans.Tests.Google</AssemblyName>
   </PropertyGroup>
 
   <ItemGroup>
@@ -18,6 +22,13 @@
     <ProjectReference Include="$(SourceRoot)src\Google\Orleans.Reminders.GoogleFirestore\Orleans.Reminders.GoogleFirestore.csproj" />
     <ProjectReference Include="$(SourceRoot)src\Google\Orleans.Streaming.GooglePubSub\Orleans.Streaming.GooglePubSub.csproj" />
     <ProjectReference Include="$(SourceRoot)test\TesterInternal\TesterInternal.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Include="..\..\..\src\Google\Shared\Storage\FirestoreDataManager.cs" Link="Shared\Storage\FirestoreDataManager.cs" />
+    <Compile Include="..\..\..\src\Google\Shared\Storage\FirestoreEntity.cs" Link="Shared\Storage\FirestoreEntity.cs" />
+    <Compile Include="..\..\..\src\Google\Shared\Storage\FirestoreOptions.cs" Link="Shared\Storage\FirestoreOptions.cs" />
+    <Compile Include="..\..\..\src\Google\Shared\Storage\GoogleCloudOptions.cs" Link="Shared\Storage\GoogleCloudOptions.cs" />
   </ItemGroup>
   
 </Project>

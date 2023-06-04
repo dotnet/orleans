@@ -1,7 +1,7 @@
 using DotNet.Testcontainers.Builders;
 using DotNet.Testcontainers.Containers;
 
-namespace Google.Tests;
+namespace Orleans.Tests.Google;
 
 public class GoogleEmulatorNotAvailableException : Exception
 {
@@ -65,6 +65,7 @@ public class GoogleEmulatorHost : IAsyncDisposable
             this._pubsub.StartAsync(),
             this._firestore.StartAsync());
 
+        // Required so the client SDKs can find the emulators.
         Environment.SetEnvironmentVariable("FIRESTORE_EMULATOR_HOST", this.FirestoreEndpoint);
         Environment.SetEnvironmentVariable("PUBSUB_EMULATOR_HOST", this.PubSubEndpoint);
         Environment.SetEnvironmentVariable("STORAGE_EMULATOR_HOST", this.StorageEndpoint);

@@ -1,4 +1,4 @@
-namespace Google.Tests;
+namespace Orleans.Tests.Google;
 
 public class GoogleCloudFixture : IAsyncLifetime
 {
