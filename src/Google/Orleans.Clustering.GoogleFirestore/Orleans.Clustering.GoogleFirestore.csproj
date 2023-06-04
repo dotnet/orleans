@@ -9,7 +9,15 @@
     <RootNamespace>Orleans.Clustering.GoogleFirestore</RootNamespace>
     <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
     <DefineConstants>$(DefineConstants);ORLEANS_CLUSTERING</DefineConstants>
+    <Nullable>enable</Nullable>
   </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="..\Shared\Storage\FirestoreDataManager.cs" Link="Storage\FirestoreDataManager.cs" />
+    <Compile Include="..\Shared\Storage\FirestoreEntity.cs" Link="Storage\FirestoreEntity.cs" />
+    <Compile Include="..\Shared\Storage\FirestoreOptions.cs" Link="Storage\FirestoreOptions.cs" />
+    <Compile Include="..\Shared\Storage\GoogleCloudOptions.cs" Link="Storage\GoogleCloudOptions.cs" />
+  </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="$(SourceRoot)src\Orleans.Runtime\Orleans.Runtime.csproj" />
