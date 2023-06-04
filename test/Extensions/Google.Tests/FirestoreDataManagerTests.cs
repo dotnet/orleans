@@ -11,7 +11,7 @@ namespace Orleans.Tests.Google;
 public class FirestoreDataManagerTests : IClassFixture<GoogleCloudFixture>, IAsyncLifetime
 {
     private const string TEST_PARTITION = "Test";
-    private readonly FirestoreDataManager<DummyFirestoreEntity> _manager;
+    private readonly FirestoreDataManager _manager;
 
     public FirestoreDataManagerTests(GoogleCloudFixture fixture)
     {
@@ -22,11 +22,11 @@ public class FirestoreDataManagerTests : IClassFixture<GoogleCloudFixture>, IAsy
             EmulatorHost = fixture.Emulator.FirestoreEndpoint,
             RootCollectionName = id
         };
-        this._manager = new FirestoreDataManager<DummyFirestoreEntity>(
+        this._manager = new FirestoreDataManager(
             "Test",
             TEST_PARTITION,
             opt,
-            NullLoggerFactory.Instance.CreateLogger<FirestoreDataManager<DummyFirestoreEntity>>());
+            NullLoggerFactory.Instance.CreateLogger<FirestoreDataManager>());
     }
 
     [Fact]
@@ -46,7 +46,7 @@ public class FirestoreDataManagerTests : IClassFixture<GoogleCloudFixture>, IAsy
         {
             Assert.Equal(StatusCode.AlreadyExists, exc.StatusCode);  // "Creating an already existing entry."
         }
-        var returned = await this._manager.ReadEntity(data.Id);
+        var returned = await this._manager.ReadEntity<DummyFirestoreEntity>(data.Id);
         Assert.NotNull(returned);
         Assert.Equal(data.Id, returned.Id);
         Assert.Equal(data.Name, returned.Name);
@@ -64,7 +64,7 @@ public class FirestoreDataManagerTests : IClassFixture<GoogleCloudFixture>, IAsy
         data2.Age = 99;
         var eTag2 = await this._manager.UpsertEntity(data2);
 
-        var returned = await this._manager.ReadEntity(data.Id);
+        var returned = await this._manager.ReadEntity<DummyFirestoreEntity>(data.Id);
         Assert.NotNull(returned);
         Assert.Equal(data.Id, returned.Id);
         Assert.Equal(data2.Name, returned.Name);
@@ -82,7 +82,7 @@ public class FirestoreDataManagerTests : IClassFixture<GoogleCloudFixture>, IAsy
         await Assert.ThrowsAsync<InvalidOperationException>(() => this._manager.Update(data));
         data.ETag = new DateTimeOffset(2021, 1, 1, 0, 0, 0, TimeSpan.Zero);
 
-        var found = await this._manager.ReadEntity(data.Id);
+        var found = await this._manager.ReadEntity<DummyFirestoreEntity>(data.Id);
         Assert.Null(found);
 
         try
@@ -117,7 +117,7 @@ public class FirestoreDataManagerTests : IClassFixture<GoogleCloudFixture>, IAsy
 
         eTag2 = await this._manager.Update(data2);
 
-        var returned = await this._manager.ReadEntity(data.Id);
+        var returned = await this._manager.ReadEntity<DummyFirestoreEntity>(data.Id);
         Assert.NotNull(returned);
         Assert.Equal(data.Id, returned.Id);
         Assert.Equal(data2.Name, returned.Name);
@@ -142,7 +142,7 @@ public class FirestoreDataManagerTests : IClassFixture<GoogleCloudFixture>, IAsy
 
         await this._manager.CreateEntity(data);
 
-        var found = await this._manager.ReadEntity(data.Id);
+        var found = await this._manager.ReadEntity<DummyFirestoreEntity>(data.Id);
         Assert.NotNull(found);
 
         try
@@ -157,7 +157,7 @@ public class FirestoreDataManagerTests : IClassFixture<GoogleCloudFixture>, IAsy
 
         await this._manager.DeleteEntity(data.Id, found.ETag);
 
-        found = await this._manager.ReadEntity(data.Id);
+        found = await this._manager.ReadEntity<DummyFirestoreEntity>(data.Id);
         Assert.Null(found);
 
         try
@@ -183,7 +183,7 @@ public class FirestoreDataManagerTests : IClassFixture<GoogleCloudFixture>, IAsy
         var data3 = GetDummyEntity();
         var eTag3 = await this._manager.CreateEntity(data3);
 
-        var all = await this._manager.ReadAllEntities();
+        var all = await this._manager.ReadAllEntities<DummyFirestoreEntity>();
         Assert.NotNull(all);
         Assert.Equal(3, all.Length);
 
@@ -211,7 +211,7 @@ public class FirestoreDataManagerTests : IClassFixture<GoogleCloudFixture>, IAsy
         await this._manager.DeleteEntity(data.Id, eTag);
         await this._manager.DeleteEntity(data2.Id, eTag2);
 
-        all = await this._manager.ReadAllEntities();
+        all = await this._manager.ReadAllEntities<DummyFirestoreEntity>();
 
         Assert.NotNull(all);
         Assert.Single(all);
@@ -225,7 +225,7 @@ public class FirestoreDataManagerTests : IClassFixture<GoogleCloudFixture>, IAsy
 
         await this._manager.DeleteEntity(data3.Id, eTag3);
 
-        all = await this._manager.ReadAllEntities();
+        all = await this._manager.ReadAllEntities<DummyFirestoreEntity>();
         Assert.NotNull(all);
         Assert.Empty(all);
     }
@@ -241,13 +241,13 @@ public class FirestoreDataManagerTests : IClassFixture<GoogleCloudFixture>, IAsy
 
         await Task.WhenAll(tasks);
 
-        var entities = await this._manager.ReadAllEntities();
+        var entities = await this._manager.ReadAllEntities<DummyFirestoreEntity>();
 
         await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() => this._manager.DeleteEntities(entities)); // "Deleting more than 500 entries at once."
 
         await this._manager.DeleteEntity(entities[0].Id, entities[0].ETag);
 
-        entities = await this._manager.ReadAllEntities();
+        entities = await this._manager.ReadAllEntities<DummyFirestoreEntity>();
         var correctEtag = entities[0].ETag;
         
         try
@@ -269,7 +269,7 @@ public class FirestoreDataManagerTests : IClassFixture<GoogleCloudFixture>, IAsy
 
         await this._manager.DeleteEntities(entities);
 
-        entities = await this._manager.ReadAllEntities();
+        entities = await this._manager.ReadAllEntities<DummyFirestoreEntity>();
 
         Assert.Empty(entities);
 
@@ -282,19 +282,19 @@ public class FirestoreDataManagerTests : IClassFixture<GoogleCloudFixture>, IAsy
         var data = GetDummyEntity();
         data.Age = 21;
         await this._manager.CreateEntity(data);
-        data = (await this._manager.ReadEntity(data.Id))!;
+        data = (await this._manager.ReadEntity<DummyFirestoreEntity>(data.Id))!;
 
         var data2 = GetDummyEntity();
         data2.Age = 60;
         await this._manager.CreateEntity(data2);
-        data2 = (await this._manager.ReadEntity(data2.Id))!;
+        data2 = (await this._manager.ReadEntity<DummyFirestoreEntity>(data2.Id))!;
 
         var data3 = GetDummyEntity();
         data3.Age = 10;
         await this._manager.CreateEntity(data3);
-        data3 = (await this._manager.ReadEntity(data3.Id))!;
+        data3 = (await this._manager.ReadEntity<DummyFirestoreEntity>(data3.Id))!;
 
-        var entities = await this._manager.QueryEntities(x => x.WhereGreaterThanOrEqualTo("Age", 18));
+        var entities = await this._manager.QueryEntities<DummyFirestoreEntity>(x => x.WhereGreaterThanOrEqualTo("Age", 18));
 
         Assert.NotNull(entities);
         Assert.Equal(2, entities.Length);
@@ -306,7 +306,7 @@ public class FirestoreDataManagerTests : IClassFixture<GoogleCloudFixture>, IAsy
         Assert.Equal(data.Age, found.Age);
         Assert.Equal(data.ETag, found.ETag);
 
-        entities = await this._manager.QueryEntities(x => x.WhereLessThan("Age", 18));
+        entities = await this._manager.QueryEntities<DummyFirestoreEntity>(x => x.WhereLessThan("Age", 18));
 
         Assert.NotNull(entities);
         Assert.Single(entities);
@@ -318,7 +318,7 @@ public class FirestoreDataManagerTests : IClassFixture<GoogleCloudFixture>, IAsy
         Assert.Equal(data3.Age, found.Age);
         Assert.Equal(data3.ETag, found.ETag);
 
-        entities = await this._manager.QueryEntities(x => x.WhereGreaterThan("Age", 60));
+        entities = await this._manager.QueryEntities<DummyFirestoreEntity>(x => x.WhereGreaterThan("Age", 60));
 
         Assert.NotNull(entities);
         Assert.Empty(entities);
