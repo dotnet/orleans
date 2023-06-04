@@ -13,7 +13,8 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <Compile Include="..\Shared\Storage\FirestoreDataManager.cs" Link="Storage\FirestoreDataManager.cs" />
+    <Compile Include="..\Shared\Storage\FirestoreDataManager.cs"
+      Link="Storage\FirestoreDataManager.cs" />
     <Compile Include="..\Shared\Storage\FirestoreEntity.cs" Link="Storage\FirestoreEntity.cs" />
     <Compile Include="..\Shared\Storage\FirestoreOptions.cs" Link="Storage\FirestoreOptions.cs" />
     <Compile Include="..\Shared\Storage\GoogleCloudOptions.cs" Link="Storage\GoogleCloudOptions.cs" />
@@ -23,5 +24,11 @@
     <ProjectReference Include="$(SourceRoot)src\Orleans.Runtime\Orleans.Runtime.csproj" />
     <PackageReference Include="Google.Cloud.Firestore" />
     <PackageReference Include="System.Net.NameResolution" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleToAttribute">
+      <_Parameter1>Orleans.Tests.Google</_Parameter1>
+    </AssemblyAttribute>
   </ItemGroup>
 </Project>

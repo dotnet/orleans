@@ -20,10 +20,9 @@ namespace Orleans.GrainDirectory.GoogleFirestore;
 // No default namespace intentionally to cause compile errors if something is not defined
 #endif
 
-internal class FirestoreDataManager<TEntity> where TEntity : FirestoreEntity, new()
+internal class FirestoreDataManager
 {
-    private static readonly DateTimeOffset _unixEpoch = new(1970, 1, 1, 0, 0, 0, TimeSpan.Zero);
-    private const int MAX_BATCH_OPS = 500; // Batches are only allowed to have 500 operations
+    public const int MAX_BATCH_ENTRIES = 500; // Batches are only allowed to have 500 operations
     private readonly FirestoreOptions _options;
     private readonly FirestoreDb _db;
     private readonly string _group;
@@ -82,7 +81,7 @@ internal class FirestoreDataManager<TEntity> where TEntity : FirestoreEntity, ne
 
         if (colSnapshot.Count == 0) return;
 
-        foreach (var chunk in colSnapshot.Documents.Chunk(MAX_BATCH_OPS))
+        foreach (var chunk in colSnapshot.Documents.Chunk(MAX_BATCH_ENTRIES))
         {
             var batch = this._db.StartBatch();
 
@@ -100,7 +99,7 @@ internal class FirestoreDataManager<TEntity> where TEntity : FirestoreEntity, ne
     /// </summary>
     /// <param name="entity">The entity</param>
     /// <returns>The entity's eTag</returns>
-    public async Task<string> CreateEntity(TEntity entity)
+    public async Task<string> CreateEntity<TEntity>(TEntity entity) where TEntity : FirestoreEntity, new()
     {
         var collection = this.GetCollection();
         if (this.Logger.IsEnabled(LogLevel.Trace)) this.Logger.LogTrace("Creating entity {id} on collection {collection}", entity.Id, this._partition);
@@ -126,7 +125,7 @@ internal class FirestoreDataManager<TEntity> where TEntity : FirestoreEntity, ne
     /// </summary>
     /// <param name="entity">The entity</param>
     /// <returns>The entity's eTag</returns>
-    public async Task<string> UpsertEntity(TEntity entity)
+    public async Task<string> UpsertEntity<TEntity>(TEntity entity) where TEntity : FirestoreEntity, new()
     {
         var collection = this.GetCollection();
         if (this.Logger.IsEnabled(LogLevel.Trace)) this.Logger.LogTrace("Upserting entity {id} on collection {collection}", entity.Id, this._partition);
@@ -137,7 +136,7 @@ internal class FirestoreDataManager<TEntity> where TEntity : FirestoreEntity, ne
 
             var docRef = collection.Document(entity.Id);
 
-            var result = await docRef.SetAsync(entity.GetFields(), SetOptions.MergeAll);
+            var result = await docRef.SetAsync(entity, SetOptions.MergeAll);
             return FormatTimestamp(result.UpdateTime);
         }
         catch (Exception ex)
@@ -152,7 +151,7 @@ internal class FirestoreDataManager<TEntity> where TEntity : FirestoreEntity, ne
     /// </summary>
     /// <param name="entity">The entity</param>
     /// <returns>The entity's eTag</returns>
-    public async Task<string> Update(TEntity entity)
+    public async Task<string> Update<TEntity>(TEntity entity) where TEntity : FirestoreEntity, new()
     {
         var collection = this.GetCollection();
         if (this.Logger.IsEnabled(LogLevel.Trace)) this.Logger.LogTrace("Merging entity {id} on collection {collection}", entity.Id, this._partition);
@@ -215,7 +214,7 @@ internal class FirestoreDataManager<TEntity> where TEntity : FirestoreEntity, ne
     /// </summary>
     /// <param name="id">The entity's id</param>
     /// <returns>The entity or null of not exist</returns>
-    public async Task<TEntity?> ReadEntity(string id)
+    public async Task<TEntity?> ReadEntity<TEntity>(string id) where TEntity : FirestoreEntity, new()
     {
         var collection = this.GetCollection();
         if (this.Logger.IsEnabled(LogLevel.Trace)) this.Logger.LogTrace("Reading entity {id} on collection {collection}", id, this._partition);
@@ -248,7 +247,7 @@ internal class FirestoreDataManager<TEntity> where TEntity : FirestoreEntity, ne
     /// Read all entities.
     /// </summary>
     /// <returns>The entities</returns>
-    public async Task<TEntity[]> ReadAllEntities()
+    public async Task<TEntity[]> ReadAllEntities<TEntity>() where TEntity : FirestoreEntity, new()
     {
         var collection = this.GetCollection();
         if (this.Logger.IsEnabled(LogLevel.Trace)) this.Logger.LogTrace("Reading all entities on collection {collection}", this._partition);
@@ -277,7 +276,7 @@ internal class FirestoreDataManager<TEntity> where TEntity : FirestoreEntity, ne
     /// Delete entities in a partition.
     /// </summary>
     /// <param name="entities">Entities to be deleted</param>
-    public async Task DeleteEntities(TEntity[] entities)
+    public async Task DeleteEntities<TEntity>(TEntity[] entities) where TEntity : FirestoreEntity, new()
     {
         var collection = this.GetCollection();
 
@@ -287,7 +286,7 @@ internal class FirestoreDataManager<TEntity> where TEntity : FirestoreEntity, ne
 
         try
         {
-            if (entities.Length > MAX_BATCH_OPS) throw new ArgumentOutOfRangeException($"Batch operation limit exceeded ({MAX_BATCH_OPS})");
+            if (entities.Length > MAX_BATCH_ENTRIES) throw new ArgumentOutOfRangeException($"Batch operation limit exceeded ({MAX_BATCH_ENTRIES})");
 
             var batch = this._db.StartBatch();
 
@@ -314,7 +313,7 @@ internal class FirestoreDataManager<TEntity> where TEntity : FirestoreEntity, ne
     /// </summary>
     /// <param name="query">The query filter</param>
     /// <returns>An array of entities</returns>
-    public async Task<TEntity[]> QueryEntities(Func<CollectionReference, Query> query)
+    public async Task<TEntity[]> QueryEntities<TEntity>(Func<CollectionReference, Query> query) where TEntity : FirestoreEntity, new()
     {
         var collection = this.GetCollection();
         if (this.Logger.IsEnabled(LogLevel.Trace)) this.Logger.LogTrace("Querying entities on collection {collection}", this._partition);
@@ -339,13 +338,17 @@ internal class FirestoreDataManager<TEntity> where TEntity : FirestoreEntity, ne
         }
     }
 
-    private static void ValidateEntity(TEntity entity, bool updating = false)
+    public Task ExecuteTransaction(Func<Transaction, Task> transactionScope) => this._db.RunTransactionAsync(transactionScope);
+
+    public Task<TEntity> ExecuteTransaction<TEntity>(Func<Transaction, Task<TEntity>> transactionScope) => this._db.RunTransactionAsync(transactionScope);
+
+    private static void ValidateEntity<TEntity>(TEntity entity, bool updating = false) where TEntity : FirestoreEntity, new()
     {
         if (entity.Id == default) throw new InvalidOperationException("Id is required to create or update an entity");
         if (updating)
         {
             if (entity.ETag == default) throw new InvalidOperationException("ETag is required to update an entity");
-            if (entity.ETag < _unixEpoch) throw new InvalidOperationException("ETag must be greater than 1970-01-01T00:00:00Z");
+            if (entity.ETag < DateTimeOffset.UnixEpoch) throw new InvalidOperationException("ETag must be greater than 1970-01-01T00:00:00Z");
         }
     }
 
@@ -355,7 +358,7 @@ internal class FirestoreDataManager<TEntity> where TEntity : FirestoreEntity, ne
     private static DateTimeOffset ParseTimestamp(string ts) =>
         DateTimeOffset.ParseExact(ts, "O", CultureInfo.InvariantCulture);
 
-    protected CollectionReference GetCollection() =>
+    public CollectionReference GetCollection() =>
         this._db.Collection($"{this._options.RootCollectionName}").Document(this._group).Collection(this._partition);
 
     private void LogError(Exception ex, string operation) =>
