@@ -7,10 +7,11 @@ namespace DefaultCluster.Tests.General
     //using ValueUpdateEventArgs = MultifacetGrainClient.ValueUpdateEventArgs;
     public class MultifacetGrainTest : HostedTestClusterEnsureDefaultStarted
     {
-        IMultifacetWriter writer;
-        IMultifacetReader reader;
+        private IMultifacetWriter writer;
+        private IMultifacetReader reader;
+
         //int eventCounter;
-        const int EXPECTED_NUMBER_OF_EVENTS = 4;
+        private const int EXPECTED_NUMBER_OF_EVENTS = 4;
         private TimeSpan timeout = TimeSpan.FromSeconds(5);
 
         public MultifacetGrainTest(DefaultClusterFixture fixture) : base(fixture)

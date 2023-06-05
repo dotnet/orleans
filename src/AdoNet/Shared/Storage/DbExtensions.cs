@@ -26,7 +26,7 @@ namespace Orleans.Tests.SqlUtils
         /// <summary>
         /// An explicit map of type CLR viz database type conversions.
         /// </summary>
-        static readonly ReadOnlyDictionary<Type, DbType> typeMap = new ReadOnlyDictionary<Type, DbType>(new Dictionary<Type, DbType>
+        private static readonly ReadOnlyDictionary<Type, DbType> typeMap = new ReadOnlyDictionary<Type, DbType>(new Dictionary<Type, DbType>
         {
             { typeof(object),   DbType.Object },
             { typeof(int),      DbType.Int32 },

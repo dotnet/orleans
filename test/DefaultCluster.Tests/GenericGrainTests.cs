@@ -802,7 +802,7 @@ namespace DefaultCluster.Tests.General
             {
             }
 
-            static async Task<Type[]> GetConcreteGenArgs(IBasicGrain @this) {
+            private static async Task<Type[]> GetConcreteGenArgs(IBasicGrain @this) {
                 var genArgTypeNames = await @this.ConcreteGenArgTypeNames();
 
                 return genArgTypeNames.Select(n => Type.GetType(n))

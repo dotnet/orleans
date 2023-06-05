@@ -56,7 +56,7 @@ namespace DefaultCluster.Tests
 
         private class MyProducer : IClientAddressableTestProducer
         {
-            int counter = 0;
+            private int counter = 0;
 
             public Task<int> Poll()
             {

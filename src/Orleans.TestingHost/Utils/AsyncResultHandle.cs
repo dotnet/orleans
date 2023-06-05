@@ -8,8 +8,8 @@ namespace Orleans.TestingHost.Utils
     /// </summary>
     public class AsyncResultHandle
     {
-        bool done = false;
-        bool continueFlag = false;
+        private bool done = false;
+        private bool continueFlag = false;
 
         /// <summary> Reset the current result handle </summary>
         public virtual void Reset()

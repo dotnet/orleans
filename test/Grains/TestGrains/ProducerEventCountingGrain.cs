@@ -4,7 +4,7 @@ using UnitTests.GrainInterfaces;
 
 namespace UnitTests.Grains
 {
-    class ProducerEventCountingGrain : BaseGrain, IProducerEventCountingGrain
+    internal class ProducerEventCountingGrain : BaseGrain, IProducerEventCountingGrain
     {
         private IAsyncObserver<int> _producer;
         private int _numProducedItems;
