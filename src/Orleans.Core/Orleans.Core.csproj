@@ -28,5 +28,5 @@
     <PackageReference Include="Newtonsoft.Json" />
     <PackageReference Include="System.Memory.Data" />
   </ItemGroup>
-  
+
 </Project>
