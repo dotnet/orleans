@@ -523,7 +523,7 @@ namespace Orleans.Runtime
         /// Gets the invocation options.
         /// </summary>
         [field: NonSerialized]
-        public InvokeMethodOptions Options { get; private set; }
+        public InvokeMethodOptions Options { get; protected set; }
 
         /// <inheritdoc/>
         public virtual int GetArgumentCount() => 0;
@@ -781,6 +781,12 @@ namespace Orleans.Runtime
     [SerializerTransparent]
     public abstract class VoidRequest : RequestBase
     {
+        protected VoidRequest()
+        {
+            // All void requests are inherently one-way.
+            Options = InvokeMethodOptions.OneWay;
+        }
+
         /// <inheritdoc/>
         [DebuggerHidden]
         public sealed override ValueTask<Response> Invoke()
