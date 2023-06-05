@@ -52,10 +52,8 @@ namespace Orleans
         /// </summary>
         protected Grain(IGrainContext grainContext, IGrainRuntime? grainRuntime = null)
         {
-            ArgumentNullException.ThrowIfNull(grainContext);
-
             GrainContext = grainContext;
-            Runtime = grainRuntime ?? grainContext.ActivationServices.GetRequiredService<IGrainRuntime>();
+            Runtime = grainRuntime ?? grainContext?.ActivationServices.GetService<IGrainRuntime>()!;
         }
 
         /// <summary>
@@ -67,10 +65,7 @@ namespace Orleans
         /// A unique identifier for the current silo.
         /// There is no semantic content to this string, but it may be useful for logging.
         /// </summary>
-        public string RuntimeIdentity
-        {
-            get { return Runtime.SiloIdentity ?? string.Empty; }
-        }
+        public string RuntimeIdentity => Runtime?.SiloIdentity ?? string.Empty;
 
         /// <summary>
         /// Registers a timer to send periodic callbacks to this grain.
