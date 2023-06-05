@@ -31,14 +31,14 @@ namespace Orleans.Runtime
     public interface IGrainMigrationParticipant
     {
         /// <summary>
-        /// Called on the original activation when migration is initiated, before <see cref="IGrainBase.OnDeactivateAsync(DeactivationReason, CancellationToken)"/>.
+        /// Called on the original activation when migration is initiated, after <see cref="IGrainBase.OnDeactivateAsync(DeactivationReason, CancellationToken)"/> completes.
         /// The participant can access and update the dehydration context.
         /// </summary>
         /// <param name="dehydrationContext"></param>
         void OnDehydrate(IDehydrationContext dehydrationContext);
 
         /// <summary>
-        /// Called on the new activation after a migration, before <see cref="IGrainBase.OnActivateAsync(CancellationToken)"/>.
+        /// Called on the new activation after a migration, before <see cref="IGrainBase.OnActivateAsync(CancellationToken)"/> is called.
         /// The participant can restore state from the migration context.
         /// </summary>
         /// <param name="rehydrationContext">The rehydration context.</param>
