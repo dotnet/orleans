@@ -25,14 +25,16 @@ namespace DefaultCluster.Tests.General
                 var grain = GrainFactory.GetGrain<IMigrationTestGrain>(GetRandomGrainId());
                 var expectedState = Random.Shared.Next();
                 await grain.SetState(expectedState);
-                var originalHost = await grain.GetHostAddress();
+                var originalAddress = await grain.GetGrainAddress();
+                var originalHost = originalAddress.SiloAddress;
                 SiloAddress newHost;
                 do
                 {
                     // Trigger migration without setting a placement hint, so the grain placement provider will be
                     // free to select any location including the existing one.
                     await grain.Cast<IGrainManagementExtension>().MigrateOnIdle();
-                    newHost = await grain.GetHostAddress();
+                    var newAddress = await grain.GetGrainAddress();
+                    newHost = newAddress.SiloAddress;
                 } while (newHost == originalHost);
 
                 var newState = await grain.GetState();
@@ -52,14 +54,16 @@ namespace DefaultCluster.Tests.General
                 var grain = GrainFactory.GetGrain<IMigrationTestGrain>(GetRandomGrainId());
                 var expectedState = Random.Shared.Next();
                 await grain.SetState(expectedState);
-                var originalHost = await grain.GetHostAddress();
+                var originalAddress = await grain.GetGrainAddress();
+                var originalHost = originalAddress.SiloAddress;
                 var targetHost = Fixture.HostedCluster.GetActiveSilos().Select(s => s.SiloAddress).First(address => address != originalHost);
 
                 // Trigger migration, setting a placement hint to coerce the placement director to use the target silo
                 RequestContext.Set(IPlacementDirector.PlacementHintKey, targetHost);
                 await grain.Cast<IGrainManagementExtension>().MigrateOnIdle();
 
-                var newHost = await grain.GetHostAddress();
+                var newAddress = await grain.GetGrainAddress();
+                var newHost = newAddress.SiloAddress;
                 Assert.Equal(targetHost, newHost);
 
                 var newState = await grain.GetState();
@@ -79,14 +83,16 @@ namespace DefaultCluster.Tests.General
                 var grain = GrainFactory.GetGrain<IMigrationTestGrain_GrainOfT>(GetRandomGrainId());
                 var expectedState = Random.Shared.Next();
                 await grain.SetState(expectedState);
-                var originalHost = await grain.GetHostAddress();
+                var originalAddress = await grain.GetGrainAddress();
+                var originalHost = originalAddress.SiloAddress;
                 var targetHost = Fixture.HostedCluster.GetActiveSilos().Select(s => s.SiloAddress).First(address => address != originalHost);
 
                 // Trigger migration, setting a placement hint to coerce the placement director to use the target silo
                 RequestContext.Set(IPlacementDirector.PlacementHintKey, targetHost);
                 await grain.Cast<IGrainManagementExtension>().MigrateOnIdle();
 
-                var newHost = await grain.GetHostAddress();
+                var newAddress = await grain.GetGrainAddress();
+                var newHost = newAddress.SiloAddress;
                 Assert.Equal(targetHost, newHost);
 
                 var newState = await grain.GetState();
@@ -107,14 +113,16 @@ namespace DefaultCluster.Tests.General
                 var expectedStateA = Random.Shared.Next();
                 var expectedStateB = Random.Shared.Next();
                 await grain.SetState(expectedStateA, expectedStateB);
-                var originalHost = await grain.GetHostAddress();
+                var originalAddress = await grain.GetGrainAddress();
+                var originalHost = originalAddress.SiloAddress;
                 var targetHost = Fixture.HostedCluster.GetActiveSilos().Select(s => s.SiloAddress).First(address => address != originalHost);
 
                 // Trigger migration, setting a placement hint to coerce the placement director to use the target silo
                 RequestContext.Set(IPlacementDirector.PlacementHintKey, targetHost);
                 await grain.Cast<IGrainManagementExtension>().MigrateOnIdle();
 
-                var newHost = await grain.GetHostAddress();
+                var newAddress = await grain.GetGrainAddress();
+                var newHost = newAddress.SiloAddress;
                 Assert.Equal(targetHost, newHost);
 
                 var (actualA, actualB) = await grain.GetState();
@@ -122,21 +130,70 @@ namespace DefaultCluster.Tests.General
                 Assert.Equal(expectedStateB, actualB);
             }
         }
+
+        /// <summary>
+        /// When grain dehydration fails, the grain should be deactivated but will not retain migration state.
+        /// </summary>
+        [Fact, TestCategory("BVT")]
+        public async Task FailDehydrationTest()
+        {
+            var grain = GrainFactory.GetGrain<IMigrationTestGrain>(GetRandomGrainId());
+            var expectedState = Random.Shared.Next();
+            await grain.SetState(expectedState);
+            var originalAddress = await grain.GetGrainAddress();
+            var targetHost = Fixture.HostedCluster.GetActiveSilos().Select(s => s.SiloAddress).First(address => address != originalAddress.SiloAddress);
+
+            // Trigger migration, setting a placement hint to coerce the placement director to use the target silo
+            // Also, tell the grain to fail to dehydrate (by stuffing some data into the request context which tells it to throw)
+            RequestContext.Set("fail_dehydrate", true);
+            RequestContext.Set(IPlacementDirector.PlacementHintKey, targetHost);
+            await grain.Cast<IGrainManagementExtension>().MigrateOnIdle();
+
+            var newAddress = await grain.GetGrainAddress();
+            Assert.Equal(targetHost, newAddress.SiloAddress);
+
+            // The grain should have lost its state during the failed migration.
+            var newState = await grain.GetState();
+            Assert.NotEqual(expectedState, newState);
+        }
+
+        /// <summary>
+        /// When grain rehydration fails, the grain should be deactivated but will not retain migration state.
+        /// </summary>
+        [Fact, TestCategory("BVT")]
+        public async Task FailRehydrationTest()
+        {
+            var grain = GrainFactory.GetGrain<IMigrationTestGrain>(GetRandomGrainId());
+            var expectedState = Random.Shared.Next();
+            await grain.SetState(expectedState);
+            var originalAddress = await grain.GetGrainAddress();
+            var targetHost = Fixture.HostedCluster.GetActiveSilos().Select(s => s.SiloAddress).First(address => address != originalAddress.SiloAddress);
+
+            // Trigger migration, setting a placement hint to coerce the placement director to use the target silo
+            // Also, tell the grain to fail to rehydrate (by stuffing some data into the rehydration context which tells it to throw)
+            RequestContext.Set("fail_rehydrate", true);
+            RequestContext.Set(IPlacementDirector.PlacementHintKey, targetHost);
+            await grain.Cast<IGrainManagementExtension>().MigrateOnIdle();
+
+            var newAddress = await grain.GetGrainAddress();
+            Assert.Equal(targetHost, newAddress.SiloAddress);
+
+            // The grain should have lost its state during the failed migration.
+            var newState = await grain.GetState();
+            Assert.NotEqual(expectedState, newState);
+        }
     }
 
     public interface IMigrationTestGrain : IGrainWithIntegerKey
     {
+        ValueTask<GrainAddress> GetGrainAddress();
         ValueTask SetState(int state);
         ValueTask<int> GetState();
-        ValueTask<SiloAddress> GetHostAddress();
     }
 
-    public class MigrationTestGrain : IMigrationTestGrain, IGrainMigrationParticipant
+    public class MigrationTestGrain : Grain, IMigrationTestGrain, IGrainMigrationParticipant
     {
         private int _state;
-        private readonly SiloAddress _hostAddress;
-        public  MigrationTestGrain(ILocalSiloDetails siloDetails) => _hostAddress = siloDetails.SiloAddress;
-
         public ValueTask<int> GetState() => new(_state);
 
         public ValueTask SetState(int state)
@@ -145,31 +202,47 @@ namespace DefaultCluster.Tests.General
             return default;
         }
 
-        public ValueTask<SiloAddress> GetHostAddress() => new(_hostAddress);
-
         public void OnDehydrate(IDehydrationContext migrationContext)
         {
             migrationContext.TryAddValue("state", _state);
+
+            {
+                if (RequestContext.Get("fail_rehydrate") is bool fail && fail)
+                {
+                    migrationContext.TryAddValue("fail_rehydrate", true);
+                }
+            }
+
+            {
+                if (RequestContext.Get("fail_dehydrate") is bool fail && fail)
+                {
+                    throw new InvalidOperationException("Failing to dehydrate on-command");
+                }
+            }
         }
 
         public void OnRehydrate(IRehydrationContext migrationContext)
         {
+            if (migrationContext.TryGetValue("fail_rehydrate", out bool fail) && fail)
+            {
+                throw new InvalidOperationException("Failing to rehydrate on-command");
+            }
+
             migrationContext.TryGetValue("state", out _state);
         }
+
+        public ValueTask<GrainAddress> GetGrainAddress() => new(GrainContext.Address);
     }
 
     public interface IMigrationTestGrain_GrainOfT : IGrainWithIntegerKey
     {
         ValueTask SetState(int state);
         ValueTask<int> GetState();
-        ValueTask<SiloAddress> GetHostAddress();
+        ValueTask<GrainAddress> GetGrainAddress();
     }
 
     public class MigrationTestGrainWithMemoryStorage : Grain<MyMigrationStateClass>, IMigrationTestGrain_GrainOfT
     {
-        private readonly SiloAddress _hostAddress;
-        public  MigrationTestGrainWithMemoryStorage(ILocalSiloDetails siloDetails) => _hostAddress = siloDetails.SiloAddress;
-
         public ValueTask<int> GetState() => new(State.Value);
 
         public ValueTask SetState(int state)
@@ -178,7 +251,7 @@ namespace DefaultCluster.Tests.General
             return default;
         }
 
-        public ValueTask<SiloAddress> GetHostAddress() => new(_hostAddress);
+        public ValueTask<GrainAddress> GetGrainAddress() => new(GrainContext.Address);
     }
 
     [GenerateSerializer]
@@ -192,23 +265,20 @@ namespace DefaultCluster.Tests.General
     {
         ValueTask SetState(int a, int b);
         ValueTask<(int A, int B)> GetState();
-        ValueTask<SiloAddress> GetHostAddress();
+        ValueTask<GrainAddress> GetGrainAddress();
     }
 
-    public class MigrationTestGrainWithInjectedMemoryStorage : IMigrationTestGrain_IPersistentStateOfT
+    public class MigrationTestGrainWithInjectedMemoryStorage : Grain, IMigrationTestGrain_IPersistentStateOfT
     {
-        private readonly SiloAddress _hostAddress;
         private readonly IPersistentState<MyMigrationStateClass> _stateA;
         private readonly IPersistentState<MyMigrationStateClass> _stateB;
 
         public MigrationTestGrainWithInjectedMemoryStorage(
             [PersistentState("a")] IPersistentState<MyMigrationStateClass> stateA,
-            [PersistentState("b")] IPersistentState<MyMigrationStateClass> stateB,
-            ILocalSiloDetails siloDetails)
+            [PersistentState("b")] IPersistentState<MyMigrationStateClass> stateB)
         {
             _stateA = stateA;
             _stateB = stateB;
-            _hostAddress = siloDetails.SiloAddress;
         }
 
         public ValueTask<(int A, int B)> GetState() => new((_stateA.State.Value, _stateB.State.Value));
@@ -220,6 +290,6 @@ namespace DefaultCluster.Tests.General
             return default;
         }
 
-        public ValueTask<SiloAddress> GetHostAddress() => new(_hostAddress);
+        public ValueTask<GrainAddress> GetGrainAddress() => new(GrainContext.Address);
     }
 }

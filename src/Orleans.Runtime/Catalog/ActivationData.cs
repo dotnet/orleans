@@ -1612,6 +1612,15 @@ namespace Orleans.Runtime
                     try
                     {
                         // Populate the dehydration context.
+                        if (context.RequestContext is { } requestContext)
+                        {
+                            RequestContextExtensions.Import(requestContext);
+                        }
+                        else
+                        {
+                            RequestContext.Clear();
+                        }
+
                         OnDehydrate(context.Value);
 
                         // Send the dehydration context to the target host
@@ -1623,6 +1632,10 @@ namespace Orleans.Runtime
                     catch (Exception exception)
                     {
                         _shared.Logger.LogWarning(exception, "Failed to migrate grain {GrainId} to {SiloAddress}", GrainId, ForwardingAddress);
+                    }
+                    finally
+                    {
+                        RequestContext.Clear();
                     }
                 }
 
