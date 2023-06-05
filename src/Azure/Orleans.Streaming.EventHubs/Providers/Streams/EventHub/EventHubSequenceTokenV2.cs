@@ -1,6 +1,4 @@
 using System;
-using Orleans.CodeGeneration;
-using Orleans.Serialization;
 
 namespace Orleans.Streaming.EventHubs
 {

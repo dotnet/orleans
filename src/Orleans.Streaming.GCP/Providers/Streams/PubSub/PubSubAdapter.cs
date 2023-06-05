@@ -1,5 +1,4 @@
 using Orleans.Runtime;
-using Orleans.Serialization;
 using Orleans.Streams;
 using System;
 using System.Collections.Concurrent;

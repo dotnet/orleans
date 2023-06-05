@@ -1,5 +1,4 @@
 using Microsoft.Extensions.DependencyInjection;
-using Orleans;
 using Orleans.Configuration;
 using Orleans.Reminders.DynamoDB;
 using System;

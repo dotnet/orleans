@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.Text;
 using Orleans.Internal;
-using Orleans.Statistics;
 
 namespace Orleans.Runtime.GrainDirectory
 {

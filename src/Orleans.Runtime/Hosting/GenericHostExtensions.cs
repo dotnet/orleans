@@ -1,6 +1,5 @@
 using System;
 using Microsoft.Extensions.DependencyInjection;
-using Orleans;
 using Orleans.Hosting;
 using Orleans.Runtime;
 using static Microsoft.Extensions.Hosting.OrleansClientGenericHostExtensions;
@@ -13,6 +12,44 @@ namespace Microsoft.Extensions.Hosting
     public static class GenericHostExtensions
     {
         /// <summary>
+        /// Configures the host app builder to host an Orleans silo.
+        /// </summary>
+        /// <param name="hostAppBuilder">The host app builder.</param>
+        /// <returns>The host builder.</returns>
+        public static HostApplicationBuilder UseOrleans(
+            this HostApplicationBuilder hostAppBuilder) =>
+            hostAppBuilder.UseOrleans(_ => { });
+
+        /// <summary>
+        /// Configures the host builder to host an Orleans silo.
+        /// </summary>
+        /// <param name="hostAppBuilder">The host app builder.</param>
+        /// <param name="configureDelegate">The delegate used to configure the silo.</param>
+        /// <returns>The host builder.</returns>
+        /// <remarks>
+        /// Calling this method multiple times on the same <see cref="HostApplicationBuilder"/> instance will result in one silo being configured.
+        /// However, the effects of <paramref name="configureDelegate"/> will be applied once for each call.
+        /// </remarks>
+        public static HostApplicationBuilder UseOrleans(
+            this HostApplicationBuilder hostAppBuilder,
+            Action<ISiloBuilder> configureDelegate)
+        {
+            ArgumentNullException.ThrowIfNull(hostAppBuilder);
+            ArgumentNullException.ThrowIfNull(configureDelegate);
+
+            if (hostAppBuilder.Configuration["HasOrleansClientBuilder"] is not null)
+            {
+                throw GetOrleansClientAddedException();
+            }
+
+            hostAppBuilder.Configuration["HasOrleansSiloBuilder"] = "true";
+
+            hostAppBuilder.Services.AddOrleans(configureDelegate);
+
+            return hostAppBuilder;
+        }
+
+        /// <summary>
         /// Configures the host builder to host an Orleans silo.
         /// </summary>
         /// <param name="hostBuilder">The host builder.</param>
@@ -24,7 +61,8 @@ namespace Microsoft.Extensions.Hosting
         /// </remarks>
         public static IHostBuilder UseOrleans(
             this IHostBuilder hostBuilder,
-            Action<ISiloBuilder> configureDelegate) => hostBuilder.UseOrleans((_, siloBuilder) => configureDelegate(siloBuilder));
+            Action<ISiloBuilder> configureDelegate) =>
+            hostBuilder.UseOrleans((_, siloBuilder) => configureDelegate(siloBuilder));
 
         /// <summary>
         /// Configures the host builder to host an Orleans silo.
@@ -40,8 +78,8 @@ namespace Microsoft.Extensions.Hosting
             this IHostBuilder hostBuilder,
             Action<HostBuilderContext, ISiloBuilder> configureDelegate)
         {
-            if (hostBuilder is null) throw new ArgumentNullException(nameof(hostBuilder));
-            if (configureDelegate == null) throw new ArgumentNullException(nameof(configureDelegate));
+            ArgumentNullException.ThrowIfNull(hostBuilder);
+            ArgumentNullException.ThrowIfNull(configureDelegate);
 
             if (hostBuilder.Properties.ContainsKey("HasOrleansClientBuilder"))
             {
@@ -67,7 +105,8 @@ namespace Microsoft.Extensions.Hosting
             this IServiceCollection services,
             Action<ISiloBuilder> configureDelegate)
         {
-            if (configureDelegate == null) throw new ArgumentNullException(nameof(configureDelegate));
+            ArgumentNullException.ThrowIfNull(configureDelegate);
+
             var builder = AddOrleans(services);
 
             configureDelegate(builder);

@@ -1,7 +1,6 @@
 using Orleans.CodeGeneration;
 using Orleans.GrainReferences;
 using Orleans.Metadata;
-using Orleans.Serialization;
 using Orleans.Serialization.Invocation;
 using System;
 using System.Collections.Generic;

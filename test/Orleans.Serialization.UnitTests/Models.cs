@@ -1,12 +1,8 @@
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
-using System.Text.Json.Serialization;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.FSharp.Core;
 using Newtonsoft.Json;
 using Orleans;
-using Orleans.Serialization.UnitTests;
 
 [GenerateSerializer]
 public record Person([property: Id(0)] int Age, [property: Id(1)] string Name)

@@ -1,9 +1,7 @@
-using System;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 using Orleans.GrainDirectory.Redis;
-using Orleans.Hosting;
 using Orleans.TestingHost;
 using StackExchange.Redis;
 using Tester.Directories;

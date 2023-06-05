@@ -4,7 +4,6 @@ using Azure;
 using Azure.Core;
 using Azure.Storage;
 using Azure.Storage.Blobs;
-using Newtonsoft.Json;
 using Orleans.Persistence.AzureStorage;
 using Orleans.Runtime;
 using Orleans.Storage;

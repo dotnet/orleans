@@ -5,7 +5,6 @@ using Orleans.Serialization;
 using Orleans.Serialization.Session;
 using Microsoft.Extensions.DependencyInjection;
 using Newtonsoft.Json;
-using System.IO;
 using System.Text;
 using System.Text.Json;
 using Xunit;
@@ -13,7 +12,6 @@ using SerializerSession = Orleans.Serialization.Session.SerializerSession;
 using Utf8JsonNS = Utf8Json;
 using Hyperion;
 using ZeroFormatter;
-using System.Buffers;
 using Google.Protobuf;
 
 namespace Benchmarks.Comparison

@@ -1,7 +1,4 @@
-using System;
-using System.Threading.Tasks;
 using System.Collections.Concurrent;
-using System.Linq;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Orleans.Providers.Streams.Common;
@@ -10,7 +7,6 @@ using Orleans.Streaming.EventHubs;
 using Orleans.Streams;
 using Orleans.Streaming.EventHubs.Testing;
 using Orleans.Configuration;
-using Orleans;
 using Orleans.Statistics;
 
 namespace ServiceBus.Tests.TestStreamProviders

@@ -4,13 +4,11 @@ using System.Linq;
 using System.Net;
 using System.Threading.Tasks;
 using Azure;
-using Azure.Core;
 using Azure.Storage.Queues;
 using Azure.Storage.Queues.Models;
 using Microsoft.Extensions.Logging;
 using Orleans.AzureUtils.Utilities;
 using Orleans.Configuration;
-using Orleans.Runtime;
 
 namespace Orleans.AzureUtils
 {

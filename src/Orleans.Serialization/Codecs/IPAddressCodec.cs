@@ -2,7 +2,6 @@ using System;
 using System.Buffers;
 using System.Net;
 using System.Runtime.CompilerServices;
-using System.Runtime.InteropServices;
 using Orleans.Serialization.Cloning;
 using Orleans.Serialization.WireProtocol;
 

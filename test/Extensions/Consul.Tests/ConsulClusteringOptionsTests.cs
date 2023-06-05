@@ -1,11 +1,8 @@
-using System;
-using System.Threading;
-using System.Threading.Tasks;
 using Orleans.Configuration;
 using Xunit;
 
 namespace Consul.Tests
-{    
+{
     public class ConsulClusteringOptionsTests
     {
         [Fact, TestCategory("BVT"), TestCategory("Consul")]

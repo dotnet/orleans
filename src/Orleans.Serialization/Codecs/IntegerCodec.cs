@@ -1,6 +1,4 @@
 using Orleans.Serialization.Buffers;
-using Orleans.Serialization.Cloning;
-using Orleans.Serialization.Serializers;
 using Orleans.Serialization.WireProtocol;
 using System;
 using System.Buffers;
@@ -8,7 +6,6 @@ using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Numerics;
 using System.Runtime.CompilerServices;
-using System.Security.Cryptography;
 
 namespace Orleans.Serialization.Codecs
 {

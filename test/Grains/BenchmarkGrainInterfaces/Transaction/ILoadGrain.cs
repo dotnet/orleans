@@ -1,8 +1,4 @@
-﻿using System;
-using System.Threading.Tasks;
-using Orleans;
-
-namespace BenchmarkGrainInterfaces.Transaction
+﻿namespace BenchmarkGrainInterfaces.Transaction
 {
     public class Report
     {

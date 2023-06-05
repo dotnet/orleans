@@ -5,7 +5,6 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
-using Orleans.Runtime;
 using Orleans.Transactions.Abstractions;
 
 namespace Orleans.Transactions.State

@@ -1,5 +1,4 @@
-﻿using Orleans.Hosting;
-using Orleans.TestingHost;
+﻿using Orleans.TestingHost;
 using TestExtensions;
 using UnitTests.Grains.Directories;
 

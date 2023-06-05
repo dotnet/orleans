@@ -4,7 +4,6 @@ using System.Numerics;
 #endif
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
-using Orleans.Serialization.Buffers;
 
 namespace Orleans.Serialization.Buffers
 {
