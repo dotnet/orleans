@@ -40,7 +40,7 @@ namespace Orleans.GrainDirectory.Redis
         {
             try
             {
-                var result = (string)await _database.HashGetAsync(GetKey(grainId), "data");
+                var result = (string)await _database.StringGetAsync(GetKey(grainId));
 
                 if (_logger.IsEnabled(LogLevel.Debug))
                     _logger.LogDebug("Lookup {GrainId}: {Result}", grainId, string.IsNullOrWhiteSpace(result) ? "null" : result);
@@ -67,31 +67,35 @@ namespace Orleans.GrainDirectory.Redis
         {
             const string RegisterScript =
                 """
-                local etag = redis.call('HGET', KEYS[1], 'etag') 
-                local data = redis.call('HGET', KEYS[1], 'data') 
-                if (not etag or etag == ARGV[2]) then
-                    redis.call('HSET', KEYS[1], 'data', ARGV[1])
-                    redis.call('HSET', KEYS[1], 'etag', ARGV[4])
+                local cur = redis.call('GET', KEYS[1]) 
+                local success = true
+                if cur ~= false then
+                    local typedCur = cjson.decode(cur)
+                    if typedCur.ActivationId ~= ARGV[2] then
+                       success = false
+                    end
+                end
 
-                    if (not ARGV[3] and ARGV[3] ~= '-1') then
+                if (success) then
+                    redis.call('SET', KEYS[1], ARGV[1])
+                    if ARGV[3] ~= '-1' then
                         redis.call('EXPIRE', KEYS[1], ARGV[3])
                     end 
-                    return nil 
+                    return nil
                 end
-                return data
+
+                return cur
                 """;
 
             var value = JsonSerializer.Serialize(address);
             try
             {
-                var etag = previousAddress is { } ? previousAddress.ActivationId.ToString() : "";
-                var newEtag = address.ActivationId.ToString();
+                var previousActivationId = previousAddress is { } ? previousAddress.ActivationId.ToString() : "";
                 var key = GetKey(address.GrainId);
-                var args = new RedisValue[] { value, etag, _ttl, newEtag };
                 var entryString = (string)await _database.ScriptEvaluateAsync(
                     RegisterScript,
                     keys: new RedisKey[] { key },
-                    values: args);
+                    values: new RedisValue[] { value, previousActivationId, _ttl });
 
                 if (entryString is null)
                 {
@@ -129,9 +133,12 @@ namespace Orleans.GrainDirectory.Redis
         {
             const string DeleteScript =
                 """
-                local etag = redis.call('HGET', KEYS[1], 'etag') 
-                if (etag == ARGV[1]) then
-                    return redis.call('DEL', KEYS[1])
+                local cur = redis.call('GET', KEYS[1]) 
+                if cur ~= false then
+                    local typedCur = cjson.decode(cur)
+                    if typedCur.ActivationId == ARGV[1] then
+                        return redis.call('DEL', KEYS[1])
+                    end
                 end
                 return 0
                 """;
