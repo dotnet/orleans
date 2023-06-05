@@ -108,14 +108,11 @@ namespace Orleans.Serialization.TypeSystem
             }
 
             type = Type.GetType(fullName, throwOnError: false);
-            if (type is null)
-            { 
-                type = Type.GetType(
+            type ??= Type.GetType(
                        fullName,
                        ResolveAssembly,
                        ResolveType,
                        false);
-            }
 
             return type != null;
 

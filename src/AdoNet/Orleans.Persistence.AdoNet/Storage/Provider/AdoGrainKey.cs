@@ -77,10 +77,7 @@ namespace Orleans.Storage
                 Array.Copy(stringBytes, 0, bytes, oldLen, stringBytes.Length);
             }
 
-            if(bytes == null)
-            {
-                bytes = Encoding.UTF8.GetBytes(StringKey);
-            }
+            bytes ??= Encoding.UTF8.GetBytes(StringKey);
 
             if(BitConverter.IsLittleEndian)
             {

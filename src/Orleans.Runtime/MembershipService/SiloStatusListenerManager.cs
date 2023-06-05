@@ -109,7 +109,7 @@ namespace Orleans.Runtime.MembershipService
                 {
                     if (!subscribers[i].TryGetTarget(out var listener))
                     {
-                        if (toRemove is null) toRemove = new List<WeakReference<ISiloStatusListener>>();
+                        toRemove ??= new List<WeakReference<ISiloStatusListener>>();
                         toRemove.Add(subscribers[i]);
                         continue;
                     }

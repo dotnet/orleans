@@ -42,7 +42,7 @@ namespace Orleans.Runtime
         private readonly InterfaceToImplementationMappingCache interfaceToImplementationMapping;
         private HostedClient hostedClient;
 
-        private HostedClient HostedClient => hostedClient ?? (hostedClient = ServiceProvider.GetRequiredService<HostedClient>());
+        private HostedClient HostedClient => hostedClient ??= ServiceProvider.GetRequiredService<HostedClient>();
         private readonly MessageFactory messageFactory;
         private IGrainReferenceRuntime grainReferenceRuntime;
         private readonly MessagingTrace messagingTrace;
@@ -96,17 +96,17 @@ namespace Orleans.Runtime
 
         public GrainFactory ConcreteGrainFactory { get; }
 
-        private Catalog Catalog => catalog ?? (catalog = ServiceProvider.GetRequiredService<Catalog>());
+        private Catalog Catalog => catalog ??= ServiceProvider.GetRequiredService<Catalog>();
 
         private GrainLocator GrainLocator
-            => grainLocator ?? (grainLocator = ServiceProvider.GetRequiredService<GrainLocator>());
+            => grainLocator ??= ServiceProvider.GetRequiredService<GrainLocator>();
 
         private List<IIncomingGrainCallFilter> GrainCallFilters
-            => grainCallFilters ?? (grainCallFilters = new List<IIncomingGrainCallFilter>(ServiceProvider.GetServices<IIncomingGrainCallFilter>()));
+            => grainCallFilters ??= new List<IIncomingGrainCallFilter>(ServiceProvider.GetServices<IIncomingGrainCallFilter>());
 
-        private MessageCenter MessageCenter => messageCenter ?? (messageCenter = ServiceProvider.GetRequiredService<MessageCenter>());
+        private MessageCenter MessageCenter => messageCenter ??= ServiceProvider.GetRequiredService<MessageCenter>();
 
-        public IGrainReferenceRuntime GrainReferenceRuntime => grainReferenceRuntime ?? (grainReferenceRuntime = ServiceProvider.GetRequiredService<IGrainReferenceRuntime>());
+        public IGrainReferenceRuntime GrainReferenceRuntime => grainReferenceRuntime ??= ServiceProvider.GetRequiredService<IGrainReferenceRuntime>();
 
         public void SendRequest(
             GrainReference target,
@@ -119,8 +119,7 @@ namespace Orleans.Runtime
             message.InterfaceVersion = target.InterfaceVersion;
 
             // fill in sender
-            if (message.SendingSilo == null)
-                message.SendingSilo = MySilo;
+            message.SendingSilo ??= MySilo;
 
             var sendingActivation = RuntimeContext.Current;
 

@@ -132,26 +132,14 @@ namespace Orleans.Streaming.EventHubs
 
             InitEventHubClient();
 
-            if (CacheFactory == null)
-            {
-                CacheFactory = CreateCacheFactory(cacheOptions).CreateCache;
-            }
+            CacheFactory ??= CreateCacheFactory(cacheOptions).CreateCache;
 
-            if (StreamFailureHandlerFactory == null)
-            {
-                //TODO: Add a queue specific default failure handler with reasonable error reporting.
-                StreamFailureHandlerFactory = partition => Task.FromResult<IStreamFailureHandler>(new NoOpStreamDeliveryFailureHandler());
-            }
+            //TODO: Add a queue specific default failure handler with reasonable error reporting.
+            StreamFailureHandlerFactory ??= partition => Task.FromResult<IStreamFailureHandler>(new NoOpStreamDeliveryFailureHandler());
 
-            if (QueueMapperFactory == null)
-            {
-                QueueMapperFactory = partitions => new(partitions, Name);
-            }
+            QueueMapperFactory ??= partitions => new(partitions, Name);
 
-            if (ReceiverMonitorFactory == null)
-            {
-                ReceiverMonitorFactory = (dimensions, logger) => new DefaultEventHubReceiverMonitor(dimensions);
-            }
+            ReceiverMonitorFactory ??= (dimensions, logger) => new DefaultEventHubReceiverMonitor(dimensions);
 
             logger = loggerFactory.CreateLogger($"{GetType().FullName}.{ehOptions.EventHubName}");
         }

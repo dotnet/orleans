@@ -437,15 +437,12 @@ namespace Orleans.Streams
                     options.LeaseAquisitionPeriod);
             }
 
-            if (leaseMaintenanceTimer == null)
-            {
-                leaseMaintenanceTimer = timerRegistry.RegisterTimer(
+            leaseMaintenanceTimer ??= timerRegistry.RegisterTimer(
                     null,
                     MaintainLeases,
                     null,
                     options.LeaseRenewPeriod,
                     options.LeaseRenewPeriod);
-            }
 
             await AcquireLeasesToMeetResponsibility();
         }

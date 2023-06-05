@@ -793,8 +793,7 @@ namespace UnitTests.Grains
             _id = _counter++;
             var loggerFactory = ServiceProvider?.GetService<ILoggerFactory>();
             //if grain created outside a cluster
-            if (loggerFactory == null)
-                loggerFactory = NullLoggerFactory.Instance;
+            loggerFactory ??= NullLoggerFactory.Instance;
             logger = loggerFactory.CreateLogger($"NonReentrentStressGrainWithoutState-{_id}");
 
             executing = false;

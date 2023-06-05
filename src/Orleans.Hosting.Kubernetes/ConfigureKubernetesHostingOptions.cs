@@ -83,10 +83,7 @@ namespace Orleans.Hosting.Kubernetes
                 }
             }
 
-            if (options.SiloListeningEndpoint is null)
-            {
-                options.SiloListeningEndpoint = new IPEndPoint(IPAddress.Any, options.SiloPort);
-            }
+            options.SiloListeningEndpoint ??= new IPEndPoint(IPAddress.Any, options.SiloPort);
 
             if (options.GatewayListeningEndpoint is null && options.GatewayPort > 0)
             {

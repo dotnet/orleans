@@ -83,10 +83,7 @@ namespace Orleans.Runtime
             {
                 return "[]";
             }
-            if (separator == null)
-            {
-                separator = Environment.NewLine;
-            }
+            separator ??= Environment.NewLine;
             var sb = new StringBuilder("[");
             var enumerator = dict.GetEnumerator();
             var index = 0;

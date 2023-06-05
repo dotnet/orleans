@@ -52,10 +52,7 @@ namespace Orleans.Runtime.Messaging
 
         public override string ToString()
         {
-            if (_cachedToString == null)
-            {
-                _cachedToString = _connection.ToString();
-            }
+            _cachedToString ??= _connection.ToString();
 
             return _cachedToString;
         }

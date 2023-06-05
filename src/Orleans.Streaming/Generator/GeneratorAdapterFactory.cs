@@ -96,12 +96,9 @@ namespace Orleans.Providers.Streams.Generator
         public void Init()
         {
             receivers = new ConcurrentDictionary<QueueId, Receiver>();
-            if (CacheMonitorFactory == null)
-                CacheMonitorFactory = (dimensions) => new DefaultCacheMonitor(dimensions);
-            if (BlockPoolMonitorFactory == null)
-                BlockPoolMonitorFactory = (dimensions) => new DefaultBlockPoolMonitor(dimensions);
-            if (ReceiverMonitorFactory == null)
-                ReceiverMonitorFactory = (dimensions) => new DefaultQueueAdapterReceiverMonitor(dimensions);
+            CacheMonitorFactory ??= (dimensions) => new DefaultCacheMonitor(dimensions);
+            BlockPoolMonitorFactory ??= (dimensions) => new DefaultBlockPoolMonitor(dimensions);
+            ReceiverMonitorFactory ??= (dimensions) => new DefaultQueueAdapterReceiverMonitor(dimensions);
             generatorConfig = serviceProvider.GetServiceByName<IStreamGeneratorConfig>(Name);
             if(generatorConfig == null)
             {
@@ -128,10 +125,10 @@ namespace Orleans.Providers.Streams.Generator
         public IQueueAdapterCache GetQueueAdapterCache() => this;
 
         /// <inheritdoc />
-        public IStreamQueueMapper GetStreamQueueMapper() => streamQueueMapper ?? (streamQueueMapper = new HashRingBasedStreamQueueMapper(queueMapperOptions, Name));
+        public IStreamQueueMapper GetStreamQueueMapper() => streamQueueMapper ??= new HashRingBasedStreamQueueMapper(queueMapperOptions, Name);
 
         /// <inheritdoc />
-        public Task<IStreamFailureHandler> GetDeliveryFailureHandler(QueueId queueId) => Task.FromResult(streamFailureHandler ?? (streamFailureHandler = new NoOpStreamDeliveryFailureHandler()));
+        public Task<IStreamFailureHandler> GetDeliveryFailureHandler(QueueId queueId) => Task.FromResult(streamFailureHandler ??= new NoOpStreamDeliveryFailureHandler());
 
         /// <inheritdoc />
         public Task QueueMessageBatchAsync<T>(StreamId streamId, IEnumerable<T> events, StreamSequenceToken token,

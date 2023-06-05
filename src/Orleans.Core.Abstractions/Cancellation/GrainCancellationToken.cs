@@ -115,8 +115,7 @@ namespace Orleans
         /// <param name="grainReference">The grain reference to add.</param>
         internal void AddGrainReference(IGrainCancellationTokenRuntime runtime, GrainReference grainReference)
         {
-            if (_cancellationTokenRuntime == null)
-                _cancellationTokenRuntime = runtime;
+            _cancellationTokenRuntime ??= runtime;
             _targetGrainReferences.TryAdd(grainReference.GrainId, grainReference);
         }
 

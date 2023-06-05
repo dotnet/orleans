@@ -42,7 +42,7 @@ namespace Orleans.Streaming.EventHubs
         [NonSerialized]
         private Body payload;
 
-        private Body GetPayload() => payload ?? (payload = Serializer.Deserialize<Body>(eventHubMessage.Payload));
+        private Body GetPayload() => payload ??= Serializer.Deserialize<Body>(eventHubMessage.Payload);
 
         [Serializable]
         [GenerateSerializer]

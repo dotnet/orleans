@@ -100,12 +100,9 @@ namespace Orleans.Providers
         public void Init()
         {
             queueGrains = new ConcurrentDictionary<QueueId, IMemoryStreamQueueGrain>();
-            if (CacheMonitorFactory == null)
-                CacheMonitorFactory = (dimensions) => new DefaultCacheMonitor(dimensions);
-            if (BlockPoolMonitorFactory == null)
-                BlockPoolMonitorFactory = (dimensions) => new DefaultBlockPoolMonitor(dimensions);
-            if (ReceiverMonitorFactory == null)
-                ReceiverMonitorFactory = (dimensions) => new DefaultQueueAdapterReceiverMonitor(dimensions);
+            CacheMonitorFactory ??= (dimensions) => new DefaultCacheMonitor(dimensions);
+            BlockPoolMonitorFactory ??= (dimensions) => new DefaultBlockPoolMonitor(dimensions);
+            ReceiverMonitorFactory ??= (dimensions) => new DefaultQueueAdapterReceiverMonitor(dimensions);
             purgePredicate = new TimePurgePredicate(cacheOptions.DataMinTimeInCache, cacheOptions.DataMaxAgeInCache);
             streamQueueMapper = new HashRingBasedStreamQueueMapper(queueMapperOptions, Name);
         }
@@ -170,7 +167,7 @@ namespace Orleans.Providers
         }
 
         /// <inheritdoc />
-        public Task<IStreamFailureHandler> GetDeliveryFailureHandler(QueueId queueId) => Task.FromResult(streamFailureHandler ?? (streamFailureHandler = new NoOpStreamDeliveryFailureHandler()));
+        public Task<IStreamFailureHandler> GetDeliveryFailureHandler(QueueId queueId) => Task.FromResult(streamFailureHandler ??= new NoOpStreamDeliveryFailureHandler());
 
         /// <summary>
         /// Generate a deterministic Guid from a queue Id. 

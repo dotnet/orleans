@@ -321,10 +321,7 @@ namespace Orleans.CodeGenerator.SyntaxGeneration
                     continue;
                 }
 
-                if (result is null)
-                {
-                    result = new List<AttributeData>();
-                }
+                result ??= new List<AttributeData>();
 
                 result.Add(attr);
             }

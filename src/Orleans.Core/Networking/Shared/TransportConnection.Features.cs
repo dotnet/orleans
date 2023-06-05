@@ -116,10 +116,7 @@ namespace Orleans.Networking.Shared
 
         private void ExtraFeatureSet(Type key, object value)
         {
-            if (MaybeExtra == null)
-            {
-                MaybeExtra = new List<KeyValuePair<Type, object>>(2);
-            }
+            MaybeExtra ??= new List<KeyValuePair<Type, object>>(2);
 
             for (var i = 0; i < MaybeExtra.Count; i++)
             {

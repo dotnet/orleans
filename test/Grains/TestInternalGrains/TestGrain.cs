@@ -224,7 +224,7 @@ namespace UnitTests.Grains
 
         public async Task<IOneWayGrain> GetOtherGrain()
         {
-            return other ?? (other = await GetGrainOnOtherSilo());
+            return other ??= await GetGrainOnOtherSilo();
 
             async Task<IOneWayGrain> GetGrainOnOtherSilo()
             {

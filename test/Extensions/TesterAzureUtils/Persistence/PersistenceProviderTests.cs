@@ -296,10 +296,7 @@ namespace Tester.AzureUtils.Persistence
         {
             var reference = grainId.IsDefault ? (GrainId)LegacyGrainId.NewId() : grainId;
 
-            if (grainState == null)
-            {
-                grainState = new GrainState<TestStoreGrainState>(new TestStoreGrainState());
-            }
+            grainState ??= new GrainState<TestStoreGrainState>(new TestStoreGrainState());
             var storedGrainState = new GrainState<TestStoreGrainState>(new TestStoreGrainState());
 
             var sw = new Stopwatch();
@@ -321,10 +318,7 @@ namespace Tester.AzureUtils.Persistence
         {
             var reference = grainId.IsDefault ? (GrainId)LegacyGrainId.NewId() : grainId;
 
-            if (grainState == null)
-            {
-                grainState = TestStoreGrainState.NewRandomState();
-            }
+            grainState ??= TestStoreGrainState.NewRandomState();
 
             var sw = new Stopwatch();
             sw.Start();
@@ -353,10 +347,7 @@ namespace Tester.AzureUtils.Persistence
         {
             var reference = grainId.IsDefault ? (GrainId)LegacyGrainId.NewId() : grainId;
 
-            if (grainState == null)
-            {
-                grainState = TestStoreGrainState.NewRandomState();
-            }
+            grainState ??= TestStoreGrainState.NewRandomState();
 
             var sw = new Stopwatch();
             sw.Start();

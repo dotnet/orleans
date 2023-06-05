@@ -36,8 +36,7 @@ namespace UnitTests.Grains
 
         private ISimpleGrain GetSimpleGrain()
         {
-            if( MySimpleGrain == null )
-                MySimpleGrain = GrainFactory.GetGrain<ISimpleGrain>((new Random()).Next(), SimpleGrain.SimpleGrainNamePrefix);
+            MySimpleGrain ??= GrainFactory.GetGrain<ISimpleGrain>((new Random()).Next(), SimpleGrain.SimpleGrainNamePrefix);
 
             return MySimpleGrain;
         }
