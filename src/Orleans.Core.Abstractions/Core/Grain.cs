@@ -34,7 +34,7 @@ namespace Orleans
         /// <summary>
         /// Gets the IServiceProvider managed by the runtime. Null if this grain is not associated with a Runtime, such as when created directly for unit testing.
         /// </summary>
-        protected internal IServiceProvider ServiceProvider => GrainContext?.ActivationServices ?? Runtime.ServiceProvider;
+        protected internal IServiceProvider ServiceProvider => GrainContext?.ActivationServices ?? Runtime?.ServiceProvider!;
 
         internal GrainId GrainId => GrainContext.GrainId;
 
