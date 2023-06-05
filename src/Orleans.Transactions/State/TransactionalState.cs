@@ -92,7 +92,7 @@ namespace Orleans.Transactions
                      info.RecordRead(participantId, record.Timestamp);
 
                      // perform the read 
-                     TResult result = default(TResult);
+                     TResult result = default;
                      try
                      {
                          detectReentrancy = true;

@@ -47,7 +47,7 @@ namespace UnitTests.Grains
 
         public override Task OnActivateAsync(CancellationToken cancellationToken)
         {
-            ExtensionProperty = default(T);
+            ExtensionProperty = default;
             extender = null;
             return base.OnActivateAsync(cancellationToken);
         }

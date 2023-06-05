@@ -137,7 +137,7 @@ namespace Orleans.Internal
             int maxNumErrorTries,
             Func<T, int, bool> retryValueFilter,
             Func<Exception, int, bool> retryExceptionFilter,
-            TimeSpan maxExecutionTime = default(TimeSpan),
+            TimeSpan maxExecutionTime = default,
             IBackoffProvider onSuccessBackOff = null,
             IBackoffProvider onErrorBackOff = null)
         {
@@ -202,7 +202,7 @@ namespace Orleans.Internal
             IBackoffProvider onSuccessBackOff = null,
             IBackoffProvider onErrorBackOff = null)
         {
-            T result = default(T);
+            T result = default;
             ExceptionDispatchInfo lastExceptionInfo = null;
             bool retry;
             var callCounter = 0;
@@ -211,7 +211,7 @@ namespace Orleans.Internal
             {
                 retry = false;
 
-                if (maxExecutionTime != Constants.INFINITE_TIMESPAN && maxExecutionTime != default(TimeSpan))
+                if (maxExecutionTime != Constants.INFINITE_TIMESPAN && maxExecutionTime != default)
                 {
                     DateTime now = DateTime.UtcNow;
                     if (now - startExecutionTime > maxExecutionTime)

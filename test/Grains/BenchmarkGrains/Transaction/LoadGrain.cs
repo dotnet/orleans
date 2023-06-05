@@ -18,7 +18,7 @@ namespace BenchmarkGrains.Transaction
 
         public async Task<Report> TryGetReport()
         {
-            if (!runTask.IsCompleted) return default(Report);
+            if (!runTask.IsCompleted) return default;
             return await runTask;
         }
 

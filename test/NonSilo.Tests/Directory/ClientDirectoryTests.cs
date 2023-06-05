@@ -69,7 +69,7 @@ namespace NonSilo.Tests.Directory
             _clusterMembershipService.UpdateSiloStatus(_localSilo, SiloStatus.Active, "local-silo");
 
             _grainFactory = Substitute.For<IInternalGrainFactory>();
-            _grainFactory.GetSystemTarget<IRemoteClientDirectory>(default(GrainType), default(SiloAddress))
+            _grainFactory.GetSystemTarget<IRemoteClientDirectory>(default, default)
                 .ReturnsForAnyArgs(info => _remoteDirectories.GetOrAdd(info.ArgAt<SiloAddress>(1), k => Substitute.For<IRemoteClientDirectory>()));
 
             _directory = new ClientDirectory(

@@ -192,7 +192,7 @@ namespace Orleans.Serialization
             return reader.Value switch
             {
                 long l => new MembershipVersion(l),
-                _ => default(MembershipVersion)
+                _ => default
             };
         }
     }

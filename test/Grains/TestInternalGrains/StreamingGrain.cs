@@ -183,7 +183,7 @@ namespace UnitTests.Grains
 
             _itemsProduced = 0;
             _expectedItemsProduced = 0;
-            _streamId = default(Guid);
+            _streamId = default;
             _providerName = null;
             _cleanedUpFlag = new InterlockedFlag();
             _observerDisposedYet = false;

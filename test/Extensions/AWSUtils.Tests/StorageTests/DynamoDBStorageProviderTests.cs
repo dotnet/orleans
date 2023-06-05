@@ -263,9 +263,9 @@ namespace AWSUtils.Tests.StorageTests
             TimeSpan readTime = sw.Elapsed;
             output.WriteLine("{0} - Write time = {1} Read time = {2}", store.GetType().FullName, writeTime, readTime);
             Assert.NotNull(storedGrainState.State);
-            Assert.Equal(default(string), storedGrainState.State.A);
-            Assert.Equal(default(int), storedGrainState.State.B);
-            Assert.Equal(default(long), storedGrainState.State.C);
+            Assert.Equal(default, storedGrainState.State.A);
+            Assert.Equal(default, storedGrainState.State.B);
+            Assert.Equal(default, storedGrainState.State.C);
 
             return storedGrainState;
         }

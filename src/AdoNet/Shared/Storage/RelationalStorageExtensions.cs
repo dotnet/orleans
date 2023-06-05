@@ -46,7 +46,7 @@ namespace Orleans.Tests.SqlUtils
         /// <param name="onlyOnceColumns">If given, SQL parameter values for the given <typeparamref name="T"/> property types are generated only once. Effective only when <paramref name="useSqlParams"/> is <em>TRUE</em>.</param>
         /// <param name="useSqlParams"><em>TRUE</em> if the query should be in parameterized form. <em>FALSE</em> otherwise.</param>
         /// <returns>The rows affected.</returns>
-        public static Task<int> ExecuteMultipleInsertIntoAsync<T>(this IRelationalStorage storage, string tableName, IEnumerable<T> parameters, CancellationToken cancellationToken = default(CancellationToken), IReadOnlyDictionary<string, string> nameMap = null, IEnumerable<string> onlyOnceColumns = null, bool useSqlParams = true)
+        public static Task<int> ExecuteMultipleInsertIntoAsync<T>(this IRelationalStorage storage, string tableName, IEnumerable<T> parameters, CancellationToken cancellationToken = default, IReadOnlyDictionary<string, string> nameMap = null, IEnumerable<string> onlyOnceColumns = null, bool useSqlParams = true)
         {
             if(string.IsNullOrWhiteSpace(tableName))
             {
@@ -182,7 +182,7 @@ namespace Orleans.Tests.SqlUtils
         /// IEnumerable&lt;Information&gt; informationData = await db.ReadAsync&lt;Information&gt;(query, new { tname = 200000 });
         /// </code>
         /// </example>
-        public static Task<IEnumerable<TResult>> ReadAsync<TResult>(this IRelationalStorage storage, string query, object parameters, CancellationToken cancellationToken = default(CancellationToken))
+        public static Task<IEnumerable<TResult>> ReadAsync<TResult>(this IRelationalStorage storage, string query, object parameters, CancellationToken cancellationToken = default)
         {
             return storage.ReadAsync(query, command =>
             {
@@ -202,7 +202,7 @@ namespace Orleans.Tests.SqlUtils
         /// <param name="query">Executes a given statement. Especially intended to use with <em>SELECT</em> statement, but works with other queries too.</param>
         /// <param name="cancellationToken">The cancellation token. Defaults to <see cref="CancellationToken.None"/>.</param>
         /// <returns>A list of objects as a result of the <see paramref="query"/>.</returns>
-        public static Task<IEnumerable<TResult>> ReadAsync<TResult>(this IRelationalStorage storage, string query, CancellationToken cancellationToken = default(CancellationToken))
+        public static Task<IEnumerable<TResult>> ReadAsync<TResult>(this IRelationalStorage storage, string query, CancellationToken cancellationToken = default)
         {
             return ReadAsync<TResult>(storage, query, null, cancellationToken);
         }
@@ -225,7 +225,7 @@ namespace Orleans.Tests.SqlUtils
         /// await db.ExecuteAsync(query, new { tname = "test_table" });
         /// </code>
         /// </example>
-        public static Task<int> ExecuteAsync(this IRelationalStorage storage, string query, object parameters, CancellationToken cancellationToken = default(CancellationToken))
+        public static Task<int> ExecuteAsync(this IRelationalStorage storage, string query, object parameters, CancellationToken cancellationToken = default)
         {
             return storage.ExecuteAsync(query, command =>
             {
@@ -244,7 +244,7 @@ namespace Orleans.Tests.SqlUtils
         /// <param name="query">Executes a given statement. Especially intended to use with <em>INSERT</em>, <em>UPDATE</em>, <em>DELETE</em> or <em>DDL</em> queries.</param>        
         /// <param name="cancellationToken">The cancellation token. Defaults to <see cref="CancellationToken.None"/>.</param>
         /// <returns>Affected rows count.</returns>
-        public static Task<int> ExecuteAsync(this IRelationalStorage storage, string query, CancellationToken cancellationToken = default(CancellationToken))
+        public static Task<int> ExecuteAsync(this IRelationalStorage storage, string query, CancellationToken cancellationToken = default)
         {
             return ExecuteAsync(storage, query, null, cancellationToken);
         }

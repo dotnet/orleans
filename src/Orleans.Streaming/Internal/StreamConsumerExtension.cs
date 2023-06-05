@@ -124,7 +124,7 @@ namespace Orleans.Streams
 
             // We got an item when we don't think we're the subscriber. This is a normal race condition.
             // We can drop the item on the floor, or pass it to the rendezvous, or ...
-            return default(StreamHandshakeToken);
+            return default;
         }
 
         public async Task<StreamHandshakeToken> DeliverBatch(GuidId subscriptionId, QualifiedStreamId streamId, IBatchContainer batch, StreamHandshakeToken handshakeToken)
@@ -159,7 +159,7 @@ namespace Orleans.Streams
 
             // We got an item when we don't think we're the subscriber. This is a normal race condition.
             // We can drop the item on the floor, or pass it to the rendezvous, or ...
-            return default(StreamHandshakeToken);
+            return default;
         }
 
         public Task CompleteStream(GuidId subscriptionId)
