@@ -6,7 +6,6 @@
     <Description>Microsoft Orleans Clustering implementation that uses Redis</Description>
     <PackageTags>$(PackageTags) Redis Clustering</PackageTags>
     <TargetFrameworks>$(DefaultTargetFrameworks)</TargetFrameworks>
-    <VersionSuffix Condition="$(VersionSuffix) == ''">beta1</VersionSuffix>
     <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
   </PropertyGroup>
 
