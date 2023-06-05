@@ -12,11 +12,11 @@ namespace UnitTests.Grains
         internal static Task CallNext(IGrainFactory grainFactory, List<(long GrainId, bool Blocking)> callChain, int currCallIndex)
         {
             if (currCallIndex >= callChain.Count) return Task.CompletedTask;
-            (long GrainId, bool Blocking) next = callChain[currCallIndex];
-            bool call_1 = (currCallIndex % 2) == 1; // odd (1) call 1, even (zero) - call 2.
+            var next = callChain[currCallIndex];
+            var call_1 = (currCallIndex % 2) == 1; // odd (1) call 1, even (zero) - call 2.
             if (next.Blocking)
             {
-                IDeadlockNonReentrantGrain nextGrain = grainFactory.GetGrain<IDeadlockNonReentrantGrain>(next.GrainId);
+                var nextGrain = grainFactory.GetGrain<IDeadlockNonReentrantGrain>(next.GrainId);
                 if (call_1)
                     return nextGrain.CallNext_1(callChain, currCallIndex + 1);
                 else
@@ -24,7 +24,7 @@ namespace UnitTests.Grains
             }
             else
             {
-                IDeadlockReentrantGrain nextGrain = grainFactory.GetGrain<IDeadlockReentrantGrain>(next.GrainId);
+                var nextGrain = grainFactory.GetGrain<IDeadlockReentrantGrain>(next.GrainId);
                 if (call_1)
                     return nextGrain.CallNext_1(callChain, currCallIndex + 1);
                 else

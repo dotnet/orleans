@@ -80,7 +80,7 @@ namespace Orleans.Storage
                     string.Format("Not enough keys supplied -- Expected count = {0} Received = {1}", numKeyLayers, keys.Count));
             }
 
-            string keyStr = MakeStoreKey(keys);
+            var keyStr = MakeStoreKey(keys);
 
             lock (lockable)
             {
@@ -116,7 +116,7 @@ namespace Orleans.Storage
 
         private Dictionary<string, object> GetDataStore(IList<Tuple<string, string>> keys)
         {
-            string keyStr = MakeStoreKey(keys);
+            var keyStr = MakeStoreKey(keys);
 
             lock (lockable)
             {
@@ -137,7 +137,7 @@ namespace Orleans.Storage
             }
 
             var results = new List<IDictionary<string, object>>();
-            string keyStr = MakeStoreKey(keys);
+            var keyStr = MakeStoreKey(keys);
 
             lock (lockable)
             {
@@ -151,7 +151,7 @@ namespace Orleans.Storage
         internal static string MakeStoreKey(IEnumerable<Tuple<string, string>> keys)
         {
             var sb = new StringBuilder();
-            bool first = true;
+            var first = true;
             foreach (var keyPair in keys)
             {
                 if (first)

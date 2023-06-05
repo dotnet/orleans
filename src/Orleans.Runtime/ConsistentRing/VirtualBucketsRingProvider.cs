@@ -48,7 +48,7 @@ namespace Orleans.Runtime.ConsistentRing
             ConsistentRingInstruments.RegisterMyRangeRingPercentageObserve(() => (float)((IRingRangeInternal)myRange).RangePercentage());
             ConsistentRingInstruments.RegisterAverageRingPercentageObserve(() =>
             {
-                int size = GetRingSize();
+                var size = GetRingSize();
                 return size == 0 ? 0 : ((float)100.0 / size);
             });
 
@@ -110,7 +110,7 @@ namespace Orleans.Runtime.ConsistentRing
                 lastNotification = (old, now, increased);
                 copy = statusListeners.ToArray();
             }
-            foreach (IRingRangeListener listener in copy)
+            foreach (var listener in copy)
             {
                 try
                 {
@@ -202,14 +202,14 @@ namespace Orleans.Runtime.ConsistentRing
         private static IRingRange CalculateRange((uint Hash, SiloAddress SiloAddress)[] list, SiloAddress silo)
         {
             var ranges = new List<IRingRange>();
-            for (int i = 0; i < list.Length; i++)
+            for (var i = 0; i < list.Length; i++)
             {
                 var curr = list[i];
                 var next = list[(i + 1) % list.Length];
                 // 'backward/clockwise' definition to assign responsibilities on the ring.
                 if (next.SiloAddress.Equals(silo))
                 {
-                    IRingRange range = RangeFactory.CreateRange(curr.Hash, next.Hash);
+                    var range = RangeFactory.CreateRange(curr.Hash, next.Hash);
                     ranges.Add(range);
                 }
             }
@@ -288,7 +288,7 @@ namespace Orleans.Runtime.ConsistentRing
             var snapshotBucketsList = sortedBucketsList;
 
             // excludeMySelf from being a TargetSilo if we're not running and the excludeThisSIloIfStopping flag is true. see the comment in the Stop method.
-            bool excludeMySelf = excludeThisSiloIfStopping && !running;
+            var excludeMySelf = excludeThisSiloIfStopping && !running;
 
             if (snapshotBucketsList.Length == 0)
             {

@@ -66,9 +66,9 @@ namespace UnitTests.StreamingTests
             _fixture.Logger.LogInformation("************************ ControllableAdapterEchoTest *********************************");
             var mgmt = _fixture.GrainFactory.GetGrain<IManagementGrain>(0);
 
-            object[] results = await mgmt.SendControlCommandToProvider(_fixture.StreamProviderTypeName, Fixture.StreamProviderName, (int)command, echoArg);
+            var results = await mgmt.SendControlCommandToProvider(_fixture.StreamProviderTypeName, Fixture.StreamProviderName, (int)command, echoArg);
             Assert.Equal(2, results.Length);
-            Tuple<ControllableTestStreamProviderCommands, object>[] echos = results.Cast<Tuple<ControllableTestStreamProviderCommands, object>>().ToArray();
+            var echos = results.Cast<Tuple<ControllableTestStreamProviderCommands, object>>().ToArray();
             foreach (var echo in echos)
             {
                 Assert.Equal(command, echo.Item1);

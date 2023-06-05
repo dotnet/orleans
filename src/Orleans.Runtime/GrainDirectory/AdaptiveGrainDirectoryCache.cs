@@ -119,7 +119,7 @@ namespace Orleans.Runtime.GrainDirectory
             GrainDirectoryCacheEntry result;
             if (!cache.TryGetValue(key, out result)) return false;
 
-            TimeSpan newExpirationTimer = StandardExtensions.Min(maxExpirationTimer, result.ExpirationTimer.Multiply(exponentialTimerGrowth));
+            var newExpirationTimer = StandardExtensions.Min(maxExpirationTimer, result.ExpirationTimer.Multiply(exponentialTimerGrowth));
             result.Refresh(newExpirationTimer);
 
             return true;
@@ -139,9 +139,9 @@ namespace Orleans.Runtime.GrainDirectory
         {
             var sb = new StringBuilder();
 
-            long curNumAccesses = NumAccesses - LastNumAccesses;
+            var curNumAccesses = NumAccesses - LastNumAccesses;
             LastNumAccesses = NumAccesses;
-            long curNumHits = NumHits - LastNumHits;
+            var curNumHits = NumHits - LastNumHits;
             LastNumHits = NumHits;
 
             sb.Append("Adaptive cache statistics:").AppendLine();

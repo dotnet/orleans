@@ -42,9 +42,9 @@ namespace Orleans.Providers.Streams.Generator
                 return false;
             }
 
-            for(int i=0; i< maxCount; i++)
+            for(var i=0; i< maxCount; i++)
             {
-                if (!TryGenerateBatch(out GeneratedBatchContainer batch))
+                if (!TryGenerateBatch(out var batch))
                     break;
                 events.Add(batch);
             }

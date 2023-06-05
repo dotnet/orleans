@@ -148,7 +148,7 @@ namespace Orleans.Tests.SqlUtils
             internal static Tuple<MembershipEntry, int> GetMembershipEntry(IDataRecord record)
             {
                 //TODO: This is a bit of hack way to check in the current version if there's membership data or not, but if there's a start time, there's member.            
-                DateTime? startTime = record.GetDateTimeValueOrDefault(nameof(Columns.StartTime));
+                var startTime = record.GetDateTimeValueOrDefault(nameof(Columns.StartTime));
                 MembershipEntry entry = null;
                 if (startTime.HasValue)
                 {
@@ -163,7 +163,7 @@ namespace Orleans.Tests.SqlUtils
                         IAmAliveTime = record.GetDateTimeValue(nameof(Columns.IAmAliveTime))
                     };
 
-                    string suspectingSilos = record.GetValueOrDefault<string>(nameof(Columns.SuspectTimes));
+                    var suspectingSilos = record.GetValueOrDefault<string>(nameof(Columns.SuspectTimes));
                     if (!string.IsNullOrWhiteSpace(suspectingSilos))
                     {
                         entry.SuspectTimes = new List<Tuple<SiloAddress, DateTime>>();
@@ -213,9 +213,9 @@ namespace Orleans.Tests.SqlUtils
             {
                 //Use the GetInt32 method instead of the generic GetValue<TValue> version to retrieve the value from the data record
                 //GetValue<int> causes an InvalidCastException with orcale data provider. See https://github.com/dotnet/orleans/issues/3561
-                int port = record.GetInt32(portName);
-                int generation = record.GetInt32(nameof(Columns.Generation));
-                string address = record.GetValue<string>(nameof(Columns.Address));
+                var port = record.GetInt32(portName);
+                var generation = record.GetInt32(nameof(Columns.Generation));
+                var address = record.GetValue<string>(nameof(Columns.Address));
                 var siloAddress = SiloAddress.New(IPAddress.Parse(address), port, generation);
                 return siloAddress;
             }

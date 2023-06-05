@@ -123,7 +123,7 @@ namespace Orleans.Runtime.Configuration
         private static IPAddress PickIPAddress(IReadOnlyList<IPAddress> candidates)
         {
             IPAddress chosen = null;
-            foreach (IPAddress addr in candidates)
+            foreach (var addr in candidates)
             {
                 if (chosen == null)
                 {
@@ -140,14 +140,14 @@ namespace Orleans.Runtime.Configuration
             // returns true if lhs is "less" (in some repeatable sense) than rhs
             static bool CompareIPAddresses(IPAddress lhs, IPAddress rhs)
             {
-                byte[] lbytes = lhs.GetAddressBytes();
-                byte[] rbytes = rhs.GetAddressBytes();
+                var lbytes = lhs.GetAddressBytes();
+                var rbytes = rhs.GetAddressBytes();
 
                 if (lbytes.Length != rbytes.Length) return lbytes.Length < rbytes.Length;
 
                 // compare starting from most significant octet.
                 // 10.68.20.21 < 10.98.05.04
-                for (int i = 0; i < lbytes.Length; i++)
+                for (var i = 0; i < lbytes.Length; i++)
                 {
                     if (lbytes[i] != rbytes[i])
                     {
@@ -168,13 +168,13 @@ namespace Orleans.Runtime.Configuration
         {
             var loopback = (family == AddressFamily.InterNetwork) ? IPAddress.Loopback : IPAddress.IPv6Loopback;
             // get list of all network interfaces
-            NetworkInterface[] netInterfaces = NetworkInterface.GetAllNetworkInterfaces();
+            var netInterfaces = NetworkInterface.GetAllNetworkInterfaces();
 
             var candidates = new List<IPAddress>();
             // loop through interfaces
-            for (int i = 0; i < netInterfaces.Length; i++)
+            for (var i = 0; i < netInterfaces.Length; i++)
             {
-                NetworkInterface netInterface = netInterfaces[i];
+                var netInterface = netInterfaces[i];
 
                 if (netInterface.OperationalStatus != OperationalStatus.Up)
                 {
@@ -184,12 +184,12 @@ namespace Orleans.Runtime.Configuration
                 if (!string.IsNullOrWhiteSpace(interfaceName) &&
                     !netInterface.Name.StartsWith(interfaceName, StringComparison.Ordinal)) continue;
 
-                bool isLoopbackInterface = (netInterface.NetworkInterfaceType == NetworkInterfaceType.Loopback);
+                var isLoopbackInterface = (netInterface.NetworkInterfaceType == NetworkInterfaceType.Loopback);
                 // get list of all unicast IPs from current interface
-                UnicastIPAddressInformationCollection ipAddresses = netInterface.GetIPProperties().UnicastAddresses;
+                var ipAddresses = netInterface.GetIPProperties().UnicastAddresses;
 
                 // loop through IP address collection
-                foreach (UnicastIPAddressInformation ip in ipAddresses)
+                foreach (var ip in ipAddresses)
                 {
                     if (ip.Address.AddressFamily == family) // Picking the first address of the requested family for now. Will need to revisit later
                     {
@@ -227,12 +227,12 @@ namespace Orleans.Runtime.Configuration
             //if connection string format doesn't contain any secretKey, then return just <--SNIP-->
             if (!secretKeys.Any(key => connectionString.Contains(key))) return mark;
 
-            string connectionInfo = connectionString;
+            var connectionInfo = connectionString;
 
             // Remove any secret keys from connection string info written to log files
             foreach (var secretKey in secretKeys)
             {
-                int keyPos = connectionInfo.IndexOf(secretKey, StringComparison.OrdinalIgnoreCase);
+                var keyPos = connectionInfo.IndexOf(secretKey, StringComparison.OrdinalIgnoreCase);
                 if (keyPos >= 0)
                 {
                     connectionInfo = connectionInfo.Remove(keyPos + secretKey.Length) + mark;

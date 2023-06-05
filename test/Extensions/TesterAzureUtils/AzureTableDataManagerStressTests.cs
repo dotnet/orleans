@@ -59,13 +59,13 @@ namespace Tester.AzureUtils
             // Write some data
             WriteAlot_Async(testName, 1, iterations, iterations);
 
-            Stopwatch sw = Stopwatch.StartNew();
+            var sw = Stopwatch.StartNew();
 
             var data = manager.ReadAllTableEntriesForPartitionAsync(PartitionKey)
                 .WaitForResultWithThrow(new AzureStoragePolicyOptions().CreationTimeout).Select(tuple => tuple.Entity);
 
             sw.Stop();
-            int count = data.Count();
+            var count = data.Count();
             output.WriteLine("AzureTable_ReadAll completed. ReadAll {0} entries in {1} at {2} RPS", count, sw.Elapsed, count / sw.Elapsed.TotalSeconds);
 
             Assert.True(count >= iterations, $"ReadAllshould return some data: Found={count}");
@@ -80,13 +80,13 @@ namespace Tester.AzureUtils
             // Write some data
             WriteAlot_Async(testName, 3, iterations, iterations);
 
-            Stopwatch sw = Stopwatch.StartNew();
+            var sw = Stopwatch.StartNew();
 
             var data = manager.ReadAllTableEntriesAsync()
                 .WaitForResultWithThrow(new AzureStoragePolicyOptions().CreationTimeout).Select(tuple => tuple.Entity);
 
             sw.Stop();
-            int count = data.Count();
+            var count = data.Count();
             output.WriteLine("AzureTable_ReadAllTableEntities completed. ReadAll {0} entries in {1} at {2} RPS", count, sw.Elapsed, count / sw.Elapsed.TotalSeconds);
 
             Assert.True(count >= iterations, $"ReadAllshould return some data: Found={count}");
@@ -100,15 +100,15 @@ namespace Tester.AzureUtils
         private void WriteAlot_Async(string testName, int numPartitions, int iterations, int batchSize)
         {
             output.WriteLine("Iterations={0}, Batch={1}, Partitions={2}", iterations, batchSize, numPartitions);
-            List<Task> promises = new List<Task>();
-            Stopwatch sw = Stopwatch.StartNew();
-            for (int i = 0; i < iterations; i++)
+            var promises = new List<Task>();
+            var sw = Stopwatch.StartNew();
+            for (var i = 0; i < iterations; i++)
             {
-                string partitionKey = PartitionKey;
+                var partitionKey = PartitionKey;
                 if (numPartitions > 1) partitionKey += (i % numPartitions);
-                string rowKey = i.ToString(CultureInfo.InvariantCulture);
+                var rowKey = i.ToString(CultureInfo.InvariantCulture);
 
-                UnitTestAzureTableData dataObject = new UnitTestAzureTableData();
+                var dataObject = new UnitTestAzureTableData();
                 dataObject.PartitionKey = partitionKey;
                 dataObject.RowKey = rowKey;
                 dataObject.StringData = rowKey;

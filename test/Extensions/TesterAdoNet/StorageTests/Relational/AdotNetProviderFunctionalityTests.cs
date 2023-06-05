@@ -23,7 +23,7 @@ namespace UnitTests.StorageTests.Relational
             Parallel.For(0, 1000000, i =>
             {
                 //These parameters can be null in this test.
-                int grainTypeHash = adonetDefaultHasher.PickHasher<object>(null, null, null, default, null, null).Hash(Encoding.UTF8.GetBytes(grainType));
+                var grainTypeHash = adonetDefaultHasher.PickHasher<object>(null, null, null, default, null, null).Hash(Encoding.UTF8.GetBytes(grainType));
                 Assert.Equal(TestGrainHash, grainTypeHash);
             });
         }
@@ -69,7 +69,7 @@ namespace UnitTests.StorageTests.Relational
         [Fact]
         public void GuidGrainIdWithExtensionAreSame()
         {
-            Guid guidId = Guid.Parse("751D8030-9C84-4A91-816E-E95F64CE7588");
+            var guidId = Guid.Parse("751D8030-9C84-4A91-816E-E95F64CE7588");
             var guidIdAsString = new AdoGrainKey(guidId, null).ToString();
 
             Assert.Equal(guidIdAsString, guidId.ToString());

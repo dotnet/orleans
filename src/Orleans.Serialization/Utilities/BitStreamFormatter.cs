@@ -231,7 +231,7 @@ namespace Orleans.Serialization.Utilities
             }
             else
             {
-                bool first = true;
+                var first = true;
                 foreach (var b in a)
                 {
                     if (!first)

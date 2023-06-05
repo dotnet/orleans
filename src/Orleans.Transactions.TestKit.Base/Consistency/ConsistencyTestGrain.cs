@@ -141,15 +141,15 @@ namespace Orleans.Transactions.TestKit.Consistency
             logger.LogTrace("g{MyNumber} {CurrentTransactionId} {Stack} Recurse {Count} {ParallelOrSequential}", MyNumber, TransactionContext.CurrentTransactionId, stack, count, (parallel ? "par" : "seq"));
             try
             {
-                int min = options.AvoidDeadlocks ? MyNumber : 0;
-                int max = options.AvoidDeadlocks ? maxgrain : options.NumGrains;
+                var min = options.AvoidDeadlocks ? MyNumber : 0;
+                var max = options.AvoidDeadlocks ? maxgrain : options.NumGrains;
                 var tasks = new List<Task<Observation[]>>();
-                int[] targets = new int[count];
-                for (int i = 0; i < count; i++)
+                var targets = new int[count];
+                for (var i = 0; i < count; i++)
                     targets[i] = random.Next(min, max);
                 if (options.AvoidDeadlocks)
                     Array.Sort(targets);
-                for (int i = 0; i < count; i++)
+                for (var i = 0; i < count; i++)
                 {
                     var randomTarget = GrainFactory.GetGrain<IConsistencyTestGrain>(options.GrainOffset + targets[i]);
                     var maxgrainfornested = (i < count - 1) ? targets[i + 1] : max;
@@ -162,7 +162,7 @@ namespace Orleans.Transactions.TestKit.Consistency
                 }
                 await Task.WhenAll(tasks);
                 var result = new HashSet<Observation>();
-                for (int i = 0; i < count; i++)
+                for (var i = 0; i < count; i++)
                 {
                     foreach (var x in tasks[i].Result)
                         result.Add(x);

@@ -51,7 +51,7 @@ namespace Tester.EventSourcingTests
         {
             // increment (count) times, on random keys, concurrently
             var tasks = new List<Task>();
-            for (int i = 0; i < count; i++)
+            for (var i = 0; i < count; i++)
                 tasks.Add(grain.Add(RandomKey(), 1, wait_for_confirmation_on_each));
             await Task.WhenAll(tasks);
 

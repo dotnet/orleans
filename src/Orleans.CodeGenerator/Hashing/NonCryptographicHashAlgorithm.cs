@@ -109,11 +109,11 @@ namespace Orleans.CodeGenerator.Hashing
                 throw new ArgumentNullException(nameof(stream));
             }
 
-            byte[] buffer = ArrayPool<byte>.Shared.Rent(4096);
+            var buffer = ArrayPool<byte>.Shared.Rent(4096);
 
             while (true)
             {
-                int read = stream.Read(buffer, 0, buffer.Length);
+                var read = stream.Read(buffer, 0, buffer.Length);
 
                 if (read == 0)
                 {
@@ -154,14 +154,14 @@ namespace Orleans.CodeGenerator.Hashing
 
         private async Task AppendAsyncCore(Stream stream, CancellationToken cancellationToken)
         {
-            byte[] buffer = ArrayPool<byte>.Shared.Rent(4096);
+            var buffer = ArrayPool<byte>.Shared.Rent(4096);
 
             while (true)
             {
 #if NETCOREAPP
                 int read = await stream.ReadAsync(buffer.AsMemory(), cancellationToken).ConfigureAwait(false);
 #else
-                int read = await stream.ReadAsync(buffer, 0, buffer.Length, cancellationToken).ConfigureAwait(false);
+                var read = await stream.ReadAsync(buffer, 0, buffer.Length, cancellationToken).ConfigureAwait(false);
 #endif
 
                 if (read == 0)
@@ -183,7 +183,7 @@ namespace Orleans.CodeGenerator.Hashing
         /// </returns>
         public byte[] GetCurrentHash()
         {
-            byte[] ret = new byte[HashLengthInBytes];
+            var ret = new byte[HashLengthInBytes];
             GetCurrentHashCore(ret);
             return ret;
         }
@@ -244,7 +244,7 @@ namespace Orleans.CodeGenerator.Hashing
         /// </returns>
         public byte[] GetHashAndReset()
         {
-            byte[] ret = new byte[HashLengthInBytes];
+            var ret = new byte[HashLengthInBytes];
             GetHashAndResetCore(ret);
             return ret;
         }

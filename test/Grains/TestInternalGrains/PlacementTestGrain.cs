@@ -86,7 +86,7 @@ namespace UnitTests.Grains
         private static async Task PropigateStatisticsToCluster(IGrainFactory grainFactory)
         {
             // force the latched statistics to propigate throughout the cluster.
-            IManagementGrain mgmtGrain =
+            var mgmtGrain =
                 grainFactory.GetGrain<IManagementGrain>(0);
 
             var hosts = await mgmtGrain.GetHosts(true);
@@ -256,7 +256,7 @@ namespace UnitTests.Grains
             {
                 throw new Exception("LocalContentGrain was not correctly initialized during silo startup!");
             }
-            object content = await localContentGrain.GetContent();
+            var content = await localContentGrain.GetContent();
             logger.LogInformation("Received content = {Content}", content);
             return content;
         }

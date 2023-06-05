@@ -43,7 +43,7 @@ namespace UnitTests.CatalogTests
             var runnerGrains = new ICatalogTestGrain[nRunnerGrains];
 
             var promises = new List<Task>(nRunnerGrains);
-            for (int i = 0; i < nRunnerGrains; i++)
+            for (var i = 0; i < nRunnerGrains; i++)
             {
                 runnerGrains[i] = fixture.GrainFactory.GetGrain<ICatalogTestGrain>(-i);
                 promises.Add(runnerGrains[i].Initialize());
@@ -52,7 +52,7 @@ namespace UnitTests.CatalogTests
             await Task.WhenAll(promises);
             promises.Clear();
 
-            for (int i = 0; i < nRunnerGrains; i++)
+            for (var i = 0; i < nRunnerGrains; i++)
             {
                 promises.Add(runnerGrains[i].BlastCallNewGrains(nTargetGrain, startingKey, nCallsToEach));
             }

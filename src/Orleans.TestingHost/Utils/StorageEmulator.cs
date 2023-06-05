@@ -191,7 +191,7 @@ namespace Orleans.TestingHost.Utils
         private static string GetStorageEmulatorPath()
         {
             //Try to take the newest known emulator path. If it does not exist, try an older one.
-            string exeBasePath = Path.Combine(GetProgramFilesBasePath(), @"Microsoft SDKs\Azure\Storage Emulator\");
+            var exeBasePath = Path.Combine(GetProgramFilesBasePath(), @"Microsoft SDKs\Azure\Storage Emulator\");
 
             return storageEmulatorFilenames
                 .Select(filename => Path.Combine(exeBasePath, filename))

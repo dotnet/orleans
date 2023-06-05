@@ -47,13 +47,13 @@ namespace UnitTests.Grains
             var error = new Counter();
 
             // get stream
-            IStreamProvider streamProvider = this.GetStreamProvider(providerToUse);
+            var streamProvider = this.GetStreamProvider(providerToUse);
             var stream = streamProvider.GetStream<int>(streamNamespace, streamId);
 
-            int countCapture = consumerCount;
+            var countCapture = consumerCount;
             consumerCount++;
             // subscribe
-            StreamSubscriptionHandle<int> handle = await stream.SubscribeAsync(
+            var handle = await stream.SubscribeAsync(
                 (items) => OnNext(items, countCapture, count),
                 e => OnError(e, countCapture, error));
 
@@ -77,10 +77,10 @@ namespace UnitTests.Grains
                 counters = Tuple.Create(new Counter(), new Counter());
             }
 
-            int countCapture = consumerCount;
+            var countCapture = consumerCount;
             consumerCount++;
             // subscribe
-            StreamSubscriptionHandle<int> newhandle = await handle.ResumeAsync(
+            var newhandle = await handle.ResumeAsync(
                 (items) => OnNext(items, countCapture, counters.Item1),
                 e => OnError(e, countCapture, counters.Item2));
 
@@ -107,7 +107,7 @@ namespace UnitTests.Grains
             logger.LogInformation("GetAllSubscriptionHandles");
 
             // get stream
-            IStreamProvider streamProvider = this.GetStreamProvider(providerToUse);
+            var streamProvider = this.GetStreamProvider(providerToUse);
             var stream = streamProvider.GetStream<int>(streamNamespace, streamId);
 
             // get all active subscription handles for this stream.
@@ -150,7 +150,7 @@ namespace UnitTests.Grains
 
         private Task OnNext(IList<SequentialItem<int>> items, int countCapture, Counter count)
         {
-            foreach(SequentialItem<int> item in items)
+            foreach(var item in items)
             {
                 logger.LogInformation("Got next event {Item} on handle {Handle}", item.Item, countCapture);
                 var contextValue = RequestContext.Get(SampleStreaming_ProducerGrain.RequestContextKey) as string;

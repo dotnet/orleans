@@ -80,18 +80,18 @@ namespace ServiceBus.Tests.StreamingTests
         {
             fixture.Logger.LogInformation("************************ EH100StreamsTo4PartitionStreamsTest *********************************");
 
-            int streamCount = 100;
-            int eventsInStream = 10;
-            int partitionCount = 4;
+            var streamCount = 100;
+            var eventsInStream = 10;
+            var partitionCount = 4;
 
-            List<ISampleStreaming_ConsumerGrain> consumers = new List<ISampleStreaming_ConsumerGrain>(partitionCount);
-            for (int i = 0; i < partitionCount; i++)
+            var consumers = new List<ISampleStreaming_ConsumerGrain>(partitionCount);
+            for (var i = 0; i < partitionCount; i++)
             {
                 consumers.Add(fixture.GrainFactory.GetGrain<ISampleStreaming_ConsumerGrain>(Guid.NewGuid()));
             }
 
             // subscribe to each partition
-            List<Task> becomeConsumersTasks = consumers
+            var becomeConsumersTasks = consumers
                 .Select( (consumer, i) => consumer.BecomeConsumer(StreamPerPartitionDataAdapter.GetPartitionGuid(i.ToString()), null, StreamProviderName))
                 .ToList();
             await Task.WhenAll(becomeConsumersTasks);
@@ -102,16 +102,16 @@ namespace ServiceBus.Tests.StreamingTests
 
         private async Task GenerateEvents(int streamCount, int eventsInStream)
         {
-            IStreamProvider streamProvider = fixture.Client.GetStreamProvider(StreamProviderName);
-            IAsyncStream<int>[] producers =
+            var streamProvider = fixture.Client.GetStreamProvider(StreamProviderName);
+            var producers =
                 Enumerable.Range(0, streamCount)
                     .Select(i => streamProvider.GetStream<int>(Guid.NewGuid()))
                     .ToArray();
 
-            for (int i = 0; i < eventsInStream; i++)
+            for (var i = 0; i < eventsInStream; i++)
             {
                 // send event on each stream
-                for (int j = 0; j < streamCount; j++)
+                for (var j = 0; j < streamCount; j++)
                 {
                     await producers[j].OnNextAsync(i);
                 }
@@ -120,10 +120,10 @@ namespace ServiceBus.Tests.StreamingTests
 
         private async Task<bool> CheckCounters(List<ISampleStreaming_ConsumerGrain> consumers, int totalEventCount, bool assertIsTrue)
         {
-            List<Task<int>> becomeConsumersTasks = consumers
+            var becomeConsumersTasks = consumers
                 .Select((consumer, i) => consumer.GetNumberConsumed())
                 .ToList();
-            int[] counts = await Task.WhenAll(becomeConsumersTasks);
+            var counts = await Task.WhenAll(becomeConsumersTasks);
 
             if (assertIsTrue)
             {

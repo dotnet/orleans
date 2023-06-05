@@ -350,7 +350,7 @@ namespace Orleans.Runtime.GrainDirectory
             var membershipUpdates = _clusterMembershipService.MembershipUpdates.GetAsyncEnumerator(_shutdownCancellation.Token);
 
             Task<bool> membershipTask = null;
-            Task<bool> timerTask = _refreshTimer.NextTick(RandomTimeSpan.Next(_messagingOptions.ClientRegistrationRefresh));
+            var timerTask = _refreshTimer.NextTick(RandomTimeSpan.Next(_messagingOptions.ClientRegistrationRefresh));
 
             while (true)
             {

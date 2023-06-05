@@ -20,10 +20,10 @@ namespace UnitTests
         [Fact, TestCategory("Functional"), TestCategory("Config")]
         public void Config_AzureConnectionInfo()
         {
-            string azureConnectionStringInput =
+            var azureConnectionStringInput =
                 @"DefaultEndpointsProtocol=https;AccountName=test;AccountKey=q-SOMEKEY-==";
             output.WriteLine("Input = " + azureConnectionStringInput);
-            string azureConnectionString = ConfigUtilities.RedactConnectionStringInfo(azureConnectionStringInput);
+            var azureConnectionString = ConfigUtilities.RedactConnectionStringInfo(azureConnectionStringInput);
             output.WriteLine("Output = " + azureConnectionString);
             Assert.True(azureConnectionString.EndsWith("AccountKey=<--SNIP-->", StringComparison.InvariantCultureIgnoreCase),
                 "Removed account key info from Azure connection string " + azureConnectionString);
@@ -32,10 +32,10 @@ namespace UnitTests
         [Fact, TestCategory("Functional"), TestCategory("Config")]
         public void Config_AdoNetConnectionInfo()
         {
-            string sqlConnectionStringInput =
+            var sqlConnectionStringInput =
                 @"Server=myServerName\myInstanceName;Database=myDataBase;User Id=myUsername;Password=myPassword";
             output.WriteLine("Input = " + sqlConnectionStringInput);
-            string sqlConnectionString = ConfigUtilities.RedactConnectionStringInfo(sqlConnectionStringInput);
+            var sqlConnectionString = ConfigUtilities.RedactConnectionStringInfo(sqlConnectionStringInput);
             output.WriteLine("Output = " + sqlConnectionString);
             Assert.True(sqlConnectionString.EndsWith("Password=<--SNIP-->", StringComparison.InvariantCultureIgnoreCase),
                 "Removed password info from SqlServer connection string " + sqlConnectionString);

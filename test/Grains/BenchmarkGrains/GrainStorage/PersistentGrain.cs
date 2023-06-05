@@ -33,7 +33,7 @@ namespace BenchmarkGrains.GrainStorage
 
         public async Task<Report> TrySet(int index)
         {
-            Stopwatch sw = Stopwatch.StartNew();
+            var sw = Stopwatch.StartNew();
             bool success;
             try
             {

@@ -54,7 +54,7 @@ namespace Orleans.Providers.Streams.Common
         /// </summary>
         public void Dispose()
         {
-            IObjectPool<T> localPool = Interlocked.Exchange(ref pool, null);
+            var localPool = Interlocked.Exchange(ref pool, null);
             if (localPool != null)
             {
                 OnResetState();

@@ -72,7 +72,7 @@ namespace Orleans.Transactions
                  () =>
                  {
                      // check if our record is gone because we expired while waiting
-                     if (!queue.RWLock.TryGetRecord(info.TransactionId, out TransactionRecord<TState> record))
+                     if (!queue.RWLock.TryGetRecord(info.TransactionId, out var record))
                      {
                          throw new OrleansCascadingAbortException(info.TransactionId.ToString());
                      }
@@ -136,7 +136,7 @@ namespace Orleans.Transactions
                 () =>
                 {
                     // check if we expired while waiting
-                    if (!queue.RWLock.TryGetRecord(info.TransactionId, out TransactionRecord<TState> record))
+                    if (!queue.RWLock.TryGetRecord(info.TransactionId, out var record))
                     {
                         throw new OrleansCascadingAbortException(info.TransactionId.ToString());
                     }
@@ -209,7 +209,7 @@ namespace Orleans.Transactions
             participantId = new ParticipantId(config.StateName, context.GrainReference, config.SupportedRoles);
 
             var storageFactory = context.ActivationServices.GetRequiredService<INamedTransactionalStateStorageFactory>();
-            ITransactionalStateStorage<TState> storage = storageFactory.Create<TState>(config.StorageName, config.StateName);
+            var storage = storageFactory.Create<TState>(config.StorageName, config.StateName);
 
             // setup transaction processing pipe
             void deactivate() => grainRuntime.DeactivateOnIdle(context);
@@ -227,7 +227,7 @@ namespace Orleans.Transactions
         private TResult CopyResult<TResult>(TResult result)
         {
             ITransactionDataCopier<TResult> resultCopier;
-            if (!copiers.TryGetValue(typeof(TResult), out object cp))
+            if (!copiers.TryGetValue(typeof(TResult), out var cp))
             {
                 resultCopier = context.ActivationServices.GetRequiredService<ITransactionDataCopier<TResult>>();
                 copiers.Add(typeof(TResult), resultCopier);

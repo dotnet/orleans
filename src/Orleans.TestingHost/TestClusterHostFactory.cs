@@ -34,7 +34,7 @@ namespace Orleans.TestingHost
         /// <returns>A new silo.</returns>
         public static IHost CreateSiloHost(string hostName, IConfiguration configuration, Action<IHostBuilder> postConfigureHostBuilder = null)
         {
-            string siloName = configuration[nameof(TestSiloSpecificOptions.SiloName)] ?? hostName;
+            var siloName = configuration[nameof(TestSiloSpecificOptions.SiloName)] ?? hostName;
 
             var hostBuilder = new HostBuilder();
             hostBuilder.UseEnvironment(Environments.Development);
@@ -121,7 +121,7 @@ namespace Orleans.TestingHost
                 Formatting = Formatting.None,
             };
 
-            KeyValuePair<string, string>[] enumerated = configuration.AsEnumerable().ToArray();
+            var enumerated = configuration.AsEnumerable().ToArray();
             return JsonConvert.SerializeObject(enumerated, settings);
         }
 
@@ -145,8 +145,8 @@ namespace Orleans.TestingHost
 
         private static void ConfigureListeningPorts(IConfiguration configuration, IServiceCollection services)
         {
-            int siloPort = int.Parse(configuration[nameof(TestSiloSpecificOptions.SiloPort)]);
-            int gatewayPort = int.Parse(configuration[nameof(TestSiloSpecificOptions.GatewayPort)]);
+            var siloPort = int.Parse(configuration[nameof(TestSiloSpecificOptions.SiloPort)]);
+            var gatewayPort = int.Parse(configuration[nameof(TestSiloSpecificOptions.GatewayPort)]);
 
             services.Configure<EndpointOptions>(options =>
             {
@@ -201,7 +201,7 @@ namespace Orleans.TestingHost
 
         private static void TryConfigureClusterMembership(IConfiguration configuration, IServiceCollection services)
         {
-            bool.TryParse(configuration[nameof(TestClusterOptions.UseTestClusterMembership)], out bool useTestClusterMembership);
+            bool.TryParse(configuration[nameof(TestClusterOptions.UseTestClusterMembership)], out var useTestClusterMembership);
 
             // Configure test cluster membership if requested and if no membership table implementation has been registered.
             // If the test involves a custom membership oracle and no membership table, special care will be required
@@ -218,14 +218,14 @@ namespace Orleans.TestingHost
 
         private static void TryConfigureClientMembership(IConfiguration configuration, IServiceCollection services)
         {
-            bool.TryParse(configuration[nameof(TestClusterOptions.UseTestClusterMembership)], out bool useTestClusterMembership);
+            bool.TryParse(configuration[nameof(TestClusterOptions.UseTestClusterMembership)], out var useTestClusterMembership);
             if (useTestClusterMembership && services.All(svc => svc.ServiceType != typeof(IGatewayListProvider)))
             {
                 Action<StaticGatewayListProviderOptions> configureOptions = options =>
                 {
-                    int baseGatewayPort = int.Parse(configuration[nameof(TestClusterOptions.BaseGatewayPort)]);
-                    int initialSilosCount = int.Parse(configuration[nameof(TestClusterOptions.InitialSilosCount)]);
-                    bool gatewayPerSilo = bool.Parse(configuration[nameof(TestClusterOptions.GatewayPerSilo)]);
+                    var baseGatewayPort = int.Parse(configuration[nameof(TestClusterOptions.BaseGatewayPort)]);
+                    var initialSilosCount = int.Parse(configuration[nameof(TestClusterOptions.InitialSilosCount)]);
+                    var gatewayPerSilo = bool.Parse(configuration[nameof(TestClusterOptions.GatewayPerSilo)]);
 
                     if (gatewayPerSilo)
                     {
@@ -250,7 +250,7 @@ namespace Orleans.TestingHost
 
         private static void TryConfigureFileLogging(IConfiguration configuration, IServiceCollection services, string name)
         {
-            bool.TryParse(configuration[nameof(TestClusterOptions.ConfigureFileLogging)], out bool configureFileLogging);
+            bool.TryParse(configuration[nameof(TestClusterOptions.ConfigureFileLogging)], out var configureFileLogging);
             if (configureFileLogging)
             {
                 var fileName = TestingUtils.CreateTraceFileName(name, configuration[nameof(TestClusterOptions.ClusterId)]);

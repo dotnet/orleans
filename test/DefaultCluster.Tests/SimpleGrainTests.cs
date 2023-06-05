@@ -22,32 +22,32 @@ namespace DefaultCluster.Tests.General
         [Fact, TestCategory("BVT")]
         public async Task SimpleGrainGetGrain()
         {
-            ISimpleGrain grain = GetSimpleGrain();
+            var grain = GetSimpleGrain();
             _ = await grain.GetAxB();
         }
 
         [Fact, TestCategory("BVT")]
         public async Task SimpleGrainControlFlow()
         {
-            ISimpleGrain grain = GetSimpleGrain();
+            var grain = GetSimpleGrain();
             
-            Task setPromise = grain.SetA(2);
+            var setPromise = grain.SetA(2);
             await setPromise;
 
             setPromise = grain.SetB(3);
             await setPromise;
 
-            Task<int> intPromise = grain.GetAxB();
+            var intPromise = grain.GetAxB();
             Assert.Equal(6, await intPromise);
         }
 
         [Fact, TestCategory("BVT")]
         public async Task SimpleGrainDataFlow()
         {
-            ISimpleGrain grain = GetSimpleGrain();
+            var grain = GetSimpleGrain();
 
-            Task setAPromise = grain.SetA(3);
-            Task setBPromise = grain.SetB(4);
+            var setAPromise = grain.SetA(3);
+            var setBPromise = grain.SetB(4);
             await Task.WhenAll(setAPromise, setBPromise);
             var x = await grain.GetAxB();
 
@@ -58,7 +58,7 @@ namespace DefaultCluster.Tests.General
         [TestCategory("BVT")]
         public async Task GettingGrainWithMultipleConstructorsActivesViaDefaultConstructor()
         {
-            ISimpleGrain grain = GrainFactory.GetGrain<ISimpleGrain>(GetRandomGrainId(), grainClassNamePrefix: MultipleConstructorsSimpleGrain.MultipleConstructorsSimpleGrainPrefix);
+            var grain = GrainFactory.GetGrain<ISimpleGrain>(GetRandomGrainId(), grainClassNamePrefix: MultipleConstructorsSimpleGrain.MultipleConstructorsSimpleGrainPrefix);
 
             var actual = await grain.GetA();
             Assert.Equal(MultipleConstructorsSimpleGrain.ValueUsedByParameterlessConstructor, actual);

@@ -50,8 +50,8 @@ namespace Orleans.Transactions
 
         private void RecordStatistics()
         {
-            ITransactionAgentStatistics current = TransactionAgentStatistics.Copy(statistics);
-            DateTime now = DateTime.UtcNow;
+            var current = TransactionAgentStatistics.Copy(statistics);
+            var now = DateTime.UtcNow;
 
             transactionStartedPerSecond = CalculateTps(lastStatistics.TransactionsStarted, lastCheckTime, current.TransactionsStarted, now);
             lastStatistics = current;
@@ -63,9 +63,9 @@ namespace Orleans.Transactions
             if (!options.Enabled)
                 return false;
 
-            DateTime now = DateTime.UtcNow;
+            var now = DateTime.UtcNow;
             monitor.TryAction(now);
-            double txPerSecondCurrently = CalculateTps(lastStatistics.TransactionsStarted, lastCheckTime, statistics.TransactionsStarted, now);
+            var txPerSecondCurrently = CalculateTps(lastStatistics.TransactionsStarted, lastCheckTime, statistics.TransactionsStarted, now);
             //decaying utilization for tx per second
             var aggregratedTxPerSecond = (transactionStartedPerSecond + (2.0 * txPerSecondCurrently)) / 3.0;
             
@@ -74,8 +74,8 @@ namespace Orleans.Transactions
 
         private static double CalculateTps(long startCounter, DateTime startTimeUtc, long currentCounter, DateTime curentTimeUtc)
         {
-            TimeSpan deltaTime = curentTimeUtc - startTimeUtc;
-            long deltaCounter = currentCounter - startCounter;
+            var deltaTime = curentTimeUtc - startTimeUtc;
+            var deltaCounter = currentCounter - startCounter;
             return (deltaTime.TotalMilliseconds < 1000)
                 ? deltaCounter
                 : (deltaCounter * 1000.0) / deltaTime.TotalMilliseconds;

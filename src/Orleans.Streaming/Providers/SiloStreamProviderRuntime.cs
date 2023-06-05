@@ -65,7 +65,7 @@ namespace Orleans.Runtime.Providers
             IQueueAdapterFactory adapterFactory,
             IQueueAdapter queueAdapter)
         {
-            IStreamQueueBalancer queueBalancer = CreateQueueBalancer(streamProviderName);
+            var queueBalancer = CreateQueueBalancer(streamProviderName);
             var managerId = SystemTargetGrainId.Create(Constants.StreamPullingAgentManagerType, siloDetails.SiloAddress, streamProviderName);
             var pubsubOptions = ServiceProvider.GetOptionsByName<StreamPubSubOptions>(streamProviderName);
             var pullingAgentOptions = ServiceProvider.GetOptionsByName<StreamPullingAgentOptions>(streamProviderName);
@@ -108,7 +108,7 @@ namespace Orleans.Runtime.Providers
             }
             catch (Exception e)
             {
-                string error = $"Cannot create stream queue balancer for StreamProvider: {streamProviderName}, Exception: {e}. Please configure your stream provider with a queue balancer.";
+                var error = $"Cannot create stream queue balancer for StreamProvider: {streamProviderName}, Exception: {e}. Please configure your stream provider with a queue balancer.";
                 throw new ArgumentOutOfRangeException("balancerType", error);
             }
         }

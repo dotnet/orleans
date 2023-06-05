@@ -30,8 +30,8 @@ namespace Orleans.Streams
 
         public async Task<ISet<PubSubSubscriptionState>> RegisterProducer(QualifiedStreamId streamId, GrainId streamProducer)
         {
-            ISet<PubSubSubscriptionState> explicitRes = await explicitPubSub.RegisterProducer(streamId, streamProducer);
-            ISet<PubSubSubscriptionState> implicitRes = await implicitPubSub.RegisterProducer(streamId, streamProducer);
+            var explicitRes = await explicitPubSub.RegisterProducer(streamId, streamProducer);
+            var implicitRes = await implicitPubSub.RegisterProducer(streamId, streamProducer);
             explicitRes.UnionWith(implicitRes);
             return explicitRes;
         }

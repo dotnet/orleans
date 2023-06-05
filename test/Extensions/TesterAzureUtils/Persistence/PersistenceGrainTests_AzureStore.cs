@@ -111,8 +111,8 @@ namespace Tester.AzureUtils.Persistence
         protected void Persistence_Perf_Activate()
         {
             const string testName = "Persistence_Perf_Activate";
-            int n = LoopIterations_Grain;
-            TimeSpan target = TimeSpan.FromMilliseconds(MaxReadTime * n);
+            var n = LoopIterations_Grain;
+            var target = TimeSpan.FromMilliseconds(MaxReadTime * n);
 
             // Timings for Activate
             RunPerfTest(n, testName, target,
@@ -125,8 +125,8 @@ namespace Tester.AzureUtils.Persistence
         protected void Persistence_Perf_Write()
         {
             const string testName = "Persistence_Perf_Write";
-            int n = LoopIterations_Grain;
-            TimeSpan target = TimeSpan.FromMilliseconds(MaxWriteTime * n);
+            var n = LoopIterations_Grain;
+            var target = TimeSpan.FromMilliseconds(MaxWriteTime * n);
 
             // Timings for Write
             RunPerfTest(n, testName, target,
@@ -139,8 +139,8 @@ namespace Tester.AzureUtils.Persistence
         protected void Persistence_Perf_Write_Reread()
         {
             const string testName = "Persistence_Perf_Write_Read";
-            int n = LoopIterations_Grain;
-            TimeSpan target = TimeSpan.FromMilliseconds(MaxWriteTime * n);
+            var n = LoopIterations_Grain;
+            var target = TimeSpan.FromMilliseconds(MaxWriteTime * n);
 
             // Timings for Write
             RunPerfTest(n, testName + "--Write", target,
@@ -160,11 +160,11 @@ namespace Tester.AzureUtils.Persistence
        
         protected async Task Persistence_Silo_StorageProvider_Azure(string providerName)
         {
-            List<SiloHandle> silos = HostedCluster.GetActiveSilos().ToList();
+            var silos = HostedCluster.GetActiveSilos().ToList();
             foreach (var silo in silos)
             {
                 var testHooks = HostedCluster.Client.GetTestHooks(silo);
-                List<string> providers = (await testHooks.GetStorageProviderNames()).ToList();
+                var providers = (await testHooks.GetStorageProviderNames()).ToList();
                 Assert.True(providers.Contains(providerName), $"No storage provider found: {providerName}");
             }
         }
@@ -177,14 +177,14 @@ namespace Tester.AzureUtils.Persistence
             Func<IMemoryStorageTestGrain, Task> actionMemoryStore,
             Func<IGrainStorageTestGrain, Task> actionAzureTable)
         {
-            IEchoTaskGrain[] noStateGrains = new IEchoTaskGrain[n];
-            IPersistenceTestGrain[] memoryGrains = new IPersistenceTestGrain[n];
-            IGrainStorageTestGrain[] azureStoreGrains = new IGrainStorageTestGrain[n];
-            IMemoryStorageTestGrain[] memoryStoreGrains = new IMemoryStorageTestGrain[n];
+            var noStateGrains = new IEchoTaskGrain[n];
+            var memoryGrains = new IPersistenceTestGrain[n];
+            var azureStoreGrains = new IGrainStorageTestGrain[n];
+            var memoryStoreGrains = new IMemoryStorageTestGrain[n];
 
-            for (int i = 0; i < n; i++)
+            for (var i = 0; i < n; i++)
             {
-                Guid id = Guid.NewGuid();
+                var id = Guid.NewGuid();
                 noStateGrains[i] = GrainFactory.GetGrain<IEchoTaskGrain>(id);
                 memoryGrains[i] = GrainFactory.GetGrain<IPersistenceTestGrain>(id);
                 azureStoreGrains[i] = GrainFactory.GetGrain<IGrainStorageTestGrain>(id);
@@ -207,7 +207,7 @@ namespace Tester.AzureUtils.Persistence
 
             if (elapsed > target.Multiply(timingFactor))
             {
-                string msg = string.Format("{0}: Elapsed time {1} exceeds target time {2}", testName, elapsed, target);
+                var msg = string.Format("{0}: Elapsed time {1} exceeds target time {2}", testName, elapsed, target);
 
                 if (elapsed > target.Multiply(2.0 * timingFactor))
                 {
@@ -222,10 +222,10 @@ namespace Tester.AzureUtils.Persistence
 
         private void RunIterations(string testName, int n, Func<int, Task> action)
         {
-            List<Task> promises = new List<Task>();
-            Stopwatch sw = Stopwatch.StartNew();
+            var promises = new List<Task>();
+            var sw = Stopwatch.StartNew();
             // Fire off requests in batches
-            for (int i = 0; i < n; i++)
+            for (var i = 0; i < n; i++)
             {
                 var promise = action(i);
                 promises.Add(promise);

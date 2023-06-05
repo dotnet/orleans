@@ -104,15 +104,15 @@ namespace Orleans.Runtime.MembershipService
         {
             try
             {
-                int idx1 = rowKey.IndexOf(Seperator);
-                int idx2 = rowKey.LastIndexOf(Seperator);
-                ReadOnlySpan<char> rowKeySpan = rowKey.AsSpan();
-                ReadOnlySpan<char> addressStr = rowKeySpan.Slice(0, idx1);
-                ReadOnlySpan<char> portStr = rowKeySpan.Slice(idx1 + 1, idx2 - idx1 - 1);
-                ReadOnlySpan<char> genStr = rowKeySpan.Slice(idx2 + 1);
-                IPAddress address = IPAddress.Parse(addressStr);
-                int port = int.Parse(portStr);
-                int generation = int.Parse(genStr);
+                var idx1 = rowKey.IndexOf(Seperator);
+                var idx2 = rowKey.LastIndexOf(Seperator);
+                var rowKeySpan = rowKey.AsSpan();
+                var addressStr = rowKeySpan.Slice(0, idx1);
+                var portStr = rowKeySpan.Slice(idx1 + 1, idx2 - idx1 - 1);
+                var genStr = rowKeySpan.Slice(idx2 + 1);
+                var address = IPAddress.Parse(addressStr);
+                var port = int.Parse(portStr);
+                var generation = int.Parse(genStr);
                 return SiloAddress.New(address, port, generation);
             }
             catch (Exception exc)

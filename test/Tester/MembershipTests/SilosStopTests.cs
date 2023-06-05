@@ -57,7 +57,7 @@ namespace UnitTests.MembershipTests
         private async Task<ILongRunningTaskGrain<bool>> GetGrainOnTargetSilo(SiloHandle siloHandle)
         {
             const int maxRetry = 10;
-            for (int i = 0; i < maxRetry; i++)
+            for (var i = 0; i < maxRetry; i++)
             {
                 var grain = GrainFactory.GetGrain<ILongRunningTaskGrain<bool>>(Guid.NewGuid());
                 var instanceId = await grain.GetRuntimeInstanceId();

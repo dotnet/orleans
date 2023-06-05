@@ -52,12 +52,12 @@ namespace Orleans.Runtime
         public int GetNumRecentlyUsed(TimeSpan recencyPeriod)
         {
             var now = DateTime.UtcNow;
-            int sum = 0;
+            var sum = 0;
             foreach (var bucket in buckets)
             {
                 // Ticket is the date time when this bucket should be collected (last touched time plus age limit)
                 // For now we take the shortest age limit as an approximation of the per-type age limit.
-                DateTime ticket = bucket.Key;
+                var ticket = bucket.Key;
                 var timeTillCollection = ticket - now;
                 var timeSinceLastUsed = shortestAgeLimit - timeTillCollection;
                 if (timeSinceLastUsed <= recencyPeriod)
@@ -94,7 +94,7 @@ namespace Orleans.Runtime
                     return;
                 }
 
-                DateTime ticket = MakeTicketFromTimeSpan(timeout);
+                var ticket = MakeTicketFromTimeSpan(timeout);
 
                 if (default != item.CollectionTicket)
                 {
@@ -116,7 +116,7 @@ namespace Orleans.Runtime
 
             lock (item)
             {
-                DateTime ticket = item.CollectionTicket;
+                var ticket = item.CollectionTicket;
                 if (default == ticket) return false;
                 if (IsExpired(ticket)) return false;
 
@@ -153,8 +153,8 @@ namespace Orleans.Runtime
             ThrowIfTicketIsInvalid(item.CollectionTicket);
             if (IsExpired(item.CollectionTicket)) return false;
 
-            DateTime oldTicket = item.CollectionTicket;
-            DateTime newTicket = MakeTicketFromTimeSpan(timeout);
+            var oldTicket = item.CollectionTicket;
+            var newTicket = MakeTicketFromTimeSpan(timeout);
             // if the ticket value doesn't change, then the source and destination bucket are the same and there's nothing to do.
             if (newTicket.Equals(oldTicket)) return true;
 
@@ -464,7 +464,7 @@ namespace Orleans.Runtime
         {
             var watch = ValueStopwatch.StartNew();
             var number = Interlocked.Increment(ref collectionNumber);
-            long memBefore = GC.GetTotalMemory(false) / (1024 * 1024);
+            var memBefore = GC.GetTotalMemory(false) / (1024 * 1024);
 
             if (logger.IsEnabled(LogLevel.Debug))
             {
@@ -477,7 +477,7 @@ namespace Orleans.Runtime
                     ToString());
             }
 
-            List<ICollectibleGrainContext> list = scanStale ? ScanStale() : ScanAll(ageLimit);
+            var list = scanStale ? ScanStale() : ScanAll(ageLimit);
             CatalogInstruments.ActivationCollections.Add(1);
             var count = 0;
             if (list != null && list.Count > 0)
@@ -487,7 +487,7 @@ namespace Orleans.Runtime
                 await DeactivateActivationsFromCollector(list);
             }
 
-            long memAfter = GC.GetTotalMemory(false) / (1024 * 1024);
+            var memAfter = GC.GetTotalMemory(false) / (1024 * 1024);
             watch.Stop();
 
             if (logger.IsEnabled(LogLevel.Debug))

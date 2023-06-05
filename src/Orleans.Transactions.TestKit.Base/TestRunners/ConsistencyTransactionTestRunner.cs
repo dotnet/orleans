@@ -24,12 +24,12 @@ namespace Orleans.Transactions.TestKit
 
             // first, run the random work load to generate history events
             testOutput($"start at {DateTime.UtcNow}");
-            int numThreads = scale;
-            int numTxsPerThread = scale * scale;
+            var numThreads = scale;
+            var numTxsPerThread = scale * scale;
 
             // start the threads that run transactions
             var tasks = new Task[numThreads];
-            for (int i = 0; i < numThreads; i++)
+            for (var i = 0; i < numThreads; i++)
             {
                 tasks[i] = harness.RunRandomTransactionSequence(i, numTxsPerThread, grainFactory, testOutput);
             }

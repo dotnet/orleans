@@ -121,7 +121,7 @@ namespace Orleans.Streams
             foreach (var entry in entries)
             {
                 var grainId = entry.GetGrainId(streamId);
-                Guid subscriptionGuid = MakeSubscriptionGuid(entry.GrainType, streamId);
+                var subscriptionGuid = MakeSubscriptionGuid(entry.GrainType, streamId);
                 CollectionsMarshal.GetValueRefOrAddDefault(result, subscriptionGuid, out var duplicate) = grainId;
                 if (duplicate)
                 {

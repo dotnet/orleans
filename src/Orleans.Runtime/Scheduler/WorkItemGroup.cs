@@ -99,11 +99,11 @@ namespace Orleans.Runtime.Scheduler
 
             lock (lockable)
             {
-                long thisSequenceNumber = totalItemsEnqueued++;
-                int count = WorkItemCount;
+                var thisSequenceNumber = totalItemsEnqueued++;
+                var count = WorkItemCount;
 
                 workItems.Enqueue(task);
-                int maxPendingItemsLimit = schedulingOptions.MaxPendingWorkItemsSoftLimit;
+                var maxPendingItemsLimit = schedulingOptions.MaxPendingWorkItemsSoftLimit;
                 if (maxPendingItemsLimit > 0 && count > maxPendingItemsLimit)
                 {
                     var now = ValueStopwatch.GetTimestamp();
@@ -172,7 +172,7 @@ namespace Orleans.Runtime.Scheduler
                 RuntimeContext.SetExecutionContext(GrainContext);
 
                 // Process multiple items -- drain the applicationMessageQueue (up to max items) for this physical activation
-                int count = 0;
+                var count = 0;
                 var stopwatch = ValueStopwatch.StartNew();
                 do
                 {

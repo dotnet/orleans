@@ -60,13 +60,13 @@ namespace AWSUtils.Tests.StorageTests
             // Write some data
             WriteAlot_Async(testName, 1, iterations, iterations);
 
-            Stopwatch sw = Stopwatch.StartNew();
+            var sw = Stopwatch.StartNew();
 
             var keys = new Dictionary<string, AttributeValue> { { ":PK", new AttributeValue(PartitionKey) } };
             var data = manager.QueryAsync(UnitTestDynamoDBStorage.INSTANCE_TABLE_NAME, keys, $"PartitionKey = :PK", item => new UnitTestDynamoDBTableData(item)).Result;
 
             sw.Stop();
-            int count = data.results.Count();
+            var count = data.results.Count();
             output.WriteLine("DynamoDBDataManagerStressTests_ReadAll completed. ReadAll {0} entries in {1} at {2} RPS", count, sw.Elapsed, count / sw.Elapsed.TotalSeconds);
 
             //Assert.True(count >= iterations, $"ReadAllshould return some data: Found={count}");
@@ -75,15 +75,15 @@ namespace AWSUtils.Tests.StorageTests
         private void WriteAlot_Async(string testName, int numPartitions, int iterations, int batchSize)
         {
             output.WriteLine("Iterations={0}, Batch={1}, Partitions={2}", iterations, batchSize, numPartitions);
-            List<Task> promises = new List<Task>();
-            Stopwatch sw = Stopwatch.StartNew();
-            for (int i = 0; i < iterations; i++)
+            var promises = new List<Task>();
+            var sw = Stopwatch.StartNew();
+            for (var i = 0; i < iterations; i++)
             {
-                string partitionKey = PartitionKey;
+                var partitionKey = PartitionKey;
                 if (numPartitions > 1) partitionKey += (i % numPartitions);
-                string rowKey = i.ToString(CultureInfo.InvariantCulture);
+                var rowKey = i.ToString(CultureInfo.InvariantCulture);
 
-                UnitTestDynamoDBTableData dataObject = new UnitTestDynamoDBTableData();
+                var dataObject = new UnitTestDynamoDBTableData();
                 dataObject.PartitionKey = partitionKey;
                 dataObject.RowKey = rowKey;
                 dataObject.StringData = rowKey;

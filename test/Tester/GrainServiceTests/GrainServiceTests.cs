@@ -34,7 +34,7 @@ namespace Tester
         [Fact, TestCategory("BVT"), TestCategory("GrainServices")]
         public async Task SimpleInvokeGrainService()
         {
-            IGrainServiceTestGrain grain = GrainFactory.GetGrain<IGrainServiceTestGrain>(0);
+            var grain = GrainFactory.GetGrain<IGrainServiceTestGrain>(0);
             var grainId = await grain.GetHelloWorldUsingCustomService();
             Assert.Equal("Hello World from Test Grain Service", grainId);
             var prop = await grain.GetServiceConfigProperty();
@@ -44,7 +44,7 @@ namespace Tester
         [Fact, TestCategory("BVT"), TestCategory("GrainServices")]
         public async Task GrainServiceWasStarted()
         {
-            IGrainServiceTestGrain grain = GrainFactory.GetGrain<IGrainServiceTestGrain>(0);
+            var grain = GrainFactory.GetGrain<IGrainServiceTestGrain>(0);
             var prop = await grain.CallHasStarted();
             Assert.True(prop);
         }
@@ -52,7 +52,7 @@ namespace Tester
         [Fact, TestCategory("BVT"), TestCategory("GrainServices")]
         public async Task GrainServiceWasStartedInBackground()
         {
-            IGrainServiceTestGrain grain = GrainFactory.GetGrain<IGrainServiceTestGrain>(0);
+            var grain = GrainFactory.GetGrain<IGrainServiceTestGrain>(0);
             var prop = await grain.CallHasStartedInBackground();
             Assert.True(prop);
         }
@@ -60,7 +60,7 @@ namespace Tester
         [Fact, TestCategory("BVT"), TestCategory("GrainServices")]
         public async Task GrainServiceWasInit()
         {
-            IGrainServiceTestGrain grain = GrainFactory.GetGrain<IGrainServiceTestGrain>(0);
+            var grain = GrainFactory.GetGrain<IGrainServiceTestGrain>(0);
             var prop = await grain.CallHasInit();
             Assert.True(prop);
         }
@@ -68,7 +68,7 @@ namespace Tester
         [Fact, TestCategory("BVT"), TestCategory("GrainServices")]
         public async Task GrainServiceExtensionTest()
         {
-            IGrainServiceTestGrain grain = GrainFactory.GetGrain<IGrainServiceTestGrain>(0);
+            var grain = GrainFactory.GetGrain<IGrainServiceTestGrain>(0);
             var what = await grain.EchoViaExtension("what");
             Assert.Equal("what", what);
         }

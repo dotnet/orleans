@@ -13,7 +13,7 @@ namespace Orleans.Hosting.Kubernetes
     {
         public static async IAsyncEnumerable<(WatchEventType EventType, TValue Value)> WatchAsync<TList, TValue>(this HttpOperationResponse<TList> watchList, [EnumeratorCancellation] CancellationToken cancellation)
         {
-            Channel<(WatchEventType, TValue)> channel = Channel.CreateUnbounded<(WatchEventType, TValue)>(
+            var channel = Channel.CreateUnbounded<(WatchEventType, TValue)>(
                 new UnboundedChannelOptions
                 {
                     AllowSynchronousContinuations = false,
@@ -22,7 +22,7 @@ namespace Orleans.Hosting.Kubernetes
                 });
 
             var reader = channel.Reader;
-            Watcher<TValue>[] watcher = new Watcher<TValue>[] { default };
+            var watcher = new Watcher<TValue>[] { default };
             var cancellationRegistration = cancellation.Register(() =>
             {
                 _ = channel.Writer.TryComplete();

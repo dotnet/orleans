@@ -51,11 +51,11 @@ namespace Orleans.Runtime
             if (timerStarted) throw new InvalidOperationException(String.Format("Calling start on timer {0} is not allowed, since it was already created in a started mode with specified due.", GetFullName()));
             if (period == TimeSpan.Zero) throw new ArgumentOutOfRangeException("period", period, "Cannot use TimeSpan.Zero for timer period");
 
-            long dueTm = (long)dueTime.TotalMilliseconds;
+            var dueTm = (long)dueTime.TotalMilliseconds;
             if (dueTm < -1) throw new ArgumentOutOfRangeException(nameof(dueTime), "The due time must not be less than -1.");
             if (dueTm > MaxSupportedTimeout) throw new ArgumentOutOfRangeException(nameof(dueTime), "The due time interval must be less than 2^32-2.");
 
-            long periodTm = (long)period.TotalMilliseconds;
+            var periodTm = (long)period.TotalMilliseconds;
             if (periodTm < -1) throw new ArgumentOutOfRangeException(nameof(period), "The period must not be less than -1.");
             if (periodTm > MaxSupportedTimeout) throw new ArgumentOutOfRangeException(nameof(period), "The period interval must be less than 2^32-2.");
 
@@ -69,15 +69,15 @@ namespace Orleans.Runtime
         private void Init(ILogger logger, Func<object, Task> asynCallback, TimerCallback synCallback, object state, TimeSpan due, TimeSpan period)
         {
             if (synCallback == null && asynCallback == null) throw new ArgumentNullException("synCallback", "Cannot use null for both sync and asyncTask timer callbacks.");
-            int numNonNulls = (asynCallback != null ? 1 : 0) + (synCallback != null ? 1 : 0);
+            var numNonNulls = (asynCallback != null ? 1 : 0) + (synCallback != null ? 1 : 0);
             if (numNonNulls > 1) throw new ArgumentNullException("synCallback", "Cannot define more than one timer callbacks. Pick one.");
             if (period == TimeSpan.Zero) throw new ArgumentOutOfRangeException("period", period, "Cannot use TimeSpan.Zero for timer period");
 
-            long dueTm = (long)dueTime.TotalMilliseconds;
+            var dueTm = (long)dueTime.TotalMilliseconds;
             if (dueTm < -1) throw new ArgumentOutOfRangeException(nameof(dueTime), "The due time must not be less than -1.");
             if (dueTm > MaxSupportedTimeout) throw new ArgumentOutOfRangeException(nameof(dueTime), "The due time interval must be less than 2^32-2.");
 
-            long periodTm = (long)period.TotalMilliseconds;
+            var periodTm = (long)period.TotalMilliseconds;
             if (periodTm < -1) throw new ArgumentOutOfRangeException(nameof(period), "The period must not be less than -1.");
             if (periodTm > MaxSupportedTimeout) throw new ArgumentOutOfRangeException(nameof(period), "The period interval must be less than 2^32-2.");
 
@@ -152,8 +152,8 @@ namespace Orleans.Runtime
         public static bool CheckTimerDelay(DateTime previousTickTime, int totalNumTicks, 
                         TimeSpan dueTime, TimeSpan timerFrequency, ILogger logger, Func<string> getName, ErrorCode errorCode, bool freezeCheck)
         {
-            TimeSpan timeSinceLastTick = DateTime.UtcNow - previousTickTime;
-            TimeSpan exceptedTimeToNextTick = totalNumTicks == 0 ? dueTime : timerFrequency;
+            var timeSinceLastTick = DateTime.UtcNow - previousTickTime;
+            var exceptedTimeToNextTick = totalNumTicks == 0 ? dueTime : timerFrequency;
             TimeSpan exceptedTimeWithSlack;
             if (exceptedTimeToNextTick >= TimeSpan.FromSeconds(6))
             {

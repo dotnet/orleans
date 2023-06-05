@@ -49,7 +49,7 @@ namespace Orleans.Providers
 
         private CachedMessage QueueMessageToCachedMessage(MemoryMessageData queueMessage, DateTime dequeueTimeUtc)
         {
-            StreamPosition streamPosition = GetStreamPosition(queueMessage);
+            var streamPosition = GetStreamPosition(queueMessage);
             return new CachedMessage()
             {
                 StreamId = streamPosition.StreamId,
@@ -64,7 +64,7 @@ namespace Orleans.Providers
         private ArraySegment<byte> SerializeMessageIntoPooledSegment(MemoryMessageData queueMessage)
         {
             // serialize payload
-            int size = SegmentBuilder.CalculateAppendSize(queueMessage.Payload);
+            var size = SegmentBuilder.CalculateAppendSize(queueMessage.Payload);
 
             // get segment from current block
             ArraySegment<byte> segment;
@@ -77,13 +77,13 @@ namespace Orleans.Providers
                 // if this fails with clean block, then requested size is too big
                 if (!currentBuffer.TryGetSegment(size, out segment))
                 {
-                    string errmsg = String.Format(CultureInfo.InvariantCulture,
+                    var errmsg = String.Format(CultureInfo.InvariantCulture,
                         "Message size is too big. MessageSize: {0}", size);
                     throw new ArgumentOutOfRangeException(nameof(queueMessage), errmsg);
                 }
             }
             // encode namespace, offset, partitionkey, properties and payload into segment
-            int writeOffset = 0;
+            var writeOffset = 0;
             SegmentBuilder.Append(segment, ref writeOffset, queueMessage.Payload);
             return segment;
         }
@@ -147,8 +147,8 @@ namespace Orleans.Providers
         /// <inheritdoc/>
         public void AddToCache(IList<IBatchContainer> messages)
         {
-            DateTime utcNow = DateTime.UtcNow;
-            List<CachedMessage> memoryMessages = messages
+            var utcNow = DateTime.UtcNow;
+            var memoryMessages = messages
                 .Cast<MemoryBatchContainer<TSerializer>>()
                 .Select(container => container.MessageData)
                 .Select(batch => QueueMessageToCachedMessage(batch, utcNow))
@@ -180,9 +180,9 @@ namespace Orleans.Providers
         public IBatchContainer GetBatchContainer(ref CachedMessage cachedMessage)
         {
             //Deserialize payload
-            int readOffset = 0;
-            ArraySegment<byte> payload = SegmentBuilder.ReadNextBytes(cachedMessage.Segment, ref readOffset);
-            MemoryMessageData message = MemoryMessageData.Create(cachedMessage.StreamId, new ArraySegment<byte>(payload.ToArray()));
+            var readOffset = 0;
+            var payload = SegmentBuilder.ReadNextBytes(cachedMessage.Segment, ref readOffset);
+            var message = MemoryMessageData.Create(cachedMessage.StreamId, new ArraySegment<byte>(payload.ToArray()));
             message.SequenceNumber = cachedMessage.SequenceNumber;
             return new MemoryBatchContainer<TSerializer>(message, serializer);
         }

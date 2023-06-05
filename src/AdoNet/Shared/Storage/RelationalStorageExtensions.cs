@@ -82,7 +82,7 @@ namespace Orleans.Tests.SqlUtils
                 {
                     var onlyOnceProperties = properties.Where(pn => onlyOnceColumns.Contains(pn.Name)).Select(pn => pn).ToArray();
                     var onlyOnceData = parameters.First();
-                    for(int i = 0; i < onlyOnceProperties.Length; ++i)
+                    for(var i = 0; i < onlyOnceProperties.Length; ++i)
                     {
                         var currentProperty = onlyOnceProperties[i];
                         var parameterValue = currentProperty.GetValue(onlyOnceData, null);
@@ -101,10 +101,10 @@ namespace Orleans.Tests.SqlUtils
 
                 var dataRows = new List<string>();
                 var multiProperties = onlyOnceColumns == null ? properties : properties.Where(pn => !onlyOnceColumns.Contains(pn.Name)).Select(pn => pn).ToArray();
-                int parameterCount = 0;
+                var parameterCount = 0;
                 foreach(var row in parameters)
                 {
-                    for(int i = 0; i < multiProperties.Length; ++i)
+                    for(var i = 0; i < multiProperties.Length; ++i)
                     {
                         var currentProperty = multiProperties[i];
                         var parameterValue = currentProperty.GetValue(row, null);

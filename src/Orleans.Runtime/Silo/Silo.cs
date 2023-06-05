@@ -79,12 +79,12 @@ namespace Orleans.Runtime
             Justification = "Should not Dispose of messageCenter in this method because it continues to run / exist after this point.")]
         public Silo(ILocalSiloDetails siloDetails, IServiceProvider services)
         {
-            string name = siloDetails.Name;
+            var name = siloDetails.Name;
             // Temporarily still require this. Hopefuly gone when 2.0 is released.
             this.siloDetails = siloDetails;
             SystemStatus = SystemStatus.Creating;
 
-            IOptions<ClusterMembershipOptions> clusterMembershipOptions = services.GetRequiredService<IOptions<ClusterMembershipOptions>>();
+            var clusterMembershipOptions = services.GetRequiredService<IOptions<ClusterMembershipOptions>>();
             initTimeout = clusterMembershipOptions.Value.MaxJoinAttemptTime;
             if (Debugger.IsAttached)
             {
@@ -97,7 +97,7 @@ namespace Orleans.Runtime
             Services = services;
 
             //set PropagateActivityId flag from node config
-            IOptions<SiloMessagingOptions> messagingOptions = services.GetRequiredService<IOptions<SiloMessagingOptions>>();
+            var messagingOptions = services.GetRequiredService<IOptions<SiloMessagingOptions>>();
             waitForMessageToBeQueuedForOutbound = messagingOptions.Value.WaitForMessageToBeQueuedForOutboundTime;
 
             loggerFactory = Services.GetRequiredService<ILoggerFactory>();
@@ -168,8 +168,8 @@ namespace Orleans.Runtime
 
             siloLifecycle = Services.GetRequiredService<ISiloLifecycleSubject>();
             // register all lifecycle participants
-            IEnumerable<ILifecycleParticipant<ISiloLifecycle>> lifecycleParticipants = Services.GetServices<ILifecycleParticipant<ISiloLifecycle>>();
-            foreach(ILifecycleParticipant<ISiloLifecycle> participant in lifecycleParticipants)
+            var lifecycleParticipants = Services.GetServices<ILifecycleParticipant<ISiloLifecycle>>();
+            foreach(var participant in lifecycleParticipants)
             {
                 participant?.Participate(siloLifecycle);
             }
@@ -178,7 +178,7 @@ namespace Orleans.Runtime
             var namedLifecycleParticipantCollection = Services.GetService<IKeyedServiceCollection<string,ILifecycleParticipant<ISiloLifecycle>>>();
             if (namedLifecycleParticipantCollection?.GetServices(Services)?.Select(s => s.GetService(Services)) is { } namedParticipants)
             {
-                foreach (ILifecycleParticipant<ISiloLifecycle> participant in namedParticipants)
+                foreach (var participant in namedParticipants)
                 {
                     participant.Participate(siloLifecycle);
                 }
@@ -420,7 +420,7 @@ namespace Orleans.Runtime
         /// <returns>A <see cref="Task"/> representing the operation.</returns>
         public async Task StopAsync(CancellationToken cancellationToken)
         {
-            bool gracefully = !cancellationToken.IsCancellationRequested;
+            var gracefully = !cancellationToken.IsCancellationRequested;
             if (gracefully)
             {
                 if (logger.IsEnabled(LogLevel.Debug))
@@ -436,7 +436,7 @@ namespace Orleans.Runtime
                 }
             }
 
-            bool stopAlreadyInProgress = false;
+            var stopAlreadyInProgress = false;
             lock (lockable)
             {
                 if (SystemStatus.Equals(SystemStatus.Stopping) ||
@@ -542,7 +542,7 @@ namespace Orleans.Runtime
             if (isFastKilledNeeded)
                 return;
 
-            bool gracefully = !ct.IsCancellationRequested;
+            var gracefully = !ct.IsCancellationRequested;
             try
             {
                 if (gracefully)
@@ -612,7 +612,7 @@ namespace Orleans.Runtime
                     logger.LogDebug(
                         "{GrainServiceType} Grain Service with Id {GrainServiceId} stopped successfully.",
                         grainService.GetType().FullName,
-                        grainService.GetPrimaryKeyLong(out string ignored));
+                        grainService.GetPrimaryKeyLong(out var ignored));
                 }
             }
         }

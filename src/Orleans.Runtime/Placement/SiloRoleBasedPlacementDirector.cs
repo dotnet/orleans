@@ -18,9 +18,9 @@ namespace Orleans.Runtime.Placement
         public virtual Task<SiloAddress> OnAddActivation(
             PlacementStrategy strategy, PlacementTarget target, IPlacementContext context)
         {
-            string siloRole = target.GrainIdentity.Key.ToString();
+            var siloRole = target.GrainIdentity.Key.ToString();
 
-            List<SiloAddress> siloAddressesSameRole = membershipTableManager.MembershipTableSnapshot.Entries
+            var siloAddressesSameRole = membershipTableManager.MembershipTableSnapshot.Entries
                 .Where(s => s.Value.Status == SiloStatus.Active && s.Value.RoleName == siloRole)
                 .Select(s => s.Key)
                 .Intersect(context.GetCompatibleSilos(target))

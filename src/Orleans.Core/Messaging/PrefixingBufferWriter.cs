@@ -198,7 +198,7 @@ namespace Orleans.Runtime.Messaging
         /// <param name="sizeHint">The size requested by the caller to either <see cref="GetMemory(int)"/> or <see cref="GetSpan(int)"/>.</param>
         private void Initialize(int sizeHint)
         {
-            int sizeToRequest = expectedPrefixSize + Math.Max(sizeHint, payloadSizeHint);
+            var sizeToRequest = expectedPrefixSize + Math.Max(sizeHint, payloadSizeHint);
             var memory = innerWriter.GetMemory(sizeToRequest);
             prefixMemory = memory.Slice(0, expectedPrefixSize);
             realMemory = memory.Slice(expectedPrefixSize);

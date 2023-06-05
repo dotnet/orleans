@@ -73,7 +73,7 @@ namespace ServiceBus.Tests.SlowConsumingTests
             await slowConsumer.BecomeConsumer(streamGuid, StreamNamespace, StreamProviderName);
 
             //set up 30 healthy consumer grain to show how much we favor slow consumer 
-            int healthyConsumerCount = 30;
+            var healthyConsumerCount = 30;
             var healthyConsumers = await SetUpHealthyConsumerGrain(fixture.GrainFactory, streamGuid, StreamNamespace, StreamProviderName, healthyConsumerCount);
 
             //configure data generator for stream and start producing
@@ -99,8 +99,8 @@ namespace ServiceBus.Tests.SlowConsumingTests
 
         public static async Task<List<ISampleStreaming_ConsumerGrain>> SetUpHealthyConsumerGrain(IGrainFactory GrainFactory, Guid streamId, string streamNameSpace, string streamProvider, int grainCount)
         {
-            List<ISampleStreaming_ConsumerGrain> grains = new List<ISampleStreaming_ConsumerGrain>();
-            List<Task> tasks = new List<Task>();
+            var grains = new List<ISampleStreaming_ConsumerGrain>();
+            var tasks = new List<Task>();
             while (grainCount > 0)
             {
                 var consumer = GrainFactory.GetGrain<ISampleStreaming_ConsumerGrain>(Guid.NewGuid());
@@ -114,7 +114,7 @@ namespace ServiceBus.Tests.SlowConsumingTests
 
         private async Task StopHealthyConsumerGrainComing(List<ISampleStreaming_ConsumerGrain> grains)
         {
-            List<Task> tasks = new List<Task>();
+            var tasks = new List<Task>();
             foreach (var grain in grains)
             {
                 tasks.Add(grain.StopConsuming());
@@ -126,7 +126,7 @@ namespace ServiceBus.Tests.SlowConsumingTests
         {
             if (assertIsTrue)
             {
-                bool actualResult = await IsBackPressureTriggered();
+                var actualResult = await IsBackPressureTriggered();
                 Assert.True(expectedResult == actualResult, $"Back pressure algorithm should be triggered? expected: {expectedResult}, actual: {actualResult}");
                 return true;
             }
@@ -138,8 +138,8 @@ namespace ServiceBus.Tests.SlowConsumingTests
 
         private async Task<bool> IsBackPressureTriggered()
         {
-            IManagementGrain mgmtGrain = fixture.HostedCluster.GrainFactory.GetGrain<IManagementGrain>(0);
-            object[] replies = await mgmtGrain.SendControlCommandToProvider(typeof(PersistentStreamProvider).FullName,
+            var mgmtGrain = fixture.HostedCluster.GrainFactory.GetGrain<IManagementGrain>(0);
+            var replies = await mgmtGrain.SendControlCommandToProvider(typeof(PersistentStreamProvider).FullName,
                              StreamProviderName, EHStreamProviderWithCreatedCacheListAdapterFactory.IsCacheBackPressureTriggeredCommand, null);
             foreach (var re in replies)
             {

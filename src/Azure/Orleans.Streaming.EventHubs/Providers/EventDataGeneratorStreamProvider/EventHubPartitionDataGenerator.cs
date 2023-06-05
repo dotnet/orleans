@@ -44,8 +44,8 @@ namespace Orleans.Streaming.EventHubs.Testing
                 events = null;
                 return false;
             }
-            int count = maxCount;
-            List<EventData> eventDataList = new List<EventData>();
+            var count = maxCount;
+            var eventDataList = new List<EventData>();
             while (count-- > 0)
             {
                 SequenceNumberCounter.Increment();

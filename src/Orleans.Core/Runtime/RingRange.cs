@@ -81,7 +81,7 @@ namespace Orleans.Runtime
         /// <returns>true if n is in (Begin, End], false otherwise</returns>
         public bool InRange(uint n)
         {
-            uint num = n;
+            var num = n;
             if (begin < end)
             {
                 return num > begin && num <= end;
@@ -313,13 +313,13 @@ namespace Orleans.Runtime
         private static SingleRange GetEquallyDividedSubRange(SingleRange singleRange, int numSubRanges, int mySubRangeIndex)
         {
             var rangeSize = singleRange.RangeSize();
-            uint portion = (uint)(rangeSize / numSubRanges);
-            uint remainder = (uint)(rangeSize - portion * numSubRanges);
-            uint start = singleRange.Begin;
-            for (int i = 0; i < numSubRanges; i++)
+            var portion = (uint)(rangeSize / numSubRanges);
+            var remainder = (uint)(rangeSize - portion * numSubRanges);
+            var start = singleRange.Begin;
+            for (var i = 0; i < numSubRanges; i++)
             {
                 // (Begin, End]
-                uint end = (unchecked(start + portion));
+                var end = (unchecked(start + portion));
                 // I want it to overflow on purpose. It will do the right thing.
                 if (remainder > 0)
                 {

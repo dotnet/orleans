@@ -61,7 +61,7 @@ namespace Orleans.TestingHost
         /// <returns>Completion promise for the Read operation on the specified grain.</returns>
         public async Task ReadStateAsync<T>(string grainType, GrainId grainId, IGrainState<T> grainState)
         {
-            IStorageFaultGrain faultGrain = grainFactory.GetGrain<IStorageFaultGrain>(grainType);
+            var faultGrain = grainFactory.GetGrain<IStorageFaultGrain>(grainType);
             try
             {
                 await InsertDelay();
@@ -86,7 +86,7 @@ namespace Orleans.TestingHost
         /// <returns>Completion promise for the Write operation on the specified grain.</returns>
         public async Task WriteStateAsync<T>(string grainType, GrainId grainId, IGrainState<T> grainState)
         {
-            IStorageFaultGrain faultGrain = grainFactory.GetGrain<IStorageFaultGrain>(grainType);
+            var faultGrain = grainFactory.GetGrain<IStorageFaultGrain>(grainType);
             try
             {
                 await InsertDelay();
@@ -111,7 +111,7 @@ namespace Orleans.TestingHost
         /// <returns>Completion promise for the Delete operation on the specified grain.</returns>
         public async Task ClearStateAsync<T>(string grainType, GrainId grainId, IGrainState<T> grainState)
         {
-            IStorageFaultGrain faultGrain = grainFactory.GetGrain<IStorageFaultGrain>(grainType);
+            var faultGrain = grainFactory.GetGrain<IStorageFaultGrain>(grainType);
             try
             {
                 await InsertDelay();

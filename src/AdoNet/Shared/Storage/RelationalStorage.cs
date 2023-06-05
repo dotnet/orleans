@@ -214,7 +214,7 @@ namespace Orleans.Tests.SqlUtils
         private static async Task<Tuple<IEnumerable<TResult>, int>> SelectAsync<TResult>(DbDataReader reader, Func<IDataReader, int, CancellationToken, Task<TResult>> selector, CancellationToken cancellationToken)
         {
             var results = new List<TResult>();
-            int resultSetCount = 0;
+            var resultSetCount = 0;
             while(reader.HasRows)
             {
                 while(await reader.ReadAsync(cancellationToken).ConfigureAwait(continueOnCapturedContext: false))

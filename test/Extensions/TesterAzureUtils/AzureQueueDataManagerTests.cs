@@ -27,13 +27,13 @@ namespace Tester.AzureUtils
 
         public async Task DisposeAsync()
         {
-            AzureQueueDataManager manager = await GetTableManager(queueName);
+            var manager = await GetTableManager(queueName);
             await manager.DeleteQueue();
         }
 
         private async Task<AzureQueueDataManager> GetTableManager(string qName, TimeSpan? visibilityTimeout = null)
         {
-            AzureQueueDataManager manager = new AzureQueueDataManager(loggerFactory, $"{qName}-{DeploymentId}", new AzureQueueOptions { MessageVisibilityTimeout = visibilityTimeout }.ConfigureTestDefaults());
+            var manager = new AzureQueueDataManager(loggerFactory, $"{qName}-{DeploymentId}", new AzureQueueOptions { MessageVisibilityTimeout = visibilityTimeout }.ConfigureTestDefaults());
             await manager.InitQueueAsync();
             return manager;
         }
@@ -42,7 +42,7 @@ namespace Tester.AzureUtils
         public async Task AQ_Standalone_1()
         {
             queueName = "Test-1-".ToLower() + Guid.NewGuid();
-            AzureQueueDataManager manager = await GetTableManager(queueName);
+            var manager = await GetTableManager(queueName);
             Assert.Equal(0, await manager.GetApproximateMessageCount());
 
             var inMessage = "Hello, World";
@@ -58,12 +58,12 @@ namespace Tester.AzureUtils
             logger.LogInformation("PeekQueueMessage 2: {Message}", PrintQueueMessage(outMessage2));
             Assert.Equal(inMessage, outMessage2.MessageText);
 
-            QueueMessage outMessage3 = await manager.GetQueueMessage();
+            var outMessage3 = await manager.GetQueueMessage();
             logger.LogInformation("GetQueueMessage 3: {Message}", PrintQueueMessage(outMessage3));
             Assert.Equal(inMessage, outMessage3.MessageText);
             Assert.Equal(1, await manager.GetApproximateMessageCount());
 
-            QueueMessage outMessage4 = await manager.GetQueueMessage();
+            var outMessage4 = await manager.GetQueueMessage();
             Assert.Null(outMessage4);
 
             Assert.Equal(1, await manager.GetApproximateMessageCount());
@@ -76,14 +76,14 @@ namespace Tester.AzureUtils
         public async Task AQ_Standalone_2()
         {
             queueName = "Test-2-".ToLower() + Guid.NewGuid();
-            AzureQueueDataManager manager = await GetTableManager(queueName);
+            var manager = await GetTableManager(queueName);
 
-            IEnumerable<QueueMessage> msgs = await manager.GetQueueMessages();
+            var msgs = await manager.GetQueueMessages();
             Assert.True(msgs == null || !msgs.Any());
 
-            int numMsgs = 10;
-            List<Task> promises = new List<Task>();
-            for (int i = 0; i < numMsgs; i++)
+            var numMsgs = 10;
+            var promises = new List<Task>();
+            for (var i = 0; i < numMsgs; i++)
             {
                 promises.Add(manager.AddQueueMessage(i.ToString()));
             }
@@ -109,13 +109,13 @@ namespace Tester.AzureUtils
             queueName = "Test-4-".ToLower() + Guid.NewGuid();
 
             const int NumThreads = 100;
-            Task<bool>[] promises = new Task<bool>[NumThreads];
+            var promises = new Task<bool>[NumThreads];
 
-            for (int i = 0; i < NumThreads; i++)
+            for (var i = 0; i < NumThreads; i++)
             {
                 promises[i] = Task.Run(async () =>
                 {
-                    AzureQueueDataManager manager = await GetTableManager(queueName);
+                    var manager = await GetTableManager(queueName);
                     return true;
                 });
             }
@@ -125,17 +125,17 @@ namespace Tester.AzureUtils
         [SkippableFact, TestCategory("Functional")]
         public async Task AQ_Standalone_4()
         {
-            TimeSpan visibilityTimeout = TimeSpan.FromSeconds(2);
+            var visibilityTimeout = TimeSpan.FromSeconds(2);
 
             queueName = "Test-5-".ToLower() + Guid.NewGuid();
-            AzureQueueDataManager manager = await GetTableManager(queueName, visibilityTimeout);
+            var manager = await GetTableManager(queueName, visibilityTimeout);
             Assert.Equal(0, await manager.GetApproximateMessageCount());
 
             var inMessage = "Hello, World";
             await manager.AddQueueMessage(inMessage);
             Assert.Equal(1, await manager.GetApproximateMessageCount());
 
-            QueueMessage outMessage = await manager.GetQueueMessage();
+            var outMessage = await manager.GetQueueMessage();
             logger.LogInformation("GetQueueMessage: {Message}", PrintQueueMessage(outMessage));
             Assert.Equal(inMessage, outMessage.MessageText);
 
@@ -143,7 +143,7 @@ namespace Tester.AzureUtils
 
             Assert.Equal(1, await manager.GetApproximateMessageCount());
 
-            QueueMessage outMessage2 = await manager.GetQueueMessage();
+            var outMessage2 = await manager.GetQueueMessage();
             Assert.Equal(inMessage, outMessage2.MessageText);
 
             await manager.DeleteQueueMessage(outMessage2);

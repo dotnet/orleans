@@ -85,7 +85,7 @@ namespace UnitTests.Grains
 
         public Task<string> CheckProviderType()
         {
-            IGrainStorage grainStorage = GrainStorageHelpers.GetGrainStorage(GetType(), ServiceProvider);
+            var grainStorage = GrainStorageHelpers.GetGrainStorage(GetType(), ServiceProvider);
             Assert.NotNull(grainStorage);
             return Task.FromResult(grainStorage.GetType().FullName);
         }

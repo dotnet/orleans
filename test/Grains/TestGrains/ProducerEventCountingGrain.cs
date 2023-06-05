@@ -36,8 +36,8 @@ namespace UnitTests.Grains
             {
                 throw new ArgumentNullException("providerToUse");
             }
-            IStreamProvider streamProvider = this.GetStreamProvider(providerToUse);
-            IAsyncStream<int> stream = streamProvider.GetStream<int>(ConsumerEventCountingGrain.StreamNamespace, streamId);
+            var streamProvider = this.GetStreamProvider(providerToUse);
+            var stream = streamProvider.GetStream<int>(ConsumerEventCountingGrain.StreamNamespace, streamId);
             _producer = stream;
             return Task.CompletedTask;
         }

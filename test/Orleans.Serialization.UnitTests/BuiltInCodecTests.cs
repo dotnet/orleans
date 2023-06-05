@@ -2288,7 +2288,7 @@ namespace Orleans.Serialization.UnitTests
                 return false;
             }
 
-            foreach (string k in left.Keys)
+            foreach (var k in left.Keys)
             {
                 if (!(right.ContainsKey(k) && left[k] == right[k]))
                 {
@@ -2331,7 +2331,7 @@ namespace Orleans.Serialization.UnitTests
                 return false;
             }
 
-            foreach (string k in left.Keys)
+            foreach (var k in left.Keys)
             {
                 if (!(right.ContainsKey(k) && left[k] == right[k]))
                 {

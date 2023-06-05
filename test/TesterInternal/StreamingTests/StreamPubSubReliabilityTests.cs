@@ -105,16 +105,16 @@ namespace UnitTests.StreamingTests
         private async Task Test_PubSub_Stream(string streamProviderName, Guid streamId)
         {
             // Consumer
-            IStreamLifecycleConsumerGrain consumer = GrainFactory.GetGrain<IStreamLifecycleConsumerGrain>(Guid.NewGuid());
+            var consumer = GrainFactory.GetGrain<IStreamLifecycleConsumerGrain>(Guid.NewGuid());
             await consumer.BecomeConsumer(streamId, StreamNamespace, streamProviderName);
 
             // Producer
-            IStreamLifecycleProducerGrain producer = GrainFactory.GetGrain<IStreamLifecycleProducerGrain>(Guid.NewGuid());
+            var producer = GrainFactory.GetGrain<IStreamLifecycleProducerGrain>(Guid.NewGuid());
             await producer.BecomeProducer(StreamId, StreamNamespace, streamProviderName);
 
             await producer.SendItem(1);
 
-            int received1 = 0;
+            var received1 = 0;
             var cts = new CancellationTokenSource(1000);
             do
             {
@@ -131,7 +131,7 @@ namespace UnitTests.StreamingTests
 
             await Task.Delay(300);
 
-            int received2 = await consumer.GetReceivedCount();
+            var received2 = await consumer.GetReceivedCount();
 
             Assert.Equal(0, received2);  // $"Received count for consumer {consumer} is wrong = {received2}"
 

@@ -13,8 +13,8 @@ namespace DefaultCluster.Tests
         [Fact, TestCategory("BVT"), TestCategory("Reminders")]
         public async Task SimpleGrainGetGrain()
         {
-            IReminderTestGrain grain = GrainFactory.GetGrain<IReminderTestGrain>(GetRandomGrainId());
-            bool notExists = await grain.IsReminderExists("not exists");
+            var grain = GrainFactory.GetGrain<IReminderTestGrain>(GetRandomGrainId());
+            var notExists = await grain.IsReminderExists("not exists");
             Assert.False(notExists);
 
             await grain.AddReminder("dummy");

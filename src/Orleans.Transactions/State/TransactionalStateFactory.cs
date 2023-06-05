@@ -18,7 +18,7 @@ namespace Orleans.Transactions
         public ITransactionalState<TState> Create<TState>(TransactionalStateConfiguration config) where TState : class, new()
         {
             var currentContext = contextAccessor.GrainContext;
-            TransactionalState<TState> transactionalState = ActivatorUtilities.CreateInstance<TransactionalState<TState>>(currentContext.ActivationServices, config, contextAccessor);
+            var transactionalState = ActivatorUtilities.CreateInstance<TransactionalState<TState>>(currentContext.ActivationServices, config, contextAccessor);
             transactionalState.Participate(currentContext.ObservableLifecycle);
             return transactionalState;
         }

@@ -23,11 +23,11 @@ namespace UnitTests.ConcurrencyTests
         [Fact, TestCategory("Functional"), TestCategory("ReadOnly"), TestCategory("AsynchronyPrimitives")]
         public async Task ConcurrencyTest_ReadOnly()
         {
-            IConcurrentGrain first = fixture.GrainFactory.GetGrain<IConcurrentGrain>(GetRandomGrainId());
+            var first = fixture.GrainFactory.GetGrain<IConcurrentGrain>(GetRandomGrainId());
             first.Initialize(0).Wait();
 
-            List<Task> promises = new List<Task>();
-            for (int i = 0; i < 5; i++)
+            var promises = new List<Task>();
+            for (var i = 0; i < 5; i++)
             {
                 Task p = first.A();
                 promises.Add(p);
@@ -38,12 +38,12 @@ namespace UnitTests.ConcurrencyTests
         [Fact, TestCategory("Functional"), TestCategory("ReadOnly"), TestCategory("AsynchronyPrimitives")]
         public void ConcurrencyTest_ModifyReturnList()
         {
-            IConcurrentGrain grain = fixture.GrainFactory.GetGrain<IConcurrentGrain>(GetRandomGrainId());
+            var grain = fixture.GrainFactory.GetGrain<IConcurrentGrain>(GetRandomGrainId());
 
-            Task<List<int>>[] ll = new Task<List<int>>[20];
-            for (int i = 0; i < 2000; i++)
+            var ll = new Task<List<int>>[20];
+            for (var i = 0; i < 2000; i++)
             {
-                for (int j = 0; j < ll.Length; j++)
+                for (var j = 0; j < ll.Length; j++)
                     ll[j] = grain.ModifyReturnList_Test();
 
                 Task.WhenAll(ll).Wait();

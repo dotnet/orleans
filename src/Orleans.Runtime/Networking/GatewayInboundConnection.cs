@@ -68,14 +68,14 @@ namespace Orleans.Runtime.Messaging
             if (overloadDetector.Overloaded)
             {
                 MessagingInstruments.OnRejectedMessage(msg);
-                Message rejection = MessageFactory.CreateRejectionResponse(msg, Message.RejectionTypes.GatewayTooBusy, "Shedding load");
+                var rejection = MessageFactory.CreateRejectionResponse(msg, Message.RejectionTypes.GatewayTooBusy, "Shedding load");
                 messageCenter.TryDeliverToProxy(rejection);
                 if (Log.IsEnabled(LogLevel.Debug)) Log.LogDebug("Rejecting a request due to overloading: {Message}", msg.ToString());
                 GatewayInstruments.GatewayLoadShedding.Add(1);
                 return;
             }
 
-            SiloAddress targetAddress = gateway.TryToReroute(msg);
+            var targetAddress = gateway.TryToReroute(msg);
             msg.SendingSilo = myAddress;
             if (targetAddress is null)
             {

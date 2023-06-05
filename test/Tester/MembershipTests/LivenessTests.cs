@@ -27,11 +27,11 @@ namespace UnitTests.MembershipTests
         {
             output.WriteLine("ClusterId= {0}", HostedCluster.Options.ClusterId);
 
-            SiloHandle silo3 = await HostedCluster.StartAdditionalSiloAsync();
+            var silo3 = await HostedCluster.StartAdditionalSiloAsync();
 
-            IManagementGrain mgmtGrain = GrainFactory.GetGrain<IManagementGrain>(0);
+            var mgmtGrain = GrainFactory.GetGrain<IManagementGrain>(0);
 
-            Dictionary<SiloAddress, SiloStatus> statuses = await mgmtGrain.GetHosts(false);
+            var statuses = await mgmtGrain.GetHosts(false);
             foreach (var pair in statuses)
             {
                 output.WriteLine("       ######## Silo {0}, status: {1}", pair.Key, pair.Value);
@@ -39,7 +39,7 @@ namespace UnitTests.MembershipTests
             }
             Assert.Equal(3, statuses.Count);
 
-            IPEndPoint address = silo3.SiloAddress.Endpoint;
+            var address = silo3.SiloAddress.Endpoint;
             output.WriteLine("About to stop {0}", address);
             await HostedCluster.StopSiloAsync(silo3);
 
@@ -51,7 +51,7 @@ namespace UnitTests.MembershipTests
             foreach (var pair in statuses)
             {
                 output.WriteLine("       ######## Silo {0}, status: {1}", pair.Key, pair.Value);
-                IPEndPoint silo = pair.Key.Endpoint;
+                var silo = pair.Key.Endpoint;
                 if (silo.Equals(address))
                 {
                     Assert.True(pair.Value == SiloStatus.ShuttingDown
@@ -71,12 +71,12 @@ namespace UnitTests.MembershipTests
             await HostedCluster.StartAdditionalSilosAsync(numAdditionalSilos);
             await HostedCluster.WaitForLivenessToStabilizeAsync();
 
-            for (int i = 0; i < numGrains; i++)
+            for (var i = 0; i < numGrains; i++)
             {
                 await SendTraffic(i + 1, startTimers);
             }
 
-            SiloHandle silo2KillHandle = HostedCluster.Silos[silo2Kill];
+            var silo2KillHandle = HostedCluster.Silos[silo2Kill];
 
             logger.LogInformation("\n\n\n\nAbout to kill {Endpoint}\n\n\n", silo2KillHandle.SiloAddress.Endpoint);
 
@@ -85,17 +85,17 @@ namespace UnitTests.MembershipTests
             else
                 await HostedCluster.KillSiloAsync(silo2KillHandle);
 
-            bool didKill = !restart;
+            var didKill = !restart;
             await HostedCluster.WaitForLivenessToStabilizeAsync(didKill);
 
             logger.LogInformation("\n\n\n\nAbout to start sending msg to grain again\n\n\n");
 
-            for (int i = 0; i < numGrains; i++)
+            for (var i = 0; i < numGrains; i++)
             {
                 await SendTraffic(i + 1);
             }
 
-            for (int i = numGrains; i < 2 * numGrains; i++)
+            for (var i = numGrains; i < 2 * numGrains; i++)
             {
                 await SendTraffic(i + 1);
             }
@@ -133,12 +133,12 @@ namespace UnitTests.MembershipTests
         {
             logger.LogInformation("\n\n\n\nAbout to start sending msg to grain again.\n\n\n");
             // same grains
-            for (int i = 0; i < numGrains; i++)
+            for (var i = 0; i < numGrains; i++)
             {
                 await SendTraffic(i + 1);
             }
             // new random grains
-            for (int i = 0; i < numGrains; i++)
+            for (var i = 0; i < numGrains; i++)
             {
                 await SendTraffic(Random.Shared.Next(10000));
             }
@@ -148,7 +148,7 @@ namespace UnitTests.MembershipTests
         {
             try
             {
-                ILivenessTestGrain grain = GrainFactory.GetGrain<ILivenessTestGrain>(key);
+                var grain = GrainFactory.GetGrain<ILivenessTestGrain>(key);
                 Assert.Equal(key, grain.GetPrimaryKeyLong());
                 Assert.Equal(key.ToString(CultureInfo.InvariantCulture), await grain.GetLabel());
                 await LogGrainIdentity(logger, grain);

@@ -177,7 +177,7 @@ namespace Orleans.Streams
             {
                 foreach (var batchContainer in batchContainerBatch.BatchContainers)
                 {
-                    bool isRequestContextSet = batchContainer.ImportRequestContext();
+                    var isRequestContextSet = batchContainer.ImportRequestContext();
                     try
                     {
                         foreach (var itemTuple in batchContainer.GetEvents<T>())

@@ -39,7 +39,7 @@ namespace Orleans.Runtime.Scheduler
         public void RunTask(Task task)
         {
             RuntimeContext.SetExecutionContext(workerGroup.GrainContext);
-            bool done = TryExecuteTask(task);
+            var done = TryExecuteTask(task);
             if (!done)
                 logger.LogWarning(
                     (int)ErrorCode.SchedulerTaskExecuteIncomplete4,
@@ -72,7 +72,7 @@ namespace Orleans.Runtime.Scheduler
         protected override bool TryExecuteTaskInline(Task task, bool taskWasPreviouslyQueued)
         {
             var currentContext = RuntimeContext.Current;
-            bool canExecuteInline = currentContext != null && object.Equals(currentContext, workerGroup.GrainContext);
+            var canExecuteInline = currentContext != null && object.Equals(currentContext, workerGroup.GrainContext);
 
 #if DEBUG
             if (logger.IsEnabled(LogLevel.Trace))
@@ -114,7 +114,7 @@ namespace Orleans.Runtime.Scheduler
                     Thread.CurrentThread.ManagedThreadId);
 #endif
             // Try to run the task.
-            bool done = TryExecuteTask(task);
+            var done = TryExecuteTask(task);
             if (!done)
             {
                 logger.LogWarning(

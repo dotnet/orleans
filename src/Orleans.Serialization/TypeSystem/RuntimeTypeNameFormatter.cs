@@ -109,7 +109,7 @@ public static class RuntimeTypeNameFormatter
         builder.Append(')');
         if (type.IsGenericType)
         {
-            int parameterCount = type.IsConstructedGenericType switch
+            var parameterCount = type.IsConstructedGenericType switch
             {
                 true => type.GenericTypeArguments.Length,
                 false => type.GetTypeInfo().GenericTypeParameters.Length

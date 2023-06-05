@@ -19,7 +19,7 @@ namespace Tester
                 throw new SkipException("No connection string found. Skipping");
             }
 
-            bool usingLocalWAS = string.Equals(DataConnectionString, "UseDevelopmentStorage=true", StringComparison.OrdinalIgnoreCase);
+            var usingLocalWAS = string.Equals(DataConnectionString, "UseDevelopmentStorage=true", StringComparison.OrdinalIgnoreCase);
 
             if (!usingLocalWAS)
             {
@@ -31,7 +31,7 @@ namespace Tester
             //Starts the storage emulator if not started already and it exists (i.e. is installed).
             if (!StorageEmulator.TryStart())
             {
-                string errorMsg = "Azure Storage Emulator could not be started.";
+                var errorMsg = "Azure Storage Emulator could not be started.";
                 Console.WriteLine(errorMsg);
                 throw new SkipException(errorMsg);
             }
@@ -64,13 +64,13 @@ namespace Tester
         public static double CalibrateTimings()
         {
             const int NumLoops = 10000;
-            TimeSpan baseline = TimeSpan.FromTicks(80); // Baseline from jthelin03D
+            var baseline = TimeSpan.FromTicks(80); // Baseline from jthelin03D
             var sw = Stopwatch.StartNew();
-            for (int i = 0; i < NumLoops; i++)
+            for (var i = 0; i < NumLoops; i++)
             {
             }
             sw.Stop();
-            double multiple = 1.0 * sw.ElapsedTicks / baseline.Ticks;
+            var multiple = 1.0 * sw.ElapsedTicks / baseline.Ticks;
             Console.WriteLine("CalibrateTimings: {0} [{1} Ticks] vs {2} [{3} Ticks] = x{4}",
                 sw.Elapsed, sw.ElapsedTicks,
                 baseline, baseline.Ticks,
@@ -82,20 +82,20 @@ namespace Tester
         {
             var stopwatch = new Stopwatch();
 
-            long startMem = GC.GetTotalMemory(true);
+            var startMem = GC.GetTotalMemory(true);
             stopwatch.Start();
 
             action();
 
             stopwatch.Stop();
-            long stopMem = GC.GetTotalMemory(false);
-            long memUsed = stopMem - startMem;
-            TimeSpan duration = stopwatch.Elapsed;
+            var stopMem = GC.GetTotalMemory(false);
+            var memUsed = stopMem - startMem;
+            var duration = stopwatch.Elapsed;
 
-            string timeDeltaStr = "";
+            var timeDeltaStr = "";
             if (baseline > TimeSpan.Zero)
             {
-                double delta = (duration - baseline).TotalMilliseconds / baseline.TotalMilliseconds;
+                var delta = (duration - baseline).TotalMilliseconds / baseline.TotalMilliseconds;
                 timeDeltaStr = String.Format("-- Change = {0}%", 100.0 * delta);
             }
             Console.WriteLine("Time for {0} loops doing {1} = {2} {3} Memory used={4}", numIterations, what, duration, timeDeltaStr, memUsed);
@@ -112,10 +112,10 @@ namespace Tester
 
         public static async Task<int> GetActivationCount(IGrainFactory grainFactory, string fullTypeName)
         {
-            int result = 0;
+            var result = 0;
 
-            IManagementGrain mgmtGrain = grainFactory.GetGrain<IManagementGrain>(0);
-            SimpleGrainStatistic[] stats = await mgmtGrain.GetSimpleGrainStatistics();
+            var mgmtGrain = grainFactory.GetGrain<IManagementGrain>(0);
+            var stats = await mgmtGrain.GetSimpleGrainStatistics();
             foreach (var stat in stats)
             {
                 if (stat.GrainType == fullTypeName)

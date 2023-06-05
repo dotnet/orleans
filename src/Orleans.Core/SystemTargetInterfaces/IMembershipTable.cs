@@ -188,12 +188,12 @@ namespace Orleans
 
         public override string ToString()
         {
-            int active = Members.Count(e => e.Item1.Status == SiloStatus.Active);
-            int dead = Members.Count(e => e.Item1.Status == SiloStatus.Dead);
-            int created = Members.Count(e => e.Item1.Status == SiloStatus.Created);
-            int joining = Members.Count(e => e.Item1.Status == SiloStatus.Joining);
-            int shuttingDown = Members.Count(e => e.Item1.Status == SiloStatus.ShuttingDown);
-            int stopping = Members.Count(e => e.Item1.Status == SiloStatus.Stopping);
+            var active = Members.Count(e => e.Item1.Status == SiloStatus.Active);
+            var dead = Members.Count(e => e.Item1.Status == SiloStatus.Dead);
+            var created = Members.Count(e => e.Item1.Status == SiloStatus.Created);
+            var joining = Members.Count(e => e.Item1.Status == SiloStatus.Joining);
+            var shuttingDown = Members.Count(e => e.Item1.Status == SiloStatus.ShuttingDown);
+            var stopping = Members.Count(e => e.Item1.Status == SiloStatus.Stopping);
 
             return @$"{Members.Count} silos, {active} are Active, {dead} are Dead{
                 (created > 0 ? $", {created} are Created" : null)}{
@@ -224,7 +224,7 @@ namespace Orleans
                 }
             }
             //now add back non-dead
-            List<Tuple<MembershipEntry, string>> all = dead.Values.ToList();
+            var all = dead.Values.ToList();
             all.AddRange(Members.Where(item => item.Item1.Status != SiloStatus.Dead));
             return new MembershipTableData(all, Version);
         }
@@ -311,14 +311,14 @@ namespace Orleans
             //      update my vote, if I voted previously
             //      OR if the list is not full - just add a new vote
             //      OR overwrite the oldest entry.
-            int indexToWrite = allVotes.FindIndex(voter => localSilo.Equals(voter.Item1));
+            var indexToWrite = allVotes.FindIndex(voter => localSilo.Equals(voter.Item1));
             if (indexToWrite == -1)
             {
                 // My vote is not recorded. Find the most outdated vote if the list is full, and overwrite it
                 if (allVotes.Count >= maxVotes) // if the list is full
                 {
                     // The list is full, so pick the most outdated value to overwrite.
-                    DateTime minVoteTime = allVotes.Min(voter => voter.Item2);
+                    var minVoteTime = allVotes.Min(voter => voter.Item2);
 
                     // Only overwrite an existing vote if the local time is greater than the current minimum vote time.
                     if (voteTime >= minVoteTime)

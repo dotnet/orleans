@@ -91,7 +91,7 @@ namespace Orleans.Providers.Streams.Common
             var allItems = new List<IBatchContainer>();
             while (cacheCursorHistogram.Count > 0 && cacheCursorHistogram[0].NumCurrentCursors == 0)
             {
-                List<IBatchContainer> items = DrainBucket(cacheCursorHistogram[0]);
+                var items = DrainBucket(cacheCursorHistogram[0]);
                 allItems.AddRange(items);
                 cacheCursorHistogram.RemoveAt(0); // remove the last bucket
             }
@@ -112,7 +112,7 @@ namespace Orleans.Providers.Streams.Common
             // and remove from the cache the oness that reside in the given bucket until we jump to a next bucket
             while (bucket.NumCurrentItems > 0)
             {
-                SimpleQueueCacheItem item = cachedMessages.Last.Value;
+                var item = cachedMessages.Last.Value;
                 if (item.CacheBucket.Equals(bucket))
                 {
                     if (!item.DeliveryFailure)
@@ -179,7 +179,7 @@ namespace Orleans.Providers.Streams.Common
                 return;
             }
 
-            LinkedListNode<SimpleQueueCacheItem> lastMessage = cachedMessages.Last;
+            var lastMessage = cachedMessages.Last;
             // Check to see if offset is too old to be in cache
             if (sequenceToken.Older(lastMessage.Value.SequenceToken))
             {
@@ -190,7 +190,7 @@ namespace Orleans.Providers.Streams.Common
 
             // Find first message at or below offset
             // Events are ordered from newest to oldest, so iterate from start of list until we hit a node at a previous offset, or the end.
-            LinkedListNode<SimpleQueueCacheItem> node = cachedMessages.First;
+            var node = cachedMessages.First;
             while (node != null && node.Value.SequenceToken.Newer(sequenceToken))
             {
                 // did we get to the end?

@@ -93,7 +93,7 @@ namespace Orleans.Streams
             if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug("Subscribe - Connecting to Rendezvous {PubSub} My GrainRef={GrainReference} Token={Token}",
                 pubSub, myGrainReference, token);
 
-            GuidId subscriptionId = pubSub.CreateSubscriptionId(stream.InternalStreamId, myGrainReference.GetGrainId());
+            var subscriptionId = pubSub.CreateSubscriptionId(stream.InternalStreamId, myGrainReference.GetGrainId());
 
             // Optimistic Concurrency: 
             // In general, we should first register the subsription with the pubsub (pubSub.RegisterConsumer)
@@ -145,7 +145,7 @@ namespace Orleans.Streams
         {
             using var _ = RequestContext.SuppressCallChainReentrancy();
 
-            StreamSubscriptionHandleImpl<T> oldHandleImpl = CheckHandleValidity(handle);
+            var oldHandleImpl = CheckHandleValidity(handle);
 
             if (token != null && !IsRewindable)
                 throw new ArgumentNullException("token", "Passing a non-null token to a non-rewindable IAsyncObservable.");
@@ -170,7 +170,7 @@ namespace Orleans.Streams
 
             await BindExtensionLazy();
 
-            StreamSubscriptionHandleImpl<T> handleImpl = CheckHandleValidity(handle);
+            var handleImpl = CheckHandleValidity(handle);
 
             if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug("Unsubscribe StreamSubscriptionHandle={Handle}", handle);
 
@@ -191,7 +191,7 @@ namespace Orleans.Streams
 
             await BindExtensionLazy();
 
-            List<StreamSubscription> subscriptions= await pubSub.GetAllSubscriptions(stream.InternalStreamId, myGrainReference.GetGrainId());
+            var subscriptions= await pubSub.GetAllSubscriptions(stream.InternalStreamId, myGrainReference.GetGrainId());
             return subscriptions.Select(sub => new StreamSubscriptionHandleImpl<T>(GuidId.GetGuidId(sub.SubscriptionId), stream))
                                   .ToList<StreamSubscriptionHandle<T>>();
         }

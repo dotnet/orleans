@@ -92,7 +92,7 @@ namespace UnitTests.StorageTests.Relational
                 throw new ArgumentOutOfRangeException(nameof(count), "The count news to be more than zero.");
             }
 
-            object randomGenerator = RandomGenerators[typeof(string)];
+            var randomGenerator = RandomGenerators[typeof(string)];
             return ((Func<object, string>)randomGenerator)(Tuple.Create(new Range<long>(count, count), symbolSet));
         }
 

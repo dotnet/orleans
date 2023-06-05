@@ -94,13 +94,13 @@ namespace Orleans.Runtime
             }
 
             WatchdogInstruments.HealthChecks.Add(1);
-            int numFailedChecks = 0;
+            var numFailedChecks = 0;
             StringBuilder reasons = null;
-            foreach (IHealthCheckParticipant participant in participants)
+            foreach (var participant in participants)
             {
                 try
                 {
-                    bool ok = participant.CheckHealth(lastWatchdogCheck, out var reason);
+                    var ok = participant.CheckHealth(lastWatchdogCheck, out var reason);
                     if (!ok)
                     {
                         reasons ??= new StringBuilder();

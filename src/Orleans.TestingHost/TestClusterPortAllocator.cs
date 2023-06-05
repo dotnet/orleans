@@ -22,8 +22,8 @@ namespace Orleans.TestingHost
         public (int, int) AllocateConsecutivePortPairs(int numPorts = 5)
         {
             // Evaluate current system tcp connections
-            IPGlobalProperties ipGlobalProperties = IPGlobalProperties.GetIPGlobalProperties();
-            IPEndPoint[] tcpConnInfoArray = ipGlobalProperties.GetActiveTcpListeners();
+            var ipGlobalProperties = IPGlobalProperties.GetIPGlobalProperties();
+            var tcpConnInfoArray = ipGlobalProperties.GetActiveTcpListeners();
 
             // each returned port in the pair will have to have at least this amount of available ports following it
 
@@ -80,13 +80,13 @@ namespace Orleans.TestingHost
 
             var allocations = new List<(int Port, string Mutex)>();
 
-            for (int attempts = 0; attempts < MaxAttempts; attempts++)
+            for (var attempts = 0; attempts < MaxAttempts; attempts++)
             {
-                int basePort = Random.Shared.Next(portStartRange, portEndRange);
+                var basePort = Random.Shared.Next(portStartRange, portEndRange);
 
                 // get ports in buckets, so we don't interfere with parallel runs of this same function
                 basePort = basePort - (basePort % consecutivePortsToCheck);
-                int endPort = basePort + consecutivePortsToCheck;
+                var endPort = basePort + consecutivePortsToCheck;
 
                 // make sure none of the ports in the sub range are in use
                 if (tcpConnInfoArray.All(endpoint => endpoint.Port < basePort || endpoint.Port >= endPort))

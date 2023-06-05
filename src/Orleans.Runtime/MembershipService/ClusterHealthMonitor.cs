@@ -127,7 +127,7 @@ namespace Orleans.Runtime.MembershipService
 
             tmpList.Sort((x, y) => x.GetConsistentHashCode().CompareTo(y.GetConsistentHashCode()));
 
-            int myIndex = tmpList.FindIndex(el => el.Equals(self.SiloAddress));
+            var myIndex = tmpList.FindIndex(el => el.Equals(self.SiloAddress));
             if (myIndex < 0)
             {
                 // this should not happen ...
@@ -145,14 +145,14 @@ namespace Orleans.Runtime.MembershipService
             var silosToWatch = new List<SiloAddress>();
             var additionalSilos = new List<SiloAddress>();
 
-            for (int i = 0; i < tmpList.Count - 1 && silosToWatch.Count < clusterMembershipOptions.CurrentValue.NumProbedSilos; i++)
+            for (var i = 0; i < tmpList.Count - 1 && silosToWatch.Count < clusterMembershipOptions.CurrentValue.NumProbedSilos; i++)
             {
                 var candidate = tmpList[(myIndex + i + 1) % tmpList.Count];
                 var candidateEntry = membership.Entries[candidate];
 
                 if (candidate.IsSameLogicalSilo(localSiloDetails.SiloAddress)) continue;
 
-                bool isSuspected = candidateEntry.GetFreshVotes(now, clusterMembershipOptions.CurrentValue.DeathVoteExpirationTimeout).Count > 0;
+                var isSuspected = candidateEntry.GetFreshVotes(now, clusterMembershipOptions.CurrentValue.DeathVoteExpirationTimeout).Count > 0;
                 if (isSuspected)
                 {
                     additionalSilos.Add(candidate);

@@ -21,11 +21,11 @@ namespace UnitTests.AsyncPrimitivesTests
         [Fact, TestCategory("Functional")]
         public void AsyncPipelineSimpleTest()
         {
-            int step = 2000;
-            int epsilon = 200;
+            var step = 2000;
+            var epsilon = 200;
             var pipeline = new AsyncPipeline(2);
             var done = TimedCompletions(step, step, step);
-            Stopwatch watch = Stopwatch.StartNew();
+            var watch = Stopwatch.StartNew();
             pipeline.Add(done[0]);
             var elapsed0 = watch.ElapsedMilliseconds;
             Assert.True(elapsed0 < epsilon, $"{elapsed0}ms");
@@ -45,11 +45,11 @@ namespace UnitTests.AsyncPrimitivesTests
         [Fact, TestCategory("Functional")]
         public void AsyncPipelineWaitTest()
         {
-            Random rand = new Random(222);
-            int started = 0;
-            int finished1 = 0;
-            int finished2 = 0;
-            int numActions = 1000;
+            var rand = new Random(222);
+            var started = 0;
+            var finished1 = 0;
+            var finished2 = 0;
+            var numActions = 1000;
             Action action1 = (() => 
                 {
                     lock (this) started++;
@@ -63,7 +63,7 @@ namespace UnitTests.AsyncPrimitivesTests
             });
 
             var pipeline = new AsyncPipeline(10);
-            for (int i = 0; i < numActions; i++)
+            for (var i = 0; i < numActions; i++)
             {
                 var async1 = Task.Run(action1);
                 pipeline.Add(async1);
@@ -99,13 +99,13 @@ namespace UnitTests.AsyncPrimitivesTests
             if (workerCount < 1)
                 throw new ArgumentOutOfRangeException("You must specify at least one worker.", "workerCount");
 
-            int loopCount = _iterationCount / workerCount;
+            var loopCount = _iterationCount / workerCount;
             const double variance = 0.1;
-            int expectedTasksCompleted = loopCount * workerCount;
+            var expectedTasksCompleted = loopCount * workerCount;
             var delayLength = TimeSpan.FromSeconds(1);
             const int pipelineCapacity = _defaultPipelineCapacity;
             var pipeline = new AsyncPipeline(pipelineCapacity);
-            int tasksCompleted = 0;
+            var tasksCompleted = 0;
             // the following value is wrapped within an array to avoid a modified closure warning from ReSharper.
             int[] pipelineSize = { 0 };
             var capacityReached = new InterlockedFlag();
@@ -123,7 +123,7 @@ namespace UnitTests.AsyncPrimitivesTests
             {
                 for (var j = 0; j < loopCount; j++)
                 {
-                    Task task = new Task(workFunc);
+                    var task = new Task(workFunc);
                     pipeline.Add(task, whiteBox: null);
                     task.Start();
                 }

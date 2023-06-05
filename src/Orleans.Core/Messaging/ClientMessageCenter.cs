@@ -263,9 +263,9 @@ namespace Orleans.Messaging
                 // If Yes, use it.
                 // If not, create a new GatewayConnection and start it.
                 // If start fails, we will mark this connection as dead and remove it from the GetCachedLiveGatewayNames.
-                int msgNumber = Interlocked.Increment(ref numMessages);
+                var msgNumber = Interlocked.Increment(ref numMessages);
                 var gatewayAddresses = gatewayManager.GetLiveGateways();
-                int numGateways = gatewayAddresses.Count;
+                var numGateways = gatewayAddresses.Count;
                 if (numGateways == 0)
                 {
                     RejectMessage(msg, "No gateways available");
@@ -293,7 +293,7 @@ namespace Orleans.Messaging
             // Each bucket holds a (possibly null) weak reference to a GatewayConnection object. That connection instance is used
             // if the WeakReference is non-null, is alive, and points to a live gateway connection. If any of these conditions is
             // false, then a new gateway is selected using the gateway manager, and a new connection established if necessary.
-            WeakReference<ClientOutboundConnection> weakRef = grainBuckets[index];
+            var weakRef = grainBuckets[index];
 
             if (weakRef != null
                 && weakRef.TryGetTarget(out var existingConnection)
@@ -367,7 +367,7 @@ namespace Orleans.Messaging
 
             static uint GetHashCodeModulo(int key, uint umod)
             {
-                int mod = (int)umod;
+                var mod = (int)umod;
                 key = ((key % mod) + mod) % mod; // key should be positive now. So assert with checked.
                 return checked((uint)key);
             }
@@ -407,7 +407,7 @@ namespace Orleans.Messaging
 
         internal void OnGatewayConnectionOpen()
         {
-            int newCount = Interlocked.Increment(ref numberOfConnectedGateways);
+            var newCount = Interlocked.Increment(ref numberOfConnectedGateways);
             connectionStatusListener.NotifyGatewayCountChanged(newCount, newCount - 1);
         }
 

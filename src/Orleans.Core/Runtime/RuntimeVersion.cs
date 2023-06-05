@@ -12,15 +12,15 @@ namespace Orleans.Runtime
         {
             get
             {
-                Assembly thisProg = typeof(RuntimeVersion).Assembly;
+                var thisProg = typeof(RuntimeVersion).Assembly;
                 var ApiVersion = thisProg.GetName().Version.ToString();
                 if (string.IsNullOrWhiteSpace(thisProg.Location))
                 {
                     return ApiVersion;
                 }
-                FileVersionInfo progVersionInfo = FileVersionInfo.GetVersionInfo(thisProg.Location);
-                bool isDebug = IsAssemblyDebugBuild(thisProg);
-                string productVersion = progVersionInfo.ProductVersion + (isDebug ? " (Debug)." : " (Release)."); // progVersionInfo.IsDebug; does not work
+                var progVersionInfo = FileVersionInfo.GetVersionInfo(thisProg.Location);
+                var isDebug = IsAssemblyDebugBuild(thisProg);
+                var productVersion = progVersionInfo.ProductVersion + (isDebug ? " (Debug)." : " (Release)."); // progVersionInfo.IsDebug; does not work
                 return string.IsNullOrEmpty(productVersion) ? ApiVersion : productVersion;
             }
         }

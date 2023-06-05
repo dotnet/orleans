@@ -72,7 +72,7 @@ namespace Orleans.Runtime.GrainDirectory
 
             foreach (var tuple in grainAndETagList)
             {
-                int curGen = partition.GetGrainETag(tuple.GrainId);
+                var curGen = partition.GetGrainETag(tuple.GrainId);
                 if (curGen == tuple.Version || curGen == GrainInfo.NO_ETAG)
                 {
                     // the grain entry either does not exist in the local partition (curGen = -1) or has not been updated

@@ -9,20 +9,20 @@ namespace DependencyInjection.Tests
         [Fact]
         public void DisambiguateByKeyTest()
         {
-            IServiceProvider services = BuildServiceProvider(ConfigureServices());
-            int actual0 = services.GetServiceByKey<int, IValue<int>>(0).Value;
+            var services = BuildServiceProvider(ConfigureServices());
+            var actual0 = services.GetServiceByKey<int, IValue<int>>(0).Value;
             Assert.StrictEqual(0, actual0);
-            int actual1 = services.GetServiceByKey<int, IValue<int>>(1).Value;
+            var actual1 = services.GetServiceByKey<int, IValue<int>>(1).Value;
             Assert.StrictEqual(1, actual1);
         }
 
         [Fact]
         public void DisambiguateByNameTest()
         {
-            IServiceProvider services = BuildServiceProvider(ConfigureServices());
-            string actualThis = services.GetServiceByName<IValue<string>>("this").Value;
+            var services = BuildServiceProvider(ConfigureServices());
+            var actualThis = services.GetServiceByName<IValue<string>>("this").Value;
             Assert.Equal("this", actualThis);
-            string actualThat = services.GetServiceByName<IValue<string>>("that").Value;
+            var actualThat = services.GetServiceByName<IValue<string>>("that").Value;
             Assert.Equal("that", actualThat);
         }
 

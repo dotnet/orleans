@@ -160,7 +160,7 @@ namespace Orleans.Runtime.Messaging
             {
                 // Got ping that is not destined to me. For example, got a ping to my older incarnation.
                 MessagingInstruments.OnRejectedMessage(msg);
-                Message rejection = MessageFactory.CreateRejectionResponse(msg, Message.RejectionTypes.Unrecoverable,
+                var rejection = MessageFactory.CreateRejectionResponse(msg, Message.RejectionTypes.Unrecoverable,
                     $"The target silo is no longer active: target was {msg.TargetSilo}, but this silo is {LocalSiloAddress}. The rejected ping message is {msg}.");
                 Send(rejection);
             }

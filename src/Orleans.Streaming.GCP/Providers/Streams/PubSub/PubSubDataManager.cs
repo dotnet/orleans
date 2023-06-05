@@ -67,7 +67,7 @@ namespace Orleans.Providers.GCP.Streams.PubSub
                 ReportErrorAndRethrow(e, "CreateAsync", GoogleErrorCode.Initializing);
             }
 
-            bool didCreate = false;
+            var didCreate = false;
 
             try
             {

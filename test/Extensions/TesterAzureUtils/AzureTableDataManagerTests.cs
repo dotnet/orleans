@@ -92,7 +92,7 @@ namespace Tester.AzureUtils
 
             var data2 = data.Clone();
             data2.StringData = "NewData";
-            string eTag1 = await manager.UpdateTableEntryAsync(data2, AzureTableUtils.ANY_ETAG);
+            var eTag1 = await manager.UpdateTableEntryAsync(data2, AzureTableUtils.ANY_ETAG);
             tuple = await manager.ReadSingleTableEntryAsync(data2.PartitionKey, data2.RowKey);
             Assert.Equal(data2.StringData, tuple.Entity.StringData);
 
@@ -104,7 +104,7 @@ namespace Tester.AzureUtils
 
             try
             {
-                string eTag3 = await manager.UpdateTableEntryAsync(data3.Clone(), eTag1);
+                var eTag3 = await manager.UpdateTableEntryAsync(data3.Clone(), eTag1);
                 Assert.True(false, "Should have thrown RequestFailedException.");
             }
             catch (RequestFailedException exc)
@@ -135,7 +135,7 @@ namespace Tester.AzureUtils
                 Assert.Equal(HttpStatusCode.NotFound, httpStatusCode);
             }
 
-            string eTag1 = await manager.UpsertTableEntryAsync(data);
+            var eTag1 = await manager.UpsertTableEntryAsync(data);
             await manager.DeleteTableEntryAsync(data, eTag1);
 
             try
@@ -175,7 +175,7 @@ namespace Tester.AzureUtils
                 Assert.Equal(TableErrorCode.ResourceNotFound.ToString(), restStatus);
             }
 
-            string eTag1 = await manager.UpsertTableEntryAsync(data);
+            var eTag1 = await manager.UpsertTableEntryAsync(data);
             var data2 = data.Clone();
             data2.StringData = "NewData";
             await manager.MergeTableEntryAsync(data2, eTag1);
@@ -228,7 +228,7 @@ namespace Tester.AzureUtils
                 Assert.Equal(TableErrorCode.ResourceNotFound.ToString(), restStatus);
             }
 
-            string etag = await manager.CreateTableEntryAsync(data2.Clone());
+            var etag = await manager.CreateTableEntryAsync(data2.Clone());
             var tuple = await manager.InsertTwoTableEntriesConditionallyAsync(data1, data2, etag);
             try
             {
@@ -283,7 +283,7 @@ namespace Tester.AzureUtils
                 Assert.Equal(TableErrorCode.ResourceNotFound.ToString(), restStatus);
             }
 
-            string etag = await manager.CreateTableEntryAsync(data2.Clone());
+            var etag = await manager.CreateTableEntryAsync(data2.Clone());
             var tuple1 = await manager.InsertTwoTableEntriesConditionallyAsync(data1, data2, etag);
             _ = await manager.UpdateTwoTableEntriesConditionallyAsync(data1, tuple1.Item1, data2, tuple1.Item2);
 

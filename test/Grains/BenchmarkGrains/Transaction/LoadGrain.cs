@@ -24,11 +24,11 @@ namespace BenchmarkGrains.Transaction
 
         private async Task<Report> RunGeneration(int run, int transactions, int conncurrent)
         {
-            List<Task> pending = new List<Task>();
-            Report report = new Report();
-            Stopwatch sw = Stopwatch.StartNew();
-            int generated = run * transactions * 2;
-            int max = generated + transactions;
+            var pending = new List<Task>();
+            var report = new Report();
+            var sw = Stopwatch.StartNew();
+            var generated = run * transactions * 2;
+            var max = generated + transactions;
             while (generated < max)
             {
                 while (generated < max && pending.Count < conncurrent)
@@ -56,8 +56,8 @@ namespace BenchmarkGrains.Transaction
                     await Task.WhenAny(pending);
                 }
             } catch (Exception) {}
-            List<Task> remaining = new List<Task>();
-            foreach (Task t in pending)
+            var remaining = new List<Task>();
+            foreach (var t in pending)
             {
                 if (t.IsFaulted || t.IsCanceled)
                 {

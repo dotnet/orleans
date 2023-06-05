@@ -67,8 +67,8 @@ namespace UnitTests.Grains
             var self = _grainContext.Address.GrainId.Type;
             if (other == self)
             {
-                IBusyActivationGcTestGrain1 g = GrainFactory.GetGrain<IBusyActivationGcTestGrain1>(grainId);
-                for (int i = 0; i < burstCount; ++i)
+                var g = GrainFactory.GetGrain<IBusyActivationGcTestGrain1>(grainId);
+                for (var i = 0; i < burstCount; ++i)
                 {
                     g.Delay(TimeSpan.FromMilliseconds(10)).Ignore();
                 }

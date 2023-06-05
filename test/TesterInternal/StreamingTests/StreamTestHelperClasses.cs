@@ -184,7 +184,7 @@ namespace UnitTests.StreamingTests
             if (logger == null)
                 throw new ArgumentNullException("logger");
 
-            ConsumerProxy newObj = new ConsumerProxy(targets, logger, grainFactory);
+            var newObj = new ConsumerProxy(targets, logger, grainFactory);
             await newObj.BecomeConsumer(streamId, streamProvider);
             return newObj;
         }
@@ -222,7 +222,7 @@ namespace UnitTests.StreamingTests
 
         public static Task<ConsumerProxy> NewProducerConsumerGrainsAsync(Guid streamId, string streamProvider, ILogger logger, int[] grainIds, bool useReentrantGrain, IInternalGrainFactory grainFactory)
         {
-            int grainCount = grainIds.Length;
+            var grainCount = grainIds.Length;
             if (grainCount < 1)
                 throw new ArgumentOutOfRangeException("grainIds", "The grain count must be at least one");
             logger.LogInformation("ConsumerProxy.NewProducerConsumerGrainsAsync: multiplexing {GrainCount} consumer grains for stream {StreamId}.", grainCount, streamId);
@@ -273,16 +273,16 @@ namespace UnitTests.StreamingTests
 
             var grains = new IStreaming_ConsumerGrain[1];
             grains[0] = grainFactory.GetGrain<IStreaming_ConsumerGrain>(consumerGrainId, grainClassName);
-            ConsumerProxy newObj = new ConsumerProxy(grains, logger, grainFactory);
+            var newObj = new ConsumerProxy(grains, logger, grainFactory);
             return newObj;
         }
 
         private async Task BecomeConsumer(Guid streamId, string providerToUse)
         {
-            List<Task> tasks = new List<Task>();
+            var tasks = new List<Task>();
             foreach (var target in _targets)
             {
-                Task t = target.BecomeConsumer(streamId, providerToUse, null);
+                var t = target.BecomeConsumer(streamId, providerToUse, null);
                 // Consider: remove this await, let the calls go in parallel. 
                 // Have to do it for now to prevent multithreaded scheduler bug from happening.
                 // await t;
@@ -335,7 +335,7 @@ namespace UnitTests.StreamingTests
         public static async Task<int> GetNumActivations(IEnumerable<IGrain> targets, IInternalGrainFactory grainFactory)
         {
             var grainIds = targets.Distinct().Where(t => t is GrainReference).Select(t => ((GrainReference)t).GrainId).ToArray();
-            IManagementGrain systemManagement = grainFactory.GetGrain<IManagementGrain>(0);
+            var systemManagement = grainFactory.GetGrain<IManagementGrain>(0);
             var tasks = grainIds.Select(g => systemManagement.GetGrainActivationCount((GrainReference)grainFactory.GetGrain(g))).ToArray();
             await Task.WhenAll(tasks);
             return tasks.Sum(t => t.Result);
@@ -380,7 +380,7 @@ namespace UnitTests.StreamingTests
             if (logger == null)
                 throw new ArgumentNullException("logger");
 
-            ProducerProxy newObj = new ProducerProxy(targets, streamId, streamProvider, logger);
+            var newObj = new ProducerProxy(targets, streamId, streamProvider, logger);
             await newObj.BecomeProducer(streamId, streamProvider, streamNamespace);
             return newObj;
         }
@@ -418,7 +418,7 @@ namespace UnitTests.StreamingTests
 
         public static Task<ProducerProxy> NewProducerConsumerGrainsAsync(Guid streamId, string streamProvider, ILogger logger, int[] grainIds, bool useReentrantGrain, IInternalGrainFactory grainFactory)
         {
-            int grainCount = grainIds.Length;
+            var grainCount = grainIds.Length;
             if (grainCount < 1)
                 throw new ArgumentOutOfRangeException("grainIds", "The grain count must be at least one");
             logger.LogInformation("ConsumerProxy.NewProducerConsumerGrainsAsync: multiplexing {GrainCount} producer grains for stream {StreamId}.", grainCount, streamId);
@@ -496,7 +496,7 @@ namespace UnitTests.StreamingTests
                 throw new InvalidOperationException("This method is only supported for singular producer cases");
             // disabled temporarily.
             // return _targets[0].AddNewConsumerGrain();
-            Guid consumerGrainId = Guid.NewGuid();
+            var consumerGrainId = Guid.NewGuid();
             await _targets[0].AddNewConsumerGrain(consumerGrainId);
             return consumerGrainId;
         }

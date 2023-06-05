@@ -53,7 +53,7 @@ namespace Tester.StreamingTests
 
             await producer.StartPeriodicProducing();
 
-            int numProduced = 0;
+            var numProduced = 0;
             await TestingUtils.WaitUntilAsync(lastTry => ProducerHasProducedSinceLastCheck(numProduced, producer, lastTry), _timeout);
             await producer.StopPeriodicProducing();
             
@@ -84,7 +84,7 @@ namespace Tester.StreamingTests
 
             await producer.StartPeriodicProducing();
 
-            int numProduced = 0;
+            var numProduced = 0;
             await TestingUtils.WaitUntilAsync(lastTry => ProducerHasProducedSinceLastCheck(numProduced, producer, lastTry), _timeout);
             //the subscription to remove
             var subscription = subscriptions[0];
@@ -152,7 +152,7 @@ namespace Tester.StreamingTests
 
             await producer.StartPeriodicProducing();
 
-            int numProduced = 0;
+            var numProduced = 0;
             await TestingUtils.WaitUntilAsync(lastTry => ProducerHasProducedSinceLastCheck(numProduced, producer, lastTry), _timeout);
             await producer.StopPeriodicProducing();
             //wait for consumers to react
@@ -179,7 +179,7 @@ namespace Tester.StreamingTests
 
             await producer.StartPeriodicProducing();
 
-            int numProduced = 0;
+            var numProduced = 0;
             await TestingUtils.WaitUntilAsync(lastTry => ProducerHasProducedSinceLastCheck(numProduced, producer, lastTry), _timeout);
             // set up the new stream to subscribe, which produce strings
             var streamId2 = new FullStreamIdentity(Guid.NewGuid(), "EmptySpace2", StreamProviderName);
@@ -223,7 +223,7 @@ namespace Tester.StreamingTests
 
             await producer.StartPeriodicProducing();
 
-            int numProduced = 0;
+            var numProduced = 0;
             await TestingUtils.WaitUntilAsync(lastTry => ProducerHasProducedSinceLastCheck(numProduced, producer, lastTry), _timeout);
             // set up the new stream to subscribe, which produce strings
             var streamId2 = new FullStreamIdentity(Guid.NewGuid(), "EmptySpace2", StreamProviderName2);
@@ -271,7 +271,7 @@ namespace Tester.StreamingTests
 
         public static async Task<bool> CheckCounters(List<ITypedProducerGrain> producers, IPassive_ConsumerGrain consumer, bool assertIsTrue, ILogger logger)
         {
-            int numProduced = 0;
+            var numProduced = 0;
             foreach (var p in producers)
             {
                 numProduced += await p.GetNumberProduced();

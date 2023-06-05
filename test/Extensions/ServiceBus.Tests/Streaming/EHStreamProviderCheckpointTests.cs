@@ -94,7 +94,7 @@ namespace ServiceBus.Tests.StreamingTests
 
         private async Task ReloadFromCheckpointTestRunner(string streamNamespace, int streamCount, int eventsInStream)
         {
-            List<Guid> streamGuids = Enumerable.Range(0, streamCount).Select(_ => Guid.NewGuid()).ToList();
+            var streamGuids = Enumerable.Range(0, streamCount).Select(_ => Guid.NewGuid()).ToList();
             try
             {
                 await GenerateEvents(streamNamespace, streamGuids, eventsInStream, 4096);
@@ -114,7 +114,7 @@ namespace ServiceBus.Tests.StreamingTests
 
         private async Task RestartSiloAfterCheckpointTestRunner(string streamNamespace, int streamCount, int eventsInStream)
         {
-            List<Guid> streamGuids = Enumerable.Range(0, streamCount).Select(_ => Guid.NewGuid()).ToList();
+            var streamGuids = Enumerable.Range(0, streamCount).Select(_ => Guid.NewGuid()).ToList();
             try
             {
                 await GenerateEvents(streamNamespace, streamGuids, eventsInStream, 0);
@@ -142,7 +142,7 @@ namespace ServiceBus.Tests.StreamingTests
             {
                 // one stream per queue
                 Assert.Equal(streamCount, report.Count);
-                foreach (int eventsPerStream in report.Values)
+                foreach (var eventsPerStream in report.Values)
                 {
                     Assert.Equal(eventsInStream, eventsPerStream);
                 }
@@ -165,21 +165,21 @@ namespace ServiceBus.Tests.StreamingTests
 
         private async Task GenerateEvents(string streamNamespace, List<Guid> streamGuids, int eventsInStream, int payloadSize)
         {
-            IStreamProvider streamProvider = Client.GetStreamProvider(StreamProviderName);
-            IAsyncStream<GeneratedEvent>[] producers = streamGuids
+            var streamProvider = Client.GetStreamProvider(StreamProviderName);
+            var producers = streamGuids
                     .Select(streamGuid => streamProvider.GetStream<GeneratedEvent>(streamNamespace, streamGuid))
                     .ToArray();
 
-            for (int i = 0; i < eventsInStream - 1; i++)
+            for (var i = 0; i < eventsInStream - 1; i++)
             {
                 // send event on each stream
-                for (int j = 0; j < streamGuids.Count; j++)
+                for (var j = 0; j < streamGuids.Count; j++)
                 {
                     await producers[j].OnNextAsync(new GeneratedEvent { EventType = GeneratedEvent.GeneratedEventType.Fill, Payload = new int[payloadSize] });
                 }
             }
             // send end events
-            for (int j = 0; j < streamGuids.Count; j++)
+            for (var j = 0; j < streamGuids.Count; j++)
             {
                 await producers[j].OnNextAsync(new GeneratedEvent { EventType = GeneratedEvent.GeneratedEventType.Report, Payload = new int[payloadSize] });
             }

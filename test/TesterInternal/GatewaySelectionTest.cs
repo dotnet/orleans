@@ -37,7 +37,7 @@ namespace UnitTests.MessageCenterTests
 
         protected async Task Test_GatewaySelection(IGatewayListProvider listProvider)
         {
-            IList<Uri> gatewayUris = listProvider.GetGateways().GetResult();
+            var gatewayUris = listProvider.GetGateways().GetResult();
             Assert.True(gatewayUris.Count > 0, $"Found some gateways. Data = {Utils.EnumerableToString(gatewayUris)}");
 
             var gatewayEndpoints = gatewayUris.Select(uri =>
@@ -50,7 +50,7 @@ namespace UnitTests.MessageCenterTests
 
             var counts = new int[4];
 
-            for (int i = 0; i < 2300; i++)
+            for (var i = 0; i < 2300; i++)
             {
                 var ip = gatewayManager.GetLiveGateway();
                 var addr = ip.Endpoint.Address;
@@ -70,8 +70,8 @@ namespace UnitTests.MessageCenterTests
             //Assert.True((287 < counts[2]) && (counts[2] < 1150), "Gateway selection is incorrectly skewed");
             //Assert.True((287 < counts[3]) && (counts[3] < 1150), "Gateway selection is incorrectly skewed");
 
-            int low = 2300 / 4;
-            int up = 2300 / 4;
+            var low = 2300 / 4;
+            var up = 2300 / 4;
             Assert.True((low <= counts[0]) && (counts[0] <= up), "Gateway selection is incorrectly skewed. " + counts[0]);
             Assert.True((low <= counts[1]) && (counts[1] <= up), "Gateway selection is incorrectly skewed. " + counts[1]);
             Assert.True((low <= counts[2]) && (counts[2] <= up), "Gateway selection is incorrectly skewed. " + counts[2]);

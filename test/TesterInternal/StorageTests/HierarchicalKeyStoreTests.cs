@@ -33,16 +33,16 @@ namespace UnitTests.StorageTests
                 Tuple.Create("Two", "2")
             }.ToList();
 
-            string keyStr = HierarchicalKeyStore.MakeStoreKey(keys);
+            var keyStr = HierarchicalKeyStore.MakeStoreKey(keys);
             Assert.Equal("One=1+Two=2", keyStr); // Output from MakeStoreKey
         }
 
         [Fact, TestCategory("Functional"), TestCategory("MemoryStore")]
         public void HKS_1Key_Read_Write()
         {
-            string testName = Guid.NewGuid().ToString(); //TestContext.TestName;
+            var testName = Guid.NewGuid().ToString(); //TestContext.TestName;
 
-            int key1 = _keyCounter++;
+            var key1 = _keyCounter++;
 
             var keys = new[]
             {
@@ -58,7 +58,7 @@ namespace UnitTests.StorageTests
             var result = store.ReadRow(keys);
 
             Assert.NotNull(result); // Null result
-            foreach (string valueName in data.Keys)
+            foreach (var valueName in data.Keys)
             {
                 Assert.Equal(data[valueName], result[valueName]);
             }
@@ -67,10 +67,10 @@ namespace UnitTests.StorageTests
         [Fact, TestCategory("Functional"), TestCategory("MemoryStore")]
         public void HKS_2Key_Read_Write()
         {
-            string testName = Guid.NewGuid().ToString(); //TestContext.TestName;
+            var testName = Guid.NewGuid().ToString(); //TestContext.TestName;
 
-            int key1 = _keyCounter++;
-            int key2 = _keyCounter++;
+            var key1 = _keyCounter++;
+            var key2 = _keyCounter++;
 
             var keys = new[]
             {
@@ -87,7 +87,7 @@ namespace UnitTests.StorageTests
             var result = store.ReadRow(keys);
 
             Assert.NotNull(result); // Null result
-            foreach (string valueName in data.Keys)
+            foreach (var valueName in data.Keys)
             {
                 Assert.Equal(data[valueName], result[valueName]);
             }
@@ -96,11 +96,11 @@ namespace UnitTests.StorageTests
         [Fact, TestCategory("Functional"), TestCategory("MemoryStore")]
         public void HKS_3Key_Read_Write()
         {
-            string testName = Guid.NewGuid().ToString(); //TestContext.TestName;
+            var testName = Guid.NewGuid().ToString(); //TestContext.TestName;
 
-            int key1 = _keyCounter++;
-            int key2 = _keyCounter++;
-            int key3 = _keyCounter++;
+            var key1 = _keyCounter++;
+            var key2 = _keyCounter++;
+            var key3 = _keyCounter++;
 
             var keys = new[]
             {
@@ -120,7 +120,7 @@ namespace UnitTests.StorageTests
             var result = store.ReadRow(keys);
 
             Assert.NotNull(result); // Null result
-            foreach (string valueName in data.Keys)
+            foreach (var valueName in data.Keys)
             {
                 Assert.Equal(data[valueName], result[valueName]);
             }
@@ -129,12 +129,12 @@ namespace UnitTests.StorageTests
         [Fact, TestCategory("Functional"), TestCategory("MemoryStore")]
         public void HKS_Write2()
         {
-            string testName = Guid.NewGuid().ToString(); //TestContext.TestName;
+            var testName = Guid.NewGuid().ToString(); //TestContext.TestName;
 
-            int key1 = _keyCounter++;
-            int key2 = _keyCounter++;
+            var key1 = _keyCounter++;
+            var key2 = _keyCounter++;
 
-            List<Tuple<string, string>> keys = MakeKeys(key1, key2);
+            var keys = MakeKeys(key1, key2);
 
             var data = new Dictionary<string, object>();
             data[ValueName1] = testName;
@@ -142,7 +142,7 @@ namespace UnitTests.StorageTests
             var store = new HierarchicalKeyStore(keys.Count);
 
             // Write #1
-            string eTag = store.WriteRow(keys, data, null);
+            var eTag = store.WriteRow(keys, data, null);
 
             data[ValueName1] = "One";
             data[ValueName2] = "Two";
@@ -154,7 +154,7 @@ namespace UnitTests.StorageTests
             var result = store.ReadRow(keys);
 
             Assert.NotNull(result); // Null result
-            foreach (string valueName in data.Keys)
+            foreach (var valueName in data.Keys)
             {
                 Assert.Equal(data[valueName], result[valueName]);
             }
@@ -163,15 +163,15 @@ namespace UnitTests.StorageTests
         [Fact, TestCategory("Functional"), TestCategory("MemoryStore")]
         public void HKS_DeleteRow()
         {
-            string testName = Guid.NewGuid().ToString(); //TestContext.TestName;
+            var testName = Guid.NewGuid().ToString(); //TestContext.TestName;
 
-            int key1 = _keyCounter++;
-            int key2 = _keyCounter++;
-            int key3 = _keyCounter++;
-            int key4 = _keyCounter++;
+            var key1 = _keyCounter++;
+            var key2 = _keyCounter++;
+            var key3 = _keyCounter++;
+            var key4 = _keyCounter++;
 
-            List<Tuple<string, string>> keys1 = MakeKeys(key1, key2);
-            List<Tuple<string, string>> keys2 = MakeKeys(key3, key4);
+            var keys1 = MakeKeys(key1, key2);
+            var keys2 = MakeKeys(key3, key4);
 
             var data = new Dictionary<string, object>();
             data[ValueName1] = testName;
@@ -179,14 +179,14 @@ namespace UnitTests.StorageTests
             var store = new HierarchicalKeyStore(keys1.Count);
 
             // Write #1
-            string eTag = store.WriteRow(keys1, data, null);
+            var eTag = store.WriteRow(keys1, data, null);
 
             data[ValueName1] = "One";
             data[ValueName2] = "Two";
             data[ValueName3] = "Three";
 
             // Write #2
-            string newEtag = store.WriteRow(keys2, data, eTag);
+            var newEtag = store.WriteRow(keys2, data, eTag);
 
             store.DeleteRow(keys1, newEtag);
 
@@ -198,7 +198,7 @@ namespace UnitTests.StorageTests
             result = store.ReadRow(keys2);
 
             Assert.NotNull(result); // Null result
-            foreach (string valueName in data.Keys)
+            foreach (var valueName in data.Keys)
             {
                 Assert.Equal(data[valueName], result[valueName]);
             }
@@ -207,12 +207,12 @@ namespace UnitTests.StorageTests
         [Fact, TestCategory("Functional"), TestCategory("MemoryStore")]
         public void HKS_Read_PartialKey()
         {
-            string testName = Guid.NewGuid().ToString(); //TestContext.TestName;
+            var testName = Guid.NewGuid().ToString(); //TestContext.TestName;
 
-            int key1 = _keyCounter++;
-            int key2 = _keyCounter++;
+            var key1 = _keyCounter++;
+            var key2 = _keyCounter++;
 
-            List<Tuple<string, string>> keys = MakeKeys(key1, key2);
+            var keys = MakeKeys(key1, key2);
 
             var data = new Dictionary<string, object>();
             data[ValueName1] = testName + 1;
@@ -233,7 +233,7 @@ namespace UnitTests.StorageTests
             var result = results.First();
 
             Assert.NotNull(result); // Null result
-            foreach (string valueName in data.Keys)
+            foreach (var valueName in data.Keys)
             {
                 Assert.Equal(data[valueName], result[valueName]);
             }
@@ -244,10 +244,10 @@ namespace UnitTests.StorageTests
         {
             _ = Guid.NewGuid().ToString(); //TestContext.TestName;
 
-            int key1 = _keyCounter++;
-            int key2 = _keyCounter++;
+            var key1 = _keyCounter++;
+            var key2 = _keyCounter++;
 
-            List<Tuple<string, string>> keys = MakeKeys(key1, key2);
+            var keys = MakeKeys(key1, key2);
 
             var store = new HierarchicalKeyStore(keys.Count);
 

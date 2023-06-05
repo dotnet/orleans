@@ -73,26 +73,26 @@ namespace Orleans.Runtime.ConsistentRing
             {
                 if (membershipRingList.Contains(silo)) return; // we already have this silo
 
-                int myOldIndex = membershipRingList.IndexOf(MyAddress);
+                var myOldIndex = membershipRingList.IndexOf(MyAddress);
 
                 if (!(membershipRingList.Count == 0 || myOldIndex != -1))
                     throw new OrleansException(string.Format("{0}: Couldn't find my position in the ring {1}.", MyAddress, Utils.EnumerableToString(membershipRingList)));
 
 
                 // insert new silo in the sorted order
-                int hash = silo.GetConsistentHashCode();
+                var hash = silo.GetConsistentHashCode();
 
                 // Find the last silo with hash smaller than the new silo, and insert the latter after (this is why we have +1 here) the former.
                 // Notice that FindLastIndex might return -1 if this should be the first silo in the list, but then
                 // 'index' will get 0, as needed.
-                int index = membershipRingList.FindLastIndex(siloAddr => siloAddr.GetConsistentHashCode() < hash) + 1;
+                var index = membershipRingList.FindLastIndex(siloAddr => siloAddr.GetConsistentHashCode() < hash) + 1;
                 membershipRingList.Insert(index, silo);
 
                 // relating to triggering handler ... new node took over some of my responsibility
                 if (index == myOldIndex || // new node was inserted in my place
                     (myOldIndex == 0 && index == membershipRingList.Count - 1)) // I am the first node, and the new server is the last node
                 {
-                    IRingRange oldRange = myRange;
+                    var oldRange = myRange;
                     try
                     {
                         myRange = RangeFactory.CreateRange(unchecked((uint)hash), unchecked((uint)myKey));
@@ -123,11 +123,11 @@ namespace Orleans.Runtime.ConsistentRing
                     return $"[{membershipRingList[0]:H} -> {RangeFactory.CreateFullRange()}]";
 
                 var sb = new StringBuilder().Append('[');
-                for (int i = 0; i < membershipRingList.Count; i++)
+                for (var i = 0; i < membershipRingList.Count; i++)
                 {
-                    SiloAddress curr = membershipRingList[i];
-                    SiloAddress next = membershipRingList[(i + 1) % membershipRingList.Count];
-                    IRingRange range = RangeFactory.CreateRange(unchecked((uint)curr.GetConsistentHashCode()), unchecked((uint)next.GetConsistentHashCode()));
+                    var curr = membershipRingList[i];
+                    var next = membershipRingList[(i + 1) % membershipRingList.Count];
+                    var range = RangeFactory.CreateRange(unchecked((uint)curr.GetConsistentHashCode()), unchecked((uint)next.GetConsistentHashCode()));
                     sb.Append($"{curr:H} -> {range},  ");
                 }
                 return sb.Append(']').ToString();
@@ -138,23 +138,23 @@ namespace Orleans.Runtime.ConsistentRing
         {
             lock (membershipRingList)
             {
-                int indexOfFailedSilo = membershipRingList.IndexOf(silo);
+                var indexOfFailedSilo = membershipRingList.IndexOf(silo);
                 if (indexOfFailedSilo < 0) return; // we have already removed this silo
 
                 membershipRingList.RemoveAt(indexOfFailedSilo);
 
                 // related to triggering handler
-                int myNewIndex = membershipRingList.IndexOf(MyAddress);
+                var myNewIndex = membershipRingList.IndexOf(MyAddress);
 
                 if (myNewIndex == -1)
                     throw new OrleansException($"{MyAddress}: Couldn't find my position in the ring {ToString()}.");
 
-                bool wasMyPred = ((myNewIndex == indexOfFailedSilo) || (myNewIndex == 0 && indexOfFailedSilo == membershipRingList.Count)); // no need for '- 1'
+                var wasMyPred = ((myNewIndex == indexOfFailedSilo) || (myNewIndex == 0 && indexOfFailedSilo == membershipRingList.Count)); // no need for '- 1'
                 if (wasMyPred) // failed node was our predecessor
                 {
                     if (log.IsEnabled(LogLevel.Debug)) log.LogDebug("Failed server was my predecessor? {WasPredecessor}, updated view {CurrentView}", wasMyPred, ToString());
 
-                    IRingRange oldRange = myRange;
+                    var oldRange = myRange;
                     if (membershipRingList.Count == 1) // i'm the only one left
                     {
                         myRange = RangeFactory.CreateFullRange();
@@ -162,8 +162,8 @@ namespace Orleans.Runtime.ConsistentRing
                     }
                     else
                     {
-                        int myNewPredIndex = myNewIndex == 0 ? membershipRingList.Count - 1 : myNewIndex - 1;
-                        int myPredecessorsHash = membershipRingList[myNewPredIndex].GetConsistentHashCode();
+                        var myNewPredIndex = myNewIndex == 0 ? membershipRingList.Count - 1 : myNewIndex - 1;
+                        var myPredecessorsHash = membershipRingList[myNewPredIndex].GetConsistentHashCode();
 
                         myRange = RangeFactory.CreateRange(unchecked((uint)myPredecessorsHash), unchecked((uint)myKey));
                         NotifyLocalRangeSubscribers(oldRange, myRange, true);
@@ -210,7 +210,7 @@ namespace Orleans.Runtime.ConsistentRing
                 lastNotification = (old, now, increased);
                 copy = statusListeners.ToArray();
             }
-            foreach (IRingRangeListener listener in copy)
+            foreach (var listener in copy)
             {
                 try
                 {
@@ -268,7 +268,7 @@ namespace Orleans.Runtime.ConsistentRing
             lock (membershipRingList)
             {
                 // excludeMySelf from being a TargetSilo if we're not running and the excludeThisSIloIfStopping flag is true. see the comment in the Stop method.
-                bool excludeMySelf = excludeThisSiloIfStopping && !isRunning;
+                var excludeMySelf = excludeThisSiloIfStopping && !isRunning;
 
                 if (membershipRingList.Count == 0)
                 {
@@ -280,7 +280,7 @@ namespace Orleans.Runtime.ConsistentRing
                 // if you want to stick to counter-clockwise, change the responsibility definition in 'In()' method & responsibility defs in OrleansReminderMemory
                 // need to implement a binary search, but for now simply traverse the list of silos sorted by their hashes
 
-                for (int index = 0; index < membershipRingList.Count; ++index)
+                for (var index = 0; index < membershipRingList.Count; ++index)
                 {
                     var siloAddr = membershipRingList[index];
                     if (IsSiloNextInTheRing(siloAddr, hash, excludeMySelf))

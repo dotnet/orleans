@@ -74,12 +74,12 @@ namespace Orleans.Providers.GCP.Streams.PubSub
 
                 var task = pubSubRef.GetMessages(maxCount);
                 _outstandingTask = task;
-                IEnumerable<ReceivedMessage> messages = await task;
+                var messages = await task;
 
-                List<IBatchContainer> pubSubMessages = new List<IBatchContainer>();
+                var pubSubMessages = new List<IBatchContainer>();
                 foreach (var message in messages)
                 {
-                    IBatchContainer container = _dataAdapter.FromPullResponseMessage(message.Message, _lastReadMessage++);
+                    var container = _dataAdapter.FromPullResponseMessage(message.Message, _lastReadMessage++);
                     pubSubMessages.Add(container);
                     _pending.Add(new PendingDelivery(container.SequenceToken, message));
                 }
@@ -99,18 +99,18 @@ namespace Orleans.Providers.GCP.Streams.PubSub
                 var pubSubRef = _pubSub; // store direct ref, in case we are somehow asked to shutdown while we are receiving.
                 if (messages.Count == 0 || pubSubRef == null) return;
                 // get sequence tokens of delivered messages
-                List<StreamSequenceToken> deliveredTokens = messages.Select(message => message.SequenceToken).ToList();
+                var deliveredTokens = messages.Select(message => message.SequenceToken).ToList();
                 // find oldest delivered message
-                StreamSequenceToken oldest = deliveredTokens.Max();
+                var oldest = deliveredTokens.Max();
                 // finalize all pending messages at or befor the oldest
-                List<PendingDelivery> finalizedDeliveries = _pending
+                var finalizedDeliveries = _pending
                     .Where(pendingDelivery => !pendingDelivery.Token.Newer(oldest))
                     .ToList();
                 if (finalizedDeliveries.Count == 0) return;
                 // remove all finalized deliveries from pending, regardless of if it was delivered or not.
                 _pending.RemoveRange(0, finalizedDeliveries.Count);
                 // get the queue messages for all finalized deliveries that were delivered.
-                List<ReceivedMessage> deliveredMessages = finalizedDeliveries
+                var deliveredMessages = finalizedDeliveries
                     .Where(finalized => deliveredTokens.Contains(finalized.Token))
                     .Select(finalized => finalized.Message)
                     .ToList();

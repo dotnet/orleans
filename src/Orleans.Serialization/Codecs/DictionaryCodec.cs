@@ -263,7 +263,7 @@ namespace Orleans.Serialization.Codecs
             var valueExpected = false;
             IEqualityComparer<TKey> comparer = null;
             uint fieldId = 0;
-            bool hasLengthField = false;
+            var hasLengthField = false;
             while (true)
             {
                 var header = reader.ReadFieldHeader();

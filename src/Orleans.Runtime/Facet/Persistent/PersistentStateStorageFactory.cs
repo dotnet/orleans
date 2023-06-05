@@ -26,7 +26,7 @@ namespace Orleans.Runtime
             {
                 ThrowMissingProviderException(context, cfg);
             }
-            string fullStateName = GetFullStateName(context, cfg);
+            var fullStateName = GetFullStateName(context, cfg);
             var bridge = new PersistentStateBridge<TState>(fullStateName, context, storageProvider);
             bridge.Participate(context.ObservableLifecycle);
             return bridge;

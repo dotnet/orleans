@@ -19,7 +19,7 @@ namespace Orleans.Networking.Shared
         {
             return string.Create(13, id, (buffer, value) =>
             {
-                char[] encode32Chars = s_encode32Chars;
+                var encode32Chars = s_encode32Chars;
 
                 buffer[12] = encode32Chars[value & 31];
                 buffer[11] = encode32Chars[(value >> 5) & 31];

@@ -87,7 +87,7 @@ namespace Orleans.Runtime
         {
             var options = _messagingOptions.CurrentValue;
             var optionsPeriod = options.GrainWorkloadAnalysisPeriod;
-            TimeSpan nextDelay = optionsPeriod > TimeSpan.Zero ? optionsPeriod : DefaultAnalysisPeriod;
+            var nextDelay = optionsPeriod > TimeSpan.Zero ? optionsPeriod : DefaultAnalysisPeriod;
             var messageCenter = _serviceProvider.GetRequiredService<MessageCenter>();
 
             while (await _scanPeriodTimer.NextTick(nextDelay))

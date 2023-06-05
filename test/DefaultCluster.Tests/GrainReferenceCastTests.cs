@@ -21,8 +21,8 @@ namespace DefaultCluster.Tests
         [Fact, TestCategory("BVT"), TestCategory("Cast")]
         public void CastGrainRefCastFromMyType()
         {
-            GrainReference grain = (GrainReference)GrainFactory.GetGrain<ISimpleGrain>(Random.Shared.Next(), SimpleGrain.SimpleGrainNamePrefix);
-            GrainReference cast = (GrainReference)grain.AsReference<ISimpleGrain>();
+            var grain = (GrainReference)GrainFactory.GetGrain<ISimpleGrain>(Random.Shared.Next(), SimpleGrain.SimpleGrainNamePrefix);
+            var cast = (GrainReference)grain.AsReference<ISimpleGrain>();
             Assert.IsAssignableFrom(grain.GetType(), cast);
             Assert.IsAssignableFrom<ISimpleGrain>(cast);
         }
@@ -53,19 +53,19 @@ namespace DefaultCluster.Tests
         {
             // MultifacetTestGrain implements IMultifacetReader
             // MultifacetTestGrain implements IMultifacetWriter
-            int newValue = 3;
+            var newValue = 3;
 
-            IMultifacetWriter writer = GrainFactory.GetGrain<IMultifacetWriter>(1);
+            var writer = GrainFactory.GetGrain<IMultifacetWriter>(1);
             // No Wait in this test case
 
-            IMultifacetReader reader = writer.AsReference<IMultifacetReader>();  // --> Test case intermittently fails here
+            var reader = writer.AsReference<IMultifacetReader>();  // --> Test case intermittently fails here
             // Error: System.InvalidCastException: Grain reference MultifacetGrain.MultifacetWriterFactory+MultifacetWriterReference service interface mismatch: expected interface id=[1947430462] received interface name=[MultifacetGrain.IMultifacetWriter] id=[62435819] in grainRef=[GrainReference:*std/b198f19f]
 
             writer.SetValue(newValue).Wait();
 
-            Task<int> readAsync = reader.GetValue();
+            var readAsync = reader.GetValue();
             readAsync.Wait();
-            int result = readAsync.Result;
+            var result = readAsync.Result;
 
             Assert.Equal(newValue, result);
         }
@@ -82,16 +82,16 @@ namespace DefaultCluster.Tests
             // IMultifacetReader = 1947430462
             // IMultifacetTestGrain = 222717230 (also compatable with 1947430462 or 62435819)
 
-            int newValue = 4;
+            var newValue = 4;
 
-            IMultifacetWriter writer = GrainFactory.GetGrain<IMultifacetWriter>(2);
+            var writer = GrainFactory.GetGrain<IMultifacetWriter>(2);
             
-            IMultifacetReader reader = writer.AsReference<IMultifacetReader>(); // --> Test case fails here
+            var reader = writer.AsReference<IMultifacetReader>(); // --> Test case fails here
             // Error: System.InvalidCastException: Grain reference MultifacetGrain.MultifacetWriterFactory+MultifacetWriterReference service interface mismatch: expected interface id=[1947430462] received interface name=[MultifacetGrain.IMultifacetWriter] id=[62435819] in grainRef=[GrainReference:*std/8408c2bc]
             
             writer.SetValue(newValue).Wait();
 
-            int result = reader.GetValue().Result;
+            var result = reader.GetValue().Result;
 
             Assert.Equal(newValue, result);
         }
@@ -110,7 +110,7 @@ namespace DefaultCluster.Tests
         [Fact, TestCategory("BVT"), TestCategory("Cast")]
         public void CastInternalCastFromMyType()
         {
-            GrainReference grain = (GrainReference)GrainFactory.GetGrain<ISimpleGrain>(Random.Shared.Next(), SimpleGrain.SimpleGrainNamePrefix);
+            var grain = (GrainReference)GrainFactory.GetGrain<ISimpleGrain>(Random.Shared.Next(), SimpleGrain.SimpleGrainNamePrefix);
             
             // This cast should be a no-op, since the interface matches the initial reference's exactly.
             IAddressable cast = grain.Cast<ISimpleGrain>();
@@ -123,7 +123,7 @@ namespace DefaultCluster.Tests
         public void CastInternalCastUpFromChild()
         {
             // GeneratorTestDerivedGrain1Reference extends GeneratorTestGrainReference
-            GrainReference grain = (GrainReference)GrainFactory.GetGrain<IGeneratorTestDerivedGrain1>(GetRandomGrainId());
+            var grain = (GrainReference)GrainFactory.GetGrain<IGeneratorTestDerivedGrain1>(GetRandomGrainId());
             
             // This cast should be a no-op, since the interface is implemented by the initial reference's interface.
             IAddressable cast = grain.Cast<IGeneratorTestGrain>();
@@ -136,8 +136,8 @@ namespace DefaultCluster.Tests
         public void CastGrainRefUpCastFromChild()
         {
             // GeneratorTestDerivedGrain1Reference extends GeneratorTestGrainReference
-            GrainReference grain = (GrainReference) GrainFactory.GetGrain<IGeneratorTestDerivedGrain1>(GetRandomGrainId());
-            GrainReference cast = (GrainReference) grain.AsReference<IGeneratorTestGrain>();
+            var grain = (GrainReference) GrainFactory.GetGrain<IGeneratorTestDerivedGrain1>(GetRandomGrainId());
+            var cast = (GrainReference) grain.AsReference<IGeneratorTestGrain>();
             Assert.IsAssignableFrom<IGeneratorTestDerivedGrain1>(cast);
             Assert.IsAssignableFrom<IGeneratorTestGrain>(cast);
         }
@@ -147,11 +147,11 @@ namespace DefaultCluster.Tests
         {
             // GeneratorTestDerivedGrain1Reference extends GeneratorTestGrainReference
             // GeneratorTestDerivedGrain2Reference extends GeneratorTestGrainReference
-            IGeneratorTestDerivedGrain1 grain = GrainFactory.GetGrain<IGeneratorTestDerivedGrain1>(GetRandomGrainId());
+            var grain = GrainFactory.GetGrain<IGeneratorTestDerivedGrain1>(GetRandomGrainId());
             Assert.True(grain.StringIsNullOrEmpty().Result);
 
             // Fails the next line as grain reference is already resolved
-            IGeneratorTestDerivedGrain2 cast = grain.AsReference<IGeneratorTestDerivedGrain2>();
+            var cast = grain.AsReference<IGeneratorTestDerivedGrain2>();
             
             await Assert.ThrowsAsync<InvalidCastException>(() => cast.StringConcat("a", "b", "c"));
         }
@@ -161,10 +161,10 @@ namespace DefaultCluster.Tests
         {
             // GeneratorTestDerivedGrain1Reference extends GeneratorTestGrainReference
             // GeneratorTestDerivedGrain2Reference extends GeneratorTestGrainReference
-            IGeneratorTestDerivedGrain1 grain = GrainFactory.GetGrain<IGeneratorTestDerivedGrain1>(GetRandomGrainId());
+            var grain = GrainFactory.GetGrain<IGeneratorTestDerivedGrain1>(GetRandomGrainId());
 
             // Cast works optimistically when the grain reference is not already resolved
-            IGeneratorTestDerivedGrain2 cast = grain.AsReference<IGeneratorTestDerivedGrain2>();
+            var cast = grain.AsReference<IGeneratorTestDerivedGrain2>();
 
             // Operation fails when grain reference is completely resolved
             await Assert.ThrowsAsync<InvalidCastException>(() => cast.StringConcat("a", "b", "c"));
@@ -180,10 +180,10 @@ namespace DefaultCluster.Tests
                 // GeneratorTestDerivedGrain2Reference extends GeneratorTestGrainReference
                 try
                 {
-                    IGeneratorTestDerivedGrain1 grain = GrainFactory.GetGrain<IGeneratorTestDerivedGrain1>(GetRandomGrainId());
+                    var grain = GrainFactory.GetGrain<IGeneratorTestDerivedGrain1>(GetRandomGrainId());
                     IGeneratorTestDerivedGrain2 cast = null;
-                    Task<bool> av = grain.StringIsNullOrEmpty();
-                    Task<bool> av2 = av.ContinueWith((Task<bool> t) => Assert.True(t.Result)).ContinueWith((_AppDomain) =>
+                    var av = grain.StringIsNullOrEmpty();
+                    var av2 = av.ContinueWith((Task<bool> t) => Assert.True(t.Result)).ContinueWith((_AppDomain) =>
                     {
                         cast = grain.AsReference<IGeneratorTestDerivedGrain2>();
                     }).ContinueWith((_) => cast.StringConcat("a", "b", "c")).ContinueWith((_) => cast.StringIsNullOrEmpty().Result);
@@ -191,7 +191,7 @@ namespace DefaultCluster.Tests
                 }
                 catch (AggregateException ae)
                 {
-                    Exception ex = ae.InnerException;
+                    var ex = ae.InnerException;
                     while (ex is AggregateException) ex = ex.InnerException;
                     throw ex;
                 }
@@ -207,7 +207,7 @@ namespace DefaultCluster.Tests
             // GeneratorTestDerivedDerivedGrainReference derives from GeneratorTestDerivedGrain2Reference
 
             GrainReference cast;
-            GrainReference grain = (GrainReference)GrainFactory.GetGrain<IGeneratorTestDerivedDerivedGrain>(GetRandomGrainId());
+            var grain = (GrainReference)GrainFactory.GetGrain<IGeneratorTestDerivedDerivedGrain>(GetRandomGrainId());
   
             // Parent
             cast = (GrainReference) grain.AsReference<IGeneratorTestDerivedGrain2>();
@@ -232,8 +232,8 @@ namespace DefaultCluster.Tests
         {
             // GeneratorTestDerivedDerivedGrainReference extends GeneratorTestDerivedGrain2Reference
             // GeneratorTestDerivedGrain2Reference extends GeneratorTestGrainReference
-            GrainReference grain = (GrainReference) GrainFactory.GetGrain<IGeneratorTestDerivedDerivedGrain>(GetRandomGrainId());
-            GrainReference cast = (GrainReference) grain.AsReference<IGeneratorTestDerivedGrain2>();
+            var grain = (GrainReference) GrainFactory.GetGrain<IGeneratorTestDerivedDerivedGrain>(GetRandomGrainId());
+            var cast = (GrainReference) grain.AsReference<IGeneratorTestDerivedGrain2>();
             Assert.IsAssignableFrom<IGeneratorTestDerivedDerivedGrain>(cast);
             Assert.IsAssignableFrom<IGeneratorTestDerivedGrain2>(cast);
             Assert.IsAssignableFrom<IGeneratorTestGrain>(cast);
@@ -244,9 +244,9 @@ namespace DefaultCluster.Tests
         public void CastAsyncGrainRefCastFromSelf()
         {
             IAddressable grain = GrainFactory.GetGrain<ISimpleGrain>(Random.Shared.Next(), SimpleGrain.SimpleGrainNamePrefix);
-            ISimpleGrain cast = grain.AsReference<ISimpleGrain>();
+            var cast = grain.AsReference<ISimpleGrain>();
 
-            Task<int> successfulCallPromise = cast.GetA();
+            var successfulCallPromise = cast.GetA();
             successfulCallPromise.Wait();
             Assert.Equal(TaskStatus.RanToCompletion, successfulCallPromise.Status);
         }
@@ -386,7 +386,7 @@ namespace DefaultCluster.Tests
 
             Task<bool> isNullStr;
 
-            IGeneratorTestDerivedGrain1 grain = GrainFactory.GetGrain<IGeneratorTestDerivedGrain1>(GetRandomGrainId());
+            var grain = GrainFactory.GetGrain<IGeneratorTestDerivedGrain1>(GetRandomGrainId());
             isNullStr = grain.StringIsNullOrEmpty();
             Assert.True(isNullStr.Result, "Value should be null initially");
 
@@ -396,7 +396,7 @@ namespace DefaultCluster.Tests
             isNullStr = grain.StringSet(null).ContinueWith((_) => grain.StringIsNullOrEmpty()).Unwrap();
             Assert.True(isNullStr.Result, "Value should be null after SetString(null)");
 
-            IGeneratorTestGrain cast = grain.AsReference<IGeneratorTestGrain>();
+            var cast = grain.AsReference<IGeneratorTestGrain>();
             isNullStr = cast.StringSet("b").ContinueWith((_) => grain.StringIsNullOrEmpty()).Unwrap();
             Assert.False(isNullStr.Result, "Value should not be null after cast.SetString(b)");
         }

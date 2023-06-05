@@ -87,7 +87,7 @@ namespace Orleans.Runtime.Development
 
         public Task Release(string category, AcquiredLease[] acquiredLeases)
         {
-            foreach(AcquiredLease lease in acquiredLeases)
+            foreach(var lease in acquiredLeases)
             {
                 Release(category, lease);
             }
@@ -107,8 +107,8 @@ namespace Orleans.Runtime.Development
 
         private AcquireLeaseResult Acquire(string category, LeaseRequest leaseRequest)
         {
-            DateTime now = DateTime.UtcNow;
-            Lease lease = leases.GetValueOrAddNew(Tuple.Create(category, leaseRequest.ResourceKey));
+            var now = DateTime.UtcNow;
+            var lease = leases.GetValueOrAddNew(Tuple.Create(category, leaseRequest.ResourceKey));
             if(lease.ExpiredUtc < now)
             {
                 lease.ExpiredUtc = now + leaseRequest.Duration;
@@ -119,8 +119,8 @@ namespace Orleans.Runtime.Development
 
         private void Release(string category, AcquiredLease acquiredLease)
         {
-            Tuple<string,string> leaseKey = Tuple.Create(category, acquiredLease.ResourceKey);
-            if (leases.TryGetValue(leaseKey, out Lease lease) && lease.Token == acquiredLease.Token)
+            var leaseKey = Tuple.Create(category, acquiredLease.ResourceKey);
+            if (leases.TryGetValue(leaseKey, out var lease) && lease.Token == acquiredLease.Token)
             {
                 leases.Remove(leaseKey);
             }
@@ -128,9 +128,9 @@ namespace Orleans.Runtime.Development
 
         private AcquireLeaseResult Renew(string category, AcquiredLease acquiredLease)
         {
-            DateTime now = DateTime.UtcNow;
+            var now = DateTime.UtcNow;
             // if lease exists, and we have the right token, and lease has not expired, renew.
-            if (!leases.TryGetValue(Tuple.Create(category, acquiredLease.ResourceKey), out Lease lease) || lease.Token != acquiredLease.Token)
+            if (!leases.TryGetValue(Tuple.Create(category, acquiredLease.ResourceKey), out var lease) || lease.Token != acquiredLease.Token)
             {
                 return new AcquireLeaseResult(new AcquiredLease(acquiredLease.ResourceKey), ResponseCode.InvalidToken, new OrleansException("Invalid token provided, caller is not the owner."));
             }

@@ -18,14 +18,14 @@ namespace Tester.StorageFacet.Infrastructure
                 config = new ExampleStorageConfig(parameter.Name);
             }
             // use generic type args to define collection type.
-            MethodInfo genericCreate = create.MakeGenericMethod(parameter.ParameterType.GetGenericArguments());
-            object[] args = new object[] {attribute.StorageProviderName, config};
+            var genericCreate = create.MakeGenericMethod(parameter.ParameterType.GetGenericArguments());
+            var args = new object[] {attribute.StorageProviderName, config};
             return context => Create(context, genericCreate, args);
         }
 
         private object Create(IGrainContext context, MethodInfo genericCreate, object[] args)
         {
-            INamedExampleStorageFactory factory = context.ActivationServices.GetRequiredService<INamedExampleStorageFactory>();
+            var factory = context.ActivationServices.GetRequiredService<INamedExampleStorageFactory>();
             return genericCreate.Invoke(factory, args);
         }
     }

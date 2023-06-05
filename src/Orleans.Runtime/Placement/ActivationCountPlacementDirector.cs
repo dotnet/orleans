@@ -69,11 +69,11 @@ namespace Orleans.Runtime.Placement
 
             if (relevantSilos.Count > 0)
             {
-                int chooseFrom = Math.Min(relevantSilos.Count, chooseHowMany);
+                var chooseFrom = Math.Min(relevantSilos.Count, chooseHowMany);
                 var chooseFromThoseSilos = new List<KeyValuePair<SiloAddress, CachedLocalStat>>();
                 while (chooseFromThoseSilos.Count < chooseFrom)
                 {
-                    int index = Random.Shared.Next(relevantSilos.Count);
+                    var index = Random.Shared.Next(relevantSilos.Count);
                     var pickedSilo = relevantSilos[index];
                     relevantSilos.RemoveAt(index);
                     chooseFromThoseSilos.Add(pickedSilo);

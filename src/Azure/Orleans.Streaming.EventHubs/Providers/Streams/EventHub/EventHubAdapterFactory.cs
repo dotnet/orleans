@@ -216,8 +216,8 @@ namespace Orleans.Streaming.EventHubs
         public virtual Task QueueMessageBatchAsync<T>(StreamId streamId, IEnumerable<T> events, StreamSequenceToken token,
             Dictionary<string, object> requestContext)
         {
-            EventData eventData = dataAdapter.ToQueueMessage(streamId, events, token, requestContext);
-            string partitionKey = dataAdapter.GetPartitionKey(streamId);
+            var eventData = dataAdapter.ToQueueMessage(streamId, events, token, requestContext);
+            var partitionKey = dataAdapter.GetPartitionKey(streamId);
             return client.SendAsync(new[] { eventData }, new SendEventOptions { PartitionKey = partitionKey });
         }
 
@@ -308,7 +308,7 @@ namespace Orleans.Streaming.EventHubs
             var cacheOptions = services.GetOptionsByName<EventHubStreamCachePressureOptions>(name);
             var statisticOptions = services.GetOptionsByName<StreamStatisticOptions>(name);
             var evictionOptions = services.GetOptionsByName<StreamCacheEvictionOptions>(name);
-            IEventHubDataAdapter dataAdapter = services.GetServiceByName<IEventHubDataAdapter>(name)
+            var dataAdapter = services.GetServiceByName<IEventHubDataAdapter>(name)
                 ?? services.GetService<IEventHubDataAdapter>()
                 ?? ActivatorUtilities.CreateInstance<EventHubDataAdapter>(services);
             var factory = ActivatorUtilities.CreateInstance<EventHubAdapterFactory>(services, name, ehOptions, receiverOptions, cacheOptions, evictionOptions, statisticOptions, dataAdapter);

@@ -22,7 +22,7 @@ namespace DefaultCluster.Tests.General
         public async Task SiloRoleBasedPlacementDirector_CanFindSilo()
         {
             var grain = GrainFactory.GetGrain<ISiloRoleBasedPlacementGrain>("testhost");
-            bool result = await grain.Ping();
+            var result = await grain.Ping();
             Assert.True(result);
         }
     }

@@ -173,14 +173,14 @@ namespace Orleans.Transactions.TestKit
         private Dictionary<Guid, CommitRecord> MakeCommitRecords(int count, int size)
         {
             var result = new Dictionary<Guid, CommitRecord>();
-            for (int j = 0; j < size; j++)
+            for (var j = 0; j < size; j++)
             {
                 var r = new CommitRecord()
                 {
                     Timestamp = DateTime.UtcNow,
                     WriteParticipants = new List<ParticipantId>(),
                 };
-                for (int i = 0; i < size; i++)
+                for (var i = 0; i < size; i++)
                 {
                     r.WriteParticipants.Add(MakeParticipantId());
                 }
@@ -363,12 +363,12 @@ namespace Orleans.Transactions.TestKit
 
             var pendingstates = new List<PendingTransactionState<TState>>();
             var expectedStates = new List<TState>();
-            for (int i = 0; i < count; i++)
+            for (var i = 0; i < count; i++)
             {
                 expectedStates.Add(stateFactory(i * 1000));
             }
 
-            for (int i = 0; i < count; i++)
+            for (var i = 0; i < count; i++)
             {
                 pendingstates.Add(MakePendingState(i + 1, expectedStates[i], false));
             }
@@ -383,7 +383,7 @@ namespace Orleans.Transactions.TestKit
             loadresponse.CommittedSequenceId.Should().Be(0);
             loadresponse.PendingStates.Count.Should().Be(count);
 
-            for (int i = 0; i < count; i++)
+            for (var i = 0; i < count; i++)
             {
                 loadresponse.PendingStates[i].SequenceId.Should().Be(i+1);
                 loadresponse.PendingStates[i].TimeStamp.Should().Be(pendingstates[i].TimeStamp);
@@ -402,12 +402,12 @@ namespace Orleans.Transactions.TestKit
             var initialstate = loadresponse.CommittedState;
 
             var expectedStates = new List<TState>();
-            for (int i = 0; i < count; i++)
+            for (var i = 0; i < count; i++)
             {
                 expectedStates.Add(stateFactory(i * 1000));
             }
             var pendingstates = new List<PendingTransactionState<TState>>();
-            for (int i = 0; i < count; i++)
+            for (var i = 0; i < count; i++)
             {
                 pendingstates.Add(MakePendingState(i + 1, expectedStates[i], false));
             }
@@ -444,13 +444,13 @@ namespace Orleans.Transactions.TestKit
             var initialstate = loadresponse.CommittedState;
 
             var expectedStates = new List<TState>();
-            for (int i = 0; i < count; i++)
+            for (var i = 0; i < count; i++)
             {
                 expectedStates.Add(stateFactory(i * 1000));
             }
 
             var pendingstates = new List<PendingTransactionState<TState>>();
-            for (int i = 0; i < count; i++)
+            for (var i = 0; i < count; i++)
             {
                 pendingstates.Add(MakePendingState(i + 1, expectedStates[i], false));
             }
@@ -480,24 +480,24 @@ namespace Orleans.Transactions.TestKit
             var initialstate = loadresponse.CommittedState;
 
             var expectedStates1 = new List<TState>();
-            for (int i = 0; i < count; i++)
+            for (var i = 0; i < count; i++)
             {
                 expectedStates1.Add(stateFactory(i * 1000 + 1));
             }
 
             var expectedStates2 = new List<TState>();
-            for (int i = 0; i < count; i++)
+            for (var i = 0; i < count; i++)
             {
                 expectedStates2.Add(stateFactory(i * 1000));
             }
 
             var pendingstates1 = new List<PendingTransactionState<TState>>();
-            for (int i = 0; i < count; i++)
+            for (var i = 0; i < count; i++)
             {
                 pendingstates1.Add(MakePendingState(i + 1, expectedStates1[i], false));
             }
             var pendingstates2 = new List<PendingTransactionState<TState>>();
-            for (int i = 0; i < count; i++)
+            for (var i = 0; i < count; i++)
             {
                 pendingstates2.Add(MakePendingState(i + 1, expectedStates2[i], false));
             }
@@ -514,7 +514,7 @@ namespace Orleans.Transactions.TestKit
             loadresponse.CommittedSequenceId.Should().Be(0);
             loadresponse.PendingStates.Count.Should().Be(count);
 
-            for (int i = 0; i < count; i++)
+            for (var i = 0; i < count; i++)
             {
                 loadresponse.PendingStates[i].SequenceId.Should().Be(i + 1);
                 loadresponse.PendingStates[i].TimeStamp.Should().Be(pendingstates2[i].TimeStamp);

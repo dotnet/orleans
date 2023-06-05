@@ -79,7 +79,7 @@ namespace UnitTests.StreamingTests
             {
                 // one stream per queue
                 Assert.Equal(TotalQueueCount, report.Count);
-                foreach (int eventsPerStream in report.Values)
+                foreach (var eventsPerStream in report.Values)
                 {
                     Assert.Equal(Fixture.GeneratorConfig.EventsInStream, eventsPerStream);
                 }

@@ -116,7 +116,7 @@ namespace Orleans.Storage
         {
             if (storage == null) throw new ArgumentException("GrainState-Table property not initialized");
 
-            string partitionKey = GetKeyString(grainId);
+            var partitionKey = GetKeyString(grainId);
             if (logger.IsEnabled(LogLevel.Trace))
                 logger.LogTrace(
                     (int)ErrorCode.StorageProviderBase,
@@ -126,7 +126,7 @@ namespace Orleans.Storage
                     grainId,
                     options.TableName);
 
-            string rowKey = AWSUtils.ValidateDynamoDBRowKey(grainType);
+            var rowKey = AWSUtils.ValidateDynamoDBRowKey(grainType);
 
             var record = await storage.ReadSingleEntryAsync(options.TableName,
                 new Dictionary<string, AttributeValue>
@@ -162,8 +162,8 @@ namespace Orleans.Storage
         {
             if (storage == null) throw new ArgumentException("GrainState-Table property not initialized");
 
-            string partitionKey = GetKeyString(grainId);
-            string rowKey = AWSUtils.ValidateDynamoDBRowKey(grainType);
+            var partitionKey = GetKeyString(grainId);
+            var rowKey = AWSUtils.ValidateDynamoDBRowKey(grainType);
 
             var record = new GrainStateRecord { GrainReference = partitionKey, GrainType = rowKey };
 
@@ -207,7 +207,7 @@ namespace Orleans.Storage
                 fields.Add(BINARY_STATE_PROPERTY_NAME, new AttributeValue { NULL = true });
             }
 
-            int newEtag = 0;
+            var newEtag = 0;
             if (clear)
             {
                 fields.Add(GRAIN_REFERENCE_PROPERTY_NAME, new AttributeValue(record.GrainReference));
@@ -262,7 +262,7 @@ namespace Orleans.Storage
         {
             if (storage == null) throw new ArgumentException("GrainState-Table property not initialized");
 
-            string partitionKey = GetKeyString(grainId);
+            var partitionKey = GetKeyString(grainId);
             if (logger.IsEnabled(LogLevel.Trace))
             {
                 logger.LogTrace(
@@ -275,7 +275,7 @@ namespace Orleans.Storage
                     options.DeleteStateOnClear,
                     options.TableName);
             }
-            string rowKey = AWSUtils.ValidateDynamoDBRowKey(grainType);
+            var rowKey = AWSUtils.ValidateDynamoDBRowKey(grainType);
             var record = new GrainStateRecord { GrainReference = partitionKey, ETag = string.IsNullOrWhiteSpace(grainState.ETag) ? 0 : int.Parse(grainState.ETag), GrainType = rowKey };
 
             var operation = "Clearing";

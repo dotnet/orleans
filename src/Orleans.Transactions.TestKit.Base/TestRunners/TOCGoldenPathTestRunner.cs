@@ -15,13 +15,13 @@ namespace Orleans.Transactions.TestKit
         {
             const int expected = 5;
 
-            ITransactionCommitterTestGrain committer = grainFactory.GetGrain<ITransactionCommitterTestGrain>(Guid.NewGuid());
-            List<ITransactionTestGrain> grains =
+            var committer = grainFactory.GetGrain<ITransactionCommitterTestGrain>(Guid.NewGuid());
+            var grains =
                 Enumerable.Range(0, grainCount)
                     .Select(i => RandomTestGrain(grainStates))
                     .ToList();
 
-            ITransactionCoordinatorGrain coordinator = grainFactory.GetGrain<ITransactionCoordinatorGrain>(Guid.NewGuid());
+            var coordinator = grainFactory.GetGrain<ITransactionCoordinatorGrain>(Guid.NewGuid());
 
             await coordinator.MultiGrainAdd(committer, new PassOperation("pass"), grains, expected);
 

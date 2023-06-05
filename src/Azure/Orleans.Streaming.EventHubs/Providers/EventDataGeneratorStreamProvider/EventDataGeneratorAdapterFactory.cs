@@ -102,7 +102,7 @@ namespace Orleans.Streaming.EventHubs.Testing
         public static string[] GenerateEventHubPartitions(int partitionCount)
         {
             var partitions = new string[partitionCount];
-            for (int i = 0; i < partitions.Length; i++)
+            for (var i = 0; i < partitions.Length; i++)
                 partitions[i] = $"partition-{i}";
             return partitions;
         }
@@ -183,7 +183,7 @@ namespace Orleans.Streaming.EventHubs.Testing
             var cacheOptions = services.GetOptionsByName<EventHubStreamCachePressureOptions>(name);
             var statisticOptions = services.GetOptionsByName<StreamStatisticOptions>(name);
             var evictionOptions = services.GetOptionsByName<StreamCacheEvictionOptions>(name);
-            IEventHubDataAdapter dataAdapter = services.GetServiceByName<IEventHubDataAdapter>(name)
+            var dataAdapter = services.GetServiceByName<IEventHubDataAdapter>(name)
                 ?? services.GetService<IEventHubDataAdapter>()
                 ?? ActivatorUtilities.CreateInstance<EventHubDataAdapter>(services);
             var factory = ActivatorUtilities.CreateInstance<EventDataGeneratorAdapterFactory>(services, name, generatorOptions, ehOptions, receiverOptions, cacheOptions, 

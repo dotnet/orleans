@@ -67,7 +67,7 @@ namespace Orleans.Serialization
             string stackTrace = null;
             Exception innerException = null;
             Dictionary<object, object> data = null;
-            int hResult = 0;
+            var hResult = 0;
             while (true)
             {
                 var header = reader.ReadFieldHeader();
@@ -294,7 +294,7 @@ namespace Orleans.Serialization
                 return null;
             }
 
-            Type valueType = field.FieldType;
+            var valueType = field.FieldType;
             if (valueType is null || valueType == typeof(Exception))
             {
                 return DeserializeException(ref reader, field);
@@ -325,7 +325,7 @@ namespace Orleans.Serialization
             string stackTrace = null;
             Exception innerException = null;
             Dictionary<object, object> data = null;
-            int hResult = 0;
+            var hResult = 0;
             while (true)
             {
                 var header = reader.ReadFieldHeader();

@@ -41,7 +41,7 @@ namespace Tester.AzureUtils
 
         public override string ToString()
         {
-            StringBuilder sb = new StringBuilder();
+            var sb = new StringBuilder();
             sb.Append("UnitTestAzureData[");
             sb.Append(" PartitionKey=").Append(PartitionKey);
             sb.Append(" RowKey=").Append(RowKey);

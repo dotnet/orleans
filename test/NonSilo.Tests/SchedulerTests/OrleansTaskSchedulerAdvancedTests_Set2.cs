@@ -44,10 +44,10 @@ namespace UnitTests.SchedulerTests
             var workItemGroup = SchedulingHelper.CreateWorkItemGroupForTesting(context, loggerFactory);
             TaskScheduler scheduler = workItemGroup.TaskScheduler;
 
-            int n = 0;
+            var n = 0;
             // ReSharper disable AccessToModifiedClosure
-            Task task1 = new Task(() => { Thread.Sleep(1000); n = n + 5; });
-            Task task2 = new Task(() => { n = n * 3; });
+            var task1 = new Task(() => { Thread.Sleep(1000); n = n + 5; });
+            var task2 = new Task(() => { n = n * 3; });
             // ReSharper restore AccessToModifiedClosure
 
             task1.Start(scheduler);
@@ -67,18 +67,18 @@ namespace UnitTests.SchedulerTests
             var workItemGroup = SchedulingHelper.CreateWorkItemGroupForTesting(context, loggerFactory);
             TaskScheduler scheduler = workItemGroup.TaskScheduler;
 
-            Task<Task> wrapped = new Task<Task>(() =>
+            var wrapped = new Task<Task>(() =>
             {
                 output.WriteLine("#0 - new Task - SynchronizationContext.Current={0} TaskScheduler.Current={1}",
                     SynchronizationContext.Current, TaskScheduler.Current);
 
-                Task t0 = new Task(() =>
+                var t0 = new Task(() =>
                 {
                     output.WriteLine("#1 - new Task - SynchronizationContext.Current={0} TaskScheduler.Current={1}",
                         SynchronizationContext.Current, TaskScheduler.Current);
                     Assert.Equal(scheduler, TaskScheduler.Current);  // "TaskScheduler.Current #1"
                 });
-                Task t1 = t0.ContinueWith(task =>
+                var t1 = t0.ContinueWith(task =>
                 {
                     Assert.False(task.IsFaulted, "Task #1 Faulted=" + task.Exception);
 
@@ -90,7 +90,7 @@ namespace UnitTests.SchedulerTests
                 return t1;
             });
             wrapped.Start(scheduler);
-            bool ok = wrapped.Unwrap().Wait(TimeSpan.FromSeconds(2));
+            var ok = wrapped.Unwrap().Wait(TimeSpan.FromSeconds(2));
             Assert.True(ok, "Finished OK");
         }
 
@@ -102,22 +102,22 @@ namespace UnitTests.SchedulerTests
 
             LogContext("Main-task " + Task.CurrentId);
 
-            int n = 0;
+            var n = 0;
 
             void action()
             {
                 LogContext("WorkItem-task " + Task.CurrentId);
 
-                for (int i = 0; i < 10; i++)
+                for (var i = 0; i < 10; i++)
                 {
-                    int id = -1;
+                    var id = -1;
                     Task.Factory.StartNew(() =>
                     {
                         id = Task.CurrentId.HasValue ? (int)Task.CurrentId : -1;
 
                         // ReSharper disable AccessToModifiedClosure
                         LogContext("Sub-task " + id + " n=" + n);
-                        int k = n;
+                        var k = n;
                         output.WriteLine("Sub-task " + id + " sleeping");
                         Thread.Sleep(100);
                         output.WriteLine("Sub-task " + id + " awake");
@@ -133,7 +133,7 @@ namespace UnitTests.SchedulerTests
                 }
             }
 
-            Task t = new Task(action);
+            var t = new Task(action);
 
             t.Start(scheduler);
 
@@ -154,15 +154,15 @@ namespace UnitTests.SchedulerTests
             TaskScheduler scheduler = workItemGroup.TaskScheduler;
 
             var result = new TaskCompletionSource<bool>();
-            int n = 0;
+            var n = 0;
 
-            Task wrapper = new Task(() =>
+            var wrapper = new Task(() =>
             {
                 // ReSharper disable AccessToModifiedClosure
-                Task task1 = Task.Factory.StartNew(() => { output.WriteLine("===> 1a"); Thread.Sleep(1000); n = n + 3; output.WriteLine("===> 1b"); });
-                Task task2 = task1.ContinueWith(task => { n = n * 5; output.WriteLine("===> 2"); });
-                Task task3 = task2.ContinueWith(task => { n = n / 5; output.WriteLine("===> 3"); });
-                Task task4 = task3.ContinueWith(task => { n = n - 2; output.WriteLine("===> 4"); result.SetResult(true); });
+                var task1 = Task.Factory.StartNew(() => { output.WriteLine("===> 1a"); Thread.Sleep(1000); n = n + 3; output.WriteLine("===> 1b"); });
+                var task2 = task1.ContinueWith(task => { n = n * 5; output.WriteLine("===> 2"); });
+                var task3 = task2.ContinueWith(task => { n = n / 5; output.WriteLine("===> 3"); });
+                var task4 = task3.ContinueWith(task => { n = n - 2; output.WriteLine("===> 4"); result.SetResult(true); });
                 // ReSharper restore AccessToModifiedClosure
                 task4.ContinueWith(task =>
                 {
@@ -192,13 +192,13 @@ namespace UnitTests.SchedulerTests
             var workItemGroup = SchedulingHelper.CreateWorkItemGroupForTesting(context, loggerFactory);
             TaskScheduler scheduler = workItemGroup.TaskScheduler;
 
-            ManualResetEvent pause1 = new ManualResetEvent(false);
-            ManualResetEvent pause2 = new ManualResetEvent(false);
+            var pause1 = new ManualResetEvent(false);
+            var pause2 = new ManualResetEvent(false);
             var finish = new TaskCompletionSource<bool>();
             Task<int> task1 = null;
             Task<int> task2 = null;
             Task join = null;
-            Task wrapper = new Task(() =>
+            var wrapper = new Task(() =>
             {
                 task1 = Task<int>.Factory.StartNew(() =>
                 {
@@ -249,13 +249,13 @@ namespace UnitTests.SchedulerTests
             var workItemGroup = SchedulingHelper.CreateWorkItemGroupForTesting(context, loggerFactory);
             TaskScheduler scheduler = workItemGroup.TaskScheduler;
 
-            ManualResetEvent pause1 = new ManualResetEvent(false);
-            ManualResetEvent pause2 = new ManualResetEvent(false);
+            var pause1 = new ManualResetEvent(false);
+            var pause2 = new ManualResetEvent(false);
             var finish = new TaskCompletionSource<bool>();
             Task<int> task1 = null;
             Task<int> task2 = null;
             Task join = null;
-            Task wrapper = new Task(() =>
+            var wrapper = new Task(() =>
             {
                 task1 = Task<int>.Factory.StartNew(() =>
                 {
@@ -315,13 +315,13 @@ namespace UnitTests.SchedulerTests
             Task<int> task1 = null;
             Task<int> task2 = null;
             Task join = null;
-            Task wrapper = new Task(() =>
+            var wrapper = new Task(() =>
             {
                 task1 = Task<int>.Factory.StartNew(() =>
                 {
                     output.WriteLine("Task-1 Started");
                     Assert.Equal(scheduler, TaskScheduler.Current);
-                    int num1 = 1;
+                    var num1 = 1;
                     while (!pause1.Task.Result) // Infinite busy loop
                     {
                         num1 = Random.Shared.Next();
@@ -333,7 +333,7 @@ namespace UnitTests.SchedulerTests
                 {
                     output.WriteLine("Task-2 Started");
                     Assert.Equal(scheduler, TaskScheduler.Current);
-                    int num2 = 2;
+                    var num2 = 2;
                     while (!pause2.Task.Result) // Infinite busy loop
                     {
                         num2 = Random.Shared.Next();
@@ -374,13 +374,13 @@ namespace UnitTests.SchedulerTests
             var workItemGroup = SchedulingHelper.CreateWorkItemGroupForTesting(context, loggerFactory);
             TaskScheduler scheduler = workItemGroup.TaskScheduler;
 
-            ManualResetEvent pause1 = new ManualResetEvent(false);
-            ManualResetEvent pause2 = new ManualResetEvent(false);
+            var pause1 = new ManualResetEvent(false);
+            var pause2 = new ManualResetEvent(false);
             var finish = new TaskCompletionSource<bool>();
             Task<int> task1 = null;
             Task<int> task2 = null;
             Task join = null;
-            Task wrapper = new Task(() =>
+            var wrapper = new Task(() =>
             {
                 task1 = Task.Run(() =>
                 {
@@ -436,13 +436,13 @@ namespace UnitTests.SchedulerTests
             var workItemGroup = SchedulingHelper.CreateWorkItemGroupForTesting(context, loggerFactory);
             TaskScheduler scheduler = workItemGroup.TaskScheduler;
 
-            ManualResetEvent pause1 = new ManualResetEvent(false);
-            ManualResetEvent pause2 = new ManualResetEvent(false);
+            var pause1 = new ManualResetEvent(false);
+            var pause2 = new ManualResetEvent(false);
             var finish = new TaskCompletionSource<bool>();
             Task<int> task1 = null;
             Task<int> task2 = null;
             Task join = null;
-            Task wrapper = new Task(() =>
+            var wrapper = new Task(() =>
             {
                 task1 = Task.Run(() =>
                 {
@@ -502,7 +502,7 @@ namespace UnitTests.SchedulerTests
             var workItemGroup = SchedulingHelper.CreateWorkItemGroupForTesting(context, loggerFactory);
             TaskScheduler scheduler = workItemGroup.TaskScheduler;
 
-            Task<Task> wrapper = new Task<Task>(async () =>
+            var wrapper = new Task<Task>(async () =>
             {
                 Assert.Equal(scheduler, TaskScheduler.Current);
                 await DoDelay(1);
@@ -542,15 +542,15 @@ namespace UnitTests.SchedulerTests
             // You test that no CW/StartNew runs until the main turn is fully done. And run in stress.
 
             var resultHandles = new TaskCompletionSource<bool>[NumChains];
-            Task[] taskChains = new Task[NumChains];
-            Task[] taskChainEnds = new Task[NumChains];
-            bool[] executingChain = new bool[NumChains];
-            int[] stageComplete = new int[NumChains];
-            int executingGlobal = -1;
-            for (int i = 0; i < NumChains; i++)
+            var taskChains = new Task[NumChains];
+            var taskChainEnds = new Task[NumChains];
+            var executingChain = new bool[NumChains];
+            var stageComplete = new int[NumChains];
+            var executingGlobal = -1;
+            for (var i = 0; i < NumChains; i++)
             {
-                int chainNum = i; // Capture
-                int sleepTime = Random.Shared.Next(100);
+                var chainNum = i; // Capture
+                var sleepTime = Random.Shared.Next(100);
                 resultHandles[i] = new TaskCompletionSource<bool>();
                 taskChains[i] = new Task(() =>
                 {
@@ -572,10 +572,10 @@ namespace UnitTests.SchedulerTests
                         executingGlobal = -1;
                     }
                 });
-                Task task = taskChains[i];
-                for (int j = 1; j < ChainLength; j++)
+                var task = taskChains[i];
+                for (var j = 1; j < ChainLength; j++)
                 {
-                    int taskNum = j; // Capture
+                    var taskNum = j; // Capture
                     task = task.ContinueWith(t =>
                     {
                         if (t.IsFaulted) throw t.Exception;
@@ -607,14 +607,14 @@ namespace UnitTests.SchedulerTests
                 }, scheduler);
             }
 
-            for (int i = 0; i < NumChains; i++)
+            for (var i = 0; i < NumChains; i++)
             {
                 taskChains[i].Start(scheduler);
             }
 
-            for (int i = 0; i < NumChains; i++)
+            for (var i = 0; i < NumChains; i++)
             {
-                TimeSpan waitCheckTime = TimeSpan.FromMilliseconds(150 * ChainLength * NumChains * WaitFactor);
+                var waitCheckTime = TimeSpan.FromMilliseconds(150 * ChainLength * NumChains * WaitFactor);
 
                 try
                 {
@@ -625,7 +625,7 @@ namespace UnitTests.SchedulerTests
                     Assert.True(false, "Result did not arrive before timeout " + waitCheckTime);
                 }
 
-                bool ok = resultHandles[i].Task.Result;
+                var ok = resultHandles[i].Task.Result;
                 
                 try
                 {
@@ -665,18 +665,18 @@ namespace UnitTests.SchedulerTests
         [Fact, TestCategory("Functional"), TestCategory("Scheduler")]
         public async Task OrleansSched_Test1()
         {
-            UnitTestSchedulingContext context = new UnitTestSchedulingContext();
+            var context = new UnitTestSchedulingContext();
             var workItemGroup = SchedulingHelper.CreateWorkItemGroupForTesting(context, loggerFactory);
-            ActivationTaskScheduler scheduler = workItemGroup.TaskScheduler;
+            var scheduler = workItemGroup.TaskScheduler;
 
             await Run_ActivationSched_Test1(scheduler, false);
         }
         [Fact, TestCategory("Functional"), TestCategory("Scheduler")]
         public async Task OrleansSched_Test1_Bounce()
         {
-            UnitTestSchedulingContext context = new UnitTestSchedulingContext();
+            var context = new UnitTestSchedulingContext();
             var workItemGroup = SchedulingHelper.CreateWorkItemGroupForTesting(context, loggerFactory);
-            ActivationTaskScheduler scheduler = workItemGroup.TaskScheduler;
+            var scheduler = workItemGroup.TaskScheduler;
 
             await Run_ActivationSched_Test1(scheduler, true);
         }
@@ -695,12 +695,12 @@ namespace UnitTests.SchedulerTests
             Task wrapped = null;
             var wrapperDone = new TaskCompletionSource<bool>();
             var wrappedDone = new TaskCompletionSource<bool>();
-            Task<Task> wrapper = new Task<Task>(() =>
+            var wrapper = new Task<Task>(() =>
             {
                 output.WriteLine("#0 - new Task - SynchronizationContext.Current={0} TaskScheduler.Current={1}",
                     SynchronizationContext.Current, TaskScheduler.Current);
                 
-                Task t1 = grain.Test1();
+                var t1 = grain.Test1();
 
                 void wrappedDoneAction() { wrappedDone.SetResult(true); }
 
@@ -730,7 +730,7 @@ namespace UnitTests.SchedulerTests
             {
                 Assert.True(false, "Result did not arrive before timeout " + timeoutLimit);
             }
-            bool done = wrapperDone.Task.Result;
+            var done = wrapperDone.Task.Result;
 
             Assert.True(done, "Wrapper Task finished");
             Assert.True(wrapper.IsCompleted, "Wrapper Task completed");

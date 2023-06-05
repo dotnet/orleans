@@ -26,7 +26,7 @@ namespace Orleans.CodeGeneration
             if (!bAllMethods)
                 flags |= BindingFlags.DeclaredOnly;
 
-            MethodInfo[] infos = grainType.GetMethods(flags);
+            var infos = grainType.GetMethods(flags);
             foreach (var methodInfo in infos)
             {
                 if (!methodInfos.Contains(methodInfo, MethodInfoComparer.Default))
@@ -153,7 +153,7 @@ namespace Orleans.CodeGeneration
 
             public int GetHashCode(MethodInfo obj)
             {
-                int hashCode = -499943048;
+                var hashCode = -499943048;
                 hashCode = hashCode * -1521134295 + StringComparer.Ordinal.GetHashCode(obj.Name);
 
                 foreach (var arg in obj.GetGenericArguments())

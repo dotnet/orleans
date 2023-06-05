@@ -208,12 +208,12 @@ namespace Orleans.Runtime.MembershipService
 
         private void DetectNodeMigration(MembershipTableSnapshot snapshot, string myHostname)
         {
-            string mySiloName = localSiloDetails.Name;
+            var mySiloName = localSiloDetails.Name;
             MembershipEntry mostRecentPreviousEntry = null;
             // look for silo instances that are same as me, find most recent with Generation before me.
             foreach (var entry in snapshot.Entries.Select(entry => entry.Value).Where(data => mySiloName.Equals(data.SiloName)))
             {
-                bool iAmLater = myAddress.Generation.CompareTo(entry.SiloAddress.Generation) > 0;
+                var iAmLater = myAddress.Generation.CompareTo(entry.SiloAddress.Generation) > 0;
                 // more recent
                 if (iAmLater && (mostRecentPreviousEntry == null || entry.SiloAddress.Generation.CompareTo(mostRecentPreviousEntry.SiloAddress.Generation) > 0))
                     mostRecentPreviousEntry = entry;
@@ -221,7 +221,7 @@ namespace Orleans.Runtime.MembershipService
 
             if (mostRecentPreviousEntry != null)
             {
-                bool physicalHostChanged = !myHostname.Equals(mostRecentPreviousEntry.HostName) || !myAddress.Endpoint.Equals(mostRecentPreviousEntry.SiloAddress.Endpoint);
+                var physicalHostChanged = !myHostname.Equals(mostRecentPreviousEntry.HostName) || !myAddress.Endpoint.Equals(mostRecentPreviousEntry.SiloAddress.Endpoint);
                 if (physicalHostChanged)
                 {
                     log.LogWarning(
@@ -313,8 +313,8 @@ namespace Orleans.Runtime.MembershipService
 
         public async Task UpdateStatus(SiloStatus status)
         {
-            bool wasThrownLocally = false;
-            int numCalls = 0;
+            var wasThrownLocally = false;
+            var numCalls = 0;
             
             try
             {
@@ -341,7 +341,7 @@ namespace Orleans.Runtime.MembershipService
                     return;
                 }
 
-                bool ok = await MembershipExecuteWithRetries(updateMyStatusTask, clusterMembershipOptions.MaxJoinAttemptTime);
+                var ok = await MembershipExecuteWithRetries(updateMyStatusTask, clusterMembershipOptions.MaxJoinAttemptTime);
 
                 if (ok)
                 {
@@ -429,7 +429,7 @@ namespace Orleans.Runtime.MembershipService
             myEntry.IAmAliveTime = now;
 
             bool ok;
-            TableVersion next = table.Version.Next();
+            var next = table.Version.Next();
             if (myEtag != null) // no previous etag for my entry -> its the first write to this entry, so insert instead of update.
             {
                 ok = await membershipTableProvider.UpdateRow(myEntry, myEtag, next);
@@ -601,9 +601,9 @@ namespace Orleans.Runtime.MembershipService
 
             foreach (var siloData in silosToDeclareDead)
             {
-                MembershipEntry entry = siloData.Item1;
-                string eTag = siloData.Item2;
-                bool ok = await DeclareDead(entry, eTag, nextVersion, GetDateTimeUtcNow());
+                var entry = siloData.Item1;
+                var eTag = siloData.Item2;
+                var ok = await DeclareDead(entry, eTag, nextVersion, GetDateTimeUtcNow());
                 if (!ok) result = false;
                 nextVersion = nextVersion.Next(); // advance the table version (if write succeded, we advanced the version. if failed, someone else did. It is safe anyway).
             }
@@ -684,7 +684,7 @@ namespace Orleans.Runtime.MembershipService
             }
 
             var entry = tuple.Item1.Copy();
-            string eTag = tuple.Item2;
+            var eTag = tuple.Item2;
 
             // Check if the table already knows that this silo is dead
             if (entry.Status == SiloStatus.Dead)
@@ -736,7 +736,7 @@ namespace Orleans.Runtime.MembershipService
             }
 
             var entry = tuple.Item1.Copy();
-            string eTag = tuple.Item2;
+            var eTag = tuple.Item2;
             if (log.IsEnabled(LogLevel.Debug))
             {
                 log.LogDebug(
@@ -780,11 +780,11 @@ namespace Orleans.Runtime.MembershipService
 
             // Determine if there are enough votes to evict the silo.
             // Handle the corner case when the number of active silos is very small (then my only vote is enough)
-            int activeSilos = table.GetSiloStatuses(status => status == SiloStatus.Active, true, myAddress).Count;
+            var activeSilos = table.GetSiloStatuses(status => status == SiloStatus.Active, true, myAddress).Count;
             if (freshVotes.Count >= clusterMembershipOptions.NumVotesForDeathDeclaration || freshVotes.Count >= (activeSilos + 1) / 2)
             {
                 // Find the local silo's vote index
-                int myVoteIndex = freshVotes.FindIndex(voter => myAddress.Equals(voter.Item1));
+                var myVoteIndex = freshVotes.FindIndex(voter => myAddress.Equals(voter.Item1));
 
                 // Kick this silo off
                 log.LogInformation(
@@ -839,7 +839,7 @@ namespace Orleans.Runtime.MembershipService
 
                 if (log.IsEnabled(LogLevel.Debug)) log.LogDebug("Going to DeclareDead silo {SiloAddress} in the table. About to write entry {Entry}.", entry.SiloAddress, entry.ToString());
                 entry.Status = SiloStatus.Dead;
-                bool ok = await membershipTableProvider.UpdateRow(entry, etag, tableVersion.Next());
+                var ok = await membershipTableProvider.UpdateRow(entry, etag, tableVersion.Next());
                 if (ok)
                 {
                     if (log.IsEnabled(LogLevel.Debug)) log.LogDebug("Successfully updated {SiloAddress} status to Dead in the membership table.", entry.SiloAddress);

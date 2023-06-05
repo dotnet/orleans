@@ -55,11 +55,11 @@ namespace Orleans.EventSourcing
         private Task OnSetupState(CancellationToken ct)
         {
             if (ct.IsCancellationRequested) return Task.CompletedTask;
-            IGrainContextAccessor grainContextAccessor = ServiceProvider.GetRequiredService<IGrainContextAccessor>();
-            Factory<IGrainContext, ILogConsistencyProtocolServices> protocolServicesFactory = ServiceProvider.GetRequiredService<Factory<IGrainContext, ILogConsistencyProtocolServices>>();
+            var grainContextAccessor = ServiceProvider.GetRequiredService<IGrainContextAccessor>();
+            var protocolServicesFactory = ServiceProvider.GetRequiredService<Factory<IGrainContext, ILogConsistencyProtocolServices>>();
             var grainContext = grainContextAccessor.GrainContext;
-            ILogViewAdaptorFactory consistencyProvider = SetupLogConsistencyProvider(grainContext);
-            IGrainStorage grainStorage = consistencyProvider.UsesStorageProvider ? GrainStorageHelpers.GetGrainStorage(grainContext?.GrainInstance.GetType(), ServiceProvider) : null;
+            var consistencyProvider = SetupLogConsistencyProvider(grainContext);
+            var grainStorage = consistencyProvider.UsesStorageProvider ? GrainStorageHelpers.GetGrainStorage(grainContext?.GrainInstance.GetType(), ServiceProvider) : null;
             InstallLogViewAdaptor(grainContext, protocolServicesFactory, consistencyProvider, grainStorage);
             return Task.CompletedTask;
         }
@@ -81,9 +81,9 @@ namespace Orleans.EventSourcing
             IGrainStorage grainStorage)
         {
             // encapsulate runtime services used by consistency adaptors
-            ILogConsistencyProtocolServices svc = protocolServicesFactory(grainContext);
+            var svc = protocolServicesFactory(grainContext);
 
-            TView state = (TView)Activator.CreateInstance(typeof(TView));
+            var state = (TView)Activator.CreateInstance(typeof(TView));
 
             InstallAdaptor(factory, state, GetType().FullName, grainStorage, svc);
         }
@@ -92,7 +92,7 @@ namespace Orleans.EventSourcing
         {
             var attr = GetType().GetCustomAttributes<LogConsistencyProviderAttribute>(true).FirstOrDefault();
 
-            ILogViewAdaptorFactory defaultFactory = attr != null
+            var defaultFactory = attr != null
                 ? ServiceProvider.GetServiceByName<ILogViewAdaptorFactory>(attr.ProviderName)
                 : ServiceProvider.GetService<ILogViewAdaptorFactory>();
             if (attr != null && defaultFactory == null)

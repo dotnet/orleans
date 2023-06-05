@@ -18,10 +18,10 @@ namespace UnitTests
 
         public void NonReentrantGrain(bool performDeadlockDetection)
         {
-            INonReentrantGrain nonreentrant = grainFactory.GetGrain<INonReentrantGrain>(OrleansTestingBase.GetRandomGrainId());
+            var nonreentrant = grainFactory.GetGrain<INonReentrantGrain>(OrleansTestingBase.GetRandomGrainId());
             nonreentrant.SetSelf(nonreentrant).Wait();
-            bool timeout = false;
-            bool deadlock = false;
+            var timeout = false;
+            var deadlock = false;
             try
             {
                 timeout = !nonreentrant.Two().Wait(2000);
@@ -45,8 +45,8 @@ namespace UnitTests
         {
             var grain = grainFactory.GetGrain<IMayInterleavePredicateGrain>(OrleansTestingBase.GetRandomGrainId());
             grain.SetSelf(grain).Wait();
-            bool timeout = false;
-            bool deadlock = false;
+            var timeout = false;
+            var deadlock = false;
             try
             {
                 timeout = !grain.Two().Wait(2000);
@@ -68,10 +68,10 @@ namespace UnitTests
 
         public void UnorderedNonReentrantGrain(bool performDeadlockDetection)
         {
-            IUnorderedNonReentrantGrain unonreentrant = grainFactory.GetGrain<IUnorderedNonReentrantGrain>(OrleansTestingBase.GetRandomGrainId());
+            var unonreentrant = grainFactory.GetGrain<IUnorderedNonReentrantGrain>(OrleansTestingBase.GetRandomGrainId());
             unonreentrant.SetSelf(unonreentrant).Wait();
-            bool timeout = false;
-            bool deadlock = false;
+            var timeout = false;
+            var deadlock = false;
             try
             {
                 timeout = !unonreentrant.Two().Wait(2000);

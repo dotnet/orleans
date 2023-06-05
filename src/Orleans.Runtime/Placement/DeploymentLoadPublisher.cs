@@ -145,7 +145,7 @@ namespace Orleans.Runtime
                     foreach (var siloAddress in members)
                     {
                         var capture = siloAddress;
-                        Task task = grainFactory.GetSystemTarget<ISiloControl>(Constants.SiloControlType, capture)
+                        var task = grainFactory.GetSystemTarget<ISiloControl>(Constants.SiloControlType, capture)
                                 .GetRuntimeStatistics()
                                 .ContinueWith((Task<SiloRuntimeStatistics> statsTask) =>
                                     {

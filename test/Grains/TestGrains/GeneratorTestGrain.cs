@@ -29,7 +29,7 @@ namespace UnitTests.Grains
 
         public Task<MemberVariables> GetMemberVariables()
         {
-            MemberVariables memberVar = new MemberVariables(myGrainBytes, myGrainString, myCode);
+            var memberVar = new MemberVariables(myGrainBytes, myGrainString, myCode);
             return Task.FromResult(memberVar);
         }
 

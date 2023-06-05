@@ -101,14 +101,14 @@ namespace Tester.AzureUtils.Streaming
         {
             var mgmt = GrainFactory.GetGrain<IManagementGrain>(0);
 
-            object[] results = await mgmt.SendControlCommandToProvider(adapterType, adapterName, (int)PersistentStreamProviderCommand.GetNumberRunningAgents);
+            var results = await mgmt.SendControlCommandToProvider(adapterType, adapterName, (int)PersistentStreamProviderCommand.GetNumberRunningAgents);
             Assert.Equal(numExpectedSilos, results.Length);
 
             // Convert.ToInt32 is used because of different behavior of the fallback serializers: binary formatter and Json.Net.
             // The binary one deserializes object[] into array of ints when the latter one - into longs. http://stackoverflow.com/a/17918824
             var numAgents = results.Select(Convert.ToInt32).ToArray();
             logger.LogInformation("Got back RunningAgentCounts: {RunningAgentCounts}", Utils.EnumerableToString(numAgents));
-            int i = 0;
+            var i = 0;
             foreach (var agents in numAgents)
             {
                 logger.LogCritical($"Silo {i++} get agents {agents}");

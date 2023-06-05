@@ -43,7 +43,7 @@ namespace DependencyInjection.Tests
         [Fact]
         public async Task CanGetGrainWithInjectedDependencies()
         {
-            IDIGrainWithInjectedServices grain = fixture.GrainFactory.GetGrain<IDIGrainWithInjectedServices>(GetRandomGrainId());
+            var grain = fixture.GrainFactory.GetGrain<IDIGrainWithInjectedServices>(GetRandomGrainId());
             var _ = await grain.GetLongValue();
         }
 
@@ -52,7 +52,7 @@ namespace DependencyInjection.Tests
         {
             // please don't inject your implemetation of IGrainFactory to DI container in Startup Class, 
             // since we are currently not supporting replacing IGrainFactory 
-            IDIGrainWithInjectedServices grain = fixture.GrainFactory.GetGrain<IDIGrainWithInjectedServices>(GetRandomGrainId());
+            var grain = fixture.GrainFactory.GetGrain<IDIGrainWithInjectedServices>(GetRandomGrainId());
             _ = await grain.GetGrainFactoryId();
         }
 
@@ -89,8 +89,8 @@ namespace DependencyInjection.Tests
         [Fact]
         public async Task CanResolveScopedGrainActivationContext()
         {
-            long id1 = GetRandomGrainId();
-            long id2 = GetRandomGrainId();
+            var id1 = GetRandomGrainId();
+            var id2 = GetRandomGrainId();
             var grain1 = fixture.GrainFactory.GetGrain<IDIGrainWithInjectedServices>(id1);
             var grain2 = fixture.GrainFactory.GetGrain<IDIGrainWithInjectedServices>(id2);
 
@@ -114,7 +114,7 @@ namespace DependencyInjection.Tests
                     .ToList();
 
             await Task.WhenAll(calls);
-            string expected = calls[0].Result;
+            var expected = calls[0].Result;
             foreach (var value in calls.Select(x => x.Result))
             {
                 Assert.Equal(expected, value);
@@ -151,7 +151,7 @@ namespace DependencyInjection.Tests
         [Fact]
         public async Task CannotGetExplictlyRegisteredGrain()
         {
-            ISimpleDIGrain grain = fixture.GrainFactory.GetGrain<ISimpleDIGrain>(GetRandomGrainId(), grainClassNamePrefix: "UnitTests.Grains.ExplicitlyRegistered");
+            var grain = fixture.GrainFactory.GetGrain<ISimpleDIGrain>(GetRandomGrainId(), grainClassNamePrefix: "UnitTests.Grains.ExplicitlyRegistered");
             var exception = await Assert.ThrowsAsync<InvalidOperationException>(() => grain.GetLongValue());
             Assert.Contains("Unable to resolve service for type 'System.String' while attempting to activate 'UnitTests.Grains.ExplicitlyRegisteredSimpleDIGrain'", exception.Message);
         }

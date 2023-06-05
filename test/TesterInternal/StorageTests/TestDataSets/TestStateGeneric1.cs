@@ -43,7 +43,7 @@
         {
             unchecked
             {
-                int hash = 17;
+                var hash = 17;
                 hash = hash * 23 + EqualityComparer<T>.Default.GetHashCode(SomeData);
                 hash = hash * 23 + EqualityComparer<string>.Default.GetHashCode(A);
                 hash = hash * 23 + B.GetHashCode();

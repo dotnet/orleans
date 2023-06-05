@@ -70,7 +70,7 @@ namespace Orleans.Reminders.Redis
             try
             {
                 var (from, to) = GetFilter(grainId, reminderName);
-                RedisValue[] values = await _db.SortedSetRangeByValueAsync(_hashSetKey, from, to);
+                var values = await _db.SortedSetRangeByValueAsync(_hashSetKey, from, to);
                 if (values.Length == 0)
                 {
                     return null;
@@ -91,8 +91,8 @@ namespace Orleans.Reminders.Redis
             try
             {
                 var (from, to) = GetFilter(grainId);
-                RedisValue[] values = await _db.SortedSetRangeByValueAsync(_hashSetKey, from, to);
-                IEnumerable<ReminderEntry> records = values.Select(static v => ConvertToEntry(v));
+                var values = await _db.SortedSetRangeByValueAsync(_hashSetKey, from, to);
+                var records = values.Select(static v => ConvertToEntry(v));
                 return new ReminderTableData(records);
             }
             catch (Exception exception)
@@ -116,12 +116,12 @@ namespace Orleans.Reminders.Redis
                 else
                 {
                     // *****end------begin*****
-                    RedisValue[] values1 = await _db.SortedSetRangeByValueAsync(_hashSetKey, from, "\"FFFFFFFF\",#");
-                    RedisValue[] values2 = await _db.SortedSetRangeByValueAsync(_hashSetKey, "\"00000000\",\"", to);
+                    var values1 = await _db.SortedSetRangeByValueAsync(_hashSetKey, from, "\"FFFFFFFF\",#");
+                    var values2 = await _db.SortedSetRangeByValueAsync(_hashSetKey, "\"00000000\",\"", to);
                     values = values1.Concat(values2);
                 }
 
-                IEnumerable<ReminderEntry> records = values.Select(static v => ConvertToEntry(v));
+                var records = values.Select(static v => ConvertToEntry(v));
                 return new ReminderTableData(records);
             }
             catch (Exception exception)
@@ -135,7 +135,7 @@ namespace Orleans.Reminders.Redis
             try
             {
                 var (from, to) = GetFilter(grainId, reminderName, eTag);
-                long removed = await _db.SortedSetRemoveRangeByValueAsync(_hashSetKey, from, to);
+                var removed = await _db.SortedSetRemoveRangeByValueAsync(_hashSetKey, from, to);
                 return removed > 0;
             }
             catch (Exception exception)
@@ -193,7 +193,7 @@ namespace Orleans.Reminders.Redis
 
         private static ReminderEntry ConvertToEntry(string reminderValue)
         {
-            string[] segments = JsonConvert.DeserializeObject<string[]>($"[{reminderValue}]");
+            var segments = JsonConvert.DeserializeObject<string[]>($"[{reminderValue}]");
 
             return new ReminderEntry
             {
@@ -227,15 +227,15 @@ namespace Orleans.Reminders.Redis
 
         private (RedisValue from, RedisValue to) GetFilter(params string[] segments)
         {
-            string prefix = JsonConvert.SerializeObject(segments, _jsonSettings);
+            var prefix = JsonConvert.SerializeObject(segments, _jsonSettings);
             return ($"{prefix[1..^1]},\"", $"{prefix[1..^1]},#");
         }
 
         private (RedisValue eTag, RedisValue value) ConvertFromEntry(ReminderEntry entry)
         {
-            string grainHash = entry.GrainId.GetUniformHashCode().ToString("X8");
-            string eTag = Guid.NewGuid().ToString();
-            string[] segments = new string[]
+            var grainHash = entry.GrainId.GetUniformHashCode().ToString("X8");
+            var eTag = Guid.NewGuid().ToString();
+            var segments = new string[]
             {
                 grainHash,
                 entry.GrainId.ToString(),

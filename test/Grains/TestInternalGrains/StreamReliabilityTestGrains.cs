@@ -122,19 +122,19 @@ namespace UnitTests.Grains
 
         public Task<int> GetConsumerCount()
         {
-            int numConsumers = State.ConsumerSubscriptionHandles.Count;
+            var numConsumers = State.ConsumerSubscriptionHandles.Count;
             logger.LogInformation("ConsumerCount={Count}", numConsumers);
             return Task.FromResult(numConsumers);
         }
         public Task<int> GetReceivedCount()
         {
-            int numReceived = Observers.Sum(o => o.Value.NumItems);
+            var numReceived = Observers.Sum(o => o.Value.NumItems);
             logger.LogInformation("ReceivedCount={Count}", numReceived);
             return Task.FromResult(numReceived);
         }
         public Task<int> GetErrorsCount()
         {
-            int numErrors = Observers.Sum(o => o.Value.NumErrors);
+            var numErrors = Observers.Sum(o => o.Value.NumErrors);
             logger.LogInformation("ErrorsCount={Count}", numErrors);
             return Task.FromResult(numErrors);
         }
@@ -223,13 +223,13 @@ namespace UnitTests.Grains
 
         public Task<bool> IsConsumer()
         {
-            bool isConsumer = State.ConsumerSubscriptionHandles.Count > 0;
+            var isConsumer = State.ConsumerSubscriptionHandles.Count > 0;
             logger.LogInformation("IsConsumer={IsConsumer}", isConsumer);
             return Task.FromResult(isConsumer);
         }
         public Task<bool> IsProducer()
         {
-            bool isProducer = State.IsProducer;
+            var isProducer = State.IsProducer;
             logger.LogInformation("IsProducer={IsProducer}", isProducer);
             return Task.FromResult(isProducer);
         }
@@ -261,7 +261,7 @@ namespace UnitTests.Grains
 
         public Task<SiloAddress> GetLocation()
         {
-            SiloAddress siloAddress = _grainContext.Address.SiloAddress;
+            var siloAddress = _grainContext.Address.SiloAddress;
             logger.LogInformation("GetLocation SiloAddress={SiloAddress}", siloAddress);
             return Task.FromResult(siloAddress);
         }
@@ -276,7 +276,7 @@ namespace UnitTests.Grains
             {
                 logger.LogInformation("InitStream StreamId={StreamId} StreamProvider={ProviderName}", streamId, providerName);
 
-                IStreamProvider streamProvider = this.GetStreamProvider(providerName);
+                var streamProvider = this.GetStreamProvider(providerName);
 #if USE_GENERICS
                 State.Stream = streamProvider.GetStream<T>(streamId);
 #else
@@ -378,7 +378,7 @@ namespace UnitTests.Grains
             if (State.Stream == null)
             {
                 logger.LogInformation("InitStream StreamId={StreamId} StreamProvider={ProviderName}", streamId, providerName);
-                IStreamProvider streamProvider = this.GetStreamProvider(providerName);
+                var streamProvider = this.GetStreamProvider(providerName);
                 State.Stream = streamProvider.GetStream<int>(StreamNamespace, streamId);
             }
 

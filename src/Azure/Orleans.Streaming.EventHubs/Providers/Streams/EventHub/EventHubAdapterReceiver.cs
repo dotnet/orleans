@@ -114,7 +114,7 @@ namespace Orleans.Streaming.EventHubs
                 }
                 cache = cacheFactory(settings.Partition, checkpointer, loggerFactory);
                 flowController = new AggregatedQueueFlowController(MaxMessagesPerRead) { cache, LoadShedQueueFlowController.CreateAsPercentOfLoadSheddingLimit(loadSheddingOptions, _hostEnvironmentStatistics) };
-                string offset = await checkpointer.Load();
+                var offset = await checkpointer.Load();
                 receiver = eventHubReceiverFactory(settings, offset, logger);
                 watch.Stop();
                 monitor?.TrackInitialization(true, watch.Elapsed, null);
@@ -176,12 +176,12 @@ namespace Orleans.Streaming.EventHubs
             // monitor message age
             var dequeueTimeUtc = DateTime.UtcNow;
 
-            DateTime oldestMessageEnqueueTime = messages[0].EnqueuedTime.UtcDateTime;
-            DateTime newestMessageEnqueueTime = messages[messages.Count - 1].EnqueuedTime.UtcDateTime;
+            var oldestMessageEnqueueTime = messages[0].EnqueuedTime.UtcDateTime;
+            var newestMessageEnqueueTime = messages[messages.Count - 1].EnqueuedTime.UtcDateTime;
 
             monitor?.TrackMessagesReceived(messages.Count, oldestMessageEnqueueTime, newestMessageEnqueueTime);
 
-            List<StreamPosition> messageStreamPositions = cache.Add(messages, dequeueTimeUtc);
+            var messageStreamPositions = cache.Add(messages, dequeueTimeUtc);
             foreach (var streamPosition in messageStreamPositions)
             {
                 batches.Add(new StreamActivityNotificationBatch(streamPosition));
@@ -240,12 +240,12 @@ namespace Orleans.Streaming.EventHubs
                 logger.LogInformation("Stopping reading from EventHub partition {EventHubName}-{Partition}", settings.Hub.EventHubName, settings.Partition);
 
                 // clear cache and receiver
-                IEventHubQueueCache localCache = Interlocked.Exchange(ref cache, null);
+                var localCache = Interlocked.Exchange(ref cache, null);
 
                 var localReceiver = Interlocked.Exchange(ref receiver, null);
 
                 // start closing receiver
-                Task closeTask = Task.CompletedTask;
+                var closeTask = Task.CompletedTask;
                 if (localReceiver != null)
                 {
                     closeTask = localReceiver.CloseAsync();

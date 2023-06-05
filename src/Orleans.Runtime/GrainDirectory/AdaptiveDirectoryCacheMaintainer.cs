@@ -63,10 +63,10 @@ namespace Orleans.Runtime.GrainDirectory
                 while (enumerator.MoveNext())
                 {
                     var pair = enumerator.Current;
-                    GrainId grain = pair.Key;
+                    var grain = pair.Key;
                     var entry = pair.Value;
 
-                    SiloAddress owner = router.CalculateGrainDirectoryPartition(grain);
+                    var owner = router.CalculateGrainDirectoryPartition(grain);
                     if (owner == null) // Null means there's no other silo and we're shutting down, so skip this entry
                     {
                         continue;
@@ -202,10 +202,10 @@ namespace Orleans.Runtime.GrainDirectory
         {
             var grainAndETagList = new List<(GrainId, int)>();
 
-            foreach (GrainId grain in grains)
+            foreach (var grain in grains)
             {
                 // NOTE: should this be done with TryGet? Won't Get invoke the LRU getter function?
-                AdaptiveGrainDirectoryCache.GrainDirectoryCacheEntry entry = cache.Get(grain);
+                var entry = cache.Get(grain);
 
                 if (entry != null)
                 {
@@ -230,11 +230,11 @@ namespace Orleans.Runtime.GrainDirectory
             // We do not want to synchronize the access on numAccess and numHits in cache to avoid performance issues.
             // Thus we take the current reading of these fields and calculate the stats. We might miss an access or two,
             // but it should not be matter.
-            long curNumAccesses = cache.NumAccesses;
-            long curNumHits = cache.NumHits;
+            var curNumAccesses = cache.NumAccesses;
+            var curNumHits = cache.NumHits;
 
-            long numAccesses = curNumAccesses - lastNumAccesses;
-            long numHits = curNumHits - lastNumHits;
+            var numAccesses = curNumAccesses - lastNumAccesses;
+            var numHits = curNumHits - lastNumHits;
 
             if (Log.IsEnabled(LogLevel.Trace)) Log.LogTrace("#accesses: {AccessCount}, hit-ratio: {HitRatio}%", numAccesses, (numHits / Math.Max(numAccesses, 0.00001)) * 100);
 

@@ -40,7 +40,7 @@ namespace Orleans.Metadata
         {
             if (Properties is null) return string.Empty;
             var result = new StringBuilder("[");
-            bool first = true;
+            var first = true;
             foreach (var entry in Properties)
             {
                 if (!first)

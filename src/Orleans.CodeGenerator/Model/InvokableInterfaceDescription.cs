@@ -322,7 +322,7 @@ namespace Orleans.CodeGenerator
 
             public int GetHashCode(IMethodSymbol obj)
             {
-                int hashCode = -499943048;
+                var hashCode = -499943048;
                 hashCode = hashCode * -1521134295 + StringComparer.Ordinal.GetHashCode(obj.Name);
 
                 foreach (var arg in obj.TypeArguments)

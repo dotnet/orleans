@@ -103,8 +103,8 @@ namespace UnitTests.HaloTests.Streaming
             fixture.Logger.LogInformation("\n\n************************ Halo_AzureQueue_ResubscribeTest_ConsumerProducer ********************************* \n\n");
             _streamId = Guid.NewGuid();
             _streamProvider = AzureQueueStreamProviderName;
-            Guid consumerGuid = Guid.NewGuid();
-            Guid producerGuid = Guid.NewGuid();
+            var consumerGuid = Guid.NewGuid();
+            var producerGuid = Guid.NewGuid();
             await ConsumerProducerTest(consumerGuid, producerGuid);
             await ConsumerProducerTest(consumerGuid, producerGuid);
         }
@@ -115,8 +115,8 @@ namespace UnitTests.HaloTests.Streaming
             fixture.Logger.LogInformation("\n\n************************ Halo_AzureQueue_ResubscribeTest_ProducerConsumer ********************************* \n\n");
             _streamId = Guid.NewGuid();
             _streamProvider = AzureQueueStreamProviderName;
-            Guid producerGuid = Guid.NewGuid();
-            Guid consumerGuid = Guid.NewGuid();
+            var producerGuid = Guid.NewGuid();
+            var consumerGuid = Guid.NewGuid();
             await ProducerConsumerTest(producerGuid, consumerGuid);
             await ProducerConsumerTest(producerGuid, consumerGuid);
         }
@@ -124,10 +124,10 @@ namespace UnitTests.HaloTests.Streaming
         private async Task ConsumerProducerTest(Guid consumerGuid, Guid producerGuid)
         {
             // consumer joins first, producer later
-            IConsumerEventCountingGrain consumer = fixture.GrainFactory.GetGrain<IConsumerEventCountingGrain>(consumerGuid);
+            var consumer = fixture.GrainFactory.GetGrain<IConsumerEventCountingGrain>(consumerGuid);
             await consumer.BecomeConsumer(_streamId, _streamProvider);
 
-            IProducerEventCountingGrain producer = fixture.GrainFactory.GetGrain<IProducerEventCountingGrain>(producerGuid);
+            var producer = fixture.GrainFactory.GetGrain<IProducerEventCountingGrain>(producerGuid);
             await producer.BecomeProducer(_streamId, _streamProvider);
 
             await producer.SendEvent();
@@ -142,10 +142,10 @@ namespace UnitTests.HaloTests.Streaming
         private async Task ProducerConsumerTest(Guid producerGuid, Guid consumerGuid)
         {
             // producer joins first, consumer later
-            IProducerEventCountingGrain producer = fixture.GrainFactory.GetGrain<IProducerEventCountingGrain>(producerGuid);
+            var producer = fixture.GrainFactory.GetGrain<IProducerEventCountingGrain>(producerGuid);
             await producer.BecomeProducer(_streamId, _streamProvider);
 
-            IConsumerEventCountingGrain consumer = fixture.GrainFactory.GetGrain<IConsumerEventCountingGrain>(consumerGuid);
+            var consumer = fixture.GrainFactory.GetGrain<IConsumerEventCountingGrain>(consumerGuid);
             await consumer.BecomeConsumer(_streamId, _streamProvider);
 
             await producer.SendEvent();

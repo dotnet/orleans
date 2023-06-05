@@ -75,10 +75,10 @@ namespace Orleans.Runtime
             this.loadSheddingOptions = loadSheddingOptions;
             _grainCountStatistics = grainCountStatistics;
             controllables = new Dictionary<Tuple<string, string>, IControllable>();
-            IEnumerable<IKeyedServiceCollection<string, IControllable>> namedIControllableCollections = services.GetServices<IKeyedServiceCollection<string, IControllable>>();
-            foreach (IKeyedService<string, IControllable> keyedService in namedIControllableCollections.SelectMany(c => c.GetServices(services)))
+            var namedIControllableCollections = services.GetServices<IKeyedServiceCollection<string, IControllable>>();
+            foreach (var keyedService in namedIControllableCollections.SelectMany(c => c.GetServices(services)))
             {
-                IControllable controllable = keyedService.GetService(services);
+                var controllable = keyedService.GetService(services);
                 if(controllable != null)
                 {
                     controllables.Add(Tuple.Create(controllable.GetType().FullName, keyedService.Key), controllable);

@@ -87,7 +87,7 @@ namespace UnitTests.StreamingTests
 
             var numAgents = await mgmt.SendControlCommandToProvider(adapterType, adapterName, (int)PersistentStreamProviderCommand.GetNumberRunningAgents);
             Assert.Equal(2, numAgents.Length);
-            int totalNumAgents = numAgents.Select(Convert.ToInt32).Sum();
+            var totalNumAgents = numAgents.Select(Convert.ToInt32).Sum();
             if (expectedState == StreamLifecycleOptions.RunState.AgentsStarted)
             {
                 Assert.Equal(HashRingStreamQueueMapperOptions.DEFAULT_NUM_QUEUES, totalNumAgents);

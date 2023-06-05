@@ -96,10 +96,10 @@ namespace Tests.GeoClusterTests
             // Global 
             async Task checker1()
             {
-                int x = GetRandom();
+                var x = GetRandom();
                 var grain = fixture.GrainFactory.GetGrain<ILogTestGrain>(x, grainClass);
                 await grain.SetAGlobal(x);
-                int a = await grain.GetAGlobal();
+                var a = await grain.GetAGlobal();
                 Assert.Equal(x, a); // value of A survive grain call
                 Assert.Equal(1, await grain.GetConfirmedVersion());
             }
@@ -107,11 +107,11 @@ namespace Tests.GeoClusterTests
             // Local
             async Task checker2()
             {
-                int x = GetRandom();
+                var x = GetRandom();
                 var grain = fixture.GrainFactory.GetGrain<ILogTestGrain>(x, grainClass);
                 Assert.Equal(0, await grain.GetConfirmedVersion());
                 await grain.SetALocal(x);
-                int a = await grain.GetALocal();
+                var a = await grain.GetALocal();
                 Assert.Equal(x, a); // value of A survive grain call
             }
 
@@ -119,10 +119,10 @@ namespace Tests.GeoClusterTests
             async Task checker3()
             {
                 // Local then Global
-                int x = GetRandom();
+                var x = GetRandom();
                 var grain = fixture.GrainFactory.GetGrain<ILogTestGrain>(x, grainClass);
                 await grain.SetALocal(x);
-                int a = await grain.GetAGlobal();
+                var a = await grain.GetAGlobal();
                 Assert.Equal(x, a);
                 Assert.Equal(1, await grain.GetConfirmedVersion());
             }
@@ -134,7 +134,7 @@ namespace Tests.GeoClusterTests
 
             // test (phases) instances of each checker, all in parallel
             var tasks = new List<Task>();
-            for (int i = 0; i < phases; i++)
+            for (var i = 0; i < phases; i++)
             {
                 tasks.Add(checker1());
                 tasks.Add(checker2());

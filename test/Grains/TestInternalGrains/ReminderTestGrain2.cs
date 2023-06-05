@@ -59,7 +59,7 @@ namespace UnitTests.Grains
 
         public async Task<IGrainReminder> StartReminder(string reminderName, TimeSpan? p = null, bool validate = false)
         {
-            TimeSpan usePeriod = p ?? period;
+            var usePeriod = p ?? period;
             logger.LogInformation("Starting reminder {ReminderName}.", reminderName);
             TimeSpan dueTime;
             if (reminderOptions.Value.MinimumReminderPeriod < TimeSpan.FromSeconds(2))
@@ -75,7 +75,7 @@ namespace UnitTests.Grains
             allReminders[reminderName] = new(r);
             sequence[reminderName] = 0;
 
-            string fileName = GetFileName(reminderName);
+            var fileName = GetFileName(reminderName);
             File.Delete(fileName); // if successfully started, then remove any old data
             logger.LogInformation("Started reminder {Reminder}", r);
             return r;
@@ -100,10 +100,10 @@ namespace UnitTests.Grains
             // using dateTime.Ticks is not accurate as between two invocations of ReceiveReminder(), there maybe < period.Ticks
             // if # of ticks between two consecutive ReceiveReminder() is larger than period.Ticks, everything is fine... the problem is when its less
             // thus, we reduce our accuracy by ACCURACY ... here, we are preparing all used variables for the given accuracy
-            long now = status.CurrentTickTime.Ticks / aCCURACY; //DateTime.UtcNow.Ticks / ACCURACY;
-            long first = status.FirstTickTime.Ticks / aCCURACY;
-            long per = status.Period.Ticks / aCCURACY;
-            long sequenceNumber = 1 + ((now - first) / per);
+            var now = status.CurrentTickTime.Ticks / aCCURACY; //DateTime.UtcNow.Ticks / ACCURACY;
+            var first = status.FirstTickTime.Ticks / aCCURACY;
+            var per = status.Period.Ticks / aCCURACY;
+            var sequenceNumber = 1 + ((now - first) / per);
 
             // end of calculating tick sequence number
 
@@ -116,8 +116,8 @@ namespace UnitTests.Grains
             sequence[reminderName] = sequenceNumber;
             logger.LogInformation("ReceiveReminder: {ReminderNAme} Sequence # {SequenceNumber} with status {Status}.", reminderName, sequence[reminderName], status);
 
-            string fileName = GetFileName(reminderName);
-            string counterValue = sequence[reminderName].ToString(CultureInfo.InvariantCulture);
+            var fileName = GetFileName(reminderName);
+            var counterValue = sequence[reminderName].ToString(CultureInfo.InvariantCulture);
             File.WriteAllText(fileName, counterValue);
 
             return Task.CompletedTask;
@@ -157,9 +157,9 @@ namespace UnitTests.Grains
 
         private async Task GetMissingReminders()
         {
-            List<IGrainReminder> reminders = await this.GetReminders();
+            var reminders = await this.GetReminders();
             logger.LogInformation("Got missing reminders {Reminders}", Utils.EnumerableToString(reminders));
-            foreach (IGrainReminder l in reminders)
+            foreach (var l in reminders)
             {
                 if (!allReminders.ContainsKey(l.ReminderName))
                 {
@@ -190,9 +190,9 @@ namespace UnitTests.Grains
 
         public Task<long> GetCounter(string name)
         {
-            string fileName = GetFileName(name);
-            string data = File.ReadAllText(fileName);
-            long counterValue = long.Parse(data);
+            var fileName = GetFileName(name);
+            var data = File.ReadAllText(fileName);
+            var counterValue = long.Parse(data);
             return Task.FromResult(counterValue);
         }
 
@@ -213,7 +213,7 @@ namespace UnitTests.Grains
 
         public static TimeSpan GetDefaultPeriod(ILogger log)
         {
-            int period = 12; // Seconds
+            var period = 12; // Seconds
             var reminderPeriod = TimeSpan.FromSeconds(period);
             log.LogInformation("Using reminder period of {Period} in ReminderTestGrain", reminderPeriod);
             return reminderPeriod;
@@ -268,7 +268,7 @@ namespace UnitTests.Grains
 
         public async Task<IGrainReminder> StartReminder(string reminderName, TimeSpan? p = null, bool validate = false)
         {
-            TimeSpan usePeriod = p ?? period;
+            var usePeriod = p ?? period;
             logger.LogInformation("Starting reminder {ReminderName} for {GrainId}", reminderName, GrainId);
             IGrainReminder r;
             if (validate)
@@ -314,10 +314,10 @@ namespace UnitTests.Grains
             // using dateTime.Ticks is not accurate as between two invocations of ReceiveReminder(), there maybe < period.Ticks
             // if # of ticks between two consecutive ReceiveReminder() is larger than period.Ticks, everything is fine... the problem is when its less
             // thus, we reduce our accuracy by ACCURACY ... here, we are preparing all used variables for the given accuracy
-            long now = status.CurrentTickTime.Ticks / aCCURACY; //DateTime.UtcNow.Ticks / ACCURACY;
-            long first = status.FirstTickTime.Ticks / aCCURACY;
-            long per = status.Period.Ticks / aCCURACY;
-            long sequenceNumber = 1 + ((now - first) / per);
+            var now = status.CurrentTickTime.Ticks / aCCURACY; //DateTime.UtcNow.Ticks / ACCURACY;
+            var first = status.FirstTickTime.Ticks / aCCURACY;
+            var per = status.Period.Ticks / aCCURACY;
+            var sequenceNumber = 1 + ((now - first) / per);
 
             // end of calculating tick sequence number
 
@@ -357,8 +357,8 @@ namespace UnitTests.Grains
 
         private async Task GetMissingReminders()
         {
-            List<IGrainReminder> reminders = await this.GetReminders();
-            foreach (IGrainReminder l in reminders)
+            var reminders = await this.GetReminders();
+            foreach (var l in reminders)
             {
                 if (!allReminders.ContainsKey(l.ReminderName))
                 {
@@ -417,7 +417,7 @@ namespace UnitTests.Grains
         public async Task<bool> StartReminder(string reminderName)
         {
             logger.LogInformation("Starting reminder {Reminder}.", reminderName);
-            IGrainReminder r = await this.RegisterOrUpdateReminder(reminderName, TimeSpan.FromSeconds(2), TimeSpan.FromSeconds(3));
+            var r = await this.RegisterOrUpdateReminder(reminderName, TimeSpan.FromSeconds(2), TimeSpan.FromSeconds(3));
             logger.LogInformation("Started reminder {Reminder}. It shouldn't have succeeded!", r);
             return true;
         }

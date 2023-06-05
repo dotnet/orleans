@@ -57,20 +57,20 @@ namespace Tester.StreamingTests
             fixture.Logger.LogInformation("************************ PersistentStreamingOverSingleGatewayTest *********************************");
 
             // generate stream Id's
-            List<Guid> streamIds = Enumerable.Range(0, streamCount)
+            var streamIds = Enumerable.Range(0, streamCount)
                 .Select(i => Guid.NewGuid())
                 .ToList();
 
             // subscribe to all streams
-            foreach(Guid streamId in streamIds)
+            foreach(var streamId in streamIds)
             {
-                IStreamProvider streamProvider = fixture.Client.GetStreamProvider(Fixture.StreamProviderName);
+                var streamProvider = fixture.Client.GetStreamProvider(Fixture.StreamProviderName);
                 IAsyncObservable<int> stream = streamProvider.GetStream<int>(streamId);
                 await stream.SubscribeAsync(OnNextAsync);
             }
 
             // create producer grains
-            List<ISampleStreaming_ProducerGrain> producers = streamIds
+            var producers = streamIds
                 .Select(id => fixture.GrainFactory.GetGrain<ISampleStreaming_ProducerGrain>(id))
                 .ToList();
 
@@ -82,7 +82,7 @@ namespace Tester.StreamingTests
             await Task.Delay(TimeSpan.FromMilliseconds(1000));
             await Task.WhenAll(Enumerable.Range(0, streamCount).Select(i => producers[i].StopPeriodicProducing()));
 
-            int[] counts = await Task.WhenAll(Enumerable.Range(0, streamCount).Select(i => producers[i].GetNumberProduced()));
+            var counts = await Task.WhenAll(Enumerable.Range(0, streamCount).Select(i => producers[i].GetNumberProduced()));
 
             // make sure all went well
             await TestingUtils.WaitUntilAsync(lastTry => CheckCounters(counts.Sum(), lastTry), Timeout);
@@ -96,7 +96,7 @@ namespace Tester.StreamingTests
 
         private Task<bool> CheckCounters(int eventsProduced, bool assertIsTrue)
         {
-            int numConsumed = eventsConsumed;
+            var numConsumed = eventsConsumed;
             if (!assertIsTrue) return Task.FromResult(eventsProduced == numConsumed);
             Assert.Equal(eventsProduced, numConsumed);
             return Task.FromResult(true);

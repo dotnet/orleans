@@ -98,15 +98,15 @@ namespace Orleans.AzureUtils
         /// <returns></returns>
         private static Uri ConvertToGatewayUri(SiloInstanceTableEntry gateway)
         {
-            int proxyPort = 0;
+            var proxyPort = 0;
             if (!string.IsNullOrEmpty(gateway.ProxyPort))
                 int.TryParse(gateway.ProxyPort, out proxyPort);
 
-            int gen = 0;
+            var gen = 0;
             if (!string.IsNullOrEmpty(gateway.Generation))
                 int.TryParse(gateway.Generation, out gen);
 
-            SiloAddress address = SiloAddress.New(IPAddress.Parse(gateway.Address), proxyPort, gen);
+            var address = SiloAddress.New(IPAddress.Parse(gateway.Address), proxyPort, gen);
             return address.ToGatewayUri();
         }
 
@@ -135,7 +135,7 @@ namespace Orleans.AzureUtils
         {
             var queryResults = await storage.ReadAllTableEntriesForPartitionAsync(DeploymentId);
 
-            SiloInstanceTableEntry[] entries = queryResults.Select(entry => entry.Item1).ToArray();
+            var entries = queryResults.Select(entry => entry.Item1).ToArray();
 
             var sb = new StringBuilder();
             sb.Append(String.Format("Deployment {0}. Silos: ", DeploymentId));
@@ -150,7 +150,7 @@ namespace Orleans.AzureUtils
                     if (e2.SiloName == null) return (e1.SiloName == null) ? 0 : 1;
                     return String.CompareOrdinal(e1.SiloName, e2.SiloName);
                 });
-            foreach (SiloInstanceTableEntry entry in entries)
+            foreach (var entry in entries)
             {
                 sb.AppendLine(String.Format("[IP {0}:{1}:{2}, {3}, Instance={4}, Status={5}]", entry.Address, entry.Port, entry.Generation,
                     entry.HostName, entry.SiloName, entry.Status));
@@ -209,7 +209,7 @@ namespace Orleans.AzureUtils
 
         internal async Task<List<(SiloInstanceTableEntry, string)>> FindSiloEntryAndTableVersionRow(SiloAddress siloAddress)
         {
-            string rowKey = SiloInstanceTableEntry.ConstructRowKey(siloAddress);
+            var rowKey = SiloInstanceTableEntry.ConstructRowKey(siloAddress);
 
             var filter = TableClient.CreateQueryFilter($"(PartitionKey eq {DeploymentId}) and ((RowKey eq {rowKey}) or (RowKey eq {SiloInstanceTableEntry.TABLE_VERSION_ROW}))");
             var queryResults = await storage.ReadTableEntriesAndEtagsAsync(filter);
@@ -218,7 +218,7 @@ namespace Orleans.AzureUtils
             if (asList.Count < 1 || asList.Count > 2)
                 throw new KeyNotFoundException(string.Format("Could not find table version row or found too many entries. Was looking for key {0}, found = {1}", siloAddress, Utils.EnumerableToString(asList)));
 
-            int numTableVersionRows = asList.Count(tuple => tuple.Item1.RowKey == SiloInstanceTableEntry.TABLE_VERSION_ROW);
+            var numTableVersionRows = asList.Count(tuple => tuple.Item1.RowKey == SiloInstanceTableEntry.TABLE_VERSION_ROW);
             if (numTableVersionRows < 1)
                 throw new KeyNotFoundException(string.Format("Did not read table version row. Read = {0}", Utils.EnumerableToString(asList)));
 
@@ -236,7 +236,7 @@ namespace Orleans.AzureUtils
             if (asList.Count < 1)
                 throw new KeyNotFoundException(string.Format("Could not find enough rows in the FindAllSiloEntries call. Found = {0}", Utils.EnumerableToString(asList)));
 
-            int numTableVersionRows = asList.Count(tuple => tuple.Item1.RowKey == SiloInstanceTableEntry.TABLE_VERSION_ROW);
+            var numTableVersionRows = asList.Count(tuple => tuple.Item1.RowKey == SiloInstanceTableEntry.TABLE_VERSION_ROW);
             if (numTableVersionRows < 1)
                 throw new KeyNotFoundException(string.Format("Did not find table version row. Read = {0}", Utils.EnumerableToString(asList)));
             if (numTableVersionRows > 1)
@@ -258,7 +258,7 @@ namespace Orleans.AzureUtils
                     return false;
                 }
 
-                SiloInstanceTableEntry entry = CreateTableVersionEntry(0);
+                var entry = CreateTableVersionEntry(0);
                 await storage.CreateTableEntryAsync(entry);
                 return true;
             }

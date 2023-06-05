@@ -95,7 +95,7 @@ namespace UnitTests
             var target = new LRU<string, string>(maxSize, maxAge);
             target.RaiseFlushEvent += () => flushCounter++;
 
-            for (int i = 0; i < n; i++)
+            for (var i = 0; i < n; i++)
             {
                 var s = i.ToString();
                 target.Add(s, $"item {s}");

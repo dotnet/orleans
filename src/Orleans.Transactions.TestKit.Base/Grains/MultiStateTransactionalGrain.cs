@@ -97,7 +97,7 @@ namespace Orleans.Transactions.TestKit
         public async Task<int[]> Add(int numberToAdd)
         {
             var result = new int[dataArray.Length];
-            for(int i = 0; i < dataArray.Length; i++)
+            for(var i = 0; i < dataArray.Length; i++)
             {
                 result[i] = await dataArray[i].PerformUpdate(state =>
                 {
@@ -113,7 +113,7 @@ namespace Orleans.Transactions.TestKit
         public async Task<int[]> Get()
         {
             var result = new int[dataArray.Length];
-            for (int i = 0; i < dataArray.Length; i++)
+            for (var i = 0; i < dataArray.Length; i++)
             {
                 result[i] = await dataArray[i].PerformRead(state =>
                 {

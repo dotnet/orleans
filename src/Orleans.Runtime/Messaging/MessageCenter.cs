@@ -315,7 +315,7 @@ namespace Orleans.Runtime.Messaging
 
         internal void TryForwardRequest(Message message, GrainAddress oldAddress, GrainAddress forwardingAddress, string failedOperation = null, Exception exc = null)
         {
-            bool forwardingSucceded = false;
+            var forwardingSucceded = false;
             try
             {
                 messagingTrace.OnDispatcherForwarding(message, oldAddress, forwardingAddress, failedOperation, exc);

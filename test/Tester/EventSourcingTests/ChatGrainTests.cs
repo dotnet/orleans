@@ -88,7 +88,7 @@ namespace Tester.EventSourcingTests
         {
             var chat = fixture.GrainFactory.GetGrain<IChatGrain>($"Chatroom-{Guid.NewGuid()}");
 
-            for (int i = 0; i < ChatFormat.MaxNumPosts + 10; i++)
+            for (var i = 0; i < ChatFormat.MaxNumPosts + 10; i++)
                 await chat.Post(Guid.NewGuid(), i.ToString(), i.ToString());
 
             {

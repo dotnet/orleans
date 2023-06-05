@@ -65,7 +65,7 @@ namespace Tester.AzureUtils.Persistence
             TestUtils.CheckForAzureStorage();
             const string testName = nameof(PersistenceProvider_Azure_Read);
 
-            AzureTableGrainStorage store = await InitAzureTableGrainStorage();
+            var store = await InitAzureTableGrainStorage();
             await Test_PersistenceProvider_Read(testName, store);
         }
 
@@ -217,8 +217,8 @@ namespace Tester.AzureUtils.Persistence
         public async Task PersistenceProvider_Memory_FixedLatency_WriteRead()
         {
             const string testName = nameof(PersistenceProvider_Memory_FixedLatency_WriteRead);
-            TimeSpan expectedLatency = TimeSpan.FromMilliseconds(200);
-            MemoryGrainStorageWithLatency store = new MemoryGrainStorageWithLatency(
+            var expectedLatency = TimeSpan.FromMilliseconds(200);
+            var store = new MemoryGrainStorageWithLatency(
                 testName,
                 new MemoryStorageWithLatencyOptions()
                 {
@@ -231,17 +231,17 @@ namespace Tester.AzureUtils.Persistence
 
             var reference = (GrainId)LegacyGrainId.NewId();
             var state = TestStoreGrainState.NewRandomState();
-            Stopwatch sw = new Stopwatch();
+            var sw = new Stopwatch();
             sw.Start();
             await store.WriteStateAsync(testName, reference, state);
-            TimeSpan writeTime = sw.Elapsed;
+            var writeTime = sw.Elapsed;
             output.WriteLine("{0} - Write time = {1}", store.GetType().FullName, writeTime);
             Assert.True(writeTime >= expectedLatency, $"Write: Expected minimum latency = {expectedLatency} Actual = {writeTime}");
 
             sw.Restart();
             var storedState = new GrainState<TestStoreGrainState>();
             await store.ReadStateAsync(testName, reference, storedState);
-            TimeSpan readTime = sw.Elapsed;
+            var readTime = sw.Elapsed;
             output.WriteLine("{0} - Read time = {1}", store.GetType().FullName, readTime);
             Assert.True(readTime >= expectedLatency, $"Read: Expected minimum latency = {expectedLatency} Actual = {readTime}");
         }
@@ -249,8 +249,8 @@ namespace Tester.AzureUtils.Persistence
         [Fact, TestCategory("Functional")]
         public void LoadClassByName()
         {
-            string className = typeof(MockStorageProvider).FullName;
-            Type classType = new CachedTypeResolver().ResolveType(className);
+            var className = typeof(MockStorageProvider).FullName;
+            var classType = new CachedTypeResolver().ResolveType(className);
             Assert.NotNull(classType); // Type
             Assert.True(typeof(IGrainStorage).IsAssignableFrom(classType), $"Is an IStorageProvider : {classType.FullName}");
         }
@@ -259,7 +259,7 @@ namespace Tester.AzureUtils.Persistence
         {
             // TODO change test to include more serializer?
             var serializer = new OrleansGrainStorageSerializer(providerRuntime.ServiceProvider.GetRequiredService<Serializer>());
-            AzureTableGrainStorage store = ActivatorUtilities.CreateInstance<AzureTableGrainStorage>(providerRuntime.ServiceProvider, options, serializer, "TestStorage");
+            var store = ActivatorUtilities.CreateInstance<AzureTableGrainStorage>(providerRuntime.ServiceProvider, options, serializer, "TestStorage");
             ISiloLifecycleSubject lifecycle = ActivatorUtilities.CreateInstance<SiloLifecycleSubject>(providerRuntime.ServiceProvider);
             store.Participate(lifecycle);
             await lifecycle.OnStart();
@@ -284,7 +284,7 @@ namespace Tester.AzureUtils.Persistence
                 ? new GrainStorageSerializer(jsonSerializer, binarySerializer)
                 : new GrainStorageSerializer(binarySerializer, jsonSerializer);
 
-            AzureTableGrainStorage store = ActivatorUtilities.CreateInstance<AzureTableGrainStorage>(providerRuntime.ServiceProvider, options, "TestStorage");
+            var store = ActivatorUtilities.CreateInstance<AzureTableGrainStorage>(providerRuntime.ServiceProvider, options, "TestStorage");
             ISiloLifecycleSubject lifecycle = ActivatorUtilities.CreateInstance<SiloLifecycleSubject>(providerRuntime.ServiceProvider);
             store.Participate(lifecycle);
             await lifecycle.OnStart();
@@ -302,12 +302,12 @@ namespace Tester.AzureUtils.Persistence
             }
             var storedGrainState = new GrainState<TestStoreGrainState>(new TestStoreGrainState());
 
-            Stopwatch sw = new Stopwatch();
+            var sw = new Stopwatch();
             sw.Start();
 
             await store.ReadStateAsync(grainTypeName, reference, storedGrainState);
 
-            TimeSpan readTime = sw.Elapsed;
+            var readTime = sw.Elapsed;
             output.WriteLine("{0} - Read time = {1}", store.GetType().FullName, readTime);
 
             var storedState = storedGrainState.State;
@@ -326,12 +326,12 @@ namespace Tester.AzureUtils.Persistence
                 grainState = TestStoreGrainState.NewRandomState();
             }
 
-            Stopwatch sw = new Stopwatch();
+            var sw = new Stopwatch();
             sw.Start();
 
             await store.WriteStateAsync(grainTypeName, reference, grainState);
 
-            TimeSpan writeTime = sw.Elapsed;
+            var writeTime = sw.Elapsed;
             sw.Restart();
 
             var storedGrainState = new GrainState<TestStoreGrainState>
@@ -339,7 +339,7 @@ namespace Tester.AzureUtils.Persistence
                 State = new TestStoreGrainState()
             };
             await store.ReadStateAsync(grainTypeName, reference, storedGrainState);
-            TimeSpan readTime = sw.Elapsed;
+            var readTime = sw.Elapsed;
             output.WriteLine("{0} - Write time = {1} Read time = {2}", store.GetType().FullName, writeTime, readTime);
             Assert.Equal(grainState.State.A, storedGrainState.State.A);
             Assert.Equal(grainState.State.B, storedGrainState.State.B);
@@ -358,12 +358,12 @@ namespace Tester.AzureUtils.Persistence
                 grainState = TestStoreGrainState.NewRandomState();
             }
 
-            Stopwatch sw = new Stopwatch();
+            var sw = new Stopwatch();
             sw.Start();
 
             await store.WriteStateAsync(grainTypeName, reference, grainState);
 
-            TimeSpan writeTime = sw.Elapsed;
+            var writeTime = sw.Elapsed;
             sw.Restart();
 
             await store.ClearStateAsync(grainTypeName, reference, grainState);
@@ -373,7 +373,7 @@ namespace Tester.AzureUtils.Persistence
                 State = new TestStoreGrainState()
             };
             await store.ReadStateAsync(grainTypeName, reference, storedGrainState);
-            TimeSpan readTime = sw.Elapsed;
+            var readTime = sw.Elapsed;
             output.WriteLine("{0} - Write time = {1} Read time = {2}", store.GetType().FullName, writeTime, readTime);
             Assert.NotNull(storedGrainState.State);
             Assert.Equal(default, storedGrainState.State.A);

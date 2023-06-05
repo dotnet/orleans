@@ -63,7 +63,7 @@ namespace Orleans.Transactions.State
 
         private async Task NotifyAll(Guid transactionId, DateTime timestamp, List<ParticipantId> participants)
         {
-            List<Confirmation> confirmations = participants
+            var confirmations = participants
                     .Where(p => !p.Equals(me))
                     .Select(p => new Confirmation(
                         p,
@@ -79,7 +79,7 @@ namespace Orleans.Transactions.State
             // attempts to confirm all, will retry every ConfirmationRetryDelay until all succeed
             var ct = activationLifetime.OnDeactivating;
 
-            bool hasPendingConfirmations = true;
+            var hasPendingConfirmations = true;
             while (!ct.IsCancellationRequested && hasPendingConfirmations)
             {
                 using (activationLifetime.BlockDeactivation())
@@ -121,7 +121,7 @@ namespace Orleans.Transactions.State
             {
                 var storeComplete = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
                 // Now we can remove the commit record.
-                StorageBatch<TState> storageBatch = getStorageBatch();
+                var storageBatch = getStorageBatch();
                 storageBatch.Collect(transactionId);
                 storageBatch.FollowUpAction(() =>
                 {

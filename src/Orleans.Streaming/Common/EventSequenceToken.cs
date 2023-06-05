@@ -91,7 +91,7 @@ namespace Orleans.Providers.Streams.Common
             if (token == null)
                 throw new ArgumentOutOfRangeException("other");
             
-            int difference = SequenceNumber.CompareTo(token.SequenceNumber);
+            var difference = SequenceNumber.CompareTo(token.SequenceNumber);
             return difference != 0 ? difference : EventIndex.CompareTo(token.EventIndex);
         }
 

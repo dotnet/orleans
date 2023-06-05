@@ -43,21 +43,21 @@ namespace UnitTests.General
         [Fact, TestCategory("Functional"), TestCategory("RequestContext")]
         public async Task RequestContext_ActivityId_Simple()
         {
-            Guid activityId = Guid.NewGuid();
-            IRequestContextTestGrain grain = fixture.GrainFactory.GetGrain<IRequestContextTestGrain>(GetRandomGrainId());
+            var activityId = Guid.NewGuid();
+            var grain = fixture.GrainFactory.GetGrain<IRequestContextTestGrain>(GetRandomGrainId());
 
             RequestContextTestUtils.SetActivityId(activityId);
-            Guid result = await grain.E2EActivityId();
+            var result = await grain.E2EActivityId();
             Assert.Equal(activityId,  result);  // "E2E ActivityId not propagated correctly"
         }
 
         [Fact, TestCategory("Functional"), TestCategory("RequestContext")]
         public async Task RequestContext_AC_Test1()
         {
-            long id = GetRandomGrainId();
+            var id = GetRandomGrainId();
             const string key = "TraceId";
-            string val = "TraceValue-" + id;
-            string val2 = val + "-2";
+            var val = "TraceValue-" + id;
+            var val2 = val + "-2";
 
             var grain = fixture.GrainFactory.GetGrain<IRequestContextTestGrain>(id);
 
@@ -81,10 +81,10 @@ namespace UnitTests.General
         [Fact, TestCategory("Functional"), TestCategory("RequestContext")]
         public async Task RequestContext_Task_Test1()
         {
-            long id = GetRandomGrainId();
+            var id = GetRandomGrainId();
             const string key = "TraceId";
-            string val = "TraceValue-" + id;
-            string val2 = val + "-2";
+            var val = "TraceValue-" + id;
+            var val2 = val + "-2";
 
             var grain = fixture.GrainFactory.GetGrain<IRequestContextTaskGrain>(id);
 
@@ -118,7 +118,7 @@ namespace UnitTests.General
         public async Task RequestContext_Task_TestRequestContext()
         {
             var grain = fixture.GrainFactory.GetGrain<IRequestContextTaskGrain>(1);
-            Tuple<string, string> requestContext = await grain.TestRequestContext();
+            var requestContext = await grain.TestRequestContext();
             fixture.Logger.LogInformation("Request Context is: {RequestContext}", requestContext);
             Assert.Equal("binks",  requestContext.Item1);  // "Item1=" + requestContext.Item1
             Assert.Equal("binks",  requestContext.Item2);  // "Item2=" + requestContext.Item2
@@ -127,14 +127,14 @@ namespace UnitTests.General
         [Fact, TestCategory("Functional"), TestCategory("RequestContext")]
         public async Task RequestContext_ActivityId_RC_Set_E2E()
         {
-            Guid activityId = Guid.NewGuid();
-            Guid activityId2 = Guid.NewGuid();
-            Guid nullActivityId = Guid.Empty;
+            var activityId = Guid.NewGuid();
+            var activityId2 = Guid.NewGuid();
+            var nullActivityId = Guid.Empty;
 
-            IRequestContextTestGrain grain = fixture.GrainFactory.GetGrain<IRequestContextTestGrain>(GetRandomGrainId());
+            var grain = fixture.GrainFactory.GetGrain<IRequestContextTestGrain>(GetRandomGrainId());
 
             RequestContext.Set(RequestContext.CALL_CHAIN_REENTRANCY_HEADER, activityId);
-            Guid result = await grain.E2EActivityId();
+            var result = await grain.E2EActivityId();
             Assert.Equal(activityId,  result);  // "E2E ActivityId not propagated correctly"
             RequestContext.Clear();
 
@@ -152,21 +152,21 @@ namespace UnitTests.General
         [Fact, TestCategory("Functional"), TestCategory("RequestContext")]
         public async Task RequestContext_ActivityId_CM_E2E()
         {
-            Guid activityId = Guid.NewGuid();
-            Guid activityId2 = Guid.NewGuid();
-            Guid nullActivityId = Guid.Empty;
+            var activityId = Guid.NewGuid();
+            var activityId2 = Guid.NewGuid();
+            var nullActivityId = Guid.Empty;
 
-            IRequestContextTestGrain grain = fixture.GrainFactory.GetGrain<IRequestContextTestGrain>(GetRandomGrainId());
+            var grain = fixture.GrainFactory.GetGrain<IRequestContextTestGrain>(GetRandomGrainId());
 
             Assert.Null(RequestContext.Get(RequestContext.CALL_CHAIN_REENTRANCY_HEADER));
             RequestContext.ReentrancyId = activityId;
-            Guid result = await grain.E2EActivityId();
+            var result = await grain.E2EActivityId();
             Assert.Equal(activityId, result);  // "E2E ActivityId not propagated correctly"
             RequestContext.Clear();
 
             RequestContext.ReentrancyId = nullActivityId;
             Assert.Null(RequestContext.Get(RequestContext.CALL_CHAIN_REENTRANCY_HEADER));
-            for (int i = 0; i < Environment.ProcessorCount; i++)
+            for (var i = 0; i < Environment.ProcessorCount; i++)
             {
                 result = await grain.E2EActivityId();
                 Assert.Equal(nullActivityId,  result);  // "Null ActivityId propagated E2E incorrectly"
@@ -183,21 +183,21 @@ namespace UnitTests.General
         [Fact, TestCategory("Functional"), TestCategory("RequestContext")]
         public async Task RequestContext_ActivityId_CM_E2E_ViaProxy()
         {
-            Guid activityId = Guid.NewGuid();
-            Guid activityId2 = Guid.NewGuid();
-            Guid nullActivityId = Guid.Empty;
+            var activityId = Guid.NewGuid();
+            var activityId2 = Guid.NewGuid();
+            var nullActivityId = Guid.Empty;
 
-            IRequestContextProxyGrain grain = fixture.GrainFactory.GetGrain<IRequestContextProxyGrain>(GetRandomGrainId());
+            var grain = fixture.GrainFactory.GetGrain<IRequestContextProxyGrain>(GetRandomGrainId());
 
             Assert.Null(RequestContext.Get(RequestContext.CALL_CHAIN_REENTRANCY_HEADER));
             RequestContext.ReentrancyId = activityId;
-            Guid result = await grain.E2EActivityId();
+            var result = await grain.E2EActivityId();
             Assert.Equal(activityId,  result);  // "E2E ActivityId not propagated correctly"
             RequestContext.Clear();
 
             RequestContext.ReentrancyId = nullActivityId;
             Assert.Null(RequestContext.Get(RequestContext.CALL_CHAIN_REENTRANCY_HEADER));
-            for (int i = 0; i < Environment.ProcessorCount; i++)
+            for (var i = 0; i < Environment.ProcessorCount; i++)
             {
                 result = await grain.E2EActivityId();
                 Assert.Equal(nullActivityId,  result);  // "Null ActivityId propagated E2E incorrectly"
@@ -214,13 +214,13 @@ namespace UnitTests.General
         [Fact, TestCategory("Functional"), TestCategory("RequestContext")]
         public async Task RequestContext_ActivityId_RC_None_E2E()
         {
-            Guid nullActivityId = Guid.Empty;
+            var nullActivityId = Guid.Empty;
 
             RequestContext.Clear();
 
-            IRequestContextTestGrain grain = fixture.GrainFactory.GetGrain<IRequestContextTestGrain>(GetRandomGrainId());
+            var grain = fixture.GrainFactory.GetGrain<IRequestContextTestGrain>(GetRandomGrainId());
 
-            Guid result = await grain.E2EActivityId();
+            var result = await grain.E2EActivityId();
             Assert.Equal(nullActivityId,  result);  // "E2E ActivityId should not exist"
 
             result = await grain.E2EActivityId();
@@ -231,7 +231,7 @@ namespace UnitTests.General
             Assert.Equal(nullActivityId,  result);  // "E2E ActivityId 2 should not exist"
             Assert.Null(RequestContext.Get(RequestContext.CALL_CHAIN_REENTRANCY_HEADER));  // "No ActivityId context should be set"
 
-            for (int i = 0; i < Environment.ProcessorCount; i++)
+            for (var i = 0; i < Environment.ProcessorCount; i++)
             {
                 Assert.Null(RequestContext.Get(RequestContext.CALL_CHAIN_REENTRANCY_HEADER));  // "No ActivityId context should be set"
 
@@ -246,11 +246,11 @@ namespace UnitTests.General
         [Fact, TestCategory("Functional"), TestCategory("RequestContext")]
         public async Task RequestContext_ActivityId_CM_None_E2E()
         {
-            Guid nullActivityId = Guid.Empty;
+            var nullActivityId = Guid.Empty;
 
-            IRequestContextTestGrain grain = fixture.GrainFactory.GetGrain<IRequestContextTestGrain>(GetRandomGrainId());
+            var grain = fixture.GrainFactory.GetGrain<IRequestContextTestGrain>(GetRandomGrainId());
 
-            Guid result = grain.E2EActivityId().Result;
+            var result = grain.E2EActivityId().Result;
             Assert.Equal(nullActivityId,  result);  // "E2E ActivityId should not exist"
 
             RequestContextTestUtils.SetActivityId(nullActivityId);
@@ -261,7 +261,7 @@ namespace UnitTests.General
 
             RequestContextTestUtils.SetActivityId(nullActivityId);
            Assert.Null(RequestContext.Get(RequestContext.CALL_CHAIN_REENTRANCY_HEADER));
-            for (int i = 0; i < Environment.ProcessorCount; i++)
+            for (var i = 0; i < Environment.ProcessorCount; i++)
             {
                 result = await grain.E2EActivityId();
                 Assert.Equal(nullActivityId,  result);  // "Null ActivityId propagated E2E incorrectly"
@@ -277,13 +277,13 @@ namespace UnitTests.General
         [Fact, TestCategory("Functional"), TestCategory("RequestContext")]
         public async Task RequestContext_ActivityId_CM_DynamicChange_Client()
         {
-            Guid activityId = Guid.NewGuid();
-            Guid activityId2 = Guid.NewGuid();
+            var activityId = Guid.NewGuid();
+            var activityId2 = Guid.NewGuid();
 
-            IRequestContextTestGrain grain = fixture.GrainFactory.GetGrain<IRequestContextTestGrain>(GetRandomGrainId());
+            var grain = fixture.GrainFactory.GetGrain<IRequestContextTestGrain>(GetRandomGrainId());
 
             RequestContext.ReentrancyId = activityId;
-            Guid result = await grain.E2EActivityId();
+            var result = await grain.E2EActivityId();
             Assert.Equal(activityId,  result);  // "E2E ActivityId #1 not propagated correctly"
             RequestContext.Clear();
 
@@ -338,10 +338,10 @@ namespace UnitTests.General
         [Fact, TestCategory("Functional"), TestCategory("RequestContext")]
         public async Task Halo_RequestContextShouldBeMaintainedWhenThreadHoppingOccurs()
         {
-            int numTasks = 20;
-            Task[] tasks = new Task[numTasks];
+            var numTasks = 20;
+            var tasks = new Task[numTasks];
 
-            for (int i = 0; i < numTasks; i++)
+            for (var i = 0; i < numTasks; i++)
             {
                 var closureInt = i;
                 async Task func() { await ContextTester(closureInt); }
@@ -354,17 +354,17 @@ namespace UnitTests.General
         private async Task ContextTester(int i)
         {
             RequestContext.Set("threadId", i);
-            int contextId = (int)(RequestContext.Get("threadId") ?? -1);
+            var contextId = (int)(RequestContext.Get("threadId") ?? -1);
             output.WriteLine("ExplicitId={0}, ContextId={2}, ManagedThreadId={1}", i, Thread.CurrentThread.ManagedThreadId, contextId);
             await FrameworkContextVerification(i).ConfigureAwait(false);
         }
 
         private async Task FrameworkContextVerification(int id)
         {
-            for (int i = 0; i < 10; i++)
+            for (var i = 0; i < 10; i++)
             {
                 await Task.Delay(10);
-                int contextId = (int)(RequestContext.Get("threadId") ?? -1);
+                var contextId = (int)(RequestContext.Get("threadId") ?? -1);
                 output.WriteLine("Inner, in loop {0}, Explicit Id={2}, ContextId={3}, ManagedThreadId={1}", i, Thread.CurrentThread.ManagedThreadId, id, contextId);
                 Assert.Equal(id, contextId);
             }
@@ -385,10 +385,10 @@ namespace UnitTests.General
         [Fact, TestCategory("Functional"), TestCategory("RequestContext")]
         public async Task Halo_LogicalCallContextShouldBeMaintainedWhenThreadHoppingOccurs()
         {
-            int numTasks = 20;
-            Task[] tasks = new Task[numTasks];
+            var numTasks = 20;
+            var tasks = new Task[numTasks];
 
-            for (int i = 0; i < numTasks; i++)
+            for (var i = 0; i < numTasks; i++)
             {
                 var closureInt = i;
                 async Task func() { await ContextTester(closureInt); }
@@ -401,17 +401,17 @@ namespace UnitTests.General
         private async Task ContextTester(int i)
         {
             threadId.Value = i;
-            int contextId = threadId.Value;
+            var contextId = threadId.Value;
             output.WriteLine("ExplicitId={0}, ContextId={2}, ManagedThreadId={1}", i, Thread.CurrentThread.ManagedThreadId, contextId);
             await FrameworkContextVerification(i).ConfigureAwait(false);
         }
 
         private async Task FrameworkContextVerification(int id)
         {
-            for (int i = 0; i < 10; i++)
+            for (var i = 0; i < 10; i++)
             {
                 await Task.Delay(10);
-                int contextId = threadId.Value;
+                var contextId = threadId.Value;
                 output.WriteLine("Inner, in loop {0}, Explicit Id={2}, ContextId={3}, ManagedThreadId={1}", i, Thread.CurrentThread.ManagedThreadId, id, contextId);
                 Assert.Equal(id, contextId);
             }

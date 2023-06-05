@@ -31,17 +31,17 @@ namespace UnitTests
         [Fact, TestCategory("Functional"), TestCategory("Timeout")]
         public void Timeout_LongMethod()
         {
-            bool finished = false;
+            var finished = false;
             var grainName = typeof (ErrorGrain).FullName;
-            IErrorGrain grain = GrainFactory.GetGrain<IErrorGrain>(GetRandomGrainId(), grainName);
-            TimeSpan timeout = TimeSpan.FromMilliseconds(1000);
+            var grain = GrainFactory.GetGrain<IErrorGrain>(GetRandomGrainId(), grainName);
+            var timeout = TimeSpan.FromMilliseconds(1000);
             runtimeClient.SetResponseTimeout(timeout);
 
-            Task promise = grain.LongMethod((int)timeout.Multiply(4).TotalMilliseconds);
+            var promise = grain.LongMethod((int)timeout.Multiply(4).TotalMilliseconds);
             //promise = grain.LongMethodWithError(2000);
 
             // there is a race in the test here. If run in debugger, the invocation can actually finish OK
-            Stopwatch stopwatch = new Stopwatch();
+            var stopwatch = new Stopwatch();
             stopwatch.Start();
             try
             {
@@ -51,7 +51,7 @@ namespace UnitTests
             catch (Exception exc)
             {
                 stopwatch.Stop();
-                Exception baseExc = exc.GetBaseException();
+                var baseExc = exc.GetBaseException();
                 if (!(baseExc is TimeoutException))
                 {
                     Assert.True(false, "Should not have got here " + exc);
@@ -73,7 +73,7 @@ namespace UnitTests
             catch (Exception exc)
             {
                 stopwatch.Stop();
-                Exception baseExc = exc.GetBaseException();
+                var baseExc = exc.GetBaseException();
                 if (!(baseExc is TimeoutException))
                 {
                     Assert.True(false, "Should not have got here " + exc);

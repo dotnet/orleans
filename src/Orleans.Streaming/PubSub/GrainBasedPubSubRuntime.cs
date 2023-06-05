@@ -64,7 +64,7 @@ namespace Orleans.Streams
 
         public GuidId CreateSubscriptionId(QualifiedStreamId streamId, GrainId streamConsumer)
         {
-            Guid subscriptionId = SubscriptionMarker.MarkAsExplicitSubscriptionId(Guid.NewGuid());
+            var subscriptionId = SubscriptionMarker.MarkAsExplicitSubscriptionId(Guid.NewGuid());
             return GuidId.GetGuidId(subscriptionId);
         }
 

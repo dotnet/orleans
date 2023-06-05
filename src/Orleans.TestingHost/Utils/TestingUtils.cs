@@ -115,8 +115,8 @@ namespace Orleans.TestingHost.Utils
         /// <returns>The resulting time span value.</returns>
         public static TimeSpan Multiply(TimeSpan time, double value)
         {
-            double ticksD = checked(time.Ticks * value);
-            long ticks = checked((long)ticksD);
+            var ticksD = checked(time.Ticks * value);
+            var ticks = checked((long)ticksD);
             return TimeSpan.FromTicks(ticks);
         }
 

@@ -83,7 +83,7 @@ namespace UnitTests.StorageTests
 
         public static async Task SetErrorInjection(string providerName, ErrorInjectionBehavior errorInjectionBehavior, IGrainFactory grainFactory)
         {
-            IManagementGrain mgmtGrain = grainFactory.GetGrain<IManagementGrain>(0);
+            var mgmtGrain = grainFactory.GetGrain<IManagementGrain>(0);
             await mgmtGrain.SendControlCommandToProvider(
                 typeof(ErrorInjectionStorageProvider).FullName,
                 providerName, 

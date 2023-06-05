@@ -24,7 +24,7 @@ namespace Orleans.CodeGenerator
             _libraryTypes = libraryTypes;
 
             var t = type;
-            Accessibility accessibility = t.DeclaredAccessibility;
+            var accessibility = t.DeclaredAccessibility;
             while (t is not null)
             {
                 if ((int)t.DeclaredAccessibility < (int)accessibility)

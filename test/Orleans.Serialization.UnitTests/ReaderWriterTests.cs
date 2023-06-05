@@ -246,7 +246,7 @@ namespace Orleans.Serialization.UnitTests
                 var writer = CreateWriter(buffer, writerSession);
                 try
                 {
-                    for (int i = 0; i < 5; i++)
+                    for (var i = 0; i < 5; i++)
                     {
                         writeValue(ref writer, expected);
                     }
@@ -256,7 +256,7 @@ namespace Orleans.Serialization.UnitTests
                     var readerBuffer = GetBuffer(buffer, writer.Output);
                     var reader = CreateReader(readerBuffer, readerSession);
 
-                    for (int i = 0; i < 5; i++)
+                    for (var i = 0; i < 5; i++)
                     {
                         var actual = readValue(ref reader);
                         if (!EqualityComparer<T>.Default.Equals(expected, actual))

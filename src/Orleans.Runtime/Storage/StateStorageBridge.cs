@@ -72,7 +72,7 @@ namespace Orleans.Core
             {
                 StorageInstruments.OnStorageReadError();
 
-                string errMsg = MakeErrorMsg("ReadState", exc);
+                var errMsg = MakeErrorMsg("ReadState", exc);
                 logger.LogError((int)ErrorCode.StorageProvider_ReadFailed, exc, "{Message}", errMsg);
                 if (!(exc is OrleansException))
                 {
@@ -96,7 +96,7 @@ namespace Orleans.Core
             catch (Exception exc)
             {
                 StorageInstruments.OnStorageWriteError();
-                string errMsgToLog = MakeErrorMsg("WriteState", exc);
+                var errMsgToLog = MakeErrorMsg("WriteState", exc);
                 logger.LogError((int)ErrorCode.StorageProvider_WriteFailed, exc, "{Message}", errMsgToLog);
                 // If error is not specialization of OrleansException, wrap it
                 if (!(exc is OrleansException))
@@ -129,7 +129,7 @@ namespace Orleans.Core
             {
                 StorageInstruments.OnStorageDeleteError();
 
-                string errMsg = MakeErrorMsg("ClearState", exc);
+                var errMsg = MakeErrorMsg("ClearState", exc);
                 logger.LogError((int)ErrorCode.StorageProvider_DeleteFailed, exc, "{Message}", errMsg);
                 if (!(exc is OrleansException))
                 {

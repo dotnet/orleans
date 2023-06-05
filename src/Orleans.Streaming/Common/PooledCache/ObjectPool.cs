@@ -82,7 +82,7 @@ namespace Orleans.Providers.Streams.Common
         private void ReportObjectPoolStatistics()
         {
             var availableObjects = pool.Count;
-            long claimedObjects = totalObjects - availableObjects;
+            var claimedObjects = totalObjects - availableObjects;
             monitor.Report(totalObjects, availableObjects, claimedObjects);
         }
     }

@@ -46,7 +46,7 @@ namespace Orleans.SqlUtils.StorageProvider.GrainClasses
 
         public async Task SetRandomState()
         {
-            int customerId = (int)this.GetPrimaryKeyLong();
+            var customerId = (int)this.GetPrimaryKeyLong();
             
             var dt = DateTime.UtcNow;
             var now = new DateTime(dt.Year, dt.Month, dt.Day, dt.Hour, dt.Minute, dt.Second, DateTimeKind.Utc);

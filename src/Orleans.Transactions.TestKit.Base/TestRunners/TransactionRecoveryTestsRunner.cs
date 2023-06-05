@@ -74,13 +74,13 @@ namespace Orleans.Transactions.TestKit
             var endOnCommand = new[] { false };
             var index = new[] { 0 };
             int getIndex() => index[0]++;
-            List<ExpectedGrainActivity> txGrains = Enumerable.Range(0, concurrent * 2)
+            var txGrains = Enumerable.Range(0, concurrent * 2)
                 .Select(i => Guid.NewGuid())
                 .Select(grainId => new ExpectedGrainActivity(grainId, TestGrain<ITransactionalBitArrayGrain>(transactionTestGrainClassName, grainId)))
                 .ToList();
             //ping all grains to activate them
             await WakeupGrains(txGrains.Select(g=>g.Grain).ToList());
-            List<ExpectedGrainActivity>[] transactionGroups = txGrains
+            var transactionGroups = txGrains
                 .Select((txGrain, i) => new { index = i, value = txGrain })
                 .GroupBy(v => v.index / 2)
                 .Select(g => g.Select(i => i.value).ToList())
@@ -90,7 +90,7 @@ namespace Orleans.Transactions.TestKit
             await ValidateResults(txGrains, transactionGroups);
 
             // have transactions in flight when silo goes down
-            Task<bool> succeeding = RunWhileSucceeding(transactionGroups, getIndex, endOnCommand);
+            var succeeding = RunWhileSucceeding(transactionGroups, getIndex, endOnCommand);
             await Task.Delay(TimeSpan.FromSeconds(2));
 
             var siloToTerminate = testCluster.Silos[Random.Shared.Next(testCluster.Silos.Count)];
@@ -104,7 +104,7 @@ namespace Orleans.Transactions.TestKit
             Log("Waiting for transactions to stop completing successfully");
             var complete = await Task.WhenAny(succeeding, Task.Delay(TimeSpan.FromSeconds(30)));
             endOnCommand[0] = true;
-            bool endedOnCommand = await succeeding;
+            var endedOnCommand = await succeeding;
             if (endedOnCommand) Log($"No transactions failed due to silo death.  Test may not be valid");
 
             Log($"Waiting for system to recover. Performed {index[0]} transactions on each group.");
@@ -137,7 +137,7 @@ namespace Orleans.Transactions.TestKit
         {
             // only retry failed transactions
             transactionGroupsRef[0] = await RunAllTxReportFailed(transactionGroupsRef[0], getIndex());
-            bool succeed = transactionGroupsRef[0] == null;
+            var succeed = transactionGroupsRef[0] == null;
             Log($"All transactions succeed after interruption : {succeed}");
             if (assertIsTrue)
             {
@@ -155,7 +155,7 @@ namespace Orleans.Transactions.TestKit
         // Runs all transactions and returns failed;
         private async Task<List<ExpectedGrainActivity>[]> RunAllTxReportFailed(List<ExpectedGrainActivity>[] transactionGroups, int index)
         {
-            List<Task> tasks = transactionGroups
+            var tasks = transactionGroups
                 .Select(p => SetBit(p, index))
                 .ToList();
             try
@@ -166,7 +166,7 @@ namespace Orleans.Transactions.TestKit
             catch (Exception)
             {
                 // Collect the indices of the transaction groups which failed their transactions for diagnostics.
-                List<ExpectedGrainActivity>[] failedGroups = tasks.Select((task, i) => new { task, i }).Where(t => t.task.IsFaulted).Select(t => transactionGroups[t.i]).ToArray();
+                var failedGroups = tasks.Select((task, i) => new { task, i }).Where(t => t.task.IsFaulted).Select(t => transactionGroups[t.i]).ToArray();
                 Log($"Some transactions failed. Index: {index}. {failedGroups.Length} out of {tasks.Count} failed. Failed groups: {string.Join(", ", failedGroups.Select(transactionGroup => string.Join(":", transactionGroup.Select(a => a.GrainId))))}");
                 return failedGroups;
             }
@@ -216,15 +216,15 @@ namespace Orleans.Transactions.TestKit
             await Task.WhenAll(txGrains.Select(a => a.GetActual()));
             Log($"Got all {txGrains.Count} actual values");
 
-            bool pass = true;
-            foreach (List<ExpectedGrainActivity> transactionGroup in transactionGroups)
+            var pass = true;
+            foreach (var transactionGroup in transactionGroups)
             {
                 if (transactionGroup.Count == 0) continue;
-                BitArrayState first = transactionGroup[0].Actual.FirstOrDefault();
-                foreach (ExpectedGrainActivity activity in transactionGroup.Skip(1))
+                var first = transactionGroup[0].Actual.FirstOrDefault();
+                foreach (var activity in transactionGroup.Skip(1))
                 {
-                    BitArrayState actual = activity.Actual.FirstOrDefault();
-                    BitArrayState difference = first ^ actual;
+                    var actual = activity.Actual.FirstOrDefault();
+                    var difference = first ^ actual;
                     if (difference.Value.Any(v => v != 0))
                     {
                         Log($"Activity on grain {activity.GrainId} did not match activity on {transactionGroup[0].GrainId}:\n"
@@ -238,14 +238,14 @@ namespace Orleans.Transactions.TestKit
                 }
             }
 
-            int i = 0;
-            foreach (ExpectedGrainActivity activity in txGrains)
+            var i = 0;
+            foreach (var activity in txGrains)
             {
-                BitArrayState expected = activity.Expected;
-                BitArrayState unambiguous = activity.Unambiguous;
-                BitArrayState unambuguousExpected = expected & unambiguous;
-                List<BitArrayState> actual = activity.Actual;
-                BitArrayState first = actual.FirstOrDefault();
+                var expected = activity.Expected;
+                var unambiguous = activity.Unambiguous;
+                var unambuguousExpected = expected & unambiguous;
+                var actual = activity.Actual;
+                var first = actual.FirstOrDefault();
                 if (first == null)
                 {
                     Log($"No activity for {i} ({activity.GrainId})");
@@ -253,8 +253,8 @@ namespace Orleans.Transactions.TestKit
                     continue;
                 }
 
-                int j = 0;
-                foreach (BitArrayState result in actual)
+                var j = 0;
+                foreach (var result in actual)
                 {
                     // skip comparing first to first.
                     if (ReferenceEquals(first, result)) continue;

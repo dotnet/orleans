@@ -16,8 +16,8 @@ namespace Orleans.Transactions.TestKit
         {
             const int expected = 5;
 
-            ITransactionTestGrain grain = RandomTestGrain(grainStates);
-            ITransactionCoordinatorGrain coordinator = grainFactory.GetGrain<ITransactionCoordinatorGrain>(Guid.NewGuid());
+            var grain = RandomTestGrain(grainStates);
+            var coordinator = grainFactory.GetGrain<ITransactionCoordinatorGrain>(Guid.NewGuid());
 
             await coordinator.MultiGrainSet(new List<ITransactionTestGrain> { grain }, expected);
             Func<Task> task = () => coordinator.AddAndThrow(grain, expected);
@@ -25,7 +25,7 @@ namespace Orleans.Transactions.TestKit
 
             await TestAfterDustSettles(async () =>
             {
-                int[] actualValues = await grain.Get();
+                var actualValues = await grain.Get();
                 foreach (var actual in actualValues)
                 {
                     actual.Should().Be(expected);
@@ -38,12 +38,12 @@ namespace Orleans.Transactions.TestKit
             const int grainCount = TransactionTestConstants.MaxCoordinatedTransactions - 1;
             const int expected = 5;
 
-            ITransactionTestGrain throwGrain = RandomTestGrain(grainStates);
-            List<ITransactionTestGrain> grains =
+            var throwGrain = RandomTestGrain(grainStates);
+            var grains =
                 Enumerable.Range(0, grainCount)
                     .Select(i => RandomTestGrain(grainStates))
                     .ToList();
-            ITransactionCoordinatorGrain coordinator = grainFactory.GetGrain<ITransactionCoordinatorGrain>(Guid.NewGuid());
+            var coordinator = grainFactory.GetGrain<ITransactionCoordinatorGrain>(Guid.NewGuid());
 
             await throwGrain.Set(expected);
             await coordinator.MultiGrainSet(grains, expected);
@@ -58,7 +58,7 @@ namespace Orleans.Transactions.TestKit
             {
                 foreach (var grain in grains)
                 {
-                    int[] actualValues = await grain.Get();
+                    var actualValues = await grain.Get();
                     foreach (var actual in actualValues)
                     {
                         actual.Should().Be(expected);
@@ -73,14 +73,14 @@ namespace Orleans.Transactions.TestKit
             const int grainCount = TransactionTestConstants.MaxCoordinatedTransactions - throwGrainCount;
             const int expected = 5;
 
-            List<ITransactionTestGrain> throwGrains = Enumerable.Range(0, throwGrainCount)
+            var throwGrains = Enumerable.Range(0, throwGrainCount)
                 .Select(i => RandomTestGrain(grainStates))
                 .ToList();
-            List<ITransactionTestGrain> grains =
+            var grains =
                 Enumerable.Range(0, grainCount)
                     .Select(i => RandomTestGrain(grainStates))
                     .ToList();
-            ITransactionCoordinatorGrain coordinator = grainFactory.GetGrain<ITransactionCoordinatorGrain>(Guid.NewGuid());
+            var coordinator = grainFactory.GetGrain<ITransactionCoordinatorGrain>(Guid.NewGuid());
 
             await coordinator.MultiGrainSet(throwGrains, expected);
             await coordinator.MultiGrainSet(grains, expected);
@@ -107,7 +107,7 @@ namespace Orleans.Transactions.TestKit
             {
                 foreach (var grain in grains)
                 {
-                    int[] actualValues = await grain.Get();
+                    var actualValues = await grain.Get();
                     foreach (var actual in actualValues)
                     {
                         actual.Should().Be(expected);
@@ -120,8 +120,8 @@ namespace Orleans.Transactions.TestKit
         {
             const int expected = 5;
 
-            ITransactionTestGrain grain = RandomTestGrain(grainStates);
-            ITransactionCoordinatorGrain coordinator = grainFactory.GetGrain<ITransactionCoordinatorGrain>(Guid.NewGuid());
+            var grain = RandomTestGrain(grainStates);
+            var coordinator = grainFactory.GetGrain<ITransactionCoordinatorGrain>(Guid.NewGuid());
 
             await grain.Set(expected);
             Func<Task> task = () => coordinator.OrphanCallTransaction(grain);
@@ -131,7 +131,7 @@ namespace Orleans.Transactions.TestKit
 
             await TestAfterDustSettles(async () =>
             {
-                int[] actualValues = await grain.Get();
+                var actualValues = await grain.Get();
                 foreach (var actual in actualValues)
                 {
                     actual.Should().Be(expected);
@@ -141,7 +141,7 @@ namespace Orleans.Transactions.TestKit
 
         private async Task TestAfterDustSettles(Func<Task> what)
         {
-            int tries = 2;
+            var tries = 2;
             while (tries-- > 0)
             {
                 try

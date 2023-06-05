@@ -6,8 +6,8 @@ namespace UnitTests.Grains
     {
         public Task<string> StringNConcat(string[] strArray)
         {
-            string strAll = string.Empty;
-            foreach(string str in strArray)
+            var strAll = string.Empty;
+            foreach(var str in strArray)
                 strAll = String.Concat(strAll, str);
 
             return Task.FromResult(strAll);

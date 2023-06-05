@@ -50,7 +50,7 @@ namespace UnitTests.General
             AssertIsInRange(activationCounts[HostedCluster.Primary], perSilo, leavy);
             AssertIsInRange(activationCounts[HostedCluster.SecondarySilos.First()], perSilo, leavy);
 
-            SiloHandle silo3 = HostedCluster.StartAdditionalSilo();
+            var silo3 = HostedCluster.StartAdditionalSilo();
             await HostedCluster.WaitForLivenessToStabilizeAsync();
 
             logger.LogInformation("\n\n\n----- Phase 2 -----\n\n");
@@ -63,7 +63,7 @@ namespace UnitTests.General
             activationCounts = await GetPerSiloActivationCounts();
             LogCounts(activationCounts);
             logger.LogInformation("-----------------------------------------------------------------");
-            double expected = (6.0 * perSilo) / 3.0;
+            var expected = (6.0 * perSilo) / 3.0;
             AssertIsInRange(activationCounts[HostedCluster.Primary], expected, leavy);
             AssertIsInRange(activationCounts[HostedCluster.SecondarySilos.First()], expected, leavy);
             AssertIsInRange(activationCounts[silo3], expected, leavy);
@@ -93,9 +93,9 @@ namespace UnitTests.General
         [SkippableFact(Skip = "https://github.com/dotnet/orleans/issues/4008"), TestCategory("Functional")]
         public async Task ElasticityTest_StoppingSilos()
         {
-            List<SiloHandle> runtimes = await HostedCluster.StartAdditionalSilosAsync(2);
+            var runtimes = await HostedCluster.StartAdditionalSilosAsync(2);
             await HostedCluster.WaitForLivenessToStabilizeAsync();
-            int stopLeavy = leavy;
+            var stopLeavy = leavy;
 
             await AddTestGrains(perSilo);
             await AddTestGrains(perSilo);
@@ -119,7 +119,7 @@ namespace UnitTests.General
             logger.LogInformation("-----------------------------------------------------------------");
             LogCounts(activationCounts);
             logger.LogInformation("-----------------------------------------------------------------");
-            double expected = perSilo * 1.33;
+            var expected = perSilo * 1.33;
             AssertIsInRange(activationCounts[HostedCluster.Primary], expected, stopLeavy);
             AssertIsInRange(activationCounts[HostedCluster.SecondarySilos.First()], expected, stopLeavy);
             AssertIsInRange(activationCounts[runtimes[1]], expected, stopLeavy);
@@ -199,7 +199,7 @@ namespace UnitTests.General
             while (true)
             {
                 IPlacementTestGrain grain = GrainFactory.GetGrain<IRandomPlacementTestGrain>(Guid.NewGuid());
-                SiloAddress address = await grain.GetLocation();
+                var address = await grain.GetLocation();
                 if (address.Equals(silo))
                     return grain;
             }
@@ -263,7 +263,7 @@ namespace UnitTests.General
             var promises = new List<Task>();
             for (var i = 0; i < amount; i++)
             {
-                IActivationCountBasedPlacementTestGrain grain = GrainFactory.GetGrain<IActivationCountBasedPlacementTestGrain>(Guid.NewGuid());
+                var grain = GrainFactory.GetGrain<IActivationCountBasedPlacementTestGrain>(Guid.NewGuid());
                 grains.Add(grain);
                 // Make sure we activate grain:
                 promises.Add(grain.Nop());
@@ -283,10 +283,10 @@ namespace UnitTests.General
 
         private async Task<Dictionary<SiloHandle, int>> GetPerSiloActivationCounts()
         {
-            string fullTypeName = "UnitTests.Grains.ActivationCountBasedPlacementTestGrain";
+            var fullTypeName = "UnitTests.Grains.ActivationCountBasedPlacementTestGrain";
 
-            IManagementGrain mgmtGrain = GrainFactory.GetGrain<IManagementGrain>(0);
-            SimpleGrainStatistic[] stats = await mgmtGrain.GetSimpleGrainStatistics();
+            var mgmtGrain = GrainFactory.GetGrain<IManagementGrain>(0);
+            var stats = await mgmtGrain.GetSimpleGrainStatistics();
 
             return HostedCluster.GetActiveSilos()
                 .ToDictionary(

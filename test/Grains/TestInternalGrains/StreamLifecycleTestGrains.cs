@@ -142,7 +142,7 @@ namespace UnitTests.Grains
                 _streamProvider = this.GetStreamProvider(providerToUse);
                 _lastProviderName = providerToUse;
             }
-            IAsyncStream<int> stream = _streamProvider.GetStream<int>(streamId);
+            var stream = _streamProvider.GetStream<int>(streamId);
             State.Stream = stream;
             State.StreamProviderName = providerToUse;
 
@@ -184,7 +184,7 @@ namespace UnitTests.Grains
                     foreach (var handle in handles)
                     {
                         var observer = new MyStreamObserver<int>(logger);
-                        StreamSubscriptionHandle<int> subsHandle = await handle.ResumeAsync(observer);
+                        var subsHandle = await handle.ResumeAsync(observer);
                         Observers.Add(subsHandle, observer);
                     }
                 }
@@ -202,13 +202,13 @@ namespace UnitTests.Grains
 
         public Task<int> GetReceivedCount()
         {
-            int numReceived = Observers.Sum(o => o.Value.NumItems);
+            var numReceived = Observers.Sum(o => o.Value.NumItems);
             if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug("ReceivedCount={0}", numReceived);
             return Task.FromResult(numReceived);
         }
         public Task<int> GetErrorsCount()
         {
-            int numErrors = Observers.Sum(o => o.Value.NumErrors);
+            var numErrors = Observers.Sum(o => o.Value.NumErrors);
             if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug("ErrorsCount={0}", numErrors);
             return Task.FromResult(numErrors);
         }
@@ -239,10 +239,10 @@ namespace UnitTests.Grains
 
             var (myExtension, myExtensionReference) = streamProviderRuntime.BindExtension<StreamConsumerExtension, IStreamConsumerExtension>(
                 () => new StreamConsumerExtension(streamProviderRuntime));
-            string extKey = providerName + "_" + Encoding.UTF8.GetString(State.Stream.StreamId.Namespace.ToArray());
+            var extKey = providerName + "_" + Encoding.UTF8.GetString(State.Stream.StreamId.Namespace.ToArray());
             var id = new QualifiedStreamId(providerName, streamId);
-            IPubSubRendezvousGrain pubsub = GrainFactory.GetGrain<IPubSubRendezvousGrain>(id.ToString());
-            GuidId subscriptionId = GuidId.GetNewGuidId();
+            var pubsub = GrainFactory.GetGrain<IPubSubRendezvousGrain>(id.ToString());
+            var subscriptionId = GuidId.GetNewGuidId();
             await pubsub.RegisterConsumer(subscriptionId, ((StreamImpl<int>)State.Stream).InternalStreamId, myExtensionReference.GetGrainId(), null);
 
             myExtension.SetObserver(subscriptionId, ((StreamImpl<int>)State.Stream), observer, null, null, null);
@@ -305,14 +305,14 @@ namespace UnitTests.Grains
 
         public Task<int> GetSendCount()
         {
-            int result = State.NumMessagesSent;
+            var result = State.NumMessagesSent;
             if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug("GetSendCount={0}", result);
             return Task.FromResult(result);
         }
 
         public Task<int> GetErrorsCount()
         {
-            int result = State.NumErrors;
+            var result = State.NumErrors;
             if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug("GetErrorsCount={0}", result);
             return Task.FromResult(result);
         }

@@ -136,7 +136,7 @@ namespace Orleans.Streams
             var oldQueues = new HashSet<QueueId>(myQueues.Select(queue => queue.QueueId));
             try
             {
-                bool allLeasesRenewed = await RenewLeases();
+                var allLeasesRenewed = await RenewLeases();
                 // if we lost some leases during renew after leaseAquisitionTimer stopped, restart it
                 if (!allLeasesRenewed &&
                     leaseAquisitionTimer == null &&
@@ -202,14 +202,14 @@ namespace Orleans.Streams
             // Remove oldest acquired queues first, this provides max recovery time for the queues
             //  being moved.
             // TODO: Consider making this behavior configurable/plugable - jbragg
-            AcquiredLease[] queuesToGiveUp = myQueues
+            var queuesToGiveUp = myQueues
                 .OrderBy(queue => queue.LeaseOrder)
                 .Take(queueCountToRelease)
                 .Select(queue => queue.AcquiredLease)
                 .ToArray();
             // Remove queues from list even if release fails, since we can let the lease expire
             // TODO: mark for removal instead so we don't renew, and only remove leases that have not expired. - jbragg
-            for(int index = myQueues.Count-1; index >= 0; index--)
+            for(var index = myQueues.Count-1; index >= 0; index--)
             {
                 if(queuesToGiveUp.Contains(myQueues[index].AcquiredLease))
                 {
@@ -240,22 +240,22 @@ namespace Orleans.Streams
                 Logger.LogDebug("Holding leased for {QueueCount} queues.  Trying to acquire {AquireQueueCount} queues to reach {TargetQueueCount} of a possible {PossibleLeaseCount}", myQueues.Count, leasesToAquire, expectedTotalLeaseCount, possibleLeaseCount);
             }
 
-            ValueStopwatch sw = ValueStopwatch.StartNew();
+            var sw = ValueStopwatch.StartNew();
             // try to acquire leases until we have no more to aquire or no more possible
             while (!base.Cancellation.IsCancellationRequested && leasesToAquire > 0 && possibleLeaseCount > 0)
             {
                 //select new queues to acquire
-                List<QueueId> expectedQueues = queueSelector.NextSelection(leasesToAquire, myQueues.Select(queue=>queue.QueueId).ToList());
+                var expectedQueues = queueSelector.NextSelection(leasesToAquire, myQueues.Select(queue=>queue.QueueId).ToList());
                 // build lease request from each queue
-                LeaseRequest[] leaseRequests = expectedQueues
+                var leaseRequests = expectedQueues
                     .Select(queue => new LeaseRequest(queue.ToString(), options.LeaseLength))
                     .ToArray();
 
-                AcquireLeaseResult[] results = await leaseProvider.Acquire(options.LeaseCategory, leaseRequests);
+                var results = await leaseProvider.Acquire(options.LeaseCategory, leaseRequests);
                 //add successfully acquired queue to myQueues list
                 for (var i = 0; i < results.Length; i++)
                 {
-                    AcquireLeaseResult result = results[i];
+                    var result = results[i];
                     switch (result.StatusCode)
                     {
                         case ResponseCode.OK:
@@ -312,7 +312,7 @@ namespace Orleans.Streams
         /// <returns>bool - false if we failed to renew all leases</returns>
         private async Task<bool> RenewLeases()
         {
-            bool allRenewed = true;
+            var allRenewed = true;
             if (base.Cancellation.IsCancellationRequested) return false;
             if (Logger.IsEnabled(LogLevel.Trace))
             {
@@ -324,7 +324,7 @@ namespace Orleans.Streams
             //update myQueues list with successfully renewed leases
             for (var i = 0; i < results.Length; i++)
             {
-                AcquireLeaseResult result = results[i];
+                var result = results[i];
                 switch (result.StatusCode)
                 {
                     case ResponseCode.OK:

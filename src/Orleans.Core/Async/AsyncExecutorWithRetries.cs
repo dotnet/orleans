@@ -213,7 +213,7 @@ namespace Orleans.Internal
 
                 if (maxExecutionTime != Constants.INFINITE_TIMESPAN && maxExecutionTime != default)
                 {
-                    DateTime now = DateTime.UtcNow;
+                    var now = DateTime.UtcNow;
                     if (now - startExecutionTime > maxExecutionTime)
                     {
                         if (lastExceptionInfo == null)
@@ -226,7 +226,7 @@ namespace Orleans.Internal
                     }
                 }
 
-                int counter = callCounter;
+                var counter = callCounter;
 
                 try
                 {
@@ -242,7 +242,7 @@ namespace Orleans.Internal
 
                     if (retry)
                     {
-                        TimeSpan? delay = onSuccessBackOff?.Next(counter);
+                        var delay = onSuccessBackOff?.Next(counter);
 
                         if (delay.HasValue)
                         {
@@ -267,7 +267,7 @@ namespace Orleans.Internal
 
                     lastExceptionInfo = ExceptionDispatchInfo.Capture(exc);
 
-                    TimeSpan? delay = onErrorBackOff?.Next(counter);
+                    var delay = onErrorBackOff?.Next(counter);
 
                     if (delay.HasValue)
                     {

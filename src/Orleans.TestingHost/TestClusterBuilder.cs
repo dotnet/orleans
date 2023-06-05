@@ -171,17 +171,17 @@ namespace Orleans.TestingHost
         /// <returns>A new cluster identifier.</returns>
         public static string CreateClusterId()
         {
-            string prefix = "testcluster-";
-            int randomSuffix = Random.Shared.Next(1000);
-            DateTime now = DateTime.UtcNow;
-            string DateTimeFormat = @"yyyy-MM-dd\tHH-mm-ss";
+            var prefix = "testcluster-";
+            var randomSuffix = Random.Shared.Next(1000);
+            var now = DateTime.UtcNow;
+            var DateTimeFormat = @"yyyy-MM-dd\tHH-mm-ss";
             return $"{prefix}{now.ToString(DateTimeFormat, CultureInfo.InvariantCulture)}-{randomSuffix}";
         }
 
         private void ConfigureDefaultPorts()
         {
             // Set base ports if none are currently set.
-            (int baseSiloPort, int baseGatewayPort) = PortAllocator.AllocateConsecutivePortPairs(Options.InitialSilosCount + 3);
+            (var baseSiloPort, var baseGatewayPort) = PortAllocator.AllocateConsecutivePortPairs(Options.InitialSilosCount + 3);
             if (Options.BaseSiloPort == 0) Options.BaseSiloPort = baseSiloPort;
             if (Options.BaseGatewayPort == 0) Options.BaseGatewayPort = baseGatewayPort;
         }

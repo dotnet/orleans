@@ -64,7 +64,7 @@ namespace Orleans
         /// <param name="initialSize">The initial size of the interner mapping.</param>
         public Interner(int initialSize = InternerConstants.SIZE_SMALL)
         {
-            int concurrencyLevel = Environment.ProcessorCount; // Default from ConcurrentDictionary class in .NET Core for size 31
+            var concurrencyLevel = Environment.ProcessorCount; // Default from ConcurrentDictionary class in .NET Core for size 31
             if (initialSize >= InternerConstants.SIZE_MEDIUM) concurrencyLevel *= 4;
             if (initialSize >= InternerConstants.SIZE_LARGE) concurrencyLevel *= 4;
             concurrencyLevel = Math.Min(concurrencyLevel, 1024);

@@ -28,13 +28,13 @@ namespace Orleans.Streaming.EventHubs
 
         public static string MakePartitionKey(string streamProviderName, string checkpointNamespace)
         {
-            string key = $"EventHubCheckpoints_{streamProviderName}_{checkpointNamespace}";
+            var key = $"EventHubCheckpoints_{streamProviderName}_{checkpointNamespace}";
             return AzureTableUtils.SanitizeTableProperty(key);
         }
 
         public static string MakeRowKey(string partition)
         {
-            string key = $"partition_{partition}";
+            var key = $"partition_{partition}";
             return AzureTableUtils.SanitizeTableProperty(key);
         }
     }

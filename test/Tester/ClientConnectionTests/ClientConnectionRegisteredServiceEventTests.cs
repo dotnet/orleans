@@ -73,7 +73,7 @@ namespace Tester
             try
             {
                 // Burst lot of call, to be sure that we are connected to all silos
-                for (int i = 0; i < 100; i++)
+                for (var i = 0; i < 100; i++)
                 {
                     var grain = GrainFactory.GetGrain<ITestGrain>(i);
                     await grain.SetLabel(i.ToString());

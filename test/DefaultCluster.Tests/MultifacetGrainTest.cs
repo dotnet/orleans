@@ -23,10 +23,10 @@ namespace DefaultCluster.Tests.General
             writer = GrainFactory.GetGrain<IMultifacetWriter>(GetRandomGrainId());
             reader = writer.AsReference<IMultifacetReader>();
             
-            int x = 1234;
-            bool ok = writer.SetValue(x).Wait(timeout);
+            var x = 1234;
+            var ok = writer.SetValue(x).Wait(timeout);
             if (!ok) throw new TimeoutException();
-            int y = reader.GetValue().Result;
+            var y = reader.GetValue().Result;
             Assert.Equal(x, y);
         }
 
@@ -43,12 +43,12 @@ namespace DefaultCluster.Tests.General
         [Fact, TestCategory("BVT"), TestCategory("Cast")]
         public async Task MultifacetFactory()
         {
-            IMultifacetFactoryTestGrain factory = GrainFactory.GetGrain<IMultifacetFactoryTestGrain>(GetRandomGrainId());
-            IMultifacetTestGrain grain = GrainFactory.GetGrain<IMultifacetTestGrain>(GetRandomGrainId());
-            IMultifacetWriter writer = await factory.GetWriter(grain /*"MultifacetFactory"*/);
-            IMultifacetReader reader = await factory.GetReader(grain /*"MultifacetFactory"*/);
+            var factory = GrainFactory.GetGrain<IMultifacetFactoryTestGrain>(GetRandomGrainId());
+            var grain = GrainFactory.GetGrain<IMultifacetTestGrain>(GetRandomGrainId());
+            var writer = await factory.GetWriter(grain /*"MultifacetFactory"*/);
+            var reader = await factory.GetReader(grain /*"MultifacetFactory"*/);
             writer.SetValue(5).Wait();
-            int v = reader.GetValue().Result;
+            var v = reader.GetValue().Result;
             Assert.Equal(5, v);
             
         }
@@ -56,14 +56,14 @@ namespace DefaultCluster.Tests.General
         [Fact, TestCategory("BVT"), TestCategory("Cast")]
         public async Task Multifacet_InterfacesAsArguments()
         {
-            IMultifacetFactoryTestGrain factory = GrainFactory.GetGrain<IMultifacetFactoryTestGrain>(GetRandomGrainId());
-            IMultifacetTestGrain grain = GrainFactory.GetGrain<IMultifacetTestGrain>(GetRandomGrainId());
+            var factory = GrainFactory.GetGrain<IMultifacetFactoryTestGrain>(GetRandomGrainId());
+            var grain = GrainFactory.GetGrain<IMultifacetTestGrain>(GetRandomGrainId());
             factory.SetReader(grain).Wait();
             factory.SetWriter(grain).Wait();
-            IMultifacetWriter writer = await factory.GetWriter();
-            IMultifacetReader reader = await factory.GetReader();
+            var writer = await factory.GetWriter();
+            var reader = await factory.GetReader();
             writer.SetValue(10).Wait();
-            int v = reader.GetValue().Result;
+            var v = reader.GetValue().Result;
             Assert.Equal(10, v);
         }
     }

@@ -51,7 +51,7 @@ namespace Orleans.Serialization.Session
         public object TryGetReferencedObject(uint reference)
         {
             var refs = _referenceToObject.AsSpan(0, ReferenceToObjectCount);
-            for (int i = 0; i < refs.Length; ++i)
+            for (var i = 0; i < refs.Length; ++i)
             {
                 if (refs[i].Id == reference)
                     return refs[i].Object;
@@ -91,7 +91,7 @@ namespace Orleans.Serialization.Session
             }
 
             var objects = _objectToReference.AsSpan(0, _objectToReferenceCount);
-            for (int i = 0; i < objects.Length; ++i)
+            for (var i = 0; i < objects.Length; ++i)
             {
                 if (objects[i].Object == value)
                 {
@@ -160,7 +160,7 @@ namespace Orleans.Serialization.Session
             }
 
             var refs = _referenceToObject.AsSpan(0, ReferenceToObjectCount);
-            for (int i = 0; i < refs.Length; ++i)
+            for (var i = 0; i < refs.Length; ++i)
             {
                 if (refs[i].Object == value)
                 {

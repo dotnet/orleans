@@ -53,24 +53,24 @@ namespace Orleans.AzureUtils
                 debugInfo = string.Format("UnpackRowKey: RowKey={0}", rowKey);
                 Trace.TraceInformation(debugInfo);
 #endif
-                int idx1 = rowKey.IndexOf(Seperator);
-                int idx2 = rowKey.LastIndexOf(Seperator);
+                var idx1 = rowKey.IndexOf(Seperator);
+                var idx2 = rowKey.LastIndexOf(Seperator);
 #if DEBUG
                 debugInfo = string.Format("UnpackRowKey: RowKey={0} Idx1={1} Idx2={2}", rowKey, idx1, idx2);
 #endif
-                ReadOnlySpan<char> rowKeySpan = rowKey.AsSpan();
-                ReadOnlySpan<char> addressStr = rowKeySpan.Slice(0, idx1);
-                ReadOnlySpan<char> portStr = rowKeySpan.Slice(idx1 + 1, idx2 - idx1 - 1);
-                ReadOnlySpan<char> genStr = rowKeySpan.Slice(idx2 + 1);
+                var rowKeySpan = rowKey.AsSpan();
+                var addressStr = rowKeySpan.Slice(0, idx1);
+                var portStr = rowKeySpan.Slice(idx1 + 1, idx2 - idx1 - 1);
+                var genStr = rowKeySpan.Slice(idx2 + 1);
 #if DEBUG
                 debugInfo = string.Format("UnpackRowKey: RowKey={0} -> Address={1} Port={2} Generation={3}",
                     rowKey, addressStr.ToString(), portStr.ToString(), genStr.ToString());
 
                 Trace.TraceInformation(debugInfo);
 #endif
-                IPAddress address = IPAddress.Parse(addressStr);
-                int port = int.Parse(portStr);
-                int generation = int.Parse(genStr);
+                var address = IPAddress.Parse(addressStr);
+                var port = int.Parse(portStr);
+                var generation = int.Parse(genStr);
                 return SiloAddress.New(address, port, generation);
             }
             catch (Exception exc)

@@ -55,8 +55,8 @@ namespace Tester.CustomPlacementTests
         {
             const int nGrains = 100;
 
-            Task<string>[] tasks = new Task<string>[nGrains];
-            for (int i = 0; i < nGrains; i++)
+            var tasks = new Task<string>[nGrains];
+            for (var i = 0; i < nGrains; i++)
             {
                 var g = fixture.GrainFactory.GetGrain<ICustomPlacementTestGrain>(Guid.NewGuid(),
                     "UnitTests.Grains.CustomPlacement_FixedSiloGrain");
@@ -68,7 +68,7 @@ namespace Tester.CustomPlacementTests
             var silo = tasks[0].Result;
             Assert.Equal(silos[silos.Length-2], silo);
 
-            for (int i = 1; i < nGrains; i++)
+            for (var i = 1; i < nGrains; i++)
             {
                 Assert.Equal(silo, tasks[i].Result);
             }
@@ -79,8 +79,8 @@ namespace Tester.CustomPlacementTests
         {
             const int nGrains = 100;
 
-            Task<string>[] tasks = new Task<string>[nGrains];
-            for (int i = 0; i < nGrains; i++)
+            var tasks = new Task<string>[nGrains];
+            for (var i = 0; i < nGrains; i++)
             {
                 var g = fixture.GrainFactory.GetGrain<ICustomPlacementTestGrain>(Guid.NewGuid(),
                     "UnitTests.Grains.CustomPlacement_ExcludeOneGrain");
@@ -90,7 +90,7 @@ namespace Tester.CustomPlacementTests
             await Task.WhenAll(tasks);
             var excludedSilo = silos[1];
 
-            for (int i = 1; i < nGrains; i++)
+            for (var i = 1; i < nGrains; i++)
             {
                 Assert.NotEqual(excludedSilo, tasks[i].Result);
             }
@@ -102,8 +102,8 @@ namespace Tester.CustomPlacementTests
             const int nGrains = 100;
             var targetSilo = silos.Length - 1; // Always target the last one
 
-            Task<string>[] tasks = new Task<string>[nGrains];
-            for (int i = 0; i < nGrains; i++)
+            var tasks = new Task<string>[nGrains];
+            for (var i = 0; i < nGrains; i++)
             {
                 RequestContext.Set(TestPlacementStrategyFixedSiloDirector.TARGET_SILO_INDEX, targetSilo);
                 var g = fixture.GrainFactory.GetGrain<ICustomPlacementTestGrain>(Guid.NewGuid(),
@@ -114,7 +114,7 @@ namespace Tester.CustomPlacementTests
 
             await Task.WhenAll(tasks);
 
-            for (int i = 1; i < nGrains; i++)
+            for (var i = 1; i < nGrains; i++)
             {
                 Assert.Equal(silos[targetSilo], tasks[i].Result);
             }
@@ -125,9 +125,9 @@ namespace Tester.CustomPlacementTests
         {
             const int nGrains = 100;
 
-            Task<SiloAddress>[] tasks = new Task<SiloAddress>[nGrains];
-            List<GrainId> grains = new List<GrainId>();
-            for (int i = 0; i < nGrains; i++)
+            var tasks = new Task<SiloAddress>[nGrains];
+            var grains = new List<GrainId>();
+            for (var i = 0; i < nGrains; i++)
             {
                 var g = fixture.GrainFactory.GetGrain<IHashBasedPlacementGrain>(Guid.NewGuid(),
                     "UnitTests.Grains.HashBasedBasedPlacementGrain");
@@ -137,7 +137,7 @@ namespace Tester.CustomPlacementTests
 
             await Task.WhenAll(tasks);
 
-            for (int i = 0; i < nGrains; i++)
+            for (var i = 0; i < nGrains; i++)
             {
                 var hash = (int) (grains[i].GetUniformHashCode() & 0x7fffffff);
                 Assert.Equal(siloAddresses[hash % silos.Length], tasks[i].Result);

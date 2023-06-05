@@ -15,7 +15,7 @@ namespace Orleans.Transactions.TestKit
         {
             const int expected = 0;
 
-            ITransactionTestGrain grain = RandomTestGrain(grainStates);
+            var grain = RandomTestGrain(grainStates);
             var actualResults = await grain.Get();
             //each transaction state should all be 0 since no operation was applied yet
             foreach (var actual in actualResults)
@@ -27,7 +27,7 @@ namespace Orleans.Transactions.TestKit
         public virtual async Task SingleGrainWriteTransaction(string grainStates)
         {
             const int delta = 5;
-            ITransactionTestGrain grain = RandomTestGrain(grainStates);
+            var grain = RandomTestGrain(grainStates);
             var original = await grain.Get();
             await grain.Add(delta);
             var expected = original.Select(value => value + delta).ToArray();
@@ -39,12 +39,12 @@ namespace Orleans.Transactions.TestKit
         {
             const int expected = 5;
 
-            List<ITransactionTestGrain> grains =
+            var grains =
                 Enumerable.Range(0, grainCount)
                     .Select(i => RandomTestGrain(grainStates))
                     .ToList();
 
-            ITransactionCoordinatorGrain coordinator = grainFactory.GetGrain<ITransactionCoordinatorGrain>(Guid.NewGuid());
+            var coordinator = grainFactory.GetGrain<ITransactionCoordinatorGrain>(Guid.NewGuid());
 
             await coordinator.MultiGrainAdd(grains, expected);
 
@@ -62,20 +62,20 @@ namespace Orleans.Transactions.TestKit
         {
             const int delta = 5;
 
-            List<ITransactionTestGrain> grains =
+            var grains =
                 Enumerable.Range(0, grainCount)
                     .Select(i => RandomTestGrain(grainStates))
                     .ToList();
 
-            ITransactionCoordinatorGrain coordinator = grainFactory.GetGrain<ITransactionCoordinatorGrain>(Guid.NewGuid());
+            var coordinator = grainFactory.GetGrain<ITransactionCoordinatorGrain>(Guid.NewGuid());
 
             await coordinator.MultiGrainSet(grains, delta);
             await coordinator.MultiGrainDouble(grains);
 
-            int expected = delta + delta;
+            var expected = delta + delta;
             foreach (var grain in grains)
             {
-                int[] actualValues = await grain.Get();
+                var actualValues = await grain.Get();
                 foreach (var actual in actualValues)
                 {
                     if (expected != actual) testOutput($"{grain} - failed");
@@ -89,25 +89,25 @@ namespace Orleans.Transactions.TestKit
             const int repeat = 10;
             const int delta = 5;
 
-            List<Guid> grainIds = Enumerable.Range(0, grainCount)
+            var grainIds = Enumerable.Range(0, grainCount)
                     .Select(i => Guid.NewGuid())
                     .ToList();
 
-            List<ITransactionTestGrain> grains = grainIds
+            var grains = grainIds
                     .Select(id => TestGrain(grainStates, id))
                     .ToList();
 
-            ITransactionCoordinatorGrain coordinator = grainFactory.GetGrain<ITransactionCoordinatorGrain>(Guid.NewGuid());
+            var coordinator = grainFactory.GetGrain<ITransactionCoordinatorGrain>(Guid.NewGuid());
 
             await coordinator.MultiGrainSet(grains, delta);
-            for (int i = 0; i < repeat; i++)
+            for (var i = 0; i < repeat; i++)
             {
                 await coordinator.MultiGrainDouble(grains);
 
-                int expected = delta * (int)Math.Pow(2,i+1);
+                var expected = delta * (int)Math.Pow(2,i+1);
                 foreach (var grain in grains)
                 {
-                    int[] actualValues = await grain.Get();
+                    var actualValues = await grain.Get();
                     foreach (var actual in actualValues)
                     {
                         if (expected != actual) testOutput($"{grain} - failed");
@@ -122,15 +122,15 @@ namespace Orleans.Transactions.TestKit
             const int delta = 5;
             const int concurrentWrites = 3;
 
-            ITransactionTestGrain grain = RandomTestGrain(grainStates);
-            List<ITransactionTestGrain> grains = Enumerable.Repeat(grain, concurrentWrites).ToList();
+            var grain = RandomTestGrain(grainStates);
+            var grains = Enumerable.Repeat(grain, concurrentWrites).ToList();
 
-            ITransactionCoordinatorGrain coordinator = grainFactory.GetGrain<ITransactionCoordinatorGrain>(Guid.NewGuid());
+            var coordinator = grainFactory.GetGrain<ITransactionCoordinatorGrain>(Guid.NewGuid());
 
             await coordinator.MultiGrainAdd(grains, delta);
 
-            int expected = delta * concurrentWrites;
-            int[] actualValues = await grains[0].Get();
+            var expected = delta * concurrentWrites;
+            var actualValues = await grains[0].Get();
             foreach (var actual in actualValues)
             {
                 actual.Should().Be(expected);
@@ -141,19 +141,19 @@ namespace Orleans.Transactions.TestKit
         {
             const int delta = 5;
 
-            List<ITransactionTestGrain> grains =
+            var grains =
                 Enumerable.Range(0, grainCount)
                     .Select(i => RandomTestGrain(grainStates))
                     .ToList();
 
-            ITransactionCoordinatorGrain coordinator = grainFactory.GetGrain<ITransactionCoordinatorGrain>(Guid.NewGuid());
+            var coordinator = grainFactory.GetGrain<ITransactionCoordinatorGrain>(Guid.NewGuid());
 
             await coordinator.MultiGrainDoubleByRWRW(grains, delta);
 
-            int expected = delta + delta;
+            var expected = delta + delta;
             foreach (var grain in grains)
             {
-                int[] actualValues = await grain.Get();
+                var actualValues = await grain.Get();
                 foreach (var actual in actualValues)
                 {
                     if (expected != actual) testOutput($"{grain} - failed");
@@ -166,19 +166,19 @@ namespace Orleans.Transactions.TestKit
         {
             const int delta = 5;
 
-            List<ITransactionTestGrain> grains =
+            var grains =
                 Enumerable.Range(0, grainCount)
                     .Select(i => RandomTestGrain(grainStates))
                     .ToList();
 
-            ITransactionCoordinatorGrain coordinator = grainFactory.GetGrain<ITransactionCoordinatorGrain>(Guid.NewGuid());
+            var coordinator = grainFactory.GetGrain<ITransactionCoordinatorGrain>(Guid.NewGuid());
 
             await coordinator.MultiGrainDoubleByWRWR(grains, delta);
 
-            int expected = delta + delta;
+            var expected = delta + delta;
             foreach (var grain in grains)
             {
-                int[] actualValues = await grain.Get();
+                var actualValues = await grain.Get();
                 foreach (var actual in actualValues)
                 {
                     if (expected != actual) testOutput($"{grain} - failed");

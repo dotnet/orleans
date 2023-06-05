@@ -28,7 +28,7 @@ namespace UnitTests.OrleansRuntime.Streams
         public void EmptyBlockGetSegmentTooLargeBvt()
         {
             IObjectPool<FixedSizeBuffer> pool = new MyTestPooled();
-            FixedSizeBuffer buffer = pool.Allocate();
+            var buffer = pool.Allocate();
             ArraySegment<byte> segment;
             Assert.False(buffer.TryGetSegment(TestBlockSize + 1, out segment), "Should not be able to get segement that is bigger than block.");
             Assert.Null(segment.Array);
@@ -42,7 +42,7 @@ namespace UnitTests.OrleansRuntime.Streams
         public void EmptyBlockTryGetMaxSegmentBvt()
         {
             IObjectPool<FixedSizeBuffer> pool = new MyTestPooled();
-            FixedSizeBuffer buffer = pool.Allocate();
+            var buffer = pool.Allocate();
             ArraySegment<byte> segment;
             Assert.True(buffer.TryGetSegment(TestBlockSize, out segment), "Should be able to get segement of block size.");
             Assert.NotNull(segment.Array);
@@ -54,9 +54,9 @@ namespace UnitTests.OrleansRuntime.Streams
         public void FillBlockTestBvt()
         {
             IObjectPool<FixedSizeBuffer> pool = new MyTestPooled();
-            FixedSizeBuffer buffer = pool.Allocate();
+            var buffer = pool.Allocate();
             ArraySegment<byte> segment;
-            for (int i = 0; i < TestBlockSize; i++)
+            for (var i = 0; i < TestBlockSize; i++)
             {
                 Assert.True(buffer.TryGetSegment(1, out segment), String.Format("Should be able to get {0}th segement of size 1.", i + 1));
                 Assert.Equal(i, segment.Offset);

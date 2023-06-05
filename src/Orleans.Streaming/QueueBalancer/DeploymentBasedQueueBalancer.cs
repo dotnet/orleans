@@ -82,9 +82,9 @@ namespace Orleans.Streams
 
         public override IEnumerable<QueueId> GetMyQueues()
         {
-            BestFitBalancer<string, QueueId> balancer = GetBalancer();
-            bool useIdealDistribution = options.IsFixed || isStarting;
-            Dictionary<string, List<QueueId>> distribution = useIdealDistribution
+            var balancer = GetBalancer();
+            var useIdealDistribution = options.IsFixed || isStarting;
+            var distribution = useIdealDistribution
                 ? balancer.IdealDistribution
                 : balancer.GetDistribution(GetActiveSilos(siloStatusOracle, immatureSilos));
 
@@ -93,7 +93,7 @@ namespace Orleans.Streams
             {
                 if (!useIdealDistribution)
                 {
-                    HashSet<QueueId> queuesOfImmatureSilos = GetQueuesOfImmatureSilos(siloStatusOracle, immatureSilos, balancer.IdealDistribution);
+                    var queuesOfImmatureSilos = GetQueuesOfImmatureSilos(siloStatusOracle, immatureSilos, balancer.IdealDistribution);
                     // filter queues that belong to immature silos
                     myQueues.RemoveAll(queue => queuesOfImmatureSilos.Contains(queue));
                 }
@@ -136,7 +136,7 @@ namespace Orleans.Streams
             ConcurrentDictionary<SiloAddress, bool> immatureSilos, 
             Dictionary<string, List<QueueId>> idealDistribution)
         {
-            HashSet<QueueId> queuesOfImmatureSilos = new HashSet<QueueId>();
+            var queuesOfImmatureSilos = new HashSet<QueueId>();
             foreach (var silo in immatureSilos.Where(s => s.Value)) // take only those from immature set that have their immature status bit set
             {
                 string siloName;
@@ -159,7 +159,7 @@ namespace Orleans.Streams
 
         private async Task SignalClusterChange(HashSet<SiloAddress> activeSilos)
         {
-            List<Task> tasks = new List<Task>();
+            var tasks = new List<Task>();
             // look at all currently active silos not including myself
             foreach (var silo in activeSilos)
             {

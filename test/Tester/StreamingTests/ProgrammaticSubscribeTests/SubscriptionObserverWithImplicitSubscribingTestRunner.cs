@@ -35,7 +35,7 @@ namespace Tester.StreamingTests.ProgrammaticSubscribeTests
 
             await producer.StartPeriodicProducing();
 
-            int numProduced = 0;
+            var numProduced = 0;
             await TestingUtils.WaitUntilAsync(lastTry => ProgrammaticSubcribeTestsRunner.ProducerHasProducedSinceLastCheck(numProduced, producer, lastTry), _timeout);
             await producer.StopPeriodicProducing();
 
@@ -56,7 +56,7 @@ namespace Tester.StreamingTests.ProgrammaticSubscribeTests
             var producer = fixture.GrainFactory.GetGrain<ITypedProducerGrainProducingApple>(Guid.NewGuid());
             await producer.BecomeProducer(streamId.Guid, streamId.Namespace, streamId.ProviderName);
             await producer.StartPeriodicProducing();
-            int numProduced = 0;
+            var numProduced = 0;
             await TestingUtils.WaitUntilAsync(lastTry => ProgrammaticSubcribeTestsRunner.ProducerHasProducedSinceLastCheck(numProduced, producer, lastTry), _timeout);
 
             // set up the new stream with the same guid, but different namespace, so it would invoke the same consumer grain
@@ -86,7 +86,7 @@ namespace Tester.StreamingTests.ProgrammaticSubscribeTests
             var producer = fixture.GrainFactory.GetGrain<ITypedProducerGrainProducingApple>(Guid.NewGuid());
             await producer.BecomeProducer(streamId.Guid, streamId.Namespace, streamId.ProviderName);
             await producer.StartPeriodicProducing();
-            int numProduced = 0;
+            var numProduced = 0;
             await TestingUtils.WaitUntilAsync(lastTry => ProgrammaticSubcribeTestsRunner.ProducerHasProducedSinceLastCheck(numProduced, producer, lastTry), _timeout);
 
             // set up the new stream with the same guid, but different namespace, so it would invoke the same consumer grain

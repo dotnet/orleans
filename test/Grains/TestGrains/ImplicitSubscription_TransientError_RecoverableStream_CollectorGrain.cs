@@ -82,7 +82,7 @@ namespace TestGrains
             Faults.onActivateFault.TryFire(() => InjectFault(activating: true));
             await ReadStateAsync();
 
-            Guid streamGuid = this.GetPrimaryKey();
+            var streamGuid = this.GetPrimaryKey();
             if (State.StreamGuid != streamGuid)
             {
                 State.StreamGuid = streamGuid;
@@ -92,7 +92,7 @@ namespace TestGrains
 
             var streamProvider = this.GetStreamProvider(GeneratedStreamTestConstants.StreamProviderName);
             stream = streamProvider.GetStream<GeneratedEvent>(State.StreamNamespace, State.StreamGuid);
-            foreach (StreamSubscriptionHandle<GeneratedEvent> handle in await stream.GetAllSubscriptionHandles())
+            foreach (var handle in await stream.GetAllSubscriptionHandles())
             {
                 await handle.ResumeAsync(OnNextAsync, OnErrorAsync, State.RecoveryToken);
             }

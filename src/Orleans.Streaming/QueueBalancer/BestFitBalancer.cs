@@ -72,7 +72,7 @@ namespace Orleans.Streams
             }
 
             // sanitize active buckets.  Remove duplicates, ensure all buckets are valid
-            HashSet<TBucket> activeBucketsSet = new HashSet<TBucket>(activeBuckets);
+            var activeBucketsSet = new HashSet<TBucket>(activeBuckets);
             foreach (var bucket in activeBucketsSet)
             {
                 if (!idealDistribution.ContainsKey(bucket))
@@ -99,9 +99,9 @@ namespace Orleans.Streams
             }
 
             // redistribute remaining resources across the resource lists of the active buckets, resource lists with the fewest reasources first
-            IOrderedEnumerable<List<TResource>> sortedResourceLists = newDistribution.Values.OrderBy(resources => resources.Count);
-            IEnumerator<List<TResource>> resourceListenumerator = sortedResourceLists.GetEnumerator();
-            foreach (TResource resource in resourcesToRedistribute)
+            var sortedResourceLists = newDistribution.Values.OrderBy(resources => resources.Count);
+            var resourceListenumerator = sortedResourceLists.GetEnumerator();
+            foreach (var resource in resourcesToRedistribute)
             {
                 // if we reach the end, start over
                 if (!resourceListenumerator.MoveNext())
@@ -127,7 +127,7 @@ namespace Orleans.Streams
             var idealDistribution = new Dictionary<TBucket, List<TResource>>();
 
             // Sanitize buckets.  Remove duplicates and sort
-            List<TBucket> bucketList = buckets.Distinct().ToList();
+            var bucketList = buckets.Distinct().ToList();
             if (bucketList.Count == 0)
             {
                 return idealDistribution;
@@ -135,25 +135,25 @@ namespace Orleans.Streams
             bucketList.Sort();
 
             // Sanitize resources.  Removed duplicates and sort
-            List<TResource> resourceList = resources.Distinct().ToList();
+            var resourceList = resources.Distinct().ToList();
             resourceList.Sort();
 
             // Distribute resources evenly among buckets
             var upperResourceCountPerBucket = (int)Math.Ceiling((double)resourceList.Count / bucketList.Count);
             var lowerResourceCountPerBucket = upperResourceCountPerBucket - 1;
-            List<TResource>.Enumerator resourceEnumerator = resourceList.GetEnumerator();
-            int bucketsToFillWithUpperResource = resourceList.Count % bucketList.Count;
+            var resourceEnumerator = resourceList.GetEnumerator();
+            var bucketsToFillWithUpperResource = resourceList.Count % bucketList.Count;
             // a bucketsToFillWithUpperResource of 0 indicates resources are evenly devisible, so fill them all with upper resource count
             if (bucketsToFillWithUpperResource == 0)
             {
                 bucketsToFillWithUpperResource = bucketList.Count;
             }
-            int bucketsFilledCount = 0;
-            foreach (TBucket bucket in bucketList)
+            var bucketsFilledCount = 0;
+            foreach (var bucket in bucketList)
             {
                 // if we've filled the first bucketsToFillWithUpperResource buckets with upperResourceCountPerBucket
                 //   resources, fill the rest with lowerResourceCountPerBucket
-                int resourcesToAddToBucket = bucketsFilledCount < bucketsToFillWithUpperResource
+                var resourcesToAddToBucket = bucketsFilledCount < bucketsToFillWithUpperResource
                     ? upperResourceCountPerBucket
                     : lowerResourceCountPerBucket;
                 var bucketResources = new List<TResource>();

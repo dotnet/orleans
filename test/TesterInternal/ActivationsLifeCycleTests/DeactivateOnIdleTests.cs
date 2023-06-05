@@ -73,7 +73,7 @@ namespace UnitTests.ActivationsLifeCycleTests
             var a = testCluster.GrainFactory.GetGrain<ICollectionTestGrain>(1);
             await a.GetAge();
             await a.DeactivateSelf();
-            for (int i = 0; i < 30; i++)
+            for (var i = 0; i < 30; i++)
             {
                 await a.GetAge();
             }
@@ -86,10 +86,10 @@ namespace UnitTests.ActivationsLifeCycleTests
             var a = testCluster.GrainFactory.GetGrain<ICollectionTestGrain>(1, "UnitTests.Grains.CollectionTestGrain");
             await a.IncrCounter();
 
-            Task t1 = Task.Run(async () =>
+            var t1 = Task.Run(async () =>
             {
-                List<Task> tasks = new List<Task>();
-                for (int i = 0; i < 100; i++)
+                var tasks = new List<Task>();
+                for (var i = 0; i < 100; i++)
                 {
                     tasks.Add(a.IncrCounter());
                 }
@@ -97,7 +97,7 @@ namespace UnitTests.ActivationsLifeCycleTests
             });
 
             await Task.Delay(1);
-            Task t2 = a.DeactivateSelf();
+            var t2 = a.DeactivateSelf();
             await Task.WhenAll(t1, t2);
         }
 
@@ -108,10 +108,10 @@ namespace UnitTests.ActivationsLifeCycleTests
             var a = testCluster.GrainFactory.GetGrain<ICollectionTestGrain>(1, "UnitTests.Grains.ReentrantCollectionTestGrain");
             await a.IncrCounter();
 
-            Task t1 = Task.Run(async () =>
+            var t1 = Task.Run(async () =>
             {
-                List<Task> tasks = new List<Task>();
-                for (int i = 0; i < 100; i++)
+                var tasks = new List<Task>();
+                for (var i = 0; i < 100; i++)
                 {
                     tasks.Add(a.IncrCounter());
                 }
@@ -119,7 +119,7 @@ namespace UnitTests.ActivationsLifeCycleTests
             });
 
             await Task.Delay(TimeSpan.FromMilliseconds(1));
-            Task t2 = a.DeactivateSelf();
+            var t2 = a.DeactivateSelf();
             await Task.WhenAll(t1, t2);
         }
 
@@ -128,7 +128,7 @@ namespace UnitTests.ActivationsLifeCycleTests
         {
             Initialize();
             var a = testCluster.GrainFactory.GetGrain<ICollectionTestGrain>(1, "UnitTests.Grains.ReentrantCollectionTestGrain");
-            for (int i = 0; i < 10; i++)
+            for (var i = 0; i < 10; i++)
             {
                 await a.StartTimer(TimeSpan.FromMilliseconds(5), TimeSpan.FromMilliseconds(100));
             }
@@ -143,19 +143,19 @@ namespace UnitTests.ActivationsLifeCycleTests
             var a = testCluster.GrainFactory.GetGrain<ICollectionTestGrain>(1);
             await a.IncrCounter();
 
-            Task t1 = Task.Run(async () =>
+            var t1 = Task.Run(async () =>
             {
-                List<Task> tasks = new List<Task>();
-                for (int i = 0; i < 100; i++)
+                var tasks = new List<Task>();
+                for (var i = 0; i < 100; i++)
                 {
                     tasks.Add(a.IncrCounter());
                 }
                 await Task.WhenAll(tasks);
             });
-            Task t2 = Task.Run(async () =>
+            var t2 = Task.Run(async () =>
             {
-                List<Task> tasks = new List<Task>();
-                for (int i = 0; i < 1; i++)
+                var tasks = new List<Task>();
+                for (var i = 0; i < 1; i++)
                 {
                     await Task.Delay(1);
                     tasks.Add(a.DeactivateSelf());
@@ -170,8 +170,8 @@ namespace UnitTests.ActivationsLifeCycleTests
         {
             Initialize();
             var a = testCluster.GrainFactory.GetGrain<ICollectionTestGrain>(1);
-            List<Task> tasks = new List<Task>();
-            for (int i = 0; i < 100; i++)
+            var tasks = new List<Task>();
+            for (var i = 0; i < 100; i++)
             {
                 tasks.Add(a.IncrCounter());
             }
@@ -219,10 +219,10 @@ namespace UnitTests.ActivationsLifeCycleTests
             builder.Properties["MaxForwardCount"] = forwardCount.ToString();
             Initialize(builder);
 
-            ICollectionTestGrain grain = await PickGrainInNonPrimary();
+            var grain = await PickGrainInNonPrimary();
 
             output.WriteLine("About to make a 1st GetAge() call.");
-            TimeSpan age = await grain.GetAge();
+            var age = await grain.GetAge();
             output.WriteLine(age.ToString());
 
             await grain.DeactivateSelf();
@@ -235,21 +235,21 @@ namespace UnitTests.ActivationsLifeCycleTests
 
         private async Task<ICollectionTestGrain> PickGrainInNonPrimary()
         {
-            for (int i = 0; i < 500; i++)
+            for (var i = 0; i < 500; i++)
             {
                 if (i % 30 == 29) await Task.Delay(1000); // give some extra time to stabilize if it can't find a suitable grain
 
                 // Create grain such that:
                 // Its directory owner is not the Gateway silo. This way Gateway will use its directory cache.
                 // Its activation is located on the non Gateway silo as well.
-                ICollectionTestGrain grain = testCluster.GrainFactory.GetGrain<ICollectionTestGrain>(i);
-                GrainId grainId = ((GrainReference)await grain.GetGrainReference()).GrainId;
-                SiloAddress primaryForGrain = (await TestUtils.GetDetailedGrainReport(testCluster.InternalGrainFactory, grainId, testCluster.Primary)).PrimaryForGrain;
+                var grain = testCluster.GrainFactory.GetGrain<ICollectionTestGrain>(i);
+                var grainId = ((GrainReference)await grain.GetGrainReference()).GrainId;
+                var primaryForGrain = (await TestUtils.GetDetailedGrainReport(testCluster.InternalGrainFactory, grainId, testCluster.Primary)).PrimaryForGrain;
                 if (primaryForGrain.Equals(testCluster.Primary.SiloAddress))
                 {
                     continue;
                 }
-                string siloHostingActivation = await grain.GetRuntimeInstanceId();
+                var siloHostingActivation = await grain.GetRuntimeInstanceId();
                 if (testCluster.Primary.SiloAddress.ToString().Equals(siloHostingActivation))
                 {
                     continue;

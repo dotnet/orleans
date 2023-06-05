@@ -44,7 +44,7 @@ namespace UnitTests.StorageTests.Relational
         public override bool Equals(object obj)
         {
             if(!(obj is Range<T>)) return false;
-            Range<T> other = (Range<T>)obj;
+            var other = (Range<T>)obj;
 
             return Equals(other);
         }
@@ -61,7 +61,7 @@ namespace UnitTests.StorageTests.Relational
             unchecked
             {
                 var comparer = EqualityComparer<T>.Default;
-                int hash = 17;
+                var hash = 17;
                 hash = hash * 23 + comparer.GetHashCode(Start);
                 hash = hash * 23 + comparer.GetHashCode(End);
 

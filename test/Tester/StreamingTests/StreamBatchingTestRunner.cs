@@ -23,11 +23,11 @@ namespace UnitTests.StreamingTests
         public async Task SingleSendBatchConsume()
         {
             const int ExpectedConsumed = 30;
-            Guid streamGuid = Guid.NewGuid();
+            var streamGuid = Guid.NewGuid();
 
-            IStreamProvider provider = fixture.Client.GetStreamProvider(StreamBatchingTestConst.ProviderName);
-            IAsyncStream<string> stream = provider.GetStream<string>(StreamBatchingTestConst.BatchingNameSpace, streamGuid);
-            for(int i = 0; i< ExpectedConsumed; i++)
+            var provider = fixture.Client.GetStreamProvider(StreamBatchingTestConst.ProviderName);
+            var stream = provider.GetStream<string>(StreamBatchingTestConst.BatchingNameSpace, streamGuid);
+            for(var i = 0; i< ExpectedConsumed; i++)
             {
                 await stream.OnNextAsync(i.ToString());
             }
@@ -41,11 +41,11 @@ namespace UnitTests.StreamingTests
             const int BatchesSent = 3;
             const int ItemsPerBatch = 10;
             const int ExpectedConsumed = BatchesSent * ItemsPerBatch;
-            Guid streamGuid = Guid.NewGuid();
+            var streamGuid = Guid.NewGuid();
 
-            IStreamProvider provider = fixture.Client.GetStreamProvider(StreamBatchingTestConst.ProviderName);
-            IAsyncStream<string> stream = provider.GetStream<string>(StreamBatchingTestConst.NonBatchingNameSpace, streamGuid);
-            for (int i = 0; i < BatchesSent; i++)
+            var provider = fixture.Client.GetStreamProvider(StreamBatchingTestConst.ProviderName);
+            var stream = provider.GetStream<string>(StreamBatchingTestConst.NonBatchingNameSpace, streamGuid);
+            for (var i = 0; i < BatchesSent; i++)
             {
                 await stream.OnNextBatchAsync(Enumerable.Range(i, ItemsPerBatch).Select(v => v.ToString()));
             }
@@ -59,11 +59,11 @@ namespace UnitTests.StreamingTests
             const int BatchesSent = 3;
             const int ItemsPerBatch = 10;
             const int ExpectedConsumed = BatchesSent * ItemsPerBatch;
-            Guid streamGuid = Guid.NewGuid();
+            var streamGuid = Guid.NewGuid();
 
-            IStreamProvider provider = fixture.Client.GetStreamProvider(StreamBatchingTestConst.ProviderName);
-            IAsyncStream<string> stream = provider.GetStream<string>(StreamBatchingTestConst.BatchingNameSpace, streamGuid);
-            for (int i = 0; i < BatchesSent; i++)
+            var provider = fixture.Client.GetStreamProvider(StreamBatchingTestConst.ProviderName);
+            var stream = provider.GetStream<string>(StreamBatchingTestConst.BatchingNameSpace, streamGuid);
+            for (var i = 0; i < BatchesSent; i++)
             {
                 await stream.OnNextBatchAsync(Enumerable.Range(i, ItemsPerBatch).Select(v => v.ToString()));
             }
@@ -73,7 +73,7 @@ namespace UnitTests.StreamingTests
 
         private async Task<bool> CheckCounters(IStreamBatchingTestConsumerGrain consumer, int expectedConsumed, int minBatchSize, bool assertIsTrue)
         {
-            ConsumptionReport report = await consumer.GetConsumptionReport();
+            var report = await consumer.GetConsumptionReport();
             output.WriteLine($"Report - Consumed: {report.Consumed}, MaxBatchSize: {report.MaxBatchSize}");
             if (assertIsTrue)
             {

@@ -100,7 +100,7 @@ namespace UnitTests
         [Fact, TestCategory("Functional"), TestCategory("Tasks"), TestCategory("Reentrancy")]
         public void Reentrancy_Deadlock_1()
         {
-            List<Task> done = new List<Task>();
+            var done = new List<Task>();
             var grain1 = fixture.GrainFactory.GetGrain<IReentrantSelfManagedGrain>(1);
             grain1.SetDestination(2).Wait();
             done.Add(grain1.Ping(15));
@@ -117,7 +117,7 @@ namespace UnitTests
         [Fact(Skip = "Ignore"), TestCategory("Failures"), TestCategory("Tasks"), TestCategory("Reentrancy")]
         public void Reentrancy_Deadlock_2()
         {
-            List<Task> done = new List<Task>();
+            var done = new List<Task>();
             var grain1 = fixture.GrainFactory.GetGrain<INonReentrantSelfManagedGrain>(1);
             grain1.SetDestination(2).Wait();
 
@@ -199,7 +199,7 @@ namespace UnitTests
         {
             const int numLoops = 5;
             const int blockSize = 10;
-            TimeSpan timeout = TimeSpan.FromSeconds(40);
+            var timeout = TimeSpan.FromSeconds(40);
             Do_FanOut_Stress(numLoops, blockSize, timeout, false, false);
         }
 
@@ -208,7 +208,7 @@ namespace UnitTests
         {
             const int numLoops = 5;
             const int blockSize = 10;
-            TimeSpan timeout = TimeSpan.FromSeconds(40);
+            var timeout = TimeSpan.FromSeconds(40);
             Do_FanOut_Stress(numLoops, blockSize, timeout, true, false);
         }
 
@@ -217,7 +217,7 @@ namespace UnitTests
         {
             const int numLoops = 5;
             const int blockSize = 10;
-            TimeSpan timeout = TimeSpan.FromSeconds(40);
+            var timeout = TimeSpan.FromSeconds(40);
             Do_FanOut_Stress(numLoops, blockSize, timeout, false, true);
         }
 
@@ -226,7 +226,7 @@ namespace UnitTests
         {
             const int numLoops = 5;
             const int blockSize = 10;
-            TimeSpan timeout = TimeSpan.FromSeconds(40);
+            var timeout = TimeSpan.FromSeconds(40);
             Do_FanOut_Stress(numLoops, blockSize, timeout, true, true);
         }
 
@@ -235,10 +235,10 @@ namespace UnitTests
         private async Task Do_FanOut_Task_Join(int offset, bool doNonReentrant, bool doCallChain)
         {
             const int num = 10;
-            int id = Random.Shared.Next();
+            var id = Random.Shared.Next();
             if (doNonReentrant)
             {
-                IFanOutGrain grain = fixture.GrainFactory.GetGrain<IFanOutGrain>(id);
+                var grain = fixture.GrainFactory.GetGrain<IFanOutGrain>(id);
                 if (doCallChain)
                 {
                     await grain.FanOutNonReentrant_Chain(offset*num, num);
@@ -250,7 +250,7 @@ namespace UnitTests
             }
             else
             {
-                IFanOutGrain grain = fixture.GrainFactory.GetGrain<IFanOutGrain>(id);
+                var grain = fixture.GrainFactory.GetGrain<IFanOutGrain>(id);
                 if (doCallChain)
                 {
                     await grain.FanOutReentrant_Chain(offset*num, num);
@@ -265,10 +265,10 @@ namespace UnitTests
         private async Task Do_FanOut_AC_Join(int offset, bool doNonReentrant, bool doCallChain)
         {
             const int num = 10;
-            int id = Random.Shared.Next();
+            var id = Random.Shared.Next();
             if (doNonReentrant)
             {
-                IFanOutACGrain grain = fixture.GrainFactory.GetGrain<IFanOutACGrain>(id);
+                var grain = fixture.GrainFactory.GetGrain<IFanOutACGrain>(id);
                 if (doCallChain)
                 {
                     await grain.FanOutACNonReentrant_Chain(offset * num, num);
@@ -280,7 +280,7 @@ namespace UnitTests
             }
             else
             {
-                IFanOutACGrain grain = fixture.GrainFactory.GetGrain<IFanOutACGrain>(id);
+                var grain = fixture.GrainFactory.GetGrain<IFanOutACGrain>(id);
                 if (doCallChain)
                 {
                     await grain.FanOutACReentrant_Chain(offset * num, num);
@@ -297,32 +297,32 @@ namespace UnitTests
         private void Do_FanOut_Stress(int numLoops, int blockSize, TimeSpan timeout,
             bool doNonReentrant, bool doAC)
         {
-            Stopwatch totalTime = Stopwatch.StartNew();
-            List<Task> promises = new List<Task>();
-            for (int i = 0; i < numLoops; i++)
+            var totalTime = Stopwatch.StartNew();
+            var promises = new List<Task>();
+            for (var i = 0; i < numLoops; i++)
             {
                 output.WriteLine("Start loop {0}", i);
-                Stopwatch loopClock = Stopwatch.StartNew();
-                for (int j = 0; j < blockSize; j++)
+                var loopClock = Stopwatch.StartNew();
+                for (var j = 0; j < blockSize; j++)
                 {
-                    int offset = j;
+                    var offset = j;
                     output.WriteLine("Start inner loop {0}", j);
-                    Stopwatch innerClock = Stopwatch.StartNew();
-                    Task promise = Task.Run(() =>
+                    var innerClock = Stopwatch.StartNew();
+                    var promise = Task.Run(() =>
                     {
                         return doAC ? Do_FanOut_AC_Join(offset, doNonReentrant, false)
                                     : Do_FanOut_Task_Join(offset, doNonReentrant, false);
                     });
                     promises.Add(promise);
                     output.WriteLine("Inner loop {0} - Created Tasks. Elapsed={1}", j, innerClock.Elapsed);
-                    bool ok = Task.WhenAll(promises).Wait(timeout);
+                    var ok = Task.WhenAll(promises).Wait(timeout);
                     if (!ok) throw new TimeoutException();
                     output.WriteLine("Inner loop {0} - Finished Join. Elapsed={1}", j, innerClock.Elapsed);
                     promises.Clear();
                 }
                 output.WriteLine("End loop {0} Elapsed={1}", i, loopClock.Elapsed);
             }
-            TimeSpan elapsed = totalTime.Elapsed;
+            var elapsed = totalTime.Elapsed;
             Assert.True(elapsed < MaxStressExecutionTime, $"Stress test execution took too long: {elapsed}");
         }
     }

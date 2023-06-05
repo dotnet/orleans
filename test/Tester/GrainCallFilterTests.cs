@@ -205,7 +205,7 @@ namespace UnitTests.General
             const int testValue = 43;
             await stream.OnNextAsync(testValue);
             var cts = new CancellationTokenSource(1000);
-            int actual = 0;
+            var actual = 0;
             while (!cts.IsCancellationRequested)
             {
                 actual = await grain.GetLastStreamValue();

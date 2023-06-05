@@ -22,7 +22,7 @@ namespace Tester.StreamingTests
         public async Task StreamProducerOnDroppedClientTest(string streamProviderName, string streamNamespace)
         {
             const int eventsProduced = 10;
-            Guid streamGuid = Guid.NewGuid();
+            var streamGuid = Guid.NewGuid();
 
             await ProduceEventsFromClient(streamProviderName, streamGuid, streamNamespace, eventsProduced);
 
@@ -43,7 +43,7 @@ namespace Tester.StreamingTests
         {
             getDeliveryFailureCount = getDeliveryFailureCount ?? DefaultDeliveryFailureCount;
 
-            Guid streamGuid = Guid.NewGuid();
+            var streamGuid = Guid.NewGuid();
             int[] eventCount = {0};
 
             // become stream consumers
@@ -94,14 +94,14 @@ namespace Tester.StreamingTests
 
             // check counts
             await TestingUtils.WaitUntilAsync(lastTry => CheckCounters(() => Task.FromResult(eventCount[0]), producer.GetNumberProduced, lastTry), _timeout);
-            int deliveryFailureCount = await getDeliveryFailureCount();
+            var deliveryFailureCount = await getDeliveryFailureCount();
             Assert.Equal(0, deliveryFailureCount);
         }
 
         private Task SubscribeToStream(string streamProviderName, Guid streamGuid, string streamNamespace,
             Func<int, StreamSequenceToken, Task> onNextAsync)
         {
-            IStreamProvider streamProvider = testHost.Client.GetStreamProvider(streamProviderName);
+            var streamProvider = testHost.Client.GetStreamProvider(streamProviderName);
             IAsyncObservable<int> stream = streamProvider.GetStream<int>(streamNamespace, streamGuid);
             return stream.SubscribeAsync(onNextAsync);
         }
@@ -123,9 +123,9 @@ namespace Tester.StreamingTests
 
         private async Task GenerateEvents(string streamProviderName, Guid streamGuid, string streamNamespace, int produceCount)
         {
-            IStreamProvider streamProvider = testHost.Client.GetStreamProvider(streamProviderName);
+            var streamProvider = testHost.Client.GetStreamProvider(streamProviderName);
             IAsyncObserver<int> observer = streamProvider.GetStream<int>(streamNamespace, streamGuid);
-            for (int i = 0; i < produceCount; i++)
+            for (var i = 0; i < produceCount; i++)
             {
                 await observer.OnNextAsync(i);
             }
@@ -133,8 +133,8 @@ namespace Tester.StreamingTests
 
         private async Task<bool> CheckCounters(Func<Task<int>> getConsumed, Func<Task<int>> getProduced, bool assertIsTrue)
         {
-            int eventsProduced = await getProduced();
-            int numConsumed = await getConsumed();
+            var eventsProduced = await getProduced();
+            var numConsumed = await getConsumed();
             if (!assertIsTrue) return eventsProduced == numConsumed;
             Assert.Equal(eventsProduced, numConsumed);
             return true;

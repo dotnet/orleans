@@ -64,8 +64,8 @@ namespace Tester
             where TGrainInterface : IStorageFacetGrain
         {
             IStorageFacetGrain grain = fixture.GrainFactory.GetGrain<TGrainInterface>(0);
-            string[] names = await grain.GetNames();
-            string[] info = await grain.GetExtendedInfo();
+            var names = await grain.GetNames();
+            var info = await grain.GetExtendedInfo();
             Assert.Equal(2, names.Length);
             Assert.Equal("FirstState", names[0]);
             Assert.Equal("second", names[1]);
@@ -90,8 +90,8 @@ namespace Tester
             where TGrainInterface : IStorageFacetGrain
         {
             IStorageFacetGrain grain = fixture.GrainFactory.GetGrain<TGrainInterface>(0);
-            string[] names = await grain.GetNames();
-            string[] info = await grain.GetExtendedInfo();
+            var names = await grain.GetNames();
+            var info = await grain.GetExtendedInfo();
             Assert.Equal(2, names.Length);
             Assert.Equal("FirstState", names[0]);
             Assert.Equal("second", names[1]);

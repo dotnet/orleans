@@ -59,9 +59,9 @@ namespace Orleans.Storage
             logger.LogInformation("Init: Name={Name} NumStorageGrains={NumStorageGrains}", name, options.NumStorageGrains);
 
             storageGrains = new Lazy<IMemoryStorageGrain>[options.NumStorageGrains];
-            for (int i = 0; i < storageGrains.Length; i++)
+            for (var i = 0; i < storageGrains.Length; i++)
             {
-                int idx = i; // Capture variable to avoid modified closure error
+                var idx = i; // Capture variable to avoid modified closure error
                 storageGrains[idx] = new Lazy<IMemoryStorageGrain>(() => grainFactory.GetGrain<IMemoryStorageGrain>(idx));
             }
         }
@@ -73,7 +73,7 @@ namespace Orleans.Storage
 
             if (logger.IsEnabled(LogLevel.Trace)) logger.LogTrace("Read Keys={Keys}", key);
 
-            IMemoryStorageGrain storageGrain = GetStorageGrain(key);
+            var storageGrain = GetStorageGrain(key);
             var state = await storageGrain.ReadStateAsync<ReadOnlyMemory<byte>>(key);
             if (state != null)
             {
@@ -89,7 +89,7 @@ namespace Orleans.Storage
         {
             var key = MakeKey(grainType, grainId);
             if (logger.IsEnabled(LogLevel.Trace)) logger.LogTrace("Write Keys={Keys} Data={Data} Etag={Etag}", key, grainState.State, grainState.ETag);
-            IMemoryStorageGrain storageGrain = GetStorageGrain(key);
+            var storageGrain = GetStorageGrain(key);
             try
             {
                 var data = ConvertToStorageFormat<T>(grainState.State);
@@ -111,7 +111,7 @@ namespace Orleans.Storage
         {
             var key = MakeKey(grainType, grainId);
             if (logger.IsEnabled(LogLevel.Trace)) logger.LogTrace("Delete Keys={Keys} Etag={Etag}", key, grainState.ETag);
-            IMemoryStorageGrain storageGrain = GetStorageGrain(key);
+            var storageGrain = GetStorageGrain(key);
             try
             {
                 await storageGrain.DeleteStateAsync<ReadOnlyMemory<byte>>(key, grainState.ETag);

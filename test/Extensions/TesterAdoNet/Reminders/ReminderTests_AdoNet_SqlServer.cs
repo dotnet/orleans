@@ -27,7 +27,7 @@ namespace Tester.AdoNet.Reminders
         {
             protected override void ConfigureTestCluster(TestClusterBuilder builder)
             {
-                string connectionString = RelationalStorageForTesting.SetupInstance(AdoInvariant, TestDatabaseName)
+                var connectionString = RelationalStorageForTesting.SetupInstance(AdoInvariant, TestDatabaseName)
                     .Result.CurrentConnectionString;
                 builder.ConfigureHostConfiguration(config => config.AddInMemoryCollection(new Dictionary<string, string>
                 {

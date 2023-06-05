@@ -71,7 +71,7 @@ namespace Orleans.Storage
 
             if(bytes != null && StringKey != null)
             {
-                int oldLen = bytes.Length;
+                var oldLen = bytes.Length;
                 var stringBytes = Encoding.UTF8.GetBytes(StringKey);
                 Array.Resize(ref bytes, bytes.Length + stringBytes.Length);
                 Array.Copy(stringBytes, 0, bytes, oldLen, stringBytes.Length);

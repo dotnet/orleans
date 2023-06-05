@@ -14,7 +14,7 @@ namespace UnitTests.Grains.Batching
 
         public Task OnSubscribed(IStreamSubscriptionHandleFactory handleFactory)
         {
-            StreamSubscriptionHandle<string> handle = handleFactory.Create<string>();
+            var handle = handleFactory.Create<string>();
             return (handle.StreamId.GetNamespace() == StreamBatchingTestConst.BatchingNameSpace)
                 ? handle.ResumeAsync(OnNextBatch)
                 : handle.ResumeAsync(OnNext);

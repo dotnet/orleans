@@ -39,8 +39,8 @@ namespace Orleans.Transactions.TestKit
         public IFaultInjectionTransactionalState<TState> Create<TState>(IFaultInjectionTransactionalStateConfiguration config) where TState : class, new()
         {
             var currentContext = contextAccessor.GrainContext;
-            TransactionalState<TState> transactionalState = ActivatorUtilities.CreateInstance<TransactionalState<TState>>(currentContext.ActivationServices, new TransactionalStateConfiguration(config), contextAccessor);
-            FaultInjectionTransactionalState<TState> deactivationTransactionalState = ActivatorUtilities.CreateInstance<FaultInjectionTransactionalState<TState>>(currentContext.ActivationServices, transactionalState);
+            var transactionalState = ActivatorUtilities.CreateInstance<TransactionalState<TState>>(currentContext.ActivationServices, new TransactionalStateConfiguration(config), contextAccessor);
+            var deactivationTransactionalState = ActivatorUtilities.CreateInstance<FaultInjectionTransactionalState<TState>>(currentContext.ActivationServices, transactionalState);
             deactivationTransactionalState.Participate(currentContext.ObservableLifecycle);
             return deactivationTransactionalState;
         }
@@ -54,14 +54,14 @@ namespace Orleans.Transactions.TestKit
         {
             IFaultInjectionTransactionalStateConfiguration config = attribute;
             // use generic type args to define collection type.
-            MethodInfo genericCreate = create.MakeGenericMethod(parameter.ParameterType.GetGenericArguments());
-            object[] args = new object[] { config };
+            var genericCreate = create.MakeGenericMethod(parameter.ParameterType.GetGenericArguments());
+            var args = new object[] { config };
             return context => Create(context, genericCreate, args);
         }
 
         private object Create(IGrainContext context, MethodInfo genericCreate, object[] args)
         {
-            IFaultInjectionTransactionalStateFactory factory = context.ActivationServices.GetRequiredService<IFaultInjectionTransactionalStateFactory>();
+            var factory = context.ActivationServices.GetRequiredService<IFaultInjectionTransactionalStateFactory>();
             return genericCreate.Invoke(factory, args);
         }
     }

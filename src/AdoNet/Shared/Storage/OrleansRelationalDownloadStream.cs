@@ -153,7 +153,7 @@ namespace Orleans.Tests.SqlUtils
 
             try
             {                                                               
-                int length = Math.Min(count, (int)(totalBytes - position));
+                var length = Math.Min(count, (int)(totalBytes - position));
                 long bytesRead = 0;
                 if(length > 0)
                 {
@@ -195,7 +195,7 @@ namespace Orleans.Tests.SqlUtils
             {
                 //The last used task is saved in order to avoid one allocation when the number of bytes read
                 //will likely be the same multiple times.
-                int bytesRead = Read(buffer, offset, count);
+                var bytesRead = Read(buffer, offset, count);
                 var ret = lastTask != null && bytesRead == lastTask.Result ? lastTask : (lastTask = Task.FromResult(bytesRead));
 
                 return ret;
@@ -222,7 +222,7 @@ namespace Orleans.Tests.SqlUtils
         {
             if(!cancellationToken.IsCancellationRequested)
             {
-                byte[] buffer = new byte[InternalReadBufferLength];
+                var buffer = new byte[InternalReadBufferLength];
                 int bytesRead;
                 while((bytesRead = Read(buffer, 0, buffer.Length)) > 0)
                 {

@@ -61,8 +61,8 @@ namespace Orleans.Transactions.State
         public async Task<TResult> EnterLock<TResult>(Guid transactionId, DateTime priority,
                                    AccessCounter counter, bool isRead, Func<TResult> task)
         {
-            bool rollbacksOccurred = false;
-            List<Task> cleanup = new List<Task>();
+            var rollbacksOccurred = false;
+            var cleanup = new List<Task>();
 
             await queue.Ready();
 
@@ -188,7 +188,7 @@ namespace Orleans.Transactions.State
 
         public async Task<(TransactionalStatus Status, TransactionRecord<TState> State)> ValidateLock(Guid transactionId, AccessCounter accessCount)
         {
-            if (currentGroup == null || !currentGroup.TryGetValue(transactionId, out TransactionRecord<TState> record))
+            if (currentGroup == null || !currentGroup.TryGetValue(transactionId, out var record))
             {
                 return (TransactionalStatus.BrokenLock, new TransactionRecord<TState>());
             }
@@ -218,7 +218,7 @@ namespace Orleans.Transactions.State
         {
             if (currentGroup != null)
             {
-                Task[] pending = currentGroup.Select(g => BreakLock(g.Key, g.Value, exception)).ToArray();
+                var pending = currentGroup.Select(g => BreakLock(g.Key, g.Value, exception)).ToArray();
                 currentGroup.Reset();
                 return Task.WhenAll(pending);
             }
@@ -303,8 +303,8 @@ namespace Orleans.Transactions.State
                             if (currentGroup.Deadline.Value < now)
                             {
                                 // the lock group has timed out.
-                                string txlist = string.Join(",", currentGroup.Keys.Select(g => g.ToString()));
-                                TimeSpan late = now - currentGroup.Deadline.Value;
+                                var txlist = string.Join(",", currentGroup.Keys.Select(g => g.ToString()));
+                                var late = now - currentGroup.Deadline.Value;
                                 logger.LogWarning("Break-lock timeout for transactions {TransactionIds}. {Late}ms late", txlist, Math.Floor(late.TotalMilliseconds));
                                 await AbortExecutingTransactions(exception: null);
                                 lockWorker.Notify();
@@ -320,7 +320,7 @@ namespace Orleans.Transactions.State
                         }
                         else
                         {
-                            string txlist = string.Join(",", currentGroup.Keys.Select(g => g.ToString()));
+                            var txlist = string.Join(",", currentGroup.Keys.Select(g => g.ToString()));
                             logger.LogWarning("Deadline not set for transactions {TransactionIds}", txlist);
                         }
                     }
@@ -421,7 +421,7 @@ namespace Orleans.Transactions.State
 
         private bool HasConflict(bool isRead, DateTime priority, Guid transactionId, LockGroup group, out bool resolvable)
         {
-            bool foundResolvableConflicts = false;
+            var foundResolvableConflicts = false;
 
             foreach (var kvp in group)
             {
@@ -537,7 +537,7 @@ namespace Orleans.Transactions.State
                 {
                     multiple.Sort(Comparer);
 
-                    for (int i = 0; i < multiple.Count; i++)
+                    for (var i = 0; i < multiple.Count; i++)
                     {
                         currentGroup.Remove(multiple[i].TransactionId);
 

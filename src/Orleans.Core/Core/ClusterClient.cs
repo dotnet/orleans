@@ -37,7 +37,7 @@ namespace Orleans
             _clusterClientLifecycle = new ClusterClientLifecycle(_logger);
 
             // register all lifecycle participants
-            IEnumerable<ILifecycleParticipant<IClusterClientLifecycle>> lifecycleParticipants = ServiceProvider.GetServices<ILifecycleParticipant<IClusterClientLifecycle>>();
+            var lifecycleParticipants = ServiceProvider.GetServices<ILifecycleParticipant<IClusterClientLifecycle>>();
             foreach (var participant in lifecycleParticipants)
             {
                 participant?.Participate(_clusterClientLifecycle);

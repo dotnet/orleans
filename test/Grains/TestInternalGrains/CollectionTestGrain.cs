@@ -46,7 +46,7 @@ namespace UnitTests.Grains
         {
             staticCounter++;
             counter++;
-            int tmpCounter = counter;
+            var tmpCounter = counter;
             Logger().LogInformation("IncrCounter {Counter}, staticCounter {StaticCounter}.", tmpCounter, staticCounter);
             return Task.FromResult(counter);
         }
@@ -96,10 +96,10 @@ namespace UnitTests.Grains
 
         private async Task TimerCallback(object state)
         {
-            TimeSpan delayPeriod = (TimeSpan)state;
+            var delayPeriod = (TimeSpan)state;
             staticCounter++;
             counter++;
-            int tmpCounter = counter;
+            var tmpCounter = counter;
             Logger().LogInformation("Start TimerCallback {Counter}, staticCounter {StaticCounter}.", tmpCounter, staticCounter);
             await Task.Delay(delayPeriod);
             Logger().LogInformation("After first delay TimerCallback {Counter}, staticCounter {StaticCounter}.", tmpCounter, staticCounter);
@@ -142,7 +142,7 @@ namespace UnitTests.Grains
         public override async Task<int> IncrCounter()
         {
             staticCounter++;
-            int tmpCounter = counter++;
+            var tmpCounter = counter++;
             Logger().LogInformation("Reentrant:IncrCounter BEFORE Delay {Count}, staticCounter {StaticCounter}.", tmpCounter, staticCounter);
             await Task.Delay(TimeSpan.FromMilliseconds(1000));
             Logger().LogInformation("Reentrant:IncrCounter AFTER Delay {Count}, staticCounter {StaticCounter}.", tmpCounter, staticCounter);

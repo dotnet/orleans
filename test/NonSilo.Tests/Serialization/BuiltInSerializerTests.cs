@@ -154,13 +154,13 @@ namespace UnitTests.Serialization
         public void Serialize_BasicDictionaries()
         {
 
-            Dictionary<string, string> source1 = new Dictionary<string, string>();
+            var source1 = new Dictionary<string, string>();
             source1["Hello"] = "Yes";
             source1["Goodbye"] = "No";
             var deserialized = OrleansSerializationLoop(environment.Serializer, environment.DeepCopier, source1);
             ValidateDictionary<string, string>(source1, deserialized, "string/string");
 
-            Dictionary<int, DateTime> source2 = new Dictionary<int, DateTime>();
+            var source2 = new Dictionary<int, DateTime>();
             source2[3] = DateTime.Now;
             source2[27] = DateTime.Now.AddHours(2);
             deserialized = OrleansSerializationLoop(environment.Serializer, environment.DeepCopier, source2);
@@ -170,14 +170,14 @@ namespace UnitTests.Serialization
         [Fact, TestCategory("Functional")]
         public void Serialize_ReadOnlyDictionary()
         {
-            Dictionary<string, string> source1 = new Dictionary<string, string>();
+            var source1 = new Dictionary<string, string>();
             source1["Hello"] = "Yes";
             source1["Goodbye"] = "No";
             var readOnlySource1 = new ReadOnlyDictionary<string, string>(source1);
             var deserialized = OrleansSerializationLoop(environment.Serializer, environment.DeepCopier, readOnlySource1);
             ValidateReadOnlyDictionary(readOnlySource1, deserialized, "string/string");
 
-            Dictionary<int, DateTime> source2 = new Dictionary<int, DateTime>();
+            var source2 = new Dictionary<int, DateTime>();
             source2[3] = DateTime.Now;
             source2[27] = DateTime.Now.AddHours(2);
             var readOnlySource2 = new ReadOnlyDictionary<int, DateTime>(source2);
@@ -188,20 +188,20 @@ namespace UnitTests.Serialization
         [Fact, TestCategory("Functional")]
         public void Serialize_DictionaryWithComparer()
         {
-            Dictionary<string, string> source1 = new Dictionary<string, string>(new CaseInsensitiveStringEquality());
+            var source1 = new Dictionary<string, string>(new CaseInsensitiveStringEquality());
             source1["Hello"] = "Yes";
             source1["Goodbye"] = "No";
             var deserialized = OrleansSerializationLoop(environment.Serializer, environment.DeepCopier, source1);
             ValidateDictionary<string, string>(source1, deserialized, "case-insensitive string/string");
-            Dictionary<string, string> result1 = deserialized as Dictionary<string, string>;
+            var result1 = deserialized as Dictionary<string, string>;
             Assert.Equal(source1["Hello"], result1["hElLo"]); //Round trip for case insensitive string/string dictionary lost the custom comparer
 
-            Dictionary<int, DateTime> source2 = new Dictionary<int, DateTime>(new Mod5IntegerComparer());
+            var source2 = new Dictionary<int, DateTime>(new Mod5IntegerComparer());
             source2[3] = DateTime.Now;
             source2[27] = DateTime.Now.AddHours(2);
             deserialized = OrleansSerializationLoop(environment.Serializer, environment.DeepCopier, source2);
             ValidateDictionary<int, DateTime>(source2, deserialized, "int/date");
-            Dictionary<int, DateTime> result2 = (Dictionary<int, DateTime>)deserialized;
+            var result2 = (Dictionary<int, DateTime>)deserialized;
             Assert.Equal<DateTime>(source2[3], result2[13]);  //Round trip for case insensitive int/DateTime dictionary lost the custom comparer"
         }
 
@@ -211,7 +211,7 @@ namespace UnitTests.Serialization
             var source1 = new SortedDictionary<string, string>(new CaseInsensitiveStringComparer());
             source1["Hello"] = "Yes";
             source1["Goodbye"] = "No";
-            object deserialized = OrleansSerializationLoop(environment.Serializer, environment.DeepCopier, source1);
+            var deserialized = OrleansSerializationLoop(environment.Serializer, environment.DeepCopier, source1);
             ValidateSortedDictionary<string, string>(source1, deserialized, "string/string");
         }
 
@@ -221,7 +221,7 @@ namespace UnitTests.Serialization
             var source1 = new SortedList<string, string>(new CaseInsensitiveStringComparer());
             source1["Hello"] = "Yes";
             source1["Goodbye"] = "No";
-            object deserialized = OrleansSerializationLoop(environment.Serializer, environment.DeepCopier, source1);
+            var deserialized = OrleansSerializationLoop(environment.Serializer, environment.DeepCopier, source1);
             ValidateSortedList<string, string>(source1, deserialized, "string/string");
         }
 
@@ -252,7 +252,7 @@ namespace UnitTests.Serialization
             source1.Push("one");
             source1.Push("two");
             source1.Push("three");
-            object deserialized = OrleansSerializationLoop(environment.Serializer, environment.DeepCopier, source1);
+            var deserialized = OrleansSerializationLoop(environment.Serializer, environment.DeepCopier, source1);
             Assert.IsAssignableFrom(source1.GetType(), deserialized); //Type is wrong after round-trip of string stack
             var result = deserialized as Stack<string>;
             Assert.Equal(source1.Count, result.Count); //Count is wrong after round-trip of string stack
@@ -290,7 +290,7 @@ namespace UnitTests.Serialization
             source1.Add("one");
             source1.Add("two");
             source1.Add("three");
-            object deserialized = OrleansSerializationLoop(environment.Serializer, environment.DeepCopier, source1);
+            var deserialized = OrleansSerializationLoop(environment.Serializer, environment.DeepCopier, source1);
             Assert.IsAssignableFrom(source1.GetType(), deserialized); //Type is wrong after round-trip of string sorted set with comparer
             var result = (SortedSet<string>)deserialized;
             Assert.Equal(source1.Count, result.Count); //Count is wrong after round-trip of string sorted set with comparer
@@ -307,7 +307,7 @@ namespace UnitTests.Serialization
         public void Serialize_Array()
         {
             var source1 = new int[] { 1, 3, 5 };
-            object deserialized = OrleansSerializationLoop(environment.Serializer, environment.DeepCopier, source1);
+            var deserialized = OrleansSerializationLoop(environment.Serializer, environment.DeepCopier, source1);
             ValidateArray<int>(source1, deserialized, "int");
 
             var source2 = new string[] { "hello", "goodbye", "yes", "no", "", "I don't know" };
@@ -327,7 +327,7 @@ namespace UnitTests.Serialization
         public void Serialize_ArrayOfArrays()
         {
             var source1 = new[] { new[] { 1, 3, 5 }, new[] { 10, 20, 30 }, new[] { 17, 13, 11, 7, 5, 3, 2 } };
-            object deserialized = OrleansSerializationLoop(environment.Serializer, environment.DeepCopier, source1);
+            var deserialized = OrleansSerializationLoop(environment.Serializer, environment.DeepCopier, source1);
             ValidateArrayOfArrays(source1, deserialized, "int");
 
             var source2 = new[] { new[] { "hello", "goodbye", "yes", "no", "", "I don't know" }, new[] { "yes" } };
@@ -373,10 +373,10 @@ namespace UnitTests.Serialization
             ValidateArrayOfArrays(source4, deserialized, "grain reference");
 
             var source5 = new GrainReference[32][];
-            for (int i = 0; i < source5.Length; i++)
+            for (var i = 0; i < source5.Length; i++)
             {
                 source5[i] = new GrainReference[64];
-                for (int j = 0; j < source5[i].Length; j++)
+                for (var j = 0; j < source5[i].Length; j++)
                 {
                     source5[i][j] = (GrainReference)environment.InternalGrainFactory.GetGrain(LegacyGrainId.NewId());
                 }
@@ -392,7 +392,7 @@ namespace UnitTests.Serialization
             var source2 = new[] { new[] { 1, 3 }, new[] { 10, 20 }, new[] { 17, 13, 11, 7, 5 } };
             var source3 = new[] { new[] { 1, 3, 5 }, new[] { 10, 20, 30 } };
             var source = new[] { source1, source2, source3 };
-            object deserialized = OrleansSerializationLoop(environment.Serializer, environment.DeepCopier, source);
+            var deserialized = OrleansSerializationLoop(environment.Serializer, environment.DeepCopier, source);
             ValidateArrayOfArrayOfArrays(source, deserialized, "int");
         }
 
@@ -490,7 +490,7 @@ namespace UnitTests.Serialization
             Assert.Equal(27, result.B);  //Property B is wrong after deep copy of unrecognized"
 
             var test2 = new Unrecognized[3];
-            for (int i = 0; i < 3; i++)
+            for (var i = 0; i < 3; i++)
             {
                 test2[i] = new Unrecognized { A = i, B = 2 * i };
             }
@@ -498,7 +498,7 @@ namespace UnitTests.Serialization
             Assert.IsAssignableFrom<Unrecognized[]>(raw); //Type is wrong after round trip of array of unrecognized
             var result2 = (Unrecognized[])raw;
             Assert.Equal(3, result2.Length); //Array length is wrong after round trip of array of unrecognized
-            for (int j = 0; j < 3; j++)
+            for (var j = 0; j < 3; j++)
             {
                 Assert.Equal(j, result2[j].A); //Property A at index " + j + "is wrong after round trip of array of unrecognized
                 Assert.Equal(2 * j, result2[j].B); //Property B at index " + j + "is wrong after round trip of array of unrecognized
@@ -514,7 +514,7 @@ namespace UnitTests.Serialization
             Assert.Same(test1, raw); //Deep copy of [Immutable] object made a copy instead of just copying the pointer
 
             var test2list = new List<int>();
-            for (int i = 0; i < 3; i++)
+            for (var i = 0; i < 3; i++)
             {
                 test2list.Add(i);
             }
@@ -545,9 +545,9 @@ namespace UnitTests.Serialization
         public void Serialize_GrainReference()
         {
             GrainId grainId = LegacyGrainId.NewId();
-            GrainReference input = (GrainReference)environment.InternalGrainFactory.GetGrain(grainId);
+            var input = (GrainReference)environment.InternalGrainFactory.GetGrain(grainId);
 
-            object deserialized = OrleansSerializationLoop(environment.Serializer, environment.DeepCopier,  input);
+            var deserialized = OrleansSerializationLoop(environment.Serializer, environment.DeepCopier,  input);
 
             var grainRef = Assert.IsAssignableFrom<GrainReference>(deserialized); //GrainReference copied as wrong type
             Assert.Equal(grainId, grainRef.GrainId); //GrainId different after copy
@@ -559,7 +559,7 @@ namespace UnitTests.Serialization
             if (array1.Length != array2.Length)
                 return false;
 
-            for (int i = 0; i < array1.Length; i++)
+            for (var i = 0; i < array1.Length; i++)
             {
                 if (array1[i] != array2[i])
                     return false;
@@ -603,7 +603,7 @@ namespace UnitTests.Serialization
         private void ValidateSortedDictionary<K, V>(SortedDictionary<K, V> source, object deserialized, string type)
         {
             Assert.IsAssignableFrom<SortedDictionary<K, V>>(deserialized);
-            SortedDictionary<K, V> result = deserialized as SortedDictionary<K, V>;
+            var result = deserialized as SortedDictionary<K, V>;
             Assert.Equal(source.Count, result.Count); //Count is wrong after round-trip of " + type + " sorted dict
             foreach (var pair in source)
             {
@@ -622,7 +622,7 @@ namespace UnitTests.Serialization
         private void ValidateSortedList<K, V>(SortedList<K, V> source, object deserialized, string type)
         {
             Assert.IsAssignableFrom<SortedList<K, V>>(deserialized);
-            SortedList<K, V> result = deserialized as SortedList<K, V>;
+            var result = deserialized as SortedList<K, V>;
             Assert.Equal(source.Count, result.Count);  //Count is wrong after round-trip of " + type + " sorted list"
             foreach (var pair in source)
             {
@@ -647,7 +647,7 @@ namespace UnitTests.Serialization
         private void ValidateList<T>(IList<T> expected, IList<T> result, string type)
         {
             Assert.Equal(expected.Count, result.Count);
-            for (int i = 0; i < expected.Count; i++)
+            for (var i = 0; i < expected.Count; i++)
             {
                 Assert.Equal<T>(expected[i], result[i]); //Item " + i + " is wrong after round trip of " + type + " list
             }
@@ -657,7 +657,7 @@ namespace UnitTests.Serialization
         {
             var result = Assert.IsAssignableFrom<T[]>(deserialized);
             Assert.Equal(expected.Length, result.Length);  //Length is wrong after round-trip of " + type + " array"
-            for (int i = 0; i < expected.Length; i++)
+            for (var i = 0; i < expected.Length; i++)
             {
                 Assert.Equal<T>(expected[i], result[i]);  //Item " + i + " is wrong after round trip of " + type + " array"
             }
@@ -667,7 +667,7 @@ namespace UnitTests.Serialization
         {
             var result = Assert.IsAssignableFrom<T[][]>(deserialized);  //Type is wrong after round-trip of " + type + " array of arrays"
             Assert.Equal(expected.Length, result.Length);  //Length is wrong after round-trip of " + type + " array of arrays"
-            for (int i = 0; i < expected.Length; i++)
+            for (var i = 0; i < expected.Length; i++)
             {
                 ValidateArray<T>(expected[i], result[i], "Array of " + type + "[" + i + "] ");
             }
@@ -677,7 +677,7 @@ namespace UnitTests.Serialization
         {
             var result = Assert.IsAssignableFrom<T[][][]>(deserialized);  //Type is wrong after round-trip of " + type + " array of arrays"
             Assert.Equal(expected.Length, result.Length);  //Length is wrong after round-trip of " + type + " array of arrays"
-            for (int i = 0; i < expected.Length; i++)
+            for (var i = 0; i < expected.Length; i++)
             {
                 ValidateArrayOfArrays<T>(expected[i], result[i], "Array of " + type + "[" + i + "][]");
             }

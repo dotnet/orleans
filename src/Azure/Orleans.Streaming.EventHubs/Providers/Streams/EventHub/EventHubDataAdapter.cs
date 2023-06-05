@@ -74,7 +74,7 @@ namespace Orleans.Streaming.EventHubs
 
         public virtual StreamPosition GetStreamPosition(string partition, EventData queueMessage)
         {
-            StreamId streamId = GetStreamIdentity(queueMessage);
+            var streamId = GetStreamIdentity(queueMessage);
             StreamSequenceToken token =
                 new EventHubSequenceTokenV2(queueMessage.Offset.ToString(), queueMessage.SequenceNumber, 0);
             return new StreamPosition(streamId, token);
@@ -86,7 +86,7 @@ namespace Orleans.Streaming.EventHubs
         public virtual string GetOffset(CachedMessage lastItemPurged)
         {
             // TODO figure out how to get this from the adapter
-            int readOffset = 0;
+            var readOffset = 0;
             return SegmentBuilder.ReadNextString(lastItemPurged.Segment, ref readOffset); // read offset
         }
 
@@ -104,28 +104,28 @@ namespace Orleans.Streaming.EventHubs
         /// <returns>The stream identity.</returns>
         public virtual StreamId GetStreamIdentity(EventData queueMessage)
         {
-            string streamKey = queueMessage.PartitionKey;
-            string streamNamespace = queueMessage.GetStreamNamespaceProperty();
+            var streamKey = queueMessage.PartitionKey;
+            var streamNamespace = queueMessage.GetStreamNamespaceProperty();
             return StreamId.Create(streamNamespace, streamKey);
         }
 
         // Placed object message payload into a segment.
         protected virtual ArraySegment<byte> EncodeMessageIntoSegment(EventData queueMessage, Func<int, ArraySegment<byte>> getSegment)
         {
-            byte[] propertiesBytes = queueMessage.SerializeProperties(serializer);
+            var propertiesBytes = queueMessage.SerializeProperties(serializer);
             var payload = queueMessage.Body.Span;
             var offset = queueMessage.Offset.ToString();
             // get size of namespace, offset, partitionkey, properties, and payload
-            int size = SegmentBuilder.CalculateAppendSize(offset) +
+            var size = SegmentBuilder.CalculateAppendSize(offset) +
                 SegmentBuilder.CalculateAppendSize(queueMessage.PartitionKey) +
                 SegmentBuilder.CalculateAppendSize(propertiesBytes) +
                 SegmentBuilder.CalculateAppendSize(payload);
 
             // get segment
-            ArraySegment<byte> segment = getSegment(size);
+            var segment = getSegment(size);
 
             // encode namespace, offset, partitionkey, properties and payload into segment
-            int writeOffset = 0;
+            var writeOffset = 0;
             SegmentBuilder.Append(segment, ref writeOffset, offset);
             SegmentBuilder.Append(segment, ref writeOffset, queueMessage.PartitionKey);
             SegmentBuilder.Append(segment, ref writeOffset, propertiesBytes);

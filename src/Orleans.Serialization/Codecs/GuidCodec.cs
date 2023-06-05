@@ -55,7 +55,7 @@ namespace Orleans.Serialization.Codecs
 
             field.EnsureWireType(WireType.LengthPrefixed);
 
-            uint length = reader.ReadVarUInt32();
+            var length = reader.ReadVarUInt32();
             if (length != Width)
             {
                 throw new UnexpectedLengthPrefixValueException(nameof(Guid), Width, length);

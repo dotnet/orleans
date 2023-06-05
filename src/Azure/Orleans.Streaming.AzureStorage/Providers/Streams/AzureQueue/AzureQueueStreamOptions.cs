@@ -120,7 +120,7 @@ namespace Orleans.Configuration
 
         public static IConfigurationValidator Create(IServiceProvider services, string name)
         {
-            AzureQueueOptions aqOptions = services.GetOptionsByName<AzureQueueOptions>(name);
+            var aqOptions = services.GetOptionsByName<AzureQueueOptions>(name);
             return new AzureQueueOptionsValidator(aqOptions, name);
         }
     }

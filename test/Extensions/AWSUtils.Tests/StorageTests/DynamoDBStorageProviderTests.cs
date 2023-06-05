@@ -162,7 +162,7 @@ namespace AWSUtils.Tests.StorageTests
         private async Task<DynamoDBGrainStorage> InitDynamoDBGrainStorage(DynamoDBStorageOptions options)
         {
             options.GrainStorageSerializer = ActivatorUtilities.CreateInstance<JsonGrainStorageSerializer>(providerRuntime.ServiceProvider);
-            DynamoDBGrainStorage store = ActivatorUtilities.CreateInstance<DynamoDBGrainStorage>(providerRuntime.ServiceProvider, "StorageProviderTests", options);
+            var store = ActivatorUtilities.CreateInstance<DynamoDBGrainStorage>(providerRuntime.ServiceProvider, "StorageProviderTests", options);
             ISiloLifecycleSubject lifecycle = ActivatorUtilities.CreateInstance<SiloLifecycleSubject>(providerRuntime.ServiceProvider, NullLogger<SiloLifecycleSubject>.Instance);
             store.Participate(lifecycle);
             await lifecycle.OnStart();
@@ -189,12 +189,12 @@ namespace AWSUtils.Tests.StorageTests
             }
             var storedGrainState = new GrainState<TestStoreGrainState>(new TestStoreGrainState());
 
-            Stopwatch sw = new Stopwatch();
+            var sw = new Stopwatch();
             sw.Start();
 
             await store.ReadStateAsync(grainTypeName, reference, storedGrainState);
 
-            TimeSpan readTime = sw.Elapsed;
+            var readTime = sw.Elapsed;
             output.WriteLine("{0} - Read time = {1}", store.GetType().FullName, readTime);
 
             var storedState = storedGrainState.State;
@@ -213,12 +213,12 @@ namespace AWSUtils.Tests.StorageTests
                 grainState = TestStoreGrainState.NewRandomState();
             }
 
-            Stopwatch sw = new Stopwatch();
+            var sw = new Stopwatch();
             sw.Start();
 
             await store.WriteStateAsync(grainTypeName, reference, grainState);
 
-            TimeSpan writeTime = sw.Elapsed;
+            var writeTime = sw.Elapsed;
             sw.Restart();
 
             var storedGrainState = new GrainState<TestStoreGrainState>
@@ -226,7 +226,7 @@ namespace AWSUtils.Tests.StorageTests
                 State = new TestStoreGrainState()
             };
             await store.ReadStateAsync(grainTypeName, reference, storedGrainState);
-            TimeSpan readTime = sw.Elapsed;
+            var readTime = sw.Elapsed;
             output.WriteLine("{0} - Write time = {1} Read time = {2}", store.GetType().FullName, writeTime, readTime);
             Assert.Equal(grainState.State.A, storedGrainState.State.A);
             Assert.Equal(grainState.State.B, storedGrainState.State.B);
@@ -245,12 +245,12 @@ namespace AWSUtils.Tests.StorageTests
                 grainState = TestStoreGrainState.NewRandomState();
             }
 
-            Stopwatch sw = new Stopwatch();
+            var sw = new Stopwatch();
             sw.Start();
 
             await store.WriteStateAsync(grainTypeName, reference, grainState);
 
-            TimeSpan writeTime = sw.Elapsed;
+            var writeTime = sw.Elapsed;
             sw.Restart();
 
             await store.ClearStateAsync(grainTypeName, reference, grainState);
@@ -260,7 +260,7 @@ namespace AWSUtils.Tests.StorageTests
                 State = new TestStoreGrainState()
             };
             await store.ReadStateAsync(grainTypeName, reference, storedGrainState);
-            TimeSpan readTime = sw.Elapsed;
+            var readTime = sw.Elapsed;
             output.WriteLine("{0} - Write time = {1} Read time = {2}", store.GetType().FullName, writeTime, readTime);
             Assert.NotNull(storedGrainState.State);
             Assert.Equal(default, storedGrainState.State.A);

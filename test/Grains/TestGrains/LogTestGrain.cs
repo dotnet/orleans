@@ -80,8 +80,8 @@ namespace TestGrains
 
         public async Task<Tuple<int, bool>> SetAConditional(int x)
         {
-            int version = Version;
-            bool success = await RaiseConditionalEvent(new UpdateA() { Val = x });
+            var version = Version;
+            var success = await RaiseConditionalEvent(new UpdateA() { Val = x });
             return new Tuple<int, bool>(version, success);
         }
 

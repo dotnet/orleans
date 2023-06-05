@@ -20,7 +20,7 @@ namespace Orleans.Streams
         public IdSpan GetGrainKeyId(GrainBindings grainBindings, StreamId streamId)
         {
             string? keyType = null;
-            bool includeNamespaceInGrainId = false;
+            var includeNamespaceInGrainId = false;
 
             foreach (var grainBinding in grainBindings.Bindings)
             {

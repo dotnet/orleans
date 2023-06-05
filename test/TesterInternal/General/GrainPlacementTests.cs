@@ -96,7 +96,7 @@ namespace UnitTests.General
             logger.LogInformation("********************** Starting the test PreferLocalPlacedGrainShouldPlaceActivationsLocally ******************************");
             TestSilosStarted(2);
 
-            int numGrains = 20;
+            var numGrains = 20;
             var randomGrains =
                 Enumerable.Range(0, numGrains).
                     Select(
@@ -112,10 +112,10 @@ namespace UnitTests.General
             var preferLocalGrainPlaces = preferLocalGrainKeys.Select(key => GrainFactory.GetGrain<IPreferLocalPlacementTestGrain>(key).GetRuntimeInstanceId().Result).ToList();
 
             // check that every "prefer local grain" was placed on the same silo with its requesting random grain
-            foreach(int key in Enumerable.Range(0, numGrains))
+            foreach(var key in Enumerable.Range(0, numGrains))
             {
-                string random = randomGrainPlaces.ElementAt(key);
-                string preferLocal = preferLocalGrainPlaces.ElementAt(key);
+                var random = randomGrainPlaces.ElementAt(key);
+                var preferLocal = preferLocalGrainPlaces.ElementAt(key);
                 Assert.Equal(random, preferLocal);  //"Grains should be on the same silos, but they are on " + random + " and " + preferLocal
             }
         }
@@ -186,7 +186,7 @@ namespace UnitTests.General
             output.WriteLine("******************** Starting test ({0}) ********************", value);
             TestSilosStarted(2);
 
-            foreach (SiloHandle silo in HostedCluster.GetActiveSilos())
+            foreach (var silo in HostedCluster.GetActiveSilos())
             {
                 output.WriteLine(
                     "Silo {0} : Address = {1} Proxy gateway: {2}",
@@ -213,18 +213,18 @@ namespace UnitTests.General
             } while (!targetSilo.Equals(expected));
             output.WriteLine("Proxy grain was originally located on silo {0}", expected);
 
-            Guid grainKey = proxyKey;
+            var grainKey = proxyKey;
             await proxy.StartPreferLocalGrain(grainKey);
-            IPreferLocalPlacementTestGrain grain = GrainFactory.GetGrain<IPreferLocalPlacementTestGrain>(grainKey);
-            IPEndPoint actual = await grain.GetEndpoint();
+            var grain = GrainFactory.GetGrain<IPreferLocalPlacementTestGrain>(grainKey);
+            var actual = await grain.GetEndpoint();
             output.WriteLine("PreferLocalPlacement grain was originally located on silo {0}", actual);
             Assert.Equal(expected, actual);  // "PreferLocalPlacement strategy should create activations on the local silo."
 
-            SiloHandle siloToKill = HostedCluster.GetActiveSilos().First(s => s.SiloAddress.Endpoint.Equals(expected));
+            var siloToKill = HostedCluster.GetActiveSilos().First(s => s.SiloAddress.Endpoint.Equals(expected));
             output.WriteLine("Killing silo {0} hosting locally placed grain", siloToKill);
             await HostedCluster.StopSiloAsync(siloToKill);
 
-            IPEndPoint newActual = await grain.GetEndpoint();
+            var newActual = await grain.GetEndpoint();
             output.WriteLine("PreferLocalPlacement grain was recreated on silo {0}", newActual);
             Assert.NotEqual(expected, newActual);  // "PreferLocalPlacement strategy should recreate activations on other silo if local fails."
         }
@@ -239,7 +239,7 @@ namespace UnitTests.General
             output.WriteLine("******************** Starting test ({0}) ********************", value);
             TestSilosStarted(2);
 
-            foreach (SiloHandle silo in HostedCluster.GetActiveSilos())
+            foreach (var silo in HostedCluster.GetActiveSilos())
             {
                 output.WriteLine(
                     "Silo {0} : Address = {1} Proxy gateway: {2}",
@@ -266,27 +266,27 @@ namespace UnitTests.General
             } while (!targetSilo.Equals(expected));
             output.WriteLine("Proxy grain was originally located on silo {0}", expected);
 
-            Guid grainKey = proxyKey;
+            var grainKey = proxyKey;
             await proxy.StartPreferLocalGrain(grainKey);
-            IPreferLocalPlacementTestGrain grain = GrainFactory.GetGrain<IPreferLocalPlacementTestGrain>(grainKey);
-            IPEndPoint actual = await grain.GetEndpoint();
+            var grain = GrainFactory.GetGrain<IPreferLocalPlacementTestGrain>(grainKey);
+            var actual = await grain.GetEndpoint();
             output.WriteLine("PreferLocalPlacement grain was originally located on silo {0}", actual);
             Assert.Equal(expected, actual);  // "PreferLocalPlacement strategy should create activations on the local silo."
 
-            SiloHandle siloToKill = HostedCluster.GetActiveSilos().First(s => !s.SiloAddress.Endpoint.Equals(expected));
+            var siloToKill = HostedCluster.GetActiveSilos().First(s => !s.SiloAddress.Endpoint.Equals(expected));
             output.WriteLine("Killing other silo {0} not hosting locally placed grain", siloToKill);
             await HostedCluster.StopSiloAsync(siloToKill);
 
-            IPEndPoint newActual = await grain.GetEndpoint();
+            var newActual = await grain.GetEndpoint();
             output.WriteLine("PreferLocalPlacement grain is now located on silo {0}", newActual);
             Assert.Equal(expected, newActual);  // "PreferLocalPlacement strategy should not move activations when other non-hosting silo fails."
         }
 
         private void TestSilosStarted(int expected)
         {
-            IManagementGrain mgmtGrain = GrainFactory.GetGrain<IManagementGrain>(0);
+            var mgmtGrain = GrainFactory.GetGrain<IManagementGrain>(0);
 
-            Dictionary<SiloAddress, SiloStatus> statuses = mgmtGrain.GetHosts(onlyActive: true).Result;
+            var statuses = mgmtGrain.GetHosts(onlyActive: true).Result;
             foreach (var pair in statuses)
             {
                 logger.LogInformation("       ######## Silo {SiloAddress}, status: {Status}", pair.Key, pair.Value);

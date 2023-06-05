@@ -110,7 +110,7 @@ namespace Orleans.Analyzers
 
         public static bool IsFieldOrAutoProperty(this MemberDeclarationSyntax member)
         {
-            bool isFieldOrAutoProperty = false;
+            var isFieldOrAutoProperty = false;
             switch (member)
             {
                 case FieldDeclarationSyntax:
@@ -118,7 +118,7 @@ namespace Orleans.Analyzers
                     break;
                 case PropertyDeclarationSyntax property:
                     {
-                        bool hasBody = property.ExpressionBody is not null;
+                        var hasBody = property.ExpressionBody is not null;
                         var accessors = property.AccessorList?.Accessors;
                         if (!hasBody && accessors.HasValue)
                         {

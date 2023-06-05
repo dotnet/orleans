@@ -92,7 +92,7 @@ namespace Orleans.Runtime
                 }
                 else
                 {
-                    foreach (Exception inner in loaderExceptions)
+                    foreach (var inner in loaderExceptions)
                     {
                         // call recursively on all loader exceptions. Same level for all.
                         PrintException_Helper(sb, inner, level + 1);
@@ -103,7 +103,7 @@ namespace Orleans.Runtime
             {
                 if (exception is AggregateException { InnerExceptions: { Count: > 1 } innerExceptions })
                 {
-                    foreach (Exception inner in innerExceptions)
+                    foreach (var inner in innerExceptions)
                     {
                         // call recursively on all inner exceptions. Same level for all.
                         PrintException_Helper(sb, inner, level + 1);

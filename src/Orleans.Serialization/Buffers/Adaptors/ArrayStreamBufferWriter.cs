@@ -80,14 +80,14 @@ namespace Orleans.Serialization.Buffers.Adaptors
 
             if (sizeHint > _buffer.Length - _index)
             {
-                int growBy = Math.Max(sizeHint, _buffer.Length);
+                var growBy = Math.Max(sizeHint, _buffer.Length);
 
                 if (_buffer.Length == 0)
                 {
                     growBy = Math.Max(growBy, DefaultInitialBufferSize);
                 }
 
-                int newSize = checked(_buffer.Length + growBy);
+                var newSize = checked(_buffer.Length + growBy);
 
                 Array.Resize(ref _buffer, newSize);
             }

@@ -103,7 +103,7 @@ namespace Orleans
             if (highStage.HasValue) throw new InvalidOperationException("Lifecycle has already been started.");
             try
             {
-                foreach (IGrouping<int, OrderedObserver> observerGroup in subscribers
+                foreach (var observerGroup in subscribers
                     .GroupBy(orderedObserver => orderedObserver.Stage)
                     .OrderBy(group => group.Key))
                 {
@@ -174,7 +174,7 @@ namespace Orleans
             // if not started, do nothing
             if (!highStage.HasValue) return;
             var loggedCancellation = false;
-            foreach (IGrouping<int, OrderedObserver> observerGroup in subscribers
+            foreach (var observerGroup in subscribers
                 // include up to highest started stage
                 .Where(orderedObserver => orderedObserver.Stage <= highStage && orderedObserver.Observer != null)
                 .GroupBy(orderedObserver => orderedObserver.Stage)

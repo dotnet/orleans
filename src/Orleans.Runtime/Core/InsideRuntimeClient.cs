@@ -122,7 +122,7 @@ namespace Orleans.Runtime
             if (message.SendingSilo == null)
                 message.SendingSilo = MySilo;
 
-            IGrainContext sendingActivation = RuntimeContext.Current;
+            var sendingActivation = RuntimeContext.Current;
 
             if (sendingActivation == null)
             {
@@ -200,7 +200,7 @@ namespace Orleans.Runtime
             {
                 if (message.CacheInvalidationHeader != null)
                 {
-                    foreach (GrainAddress address in message.CacheInvalidationHeader)
+                    foreach (var address in message.CacheInvalidationHeader)
                     {
                         GrainLocator.InvalidateCache(address);
                     }
@@ -435,7 +435,7 @@ namespace Orleans.Runtime
             }
 
             CallbackData callbackData;
-            bool found = callbacks.TryRemove((message.TargetGrain, message.Id), out callbackData);
+            var found = callbacks.TryRemove((message.TargetGrain, message.Id), out callbackData);
             if (found)
             {
                 // IMPORTANT: we do not schedule the response callback via the scheduler, since the only thing it does

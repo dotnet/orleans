@@ -30,7 +30,7 @@ namespace UnitTests.Grains
 
         public Task LongCall()
         {
-            int count = 0;
+            var count = 0;
             lock (allActivationIds)
             {
                 if (!allActivationIds.Contains(activationGuid))
@@ -39,13 +39,13 @@ namespace UnitTests.Grains
                 }
                 count = allActivationIds.Count;
             }
-            DateTime start = DateTime.UtcNow;
-            TaskCompletionSource<bool> resolver = new TaskCompletionSource<bool>();
+            var start = DateTime.UtcNow;
+            var resolver = new TaskCompletionSource<bool>();
             RegisterTimer(TimerCallback, resolver, TimeSpan.FromSeconds(2), TimeSpan.FromMilliseconds(-1));
             return resolver.Task.ContinueWith(
                 (_) =>
                 {
-                    DateTime stop = DateTime.UtcNow;
+                    var stop = DateTime.UtcNow;
                     calls.Add(new Tuple<DateTime, DateTime>(start, stop));
                     logger.LogInformation("{DurationMilliseconds}", (stop - start).TotalMilliseconds);
                     logger.LogInformation(
@@ -67,7 +67,7 @@ namespace UnitTests.Grains
         public Task<Tuple<Guid, string, List<Tuple<DateTime, DateTime>>>> GetCallStats()
         {
             Thread.Sleep(200);
-            string silo = RuntimeIdentity;
+            var silo = RuntimeIdentity;
             List<Guid> ids;
             lock (allActivationIds)
             {

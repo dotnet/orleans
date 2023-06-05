@@ -154,8 +154,8 @@ namespace Orleans.Messaging
         /// <returns></returns>
         public SiloAddress GetLiveGateway()
         {
-            List<SiloAddress> live = GetLiveGateways();
-            int count = live.Count;
+            var live = GetLiveGateways();
+            var count = live.Count;
             if (count > 0)
             {
                 lock (lockable)
@@ -256,7 +256,7 @@ namespace Orleans.Messaging
                 var now = DateTime.UtcNow;
 
                 knownGateways = refreshedGateways as List<SiloAddress> ?? refreshedGateways.ToList();
-                foreach (SiloAddress trial in knownGateways)
+                foreach (var trial in knownGateways)
                 {
                     var address = trial.Generation == 0 ? trial : SiloAddress.New(trial.Endpoint, 0);
 
@@ -309,7 +309,7 @@ namespace Orleans.Messaging
                 cachedLiveGateways = live;
                 cachedLiveGatewaysSet = new HashSet<SiloAddress>(live);
 
-                DateTime prevRefresh = lastRefreshTime;
+                var prevRefresh = lastRefreshTime;
                 lastRefreshTime = now;
                 if (logger.IsEnabled(LogLevel.Debug))
                 {

@@ -29,10 +29,10 @@ namespace Orleans.Streams
             }
             else
             {
-                uint portion = checked((uint)(RangeFactory.RING_SIZE / numQueues + 1));
+                var portion = checked((uint)(RangeFactory.RING_SIZE / numQueues + 1));
                 for (uint i = 0; i < numQueues; i++)
                 {
-                    uint uniformHashCode = checked(portion * i);
+                    var uniformHashCode = checked(portion * i);
                     queueIds[i] = QueueId.GetQueueId(queueNamePrefix, i, uniformHashCode);
                 }
             }
@@ -44,7 +44,7 @@ namespace Orleans.Streams
         public IEnumerable<QueueId> GetQueuesForRange(IRingRange range)
         {
             var ls = new List<QueueId>();
-            foreach (QueueId queueId in hashRing.GetAllRingMembers())
+            foreach (var queueId in hashRing.GetAllRingMembers())
             {
                 if (range.InRange(queueId.GetUniformHashCode()))
                 {

@@ -21,7 +21,7 @@ public class HistogramAggregatorTests
         aggregator.Record(20);
         aggregator.Record(100);
         var buckets = aggregator.CollectBuckets().ToArray();
-        for(int i = 0; i < bounds.Length; i++)
+        for(var i = 0; i < bounds.Length; i++)
         {
             Assert.Equal("foo", buckets[i].Tags[0].Key);
             Assert.Equal("bar", buckets[i].Tags[0].Value);

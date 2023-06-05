@@ -163,7 +163,7 @@ namespace Orleans.CodeGenerator.SyntaxGeneration
                 if (symbol.TypeArguments.Length > 0)
                 {
                     res.Append('<');
-                    bool first = true;
+                    var first = true;
                     foreach (var typeParameter in symbol.TypeArguments)
                     {
                         if (!first)

@@ -57,28 +57,28 @@ namespace UnitTests.General
         [Fact, TestCategory("BVT"), TestCategory("Identifiers")]
         public void ParsingUniqueKeyStringificationShouldReproduceAnIdenticalObject()
         {
-            UniqueKey expected1 = UniqueKey.NewKey(Guid.NewGuid());
-            string str1 = expected1.ToHexString();
-            UniqueKey actual1 = UniqueKey.Parse(str1.AsSpan());
+            var expected1 = UniqueKey.NewKey(Guid.NewGuid());
+            var str1 = expected1.ToHexString();
+            var actual1 = UniqueKey.Parse(str1.AsSpan());
             Assert.Equal(expected1, actual1); // UniqueKey.ToString() and UniqueKey.Parse() failed to reproduce an identical object (case 1).
 
-            string kx3 = "case 3";
-            UniqueKey expected3 = UniqueKey.NewKey(Guid.NewGuid(), category: UniqueKey.Category.KeyExtGrain, keyExt: kx3);
-            string str3 = expected3.ToHexString();
-            UniqueKey actual3 = UniqueKey.Parse(str3.AsSpan());
+            var kx3 = "case 3";
+            var expected3 = UniqueKey.NewKey(Guid.NewGuid(), category: UniqueKey.Category.KeyExtGrain, keyExt: kx3);
+            var str3 = expected3.ToHexString();
+            var actual3 = UniqueKey.Parse(str3.AsSpan());
             Assert.Equal(expected3, actual3); // UniqueKey.ToString() and UniqueKey.Parse() failed to reproduce an identical object (case 3).
 
             long pk = random.Next();
-            UniqueKey expected4 = UniqueKey.NewKey(pk);
-            string str4 = expected4.ToHexString();
-            UniqueKey actual4 = UniqueKey.Parse(str4.AsSpan());
+            var expected4 = UniqueKey.NewKey(pk);
+            var str4 = expected4.ToHexString();
+            var actual4 = UniqueKey.Parse(str4.AsSpan());
             Assert.Equal(expected4, actual4); // UniqueKey.ToString() and UniqueKey.Parse() failed to reproduce an identical object (case 4).
 
             pk = random.Next();
-            string kx5 = "case 5";
-            UniqueKey expected5 = UniqueKey.NewKey(pk, category: UniqueKey.Category.KeyExtGrain, keyExt: kx5);
-            string str5 = expected5.ToHexString();
-            UniqueKey actual5 = UniqueKey.Parse(str5.AsSpan());
+            var kx5 = "case 5";
+            var expected5 = UniqueKey.NewKey(pk, category: UniqueKey.Category.KeyExtGrain, keyExt: kx5);
+            var str5 = expected5.ToHexString();
+            var actual5 = UniqueKey.Parse(str5.AsSpan());
             Assert.Equal(expected5, actual5); // UniqueKey.ToString() and UniqueKey.Parse() failed to reproduce an identical object (case 5).
         }
 
@@ -87,11 +87,11 @@ namespace UnitTests.General
         public void GrainIdShouldEncodeAndDecodePrimaryKeyGuidCorrectly()
         {
             const int repeat = 100;
-            for (int i = 0; i < repeat; ++i)
+            for (var i = 0; i < repeat; ++i)
             {
-                Guid expected = Guid.NewGuid();
-                GrainId grainId = GrainId.Create(GrainType.Create("foo"), GrainIdKeyExtensions.CreateGuidKey(expected));
-                Guid actual = grainId.GetGuidKey();
+                var expected = Guid.NewGuid();
+                var grainId = GrainId.Create(GrainType.Create("foo"), GrainIdKeyExtensions.CreateGuidKey(expected));
+                var actual = grainId.GetGuidKey();
                 Assert.Equal(expected, actual); // Failed to encode and decode grain id
             }
         }
@@ -99,12 +99,12 @@ namespace UnitTests.General
         [Fact, TestCategory("SlowBVT"), TestCategory("Identifiers")]
         public void GrainId_ToFromPrintableString()
         {
-            Guid guid = Guid.NewGuid();
-            GrainId grainId = GrainId.Create(GrainType.Create("test"), GrainIdKeyExtensions.CreateGuidKey(guid));
-            GrainId roundTripped = RoundTripGrainIdToParsable(grainId);
+            var guid = Guid.NewGuid();
+            var grainId = GrainId.Create(GrainType.Create("test"), GrainIdKeyExtensions.CreateGuidKey(guid));
+            var roundTripped = RoundTripGrainIdToParsable(grainId);
             Assert.Equal(grainId, roundTripped); // GrainId.ToPrintableString -- Guid key
 
-            string extKey = "Guid-ExtKey-1";
+            var extKey = "Guid-ExtKey-1";
             guid = Guid.NewGuid();
             grainId = GrainId.Create(GrainType.Create("test"), GrainIdKeyExtensions.CreateGuidKey(guid, extKey));
             roundTripped = RoundTripGrainIdToParsable(grainId);
@@ -133,7 +133,7 @@ namespace UnitTests.General
 
         private GrainId RoundTripGrainIdToParsable(GrainId input)
         {
-            string str = input.ToString();
+            var str = input.ToString();
             return GrainId.Parse(str);
         }
 
@@ -189,13 +189,13 @@ namespace UnitTests.General
         [Fact, TestCategory("BVT"), TestCategory("Identifiers")]
         public void ID_Interning_GrainID()
         {
-            Guid guid = new Guid();
+            var guid = new Guid();
             GrainId gid1 = LegacyGrainId.FromParsableString(guid.ToString("B"));
             GrainId gid2 = LegacyGrainId.FromParsableString(guid.ToString("N"));
             Assert.Equal(gid1, gid2); // Should be equal GrainId's
 
             // Round-trip through Serializer
-            GrainId gid3 = environment.Serializer.Deserialize<GrainId>(environment.Serializer.SerializeToArray(gid1));
+            var gid3 = environment.Serializer.Deserialize<GrainId>(environment.Serializer.SerializeToArray(gid1));
             Assert.Equal(gid1, gid3); // Should be equal GrainId's
             Assert.Equal(gid2, gid3); // Should be equal GrainId's
         }
@@ -205,14 +205,14 @@ namespace UnitTests.General
         {
             using var interner = new Interner<string, string>();
             const string str = "1";
-            string r1 = interner.FindOrCreate("1", _ => str);
-            string r2 = interner.FindOrCreate("1", _ => null); // Should always be found
+            var r1 = interner.FindOrCreate("1", _ => str);
+            var r2 = interner.FindOrCreate("1", _ => null); // Should always be found
 
             Assert.Equal(r1, r2); // 1: Objects should be equal
             Assert.Same(r1, r2); // 2: Objects should be same / intern'ed
 
             // Round-trip through Serializer
-            string r3 = environment.Serializer.Deserialize<string>(environment.Serializer.SerializeToArray(r1));
+            var r3 = environment.Serializer.Deserialize<string>(environment.Serializer.SerializeToArray(r1));
 
             Assert.Equal(r1, r3); // 3: Should be equal
             Assert.Equal(r2, r3); // 4: Should be equal
@@ -254,13 +254,13 @@ namespace UnitTests.General
         public void Interning_SiloAddress()
         {
             //string addrStr1 = "1.2.3.4@11111@1";
-            SiloAddress a1 = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 1111), 12345);
-            SiloAddress a2 = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 1111), 12345);
+            var a1 = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 1111), 12345);
+            var a2 = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 1111), 12345);
             Assert.Equal(a1, a2); // Should be equal SiloAddress's
             Assert.Same(a1, a2); // Should be same / intern'ed SiloAddress object
 
             // Round-trip through Serializer
-            SiloAddress a3 = environment.Serializer.Deserialize<SiloAddress>(environment.Serializer.SerializeToArray(a1));
+            var a3 = environment.Serializer.Deserialize<SiloAddress>(environment.Serializer.SerializeToArray(a1));
             Assert.Equal(a1, a3); // Should be equal SiloAddress's
             Assert.Equal(a2, a3); // Should be equal SiloAddress's
             Assert.Same(a1, a3); // Should be same / intern'ed SiloAddress object
@@ -270,8 +270,8 @@ namespace UnitTests.General
         [Fact, TestCategory("BVT"), TestCategory("Identifiers")]
         public void Interning_SiloAddress2()
         {
-            SiloAddress a1 = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 1111), 12345);
-            SiloAddress a2 = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 2222), 12345);
+            var a1 = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 1111), 12345);
+            var a2 = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 2222), 12345);
             Assert.NotEqual(a1, a2); // Should not be equal SiloAddress's
             Assert.NotSame(a1, a2); // Should not be same / intern'ed SiloAddress object
         }
@@ -279,10 +279,10 @@ namespace UnitTests.General
         [Fact, TestCategory("BVT"), TestCategory("Identifiers")]
         public void Interning_SiloAddress_Serialization()
         {
-            SiloAddress a1 = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 1111), 12345);
+            var a1 = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 1111), 12345);
 
             // Round-trip through Serializer
-            SiloAddress a3 = environment.Serializer.Deserialize<SiloAddress>(environment.Serializer.SerializeToArray(a1));
+            var a3 = environment.Serializer.Deserialize<SiloAddress>(environment.Serializer.SerializeToArray(a1));
             Assert.Equal(a1, a3); // Should be equal SiloAddress's
             Assert.Same(a1, a3); // Should be same / intern'ed SiloAddress object
         }
@@ -290,10 +290,10 @@ namespace UnitTests.General
         [Fact, TestCategory("BVT"), TestCategory("Identifiers")]
         public void SiloAddress_ToFrom_ParsableString()
         {
-            SiloAddress address1 = SiloAddressUtils.NewLocalSiloAddress(12345);
+            var address1 = SiloAddressUtils.NewLocalSiloAddress(12345);
 
-            string addressStr1 = address1.ToParsableString();
-            SiloAddress addressObj1 = SiloAddress.FromParsableString(addressStr1);
+            var addressStr1 = address1.ToParsableString();
+            var addressObj1 = SiloAddress.FromParsableString(addressStr1);
 
             output.WriteLine("Convert -- From: {0} Got result string: '{1}' object: {2}",
                 address1, addressStr1, addressObj1);
@@ -302,8 +302,8 @@ namespace UnitTests.General
 
             //const string addressStr2 = "127.0.0.1-11111-144611139";
             const string addressStr2 = "127.0.0.1:11111@144611139";
-            SiloAddress addressObj2 = SiloAddress.FromParsableString(addressStr2);
-            string addressStr2Out = addressObj2.ToParsableString();
+            var addressObj2 = SiloAddress.FromParsableString(addressStr2);
+            var addressStr2Out = addressObj2.ToParsableString();
 
             output.WriteLine("Convert -- From: {0} Got result string: '{1}' object: {2}",
                 addressStr2, addressStr2Out, addressObj2);
@@ -313,9 +313,9 @@ namespace UnitTests.General
         [Fact, TestCategory("BVT"), TestCategory("Identifiers"), TestCategory("GrainReference")]
         public void GrainReference_Test1()
         {
-            Guid guid = Guid.NewGuid();
+            var guid = Guid.NewGuid();
             GrainId regularGrainId = LegacyGrainId.GetGrainIdForTesting(guid);
-            GrainReference grainRef = (GrainReference)environment.InternalGrainFactory.GetGrain(regularGrainId);
+            var grainRef = (GrainReference)environment.InternalGrainFactory.GetGrain(regularGrainId);
             TestGrainReference(grainRef);
 
             grainRef = (GrainReference)environment.InternalGrainFactory.GetGrain(regularGrainId);
@@ -324,7 +324,7 @@ namespace UnitTests.General
 
         private void TestGrainReference(GrainReference grainRef)
         {
-            GrainReference roundTripped = RoundTripGrainReferenceToKey(grainRef);
+            var roundTripped = RoundTripGrainReferenceToKey(grainRef);
             Assert.Equal(grainRef, roundTripped); // GrainReference.ToKeyString
 
             roundTripped = environment.Serializer.Deserialize<GrainReference>(environment.Serializer.SerializeToArray(grainRef));
@@ -333,8 +333,8 @@ namespace UnitTests.General
 
         private GrainReference RoundTripGrainReferenceToKey(GrainReference input)
         {
-            string str = input.GrainId.ToString();
-            GrainReference output = environment.Services.GetRequiredService<GrainReferenceActivator>().CreateReference(GrainId.Parse(str), default);
+            var str = input.GrainId.ToString();
+            var output = environment.Services.GetRequiredService<GrainReferenceActivator>().CreateReference(GrainId.Parse(str), default);
             return output;
         }
     }
