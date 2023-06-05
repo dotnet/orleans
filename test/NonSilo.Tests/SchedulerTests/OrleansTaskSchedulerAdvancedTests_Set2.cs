@@ -104,7 +104,7 @@ namespace UnitTests.SchedulerTests
 
             int n = 0;
 
-            Action action = () =>
+            void action()
             {
                 LogContext("WorkItem-task " + Task.CurrentId);
 
@@ -131,7 +131,7 @@ namespace UnitTests.SchedulerTests
                         this.output.WriteLine("Sub-task " + id + " Done");
                     });
                 }
-            };
+            }
 
             Task t = new Task(action);
 
@@ -702,7 +702,7 @@ namespace UnitTests.SchedulerTests
                 
                 Task t1 = grain.Test1();
 
-                Action wrappedDoneAction = () => { wrappedDone.SetResult(true); };
+                void wrappedDoneAction() { wrappedDone.SetResult(true); }
 
                 if (bounceToThreadPool)
                 {

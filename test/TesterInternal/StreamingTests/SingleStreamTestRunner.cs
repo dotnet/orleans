@@ -318,8 +318,7 @@ namespace UnitTests.StreamingTests
             var producerCount = await producer.ProducerCount;
             logger.LogInformation("\n** Test {TestNumber} BasicTestAsync: producerCount={ProducerCount}.\n", testNumber, producerCount);
 
-            Func<bool, Task<bool>> waitUntilFunc =
-                async lastTry =>
+            async Task<bool> waitUntilFunc(bool lastTry) =>
                     0 < await TestUtils.GetActivationCount(this.client, consumerTypeName) && await this.CheckCounters(this.producer, this.consumer, false);
             await producer.ProduceSequentialSeries(ItemCount);
             await TestingUtils.WaitUntilAsync(waitUntilFunc, _timeout);
@@ -339,8 +338,7 @@ namespace UnitTests.StreamingTests
             var producerCount = await producer.ProducerCount;
             logger.LogInformation("\n** Test {TestNumber} BasicTestAsync: producerCount={ProducerCount}.\n", testNumber, producerCount);
 
-            Func<bool, Task<bool>> waitUntilFunc =
-                async lastTry =>
+            async Task<bool> waitUntilFunc(bool lastTry) =>
                     0 < await TestUtils.GetActivationCount(this.client, consumerTypeName) && await this.CheckCounters(this.producer, this.consumer, false);
             await producer.ProduceSequentialSeries(ItemCount);
             await TestingUtils.WaitUntilAsync(waitUntilFunc, _timeout);
@@ -361,8 +359,7 @@ namespace UnitTests.StreamingTests
             var producerCount = await producer.ProducerCount;
             logger.LogInformation("\n** Test {TestNumber} BasicTestAsync: producerCount={ProducerCount}.\n", testNumber, producerCount);
 
-            Func<bool, Task<bool>> waitUntilFunc =
-                async lastTry =>
+            async Task<bool> waitUntilFunc(bool lastTry) =>
                     0 < await TestUtils.GetActivationCount(this.client, consumerTypeName) && await this.CheckCounters(this.producer, this.consumer, false);
             await producer.ProduceSequentialSeries(ItemCount);
             await TestingUtils.WaitUntilAsync(waitUntilFunc, _timeout);

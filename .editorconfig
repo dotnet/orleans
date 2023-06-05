@@ -38,7 +38,7 @@ insert_final_newline = true
 end_of_line = lf
 
 # Dotnet Code Style Settings
-# See https://docs.microsoft.com/visualstudio/ide/editorconfig-code-style-settings-reference
+# See https://learn.microsoft.com/visualstudio/ide/editorconfig-code-style-settings-reference
 # See http://kent-boogaart.com/blog/editorconfig-reference-for-c-developers
 [*.{cs,csx,cake,vb}]
 dotnet_sort_system_directives_first                                          = true
@@ -161,7 +161,7 @@ dotnet_naming_rule.private_members_with_underscore.style                     = p
 dotnet_naming_rule.private_members_with_underscore.severity                  = suggestion
 
 # C# Code Style Settings
-# See https://docs.microsoft.com/en-us/visualstudio/ide/editorconfig-code-style-settings-reference
+# See https://learn.microsoft.com/visualstudio/ide/editorconfig-code-style-settings-reference
 # See http://kent-boogaart.com/blog/editorconfig-reference-for-c-developers
 [*.{cs,csx,cake}]
 # Indentation Options

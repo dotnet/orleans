@@ -33,7 +33,7 @@ namespace Consul.Tests
         {
             var fakeConsul = new FakeConsul();
             var options = new ConsulClusteringOptions();
-            Func<IConsulClient> callback = () => fakeConsul;
+            IConsulClient callback() => fakeConsul;
 
             //we can inject the consul
             options.ConfigureConsulClient(callback);

@@ -137,7 +137,7 @@ namespace Orleans.Transactions.State
 
             var result =
                 new TaskCompletionSource<TResult>(TaskCreationOptions.RunContinuationsAsynchronously);
-            Action completion = () =>
+            void completion()
             {
                 try
                 {
@@ -147,7 +147,7 @@ namespace Orleans.Transactions.State
                 {
                     result.TrySetException(exception);
                 }
-            };
+            }
 
             if (group != currentGroup)
             {
