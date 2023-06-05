@@ -34,7 +34,7 @@ namespace Orleans.Runtime
         /// Called on the original activation when migration is initiated, after <see cref="IGrainBase.OnDeactivateAsync(DeactivationReason, CancellationToken)"/> completes.
         /// The participant can access and update the dehydration context.
         /// </summary>
-        /// <param name="dehydrationContext"></param>
+        /// <param name="dehydrationContext">The dehydration context.</param>
         void OnDehydrate(IDehydrationContext dehydrationContext);
 
         /// <summary>
