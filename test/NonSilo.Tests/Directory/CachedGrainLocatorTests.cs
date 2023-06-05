@@ -112,6 +112,87 @@ namespace UnitTests.Directory
         }
 
         [Fact]
+        public async Task RegisterWhenOtherEntryExistsAndPreviousAddressMatches()
+        {
+            var silo = GenerateSiloAddress();
+
+            // Setup membership service
+            this.mockMembershipService.UpdateSiloStatus(silo, SiloStatus.Active, "exp");
+            await this.lifecycle.OnStart();
+            await WaitUntilClusterChangePropagated();
+
+            var existing = GenerateGrainAddress(silo);
+            var replacement = new GrainAddress
+            {
+                ActivationId = ActivationId.NewId(),
+                SiloAddress = GenerateSiloAddress(),
+                GrainId = existing.GrainId,
+                MembershipVersion = existing.MembershipVersion
+            };
+
+            this.grainDirectory.Register(replacement, previousAddress: null).Returns(existing);
+
+            var actual = await this.grainLocator.Register(replacement, previousAddress: null);
+            Assert.Equal(existing, actual);
+            await this.grainDirectory.Received(1).Register(replacement, previousAddress: null);
+            this.grainDirectory.ClearReceivedCalls();
+
+            this.grainDirectory.Register(replacement, previousAddress: existing).Returns(replacement);
+            actual = await this.grainLocator.Register(replacement, previousAddress: existing);
+            await this.grainDirectory.Received(1).Register(replacement, previousAddress: existing);
+            Assert.Equal(replacement, actual);
+
+            // Now should be in cache
+            Assert.True(this.grainLocator.TryLookupInCache(replacement.GrainId, out var result));
+            Assert.NotNull(result);
+            Assert.Equal(replacement, result);
+        }
+
+        [Fact]
+        public async Task RegisterWhenOtherEntryExistsAndPreviousAddressDoesNotMatch()
+        {
+            var silo = GenerateSiloAddress();
+
+            // Setup membership service
+            this.mockMembershipService.UpdateSiloStatus(silo, SiloStatus.Active, "exp");
+            await this.lifecycle.OnStart();
+            await WaitUntilClusterChangePropagated();
+
+            var existing = GenerateGrainAddress(silo);
+            var nonMatching = new GrainAddress
+            {
+                ActivationId = ActivationId.NewId(),
+                SiloAddress = GenerateSiloAddress(),
+                GrainId = existing.GrainId,
+                MembershipVersion = existing.MembershipVersion
+            };
+            var replacement = new GrainAddress
+            {
+                ActivationId = ActivationId.NewId(),
+                SiloAddress = GenerateSiloAddress(),
+                GrainId = existing.GrainId,
+                MembershipVersion = existing.MembershipVersion
+            };
+
+            this.grainDirectory.Register(replacement, previousAddress: null).Returns(existing);
+
+            var actual = await this.grainLocator.Register(replacement, previousAddress: null);
+            Assert.Equal(existing, actual);
+            await this.grainDirectory.Received(1).Register(replacement, previousAddress: null);
+            this.grainDirectory.ClearReceivedCalls();
+
+            this.grainDirectory.Register(replacement, previousAddress: nonMatching).Returns(existing);
+            actual = await this.grainLocator.Register(replacement, previousAddress: nonMatching);
+            await this.grainDirectory.Received(1).Register(replacement, previousAddress: nonMatching);
+            Assert.Equal(existing, actual);
+
+            // Cache should contain original address
+            Assert.True(this.grainLocator.TryLookupInCache(replacement.GrainId, out var result));
+            Assert.NotNull(result);
+            Assert.Equal(existing, result);
+        }
+
+        [Fact]
         public async Task RegisterWhenOtherEntryExistsButSiloIsDead()
         {
             var expectedSilo = GenerateSiloAddress();
