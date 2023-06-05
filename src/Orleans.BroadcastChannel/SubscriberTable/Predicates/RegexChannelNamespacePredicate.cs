@@ -29,9 +29,6 @@ namespace Orleans.BroadcastChannel
         }
 
         /// <inheritdoc />
-        public bool IsMatch(string streamNameSpace)
-        {
-            return regex.IsMatch(streamNameSpace);
-        }
+        public bool IsMatch(string streamNameSpace) => regex.IsMatch(streamNameSpace);
     }
 }

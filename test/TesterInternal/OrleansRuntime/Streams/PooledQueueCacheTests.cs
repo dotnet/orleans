@@ -36,15 +36,9 @@ namespace UnitTests.OrleansRuntime.Streams
             [Id(2)]
             public byte[] Data { get; set; }
 
-            public IEnumerable<Tuple<T, StreamSequenceToken>> GetEvents<T>()
-            {
-                throw new NotImplementedException();
-            }
+            public IEnumerable<Tuple<T, StreamSequenceToken>> GetEvents<T>() => throw new NotImplementedException();
 
-            public bool ImportRequestContext()
-            {
-                throw new NotImplementedException();
-            }
+            public bool ImportRequestContext() => throw new NotImplementedException();
         }
 
 
@@ -64,10 +58,7 @@ namespace UnitTests.OrleansRuntime.Streams
                 };
             }
 
-            public StreamSequenceToken GetSequenceToken(ref CachedMessage cachedMessage)
-            {
-                return new EventSequenceTokenV2(cachedMessage.SequenceNumber);
-            }
+            public StreamSequenceToken GetSequenceToken(ref CachedMessage cachedMessage) => new EventSequenceTokenV2(cachedMessage.SequenceNumber);
 
         }
 
@@ -170,16 +161,10 @@ namespace UnitTests.OrleansRuntime.Streams
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Streaming")]
-        public void AvoidCacheMissNotEmptyCache()
-        {
-            AvoidCacheMiss(false);
-        }
+        public void AvoidCacheMissNotEmptyCache() => AvoidCacheMiss(false);
 
         [Fact, TestCategory("BVT"), TestCategory("Streaming")]
-        public void AvoidCacheMissEmptyCache()
-        {
-            AvoidCacheMiss(true);
-        }
+        public void AvoidCacheMissEmptyCache() => AvoidCacheMiss(true);
 
         [Fact, TestCategory("BVT"), TestCategory("Streaming")]
         public void AvoidCacheMissMultipleStreamsActive()

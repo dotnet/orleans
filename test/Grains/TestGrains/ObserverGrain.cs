@@ -20,9 +20,6 @@ namespace UnitTests.Grains
             return Task.CompletedTask;
         }
 
-        public void StateChanged(int a, int b)
-        {
-            Observer.StateChanged(a, b);
-        }
+        public void StateChanged(int a, int b) => Observer.StateChanged(a, b);
     }
 }

@@ -319,10 +319,7 @@ namespace Orleans.Runtime.MembershipService
             }
         }
 
-        public void Participate(ISiloLifecycle lifecycle)
-        {
-            lifecycle.Subscribe(ServiceLifecycleStage.Active, this);
-        }
+        public void Participate(ISiloLifecycle lifecycle) => lifecycle.Subscribe(ServiceLifecycleStage.Active, this);
 
         public Task OnStart(CancellationToken ct)
         {

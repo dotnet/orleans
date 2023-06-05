@@ -84,10 +84,7 @@ namespace UnitTests.MembershipTests
         protected abstract IMembershipTable CreateMembershipTable(ILogger logger);
         protected abstract Task<string> GetConnectionString();
 
-        protected virtual string GetAdoInvariant()
-        {
-            return null;
-        }
+        protected virtual string GetAdoInvariant() => null;
 
         protected async Task MembershipTable_GetGateways()
         {

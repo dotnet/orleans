@@ -88,25 +88,13 @@ namespace TestExtensions
             
             public string Root { get; set; }
 
-            public IDirectoryContents GetDirectoryContents(string subpath)
-            {
-                return FileProvider().GetDirectoryContents(subpath);
-            }
+            public IDirectoryContents GetDirectoryContents(string subpath) => FileProvider().GetDirectoryContents(subpath);
 
-            public IFileInfo GetFileInfo(string subpath)
-            {
-                return FileProvider().GetFileInfo(subpath);
-            }
+            public IFileInfo GetFileInfo(string subpath) => FileProvider().GetFileInfo(subpath);
 
-            public IChangeToken Watch(string filter)
-            {
-                return FileProvider().Watch(filter);
-            }
+            public IChangeToken Watch(string filter) => FileProvider().Watch(filter);
 
-            private PhysicalFileProvider FileProvider()
-            {
-                return fileProvider ?? (fileProvider = new PhysicalFileProvider(Root));
-            }
+            private PhysicalFileProvider FileProvider() => fileProvider ?? (fileProvider = new PhysicalFileProvider(Root));
         }
 
         /// <summary>Try to find a file with specified name up the folder hierarchy, as some of our CI environments are configured this way.</summary>
@@ -138,9 +126,6 @@ namespace TestExtensions
             return false;
         }
 
-        public static void ConfigureTestCluster(TestClusterBuilder builder)
-        {
-            builder.ConfigureHostConfiguration(ConfigureHostConfiguration);
-        }
+        public static void ConfigureTestCluster(TestClusterBuilder builder) => builder.ConfigureHostConfiguration(ConfigureHostConfiguration);
     }
 }

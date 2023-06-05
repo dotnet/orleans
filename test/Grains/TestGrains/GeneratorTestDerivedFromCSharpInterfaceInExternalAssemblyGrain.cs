@@ -4,9 +4,6 @@ namespace UnitTests.Grains
 {
     public class GeneratorTestDerivedFromCSharpInterfaceInExternalAssemblyGrain : Grain, IGeneratorTestDerivedFromCSharpInterfaceInExternalAssemblyGrain
     {
-        public Task<int> Echo(int x)
-        {
-            return Task.FromResult(x);
-        }
+        public Task<int> Echo(int x) => Task.FromResult(x);
     }
 }

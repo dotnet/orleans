@@ -26,10 +26,7 @@ namespace UnitTests.StreamingTests
                 streamProviderName);
         }
 
-        internal static void LogEndTest(string testName, ILogger logger)
-        {
-            logger.LogInformation("\n\n--END------------------------ {TestName} --------------------------------- \n\n", testName);
-        }
+        internal static void LogEndTest(string testName, ILogger logger) => logger.LogInformation("\n\n--END------------------------ {TestName} --------------------------------- \n\n", testName);
 
         internal static IStreamPubSub GetStreamPubSub(IInternalClusterClient client)
         {

@@ -34,10 +34,7 @@ namespace Orleans
         }
 
         /// <inheritdoc />
-        public void Participate(IClusterClientLifecycle lifecycle)
-        {
-            lifecycle.Subscribe<ClientOptionsLogger>(ClientOptionLoggerLifeCycleRing, OnStart);
-        }
+        public void Participate(IClusterClientLifecycle lifecycle) => lifecycle.Subscribe<ClientOptionsLogger>(ClientOptionLoggerLifeCycleRing, OnStart);
 
         /// <inheritdoc />
         public Task OnStart(CancellationToken token)
@@ -73,10 +70,7 @@ namespace Orleans
         /// <summary>
         /// Log all options with registered formatters
         /// </summary>
-        public void LogOptions()
-        {
-            LogOptions(services.GetServices<IOptionFormatter>());
-        }
+        public void LogOptions() => LogOptions(services.GetServices<IOptionFormatter>());
 
         /// <summary>
         /// Log options using a set of formatters.

@@ -41,10 +41,7 @@ namespace Orleans.Transactions.State
             return await record.PromiseForTA.Task;
         }
 
-        public Task Prepared(Guid transactionId, DateTime timeStamp, ParticipantId resource, TransactionalStatus status)
-        {
-            return queue.NotifyOfPrepared(transactionId, timeStamp, status);
-        }
+        public Task Prepared(Guid transactionId, DateTime timeStamp, ParticipantId resource, TransactionalStatus status) => queue.NotifyOfPrepared(transactionId, timeStamp, status);
 
         public async Task Ping(Guid transactionId, DateTime timeStamp, ParticipantId resource)
         {

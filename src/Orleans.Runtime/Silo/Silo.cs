@@ -617,18 +617,12 @@ namespace Orleans.Runtime
             }
         }
 
-        private void SafeExecute(Action action)
-        {
-            Utils.SafeExecute(action, logger, "Silo.Stop");
-        }
+        private void SafeExecute(Action action) => Utils.SafeExecute(action, logger, "Silo.Stop");
 
         internal void RegisterSystemTarget(SystemTarget target) => catalog.RegisterSystemTarget(target);
 
         /// <inheritdoc/>
-        public override string ToString()
-        {
-            return localGrainDirectory.ToString();
-        }
+        public override string ToString() => localGrainDirectory.ToString();
 
         private void Participate(ISiloLifecycle lifecycle)
         {

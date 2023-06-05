@@ -17,10 +17,7 @@ namespace Tester
 
             private class GrainServiceSiloBuilderConfigurator : ISiloConfigurator
             {
-                public void Configure(ISiloBuilder hostBuilder)
-                {
-                    hostBuilder.AddTestGrainService("abc").AddGrainExtension<IEchoExtension, EchoExtension>();
-                }
+                public void Configure(ISiloBuilder hostBuilder) => hostBuilder.AddTestGrainService("abc").AddGrainExtension<IEchoExtension, EchoExtension>();
             }
         }
 
@@ -75,10 +72,7 @@ namespace Tester
 
         public class EchoExtension : IEchoExtension
         {
-            public Task<string> Echo(string what)
-            {
-                return Task.FromResult(what);
-            }
+            public Task<string> Echo(string what) => Task.FromResult(what);
         }
     }
 }

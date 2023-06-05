@@ -44,10 +44,7 @@ namespace Orleans.Networking.Shared
             Pool.RefreshBlock(Slab, _offset, _length);
         }
 
-        public void Dispose()
-        {
-            Pool.Return(this);
-        }
+        public void Dispose() => Pool.Return(this);
 
         public void Lease()
         {

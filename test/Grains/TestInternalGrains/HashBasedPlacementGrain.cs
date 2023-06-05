@@ -8,9 +8,6 @@ namespace UnitTests.Grains
     public class HashBasedBasedPlacementGrain : Grain, IHashBasedPlacementGrain
     {
 
-        public Task<SiloAddress> GetSiloAddress()
-        {
-            return Task.FromResult(Runtime.SiloAddress);
-        }
+        public Task<SiloAddress> GetSiloAddress() => Task.FromResult(Runtime.SiloAddress);
     }
 }

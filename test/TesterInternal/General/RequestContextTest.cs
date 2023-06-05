@@ -18,10 +18,7 @@ namespace UnitTests.General
 
         public class Fixture : BaseTestClusterFixture
         {
-            protected override void ConfigureTestCluster(TestClusterBuilder builder)
-            {
-                builder.Options.InitialSilosCount = 1;
-            }
+            protected override void ConfigureTestCluster(TestClusterBuilder builder) => builder.Options.InitialSilosCount = 1;
         }
 
         public RequestContextTests_Silo(ITestOutputHelper output, Fixture fixture)

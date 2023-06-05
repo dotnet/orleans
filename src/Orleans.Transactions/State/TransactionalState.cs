@@ -188,10 +188,7 @@ namespace Orleans.Transactions
             );
         }
 
-        public void Participate(IGrainLifecycle lifecycle)
-        {
-            lifecycle.Subscribe<TransactionalState<TState>>(GrainLifecycleStage.SetupState, (ct) => OnSetupState(ct, SetupResourceFactory));
-        }
+        public void Participate(IGrainLifecycle lifecycle) => lifecycle.Subscribe<TransactionalState<TState>>(GrainLifecycleStage.SetupState, (ct) => OnSetupState(ct, SetupResourceFactory));
 
         private static void SetupResourceFactory(IGrainContext context, string stateName, TransactionQueue<TState> queue)
         {

@@ -21,8 +21,5 @@ internal static class ApplicationRequestInstruments
             AppRequestsLatencyHistogramAggregator.Record(durationMilliseconds);
     }
 
-    internal static void OnAppRequestsTimedOut()
-    {
-        TimedOutRequestsCounter.Add(1);
-    }
+    internal static void OnAppRequestsTimedOut() => TimedOutRequestsCounter.Add(1);
 }

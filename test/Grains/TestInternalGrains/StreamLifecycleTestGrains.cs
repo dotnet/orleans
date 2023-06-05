@@ -59,10 +59,7 @@ namespace UnitTests.Grains
             return A.Equals(item.A) && B.Equals(item.B);
         }
 
-        public override int GetHashCode()
-        {
-            return (B * 397) ^ (A != null ? A.GetHashCode() : 0);
-        }
+        public override int GetHashCode() => (B * 397) ^ (A != null ? A.GetHashCode() : 0);
     }
 
     public class AsyncObserverArg : GenericArg
@@ -110,14 +107,13 @@ namespace UnitTests.Grains
 #endif
         }
 
-        protected Task RecordDeactivate()
-        {
+        protected Task RecordDeactivate() =>
 #if COUNT_ACTIVATE_DEACTIVATE
-            return watcher.RecordDeactivateCall(IdentityString);
+            watcher.RecordDeactivateCall(IdentityString);
 #else
             return Task.CompletedTask;
 #endif
-        }
+
 
         protected void InitStream(StreamId streamId, string providerToUse)
         {

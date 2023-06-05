@@ -36,10 +36,7 @@ namespace Orleans.Streams
             return explicitRes;
         }
 
-        public Task UnregisterProducer(QualifiedStreamId streamId, GrainId streamProducer)
-        {
-            return explicitPubSub.UnregisterProducer(streamId, streamProducer);
-        }
+        public Task UnregisterProducer(QualifiedStreamId streamId, GrainId streamProducer) => explicitPubSub.UnregisterProducer(streamId, streamProducer);
 
         public Task RegisterConsumer(GuidId subscriptionId, QualifiedStreamId streamId, GrainId streamConsumer, string filterData)
         {
@@ -55,15 +52,9 @@ namespace Orleans.Streams
                 : explicitPubSub.UnregisterConsumer(subscriptionId, streamId);
         }
 
-        public Task<int> ProducerCount(QualifiedStreamId streamId)
-        {
-            return explicitPubSub.ProducerCount(streamId); 
-        }
+        public Task<int> ProducerCount(QualifiedStreamId streamId) => explicitPubSub.ProducerCount(streamId);
 
-        public Task<int> ConsumerCount(QualifiedStreamId streamId)
-        {
-            return explicitPubSub.ConsumerCount(streamId); 
-        }
+        public Task<int> ConsumerCount(QualifiedStreamId streamId) => explicitPubSub.ConsumerCount(streamId);
 
         public async Task<List<StreamSubscription>> GetAllSubscriptions(QualifiedStreamId streamId, GrainId streamConsumer)
         {

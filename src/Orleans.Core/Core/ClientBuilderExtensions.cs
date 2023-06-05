@@ -25,10 +25,7 @@ namespace Orleans.Hosting
         /// <param name="builder">The host builder.</param>
         /// <param name="connectionRetryFilter">The connection retry filter.</param>
         /// <returns>The same instance of the <see cref="IClientBuilder"/> for chaining.</returns>
-        public static IClientBuilder UseConnectionRetryFilter(this IClientBuilder builder, Func<Exception, CancellationToken, Task<bool>> connectionRetryFilter)
-        {
-            return builder.ConfigureServices(collection => collection.AddSingleton<IClientConnectionRetryFilter>(new DelegateConnectionRetryFilter(connectionRetryFilter)));
-        }
+        public static IClientBuilder UseConnectionRetryFilter(this IClientBuilder builder, Func<Exception, CancellationToken, Task<bool>> connectionRetryFilter) => builder.ConfigureServices(collection => collection.AddSingleton<IClientConnectionRetryFilter>(new DelegateConnectionRetryFilter(connectionRetryFilter)));
 
         /// <summary>
         /// Configures the provided delegate as a connection retry filter, used to determine whether initial connection to the Orleans cluster should be retried after a failure.
@@ -36,20 +33,14 @@ namespace Orleans.Hosting
         /// <param name="builder">The host builder.</param>
         /// <param name="connectionRetryFilter">The connection retry filter.</param>
         /// <returns>The same instance of the <see cref="IClientBuilder"/> for chaining.</returns>
-        public static IClientBuilder UseConnectionRetryFilter(this IClientBuilder builder, IClientConnectionRetryFilter connectionRetryFilter)
-        {
-            return builder.ConfigureServices(collection => collection.AddSingleton<IClientConnectionRetryFilter>(connectionRetryFilter));
-        }
+        public static IClientBuilder UseConnectionRetryFilter(this IClientBuilder builder, IClientConnectionRetryFilter connectionRetryFilter) => builder.ConfigureServices(collection => collection.AddSingleton<IClientConnectionRetryFilter>(connectionRetryFilter));
 
         /// <summary>
         /// Configures the provided <typeparamref name="TConnectionRetryFilter"/> type as a connection retry filter, used to determine whether initial connection to the Orleans cluster should be retried after a failure.
         /// </summary>
         /// <param name="builder">The host builder.</param>
         /// <returns>The same instance of the <see cref="IClientBuilder"/> for chaining.</returns>
-        public static IClientBuilder UseConnectionRetryFilter<TConnectionRetryFilter>(this IClientBuilder builder) where TConnectionRetryFilter : class, IClientConnectionRetryFilter
-        {
-            return builder.ConfigureServices(collection => collection.AddSingleton<IClientConnectionRetryFilter, TConnectionRetryFilter>());
-        }
+        public static IClientBuilder UseConnectionRetryFilter<TConnectionRetryFilter>(this IClientBuilder builder) where TConnectionRetryFilter : class, IClientConnectionRetryFilter => builder.ConfigureServices(collection => collection.AddSingleton<IClientConnectionRetryFilter, TConnectionRetryFilter>());
 
         private sealed class DelegateConnectionRetryFilter : IClientConnectionRetryFilter
         {
@@ -78,10 +69,7 @@ namespace Orleans.Hosting
         /// <param name="builder">The host builder.</param>
         /// <param name="configureOptions">The action used to configure the options.</param>
         /// <returns>The client builder.</returns>
-        public static IClientBuilder Configure<TOptions>(this IClientBuilder builder, Action<TOptions> configureOptions) where TOptions : class
-        {
-            return builder.ConfigureServices(services => services.Configure(configureOptions));
-        }
+        public static IClientBuilder Configure<TOptions>(this IClientBuilder builder, Action<TOptions> configureOptions) where TOptions : class => builder.ConfigureServices(services => services.Configure(configureOptions));
 
         /// <summary>
         /// Registers a configuration instance which <typeparamref name="TOptions"/> will bind against.
@@ -90,10 +78,7 @@ namespace Orleans.Hosting
         /// <param name="builder">The host builder.</param>
         /// <param name="configuration">The configuration.</param>
         /// <returns>The client builder.</returns>
-        public static IClientBuilder Configure<TOptions>(this IClientBuilder builder, IConfiguration configuration) where TOptions : class
-        {
-            return builder.ConfigureServices(services => services.AddOptions<TOptions>().Bind(configuration));
-        }
+        public static IClientBuilder Configure<TOptions>(this IClientBuilder builder, IConfiguration configuration) where TOptions : class => builder.ConfigureServices(services => services.AddOptions<TOptions>().Bind(configuration));
 
         /// <summary>
         /// Registers a <see cref="GatewayCountChangedHandler"/> event handler.
@@ -152,10 +137,7 @@ namespace Orleans.Hosting
             this IClientBuilder builder,
             int gatewayPort = 30000,
             string serviceId = ClusterOptions.DevelopmentServiceId,
-            string clusterId = ClusterOptions.DevelopmentClusterId)
-        {
-            return builder.UseLocalhostClustering(new [] {gatewayPort}, serviceId, clusterId);
-        }
+            string clusterId = ClusterOptions.DevelopmentClusterId) => builder.UseLocalhostClustering(new[] { gatewayPort }, serviceId, clusterId);
 
         /// <summary>
         /// Configures the client to connect to a silo on the localhost.
@@ -215,10 +197,7 @@ namespace Orleans.Hosting
         /// <returns>
         /// The <see cref="IClientBuilder"/>.
         /// </returns>
-        public static IClientBuilder UseStaticClustering(this IClientBuilder builder, params IPEndPoint[] endpoints)
-        {
-            return builder.UseStaticClustering(options => options.Gateways = endpoints.Select(ep => ep.ToGatewayUri()).ToList());
-        }
+        public static IClientBuilder UseStaticClustering(this IClientBuilder builder, params IPEndPoint[] endpoints) => builder.UseStaticClustering(options => options.Gateways = endpoints.Select(ep => ep.ToGatewayUri()).ToList());
 
         /// <summary>
         /// Configures the client to use static clustering.

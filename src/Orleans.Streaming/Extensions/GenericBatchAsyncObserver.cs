@@ -21,19 +21,10 @@ namespace Orleans.Streams
             this.onCompletedAsync = onCompletedAsync ?? throw new ArgumentNullException("onCompletedAsync");
         }
 
-        public Task OnNextAsync(IList<SequentialItem<T>> items)
-        {
-            return onNextAsync(items);
-        }
+        public Task OnNextAsync(IList<SequentialItem<T>> items) => onNextAsync(items);
 
-        public Task OnCompletedAsync()
-        {
-            return onCompletedAsync();
-        }
+        public Task OnCompletedAsync() => onCompletedAsync();
 
-        public Task OnErrorAsync(Exception ex)
-        {
-            return onErrorAsync(ex);
-        }
+        public Task OnErrorAsync(Exception ex) => onErrorAsync(ex);
     }
 }

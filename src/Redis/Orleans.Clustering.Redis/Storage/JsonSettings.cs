@@ -26,10 +26,7 @@ namespace Orleans.Clustering.Redis
 
         private class IPAddressConverter : JsonConverter
         {
-            public override bool CanConvert(Type objectType)
-            {
-                return objectType == typeof(IPAddress);
-            }
+            public override bool CanConvert(Type objectType) => objectType == typeof(IPAddress);
 
             public override void WriteJson(JsonWriter writer, object value, JsonSerializer serializer)
             {
@@ -46,10 +43,7 @@ namespace Orleans.Clustering.Redis
 
         private class IPEndPointConverter : JsonConverter
         {
-            public override bool CanConvert(Type objectType)
-            {
-                return objectType == typeof(IPEndPoint);
-            }
+            public override bool CanConvert(Type objectType) => objectType == typeof(IPEndPoint);
 
             public override void WriteJson(JsonWriter writer, object value, JsonSerializer serializer)
             {
@@ -73,10 +67,7 @@ namespace Orleans.Clustering.Redis
 
         private class SiloAddressConverter : JsonConverter
         {
-            public override bool CanConvert(Type objectType)
-            {
-                return objectType == typeof(SiloAddress);
-            }
+            public override bool CanConvert(Type objectType) => objectType == typeof(SiloAddress);
 
             public override void WriteJson(JsonWriter writer, object value, JsonSerializer serializer)
             {

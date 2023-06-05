@@ -71,10 +71,7 @@ namespace Orleans.Transactions.TestKit
             });
         }
 
-        public Task<int> Get()
-        {
-            return data.PerformRead<int>(d => d.Value);
-        }
+        public Task<int> Get() => data.PerformRead<int>(d => d.Value);
 
         public Task Deactivate()
         {

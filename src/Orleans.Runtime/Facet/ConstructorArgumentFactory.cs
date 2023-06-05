@@ -16,10 +16,7 @@ namespace Orleans.Runtime
             this.services = services;
         }
 
-        public ArgumentFactory CreateFactory(Type grainClass)
-        {
-            return new ArgumentFactory(services, grainClass);
-        }
+        public ArgumentFactory CreateFactory(Type grainClass) => new ArgumentFactory(services, grainClass);
 
         /// <summary>
         /// Facet Argument factory

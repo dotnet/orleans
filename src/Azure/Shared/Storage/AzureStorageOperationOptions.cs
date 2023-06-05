@@ -68,10 +68,7 @@ namespace Orleans.GrainDirectory.AzureStorage
         /// <summary>
         /// Configures the <see cref="TableServiceClient"/> using the provided callback.
         /// </summary>
-        public void ConfigureTableServiceClient(Func<Task<TableServiceClient>> createClientCallback)
-        {
-            CreateClient = createClientCallback ?? throw new ArgumentNullException(nameof(createClientCallback));
-        }
+        public void ConfigureTableServiceClient(Func<Task<TableServiceClient>> createClientCallback) => CreateClient = createClientCallback ?? throw new ArgumentNullException(nameof(createClientCallback));
 
         /// <summary>
         /// Configures the <see cref="TableServiceClient"/> using an authenticated service URI and a <see cref="Azure.Core.TokenCredential"/>.
@@ -135,9 +132,6 @@ namespace Orleans.GrainDirectory.AzureStorage
         public TOptions Options { get; }
         public string Name { get; }
 
-        public virtual void ValidateConfiguration()
-        {
-            Options.Validate(Name);
-        }
+        public virtual void ValidateConfiguration() => Options.Validate(Name);
     }
 }

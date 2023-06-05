@@ -152,10 +152,7 @@ namespace Orleans.Streams
             return queuesOfImmatureSilos;
         }
 
-        protected override void OnClusterMembershipChange(HashSet<SiloAddress> activeSilos)
-        {
-            SignalClusterChange(activeSilos).Ignore();
-        }
+        protected override void OnClusterMembershipChange(HashSet<SiloAddress> activeSilos) => SignalClusterChange(activeSilos).Ignore();
 
         private async Task SignalClusterChange(HashSet<SiloAddress> activeSilos)
         {

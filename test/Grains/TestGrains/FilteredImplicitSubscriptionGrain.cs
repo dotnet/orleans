@@ -35,9 +35,6 @@ namespace UnitTests.Grains
             }
         }
 
-        public Task<int> GetCounter(string streamNamespace)
-        {
-            return Task.FromResult(counters[streamNamespace]);
-        }
+        public Task<int> GetCounter(string streamNamespace) => Task.FromResult(counters[streamNamespace]);
     }
 }

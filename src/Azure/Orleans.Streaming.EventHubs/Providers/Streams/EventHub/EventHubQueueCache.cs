@@ -73,10 +73,7 @@ namespace Orleans.Streaming.EventHubs
         }
 
         /// <inheritdoc />
-        public void SignalPurge()
-        {
-            evictionStrategy.PerformPurge(DateTime.UtcNow);
-        }
+        public void SignalPurge() => evictionStrategy.PerformPurge(DateTime.UtcNow);
 
         /// <summary>
         /// Add cache pressure monitor to the cache's back pressure algorithm
@@ -92,18 +89,12 @@ namespace Orleans.Streaming.EventHubs
         /// Performs application-defined tasks associated with freeing, releasing, or resetting unmanaged resources.
         /// </summary>
         /// <filterpriority>2</filterpriority>
-        public void Dispose()
-        {
-            evictionStrategy.OnPurged = null;
-        }
+        public void Dispose() => evictionStrategy.OnPurged = null;
 
         /// <summary>
         /// The limit of the maximum number of items that can be added
         /// </summary>
-        public int GetMaxAddCount()
-        {
-            return cachePressureMonitor.IsUnderPressure(DateTime.UtcNow) ? 0 : defaultMaxAddCount;
-        }
+        public int GetMaxAddCount() => cachePressureMonitor.IsUnderPressure(DateTime.UtcNow) ? 0 : defaultMaxAddCount;
 
         /// <summary>
         /// Add a list of EventHub EventData to the cache.
@@ -131,10 +122,7 @@ namespace Orleans.Streaming.EventHubs
         /// <param name="streamId"></param>
         /// <param name="sequenceToken"></param>
         /// <returns></returns>
-        public object GetCursor(StreamId streamId, StreamSequenceToken sequenceToken)
-        {
-            return cache.GetCursor(streamId, sequenceToken);
-        }
+        public object GetCursor(StreamId streamId, StreamSequenceToken sequenceToken) => cache.GetCursor(streamId, sequenceToken);
 
         /// <summary>
         /// Try to get the next message in the cache for the provided cursor.

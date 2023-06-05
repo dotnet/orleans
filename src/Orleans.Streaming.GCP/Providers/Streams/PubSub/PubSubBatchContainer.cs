@@ -53,10 +53,7 @@ namespace Orleans.Providers.GCP.Streams.PubSub
             this.requestContext = requestContext;
         }
 
-        public IEnumerable<Tuple<T, StreamSequenceToken>> GetEvents<T>()
-        {
-            return events.OfType<T>().Select((e, i) => Tuple.Create<T, StreamSequenceToken>(e, sequenceToken.CreateSequenceTokenForEvent(i)));
-        }
+        public IEnumerable<Tuple<T, StreamSequenceToken>> GetEvents<T>() => events.OfType<T>().Select((e, i) => Tuple.Create<T, StreamSequenceToken>(e, sequenceToken.CreateSequenceTokenForEvent(i)));
 
         public bool ImportRequestContext()
         {
@@ -68,9 +65,6 @@ namespace Orleans.Providers.GCP.Streams.PubSub
             return false;
         }
 
-        public override string ToString()
-        {
-            return $"[GooglePubSubBatchContainer:Stream={StreamId},#Items={events.Count}]";
-        }
+        public override string ToString() => $"[GooglePubSubBatchContainer:Stream={StreamId},#Items={events.Count}]";
     }
 }

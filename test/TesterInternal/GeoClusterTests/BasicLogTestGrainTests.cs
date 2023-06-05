@@ -54,30 +54,15 @@ namespace Tests.GeoClusterTests
         }
 
         [SkippableFact]
-        public async Task DefaultStorage()
-        {
-            await DoBasicLogTestGrainTest("TestGrains.LogTestGrainDefaultStorage");
-        }
+        public async Task DefaultStorage() => await DoBasicLogTestGrainTest("TestGrains.LogTestGrainDefaultStorage");
         [SkippableFact]
-        public async Task MemoryStorage()
-        {
-            await DoBasicLogTestGrainTest("TestGrains.LogTestGrainMemoryStorage");
-        }
+        public async Task MemoryStorage() => await DoBasicLogTestGrainTest("TestGrains.LogTestGrainMemoryStorage");
         [SkippableFact]
-        public async Task SharedStorage()
-        {
-            await DoBasicLogTestGrainTest("TestGrains.LogTestGrainSharedStateStorage");
-        }
+        public async Task SharedStorage() => await DoBasicLogTestGrainTest("TestGrains.LogTestGrainSharedStateStorage");
         [SkippableFact]
-        public async Task SharedLogStorage()
-        {
-            await DoBasicLogTestGrainTest("TestGrains.LogTestGrainSharedLogStorage");
-        }
+        public async Task SharedLogStorage() => await DoBasicLogTestGrainTest("TestGrains.LogTestGrainSharedLogStorage");
         [SkippableFact]
-        public async Task CustomStorage()
-        {
-            await DoBasicLogTestGrainTest("TestGrains.LogTestGrainCustomStorage");
-        }
+        public async Task CustomStorage() => await DoBasicLogTestGrainTest("TestGrains.LogTestGrainCustomStorage");
 
         private int GetRandom()
         {
@@ -86,10 +71,7 @@ namespace Tests.GeoClusterTests
         }
 
 
-        private async Task DoBasicLogTestGrainTest(string grainClass, int phases = 100)
-        {
-            await ThreeCheckers(grainClass, phases);
-        }
+        private async Task DoBasicLogTestGrainTest(string grainClass, int phases = 100) => await ThreeCheckers(grainClass, phases);
 
         private async Task ThreeCheckers(string grainClass, int phases)
         {

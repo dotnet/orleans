@@ -14,10 +14,7 @@ namespace DefaultCluster.Tests.General
         {
         }
 
-        public ISimpleGrain GetSimpleGrain()
-        {
-            return GrainFactory.GetGrain<ISimpleGrain>(GetRandomGrainId(), SimpleGrain.SimpleGrainNamePrefix);
-        }
+        public ISimpleGrain GetSimpleGrain() => GrainFactory.GetGrain<ISimpleGrain>(GetRandomGrainId(), SimpleGrain.SimpleGrainNamePrefix);
 
         [Fact, TestCategory("BVT")]
         public async Task SimpleGrainGetGrain()

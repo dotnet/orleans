@@ -24,19 +24,10 @@ namespace Orleans.Streams
             this.onCompletedAsync = onCompletedAsync;
         }
 
-        public Task OnNextAsync(T item, StreamSequenceToken token = null)
-        {
-            return onNextAsync(item, token);
-        }
+        public Task OnNextAsync(T item, StreamSequenceToken token = null) => onNextAsync(item, token);
 
-        public Task OnCompletedAsync()
-        {
-            return onCompletedAsync();
-        }
+        public Task OnCompletedAsync() => onCompletedAsync();
 
-        public Task OnErrorAsync(Exception ex)
-        {
-            return onErrorAsync(ex);
-        }
+        public Task OnErrorAsync(Exception ex) => onErrorAsync(ex);
     }
 }

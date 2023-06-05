@@ -44,10 +44,7 @@ namespace Orleans.Providers.Streams.Common
         /// If this object is to be used in a fixed size object pool, this call should be
         ///   overridden with the purge implementation that returns the object to the pool.
         /// </summary>
-        public virtual void SignalPurge()
-        {
-            Dispose();
-        }
+        public virtual void SignalPurge() => Dispose();
 
         /// <summary>
         /// Returns item to pool.

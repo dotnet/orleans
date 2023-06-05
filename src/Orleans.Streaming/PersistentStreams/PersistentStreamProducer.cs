@@ -27,32 +27,18 @@ namespace Orleans.Streams
                 stream.ToString(), typeof (T), this.queueAdapter.Name);
         }
 
-        public Task OnNextAsync(T item, StreamSequenceToken token)
-        {
-            return queueAdapter.QueueMessageAsync(stream.StreamId, item, token, RequestContextExtensions.Export(deepCopier));
-        }
-        
-        public Task OnNextBatchAsync(IEnumerable<T> batch, StreamSequenceToken token)
-        {
-            return queueAdapter.QueueMessageBatchAsync(stream.StreamId, batch, token, RequestContextExtensions.Export(deepCopier));
+        public Task OnNextAsync(T item, StreamSequenceToken token) => queueAdapter.QueueMessageAsync(stream.StreamId, item, token, RequestContextExtensions.Export(deepCopier));
 
-        }
+        public Task OnNextBatchAsync(IEnumerable<T> batch, StreamSequenceToken token) => queueAdapter.QueueMessageBatchAsync(stream.StreamId, batch, token, RequestContextExtensions.Export(deepCopier));
 
-        public Task OnCompletedAsync()
-        {
+        public Task OnCompletedAsync() =>
             // Maybe send a close message to the rendezvous?
             throw new NotImplementedException("OnCompletedAsync is not implemented for now.");
-        }
 
-        public Task OnErrorAsync(Exception ex)
-        {
+        public Task OnErrorAsync(Exception ex) =>
             // Maybe send a close message to the rendezvous?
             throw new NotImplementedException("OnErrorAsync is not implemented for now.");
-        }
 
-        public Task Cleanup()
-        {
-            return Task.CompletedTask;
-        }
+        public Task Cleanup() => Task.CompletedTask;
     }
 }

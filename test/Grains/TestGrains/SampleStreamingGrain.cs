@@ -91,15 +91,9 @@ namespace UnitTests.Grains
             return Task.CompletedTask;
         }
 
-        public Task Produce()
-        {
-            return Fire();
-        }
+        public Task Produce() => Fire();
 
-        private Task TimerCallback(object state)
-        {
-            return producerTimer != null? Fire(): Task.CompletedTask;
-        }
+        private Task TimerCallback(object state) => producerTimer != null ? Fire() : Task.CompletedTask;
 
         private async Task Fire([CallerMemberName] string caller = null)
         {
@@ -156,10 +150,7 @@ namespace UnitTests.Grains
             }
         }
 
-        public Task<int> GetNumberConsumed()
-        {
-            return Task.FromResult(numConsumedItems);
-        }
+        public Task<int> GetNumberConsumed() => Task.FromResult(numConsumedItems);
 
         public override Task OnDeactivateAsync(DeactivationReason reason, CancellationToken cancellationToken)
         {
@@ -207,10 +198,7 @@ namespace UnitTests.Grains
             }
         }
 
-        public Task<int> GetNumberConsumed()
-        {
-            return Task.FromResult( numConsumedItems );
-        }
+        public Task<int> GetNumberConsumed() => Task.FromResult(numConsumedItems);
 
         public Task OnNextAsync( int item, StreamSequenceToken token = null )
         {

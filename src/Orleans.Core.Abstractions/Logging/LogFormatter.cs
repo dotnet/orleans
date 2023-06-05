@@ -21,30 +21,21 @@ namespace Orleans.Runtime
         /// </summary>
         /// <param name="date">The <c>DateTime</c> value to be printed.</param>
         /// <returns>Formatted string representation of the input data, in the printable format used by the Logger subsystem.</returns>
-        public static string PrintDate(DateTime date)
-        {
-            return date.ToString(DATE_FORMAT, CultureInfo.InvariantCulture);
-        }
+        public static string PrintDate(DateTime date) => date.ToString(DATE_FORMAT, CultureInfo.InvariantCulture);
 
         /// <summary>
         /// Parses a date.
         /// </summary>
         /// <param name="dateStr">The date string.</param>
         /// <returns>The parsed date.</returns>
-        public static DateTime ParseDate(string dateStr)
-        {
-            return DateTime.ParseExact(dateStr, DATE_FORMAT, CultureInfo.InvariantCulture);
-        }
+        public static DateTime ParseDate(string dateStr) => DateTime.ParseExact(dateStr, DATE_FORMAT, CultureInfo.InvariantCulture);
 
         /// <summary>
         /// Utility function to convert a <c>DateTime</c> object into printable time format used by the Logger subsystem.
         /// </summary>
         /// <param name="date">The <c>DateTime</c> value to be printed.</param>
         /// <returns>Formatted string representation of the input data, in the printable format used by the Logger subsystem.</returns>
-        public static string PrintTime(DateTime date)
-        {
-            return date.ToString(TIME_FORMAT, CultureInfo.InvariantCulture);
-        }
+        public static string PrintTime(DateTime date) => date.ToString(TIME_FORMAT, CultureInfo.InvariantCulture);
 
         /// <summary>
         /// Utility function to convert an exception into printable format, including expanding and formatting any nested sub-expressions.
@@ -66,10 +57,7 @@ namespace Orleans.Runtime
         /// </summary>
         /// <param name="exceptionType">The exception type to configure a decoder for.</param>
         /// <param name="decoder">The decoder.</param>
-        public static void SetExceptionDecoder(Type exceptionType, Func<Exception, string> decoder)
-        {
-            exceptionDecoders.TryAdd(exceptionType, decoder);
-        }
+        public static void SetExceptionDecoder(Type exceptionType, Func<Exception, string> decoder) => exceptionDecoders.TryAdd(exceptionType, decoder);
 
         private static void PrintException_Helper(StringBuilder sb, Exception exception, int level)
         {

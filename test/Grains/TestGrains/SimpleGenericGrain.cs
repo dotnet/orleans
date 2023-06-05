@@ -12,15 +12,9 @@ namespace UnitTests.Grains
             return Task.CompletedTask;
         }
 
-        public virtual Task Transform()
-        {
-            return Task.CompletedTask;
-        }
+        public virtual Task Transform() => Task.CompletedTask;
 
-        public Task<TType> Get()
-        {
-            return Task.FromResult(Value);
-        }
+        public Task<TType> Get() => Task.FromResult(Value);
 
         public Task CompareGrainReferences(ISimpleGenericGrain<TType> clientReference)
         {

@@ -31,9 +31,6 @@ namespace UnitTests.Grains
                 });
         }
 
-        public Task<int> GetCounter()
-        {
-            return Task.FromResult(counter);
-        }
+        public Task<int> GetCounter() => Task.FromResult(counter);
     }
 }

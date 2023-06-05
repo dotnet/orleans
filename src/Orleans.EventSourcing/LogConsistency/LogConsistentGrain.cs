@@ -64,15 +64,9 @@ namespace Orleans.EventSourcing
             return Task.CompletedTask;
         }
 
-        private async Task PreActivate(CancellationToken ct)
-        {
-            await ((ILogConsistencyProtocolParticipant)this).PreActivateProtocolParticipant();
-        }
+        private async Task PreActivate(CancellationToken ct) => await ((ILogConsistencyProtocolParticipant)this).PreActivateProtocolParticipant();
 
-        private async Task PostActivate(CancellationToken ct)
-        {
-            await ((ILogConsistencyProtocolParticipant)this).PostActivateProtocolParticipant();
-        }
+        private async Task PostActivate(CancellationToken ct) => await ((ILogConsistencyProtocolParticipant)this).PostActivateProtocolParticipant();
 
         private void InstallLogViewAdaptor(
             IGrainContext grainContext,

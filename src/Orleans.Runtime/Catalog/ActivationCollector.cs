@@ -336,10 +336,7 @@ namespace Orleans.Runtime
             }
         }
 
-        private bool IsExpired(DateTime ticket)
-        {
-            return ticket < nextTicket;
-        }
+        private bool IsExpired(DateTime ticket) => ticket < nextTicket;
 
         private DateTime MakeTicketFromDateTime(DateTime timestamp)
         {

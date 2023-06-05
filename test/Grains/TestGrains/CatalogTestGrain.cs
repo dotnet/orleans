@@ -4,15 +4,9 @@ namespace UnitTests.Grains
 {
     public class CatalogTestGrain : Grain, ICatalogTestGrain
     {
-        public override Task OnActivateAsync(CancellationToken cancellationToken)
-        {
-            return Task.Delay(TimeSpan.FromMilliseconds(50));
-        }
+        public override Task OnActivateAsync(CancellationToken cancellationToken) => Task.Delay(TimeSpan.FromMilliseconds(50));
 
-        public Task Initialize()
-        {
-            return Task.CompletedTask;
-        }
+        public Task Initialize() => Task.CompletedTask;
 
         public Task BlastCallNewGrains(int nGrains, long startingKey, int nCallsToEach)
         {

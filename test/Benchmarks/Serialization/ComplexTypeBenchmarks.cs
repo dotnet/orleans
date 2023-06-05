@@ -96,16 +96,10 @@ namespace Benchmarks
         }
 
         [Fact]
-        public void CopyComplex()
-        {
-            _copier.Copy(_value); 
-        }
+        public void CopyComplex() => _copier.Copy(_value);
 
         [Fact]
-        public void CopyComplexStruct()
-        {
-            _structCopier.Copy(_structValue); 
-        }
+        public void CopyComplexStruct() => _structCopier.Copy(_structValue);
 
         [Fact]
         [Benchmark]

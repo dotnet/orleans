@@ -16,10 +16,7 @@ namespace UnitTests.TimerTests
     {
         public class Fixture : BaseTestClusterFixture
         {
-            protected override void ConfigureTestCluster(TestClusterBuilder builder)
-            {
-                builder.AddSiloBuilderConfigurator<SiloConfigurator>();
-            }
+            protected override void ConfigureTestCluster(TestClusterBuilder builder) => builder.AddSiloBuilderConfigurator<SiloConfigurator>();
 
             private class SiloConfigurator : ISiloConfigurator
             {
@@ -43,16 +40,10 @@ namespace UnitTests.TimerTests
         // Basic tests
 
         [Fact]
-        public async Task Rem_Grain_Basic_StopByRef()
-        {
-            await Test_Reminders_Basic_StopByRef();
-        }
+        public async Task Rem_Grain_Basic_StopByRef() => await Test_Reminders_Basic_StopByRef();
 
         [Fact]
-        public async Task Rem_Grain_Basic_ListOps()
-        {
-            await Test_Reminders_Basic_ListOps();
-        }
+        public async Task Rem_Grain_Basic_ListOps() => await Test_Reminders_Basic_ListOps();
 
         [Fact]
         public async Task Rem_Grain_MultipleReminders()
@@ -64,16 +55,10 @@ namespace UnitTests.TimerTests
         // Single join tests ... multi grain, multi reminders
 
         [SkippableFact(Skip = "https://github.com/dotnet/orleans/issues/4318")]
-        public async Task Rem_Grain_1J_MultiGrainMultiReminders()
-        {
-            await Test_Reminders_1J_MultiGrainMultiReminders();
-        }
+        public async Task Rem_Grain_1J_MultiGrainMultiReminders() => await Test_Reminders_1J_MultiGrainMultiReminders();
 
         [Fact]
-        public async Task Rem_Grain_ReminderNotFounds()
-        {
-            await Test_Reminders_ReminderNotFound();
-        }
+        public async Task Rem_Grain_ReminderNotFounds() => await Test_Reminders_ReminderNotFound();
     }
 }
 // ReSharper restore InconsistentNaming

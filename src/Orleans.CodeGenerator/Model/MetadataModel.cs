@@ -74,10 +74,7 @@ namespace Orleans.CodeGenerator
             return false;
         }
 
-        public void Add(CompoundTypeAliasComponent[] key, TypeSyntax value)
-        {
-            Add(key.AsSpan(), value);
-        }
+        public void Add(CompoundTypeAliasComponent[] key, TypeSyntax value) => Add(key.AsSpan(), value);
 
         public void Add(ReadOnlySpan<CompoundTypeAliasComponent> keys, TypeSyntax value)
         {

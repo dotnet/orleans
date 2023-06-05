@@ -17,9 +17,6 @@ namespace Orleans
         /// <param name="name">The name.</param>
         /// <returns>TOption.</returns>
         public static TOption GetOptionsByName<TOption>(this IServiceProvider services, string name)
-            where TOption : class, new()
-        {
-            return services.GetRequiredService<IOptionsMonitor<TOption>>().Get(name);
-        }
+            where TOption : class, new() => services.GetRequiredService<IOptionsMonitor<TOption>>().Get(name);
     }
 }

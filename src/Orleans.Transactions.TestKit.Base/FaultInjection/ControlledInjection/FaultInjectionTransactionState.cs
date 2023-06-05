@@ -89,14 +89,8 @@ namespace Orleans.Transactions.TestKit
             context.RegisterResourceFactory<ITransactionManager>(stateName, () => new FaultInjectionTransactionManager<TState>(faultInjector, FaultInjectionControl, new TransactionManager<TState>(queue), context, logger, grainRuntime));
         }
 
-        public Task<TResult> PerformRead<TResult>(Func<TState, TResult> readFunction)
-        {
-            return txState.PerformRead(readFunction);
-        }
+        public Task<TResult> PerformRead<TResult>(Func<TState, TResult> readFunction) => txState.PerformRead(readFunction);
 
-        public Task<TResult> PerformUpdate<TResult>(Func<TState, TResult> updateFunction)
-        {
-            return txState.PerformUpdate(updateFunction);
-        }
+        public Task<TResult> PerformUpdate<TResult>(Func<TState, TResult> updateFunction) => txState.PerformUpdate(updateFunction);
     }
 }

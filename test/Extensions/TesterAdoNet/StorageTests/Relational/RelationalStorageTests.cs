@@ -42,10 +42,7 @@ namespace UnitTests.StorageTests.Relational
             }
         }
 
-        internal Task Relational_WriteReadWriteRead100StatesInParallel()
-        {
-            return PersistenceStorageTests.PersistenceStorage_WriteReadWriteReadStatesInParallel(nameof(Relational_WriteReadWriteRead100StatesInParallel));
-        }
+        internal Task Relational_WriteReadWriteRead100StatesInParallel() => PersistenceStorageTests.PersistenceStorage_WriteReadWriteReadStatesInParallel(nameof(Relational_WriteReadWriteRead100StatesInParallel));
 
         internal Task Relational_HashCollisionTests()
         {

@@ -25,9 +25,6 @@ public class UnixSocketTransportTests : TransportTestsBase, IClassFixture<UnixSo
             }
         }
 
-        protected override void ConfigureTestCluster(TestClusterBuilder builder)
-        {
-            builder.Options.ConnectionTransport = ConnectionTransportType.UnixSocket;
-        }
+        protected override void ConfigureTestCluster(TestClusterBuilder builder) => builder.Options.ConnectionTransport = ConnectionTransportType.UnixSocket;
     }
 }

@@ -58,10 +58,7 @@ namespace Orleans.Configuration
         /// The <see cref="IServiceCollection"/>, for chaining with other calls.
         /// </returns>
         public static IServiceCollection ConfigureFormatter<TOptions>(this IServiceCollection services)
-            where TOptions : class, new()
-        {
-            return services.AddSingleton<IOptionFormatter>(sp => sp.GetService<IOptionFormatter<TOptions>>());
-        }
+            where TOptions : class, new() => services.AddSingleton<IOptionFormatter>(sp => sp.GetService<IOptionFormatter<TOptions>>());
 
         /// <summary>
         /// Configures an options formatter for <typeparamref name="TOptions"/> if none are already configured.
@@ -107,10 +104,7 @@ namespace Orleans.Configuration
         /// </returns>
         public static IServiceCollection ConfigureFormatterResolver<TOptions, TOptionFormatterResolver>(this IServiceCollection services)
             where TOptions : class
-            where TOptionFormatterResolver : class, IOptionFormatterResolver<TOptions>
-        {
-            return services.AddSingleton<IOptionFormatterResolver<TOptions>, TOptionFormatterResolver>();
-        }
+            where TOptionFormatterResolver : class, IOptionFormatterResolver<TOptions> => services.AddSingleton<IOptionFormatterResolver<TOptions>, TOptionFormatterResolver>();
 
         /// <summary>
         /// Configure option formatter resolver for named option TOptions, if none is configured
@@ -143,9 +137,6 @@ namespace Orleans.Configuration
         /// The <see cref="IServiceCollection"/>, for chaining with other calls.
         /// </returns>
         public static IServiceCollection ConfigureNamedOptionForLogging<TOptions>(this IServiceCollection services, string name)
-            where TOptions : class
-        {
-            return services.AddSingleton<IOptionFormatter>(sp => sp.GetService<IOptionFormatterResolver<TOptions>>().Resolve(name));
-        }
+            where TOptions : class => services.AddSingleton<IOptionFormatter>(sp => sp.GetService<IOptionFormatterResolver<TOptions>>().Resolve(name));
     }
 }

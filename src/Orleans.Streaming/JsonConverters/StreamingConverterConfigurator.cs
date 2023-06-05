@@ -15,9 +15,6 @@ namespace Orleans.Streaming.JsonConverters
             _runtimeClient = runtimeClient;
         }
 
-        public void PostConfigure(string? name, OrleansJsonSerializerOptions options)
-        {
-            options.JsonSerializerSettings.Converters.Add(new StreamImplConverter(_runtimeClient));
-        }
+        public void PostConfigure(string? name, OrleansJsonSerializerOptions options) => options.JsonSerializerSettings.Converters.Add(new StreamImplConverter(_runtimeClient));
     }
 }

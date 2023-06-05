@@ -11,10 +11,7 @@ namespace Orleans.Serialization.Codecs
     public class SkipFieldCodec : IFieldCodec
     {
         /// <inheritdoc />
-        public void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, object value) where TBufferWriter : IBufferWriter<byte>
-        {
-            throw new NotImplementedException();
-        }
+        public void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, object value) where TBufferWriter : IBufferWriter<byte> => throw new NotImplementedException();
 
         /// <inheritdoc />
         public object ReadValue<TInput>(ref Reader<TInput> reader, Field field)

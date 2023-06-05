@@ -58,10 +58,7 @@ namespace Orleans.Providers.Streams.PersistentStreams
         /// Initialization
         /// </summary>
         /// <returns></returns>
-        public Task InitAsync()
-        {
-            return dataManager.InitTableAsync();
-        }
+        public Task InitAsync() => dataManager.InitTableAsync();
 
         /// <summary>
         /// Should be called when an event could not be delivered to a consumer, after exhausting retry attempts.
@@ -72,10 +69,7 @@ namespace Orleans.Providers.Streams.PersistentStreams
         /// <param name="sequenceToken"></param>
         /// <returns></returns>
         public Task OnDeliveryFailure(GuidId subscriptionId, string streamProviderName, StreamId streamId,
-            StreamSequenceToken sequenceToken)
-        {
-            return OnFailure(subscriptionId, streamProviderName, streamId, sequenceToken);
-        }
+            StreamSequenceToken sequenceToken) => OnFailure(subscriptionId, streamProviderName, streamId, sequenceToken);
 
         /// <summary>
         /// Should be called when a subscription requested by a consumer could not be setup, after exhausting retry attempts.
@@ -86,10 +80,7 @@ namespace Orleans.Providers.Streams.PersistentStreams
         /// <param name="sequenceToken"></param>
         /// <returns></returns>
         public Task OnSubscriptionFailure(GuidId subscriptionId, string streamProviderName, StreamId streamId,
-            StreamSequenceToken sequenceToken)
-        {
-            return OnFailure(subscriptionId, streamProviderName, streamId, sequenceToken);
-        }
+            StreamSequenceToken sequenceToken) => OnFailure(subscriptionId, streamProviderName, streamId, sequenceToken);
 
         private async Task OnFailure(GuidId subscriptionId, string streamProviderName, StreamId streamId,
                 StreamSequenceToken sequenceToken)

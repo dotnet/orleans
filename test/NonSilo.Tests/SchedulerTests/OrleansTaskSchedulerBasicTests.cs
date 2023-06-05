@@ -66,11 +66,8 @@ namespace UnitTests.SchedulerTests
             rootContext = new UnitTestSchedulingContext();
             rootContext.Scheduler = SchedulingHelper.CreateWorkItemGroupForTesting(rootContext, loggerFactory);
         }
-        
-        public void Dispose()
-        {
-            SynchronizationContext.SetSynchronizationContext(null);
-        }
+
+        public void Dispose() => SynchronizationContext.SetSynchronizationContext(null);
 
         [Fact, TestCategory("AsynchronyPrimitives")]
         public void Async_Task_Start_ActivationTaskScheduler()

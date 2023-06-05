@@ -5,21 +5,12 @@ namespace ServiceBus.Tests.MonitorTests
     public class BlockPoolMonitorForTesting : IBlockPoolMonitor
     {
         public ObjectPoolMonitorCounters CallCounters { get; } = new ObjectPoolMonitorCounters();
- 
-        public void TrackMemoryAllocated(long allocatedMemoryInByte)
-        {
-            Interlocked.Increment(ref CallCounters.TrackObjectAllocatedByCacheCallCounter);
-        }
 
-        public void TrackMemoryReleased(long releasedMemoryInByte)
-        {
-            Interlocked.Increment(ref CallCounters.TrackObjectReleasedFromCacheCallCounter);
-        }
+        public void TrackMemoryAllocated(long allocatedMemoryInByte) => Interlocked.Increment(ref CallCounters.TrackObjectAllocatedByCacheCallCounter);
 
-        public void Report(long totalMemoryInByte, long availableMemoryInByte, long claimedMemoryInByte)
-        {
-            Interlocked.Increment(ref CallCounters.ReportCallCounter);
-        }
+        public void TrackMemoryReleased(long releasedMemoryInByte) => Interlocked.Increment(ref CallCounters.TrackObjectReleasedFromCacheCallCounter);
+
+        public void Report(long totalMemoryInByte, long availableMemoryInByte, long claimedMemoryInByte) => Interlocked.Increment(ref CallCounters.ReportCallCounter);
     }
 
     [Serializable]

@@ -28,11 +28,9 @@ namespace UnitTests.RemindersTest
             return filters;
         }
 
-        public override Task DisposeAsync()
-        {
+        public override Task DisposeAsync() =>
             // Reset init timeout after tests
-            return base.DisposeAsync();
-        }
+            base.DisposeAsync();
 
         protected override IReminderTable CreateRemindersTable()
         {
@@ -54,21 +52,12 @@ namespace UnitTests.RemindersTest
         }
 
         [SkippableFact, TestCategory("Functional")]
-        public async Task RemindersTable_Azure_RemindersRange()
-        {
-            await RemindersRange(50);
-        }
+        public async Task RemindersTable_Azure_RemindersRange() => await RemindersRange(50);
 
         [SkippableFact, TestCategory("Functional")]
-        public async Task RemindersTable_Azure_RemindersParallelUpsert()
-        {
-            await RemindersParallelUpsert();
-        }
+        public async Task RemindersTable_Azure_RemindersParallelUpsert() => await RemindersParallelUpsert();
 
         [SkippableFact, TestCategory("Functional")]
-        public async Task RemindersTable_Azure_ReminderSimple()
-        {
-            await ReminderSimple();
-        }
+        public async Task RemindersTable_Azure_ReminderSimple() => await ReminderSimple();
     }
 }

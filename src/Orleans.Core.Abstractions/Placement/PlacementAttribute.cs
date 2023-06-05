@@ -21,10 +21,7 @@ namespace Orleans.Placement
         }
 
         /// <inheritdoc />
-        public virtual void Populate(IServiceProvider services, Type grainClass, GrainType grainType, Dictionary<string, string> properties)
-        {
-            PlacementStrategy?.PopulateGrainProperties(services, grainClass, grainType, properties);
-        }
+        public virtual void Populate(IServiceProvider services, Type grainClass, GrainType grainType, Dictionary<string, string> properties) => PlacementStrategy?.PopulateGrainProperties(services, grainClass, grainType, properties);
     }
 
     /// <summary>

@@ -46,15 +46,9 @@ namespace TestGrains
         /// must override the transition function
         /// (because an XDocument object does not have an Apply function)
         /// </summary>
-        protected override void TransitionState(XDocument state, IChatEvent @event)
-        {
-            @event.Update(state);
-        }
+        protected override void TransitionState(XDocument state, IChatEvent @event) => @event.Update(state);
 
-        public Task<XDocument> GetChat()
-        {
-            return Task.FromResult(TentativeState);
-        }
+        public Task<XDocument> GetChat() => Task.FromResult(TentativeState);
 
         public Task Post(Guid guid, string user, string text)
         {

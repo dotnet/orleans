@@ -57,10 +57,7 @@ namespace Orleans.Transactions
         public string ETag { get; set; }
 
         public int BatchSize => total;
-        public override string ToString()
-        {
-            return $"batchsize={total} [{read}r {prepare}p {commit}c {confirm}cf {collect}cl {cancel}cc]";
-        }
+        public override string ToString() => $"batchsize={total} [{read}r {prepare}p {commit}c {confirm}cf {collect}cl {cancel}cc]";
 
         public StorageBatch(TransactionalStateMetaData metaData, string etag, long confirmUpTo, long cancelAbove)
         {
@@ -191,15 +188,9 @@ namespace Orleans.Transactions
             MetaData.CommitRecords.Remove(transactionId);
         }
 
-        public void FollowUpAction(Action action)
-        {
-            followUpActions.Add(action);
-        }
+        public void FollowUpAction(Action action) => followUpActions.Add(action);
 
-        public void AddStorePreCondition(Func<Task<bool>> action)
-        {
-            storeConditions.Add(action);
-        }
+        public void AddStorePreCondition(Func<Task<bool>> action) => storeConditions.Add(action);
 
         public async Task<bool> CheckStorePreConditions()
         {

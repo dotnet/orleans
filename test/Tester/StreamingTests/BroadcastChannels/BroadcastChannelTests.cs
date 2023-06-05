@@ -19,10 +19,7 @@ namespace Tester.StreamingTests.BroadcastChannel
 
         public class Fixture : BaseTestClusterFixture
         {
-            protected override void CheckPreconditionsOrThrow()
-            {
-                base.CheckPreconditionsOrThrow();
-            }
+            protected override void CheckPreconditionsOrThrow() => base.CheckPreconditionsOrThrow();
 
             protected override void ConfigureTestCluster(TestClusterBuilder builder)
             {

@@ -81,14 +81,8 @@ namespace Orleans.Streaming.EventHubs
             }
         }
 
-        public async Task<IEnumerable<EventData>> ReceiveAsync(int maxCount, TimeSpan waitTime)
-        {
-            return await client.ReceiveBatchAsync(maxCount, waitTime);
-        }
+        public async Task<IEnumerable<EventData>> ReceiveAsync(int maxCount, TimeSpan waitTime) => await client.ReceiveBatchAsync(maxCount, waitTime);
 
-        public async Task CloseAsync()
-        {
-            await client.CloseAsync();
-        }
+        public async Task CloseAsync() => await client.CloseAsync();
     }
 }

@@ -33,11 +33,9 @@ namespace Orleans.Streams
             // Note: Can't use the 'as' operator on PubSubPublisherState because it is a struct.
             return obj is PubSubPublisherState && Equals((PubSubPublisherState)obj);
         }
-        public bool Equals(PubSubPublisherState other)
-        {
+        public bool Equals(PubSubPublisherState other) =>
             // Note: PubSubPublisherState is a struct, so 'other' can never be null.
-            return Equals(other.Stream, other.Producer);
-        }
+            Equals(other.Stream, other.Producer);
         public bool Equals(QualifiedStreamId streamId, GrainId streamProducer)
         {
             if (Stream == default) return false;
@@ -61,9 +59,6 @@ namespace Orleans.Streams
             }
         }
 
-        public override string ToString()
-        {
-            return string.Format("PubSubPublisherState:StreamId={0},Producer={1}.", Stream, Producer);
-        }
+        public override string ToString() => string.Format("PubSubPublisherState:StreamId={0},Producer={1}.", Stream, Producer);
     }
 }

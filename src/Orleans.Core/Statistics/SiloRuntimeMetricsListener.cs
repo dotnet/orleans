@@ -43,10 +43,7 @@ public static class SiloRuntimeMetricsListener
         MeterListener.SetMeasurementEventCallback<int>(OnMeasurementRecorded);
     }
 
-    internal static void Start()
-    {
-        MeterListener.Start();
-    }
+    internal static void Start() => MeterListener.Start();
 
     private static void OnMeasurementRecorded(Instrument instrument, int measurement, ReadOnlySpan<KeyValuePair<string, object>> tags, object state)
     {

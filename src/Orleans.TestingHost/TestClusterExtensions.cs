@@ -33,20 +33,14 @@ namespace Orleans.TestingHost
         /// <param name="hostBuilder">The host builder.</param>
         /// <param name="key">The key.</param>
         /// <returns>The configuration value.</returns>
-        public static string GetConfigurationValue(this IHostBuilder hostBuilder, string key)
-        {
-            return hostBuilder.GetConfiguration()[key];
-        }
+        public static string GetConfigurationValue(this IHostBuilder hostBuilder, string key) => hostBuilder.GetConfiguration()[key];
 
         /// <summary>
         /// Gets the test cluster options.
         /// </summary>
         /// <param name="hostBuilder">The host builder.</param>
         /// <returns>The test cluster options.</returns>
-        public static TestClusterOptions GetTestClusterOptions(this IHostBuilder hostBuilder)
-        {
-            return hostBuilder.GetConfiguration().GetTestClusterOptions();
-        }
+        public static TestClusterOptions GetTestClusterOptions(this IHostBuilder hostBuilder) => hostBuilder.GetConfiguration().GetTestClusterOptions();
 
         /// <summary>
         /// Gets the test cluster options.

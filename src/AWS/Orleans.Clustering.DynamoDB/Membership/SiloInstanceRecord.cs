@@ -144,10 +144,7 @@ namespace Orleans.Runtime.MembershipService
             return sb.ToString();
         }
 
-        public static string ConstructSiloIdentity(SiloAddress silo)
-        {
-            return string.Format("{0}-{1}-{2}", silo.Endpoint.Address, silo.Endpoint.Port, silo.Generation);
-        }
+        public static string ConstructSiloIdentity(SiloAddress silo) => string.Format("{0}-{1}-{2}", silo.Endpoint.Address, silo.Endpoint.Port, silo.Generation);
 
         public Dictionary<string, AttributeValue> GetKeys()
         {

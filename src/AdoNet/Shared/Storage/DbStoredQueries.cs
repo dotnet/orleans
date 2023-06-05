@@ -199,15 +199,9 @@ namespace Orleans.Tests.SqlUtils
 
             }
 
-            internal static int GetVersion(IDataRecord record)
-            {
-                return Convert.ToInt32(record.GetValue<object>(nameof(Version)));
-            }
+            internal static int GetVersion(IDataRecord record) => Convert.ToInt32(record.GetValue<object>(nameof(Version)));
 
-            internal static Uri GetGatewayUri(IDataRecord record)
-            {
-                return GetSiloAddress(record, nameof(Columns.ProxyPort)).ToGatewayUri();
-            }
+            internal static Uri GetGatewayUri(IDataRecord record) => GetSiloAddress(record, nameof(Columns.ProxyPort)).ToGatewayUri();
 
             private static SiloAddress GetSiloAddress(IDataRecord record, string portName)
             {
@@ -237,20 +231,11 @@ namespace Orleans.Tests.SqlUtils
 
             }
 
-            private void Add<T>(string paramName, T paramValue, DbType? dbType = null)
-            {
-                command.AddParameter(paramName, paramValue, dbType: dbType);
-            }
-            
-            private void AddAddress(string name, IPAddress address)
-            {
-                Add(name, address.ToString(), dbType: DbType.AnsiString);
-            }
+            private void Add<T>(string paramName, T paramValue, DbType? dbType = null) => command.AddParameter(paramName, paramValue, dbType: dbType);
 
-            private void AddGrainHash(string name, uint grainHash)
-            {
-                Add(name, (int)grainHash);
-            }
+            private void AddAddress(string name, IPAddress address) => Add(name, address.ToString(), dbType: DbType.AnsiString);
+
+            private void AddGrainHash(string name, uint grainHash) => Add(name, (int)grainHash);
 
             internal string ClientId
             {

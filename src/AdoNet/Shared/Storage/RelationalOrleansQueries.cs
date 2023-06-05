@@ -71,10 +71,7 @@ namespace Orleans.Tests.SqlUtils
             return new RelationalOrleansQueries(storage, new DbStoredQueries(queries.ToDictionary(q => q.Key, q => q.Value)));
         }
 
-        private Task ExecuteAsync(string query, Func<IDbCommand, DbStoredQueries.Columns> parameterProvider)
-        {
-            return storage.ExecuteAsync(query, command => parameterProvider(command));
-        }
+        private Task ExecuteAsync(string query, Func<IDbCommand, DbStoredQueries.Columns> parameterProvider) => storage.ExecuteAsync(query, command => parameterProvider(command));
 
         private async Task<TAggregate> ReadAsync<TResult, TAggregate>(string query,
             Func<IDataRecord, TResult> selector,

@@ -25,18 +25,15 @@ namespace TestGrains
             Reservations = new Dictionary<string, int>();
         }
 
-        public override string ToString()
-        {
-            return string.Format("A={0} B={1} R={{{2}}}", A, B, string.Join(", ", Reservations.Select(kvp => string.Format("{0}:{1}", kvp.Key, kvp.Value))));
-        }
+        public override string ToString() => string.Format("A={0} B={1} R={{{2}}}", A, B, string.Join(", ", Reservations.Select(kvp => string.Format("{0}:{1}", kvp.Key, kvp.Value))));
 
         // all the update operations are listed here
-        public void Apply(UpdateA x) { A = x.Val; }
-        public void Apply(UpdateB x) { B = x.Val; }
-        public void Apply(IncrementA x) { A++; }
+        public void Apply(UpdateA x) => A = x.Val;
+        public void Apply(UpdateB x) => B = x.Val;
+        public void Apply(IncrementA x) => A++;
 
-        public void Apply(AddReservation x) { Reservations[x.Val.ToString()] = x.Val; }
-        public void Apply(RemoveReservation x) { Reservations.Remove(x.Val.ToString()); }
+        public void Apply(AddReservation x) => Reservations[x.Val.ToString()] = x.Val;
+        public void Apply(RemoveReservation x) => Reservations.Remove(x.Val.ToString());
     }
  
 
@@ -67,10 +64,7 @@ namespace TestGrains
     public abstract class LogTestGrain : JournaledGrain<MyGrainState,object>, UnitTests.GrainInterfaces.ILogTestGrain
     {
 
-        public override Task OnActivateAsync(CancellationToken cancellationToken)
-        {
-            return Task.CompletedTask; // do not wait for initial load
-        }
+        public override Task OnActivateAsync(CancellationToken cancellationToken) => Task.CompletedTask; // do not wait for initial load
 
         public async Task SetAGlobal(int x)
         {
@@ -121,10 +115,7 @@ namespace TestGrains
             return State.A;
         }
 
-        public Task<int> GetALocal()
-        {
-            return Task.FromResult(TentativeState.A);
-        }
+        public Task<int> GetALocal() => Task.FromResult(TentativeState.A);
 
         public async Task<AB> GetBothGlobal()
         {
@@ -132,10 +123,7 @@ namespace TestGrains
             return new AB() { A = State.A, B = State.B };
         }
 
-        public Task<AB> GetBothLocal()
-        {
-            return Task.FromResult(new AB() { A = TentativeState.A, B = TentativeState.B });
-        }
+        public Task<AB> GetBothLocal() => Task.FromResult(new AB() { A = TentativeState.A, B = TentativeState.B });
 
         public Task AddReservationLocal(int val)
         {
@@ -155,15 +143,9 @@ namespace TestGrains
             return State.Reservations.Values.ToArray();
         }
 
-        public Task SynchronizeGlobalState()
-        {
-            return RefreshNow();
-        }
+        public Task SynchronizeGlobalState() => RefreshNow();
 
-        public Task<int> GetConfirmedVersion()
-        {
-            return Task.FromResult(Version);
-        }
+        public Task<int> GetConfirmedVersion() => Task.FromResult(Version);
 
         public async Task<KeyValuePair<int, object>> Read()
         {
@@ -185,9 +167,7 @@ namespace TestGrains
             return Task.CompletedTask;
         }
 
-        public Task<IReadOnlyList<object>> GetEventLog() {
-            return RetrieveConfirmedEvents(0, Version);
-        }
+        public Task<IReadOnlyList<object>> GetEventLog() => RetrieveConfirmedEvents(0, Version);
 
     }
 }

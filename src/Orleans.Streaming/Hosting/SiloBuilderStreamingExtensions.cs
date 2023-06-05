@@ -43,10 +43,7 @@ namespace Orleans.Hosting
         /// <param name="builder">The builder.</param>
         /// <param name="name">The stream filter name.</param>
         /// <returns>The silo builder.</returns>
-        public static ISiloBuilder AddStreamFilter<T>(this ISiloBuilder builder, string name) where T : class, IStreamFilter
-        {
-            return builder.ConfigureServices(svc => svc.AddStreamFilter<T>(name));
-        }
+        public static ISiloBuilder AddStreamFilter<T>(this ISiloBuilder builder, string name) where T : class, IStreamFilter => builder.ConfigureServices(svc => svc.AddStreamFilter<T>(name));
 
         /// <summary>
         /// Adds a stream filter. 
@@ -55,9 +52,6 @@ namespace Orleans.Hosting
         /// <param name="builder">The builder.</param>
         /// <param name="name">The stream filter name.</param>
         /// <returns>The client builder.</returns>
-        public static IClientBuilder AddStreamFilter<T>(this IClientBuilder builder, string name) where T : class, IStreamFilter
-        {
-            return builder.ConfigureServices(svc => svc.AddStreamFilter<T>(name));
-        }
+        public static IClientBuilder AddStreamFilter<T>(this IClientBuilder builder, string name) where T : class, IStreamFilter => builder.ConfigureServices(svc => svc.AddStreamFilter<T>(name));
     }
 }

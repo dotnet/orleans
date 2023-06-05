@@ -680,8 +680,7 @@ public partial struct PooledBuffer : IBufferWriter<byte>, IDisposable
         public bool IsValid => Array is { Length: > 0 };
         public bool IsMinimumSize => Array.Length == SequenceSegmentPool.MinimumBlockSize;
 
-        public Memory<byte> AsMemory(int offset)
-        {
+        public Memory<byte> AsMemory(int offset) =>
 #if NET6_0_OR_GREATER
             if (IsMinimumSize)
             {
@@ -689,11 +688,9 @@ public partial struct PooledBuffer : IBufferWriter<byte>, IDisposable
             }
 #endif
 
-            return Array.AsMemory(offset);
-        }
+            Array.AsMemory(offset);
 
-        public Memory<byte> AsMemory(int offset, int length)
-        {
+        public Memory<byte> AsMemory(int offset, int length) =>
 #if NET6_0_OR_GREATER
             if (IsMinimumSize)
             {
@@ -701,8 +698,7 @@ public partial struct PooledBuffer : IBufferWriter<byte>, IDisposable
             }
 #endif
 
-            return Array.AsMemory(offset, length);
-        }
+            Array.AsMemory(offset, length);
 
         public void Commit(long runningIndex, int length)
         {

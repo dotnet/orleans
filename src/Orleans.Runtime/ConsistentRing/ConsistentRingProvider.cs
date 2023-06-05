@@ -47,25 +47,13 @@ namespace Orleans.Runtime.ConsistentRing
         /// </summary>
         /// <param name="key"></param>
         /// <returns></returns>
-        public SiloAddress GetPrimaryTargetSilo(uint key)
-        {
-            return CalculateTargetSilo(key);
-        }
+        public SiloAddress GetPrimaryTargetSilo(uint key) => CalculateTargetSilo(key);
 
-        public IRingRange GetMyRange()
-        {
-            return myRange; // its immutable, so no need to clone
-        }
+        public IRingRange GetMyRange() => myRange; // its immutable, so no need to clone
 
-        private void Start()
-        {
-            isRunning = true;
-        }
+        private void Start() => isRunning = true;
 
-        private void Stop()
-        {
-            isRunning = false;
-        }
+        private void Stop() => isRunning = false;
 
         internal void AddServer(SiloAddress silo)
         {
@@ -308,9 +296,6 @@ namespace Orleans.Runtime.ConsistentRing
             return siloAddress;
         }
 
-        private bool IsSiloNextInTheRing(SiloAddress siloAddr, uint hash, bool excludeMySelf)
-        {
-            return siloAddr.GetConsistentHashCode() >= hash && (!siloAddr.Equals(MyAddress) || !excludeMySelf);
-        }
+        private bool IsSiloNextInTheRing(SiloAddress siloAddr, uint hash, bool excludeMySelf) => siloAddr.GetConsistentHashCode() >= hash && (!siloAddr.Equals(MyAddress) || !excludeMySelf);
     }
 }

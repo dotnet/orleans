@@ -23,10 +23,7 @@ namespace UnitTests.StreamingTests
                 return Task.CompletedTask;
             }
 
-            public void Clear()
-            {
-                Value = 0;
-            }
+            public void Clear() => Value = 0;
         }
 
         public DeactivationTestRunner(string streamProviderName, IClusterClient client)

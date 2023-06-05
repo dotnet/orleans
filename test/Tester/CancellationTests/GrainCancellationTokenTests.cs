@@ -20,10 +20,7 @@ namespace UnitTests.CancellationTests
 
             private class SiloConfig : ISiloConfigurator
             {
-                public void Configure(ISiloBuilder siloBuilder)
-                {
-                    siloBuilder.ConfigureLogging(logging => logging.AddDebug());
-                }
+                public void Configure(ISiloBuilder siloBuilder) => siloBuilder.ConfigureLogging(logging => logging.AddDebug());
             }
         }
 
@@ -160,37 +157,25 @@ namespace UnitTests.CancellationTests
         [InlineData(0)]
         [InlineData(10)]
         [InlineData(300)]
-        public async Task InSiloGrainCancellation(int delay)
-        {
-            await GrainGrainCancellation(false, delay);
-        }
+        public async Task InSiloGrainCancellation(int delay) => await GrainGrainCancellation(false, delay);
 
         [Theory, TestCategory("BVT"), TestCategory("Cancellation")]
         [InlineData(0)]
         [InlineData(10)]
         [InlineData(300)]
-        public async Task InterSiloGrainCancellation(int delay)
-        {
-            await GrainGrainCancellation(true, delay);
-        }
+        public async Task InterSiloGrainCancellation(int delay) => await GrainGrainCancellation(true, delay);
 
-        [SkippableTheory(Skip="https://github.com/dotnet/orleans/issues/5654"), TestCategory("BVT"), TestCategory("Cancellation")]
+        [SkippableTheory(Skip = "https://github.com/dotnet/orleans/issues/5654"), TestCategory("BVT"), TestCategory("Cancellation")]
         [InlineData(0)]
         [InlineData(10)]
         [InlineData(300)]
-        public async Task InterSiloClientCancellationTokenPassing(int delay)
-        {
-            await ClientGrainGrainTokenPassing(delay, true);
-        }
+        public async Task InterSiloClientCancellationTokenPassing(int delay) => await ClientGrainGrainTokenPassing(delay, true);
 
         [Theory, TestCategory("BVT"), TestCategory("Cancellation")]
         [InlineData(0)]
         [InlineData(10)]
         [InlineData(300)]
-        public async Task InSiloClientCancellationTokenPassing(int delay)
-        {
-            await ClientGrainGrainTokenPassing(delay, false);
-        }
+        public async Task InSiloClientCancellationTokenPassing(int delay) => await ClientGrainGrainTokenPassing(delay, false);
 
         private async Task ClientGrainGrainTokenPassing(int delay, bool interSilo)
         {

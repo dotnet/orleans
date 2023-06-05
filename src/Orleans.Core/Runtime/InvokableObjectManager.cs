@@ -34,15 +34,9 @@ namespace Orleans
             this.logger = logger;
         }
 
-        public bool TryRegister(IAddressable obj, ObserverGrainId objectId)
-        {
-            return localObjects.TryAdd(objectId, new LocalObjectData(obj, objectId, this));
-        }
+        public bool TryRegister(IAddressable obj, ObserverGrainId objectId) => localObjects.TryAdd(objectId, new LocalObjectData(obj, objectId, this));
 
-        public bool TryDeregister(ObserverGrainId objectId)
-        {
-            return localObjects.TryRemove(objectId, out _);
-        }
+        public bool TryDeregister(ObserverGrainId objectId) => localObjects.TryRemove(objectId, out _);
 
         public void Dispatch(Message message)
         {

@@ -15,10 +15,7 @@ namespace Orleans.Hosting
         /// Configures the stream provider to use the consistent ring queue balancer.
         /// </summary>
         /// <param name="configurator">The confiurator.</param>
-        public static void UseConsistentRingQueueBalancer(this ISiloPersistentStreamConfigurator configurator)
-        {
-            configurator.ConfigurePartitionBalancing(ConsistentRingQueueBalancer.Create);
-        }
+        public static void UseConsistentRingQueueBalancer(this ISiloPersistentStreamConfigurator configurator) => configurator.ConfigurePartitionBalancing(ConsistentRingQueueBalancer.Create);
 
         /// <summary>
         /// Configures the stream provider to use the static cluster configuration deployment balancer.

@@ -6,20 +6,11 @@ namespace Orleans.Storage
 {
     internal static class StorageExceptionExtensions
     {
-        public static bool IsNotFound(this RequestFailedException requestFailedException)
-        {
-            return requestFailedException?.Status == (int)HttpStatusCode.NotFound;
-        }
+        public static bool IsNotFound(this RequestFailedException requestFailedException) => requestFailedException?.Status == (int)HttpStatusCode.NotFound;
 
-        public static bool IsPreconditionFailed(this RequestFailedException requestFailedException)
-        {
-            return requestFailedException?.Status == (int)HttpStatusCode.PreconditionFailed;
-        }
+        public static bool IsPreconditionFailed(this RequestFailedException requestFailedException) => requestFailedException?.Status == (int)HttpStatusCode.PreconditionFailed;
 
-        public static bool IsConflict(this RequestFailedException requestFailedException)
-        {
-            return requestFailedException?.Status == (int)HttpStatusCode.Conflict;
-        }
+        public static bool IsConflict(this RequestFailedException requestFailedException) => requestFailedException?.Status == (int)HttpStatusCode.Conflict;
 
         public static bool IsContainerNotFound(this RequestFailedException requestFailedException)
         {

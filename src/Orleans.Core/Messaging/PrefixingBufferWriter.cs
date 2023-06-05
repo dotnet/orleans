@@ -187,10 +187,7 @@ namespace Orleans.Runtime.Messaging
             _committedBytes = 0;
         }
 
-        public void Dispose()
-        {
-            privateWriter?.Dispose();
-        }
+        public void Dispose() => privateWriter?.Dispose();
 
         /// <summary>
         /// Makes the initial call to acquire memory from the underlying writer.

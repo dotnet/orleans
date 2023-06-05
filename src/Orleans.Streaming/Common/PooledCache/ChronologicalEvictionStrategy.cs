@@ -47,10 +47,7 @@ namespace Orleans.Providers.Streams.Common
             cacheSizeInByte = 0;
         }
 
-        private void ReportCacheSize()
-        {
-            cacheMonitor.ReportCacheSize(cacheSizeInByte);
-        }
+        private void ReportCacheSize() => cacheMonitor.ReportCacheSize(cacheSizeInByte);
 
         /// <inheritdoc />
         public IPurgeObservable PurgeObservable { private get; set; }

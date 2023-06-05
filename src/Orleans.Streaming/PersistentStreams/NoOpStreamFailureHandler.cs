@@ -30,16 +30,10 @@ namespace Orleans.Streams
 
         /// <inheritdoc/>
         public Task OnDeliveryFailure(GuidId subscriptionId, string streamProviderName, StreamId streamId,
-            StreamSequenceToken sequenceToken)
-        {
-            return Task.CompletedTask;
-        }
+            StreamSequenceToken sequenceToken) => Task.CompletedTask;
 
         /// <inheritdoc/>
         public Task OnSubscriptionFailure(GuidId subscriptionId, string streamProviderName, StreamId streamId,
-            StreamSequenceToken sequenceToken)
-        {
-            return Task.CompletedTask;
-        }
+            StreamSequenceToken sequenceToken) => Task.CompletedTask;
     }
 }

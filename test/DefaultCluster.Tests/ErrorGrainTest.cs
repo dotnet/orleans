@@ -231,16 +231,10 @@ namespace DefaultCluster.Tests
         }
 
         [Fact, TestCategory("Revisit"), TestCategory("Observers")]
-        public void ObserverTest_Disconnect()
-        {
-            ObserverTest_DisconnectRunner(false);
-        }
+        public void ObserverTest_Disconnect() => ObserverTest_DisconnectRunner(false);
 
         [Fact, TestCategory("Revisit"), TestCategory("Observers")]
-        public void ObserverTest_Disconnect2()
-        {
-            ObserverTest_DisconnectRunner(true);
-        }
+        public void ObserverTest_Disconnect2() => ObserverTest_DisconnectRunner(true);
 
         private void ObserverTest_DisconnectRunner(bool observeTwice)
         {

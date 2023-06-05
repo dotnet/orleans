@@ -67,10 +67,7 @@ namespace Orleans.Providers
             return batches;
         }
 
-        public Task MessagesDeliveredAsync(IList<IBatchContainer> messages)
-        {
-            return Task.CompletedTask;
-        }
+        public Task MessagesDeliveredAsync(IList<IBatchContainer> messages) => Task.CompletedTask;
 
         public async Task Shutdown(TimeSpan timeout)
         {

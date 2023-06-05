@@ -22,11 +22,8 @@ namespace Orleans.Configuration
         /// <summary>
         /// Configures the <see cref="CreateClient"/> using the provided callback.
         /// </summary>
-        public void ConfigureConsulClient(Func<IConsulClient> createClientCallback)
-        {
-            CreateClient = createClientCallback ?? throw new ArgumentNullException(nameof(createClientCallback));
-        }
-       
+        public void ConfigureConsulClient(Func<IConsulClient> createClientCallback) => CreateClient = createClientCallback ?? throw new ArgumentNullException(nameof(createClientCallback));
+
         /// <summary>
         /// Configures the <see cref="CreateClient"/> using the consul-address and a acl-token.
         /// </summary>
@@ -66,9 +63,6 @@ namespace Orleans.Configuration
         public TOptions Options { get; }
         public string Name { get; }
 
-        public virtual void ValidateConfiguration()
-        {
-            Options.Validate(Name);
-        }
+        public virtual void ValidateConfiguration() => Options.Validate(Name);
     }
 }

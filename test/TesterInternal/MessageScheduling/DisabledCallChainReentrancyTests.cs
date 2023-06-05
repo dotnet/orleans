@@ -10,10 +10,7 @@ namespace UnitTests.General
 
         public class Fixture : BaseTestClusterFixture
         {
-            protected override void ConfigureTestCluster(TestClusterBuilder builder)
-            {
-                builder.AddSiloBuilderConfigurator<ReentrancyTestsSiloBuilderConfigurator>();
-            }
+            protected override void ConfigureTestCluster(TestClusterBuilder builder) => builder.AddSiloBuilderConfigurator<ReentrancyTestsSiloBuilderConfigurator>();
         }
 
         public DisabledCallChainReentrancyTests(Fixture fixture)
@@ -22,21 +19,12 @@ namespace UnitTests.General
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Tasks"), TestCategory("Reentrancy")]
-        public void NonReentrantGrain()
-        {
-            runner.NonReentrantGrain(false);
-        }
+        public void NonReentrantGrain() => runner.NonReentrantGrain(false);
 
         [Fact, TestCategory("Functional"), TestCategory("Tasks"), TestCategory("Reentrancy")]
-        public void NonReentrantGrain_WithMayInterleavePredicate_WhenPredicateReturnsFalse()
-        {
-            runner.NonReentrantGrain_WithMayInterleavePredicate_WhenPredicateReturnsFalse(false);
-        }
+        public void NonReentrantGrain_WithMayInterleavePredicate_WhenPredicateReturnsFalse() => runner.NonReentrantGrain_WithMayInterleavePredicate_WhenPredicateReturnsFalse(false);
 
         [Fact, TestCategory("Functional"), TestCategory("Tasks"), TestCategory("Reentrancy")]
-        public void UnorderedNonReentrantGrain()
-        {
-            runner.UnorderedNonReentrantGrain(false);
-        }
+        public void UnorderedNonReentrantGrain() => runner.UnorderedNonReentrantGrain(false);
     }
 }

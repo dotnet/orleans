@@ -21,10 +21,7 @@ namespace DependencyInjection.Tests.Autofac
             //configure to use Autofac as DI container
             private class SiloBuilderConfiguratorConfiguringAutofac : IHostConfigurator
             {
-                public void Configure(IHostBuilder hostBuilder)
-                {
-                    hostBuilder.UseServiceProviderFactory(new AutofacServiceProviderFactory());
-                }
+                public void Configure(IHostBuilder hostBuilder) => hostBuilder.UseServiceProviderFactory(new AutofacServiceProviderFactory());
             }
         }
 
@@ -51,10 +48,7 @@ namespace DependencyInjection.Tests.Autofac
             //configure to use Autofac as DI container
             private class HostBuilderConfigurator : IHostConfigurator
             {
-                public void Configure(IHostBuilder hostBuilder)
-                {
-                    hostBuilder.UseServiceProviderFactory(new AutofacServiceProviderFactory());
-                }
+                public void Configure(IHostBuilder hostBuilder) => hostBuilder.UseServiceProviderFactory(new AutofacServiceProviderFactory());
             }
 
             private class SiloBuilderConfigurator : ISiloConfigurator

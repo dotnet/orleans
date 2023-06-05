@@ -36,18 +36,12 @@ namespace Orleans.Transactions
             SupportedRoles = supportedRoles;
         }
 
-        public override string ToString()
-        {
-            return $"ParticipantId.{Name}.{Reference}";
-        }
+        public override string ToString() => $"ParticipantId.{Name}.{Reference}";
 
         [GenerateSerializer, Immutable]
         public sealed class IdComparer : IEqualityComparer<ParticipantId>
         {
-            public bool Equals(ParticipantId x, ParticipantId y)
-            {
-                return string.CompareOrdinal(x.Name, y.Name) == 0 && Equals(x.Reference, y.Reference);
-            }
+            public bool Equals(ParticipantId x, ParticipantId y) => string.CompareOrdinal(x.Name, y.Name) == 0 && Equals(x.Reference, y.Reference);
 
             public int GetHashCode(ParticipantId obj)
             {
@@ -63,39 +57,18 @@ namespace Orleans.Transactions
 
     public static class ParticipantRoleExtensions
     {
-        public static bool SupportsRoles(this ParticipantId participant, ParticipantId.Role role)
-        {
-            return (participant.SupportedRoles & role) != 0;
-        }
+        public static bool SupportsRoles(this ParticipantId participant, ParticipantId.Role role) => (participant.SupportedRoles & role) != 0;
 
-        public static bool IsResource(this ParticipantId participant)
-        {
-            return participant.SupportsRoles(ParticipantId.Role.Resource);
-        }
+        public static bool IsResource(this ParticipantId participant) => participant.SupportsRoles(ParticipantId.Role.Resource);
 
-        public static bool IsManager(this ParticipantId participant)
-        {
-            return participant.SupportsRoles(ParticipantId.Role.Manager);
-        }
+        public static bool IsManager(this ParticipantId participant) => participant.SupportsRoles(ParticipantId.Role.Manager);
 
-        public static bool IsPriorityManager(this ParticipantId participant)
-        {
-            return participant.SupportsRoles(ParticipantId.Role.PriorityManager);
-        }
+        public static bool IsPriorityManager(this ParticipantId participant) => participant.SupportsRoles(ParticipantId.Role.PriorityManager);
 
-        public static IEnumerable<KeyValuePair<ParticipantId,AccessCounter>> SelectResources(this IEnumerable<KeyValuePair<ParticipantId, AccessCounter>> participants)
-        {
-            return participants.Where(p => p.Key.IsResource());
-        }
+        public static IEnumerable<KeyValuePair<ParticipantId, AccessCounter>> SelectResources(this IEnumerable<KeyValuePair<ParticipantId, AccessCounter>> participants) => participants.Where(p => p.Key.IsResource());
 
-        public static IEnumerable<KeyValuePair<ParticipantId, AccessCounter>> SelectManagers(this IEnumerable<KeyValuePair<ParticipantId, AccessCounter>> participants)
-        {
-            return participants.Where(p => p.Key.IsManager());
-        }
+        public static IEnumerable<KeyValuePair<ParticipantId, AccessCounter>> SelectManagers(this IEnumerable<KeyValuePair<ParticipantId, AccessCounter>> participants) => participants.Where(p => p.Key.IsManager());
 
-        public static IEnumerable<ParticipantId> SelectPriorityManagers(this IEnumerable<ParticipantId> participants)
-        {
-            return participants.Where(p => p.IsPriorityManager());
-        }
+        public static IEnumerable<ParticipantId> SelectPriorityManagers(this IEnumerable<ParticipantId> participants) => participants.Where(p => p.IsPriorityManager());
     }
 }

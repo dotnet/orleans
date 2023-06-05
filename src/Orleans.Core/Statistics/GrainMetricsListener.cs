@@ -22,10 +22,7 @@ internal static class GrainMetricsListener
         MeterListener.SetMeasurementEventCallback<int>(OnMeasurementRecorded);
     }
 
-    internal static void Start()
-    {
-        MeterListener.Start();
-    }
+    internal static void Start() => MeterListener.Start();
 
     // Alternatives:
     // 1. Use existing *Statistics counters

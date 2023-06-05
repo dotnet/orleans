@@ -15,25 +15,13 @@ namespace UnitTests.Grains
     [Orleans.Providers.StorageProvider(ProviderName = "MemoryStore")]
     public class MultifacetFactoryTestGrain : Grain<MultifacetFactoryTestGrainState>, IMultifacetFactoryTestGrain
     {
-        public Task<IMultifacetReader> GetReader(IMultifacetTestGrain grain)
-        {
-            return Task.FromResult<IMultifacetReader>(grain);
-        }
+        public Task<IMultifacetReader> GetReader(IMultifacetTestGrain grain) => Task.FromResult<IMultifacetReader>(grain);
 
-        public Task<IMultifacetReader> GetReader()
-        {
-            return Task.FromResult(State.Reader);
-        }
+        public Task<IMultifacetReader> GetReader() => Task.FromResult(State.Reader);
 
-        public Task<IMultifacetWriter> GetWriter(IMultifacetTestGrain grain)
-        {
-            return Task.FromResult<IMultifacetWriter>(grain);
-        }
+        public Task<IMultifacetWriter> GetWriter(IMultifacetTestGrain grain) => Task.FromResult<IMultifacetWriter>(grain);
 
-        public Task<IMultifacetWriter> GetWriter()
-        {
-            return Task.FromResult(State.Writer);
-        }
+        public Task<IMultifacetWriter> GetWriter() => Task.FromResult(State.Writer);
 
         public Task SetReader(IMultifacetReader reader)
         {

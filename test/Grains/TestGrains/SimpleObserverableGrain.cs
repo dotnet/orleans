@@ -58,25 +58,13 @@ namespace UnitTests.Grains
             }).Unwrap();
         }
 
-        public async Task IncrementA()
-        {
-            await SetA(A + 1);
-        }
+        public async Task IncrementA() => await SetA(A + 1);
 
-        public Task<int> GetAxB()
-        {
-            return Task.FromResult(A * B);
-        }
+        public Task<int> GetAxB() => Task.FromResult(A * B);
 
-        public Task<int> GetAxB(int a, int b)
-        {
-            return Task.FromResult(a * b);
-        }
+        public Task<int> GetAxB(int a, int b) => Task.FromResult(a * b);
 
-        public Task<int> GetA()
-        {
-            return Task.FromResult(A);
-        }
+        public Task<int> GetA() => Task.FromResult(A);
 
         public Task Subscribe(ISimpleGrainObserver observer)
         {
@@ -90,10 +78,7 @@ namespace UnitTests.Grains
             return Task.CompletedTask;
         }
 
-        public Task<string> GetRuntimeInstanceId()
-        {
-            return Task.FromResult(RuntimeIdentity);
-        }
+        public Task<string> GetRuntimeInstanceId() => Task.FromResult(RuntimeIdentity);
 
         protected void RaiseStateUpdateEvent()
         {

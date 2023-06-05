@@ -29,60 +29,36 @@ namespace Orleans.Transactions.TestKit.xUnit
         }
 
         [Fact]
-        public override Task FirstTime_Load_ShouldReturnEmptyLoadResponse()
-        {
-            return base.FirstTime_Load_ShouldReturnEmptyLoadResponse();
-        }
+        public override Task FirstTime_Load_ShouldReturnEmptyLoadResponse() => base.FirstTime_Load_ShouldReturnEmptyLoadResponse();
 
         [Theory]
         [InlineData(true)]
         [InlineData(false)]
-        public override Task ConfirmOne(bool useTwoSteps)
-        {
-            return base.ConfirmOne(useTwoSteps);
-        }
+        public override Task ConfirmOne(bool useTwoSteps) => base.ConfirmOne(useTwoSteps);
 
         [Fact]
-        public override Task CancelOne()
-        {
-            return base.CancelOne();
-        }
+        public override Task CancelOne() => base.CancelOne();
 
         [Fact]
-        public override Task ReplaceOne()
-        {
-            return base.ReplaceOne();
-        }
+        public override Task ReplaceOne() => base.ReplaceOne();
 
         [Theory]
         [InlineData(false, false)]
         [InlineData(true, true)]
         [InlineData(true, false)]
-        public override Task ConfirmOneAndCancelOne(bool useTwoSteps, bool reverseOrder)
-        {
-            return base.ConfirmOneAndCancelOne(useTwoSteps, reverseOrder);
-        }
+        public override Task ConfirmOneAndCancelOne(bool useTwoSteps, bool reverseOrder) => base.ConfirmOneAndCancelOne(useTwoSteps, reverseOrder);
 
         [Fact]
-        public override Task GrowingBatch()
-        {
-            return base.GrowingBatch();
-        }
+        public override Task GrowingBatch() => base.GrowingBatch();
 
         [Fact]
-        public override Task ShrinkingBatch()
-        {
-            return base.ShrinkingBatch();
-        }
+        public override Task ShrinkingBatch() => base.ShrinkingBatch();
 
         [Theory]
         [InlineData(99)]
         [InlineData(100)]
         [InlineData(200)]
-        public override Task PrepareMany(int count)
-        {
-            return base.PrepareMany(count);
-        }
+        public override Task PrepareMany(int count) => base.PrepareMany(count);
 
         [Theory]
         [InlineData(99, true)]
@@ -91,27 +67,18 @@ namespace Orleans.Transactions.TestKit.xUnit
         [InlineData(100, false)]
         [InlineData(200, true)]
         [InlineData(200, false)]
-        public override Task ConfirmMany(int count, bool useTwoSteps)
-        {
-            return base.ConfirmMany(count, useTwoSteps);
-        }
+        public override Task ConfirmMany(int count, bool useTwoSteps) => base.ConfirmMany(count, useTwoSteps);
 
         [Theory]
         [InlineData(99)]
         [InlineData(100)]
         [InlineData(200)]
-        public override Task CancelMany(int count)
-        {
-            return base.CancelMany(count);
-        }
+        public override Task CancelMany(int count) => base.CancelMany(count);
 
         [Theory]
         [InlineData(99)]
         [InlineData(100)]
         [InlineData(200)]
-        public override Task ReplaceMany(int count)
-        {
-            return base.ReplaceMany(count);
-        }
+        public override Task ReplaceMany(int count) => base.ReplaceMany(count);
     }
 }

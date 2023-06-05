@@ -74,9 +74,6 @@ namespace Orleans.Streaming.EventHubs.Testing
     {
         private int counter = 0;
         public int Value { get { return counter; } }
-        public void Increment()
-        {
-            counter++;
-        }
+        public void Increment() => counter++;
     }
 }

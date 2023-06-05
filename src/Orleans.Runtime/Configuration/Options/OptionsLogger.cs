@@ -12,10 +12,7 @@ namespace Orleans.Runtime
         {
         }
 
-        public void Participate(ISiloLifecycle lifecycle)
-        {
-            lifecycle.Subscribe<SiloOptionsLogger>(ServiceLifecycleStage.First, OnStart);
-        }
+        public void Participate(ISiloLifecycle lifecycle) => lifecycle.Subscribe<SiloOptionsLogger>(ServiceLifecycleStage.First, OnStart);
 
         public Task OnStart(CancellationToken token)
         {

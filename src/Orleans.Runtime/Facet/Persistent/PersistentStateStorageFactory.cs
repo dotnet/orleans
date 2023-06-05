@@ -32,10 +32,7 @@ namespace Orleans.Runtime
             return bridge;
         }
 
-        protected virtual string GetFullStateName(IGrainContext context, IPersistentStateConfiguration cfg)
-        {
-            return cfg.StateName;
-        }
+        protected virtual string GetFullStateName(IGrainContext context, IPersistentStateConfiguration cfg) => cfg.StateName;
 
         [DoesNotReturn]
         private static void ThrowMissingProviderException(IGrainContext context, IPersistentStateConfiguration cfg)
@@ -78,25 +75,13 @@ namespace Orleans.Runtime
 
             public bool RecordExists => storage.RecordExists;
 
-            public Task ClearStateAsync()
-            {
-                return storage.ClearStateAsync();
-            }
+            public Task ClearStateAsync() => storage.ClearStateAsync();
 
-            public Task ReadStateAsync()
-            {
-                return storage.ReadStateAsync();
-            }
+            public Task ReadStateAsync() => storage.ReadStateAsync();
 
-            public Task WriteStateAsync()
-            {
-                return storage.WriteStateAsync();
-            }
+            public Task WriteStateAsync() => storage.WriteStateAsync();
 
-            public void Participate(IGrainLifecycle lifecycle)
-            {
-                lifecycle.Subscribe(GetType().FullName, GrainLifecycleStage.SetupState, OnSetupState);
-            }
+            public void Participate(IGrainLifecycle lifecycle) => lifecycle.Subscribe(GetType().FullName, GrainLifecycleStage.SetupState, OnSetupState);
 
             private Task OnSetupState(CancellationToken ct)
             {

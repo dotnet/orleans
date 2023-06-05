@@ -28,38 +28,23 @@ namespace UnitTests.StorageTests.Relational
 
         [SkippableFact]
         [TestCategory("Functional")]
-        public async Task PersistenceStorage_WriteDuplicateFailsWithInconsistentStateException()
-        {
-            await Relational_WriteDuplicateFailsWithInconsistentStateException();
-        }
+        public async Task PersistenceStorage_WriteDuplicateFailsWithInconsistentStateException() => await Relational_WriteDuplicateFailsWithInconsistentStateException();
 
         [SkippableFact]
         [TestCategory("Functional")]
-        public async Task StorageDataSetGeneric_HashCollisionTests()
-        {
-            await Relational_HashCollisionTests();
-        }
+        public async Task StorageDataSetGeneric_HashCollisionTests() => await Relational_HashCollisionTests();
 
         [SkippableFact]
         [TestCategory("Functional")]
-        public async Task WriteInconsistentFailsWithIncosistentStateException()
-        {
-            await Relational_WriteInconsistentFailsWithIncosistentStateException();
-        }
+        public async Task WriteInconsistentFailsWithIncosistentStateException() => await Relational_WriteInconsistentFailsWithIncosistentStateException();
 
         [SkippableFact]
         [TestCategory("Functional")]
-        public async Task WriteRead100StatesInParallel()
-        {
-            await Relational_WriteReadWriteRead100StatesInParallel();
-        }
+        public async Task WriteRead100StatesInParallel() => await Relational_WriteReadWriteRead100StatesInParallel();
 
         [SkippableFact]
         [TestCategory("Functional")]
-        public async Task WriteReadCyrillic()
-        {
-            await PersistenceStorageTests.PersistenceStorage_Relational_WriteReadIdCyrillic();
-        }
+        public async Task WriteReadCyrillic() => await PersistenceStorageTests.PersistenceStorage_Relational_WriteReadIdCyrillic();
 
         [SkippableTheory, ClassData(typeof(StorageDataSet2CyrillicIdsAndGrainNames<string>))]
         [TestCategory("Functional")]

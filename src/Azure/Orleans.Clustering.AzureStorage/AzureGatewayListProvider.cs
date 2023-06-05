@@ -32,11 +32,9 @@ namespace Orleans.AzureUtils
                 options);
         }
         // no caching
-        public Task<IList<Uri>> GetGateways()
-        {
+        public Task<IList<Uri>> GetGateways() =>
             // FindAllGatewayProxyEndpoints already returns a deep copied List<Uri>.
-            return siloInstanceManager.FindAllGatewayProxyEndpoints();
-        }
+            siloInstanceManager.FindAllGatewayProxyEndpoints();
 
         public TimeSpan MaxStaleness { get; }
 

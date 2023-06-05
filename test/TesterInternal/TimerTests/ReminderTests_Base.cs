@@ -339,10 +339,7 @@ namespace UnitTests.TimerTests
             return true;
         }
 
-        protected static string Time()
-        {
-            return DateTime.UtcNow.ToString("hh:mm:ss.fff");
-        }
+        protected static string Time() => DateTime.UtcNow.ToString("hh:mm:ss.fff");
 
         protected void AssertIsInRange(long val, long lowerLimit, long upperLimit, IGrain grain, string reminderName, TimeSpan sleepFor)
         {

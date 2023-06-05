@@ -12,9 +12,6 @@ namespace Orleans.Transactions
             this.deepCopier = deepCopier;
         }
 
-        public TData DeepCopy(TData original)
-        {
-            return (TData)deepCopier.Copy(original);
-        }
+        public TData DeepCopy(TData original) => (TData)deepCopier.Copy(original);
     }
 }

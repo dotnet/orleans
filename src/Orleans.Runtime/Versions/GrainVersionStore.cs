@@ -82,10 +82,7 @@ namespace Orleans.Runtime.Versions
             static void ThrowDisabled() => throw new OrleansException("Version store not enabled, make sure the store is configured");
         }
 
-        public void Participate(ISiloLifecycle lifecycle)
-        {
-            lifecycle.Subscribe<GrainVersionStore>(ServiceLifecycleStage.ApplicationServices, OnStart);
-        }
+        public void Participate(ISiloLifecycle lifecycle) => lifecycle.Subscribe<GrainVersionStore>(ServiceLifecycleStage.ApplicationServices, OnStart);
 
         private Task OnStart(CancellationToken token)
         {

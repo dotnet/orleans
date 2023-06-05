@@ -289,10 +289,7 @@ namespace Orleans.Storage
             }
         }
 
-        public void Participate(ISiloLifecycle lifecycle)
-        {
-            lifecycle.Subscribe(OptionFormattingUtilities.Name<AzureBlobGrainStorage>(name), options.InitStage, Init);
-        }
+        public void Participate(ISiloLifecycle lifecycle) => lifecycle.Subscribe(OptionFormattingUtilities.Name<AzureBlobGrainStorage>(name), options.InitStage, Init);
 
         /// <summary> Initialization function for this storage provider. </summary>
         private async Task Init(CancellationToken ct)

@@ -21,10 +21,7 @@ namespace UnitTests.Grains
             throw new InvalidOperationException("Test exception");
         }
 
-        public Task ThrowsNullReferenceException()
-        {
-            throw new NullReferenceException("null null null");
-        }
+        public Task ThrowsNullReferenceException() => throw new NullReferenceException("null null null");
 
         public async Task ThrowsAggregateExceptionWrappingInvalidOperationException()
         {
@@ -50,15 +47,9 @@ namespace UnitTests.Grains
             return otherGrain.ThrowsAggregateExceptionWrappingInvalidOperationException();
         }
 
-        public Task ThrowsSynchronousInvalidOperationException()
-        {
-            throw new InvalidOperationException("Test exception");
-        }
+        public Task ThrowsSynchronousInvalidOperationException() => throw new InvalidOperationException("Test exception");
 
-        public Task<object> ThrowsSynchronousExceptionObjectTask()
-        {
-            throw new InvalidOperationException("Test exception");
-        }
+        public Task<object> ThrowsSynchronousExceptionObjectTask() => throw new InvalidOperationException("Test exception");
 
         public Task ThrowsMultipleExceptionsAggregatedInFaultedTask()
         {

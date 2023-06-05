@@ -152,10 +152,7 @@ namespace Orleans.Runtime
                 $"{nameof(GrainMethodInvoker)}.{nameof(Invoke)}() received an invalid call.");
         }
 
-        private static void ThrowBrokenCallFilterChain(string filterName)
-        {
-            throw new InvalidOperationException($"{nameof(GrainMethodInvoker)}.{nameof(Invoke)}() invoked a broken filter: {filterName}.");
-        }
+        private static void ThrowBrokenCallFilterChain(string filterName) => throw new InvalidOperationException($"{nameof(GrainMethodInvoker)}.{nameof(Invoke)}() invoked a broken filter: {filterName}.");
 
 
         private (MethodInfo ImplementationMethod, MethodInfo InterfaceMethod) GetMethodEntry()

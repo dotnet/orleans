@@ -62,42 +62,24 @@ namespace Tester.AzureUtils.Persistence
         {
             fixture.EnsurePreconditionsMet();
         }
-        
-        [SkippableFact, TestCategory("Functional")]
-        public async Task Grain_AzureBlobStore_Delete()
-        {
-            await base.Grain_AzureStore_Delete();
-        }
 
         [SkippableFact, TestCategory("Functional")]
-        public async Task Grain_AzureBlobStore_Read()
-        {
-            await base.Grain_AzureStore_Read();
-        }
+        public async Task Grain_AzureBlobStore_Delete() => await base.Grain_AzureStore_Delete();
 
         [SkippableFact, TestCategory("Functional")]
-        public async Task Grain_GuidKey_AzureBlobStore_Read_Write()
-        {
-            await base.Grain_GuidKey_AzureStore_Read_Write();
-        }
+        public async Task Grain_AzureBlobStore_Read() => await base.Grain_AzureStore_Read();
 
         [SkippableFact, TestCategory("Functional")]
-        public async Task Grain_LongKey_AzureBlobStore_Read_Write()
-        {
-            await base.Grain_LongKey_AzureStore_Read_Write();
-        }
+        public async Task Grain_GuidKey_AzureBlobStore_Read_Write() => await base.Grain_GuidKey_AzureStore_Read_Write();
 
         [SkippableFact, TestCategory("Functional")]
-        public async Task Grain_LongKeyExtended_AzureBlobStore_Read_Write()
-        {
-            await base.Grain_LongKeyExtended_AzureStore_Read_Write();
-        }
+        public async Task Grain_LongKey_AzureBlobStore_Read_Write() => await base.Grain_LongKey_AzureStore_Read_Write();
 
         [SkippableFact, TestCategory("Functional")]
-        public async Task Grain_GuidKeyExtended_AzureBlobStore_Read_Write()
-        {
-            await base.Grain_GuidKeyExtended_AzureStore_Read_Write();
-        }
+        public async Task Grain_LongKeyExtended_AzureBlobStore_Read_Write() => await base.Grain_LongKeyExtended_AzureStore_Read_Write();
+
+        [SkippableFact, TestCategory("Functional")]
+        public async Task Grain_GuidKeyExtended_AzureBlobStore_Read_Write() => await base.Grain_GuidKeyExtended_AzureStore_Read_Write();
 
         [SkippableFact, TestCategory("Functional")]
         public async Task Grain_Generic_AzureBlobStore_Read_Write()
@@ -115,40 +97,25 @@ namespace Tester.AzureUtils.Persistence
             await base.Grain_Generic_AzureStore_DiffTypes();
         }
 
-        [SkippableFact(Skip="https://github.com/dotnet/orleans/issues/5651"), TestCategory("Functional")]
-        public async Task Grain_AzureBlobStore_SiloRestart()
-        {
-            await base.Grain_AzureStore_SiloRestart();
-        }
+        [SkippableFact(Skip = "https://github.com/dotnet/orleans/issues/5651"), TestCategory("Functional")]
+        public async Task Grain_AzureBlobStore_SiloRestart() => await base.Grain_AzureStore_SiloRestart();
 
         [SkippableFact, TestCategory("CorePerf"), TestCategory("Performance"), TestCategory("Stress")]
-        public void Persistence_Perf_Activate_AzureBlobStore()
-        {
-            base.Persistence_Perf_Activate();
-        }
+        public void Persistence_Perf_Activate_AzureBlobStore() => base.Persistence_Perf_Activate();
 
         [SkippableFact, TestCategory("CorePerf"), TestCategory("Performance"), TestCategory("Stress")]
-        public void Persistence_Perf_Write_AzureBlobStore()
-        {
-            base.Persistence_Perf_Write();
-        }
+        public void Persistence_Perf_Write_AzureBlobStore() => base.Persistence_Perf_Write();
 
         [SkippableFact, TestCategory("CorePerf"), TestCategory("Performance"), TestCategory("Stress")]
-        public void Persistence_Perf_Write_Reread_AzureBlobStore()
-        {
-            base.Persistence_Perf_Write_Reread();
-        }
+        public void Persistence_Perf_Write_Reread_AzureBlobStore() => base.Persistence_Perf_Write_Reread();
 
-      
+
         [SkippableTheory, TestCategory("Functional")]
         [InlineData("AzureStore")]
         [InlineData("AzureStore1")]
         [InlineData("AzureStore2")]
         [InlineData("AzureStore3")]
-        public Task Persistence_Silo_StorageProvider_AzureBlobStore(string providerName)
-        {
-            return base.Persistence_Silo_StorageProvider_Azure(providerName);
-        }
+        public Task Persistence_Silo_StorageProvider_AzureBlobStore(string providerName) => base.Persistence_Silo_StorageProvider_Azure(providerName);
 
     }
 }

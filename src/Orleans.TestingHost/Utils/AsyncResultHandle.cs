@@ -44,19 +44,13 @@ namespace Orleans.TestingHost.Utils
         /// </summary>
         /// <param name="timeout"></param>
         /// <returns>Returns <c>true</c> if operation completes before timeout</returns>
-        public Task<bool> WaitForFinished(TimeSpan timeout)
-        {
-            return WaitFor(timeout, () => done);
-        }
+        public Task<bool> WaitForFinished(TimeSpan timeout) => WaitFor(timeout, () => done);
 
         /// <summary>
         /// </summary>
         /// <param name="timeout"></param>
         /// <returns>Returns <c>true</c> if operation completes before timeout</returns>
-        public Task<bool> WaitForContinue(TimeSpan timeout)
-        {
-            return WaitFor(timeout, () => continueFlag);
-        }
+        public Task<bool> WaitForContinue(TimeSpan timeout) => WaitFor(timeout, () => continueFlag);
 
         /// <summary>
         /// </summary>

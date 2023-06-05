@@ -124,10 +124,7 @@ namespace Orleans.Transactions
             );
         }
 
-        public void Participate(IGrainLifecycle lifecycle)
-        {
-            lifecycle.Subscribe<TransactionalState<OperationState>>(GrainLifecycleStage.SetupState, OnSetupState);
-        }
+        public void Participate(IGrainLifecycle lifecycle) => lifecycle.Subscribe<TransactionalState<OperationState>>(GrainLifecycleStage.SetupState, OnSetupState);
 
         private async Task OnSetupState(CancellationToken ct)
         {

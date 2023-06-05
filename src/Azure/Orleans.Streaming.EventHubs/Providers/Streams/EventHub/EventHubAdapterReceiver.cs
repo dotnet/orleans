@@ -61,10 +61,7 @@ namespace Orleans.Streaming.EventHubs
         private const int ReceiverShutdown = 0;
         private const int ReceiverRunning = 1;
 
-        public int GetMaxAddCount()
-        {
-            return flowController.GetMaxAddCount();
-        }
+        public int GetMaxAddCount() => flowController.GetMaxAddCount();
 
         public EventHubAdapterReceiver(EventHubPartitionSettings settings,
             Func<string, IStreamQueueCheckpointer<string>, ILoggerFactory, IEventHubQueueCache> cacheFactory,
@@ -211,20 +208,11 @@ namespace Orleans.Streaming.EventHubs
             return false;
         }
 
-        public IQueueCacheCursor GetCacheCursor(StreamId streamId, StreamSequenceToken token)
-        {
-            return new Cursor(cache, streamId, token);
-        }
+        public IQueueCacheCursor GetCacheCursor(StreamId streamId, StreamSequenceToken token) => new Cursor(cache, streamId, token);
 
-        public bool IsUnderPressure()
-        {
-            return GetMaxAddCount() <= 0;
-        }
+        public bool IsUnderPressure() => GetMaxAddCount() <= 0;
 
-        public Task MessagesDeliveredAsync(IList<IBatchContainer> messages)
-        {
-            return Task.CompletedTask;
-        }
+        public Task MessagesDeliveredAsync(IList<IBatchContainer> messages) => Task.CompletedTask;
 
         public async Task Shutdown(TimeSpan timeout)
         {
@@ -266,24 +254,15 @@ namespace Orleans.Streaming.EventHubs
             }
         }
 
-        private static IEventHubReceiver CreateReceiver(EventHubPartitionSettings partitionSettings, string offset, ILogger logger)
-        {
-            return new EventHubReceiverProxy(partitionSettings, offset, logger);
-        }
+        private static IEventHubReceiver CreateReceiver(EventHubPartitionSettings partitionSettings, string offset, ILogger logger) => new EventHubReceiverProxy(partitionSettings, offset, logger);
 
         /// <summary>
         /// For test purpose. ConfigureDataGeneratorForStream will configure a data generator for the stream
         /// </summary>
         /// <param name="streamId"></param>
-        internal void ConfigureDataGeneratorForStream(StreamId streamId)
-        {
-            (receiver as EventHubPartitionGeneratorReceiver)?.ConfigureDataGeneratorForStream(streamId);
-        }
+        internal void ConfigureDataGeneratorForStream(StreamId streamId) => (receiver as EventHubPartitionGeneratorReceiver)?.ConfigureDataGeneratorForStream(streamId);
 
-        internal void StopProducingOnStream(StreamId streamId)
-        {
-            (receiver as EventHubPartitionGeneratorReceiver)?.StopProducingOnStream(streamId);
-        }
+        internal void StopProducingOnStream(StreamId streamId) => (receiver as EventHubPartitionGeneratorReceiver)?.StopProducingOnStream(streamId);
 
         [GenerateSerializer]
         internal class StreamActivityNotificationBatch : IBatchContainer
@@ -299,8 +278,8 @@ namespace Orleans.Streaming.EventHubs
                 Position = position;
             }
 
-            public IEnumerable<Tuple<T, StreamSequenceToken>> GetEvents<T>() { throw new NotSupportedException(); }
-            public bool ImportRequestContext() { throw new NotSupportedException(); }
+            public IEnumerable<Tuple<T, StreamSequenceToken>> GetEvents<T>() => throw new NotSupportedException();
+            public bool ImportRequestContext() => throw new NotSupportedException();
         }
 
         private class Cursor : IQueueCacheCursor

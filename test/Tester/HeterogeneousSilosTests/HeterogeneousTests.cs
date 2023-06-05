@@ -65,10 +65,7 @@ namespace Tester.HeterogeneousSilosTests
 
         public class ClientConfigurator : IClientBuilderConfigurator
         {
-            public void Configure(IConfiguration configuration, IClientBuilder clientBuilder)
-            {
-                clientBuilder.Configure<TypeManagementOptions>(options => options.TypeMapRefreshInterval = ClientRefreshDelay);
-            }
+            public void Configure(IConfiguration configuration, IClientBuilder clientBuilder) => clientBuilder.Configure<TypeManagementOptions>(options => options.TypeMapRefreshInterval = ClientRefreshDelay);
         }
 
         public void Dispose()
@@ -188,10 +185,7 @@ namespace Tester.HeterogeneousSilosTests
             Assert.Contains("Could not find an implementation for interface", exception.Message);
         }
 
-        public Task InitializeAsync()
-        {
-            return Task.CompletedTask;
-        }
+        public Task InitializeAsync() => Task.CompletedTask;
 
         public async Task DisposeAsync()
         {

@@ -35,10 +35,7 @@ namespace UnitTests.Grains
             return base.OnActivateAsync(cancellationToken);
         }
 
-        public Task<string> GetLastEcho()
-        {
-            return Task.FromResult(State.LastEcho);
-        }
+        public Task<string> GetLastEcho() => Task.FromResult(State.LastEcho);
 
         public Task<string> Echo(string data)
         {
@@ -71,8 +68,8 @@ namespace UnitTests.Grains
             _grainContext = grainContext;
         }
 
-        public Task<int> GetMyIdAsync() { return Task.FromResult(State.MyId); }
-        public Task<string> GetLastEchoAsync() { return Task.FromResult(State.LastEcho); }
+        public Task<int> GetMyIdAsync() => Task.FromResult(State.MyId);
+        public Task<string> GetLastEchoAsync() => Task.FromResult(State.LastEcho);
 
         public override Task OnActivateAsync(CancellationToken cancellationToken)
         {
@@ -181,10 +178,7 @@ namespace UnitTests.Grains
             logger.LogInformation("Ping reply received for {SiloAddress}", siloAddress);
         }
 
-        private ISiloControl GetSiloControlReference(SiloAddress silo)
-        {
-            return internalGrainFactory.GetSystemTarget<ISiloControl>(Constants.SiloControlType, silo);
-        }
+        private ISiloControl GetSiloControlReference(SiloAddress silo) => internalGrainFactory.GetSystemTarget<ISiloControl>(Constants.SiloControlType, silo);
 
         public Task OrleansDebuggerHelper_GetGrainInstance_Test()
         {
@@ -220,15 +214,9 @@ namespace UnitTests.Grains
             return base.OnActivateAsync(cancellationToken);
         }
 
-        public Task<int> GetMyId()
-        {
-            return Task.FromResult(State.MyId);
-        }
+        public Task<int> GetMyId() => Task.FromResult(State.MyId);
 
-        public Task<string> GetLastEcho()
-        {
-            return Task.FromResult(State.LastEcho);
-        }
+        public Task<string> GetLastEcho() => Task.FromResult(State.LastEcho);
 
         public Task<string> Echo(string data)
         {
@@ -313,15 +301,9 @@ namespace UnitTests.Grains
             return base.OnActivateAsync(cancellationToken);
         }
 
-        public Task<int> GetMyId()
-        {
-            return Task.FromResult(State.MyId);
-        }
+        public Task<int> GetMyId() => Task.FromResult(State.MyId);
 
-        public Task<string> GetLastEcho()
-        {
-            return Task.FromResult(State.LastEcho);
-        }
+        public Task<string> GetLastEcho() => Task.FromResult(State.LastEcho);
 
         public Task<string> Echo(string data)
         {

@@ -21,10 +21,7 @@ namespace Orleans.Runtime.Placement
 
             internal CachedLocalStat(SiloRuntimeStatistics siloStats) => SiloStats = siloStats;
 
-            public void IncrementActivationCount(int delta)
-            {
-                Interlocked.Add(ref activationCount, delta);
-            }
+            public void IncrementActivationCount(int delta) => Interlocked.Add(ref activationCount, delta);
         }
         
         // Track created activations on this silo between statistic intervals.
@@ -47,10 +44,7 @@ namespace Orleans.Runtime.Placement
             deploymentLoadPublisher?.SubscribeToStatisticsChangeEvents(this);
         }
 
-        private static bool IsSiloOverloaded(SiloRuntimeStatistics stats)
-        {
-            return stats.IsOverloaded || (stats.CpuUsage ?? 0) >= 100;
-        }
+        private static bool IsSiloOverloaded(SiloRuntimeStatistics stats) => stats.IsOverloaded || (stats.CpuUsage ?? 0) >= 100;
 
         private Task<SiloAddress> SelectSiloPowerOfK(PlacementTarget target, IPlacementContext context)
         {
@@ -118,15 +112,10 @@ namespace Orleans.Runtime.Placement
             return SelectSiloPowerOfK(target, context);
         }
 
-        public void SiloStatisticsChangeNotification(SiloAddress updatedSilo, SiloRuntimeStatistics newSiloStats)
-        {
+        public void SiloStatisticsChangeNotification(SiloAddress updatedSilo, SiloRuntimeStatistics newSiloStats) =>
             // just create a new empty CachedLocalStat and throw the old one.
             localCache[updatedSilo] = new(newSiloStats);
-        }
 
-        public void RemoveSilo(SiloAddress removedSilo)
-        {
-            localCache.TryRemove(removedSilo, out _);
-        }
+        public void RemoveSilo(SiloAddress removedSilo) => localCache.TryRemove(removedSilo, out _);
     }
 }

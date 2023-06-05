@@ -99,10 +99,7 @@ namespace Orleans.Runtime
         }
 
         /// <inheritdoc/>
-        public override IAddressable ConvertFromSurrogate(ref GrainReferenceSurrogate surrogate)
-        {
-            return _grainFactory.GetGrain(surrogate.GrainId, surrogate.GrainInterfaceType);
-        }
+        public override IAddressable ConvertFromSurrogate(ref GrainReferenceSurrogate surrogate) => _grainFactory.GetGrain(surrogate.GrainId, surrogate.GrainInterfaceType);
 
         /// <inheritdoc/>
         public override void ConvertToSurrogate(IAddressable value, ref GrainReferenceSurrogate surrogate)
@@ -197,10 +194,7 @@ namespace Orleans.Runtime
         }
 
         /// <inheritdoc/>
-        public override T ConvertFromSurrogate(ref GrainReferenceSurrogate surrogate)
-        {
-            return (T)_grainFactory.GetGrain(surrogate.GrainId, surrogate.GrainInterfaceType);
-        }
+        public override T ConvertFromSurrogate(ref GrainReferenceSurrogate surrogate) => (T)_grainFactory.GetGrain(surrogate.GrainId, surrogate.GrainInterfaceType);
 
         /// <inheritdoc/>
         public override void ConvertToSurrogate(T value, ref GrainReferenceSurrogate surrogate)
@@ -329,10 +323,7 @@ namespace Orleans.Runtime
         /// </summary>
         /// <param name="obj">The object to test for equality against this reference.</param>
         /// <returns><c>true</c> if the object is equal to this reference.</returns>
-        public override bool Equals(object obj)
-        {
-            return Equals(obj as GrainReference);
-        }
+        public override bool Equals(object obj) => Equals(obj as GrainReference);
 
         /// <inheritdoc />
         public bool Equals(GrainReference other) => other is not null && GrainId.Equals(other.GrainId);
@@ -346,11 +337,9 @@ namespace Orleans.Runtime
         /// <returns>
         /// The uniform hash code.
         /// </returns>
-        public uint GetUniformHashCode()
-        {
+        public uint GetUniformHashCode() =>
             // GrainId already includes the hashed type code for generic arguments.
-            return GrainId.GetUniformHashCode();
-        }
+            GrainId.GetUniformHashCode();
 
         /// <summary>
         /// Compares two references for equality.
@@ -407,29 +396,20 @@ namespace Orleans.Runtime
         /// <typeparam name="T">The underlying method return type.</typeparam>
         /// <param name="methodDescription">The method description.</param>
         /// <returns>The result of the invocation.</returns>
-        protected ValueTask<T> InvokeAsync<T>(IRequest methodDescription)
-        {
-            return Runtime.InvokeMethodAsync<T>(this, methodDescription, methodDescription.Options);
-        }
+        protected ValueTask<T> InvokeAsync<T>(IRequest methodDescription) => Runtime.InvokeMethodAsync<T>(this, methodDescription, methodDescription.Options);
 
         /// <summary>
         /// Invokes the provided method.
         /// </summary>
         /// <param name="methodDescription">The method description.</param>
         /// <returns>A <see cref="ValueTask"/> representing the operation.</returns>
-        protected ValueTask InvokeAsync(IRequest methodDescription)
-        {
-            return Runtime.InvokeMethodAsync(this, methodDescription, methodDescription.Options);
-        }
+        protected ValueTask InvokeAsync(IRequest methodDescription) => Runtime.InvokeMethodAsync(this, methodDescription, methodDescription.Options);
 
         /// <summary>
         /// Invokes the provided method.
         /// </summary>
         /// <param name="methodDescription">The method description.</param>
-        protected void Invoke(IRequest methodDescription)
-        {
-            Runtime.InvokeMethod(this, methodDescription, methodDescription.Options);
-        }
+        protected void Invoke(IRequest methodDescription) => Runtime.InvokeMethod(this, methodDescription, methodDescription.Options);
     }
 
     /// <summary>
@@ -534,10 +514,7 @@ namespace Orleans.Runtime
         /// <param name="options">
         /// The options.
         /// </param>
-        public void AddInvokeMethodOptions(InvokeMethodOptions options)
-        {
-            Options |= options;
-        }
+        public void AddInvokeMethodOptions(InvokeMethodOptions options) => Options |= options;
 
         /// <inheritdoc/>
         [DebuggerHidden]

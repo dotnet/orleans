@@ -50,10 +50,7 @@ namespace Orleans.Connections.Security
             _logger = loggerFactory?.CreateLogger<TlsServerConnectionMiddleware>();
         }
 
-        public Task OnConnectionAsync(ConnectionContext context)
-        {
-            return Task.Run(() => InnerOnConnectionAsync(context));
-        }
+        public Task OnConnectionAsync(ConnectionContext context) => Task.Run(() => InnerOnConnectionAsync(context));
 
         private async Task InnerOnConnectionAsync(ConnectionContext context)
         {

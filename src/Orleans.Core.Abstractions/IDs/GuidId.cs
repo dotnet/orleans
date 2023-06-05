@@ -35,30 +35,21 @@ namespace Orleans.Runtime
         /// Returns a new, randomly generated <see cref="GuidId"/>.
         /// </summary>
         /// <returns>A new, randomly generated <see cref="GuidId"/>.</returns>
-        public static GuidId GetNewGuidId()
-        {
-            return FindOrCreateGuidId(Guid.NewGuid());
-        }
+        public static GuidId GetNewGuidId() => FindOrCreateGuidId(Guid.NewGuid());
 
         /// <summary>
         /// Returns a <see cref="GuidId"/> instance corresponding to the provided <see cref="Guid"/>.
         /// </summary>
         /// <param name="guid">The guid.</param>
         /// <returns>A <see cref="GuidId"/> instance corresponding to the provided <see cref="Guid"/>.</returns>
-        public static GuidId GetGuidId(Guid guid)
-        {
-            return FindOrCreateGuidId(guid);
-        }
+        public static GuidId GetGuidId(Guid guid) => FindOrCreateGuidId(guid);
 
         /// <summary>
         /// Returns a <see cref="GuidId"/> instance corresponding to the provided <see cref="Guid"/>.
         /// </summary>
         /// <param name="guid">The <see cref="Guid"/>.</param>
         /// <returns>A <see cref="GuidId"/> instance corresponding to the provided <see cref="Guid"/>.</returns>
-        private static GuidId FindOrCreateGuidId(Guid guid)
-        {
-            return guidIdInternCache.FindOrCreate(guid, g => new GuidId(g));
-        }
+        private static GuidId FindOrCreateGuidId(Guid guid) => guidIdInternCache.FindOrCreate(guid, g => new GuidId(g));
 
         /// <inheritdoc />
         public int CompareTo(GuidId? other) => other is null ? 1 : Guid.CompareTo(other.Guid);
@@ -92,10 +83,7 @@ namespace Orleans.Runtime
         public static bool operator !=(GuidId? left, GuidId? right) => !(left == right);
 
         /// <inheritdoc />
-        public void GetObjectData(SerializationInfo info, StreamingContext context)
-        {
-            info.AddValue("Guid", Guid, typeof(Guid));
-        }
+        public void GetObjectData(SerializationInfo info, StreamingContext context) => info.AddValue("Guid", Guid, typeof(Guid));
 
         private GuidId(SerializationInfo info, StreamingContext context)
         {

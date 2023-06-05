@@ -43,9 +43,6 @@ namespace Orleans
             });
         }
 
-        internal static void ThrowNoPrivateKey(X509Certificate2 certificate, string parameterName)
-        {
-            throw new ArgumentException($"Certificate {certificate.ToString(verbose: true)} does not contain a private key", parameterName);
-        }
+        internal static void ThrowNoPrivateKey(X509Certificate2 certificate, string parameterName) => throw new ArgumentException($"Certificate {certificate.ToString(verbose: true)} does not contain a private key", parameterName);
     }
 }

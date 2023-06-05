@@ -66,10 +66,7 @@ namespace ServiceBus.Tests.TestStreamProviders
             base.Init();
         }
 
-        private void ChangeCachePressure()
-        {
-            cachePressureInjectionMonitor.UnderPressure = !cachePressureInjectionMonitor.UnderPressure;
-        }
+        private void ChangeCachePressure() => cachePressureInjectionMonitor.UnderPressure = !cachePressureInjectionMonitor.UnderPressure;
 
         protected override IEventHubQueueCacheFactory CreateCacheFactory(EventHubStreamCachePressureOptions cacheOptions)
         {
@@ -109,10 +106,7 @@ namespace ServiceBus.Tests.TestStreamProviders
             }
 
             protected override void AddCachePressureMonitors(IEventHubQueueCache cache, EventHubStreamCachePressureOptions providerOptions,
-                    ILogger cacheLogger)
-            {
-                cache.AddCachePressureMonitor(cachePressureInjectionMonitor);
-            }
+                    ILogger cacheLogger) => cache.AddCachePressureMonitor(cachePressureInjectionMonitor);
         }
         public enum QueryCommands
         {

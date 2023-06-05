@@ -88,10 +88,7 @@ namespace Orleans.Runtime.Utilities
 
         private static void ThrowDisposed() => throw new ObjectDisposedException("This instance has been disposed");
 
-        public IAsyncEnumerator<T> GetAsyncEnumerator(CancellationToken cancellationToken = default)
-        {
-            return new AsyncEnumerator(current, cancellationToken);
-        }
+        public IAsyncEnumerator<T> GetAsyncEnumerator(CancellationToken cancellationToken = default) => new AsyncEnumerator(current, cancellationToken);
 
         private sealed class AsyncEnumerator : IAsyncEnumerator<T>
         {

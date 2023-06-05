@@ -18,10 +18,7 @@ namespace Orleans.Transactions.TestKit.xUnit
         [InlineData(TransactionTestConstants.SingleStateTransactionalGrain)]
         [InlineData(TransactionTestConstants.DoubleStateTransactionalGrain)]
         [InlineData(TransactionTestConstants.MaxStateTransactionalGrain)]
-        public override Task SingleSharedGrainTest(string grainStates)
-        {
-            return base.SingleSharedGrainTest(grainStates);
-        }
+        public override Task SingleSharedGrainTest(string grainStates) => base.SingleSharedGrainTest(grainStates);
 
         /// <summary>
         /// Chain of transactions, each dependent on the results of the previous
@@ -32,10 +29,7 @@ namespace Orleans.Transactions.TestKit.xUnit
         [InlineData(TransactionTestConstants.SingleStateTransactionalGrain)]
         [InlineData(TransactionTestConstants.DoubleStateTransactionalGrain)]
         [InlineData(TransactionTestConstants.MaxStateTransactionalGrain)]
-        public override Task TransactionChainTest(string grainStates)
-        {
-            return base.TransactionChainTest(grainStates);
-        }
+        public override Task TransactionChainTest(string grainStates) => base.TransactionChainTest(grainStates);
 
         /// <summary>
         /// Single transaction containing two grains is dependent on two other transaction, one from each grain
@@ -46,9 +40,6 @@ namespace Orleans.Transactions.TestKit.xUnit
         [InlineData(TransactionTestConstants.SingleStateTransactionalGrain)]
         [InlineData(TransactionTestConstants.DoubleStateTransactionalGrain)]
         [InlineData(TransactionTestConstants.MaxStateTransactionalGrain)]
-        public override Task TransactionTreeTest(string grainStates)
-        {
-            return base.TransactionTreeTest(grainStates);
-        }
+        public override Task TransactionTreeTest(string grainStates) => base.TransactionTreeTest(grainStates);
     }
 }

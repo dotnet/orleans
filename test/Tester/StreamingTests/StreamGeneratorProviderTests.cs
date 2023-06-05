@@ -29,10 +29,7 @@ namespace UnitTests.StreamingTests
                 EventsInStream = 100
             };
 
-            protected override void ConfigureTestCluster(TestClusterBuilder builder)
-            {
-                builder.AddSiloBuilderConfigurator<MySiloBuilderConfigurator>();
-            }
+            protected override void ConfigureTestCluster(TestClusterBuilder builder) => builder.AddSiloBuilderConfigurator<MySiloBuilderConfigurator>();
 
             private class MySiloBuilderConfigurator : ISiloConfigurator
             {

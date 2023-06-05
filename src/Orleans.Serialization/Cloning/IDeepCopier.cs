@@ -237,10 +237,7 @@ namespace Orleans.Serialization.Cloning
         /// </summary>
         /// <param name="original">The original value.</param>
         /// <param name="copy">The copy of <paramref name="original"/>.</param>
-        public void RecordCopy(object original, object copy)
-        {
-            _copies[original] = copy;
-        }
+        public void RecordCopy(object original, object copy) => _copies[original] = copy;
 
         /// <summary>
         /// Resets this instance.

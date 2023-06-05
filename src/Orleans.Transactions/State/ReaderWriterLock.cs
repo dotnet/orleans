@@ -204,15 +204,9 @@ namespace Orleans.Transactions.State
             }
         }
 
-        public void Notify()
-        {
-            lockWorker.Notify();
-        }
+        public void Notify() => lockWorker.Notify();
 
-        public bool TryGetRecord(Guid transactionId, out TransactionRecord<TState> record)
-        {
-            return currentGroup.TryGetValue(transactionId, out record);
-        }
+        public bool TryGetRecord(Guid transactionId, out TransactionRecord<TState> record) => currentGroup.TryGetValue(transactionId, out record);
 
         public Task AbortExecutingTransactions(Exception exception)
         {
@@ -557,9 +551,6 @@ namespace Orleans.Transactions.State
             }
         }
 
-        private static int Comparer(TransactionRecord<TState> a, TransactionRecord<TState> b)
-        {
-            return a.Timestamp.CompareTo(b.Timestamp);
-        }
+        private static int Comparer(TransactionRecord<TState> a, TransactionRecord<TState> b) => a.Timestamp.CompareTo(b.Timestamp);
     }
 }

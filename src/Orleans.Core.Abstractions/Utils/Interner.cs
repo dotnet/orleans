@@ -146,9 +146,6 @@ namespace Orleans
         }
 
         /// <inheritdoc/>
-        public void Dispose()
-        {
-            cacheCleanupTimer?.Dispose();
-        }
+        public void Dispose() => cacheCleanupTimer?.Dispose();
     }
 }

@@ -13,10 +13,7 @@ namespace Orleans.Streams
         private IConsistentRingStreamQueueMapper _streamQueueMapper;
         private IRingRange _myRange;
 
-        public static IStreamQueueBalancer Create(IServiceProvider services, string name)
-        {
-            return ActivatorUtilities.CreateInstance<ConsistentRingQueueBalancer>(services);
-        }
+        public static IStreamQueueBalancer Create(IServiceProvider services, string name) => ActivatorUtilities.CreateInstance<ConsistentRingQueueBalancer>(services);
 
         public ConsistentRingQueueBalancer(IConsistentRingProvider consistentRingProvider, ILoggerFactory loggerFactory, IServiceProvider services, ILogger<ConsistentRingQueueBalancer> logger)
             : base(services, logger)
@@ -46,10 +43,7 @@ namespace Orleans.Streams
             return base.Initialize(queueMapper);
         }
 
-        public override IEnumerable<QueueId> GetMyQueues()
-        {
-            return _streamQueueMapper.GetQueuesForRange(_myRange);
-        }
+        public override IEnumerable<QueueId> GetMyQueues() => _streamQueueMapper.GetQueuesForRange(_myRange);
 
         protected override void OnClusterMembershipChange(HashSet<SiloAddress> activeSilos)
         {

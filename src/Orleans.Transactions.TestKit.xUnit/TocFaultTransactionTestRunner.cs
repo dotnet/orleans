@@ -13,18 +13,12 @@ namespace Orleans.Transactions.TestKit.xUnit
         [InlineData(TransactionTestConstants.SingleStateTransactionalGrain, TransactionTestConstants.MaxCoordinatedTransactions)]
         [InlineData(TransactionTestConstants.DoubleStateTransactionalGrain, TransactionTestConstants.MaxCoordinatedTransactions / 2)]
         [InlineData(TransactionTestConstants.MaxStateTransactionalGrain, 1)]
-        public override Task MultiGrainWriteTransactionWithCommitFailure(string grainStates, int grainCount)
-        {
-            return base.MultiGrainWriteTransactionWithCommitFailure(grainStates, grainCount);
-        }
+        public override Task MultiGrainWriteTransactionWithCommitFailure(string grainStates, int grainCount) => base.MultiGrainWriteTransactionWithCommitFailure(grainStates, grainCount);
 
         [SkippableTheory]
         [InlineData(TransactionTestConstants.SingleStateTransactionalGrain, TransactionTestConstants.MaxCoordinatedTransactions)]
         [InlineData(TransactionTestConstants.DoubleStateTransactionalGrain, TransactionTestConstants.MaxCoordinatedTransactions / 2)]
         [InlineData(TransactionTestConstants.MaxStateTransactionalGrain, 1)]
-        public override Task MultiGrainWriteTransactionWithCommitException(string grainStates, int grainCount)
-        {
-            return base.MultiGrainWriteTransactionWithCommitException(grainStates, grainCount);
-        }
+        public override Task MultiGrainWriteTransactionWithCommitException(string grainStates, int grainCount) => base.MultiGrainWriteTransactionWithCommitException(grainStates, grainCount);
     }
 }

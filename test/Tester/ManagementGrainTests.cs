@@ -81,16 +81,10 @@ namespace UnitTests.Management
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Management")]
-        public void GetSimpleGrainStatistics_ActivationCounts()
-        {
-            RunGetStatisticsTest<ISimpleGrain, SimpleGrain>(g => g.GetA().Wait());
-        }
+        public void GetSimpleGrainStatistics_ActivationCounts() => RunGetStatisticsTest<ISimpleGrain, SimpleGrain>(g => g.GetA().Wait());
 
         [Fact, TestCategory("BVT"), TestCategory("Management")]
-        public void GetTestGrainStatistics_ActivationCounts()
-        {
-            RunGetStatisticsTest<ITestGrain, TestGrain>(g => g.GetKey().Wait());
-        }
+        public void GetTestGrainStatistics_ActivationCounts() => RunGetStatisticsTest<ITestGrain, TestGrain>(g => g.GetKey().Wait());
 
         private void RunGetStatisticsTest<TGrainInterface, TGrain>(Action<TGrainInterface> callGrainMethodAction)
             where TGrainInterface : IGrainWithIntegerKey

@@ -25,15 +25,9 @@ namespace UnitTests.OrleansRuntime.Streams
             [Id(1)]
             public StreamSequenceToken SequenceToken { get; set; }
 
-            public IEnumerable<Tuple<T, StreamSequenceToken>> GetEvents<T>()
-            {
-                throw new NotImplementedException();
-            }
+            public IEnumerable<Tuple<T, StreamSequenceToken>> GetEvents<T>() => throw new NotImplementedException();
 
-            public bool ImportRequestContext()
-            {
-                throw new NotImplementedException();
-            }
+            public bool ImportRequestContext() => throw new NotImplementedException();
         }
 
         private class TestCacheDataAdapter : ICacheDataAdapter
@@ -47,10 +41,7 @@ namespace UnitTests.OrleansRuntime.Streams
                 };
             }
 
-            public StreamSequenceToken GetSequenceToken(ref CachedMessage cachedMessage)
-            {
-                return new EventSequenceTokenV2(cachedMessage.SequenceNumber, cachedMessage.EventIndex);
-            }
+            public StreamSequenceToken GetSequenceToken(ref CachedMessage cachedMessage) => new EventSequenceTokenV2(cachedMessage.SequenceNumber, cachedMessage.EventIndex);
         }
 
         private StreamPosition GetStreamPosition(TestQueueMessage queueMessage)
@@ -73,10 +64,7 @@ namespace UnitTests.OrleansRuntime.Streams
 
         private class MyTestPooled : IObjectPool<CachedMessageBlock>
         {
-            public CachedMessageBlock Allocate()
-            {
-                return new CachedMessageBlock(TestBlockSize){Pool = this};
-            }
+            public CachedMessageBlock Allocate() => new CachedMessageBlock(TestBlockSize) { Pool = this };
 
             public void Free(CachedMessageBlock resource)
             {

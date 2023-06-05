@@ -50,10 +50,7 @@ namespace TestGrains
             return Task.CompletedTask;
         }
 
-        public Task ConfirmChanges()
-        {
-            return ConfirmEvents();
-        }
+        public Task ConfirmChanges() => ConfirmEvents();
 
         public Task<PersonAttributes> GetTentativePersonalAttributes()
         {
@@ -75,15 +72,9 @@ namespace TestGrains
             });
         }
 
-        public Task<int> GetConfirmedVersion()
-        {
-            return Task.FromResult(Version);
-        }
+        public Task<int> GetConfirmedVersion() => Task.FromResult(Version);
 
-        public Task<int> GetTentativeVersion()
-        {
-            return Task.FromResult(TentativeVersion);
-        }
+        public Task<int> GetTentativeVersion() => Task.FromResult(TentativeVersion);
 
         private int TentativeVersion
         {

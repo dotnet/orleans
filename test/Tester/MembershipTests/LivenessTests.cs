@@ -179,42 +179,24 @@ namespace UnitTests.MembershipTests
         {
         }
 
-        protected override void ConfigureTestCluster(TestClusterBuilder builder)
-        {
-            builder.AddClientBuilderConfigurator<ClientConfigurator>();
-        }
+        protected override void ConfigureTestCluster(TestClusterBuilder builder) => builder.AddClientBuilderConfigurator<ClientConfigurator>();
 
         public class ClientConfigurator : IClientBuilderConfigurator
         {
-            public void Configure(IConfiguration configuration, IClientBuilder clientBuilder)
-            {
-                clientBuilder.Configure<GatewayOptions>(options => options.PreferedGatewayIndex = 1);
-            }
+            public void Configure(IConfiguration configuration, IClientBuilder clientBuilder) => clientBuilder.Configure<GatewayOptions>(options => options.PreferedGatewayIndex = 1);
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Membership")]
-        public async Task Liveness_Grain_1()
-        {
-            await Do_Liveness_OracleTest_1();
-        }
+        public async Task Liveness_Grain_1() => await Do_Liveness_OracleTest_1();
 
         [Fact, TestCategory("Functional"), TestCategory("Membership")]
-        public async Task Liveness_Grain_2_Restart_GW()
-        {
-            await Do_Liveness_OracleTest_2(1);
-        }
+        public async Task Liveness_Grain_2_Restart_GW() => await Do_Liveness_OracleTest_2(1);
 
         [Fact, TestCategory("Functional"), TestCategory("Membership")]
-        public async Task Liveness_Grain_3_Restart_Silo_1()
-        {
-            await Do_Liveness_OracleTest_2(2);
-        }
+        public async Task Liveness_Grain_3_Restart_Silo_1() => await Do_Liveness_OracleTest_2(2);
 
         [Fact, TestCategory("Functional"), TestCategory("Membership")]
-        public async Task Liveness_Grain_4_Kill_Silo_1_With_Timers()
-        {
-            await Do_Liveness_OracleTest_2(2, false, true);
-        }
+        public async Task Liveness_Grain_4_Kill_Silo_1_With_Timers() => await Do_Liveness_OracleTest_2(2, false, true);
 
         //[Fact, TestCategory("Functional"), TestCategory("Membership")]
         /*public async Task Liveness_Grain_5_ShutdownRestartZeroLoss()

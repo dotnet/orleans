@@ -10,10 +10,7 @@ namespace Orleans.Runtime.Scheduler
         private static readonly Action<object> TaskFunc = (state) => RunWorkItemTask((IWorkItem)state);
         private static readonly Action<object> ThreadPoolWorkItemTaskFunc = (state) => RunThreadPoolWorkItemTask((IThreadPoolWorkItem)state);
 
-        private static void RunThreadPoolWorkItemTask(IThreadPoolWorkItem todo)
-        {
-            todo.Execute();
-        }
+        private static void RunThreadPoolWorkItemTask(IThreadPoolWorkItem todo) => todo.Execute();
 
         private static void RunWorkItemTask(IWorkItem todo)
         {

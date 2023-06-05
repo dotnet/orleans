@@ -57,9 +57,6 @@ namespace Orleans.Providers.Streams.Common
         }
 
         /// <inheritdoc />
-        public override void OnResetState()
-        {
-            count = 0;
-        }
+        public override void OnResetState() => count = 0;
     }
 }

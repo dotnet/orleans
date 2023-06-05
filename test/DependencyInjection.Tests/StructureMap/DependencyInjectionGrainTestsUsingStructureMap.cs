@@ -21,10 +21,7 @@ namespace DependencyInjection.Tests.StructureMap
             //configure to use StructureMap as DI container
             private class SiloBuilderConfiguratorConfiguringStructureMap : IHostConfigurator
             {
-                public void Configure(IHostBuilder hostBuilder)
-                {
-                    hostBuilder.UseServiceProviderFactory(new StructureMapServiceProviderFactory(new Registry()));
-                }
+                public void Configure(IHostBuilder hostBuilder) => hostBuilder.UseServiceProviderFactory(new StructureMapServiceProviderFactory(new Registry()));
             }
         }
 

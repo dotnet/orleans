@@ -42,15 +42,9 @@ namespace Orleans.Networking.Shared
             // Reserved: Event ID 3
         }
 
-        public void ConnectionReadFin(string connectionId)
-        {
-            _connectionReadFin(_logger, connectionId, null);
-        }
+        public void ConnectionReadFin(string connectionId) => _connectionReadFin(_logger, connectionId, null);
 
-        public void ConnectionWriteFin(string connectionId, string reason)
-        {
-            _connectionWriteFin(_logger, connectionId, reason, null);
-        }
+        public void ConnectionWriteFin(string connectionId, string reason) => _connectionWriteFin(_logger, connectionId, reason, null);
 
         public void ConnectionWrite(string connectionId, int count)
         {
@@ -64,25 +58,13 @@ namespace Orleans.Networking.Shared
             // Reserved: Event ID 12
         }
 
-        public void ConnectionError(string connectionId, Exception ex)
-        {
-            _connectionError(_logger, connectionId, ex);
-        }
+        public void ConnectionError(string connectionId, Exception ex) => _connectionError(_logger, connectionId, ex);
 
-        public void ConnectionReset(string connectionId)
-        {
-            _connectionReset(_logger, connectionId, null);
-        }
+        public void ConnectionReset(string connectionId) => _connectionReset(_logger, connectionId, null);
 
-        public void ConnectionPause(string connectionId)
-        {
-            _connectionPause(_logger, connectionId, null);
-        }
+        public void ConnectionPause(string connectionId) => _connectionPause(_logger, connectionId, null);
 
-        public void ConnectionResume(string connectionId)
-        {
-            _connectionResume(_logger, connectionId, null);
-        }
+        public void ConnectionResume(string connectionId) => _connectionResume(_logger, connectionId, null);
 
         public IDisposable BeginScope<TState>(TState state) => _logger.BeginScope(state);
 

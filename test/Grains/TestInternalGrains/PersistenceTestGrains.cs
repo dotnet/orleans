@@ -67,10 +67,7 @@ namespace UnitTests.Grains
     [Orleans.Providers.StorageProvider(ProviderName = "test1")]
     public class PersistenceTestGrain : Grain<PersistenceTestGrainState>, IPersistenceTestGrain
     {
-        public override Task OnActivateAsync(CancellationToken cancellationToken)
-        {
-            return Task.CompletedTask;
-        }
+        public override Task OnActivateAsync(CancellationToken cancellationToken) => Task.CompletedTask;
 
         public Task<bool> CheckStateInit()
         {
@@ -90,10 +87,7 @@ namespace UnitTests.Grains
             return Task.FromResult(grainStorage.GetType().FullName);
         }
 
-        public Task DoSomething()
-        {
-            return Task.CompletedTask;
-        }
+        public Task DoSomething() => Task.CompletedTask;
 
         public Task DoWrite(int val)
         {
@@ -108,15 +102,9 @@ namespace UnitTests.Grains
             return State.Field1;
         }
 
-        public Task<int> GetValue()
-        {
-            return Task.FromResult(State.Field1);
-        }
+        public Task<int> GetValue() => Task.FromResult(State.Field1);
 
-        public async Task DoDelete()
-        {
-            await ClearStateAsync();
-        }
+        public async Task DoDelete() => await ClearStateAsync();
     }
 
     [Orleans.Providers.StorageProvider(ProviderName = "test1")]
@@ -130,15 +118,9 @@ namespace UnitTests.Grains
     {
         private readonly string _id = Guid.NewGuid().ToString();
 
-        public override Task OnActivateAsync(CancellationToken cancellationToken)
-        {
-            return Task.CompletedTask;
-        }
+        public override Task OnActivateAsync(CancellationToken cancellationToken) => Task.CompletedTask;
 
-        public Task<int> GetValue()
-        {
-            return Task.FromResult(State.Field1);
-        }
+        public Task<int> GetValue() => Task.FromResult(State.Field1);
 
         public Task DoWrite(int val)
         {
@@ -167,10 +149,7 @@ namespace UnitTests.Grains
             this.copier = copier;
         }
 
-        public Task<int> GetValue()
-        {
-            return Task.FromResult(State.Field1);
-        }
+        public Task<int> GetValue() => Task.FromResult(State.Field1);
 
         public async Task DoWrite(int val, bool recover)
         {
@@ -223,15 +202,9 @@ namespace UnitTests.Grains
     [Orleans.Providers.StorageProvider(ProviderName = "test1")]
     public class PersistenceErrorGrain : Grain<PersistenceTestGrainState>, IPersistenceErrorGrain
     {
-        public override Task OnActivateAsync(CancellationToken cancellationToken)
-        {
-            return Task.CompletedTask;
-        }
+        public override Task OnActivateAsync(CancellationToken cancellationToken) => Task.CompletedTask;
 
-        public Task<int> GetValue()
-        {
-            return Task.FromResult(State.Field1);
-        }
+        public Task<int> GetValue() => Task.FromResult(State.Field1);
 
         public Task DoWrite(int val)
         {
@@ -317,25 +290,16 @@ namespace UnitTests.Grains
             this.clusterOptions = clusterOptions;
         }
 
-        public Task<string> GetServiceId()
-        {
-            return Task.FromResult(clusterOptions.Value.ServiceId);
-        }
+        public Task<string> GetServiceId() => Task.FromResult(clusterOptions.Value.ServiceId);
     }
 
     [Orleans.Providers.StorageProvider(ProviderName = "GrainStorageForTest")]
     public class GrainStorageTestGrain : Grain<PersistenceTestGrainState>,
         IGrainStorageTestGrain, IGrainStorageTestGrain_LongKey
     {
-        public override Task OnActivateAsync(CancellationToken cancellationToken)
-        {
-            return Task.CompletedTask;
-        }
+        public override Task OnActivateAsync(CancellationToken cancellationToken) => Task.CompletedTask;
 
-        public Task<int> GetValue()
-        {
-            return Task.FromResult(State.Field1);
-        }
+        public Task<int> GetValue() => Task.FromResult(State.Field1);
 
         public Task DoWrite(int val)
         {
@@ -349,25 +313,16 @@ namespace UnitTests.Grains
             return State.Field1;
         }
 
-        public Task DoDelete()
-        {
-            return ClearStateAsync();
-        }
+        public Task DoDelete() => ClearStateAsync();
     }
 
     [Orleans.Providers.StorageProvider(ProviderName = "GrainStorageForTest")]
     public class GrainStorageGenericGrain<T> : Grain<PersistenceGenericGrainState<T>>,
         IGrainStorageGenericGrain<T>
     {
-        public override Task OnActivateAsync(CancellationToken cancellationToken)
-        {
-            return Task.CompletedTask;
-        }
+        public override Task OnActivateAsync(CancellationToken cancellationToken) => Task.CompletedTask;
 
-        public Task<T> GetValue()
-        {
-            return Task.FromResult(State.Field1);
-        }
+        public Task<T> GetValue() => Task.FromResult(State.Field1);
 
         public Task DoWrite(T val)
         {
@@ -381,25 +336,16 @@ namespace UnitTests.Grains
             return State.Field1;
         }
 
-        public Task DoDelete()
-        {
-            return ClearStateAsync();
-        }
+        public Task DoDelete() => ClearStateAsync();
     }
 
     [Orleans.Providers.StorageProvider(ProviderName = "GrainStorageForTest")]
     public class GrainStorageTestGrainExtendedKey : Grain<PersistenceTestGrainState>,
         IGrainStorageTestGrain_GuidExtendedKey, IGrainStorageTestGrain_LongExtendedKey
     {
-        public override Task OnActivateAsync(CancellationToken cancellationToken)
-        {
-            return Task.CompletedTask;
-        }
+        public override Task OnActivateAsync(CancellationToken cancellationToken) => Task.CompletedTask;
 
-        public Task<int> GetValue()
-        {
-            return Task.FromResult(State.Field1);
-        }
+        public Task<int> GetValue() => Task.FromResult(State.Field1);
 
         public Task<string> GetExtendedKeyValue()
         {
@@ -420,10 +366,7 @@ namespace UnitTests.Grains
             return State.Field1;
         }
 
-        public Task DoDelete()
-        {
-            return ClearStateAsync();
-        }
+        public Task DoDelete() => ClearStateAsync();
     }
 
     [Orleans.Providers.StorageProvider(ProviderName = "DDBStore")]
@@ -432,15 +375,9 @@ namespace UnitTests.Grains
     {
         private readonly string _id = Guid.NewGuid().ToString();
 
-        public override Task OnActivateAsync(CancellationToken cancellationToken)
-        {
-            return Task.CompletedTask;
-        }
+        public override Task OnActivateAsync(CancellationToken cancellationToken) => Task.CompletedTask;
 
-        public Task<int> GetValue()
-        {
-            return Task.FromResult(State.Field1);
-        }
+        public Task<int> GetValue() => Task.FromResult(State.Field1);
 
         public Task DoWrite(int val)
         {
@@ -456,25 +393,16 @@ namespace UnitTests.Grains
 
         public Task<string> GetActivationId() => Task.FromResult(_id);
 
-        public Task DoDelete()
-        {
-            return ClearStateAsync();
-        }
+        public Task DoDelete() => ClearStateAsync();
     }
 
     [Orleans.Providers.StorageProvider(ProviderName = "DDBStore")]
     public class AWSStorageGenericGrain<T> : Grain<PersistenceGenericGrainState<T>>,
         IAWSStorageGenericGrain<T>
     {
-        public override Task OnActivateAsync(CancellationToken cancellationToken)
-        {
-            return Task.CompletedTask;
-        }
+        public override Task OnActivateAsync(CancellationToken cancellationToken) => Task.CompletedTask;
 
-        public Task<T> GetValue()
-        {
-            return Task.FromResult(State.Field1);
-        }
+        public Task<T> GetValue() => Task.FromResult(State.Field1);
 
         public Task DoWrite(T val)
         {
@@ -488,25 +416,16 @@ namespace UnitTests.Grains
             return State.Field1;
         }
 
-        public Task DoDelete()
-        {
-            return ClearStateAsync();
-        }
+        public Task DoDelete() => ClearStateAsync();
     }
 
     [Orleans.Providers.StorageProvider(ProviderName = "DDBStore")]
     public class AWSStorageTestGrainExtendedKey : Grain<PersistenceTestGrainState>,
         IAWSStorageTestGrain_GuidExtendedKey, IAWSStorageTestGrain_LongExtendedKey
     {
-        public override Task OnActivateAsync(CancellationToken cancellationToken)
-        {
-            return Task.CompletedTask;
-        }
+        public override Task OnActivateAsync(CancellationToken cancellationToken) => Task.CompletedTask;
 
-        public Task<int> GetValue()
-        {
-            return Task.FromResult(State.Field1);
-        }
+        public Task<int> GetValue() => Task.FromResult(State.Field1);
 
         public Task<string> GetExtendedKeyValue()
         {
@@ -527,10 +446,7 @@ namespace UnitTests.Grains
             return State.Field1;
         }
 
-        public Task DoDelete()
-        {
-            return ClearStateAsync();
-        }
+        public Task DoDelete() => ClearStateAsync();
     }
 
     [Orleans.Providers.StorageProvider(ProviderName = "MemoryStore")]
@@ -538,15 +454,9 @@ namespace UnitTests.Grains
     public class MemoryStorageTestGrain : Grain<MemoryStorageTestGrain.NestedPersistenceTestGrainState>,
         IMemoryStorageTestGrain
     {
-        public override Task OnActivateAsync(CancellationToken cancellationToken)
-        {
-            return Task.CompletedTask;
-        }
+        public override Task OnActivateAsync(CancellationToken cancellationToken) => Task.CompletedTask;
 
-        public Task<int> GetValue()
-        {
-            return Task.FromResult(State.Field1);
-        }
+        public Task<int> GetValue() => Task.FromResult(State.Field1);
 
         public Task DoWrite(int val)
         {
@@ -560,10 +470,7 @@ namespace UnitTests.Grains
             return State.Field1;
         }
 
-        public Task DoDelete()
-        {
-            return ClearStateAsync();
-        }
+        public Task DoDelete() => ClearStateAsync();
 
         [Serializable]
         [GenerateSerializer]
@@ -619,15 +526,9 @@ namespace UnitTests.Grains
             return WriteStateAsync();
         }
 
-        public Task<string> GetStatus()
-        {
-            return Task.FromResult($"{State.Name} : {State.Status}");
-        }
+        public Task<string> GetStatus() => Task.FromResult($"{State.Name} : {State.Status}");
 
-        public Task<string> GetName()
-        {
-            return Task.FromResult(State.Name);
-        }
+        public Task<string> GetName() => Task.FromResult(State.Name);
 
         public Task UpdateStatus(string status)
         {
@@ -645,10 +546,7 @@ namespace UnitTests.Grains
             return Task.CompletedTask;
         }
 
-        public Task<List<IUser>> GetFriends()
-        {
-            return Task.FromResult(State.Friends);
-        }
+        public Task<List<IUser>> GetFriends() => Task.FromResult(State.Friends);
 
         public async Task<string> GetFriendsStatuses()
         {

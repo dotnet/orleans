@@ -22,10 +22,7 @@ namespace UnitTests.General
             headers.Clear();
         }
 
-        public void Dispose()
-        {
-            TestCleanup();
-        }
+        public void Dispose() => TestCleanup();
 
         private void TestCleanup()
         {

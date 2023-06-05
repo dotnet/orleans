@@ -79,10 +79,7 @@ namespace Orleans.Connections.Security
         /// <summary>
         /// Overrides the current <see cref="RemoteCertificateValidation"/> callback and allows any client certificate.
         /// </summary>
-        public void AllowAnyRemoteCertificate()
-        {
-            RemoteCertificateValidation = (_, __, ___) => true;
-        }
+        public void AllowAnyRemoteCertificate() => RemoteCertificateValidation = (_, __, ___) => true;
 
         /// <summary>
         /// Provides direct configuration of the <see cref="TlsServerAuthenticationOptions"/> on a per-connection basis.

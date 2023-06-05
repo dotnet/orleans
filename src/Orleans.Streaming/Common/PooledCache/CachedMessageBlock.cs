@@ -148,21 +148,15 @@ namespace Orleans.Providers.Streams.Common
         /// </summary>
         /// <param name="dataAdapter">The data adapter.</param>
         /// <returns>The sequence token of the newest message in this block.</returns>
-        public StreamSequenceToken GetNewestSequenceToken(ICacheDataAdapter dataAdapter)
-        {
-            return GetSequenceToken(NewestMessageIndex, dataAdapter);
-        }
+        public StreamSequenceToken GetNewestSequenceToken(ICacheDataAdapter dataAdapter) => GetSequenceToken(NewestMessageIndex, dataAdapter);
 
         /// <summary>
         /// Gets the sequence token of the oldest message in this block
         /// </summary>
         /// <param name="dataAdapter">The data adapter.</param>
         /// <returns>The sequence token of the oldest message in this block.</returns>
-        public StreamSequenceToken GetOldestSequenceToken(ICacheDataAdapter dataAdapter)
-        {
-            return GetSequenceToken(OldestMessageIndex, dataAdapter);
-        }
-        
+        public StreamSequenceToken GetOldestSequenceToken(ICacheDataAdapter dataAdapter) => GetSequenceToken(OldestMessageIndex, dataAdapter);
+
         /// <summary>
         /// Gets the index of the first message in this block that has a sequence token at or before the provided token
         /// </summary>
@@ -187,10 +181,7 @@ namespace Orleans.Providers.Streams.Common
         /// <param name="dataAdapter">The data adapter.</param>
         /// <param name="index">The index.</param>
         /// <returns><see langword="true" /> if the message was found, <see langword="false" /> otherwise.</returns>
-        public bool TryFindFirstMessage(StreamId streamId, ICacheDataAdapter dataAdapter, out int index)
-        {
-            return TryFindNextMessage(readIndex, streamId, dataAdapter, out index);
-        }
+        public bool TryFindFirstMessage(StreamId streamId, ICacheDataAdapter dataAdapter, out int index) => TryFindNextMessage(readIndex, streamId, dataAdapter, out index);
 
         /// <summary>
         /// Tries to get the next message from the provided stream, starting at the start index.

@@ -25,14 +25,8 @@ namespace UnitTests.Grains.Directories
             return Task.CompletedTask;
         }
 
-        public Task<string> GetRuntimeInstanceId()
-        {
-            return Task.FromResult(_siloAddress.ToString());
-        }
+        public Task<string> GetRuntimeInstanceId() => Task.FromResult(_siloAddress.ToString());
 
-        public Task<int> ProxyPing(ICommonDirectoryGrain grain)
-        {
-            return grain.Ping();
-        }
+        public Task<int> ProxyPing(ICommonDirectoryGrain grain) => grain.Ping();
     }
 }

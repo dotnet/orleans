@@ -10,10 +10,7 @@ namespace Tester.ClientConnectionTests
 {
     public class InvalidPreambleConnectionTests : TestClusterPerTest
     {
-        protected override void ConfigureTestCluster(TestClusterBuilder builder)
-        {
-            builder.Options.ConnectionTransport = ConnectionTransportType.TcpSocket;
-        }
+        protected override void ConfigureTestCluster(TestClusterBuilder builder) => builder.Options.ConnectionTransport = ConnectionTransportType.TcpSocket;
 
         [Fact, TestCategory("Functional")]
         public async Task ShouldCloseConnectionWhenClientSendsInvalidPreambleSize()

@@ -32,10 +32,7 @@ namespace Orleans.Concurrency
     public sealed class ReentrantAttribute : Attribute, IGrainPropertiesProviderAttribute
     {
         /// <inheritdoc/>
-        public void Populate(IServiceProvider services, Type grainClass, GrainType grainType, Dictionary<string, string> properties)
-        {
-            properties[WellKnownGrainTypeProperties.Reentrant] = "true";
-        }
+        public void Populate(IServiceProvider services, Type grainClass, GrainType grainType, Dictionary<string, string> properties) => properties[WellKnownGrainTypeProperties.Reentrant] = "true";
     }
 
     /// <summary>
@@ -123,10 +120,7 @@ namespace Orleans.Concurrency
 
 
         /// <inheritdoc/>
-        public void Populate(IServiceProvider services, Type grainClass, GrainType grainType, Dictionary<string, string> properties)
-        {
-            properties[WellKnownGrainTypeProperties.MayInterleavePredicate] = CallbackMethodName;
-        }
+        public void Populate(IServiceProvider services, Type grainClass, GrainType grainType, Dictionary<string, string> properties) => properties[WellKnownGrainTypeProperties.MayInterleavePredicate] = CallbackMethodName;
     }
 
     /// <summary>

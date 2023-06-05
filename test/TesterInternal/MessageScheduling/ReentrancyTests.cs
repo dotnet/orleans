@@ -24,10 +24,7 @@ namespace UnitTests
     {
         public class Fixture : BaseTestClusterFixture
         {
-            protected override void ConfigureTestCluster(TestClusterBuilder builder)
-            {
-                builder.AddSiloBuilderConfigurator<ReentrancyTestsSiloBuilderConfigurator>();
-            }
+            protected override void ConfigureTestCluster(TestClusterBuilder builder) => builder.AddSiloBuilderConfigurator<ReentrancyTestsSiloBuilderConfigurator>();
         }
 
         private readonly ITestOutputHelper output;
@@ -144,55 +141,31 @@ namespace UnitTests
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Tasks"), TestCategory("Reentrancy")]
-        public async Task FanOut_Task_Reentrant()
-        {
-            await Do_FanOut_Task_Join(0, false, false);
-        }
+        public async Task FanOut_Task_Reentrant() => await Do_FanOut_Task_Join(0, false, false);
 
         [Fact, TestCategory("Functional"), TestCategory("Tasks"), TestCategory("Reentrancy")]
-        public async Task FanOut_Task_NonReentrant()
-        {
-            await Do_FanOut_Task_Join(0, true, false);
-        }
+        public async Task FanOut_Task_NonReentrant() => await Do_FanOut_Task_Join(0, true, false);
 
         [Fact, TestCategory("Functional"), TestCategory("Tasks"), TestCategory("Reentrancy")]
-        public async Task FanOut_Task_Reentrant_Chain()
-        {
-            await Do_FanOut_Task_Join(0, false, true);
-        }
+        public async Task FanOut_Task_Reentrant_Chain() => await Do_FanOut_Task_Join(0, false, true);
 
         // TODO: [Fact, TestCategory("BVT"), TestCategory("Tasks"), TestCategory("Reentrancy")]
-        [Fact(Skip ="Ignore"), TestCategory("Failures"), TestCategory("Tasks"), TestCategory("Reentrancy")]
-        public async Task FanOut_Task_NonReentrant_Chain()
-        {
-            await Do_FanOut_Task_Join(0, true, true);
-        }
+        [Fact(Skip = "Ignore"), TestCategory("Failures"), TestCategory("Tasks"), TestCategory("Reentrancy")]
+        public async Task FanOut_Task_NonReentrant_Chain() => await Do_FanOut_Task_Join(0, true, true);
 
         [Fact, TestCategory("Functional"), TestCategory("Tasks"), TestCategory("Reentrancy")]
-        public async Task FanOut_AC_Reentrant()
-        {
-            await Do_FanOut_AC_Join(0, false, false);
-        }
+        public async Task FanOut_AC_Reentrant() => await Do_FanOut_AC_Join(0, false, false);
 
         [Fact, TestCategory("Functional"), TestCategory("Tasks"), TestCategory("Reentrancy")]
-        public async Task FanOut_AC_NonReentrant()
-        {
-            await Do_FanOut_AC_Join(0, true, false);
-        }
+        public async Task FanOut_AC_NonReentrant() => await Do_FanOut_AC_Join(0, true, false);
 
         [Fact, TestCategory("Functional"), TestCategory("Tasks"), TestCategory("Reentrancy")]
-        public async Task FanOut_AC_Reentrant_Chain()
-        {
-            await Do_FanOut_AC_Join(0, false, true);
-        }
+        public async Task FanOut_AC_Reentrant_Chain() => await Do_FanOut_AC_Join(0, false, true);
 
         [TestCategory("MultithreadingFailures")]
         // TODO: [TestCategory("Functional")]
-        [Fact(Skip ="Ignore"), TestCategory("Tasks"), TestCategory("Reentrancy")]
-        public async Task FanOut_AC_NonReentrant_Chain()
-        {
-            await Do_FanOut_AC_Join(0, true, true);
-        }
+        [Fact(Skip = "Ignore"), TestCategory("Tasks"), TestCategory("Reentrancy")]
+        public async Task FanOut_AC_NonReentrant_Chain() => await Do_FanOut_AC_Join(0, true, true);
 
         [Fact, TestCategory("Stress"), TestCategory("Functional"), TestCategory("Tasks"), TestCategory("Reentrancy")]
         public void FanOut_Task_Stress_Reentrant()

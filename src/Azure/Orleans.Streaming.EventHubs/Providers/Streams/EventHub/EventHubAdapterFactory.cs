@@ -157,10 +157,7 @@ namespace Orleans.Streaming.EventHubs
         }
 
         //should only need checkpointer on silo side, so move its init logic when it is used
-        private void InitCheckpointerFactory()
-        {
-            checkpointerFactory = serviceProvider.GetRequiredServiceByName<IStreamQueueCheckpointerFactory>(Name);
-        }
+        private void InitCheckpointerFactory() => checkpointerFactory = serviceProvider.GetRequiredServiceByName<IStreamQueueCheckpointerFactory>(Name);
         /// <summary>
         /// Create queue adapter.
         /// </summary>
@@ -179,30 +176,22 @@ namespace Orleans.Streaming.EventHubs
         /// Create queue message cache adapter
         /// </summary>
         /// <returns></returns>
-        public IQueueAdapterCache GetQueueAdapterCache()
-        {
-            return this;
-        }
+        public IQueueAdapterCache GetQueueAdapterCache() => this;
 
         /// <summary>
         /// Create queue mapper
         /// </summary>
         /// <returns></returns>
-        public IStreamQueueMapper GetStreamQueueMapper()
-        {
+        public IStreamQueueMapper GetStreamQueueMapper() =>
             //TODO: CreateAdapter must be called first.  Figure out how to safely enforce this
-            return streamQueueMapper;
-        }
+            streamQueueMapper;
 
         /// <summary>
         /// Acquire delivery failure handler for a queue
         /// </summary>
         /// <param name="queueId"></param>
         /// <returns></returns>
-        public Task<IStreamFailureHandler> GetDeliveryFailureHandler(QueueId queueId)
-        {
-            return StreamFailureHandlerFactory(streamQueueMapper.QueueToPartition(queueId));
-        }
+        public Task<IStreamFailureHandler> GetDeliveryFailureHandler(QueueId queueId) => StreamFailureHandlerFactory(streamQueueMapper.QueueToPartition(queueId));
 
         /// <summary>
         /// Writes a set of events to the queue as a single batch associated with the provided streamId.
@@ -226,24 +215,15 @@ namespace Orleans.Streaming.EventHubs
         /// </summary>
         /// <param name="queueId"></param>
         /// <returns></returns>
-        public IQueueAdapterReceiver CreateReceiver(QueueId queueId)
-        {
-            return GetOrCreateReceiver(queueId);
-        }
+        public IQueueAdapterReceiver CreateReceiver(QueueId queueId) => GetOrCreateReceiver(queueId);
 
         /// <summary>
         /// Create a cache for a given queue id
         /// </summary>
         /// <param name="queueId"></param>
-        public IQueueCache CreateQueueCache(QueueId queueId)
-        {
-            return GetOrCreateReceiver(queueId);
-        }
+        public IQueueCache CreateQueueCache(QueueId queueId) => GetOrCreateReceiver(queueId);
 
-        private EventHubAdapterReceiver GetOrCreateReceiver(QueueId queueId)
-        {
-            return receivers.GetOrAdd(queueId, (q, instance) => instance.MakeReceiver(q), this);
-        }
+        private EventHubAdapterReceiver GetOrCreateReceiver(QueueId queueId) => receivers.GetOrAdd(queueId, (q, instance) => instance.MakeReceiver(q), this);
 
         protected virtual void InitEventHubClient()
         {
@@ -296,10 +276,7 @@ namespace Orleans.Streaming.EventHubs
         /// Get partition Ids from eventhub
         /// </summary>
         /// <returns></returns>
-        protected virtual async Task<string[]> GetPartitionIdsAsync()
-        {
-            return await client.GetPartitionIdsAsync();
-        }
+        protected virtual async Task<string[]> GetPartitionIdsAsync() => await client.GetPartitionIdsAsync();
 
         public static EventHubAdapterFactory Create(IServiceProvider services, string name)
         {

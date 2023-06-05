@@ -60,9 +60,6 @@ namespace Orleans.Streams
         /// <param name="token">The token.</param>
         /// <param name="requestContext">The request context.</param>
         /// <returns>A <see cref="Task"/> representing the operation.</returns>
-        public static Task QueueMessageAsync<T>(this IQueueAdapter adapter, StreamId streamId, T evt, StreamSequenceToken token, Dictionary<string, object> requestContext)
-        {
-            return adapter.QueueMessageBatchAsync(streamId, new[] { evt }, token, requestContext);
-        }
+        public static Task QueueMessageAsync<T>(this IQueueAdapter adapter, StreamId streamId, T evt, StreamSequenceToken token, Dictionary<string, object> requestContext) => adapter.QueueMessageBatchAsync(streamId, new[] { evt }, token, requestContext);
     }
 }

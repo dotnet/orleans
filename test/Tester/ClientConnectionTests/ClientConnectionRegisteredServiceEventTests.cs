@@ -22,10 +22,7 @@ namespace Tester
             gatewayCountChangedNotifier = HostedCluster.ServiceProvider.GetRequiredService<EventNotifier<GatewayCountChangedEventArgs>>();
         }
 
-        protected override void ConfigureTestCluster(TestClusterBuilder builder)
-        {
-            builder.AddClientBuilderConfigurator<Configurator>();
-        }
+        protected override void ConfigureTestCluster(TestClusterBuilder builder) => builder.AddClientBuilderConfigurator<Configurator>();
 
         public class EventNotifier<TEventArgs>
         {

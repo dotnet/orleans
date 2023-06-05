@@ -22,9 +22,6 @@ namespace Orleans.Streams
         }
 
         /// <inheritdoc/>
-        public int GetMaxAddCount()
-        {
-            return this.Aggregate(defaultMaxAddCount, (count, fc) => Math.Min(count, fc.GetMaxAddCount()));
-        }
+        public int GetMaxAddCount() => this.Aggregate(defaultMaxAddCount, (count, fc) => Math.Min(count, fc.GetMaxAddCount()));
     }
 }

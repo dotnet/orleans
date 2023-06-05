@@ -303,25 +303,13 @@ namespace Orleans.Streams
             }
         }
 
-        public Task<int> ProducerCount(QualifiedStreamId streamId)
-        {
-            return Task.FromResult(State.Producers.Count);
-        }
+        public Task<int> ProducerCount(QualifiedStreamId streamId) => Task.FromResult(State.Producers.Count);
 
-        public Task<int> ConsumerCount(QualifiedStreamId streamId)
-        {
-            return Task.FromResult(GetConsumersForStream(streamId).Length);
-        }
+        public Task<int> ConsumerCount(QualifiedStreamId streamId) => Task.FromResult(GetConsumersForStream(streamId).Length);
 
-        public Task<PubSubSubscriptionState[]> DiagGetConsumers(QualifiedStreamId streamId)
-        {
-            return Task.FromResult(GetConsumersForStream(streamId));
-        }
+        public Task<PubSubSubscriptionState[]> DiagGetConsumers(QualifiedStreamId streamId) => Task.FromResult(GetConsumersForStream(streamId));
 
-        private PubSubSubscriptionState[] GetConsumersForStream(QualifiedStreamId streamId)
-        {
-            return State.Consumers.Where(c => !c.IsFaulted && c.Stream.Equals(streamId)).ToArray();
-        }
+        private PubSubSubscriptionState[] GetConsumersForStream(QualifiedStreamId streamId) => State.Consumers.Where(c => !c.IsFaulted && c.Stream.Equals(streamId)).ToArray();
 
         private void LogPubSubCounts(string fmt, params object[] args)
         {

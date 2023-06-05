@@ -32,9 +32,6 @@ namespace Orleans.Providers.Streams.Common
         }
 
         /// <inheritdoc />
-        public IQueueCache CreateQueueCache(QueueId queueId)
-        {
-            return new SimpleQueueCache(cacheSize, loggerFactory.CreateLogger($"{typeof(SimpleQueueCache).FullName}.{providerName}.{queueId}"));
-        }
+        public IQueueCache CreateQueueCache(QueueId queueId) => new SimpleQueueCache(cacheSize, loggerFactory.CreateLogger($"{typeof(SimpleQueueCache).FullName}.{providerName}.{queueId}"));
     }
 }

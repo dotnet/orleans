@@ -73,10 +73,7 @@ namespace Orleans.Runtime.Messaging
 
         protected virtual void ConfigureConnectionBuilder(IConnectionBuilder connectionBuilder) { }
 
-        protected async Task BindAsync()
-        {
-            listener = await listenerFactory.BindAsync(Endpoint);
-        }
+        protected async Task BindAsync() => listener = await listenerFactory.BindAsync(Endpoint);
 
         protected void Start()
         {

@@ -36,10 +36,7 @@ namespace Orleans.Runtime.MembershipService
                 new Tuple<MembershipEntry, string>(deepCopier.Copy(tuple.Item1), tuple.Item2)).ToList(), tableVersion);
         }
 
-        public TableVersion ReadTableVersion()
-        {
-            return tableVersion;
-        }
+        public TableVersion ReadTableVersion() => tableVersion;
 
         public bool Insert(MembershipEntry entry, TableVersion version)
         {
@@ -79,9 +76,6 @@ namespace Orleans.Runtime.MembershipService
 
         public override string ToString() => $"Table = {ReadAll()}, ETagCounter={lastETagCounter}";
 
-        private string NewETag()
-        {
-            return lastETagCounter++.ToString(CultureInfo.InvariantCulture);
-        }
+        private string NewETag() => lastETagCounter++.ToString(CultureInfo.InvariantCulture);
     }
 }

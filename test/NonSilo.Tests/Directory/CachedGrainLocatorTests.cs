@@ -292,10 +292,7 @@ namespace UnitTests.Directory
         private int generation = 0;
         private SiloAddress GenerateSiloAddress() => SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 5000), ++generation);
 
-        private async Task WaitUntilClusterChangePropagated()
-        {
-            await Until(() => mockMembershipService.CurrentVersion == ((CachedGrainLocator.ITestAccessor)grainLocator).LastMembershipVersion);
-        }
+        private async Task WaitUntilClusterChangePropagated() => await Until(() => mockMembershipService.CurrentVersion == ((CachedGrainLocator.ITestAccessor)grainLocator).LastMembershipVersion);
 
         private static async Task Until(Func<bool> condition)
         {

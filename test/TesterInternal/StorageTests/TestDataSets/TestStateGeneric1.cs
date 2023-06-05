@@ -20,10 +20,7 @@
         public long C { get; set; }
 
 
-        public override bool Equals(object obj)
-        {
-            return Equals(obj as TestStateGeneric1<T>);
-        }
+        public override bool Equals(object obj) => Equals(obj as TestStateGeneric1<T>);
 
 
         public bool Equals(TestStateGeneric1<T> other)

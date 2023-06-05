@@ -10,16 +10,10 @@ namespace Orleans.Transactions.TestKit.xUnit
 
         [SkippableTheory]
         [InlineData(TransactionTestConstants.NoStateTransactionalGrain)]
-        public override void TransactionGrainsThrowWhenTransactions(string transactionTestGrainClassName)
-        {
-             base.TransactionGrainsThrowWhenTransactions(transactionTestGrainClassName);
-        }
+        public override void TransactionGrainsThrowWhenTransactions(string transactionTestGrainClassName) => base.TransactionGrainsThrowWhenTransactions(transactionTestGrainClassName);
 
         [SkippableTheory]
         [InlineData(TransactionTestConstants.NoStateTransactionalGrain)]
-        public override void MultiTransactionGrainsThrowWhenTransactions(string transactionTestGrainClassName)
-        {
-            base.MultiTransactionGrainsThrowWhenTransactions(transactionTestGrainClassName);
-        }
+        public override void MultiTransactionGrainsThrowWhenTransactions(string transactionTestGrainClassName) => base.MultiTransactionGrainsThrowWhenTransactions(transactionTestGrainClassName);
     }
 }

@@ -341,10 +341,7 @@ namespace Orleans.Runtime.MembershipService
             }
         }
 
-        private async Task UpdateStatus(SiloStatus status)
-        {
-            await tableManager.UpdateStatus(status);
-        }
+        private async Task UpdateStatus(SiloStatus status) => await tableManager.UpdateStatus(status);
 
         void ILifecycleParticipant<ISiloLifecycle>.Participate(ISiloLifecycle lifecycle)
         {
@@ -426,10 +423,7 @@ namespace Orleans.Runtime.MembershipService
             }
         }
 
-        public void Dispose()
-        {
-            iAmAliveTimer.Dispose();
-        }
+        public void Dispose() => iAmAliveTimer.Dispose();
 
         bool IHealthCheckable.CheckHealth(DateTime lastCheckTime, out string reason) => iAmAliveTimer.CheckHealth(lastCheckTime, out reason);
     }

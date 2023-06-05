@@ -43,25 +43,13 @@ namespace Orleans.Runtime.GrainDirectory
             return Task.WhenAll(addresses.Select(addr => router.RegisterAsync(addr, 1)));
         }
 
-        public Task UnregisterAsync(GrainAddress address, UnregistrationCause cause, int hopCount)
-        {
-            return router.UnregisterAsync(address, cause, hopCount);
-        }
+        public Task UnregisterAsync(GrainAddress address, UnregistrationCause cause, int hopCount) => router.UnregisterAsync(address, cause, hopCount);
 
-        public Task UnregisterManyAsync(List<GrainAddress> addresses, UnregistrationCause cause, int hopCount)
-        {
-            return router.UnregisterManyAsync(addresses, cause, hopCount);
-        }
+        public Task UnregisterManyAsync(List<GrainAddress> addresses, UnregistrationCause cause, int hopCount) => router.UnregisterManyAsync(addresses, cause, hopCount);
 
-        public Task DeleteGrainAsync(GrainId grainId, int hopCount)
-        {
-            return router.DeleteGrainAsync(grainId, hopCount);
-        }
+        public Task DeleteGrainAsync(GrainId grainId, int hopCount) => router.DeleteGrainAsync(grainId, hopCount);
 
-        public Task<AddressAndTag> LookupAsync(GrainId grainId, int hopCount)
-        {
-            return router.LookupAsync(grainId, hopCount);
-        }
+        public Task<AddressAndTag> LookupAsync(GrainId grainId, int hopCount) => router.LookupAsync(grainId, hopCount);
 
         public Task<List<AddressAndTag>> LookUpMany(List<(GrainId GrainId, int Version)> grainAndETagList)
         {

@@ -14,11 +14,8 @@ namespace UnitTests.Grains
     [StorageProvider(ProviderName = "MemoryStore")]
     public class MultifacetTestGrain : Grain<MultifacetTestGrainState>, IMultifacetTestGrain
     {
-        
-        public string GetRuntimeInstanceId()
-        {
-            return RuntimeIdentity;
-        }
+
+        public string GetRuntimeInstanceId() => RuntimeIdentity;
 
         public Task SetValue(int x)
         {
@@ -26,9 +23,6 @@ namespace UnitTests.Grains
             return Task.CompletedTask;
         }
 
-        Task<int> IMultifacetReader.GetValue()
-        {
-            return Task.FromResult(State.Value);
-        }
+        Task<int> IMultifacetReader.GetValue() => Task.FromResult(State.Value);
     }
 }

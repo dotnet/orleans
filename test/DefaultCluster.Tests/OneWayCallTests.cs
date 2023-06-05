@@ -78,10 +78,7 @@ namespace DefaultCluster.Tests.General
         {
             private readonly TaskCompletionSource<int> completion = new TaskCompletionSource<int>();
             public Task ReceivedValue => completion.Task;
-            public void StateChanged(int a, int b)
-            {
-                completion.SetResult(b);
-            }
+            public void StateChanged(int a, int b) => completion.SetResult(b);
         }
     }
 }

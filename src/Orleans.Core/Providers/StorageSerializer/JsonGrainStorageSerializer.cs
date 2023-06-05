@@ -26,9 +26,6 @@ namespace Orleans.Storage
         }
 
         /// <inheritdoc/>
-        public T Deserialize<T>(BinaryData input)
-        {
-            return (T)_orleansJsonSerializer.Deserialize(typeof(T), input.ToString());
-        }
+        public T Deserialize<T>(BinaryData input) => (T)_orleansJsonSerializer.Deserialize(typeof(T), input.ToString());
     }
 }

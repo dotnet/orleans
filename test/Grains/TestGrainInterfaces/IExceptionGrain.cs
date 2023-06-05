@@ -86,10 +86,7 @@ namespace UnitTests.GrainInterfaces
         public UndeserializableType DeepCopy(UndeserializableType input, CopyContext context) => input;
 
         public UndeserializableType ReadValue<TInput>(ref Reader<TInput> reader, Field field) => throw new NotSupportedException(UndeserializableType.FailureMessage);
-        public void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, UndeserializableType value) where TBufferWriter : IBufferWriter<byte>
-        {
-            Int32Codec.WriteField(ref writer, fieldIdDelta, value.Number);
-        }
+        public void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, UndeserializableType value) where TBufferWriter : IBufferWriter<byte> => Int32Codec.WriteField(ref writer, fieldIdDelta, value.Number);
     }
 
     [RegisterSerializer]
@@ -99,9 +96,6 @@ namespace UnitTests.GrainInterfaces
         public UnserializableType DeepCopy(UnserializableType input, CopyContext context) => input;
 
         public UnserializableType ReadValue<TInput>(ref Reader<TInput> reader, Field field) => default;
-        public void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, UnserializableType value) where TBufferWriter : IBufferWriter<byte>
-        {
-            throw new NotSupportedException(UndeserializableType.FailureMessage);
-        }
+        public void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, UnserializableType value) where TBufferWriter : IBufferWriter<byte> => throw new NotSupportedException(UndeserializableType.FailureMessage);
     }
 }

@@ -12,10 +12,7 @@ namespace UnitTests.Stats
             numStatsCalls++;
             return Task.CompletedTask;
         }
-        
-        public Task<long> GetReportStatsCallCount()
-        {
-            return Task.FromResult(numStatsCalls);
-        }
+
+        public Task<long> GetReportStatsCallCount() => Task.FromResult(numStatsCalls);
     }
 }

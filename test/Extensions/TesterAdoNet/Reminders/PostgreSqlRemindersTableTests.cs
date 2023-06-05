@@ -35,10 +35,7 @@ namespace UnitTests.RemindersTest
                 Options.Create(options));
         }
 
-        protected override string GetAdoInvariant()
-        {
-            return AdoNetInvariants.InvariantNamePostgreSql;
-        }
+        protected override string GetAdoInvariant() => AdoNetInvariants.InvariantNamePostgreSql;
 
         protected override async Task<string> GetConnectionString()
         {
@@ -53,21 +50,12 @@ namespace UnitTests.RemindersTest
 
 
         [SkippableFact]
-        public async Task RemindersTable_PostgreSql_RemindersRange()
-        {
-            await RemindersRange(iterations: 50);
-        }
+        public async Task RemindersTable_PostgreSql_RemindersRange() => await RemindersRange(iterations: 50);
 
         [SkippableFact]
-        public async Task RemindersTable_PostgreSql_RemindersParallelUpsert()
-        {
-            await RemindersParallelUpsert();
-        }
+        public async Task RemindersTable_PostgreSql_RemindersParallelUpsert() => await RemindersParallelUpsert();
 
         [SkippableFact]
-        public async Task RemindersTable_PostgreSql_ReminderSimple()
-        {
-            await ReminderSimple();
-        }
+        public async Task RemindersTable_PostgreSql_ReminderSimple() => await ReminderSimple();
     }
 }

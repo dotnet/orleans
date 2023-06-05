@@ -11,20 +11,11 @@ namespace Tester.StorageFacet.Implementations
         public string Name => config.StateName;
         public TState State { get; set; }
 
-        public Task Save()
-        {
-            return Task.CompletedTask;
-        }
+        public Task Save() => Task.CompletedTask;
 
-        public string GetExtendedInfo()
-        {
-            return $"Blob:{Name}, StateType:{typeof(TState).Name}";
-        }
+        public string GetExtendedInfo() => $"Blob:{Name}, StateType:{typeof(TState).Name}";
 
-        public void Configure(IExampleStorageConfig cfg)
-        {
-            config = cfg;
-        }
+        public void Configure(IExampleStorageConfig cfg) => config = cfg;
     }
 
     public class BlobExampleStorageFactory : IExampleStorageFactory

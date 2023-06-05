@@ -18,17 +18,11 @@ namespace DefaultCluster.Tests
 
         public class Fixture : BaseTestClusterFixture
         {
-            protected override void ConfigureTestCluster(TestClusterBuilder builder)
-            {
-                builder.AddSiloBuilderConfigurator<Configurator>();
-            }
+            protected override void ConfigureTestCluster(TestClusterBuilder builder) => builder.AddSiloBuilderConfigurator<Configurator>();
 
             private class Configurator : ISiloConfigurator
             {
-                public void Configure(ISiloBuilder hostBuilder)
-                {
-                    hostBuilder.AddGrainExtension<IAutoExtension, AutoExtension>();
-                }
+                public void Configure(ISiloBuilder hostBuilder) => hostBuilder.AddGrainExtension<IAutoExtension, AutoExtension>();
             }
         }
 

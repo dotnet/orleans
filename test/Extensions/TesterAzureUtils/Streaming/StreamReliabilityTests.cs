@@ -1009,15 +1009,13 @@ namespace UnitTests.Streaming.Reliability
 #if USE_GENERICS
         protected IStreamReliabilityTestGrain<int> GetGrain(long grainId)
 #else
-        protected IStreamReliabilityTestGrain GetGrain(long grainId)
-#endif
-        {
+        protected IStreamReliabilityTestGrain GetGrain(long grainId) =>
 #if USE_GENERICS
             return StreamReliabilityTestGrainFactory<int>.GetGrain(grainId);
 #else
-            return GrainFactory.GetGrain<IStreamReliabilityTestGrain>(grainId);
+            GrainFactory.GetGrain<IStreamReliabilityTestGrain>(grainId);
 #endif
-        }
+
 
 #if USE_GENERICS
         private IStreamReliabilityTestGrain<int> CreateGrainOnSilo(SiloHandle silo)
@@ -1064,10 +1062,7 @@ namespace UnitTests.Streaming.Reliability
             Assert.Equal(expectedNumConsumers, consumerHandleCount);
             Assert.Equal(expectedNumConsumers, consumerObserverCount);
         }
-        private void CheckSilosRunning(string when, int expectedNumSilos)
-        {
-            Assert.Equal(expectedNumSilos, HostedCluster.GetActiveSilos().Count());
-        }
+        private void CheckSilosRunning(string when, int expectedNumSilos) => Assert.Equal(expectedNumSilos, HostedCluster.GetActiveSilos().Count());
         protected async Task<bool> CheckGrainCounts()
         {
 #if USE_GENERICS

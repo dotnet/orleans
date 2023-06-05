@@ -48,70 +48,31 @@ namespace UnitTests.Directory
 
         public RemoteGrainDirectory CacheValidator => throw new NotImplementedException();
 
-        public Task DeleteGrainAsync(GrainId grainId, int hopCount = 0)
-        {
-            throw new NotImplementedException();
-        }
+        public Task DeleteGrainAsync(GrainId grainId, int hopCount = 0) => throw new NotImplementedException();
 
-        public GrainAddress GetLocalCacheData(GrainId grain)
-        {
-            throw new NotImplementedException();
-        }
+        public GrainAddress GetLocalCacheData(GrainId grain) => throw new NotImplementedException();
 
-        public AddressAndTag GetLocalDirectoryData(GrainId grain)
-        {
-            throw new NotImplementedException();
-        }
+        public AddressAndTag GetLocalDirectoryData(GrainId grain) => throw new NotImplementedException();
 
-        public SiloAddress GetPrimaryForGrain(GrainId grain)
-        {
-            throw new NotImplementedException();
-        }
+        public SiloAddress GetPrimaryForGrain(GrainId grain) => throw new NotImplementedException();
 
-        public void InvalidateCacheEntry(GrainAddress activation)
-        {
-            throw new NotImplementedException();
-        }
+        public void InvalidateCacheEntry(GrainAddress activation) => throw new NotImplementedException();
 
-        public bool IsSiloInCluster(SiloAddress silo)
-        {
-            throw new NotImplementedException();
-        }
+        public bool IsSiloInCluster(SiloAddress silo) => throw new NotImplementedException();
 
-        public bool LocalLookup(GrainId grain, out AddressAndTag addresses)
-        {
-            throw new NotImplementedException();
-        }
+        public bool LocalLookup(GrainId grain, out AddressAndTag addresses) => throw new NotImplementedException();
 
-        public Task<AddressAndTag> LookupAsync(GrainId grainId, int hopCount = 0)
-        {
-            throw new NotImplementedException();
-        }
+        public Task<AddressAndTag> LookupAsync(GrainId grainId, int hopCount = 0) => throw new NotImplementedException();
 
-        public Task<AddressAndTag> RegisterAsync(GrainAddress address, int hopCount = 0)
-        {
-            throw new NotImplementedException();
-        }
+        public Task<AddressAndTag> RegisterAsync(GrainAddress address, int hopCount = 0) => throw new NotImplementedException();
 
-        public void SetSiloRemovedCatalogCallback(Action<SiloAddress, SiloStatus> catalogOnSiloRemoved)
-        {
-            throw new NotImplementedException();
-        }
+        public void SetSiloRemovedCatalogCallback(Action<SiloAddress, SiloStatus> catalogOnSiloRemoved) => throw new NotImplementedException();
 
-        public void Start()
-        {
-            throw new NotImplementedException();
-        }
+        public void Start() => throw new NotImplementedException();
 
-        public void Stop()
-        {
-            throw new NotImplementedException();
-        }
+        public void Stop() => throw new NotImplementedException();
 
-        public Task UnregisterAfterNonexistingActivation(GrainAddress address, SiloAddress origin)
-        {
-            throw new NotImplementedException();
-        }
+        public Task UnregisterAfterNonexistingActivation(GrainAddress address, SiloAddress origin) => throw new NotImplementedException();
 
         public void CachePlacementDecision(GrainId grainId, SiloAddress siloAddress) => throw new NotImplementedException();
 

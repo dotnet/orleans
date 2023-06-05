@@ -114,8 +114,5 @@ internal static class MessagingProcessingInstruments
 
     internal static ObservableGauge<long> ActivationDataAll;
 
-    internal static void RegisterActivationDataAllObserve(Func<long> observeValue)
-    {
-        ActivationDataAll = Instruments.Meter.CreateObservableGauge(InstrumentNames.MESSAGING_PROCESSING_ACTIVATION_DATA_ALL, observeValue);
-    }
+    internal static void RegisterActivationDataAllObserve(Func<long> observeValue) => ActivationDataAll = Instruments.Meter.CreateObservableGauge(InstrumentNames.MESSAGING_PROCESSING_ACTIVATION_DATA_ALL, observeValue);
 }

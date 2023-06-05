@@ -22,15 +22,9 @@ namespace Tester
             this.second = second;
         }
 
-        public Task<string[]> GetNames()
-        {
-            return Task.FromResult(new[] { first.Name, second.Name });
-        }
+        public Task<string[]> GetNames() => Task.FromResult(new[] { first.Name, second.Name });
 
-        public Task<string[]> GetExtendedInfo()
-        {
-            return Task.FromResult(new[] { first.GetExtendedInfo(), second.GetExtendedInfo() });
-        }
+        public Task<string[]> GetExtendedInfo() => Task.FromResult(new[] { first.GetExtendedInfo(), second.GetExtendedInfo() });
     }
 
     public interface IStorageFactoryGrain : IStorageFacetGrain
@@ -48,15 +42,9 @@ namespace Tester
             second = namedExampleStorageFactory.Create<string>("Table", new ExampleStorageConfig("second"));
         }
 
-        public Task<string[]> GetNames()
-        {
-            return Task.FromResult(new[] { first.Name, second.Name });
-        }
+        public Task<string[]> GetNames() => Task.FromResult(new[] { first.Name, second.Name });
 
-        public Task<string[]> GetExtendedInfo()
-        {
-            return Task.FromResult(new[] { first.GetExtendedInfo(), second.GetExtendedInfo() });
-        }
+        public Task<string[]> GetExtendedInfo() => Task.FromResult(new[] { first.GetExtendedInfo(), second.GetExtendedInfo() });
     }
 
     public interface IStorageDefaultFactoryGrain : IStorageFacetGrain
@@ -75,15 +63,9 @@ namespace Tester
             second = ExampleStorageFactory.Create<string>(new ExampleStorageConfig("second"));
         }
 
-        public Task<string[]> GetNames()
-        {
-            return Task.FromResult(new[] { first.Name, second.Name });
-        }
+        public Task<string[]> GetNames() => Task.FromResult(new[] { first.Name, second.Name });
 
-        public Task<string[]> GetExtendedInfo()
-        {
-            return Task.FromResult(new[] { first.GetExtendedInfo(), second.GetExtendedInfo() });
-        }
+        public Task<string[]> GetExtendedInfo() => Task.FromResult(new[] { first.GetExtendedInfo(), second.GetExtendedInfo() });
     }
 
     public interface IStorageDefaultFacetGrain : IStorageFacetGrain
@@ -103,14 +85,8 @@ namespace Tester
             this.second = second;
         }
 
-        public Task<string[]> GetNames()
-        {
-            return Task.FromResult(new[] { first.Name, second.Name });
-        }
+        public Task<string[]> GetNames() => Task.FromResult(new[] { first.Name, second.Name });
 
-        public Task<string[]> GetExtendedInfo()
-        {
-            return Task.FromResult(new[] { first.GetExtendedInfo(), second.GetExtendedInfo() });
-        }
+        public Task<string[]> GetExtendedInfo() => Task.FromResult(new[] { first.GetExtendedInfo(), second.GetExtendedInfo() });
     }
 }

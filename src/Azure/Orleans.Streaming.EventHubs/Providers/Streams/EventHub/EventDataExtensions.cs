@@ -17,10 +17,7 @@ namespace Orleans.Streaming.EventHubs
         /// </summary>
         /// <param name="eventData"></param>
         /// <param name="streamNamespace"></param>
-        public static void SetStreamNamespaceProperty(this EventData eventData, string streamNamespace)
-        {
-            eventData.Properties[EventDataPropertyStreamNamespaceKey] = streamNamespace;
-        }
+        public static void SetStreamNamespaceProperty(this EventData eventData, string streamNamespace) => eventData.Properties[EventDataPropertyStreamNamespaceKey] = streamNamespace;
 
         /// <summary>
         /// Gets stream namespace from the EventData
@@ -49,9 +46,6 @@ namespace Orleans.Streaming.EventHubs
         /// <summary>
         /// Deserializes event data properties
         /// </summary>
-        public static IDictionary<string, object> DeserializeProperties(this ArraySegment<byte> bytes, Serialization.Serializer serializer)
-        {
-            return serializer.Deserialize<List<KeyValuePair<string, object>>>(bytes.AsSpan()).ToDictionary(kvp => kvp.Key, kvp => kvp.Value);
-        }
+        public static IDictionary<string, object> DeserializeProperties(this ArraySegment<byte> bytes, Serialization.Serializer serializer) => serializer.Deserialize<List<KeyValuePair<string, object>>>(bytes.AsSpan()).ToDictionary(kvp => kvp.Key, kvp => kvp.Value);
     }
 }

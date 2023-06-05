@@ -52,9 +52,6 @@ namespace Orleans.Runtime
         /// </summary>
         /// <param name="siloStatus">The silo status.</param>
         /// <returns><c>true</c> if the specified silo status is terminating; otherwise, <c>false</c>.</returns>
-        public static bool IsTerminating(this SiloStatus siloStatus)
-        {
-            return siloStatus == SiloStatus.ShuttingDown || siloStatus == SiloStatus.Stopping || siloStatus == SiloStatus.Dead;
-        }
+        public static bool IsTerminating(this SiloStatus siloStatus) => siloStatus == SiloStatus.ShuttingDown || siloStatus == SiloStatus.Stopping || siloStatus == SiloStatus.Dead;
     }
 }

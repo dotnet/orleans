@@ -125,10 +125,7 @@ internal class InMemoryTransportListener : IConnectionListenerFactory, IConnecti
         return new ValueTask<IConnectionListener>(this);
     }
 
-    public ValueTask DisposeAsync()
-    {
-        return UnbindAsync(default);
-    }
+    public ValueTask DisposeAsync() => UnbindAsync(default);
 
     public ValueTask UnbindAsync(CancellationToken cancellationToken = default)
     {

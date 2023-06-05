@@ -151,10 +151,7 @@ namespace UnitTests.MembershipTests
 
         public class ClientConfigurator : IClientBuilderConfigurator
         {
-            public void Configure(IConfiguration configuration, IClientBuilder clientBuilder)
-            {
-                clientBuilder.Configure<GatewayOptions>(options => options.PreferedGatewayIndex = 0);
-            }
+            public void Configure(IConfiguration configuration, IClientBuilder clientBuilder) => clientBuilder.Configure<GatewayOptions>(options => options.PreferedGatewayIndex = 0);
         }
 
         public void Dispose()

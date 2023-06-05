@@ -24,10 +24,7 @@ namespace Orleans.Internal
         }
 
         // Executes an async function such as Exception is never thrown but rather always returned as a broken task.
-        public static async Task SafeExecute(Func<Task> action)
-        {
-            await action();
-        }
+        public static async Task SafeExecute(Func<Task> action) => await action();
 
         public static async Task ExecuteAndIgnoreException(Func<Task> action)
         {
@@ -203,10 +200,7 @@ namespace Orleans.Internal
 
         //The rationale for GetAwaiter().GetResult() instead of .Result
         //is presented at https://github.com/aspnet/Security/issues/59.      
-        internal static T GetResult<T>(this Task<T> task)
-        {
-            return task.GetAwaiter().GetResult();
-        }
+        internal static T GetResult<T>(this Task<T> task) => task.GetAwaiter().GetResult();
 
         internal static Task WhenCancelled(this CancellationToken token)
         {

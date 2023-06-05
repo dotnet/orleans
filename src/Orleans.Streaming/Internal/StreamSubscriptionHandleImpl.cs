@@ -76,10 +76,7 @@ namespace Orleans.Streams
             batchObserver = null;
         }
 
-        public StreamHandshakeToken GetSequenceToken()
-        {
-            return expectedToken;
-        }
+        public StreamHandshakeToken GetSequenceToken() => expectedToken;
 
         public override Task UnsubscribeAsync()
         {
@@ -242,10 +239,7 @@ namespace Orleans.Streams
                 : observer.OnErrorAsync(ex);
         }
 
-        internal bool SameStreamId(QualifiedStreamId streamId)
-        {
-            return IsValid && streamImpl.InternalStreamId.Equals(streamId);
-        }
+        internal bool SameStreamId(QualifiedStreamId streamId) => IsValid && streamImpl.InternalStreamId.Equals(streamId);
 
         public override bool Equals(StreamSubscriptionHandle<T> other)
         {
@@ -253,19 +247,10 @@ namespace Orleans.Streams
             return o != null && SubscriptionId.Equals(o.SubscriptionId);
         }
 
-        public override bool Equals(object obj)
-        {
-            return Equals(obj as StreamSubscriptionHandle<T>);
-        }
+        public override bool Equals(object obj) => Equals(obj as StreamSubscriptionHandle<T>);
 
-        public override int GetHashCode()
-        {
-            return SubscriptionId.GetHashCode();
-        }
+        public override int GetHashCode() => SubscriptionId.GetHashCode();
 
-        public override string ToString()
-        {
-            return String.Format("StreamSubscriptionHandleImpl:Stream={0},HandleId={1}", IsValid ? streamImpl.InternalStreamId.ToString() : "null", HandleId);
-        }
+        public override string ToString() => String.Format("StreamSubscriptionHandleImpl:Stream={0},HandleId={1}", IsValid ? streamImpl.InternalStreamId.ToString() : "null", HandleId);
     }
 }

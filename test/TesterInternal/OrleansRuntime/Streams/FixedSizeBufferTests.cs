@@ -18,10 +18,7 @@ namespace UnitTests.OrleansRuntime.Streams
                 return new FixedSizeBuffer(TestBlockSize) {Pool = this};
             }
 
-            public void Free(FixedSizeBuffer resource)
-            {
-                Freed++;
-            }
+            public void Free(FixedSizeBuffer resource) => Freed++;
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Streaming")]

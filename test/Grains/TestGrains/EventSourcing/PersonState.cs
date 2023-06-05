@@ -22,14 +22,8 @@ namespace TestGrains
             Gender = @event.Gender;
         }
 
-        public void Apply(PersonMarried @event)
-        {
-            IsMarried = true;
-        }
+        public void Apply(PersonMarried @event) => IsMarried = true;
 
-        public void Apply(PersonLastNameChanged @event)
-        {
-            LastName = @event.LastName;
-        }
+        public void Apply(PersonLastNameChanged @event) => LastName = @event.LastName;
     }
 }

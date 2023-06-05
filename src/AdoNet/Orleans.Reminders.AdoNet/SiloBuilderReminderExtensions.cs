@@ -22,10 +22,7 @@ namespace Orleans.Hosting
         /// </remarks>
         public static ISiloBuilder UseAdoNetReminderService(
             this ISiloBuilder builder,
-            Action<AdoNetReminderTableOptions> configureOptions)
-        {
-            return builder.UseAdoNetReminderService(ob => ob.Configure(configureOptions));
-        }
+            Action<AdoNetReminderTableOptions> configureOptions) => builder.UseAdoNetReminderService(ob => ob.Configure(configureOptions));
 
         /// <summary>Adds reminder storage using ADO.NET. Instructions on configuring your database are available at <see href="http://aka.ms/orleans-sql-scripts"/>.</summary>
         /// <param name="builder">The builder.</param>
@@ -36,10 +33,7 @@ namespace Orleans.Hosting
         /// </remarks>
         public static ISiloBuilder UseAdoNetReminderService(
             this ISiloBuilder builder,
-            Action<OptionsBuilder<AdoNetReminderTableOptions>> configureOptions)
-        {
-            return builder.ConfigureServices(services => services.UseAdoNetReminderService(configureOptions));
-        }
+            Action<OptionsBuilder<AdoNetReminderTableOptions>> configureOptions) => builder.ConfigureServices(services => services.UseAdoNetReminderService(configureOptions));
 
         /// <summary>Adds reminder storage using ADO.NET. Instructions on configuring your database are available at <see href="http://aka.ms/orleans-sql-scripts"/>.</summary>
         /// <param name="services">The service collection.</param>

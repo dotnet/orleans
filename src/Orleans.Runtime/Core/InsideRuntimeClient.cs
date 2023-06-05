@@ -189,10 +189,7 @@ namespace Orleans.Runtime
         /// <summary>
         /// UnRegister a callback.
         /// </summary>
-        private void UnregisterCallback(GrainId grainId, CorrelationId correlationId)
-        {
-            callbacks.TryRemove((grainId, correlationId), out _);
-        }
+        private void UnregisterCallback(GrainId grainId, CorrelationId correlationId) => callbacks.TryRemove((grainId, correlationId), out _);
 
         public void SniffIncomingMessage(Message message)
         {
@@ -524,10 +521,7 @@ namespace Orleans.Runtime
             }
         }
 
-        public void Participate(ISiloLifecycle lifecycle)
-        {
-            lifecycle.Subscribe<InsideRuntimeClient>(ServiceLifecycleStage.RuntimeInitialize, OnRuntimeInitializeStart, OnRuntimeInitializeStop);
-        }
+        public void Participate(ISiloLifecycle lifecycle) => lifecycle.Subscribe<InsideRuntimeClient>(ServiceLifecycleStage.RuntimeInitialize, OnRuntimeInitializeStart, OnRuntimeInitializeStop);
 
         private void OnCallbackExpiryTick(object state)
         {

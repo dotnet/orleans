@@ -59,34 +59,22 @@ namespace Tester.AdoNet.Reminders
             var controlProxy = fixture.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
             controlProxy.EraseReminderTable().WaitWithThrow(TestConstants.InitTimeout);
         }
-        
+
         // Basic tests
 
         [SkippableFact]
-        public async Task Rem_Sql_Basic_StopByRef()
-        {
-            await Test_Reminders_Basic_StopByRef();
-        }
+        public async Task Rem_Sql_Basic_StopByRef() => await Test_Reminders_Basic_StopByRef();
 
         [SkippableFact]
-        public async Task Rem_Sql_Basic_ListOps()
-        {
-            await Test_Reminders_Basic_ListOps();
-        }
+        public async Task Rem_Sql_Basic_ListOps() => await Test_Reminders_Basic_ListOps();
 
         // Single join tests ... multi grain, multi reminders
 
         [SkippableFact]
-        public async Task Rem_Sql_1J_MultiGrainMultiReminders()
-        {
-            await Test_Reminders_1J_MultiGrainMultiReminders();
-        }
+        public async Task Rem_Sql_1J_MultiGrainMultiReminders() => await Test_Reminders_1J_MultiGrainMultiReminders();
 
         [SkippableFact]
-        public async Task Rem_Sql_ReminderNotFound()
-        {
-            await Test_Reminders_ReminderNotFound();
-        }
+        public async Task Rem_Sql_ReminderNotFound() => await Test_Reminders_ReminderNotFound();
     }
 }
 // ReSharper restore InconsistentNaming

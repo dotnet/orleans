@@ -39,8 +39,7 @@ namespace Orleans.Runtime.ReminderService
         public static string ConstructPartitionKey(string serviceId, GrainId grainId)
             => ConstructPartitionKey(serviceId, grainId.GetUniformHashCode());
 
-        public static string ConstructPartitionKey(string serviceId, uint number)
-        {
+        public static string ConstructPartitionKey(string serviceId, uint number) =>
             // IMPORTANT NOTE: Other code using this return data is very sensitive to format changes,
             //       so take great care when making any changes here!!!
 
@@ -49,8 +48,7 @@ namespace Orleans.Runtime.ReminderService
             // when comparisons will be done on strings, this will ensure that positive numbers are always greater than negative
             // string grainHash = number < 0 ? string.Format("0{0}", number.ToString("X")) : string.Format("1{0:d16}", number);
 
-            return AzureTableUtils.SanitizeTableProperty($"{serviceId}_{number:X8}");
-        }
+            AzureTableUtils.SanitizeTableProperty($"{serviceId}_{number:X8}");
 
         public static (string LowerBound, string UpperBound) ConstructPartitionKeyBounds(string serviceId)
         {
@@ -144,10 +142,7 @@ namespace Orleans.Runtime.ReminderService
             return await ReadSingleTableEntryAsync(partitionKey, rowKey);
         }
 
-        private Task<List<(ReminderTableEntry Entity, string ETag)>> FindAllReminderEntries()
-        {
-            return FindReminderEntries(0, 0);
-        }
+        private Task<List<(ReminderTableEntry Entity, string ETag)>> FindAllReminderEntries() => FindReminderEntries(0, 0);
 
         internal async Task<string> UpsertRow(ReminderTableEntry reminderEntry)
         {

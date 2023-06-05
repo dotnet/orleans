@@ -31,10 +31,7 @@ namespace Orleans.Hosting
         public static ISiloBuilder AddStartupTask<TStartup>(
             this ISiloBuilder builder,
             int stage = ServiceLifecycleStage.Active)
-            where TStartup : class, IStartupTask
-        {
-            return builder.AddStartupTask((sp, ct) => ActivatorUtilities.GetServiceOrCreateInstance<TStartup>(sp).Execute(ct), stage);
-        }
+            where TStartup : class, IStartupTask => builder.AddStartupTask((sp, ct) => ActivatorUtilities.GetServiceOrCreateInstance<TStartup>(sp).Execute(ct), stage);
 
         /// <summary>
         /// Adds a startup task to be executed when the silo has started.
@@ -54,10 +51,7 @@ namespace Orleans.Hosting
         public static ISiloBuilder AddStartupTask(
             this ISiloBuilder builder,
             IStartupTask startupTask,
-            int stage = ServiceLifecycleStage.Active)
-        {
-            return builder.AddStartupTask((sp, ct) => startupTask.Execute(ct), stage);
-        }
+            int stage = ServiceLifecycleStage.Active) => builder.AddStartupTask((sp, ct) => startupTask.Execute(ct), stage);
 
         /// <summary>
         /// Adds a startup task to be executed when the silo has started.

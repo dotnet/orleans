@@ -57,10 +57,7 @@ namespace Orleans.Providers.Streams.AzureQueue
             this.requestContext = requestContext;
         }
 
-        public IEnumerable<Tuple<T, StreamSequenceToken>> GetEvents<T>()
-        {
-            return events.OfType<T>().Select((e, i) => Tuple.Create<T, StreamSequenceToken>(e, sequenceToken.CreateSequenceTokenForEvent(i)));
-        }
+        public IEnumerable<Tuple<T, StreamSequenceToken>> GetEvents<T>() => events.OfType<T>().Select((e, i) => Tuple.Create<T, StreamSequenceToken>(e, sequenceToken.CreateSequenceTokenForEvent(i)));
 
         public bool ImportRequestContext()
         {
@@ -72,9 +69,6 @@ namespace Orleans.Providers.Streams.AzureQueue
             return false;
         }
 
-        public override string ToString()
-        {
-            return $"[AzureQueueBatchContainerV2:Stream={StreamId},#Items={events.Count}]";
-        }
+        public override string ToString() => $"[AzureQueueBatchContainerV2:Stream={StreamId},#Items={events.Count}]";
     }
 }

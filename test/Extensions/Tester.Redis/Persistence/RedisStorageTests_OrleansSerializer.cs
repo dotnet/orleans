@@ -23,28 +23,16 @@ namespace Tester.Redis.Persistence
 
         [SkippableFact]
         [TestCategory("Functional")]
-        public async Task WriteInconsistentFailsWithIncosistentStateException()
-        {
-            await Relational_WriteInconsistentFailsWithIncosistentStateException();
-        }
+        public async Task WriteInconsistentFailsWithIncosistentStateException() => await Relational_WriteInconsistentFailsWithIncosistentStateException();
 
         [SkippableFact]
         [TestCategory("Functional")]
-        public async Task WriteRead100StatesInParallel()
-        {
-            await Relational_WriteReadWriteRead100StatesInParallel();
-        }
-        internal Task Relational_WriteReadWriteRead100StatesInParallel()
-        {
-            return commonStorageTests.PersistenceStorage_WriteReadWriteReadStatesInParallel(nameof(Relational_WriteReadWriteRead100StatesInParallel));
-        }
+        public async Task WriteRead100StatesInParallel() => await Relational_WriteReadWriteRead100StatesInParallel();
+        internal Task Relational_WriteReadWriteRead100StatesInParallel() => commonStorageTests.PersistenceStorage_WriteReadWriteReadStatesInParallel(nameof(Relational_WriteReadWriteRead100StatesInParallel));
 
         [SkippableFact]
         [TestCategory("Functional")]
-        public async Task WriteReadCyrillic()
-        {
-            await commonStorageTests.PersistenceStorage_Relational_WriteReadIdCyrillic();
-        }
+        public async Task WriteReadCyrillic() => await commonStorageTests.PersistenceStorage_Relational_WriteReadIdCyrillic();
 
         [SkippableTheory, ClassData(typeof(StorageDataSet2CyrillicIdsAndGrainNames<string>))]
         [TestCategory("Functional")]
@@ -112,10 +100,7 @@ namespace Tester.Redis.Persistence
 
         [SkippableFact]
         [TestCategory("Functional")]
-        public async Task PersistenceStorage_WriteDuplicateFailsWithInconsistentStateException()
-        {
-            await Relational_WriteDuplicateFailsWithInconsistentStateException();
-        }
+        public async Task PersistenceStorage_WriteDuplicateFailsWithInconsistentStateException() => await Relational_WriteDuplicateFailsWithInconsistentStateException();
 
         internal async Task Relational_WriteDuplicateFailsWithInconsistentStateException()
         {

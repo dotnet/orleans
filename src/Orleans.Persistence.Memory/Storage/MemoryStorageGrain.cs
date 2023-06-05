@@ -51,10 +51,7 @@ namespace Orleans.Storage
             return Task.CompletedTask;
         }
 
-        private static string NewEtag()
-        {
-            return Guid.NewGuid().ToString("N");
-        }
+        private static string NewEtag() => Guid.NewGuid().ToString("N");
 
         private string GetETagFromStorage<T>(string grainStoreKey)
         {

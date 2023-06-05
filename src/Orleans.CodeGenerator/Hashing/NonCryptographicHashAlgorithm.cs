@@ -339,10 +339,6 @@ namespace Orleans.CodeGenerator.Hashing
         [EditorBrowsable(EditorBrowsableState.Never)]
         [Obsolete("Use GetCurrentHash() to retrieve the computed hash code.", true)]
 #pragma warning disable CS0809 // Obsolete member overrides non-obsolete member
-        public override int GetHashCode()
-#pragma warning restore CS0809 // Obsolete member overrides non-obsolete member
-        {
-            throw new NotSupportedException("GetHashCode");
-        }
+        public override int GetHashCode() => throw new NotSupportedException("GetHashCode");
     }
 }

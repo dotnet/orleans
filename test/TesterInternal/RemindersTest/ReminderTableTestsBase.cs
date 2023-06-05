@@ -40,10 +40,7 @@ namespace UnitTests.RemindersTest
             remindersTable = CreateRemindersTable();
         }
 
-        public virtual async Task InitializeAsync()
-        {
-            await remindersTable.Init().WithTimeout(TimeSpan.FromMinutes(1));
-        }
+        public virtual async Task InitializeAsync() => await remindersTable.Init().WithTimeout(TimeSpan.FromMinutes(1));
 
         public virtual async Task DisposeAsync()
         {
@@ -56,10 +53,7 @@ namespace UnitTests.RemindersTest
         protected abstract IReminderTable CreateRemindersTable();
         protected abstract Task<string> GetConnectionString();
 
-        protected virtual string GetAdoInvariant()
-        {
-            return null;
-        }
+        protected virtual string GetAdoInvariant() => null;
 
         protected async Task RemindersParallelUpsert()
         {

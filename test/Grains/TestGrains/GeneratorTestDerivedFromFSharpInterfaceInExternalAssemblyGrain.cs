@@ -8,14 +8,8 @@ namespace UnitTests.Grains
 
     public class GeneratorTestDerivedFromFSharpInterfaceInExternalAssemblyGrain : Grain, IGeneratorTestDerivedFromFSharpInterfaceInExternalAssemblyGrain
     {
-        public Task<int> Echo(int x)
-        {
-            return Task.FromResult(x);
-        }
+        public Task<int> Echo(int x) => Task.FromResult(x);
 
-        public Task<Tuple<string, int>> MultipleParameterEcho(string s, int x)
-        {
-            return Task.FromResult(new Tuple<string,int>(s,x));
-        }
+        public Task<Tuple<string, int>> MultipleParameterEcho(string s, int x) => Task.FromResult(new Tuple<string, int>(s, x));
     }
 }

@@ -22,10 +22,7 @@ namespace UnitTests.Grains
             return Task.CompletedTask;
         }
 
-        public Task<bool> StringIsNullOrEmpty()
-        {
-            return Task.FromResult(String.IsNullOrEmpty(myGrainString));
-        }
+        public Task<bool> StringIsNullOrEmpty() => Task.FromResult(String.IsNullOrEmpty(myGrainString));
 
         public Task<MemberVariables> GetMemberVariables()
         {

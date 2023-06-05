@@ -18,10 +18,7 @@ namespace ServiceBus.Tests.StreamingTests
 
         public class Fixture : BaseTestClusterFixture
         {
-            protected override void ConfigureTestCluster(TestClusterBuilder builder)
-            {
-                builder.AddSiloBuilderConfigurator<MySiloBuilderConfigurator>();
-            }
+            protected override void ConfigureTestCluster(TestClusterBuilder builder) => builder.AddSiloBuilderConfigurator<MySiloBuilderConfigurator>();
 
             private class MySiloBuilderConfigurator : ISiloConfigurator
             {

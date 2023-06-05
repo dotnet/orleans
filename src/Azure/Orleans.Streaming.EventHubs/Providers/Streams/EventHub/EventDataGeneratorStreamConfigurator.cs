@@ -12,15 +12,9 @@ namespace Orleans.Hosting.Developer
 
     public static class EventDataGeneratorConfiguratorExtensions
     {
-        public static void UseDataAdapter(this IEventDataGeneratorStreamConfigurator configurator, Func<IServiceProvider, string, IEventHubDataAdapter> factory)
-        {
-            configurator.ConfigureComponent(factory);
-        }
+        public static void UseDataAdapter(this IEventDataGeneratorStreamConfigurator configurator, Func<IServiceProvider, string, IEventHubDataAdapter> factory) => configurator.ConfigureComponent(factory);
 
-        public static void ConfigureCachePressuring(this IEventDataGeneratorStreamConfigurator configurator, Action<OptionsBuilder<EventHubStreamCachePressureOptions>> configureOptions)
-        {
-            configurator.Configure(configureOptions);
-        }
+        public static void ConfigureCachePressuring(this IEventDataGeneratorStreamConfigurator configurator, Action<OptionsBuilder<EventHubStreamCachePressureOptions>> configureOptions) => configurator.Configure(configureOptions);
     }
     
     public class EventDataGeneratorStreamConfigurator : SiloRecoverableStreamConfigurator, IEventDataGeneratorStreamConfigurator

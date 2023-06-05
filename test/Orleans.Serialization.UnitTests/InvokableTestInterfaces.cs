@@ -155,50 +155,23 @@ namespace Orleans.Serialization.UnitTests
     {
         private object state;
 
-        public Task<Type[]> GetTypesExplicit<T, U, V>()
-        {
-            return Task.FromResult(new[] {typeof(T), typeof(U), typeof(V)});
-        }
+        public Task<Type[]> GetTypesExplicit<T, U, V>() => Task.FromResult(new[] { typeof(T), typeof(U), typeof(V) });
 
-        public Task<Type[]> GetTypesInferred<T, U, V>(T t, U u, V v)
-        {
-            return Task.FromResult(new[] { typeof(T), typeof(U), typeof(V) });
-        }
+        public Task<Type[]> GetTypesInferred<T, U, V>(T t, U u, V v) => Task.FromResult(new[] { typeof(T), typeof(U), typeof(V) });
 
-        public Task<Type[]> GetTypesInferred<T, U>(T t, U u, int v)
-        {
-            return Task.FromResult(new[] { typeof(T), typeof(U) });
-        }
+        public Task<Type[]> GetTypesInferred<T, U>(T t, U u, int v) => Task.FromResult(new[] { typeof(T), typeof(U) });
 
-        public Task<T> RoundTrip<T>(T val)
-        {
-            return Task.FromResult(val);
-        }
+        public Task<T> RoundTrip<T>(T val) => Task.FromResult(val);
 
-        public Task<int> RoundTrip(int val)
-        {
-            return Task.FromResult(-val);
-        }
+        public Task<int> RoundTrip(int val) => Task.FromResult(-val);
 
-        public Task<T> Default<T>()
-        {
-            return Task.FromResult(default(T));
-        }
+        public Task<T> Default<T>() => Task.FromResult(default(T));
 
-        public Task<string> Default()
-        {
-            return Task.FromResult("default string");
-        }
+        public Task<string> Default() => Task.FromResult("default string");
 
-        public Task<TGrain> Constraints<TGrain>(TGrain grain) where TGrain : IMyInvokableBaseType 
-        {
-            return Task.FromResult(grain);
-        }
+        public Task<TGrain> Constraints<TGrain>(TGrain grain) where TGrain : IMyInvokableBaseType => Task.FromResult(grain);
 
-        public void SetValue<T>(T value)
-        {
-            state = value;
-        }
+        public void SetValue<T>(T value) => state = value;
 
         public Task<T> GetValue<T>() => Task.FromResult((T) state);
 
@@ -375,15 +348,9 @@ namespace Orleans.Serialization.UnitTests
 
         private sealed class EventEqualityComparer : IEqualityComparer<@event>
         {
-            public bool Equals(@event x, @event y)
-            {
-                return x.Equals(y);
-            }
+            public bool Equals(@event x, @event y) => x.Equals(y);
 
-            public int GetHashCode(@event obj)
-            {
-                return obj.GetHashCode();
-            }
+            public int GetHashCode(@event obj) => obj.GetHashCode();
         }
     }
 
@@ -426,14 +393,8 @@ namespace Orleans.Serialization.UnitTests
     /// </summary>
     public class NestedGenericGrain : INestedGenericGrain
     {
-        public Task<int> Do(NestedGeneric<int> value)
-        {
-            return Task.FromResult(value.Payload.Value);
-        }
+        public Task<int> Do(NestedGeneric<int> value) => Task.FromResult(value.Payload.Value);
 
-        public Task<int> Do(NestedConstructedGeneric value)
-        {
-            return Task.FromResult(value.Payload.Value);
-        }
+        public Task<int> Do(NestedConstructedGeneric value) => Task.FromResult(value.Payload.Value);
     }
 }

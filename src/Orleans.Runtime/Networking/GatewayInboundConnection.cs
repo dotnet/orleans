@@ -208,9 +208,6 @@ namespace Orleans.Runtime.Messaging
             }
         }
 
-        protected override void OnSendMessageFailure(Message message, string error)
-        {
-            FailMessage(message, error);
-        }
+        protected override void OnSendMessageFailure(Message message, string error) => FailMessage(message, error);
     }
 }

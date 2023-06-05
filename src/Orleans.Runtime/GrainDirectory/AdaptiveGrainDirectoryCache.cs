@@ -29,10 +29,7 @@ namespace Orleans.Runtime.GrainDirectory
                 NumAccesses = 0;
             }
 
-            internal bool IsExpired()
-            {
-                return LastRefreshed.Elapsed >= ExpirationTimer;
-            }
+            internal bool IsExpired() => LastRefreshed.Elapsed >= ExpirationTimer;
 
             internal void Refresh(TimeSpan newExpirationTimer)
             {
@@ -125,15 +122,9 @@ namespace Orleans.Runtime.GrainDirectory
             return true;
         }
 
-        internal GrainDirectoryCacheEntry Get(GrainId key)
-        {
-            return cache.Get(key);
-        }
+        internal GrainDirectoryCacheEntry Get(GrainId key) => cache.Get(key);
 
-        internal IEnumerator<KeyValuePair<GrainId, GrainDirectoryCacheEntry>> GetStoredEntries()
-        {
-            return cache.GetEnumerator();
-        }
+        internal IEnumerator<KeyValuePair<GrainId, GrainDirectoryCacheEntry>> GetStoredEntries() => cache.GetEnumerator();
 
         public override string ToString()
         {

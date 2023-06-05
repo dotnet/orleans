@@ -14,20 +14,11 @@ namespace Orleans.Runtime.Messaging
             log = loggerFactory.CreateLogger(typeof(NetworkingTrace).FullName);
         }
 
-        public IDisposable BeginScope<TState>(TState state)
-        {
-            return log.BeginScope(state);
-        }
+        public IDisposable BeginScope<TState>(TState state) => log.BeginScope(state);
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public bool IsEnabled(LogLevel logLevel)
-        {
-            return log.IsEnabled(logLevel);
-        }
+        public bool IsEnabled(LogLevel logLevel) => log.IsEnabled(logLevel);
 
-        public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception exception, Func<TState, Exception, string> formatter)
-        {
-            log.Log(logLevel, eventId, state, exception, formatter);
-        }
+        public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception exception, Func<TState, Exception, string> formatter) => log.Log(logLevel, eventId, state, exception, formatter);
     }
 }

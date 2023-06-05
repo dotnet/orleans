@@ -312,10 +312,7 @@ namespace Orleans.Internal
         }
 
         /// <inheritdoc/>
-        public TimeSpan Next(int attempt)
-        {
-            return fixedDelay;
-        }
+        public TimeSpan Next(int attempt) => fixedDelay;
     }
 
     /// <summary>

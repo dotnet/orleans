@@ -58,9 +58,6 @@ namespace Orleans.Transactions.State
             await queue.NotifyOfConfirm(transactionId, timeStamp);
         }
 
-        public async Task Prepare(Guid transactionId, AccessCounter accessCount, DateTime timeStamp, ParticipantId transactionManager)
-        {
-            await queue.NotifyOfPrepare(transactionId, accessCount, timeStamp, transactionManager);
-        }
+        public async Task Prepare(Guid transactionId, AccessCounter accessCount, DateTime timeStamp, ParticipantId transactionManager) => await queue.NotifyOfPrepare(transactionId, accessCount, timeStamp, transactionManager);
     }
 }

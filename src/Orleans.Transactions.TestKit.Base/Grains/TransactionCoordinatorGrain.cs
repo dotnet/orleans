@@ -11,20 +11,11 @@ namespace Orleans.Transactions.TestKit
     [StatelessWorker]
     public class TransactionCoordinatorGrain : Grain, ITransactionCoordinatorGrain
     {
-        public Task MultiGrainSet(List<ITransactionTestGrain> grains, int newValue)
-        {
-            return Task.WhenAll(grains.Select(g => g.Set(newValue)));
-        }
+        public Task MultiGrainSet(List<ITransactionTestGrain> grains, int newValue) => Task.WhenAll(grains.Select(g => g.Set(newValue)));
 
-        public Task MultiGrainAdd(List<ITransactionTestGrain> grains, int numberToAdd)
-        {
-            return Task.WhenAll(grains.Select(g => g.Add(numberToAdd)));
-        }
+        public Task MultiGrainAdd(List<ITransactionTestGrain> grains, int numberToAdd) => Task.WhenAll(grains.Select(g => g.Add(numberToAdd)));
 
-        public Task MultiGrainDouble(List<ITransactionTestGrain> grains)
-        {
-            return Task.WhenAll(grains.Select(Double));
-        }
+        public Task MultiGrainDouble(List<ITransactionTestGrain> grains) => Task.WhenAll(grains.Select(Double));
 
         public Task OrphanCallTransaction(ITransactionTestGrain grain)
         {
@@ -44,10 +35,7 @@ namespace Orleans.Transactions.TestKit
             await Task.WhenAll(throwGrains.Select(tg => tg.AddAndThrow(numberToAdd)));
         }
 
-        public Task MultiGrainSetBit(List<ITransactionalBitArrayGrain> grains, int bitIndex)
-        {
-            return Task.WhenAll(grains.Select(g => g.SetBit(bitIndex)));
-        }
+        public Task MultiGrainSetBit(List<ITransactionalBitArrayGrain> grains, int bitIndex) => Task.WhenAll(grains.Select(g => g.SetBit(bitIndex)));
 
         public Task MultiGrainAdd(ITransactionCommitterTestGrain committer, ITransactionCommitOperation<IRemoteCommitService> operation, List<ITransactionTestGrain> grains, int numberToAdd)
         {

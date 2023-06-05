@@ -29,10 +29,7 @@ namespace TestExtensions
             }
         }
 
-        public void EnsurePreconditionsMet()
-        {
-            preconditionsException?.Throw();
-        }
+        public void EnsurePreconditionsMet() => preconditionsException?.Throw();
 
         protected virtual void CheckPreconditionsOrThrow() { }
 

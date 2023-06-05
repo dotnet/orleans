@@ -50,10 +50,7 @@ namespace UnitTests.StorageTests.Relational
         }
 
 
-        public bool Equals(Range<T> other)
-        {
-            return Start.Equals(other.Start) && End.Equals(other.End);
-        }
+        public bool Equals(Range<T> other) => Start.Equals(other.Start) && End.Equals(other.End);
 
 
         public override int GetHashCode()

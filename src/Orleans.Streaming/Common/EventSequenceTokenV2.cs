@@ -62,16 +62,10 @@ namespace Orleans.Providers.Streams.Common
         /// </summary>
         /// <param name="eventInd">The event index.</param>
         /// <returns>A new sequence token.</returns>
-        public EventSequenceTokenV2 CreateSequenceTokenForEvent(int eventInd)
-        {
-            return new EventSequenceTokenV2(SequenceNumber, eventInd);
-        }
+        public EventSequenceTokenV2 CreateSequenceTokenForEvent(int eventInd) => new EventSequenceTokenV2(SequenceNumber, eventInd);
 
         /// <inheritdoc/>
-        public override bool Equals(object obj)
-        {
-            return Equals(obj as EventSequenceTokenV2);
-        }
+        public override bool Equals(object obj) => Equals(obj as EventSequenceTokenV2);
 
         /// <inheritdoc/>
         public override bool Equals(StreamSequenceToken other)
@@ -96,16 +90,11 @@ namespace Orleans.Providers.Streams.Common
         }
 
         /// <inheritdoc/>
-        public override int GetHashCode()
-        {
+        public override int GetHashCode() =>
             // why 397?
-            return (EventIndex * 397) ^ SequenceNumber.GetHashCode();
-        }
+            (EventIndex * 397) ^ SequenceNumber.GetHashCode();
 
         /// <inheritdoc/>
-        public override string ToString()
-        {
-            return string.Format(CultureInfo.InvariantCulture, "[EventSequenceTokenV2: SeqNum={0}, EventIndex={1}]", SequenceNumber, EventIndex);
-        }
+        public override string ToString() => string.Format(CultureInfo.InvariantCulture, "[EventSequenceTokenV2: SeqNum={0}, EventIndex={1}]", SequenceNumber, EventIndex);
     }
 }

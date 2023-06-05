@@ -43,9 +43,6 @@ namespace UnitTests.Grains
                 });
         }
 
-        public Task<Tuple<int, int>> GetCounters()
-        {
-            return Task.FromResult(new Tuple<int, int>(redCounter, blueCounter));
-        }
+        public Task<Tuple<int, int>> GetCounters() => Task.FromResult(new Tuple<int, int>(redCounter, blueCounter));
     }
 }

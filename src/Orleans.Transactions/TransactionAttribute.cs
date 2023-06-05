@@ -100,10 +100,7 @@ namespace Orleans
 
         protected void SetTransactionOptions(TransactionOptionAlias txOption) => SetTransactionOptions((TransactionOption)txOption);
 
-        protected void SetTransactionOptions(TransactionOption txOption)
-        {
-            TransactionOption = txOption;
-        }
+        protected void SetTransactionOptions(TransactionOption txOption) => TransactionOption = txOption;
 
         async Task IOutgoingGrainCallFilter.Invoke(IOutgoingGrainCallContext context)
         {
@@ -240,10 +237,7 @@ namespace Orleans
 
         protected abstract ValueTask<Response> BaseInvoke();
 
-        public override void Dispose()
-        {
-           TransactionInfo = null;
-        }
+        public override void Dispose() => TransactionInfo = null;
 
         void IOnDeserialized.OnDeserialized(DeserializationContext context)
         {

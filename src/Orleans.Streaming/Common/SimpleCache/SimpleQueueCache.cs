@@ -17,14 +17,8 @@ namespace Orleans.Providers.Streams.Common
         internal int NumCurrentItems { get; private set; }
         internal int NumCurrentCursors { get; private set; }
 
-        internal void UpdateNumItems(int val)
-        {
-            NumCurrentItems = NumCurrentItems + val;
-        }
-        internal void UpdateNumCursors(int val)
-        {
-            NumCurrentCursors = NumCurrentCursors + val;
-        }
+        internal void UpdateNumItems(int val) => NumCurrentItems = NumCurrentItems + val;
+        internal void UpdateNumCursors(int val) => NumCurrentCursors = NumCurrentCursors + val;
     }
 
     internal class SimpleQueueCacheItem
@@ -53,10 +47,7 @@ namespace Orleans.Providers.Streams.Common
         public int Size => cachedMessages.Count;
 
         /// <inheritdoc />
-        public int GetMaxAddCount()
-        {
-            return CACHE_HISTOGRAM_MAX_BUCKET_SIZE;
-        }
+        public int GetMaxAddCount() => CACHE_HISTOGRAM_MAX_BUCKET_SIZE;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="SimpleQueueCache"/> class.
@@ -74,10 +65,7 @@ namespace Orleans.Providers.Streams.Common
         }
 
         /// <inheritdoc />
-        public virtual bool IsUnderPressure()
-        {
-            return cacheCursorHistogram.Count >= NUM_CACHE_HISTOGRAM_BUCKETS;
-        }
+        public virtual bool IsUnderPressure() => cacheCursorHistogram.Count >= NUM_CACHE_HISTOGRAM_BUCKETS;
 
 
         /// <inheritdoc />

@@ -6,10 +6,7 @@ namespace TestGrains
     {
         private int A;
 
-        public Task<string> DoIt()
-        {
-            return Task.FromResult(GetType().Name);
-        }
+        public Task<string> DoIt() => Task.FromResult(GetType().Name);
 
         public Task SetA(int a)
         {
@@ -23,25 +20,16 @@ namespace TestGrains
             return Task.CompletedTask;
         }
 
-        public Task<int> GetA()
-        {
-            return Task.FromResult(A);
-        }
+        public Task<int> GetA() => Task.FromResult(A);
     }
 
     public class DoSomethingEmptyWithMoreGrain : Grain, IDoSomethingEmptyWithMoreGrain
     {
         private int A;
 
-        public Task<string> DoIt()
-        {
-            return Task.FromResult(GetType().Name);
-        }
+        public Task<string> DoIt() => Task.FromResult(GetType().Name);
 
-        public Task<string> DoMore()
-        {
-            return Task.FromResult(GetType().Name);
-        }
+        public Task<string> DoMore() => Task.FromResult(GetType().Name);
 
         public Task SetA(int a)
         {
@@ -55,10 +43,7 @@ namespace TestGrains
             return Task.CompletedTask;
         }
 
-        public Task<int> GetA()
-        {
-            return Task.FromResult(A);
-        }
+        public Task<int> GetA() => Task.FromResult(A);
     }
 
     public class DoSomethingWithMoreGrain : Grain, IDoSomethingWithMoreGrain
@@ -66,16 +51,10 @@ namespace TestGrains
         private int A;
         private int B;
 
-        public Task<string> DoIt()
-        {
-            return Task.FromResult(GetType().Name);
-        }
+        public Task<string> DoIt() => Task.FromResult(GetType().Name);
 
-        public Task<string> DoThat()
-        {
-            return Task.FromResult(GetType().Name);
-        }
-        
+        public Task<string> DoThat() => Task.FromResult(GetType().Name);
+
         public Task SetA(int a)
         {
             A = a;
@@ -88,10 +67,7 @@ namespace TestGrains
             return Task.CompletedTask;
         }
 
-        public Task<int> GetA()
-        {
-            return Task.FromResult(A);
-        }
+        public Task<int> GetA() => Task.FromResult(A);
 
         public Task SetB(int b)
         {
@@ -105,10 +81,7 @@ namespace TestGrains
             return Task.CompletedTask;
         }
 
-        public Task<int> GetB()
-        {
-            return Task.FromResult(B);
-        }
+        public Task<int> GetB() => Task.FromResult(B);
 
     }
 
@@ -116,10 +89,7 @@ namespace TestGrains
     {
         private int A;
 
-        public Task<string> DoIt()
-        {
-            return Task.FromResult(GetType().Name);
-        }
+        public Task<string> DoIt() => Task.FromResult(GetType().Name);
 
         public Task SetA(int a)
         {
@@ -133,15 +103,9 @@ namespace TestGrains
             return Task.CompletedTask;
         }
 
-        public Task<int> GetA()
-        {
-            return Task.FromResult(A);
-        }
+        public Task<int> GetA() => Task.FromResult(A);
 
-        public Task<string> DoMore()
-        {
-            return Task.FromResult(GetType().Name);
-        }
+        public Task<string> DoMore() => Task.FromResult(GetType().Name);
     }
 
 
@@ -152,20 +116,11 @@ namespace TestGrains
         private int B;
         private int C;
 
-        public Task<string> DoIt()
-        {
-            return Task.FromResult(GetType().Name);
-        }
+        public Task<string> DoIt() => Task.FromResult(GetType().Name);
 
-        public Task<string> DoMore()
-        {
-            return Task.FromResult(GetType().Name);
-        }
+        public Task<string> DoMore() => Task.FromResult(GetType().Name);
 
-        public Task<string> DoThat()
-        {
-            return Task.FromResult(GetType().Name);
-        }
+        public Task<string> DoThat() => Task.FromResult(GetType().Name);
 
         public Task SetA(int a)
         {
@@ -179,10 +134,7 @@ namespace TestGrains
             return Task.CompletedTask;
         }
 
-        public Task<int> GetA()
-        {
-            return Task.FromResult(A);
-        }
+        public Task<int> GetA() => Task.FromResult(A);
 
         public Task SetB(int b)
         {
@@ -196,10 +148,7 @@ namespace TestGrains
             return Task.CompletedTask;
         }
 
-        public Task<int> GetB()
-        {
-            return Task.FromResult(B);
-        }
+        public Task<int> GetB() => Task.FromResult(B);
 
         public Task SetC(int c)
         {
@@ -213,9 +162,6 @@ namespace TestGrains
             return Task.CompletedTask;
         }
 
-        public Task<int> GetC()
-        {
-            return Task.FromResult(C);
-        }
+        public Task<int> GetC() => Task.FromResult(C);
     }
 }

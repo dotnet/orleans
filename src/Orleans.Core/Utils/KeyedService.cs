@@ -35,10 +35,7 @@ namespace Orleans.Runtime
         public TService GetService(IServiceProvider services) => factory(services,Key);
 
         /// <inheritdoc/>
-        public bool Equals(TKey other)
-        {
-            return Equals(Key, other);
-        }
+        public bool Equals(TKey other) => Equals(Key, other);
     }
 
     /// <summary>
@@ -87,10 +84,7 @@ namespace Orleans.Runtime
         public TService GetService(IServiceProvider services) => instance.Value;
 
         /// <inheritdoc/>
-        public bool Equals(TKey other)
-        {
-            return Equals(Key, other);
-        }
+        public bool Equals(TKey other) => Equals(Key, other);
     }
 
     /// <summary>
@@ -120,16 +114,10 @@ namespace Orleans.Runtime
         where TService : class
     {
         /// <inheritdoc/>
-        public TService GetService(IServiceProvider services, TKey key)
-        {
-            return GetServices(services).LastOrDefault(s => s.Equals(key))?.GetService(services);
-        }
+        public TService GetService(IServiceProvider services, TKey key) => GetServices(services).LastOrDefault(s => s.Equals(key))?.GetService(services);
 
         /// <inheritdoc/>
-        public IEnumerable<IKeyedService<TKey, TService>> GetServices(IServiceProvider services)
-        {
-            return services.GetServices<IKeyedService<TKey, TService>>();
-        }
+        public IEnumerable<IKeyedService<TKey, TService>> GetServices(IServiceProvider services) => services.GetServices<IKeyedService<TKey, TService>>();
     }
 
     /// <summary>
@@ -141,10 +129,7 @@ namespace Orleans.Runtime
         /// Register a transient keyed service
         /// </summary>
         public static IServiceCollection AddTransientKeyedService<TKey, TService>(this IServiceCollection collection, TKey key, Func<IServiceProvider, TKey, TService> factory)
-             where TService : class
-        {
-            return collection.AddSingleton<IKeyedService<TKey, TService>>(sp => new KeyedService<TKey, TService>(key, factory));
-        }
+             where TService : class => collection.AddSingleton<IKeyedService<TKey, TService>>(sp => new KeyedService<TKey, TService>(key, factory));
 
         /// <summary>
         /// Register a transient keyed service
@@ -161,10 +146,7 @@ namespace Orleans.Runtime
         /// Register a singleton keyed service
         /// </summary>
         public static IServiceCollection AddSingletonKeyedService<TKey, TService>(this IServiceCollection collection, TKey key, Func<IServiceProvider, TKey, TService> factory)
-            where TService : class
-        {
-            return collection.AddSingleton<IKeyedService<TKey, TService>>(sp => new KeyedSingletonService<TKey, TService>(key, sp, factory));
-        }
+            where TService : class => collection.AddSingleton<IKeyedService<TKey, TService>>(sp => new KeyedSingletonService<TKey, TService>(key, sp, factory));
 
         /// <summary>
         /// Register a singleton keyed service
@@ -181,38 +163,26 @@ namespace Orleans.Runtime
         /// Register a transient named service
         /// </summary>
         public static IServiceCollection AddTransientNamedService<TService>(this IServiceCollection collection, string name, Func<IServiceProvider, string, TService> factory)
-            where TService : class
-        {
-            return collection.AddTransientKeyedService<string, TService>(name, factory);
-        }
+            where TService : class => collection.AddTransientKeyedService<string, TService>(name, factory);
 
         /// <summary>
         /// Register a transient named service
         /// </summary>
         public static IServiceCollection AddTransientNamedService<TService, TInstance>(this IServiceCollection collection, string name)
             where TInstance : class, TService
-            where TService : class
-        {
-            return collection.AddTransientKeyedService<string, TService, TInstance>(name);
-        }
+            where TService : class => collection.AddTransientKeyedService<string, TService, TInstance>(name);
 
         /// <summary>
         /// Register a singleton named service
         /// </summary>
         public static IServiceCollection AddSingletonNamedService<TService>(this IServiceCollection collection, string name, Func<IServiceProvider, string, TService> factory)
-            where TService : class
-        {
-            return collection.AddSingletonKeyedService<string, TService>(name, factory);
-        }
+            where TService : class => collection.AddSingletonKeyedService<string, TService>(name, factory);
 
         /// <summary>
         /// Register a singleton named service
         /// </summary>
         public static IServiceCollection AddSingletonNamedService<TService, TInstance>(this IServiceCollection collection, string name)
             where TInstance : class, TService
-            where TService : class
-        {
-            return collection.AddSingletonKeyedService<string, TService, TInstance>(name);
-        }
+            where TService : class => collection.AddSingletonKeyedService<string, TService, TInstance>(name);
     }
 }

@@ -55,21 +55,12 @@ namespace Tester.Redis.Reminders
         }
 
         [SkippableFact]
-        public async Task RemindersTable_Redis_RemindersRange()
-        {
-            await RemindersRange(iterations: 50);
-        }
+        public async Task RemindersTable_Redis_RemindersRange() => await RemindersRange(iterations: 50);
 
         [SkippableFact]
-        public async Task RemindersTable_Redis_RemindersParallelUpsert()
-        {
-            await RemindersParallelUpsert();
-        }
+        public async Task RemindersTable_Redis_RemindersParallelUpsert() => await RemindersParallelUpsert();
 
         [SkippableFact]
-        public async Task RemindersTable_Redis_ReminderSimple()
-        {
-            await ReminderSimple();
-        }
+        public async Task RemindersTable_Redis_ReminderSimple() => await ReminderSimple();
     }
 }

@@ -301,10 +301,7 @@ namespace Orleans.Runtime.Scheduler
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static void ScheduleExecution(WorkItemGroup workItem)
-        {
-            ThreadPool.UnsafeQueueUserWorkItem(workItem, preferLocal: true);
-        }
+        public static void ScheduleExecution(WorkItemGroup workItem) => ThreadPool.UnsafeQueueUserWorkItem(workItem, preferLocal: true);
 
         public void QueueAction(Action action) => TaskScheduler.QueueAction(action);
         public void QueueTask(Task task) => task.Start(TaskScheduler);

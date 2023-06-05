@@ -6,9 +6,6 @@ namespace UnitTests.GrainInterfaces
     {
         public string PredicatePattern => ConstructorStreamNamespacePredicateProvider.FormatPattern(typeof(RedStreamNamespacePredicate), constructorArgument: null);
 
-        public bool IsMatch(string streamNamespace)
-        {
-            return streamNamespace.StartsWith("red");
-        }
+        public bool IsMatch(string streamNamespace) => streamNamespace.StartsWith("red");
     }
 }

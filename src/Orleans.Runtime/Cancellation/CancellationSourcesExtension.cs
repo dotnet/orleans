@@ -106,10 +106,7 @@ namespace Orleans.Runtime
         }
 
         /// <inheritdoc />
-        public void Dispose()
-        {
-            _cleanupTimer.Dispose();
-        }
+        public void Dispose() => _cleanupTimer.Dispose();
 
         private class Entry
         {

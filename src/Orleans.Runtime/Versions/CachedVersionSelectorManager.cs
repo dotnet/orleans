@@ -36,10 +36,7 @@ namespace Orleans.Runtime.Versions
             return entry;
         }
 
-        public void ResetCache()
-        {
-            suitableSilosCache.Clear();
-        }
+        public void ResetCache() => suitableSilosCache.Clear();
 
         private CachedEntry GetSuitableSilosImpl((GrainType Type, GrainInterfaceType Interface, ushort Version) key)
         {

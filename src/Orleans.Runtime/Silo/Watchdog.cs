@@ -50,10 +50,7 @@ namespace Orleans.Runtime
             thread.Start();
         }
 
-        public void Stop()
-        {
-            cancellation.Cancel();
-        }
+        public void Stop() => cancellation.Cancel();
 
         protected void Run()
         {

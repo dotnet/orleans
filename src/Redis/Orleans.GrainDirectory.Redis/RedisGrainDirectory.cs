@@ -126,15 +126,9 @@ namespace Orleans.GrainDirectory.Redis
             }
         }
 
-        public Task UnregisterSilos(List<SiloAddress> siloAddresses)
-        {
-            return Task.CompletedTask;
-        }
+        public Task UnregisterSilos(List<SiloAddress> siloAddresses) => Task.CompletedTask;
 
-        public void Participate(ISiloLifecycle lifecycle)
-        {
-            lifecycle.Subscribe(nameof(RedisGrainDirectory), ServiceLifecycleStage.RuntimeInitialize, Initialize, Uninitialize);
-        }
+        public void Participate(ISiloLifecycle lifecycle) => lifecycle.Subscribe(nameof(RedisGrainDirectory), ServiceLifecycleStage.RuntimeInitialize, Initialize, Uninitialize);
 
         public async Task Initialize(CancellationToken ct = default)
         {

@@ -47,10 +47,7 @@ namespace Orleans.Runtime.Membership
         /// Consul Membership Provider does not support the extended Membership Protocol,
         /// therefore there is no MembershipTable to Initialize
         /// </remarks>
-        public Task InitializeMembershipTable(bool tryInitTableVersion)
-        {
-            return Task.CompletedTask;
-        }
+        public Task InitializeMembershipTable(bool tryInitTableVersion) => Task.CompletedTask;
 
 
         public async Task<MembershipTableData> ReadRow(SiloAddress siloAddress)
@@ -60,10 +57,7 @@ namespace Orleans.Runtime.Membership
             return AssembleMembershipTableData(tableVersion, siloRegistration);
         }
 
-        public Task<MembershipTableData> ReadAll()
-        {
-            return ReadAll(_consulClient, clusterId, kvRootFolder, _logger, versionKey);
-        }
+        public Task<MembershipTableData> ReadAll() => ReadAll(_consulClient, clusterId, kvRootFolder, _logger, versionKey);
 
         public static async Task<MembershipTableData> ReadAll(IConsulClient consulClient, string clusterId, string kvRootFolder, ILogger logger, string versionKey)
         {
@@ -148,10 +142,7 @@ namespace Orleans.Runtime.Membership
             await _consulClient.KV.Put(iAmAliveKV);
         }
 
-        public async Task DeleteMembershipTableEntries(string clusterId)
-        {
-            await _consulClient.KV.DeleteTree(ConsulSiloRegistrationAssembler.FormatDeploymentKVPrefix(this.clusterId, kvRootFolder));
-        }
+        public async Task DeleteMembershipTableEntries(string clusterId) => await _consulClient.KV.DeleteTree(ConsulSiloRegistrationAssembler.FormatDeploymentKVPrefix(this.clusterId, kvRootFolder));
 
         private static TableVersion GetTableVersion(string versionKey, QueryResult<KVPair[]> entries)
         {

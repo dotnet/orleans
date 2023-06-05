@@ -123,10 +123,7 @@ namespace Orleans.Providers.Streams.Common
         }
 
         /// <inheritdoc />
-        public void Dispose()
-        {
-            Dispose(true);
-        }
+        public void Dispose() => Dispose(true);
 
         /// <summary>
         /// Clean up cache data when done
@@ -142,9 +139,6 @@ namespace Orleans.Providers.Streams.Common
         }
 
         /// <inheritdoc />
-        public override string ToString()
-        {
-            return $"<SimpleQueueCacheCursor: Element={Element?.Value.Batch.ToString() ?? "null"}, SequenceToken={SequenceToken?.ToString() ?? "null"}>";
-        }
+        public override string ToString() => $"<SimpleQueueCacheCursor: Element={Element?.Value.Batch.ToString() ?? "null"}, SequenceToken={SequenceToken?.ToString() ?? "null"}>";
     }
 }

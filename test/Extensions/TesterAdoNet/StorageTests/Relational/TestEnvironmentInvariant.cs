@@ -109,10 +109,7 @@ namespace UnitTests.StorageTests.Relational
         /// Tries to ensure the storage emulator is running before the tests start.
         /// </summary>
         /// <remarks>This could perhaps have more functionality.</remarks>
-        public bool EnsureEmulatorStorageForTesting()
-        {
-            return StorageEmulator.TryStart();
-        }
+        public bool EnsureEmulatorStorageForTesting() => StorageEmulator.TryStart();
 
         /// <summary>
         /// Tries to load custom settings and if one is find, tries to merge them to the given default settings.

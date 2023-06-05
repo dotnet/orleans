@@ -6,10 +6,7 @@ namespace Orleans.SqlUtils.StorageProvider.GrainClasses
     [StorageProvider(ProviderName = "MemoryStore")]
     public class DeviceGrain : Grain<DeviceState>, IDeviceGrain
     {
-        public Task<string> GetSerialNumber()
-        {
-            return Task.FromResult(State.SerialNumber);
-        }
+        public Task<string> GetSerialNumber() => Task.FromResult(State.SerialNumber);
 
         public async Task SetOwner(ICustomerGrain customer)
         {

@@ -34,10 +34,7 @@ namespace UnitTests.StreamingTests
 
             public class ClientConfiguretor : IClientBuilderConfigurator
             {
-                public void Configure(IConfiguration configuration, IClientBuilder clientBuilder)
-                {
-                    clientBuilder.AddMemoryStreams<DefaultMemoryMessageBodySerializer>(StreamProvider);
-                }
+                public void Configure(IConfiguration configuration, IClientBuilder clientBuilder) => clientBuilder.AddMemoryStreams<DefaultMemoryMessageBodySerializer>(StreamProvider);
             }
         }
 

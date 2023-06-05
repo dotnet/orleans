@@ -26,20 +26,11 @@ namespace UnitTests.Grains
                 _onNext = onNext;
             }
 
-            public Task OnNextAsync(T item, StreamSequenceToken token = null)
-            {
-                return _onNext(item);
-            }
+            public Task OnNextAsync(T item, StreamSequenceToken token = null) => _onNext(item);
 
-            public Task OnCompletedAsync()
-            {
-                return Task.CompletedTask;
-            }
+            public Task OnCompletedAsync() => Task.CompletedTask;
 
-            public Task OnErrorAsync(Exception ex)
-            {
-                return Task.CompletedTask;
-            }
+            public Task OnErrorAsync(Exception ex) => Task.CompletedTask;
         }
 
         public override Task OnActivateAsync(CancellationToken cancellationToken)
@@ -89,9 +80,6 @@ namespace UnitTests.Grains
             }
         }
 
-        public Task<int> GetNumberConsumed()
-        {
-            return Task.FromResult(_numConsumedItems); 
-        }
+        public Task<int> GetNumberConsumed() => Task.FromResult(_numConsumedItems);
     }
 }

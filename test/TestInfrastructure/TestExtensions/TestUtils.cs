@@ -55,11 +55,9 @@ namespace Tester
             ForceTlsVersion();
         }
 
-        private static void ForceTlsVersion()
-        {
+        private static void ForceTlsVersion() =>
             // Force TLS 1.2
             ServicePointManager.SecurityProtocol = SecurityProtocolType.Tls12;
-        }
 
         public static double CalibrateTimings()
         {
@@ -127,19 +125,10 @@ namespace Tester
 
     public static class RequestContextTestUtils
     {
-        public static void SetActivityId(Guid id)
-        {
-            RequestContext.ReentrancyId = id;
-        }
+        public static void SetActivityId(Guid id) => RequestContext.ReentrancyId = id;
 
-        public static Guid GetActivityId()
-        {
-            return RequestContext.ReentrancyId is Guid value ? value : Guid.Empty;
-        }
+        public static Guid GetActivityId() => RequestContext.ReentrancyId is Guid value ? value : Guid.Empty;
 
-        public static void ClearActivityId()
-        {
-            RequestContext.ReentrancyId = Guid.Empty;
-        }
+        public static void ClearActivityId() => RequestContext.ReentrancyId = Guid.Empty;
     }
 }

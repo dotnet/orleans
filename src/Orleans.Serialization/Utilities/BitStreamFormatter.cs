@@ -317,10 +317,7 @@ namespace Orleans.Serialization.Utilities
             }
         }
 
-        private static void AppendAddress<TInput>(ref Reader<TInput> reader, StringBuilder res)
-        {
-            res.Append($"0x{reader.Position:X4} ");
-        }
+        private static void AppendAddress<TInput>(ref Reader<TInput> reader, StringBuilder res) => res.Append($"0x{reader.Position:X4} ");
     }
 }
 

@@ -7,10 +7,7 @@ namespace Orleans.Transactions
 {
     public class TransactionalStateAttributeMapper : TransactionalStateAttributeMapper<TransactionalStateAttribute>
     {
-        protected override TransactionalStateConfiguration AttributeToConfig(TransactionalStateAttribute attribute)
-        {
-            return new TransactionalStateConfiguration(attribute);
-        }
+        protected override TransactionalStateConfiguration AttributeToConfig(TransactionalStateAttribute attribute) => new TransactionalStateConfiguration(attribute);
     }
 
     public abstract class TransactionalStateAttributeMapper<TAttribute> : IAttributeToFactoryMapper<TAttribute>

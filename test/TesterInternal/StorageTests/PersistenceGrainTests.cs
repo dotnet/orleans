@@ -62,15 +62,9 @@ namespace UnitTests.StorageTests
             ResetMockStorageProvidersHistory();
         }
 
-        public async Task InitializeAsync()
-        {
-            await SetErrorInjection(ErrorInjectorProviderName, ErrorInjectionPoint.None);
-        }
+        public async Task InitializeAsync() => await SetErrorInjection(ErrorInjectorProviderName, ErrorInjectionPoint.None);
 
-        public async Task DisposeAsync()
-        {
-            await SetErrorInjection(ErrorInjectorProviderName, ErrorInjectionPoint.None);
-        }
+        public async Task DisposeAsync() => await SetErrorInjection(ErrorInjectorProviderName, ErrorInjectionPoint.None);
 
         public void Dispose()
         {
@@ -1196,15 +1190,9 @@ namespace UnitTests.StorageTests
                 providerName, (int)MockStorageProvider.Commands.SetValue, args).Wait();
         }
 
-        private async Task SetErrorInjection(string providerName, ErrorInjectionPoint errorInjectionPoint)
-        {
-            await SetErrorInjection(providerName, new ErrorInjectionBehavior { ErrorInjectionPoint = errorInjectionPoint });
-        }
+        private async Task SetErrorInjection(string providerName, ErrorInjectionPoint errorInjectionPoint) => await SetErrorInjection(providerName, new ErrorInjectionBehavior { ErrorInjectionPoint = errorInjectionPoint });
 
-        private async Task SetErrorInjection(string providerName, ErrorInjectionBehavior errorInjectionBehavior)
-        {
-            await ErrorInjectionStorageProvider.SetErrorInjection(providerName, errorInjectionBehavior, HostedCluster.GrainFactory);
-        }
+        private async Task SetErrorInjection(string providerName, ErrorInjectionBehavior errorInjectionBehavior) => await ErrorInjectionStorageProvider.SetErrorInjection(providerName, errorInjectionBehavior, HostedCluster.GrainFactory);
 
         private async Task CheckStorageProviderErrors(Func<Task> taskFunc, Type expectedException = null)
         {

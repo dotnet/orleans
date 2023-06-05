@@ -84,15 +84,9 @@ public class MyValue : IEquatable<MyValue>
     public static implicit operator int(MyValue value) => value.Value;
     public static implicit operator MyValue(int value) => new(value);
 
-    public bool Equals(MyValue other)
-    {
-        return other is not null && Value == other.Value;
-    }
+    public bool Equals(MyValue other) => other is not null && Value == other.Value;
 
-    public override bool Equals(object obj)
-    {
-        return Equals(obj as MyValue);
-    }
+    public override bool Equals(object obj) => Equals(obj as MyValue);
 
     public override int GetHashCode() => Value;
 } 

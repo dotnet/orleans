@@ -56,12 +56,12 @@ namespace Orleans.Runtime
         private SystemStatus(InternalSystemStatus name) { value = name; }
 
         /// <see cref="Object.ToString"/>
-        public override string ToString() { return value.ToString(); }
+        public override string ToString() => value.ToString();
         /// <see cref="Object.GetHashCode"/>
-        public override int GetHashCode() { return value.GetHashCode(); }
+        public override int GetHashCode() => value.GetHashCode();
         /// <see cref="Object.Equals(Object)"/>
         public override bool Equals(object obj) { var ss = obj as SystemStatus; return ss != null && Equals(ss); }
         /// <see cref="IEquatable{T}.Equals(T)"/>
-        public bool Equals(SystemStatus other) { return (other != null) && value.Equals(other.value); }
+        public bool Equals(SystemStatus other) => (other != null) && value.Equals(other.value);
     }
 }

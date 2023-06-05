@@ -24,8 +24,5 @@ internal class HistogramBucketAggregator
 
     public void Add(long measurement) => Interlocked.Add(ref _value, measurement);
 
-    public Measurement<long> Collect()
-    {
-        return new Measurement<long>(_value, _tags);
-    }
+    public Measurement<long> Collect() => new Measurement<long>(_value, _tags);
 }

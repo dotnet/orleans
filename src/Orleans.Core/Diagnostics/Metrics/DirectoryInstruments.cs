@@ -22,40 +22,22 @@ internal static class DirectoryInstruments
     internal static Counter<int> ValidationsCacheReceived = Instruments.Meter.CreateCounter<int>(InstrumentNames.DIRECTORY_VALIDATIONS_CACHE_RECEIVED);
 
     internal static ObservableGauge<int> DirectoryPartitionSize;
-    internal static void RegisterDirectoryPartitionSizeObserve(Func<int> observeValue)
-    {
-        DirectoryPartitionSize = Instruments.Meter.CreateObservableGauge<int>(InstrumentNames.DIRECTORY_PARTITION_SIZE, observeValue);
-    }
+    internal static void RegisterDirectoryPartitionSizeObserve(Func<int> observeValue) => DirectoryPartitionSize = Instruments.Meter.CreateObservableGauge<int>(InstrumentNames.DIRECTORY_PARTITION_SIZE, observeValue);
 
     internal static ObservableGauge<int> CacheSize;
-    internal static void RegisterCacheSizeObserve(Func<int> observeValue)
-    {
-        CacheSize = Instruments.Meter.CreateObservableGauge<int>(InstrumentNames.DIRECTORY_CACHE_SIZE, observeValue);
-    }
+    internal static void RegisterCacheSizeObserve(Func<int> observeValue) => CacheSize = Instruments.Meter.CreateObservableGauge<int>(InstrumentNames.DIRECTORY_CACHE_SIZE, observeValue);
 
     internal static ObservableGauge<int> RingSize;
-    internal static void RegisterRingSizeObserve(Func<int> observeValue)
-    {
-        RingSize = Instruments.Meter.CreateObservableGauge<int>(InstrumentNames.DIRECTORY_RING_RINGSIZE, observeValue);
-    }
+    internal static void RegisterRingSizeObserve(Func<int> observeValue) => RingSize = Instruments.Meter.CreateObservableGauge<int>(InstrumentNames.DIRECTORY_RING_RINGSIZE, observeValue);
 
     internal static ObservableGauge<long> MyPortionRingDistance;
-    internal static void RegisterMyPortionRingDistanceObserve(Func<long> observeValue)
-    {
-        MyPortionRingDistance = Instruments.Meter.CreateObservableGauge<long>(InstrumentNames.DIRECTORY_RING_MYPORTION_RINGDISTANCE, observeValue);
-    }
+    internal static void RegisterMyPortionRingDistanceObserve(Func<long> observeValue) => MyPortionRingDistance = Instruments.Meter.CreateObservableGauge<long>(InstrumentNames.DIRECTORY_RING_MYPORTION_RINGDISTANCE, observeValue);
 
     internal static ObservableGauge<float> MyPortionRingPercentage;
-    internal static void RegisterMyPortionRingPercentageObserve(Func<float> observeValue)
-    {
-        MyPortionRingPercentage = Instruments.Meter.CreateObservableGauge(InstrumentNames.DIRECTORY_RING_MYPORTION_RINGPERCENTAGE, observeValue);
-    }
+    internal static void RegisterMyPortionRingPercentageObserve(Func<float> observeValue) => MyPortionRingPercentage = Instruments.Meter.CreateObservableGauge(InstrumentNames.DIRECTORY_RING_MYPORTION_RINGPERCENTAGE, observeValue);
 
     internal static ObservableGauge<float> MyPortionAverageRingPercentage;
-    internal static void RegisterMyPortionAverageRingPercentageObserve(Func<float> observeValue)
-    {
-        MyPortionAverageRingPercentage = Instruments.Meter.CreateObservableGauge(InstrumentNames.DIRECTORY_RING_MYPORTION_AVERAGERINGPERCENTAGE, observeValue);
-    }
+    internal static void RegisterMyPortionAverageRingPercentageObserve(Func<float> observeValue) => MyPortionAverageRingPercentage = Instruments.Meter.CreateObservableGauge(InstrumentNames.DIRECTORY_RING_MYPORTION_AVERAGERINGPERCENTAGE, observeValue);
 
     internal static Counter<int> RegistrationsSingleActIssued = Instruments.Meter.CreateCounter<int>(InstrumentNames.DIRECTORY_REGISTRATIONS_SINGLE_ACT_ISSUED);
     internal static Counter<int> RegistrationsSingleActLocal = Instruments.Meter.CreateCounter<int>(InstrumentNames.DIRECTORY_REGISTRATIONS_SINGLE_ACT_LOCAL);

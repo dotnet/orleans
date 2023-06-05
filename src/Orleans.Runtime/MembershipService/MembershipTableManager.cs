@@ -289,10 +289,7 @@ namespace Orleans.Runtime.MembershipService
 
         private Task<bool> MembershipExecuteWithRetries(
             Func<int, Task<bool>> taskFunction,
-            TimeSpan timeout)
-        {
-            return MembershipExecuteWithRetries(taskFunction, timeout, (result, i) => result == false);
-        }
+            TimeSpan timeout) => MembershipExecuteWithRetries(taskFunction, timeout, (result, i) => result == false);
 
         private Task<T> MembershipExecuteWithRetries<T>(
             Func<int, Task<T>> taskFunction,

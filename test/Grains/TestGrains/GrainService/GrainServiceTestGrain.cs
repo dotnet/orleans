@@ -12,35 +12,17 @@ namespace UnitTests.Grains
             this.testGrainServiceClient = testGrainServiceClient;
         }
 
-        public Task<string> GetHelloWorldUsingCustomService()
-        {
-            return testGrainServiceClient.GetHelloWorldUsingCustomService();
-        }
+        public Task<string> GetHelloWorldUsingCustomService() => testGrainServiceClient.GetHelloWorldUsingCustomService();
 
-        public Task<bool> CallHasStarted()
-        {
-            return testGrainServiceClient.HasStarted();
-        }
+        public Task<bool> CallHasStarted() => testGrainServiceClient.HasStarted();
 
-        public Task<bool> CallHasStartedInBackground()
-        {
-            return testGrainServiceClient.HasStartedInBackground();
-        }
+        public Task<bool> CallHasStartedInBackground() => testGrainServiceClient.HasStartedInBackground();
 
-        public Task<bool> CallHasInit()
-        {
-            return testGrainServiceClient.HasInit();
-        }
+        public Task<bool> CallHasInit() => testGrainServiceClient.HasInit();
 
-        public Task<string> GetServiceConfigProperty()
-        {
-            return testGrainServiceClient.GetServiceConfigProperty();
-        }
+        public Task<string> GetServiceConfigProperty() => testGrainServiceClient.GetServiceConfigProperty();
 
-        public Task<string> EchoViaExtension(string what)
-        {
-            return testGrainServiceClient.EchoViaExtension(what);
-        }
+        public Task<string> EchoViaExtension(string what) => testGrainServiceClient.EchoViaExtension(what);
     }
 
 }

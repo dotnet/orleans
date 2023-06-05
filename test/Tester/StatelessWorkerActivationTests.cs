@@ -19,10 +19,7 @@ public class StatelessWorkerActivationTests : IClassFixture<StatelessWorkerActiv
 
         private class SiloConfigurator : ISiloConfigurator
         {
-            public void Configure(ISiloBuilder hostBuilder)
-            {
-                hostBuilder.Services.AddSingleton<StatelessWorkerScalingGrainSharedState>();
-            }
+            public void Configure(ISiloBuilder hostBuilder) => hostBuilder.Services.AddSingleton<StatelessWorkerScalingGrainSharedState>();
         }
     }
 

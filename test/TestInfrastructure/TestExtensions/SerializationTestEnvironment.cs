@@ -38,10 +38,7 @@ namespace TestExtensions
 
         public DeepCopier DeepCopier => RuntimeClient.ServiceProvider.GetRequiredService<DeepCopier>();
         public Serializer Serializer => RuntimeClient.ServiceProvider.GetRequiredService<Serializer>();
-        
-        public void Dispose()
-        {
-            RuntimeClient?.Dispose();
-        }
+
+        public void Dispose() => RuntimeClient?.Dispose();
     }
 }

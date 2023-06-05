@@ -121,9 +121,6 @@ namespace Orleans
         }
 
         /// <inheritdoc />
-        public void Dispose()
-        {
-            _cancellationTokenSource.Dispose();
-        }
+        public void Dispose() => _cancellationTokenSource.Dispose();
     }
 }

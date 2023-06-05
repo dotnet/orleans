@@ -20,10 +20,7 @@ namespace Orleans.Runtime
             this.clusterMembershipOptions = clusterMembershipOptions.Value;
         }
 
-        public bool IsUnexpected(Exception exception)
-        {
-            return !(exception is ThreadAbortException);
-        }
+        public bool IsUnexpected(Exception exception) => !(exception is ThreadAbortException);
 
         public void OnFatalException(object sender, string context, Exception exception)
         {

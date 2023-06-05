@@ -205,25 +205,13 @@ namespace Orleans.Reminders.Redis
             };
         }
 
-        private (RedisValue from, RedisValue to) GetFilter(uint grainHash)
-        {
-            return GetFilter(grainHash.ToString("X8"));
-        }
+        private (RedisValue from, RedisValue to) GetFilter(uint grainHash) => GetFilter(grainHash.ToString("X8"));
 
-        private (RedisValue from, RedisValue to) GetFilter(GrainId grainId)
-        {
-            return GetFilter(grainId.GetUniformHashCode().ToString("X8"), grainId.ToString());
-        }
+        private (RedisValue from, RedisValue to) GetFilter(GrainId grainId) => GetFilter(grainId.GetUniformHashCode().ToString("X8"), grainId.ToString());
 
-        private (RedisValue from, RedisValue to) GetFilter(GrainId grainId, string reminderName)
-        {
-            return GetFilter(grainId.GetUniformHashCode().ToString("X8"), grainId.ToString(), reminderName);
-        }
+        private (RedisValue from, RedisValue to) GetFilter(GrainId grainId, string reminderName) => GetFilter(grainId.GetUniformHashCode().ToString("X8"), grainId.ToString(), reminderName);
 
-        private (RedisValue from, RedisValue to) GetFilter(GrainId grainId, string reminderName, string eTag)
-        {
-            return GetFilter(grainId.GetUniformHashCode().ToString("X8"), grainId.ToString(), reminderName, eTag);
-        }
+        private (RedisValue from, RedisValue to) GetFilter(GrainId grainId, string reminderName, string eTag) => GetFilter(grainId.GetUniformHashCode().ToString("X8"), grainId.ToString(), reminderName, eTag);
 
         private (RedisValue from, RedisValue to) GetFilter(params string[] segments)
         {

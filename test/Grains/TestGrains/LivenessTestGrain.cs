@@ -32,10 +32,7 @@ namespace UnitTests.Grains
             return base.OnDeactivateAsync(reason, cancellationToken);
         }
 
-        public Task<string> GetLabel()
-        {
-            return Task.FromResult(label);
-        }
+        public Task<string> GetLabel() => Task.FromResult(label);
 
         public Task SetLabel(string label)
         {
@@ -58,19 +55,10 @@ namespace UnitTests.Grains
             return Task.CompletedTask;
         }
 
-        public Task<string> GetRuntimeInstanceId()
-        {
-            return Task.FromResult(RuntimeIdentity);
-        }
+        public Task<string> GetRuntimeInstanceId() => Task.FromResult(RuntimeIdentity);
 
-        public Task<string> GetUniqueId()
-        {
-            return Task.FromResult(uniqueId.ToString());
-        }
+        public Task<string> GetUniqueId() => Task.FromResult(uniqueId.ToString());
 
-        public Task<ILivenessTestGrain> GetGrainReference()
-        {
-            return Task.FromResult(this.AsReference<ILivenessTestGrain>());
-        }
+        public Task<ILivenessTestGrain> GetGrainReference() => Task.FromResult(this.AsReference<ILivenessTestGrain>());
     }
 }

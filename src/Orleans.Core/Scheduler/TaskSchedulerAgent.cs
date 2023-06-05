@@ -154,11 +154,8 @@ namespace Orleans.Runtime
             disposed = true;
         }
 
-        public override string ToString()
-        {
-            return Name;
-        }
-        
+        public override string ToString() => Name;
+
         /// <summary>
         /// Handles fault
         /// </summary>

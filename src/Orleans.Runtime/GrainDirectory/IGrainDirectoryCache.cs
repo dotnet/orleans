@@ -59,9 +59,6 @@ namespace Orleans.Runtime.GrainDirectory
         /// <param name="key">key for the lookup</param>
         /// <param name="result">value if the key is found, undefined otherwise</param>
         /// <returns>true if the given key is in the cache</returns>
-        public static bool LookUp(this IGrainDirectoryCache cache, GrainId key, out GrainAddress result)
-        {
-            return cache.LookUp(key, out result, out _);
-        }
+        public static bool LookUp(this IGrainDirectoryCache cache, GrainId key, out GrainAddress result) => cache.LookUp(key, out result, out _);
     }
 }

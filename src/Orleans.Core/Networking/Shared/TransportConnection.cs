@@ -67,9 +67,6 @@ namespace Orleans.Networking.Shared
         // That said, all derived types should override this method should override
         // this implementation of Abort because canceling pending output reads is not
         // sufficient to abort the connection if there is backpressure.
-        public override void Abort(ConnectionAbortedException abortReason)
-        {
-            Application.Input.CancelPendingRead();
-        }
+        public override void Abort(ConnectionAbortedException abortReason) => Application.Input.CancelPendingRead();
     }
 }

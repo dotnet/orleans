@@ -78,20 +78,14 @@ namespace Orleans.Tests.SqlUtils
                 }
             };
 
-        public static DbConstants GetDbConstants(string invariantName)
-        {
-            return invariantNameToConsts[invariantName];
-        }
+        public static DbConstants GetDbConstants(string invariantName) => invariantNameToConsts[invariantName];
 
         /// <summary>
         /// If the underlying storage supports cancellation or not.
         /// </summary>
         /// <param name="storage">The storage used.</param>
         /// <returns><em>TRUE</em> if cancellation is supported. <em>FALSE</em> otherwise.</returns>
-        public static bool SupportsCommandCancellation(this IRelationalStorage storage)
-        {
-            return SupportsCommandCancellation(storage.InvariantName);
-        }
+        public static bool SupportsCommandCancellation(this IRelationalStorage storage) => SupportsCommandCancellation(storage.InvariantName);
 
 
         /// <summary>
@@ -99,10 +93,7 @@ namespace Orleans.Tests.SqlUtils
         /// </summary>
         /// <param name="adoNetProvider">The ADO.NET provider invariant string.</param>
         /// <returns><em>TRUE</em> if cancellation is supported. <em>FALSE</em> otherwise.</returns>
-        public static bool SupportsCommandCancellation(string adoNetProvider)
-        {
-            return GetDbConstants(adoNetProvider).SupportsCommandCancellation;
-        }
+        public static bool SupportsCommandCancellation(string adoNetProvider) => GetDbConstants(adoNetProvider).SupportsCommandCancellation;
 
 
         /// <summary>
@@ -110,10 +101,7 @@ namespace Orleans.Tests.SqlUtils
         /// </summary>
         /// <param name="storage">The storage used.</param>
         /// <returns><em>TRUE</em> if streaming is supported natively. <em>FALSE</em> otherwise.</returns>
-        public static bool SupportsStreamNatively(this IRelationalStorage storage)
-        {
-            return SupportsStreamNatively(storage.InvariantName);
-        }
+        public static bool SupportsStreamNatively(this IRelationalStorage storage) => SupportsStreamNatively(storage.InvariantName);
 
 
         /// <summary>
@@ -121,10 +109,7 @@ namespace Orleans.Tests.SqlUtils
         /// </summary>
         /// <param name="adoNetProvider">The ADO.NET provider invariant string.</param>
         /// <returns><em>TRUE</em> if streaming is supported natively. <em>FALSE</em> otherwise.</returns>
-        public static bool SupportsStreamNatively(string adoNetProvider)
-        {
-            return GetDbConstants(adoNetProvider).SupportsStreamNatively;
-        }
+        public static bool SupportsStreamNatively(string adoNetProvider) => GetDbConstants(adoNetProvider).SupportsStreamNatively;
 
 
         /// <summary>
@@ -132,11 +117,9 @@ namespace Orleans.Tests.SqlUtils
         /// </summary>
         /// <param name="storage">The storage used.</param>
         /// <returns></returns>
-        public static bool IsSynchronousAdoNetImplementation(this IRelationalStorage storage)
-        {
+        public static bool IsSynchronousAdoNetImplementation(this IRelationalStorage storage) =>
             //Currently the assumption is all but MySQL are asynchronous.
-            return IsSynchronousAdoNetImplementation(storage.InvariantName);
-        }
+            IsSynchronousAdoNetImplementation(storage.InvariantName);
 
 
         /// <summary>
@@ -144,15 +127,9 @@ namespace Orleans.Tests.SqlUtils
         /// </summary>
         /// <param name="adoNetProvider">The ADO.NET provider invariant string.</param>
         /// <returns></returns>
-        public static bool IsSynchronousAdoNetImplementation(string adoNetProvider)
-        {
-            return GetDbConstants(adoNetProvider).IsSynchronousAdoNetImplementation;
-        }
+        public static bool IsSynchronousAdoNetImplementation(string adoNetProvider) => GetDbConstants(adoNetProvider).IsSynchronousAdoNetImplementation;
 
-        public static ICommandInterceptor GetDatabaseCommandInterceptor(string invariantName)
-        {
-            return GetDbConstants(invariantName).DatabaseCommandInterceptor;
-        }
+        public static ICommandInterceptor GetDatabaseCommandInterceptor(string invariantName) => GetDbConstants(invariantName).DatabaseCommandInterceptor;
     }
 
     internal class DbConstants

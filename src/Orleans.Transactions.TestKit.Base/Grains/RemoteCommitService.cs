@@ -58,10 +58,7 @@ namespace Orleans.Transactions.TestKit
             Data = data;
         }
 
-        public async Task<bool> Commit(Guid transactionId, IRemoteCommitService service)
-        {
-            return await service.Pass(transactionId, Data);
-        }
+        public async Task<bool> Commit(Guid transactionId, IRemoteCommitService service) => await service.Pass(transactionId, Data);
     }
 
     [Serializable]
@@ -76,10 +73,7 @@ namespace Orleans.Transactions.TestKit
             Data = data;
         }
 
-        public async Task<bool> Commit(Guid transactionId, IRemoteCommitService service)
-        {
-            return await service.Fail(transactionId, Data);
-        }
+        public async Task<bool> Commit(Guid transactionId, IRemoteCommitService service) => await service.Fail(transactionId, Data);
     }
 
     [Serializable]
@@ -94,9 +88,6 @@ namespace Orleans.Transactions.TestKit
             Data = data;
         }
 
-        public async Task<bool> Commit(Guid transactionId, IRemoteCommitService service)
-        {
-            return await service.Throw(transactionId, Data);
-        }
+        public async Task<bool> Commit(Guid transactionId, IRemoteCommitService service) => await service.Throw(transactionId, Data);
     }
 }

@@ -35,25 +35,13 @@ namespace Orleans.Transactions
         public long TransactionsFailed => _transactionsFailed;
         public long TransactionsThrottled => _transactionsThrottled;
 
-        public void TrackTransactionStarted()
-        {
-            Interlocked.Increment(ref _transactionsStarted);
-        }
+        public void TrackTransactionStarted() => Interlocked.Increment(ref _transactionsStarted);
 
-        public void TrackTransactionSucceeded()
-        {
-            Interlocked.Increment(ref _transactionsSucceeded);
-        }
+        public void TrackTransactionSucceeded() => Interlocked.Increment(ref _transactionsSucceeded);
 
-        public void TrackTransactionFailed()
-        {
-            Interlocked.Increment(ref _transactionsFailed);
-        }
+        public void TrackTransactionFailed() => Interlocked.Increment(ref _transactionsFailed);
 
-        public void TrackTransactionThrottled()
-        {
-            Interlocked.Increment(ref _transactionsThrottled);
-        }
+        public void TrackTransactionThrottled() => Interlocked.Increment(ref _transactionsThrottled);
 
         public static ITransactionAgentStatistics Copy(ITransactionAgentStatistics initialStatistics)
         {

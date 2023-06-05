@@ -11,15 +11,9 @@ namespace Orleans.Hosting
 
     public static class EventHubStreamConfiguratorExtensions
     {
-        public static void ConfigureEventHub(this IEventHubStreamConfigurator configurator, Action<OptionsBuilder<EventHubOptions>> configureOptions)
-        {
-            configurator.Configure(configureOptions);
-        }
+        public static void ConfigureEventHub(this IEventHubStreamConfigurator configurator, Action<OptionsBuilder<EventHubOptions>> configureOptions) => configurator.Configure(configureOptions);
 
-        public static void UseDataAdapter(this IEventHubStreamConfigurator configurator, Func<IServiceProvider, string, IEventHubDataAdapter> factory)
-        {
-            configurator.ConfigureComponent(factory);
-        }
+        public static void UseDataAdapter(this IEventHubStreamConfigurator configurator, Func<IServiceProvider, string, IEventHubDataAdapter> factory) => configurator.ConfigureComponent(factory);
     }
 
     public interface ISiloEventHubStreamConfigurator : IEventHubStreamConfigurator, ISiloRecoverableStreamConfigurator { }
@@ -28,25 +22,13 @@ namespace Orleans.Hosting
     public static class SiloEventHubStreamConfiguratorExtensions
     {
         public static void ConfigureCheckpointer<TOptions>(this ISiloEventHubStreamConfigurator configurator, Func<IServiceProvider, string, IStreamQueueCheckpointerFactory> checkpointerFactoryBuilder, Action<OptionsBuilder<TOptions>> configureOptions)
-            where TOptions : class, new()
-        {
-            configurator.ConfigureComponent(checkpointerFactoryBuilder, configureOptions);
-        }
+            where TOptions : class, new() => configurator.ConfigureComponent(checkpointerFactoryBuilder, configureOptions);
 
-        public static void ConfigurePartitionReceiver(this ISiloEventHubStreamConfigurator configurator, Action<OptionsBuilder<EventHubReceiverOptions>> configureOptions)
-        {
-            configurator.Configure(configureOptions);
-        }
+        public static void ConfigurePartitionReceiver(this ISiloEventHubStreamConfigurator configurator, Action<OptionsBuilder<EventHubReceiverOptions>> configureOptions) => configurator.Configure(configureOptions);
 
-        public static void ConfigureCachePressuring(this ISiloEventHubStreamConfigurator configurator, Action<OptionsBuilder<EventHubStreamCachePressureOptions>> configureOptions)
-        {
-            configurator.Configure(configureOptions);
-        }
+        public static void ConfigureCachePressuring(this ISiloEventHubStreamConfigurator configurator, Action<OptionsBuilder<EventHubStreamCachePressureOptions>> configureOptions) => configurator.Configure(configureOptions);
 
-        public static void UseAzureTableCheckpointer(this ISiloEventHubStreamConfigurator configurator, Action<OptionsBuilder<AzureTableStreamCheckpointerOptions>> configureOptions)
-        {
-            configurator.ConfigureCheckpointer(EventHubCheckpointerFactory.CreateFactory, configureOptions);
-        }
+        public static void UseAzureTableCheckpointer(this ISiloEventHubStreamConfigurator configurator, Action<OptionsBuilder<AzureTableStreamCheckpointerOptions>> configureOptions) => configurator.ConfigureCheckpointer(EventHubCheckpointerFactory.CreateFactory, configureOptions);
     }
 
     public class SiloEventHubStreamConfigurator : SiloRecoverableStreamConfigurator, ISiloEventHubStreamConfigurator

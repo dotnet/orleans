@@ -45,11 +45,9 @@ namespace Orleans.Streams
             await Task.WhenAll(promises);
         }
 
-        internal void Clear()
-        {
+        internal void Clear() =>
             // This is a quick temporary solution to unblock testing for resource leakages for streams.
             allStreams.Clear();
-        }
 
         private IStreamControl GetStreamControl(QualifiedStreamId streamId)
         {
@@ -58,10 +56,7 @@ namespace Orleans.Streams
             return ok ? streamObj as IStreamControl : null;
         }
 
-        private List<QualifiedStreamId> GetUsedStreamIds()
-        {
-            return allStreams.Select(kv => kv.Key).ToList();
-        }
+        private List<QualifiedStreamId> GetUsedStreamIds() => allStreams.Select(kv => kv.Key).ToList();
 
         public async ValueTask DisposeAsync() => await Cleanup(cleanupProducers: true, cleanupConsumers: false).ConfigureAwait(false);
     }

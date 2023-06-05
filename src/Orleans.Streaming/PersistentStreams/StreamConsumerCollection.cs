@@ -40,20 +40,11 @@ namespace Orleans.Streams
             return true;
         }
 
-        public bool Contains(GuidId subscriptionId)
-        {
-            return queueData.ContainsKey(subscriptionId);
-        }
+        public bool Contains(GuidId subscriptionId) => queueData.ContainsKey(subscriptionId);
 
-        public bool TryGetConsumer(GuidId subscriptionId, out StreamConsumerData data)
-        {
-            return queueData.TryGetValue(subscriptionId, out data);
-        }
+        public bool TryGetConsumer(GuidId subscriptionId, out StreamConsumerData data) => queueData.TryGetValue(subscriptionId, out data);
 
-        public IEnumerable<StreamConsumerData> AllConsumers()
-        {
-            return queueData.Values;
-        }
+        public IEnumerable<StreamConsumerData> AllConsumers() => queueData.Values;
 
         public void DisposeAll(ILogger logger)
         {
@@ -70,10 +61,7 @@ namespace Orleans.Streams
             get { return queueData.Count; }
         }
 
-        public void RefreshActivity(DateTime now)
-        {
-            lastActivityTime = now;
-        }
+        public void RefreshActivity(DateTime now) => lastActivityTime = now;
 
         public bool IsInactive(DateTime now, TimeSpan inactivityPeriod)
         {

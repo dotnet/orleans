@@ -383,10 +383,7 @@ namespace Orleans.Messaging
             }
         }
 
-        public void RegisterLocalMessageHandler(Action<Message> handler)
-        {
-            messageHandler = handler;
-        }
+        public void RegisterLocalMessageHandler(Action<Message> handler) => messageHandler = handler;
 
         public void RejectMessage(Message msg, string reason, Exception exc = null)
         {
@@ -422,9 +419,6 @@ namespace Orleans.Messaging
             connectionStatusListener.NotifyGatewayCountChanged(gatewayCount, gatewayCount + 1);
         }
 
-        public void Dispose()
-        {
-            gatewayManager.Dispose();
-        }
+        public void Dispose() => gatewayManager.Dispose();
     }
 }

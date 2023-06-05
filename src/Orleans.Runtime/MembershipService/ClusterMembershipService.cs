@@ -122,9 +122,6 @@ namespace Orleans.Runtime
                 OnRuntimeInitializeStop);
         }
 
-        void IDisposable.Dispose()
-        {
-            updates.Dispose();
-        }
+        void IDisposable.Dispose() => updates.Dispose();
     }
 }

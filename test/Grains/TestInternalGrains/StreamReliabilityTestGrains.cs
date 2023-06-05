@@ -233,10 +233,7 @@ namespace UnitTests.Grains
             logger.LogInformation("IsProducer={IsProducer}", isProducer);
             return Task.FromResult(isProducer);
         }
-        public Task<int> GetConsumerHandlesCount()
-        {
-            return Task.FromResult(State.ConsumerSubscriptionHandles.Count);
-        }
+        public Task<int> GetConsumerHandlesCount() => Task.FromResult(State.ConsumerSubscriptionHandles.Count);
 
         public async Task<int> GetConsumerObserversCount()
         {

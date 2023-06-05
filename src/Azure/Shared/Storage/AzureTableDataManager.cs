@@ -438,10 +438,7 @@ namespace Orleans.GrainDirectory.AzureStorage
         /// NOTE: This could be a very expensive and slow operation for large tables!
         /// </summary>
         /// <returns>Enumeration of all entries in the table.</returns>
-        public Task<List<(T Entity, string ETag)>> ReadAllTableEntriesAsync()
-        {
-            return ReadTableEntriesAndEtagsAsync(null);
-        }
+        public Task<List<(T Entity, string ETag)>> ReadAllTableEntriesAsync() => ReadTableEntriesAndEtagsAsync(null);
 
         /// <summary>
         /// Deletes a set of already existing data entries in the table, by using eTag.

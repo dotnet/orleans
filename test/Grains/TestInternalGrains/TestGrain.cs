@@ -35,15 +35,9 @@ namespace UnitTests.Grains
             return base.OnDeactivateAsync(reason, cancellationToken);
         }
 
-        public Task<long> GetKey()
-        {
-            return Task.FromResult(this.GetPrimaryKeyLong());
-        }
+        public Task<long> GetKey() => Task.FromResult(this.GetPrimaryKeyLong());
 
-        public Task<string> GetLabel()
-        {
-            return Task.FromResult(label);
-        }
+        public Task<string> GetLabel() => Task.FromResult(label);
 
         public async Task DoLongAction(TimeSpan timespan, string str)
         {
@@ -94,20 +88,11 @@ namespace UnitTests.Grains
             return new Tuple<string, string>(bar1, bar2);
         }
 
-        public Task<string> GetRuntimeInstanceId()
-        {
-            return Task.FromResult(RuntimeIdentity);
-        }
+        public Task<string> GetRuntimeInstanceId() => Task.FromResult(RuntimeIdentity);
 
-        public Task<string> GetActivationId()
-        {
-            return Task.FromResult(_id);
-        }
+        public Task<string> GetActivationId() => Task.FromResult(_id);
 
-        public Task<ITestGrain> GetGrainReference()
-        {
-            return Task.FromResult(this.AsReference<ITestGrain>());
-        }
+        public Task<ITestGrain> GetGrainReference() => Task.FromResult(this.AsReference<ITestGrain>());
 
         public Task<IGrain[]> GetMultipleGrainInterfaces_Array()
         {
@@ -146,10 +131,7 @@ namespace UnitTests.Grains
             await base.OnActivateAsync(cancellationToken);
         }
 
-        public Task<long> GetKey()
-        {
-            return Task.FromResult(this.GetPrimaryKeyLong());
-        }
+        public Task<long> GetKey() => Task.FromResult(this.GetPrimaryKeyLong());
     }
 
     internal class GuidTestGrain : Grain, IGuidTestGrain
@@ -175,15 +157,9 @@ namespace UnitTests.Grains
             return Task.CompletedTask;
         }
 
-        public Task<Guid> GetKey()
-        {
-            return Task.FromResult(this.GetPrimaryKey());
-        }
+        public Task<Guid> GetKey() => Task.FromResult(this.GetPrimaryKey());
 
-        public Task<string> GetLabel()
-        {
-            return Task.FromResult(label);
-        }
+        public Task<string> GetLabel() => Task.FromResult(label);
 
         public Task SetLabel(string label)
         {
@@ -191,15 +167,9 @@ namespace UnitTests.Grains
             return Task.CompletedTask;
         }
 
-        public Task<string> GetRuntimeInstanceId()
-        {
-            return Task.FromResult(RuntimeIdentity);
-        }
+        public Task<string> GetRuntimeInstanceId() => Task.FromResult(RuntimeIdentity);
 
-        public Task<string> GetActivationId()
-        {
-            return Task.FromResult(_id);
-        }
+        public Task<string> GetActivationId() => Task.FromResult(_id);
     }
 
     internal class OneWayGrain : Grain, IOneWayGrain, ISimpleGrainObserver
@@ -274,10 +244,7 @@ namespace UnitTests.Grains
             }
         }
 
-        public Task<string> GetActivationId()
-        {
-            return Task.FromResult(_id);
-        }
+        public Task<string> GetActivationId() => Task.FromResult(_id);
 
         public Task<string> GetActivationAddress(IGrain grain)
         {
@@ -300,20 +267,11 @@ namespace UnitTests.Grains
             return Task.CompletedTask;
         }
 
-        public Task ThrowsOneWay()
-        {
-            throw new Exception("GET OUT!");
-        }
+        public Task ThrowsOneWay() => throw new Exception("GET OUT!");
 
-        public ValueTask ThrowsOneWayValueTask()
-        {
-            throw new Exception("GET OUT (ValueTask)!");
-        }
+        public ValueTask ThrowsOneWayValueTask() => throw new Exception("GET OUT (ValueTask)!");
 
-        public Task<SiloAddress> GetSiloAddress()
-        {
-            return Task.FromResult(LocalSiloDetails.SiloAddress);
-        }
+        public Task<SiloAddress> GetSiloAddress() => Task.FromResult(LocalSiloDetails.SiloAddress);
 
         public Task<SiloAddress> GetPrimaryForGrain()
         {
@@ -328,10 +286,7 @@ namespace UnitTests.Grains
             tcs.TrySetResult(null);
         }
 
-        public async Task SendSignalTo(IOneWayGrain grain)
-        {
-            await grain.Signal(_id);
-        }
+        public async Task SendSignalTo(IOneWayGrain grain) => await grain.Signal(_id);
 
         public Task SignalSelfViaOther() => other.SendSignalTo(this.AsReference<IOneWayGrain>());
 
@@ -376,14 +331,8 @@ namespace UnitTests.Grains
 
         public Task<int> GetCount() => Task.FromResult(count);
 
-        public Task Throws()
-        {
-            throw new Exception("GET OUT!");
-        }
+        public Task Throws() => throw new Exception("GET OUT!");
 
-        public ValueTask ThrowsValueTask()
-        {
-            throw new Exception("GET OUT!");
-        }
+        public ValueTask ThrowsValueTask() => throw new Exception("GET OUT!");
     }
 }

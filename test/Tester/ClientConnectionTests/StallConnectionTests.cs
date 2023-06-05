@@ -25,18 +25,12 @@ namespace Tester.ClientConnectionTests
 
         public class SiloConfigurator : ISiloConfigurator
         {
-            public void Configure(ISiloBuilder hostBuilder)
-            {
-                hostBuilder.Configure<ConnectionOptions>(options => options.OpenConnectionTimeout = Timeout);
-            }
+            public void Configure(ISiloBuilder hostBuilder) => hostBuilder.Configure<ConnectionOptions>(options => options.OpenConnectionTimeout = Timeout);
         }
 
         public class ClientConfigurator : IClientBuilderConfigurator
         {
-            public void Configure(IConfiguration configuration, IClientBuilder clientBuilder)
-            {
-                clientBuilder.Configure<ClientMessagingOptions>(options => options.ResponseTimeout = Timeout);
-            }
+            public void Configure(IConfiguration configuration, IClientBuilder clientBuilder) => clientBuilder.Configure<ClientMessagingOptions>(options => options.ResponseTimeout = Timeout);
         }
 
         [Fact, TestCategory("Functional")]

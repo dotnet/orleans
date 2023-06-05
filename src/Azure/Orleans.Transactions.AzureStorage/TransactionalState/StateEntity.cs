@@ -29,10 +29,7 @@ namespace Orleans.Transactions.AzureStorage
         public DateTimeOffset? Timestamp => Entity.Timestamp;
         public ETag ETag => Entity.ETag;
 
-        public static string MakeRowKey(long sequenceId)
-        {
-            return $"{RK_PREFIX}{sequenceId.ToString("x16")}";
-        }
+        public static string MakeRowKey(long sequenceId) => $"{RK_PREFIX}{sequenceId.ToString("x16")}";
 
         public long SequenceId => long.Parse(RowKey.Substring(RK_PREFIX.Length), NumberStyles.AllowHexSpecifier);
 
@@ -77,15 +74,9 @@ namespace Orleans.Transactions.AzureStorage
             return result;
         }
 
-        public T GetState<T>(JsonSerializerSettings jsonSettings)
-        {
-            return JsonConvert.DeserializeObject<T>(GetStateInternal(), jsonSettings);
-        }
+        public T GetState<T>(JsonSerializerSettings jsonSettings) => JsonConvert.DeserializeObject<T>(GetStateInternal(), jsonSettings);
 
-        public void SetState<T>(T state, JsonSerializerSettings jsonSettings)
-        {
-            SetStateInternal(JsonConvert.SerializeObject(state, jsonSettings));
-        }
+        public void SetState<T>(T state, JsonSerializerSettings jsonSettings) => SetStateInternal(JsonConvert.SerializeObject(state, jsonSettings));
 
         private void SetStateInternal(string stringData)
         {

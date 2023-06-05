@@ -289,14 +289,8 @@ namespace Orleans.GrainDirectory.AzureStorage
             return $"Message = {storeExc.Message}, HTTP Status = {storeExc.Status}, HTTP Error Code = {storeExc.ErrorCode}.";
         }
 
-        internal static string PointQuery(string partitionKey, string rowKey)
-        {
-            return TableClient.CreateQueryFilter($"(PartitionKey eq {partitionKey}) and (RowKey eq {rowKey})");
-        }
+        internal static string PointQuery(string partitionKey, string rowKey) => TableClient.CreateQueryFilter($"(PartitionKey eq {partitionKey}) and (RowKey eq {rowKey})");
 
-        internal static string RangeQuery(string partitionKey, string minRowKey, string maxRowKey)
-        {
-            return TableClient.CreateQueryFilter($"((PartitionKey eq {partitionKey}) and (RowKey ge {minRowKey})) and (RowKey le {maxRowKey})");
-        }
+        internal static string RangeQuery(string partitionKey, string minRowKey, string maxRowKey) => TableClient.CreateQueryFilter($"((PartitionKey eq {partitionKey}) and (RowKey ge {minRowKey})) and (RowKey le {maxRowKey})");
     }
 }

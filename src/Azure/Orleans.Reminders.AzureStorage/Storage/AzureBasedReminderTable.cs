@@ -116,10 +116,7 @@ namespace Orleans.Runtime.ReminderService
             };
         }
 
-        public Task TestOnlyClearTable()
-        {
-            return remTableManager.DeleteTableEntries();
-        }
+        public Task TestOnlyClearTable() => remTableManager.DeleteTableEntries();
 
         public async Task<ReminderTableData> ReadRows(GrainId grainId)
         {

@@ -42,10 +42,7 @@ namespace Orleans.Transactions.AzureStorage
             return ActivatorUtilities.CreateInstance<AzureTableTransactionalStateStorage<TState>>(context.ActivationServices, table, partitionKey, jsonSettings);
         }
 
-        public void Participate(ISiloLifecycle lifecycle)
-        {
-            lifecycle.Subscribe(OptionFormattingUtilities.Name<AzureTableTransactionalStateStorageFactory>(name), options.InitStage, Init);
-        }
+        public void Participate(ISiloLifecycle lifecycle) => lifecycle.Subscribe(OptionFormattingUtilities.Name<AzureTableTransactionalStateStorageFactory>(name), options.InitStage, Init);
 
         private string MakePartitionKey(IGrainContext context, string stateName)
         {
@@ -63,9 +60,6 @@ namespace Orleans.Transactions.AzureStorage
             table = tableManager.Table;
         }
 
-        private Task Init(CancellationToken cancellationToken)
-        {
-            return CreateTable();
-        }
+        private Task Init(CancellationToken cancellationToken) => CreateTable();
     }
 }

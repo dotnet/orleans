@@ -87,10 +87,7 @@ namespace Orleans.Streams
         ///     Same applies to shutdown.
         /// </summary>
         /// <returns></returns>
-        public Task Initialize()
-        {
-            return OrleansTaskExtentions.WrapInTask(() => InitializeInternal());
-        }
+        public Task Initialize() => OrleansTaskExtentions.WrapInTask(() => InitializeInternal());
 
         private void InitializeInternal()
         {

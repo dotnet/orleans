@@ -214,10 +214,7 @@ namespace Orleans.Runtime
                : string.CompareOrdinal(KeyExt, other.KeyExt);
         }
 
-        public override int GetHashCode()
-        {
-            return unchecked((int)GetUniformHashCode());
-        }
+        public override int GetHashCode() => unchecked((int)GetUniformHashCode());
 
         internal uint GetUniformHashCode()
         {
@@ -304,10 +301,7 @@ namespace Orleans.Runtime
             }
         }
 
-        public override string ToString()
-        {
-            return ToHexString();
-        }
+        public override string ToString() => ToHexString();
 
         internal string ToHexString()
         {
@@ -332,10 +326,7 @@ namespace Orleans.Runtime
             return keyString;
         }
 
-        internal static Category GetCategory(UInt64 typeCodeData)
-        {
-            return (Category)((typeCodeData >> 56) & 0xFF);
-        }
+        internal static Category GetCategory(UInt64 typeCodeData) => (Category)((typeCodeData >> 56) & 0xFF);
 
         private static ulong GetTypeCodeData(Category category, long typeData = 0) => ((ulong)category << 56) + ((ulong)typeData & 0x00FFFFFFFFFFFFFF);
     }

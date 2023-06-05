@@ -178,10 +178,7 @@ namespace Orleans
             }
         }
 
-        public void ReceiveMessage(object message)
-        {
-            throw new NotImplementedException();
-        }
+        public void ReceiveMessage(object message) => throw new NotImplementedException();
 
         public void Activate(Dictionary<string, object> requestContext, CancellationToken? cancellationToken = null) { }
         public void Deactivate(DeactivationReason deactivationReason, CancellationToken? cancellationToken = null) { }

@@ -32,11 +32,11 @@ namespace UnitTests.Grains
             logger = loggerFactory.CreateLogger($"{GetType().Name}-{IdentityString}");
         }
 
-        Task<IChainedGrain> IChainedGrain.GetNext() { return Task.FromResult(State.Next); } 
+        Task<IChainedGrain> IChainedGrain.GetNext() => Task.FromResult(State.Next);
 
-        Task<int> IChainedGrain.GetId() { return Task.FromResult(State.Id); }
+        Task<int> IChainedGrain.GetId() => Task.FromResult(State.Id);
 
-        Task<int> IChainedGrain.GetX() { return Task.FromResult(State.X); }
+        Task<int> IChainedGrain.GetX() => Task.FromResult(State.X);
 
         public async Task<int> GetCalculatedValue()
         {
@@ -78,24 +78,12 @@ namespace UnitTests.Grains
             throw new OrleansException($"ChainGrain Id={State.Id} is in an invalid state. Next={State.Next}");
         }
 
-        public Task PassThis(IChainedGrain next)
-        {
-            return next.SetNext(this);
-        }
+        public Task PassThis(IChainedGrain next) => next.SetNext(this);
 
-        public Task PassNull(IChainedGrain next)
-        {
-            return next.SetNext(null);
-        }
+        public Task PassNull(IChainedGrain next) => next.SetNext(null);
 
-        public Task PassThisNested(ChainGrainHolder next)
-        {
-            return next.Next.SetNextNested(new ChainGrainHolder { Next = this });
-        }
+        public Task PassThisNested(ChainGrainHolder next) => next.Next.SetNextNested(new ChainGrainHolder { Next = this });
 
-        public Task PassNullNested(ChainGrainHolder next)
-        {
-            return next.Next.SetNextNested(new ChainGrainHolder { Next = null });
-        }
+        public Task PassNullNested(ChainGrainHolder next) => next.Next.SetNextNested(new ChainGrainHolder { Next = null });
     }
 }

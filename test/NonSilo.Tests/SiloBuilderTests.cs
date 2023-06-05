@@ -15,45 +15,21 @@ namespace NonSilo.Tests
 {
     public class NoOpMembershipTable : IMembershipTable
     {
-        public Task CleanupDefunctSiloEntries(DateTimeOffset beforeDate)
-        {
-            return Task.CompletedTask;
-        }
+        public Task CleanupDefunctSiloEntries(DateTimeOffset beforeDate) => Task.CompletedTask;
 
-        public Task DeleteMembershipTableEntries(string clusterId)
-        {
-            return Task.CompletedTask;
-        }
+        public Task DeleteMembershipTableEntries(string clusterId) => Task.CompletedTask;
 
-        public Task InitializeMembershipTable(bool tryInitTableVersion)
-        {
-            return Task.CompletedTask;
-        }
+        public Task InitializeMembershipTable(bool tryInitTableVersion) => Task.CompletedTask;
 
-        public Task<bool> InsertRow(MembershipEntry entry, TableVersion tableVersion)
-        {
-            return Task.FromResult(true);
-        }
+        public Task<bool> InsertRow(MembershipEntry entry, TableVersion tableVersion) => Task.FromResult(true);
 
-        public Task<MembershipTableData> ReadAll()
-        {
-            throw new NotImplementedException();
-        }
+        public Task<MembershipTableData> ReadAll() => throw new NotImplementedException();
 
-        public Task<MembershipTableData> ReadRow(SiloAddress key)
-        {
-            throw new NotImplementedException();
-        }
+        public Task<MembershipTableData> ReadRow(SiloAddress key) => throw new NotImplementedException();
 
-        public Task UpdateIAmAlive(MembershipEntry entry)
-        {
-            return Task.CompletedTask;
-        }
+        public Task UpdateIAmAlive(MembershipEntry entry) => Task.CompletedTask;
 
-        public Task<bool> UpdateRow(MembershipEntry entry, string etag, TableVersion tableVersion)
-        {
-            return Task.FromResult(true);
-        }
+        public Task<bool> UpdateRow(MembershipEntry entry, string etag, TableVersion tableVersion) => Task.FromResult(true);
     }
 
     /// <summary>

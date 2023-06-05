@@ -67,15 +67,9 @@ namespace UnitTests.Grains.ProgrammaticSubscribe
             return Task.CompletedTask;
         }
 
-        public Task Produce()
-        {
-            return Fire();
-        }
+        public Task Produce() => Fire();
 
-        private Task TimerCallback(object state)
-        {
-            return producerTimer != null ? Fire() : Task.CompletedTask;
-        }
+        private Task TimerCallback(object state) => producerTimer != null ? Fire() : Task.CompletedTask;
 
         protected virtual async Task ProducerOnNextAsync(IAsyncStream<T> theProducer)
         {
@@ -109,10 +103,7 @@ namespace UnitTests.Grains.ProgrammaticSubscribe
         {
         }
 
-        protected override Task ProducerOnNextAsync(IAsyncStream<int> theProducer)
-        {
-            return theProducer.OnNextAsync(numProducedItems);
-        }
+        protected override Task ProducerOnNextAsync(IAsyncStream<int> theProducer) => theProducer.OnNextAsync(numProducedItems);
     }
 
     public class TypedProducerGrainProducingApple : TypedProducerGrain<Apple>, ITypedProducerGrainProducingApple
@@ -121,10 +112,7 @@ namespace UnitTests.Grains.ProgrammaticSubscribe
         {
         }
 
-        protected override Task ProducerOnNextAsync(IAsyncStream<Apple> theProducer)
-        {
-            return theProducer.OnNextAsync(new Apple(numProducedItems));
-        }
+        protected override Task ProducerOnNextAsync(IAsyncStream<Apple> theProducer) => theProducer.OnNextAsync(new Apple(numProducedItems));
     }
 
     [GenerateSerializer]
@@ -138,9 +126,6 @@ namespace UnitTests.Grains.ProgrammaticSubscribe
             this.number = number;
         }
 
-        public int GetNumber()
-        {
-            return number;
-        }
+        public int GetNumber() => number;
     }
 }

@@ -129,15 +129,9 @@ namespace Orleans.Runtime
 
         internal InternalGrainRuntime InternalRuntime => _internalGrainRuntime ??= _serviceProvider.GetRequiredService<InternalGrainRuntime>();
 
-        public void OnCreateActivation(IGrainContext grainContext)
-        {
-            GrainInstruments.IncrementGrainCounts(_grainTypeName);
-        }
+        public void OnCreateActivation(IGrainContext grainContext) => GrainInstruments.IncrementGrainCounts(_grainTypeName);
 
-        public void OnDestroyActivation(IGrainContext grainContext)
-        {
-            GrainInstruments.DecrementGrainCounts(_grainTypeName);
-        }
+        public void OnDestroyActivation(IGrainContext grainContext) => GrainInstruments.DecrementGrainCounts(_grainTypeName);
     }
 
     internal interface IActivationLifecycleObserver

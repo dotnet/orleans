@@ -170,9 +170,6 @@ namespace Orleans.Metadata
         }
 
         /// <inheritdoc />
-        void IGrainInterfacePropertiesProviderAttribute.Populate(IServiceProvider services, Type type, Dictionary<string, string> properties)
-        {
-            properties[WellKnownGrainInterfaceProperties.DefaultGrainType] = grainType;
-        }
+        void IGrainInterfacePropertiesProviderAttribute.Populate(IServiceProvider services, Type type, Dictionary<string, string> properties) => properties[WellKnownGrainInterfaceProperties.DefaultGrainType] = grainType;
     }
 }

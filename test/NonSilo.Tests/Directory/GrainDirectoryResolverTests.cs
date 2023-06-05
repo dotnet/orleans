@@ -52,10 +52,7 @@ namespace NonSilo.Tests.Directory
         }
 
         [Fact]
-        public void DefaultDhtDirectory()
-        {
-            Assert.Null(target.Resolve(GrainType.Create(DefaultDirectoryGrain.DIRECTORY)));
-        }
+        public void DefaultDhtDirectory() => Assert.Null(target.Resolve(GrainType.Create(DefaultDirectoryGrain.DIRECTORY)));
 
         [Fact]
         public void ListAllDirectories()

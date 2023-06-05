@@ -26,10 +26,7 @@ namespace UnitTests.Grains
             return Task.CompletedTask;
         }
 
-        public Task<int> GetCountOfOnAddFuncCalled()
-        {
-            return Task.FromResult(onAddCalledCount);
-        }
+        public Task<int> GetCountOfOnAddFuncCalled() => Task.FromResult(onAddCalledCount);
 
         public Task<int> GetNumberConsumed()
         {

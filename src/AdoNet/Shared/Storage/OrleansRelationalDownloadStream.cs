@@ -128,15 +128,12 @@ namespace Orleans.Tests.SqlUtils
             set { throw new NotSupportedException(); }
         }
 
-        
+
         /// <summary>
         /// Throws <exception cref="NotSupportedException"/>.
         /// </summary>        
         /// <exception cref="NotSupportedException" />.
-        public override void Flush()
-        {
-            throw new NotSupportedException();
-        }
+        public override void Flush() => throw new NotSupportedException();
 
 
         /// <summary>
@@ -236,7 +233,7 @@ namespace Orleans.Tests.SqlUtils
             }
         }
 
-       
+
         /// <summary>
         /// Throws <exception cref="NotSupportedException"/>.
         /// </summary>
@@ -244,10 +241,7 @@ namespace Orleans.Tests.SqlUtils
         /// <param name="origin">The origin.</param>
         /// <returns>Throws <exception cref="NotSupportedException"/>.</returns>
         /// <exception cref="NotSupportedException" />.
-        public override long Seek(long offset, SeekOrigin origin)
-        {
-            throw new NotSupportedException();
-        }
+        public override long Seek(long offset, SeekOrigin origin) => throw new NotSupportedException();
 
 
         /// <summary>
@@ -255,10 +249,7 @@ namespace Orleans.Tests.SqlUtils
         /// </summary>
         /// <returns>Throws <exception cref="NotSupportedException"/>.</returns>
         /// <exception cref="NotSupportedException" />.
-        public override void SetLength(long value)
-        {
-            throw new NotSupportedException();
-        }
+        public override void SetLength(long value) => throw new NotSupportedException();
 
 
         /// <summary>
@@ -267,10 +258,7 @@ namespace Orleans.Tests.SqlUtils
         /// <param name="buffer">The buffer.</param>
         /// <param name="offset">The offset to the buffer.</param>
         /// <param name="count">The count of bytes to read.</param>
-        public override void Write(byte[] buffer, int offset, int count)
-        {
-            throw new NotSupportedException();
-        }
+        public override void Write(byte[] buffer, int offset, int count) => throw new NotSupportedException();
 
 
         /// <summary>

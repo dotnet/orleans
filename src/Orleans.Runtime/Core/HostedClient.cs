@@ -221,10 +221,7 @@ namespace Orleans.Runtime
             Utils.SafeExecute(() => messagePump?.GetAwaiter().GetResult());
         }
 
-        private void Start()
-        {
-            messagePump = Task.Run(RunClientMessagePump);
-        }
+        private void Start() => messagePump = Task.Run(RunClientMessagePump);
 
         private async Task RunClientMessagePump()
         {

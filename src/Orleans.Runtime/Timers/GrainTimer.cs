@@ -53,10 +53,7 @@ namespace Orleans.Runtime
             TimeSpan dueTime,
             TimeSpan period,
             string name = null,
-            IGrainContext grainContext = null)
-        {
-            return new GrainTimer(grainContext, logger, asyncCallback, state, dueTime, period, name);
-        }
+            IGrainContext grainContext = null) => new GrainTimer(grainContext, logger, asyncCallback, state, dueTime, period, name);
 
         public void Start()
         {
@@ -66,10 +63,7 @@ namespace Orleans.Runtime
             timer.Start(dueTime, timerFrequency);
         }
 
-        public void Stop()
-        {
-            asyncCallback = null;
-        }
+        public void Stop() => asyncCallback = null;
 
         private async Task TimerTick(object state, IGrainContext context)
         {
@@ -136,10 +130,7 @@ namespace Orleans.Runtime
             }
         }
 
-        public Task GetCurrentlyExecutingTickTask()
-        {
-            return currentlyExecutingTickTask ?? Task.CompletedTask;
-        }
+        public Task GetCurrentlyExecutingTickTask() => currentlyExecutingTickTask ?? Task.CompletedTask;
 
         private string GetFullName() => $"GrainTimer.{Name} TimerCallbackHandler:{asyncCallback?.Target}->{asyncCallback?.Method}";
 

@@ -38,20 +38,14 @@ namespace Orleans.Streaming.EventHubs
         /// </summary>
         /// <param name="eventHubMessage"></param>
         /// <returns></returns>
-        protected virtual IBatchContainer GetBatchContainer(EventHubMessage eventHubMessage)
-        {
-            return new EventHubBatchContainer(eventHubMessage, serializer);
-        }
+        protected virtual IBatchContainer GetBatchContainer(EventHubMessage eventHubMessage) => new EventHubBatchContainer(eventHubMessage, serializer);
 
         /// <summary>
         /// Gets the stream sequence token from a cached message.
         /// </summary>
         /// <param name="cachedMessage"></param>
         /// <returns></returns>
-        public virtual StreamSequenceToken GetSequenceToken(ref CachedMessage cachedMessage)
-        {
-            return new EventHubSequenceTokenV2("", cachedMessage.SequenceNumber, 0);
-        }
+        public virtual StreamSequenceToken GetSequenceToken(ref CachedMessage cachedMessage) => new EventHubSequenceTokenV2("", cachedMessage.SequenceNumber, 0);
 
         public virtual EventData ToQueueMessage<T>(StreamId streamId, IEnumerable<T> events, StreamSequenceToken token, Dictionary<string, object> requestContext)
         {

@@ -256,10 +256,7 @@ namespace Orleans.Serialization.TypeSystem
         /// <param name="formatted">The formatted type name.</param>
         /// <param name="result">The result.</param>
         /// <returns><see langword="true"/> if the type was parsed and loaded; otherwise <see langword="false"/>.</returns>
-        public bool TryParse(string formatted, [NotNullWhen(true)] out Type result)
-        {
-            return ParseInternal(formatted, out result);
-        }
+        public bool TryParse(string formatted, [NotNullWhen(true)] out Type result) => ParseInternal(formatted, out result);
 
         private string FormatInternal(Type type, Func<TypeSpec, TypeSpec> rewriter = null)
         {

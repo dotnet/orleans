@@ -24,10 +24,7 @@ namespace Orleans.Hosting
         public static IClientBuilder AddMemoryStreams(
             this IClientBuilder builder,
             string name,
-            Action<IClusterClientMemoryStreamConfigurator> configure = null)
-        {
-            return AddMemoryStreams<DefaultMemoryMessageBodySerializer>(builder, name, configure);
-        }
+            Action<IClusterClientMemoryStreamConfigurator> configure = null) => AddMemoryStreams<DefaultMemoryMessageBodySerializer>(builder, name, configure);
 
         /// <summary>
         /// Adds a new in-memory stream provider to the client.

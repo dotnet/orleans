@@ -52,15 +52,9 @@ namespace Orleans.Networking.Shared
             }
         }
 
-        public void UnsafeOnCompleted(Action continuation)
-        {
-            OnCompleted(continuation);
-        }
+        public void UnsafeOnCompleted(Action continuation) => OnCompleted(continuation);
 
-        public void Complete()
-        {
-            OnCompleted(this);
-        }
+        public void Complete() => OnCompleted(this);
 
         protected override void OnCompleted(SocketAsyncEventArgs _)
         {

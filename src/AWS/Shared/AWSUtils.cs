@@ -22,15 +22,13 @@ namespace Orleans.Transactions.DynamoDB
     /// </summary>
     internal static class AWSUtils
     {
-        internal static RegionEndpoint GetRegionEndpoint(string zone = "")
-        {
+        internal static RegionEndpoint GetRegionEndpoint(string zone = "") =>
             //
             // Keep the order from RegionEndpoint so it is easier to maintain.
             // us-west-2 is the default
             //
 
-            return RegionEndpoint.GetBySystemName(zone) ?? RegionEndpoint.USWest2;
-        }
+            RegionEndpoint.GetBySystemName(zone) ?? RegionEndpoint.USWest2;
 
         /// <summary>
         /// Validate DynamoDB PartitionKey.

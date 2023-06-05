@@ -600,10 +600,7 @@ namespace Orleans.Runtime.ReminderService
                 }
             }
 
-            public void StopReminder()
-            {
-                timer.Dispose();
-            }
+            public void StopReminder() => timer.Dispose();
 
             private async Task RunAsync()
             {

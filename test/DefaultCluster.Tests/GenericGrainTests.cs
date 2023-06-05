@@ -19,15 +19,9 @@ namespace DefaultCluster.Tests.General
         {
         }
 
-        public TGrainInterface GetGrain<TGrainInterface>(long i) where TGrainInterface : IGrainWithIntegerKey
-        {
-            return  GrainFactory.GetGrain<TGrainInterface>(i);
-        }
+        public TGrainInterface GetGrain<TGrainInterface>(long i) where TGrainInterface : IGrainWithIntegerKey => GrainFactory.GetGrain<TGrainInterface>(i);
 
-        public TGrainInterface GetGrain<TGrainInterface>() where TGrainInterface : IGrainWithIntegerKey
-        {
-            return  GrainFactory.GetGrain<TGrainInterface>(GetRandomGrainId());
-        }
+        public TGrainInterface GetGrain<TGrainInterface>() where TGrainInterface : IGrainWithIntegerKey => GrainFactory.GetGrain<TGrainInterface>(GetRandomGrainId());
 
         /// Can instantiate multiple concrete grain types that implement
         /// different specializations of the same generic interface

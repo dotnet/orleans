@@ -11,9 +11,6 @@ namespace UnitTests.Grains
             DeactivateOnIdle();
         }
 
-        public Task<NullableState> GetState()
-        {
-            return Task.FromResult(State);
-        }
+        public Task<NullableState> GetState() => Task.FromResult(State);
     }
 }

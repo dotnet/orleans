@@ -63,10 +63,7 @@ namespace UnitTests.ActivationsLifeCycleTests
 
         Task IAsyncLifetime.InitializeAsync() => Task.CompletedTask;
 
-        private async Task Initialize(TimeSpan collectionAgeLimit)
-        {
-            await Initialize(collectionAgeLimit, DEFAULT_COLLECTION_QUANTUM);
-        }
+        private async Task Initialize(TimeSpan collectionAgeLimit) => await Initialize(collectionAgeLimit, DEFAULT_COLLECTION_QUANTUM);
 
         public async Task DisposeAsync()
         {

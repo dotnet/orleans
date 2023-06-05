@@ -24,10 +24,7 @@ namespace Orleans.Streaming.EventHubs
             this.providerName = providerName;
         }
 
-        public Task<IStreamQueueCheckpointer<string>> Create(string partition)
-        {
-            return EventHubCheckpointer.Create(options, providerName, partition, clusterOptions.ServiceId.ToString(), loggerFactory);
-        }
+        public Task<IStreamQueueCheckpointer<string>> Create(string partition) => EventHubCheckpointer.Create(options, providerName, partition, clusterOptions.ServiceId.ToString(), loggerFactory);
 
         public static IStreamQueueCheckpointerFactory CreateFactory(IServiceProvider services, string providerName)
         {
@@ -98,10 +95,7 @@ namespace Orleans.Streaming.EventHubs
             entity = EventHubPartitionCheckpointEntity.Create(streamProviderName, serviceId, partition);
         }
 
-        private Task Initialize()
-        {
-            return dataManager.InitTableAsync();
-        }
+        private Task Initialize() => dataManager.InitTableAsync();
 
         /// <summary>
         /// Loads a checkpoint

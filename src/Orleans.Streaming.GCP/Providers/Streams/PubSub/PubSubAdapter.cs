@@ -52,10 +52,7 @@ namespace Orleans.Providers.GCP.Streams.PubSub
             _customEndpoint = customEndpoint;
         }
 
-        public IQueueAdapterReceiver CreateReceiver(QueueId queueId)
-        {
-            return PubSubAdapterReceiver.Create(loggerFactory, queueId, ProjectId, TopicId, ServiceId, _dataAdapter, Deadline, _customEndpoint);
-        }
+        public IQueueAdapterReceiver CreateReceiver(QueueId queueId) => PubSubAdapterReceiver.Create(loggerFactory, queueId, ProjectId, TopicId, ServiceId, _dataAdapter, Deadline, _customEndpoint);
 
         public async Task QueueMessageBatchAsync<T>(StreamId streamId, IEnumerable<T> events, StreamSequenceToken token, Dictionary<string, object> requestContext)
         {

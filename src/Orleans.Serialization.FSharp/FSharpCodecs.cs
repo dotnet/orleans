@@ -841,15 +841,9 @@ namespace Orleans.Serialization
         {
         }
 
-        public override FSharpRef<T> ConvertFromSurrogate(ref FSharpRefSurrogate<T> surrogate)
-        {
-            return new FSharpRef<T>(surrogate.Value);
-        }
+        public override FSharpRef<T> ConvertFromSurrogate(ref FSharpRefSurrogate<T> surrogate) => new FSharpRef<T>(surrogate.Value);
 
-        public override void ConvertToSurrogate(FSharpRef<T> value, ref FSharpRefSurrogate<T> surrogate)
-        {
-            surrogate.Value = value.Value;
-        }
+        public override void ConvertToSurrogate(FSharpRef<T> value, ref FSharpRefSurrogate<T> surrogate) => surrogate.Value = value.Value;
     }
 
     [GenerateSerializer]

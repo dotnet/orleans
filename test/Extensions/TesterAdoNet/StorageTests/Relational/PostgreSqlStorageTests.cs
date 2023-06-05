@@ -26,38 +26,23 @@ namespace UnitTests.StorageTests.Relational
 
         [SkippableFact]
         [TestCategory("Functional")]
-        public async Task WriteReadCyrillic()
-        {
-            await PersistenceStorageTests.PersistenceStorage_Relational_WriteReadIdCyrillic();
-        }
+        public async Task WriteReadCyrillic() => await PersistenceStorageTests.PersistenceStorage_Relational_WriteReadIdCyrillic();
 
         [SkippableFact]
         [TestCategory("Functional")]
-        public async Task WriteReadWriteRead100StatesInParallel()
-        {
-            await Relational_WriteReadWriteRead100StatesInParallel();
-        }
+        public async Task WriteReadWriteRead100StatesInParallel() => await Relational_WriteReadWriteRead100StatesInParallel();
 
         [SkippableFact]
         [TestCategory("Functional")]
-        public async Task StorageDataSetGeneric_HashCollisionTests()
-        {
-            await Relational_HashCollisionTests();
-        }
+        public async Task StorageDataSetGeneric_HashCollisionTests() => await Relational_HashCollisionTests();
 
         [SkippableFact]
         [TestCategory("Functional")]
-        public async Task WriteDuplicateFailsWithInconsistentStateException()
-        {
-            await Relational_WriteDuplicateFailsWithInconsistentStateException();
-        }
+        public async Task WriteDuplicateFailsWithInconsistentStateException() => await Relational_WriteDuplicateFailsWithInconsistentStateException();
 
         [SkippableFact]
         [TestCategory("Functional")]
-        public async Task WriteInconsistentFailsWithIncosistentStateException()
-        {
-            await Relational_WriteInconsistentFailsWithIncosistentStateException();
-        }
+        public async Task WriteInconsistentFailsWithIncosistentStateException() => await Relational_WriteInconsistentFailsWithIncosistentStateException();
 
         [SkippableTheory, ClassData(typeof(StorageDataSetPlain<long>))]
         [TestCategory("Functional")]

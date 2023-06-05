@@ -31,13 +31,7 @@ public static class UnixSocketConnectionExtensions
         return clientBuilder;
     }
 
-    private static Func<IServiceProvider, object, IConnectionFactory> CreateUnixSocketConnectionFactory()
-    {
-        return (IServiceProvider sp, object key) => ActivatorUtilities.CreateInstance<UnixSocketConnectionFactory>(sp);
-    }
+    private static Func<IServiceProvider, object, IConnectionFactory> CreateUnixSocketConnectionFactory() => (IServiceProvider sp, object key) => ActivatorUtilities.CreateInstance<UnixSocketConnectionFactory>(sp);
 
-    private static Func<IServiceProvider, object, IConnectionListenerFactory> CreateUnixSocketConnectionListenerFactory()
-    {
-        return (IServiceProvider sp, object key) => ActivatorUtilities.CreateInstance<UnixSocketConnectionListenerFactory>(sp);
-    }
+    private static Func<IServiceProvider, object, IConnectionListenerFactory> CreateUnixSocketConnectionListenerFactory() => (IServiceProvider sp, object key) => ActivatorUtilities.CreateInstance<UnixSocketConnectionListenerFactory>(sp);
 }

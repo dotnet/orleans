@@ -221,11 +221,7 @@ namespace UnitTests.GrainInterfaces
             filterValue = filter;
         }
 
-        public bool FilterFunc(int i)
-        {
-            return i == filterValue;
-
-        }
+        public bool FilterFunc(int i) => i == filterValue;
     }
 }
 // ReSharper restore InconsistentNaming

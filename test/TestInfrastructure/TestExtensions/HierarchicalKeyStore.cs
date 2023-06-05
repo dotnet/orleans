@@ -164,9 +164,6 @@ namespace Orleans.Storage
             return sb.ToString();
         }
 
-        private string NewEtag()
-        {
-            return lastETagCounter++.ToString(CultureInfo.InvariantCulture);
-        }
+        private string NewEtag() => lastETagCounter++.ToString(CultureInfo.InvariantCulture);
     }
 }

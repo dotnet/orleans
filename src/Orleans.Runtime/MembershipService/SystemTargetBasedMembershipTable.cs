@@ -22,10 +22,7 @@ namespace Orleans.Runtime.MembershipService
             this.serviceProvider = serviceProvider;
             this.logger = logger;
         }
-        public async Task InitializeMembershipTable(bool tryInitTableVersion)
-        {
-            grain = await GetMembershipTable();
-        }
+        public async Task InitializeMembershipTable(bool tryInitTableVersion) => grain = await GetMembershipTable();
 
         private async Task<IMembershipTableSystemTarget> GetMembershipTable()
         {
@@ -102,10 +99,7 @@ namespace Orleans.Runtime.MembershipService
 
         public Task UpdateIAmAlive(MembershipEntry entry) => grain.UpdateIAmAlive(entry);
 
-        public Task CleanupDefunctSiloEntries(DateTimeOffset beforeDate)
-        {
-            throw new NotImplementedException();
-        }
+        public Task CleanupDefunctSiloEntries(DateTimeOffset beforeDate) => throw new NotImplementedException();
     }
 
     [Reentrant]
@@ -125,10 +119,7 @@ namespace Orleans.Runtime.MembershipService
             logger.LogInformation((int)ErrorCode.MembershipGrainBasedTable1, "GrainBasedMembershipTable Activated.");
         }
 
-        private static SystemTargetGrainId CreateId(ILocalSiloDetails localSiloDetails)
-        {
-            return SystemTargetGrainId.Create(Constants.SystemMembershipTableType, SiloAddress.New(localSiloDetails.SiloAddress.Endpoint, 0));
-        }
+        private static SystemTargetGrainId CreateId(ILocalSiloDetails localSiloDetails) => SystemTargetGrainId.Create(Constants.SystemMembershipTableType, SiloAddress.New(localSiloDetails.SiloAddress.Endpoint, 0));
 
         public Task InitializeMembershipTable(bool tryInitTableVersion)
         {
@@ -143,10 +134,7 @@ namespace Orleans.Runtime.MembershipService
             return Task.CompletedTask;
         }
 
-        public Task<MembershipTableData> ReadRow(SiloAddress key)
-        {
-            return Task.FromResult(table.Read(key));
-        }
+        public Task<MembershipTableData> ReadRow(SiloAddress key) => Task.FromResult(table.Read(key));
 
         public Task<MembershipTableData> ReadAll()
         {
@@ -192,9 +180,6 @@ namespace Orleans.Runtime.MembershipService
             return Task.CompletedTask;
         }
 
-        public Task CleanupDefunctSiloEntries(DateTimeOffset beforeDate)
-        {
-            throw new NotImplementedException();
-        }
+        public Task CleanupDefunctSiloEntries(DateTimeOffset beforeDate) => throw new NotImplementedException();
     }
 }

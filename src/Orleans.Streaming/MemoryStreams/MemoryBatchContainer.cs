@@ -28,12 +28,9 @@ namespace Orleans.Providers
 
         // Payload is local cache of deserialized payloadBytes.  Should never be serialized as part of batch container.  During batch container serialization raw payloadBytes will always be used.
         [NonSerialized] private MemoryMessageBody payload;
-         
-        private MemoryMessageBody Payload()
-        {
-            return payload ?? (payload = serializer.Deserialize(MessageData.Payload));
-        }
-        
+
+        private MemoryMessageBody Payload() => payload ?? (payload = serializer.Deserialize(MessageData.Payload));
+
         public MemoryBatchContainer(MemoryMessageData messageData, TSerializer serializer)
         {
             this.serializer = serializer;
@@ -41,10 +38,7 @@ namespace Orleans.Providers
             realToken = new EventSequenceToken(messageData.SequenceNumber);
         }
 
-        public IEnumerable<Tuple<T, StreamSequenceToken>> GetEvents<T>()
-        {
-            return Payload().Events.Cast<T>().Select((e, i) => Tuple.Create<T, StreamSequenceToken>(e, realToken.CreateSequenceTokenForEvent(i)));
-        }
+        public IEnumerable<Tuple<T, StreamSequenceToken>> GetEvents<T>() => Payload().Events.Cast<T>().Select((e, i) => Tuple.Create<T, StreamSequenceToken>(e, realToken.CreateSequenceTokenForEvent(i)));
 
         public bool ImportRequestContext()
         {
@@ -57,9 +51,6 @@ namespace Orleans.Providers
             return false;
         }
 
-        void IOnDeserialized.OnDeserialized(DeserializationContext context)
-        {
-            serializer = MemoryMessageBodySerializerFactory<TSerializer>.GetOrCreateSerializer(context.ServiceProvider);
-        }
+        void IOnDeserialized.OnDeserialized(DeserializationContext context) => serializer = MemoryMessageBodySerializerFactory<TSerializer>.GetOrCreateSerializer(context.ServiceProvider);
     }
 }

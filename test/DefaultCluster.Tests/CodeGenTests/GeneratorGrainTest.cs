@@ -220,10 +220,7 @@ namespace Tester.CodeGenTests
 
             public Task<object> ValueTask => valueCompletion.Task;
 
-            public void SetValue<T>(T value)
-            {
-                valueCompletion.SetResult(value);
-            }
+            public void SetValue<T>(T value) => valueCompletion.SetResult(value);
         }
 
         [Fact, TestCategory("FSharp")]

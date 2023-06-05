@@ -13,10 +13,7 @@ namespace UnitTests.StreamingTests
 
         public class Fixture : BaseTestClusterFixture
         {
-            protected override void ConfigureTestCluster(TestClusterBuilder builder)
-            {
-               builder.AddSiloBuilderConfigurator<SiloHostConfigurator>();
-            }
+            protected override void ConfigureTestCluster(TestClusterBuilder builder) => builder.AddSiloBuilderConfigurator<SiloHostConfigurator>();
 
             public class SiloHostConfigurator : ISiloConfigurator
             {
@@ -189,15 +186,9 @@ namespace UnitTests.StreamingTests
                 id = Guid.NewGuid();
             }
 
-            public Task AddSubscriber(GuidId subscriptionId, QualifiedStreamId streamId, GrainId streamConsumer, string filterData)
-            {
-                return Task.CompletedTask;
-            }
+            public Task AddSubscriber(GuidId subscriptionId, QualifiedStreamId streamId, GrainId streamConsumer, string filterData) => Task.CompletedTask;
 
-            public Task RemoveSubscriber(GuidId subscriptionId, QualifiedStreamId streamId)
-            {
-                return Task.CompletedTask;
-            }
+            public Task RemoveSubscriber(GuidId subscriptionId, QualifiedStreamId streamId) => Task.CompletedTask;
 
             public override bool Equals(object obj)
             {
@@ -207,15 +198,9 @@ namespace UnitTests.StreamingTests
                 return Equals((DummyStreamProducerExtension)obj);
             }
 
-            public override int GetHashCode()
-            {
-                return id.GetHashCode();
-            }
+            public override int GetHashCode() => id.GetHashCode();
 
-            private bool Equals(DummyStreamProducerExtension other)
-            {
-                return id.Equals(other.id);
-            }
+            private bool Equals(DummyStreamProducerExtension other) => id.Equals(other.id);
         }
     }
 }

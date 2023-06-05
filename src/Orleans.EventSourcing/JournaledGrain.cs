@@ -138,10 +138,7 @@ namespace Orleans.EventSourcing
         /// <para>await this after raising one or more events, to ensure events are persisted before proceeding, or to guarantee strong consistency (linearizability) even if there are multiple instances of this grain</para>
         /// </summary>
         /// <returns>a task that completes once the events have been confirmed.</returns>
-        protected Task ConfirmEvents()
-        {
-            return LogViewAdaptor.ConfirmSubmittedEntries();
-        }
+        protected Task ConfirmEvents() => LogViewAdaptor.ConfirmSubmittedEntries();
 
         /// <summary>
         /// Retrieves the latest state now, and confirms all previously raised events. 
@@ -149,10 +146,7 @@ namespace Orleans.EventSourcing
         /// <para>Await this before reading the state to ensure strong consistency (linearizability) even if there are multiple instances of this grain</para>
         /// </summary>
         /// <returns>a task that completes once the log has been refreshed and the events have been confirmed.</returns>
-        protected Task RefreshNow()
-        {
-            return LogViewAdaptor.Synchronize();
-        }
+        protected Task RefreshNow() => LogViewAdaptor.Synchronize();
 
         /// <summary>
         /// Returns the current queue of unconfirmed events.
@@ -167,10 +161,7 @@ namespace Orleans.EventSourcing
         /// view from storage. Subclasses can override this behavior,
         /// and skip the wait if desired.
         /// </summary>
-        public override Task OnActivateAsync(CancellationToken cancellationToken)
-        {
-            return LogViewAdaptor.Synchronize();
-        }
+        public override Task OnActivateAsync(CancellationToken cancellationToken) => LogViewAdaptor.Synchronize();
 
         /// <summary>
         /// Retrieves a segment of the confirmed event sequence, possibly from storage. 
@@ -211,22 +202,13 @@ namespace Orleans.EventSourcing
         }
 
         /// <inheritdoc />
-        protected void EnableStatsCollection()
-        {
-            LogViewAdaptor.EnableStatsCollection();
-        }
+        protected void EnableStatsCollection() => LogViewAdaptor.EnableStatsCollection();
 
         /// <inheritdoc />
-        protected void DisableStatsCollection()
-        {
-            LogViewAdaptor.DisableStatsCollection();
-        }
+        protected void DisableStatsCollection() => LogViewAdaptor.DisableStatsCollection();
 
         /// <inheritdoc />
-        protected LogConsistencyStatistics GetStats()
-        {
-            return LogViewAdaptor.GetStats();
-        }
+        protected LogConsistencyStatistics GetStats() => LogViewAdaptor.GetStats();
 
         /// <summary>
         /// Defines how to apply events to the state. Unless it is overridden in the subclass, it calls
@@ -252,11 +234,9 @@ namespace Orleans.EventSourcing
         /// Called right after grain is constructed, to install the adaptor.
         /// The log-consistency provider contains a factory method that constructs the adaptor with chosen types for this grain
         /// </summary>
-        protected override void InstallAdaptor(ILogViewAdaptorFactory factory, object initialState, string graintypename, IGrainStorage grainStorage, ILogConsistencyProtocolServices services)
-        {
+        protected override void InstallAdaptor(ILogViewAdaptorFactory factory, object initialState, string graintypename, IGrainStorage grainStorage, ILogConsistencyProtocolServices services) =>
             // call the log consistency provider to construct the adaptor, passing the type argument
             LogViewAdaptor = factory.MakeLogViewAdaptor<TGrainState, TEventBase>(this, (TGrainState)initialState, graintypename, grainStorage, services);
-        }
 
         /// <summary>
         /// If there is no log-consistency provider specified, store versioned state using default storage provider
@@ -274,34 +254,22 @@ namespace Orleans.EventSourcing
         /// </summary>
         /// <param name="view">The log view.</param>
         /// <param name="entry">The entry.</param>
-        void ILogViewAdaptorHost<TGrainState, TEventBase>.UpdateView(TGrainState view, TEventBase entry)
-        {
-            TransitionState(view, entry);
-        }
+        void ILogViewAdaptorHost<TGrainState, TEventBase>.UpdateView(TGrainState view, TEventBase entry) => TransitionState(view, entry);
 
         /// <summary>
         /// Notify log view adaptor of activation (called before user-level OnActivate)
         /// </summary>
-        async Task ILogConsistencyProtocolParticipant.PreActivateProtocolParticipant()
-        {
-            await LogViewAdaptor.PreOnActivate();
-        }
+        async Task ILogConsistencyProtocolParticipant.PreActivateProtocolParticipant() => await LogViewAdaptor.PreOnActivate();
 
         /// <summary>
         /// Notify log view adaptor of activation (called after user-level OnActivate)
         /// </summary>
-        async Task ILogConsistencyProtocolParticipant.PostActivateProtocolParticipant()
-        {
-            await LogViewAdaptor.PostOnActivate();
-        }
+        async Task ILogConsistencyProtocolParticipant.PostActivateProtocolParticipant() => await LogViewAdaptor.PostOnActivate();
 
         /// <summary>
         /// Notify log view adaptor of deactivation
         /// </summary>
-        Task ILogConsistencyProtocolParticipant.DeactivateProtocolParticipant()
-        {
-            return LogViewAdaptor.PostOnDeactivate();
-        }
+        Task ILogConsistencyProtocolParticipant.DeactivateProtocolParticipant() => LogViewAdaptor.PostOnDeactivate();
 
         /// <summary>
         /// Called by adaptor on state change. 
@@ -317,18 +285,12 @@ namespace Orleans.EventSourcing
         /// <summary>
         /// called by adaptor on connection issues. 
         /// </summary>
-        void IConnectionIssueListener.OnConnectionIssue(ConnectionIssue connectionIssue)
-        {
-            OnConnectionIssue(connectionIssue);
-        }
+        void IConnectionIssueListener.OnConnectionIssue(ConnectionIssue connectionIssue) => OnConnectionIssue(connectionIssue);
 
         /// <summary>
         /// Called by adaptor when a connection issue is resolved. 
         /// </summary>
-        void IConnectionIssueListener.OnConnectionIssueResolved(ConnectionIssue connectionIssue)
-        {
-            OnConnectionIssueResolved(connectionIssue);
-        }
+        void IConnectionIssueListener.OnConnectionIssueResolved(ConnectionIssue connectionIssue) => OnConnectionIssueResolved(connectionIssue);
     }
 
 }

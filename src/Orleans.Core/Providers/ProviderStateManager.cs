@@ -65,10 +65,7 @@ namespace Orleans.Providers
             return false;
         }
 
-        public void CommitState()
-        {
-            State = presetState;
-        }
+        public void CommitState() => State = presetState;
     }
 
     [Serializable, GenerateSerializer]

@@ -12,10 +12,7 @@ namespace UnitTests.Grains
             return Task.CompletedTask;
         }
 
-        public Task<float> MapT2U()
-        {
-            return Task.FromResult((float)T);
-        }
+        public Task<float> MapT2U() => Task.FromResult((float)T);
     }
 
     internal class ConcreteGrainWithGenericInterfaceOfFloatString : Grain, IGenericGrain<float, string>
@@ -28,10 +25,7 @@ namespace UnitTests.Grains
             return Task.CompletedTask;
         }
 
-        public Task<string> MapT2U()
-        {
-            return Task.FromResult(Convert.ToString(T));
-        }
+        public Task<string> MapT2U() => Task.FromResult(Convert.ToString(T));
     }
 
     internal class ConcreteGrainWith2GenericInterfaces : Grain, IGenericGrain<int, string>, ISimpleGenericGrain<int>
@@ -46,17 +40,11 @@ namespace UnitTests.Grains
             return Task.CompletedTask;
         }
 
-        public Task<string> MapT2U()
-        {
-            return Task.FromResult(Convert.ToString(T * 10, 10));
-        }
+        public Task<string> MapT2U() => Task.FromResult(Convert.ToString(T * 10, 10));
 
         //ISimpleGenericGrain<int> methods:
 
-        public Task Set(int t)
-        {
-            return SetT(t);
-        }
+        public Task Set(int t) => SetT(t);
 
         public Task Transform()
         {
@@ -64,14 +52,8 @@ namespace UnitTests.Grains
             return Task.CompletedTask;
         }
 
-        public Task<int> Get()
-        {
-            return Task.FromResult(T);
-        }
+        public Task<int> Get() => Task.FromResult(T);
 
-        public Task CompareGrainReferences(ISimpleGenericGrain<int> clientReference)
-        {
-            throw new NotImplementedException();
-        }
+        public Task CompareGrainReferences(ISimpleGenericGrain<int> clientReference) => throw new NotImplementedException();
     }
 }

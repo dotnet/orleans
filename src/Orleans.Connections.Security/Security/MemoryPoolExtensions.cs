@@ -20,10 +20,8 @@ namespace Orleans.Connections.Security
             return Math.Min(4096, pool.MaxBufferSize);
         }
 
-        public static int GetMinimumAllocSize(this MemoryPool<byte> pool)
-        {
+        public static int GetMinimumAllocSize(this MemoryPool<byte> pool) =>
             // 1/2 of a segment
-            return pool.GetMinimumSegmentSize() / 2;
-        }
+            pool.GetMinimumSegmentSize() / 2;
     }
 }

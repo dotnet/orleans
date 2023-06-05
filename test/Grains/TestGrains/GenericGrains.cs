@@ -21,10 +21,7 @@ namespace UnitTests.Grains
     [StorageProvider(ProviderName = "MemoryStore")]
     public class SimpleGenericGrain1<T> : Grain<SimpleGenericGrainState<T>>, ISimpleGenericGrain1<T>
     {
-        public Task<T> GetA()
-        {
-            return Task.FromResult(State.A);
-        }
+        public Task<T> GetA() => Task.FromResult(State.A);
 
         public Task SetA(T a)
         {
@@ -61,10 +58,7 @@ namespace UnitTests.Grains
             return entity;
         }
 
-        public async Task ClearState()
-        {
-            await ClearStateAsync();
-        }
+        public async Task ClearState() => await ClearStateAsync();
     }
 
     [StorageProvider(ProviderName = "AzureStore")]
@@ -77,10 +71,7 @@ namespace UnitTests.Grains
             return entity;
         }
 
-        public async Task ClearState()
-        {
-            await ClearStateAsync();
-        }
+        public async Task ClearState() => await ClearStateAsync();
     }
 
     [Serializable]
@@ -96,10 +87,7 @@ namespace UnitTests.Grains
     [StorageProvider(ProviderName = "MemoryStore")]
     public class SimpleGenericGrainU<U> : Grain<SimpleGenericGrainUState<U>>, ISimpleGenericGrainU<U>
     {
-        public Task<U> GetA()
-        {
-            return Task.FromResult(State.A);
-        }
+        public Task<U> GetA() => Task.FromResult(State.A);
 
         public Task SetA(U a)
         {
@@ -139,10 +127,7 @@ namespace UnitTests.Grains
     [StorageProvider(ProviderName = "MemoryStore")]
     public class SimpleGenericGrain2<T, U> : Grain<SimpleGenericGrain2State<T, U>>, ISimpleGenericGrain2<T, U>
     {
-        public Task<T> GetA()
-        {
-            return Task.FromResult(State.A);
-        }
+        public Task<T> GetA() => Task.FromResult(State.A);
 
         public Task SetA(T a)
         {
@@ -210,10 +195,7 @@ namespace UnitTests.Grains
             return Task.CompletedTask;
         }
 
-        public Task<IList<string>> GetItems()
-        {
-            return Task.FromResult((State.Items));
-        }
+        public Task<IList<string>> GetItems() => Task.FromResult((State.Items));
     }
 
     [Serializable]
@@ -241,10 +223,7 @@ namespace UnitTests.Grains
             return Task.CompletedTask;
         }
 
-        public Task<IList<T>> GetItems()
-        {
-            return Task.FromResult(State.Items);
-        }
+        public Task<IList<T>> GetItems() => Task.FromResult(State.Items);
     }
 
     [Serializable]
@@ -297,10 +276,7 @@ namespace UnitTests.Grains
             return Task.CompletedTask;
         }
 
-        public Task<T> GetValue()
-        {
-            return Task.FromResult(State.Value);
-        }
+        public Task<T> GetValue() => Task.FromResult(State.Value);
     }
 
     [StorageProvider(ProviderName = "MemoryStore")]
@@ -317,15 +293,9 @@ namespace UnitTests.Grains
             return Task.CompletedTask;
         }
 
-        public Task<TOne> GetValue1()
-        {
-            return Task.FromResult(State.Value1);
-        }
+        public Task<TOne> GetValue1() => Task.FromResult(State.Value1);
 
-        public Task<TTwo> GetValue2()
-        {
-            return Task.FromResult(State.Value2);
-        }
+        public Task<TTwo> GetValue2() => Task.FromResult(State.Value2);
     }
 
     [StorageProvider(ProviderName = "MemoryStore")]
@@ -347,20 +317,11 @@ namespace UnitTests.Grains
             return Task.CompletedTask;
         }
 
-        public Task<TThree> GetValue3()
-        {
-            return Task.FromResult(State.Value3);
-        }
+        public Task<TThree> GetValue3() => Task.FromResult(State.Value3);
 
-        public Task<TOne> GetValue1()
-        {
-            return Task.FromResult(State.Value1);
-        }
+        public Task<TOne> GetValue1() => Task.FromResult(State.Value1);
 
-        public Task<TTwo> GetValue2()
-        {
-            return Task.FromResult(State.Value2);
-        }
+        public Task<TTwo> GetValue2() => Task.FromResult(State.Value2);
     }
 
     public class BasicGenericGrain<T, U> : Grain, IBasicGenericGrain<T, U>
@@ -368,10 +329,7 @@ namespace UnitTests.Grains
         private T _a;
         private U _b;
 
-        public Task<T> GetA()
-        {
-            return Task.FromResult(_a);
-        }
+        public Task<T> GetA() => Task.FromResult(_a);
 
         public Task<string> GetAxB()
         {
@@ -400,10 +358,7 @@ namespace UnitTests.Grains
 
     public class HubGrain<TKey, T1, T2> : Grain, IHubGrain<TKey, T1, T2>
     {
-        public virtual Task Bar(TKey key, T1 message1, T2 message2)
-        {
-            throw new System.NotImplementedException();
-        }
+        public virtual Task Bar(TKey key, T1 message1, T2 message2) => throw new System.NotImplementedException();
     }
 
     public class EchoHubGrain<TKey, TMessage> : HubGrain<TKey, TMessage, TMessage>, IEchoHubGrain<TKey, TMessage>
@@ -416,15 +371,9 @@ namespace UnitTests.Grains
             return Task.CompletedTask;
         }
 
-        public override Task Bar(TKey key, TMessage message1, TMessage message2)
-        {
-            return Task.CompletedTask;
-        }
+        public override Task Bar(TKey key, TMessage message1, TMessage message2) => Task.CompletedTask;
 
-        public Task<int> GetX()
-        {
-            return Task.FromResult(_x);
-        }
+        public Task<int> GetX() => Task.FromResult(_x);
     }
 
     public class EchoGenericChainGrain<T> : Grain, IEchoGenericChainGrain<T>
@@ -476,47 +425,29 @@ namespace UnitTests.Grains
 
     public class NonGenericBaseGrain : Grain, INonGenericBase
     {
-        public Task Ping()
-        {
-            return Task.CompletedTask;
-        }
+        public Task Ping() => Task.CompletedTask;
     }
 
     public class Generic1ArgumentGrain<T> : NonGenericBaseGrain, IGeneric1Argument<T>
     {
-        public Task<T> Ping(T t)
-        {
-            return Task.FromResult(t);
-        }
+        public Task<T> Ping(T t) => Task.FromResult(t);
     }
 
     public class Generic1ArgumentDerivedGrain<T> : NonGenericBaseGrain, IGeneric1Argument<T>
     {
-        public Task<T> Ping(T t)
-        {
-            return Task.FromResult(t);
-        }
+        public Task<T> Ping(T t) => Task.FromResult(t);
     }
 
     public class Generic2ArgumentGrain<T, U> : Grain, IGeneric2Arguments<T, U>
     {
-        public Task<Tuple<T, U>> Ping(T t, U u)
-        {
-            return Task.FromResult(new Tuple<T, U>(t, u));
-        }
+        public Task<Tuple<T, U>> Ping(T t, U u) => Task.FromResult(new Tuple<T, U>(t, u));
 
-        public Task Ping()
-        {
-            return Task.CompletedTask;
-        }
+        public Task Ping() => Task.CompletedTask;
     }
 
     public class Generic2ArgumentsDerivedGrain<T, U> : NonGenericBaseGrain, IGeneric2Arguments<T, U>
     {
-        public Task<Tuple<T, U>> Ping(T t, U u)
-        {
-            return Task.FromResult(new Tuple<T, U>(t, u));
-        }
+        public Task<Tuple<T, U>> Ping(T t, U u) => Task.FromResult(new Tuple<T, U>(t, u));
     }
 
     public class DbGrain<T> : Grain, IDbGrain<T>
@@ -529,10 +460,7 @@ namespace UnitTests.Grains
             return Task.CompletedTask;
         }
 
-        public Task<T> GetValue()
-        {
-            return Task.FromResult(_value);
-        }
+        public Task<T> GetValue() => Task.FromResult(_value);
     }
 
     [Reentrant]
@@ -557,22 +485,13 @@ namespace UnitTests.Grains
             return Task.FromResult(t);
         }
 
-        public Task<T> PingOther(IGenericPingSelf<T> target, T t)
-        {
-            return target.Ping(t);
-        }
+        public Task<T> PingOther(IGenericPingSelf<T> target, T t) => target.Ping(t);
 
 
-        public Task<T> PingSelf(T t)
-        {
-            return PingOther(this, t);
-        }
+        public Task<T> PingSelf(T t) => PingOther(this, t);
 
 
-        public Task<T> PingSelfThroughOther(IGenericPingSelf<T> target, T t)
-        {
-            return target.PingOther(this, t);
-        }
+        public Task<T> PingSelfThroughOther(IGenericPingSelf<T> target, T t) => target.PingOther(this, t);
 
         public Task ScheduleDelayedPing(IGenericPingSelf<T> target, T t, TimeSpan delay)
         {
@@ -589,10 +508,7 @@ namespace UnitTests.Grains
             return Task.CompletedTask;
         }
 
-        public Task<T> GetLastValue()
-        {
-            return Task.FromResult(_lastValue);
-        }
+        public Task<T> GetLastValue() => Task.FromResult(_lastValue);
 
         public async Task ScheduleDelayedPingToSelfAndDeactivate(IGenericPingSelf<T> target, T t, TimeSpan delay)
         {
@@ -627,10 +543,7 @@ namespace UnitTests.Grains
             return Task.CompletedTask;
         }
 
-        public Task<T> GetLastValue()
-        {
-            return Task.FromResult(lastValue);
-        }
+        public Task<T> GetLastValue() => Task.FromResult(lastValue);
 
         public async Task<bool> CallOtherCancellationTokenCallbackResolve(ILongRunningTaskGrain<T> target)
         {
@@ -660,10 +573,7 @@ namespace UnitTests.Grains
             return tcs.Task;
         }
 
-        public async Task<T> CallOtherLongRunningTask(ILongRunningTaskGrain<T> target, T t, TimeSpan delay)
-        {
-            return await target.LongRunningTask(t, delay);
-        }
+        public async Task<T> CallOtherLongRunningTask(ILongRunningTaskGrain<T> target, T t, TimeSpan delay) => await target.LongRunningTask(t, delay);
 
         public async Task<T> FanOutOtherLongRunningTask(ILongRunningTaskGrain<T> target, T t, TimeSpan delay, int degreeOfParallelism)
         {
@@ -676,10 +586,7 @@ namespace UnitTests.Grains
             return t;
         }
 
-        public async Task CallOtherLongRunningTask(ILongRunningTaskGrain<T> target, GrainCancellationToken tc, TimeSpan delay)
-        {
-            await target.LongWait(tc, delay);
-        }
+        public async Task CallOtherLongRunningTask(ILongRunningTaskGrain<T> target, GrainCancellationToken tc, TimeSpan delay) => await target.LongWait(tc, delay);
 
         public async Task CallOtherLongRunningTaskWithLocalToken(ILongRunningTaskGrain<T> target, TimeSpan delay, TimeSpan delayBeforeCancel)
         {
@@ -690,10 +597,7 @@ namespace UnitTests.Grains
             await task;
         }
 
-        public async Task LongWait(GrainCancellationToken tc, TimeSpan delay)
-        {
-            await Task.Delay(delay, tc.CancellationToken);
-        }
+        public async Task LongWait(GrainCancellationToken tc, TimeSpan delay) => await Task.Delay(delay, tc.CancellationToken);
 
         public async Task<T> LongRunningTask(T t, TimeSpan delay)
         {
@@ -702,10 +606,7 @@ namespace UnitTests.Grains
             return await Task.FromResult(t);
         }
 
-        public Task<string> GetRuntimeInstanceId()
-        {
-            return Task.FromResult(RuntimeIdentity);
-        }
+        public Task<string> GetRuntimeInstanceId() => Task.FromResult(RuntimeIdentity);
 
         public async Task<string> GetRuntimeInstanceIdWithDelay(TimeSpan delay)
         {
@@ -728,7 +629,7 @@ namespace UnitTests.Grains
         }
 
         [Alias("GenericGrainWithConstraints.GetCount")]
-        public Task<int> GetCount() { return Task.FromResult(collection.Count); }
+        public Task<int> GetCount() => Task.FromResult(collection.Count);
 
         public Task Add(B item)
         {
@@ -736,30 +637,21 @@ namespace UnitTests.Grains
             return Task.CompletedTask;
         }
 
-        public Task<C> RoundTrip(C value)
-        {
-            return Task.FromResult(value);
-        }
+        public Task<C> RoundTrip(C value) => Task.FromResult(value);
     }
 
 
     public class NonGenericCastableGrain : Grain, INonGenericCastableGrain, ISomeGenericGrain<string>, IIndependentlyConcretizedGenericGrain<string>, IIndependentlyConcretizedGrain
     {
-        public Task DoSomething() {
-            return Task.CompletedTask;
-        }
+        public Task DoSomething() => Task.CompletedTask;
 
-        public Task<string> Hello() {
-            return Task.FromResult("Hello!");
-        }
+        public Task<string> Hello() => Task.FromResult("Hello!");
     }
 
 
     public class GenericCastableGrain<T> : Grain, IGenericCastableGrain<T>, INonGenericCastGrain
     {
-        public Task<string> Hello() {
-            return Task.FromResult("Hello!");
-        }
+        public Task<string> Hello() => Task.FromResult("Hello!");
     }
 
     public class GenericArrayRegisterGrain<T> : Grain, IGenericArrayRegisterGrain<T>
@@ -775,9 +667,7 @@ namespace UnitTests.Grains
 
     public class IndepedentlyConcretizedGenericGrain : Grain, IIndependentlyConcretizedGenericGrain<string>, IIndependentlyConcretizedGrain
     {
-        public Task<string> Hello() {
-            return Task.FromResult("I have been independently concretized!");
-        }
+        public Task<string> Hello() => Task.FromResult("I have been independently concretized!");
     }
 
     public interface IReducer<TState, TAction>
@@ -845,9 +735,7 @@ namespace UnitTests.Grains
 
         public abstract class BasicGrain : Grain
         {
-            public Task<string> Hello() {
-                return Task.FromResult("Hello!");
-            }
+            public Task<string> Hello() => Task.FromResult("Hello!");
 
             public Task<string[]> ConcreteGenArgTypeNames() {
                 var grainType = GetImmediateSubclass(GetType());

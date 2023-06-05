@@ -101,9 +101,6 @@ namespace Orleans.Transactions.TestKit.xUnit
         [InlineData(1000, 4, false, false, ReadWriteDetermination.PerAccess)]
         [InlineData(1000, 5, false, false, ReadWriteDetermination.PerAccess)]
         public override Task RandomizedConsistency(int numGrains, int scale, bool avoidDeadlocks,
-            bool avoidTimeouts, ReadWriteDetermination readwrite)
-        {
-            return base.RandomizedConsistency(numGrains, scale, avoidDeadlocks, avoidTimeouts, readwrite);
-        }
+            bool avoidTimeouts, ReadWriteDetermination readwrite) => base.RandomizedConsistency(numGrains, scale, avoidDeadlocks, avoidTimeouts, readwrite);
     }
 }

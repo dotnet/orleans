@@ -38,29 +38,17 @@ namespace Orleans.EventSourcing.StateStorage
         private GrainStateWithMetaDataAndETag<TLogView> GlobalStateCache;
 
         /// <inheritdoc/>
-        protected override TLogView LastConfirmedView()
-        {
-            return GlobalStateCache.StateAndMetaData.State;
-        }
+        protected override TLogView LastConfirmedView() => GlobalStateCache.StateAndMetaData.State;
 
         /// <inheritdoc/>
-        protected override int GetConfirmedVersion()
-        {
-            return GlobalStateCache.StateAndMetaData.GlobalVersion;
-        }
+        protected override int GetConfirmedVersion() => GlobalStateCache.StateAndMetaData.GlobalVersion;
 
         /// <inheritdoc/>
-        protected override void InitializeConfirmedView(TLogView initialstate)
-        {
-            GlobalStateCache = new GrainStateWithMetaDataAndETag<TLogView>(initialstate);
-        }
+        protected override void InitializeConfirmedView(TLogView initialstate) => GlobalStateCache = new GrainStateWithMetaDataAndETag<TLogView>(initialstate);
 
         // no special tagging is required, thus we create a plain submission entry
         /// <inheritdoc/>
-        protected override SubmissionEntry<TLogEntry> MakeSubmissionEntry(TLogEntry entry)
-        {
-            return new SubmissionEntry<TLogEntry>() { Entry = entry };
-        }
+        protected override SubmissionEntry<TLogEntry> MakeSubmissionEntry(TLogEntry entry) => new SubmissionEntry<TLogEntry>() { Entry = entry };
 
         /// <inheritdoc/>
         protected override async Task ReadAsync()
@@ -192,10 +180,7 @@ namespace Orleans.EventSourcing.StateStorage
         public sealed class UpdateStateStorageFailed : PrimaryOperationFailed
         {
             /// <inheritdoc/>
-            public override string ToString()
-            {
-                return $"write state to storage failed: caught {Exception.GetType().Name}: {Exception.Message}";
-            }
+            public override string ToString() => $"write state to storage failed: caught {Exception.GetType().Name}: {Exception.Message}";
         }
 
 
@@ -207,10 +192,7 @@ namespace Orleans.EventSourcing.StateStorage
         public sealed class ReadFromStateStorageFailed : PrimaryOperationFailed
         {
             /// <inheritdoc/>
-            public override string ToString()
-            {
-                return $"read state from storage failed: caught {Exception.GetType().Name}: {Exception.Message}";
-            }
+            public override string ToString() => $"read state from storage failed: caught {Exception.GetType().Name}: {Exception.Message}";
         }
 
 
@@ -238,11 +220,8 @@ namespace Orleans.EventSourcing.StateStorage
             public string ETag { get; set; }
 
             /// <inheritdoc/>
-            public override string ToString()
-            {
-                return string.Format("v{0} ({1} updates by {2}) etag={3}", Version, Updates.Count, Origin, ETag);
-            }
-         }
+            public override string ToString() => string.Format("v{0} ({1} updates by {2}) etag={3}", Version, Updates.Count, Origin, ETag);
+        }
 
         /// <inheritdoc/>
         protected override INotificationMessage Merge(INotificationMessage earlierMessage, INotificationMessage laterMessage)

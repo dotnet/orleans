@@ -57,27 +57,15 @@ namespace Orleans.Runtime.TestHooks
             consistentRingProvider = this.serviceProvider.GetRequiredService<IConsistentRingProvider>();
         }
 
-        public Task<SiloAddress> GetConsistentRingPrimaryTargetSilo(uint key)
-        {
-            return Task.FromResult(consistentRingProvider.GetPrimaryTargetSilo(key));
-        }
+        public Task<SiloAddress> GetConsistentRingPrimaryTargetSilo(uint key) => Task.FromResult(consistentRingProvider.GetPrimaryTargetSilo(key));
 
-        public Task<string> GetConsistentRingProviderDiagnosticInfo()
-        {
-            return Task.FromResult(consistentRingProvider.ToString()); 
-        }
-        
+        public Task<string> GetConsistentRingProviderDiagnosticInfo() => Task.FromResult(consistentRingProvider.ToString());
+
         public Task<string> GetServiceId() => Task.FromResult(serviceProvider.GetRequiredService<IOptions<ClusterOptions>>().Value.ServiceId);
 
-        public Task<bool> HasStorageProvider(string providerName)
-        {
-            return Task.FromResult(serviceProvider.GetServiceByName<IGrainStorage>(providerName) != null);
-        }
+        public Task<bool> HasStorageProvider(string providerName) => Task.FromResult(serviceProvider.GetServiceByName<IGrainStorage>(providerName) != null);
 
-        public Task<bool> HasStreamProvider(string providerName)
-        {
-            return Task.FromResult(serviceProvider.GetServiceByName<IGrainStorage>(providerName) != null);
-        }
+        public Task<bool> HasStreamProvider(string providerName) => Task.FromResult(serviceProvider.GetServiceByName<IGrainStorage>(providerName) != null);
 
         public Task<ICollection<string>> GetStorageProviderNames()
         {

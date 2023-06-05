@@ -37,21 +37,12 @@ namespace Orleans.Streaming.EventHubs.Testing
         }
 
         /// <inheritdoc />
-        public void StopProducingOnStream(StreamId streamId)
-        {
-            (generator as IStreamDataGeneratingController)?.StopProducingOnStream(streamId);
-        }
+        public void StopProducingOnStream(StreamId streamId) => (generator as IStreamDataGeneratingController)?.StopProducingOnStream(streamId);
 
         /// <inheritdoc />
-        public void ConfigureDataGeneratorForStream(StreamId streamId)
-        {
-            (generator as IStreamDataGeneratingController)?.AddDataGeneratorForStream(streamId);
-        }
+        public void ConfigureDataGeneratorForStream(StreamId streamId) => (generator as IStreamDataGeneratingController)?.AddDataGeneratorForStream(streamId);
 
         /// <inheritdoc />
-        public Task CloseAsync()
-        {
-            return Task.CompletedTask;
-        }
+        public Task CloseAsync() => Task.CompletedTask;
     }
 }

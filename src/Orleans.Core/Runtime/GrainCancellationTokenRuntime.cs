@@ -78,10 +78,7 @@ namespace Orleans.Runtime
             _runtime = runtime;
         }
 
-        public override GrainCancellationToken ConvertFromSurrogate(ref GrainCancellationTokenSurrogate surrogate)
-        {
-            return new GrainCancellationToken(surrogate.TokenId, surrogate.IsCancellationRequested, _runtime);
-        }
+        public override GrainCancellationToken ConvertFromSurrogate(ref GrainCancellationTokenSurrogate surrogate) => new GrainCancellationToken(surrogate.TokenId, surrogate.IsCancellationRequested, _runtime);
 
         public override void ConvertToSurrogate(GrainCancellationToken value, ref GrainCancellationTokenSurrogate surrogate)
         {

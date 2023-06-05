@@ -28,10 +28,7 @@ namespace Orleans.Runtime
 
         public bool IsCompleted => completed == 1;
 
-        public void OnStatusUpdate(StatusResponse status)
-        {
-            lastKnownStatus = status;
-        }
+        public void OnStatusUpdate(StatusResponse status) => lastKnownStatus = status;
 
         public bool IsExpired(long currentTimestamp)
         {

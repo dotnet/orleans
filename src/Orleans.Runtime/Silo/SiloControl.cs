@@ -152,10 +152,7 @@ namespace Orleans.Runtime
             return Task.FromResult( catalog.GetDetailedGrainReport(grainId));
         }
 
-        public Task<int> GetActivationCount()
-        {
-            return Task.FromResult(catalog.ActivationCount);
-        }
+        public Task<int> GetActivationCount() => Task.FromResult(catalog.ActivationCount);
 
         public Task<object> SendControlCommandToProvider(string providerTypeFullName, string providerName, int command, object arg)
         {

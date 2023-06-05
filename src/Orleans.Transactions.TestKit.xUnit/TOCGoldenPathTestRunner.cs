@@ -12,9 +12,6 @@ namespace Orleans.Transactions.TestKit.xUnit
         [SkippableTheory]
         [InlineData(TransactionTestConstants.SingleStateTransactionalGrain, TransactionTestConstants.MaxCoordinatedTransactions)]
         [InlineData(TransactionTestConstants.DoubleStateTransactionalGrain, TransactionTestConstants.MaxCoordinatedTransactions / 2)]
-        public override Task MultiGrainWriteTransaction(string grainStates, int grainCount)
-        {
-            return base.MultiGrainWriteTransaction(grainStates, grainCount);
-        }
+        public override Task MultiGrainWriteTransaction(string grainStates, int grainCount) => base.MultiGrainWriteTransaction(grainStates, grainCount);
     }
 }

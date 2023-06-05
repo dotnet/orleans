@@ -323,10 +323,7 @@ namespace Orleans.Storage
             }
         }
 
-        private static string ReadStringData(TableEntity entity)
-        {
-            return string.Join(string.Empty, ReadStringDataChunks(entity));
-        }
+        private static string ReadStringData(TableEntity entity) => string.Join(string.Empty, ReadStringDataChunks(entity));
 
         /// <summary>
         /// Deserialize from Azure storage format
@@ -389,10 +386,7 @@ namespace Orleans.Storage
                 tableManager = new AzureTableDataManager<TableEntity>(options, logger);
             }
 
-            public Task InitTableAsync()
-            {
-                return tableManager.InitTableAsync();
-            }
+            public Task InitTableAsync() => tableManager.InitTableAsync();
 
             public async Task<TableEntity> Read(string partitionKey, string rowKey)
             {
@@ -482,10 +476,7 @@ namespace Orleans.Storage
         }
 
         /// <summary> Decodes Storage exceptions.</summary>
-        public bool DecodeException(Exception e, out HttpStatusCode httpStatusCode, out string restStatus, bool getRESTErrors = false)
-        {
-            return AzureTableUtils.EvaluateException(e, out httpStatusCode, out restStatus, getRESTErrors);
-        }
+        public bool DecodeException(Exception e, out HttpStatusCode httpStatusCode, out string restStatus, bool getRESTErrors = false) => AzureTableUtils.EvaluateException(e, out httpStatusCode, out restStatus, getRESTErrors);
 
         private async Task Init(CancellationToken ct)
         {
@@ -525,10 +516,7 @@ namespace Orleans.Storage
             return Task.CompletedTask;
         }
 
-        public void Participate(ISiloLifecycle lifecycle)
-        {
-            lifecycle.Subscribe(OptionFormattingUtilities.Name<AzureTableGrainStorage>(name), options.InitStage, Init, Close);
-        }
+        public void Participate(ISiloLifecycle lifecycle) => lifecycle.Subscribe(OptionFormattingUtilities.Name<AzureTableGrainStorage>(name), options.InitStage, Init, Close);
     }
 
     public static class AzureTableGrainStorageFactory

@@ -57,51 +57,27 @@ namespace Tester.AzureUtils
         }
 
         [SkippableFact, TestCategory("Functional")]
-        public async Task MembershipTable_Azure_GetGateways()
-        {
-            await MembershipTable_GetGateways();
-        }
+        public async Task MembershipTable_Azure_GetGateways() => await MembershipTable_GetGateways();
 
         [SkippableFact, TestCategory("Functional")]
-        public async Task MembershipTable_Azure_ReadAll_EmptyTable()
-        {
-            await MembershipTable_ReadAll_EmptyTable();
-        }
+        public async Task MembershipTable_Azure_ReadAll_EmptyTable() => await MembershipTable_ReadAll_EmptyTable();
 
         [SkippableFact, TestCategory("Functional")]
-        public async Task MembershipTable_Azure_InsertRow()
-        {
-            await MembershipTable_InsertRow();
-        }
+        public async Task MembershipTable_Azure_InsertRow() => await MembershipTable_InsertRow();
 
         [SkippableFact, TestCategory("Functional")]
-        public async Task MembershipTable_Azure_ReadRow_Insert_Read()
-        {
-            await MembershipTable_ReadRow_Insert_Read();
-        }
+        public async Task MembershipTable_Azure_ReadRow_Insert_Read() => await MembershipTable_ReadRow_Insert_Read();
 
         [SkippableFact, TestCategory("Functional")]
-        public async Task MembershipTable_Azure_ReadAll_Insert_ReadAll()
-        {
-            await MembershipTable_ReadAll_Insert_ReadAll();
-        }
+        public async Task MembershipTable_Azure_ReadAll_Insert_ReadAll() => await MembershipTable_ReadAll_Insert_ReadAll();
 
         [SkippableFact, TestCategory("Functional")]
-        public async Task MembershipTable_Azure_UpdateRow()
-        {
-            await MembershipTable_UpdateRow();
-        }
+        public async Task MembershipTable_Azure_UpdateRow() => await MembershipTable_UpdateRow();
 
         [SkippableFact, TestCategory("Functional")]
-        public async Task MembershipTable_Azure_UpdateRowInParallel()
-        {
-            await MembershipTable_UpdateRowInParallel();
-        }
+        public async Task MembershipTable_Azure_UpdateRowInParallel() => await MembershipTable_UpdateRowInParallel();
 
         [SkippableFact, TestCategory("Functional")]
-        public async Task MembershipTable_Azure_UpdateIAmAlive()
-        {
-            await MembershipTable_UpdateIAmAlive();
-        }
+        public async Task MembershipTable_Azure_UpdateIAmAlive() => await MembershipTable_UpdateIAmAlive();
     }
 }

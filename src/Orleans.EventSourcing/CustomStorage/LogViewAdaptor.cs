@@ -37,16 +37,10 @@ namespace Orleans.EventSourcing.CustomStorage
         private int version;
 
         /// <inheritdoc/>
-        protected override TLogView LastConfirmedView()
-        {
-            return cached;
-        }
+        protected override TLogView LastConfirmedView() => cached;
 
         /// <inheritdoc/>
-        protected override int GetConfirmedVersion()
-        {
-            return version;
-        }
+        protected override int GetConfirmedVersion() => version;
 
         /// <inheritdoc/>
         protected override void InitializeConfirmedView(TLogView initialstate)
@@ -65,11 +59,9 @@ namespace Orleans.EventSourcing.CustomStorage
         }
 
         /// <inheritdoc/>
-        protected override SubmissionEntry<TLogEntry> MakeSubmissionEntry(TLogEntry entry)
-        {
+        protected override SubmissionEntry<TLogEntry> MakeSubmissionEntry(TLogEntry entry) =>
            // no special tagging is required, thus we create a plain submission entry
-           return new SubmissionEntry<TLogEntry>() { Entry = entry };
-        }
+           new SubmissionEntry<TLogEntry>() { Entry = entry };
 
         [Serializable]
         [GenerateSerializer]
@@ -233,10 +225,7 @@ namespace Orleans.EventSourcing.CustomStorage
         public sealed class UpdatePrimaryFailed : PrimaryOperationFailed
         {
             /// <inheritdoc/>
-            public override string ToString()
-            {
-                return $"update primary failed: caught {Exception.GetType().Name}: {Exception.Message}";
-            }
+            public override string ToString() => $"update primary failed: caught {Exception.GetType().Name}: {Exception.Message}";
         }
 
 
@@ -248,10 +237,7 @@ namespace Orleans.EventSourcing.CustomStorage
         public sealed class ReadFromPrimaryFailed : PrimaryOperationFailed
         {
             /// <inheritdoc/>
-            public override string ToString()
-            {
-                return $"read from primary failed: caught {Exception.GetType().Name}: {Exception.Message}";
-            }
+            public override string ToString() => $"read from primary failed: caught {Exception.GetType().Name}: {Exception.Message}";
         }
 
 
@@ -274,10 +260,7 @@ namespace Orleans.EventSourcing.CustomStorage
             /// <summary>
             /// A representation of this notification message suitable for tracing.
             /// </summary>
-            public override string ToString()
-            {
-                return string.Format("v{0} ({1} updates)", Version, Updates.Count);
-            }
+            public override string ToString() => string.Format("v{0} ({1} updates)", Version, Updates.Count);
         }
    
         private SortedList<long, UpdateNotificationMessage> notifications = new SortedList<long,UpdateNotificationMessage>();
@@ -332,16 +315,10 @@ namespace Orleans.EventSourcing.CustomStorage
         }
 
         [Conditional("DEBUG")]
-        private void enter_operation(string name)
-        {
-            Services.Log(LogLevel.Trace, "/-- enter {0}", name);
-        }
+        private void enter_operation(string name) => Services.Log(LogLevel.Trace, "/-- enter {0}", name);
 
         [Conditional("DEBUG")]
-        private void exit_operation(string name)
-        {
-            Services.Log(LogLevel.Trace, "\\-- exit {0}", name);
-        }
+        private void exit_operation(string name) => Services.Log(LogLevel.Trace, "\\-- exit {0}", name);
 
     }
 }

@@ -71,30 +71,18 @@ namespace UnitTests.GrainInterfaces
     [GenerateSerializer]
     public class CaseInsensitiveStringEquality : EqualityComparer<string>
     {
-        public override bool Equals(string x, string y)
-        {
-            return x.Equals(y, StringComparison.OrdinalIgnoreCase);
-        }
+        public override bool Equals(string x, string y) => x.Equals(y, StringComparison.OrdinalIgnoreCase);
 
-        public override int GetHashCode(string obj)
-        {
-            return obj.ToLowerInvariant().GetHashCode();
-        }
+        public override int GetHashCode(string obj) => obj.ToLowerInvariant().GetHashCode();
     }
 
     [Serializable]
     [GenerateSerializer]
     public class Mod5IntegerComparer : EqualityComparer<int>
     {
-        public override bool Equals(int x, int y)
-        {
-            return ((x - y) % 5) == 0;
-        }
+        public override bool Equals(int x, int y) => ((x - y) % 5) == 0;
 
-        public override int GetHashCode(int obj)
-        {
-            return obj % 5;
-        }
+        public override int GetHashCode(int obj) => obj % 5;
     }
 
     [Serializable]
@@ -141,10 +129,7 @@ namespace UnitTests.GrainInterfaces
             return ret;
         }
 
-        public override int GetHashCode()
-        {
-            return base.GetHashCode();
-        }
+        public override int GetHashCode() => base.GetHashCode();
     }
 
     [Serializable]
@@ -174,25 +159,13 @@ namespace UnitTests.GrainInterfaces
             ReadonlyField = readonlyField;
         }
 
-        public int GetValueWithPrivateGetter()
-        {
-            return ValueWithPrivateGetter;
-        }
+        public int GetValueWithPrivateGetter() => ValueWithPrivateGetter;
 
-        public int GetPrivateValue()
-        {
-            return PrivateValue;
-        }
+        public int GetPrivateValue() => PrivateValue;
 
-        public void SetPrivateValue(int value)
-        {
-            PrivateValue = value;
-        }
+        public void SetPrivateValue(int value) => PrivateValue = value;
 
-        public void SetValueWithPrivateSetter(int value)
-        {
-            ValueWithPrivateSetter = value;
-        }
+        public void SetValueWithPrivateSetter(int value) => ValueWithPrivateSetter = value;
     }
 
     public interface ISomeInterface { int Int { get; set; } }
@@ -225,10 +198,7 @@ namespace UnitTests.GrainInterfaces
         
 #pragma warning disable 618
         public int GetObsoleteInt() => ObsoleteInt;
-        public void SetObsoleteInt(int value)
-        {
-            ObsoleteInt = value;
-        }
+        public void SetObsoleteInt(int value) => ObsoleteInt = value;
 #pragma warning restore 618
 
         [Id(6)]
@@ -294,10 +264,7 @@ namespace UnitTests.GrainInterfaces
             return Id.Equals(actual.Id) && Equals(Something, actual.Something);
         }
 
-        public override int GetHashCode()
-        {
-            return base.GetHashCode();
-        }
+        public override int GetHashCode() => base.GetHashCode();
     }
 
     [Serializable]

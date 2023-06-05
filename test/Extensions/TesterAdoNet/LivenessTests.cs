@@ -40,34 +40,19 @@ namespace UnitTests.MembershipTests
         }
 
         [Fact, TestCategory("Membership"), TestCategory("AdoNet")]
-        public async Task Liveness_SqlServer_1()
-        {
-            await Do_Liveness_OracleTest_1();
-        }
+        public async Task Liveness_SqlServer_1() => await Do_Liveness_OracleTest_1();
 
         [Fact, TestCategory("Membership"), TestCategory("AdoNet")]
-        public async Task Liveness_SqlServer_2_Restart_Primary()
-        {
-            await Do_Liveness_OracleTest_2(0);
-        }
+        public async Task Liveness_SqlServer_2_Restart_Primary() => await Do_Liveness_OracleTest_2(0);
 
         [Fact, TestCategory("Membership"), TestCategory("AdoNet")]
-        public async Task Liveness_SqlServer_3_Restartl_GW()
-        {
-            await Do_Liveness_OracleTest_2(1);
-        }
+        public async Task Liveness_SqlServer_3_Restartl_GW() => await Do_Liveness_OracleTest_2(1);
 
         [Fact, TestCategory("Membership"), TestCategory("AdoNet")]
-        public async Task Liveness_SqlServer_4_Restart_Silo_1()
-        {
-            await Do_Liveness_OracleTest_2(2);
-        }
+        public async Task Liveness_SqlServer_4_Restart_Silo_1() => await Do_Liveness_OracleTest_2(2);
 
         [Fact, TestCategory("Membership"), TestCategory("AdoNet")]
-        public async Task Liveness_SqlServer_5_Kill_Silo_1_With_Timers()
-        {
-            await Do_Liveness_OracleTest_2(2, false, true);
-        }
+        public async Task Liveness_SqlServer_5_Kill_Silo_1_With_Timers() => await Do_Liveness_OracleTest_2(2, false, true);
     }
 
     public class LivenessTests_PostgreSql : LivenessTestsBase
@@ -101,34 +86,19 @@ namespace UnitTests.MembershipTests
         }
 
         [Fact, TestCategory("Membership"), TestCategory("PostgreSql")]
-        public async Task Liveness_PostgreSql_1()
-        {
-            await Do_Liveness_OracleTest_1();
-        }
+        public async Task Liveness_PostgreSql_1() => await Do_Liveness_OracleTest_1();
 
         [Fact, TestCategory("Membership"), TestCategory("PostgreSql")]
-        public async Task Liveness_PostgreSql_2_Restart_Primary()
-        {
-            await Do_Liveness_OracleTest_2(0);
-        }
+        public async Task Liveness_PostgreSql_2_Restart_Primary() => await Do_Liveness_OracleTest_2(0);
 
         [Fact, TestCategory("Membership"), TestCategory("PostgreSql")]
-        public async Task Liveness_PostgreSql_3_Restartl_GW()
-        {
-            await Do_Liveness_OracleTest_2(1);
-        }
+        public async Task Liveness_PostgreSql_3_Restartl_GW() => await Do_Liveness_OracleTest_2(1);
 
         [Fact, TestCategory("Membership"), TestCategory("PostgreSql")]
-        public async Task Liveness_PostgreSql_4_Restart_Silo_1()
-        {
-            await Do_Liveness_OracleTest_2(2);
-        }
+        public async Task Liveness_PostgreSql_4_Restart_Silo_1() => await Do_Liveness_OracleTest_2(2);
 
         [Fact, TestCategory("Membership"), TestCategory("PostgreSql")]
-        public async Task Liveness_PostgreSql_5_Kill_Silo_1_With_Timers()
-        {
-            await Do_Liveness_OracleTest_2(2, false, true);
-        }
+        public async Task Liveness_PostgreSql_5_Kill_Silo_1_With_Timers() => await Do_Liveness_OracleTest_2(2, false, true);
     }
 
     [TestCategory("Membership"), TestCategory("MySql")]
@@ -164,33 +134,18 @@ namespace UnitTests.MembershipTests
         }
 
         [Fact]
-        public async Task Liveness_MySql_1()
-        {
-            await Do_Liveness_OracleTest_1();
-        }
+        public async Task Liveness_MySql_1() => await Do_Liveness_OracleTest_1();
 
         [Fact]
-        public async Task Liveness_MySql_2_Restart_Primary()
-        {
-            await Do_Liveness_OracleTest_2(0);
-        }
+        public async Task Liveness_MySql_2_Restart_Primary() => await Do_Liveness_OracleTest_2(0);
 
         [Fact]
-        public async Task Liveness_MySql_3_Restartl_GW()
-        {
-            await Do_Liveness_OracleTest_2(1);
-        }
+        public async Task Liveness_MySql_3_Restartl_GW() => await Do_Liveness_OracleTest_2(1);
 
         [Fact]
-        public async Task Liveness_MySql_4_Restart_Silo_1()
-        {
-            await Do_Liveness_OracleTest_2(2);
-        }
+        public async Task Liveness_MySql_4_Restart_Silo_1() => await Do_Liveness_OracleTest_2(2);
 
         [Fact]
-        public async Task Liveness_MySql_5_Kill_Silo_1_With_Timers()
-        {
-            await Do_Liveness_OracleTest_2(2, false, true);
-        }
+        public async Task Liveness_MySql_5_Kill_Silo_1_With_Timers() => await Do_Liveness_OracleTest_2(2, false, true);
     }
 }

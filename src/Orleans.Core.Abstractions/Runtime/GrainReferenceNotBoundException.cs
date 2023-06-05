@@ -38,9 +38,6 @@ namespace Orleans.Runtime
         {
         }
 
-        private static string CreateMessage(GrainReference grainReference)
-        {
-            return $"Attempted to use an invalid GrainReference, which has not been constructed by the runtime: {grainReference}.";
-        }
+        private static string CreateMessage(GrainReference grainReference) => $"Attempted to use an invalid GrainReference, which has not been constructed by the runtime: {grainReference}.";
     }
 }

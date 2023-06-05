@@ -24,10 +24,7 @@ namespace UnitTests.Grains
             StreamId = streamId;
         }
 
-        public override string ToString()
-        {
-            return String.Format("{0}", Data);
-        }
+        public override string ToString() => String.Format("{0}", Data);
     }
 
     [Serializable]
@@ -799,15 +796,9 @@ namespace UnitTests.Grains
             return Task.CompletedTask;
         }
 
-        public Task ProduceSequentialSeries(int count)
-        {
-            return _producer.ProduceSequentialSeries(count);
-        }
+        public Task ProduceSequentialSeries(int count) => _producer.ProduceSequentialSeries(count);
 
-        public Task ProduceParallelSeries(int count)
-        {
-            return _producer.ProduceParallelSeries(count);
-        }
+        public Task ProduceParallelSeries(int count) => _producer.ProduceParallelSeries(count);
 
         public Task ProducePeriodicSeries(int count)
         {
@@ -817,15 +808,9 @@ namespace UnitTests.Grains
             }, count);
         }
 
-        public Task<int> GetItemsProduced()
-        {
-            return _producer.ItemsProduced;
-        }
+        public Task<int> GetItemsProduced() => _producer.ItemsProduced;
 
-        public Task AddNewConsumerGrain(Guid consumerGrainId)
-        {
-            return _producer.AddNewConsumerGrain(consumerGrainId);
-        }
+        public Task AddNewConsumerGrain(Guid consumerGrainId) => _producer.AddNewConsumerGrain(consumerGrainId);
 
         public async Task BecomeConsumer(Guid streamId, string providerToUse, string streamNamespace)
         {
@@ -834,25 +819,13 @@ namespace UnitTests.Grains
             await _consumer.BecomeConsumer(streamId, this.GetStreamProvider(providerToUse), streamNamespace);
         }
 
-        public async Task<int> GetItemsConsumed()
-        {
-            return await _consumer.ItemsConsumed;
-        }
+        public async Task<int> GetItemsConsumed() => await _consumer.ItemsConsumed;
 
-        public async Task<int> GetExpectedItemsProduced()
-        {
-            return await _producer.ExpectedItemsProduced;
-        }
+        public async Task<int> GetExpectedItemsProduced() => await _producer.ExpectedItemsProduced;
 
-        public async Task<int> GetConsumerCount()
-        {
-            return await _consumer.ConsumerCount;
-        }
+        public async Task<int> GetConsumerCount() => await _consumer.ConsumerCount;
 
-        public async Task<int> GetProducerCount()
-        {
-            return await _producer.ProducerCount;
-        }
+        public async Task<int> GetProducerCount() => await _producer.ProducerCount;
 
         public async Task StopBeingConsumer()
         {
@@ -860,10 +833,7 @@ namespace UnitTests.Grains
             _consumer = null;
         }
 
-        public async Task StopBeingProducer()
-        {
-            await _producer.StopBeingProducer();
-        }
+        public async Task StopBeingProducer() => await _producer.StopBeingProducer();
 
         public async Task VerifyFinished()
         {
@@ -938,13 +908,11 @@ namespace UnitTests.Grains
             return result;
         }
 
-        public virtual Task<int> GetConsumerCount()
-        {
+        public virtual Task<int> GetConsumerCount() =>
             // it's currently impossible to detect how many implicit consumers are being used,
             // so we must resort to hard-wiring this grain to only use one provider's consumer at a time.
             // this problem will continue until we require the provider's name to be apart of the implicit subscriber attribute identity.
-            return Task.FromResult(1);
-            /*
+            Task.FromResult(1);/*
             int result = 0;
             foreach (var o in _observers.Values)
             {
@@ -952,7 +920,6 @@ namespace UnitTests.Grains
             }
             return result;
             */
-        }
 
         public async Task StopBeingConsumer()
         {

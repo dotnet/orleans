@@ -37,9 +37,6 @@ namespace Orleans.Providers
         /// <inheritdoc/>
         public (TExtension Extension, TExtensionInterface ExtensionReference) BindExtension<TExtension, TExtensionInterface>(Func<TExtension> newExtensionFunc)
             where TExtension : class, TExtensionInterface
-            where TExtensionInterface : class, IGrainExtension
-        {
-            return clientContext.GetOrSetExtension<TExtension, TExtensionInterface>(newExtensionFunc);
-        }
+            where TExtensionInterface : class, IGrainExtension => clientContext.GetOrSetExtension<TExtension, TExtensionInterface>(newExtensionFunc);
     }
 }

@@ -47,14 +47,8 @@ namespace Orleans.Transactions
         public long SequenceNumber;
         public bool HasCopiedState;
 
-        public void AddRead()
-        {
-            NumberReads++;
-        }
-        public void AddWrite()
-        {
-            NumberWrites++;
-        }
+        public void AddRead() => NumberReads++;
+        public void AddWrite() => NumberWrites++;
 
         public CommitRole Role;
 

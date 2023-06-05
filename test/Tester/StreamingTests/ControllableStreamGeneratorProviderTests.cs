@@ -25,10 +25,7 @@ namespace UnitTests.StreamingTests
             public static readonly string StreamProviderTypeName = typeof(PersistentStreamProvider).FullName;
             public const string StreamNamespace = GeneratedEventCollectorGrain.StreamNamespace;
 
-            protected override void ConfigureTestCluster(TestClusterBuilder builder)
-            {
-                builder.AddSiloBuilderConfigurator<MySiloBuilderConfigurator>();
-            }
+            protected override void ConfigureTestCluster(TestClusterBuilder builder) => builder.AddSiloBuilderConfigurator<MySiloBuilderConfigurator>();
 
             private class MySiloBuilderConfigurator : ISiloConfigurator
             {

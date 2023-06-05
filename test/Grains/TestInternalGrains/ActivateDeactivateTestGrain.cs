@@ -358,20 +358,11 @@ namespace UnitTests.Grains
             throw new ApplicationException("Thrown from Constructor");
         }
 
-        public override Task OnActivateAsync(CancellationToken cancellationToken)
-        {
-            throw new NotImplementedException("OnActivateAsync should not have been called");
-        }
+        public override Task OnActivateAsync(CancellationToken cancellationToken) => throw new NotImplementedException("OnActivateAsync should not have been called");
 
-        public override Task OnDeactivateAsync(DeactivationReason reason, CancellationToken cancellationToken)
-        {
-            throw new NotImplementedException("OnDeactivateAsync(...) should not have been called");
-        }
+        public override Task OnDeactivateAsync(DeactivationReason reason, CancellationToken cancellationToken) => throw new NotImplementedException("OnDeactivateAsync(...) should not have been called");
 
-        public Task<string> DoSomething()
-        {
-            throw new NotImplementedException("DoSomething should not have been called");
-        }
+        public Task<string> DoSomething() => throw new NotImplementedException("DoSomething should not have been called");
     }
 
     internal class DeactivatingWhileActivatingTestGrain : Grain, IDeactivatingWhileActivatingTestGrain

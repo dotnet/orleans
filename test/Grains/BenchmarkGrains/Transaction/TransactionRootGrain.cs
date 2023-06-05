@@ -7,9 +7,6 @@ namespace BenchmarkGrains.Transaction
     [StatelessWorker]
     public class TransactionRootGrain : Grain, ITransactionRootGrain
     {
-        public Task Run(List<int> grains)
-        {
-            return Task.WhenAll(grains.Select(id => GrainFactory.GetGrain<ITransactionGrain>(id).Run()));
-        }
+        public Task Run(List<int> grains) => Task.WhenAll(grains.Select(id => GrainFactory.GetGrain<ITransactionGrain>(id).Run()));
     }
 }

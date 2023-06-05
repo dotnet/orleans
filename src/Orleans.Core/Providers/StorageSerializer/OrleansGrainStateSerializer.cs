@@ -29,9 +29,6 @@ namespace Orleans.Storage
         }
 
         /// <inheritdoc/>
-        public T Deserialize<T>(BinaryData input)
-        {
-            return serializer.Deserialize<T>(input.ToMemory());
-        }
+        public T Deserialize<T>(BinaryData input) => serializer.Deserialize<T>(input.ToMemory());
     }
 }

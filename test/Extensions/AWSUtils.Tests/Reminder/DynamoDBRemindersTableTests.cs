@@ -32,10 +32,7 @@ namespace AWSUtils.Tests.RemindersTest
                 Options.Create(options));
         }
 
-        protected override Task<string> GetConnectionString()
-        {
-            return Task.FromResult(AWSTestConstants.IsDynamoDbAvailable ? $"Service={AWSTestConstants.DynamoDbService}" : null);
-        }
+        protected override Task<string> GetConnectionString() => Task.FromResult(AWSTestConstants.IsDynamoDbAvailable ? $"Service={AWSTestConstants.DynamoDbService}" : null);
 
         [SkippableFact]
         public void RemindersTable_AWS_Init()
@@ -43,21 +40,12 @@ namespace AWSUtils.Tests.RemindersTest
         }
 
         [SkippableFact]
-        public async Task RemindersTable_AWS_RemindersRange()
-        {
-            await RemindersRange(50);
-        }
+        public async Task RemindersTable_AWS_RemindersRange() => await RemindersRange(50);
 
         [SkippableFact]
-        public async Task RemindersTable_AWS_RemindersParallelUpsert()
-        {
-            await RemindersParallelUpsert();
-        }
+        public async Task RemindersTable_AWS_RemindersParallelUpsert() => await RemindersParallelUpsert();
 
         [SkippableFact]
-        public async Task RemindersTable_AWS_ReminderSimple()
-        {
-            await ReminderSimple();
-        }
+        public async Task RemindersTable_AWS_ReminderSimple() => await ReminderSimple();
     }
 }

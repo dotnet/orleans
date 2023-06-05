@@ -23,9 +23,6 @@ namespace Orleans.Serialization
             _serviceProvider = serviceProvider;
         }
 
-        public void PostConfigure(string name, OrleansJsonSerializerOptions options)
-        {
-            OrleansJsonSerializerSettings.Configure(_serviceProvider, options.JsonSerializerSettings);
-        }
+        public void PostConfigure(string name, OrleansJsonSerializerOptions options) => OrleansJsonSerializerSettings.Configure(_serviceProvider, options.JsonSerializerSettings);
     }
 }

@@ -60,9 +60,6 @@ namespace TestGrains
             return Task.CompletedTask;
         }
 
-        public Task<bool> IsLocatedOnSilo(SiloAddress siloAddress)
-        {
-            return Task.FromResult(RuntimeIdentity == siloAddress.ToString());
-        }
+        public Task<bool> IsLocatedOnSilo(SiloAddress siloAddress) => Task.FromResult(RuntimeIdentity == siloAddress.ToString());
     }
 }

@@ -166,10 +166,7 @@ namespace Orleans.GrainReferences
             }
 
             /// <inheritdoc />
-            public GrainReference CreateReference(GrainId grainId)
-            {
-                return GrainReference.FromGrainId(_shared, grainId);
-            }
+            public GrainReference CreateReference(GrainId grainId) => GrainReference.FromGrainId(_shared, grainId);
         }
     }
 

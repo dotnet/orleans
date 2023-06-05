@@ -36,10 +36,7 @@ namespace TestGrains
                     Counts.Add(e.Key, e.Amount);
             }
 
-            public void Apply(ResetAllEvent e)
-            {
-                Counts.Clear();
-            }
+            public void Apply(ResetAllEvent e) => Counts.Clear();
         }
 
         /// <summary>
@@ -64,11 +61,9 @@ namespace TestGrains
         {
         }
 
-        public override Task OnActivateAsync(CancellationToken cancellationToken)
-        {
+        public override Task OnActivateAsync(CancellationToken cancellationToken) =>
             // on activation, we load lazily (do not wait until the current state is loaded).
-            return Task.CompletedTask;
-        }
+            Task.CompletedTask;
 
         public async Task Add(string key, int amount, bool wait_for_confirmation)
         {
@@ -88,32 +83,17 @@ namespace TestGrains
                 await ConfirmEvents();
         }
 
-        public Task ConfirmAllPreviouslyRaisedEvents()
-        {
-            return ConfirmEvents();
-        }
-            
+        public Task ConfirmAllPreviouslyRaisedEvents() => ConfirmEvents();
 
-        public Task<int> GetTentativeCount(string key)
-        {
-            return Task.FromResult(TentativeState.Counts[key]);
-        }
 
-        public Task<IReadOnlyDictionary<string, int>> GetTentativeState()
-        {
-            return Task.FromResult((IReadOnlyDictionary<string, int>)TentativeState.Counts);
-        }
+        public Task<int> GetTentativeCount(string key) => Task.FromResult(TentativeState.Counts[key]);
 
-        public Task<IReadOnlyDictionary<string, int>> GetConfirmedState()
-        {
-            return Task.FromResult((IReadOnlyDictionary<string, int>)State.Counts);
-        }
+        public Task<IReadOnlyDictionary<string, int>> GetTentativeState() => Task.FromResult((IReadOnlyDictionary<string, int>)TentativeState.Counts);
+
+        public Task<IReadOnlyDictionary<string, int>> GetConfirmedState() => Task.FromResult((IReadOnlyDictionary<string, int>)State.Counts);
 
 
         // some providers allow you to look at the log of events
-        public Task<IReadOnlyList<object>> GetAllEvents()
-        {
-            return RetrieveConfirmedEvents(0, Version);
-        }
+        public Task<IReadOnlyList<object>> GetAllEvents() => RetrieveConfirmedEvents(0, Version);
     }
 }
