@@ -389,7 +389,7 @@ namespace Orleans.AzureUtils
         private string SanitizeQueueName(string queueName)
         {
             var tmp = queueName;
-            //Azure queue naming rules : https://docs.microsoft.com/en-us/rest/api/storageservices/Naming-Queues-and-Metadata?redirectedfrom=MSDN
+            //Azure queue naming rules : https://learn.microsoft.com/en-us/rest/api/storageservices/Naming-Queues-and-Metadata?redirectedfrom=MSDN
             tmp = tmp.ToLowerInvariant();
             tmp = tmp
                 .Replace('/', '-') // Forward slash

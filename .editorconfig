@@ -38,7 +38,7 @@ insert_final_newline = true
 end_of_line = lf
 
 # Dotnet Code Style Settings
-# See https://docs.microsoft.com/en-us/visualstudio/ide/editorconfig-code-style-settings-reference
+# See https://docs.microsoft.com/visualstudio/ide/editorconfig-code-style-settings-reference
 # See http://kent-boogaart.com/blog/editorconfig-reference-for-c-developers
 [*.{cs,csx,cake,vb}]
 dotnet_sort_system_directives_first                                          = true

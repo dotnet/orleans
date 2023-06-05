@@ -1,4 +1,4 @@
--- Orleans Reminders table - https://docs.microsoft.com/dotnet/orleans/grains/timers-and-reminders
+-- Orleans Reminders table - https://learn.microsoft.com/dotnet/orleans/grains/timers-and-reminders
 CREATE TABLE "ORLEANSREMINDERSTABLE"
 (
     "SERVICEID" NVARCHAR2(150) NOT NULL ENABLE,
