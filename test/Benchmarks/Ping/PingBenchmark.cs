@@ -9,6 +9,7 @@ using BenchmarkGrainInterfaces.Ping;
 using BenchmarkGrains.Ping;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 using Orleans;
 using Orleans.Configuration;
 using Orleans.Hosting;
@@ -43,7 +44,9 @@ namespace Benchmarks.Ping
                     {
                         siloBuilder.Configure<GrainTypeOptions>(options => options.Classes.Remove(typeof(PingGrain)));
                     }
-                });
+                })
+                    //.ConfigureLogging(logging => logging.AddConsole().SetMinimumLevel(LogLevel.Debug).AddFilter("Orleans.Runtime.Placement.PlacementService", LogLevel.Information))
+                    ;
 
                 var host = hostBuilder.Build();
 
@@ -68,6 +71,7 @@ namespace Benchmarks.Ping
                     }
                 });
 
+                //hostBuilder.ConfigureLogging(logging => logging.AddConsole().SetMinimumLevel(LogLevel.Debug));
                 this.clientHost = hostBuilder.Build();
                 this.clientHost.StartAsync().GetAwaiter().GetResult();
 
@@ -139,15 +143,28 @@ namespace Benchmarks.Ping
             if (clientHost is { } client)
             {
                 await client.StopAsync();
-                if (client is IAsyncDisposable asyncDisposable) await asyncDisposable.DisposeAsync();
-                else client.Dispose();
+                if (client is IAsyncDisposable asyncDisposable)
+                {
+                    await asyncDisposable.DisposeAsync();
+                }
+                else
+                {
+                    client.Dispose();
+                }
             }
 
             this.hosts.Reverse();
             foreach (var host in this.hosts)
             {
                 await host.StopAsync();
-                host.Dispose();
+                if (host is IAsyncDisposable asyncDisposable)
+                {
+                    await asyncDisposable.DisposeAsync();
+                }
+                else
+                {
+                    host.Dispose();
+                }
             }
         }
 

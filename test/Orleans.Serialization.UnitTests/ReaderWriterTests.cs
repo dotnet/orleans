@@ -1,4 +1,4 @@
-﻿using CsCheck;
+using CsCheck;
 using Orleans.Serialization.Buffers;
 using Orleans.Serialization.Buffers.Adaptors;
 using Orleans.Serialization.Session;
@@ -175,14 +175,14 @@ namespace Orleans.Serialization.UnitTests
     }
 
     [Trait("Category", "BVT")]
-    public sealed class ReaderWriterSegmentWriterTest : ReaderWriterTestBase<TestMultiSegmentBufferWriter, TestMultiSegmentBufferWriter, ReadOnlySequence<byte>>
+    public sealed class ReaderWriterSegmentWriterTest : ReaderWriterTestBase<TestMultiSegmentBufferWriter, TestMultiSegmentBufferWriter, ReadOnlySequenceInput>
     {
         public ReaderWriterSegmentWriterTest(ITestOutputHelper output) : base(output)
         {
         }
 
         protected override TestMultiSegmentBufferWriter CreateBuffer() => new(maxAllocationSize: 10);
-        protected override Reader<ReadOnlySequence<byte>> CreateReader(TestMultiSegmentBufferWriter buffer, SerializerSession session) => Reader.Create(buffer.GetReadOnlySequence(maxSegmentSize: 8), session);
+        protected override Reader<ReadOnlySequenceInput> CreateReader(TestMultiSegmentBufferWriter buffer, SerializerSession session) => Reader.Create(buffer.GetReadOnlySequence(maxSegmentSize: 8), session);
         protected override Writer<TestMultiSegmentBufferWriter> CreateWriter(TestMultiSegmentBufferWriter buffer, SerializerSession session) => Writer.Create(buffer, session);
         protected override TestMultiSegmentBufferWriter GetBuffer(TestMultiSegmentBufferWriter originalBuffer, TestMultiSegmentBufferWriter output) => output;
         protected override void DisposeBuffer(TestMultiSegmentBufferWriter buffer, TestMultiSegmentBufferWriter output)

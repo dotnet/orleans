@@ -1,9 +1,11 @@
 using System;
 using System.Buffers;
 using System.Collections.Generic;
+using System.Reflection;
 using Orleans.Serialization.Buffers;
 using Orleans.Serialization.Cloning;
 using Orleans.Serialization.GeneratedCodeHelpers;
+using Orleans.Serialization.Serializers;
 using Orleans.Serialization.Session;
 using Orleans.Serialization.WireProtocol;
 
@@ -200,5 +202,120 @@ namespace Orleans.Serialization.Codecs
                 output[_keyCopier.DeepCopy(pair.Key, context)] = _valueCopier.DeepCopy(pair.Value, context);
             }
         }
+    }
+
+    /// <summary>
+    /// Serializer for <see cref="Dictionary{TKey, TValue}"/>.
+    /// </summary>
+    /// <typeparam name="TKey">The key type.</typeparam>
+    /// <typeparam name="TValue">The value type.</typeparam>
+    [RegisterSerializer]
+    public sealed class DictionaryBaseCodec<TKey, TValue> : IBaseCodec<Dictionary<TKey, TValue>>
+    {
+        private readonly Type _keyFieldType = typeof(TKey);
+        private readonly Type _valueFieldType = typeof(TValue);
+
+        private readonly IFieldCodec<TKey> _keyCodec;
+        private readonly IFieldCodec<TValue> _valueCodec;
+        private readonly IFieldCodec<IEqualityComparer<TKey>> _comparerCodec;
+        private readonly ConstructorInfo _baseConstructor;
+
+        /// <summary>
+        /// Initializes a new instance of the <see cref="DictionaryCodec{TKey, TValue}"/> class.
+        /// </summary>
+        /// <param name="keyCodec">The key codec.</param>
+        /// <param name="valueCodec">The value codec.</param>
+        /// <param name="comparerCodec">The comparer codec.</param>
+        public DictionaryBaseCodec(
+            IFieldCodec<TKey> keyCodec,
+            IFieldCodec<TValue> valueCodec,
+            IFieldCodec<IEqualityComparer<TKey>> comparerCodec)
+        {
+            _keyCodec = OrleansGeneratedCodeHelper.UnwrapService(this, keyCodec);
+            _valueCodec = OrleansGeneratedCodeHelper.UnwrapService(this, valueCodec);
+            _comparerCodec = OrleansGeneratedCodeHelper.UnwrapService(this, comparerCodec);
+            _baseConstructor = typeof(Dictionary<TKey, TValue>).GetConstructor(new Type[] { typeof(int), typeof(IEqualityComparer<TKey>) });
+        }
+
+        void IBaseCodec<Dictionary<TKey, TValue>>.Serialize<TBufferWriter>(ref Writer<TBufferWriter> writer, Dictionary<TKey, TValue> value)
+        {
+            if (value.Comparer is var comparer && comparer != EqualityComparer<TKey>.Default)
+            {
+                _comparerCodec.WriteField(ref writer, 0, null, comparer);
+            }
+
+            if (value.Count > 0)
+            {
+                UInt32Codec.WriteField(ref writer, 1, (uint)value.Count);
+                uint innerFieldIdDelta = 1;
+                foreach (var element in value)
+                {
+                    _keyCodec.WriteField(ref writer, innerFieldIdDelta, _keyFieldType, element.Key);
+                    _valueCodec.WriteField(ref writer, 0, _valueFieldType, element.Value);
+                    innerFieldIdDelta = 0;
+                }
+            }
+        }
+
+        void IBaseCodec<Dictionary<TKey, TValue>>.Deserialize<TInput>(ref Reader<TInput> reader, Dictionary<TKey, TValue> value)
+        {
+            TKey key = default;
+            var valueExpected = false;
+            IEqualityComparer<TKey> comparer = null;
+            uint fieldId = 0;
+            bool hasLengthField = false;
+            while (true)
+            {
+                var header = reader.ReadFieldHeader();
+                if (header.IsEndBaseOrEndObject)
+                {
+                    break;
+                }
+                
+                fieldId += header.FieldIdDelta;
+                switch (fieldId)
+                {
+                    case 0:
+                        comparer = _comparerCodec.ReadValue(ref reader, header);
+                        break;
+                    case 1:
+                        var length = (int)UInt32Codec.ReadValue(ref reader, header);
+                        if (length > 10240 && length > reader.Length)
+                        {
+                            ThrowInvalidSizeException(length);
+                        }
+
+                        hasLengthField = true;
+                        _baseConstructor.Invoke(value, new object[] { length, comparer });
+                        break;
+                    case 2:
+                        if (!hasLengthField)
+                        {
+                            ThrowLengthFieldMissing();
+                        }
+
+                        if (!valueExpected)
+                        {
+                            key = _keyCodec.ReadValue(ref reader, header);
+                            valueExpected = true;
+                        }
+                        else
+                        {
+                            value.Add(key, _valueCodec.ReadValue(ref reader, header));
+                            valueExpected = false;
+                        }
+                        break;
+                    default:
+                        reader.ConsumeUnknownField(header);
+                        break;
+                }
+            }
+        }
+
+        private static void ThrowInvalidSizeException(int length) => throw new IndexOutOfRangeException(
+            $"Declared length of {typeof(Dictionary<TKey, TValue>)}, {length}, is greater than total length of input.");
+
+        private static void ThrowLengthFieldMissing() => throw new RequiredFieldMissingException("Serialized dictionary is missing its length field.");
+
     }
 }

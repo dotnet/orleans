@@ -121,7 +121,7 @@ namespace Orleans.Runtime.Messaging
             finally
             {
                 input = input.Slice(requiredBytes);
-                _deserializationSession.FullReset();
+                _deserializationSession.Reset();
             }
         }
 
@@ -206,7 +206,7 @@ namespace Orleans.Runtime.Messaging
             finally
             {
                 _bufferWriter.Reset();
-                _serializationSession.FullReset();
+                _serializationSession.Reset();
             }
         }
 
