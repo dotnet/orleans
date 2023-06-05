@@ -37,7 +37,7 @@ namespace Orleans.Utilities
     /// <typeparam name="TObserver">
     /// The observer type.
     /// </typeparam>
-    public class ObserverManager<TIdentity, TObserver> : IEnumerable<TObserver>
+    public class ObserverManager<TIdentity, TObserver> : IEnumerable<TObserver> where TIdentity : notnull
     {
         /// <summary>
         /// The observers.
@@ -81,13 +81,7 @@ namespace Orleans.Utilities
         /// <summary>
         /// Gets a copy of the observers.
         /// </summary>
-        public IDictionary<TIdentity, TObserver> Observers
-        {
-            get
-            {
-                return _observers.ToDictionary(_ => _.Key, _ => _.Value.Observer);
-            }
-        }
+        public IDictionary<TIdentity, TObserver> Observers => _observers.ToDictionary(_ => _.Key, _ => _.Value.Observer);
 
         /// <summary>
         /// Removes all observers.
@@ -136,8 +130,11 @@ namespace Orleans.Utilities
         /// </param>
         public void Unsubscribe(TIdentity id)
         {
-            _log.LogDebug("Removed entry for {Id}. {Count} total observers after remove.", id, _observers.Count);
             _observers.Remove(id, out _);
+            if (_log.IsEnabled(LogLevel.Debug))
+            {
+                _log.LogDebug("Removed entry for {Id}. {Count} total observers after remove.", id, _observers.Count);
+            }
         }
 
         /// <summary>
@@ -192,7 +189,7 @@ namespace Orleans.Utilities
                     _observers.Remove(observer, out _);
                     if (_log.IsEnabled(LogLevel.Debug))
                     {
-                        _log.LogDebug("Removing defunct entry for {0}. {1} total observers after remove.", observer, _observers.Count);
+                        _log.LogDebug("Removing defunct entry for {Id}. {Count} total observers after remove.", observer, _observers.Count);
                     }
                 }
             }
@@ -247,7 +244,7 @@ namespace Orleans.Utilities
                     _observers.Remove(observer, out _);
                     if (_log.IsEnabled(LogLevel.Debug))
                     {
-                        _log.LogDebug("Removing defunct entry for {Observer}. {Count} total observers after remove.", observer, _observers.Count);
+                        _log.LogDebug("Removing defunct entry for {Id}. {Count} total observers after remove.", observer, _observers.Count);
                     }
                 }
             }
