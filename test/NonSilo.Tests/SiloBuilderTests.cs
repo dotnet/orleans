@@ -201,6 +201,23 @@ namespace NonSilo.Tests
             });
         }
 
+        [Fact]
+        public void SiloBuilderWithHotApplicationBuilderThrowsDuringStartupIfClientBuildersAdded()
+        {
+            Assert.Throws<OrleansConfigurationException>(() =>
+            {
+                _ = Host.CreateApplicationBuilder()
+                    .UseOrleansClient(clientBuilder =>
+                    {
+                        clientBuilder.UseLocalhostClustering();
+                    })
+                    .UseOrleans(siloBuilder =>
+                    {
+                        siloBuilder.UseLocalhostClustering();
+                    });
+            });
+        }
+
         private class FakeHostEnvironmentStatistics : IHostEnvironmentStatistics
         {
             public long? TotalPhysicalMemory => 0;

@@ -1,14 +1,9 @@
-using System;
-using System.Collections.Generic;
 using System.Diagnostics;
-using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
-using Orleans;
 using Orleans.Concurrency;
 using Orleans.Configuration;
-using Orleans.Hosting;
 using Orleans.Providers;
 using Orleans.Runtime;
 using Orleans.Streams;
@@ -39,8 +34,8 @@ namespace DefaultCluster.Tests.General
             public async Task InitializeAsync()
             {
                 var (siloPort, gatewayPort) = portAllocator.AllocateConsecutivePortPairs(1);
-                Host = new HostBuilder()
-                    .UseOrleans((ctx, siloBuilder) =>
+                Host = Microsoft.Extensions.Hosting.Host.CreateApplicationBuilder()
+                    .UseOrleans(siloBuilder =>
                     {
                         siloBuilder
                             .UseLocalhostClustering(siloPort, gatewayPort)
