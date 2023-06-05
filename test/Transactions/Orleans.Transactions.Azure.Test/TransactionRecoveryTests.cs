@@ -1,6 +1,4 @@
-using System.Threading.Tasks;
 using Microsoft.Extensions.Configuration;
-using Orleans.Hosting;
 using Orleans.TestingHost;
 using Orleans.Transactions.TestKit;
 using Orleans.Transactions.TestKit.xUnit;

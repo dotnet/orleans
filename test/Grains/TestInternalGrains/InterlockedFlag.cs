@@ -1,7 +1,4 @@
-﻿using System;
-using System.Threading;
-
-namespace UnitTests.TestHelper
+﻿namespace UnitTests.TestHelper
 {
     [Serializable]
     [Orleans.GenerateSerializer]

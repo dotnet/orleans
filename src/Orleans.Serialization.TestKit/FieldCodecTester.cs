@@ -14,7 +14,6 @@ using System.Text;
 using Xunit;
 using Orleans.Serialization.Serializers;
 using Xunit.Abstractions;
-using System.Threading;
 
 namespace Orleans.Serialization.TestKit
 {

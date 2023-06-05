@@ -1,5 +1,4 @@
-﻿using System.Threading.Tasks;
-using Orleans.Runtime;
+﻿using Orleans.Runtime;
 
 namespace UnitTests.GrainInterfaces
 {

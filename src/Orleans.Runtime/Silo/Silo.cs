@@ -14,9 +14,7 @@ using Orleans.Runtime.Messaging;
 using Orleans.Runtime.Scheduler;
 using Orleans.Services;
 using Orleans.Configuration;
-using Orleans.Serialization;
 using Orleans.Internal;
-using Orleans.Hosting;
 
 namespace Orleans.Runtime
 {

@@ -1,17 +1,10 @@
 using Orleans.Providers.Streams.Common;
-using Orleans.Runtime;
 using Orleans.Streaming.EventHubs;
 using Orleans.Streams;
-using Orleans.TestingHost.Utils;
-using System;
 using System.Collections.Concurrent;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Orleans.Configuration;
-using TestExtensions;
 using Xunit;
 using Orleans.Streaming.EventHubs.Testing;
 using Azure.Messaging.EventHubs;

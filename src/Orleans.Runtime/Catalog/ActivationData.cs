@@ -13,7 +13,6 @@ using Orleans.Core.Internal;
 using Orleans.GrainDirectory;
 using Orleans.Internal;
 using Orleans.Runtime.Scheduler;
-using Orleans.Serialization;
 using Orleans.Serialization.Invocation;
 using Orleans.Serialization.TypeSystem;
 

@@ -1,10 +1,8 @@
-using System.Threading.Tasks;
 using TestExtensions;
 using Xunit;
 using Orleans.TestingHost;
 using Tester.StorageFacet.Infrastructure;
 using Tester.StorageFacet.Implementations;
-using Orleans.Hosting;
 
 namespace Tester
 {

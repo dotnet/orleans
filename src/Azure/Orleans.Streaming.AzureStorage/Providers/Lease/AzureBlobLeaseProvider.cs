@@ -9,7 +9,6 @@ using Azure.Storage.Blobs.Models;
 using Azure.Storage.Blobs.Specialized;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
-using Orleans.Streaming.AzureStorage;
 
 namespace Orleans.LeaseProviders
 {

@@ -9,7 +9,6 @@ using Orleans.GrainReferences;
 using Orleans.Metadata;
 using Orleans.Runtime.Placement;
 using Orleans.Serialization.TypeSystem;
-using Orleans.Statistics;
 
 namespace Orleans.Runtime
 {

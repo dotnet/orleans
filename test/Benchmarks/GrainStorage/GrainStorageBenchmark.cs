@@ -1,12 +1,7 @@
-using System;
-using System.Threading.Tasks;
 using System.Diagnostics;
-using Orleans.Hosting;
 using Orleans.TestingHost;
 using TestExtensions;
 using BenchmarkGrainInterfaces.GrainStorage;
-using System.Collections.Generic;
-using System.Linq;
 
 namespace Benchmarks.GrainStorage
 {

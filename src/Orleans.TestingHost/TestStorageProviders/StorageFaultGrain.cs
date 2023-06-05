@@ -6,7 +6,6 @@ using Microsoft.Extensions.Logging;
 using Orleans.Runtime;
 using Microsoft.Extensions.DependencyInjection;
 using System.Threading;
-using Orleans.Timers.Internal;
 
 namespace Orleans.TestingHost
 {

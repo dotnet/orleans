@@ -1,7 +1,5 @@
 
 using System;
-using System.Collections.Generic;
-using Microsoft.Extensions.Options;
 using Orleans.Providers.Streams.Generator;
 
 namespace Orleans.Hosting

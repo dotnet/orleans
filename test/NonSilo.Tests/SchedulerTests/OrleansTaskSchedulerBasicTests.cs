@@ -1,6 +1,3 @@
-using System;
-using System.Threading;
-using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Orleans.Runtime;
 using Orleans.Runtime.Scheduler;
@@ -9,9 +6,7 @@ using Xunit;
 using Xunit.Abstractions;
 using Orleans.TestingHost.Utils;
 using Orleans.Internal;
-using System.Collections.Generic;
 using Orleans;
-using Orleans.Core;
 
 // ReSharper disable ConvertToConstant.Local
 

@@ -9,7 +9,6 @@ using Orleans.Transactions.Abstractions;
 using Orleans.Storage;
 using Orleans.Configuration;
 using Orleans.Timers.Internal;
-using System.Runtime.CompilerServices;
 
 namespace Orleans.Transactions.State
 {

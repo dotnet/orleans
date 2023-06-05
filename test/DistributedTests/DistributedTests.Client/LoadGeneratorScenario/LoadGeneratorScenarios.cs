@@ -1,7 +1,4 @@
-using System;
-using System.Threading.Tasks;
 using DistributedTests.GrainInterfaces;
-using Orleans;
 
 namespace DistributedTests.Client.LoadGeneratorScenario
 {
