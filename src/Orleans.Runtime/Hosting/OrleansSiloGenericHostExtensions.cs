@@ -39,11 +39,6 @@ namespace Microsoft.Extensions.Hosting
             ArgumentNullException.ThrowIfNull(hostAppBuilder);
             ArgumentNullException.ThrowIfNull(configureDelegate);
 
-            if (hostAppBuilder.Services.Any(service => service.ServiceType.Equals(MarkerType)))
-            {
-                throw GetOrleansClientAddedException();
-            }
-
             hostAppBuilder.Services.AddOrleans(configureDelegate);
 
             return hostAppBuilder;
