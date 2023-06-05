@@ -33,9 +33,9 @@ namespace Orleans.Runtime
                      + "which will be the case if you create it inside Task.Run.");
             }
 
-            this.grainContext = activationData;
+            grainContext = activationData;
             this.logger = logger;
-            this.Name = name;
+            Name = name;
             this.asyncCallback = asyncCallback;
             timer = new AsyncTaskSafeTimer(logger,
                 stateObj => TimerTick(stateObj, ctxt),
@@ -78,7 +78,7 @@ namespace Orleans.Runtime
             try
             {
                 // Schedule call back to grain context
-                var workItem = new AsyncClosureWorkItem(() => ForwardToAsyncCallback(state), this.Name, context);
+                var workItem = new AsyncClosureWorkItem(() => ForwardToAsyncCallback(state), Name, context);
                 context.Scheduler.QueueWorkItem(workItem);
                 await workItem.Task;
             }
@@ -102,7 +102,7 @@ namespace Orleans.Runtime
             try
             {
                 RequestContext.Clear(); // Clear any previous RC, so it does not leak into this call by mistake.
-                lock (this.currentlyExecutingTickTaskLock)
+                lock (currentlyExecutingTickTaskLock)
                 {
                     if (TimerAlreadyStopped) return;
 
@@ -177,7 +177,7 @@ namespace Orleans.Runtime
 
             Utils.SafeExecute(tmp.Dispose);
             timer = null;
-            lock (this.currentlyExecutingTickTaskLock)
+            lock (currentlyExecutingTickTaskLock)
             {
                 asyncCallback = null;
             }

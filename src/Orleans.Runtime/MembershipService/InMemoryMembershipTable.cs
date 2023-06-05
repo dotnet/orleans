@@ -26,14 +26,14 @@ namespace Orleans.Runtime.MembershipService
         public MembershipTableData Read(SiloAddress key)
         {
             return siloTable.TryGetValue(key, out var data) ?
-                new MembershipTableData(this.deepCopier.Copy(data), tableVersion)
+                new MembershipTableData(deepCopier.Copy(data), tableVersion)
                 : new MembershipTableData(tableVersion);
         }
 
         public MembershipTableData ReadAll()
         {
             return new MembershipTableData(siloTable.Values.Select(tuple => 
-                new Tuple<MembershipEntry, string>(this.deepCopier.Copy(tuple.Item1), tuple.Item2)).ToList(), tableVersion);
+                new Tuple<MembershipEntry, string>(deepCopier.Copy(tuple.Item1), tuple.Item2)).ToList(), tableVersion);
         }
 
         public TableVersion ReadTableVersion()

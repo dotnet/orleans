@@ -35,13 +35,13 @@ namespace Orleans.Runtime
         /// Gets the namespace.
         /// </summary>
         /// <value>The namespace.</value>
-        public ReadOnlyMemory<byte> Namespace => fullKey.AsMemory(0, this.keyIndex);
+        public ReadOnlyMemory<byte> Namespace => fullKey.AsMemory(0, keyIndex);
 
         /// <summary>
         /// Gets the key.
         /// </summary>
         /// <value>The key.</value>
-        public ReadOnlyMemory<byte> Key => fullKey.AsMemory(this.keyIndex);
+        public ReadOnlyMemory<byte> Key => fullKey.AsMemory(keyIndex);
 
         private StreamId(byte[] fullKey, ushort keyIndex, int hash)
         {
@@ -58,8 +58,8 @@ namespace Orleans.Runtime
         private StreamId(SerializationInfo info, StreamingContext context)
         {
             fullKey = (byte[])info.GetValue("fk", typeof(byte[]))!;
-            this.keyIndex = info.GetUInt16("ki");
-            this.hash = info.GetInt32("fh");
+            keyIndex = info.GetUInt16("ki");
+            hash = info.GetInt32("fh");
         }
 
         /// <summary>
@@ -141,7 +141,7 @@ namespace Orleans.Runtime
         public bool Equals(StreamId other) => fullKey.AsSpan().SequenceEqual(other.fullKey);
 
         /// <inheritdoc/>
-        public override bool Equals(object? obj) => obj is StreamId other ? this.Equals(other) : false;
+        public override bool Equals(object? obj) => obj is StreamId other ? Equals(other) : false;
 
         /// <summary>
         /// Compares two <see cref="StreamId"/> instances for equality.
@@ -163,8 +163,8 @@ namespace Orleans.Runtime
         public void GetObjectData(SerializationInfo info, StreamingContext context)
         {
             info.AddValue("fk", fullKey);
-            info.AddValue("ki", this.keyIndex);
-            info.AddValue("fh", this.hash);
+            info.AddValue("ki", keyIndex);
+            info.AddValue("fh", hash);
         }
 
         /// <inheritdoc/>
@@ -212,7 +212,7 @@ namespace Orleans.Runtime
         }
 
         /// <inheritdoc/>
-        public override int GetHashCode() => this.hash;
+        public override int GetHashCode() => hash;
 
         internal uint GetUniformHashCode() => (uint)hash;
 

@@ -19,10 +19,10 @@ namespace Orleans.Runtime
         private int lowestStoppedStage;
 
         /// <inheritdoc />
-        public int HighestCompletedStage => this.highestCompletedStage;
+        public int HighestCompletedStage => highestCompletedStage;
 
         /// <inheritdoc />
-        public int LowestStoppedStage => this.lowestStoppedStage;
+        public int LowestStoppedStage => lowestStoppedStage;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="SiloLifecycleSubject"/> class.
@@ -30,22 +30,22 @@ namespace Orleans.Runtime
         /// <param name="logger">The logger.</param>
         public SiloLifecycleSubject(ILogger<SiloLifecycleSubject> logger) : base(logger)
         {
-            this.observers = new List<MonitoredObserver>();
-            this.highestCompletedStage = int.MinValue;
-            this.lowestStoppedStage = int.MaxValue;
+            observers = new List<MonitoredObserver>();
+            highestCompletedStage = int.MinValue;
+            lowestStoppedStage = int.MaxValue;
         }
 
         /// <inheritdoc />
         public override Task OnStart(CancellationToken cancellationToken = default)
         {
-            foreach(var stage in this.observers.GroupBy(o => o.Stage).OrderBy(s => s.Key))
+            foreach(var stage in observers.GroupBy(o => o.Stage).OrderBy(s => s.Key))
             {
-                if (this.logger.IsEnabled(LogLevel.Debug))
+                if (logger.IsEnabled(LogLevel.Debug))
                 {
-                    this.logger.LogDebug(
+                    logger.LogDebug(
                         (int)ErrorCode.LifecycleStagesReport,
                         "Stage {Stage}: {Observers}",
-                        this.GetStageName(stage.Key),
+                        GetStageName(stage.Key),
                         string.Join(", ", stage.Select(o => o.Name)));
                 }                
             }
@@ -56,14 +56,14 @@ namespace Orleans.Runtime
         /// <inheritdoc />
         protected override void OnStartStageCompleted(int stage)
         {
-            Interlocked.Exchange(ref this.highestCompletedStage, stage);
+            Interlocked.Exchange(ref highestCompletedStage, stage);
             base.OnStartStageCompleted(stage);
         }
 
         /// <inheritdoc />
         protected override void OnStopStageCompleted(int stage)
         {
-            Interlocked.Exchange(ref this.lowestStoppedStage, stage);
+            Interlocked.Exchange(ref lowestStoppedStage, stage);
             base.OnStopStageCompleted(stage);
         }
 
@@ -77,12 +77,12 @@ namespace Orleans.Runtime
         /// <inheritdoc />
         protected override void PerfMeasureOnStop(int stage, TimeSpan elapsed)
         {
-            if (this.logger.IsEnabled(LogLevel.Debug))
+            if (logger.IsEnabled(LogLevel.Debug))
             {
-                this.logger.LogDebug(
+                logger.LogDebug(
                     (int)ErrorCode.SiloStartPerfMeasure,
                     "Stopping lifecycle stage {Stage} took {Elapsed} Milliseconds",
-                    this.GetStageName(stage),
+                    GetStageName(stage),
                     elapsed.TotalMilliseconds);
             }
         }
@@ -90,12 +90,12 @@ namespace Orleans.Runtime
         /// <inheritdoc />
         protected override void PerfMeasureOnStart(int stage, TimeSpan elapsed)
         {
-            if (this.logger.IsEnabled(LogLevel.Debug))
+            if (logger.IsEnabled(LogLevel.Debug))
             {
-                this.logger.LogDebug(
+                logger.LogDebug(
                     (int)ErrorCode.SiloStartPerfMeasure,
                     "Starting lifecycle stage {Stage} took {Elapsed} Milliseconds",
-                    this.GetStageName(stage),
+                    GetStageName(stage),
                     elapsed.TotalMilliseconds);
             }                
         }
@@ -103,8 +103,8 @@ namespace Orleans.Runtime
         /// <inheritdoc />
         public override IDisposable Subscribe(string observerName, int stage, ILifecycleObserver observer)
         {
-            var monitoredObserver = new MonitoredObserver(observerName, stage, this.GetStageName(stage), observer, this.logger);
-            this.observers.Add(monitoredObserver);
+            var monitoredObserver = new MonitoredObserver(observerName, stage, GetStageName(stage), observer, logger);
+            observers.Add(monitoredObserver);
             return base.Subscribe(observerName, stage, monitoredObserver);
         }
 
@@ -115,9 +115,9 @@ namespace Orleans.Runtime
 
             public MonitoredObserver(string name, int stage, string stageName, ILifecycleObserver observer, ILogger logger)
             {
-                this.Name = name;
-                this.Stage = stage;
-                this.StageName = stageName;
+                Name = name;
+                Stage = stage;
+                StageName = stageName;
                 this.observer = observer;
                 this.logger = logger;
             }
@@ -131,26 +131,26 @@ namespace Orleans.Runtime
                 try
                 {
                     var stopwatch = ValueStopwatch.StartNew();
-                    await this.observer.OnStart(ct);
+                    await observer.OnStart(ct);
                     stopwatch.Stop();
-                    if (this.logger.IsEnabled(LogLevel.Debug))
+                    if (logger.IsEnabled(LogLevel.Debug))
                     {
-                        this.logger.LogDebug(
+                        logger.LogDebug(
                             (int)ErrorCode.SiloStartPerfMeasure,
                             "{Name} started in stage {Stage} in {Elapsed} Milliseconds",
-                            this.Name,
-                            this.StageName,
+                            Name,
+                            StageName,
                             stopwatch.Elapsed.TotalMilliseconds);
                     }                    
                 }
                 catch (Exception exception)
                 {
-                    this.logger.LogError(
+                    logger.LogError(
                         (int)ErrorCode.LifecycleStartFailure,
                         exception,
                         "{Name} failed to start due to errors at stage {Stage}",
-                        this.Name,
-                        this.StageName);
+                        Name,
+                        StageName);
                     throw;
                 }
             }
@@ -160,26 +160,26 @@ namespace Orleans.Runtime
                 try
                 {
                     var stopwatch = ValueStopwatch.StartNew();
-                    await this.observer.OnStop(cancellationToken);
+                    await observer.OnStop(cancellationToken);
                     stopwatch.Stop();
-                    if (this.logger.IsEnabled(LogLevel.Debug))
+                    if (logger.IsEnabled(LogLevel.Debug))
                     {
-                        this.logger.LogDebug(
+                        logger.LogDebug(
                             (int)ErrorCode.SiloStartPerfMeasure,
                             "{Name} stopped in stage {Stage} in {Elapsed} Milliseconds.",
-                            this.Name,
-                            this.StageName,
+                            Name,
+                            StageName,
                             stopwatch.Elapsed.TotalMilliseconds);
                     }                    
                 }
                 catch (Exception exception)
                 {
-                    this.logger.LogError(
+                    logger.LogError(
                         (int)ErrorCode.LifecycleStartFailure,
                         exception,
                         "{Name} failed to stop due to errors at stage {Stage}",
-                        this.Name,
-                        this.StageName);
+                        Name,
+                        StageName);
                     throw;
                 }
             }

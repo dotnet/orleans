@@ -10,7 +10,7 @@ namespace UnitTests.Grains
 
         public Task<SiloAddress> GetSiloAddress()
         {
-            return Task.FromResult(this.Runtime.SiloAddress);
+            return Task.FromResult(Runtime.SiloAddress);
         }
     }
 }

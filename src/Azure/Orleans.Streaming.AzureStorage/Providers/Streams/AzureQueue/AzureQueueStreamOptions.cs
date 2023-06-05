@@ -108,14 +108,14 @@ namespace Orleans.Configuration
 
         public void ValidateConfiguration()
         {
-            if (this.options.CreateClient is null)
+            if (options.CreateClient is null)
             {
                 throw new OrleansConfigurationException($"No credentials specified. Use the {options.GetType().Name}.{nameof(AzureQueueOptions.ConfigureQueueServiceClient)} method to configure the Azure Queue Service client.");
             }
 
             if (options.QueueNames == null || options.QueueNames.Count == 0)
                 throw new OrleansConfigurationException(
-                    $"{nameof(AzureQueueOptions)} on stream provider {this.name} is invalid. {nameof(AzureQueueOptions.QueueNames)} is invalid");
+                    $"{nameof(AzureQueueOptions)} on stream provider {name} is invalid. {nameof(AzureQueueOptions.QueueNames)} is invalid");
         }
 
         public static IConfigurationValidator Create(IServiceProvider services, string name)

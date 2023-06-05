@@ -51,7 +51,7 @@ namespace UnitTests.StreamingTests
         public GeneratedImplicitSubscriptionStreamRecoveryTests(Fixture fixture)
         {
             this.fixture = fixture;
-            this.runner = new ImplicitSubscritionRecoverableStreamTestRunner(
+            runner = new ImplicitSubscritionRecoverableStreamTestRunner(
                 this.fixture.GrainFactory,
                 Fixture.StreamProviderName);
         }
@@ -59,7 +59,7 @@ namespace UnitTests.StreamingTests
         [Fact, TestCategory("Functional"), TestCategory("Streaming")]
         public async Task Recoverable100EventStreamsWithTransientErrorsTest()
         {
-            this.fixture.Logger.LogInformation("************************ Recoverable100EventStreamsWithTransientErrorsTest *********************************");
+            fixture.Logger.LogInformation("************************ Recoverable100EventStreamsWithTransientErrorsTest *********************************");
             await runner.Recoverable100EventStreamsWithTransientErrors(GenerateEvents,
                 ImplicitSubscription_TransientError_RecoverableStream_CollectorGrain.StreamNamespace,
                 TotalQueueCount,
@@ -69,7 +69,7 @@ namespace UnitTests.StreamingTests
         [Fact, TestCategory("Functional"), TestCategory("Streaming")]
         public async Task Recoverable100EventStreamsWith1NonTransientErrorTest()
         {
-            this.fixture.Logger.LogInformation("************************ Recoverable100EventStreamsWith1NonTransientErrorTest *********************************");
+            fixture.Logger.LogInformation("************************ Recoverable100EventStreamsWith1NonTransientErrorTest *********************************");
             await runner.Recoverable100EventStreamsWith1NonTransientError(GenerateEvents,
                 ImplicitSubscription_NonTransientError_RecoverableStream_CollectorGrain.StreamNamespace,
                 TotalQueueCount,
@@ -84,7 +84,7 @@ namespace UnitTests.StreamingTests
                 EventsInStream = eventsInStream
             };
 
-            var mgmt = this.fixture.GrainFactory.GetGrain<IManagementGrain>(0);
+            var mgmt = fixture.GrainFactory.GetGrain<IManagementGrain>(0);
             object[] results = await mgmt.SendControlCommandToProvider(StreamProviderTypeName, Fixture.StreamProviderName, (int)StreamGeneratorCommand.Configure, generatorConfig);
             Assert.Equal(2, results.Length);
             bool[] bResults = results.Cast<bool>().ToArray();

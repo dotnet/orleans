@@ -65,9 +65,9 @@ namespace Orleans.Runtime.Membership
             this.logger = logger;
             var options = membershipTableOptions.Value;
             watcher = new ZooKeeperWatcher(logger);
-            this.clusterPath = "/" + clusterOptions.Value.ClusterId;
+            clusterPath = "/" + clusterOptions.Value.ClusterId;
             rootConnectionString = options.ConnectionString;
-            deploymentConnectionString = options.ConnectionString + this.clusterPath;
+            deploymentConnectionString = options.ConnectionString + clusterPath;
         }
 
         /// <summary>
@@ -85,14 +85,14 @@ namespace Orleans.Runtime.Membership
             {
                 try
                 {
-                    await zk.createAsync(this.clusterPath, null, ZooDefs.Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
-                    await zk.sync(this.clusterPath);
+                    await zk.createAsync(clusterPath, null, ZooDefs.Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
+                    await zk.sync(clusterPath);
                     //if we got here we know that we've just created the deployment path with version=0
-                    this.logger.LogInformation("Created new deployment path: {DeploymentPath}", this.clusterPath);
+                    logger.LogInformation("Created new deployment path: {DeploymentPath}", clusterPath);
                 }
                 catch (KeeperException.NodeExistsException)
                 {
-                    this.logger.LogDebug("Deployment path already exists: {DeploymentPath}", this.clusterPath);
+                    logger.LogDebug("Deployment path already exists: {DeploymentPath}", clusterPath);
                 }
             });
         }
@@ -125,7 +125,7 @@ namespace Orleans.Runtime.Membership
 
                 var tableVersion = ConvertToTableVersion((await getTableNodeTask).Stat);
                 return new MembershipTableData(rows, tableVersion);
-            }, this.deploymentConnectionString, this.watcher, true);
+            }, deploymentConnectionString, watcher, true);
         }
 
         /// <summary>
@@ -137,7 +137,7 @@ namespace Orleans.Runtime.Membership
         /// TableVersion, all read atomically.</returns>
         public Task<MembershipTableData> ReadAll()
         {
-            return ReadAll(this.deploymentConnectionString, this.watcher);
+            return ReadAll(deploymentConnectionString, watcher);
         }
 
         internal static Task<MembershipTableData> ReadAll(string deploymentConnectionString, ZooKeeperWatcher watcher)
@@ -237,7 +237,7 @@ namespace Orleans.Runtime.Membership
             string rowIAmAlivePath = ConvertToRowIAmAlivePath(entry.SiloAddress);
             byte[] newRowIAmAliveData = Serialize(entry.IAmAliveTime);
             //update the data for IAmAlive unconditionally
-            return UsingZookeeper(zk => zk.setDataAsync(rowIAmAlivePath, newRowIAmAliveData), this.deploymentConnectionString, this.watcher);
+            return UsingZookeeper(zk => zk.setDataAsync(rowIAmAlivePath, newRowIAmAliveData), deploymentConnectionString, watcher);
         }
 
         /// <summary>
@@ -257,7 +257,7 @@ namespace Orleans.Runtime.Membership
         {
             try
             {
-                await UsingZookeeper(zk => transactionFunc(zk.transaction()).commitAsync(), this.deploymentConnectionString, this.watcher);
+                await UsingZookeeper(zk => transactionFunc(zk.transaction()).commitAsync(), deploymentConnectionString, watcher);
                 return true;
             }
             catch (KeeperException e)

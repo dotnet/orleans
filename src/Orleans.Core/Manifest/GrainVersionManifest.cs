@@ -161,7 +161,7 @@ namespace Orleans.Runtime.Versions
             MajorMinorVersion? minCacheVersion = null;
             foreach (var version in versions)
             {
-                (var cacheVersion, var silosWithGrain) = this.GetSupportedSilos(grainType);
+                (var cacheVersion, var silosWithGrain) = GetSupportedSilos(grainType);
                 if (!minCacheVersion.HasValue || cacheVersion > minCacheVersion.Value)
                 {
                     minCacheVersion = cacheVersion;
@@ -170,7 +170,7 @@ namespace Orleans.Runtime.Versions
                 // We need to sort this so the list of silos returned will
                 // be the same across all silos in the cluster
                 SiloAddress[] silosWithCorrectVersion;
-                (cacheVersion, silosWithCorrectVersion) = this.GetSupportedSilos(interfaceType, version);
+                (cacheVersion, silosWithCorrectVersion) = GetSupportedSilos(interfaceType, version);
 
                 if (!minCacheVersion.HasValue || cacheVersion > minCacheVersion.Value)
                 {
@@ -314,10 +314,10 @@ namespace Orleans.Runtime.Versions
                 Dictionary<(GrainInterfaceType, ushort), SiloAddress[]> supportedSilosByInterface,
                 Dictionary<GrainType, SiloAddress[]> supportedSilosByGrainType)
             {
-                this.Version = version;
-                this.AvailableVersions = availableVersions;
-                this.SupportedSilosByGrainType = supportedSilosByGrainType;
-                this.SupportedSilosByInterface = supportedSilosByInterface;
+                Version = version;
+                AvailableVersions = availableVersions;
+                SupportedSilosByGrainType = supportedSilosByGrainType;
+                SupportedSilosByInterface = supportedSilosByInterface;
             }
 
             public MajorMinorVersion Version { get; }

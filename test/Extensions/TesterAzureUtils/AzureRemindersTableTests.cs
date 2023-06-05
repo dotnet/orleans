@@ -39,7 +39,7 @@ namespace UnitTests.RemindersTest
             TestUtils.CheckForAzureStorage();
             var options = Options.Create(new AzureTableReminderStorageOptions());
             options.Value.ConfigureTestDefaults();
-            return new AzureBasedReminderTable(loggerFactory, this.clusterOptions, options);
+            return new AzureBasedReminderTable(loggerFactory, clusterOptions, options);
         }
 
         protected override Task<string> GetConnectionString()

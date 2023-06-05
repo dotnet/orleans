@@ -24,14 +24,14 @@ namespace TestExtensions
             }
             catch (Exception ex)
             {
-                this.preconditionsException = ExceptionDispatchInfo.Capture(ex);
+                preconditionsException = ExceptionDispatchInfo.Capture(ex);
                 return;
             }
         }
 
         public void EnsurePreconditionsMet()
         {
-            this.preconditionsException?.Throw();
+            preconditionsException?.Throw();
         }
 
         protected virtual void CheckPreconditionsOrThrow() { }
@@ -42,9 +42,9 @@ namespace TestExtensions
 
         public TestCluster HostedCluster { get; private set; }
 
-        public IGrainFactory GrainFactory => this.HostedCluster?.GrainFactory;
+        public IGrainFactory GrainFactory => HostedCluster?.GrainFactory;
 
-        public IClusterClient Client => this.HostedCluster?.Client;
+        public IClusterClient Client => HostedCluster?.Client;
 
         public ILogger Logger { get; private set; }
         
@@ -52,10 +52,10 @@ namespace TestExtensions
 
         public virtual async Task InitializeAsync()
         {
-            this.EnsurePreconditionsMet();
+            EnsurePreconditionsMet();
             var builder = new TestClusterBuilder();
             TestDefaultConfiguration.ConfigureTestCluster(builder);
-            this.ConfigureTestCluster(builder);
+            ConfigureTestCluster(builder);
 
             var testCluster = builder.Build();
             if (testCluster.Primary == null)
@@ -63,13 +63,13 @@ namespace TestExtensions
                 await testCluster.DeployAsync().ConfigureAwait(false);
             }
 
-            this.HostedCluster = testCluster;
-            this.Logger = this.Client.ServiceProvider.GetRequiredService<ILoggerFactory>().CreateLogger("Application");
+            HostedCluster = testCluster;
+            Logger = Client.ServiceProvider.GetRequiredService<ILoggerFactory>().CreateLogger("Application");
         }
 
         public virtual async Task DisposeAsync()
         {
-            var cluster = this.HostedCluster;
+            var cluster = HostedCluster;
             if (cluster is null) return;
 
             try

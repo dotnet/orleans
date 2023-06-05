@@ -17,7 +17,7 @@ namespace Orleans.Runtime
         /// <param name="version">The underlying version.</param>
         public MembershipVersion(long version)
         {
-            this.Value = version;
+            Value = version;
         }
 
         /// <summary>
@@ -32,19 +32,19 @@ namespace Orleans.Runtime
         public static MembershipVersion MinValue => new MembershipVersion(long.MinValue);
 
         /// <inheritdoc/>
-        public int CompareTo(MembershipVersion other) => this.Value.CompareTo(other.Value);
+        public int CompareTo(MembershipVersion other) => Value.CompareTo(other.Value);
 
         /// <inheritdoc/>
-        public bool Equals(MembershipVersion other) => this.Value == other.Value;
+        public bool Equals(MembershipVersion other) => Value == other.Value;
 
         /// <inheritdoc/>
-        public override bool Equals(object obj) => obj is MembershipVersion other && this.Equals(other);
+        public override bool Equals(object obj) => obj is MembershipVersion other && Equals(other);
 
         /// <inheritdoc/>
-        public override int GetHashCode() => this.Value.GetHashCode();
+        public override int GetHashCode() => Value.GetHashCode();
 
         /// <inheritdoc/>
-        public override string ToString() => this.Value.ToString();
+        public override string ToString() => Value.ToString();
 
         /// <summary>
         /// Compares the provided operands for equality.

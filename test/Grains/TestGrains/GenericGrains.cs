@@ -387,13 +387,13 @@ namespace UnitTests.Grains
 
         public Task SetA(T a)
         {
-            this._a = a;
+            _a = a;
             return Task.CompletedTask;
         }
 
         public Task SetB(U b)
         {
-            this._b = b;
+            _b = b;
             return Task.CompletedTask;
         }
     }
@@ -545,7 +545,7 @@ namespace UnitTests.Grains
         public PingSelfGrain(ILogger<PingSelfGrain<T>> logger, IGrainContext context, ITimerRegistry timerRegistry)
         {
             this.logger = logger;
-            this.GrainContext = context;
+            GrainContext = context;
             _timerRegistry = timerRegistry;
         }
 
@@ -580,7 +580,7 @@ namespace UnitTests.Grains
                 GrainContext,
                 o =>
                 {
-                    this.logger.LogDebug("***Timer fired for pinging {0}***", target.GetPrimaryKey());
+                    logger.LogDebug("***Timer fired for pinging {0}***", target.GetPrimaryKey());
                     return target.Ping(t);
                 },
                 null,
@@ -602,13 +602,13 @@ namespace UnitTests.Grains
 
         public Task OnActivateAsync(CancellationToken cancellationToken)
         {
-            this.logger.LogDebug("***Activating*** {0}", this.GetPrimaryKey());
+            logger.LogDebug("***Activating*** {0}", this.GetPrimaryKey());
             return Task.CompletedTask;
         }
 
         public Task OnDeactivateAsync(DeactivationReason deactivationReason, CancellationToken cancellationToken)
         {
-            this.logger.LogDebug("***Deactivating*** {0}", this.GetPrimaryKey());
+            logger.LogDebug("***Deactivating*** {0}", this.GetPrimaryKey());
             return Task.CompletedTask;
         }
     }
@@ -698,7 +698,7 @@ namespace UnitTests.Grains
         public async Task<T> LongRunningTask(T t, TimeSpan delay)
         {
             await Task.Delay(delay);
-            this.lastValue = t;
+            lastValue = t;
             return await Task.FromResult(t);
         }
 
@@ -834,7 +834,7 @@ namespace UnitTests.Grains
             this.reducer = reducer;
         }
 
-        public Task<TState> Go(TState prevState, TAction act) => this.reducer.Handle(prevState, act);
+        public Task<TState> Go(TState prevState, TAction act) => reducer.Handle(prevState, act);
     }
 
     namespace Generic.EdgeCases
@@ -850,7 +850,7 @@ namespace UnitTests.Grains
             }
 
             public Task<string[]> ConcreteGenArgTypeNames() {
-                var grainType = GetImmediateSubclass(this.GetType());
+                var grainType = GetImmediateSubclass(GetType());
 
                 return Task.FromResult(
                                 grainType.GetGenericArguments()

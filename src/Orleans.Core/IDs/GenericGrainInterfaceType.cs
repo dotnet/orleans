@@ -27,7 +27,7 @@ namespace Orleans.Runtime
         /// <summary>
         /// Returns <see langword="true" /> if this instance contains concrete type parameters.
         /// </summary>
-        public bool IsConstructed => TypeConverterExtensions.IsConstructed(this.Value.Value);
+        public bool IsConstructed => TypeConverterExtensions.IsConstructed(Value.Value);
 
         /// <summary>
         /// Returns the generic interface id corresponding to the provided value.
@@ -58,14 +58,14 @@ namespace Orleans.Runtime
         /// </summary>
         public GenericGrainInterfaceType Construct(TypeConverter formatter, params Type[] typeArguments)
         {
-            var constructed = formatter.GetConstructed(this.Value.Value, typeArguments);
+            var constructed = formatter.GetConstructed(Value.Value, typeArguments);
             return new GenericGrainInterfaceType(new GrainInterfaceType(constructed));
         }
 
         /// <summary>
         /// Returns the type arguments which this instance was constructed with.
         /// </summary>
-        public Type[] GetArguments(TypeConverter formatter) => formatter.GetArguments(this.Value.Value);
+        public Type[] GetArguments(TypeConverter formatter) => formatter.GetArguments(Value.Value);
 
         /// <summary>
         /// Returns a UTF8 interpretation of the current instance.

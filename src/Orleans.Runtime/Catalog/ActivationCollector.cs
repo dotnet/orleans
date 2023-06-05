@@ -324,7 +324,7 @@ namespace Orleans.Runtime
             condemned ??= new();
             condemned.Add(activation);
 
-            this.Debug_OnDecideToCollectActivation?.Invoke(activation.GrainId);
+            Debug_OnDecideToCollectActivation?.Invoke(activation.GrainId);
         }
 
         private void ThrowIfTicketIsInvalid(DateTime ticket)
@@ -451,11 +451,11 @@ namespace Orleans.Runtime
             {
                 try
                 {
-                    await this.CollectActivationsImpl(true);
+                    await CollectActivationsImpl(true);
                 }
                 catch (Exception exception)
                 {
-                    this.logger.LogError(exception, "Exception while collecting activations");
+                    logger.LogError(exception, "Exception while collecting activations");
                 }
             }
         }

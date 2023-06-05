@@ -22,19 +22,19 @@ namespace Orleans.Messaging
         public StaticGatewayListProvider(IOptions<StaticGatewayListProviderOptions> options, IOptions<GatewayOptions> gatewayOptions)
         {
             this.options = options.Value;
-            this.maxStaleness = gatewayOptions.Value.GatewayListRefreshPeriod;
+            maxStaleness = gatewayOptions.Value.GatewayListRefreshPeriod;
         }
 
         /// <inheritdoc />
         public Task InitializeGatewayListProvider() => Task.CompletedTask;
         
         /// <inheritdoc />
-        public Task<IList<Uri>> GetGateways() => Task.FromResult<IList<Uri>>(this.options.Gateways);
+        public Task<IList<Uri>> GetGateways() => Task.FromResult<IList<Uri>>(options.Gateways);
 
         /// <inheritdoc />
         public TimeSpan MaxStaleness
         {
-            get => this.maxStaleness;
+            get => maxStaleness;
         }
 
         /// <inheritdoc />

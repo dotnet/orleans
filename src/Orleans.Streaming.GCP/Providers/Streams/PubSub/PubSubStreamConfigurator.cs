@@ -12,7 +12,7 @@ namespace Orleans.Hosting
         public SiloPubSubStreamConfigurator(string name, Action<Action<IServiceCollection>> configureServicesDelegate)
             : base(name, configureServicesDelegate, PubSubAdapterFactory<TDataAdapter>.Create)
         {
-            this.ConfigureDelegate(services =>
+            ConfigureDelegate(services =>
             {
                 services.ConfigureNamedOptionForLogging<PubSubOptions>(name)
                     .ConfigureNamedOptionForLogging<SimpleQueueCacheOptions>(name)

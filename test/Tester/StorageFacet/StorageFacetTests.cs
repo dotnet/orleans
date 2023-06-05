@@ -63,7 +63,7 @@ namespace Tester
         private async Task ExampleStorageHappyPath<TGrainInterface>()
             where TGrainInterface : IStorageFacetGrain
         {
-            IStorageFacetGrain grain = this.fixture.GrainFactory.GetGrain<TGrainInterface>(0);
+            IStorageFacetGrain grain = fixture.GrainFactory.GetGrain<TGrainInterface>(0);
             string[] names = await grain.GetNames();
             string[] info = await grain.GetExtendedInfo();
             Assert.Equal(2, names.Length);
@@ -89,7 +89,7 @@ namespace Tester
         private async Task ExampleStorageDefaultPath<TGrainInterface>()
             where TGrainInterface : IStorageFacetGrain
         {
-            IStorageFacetGrain grain = this.fixture.GrainFactory.GetGrain<TGrainInterface>(0);
+            IStorageFacetGrain grain = fixture.GrainFactory.GetGrain<TGrainInterface>(0);
             string[] names = await grain.GetNames();
             string[] info = await grain.GetExtendedInfo();
             Assert.Equal(2, names.Length);

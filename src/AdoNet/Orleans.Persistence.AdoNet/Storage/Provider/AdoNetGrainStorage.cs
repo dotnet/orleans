@@ -135,13 +135,13 @@ namespace Orleans.Storage
             this.providerRuntime = providerRuntime;
             this.name = name;
             this.logger = logger;
-            this.serviceId = clusterOptions.Value.ServiceId;
-            this.Serializer = options.Value.GrainStorageSerializer;
+            serviceId = clusterOptions.Value.ServiceId;
+            Serializer = options.Value.GrainStorageSerializer;
         }
 
         public void Participate(ISiloLifecycle lifecycle)
         {
-            lifecycle.Subscribe(OptionFormattingUtilities.Name<AdoNetGrainStorage>(this.name), this.options.InitStage, Init, Close);
+            lifecycle.Subscribe(OptionFormattingUtilities.Name<AdoNetGrainStorage>(name), options.InitStage, Init, Close);
         }
         /// <summary>Clear state data function for this storage provider.</summary>
         /// <see cref="IGrainStorage.ClearStateAsync{T}"/>.
@@ -166,8 +166,8 @@ namespace Orleans.Storage
             string storageVersion = null;
             try
             {
-                var grainIdHash = HashPicker.PickHasher(serviceId, this.name, baseGrainType, grainReference, grainState).Hash(grainId.GetHashBytes());
-                var grainTypeHash = HashPicker.PickHasher(serviceId, this.name, baseGrainType, grainReference, grainState).Hash(Encoding.UTF8.GetBytes(baseGrainType));
+                var grainIdHash = HashPicker.PickHasher(serviceId, name, baseGrainType, grainReference, grainState).Hash(grainId.GetHashBytes());
+                var grainTypeHash = HashPicker.PickHasher(serviceId, name, baseGrainType, grainReference, grainState).Hash(Encoding.UTF8.GetBytes(baseGrainType));
                 var clearRecord = (await Storage.ReadAsync(CurrentOperationalQueries.ClearState, command =>
                 {
                     command.AddParameter("GrainIdHash", grainIdHash);
@@ -196,7 +196,7 @@ namespace Orleans.Storage
             }
 
             const string OperationString = "ClearState";
-            var inconsistentStateException = CheckVersionInconsistency(OperationString, serviceId, this.name, storageVersion, grainState.ETag, baseGrainType, grainId.ToString());
+            var inconsistentStateException = CheckVersionInconsistency(OperationString, serviceId, name, storageVersion, grainState.ETag, baseGrainType, grainId.ToString());
             if(inconsistentStateException != null)
             {
                 throw inconsistentStateException;
@@ -242,8 +242,8 @@ namespace Orleans.Storage
             try
             {
                 var commandBehavior = CommandBehavior.Default;
-                var grainIdHash = HashPicker.PickHasher(serviceId, this.name, baseGrainType, grainReference, grainState).Hash(grainId.GetHashBytes());
-                var grainTypeHash = HashPicker.PickHasher(serviceId, this.name, baseGrainType, grainReference, grainState).Hash(Encoding.UTF8.GetBytes(baseGrainType));
+                var grainIdHash = HashPicker.PickHasher(serviceId, name, baseGrainType, grainReference, grainState).Hash(grainId.GetHashBytes());
+                var grainTypeHash = HashPicker.PickHasher(serviceId, name, baseGrainType, grainReference, grainState).Hash(Encoding.UTF8.GetBytes(baseGrainType));
                 var readRecords = (await Storage.ReadAsync(
                     CurrentOperationalQueries.ReadFromStorage,
                     command =>
@@ -343,11 +343,11 @@ namespace Orleans.Storage
             string storageVersion = null;
             try
             {
-                var grainIdHash = HashPicker.PickHasher(serviceId, this.name, baseGrainType, grainReference, grainState).Hash(grainId.GetHashBytes());
-                var grainTypeHash = HashPicker.PickHasher(serviceId, this.name, baseGrainType, grainReference, grainState).Hash(Encoding.UTF8.GetBytes(baseGrainType));
+                var grainIdHash = HashPicker.PickHasher(serviceId, name, baseGrainType, grainReference, grainState).Hash(grainId.GetHashBytes());
+                var grainTypeHash = HashPicker.PickHasher(serviceId, name, baseGrainType, grainReference, grainState).Hash(Encoding.UTF8.GetBytes(baseGrainType));
                 var writeRecord = await Storage.ReadAsync(CurrentOperationalQueries.WriteToStorage, command =>
                 {
-                    var serialized = this.Serializer.Serialize<T>(grainState.State);
+                    var serialized = Serializer.Serialize<T>(grainState.State);
 
                     command.AddParameter("GrainIdHash", grainIdHash);
                     command.AddParameter("GrainIdN0", grainId.N0Key);
@@ -377,7 +377,7 @@ namespace Orleans.Storage
             }
 
             const string OperationString = "WriteState";
-            var inconsistentStateException = CheckVersionInconsistency(OperationString, serviceId, this.name, storageVersion, grainState.ETag, baseGrainType, grainId.ToString());
+            var inconsistentStateException = CheckVersionInconsistency(OperationString, serviceId, name, storageVersion, grainState.ETag, baseGrainType, grainId.ToString());
             if(inconsistentStateException != null)
             {
                 throw inconsistentStateException;

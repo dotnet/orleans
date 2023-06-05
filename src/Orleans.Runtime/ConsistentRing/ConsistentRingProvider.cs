@@ -111,7 +111,7 @@ namespace Orleans.Runtime.ConsistentRing
                     NotifyLocalRangeSubscribers(oldRange, myRange, false);
                 }
 
-                log.LogInformation("Added Server {SiloAddress}. Current view: {CurrentView}", silo.ToStringWithHashCode(), this.ToString());
+                log.LogInformation("Added Server {SiloAddress}. Current view: {CurrentView}", silo.ToStringWithHashCode(), ToString());
             }
         }
 
@@ -147,12 +147,12 @@ namespace Orleans.Runtime.ConsistentRing
                 int myNewIndex = membershipRingList.IndexOf(MyAddress);
 
                 if (myNewIndex == -1)
-                    throw new OrleansException($"{MyAddress}: Couldn't find my position in the ring {this.ToString()}.");
+                    throw new OrleansException($"{MyAddress}: Couldn't find my position in the ring {ToString()}.");
 
                 bool wasMyPred = ((myNewIndex == indexOfFailedSilo) || (myNewIndex == 0 && indexOfFailedSilo == membershipRingList.Count)); // no need for '- 1'
                 if (wasMyPred) // failed node was our predecessor
                 {
-                    if (log.IsEnabled(LogLevel.Debug)) log.LogDebug("Failed server was my predecessor? {WasPredecessor}, updated view {CurrentView}", wasMyPred, this.ToString());
+                    if (log.IsEnabled(LogLevel.Debug)) log.LogDebug("Failed server was my predecessor? {WasPredecessor}, updated view {CurrentView}", wasMyPred, ToString());
 
                     IRingRange oldRange = myRange;
                     if (membershipRingList.Count == 1) // i'm the only one left
@@ -174,7 +174,7 @@ namespace Orleans.Runtime.ConsistentRing
                     "Removed Server {SiloAddress} hash {Hash}. Current view {CurrentView}",
                     silo,
                     silo.GetConsistentHashCode(),
-                    this.ToString());
+                    ToString());
             }
         }
 

@@ -97,7 +97,7 @@ namespace Orleans.Streams
         {
             logger.LogInformation((int)ErrorCode.PersistentStreamPullingManager_02, "Init.");
 
-            await this.queueBalancer.Initialize(this.adapterFactory.GetStreamQueueMapper());
+            await queueBalancer.Initialize(adapterFactory.GetStreamQueueMapper());
             queueBalancer.SubscribeToQueueDistributionChangeEvents(this);
 
             List<QueueId> myQueues = queueBalancer.GetMyQueues().ToList();
@@ -107,7 +107,7 @@ namespace Orleans.Streams
                 myQueues.Count,
                 PrintQueues(myQueues));
 
-            queuePrintTimer = this.RegisterTimer(AsyncTimerCallback, null, QUEUES_PRINT_PERIOD, QUEUES_PRINT_PERIOD);
+            queuePrintTimer = RegisterTimer(AsyncTimerCallback, null, QUEUES_PRINT_PERIOD, QUEUES_PRINT_PERIOD);
             managerState = RunState.Initialized;
         }
 
@@ -117,10 +117,10 @@ namespace Orleans.Streams
             if (queuePrintTimer != null)
             {
                 queuePrintTimer.Dispose();
-                this.queuePrintTimer = null;
+                queuePrintTimer = null;
             }
-            await this.queueBalancer.Shutdown();
-            this.queueBalancer = null;
+            await queueBalancer.Shutdown();
+            queueBalancer = null;
         }
 
         public async Task StartAgents()
@@ -155,7 +155,7 @@ namespace Orleans.Streams
         /// </summary>
         public Task QueueDistributionChangeNotification()
         {
-            return this.RunOrQueueTask(() => this.HandleQueueDistributionChangeNotification());
+            return this.RunOrQueueTask(() => HandleQueueDistributionChangeNotification());
         }
 
         public Task HandleQueueDistributionChangeNotification()
@@ -258,10 +258,10 @@ namespace Orleans.Streams
                     try
                     {
                         var agentIdNumber = Interlocked.Increment(ref nextAgentId);
-                        var agentId = SystemTargetGrainId.Create(Constants.StreamPullingAgentType, this.Silo, $"{streamProviderName}_{agentIdNumber}_{queueId:H}");
+                        var agentId = SystemTargetGrainId.Create(Constants.StreamPullingAgentType, Silo, $"{streamProviderName}_{agentIdNumber}_{queueId:H}");
                         IStreamFailureHandler deliveryFailureHandler = await adapterFactory.GetDeliveryFailureHandler(queueId);
-                        agent = new PersistentStreamPullingAgent(agentId, streamProviderName, this.loggerFactory, pubSub, streamFilter, queueId, this.options, this.Silo, queueAdapter, queueAdapterCache, deliveryFailureHandler);
-                        this.ActivationServices.GetRequiredService<Catalog>().RegisterSystemTarget(agent);
+                        agent = new PersistentStreamPullingAgent(agentId, streamProviderName, loggerFactory, pubSub, streamFilter, queueId, options, Silo, queueAdapter, queueAdapterCache, deliveryFailureHandler);
+                        ActivationServices.GetRequiredService<Catalog>().RegisterSystemTarget(agent);
                         queuesToAgentsMap.Add(queueId, agent);
                         agents.Add(agent);
                     }

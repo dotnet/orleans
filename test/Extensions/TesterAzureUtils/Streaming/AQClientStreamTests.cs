@@ -29,7 +29,7 @@ namespace Tester.AzureUtils.Streaming
         public override async Task InitializeAsync()
         {
             await base.InitializeAsync();
-            runner = new ClientStreamTestRunner(this.HostedCluster);
+            runner = new ClientStreamTestRunner(HostedCluster);
         }
 
         protected override void ConfigureTestCluster(TestClusterBuilder builder)
@@ -72,7 +72,7 @@ namespace Tester.AzureUtils.Streaming
             await base.DisposeAsync();
             if (!string.IsNullOrWhiteSpace(TestDefaultConfiguration.DataConnectionString))
             {
-                var serviceId = this.HostedCluster.Client.ServiceProvider.GetRequiredService<IOptions<ClusterOptions>>().Value.ServiceId;
+                var serviceId = HostedCluster.Client.ServiceProvider.GetRequiredService<IOptions<ClusterOptions>>().Value.ServiceId;
                 await AzureQueueStreamProviderUtils.DeleteAllUsedAzureQueues(NullLoggerFactory.Instance, AzureQueueStreamProviderUtils.GenerateDefaultAzureQueueNames(serviceId, AQStreamProviderName),
                     new AzureQueueOptions().ConfigureTestDefaults());
                 await TestAzureTableStorageStreamFailureHandler.DeleteAll();

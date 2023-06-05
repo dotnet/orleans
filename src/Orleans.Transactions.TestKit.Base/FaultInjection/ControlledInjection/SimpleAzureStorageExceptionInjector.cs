@@ -22,9 +22,9 @@ namespace Orleans.Transactions.TestKit
             if (InjectAfterStore)
             {
                 InjectAfterStore = false;
-                this.injectionAfterStoreCounter++;
+                injectionAfterStoreCounter++;
                 var message = $"Storage exception thrown after store, thrown total {injectionAfterStoreCounter}";
-                this.logger.LogInformation(message);
+                logger.LogInformation(message);
                 throw new SimpleAzureStorageException(message);
             }
         }
@@ -34,9 +34,9 @@ namespace Orleans.Transactions.TestKit
             if (InjectBeforeStore)
             {
                 InjectBeforeStore = false;
-                this.injectionBeforeStoreCounter++;
+                injectionBeforeStoreCounter++;
                 var message = $"Storage exception thrown before store. Thrown total {injectionBeforeStoreCounter}";
-                this.logger.LogInformation(message);
+                logger.LogInformation(message);
                 throw new SimpleAzureStorageException(message);
             }
         }

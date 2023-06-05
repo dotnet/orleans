@@ -15,13 +15,13 @@ namespace Orleans.Runtime.Scheduler
 
         public override string Name => $"RequestWorkItem:Id={request.Id}";
 
-        public override IGrainContext GrainContext => this.target;
+        public override IGrainContext GrainContext => target;
 
         public override void Execute()
         {
             try
             {
-                RuntimeContext.SetExecutionContext(this.target);
+                RuntimeContext.SetExecutionContext(target);
                 target.HandleNewRequest(request);
             }
             finally

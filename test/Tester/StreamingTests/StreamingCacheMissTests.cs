@@ -34,12 +34,12 @@ namespace Tester.StreamingTests
         [SkippableFact]
         public virtual async Task PreviousEventEvictedFromCacheTest()
         {
-            var streamProvider = this.Client.GetStreamProvider(StreamProviderName);
+            var streamProvider = Client.GetStreamProvider(StreamProviderName);
 
             // Tested stream and corresponding grain
             var key = Guid.NewGuid();
             var stream = streamProvider.GetStream<byte[]>(nameof(IImplicitSubscriptionCounterGrain), key);
-            var grain = this.Client.GetGrain<IImplicitSubscriptionCounterGrain>(key);
+            var grain = Client.GetGrain<IImplicitSubscriptionCounterGrain>(key);
 
             // We need multiple streams, so at least another one will be handled by the same PullingAgent than "stream"
             var otherStreams = new List<IAsyncStream<byte[]>>();
@@ -69,12 +69,12 @@ namespace Tester.StreamingTests
         [SkippableFact]
         public virtual async Task PreviousEventEvictedFromCacheWithFilterTest()
         {
-            var streamProvider = this.Client.GetStreamProvider(StreamProviderName);
+            var streamProvider = Client.GetStreamProvider(StreamProviderName);
 
             // Tested stream and corresponding grain
             var key = Guid.NewGuid();
             var stream = streamProvider.GetStream<byte[]>(nameof(IImplicitSubscriptionCounterGrain), key);
-            var grain = this.Client.GetGrain<IImplicitSubscriptionCounterGrain>(key);
+            var grain = Client.GetGrain<IImplicitSubscriptionCounterGrain>(key);
 
             // We need multiple streams, so at least another one will be handled by the same PullingAgent than "stream"
             var otherStreams = new List<IAsyncStream<byte[]>>();

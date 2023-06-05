@@ -101,24 +101,24 @@ namespace Tester
         public override async Task InitializeAsync()
         {
             await base.InitializeAsync();
-            this.runtimeClient = this.Client.ServiceProvider.GetRequiredService<OutsideRuntimeClient>();
+            runtimeClient = Client.ServiceProvider.GetRequiredService<OutsideRuntimeClient>();
         }
 
         [Fact, TestCategory("Functional")]
         public async Task NoReconnectionToGatewayNotReturnedByManager()
         {
             // Reduce timeout for this test
-            this.runtimeClient.SetResponseTimeout(TimeSpan.FromSeconds(1));
+            runtimeClient.SetResponseTimeout(TimeSpan.FromSeconds(1));
 
             var connectionCount = 0;
             var timeoutCount = 0;
 
             // Fake Gateway
-            var gateways = await this.HostedCluster.Client.ServiceProvider.GetRequiredService<IGatewayListProvider>().GetGateways();
+            var gateways = await HostedCluster.Client.ServiceProvider.GetRequiredService<IGatewayListProvider>().GetGateways();
             var port = gateways.First().Port + 2;
             var endpoint = new IPEndPoint(IPAddress.Loopback, port);
             var evt = new SocketAsyncEventArgs();
-            var gatewayManager = this.runtimeClient.ServiceProvider.GetService<TestGatewayManager>();
+            var gatewayManager = runtimeClient.ServiceProvider.GetService<TestGatewayManager>();
             evt.Completed += (sender, args) =>
             {
                 connectionCount++;
@@ -141,7 +141,7 @@ namespace Tester
                 {
                     try
                     {
-                        var g = this.Client.GetGrain<ISimpleGrain>(i);
+                        var g = Client.GetGrain<ISimpleGrain>(i);
                         await g.SetA(i);
                     }
                     catch (TimeoutException)
@@ -161,7 +161,7 @@ namespace Tester
         public async Task ConnectionFromDifferentClusterIsRejected()
         {
             // Arange
-            var gateways = await this.HostedCluster.Client.ServiceProvider.GetRequiredService<IGatewayListProvider>().GetGateways();
+            var gateways = await HostedCluster.Client.ServiceProvider.GetRequiredService<IGatewayListProvider>().GetGateways();
             var gwEndpoint  = gateways.First().ToIPEndPoint();
             var exceptions = new List<Exception>();
 
@@ -173,7 +173,7 @@ namespace Tester
             }
 
             // Close current client connection
-            await this.HostedCluster.StopClusterClientAsync();
+            await HostedCluster.StopClusterClientAsync();
             var hostBuilder = new HostBuilder().UseOrleansClient(
                 (ctx, clientBuilder) =>
                 {

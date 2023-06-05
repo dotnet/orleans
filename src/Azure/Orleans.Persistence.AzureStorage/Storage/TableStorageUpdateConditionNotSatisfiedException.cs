@@ -25,9 +25,9 @@ namespace Orleans.Storage
             Exception storageException)
             : base(errorMsg, storedEtag, currentEtag, storageException)
         {
-            this.GrainType = grainType;
-            this.GrainId = grainId;
-            this.TableName = tableName;
+            GrainType = grainType;
+            GrainId = grainId;
+            TableName = tableName;
         }
 
         /// <summary>
@@ -101,9 +101,9 @@ namespace Orleans.Storage
         protected TableStorageUpdateConditionNotSatisfiedException(SerializationInfo info, StreamingContext context)
             : base(info, context)
         {
-            this.GrainType = info.GetString("GrainType");
-            this.GrainId = info.GetString("GrainId");
-            this.TableName = info.GetString("TableName");
+            GrainType = info.GetString("GrainType");
+            GrainId = info.GetString("GrainId");
+            TableName = info.GetString("TableName");
         }
 
         /// <inheritdoc />
@@ -111,9 +111,9 @@ namespace Orleans.Storage
         {
             if (info == null) throw new ArgumentNullException(nameof(info));
 
-            info.AddValue("GrainType", this.GrainType);
-            info.AddValue("GrainId", this.GrainId);
-            info.AddValue("TableName", this.TableName);
+            info.AddValue("GrainType", GrainType);
+            info.AddValue("GrainId", GrainId);
+            info.AddValue("TableName", TableName);
             base.GetObjectData(info, context);
         }
     }

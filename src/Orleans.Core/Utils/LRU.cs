@@ -170,7 +170,7 @@ namespace Orleans.Runtime
         /// </summary>
         public void RemoveExpired()
         {
-            foreach (var entry in this.cache)
+            foreach (var entry in cache)
             {
                 if (entry.Value.Age.Elapsed > requiredFreshness)
                 {

@@ -29,10 +29,10 @@ namespace Tester.AzureUtils.TimerTests
         {
             this.output = output;
             this.fixture = fixture;
-            this.loggerFactory = TestingUtils.CreateDefaultLoggerFactory($"{GetType().Name}.log");
-            this.log = this.loggerFactory.CreateLogger<ReminderTests_Azure_Standalone>();
+            loggerFactory = TestingUtils.CreateDefaultLoggerFactory($"{GetType().Name}.log");
+            log = loggerFactory.CreateLogger<ReminderTests_Azure_Standalone>();
 
-            this.serviceId = Guid.NewGuid().ToString();
+            serviceId = Guid.NewGuid().ToString();
 
             TestUtils.ConfigureClientThreadPoolSettingsForStorageTests(1000);
         }
@@ -40,11 +40,11 @@ namespace Tester.AzureUtils.TimerTests
         [SkippableFact, TestCategory("Reminders"), TestCategory("Performance")]
         public async Task Reminders_AzureTable_InsertRate()
         {
-            var clusterOptions = Options.Create(new ClusterOptions { ClusterId = "TMSLocalTesting", ServiceId = this.serviceId });
+            var clusterOptions = Options.Create(new ClusterOptions { ClusterId = "TMSLocalTesting", ServiceId = serviceId });
             var storageOptions = Options.Create(new AzureTableReminderStorageOptions());
             storageOptions.Value.ConfigureTestDefaults();
 
-            IReminderTable table = new AzureBasedReminderTable(this.loggerFactory, clusterOptions, storageOptions);
+            IReminderTable table = new AzureBasedReminderTable(loggerFactory, clusterOptions, storageOptions);
             await table.Init();
 
             await TestTableInsertRate(table, 10);
@@ -55,10 +55,10 @@ namespace Tester.AzureUtils.TimerTests
         public async Task Reminders_AzureTable_InsertNewRowAndReadBack()
         {
             string clusterId = NewClusterId();
-            var clusterOptions = Options.Create(new ClusterOptions { ClusterId = clusterId, ServiceId = this.serviceId });
+            var clusterOptions = Options.Create(new ClusterOptions { ClusterId = clusterId, ServiceId = serviceId });
             var storageOptions = Options.Create(new AzureTableReminderStorageOptions());
             storageOptions.Value.ConfigureTestDefaults();
-            IReminderTable table = new AzureBasedReminderTable(this.loggerFactory, clusterOptions, storageOptions);
+            IReminderTable table = new AzureBasedReminderTable(loggerFactory, clusterOptions, storageOptions);
             await table.Init();
 
             ReminderEntry[] rows = (await GetAllRows(table)).ToArray();
@@ -75,7 +75,7 @@ namespace Tester.AzureUtils.TimerTests
             Assert.Equal(expected.Period, actual.Period); // "The newly inserted reminder table (sid={0}, did={1}) row did not have the expected period.", ServiceId, clusterId);
             // the following assertion fails but i don't know why yet-- the timestamps appear identical in the error message. it's not really a priority to hunt down the reason, however, because i have high confidence it is working well enough for the moment.
             /*Assert.Equal(expected.StartAt,  actual.StartAt); // "The newly inserted reminder table (sid={0}, did={1}) row did not contain the correct start time.", ServiceId, clusterId);*/
-            Assert.False(string.IsNullOrWhiteSpace(actual.ETag), $"The newly inserted reminder table (sid={this.serviceId}, did={clusterId}) row contains an invalid etag.");
+            Assert.False(string.IsNullOrWhiteSpace(actual.ETag), $"The newly inserted reminder table (sid={serviceId}, did={clusterId}) row contains an invalid etag.");
         }
 
         private async Task TestTableInsertRate(IReminderTable reminderTable, double numOfInserts)
@@ -103,21 +103,21 @@ namespace Tester.AzureUtils.TimerTests
                     Task<bool> promise = Task.Run(async () =>
                     {
                         await reminderTable.UpsertRow(e);
-                        this.output.WriteLine("Done " + capture);
+                        output.WriteLine("Done " + capture);
                         return true;
                     });
                     promises.Add(promise);
-                    this.log.LogInformation("Started {Capture}", capture);
+                    log.LogInformation("Started {Capture}", capture);
                 }
-                this.log.LogInformation("Started all, now waiting...");
+                log.LogInformation("Started all, now waiting...");
                 await Task.WhenAll(promises).WithTimeout(TimeSpan.FromSeconds(500));
             }
             catch (Exception exc)
             {
-                this.log.LogInformation(exc, "Exception caught");
+                log.LogInformation(exc, "Exception caught");
             }
             TimeSpan dur = DateTime.UtcNow - startedAt;
-            this.log.LogInformation(
+            log.LogInformation(
                 "Inserted {InsertCount} rows in {Duration}, i.e., {Rate} upserts/sec",
                 numOfInserts,
                 dur,

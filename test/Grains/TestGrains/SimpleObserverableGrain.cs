@@ -16,7 +16,7 @@ namespace UnitTests.Grains
         {
             EventDelay = 1000;
             logger = loggerFactory.CreateLogger( $"{nameof(SimpleObserverableGrain)}-{base.IdentityString}-{base.RuntimeIdentity}");
-            this.Observers = new ObserverManager<ISimpleGrainObserver>(TimeSpan.FromMinutes(5), logger);
+            Observers = new ObserverManager<ISimpleGrainObserver>(TimeSpan.FromMinutes(5), logger);
         }
 
         public override Task OnActivateAsync(CancellationToken cancellationToken)
@@ -44,7 +44,7 @@ namespace UnitTests.Grains
 
         public async Task SetB(int b)
         {
-            this.B = b;
+            B = b;
 
             //If this were run with Task.Run there were no need for the added Unwrap call.
             //However, Task.Run runs in ThreadPool and not in Orleans TaskScheduler, unlike Task.Factory.StartNew.

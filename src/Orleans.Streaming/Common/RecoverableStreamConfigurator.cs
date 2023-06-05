@@ -54,7 +54,7 @@ namespace Orleans.Hosting
             Func<IServiceProvider, string, IQueueAdapterFactory> adapterFactory)
             : base(name, configureDelegate, adapterFactory)
         {
-            this.ConfigureDelegate(services => services
+            ConfigureDelegate(services => services
                 .ConfigureNamedOptionForLogging<StreamStatisticOptions>(name)
                 .ConfigureNamedOptionForLogging<StreamCacheEvictionOptions>(name));
         }

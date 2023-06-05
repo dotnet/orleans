@@ -31,14 +31,14 @@ namespace Orleans.Hosting
         /// <inheritdoc/>
         public void ValidateConfiguration()
         {
-            var pubsubOptions = services.GetOptionsByName<StreamPubSubOptions>(this.streamProviderName);
+            var pubsubOptions = services.GetOptionsByName<StreamPubSubOptions>(streamProviderName);
             if (pubsubOptions.PubSubType == StreamPubSubType.ExplicitGrainBasedAndImplicit || pubsubOptions.PubSubType == StreamPubSubType.ExplicitGrainBasedOnly)
             {
-                var pubsubStore = services.GetServiceByName<IGrainStorage>(this.streamProviderName) ?? services.GetServiceByName<IGrainStorage>(ProviderConstants.DEFAULT_PUBSUB_PROVIDER_NAME);
+                var pubsubStore = services.GetServiceByName<IGrainStorage>(streamProviderName) ?? services.GetServiceByName<IGrainStorage>(ProviderConstants.DEFAULT_PUBSUB_PROVIDER_NAME);
                 if (pubsubStore == null)
                     throw new OrleansConfigurationException(
                         $" Streams with pubsub type {StreamPubSubType.ExplicitGrainBasedAndImplicit} and {StreamPubSubType.ExplicitGrainBasedOnly} requires a grain storage named " +
-                        $"{ProviderConstants.DEFAULT_PUBSUB_PROVIDER_NAME} or {this.streamProviderName} to be configured with silo. Please configure one for your stream {streamProviderName}.");
+                        $"{ProviderConstants.DEFAULT_PUBSUB_PROVIDER_NAME} or {streamProviderName} to be configured with silo. Please configure one for your stream {streamProviderName}.");
             }
         }
 
@@ -68,7 +68,7 @@ namespace Orleans.Hosting
         public SiloPersistentStreamConfigurator(string name, Action<Action<IServiceCollection>> configureDelegate, Func<IServiceProvider, string, IQueueAdapterFactory> adapterFactory)
             : base(name, configureDelegate)
         {
-            this.ConfigureDelegate(services => services.AddSiloStreaming());
+            ConfigureDelegate(services => services.AddSiloStreaming());
             this.ConfigureComponent(PersistentStreamProvider.Create);
             this.ConfigureComponent((s, n) => s.GetServiceByName<IStreamProvider>(n) as IControllable);
             this.ConfigureComponent(PersistentStreamProvider.ParticipateIn<ISiloLifecycle>);

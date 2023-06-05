@@ -39,7 +39,7 @@ namespace Orleans.Providers.GCP.Streams.PubSub
             if (dataAdapter == null) throw new ArgumentNullException(nameof(dataAdapter));
             _dataAdapter = dataAdapter;
 
-            _logger = loggerFactory.CreateLogger($"{this.GetType().FullName}.{topicId}.{queueId}");
+            _logger = loggerFactory.CreateLogger($"{GetType().FullName}.{topicId}.{queueId}");
             _pending = new List<PendingDelivery>();
         }
 

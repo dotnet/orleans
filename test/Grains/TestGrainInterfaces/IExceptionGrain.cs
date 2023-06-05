@@ -69,7 +69,7 @@ namespace UnitTests.GrainInterfaces
 
         public UndeserializableType(int num)
         {
-            this.Number = num;
+            Number = num;
         }
 
         public int Number { get; }

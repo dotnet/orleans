@@ -33,11 +33,11 @@ namespace Tester.AzureUtils.Persistence
         {
             this.output = output;
             this.fixture = fixture;
-            this.providerRuntime = new ClientProviderRuntime(
+            providerRuntime = new ClientProviderRuntime(
                 fixture.InternalGrainFactory,
                 fixture.Services,
                 fixture.Services.GetRequiredService<ClientGrainContext>());
-            this.providerCfgProps.Clear();
+            providerCfgProps.Clear();
         }
 
         [Fact, TestCategory("Functional")]
@@ -226,8 +226,8 @@ namespace Tester.AzureUtils.Persistence
                     MockCallsOnly = true
                 },
                 NullLoggerFactory.Instance,
-                this.providerRuntime.ServiceProvider.GetService<IGrainFactory>(),
-                this.providerRuntime.ServiceProvider.GetService<IGrainStorageSerializer>());
+                providerRuntime.ServiceProvider.GetService<IGrainFactory>(),
+                providerRuntime.ServiceProvider.GetService<IGrainStorageSerializer>());
 
             var reference = (GrainId)LegacyGrainId.NewId();
             var state = TestStoreGrainState.NewRandomState();
@@ -235,14 +235,14 @@ namespace Tester.AzureUtils.Persistence
             sw.Start();
             await store.WriteStateAsync(testName, reference, state);
             TimeSpan writeTime = sw.Elapsed;
-            this.output.WriteLine("{0} - Write time = {1}", store.GetType().FullName, writeTime);
+            output.WriteLine("{0} - Write time = {1}", store.GetType().FullName, writeTime);
             Assert.True(writeTime >= expectedLatency, $"Write: Expected minimum latency = {expectedLatency} Actual = {writeTime}");
 
             sw.Restart();
             var storedState = new GrainState<TestStoreGrainState>();
             await store.ReadStateAsync(testName, reference, storedState);
             TimeSpan readTime = sw.Elapsed;
-            this.output.WriteLine("{0} - Read time = {1}", store.GetType().FullName, readTime);
+            output.WriteLine("{0} - Read time = {1}", store.GetType().FullName, readTime);
             Assert.True(readTime >= expectedLatency, $"Read: Expected minimum latency = {expectedLatency} Actual = {readTime}");
         }
 
@@ -258,9 +258,9 @@ namespace Tester.AzureUtils.Persistence
         private async Task<AzureTableGrainStorage> InitAzureTableGrainStorage(AzureTableStorageOptions options)
         {
             // TODO change test to include more serializer?
-            var serializer = new OrleansGrainStorageSerializer(this.providerRuntime.ServiceProvider.GetRequiredService<Serializer>());
-            AzureTableGrainStorage store = ActivatorUtilities.CreateInstance<AzureTableGrainStorage>(this.providerRuntime.ServiceProvider, options, serializer, "TestStorage");
-            ISiloLifecycleSubject lifecycle = ActivatorUtilities.CreateInstance<SiloLifecycleSubject>(this.providerRuntime.ServiceProvider);
+            var serializer = new OrleansGrainStorageSerializer(providerRuntime.ServiceProvider.GetRequiredService<Serializer>());
+            AzureTableGrainStorage store = ActivatorUtilities.CreateInstance<AzureTableGrainStorage>(providerRuntime.ServiceProvider, options, serializer, "TestStorage");
+            ISiloLifecycleSubject lifecycle = ActivatorUtilities.CreateInstance<SiloLifecycleSubject>(providerRuntime.ServiceProvider);
             store.Participate(lifecycle);
             await lifecycle.OnStart();
             return store;
@@ -269,7 +269,7 @@ namespace Tester.AzureUtils.Persistence
         private async Task<AzureTableGrainStorage> InitAzureTableGrainStorage(bool useJson = false, TypeNameHandling? typeNameHandling = null)
         {
             var options = new AzureTableStorageOptions();
-            var jsonOptions = this.providerRuntime.ServiceProvider.GetService<IOptions<OrleansJsonSerializerOptions>>();
+            var jsonOptions = providerRuntime.ServiceProvider.GetService<IOptions<OrleansJsonSerializerOptions>>();
             if (typeNameHandling != null)
             {
                 jsonOptions.Value.JsonSerializerSettings.TypeNameHandling = typeNameHandling.Value;
@@ -278,14 +278,14 @@ namespace Tester.AzureUtils.Persistence
             options.ConfigureTestDefaults();
 
             // TODO change test to include more serializer?
-            var binarySerializer = new OrleansGrainStorageSerializer(this.providerRuntime.ServiceProvider.GetRequiredService<Serializer>());
+            var binarySerializer = new OrleansGrainStorageSerializer(providerRuntime.ServiceProvider.GetRequiredService<Serializer>());
             var jsonSerializer = new JsonGrainStorageSerializer(new OrleansJsonSerializer(jsonOptions));
             options.GrainStorageSerializer = useJson
                 ? new GrainStorageSerializer(jsonSerializer, binarySerializer)
                 : new GrainStorageSerializer(binarySerializer, jsonSerializer);
 
-            AzureTableGrainStorage store = ActivatorUtilities.CreateInstance<AzureTableGrainStorage>(this.providerRuntime.ServiceProvider, options, "TestStorage");
-            ISiloLifecycleSubject lifecycle = ActivatorUtilities.CreateInstance<SiloLifecycleSubject>(this.providerRuntime.ServiceProvider);
+            AzureTableGrainStorage store = ActivatorUtilities.CreateInstance<AzureTableGrainStorage>(providerRuntime.ServiceProvider, options, "TestStorage");
+            ISiloLifecycleSubject lifecycle = ActivatorUtilities.CreateInstance<SiloLifecycleSubject>(providerRuntime.ServiceProvider);
             store.Participate(lifecycle);
             await lifecycle.OnStart();
             return store;
@@ -308,7 +308,7 @@ namespace Tester.AzureUtils.Persistence
             await store.ReadStateAsync(grainTypeName, reference, storedGrainState);
 
             TimeSpan readTime = sw.Elapsed;
-            this.output.WriteLine("{0} - Read time = {1}", store.GetType().FullName, readTime);
+            output.WriteLine("{0} - Read time = {1}", store.GetType().FullName, readTime);
 
             var storedState = storedGrainState.State;
             Assert.Equal(grainState.State.A, storedState.A);
@@ -340,7 +340,7 @@ namespace Tester.AzureUtils.Persistence
             };
             await store.ReadStateAsync(grainTypeName, reference, storedGrainState);
             TimeSpan readTime = sw.Elapsed;
-            this.output.WriteLine("{0} - Write time = {1} Read time = {2}", store.GetType().FullName, writeTime, readTime);
+            output.WriteLine("{0} - Write time = {1} Read time = {2}", store.GetType().FullName, writeTime, readTime);
             Assert.Equal(grainState.State.A, storedGrainState.State.A);
             Assert.Equal(grainState.State.B, storedGrainState.State.B);
             Assert.Equal(grainState.State.C, storedGrainState.State.C);
@@ -374,7 +374,7 @@ namespace Tester.AzureUtils.Persistence
             };
             await store.ReadStateAsync(grainTypeName, reference, storedGrainState);
             TimeSpan readTime = sw.Elapsed;
-            this.output.WriteLine("{0} - Write time = {1} Read time = {2}", store.GetType().FullName, writeTime, readTime);
+            output.WriteLine("{0} - Write time = {1} Read time = {2}", store.GetType().FullName, writeTime, readTime);
             Assert.NotNull(storedGrainState.State);
             Assert.Equal(default(string), storedGrainState.State.A);
             Assert.Equal(default(int), storedGrainState.State.B);

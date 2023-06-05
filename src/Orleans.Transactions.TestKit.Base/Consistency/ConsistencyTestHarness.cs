@@ -42,7 +42,7 @@ namespace Orleans.Transactions.TestKit.Consistency
             this.grainFactory = grainFactory;
 
             numGrains.Should().BeLessThan(ConsistencyTestOptions.MaxGrains);
-            this.options = new ConsistencyTestOptions()
+            options = new ConsistencyTestOptions()
             {
                 AvoidDeadlocks = avoidDeadlocks,
                 ReadWrite = readWrite,
@@ -53,10 +53,10 @@ namespace Orleans.Transactions.TestKit.Consistency
                 GrainOffset = (DateTime.UtcNow.Ticks & 0xFFFFFFFF) * ConsistencyTestOptions.MaxGrains,
             };
 
-            this.tuples = new Dictionary<int, SortedDictionary<int, Dictionary<string, HashSet<string>>>>();
-            this.succeeded = new HashSet<string>();
-            this.aborted = new HashSet<string>();
-            this.indoubt = new Dictionary<string, string>();
+            tuples = new Dictionary<int, SortedDictionary<int, Dictionary<string, HashSet<string>>>>();
+            succeeded = new HashSet<string>();
+            aborted = new HashSet<string>();
+            indoubt = new Dictionary<string, string>();
 
             // determine what to check for in the end
             this.tolerateUnknownExceptions = tolerateUnknownExceptions;

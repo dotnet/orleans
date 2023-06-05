@@ -39,18 +39,18 @@ namespace Orleans.Runtime.Messaging
             return new ClientOutboundConnection(
                 address,
                 context,
-                this.ConnectionDelegate,
-                this.messageCenter,
-                this.connectionManager,
-                this.ConnectionOptions,
-                this.connectionShared,
-                this.connectionPreambleHelper,
-                this.clusterOptions);
+                ConnectionDelegate,
+                messageCenter,
+                connectionManager,
+                ConnectionOptions,
+                connectionShared,
+                connectionPreambleHelper,
+                clusterOptions);
         }
 
         protected override void ConfigureConnectionBuilder(IConnectionBuilder connectionBuilder)
         {
-            this.clientConnectionOptions.ConfigureConnectionBuilder(connectionBuilder);
+            clientConnectionOptions.ConfigureConnectionBuilder(connectionBuilder);
             base.ConfigureConnectionBuilder(connectionBuilder);
         }
 
@@ -58,13 +58,13 @@ namespace Orleans.Runtime.Messaging
         {
             if (!isInitialized)
             {
-                lock (this.initializationLock)
+                lock (initializationLock)
                 {
                     if (!isInitialized)
                     {
-                        this.messageCenter = this.connectionShared.ServiceProvider.GetRequiredService<ClientMessageCenter>();
-                        this.connectionManager = this.connectionShared.ServiceProvider.GetRequiredService<ConnectionManager>();
-                        this.isInitialized = true;
+                        messageCenter = connectionShared.ServiceProvider.GetRequiredService<ClientMessageCenter>();
+                        connectionManager = connectionShared.ServiceProvider.GetRequiredService<ConnectionManager>();
+                        isInitialized = true;
                     }
                 }
             }

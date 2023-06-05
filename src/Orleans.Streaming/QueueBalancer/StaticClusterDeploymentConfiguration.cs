@@ -17,7 +17,7 @@ namespace Orleans.Hosting
         /// <inheritdoc/>
         IList<string> IDeploymentConfiguration.GetAllSiloNames()
         {
-            return this.SiloNames;
+            return SiloNames;
         }
     }
 }

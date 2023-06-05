@@ -8,22 +8,22 @@ namespace ServiceBus.Tests.MonitorTests
 
         public void TrackInitialization(bool success, TimeSpan callTime, Exception exception)
         {
-            if(success) Interlocked.Increment(ref this.CallCounters.TrackInitializationCallCounter);
+            if(success) Interlocked.Increment(ref CallCounters.TrackInitializationCallCounter);
         }
 
         public void TrackRead(bool success, TimeSpan callTime, Exception exception)
         {
-            if (success) Interlocked.Increment(ref this.CallCounters.TrackReadCallCounter);
+            if (success) Interlocked.Increment(ref CallCounters.TrackReadCallCounter);
         }
 
         public void TrackMessagesReceived(long count, DateTime? oldestEnqueueTime, DateTime? newestEnqueueTime)
         {
-            Interlocked.Increment(ref this.CallCounters.TrackMessagesReceivedCallCounter);
+            Interlocked.Increment(ref CallCounters.TrackMessagesReceivedCallCounter);
         }
 
         public void TrackShutdown(bool success, TimeSpan callTime, Exception exception)
         {
-            Interlocked.Increment(ref this.CallCounters.TrackShutdownCallCounter);
+            Interlocked.Increment(ref CallCounters.TrackShutdownCallCounter);
         }
     }
 

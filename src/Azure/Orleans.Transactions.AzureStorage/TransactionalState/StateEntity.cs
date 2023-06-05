@@ -34,7 +34,7 @@ namespace Orleans.Transactions.AzureStorage
             return $"{RK_PREFIX}{sequenceId.ToString("x16")}";
         }
 
-        public long SequenceId => long.Parse(this.RowKey.Substring(RK_PREFIX.Length), NumberStyles.AllowHexSpecifier);
+        public long SequenceId => long.Parse(RowKey.Substring(RK_PREFIX.Length), NumberStyles.AllowHexSpecifier);
 
         // Row keys range from s0000000000000001 to s7fffffffffffffff
         public const string RK_PREFIX = "s_";
@@ -43,23 +43,23 @@ namespace Orleans.Transactions.AzureStorage
 
         public string TransactionId
         {
-            get => this.GetPropertyOrDefault(nameof(this.TransactionId)) as string;
-            set => this.Entity[nameof(this.TransactionId)] = value;
+            get => GetPropertyOrDefault(nameof(TransactionId)) as string;
+            set => Entity[nameof(TransactionId)] = value;
         }
 
         public DateTime TransactionTimestamp
         {
-            get => this.Entity.GetDateTimeOffset(nameof(this.TransactionTimestamp)).GetValueOrDefault().UtcDateTime;
-            set => this.Entity[nameof(this.TransactionTimestamp)] = new DateTimeOffset(value.ToUniversalTime());
+            get => Entity.GetDateTimeOffset(nameof(TransactionTimestamp)).GetValueOrDefault().UtcDateTime;
+            set => Entity[nameof(TransactionTimestamp)] = new DateTimeOffset(value.ToUniversalTime());
         }
 
         public string TransactionManager
         {
-            get => this.GetPropertyOrDefault(nameof(this.TransactionManager)) as string;
-            set => this.Entity[nameof(this.TransactionManager)] = value;
+            get => GetPropertyOrDefault(nameof(TransactionManager)) as string;
+            set => Entity[nameof(TransactionManager)] = value;
         }
 
-        public string StateJson { get => this.GetStateInternal(); set => this.SetStateInternal(value); }
+        public string StateJson { get => GetStateInternal(); set => SetStateInternal(value); }
 
         public static StateEntity Create<T>(JsonSerializerSettings JsonSettings,
             string partitionKey, PendingTransactionState<T> pendingState)
@@ -79,26 +79,26 @@ namespace Orleans.Transactions.AzureStorage
 
         public T GetState<T>(JsonSerializerSettings jsonSettings)
         {
-            return JsonConvert.DeserializeObject<T>(this.GetStateInternal(), jsonSettings);
+            return JsonConvert.DeserializeObject<T>(GetStateInternal(), jsonSettings);
         }
 
         public void SetState<T>(T state, JsonSerializerSettings jsonSettings)
         {
-            this.SetStateInternal(JsonConvert.SerializeObject(state, jsonSettings));
+            SetStateInternal(JsonConvert.SerializeObject(state, jsonSettings));
         }
 
         private void SetStateInternal(string stringData)
         {
-            this.CheckMaxDataSize((stringData ?? string.Empty).Length * 2, MAX_DATA_CHUNK_SIZE * MAX_DATA_CHUNKS_COUNT);
+            CheckMaxDataSize((stringData ?? string.Empty).Length * 2, MAX_DATA_CHUNK_SIZE * MAX_DATA_CHUNKS_COUNT);
 
             foreach (var key in StringDataPropertyNames)
             {
-                this.Entity.Remove(key);
+                Entity.Remove(key);
             }
 
             foreach (var entry in SplitStringData(stringData))
             {
-                this.Entity[entry.Key] = entry.Value;
+                Entity[entry.Key] = entry.Value;
             }
 
             static IEnumerable<KeyValuePair<string, object>> SplitStringData(string stringData)
@@ -123,7 +123,7 @@ namespace Orleans.Transactions.AzureStorage
 
         private string GetStateInternal()
         {
-            return string.Concat(ReadStringDataChunks(this.Entity));
+            return string.Concat(ReadStringDataChunks(Entity));
 
             static IEnumerable<string> ReadStringDataChunks(IDictionary<string, object> properties)
             {
@@ -142,7 +142,7 @@ namespace Orleans.Transactions.AzureStorage
 
         private object GetPropertyOrDefault(string key)
         {
-            this.Entity.TryGetValue(key, out var result);
+            Entity.TryGetValue(key, out var result);
             return result;
         }
 

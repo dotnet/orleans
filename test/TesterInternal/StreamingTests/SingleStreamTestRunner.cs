@@ -29,10 +29,10 @@ namespace UnitTests.StreamingTests
         internal SingleStreamTestRunner(IInternalClusterClient client, string streamProvider, int testNum = 0, bool fullTest = true)
         {
             this.client = client;
-            this.streamProviderName = streamProvider;
-            this.logger = TestingUtils.CreateDefaultLoggerFactory($"{this.GetType().Name}.log").CreateLogger<SingleStreamTestRunner>();
-            this.testNumber = testNum;
-            this.runFullTest = fullTest;
+            streamProviderName = streamProvider;
+            logger = TestingUtils.CreateDefaultLoggerFactory($"{GetType().Name}.log").CreateLogger<SingleStreamTestRunner>();
+            testNumber = testNum;
+            runFullTest = fullTest;
         }
 
         private void Heading(string testName)
@@ -46,15 +46,15 @@ namespace UnitTests.StreamingTests
             Heading("StreamTest_01_ConsumerJoinsFirstProducerLater");
             Guid streamId = Guid.NewGuid();
             // consumer joins first, producer later
-            this.consumer = await ConsumerProxy.NewConsumerGrainsAsync(streamId, this.streamProviderName, this.logger, this.client);
-            this.producer = await ProducerProxy.NewProducerGrainsAsync(streamId, this.streamProviderName, null, this.logger, this.client);
+            consumer = await ConsumerProxy.NewConsumerGrainsAsync(streamId, streamProviderName, logger, client);
+            producer = await ProducerProxy.NewProducerGrainsAsync(streamId, streamProviderName, null, logger, client);
             await BasicTestAsync();
             await StopProxies();
 
             streamId = Guid.NewGuid();
             // produce joins first, consumer later
-            this.producer = await ProducerProxy.NewProducerGrainsAsync(streamId, this.streamProviderName, null, this.logger, this.client);
-            this.consumer = await ConsumerProxy.NewConsumerGrainsAsync(streamId, this.streamProviderName, this.logger, this.client);
+            producer = await ProducerProxy.NewProducerGrainsAsync(streamId, streamProviderName, null, logger, client);
+            consumer = await ConsumerProxy.NewConsumerGrainsAsync(streamId, streamProviderName, logger, client);
             await BasicTestAsync();
             await StopProxies();
         }
@@ -63,14 +63,14 @@ namespace UnitTests.StreamingTests
         {
             Heading("StreamTest_02_OneProducerGrainOneConsumerClient");
             Guid streamId = Guid.NewGuid();
-            consumer = await ConsumerProxy.NewConsumerClientObjectsAsync(streamId, streamProviderName, logger, this.client);
-            this.producer = await ProducerProxy.NewProducerGrainsAsync(streamId, this.streamProviderName, null, this.logger, this.client);
+            consumer = await ConsumerProxy.NewConsumerClientObjectsAsync(streamId, streamProviderName, logger, client);
+            producer = await ProducerProxy.NewProducerGrainsAsync(streamId, streamProviderName, null, logger, client);
             await BasicTestAsync();
             await StopProxies();
 
             streamId = Guid.NewGuid();
-            this.producer = await ProducerProxy.NewProducerGrainsAsync(streamId, this.streamProviderName, null, this.logger, this.client);
-            consumer = await ConsumerProxy.NewConsumerClientObjectsAsync(streamId, streamProviderName, logger, this.client);
+            producer = await ProducerProxy.NewProducerGrainsAsync(streamId, streamProviderName, null, logger, client);
+            consumer = await ConsumerProxy.NewConsumerClientObjectsAsync(streamId, streamProviderName, logger, client);
             await BasicTestAsync();
             await StopProxies();
         }
@@ -79,14 +79,14 @@ namespace UnitTests.StreamingTests
         {
             Heading("StreamTest_03_OneProducerClientOneConsumerGrain");
             Guid streamId = Guid.NewGuid();
-            this.consumer = await ConsumerProxy.NewConsumerGrainsAsync(streamId, this.streamProviderName, this.logger, this.client);
-            producer = await ProducerProxy.NewProducerClientObjectsAsync(streamId, streamProviderName, null, logger, this.client);
+            consumer = await ConsumerProxy.NewConsumerGrainsAsync(streamId, streamProviderName, logger, client);
+            producer = await ProducerProxy.NewProducerClientObjectsAsync(streamId, streamProviderName, null, logger, client);
             await BasicTestAsync();
             await StopProxies();
 
             streamId = Guid.NewGuid();
-            producer = await ProducerProxy.NewProducerClientObjectsAsync(streamId, streamProviderName, null, logger, this.client);
-            this.consumer = await ConsumerProxy.NewConsumerGrainsAsync(streamId, this.streamProviderName, this.logger, this.client);
+            producer = await ProducerProxy.NewProducerClientObjectsAsync(streamId, streamProviderName, null, logger, client);
+            consumer = await ConsumerProxy.NewConsumerGrainsAsync(streamId, streamProviderName, logger, client);
             await BasicTestAsync();
             await StopProxies();
         }
@@ -95,14 +95,14 @@ namespace UnitTests.StreamingTests
         {
             Heading("StreamTest_04_OneProducerClientOneConsumerClient");
             Guid streamId = Guid.NewGuid();
-            consumer = await ConsumerProxy.NewConsumerClientObjectsAsync(streamId, streamProviderName, logger, this.client);
-            producer = await ProducerProxy.NewProducerClientObjectsAsync(streamId, streamProviderName, null, logger, this.client);
+            consumer = await ConsumerProxy.NewConsumerClientObjectsAsync(streamId, streamProviderName, logger, client);
+            producer = await ProducerProxy.NewProducerClientObjectsAsync(streamId, streamProviderName, null, logger, client);
             await BasicTestAsync();
             await StopProxies();
 
             streamId = Guid.NewGuid();
-            producer = await ProducerProxy.NewProducerClientObjectsAsync(streamId, streamProviderName, null, logger, this.client);
-            consumer = await ConsumerProxy.NewConsumerClientObjectsAsync(streamId, streamProviderName, logger, this.client);
+            producer = await ProducerProxy.NewProducerClientObjectsAsync(streamId, streamProviderName, null, logger, client);
+            consumer = await ConsumerProxy.NewConsumerClientObjectsAsync(streamId, streamProviderName, logger, client);
             await BasicTestAsync();
             await StopProxies();
         }
@@ -113,8 +113,8 @@ namespace UnitTests.StreamingTests
         {
             Heading("StreamTest_05_ManyDifferent_ManyProducerGrainsManyConsumerGrains");
             Guid streamId = Guid.NewGuid();
-            this.consumer = await ConsumerProxy.NewConsumerGrainsAsync(streamId, this.streamProviderName, this.logger, this.client, null, Many);
-            this.producer = await ProducerProxy.NewProducerGrainsAsync(streamId, this.streamProviderName, null, this.logger, this.client, null, Many);
+            consumer = await ConsumerProxy.NewConsumerGrainsAsync(streamId, streamProviderName, logger, client, null, Many);
+            producer = await ProducerProxy.NewProducerGrainsAsync(streamId, streamProviderName, null, logger, client, null, Many);
             await BasicTestAsync();
             await StopProxies();
         }
@@ -123,8 +123,8 @@ namespace UnitTests.StreamingTests
         {
             Heading("StreamTest_06_ManyDifferent_ManyProducerGrainManyConsumerClients");
             Guid streamId = Guid.NewGuid();
-            consumer = await ConsumerProxy.NewConsumerClientObjectsAsync(streamId, streamProviderName, logger, this.client, Many);
-            this.producer = await ProducerProxy.NewProducerGrainsAsync(streamId, this.streamProviderName, null, this.logger, this.client, null, Many);
+            consumer = await ConsumerProxy.NewConsumerClientObjectsAsync(streamId, streamProviderName, logger, client, Many);
+            producer = await ProducerProxy.NewProducerGrainsAsync(streamId, streamProviderName, null, logger, client, null, Many);
             await BasicTestAsync();
             await StopProxies();
         }
@@ -133,8 +133,8 @@ namespace UnitTests.StreamingTests
         {
             Heading("StreamTest_07_ManyDifferent_ManyProducerClientsManyConsumerGrains");
             Guid streamId = Guid.NewGuid();
-            this.consumer = await ConsumerProxy.NewConsumerGrainsAsync(streamId, this.streamProviderName, this.logger, this.client, null, Many);
-            producer = await ProducerProxy.NewProducerClientObjectsAsync(streamId, streamProviderName, null, logger, this.client, Many);
+            consumer = await ConsumerProxy.NewConsumerGrainsAsync(streamId, streamProviderName, logger, client, null, Many);
+            producer = await ProducerProxy.NewProducerClientObjectsAsync(streamId, streamProviderName, null, logger, client, Many);
             await BasicTestAsync();
             await StopProxies();
         }
@@ -143,8 +143,8 @@ namespace UnitTests.StreamingTests
         {
             Heading("StreamTest_08_ManyDifferent_ManyProducerClientsManyConsumerClients");
             Guid streamId = Guid.NewGuid();
-            consumer = await ConsumerProxy.NewConsumerClientObjectsAsync(streamId, streamProviderName, logger, this.client, Many);
-            producer = await ProducerProxy.NewProducerClientObjectsAsync(streamId, streamProviderName, null, logger, this.client, Many);
+            consumer = await ConsumerProxy.NewConsumerClientObjectsAsync(streamId, streamProviderName, logger, client, Many);
+            producer = await ProducerProxy.NewProducerClientObjectsAsync(streamId, streamProviderName, null, logger, client, Many);
             await BasicTestAsync();
             await StopProxies();
         }
@@ -160,8 +160,8 @@ namespace UnitTests.StreamingTests
             Guid[] consumerGrainIds = new Guid[] { grain1, grain1, grain1 };
             Guid[] producerGrainIds = new Guid[] { grain2, grain2, grain2 };
             // producer joins first, consumer later
-            this.producer = await ProducerProxy.NewProducerGrainsAsync(streamId, this.streamProviderName, null, this.logger, this.client, producerGrainIds);
-            this.consumer = await ConsumerProxy.NewConsumerGrainsAsync(streamId, this.streamProviderName, this.logger, this.client, consumerGrainIds);
+            producer = await ProducerProxy.NewProducerGrainsAsync(streamId, streamProviderName, null, logger, client, producerGrainIds);
+            consumer = await ConsumerProxy.NewConsumerGrainsAsync(streamId, streamProviderName, logger, client, consumerGrainIds);
             await BasicTestAsync();
             await StopProxies();
         }
@@ -175,8 +175,8 @@ namespace UnitTests.StreamingTests
             Guid[] consumerGrainIds = new Guid[] { grain1, grain1, grain1 };
             Guid[] producerGrainIds = new Guid[] { grain2, grain2, grain2 };
             // consumer joins first, producer later
-            this.consumer = await ConsumerProxy.NewConsumerGrainsAsync(streamId, this.streamProviderName, this.logger, this.client, consumerGrainIds);
-            this.producer = await ProducerProxy.NewProducerGrainsAsync(streamId, this.streamProviderName, null, this.logger, this.client, producerGrainIds);
+            consumer = await ConsumerProxy.NewConsumerGrainsAsync(streamId, streamProviderName, logger, client, consumerGrainIds);
+            producer = await ProducerProxy.NewProducerGrainsAsync(streamId, streamProviderName, null, logger, client, producerGrainIds);
             await BasicTestAsync();
             await StopProxies();
         }
@@ -187,8 +187,8 @@ namespace UnitTests.StreamingTests
             Guid streamId = Guid.NewGuid();
             Guid grain1 = Guid.NewGuid();
             Guid[] producerGrainIds = new Guid[] { grain1, grain1, grain1, grain1 };
-            this.producer = await ProducerProxy.NewProducerGrainsAsync(streamId, this.streamProviderName, null, this.logger, this.client, producerGrainIds);
-            consumer = await ConsumerProxy.NewConsumerClientObjectsAsync(streamId, streamProviderName, logger, this.client, Many);
+            producer = await ProducerProxy.NewProducerGrainsAsync(streamId, streamProviderName, null, logger, client, producerGrainIds);
+            consumer = await ConsumerProxy.NewConsumerClientObjectsAsync(streamId, streamProviderName, logger, client, Many);
             await BasicTestAsync();
             await StopProxies();
         }
@@ -199,8 +199,8 @@ namespace UnitTests.StreamingTests
             Guid streamId = Guid.NewGuid();
             Guid grain1 = Guid.NewGuid();
             Guid[] consumerGrainIds = new Guid[] { grain1, grain1, grain1 };
-            this.consumer = await ConsumerProxy.NewConsumerGrainsAsync(streamId, this.streamProviderName, this.logger, this.client, consumerGrainIds);
-            producer = await ProducerProxy.NewProducerClientObjectsAsync(streamId, streamProviderName, null, logger, this.client, Many);
+            consumer = await ConsumerProxy.NewConsumerGrainsAsync(streamId, streamProviderName, logger, client, consumerGrainIds);
+            producer = await ProducerProxy.NewProducerClientObjectsAsync(streamId, streamProviderName, null, logger, client, Many);
             await BasicTestAsync();
             await StopProxies();
         }
@@ -214,8 +214,8 @@ namespace UnitTests.StreamingTests
             int grain1 = Random.Shared.Next();
             int[] grainIds = new int[] { grain1 };
             // consumer joins first, producer later
-            this.consumer = await ConsumerProxy.NewProducerConsumerGrainsAsync(streamId, this.streamProviderName, this.logger, grainIds, useReentrantGrain, this.client);
-            this.producer = await ProducerProxy.NewProducerConsumerGrainsAsync(streamId, this.streamProviderName, this.logger, grainIds, useReentrantGrain, this.client);
+            consumer = await ConsumerProxy.NewProducerConsumerGrainsAsync(streamId, streamProviderName, logger, grainIds, useReentrantGrain, client);
+            producer = await ProducerProxy.NewProducerConsumerGrainsAsync(streamId, streamProviderName, logger, grainIds, useReentrantGrain, client);
             await BasicTestAsync();
             await StopProxies();
         }
@@ -227,8 +227,8 @@ namespace UnitTests.StreamingTests
             int grain1 = Random.Shared.Next();
             int[] grainIds = new int[] { grain1 };
             // produce joins first, consumer later
-            this.producer = await ProducerProxy.NewProducerConsumerGrainsAsync(streamId, this.streamProviderName, this.logger, grainIds, useReentrantGrain, this.client);
-            this.consumer = await ConsumerProxy.NewProducerConsumerGrainsAsync(streamId, this.streamProviderName, this.logger, grainIds, useReentrantGrain, this.client);
+            producer = await ProducerProxy.NewProducerConsumerGrainsAsync(streamId, streamProviderName, logger, grainIds, useReentrantGrain, client);
+            consumer = await ConsumerProxy.NewProducerConsumerGrainsAsync(streamId, streamProviderName, logger, grainIds, useReentrantGrain, client);
             await BasicTestAsync();
             await StopProxies();
         }
@@ -242,10 +242,10 @@ namespace UnitTests.StreamingTests
             // this reproduces a scenario was discovered to not work (deadlock) by the Halo team. the scenario is that
             // where a producer calls a consumer, which subscribes to the calling producer.
 
-            this.producer = await ProducerProxy.NewProducerGrainsAsync(streamId, this.streamProviderName, null, this.logger, this.client);
+            producer = await ProducerProxy.NewProducerGrainsAsync(streamId, streamProviderName, null, logger, client);
             Guid consumerGrainId = await producer.AddNewConsumerGrain();
 
-            this.consumer = ConsumerProxy.NewConsumerGrainAsync_WithoutBecomeConsumer(consumerGrainId, this.logger, this.client);
+            consumer = ConsumerProxy.NewConsumerGrainAsync_WithoutBecomeConsumer(consumerGrainId, logger, client);
             await BasicTestAsync();
             await StopProxies();
         }
@@ -253,8 +253,8 @@ namespace UnitTests.StreamingTests
         internal async Task StreamTest_Create_OneProducerGrainOneConsumerGrain()
         {
             Guid streamId = Guid.NewGuid();
-            this.consumer = await ConsumerProxy.NewConsumerGrainsAsync(streamId, this.streamProviderName, this.logger, this.client);
-            this.producer = await ProducerProxy.NewProducerGrainsAsync(streamId, this.streamProviderName, null, this.logger, this.client);
+            consumer = await ConsumerProxy.NewConsumerGrainsAsync(streamId, streamProviderName, logger, client);
+            producer = await ProducerProxy.NewProducerGrainsAsync(streamId, streamProviderName, null, logger, client);
         }
 
         public async Task StreamTest_16_Deactivation_OneProducerGrainOneConsumerGrain()
@@ -265,8 +265,8 @@ namespace UnitTests.StreamingTests
             Guid[] producerGrainIds = { Guid.NewGuid() };
 
             // consumer joins first, producer later
-            this.consumer = await ConsumerProxy.NewConsumerGrainsAsync(streamId, this.streamProviderName, this.logger, this.client, consumerGrainIds);
-            this.producer = await ProducerProxy.NewProducerGrainsAsync(streamId, this.streamProviderName, null, this.logger, this.client, producerGrainIds);
+            consumer = await ConsumerProxy.NewConsumerGrainsAsync(streamId, streamProviderName, logger, client, consumerGrainIds);
+            producer = await ProducerProxy.NewProducerGrainsAsync(streamId, streamProviderName, null, logger, client, producerGrainIds);
             await BasicTestAsync(false);
             //await consumer.StopBeingConsumer();
             await StopProxies();
@@ -279,8 +279,8 @@ namespace UnitTests.StreamingTests
 
             logger.LogInformation("\n\n\n*******************************************************************\n\n\n");
 
-            this.consumer = await ConsumerProxy.NewConsumerGrainsAsync(streamId, this.streamProviderName, this.logger, this.client, consumerGrainIds);
-            this.producer = await ProducerProxy.NewProducerGrainsAsync(streamId, this.streamProviderName, null, this.logger, this.client, producerGrainIds);
+            consumer = await ConsumerProxy.NewConsumerGrainsAsync(streamId, streamProviderName, logger, client, consumerGrainIds);
+            producer = await ProducerProxy.NewProducerGrainsAsync(streamId, streamProviderName, null, logger, client, producerGrainIds);
 
             await BasicTestAsync(false);
             await StopProxies();
@@ -311,15 +311,15 @@ namespace UnitTests.StreamingTests
             Heading("StreamTest_19_ConsumerImplicitlySubscribedToProducerClient");
             string consumerTypeName = typeof(Streaming_ImplicitlySubscribedConsumerGrain).FullName;
             Guid streamGuid = Guid.NewGuid();
-            producer = await ProducerProxy.NewProducerClientObjectsAsync(streamGuid, streamProviderName, "TestNamespace1", logger, this.client);
-            this.consumer = ConsumerProxy.NewConsumerGrainAsync_WithoutBecomeConsumer(streamGuid, this.logger, this.client, consumerTypeName);
+            producer = await ProducerProxy.NewProducerClientObjectsAsync(streamGuid, streamProviderName, "TestNamespace1", logger, client);
+            consumer = ConsumerProxy.NewConsumerGrainAsync_WithoutBecomeConsumer(streamGuid, logger, client, consumerTypeName);
 
             logger.LogInformation("\n** Starting Test {TestNumber}.\n", testNumber);
             var producerCount = await producer.ProducerCount;
             logger.LogInformation("\n** Test {TestNumber} BasicTestAsync: producerCount={ProducerCount}.\n", testNumber, producerCount);
 
             async Task<bool> waitUntilFunc(bool lastTry) =>
-                    0 < await TestUtils.GetActivationCount(this.client, consumerTypeName) && await this.CheckCounters(this.producer, this.consumer, false);
+                    0 < await TestUtils.GetActivationCount(client, consumerTypeName) && await CheckCounters(producer, consumer, false);
             await producer.ProduceSequentialSeries(ItemCount);
             await TestingUtils.WaitUntilAsync(waitUntilFunc, _timeout);
             await CheckCounters(producer, consumer);
@@ -331,15 +331,15 @@ namespace UnitTests.StreamingTests
             Heading("StreamTest_20_ConsumerImplicitlySubscribedToProducerGrain");
             string consumerTypeName = typeof(Streaming_ImplicitlySubscribedConsumerGrain).FullName;
             Guid streamGuid = Guid.NewGuid();
-            this.producer = await ProducerProxy.NewProducerGrainsAsync(streamGuid, this.streamProviderName, "TestNamespace1", this.logger, this.client);
-            this.consumer = ConsumerProxy.NewConsumerGrainAsync_WithoutBecomeConsumer(streamGuid, this.logger, this.client, consumerTypeName);
+            producer = await ProducerProxy.NewProducerGrainsAsync(streamGuid, streamProviderName, "TestNamespace1", logger, client);
+            consumer = ConsumerProxy.NewConsumerGrainAsync_WithoutBecomeConsumer(streamGuid, logger, client, consumerTypeName);
 
             logger.LogInformation("\n** Starting Test {TestNumber}.\n", testNumber);
             var producerCount = await producer.ProducerCount;
             logger.LogInformation("\n** Test {TestNumber} BasicTestAsync: producerCount={ProducerCount}.\n", testNumber, producerCount);
 
             async Task<bool> waitUntilFunc(bool lastTry) =>
-                    0 < await TestUtils.GetActivationCount(this.client, consumerTypeName) && await this.CheckCounters(this.producer, this.consumer, false);
+                    0 < await TestUtils.GetActivationCount(client, consumerTypeName) && await CheckCounters(producer, consumer, false);
             await producer.ProduceSequentialSeries(ItemCount);
             await TestingUtils.WaitUntilAsync(waitUntilFunc, _timeout);
             await CheckCounters(producer, consumer);
@@ -352,15 +352,15 @@ namespace UnitTests.StreamingTests
             //ToDo in migrate: the following consumer grain is not implemented in VSO and all tests depend on it fail.
             string consumerTypeName = "UnitTests.Grains.Streaming_ImplicitlySubscribedGenericConsumerGrain";//typeof(Streaming_ImplicitlySubscribedGenericConsumerGrain).FullName;
             Guid streamGuid = Guid.NewGuid();
-            this.producer = await ProducerProxy.NewProducerGrainsAsync(streamGuid, this.streamProviderName, "TestNamespace1", this.logger, this.client);
-            this.consumer = ConsumerProxy.NewConsumerGrainAsync_WithoutBecomeConsumer(streamGuid, this.logger, this.client, consumerTypeName);
+            producer = await ProducerProxy.NewProducerGrainsAsync(streamGuid, streamProviderName, "TestNamespace1", logger, client);
+            consumer = ConsumerProxy.NewConsumerGrainAsync_WithoutBecomeConsumer(streamGuid, logger, client, consumerTypeName);
 
             logger.LogInformation("\n** Starting Test {TestNumber}.\n", testNumber);
             var producerCount = await producer.ProducerCount;
             logger.LogInformation("\n** Test {TestNumber} BasicTestAsync: producerCount={ProducerCount}.\n", testNumber, producerCount);
 
             async Task<bool> waitUntilFunc(bool lastTry) =>
-                    0 < await TestUtils.GetActivationCount(this.client, consumerTypeName) && await this.CheckCounters(this.producer, this.consumer, false);
+                    0 < await TestUtils.GetActivationCount(client, consumerTypeName) && await CheckCounters(producer, consumer, false);
             await producer.ProduceSequentialSeries(ItemCount);
             await TestingUtils.WaitUntilAsync(waitUntilFunc, _timeout);
             await CheckCounters(producer, consumer);
@@ -371,14 +371,14 @@ namespace UnitTests.StreamingTests
         {
             Heading("StreamTest_22_TestImmutabilityDuringStreaming");
 
-            IStreamingImmutabilityTestGrain itemProducer = this.client.GetGrain<IStreamingImmutabilityTestGrain>(Guid.NewGuid());
+            IStreamingImmutabilityTestGrain itemProducer = client.GetGrain<IStreamingImmutabilityTestGrain>(Guid.NewGuid());
             string producerSilo = await itemProducer.GetSiloIdentifier();
 
             // Obtain consumer in silo of item producer
             IStreamingImmutabilityTestGrain consumerSameSilo = null;
             do
             {
-                var itemConsumer = this.client.GetGrain<IStreamingImmutabilityTestGrain>(Guid.NewGuid());
+                var itemConsumer = client.GetGrain<IStreamingImmutabilityTestGrain>(Guid.NewGuid());
                 var consumerSilo = await itemConsumer.GetSiloIdentifier();
 
                 if (consumerSilo == producerSilo)
@@ -400,7 +400,7 @@ namespace UnitTests.StreamingTests
             await consumerSameSilo.UnsubscribeFromStream();
 
             // Test behavior if immutability is disabled
-            itemProducer = this.client.GetGrain<IStreamingImmutabilityTestGrain>(Guid.NewGuid());
+            itemProducer = client.GetGrain<IStreamingImmutabilityTestGrain>(Guid.NewGuid());
 
             await consumerSameSilo.SubscribeToStream(itemProducer.GetPrimaryKey(), SMS_STREAM_PROVIDER_NAME_DO_NOT_OPTIMIZE_FOR_IMMUTABLE_DATA);
 
@@ -484,7 +484,7 @@ namespace UnitTests.StreamingTests
             if (providerName == SMS_STREAM_PROVIDER_NAME)
             {
                 var streamId = StreamId.Create(StreamTestsConstants.DefaultStreamNamespace, streamIdGuid);
-                var actualCount = await StreamTestUtils.GetStreamPubSub(this.client).ProducerCount(new QualifiedStreamId(providerName, streamId));
+                var actualCount = await StreamTestUtils.GetStreamPubSub(client).ProducerCount(new QualifiedStreamId(providerName, streamId));
                 logger.LogInformation(
                     "StreamingTestRunner.AssertProducerCount: expected={ExpectedCount} actual (SMSStreamRendezvousGrain.ProducerCount)={ActualCount} streamId={StreamId}",
                     expectedCount,
@@ -497,7 +497,7 @@ namespace UnitTests.StreamingTests
         private Task ValidatePubSub(StreamId streamId, string providerName)
         {
             var intStreamId = new QualifiedStreamId(providerName, streamId);
-            var rendez = this.client.GetGrain<IPubSubRendezvousGrain>(intStreamId.ToString());
+            var rendez = client.GetGrain<IPubSubRendezvousGrain>(intStreamId.ToString());
             return rendez.Validate();
         }
 
@@ -508,12 +508,12 @@ namespace UnitTests.StreamingTests
             if (producer != null)
             {
                 str = "Producer";
-                activationCount = await producer.GetNumActivations(this.client);
+                activationCount = await producer.GetNumActivations(client);
             }
             else if (consumer != null)
             {
                 str = "Consumer";
-                activationCount = await consumer.GetNumActivations(this.client);
+                activationCount = await consumer.GetNumActivations(client);
             }
             var expectActivationCount = 0;
             logger.LogInformation(

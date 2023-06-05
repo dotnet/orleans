@@ -24,12 +24,12 @@ namespace Tester
 
         public Task<string[]> GetNames()
         {
-            return Task.FromResult(new[] { this.first.Name, this.second.Name });
+            return Task.FromResult(new[] { first.Name, second.Name });
         }
 
         public Task<string[]> GetExtendedInfo()
         {
-            return Task.FromResult(new[] { this.first.GetExtendedInfo(), this.second.GetExtendedInfo() });
+            return Task.FromResult(new[] { first.GetExtendedInfo(), second.GetExtendedInfo() });
         }
     }
 
@@ -44,18 +44,18 @@ namespace Tester
         public StorageFactoryGrain(
             INamedExampleStorageFactory namedExampleStorageFactory)
         {
-            this.first = namedExampleStorageFactory.Create<string>("Blob", new ExampleStorageConfig("FirstState"));
-            this.second = namedExampleStorageFactory.Create<string>("Table", new ExampleStorageConfig("second"));
+            first = namedExampleStorageFactory.Create<string>("Blob", new ExampleStorageConfig("FirstState"));
+            second = namedExampleStorageFactory.Create<string>("Table", new ExampleStorageConfig("second"));
         }
 
         public Task<string[]> GetNames()
         {
-            return Task.FromResult(new[] { this.first.Name, this.second.Name });
+            return Task.FromResult(new[] { first.Name, second.Name });
         }
 
         public Task<string[]> GetExtendedInfo()
         {
-            return Task.FromResult(new[] { this.first.GetExtendedInfo(), this.second.GetExtendedInfo() });
+            return Task.FromResult(new[] { first.GetExtendedInfo(), second.GetExtendedInfo() });
         }
     }
 
@@ -71,18 +71,18 @@ namespace Tester
         public StorageDefaultFactoryGrain(
             IExampleStorageFactory ExampleStorageFactory)
         {
-            this.first = ExampleStorageFactory.Create<string>(new ExampleStorageConfig("FirstState"));
-            this.second = ExampleStorageFactory.Create<string>(new ExampleStorageConfig("second"));
+            first = ExampleStorageFactory.Create<string>(new ExampleStorageConfig("FirstState"));
+            second = ExampleStorageFactory.Create<string>(new ExampleStorageConfig("second"));
         }
 
         public Task<string[]> GetNames()
         {
-            return Task.FromResult(new[] { this.first.Name, this.second.Name });
+            return Task.FromResult(new[] { first.Name, second.Name });
         }
 
         public Task<string[]> GetExtendedInfo()
         {
-            return Task.FromResult(new[] { this.first.GetExtendedInfo(), this.second.GetExtendedInfo() });
+            return Task.FromResult(new[] { first.GetExtendedInfo(), second.GetExtendedInfo() });
         }
     }
 
@@ -105,12 +105,12 @@ namespace Tester
 
         public Task<string[]> GetNames()
         {
-            return Task.FromResult(new[] { this.first.Name, this.second.Name });
+            return Task.FromResult(new[] { first.Name, second.Name });
         }
 
         public Task<string[]> GetExtendedInfo()
         {
-            return Task.FromResult(new[] { this.first.GetExtendedInfo(), this.second.GetExtendedInfo() });
+            return Task.FromResult(new[] { first.GetExtendedInfo(), second.GetExtendedInfo() });
         }
     }
 }

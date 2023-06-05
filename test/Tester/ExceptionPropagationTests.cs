@@ -25,8 +25,8 @@ namespace UnitTests.General
             this.fixture = fixture;
 
             var grainFactory = (IInternalGrainFactory)this.fixture.GrainFactory;
-            this.exceptionGrain = grainFactory.GetGrain<IMessageSerializationGrain>(GetRandomGrainId());
-            this.clientObjectRef = grainFactory.CreateObjectReference<IMessageSerializationClientObject>(this.clientObject);
+            exceptionGrain = grainFactory.GetGrain<IMessageSerializationGrain>(GetRandomGrainId());
+            clientObjectRef = grainFactory.CreateObjectReference<IMessageSerializationClientObject>(clientObject);
         }
 
         public class Fixture : BaseTestClusterFixture
@@ -36,7 +36,7 @@ namespace UnitTests.General
         [Fact, TestCategory("BVT")]
         public async Task ExceptionsPropagatedFromGrainToClient()
         {
-            var grain = this.fixture.Client.GetGrain<IExceptionGrain>(0);
+            var grain = fixture.Client.GetGrain<IExceptionGrain>(0);
 
             var invalidOperationException = await Assert.ThrowsAsync<InvalidOperationException>(() => grain.ThrowsInvalidOperationException());
             Assert.Equal("Test exception", invalidOperationException.Message);
@@ -48,7 +48,7 @@ namespace UnitTests.General
         [Fact, TestCategory("BVT")]
         public async Task BasicExceptionPropagation()
         {
-            IExceptionGrain grain = this.fixture.GrainFactory.GetGrain<IExceptionGrain>(GetRandomGrainId());
+            IExceptionGrain grain = fixture.GrainFactory.GetGrain<IExceptionGrain>(GetRandomGrainId());
             var exception = await Assert.ThrowsAsync<InvalidOperationException>(
                 () => grain.ThrowsInvalidOperationException());
 
@@ -59,7 +59,7 @@ namespace UnitTests.General
         [Fact, TestCategory("BVT")]
         public void ExceptionContainsOriginalStackTrace()
         {
-            IExceptionGrain grain = this.fixture.GrainFactory.GetGrain<IExceptionGrain>(GetRandomGrainId());
+            IExceptionGrain grain = fixture.GrainFactory.GetGrain<IExceptionGrain>(GetRandomGrainId());
 
             // Explicitly using .Wait() instead of await the task to avoid any modification of the inner exception
             var aggEx = Assert.Throws<AggregateException>(
@@ -75,7 +75,7 @@ namespace UnitTests.General
         [Fact, TestCategory("BVT")]
         public async Task ExceptionContainsOriginalStackTraceWhenRethrowingLocally()
         {
-            IExceptionGrain grain = this.fixture.GrainFactory.GetGrain<IExceptionGrain>(GetRandomGrainId());
+            IExceptionGrain grain = fixture.GrainFactory.GetGrain<IExceptionGrain>(GetRandomGrainId());
             try
             {
                 // Use await to force the exception to be rethrown and validate that the remote stack trace is still present
@@ -94,7 +94,7 @@ namespace UnitTests.General
         [Fact, TestCategory("BVT")]
         public async Task ExceptionPropagationDoesNotUnwrapAggregateExceptions()
         {
-            IExceptionGrain grain = this.fixture.GrainFactory.GetGrain<IExceptionGrain>(GetRandomGrainId());
+            IExceptionGrain grain = fixture.GrainFactory.GetGrain<IExceptionGrain>(GetRandomGrainId());
             var exception = await Assert.ThrowsAsync<AggregateException>(
                 () => grain.ThrowsAggregateExceptionWrappingInvalidOperationException());
 
@@ -105,7 +105,7 @@ namespace UnitTests.General
         [Fact, TestCategory("BVT")]
         public async Task ExceptionPropagationDoesNoFlattenAggregateExceptions()
         {
-            IExceptionGrain grain = this.fixture.GrainFactory.GetGrain<IExceptionGrain>(GetRandomGrainId());
+            IExceptionGrain grain = fixture.GrainFactory.GetGrain<IExceptionGrain>(GetRandomGrainId());
             var exception = await Assert.ThrowsAsync<AggregateException>(
                 () => grain.ThrowsNestedAggregateExceptionsWrappingInvalidOperationException());
 
@@ -117,7 +117,7 @@ namespace UnitTests.General
         [Fact, TestCategory("BVT")]
         public async Task TaskCancelationPropagation()
         {
-            IExceptionGrain grain = this.fixture.GrainFactory.GetGrain<IExceptionGrain>(GetRandomGrainId());
+            IExceptionGrain grain = fixture.GrainFactory.GetGrain<IExceptionGrain>(GetRandomGrainId());
             await Assert.ThrowsAsync<TaskCanceledException>(
                 () => grain.Canceled());
         }
@@ -125,7 +125,7 @@ namespace UnitTests.General
         [Fact, TestCategory("BVT")]
         public async Task GrainForwardingExceptionPropagation()
         {
-            IExceptionGrain grain = this.fixture.GrainFactory.GetGrain<IExceptionGrain>(GetRandomGrainId());
+            IExceptionGrain grain = fixture.GrainFactory.GetGrain<IExceptionGrain>(GetRandomGrainId());
             var otherGrainId = GetRandomGrainId();
             var exception = await Assert.ThrowsAsync<InvalidOperationException>(
                 () => grain.GrainCallToThrowsInvalidOperationException(otherGrainId));
@@ -136,7 +136,7 @@ namespace UnitTests.General
         [Fact, TestCategory("BVT")]
         public async Task GrainForwardingExceptionPropagationDoesNotUnwrapAggregateExceptions()
         {
-            IExceptionGrain grain = this.fixture.GrainFactory.GetGrain<IExceptionGrain>(GetRandomGrainId());
+            IExceptionGrain grain = fixture.GrainFactory.GetGrain<IExceptionGrain>(GetRandomGrainId());
             var otherGrainId = GetRandomGrainId();
             var exception = await Assert.ThrowsAsync<AggregateException>(
                 () => grain.GrainCallToThrowsAggregateExceptionWrappingInvalidOperationException(otherGrainId));
@@ -148,7 +148,7 @@ namespace UnitTests.General
         [Fact, TestCategory("BVT")]
         public async Task SynchronousExceptionThrownShouldResultInFaultedTask()
         {
-            IExceptionGrain grain = this.fixture.GrainFactory.GetGrain<IExceptionGrain>(GetRandomGrainId());
+            IExceptionGrain grain = fixture.GrainFactory.GetGrain<IExceptionGrain>(GetRandomGrainId());
 
             // start the grain call but don't await it nor wrap in try/catch, to make sure it doesn't throw synchronously
             var grainCallTask = grain.ThrowsSynchronousInvalidOperationException();
@@ -165,7 +165,7 @@ namespace UnitTests.General
         [Fact(Skip = "Implementation of issue #1378 is still pending"), TestCategory("BVT")]
         public void ExceptionPropagationForwardsEntireAggregateException()
         {
-            IExceptionGrain grain = this.fixture.GrainFactory.GetGrain<IExceptionGrain>(GetRandomGrainId());
+            IExceptionGrain grain = fixture.GrainFactory.GetGrain<IExceptionGrain>(GetRandomGrainId());
             var grainCall = grain.ThrowsMultipleExceptionsAggregatedInFaultedTask();
 
             try
@@ -191,7 +191,7 @@ namespace UnitTests.General
         [Fact, TestCategory("BVT")]
         public async Task SynchronousAggregateExceptionThrownShouldResultInFaultedTaskWithOriginalAggregateExceptionUnmodifiedAsInnerException()
         {
-            IExceptionGrain grain = this.fixture.GrainFactory.GetGrain<IExceptionGrain>(GetRandomGrainId());
+            IExceptionGrain grain = fixture.GrainFactory.GetGrain<IExceptionGrain>(GetRandomGrainId());
 
             // start the grain call but don't await it nor wrap in try/catch, to make sure it doesn't throw synchronously
             var grainCallTask = grain.ThrowsSynchronousAggregateExceptionWithMultipleInnerExceptions();
@@ -217,7 +217,7 @@ namespace UnitTests.General
         {
             for (var i = 0; i < TestIterations; i++)
             {
-                var exception = await Assert.ThrowsAnyAsync<NotSupportedException>(() => exceptionGrain.SendUndeserializableToClient(this.clientObjectRef));
+                var exception = await Assert.ThrowsAnyAsync<NotSupportedException>(() => exceptionGrain.SendUndeserializableToClient(clientObjectRef));
                 Assert.Contains(UndeserializableType.FailureMessage, exception.Message);
             }
         }
@@ -230,7 +230,7 @@ namespace UnitTests.General
         {
             for (var i = 0; i < TestIterations; i++)
             {
-                var exception = await Assert.ThrowsAnyAsync<NotSupportedException>(() => exceptionGrain.GetUnserializableFromClient(this.clientObjectRef));
+                var exception = await Assert.ThrowsAnyAsync<NotSupportedException>(() => exceptionGrain.GetUnserializableFromClient(clientObjectRef));
                 Assert.Contains(UndeserializableType.FailureMessage, exception.Message);
             }
         }
@@ -243,7 +243,7 @@ namespace UnitTests.General
         {
             for (var i = 0; i < TestIterations; i++)
             {
-                var exception = await Assert.ThrowsAnyAsync<NotSupportedException>(() => exceptionGrain.GetUndeserializableFromClient(this.clientObjectRef));
+                var exception = await Assert.ThrowsAnyAsync<NotSupportedException>(() => exceptionGrain.GetUndeserializableFromClient(clientObjectRef));
                 Assert.Contains(UndeserializableType.FailureMessage, exception.Message);
             }
         }
@@ -256,7 +256,7 @@ namespace UnitTests.General
         {
             for (var i = 0; i < TestIterations; i++)
             {
-                var exception = await Assert.ThrowsAnyAsync<NotSupportedException>(() => exceptionGrain.SendUnserializableToClient(this.clientObjectRef));
+                var exception = await Assert.ThrowsAnyAsync<NotSupportedException>(() => exceptionGrain.SendUnserializableToClient(clientObjectRef));
                 Assert.Contains(UndeserializableType.FailureMessage, exception.Message);
             }
         }

@@ -135,8 +135,8 @@ namespace Orleans.Configuration
         /// </summary>
         public TimeSpan SystemResponseTimeout
         {
-            get { return Debugger.IsAttached ? ResponseTimeoutWithDebugger : this.systemResponseTimeout; }
-            set { this.systemResponseTimeout = value; }
+            get { return Debugger.IsAttached ? ResponseTimeoutWithDebugger : systemResponseTimeout; }
+            set { systemResponseTimeout = value; }
         }
 
         /// <summary>

@@ -28,7 +28,7 @@ namespace Analyzers.Tests
 
         protected async Task AssertNoDiagnostics(string source, params string[] extraUsings)
         {
-            var (diagnostics, _) = await this.GetDiagnosticsAsync(source, extraUsings);
+            var (diagnostics, _) = await GetDiagnosticsAsync(source, extraUsings);
             Assert.Empty(diagnostics);
         }
 
@@ -42,7 +42,7 @@ namespace Analyzers.Tests
             sb.AppendLine(source);
 
             var sourceText = sb.ToString();
-            return (await this.GetDiagnosticsFullSourceAsync(sourceText), sourceText);
+            return (await GetDiagnosticsFullSourceAsync(sourceText), sourceText);
         }
 
         protected async Task<Diagnostic[]> GetDiagnosticsFullSourceAsync(string source)
@@ -51,7 +51,7 @@ namespace Analyzers.Tests
             var errors = compilation.GetDiagnostics().Where(d => d.Severity == DiagnosticSeverity.Error);
 
             Assert.Empty(errors);
-            var analyzer = this.CreateDiagnosticAnalyzer();
+            var analyzer = CreateDiagnosticAnalyzer();
             var compilationWithAnalyzers
                 = compilation
                     .WithOptions(

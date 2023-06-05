@@ -19,13 +19,13 @@ namespace UnitTests
         public TimeoutTests(ITestOutputHelper output, DefaultClusterFixture fixture) : base(fixture)
         {
             this.output = output;
-            this.runtimeClient = this.HostedCluster.ServiceProvider.GetRequiredService<IRuntimeClient>();
-            originalTimeout = this.runtimeClient.GetResponseTimeout();
+            runtimeClient = HostedCluster.ServiceProvider.GetRequiredService<IRuntimeClient>();
+            originalTimeout = runtimeClient.GetResponseTimeout();
         }
 
         public virtual void Dispose()
         {
-            this.runtimeClient.SetResponseTimeout(originalTimeout);
+            runtimeClient.SetResponseTimeout(originalTimeout);
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Timeout")]
@@ -33,9 +33,9 @@ namespace UnitTests
         {
             bool finished = false;
             var grainName = typeof (ErrorGrain).FullName;
-            IErrorGrain grain = this.GrainFactory.GetGrain<IErrorGrain>(GetRandomGrainId(), grainName);
+            IErrorGrain grain = GrainFactory.GetGrain<IErrorGrain>(GetRandomGrainId(), grainName);
             TimeSpan timeout = TimeSpan.FromMilliseconds(1000);
-            this.runtimeClient.SetResponseTimeout(timeout);
+            runtimeClient.SetResponseTimeout(timeout);
 
             Task promise = grain.LongMethod((int)timeout.Multiply(4).TotalMilliseconds);
             //promise = grain.LongMethodWithError(2000);
@@ -87,7 +87,7 @@ namespace UnitTests
         public async Task CallThatShouldHaveBeenDroppedNotExecutedTest()
         {
             var responseTimeout = TimeSpan.FromSeconds(2);
-            this.runtimeClient.SetResponseTimeout(responseTimeout);
+            runtimeClient.SetResponseTimeout(responseTimeout);
 
             var target = Client.GetGrain<ILongRunningTaskGrain<int>>(Guid.NewGuid());
 

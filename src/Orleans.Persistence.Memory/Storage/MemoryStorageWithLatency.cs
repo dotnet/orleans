@@ -54,7 +54,7 @@ namespace Orleans.Storage
             IGrainFactory grainFactory,
             IGrainStorageSerializer defaultGrainStorageSerialzier)
         {
-            this.baseGranStorage = new MemoryGrainStorage(name, options, loggerFactory.CreateLogger<MemoryGrainStorage>(), grainFactory, defaultGrainStorageSerialzier);
+            baseGranStorage = new MemoryGrainStorage(name, options, loggerFactory.CreateLogger<MemoryGrainStorage>(), grainFactory, defaultGrainStorageSerialzier);
             this.options = options;
         }
 
@@ -85,7 +85,7 @@ namespace Orleans.Storage
             Exception error = null;
             try
             {
-                if (this.options.MockCallsOnly)
+                if (options.MockCallsOnly)
                 {
                     // Simulated call with slight delay
                     await Task.Delay(10);
@@ -101,12 +101,12 @@ namespace Orleans.Storage
                 error = exc;
             }
 
-            if (sw.Elapsed < this.options.Latency)
+            if (sw.Elapsed < options.Latency)
             {
                 // Work out the remaining time to wait so that this operation exceeds the required Latency.
                 // Also adds an extra fudge factor to account for any system clock resolution edge cases.
                 var extraDelay = TimeSpan.FromTicks(
-                    this.options.Latency.Ticks - sw.Elapsed.Ticks + TimeSpan.TicksPerMillisecond /* round up */ );
+                    options.Latency.Ticks - sw.Elapsed.Ticks + TimeSpan.TicksPerMillisecond /* round up */ );
 
                 await Task.Delay(extraDelay);
             }

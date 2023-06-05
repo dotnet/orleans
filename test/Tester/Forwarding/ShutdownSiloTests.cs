@@ -47,7 +47,7 @@ namespace Tester.Forwarding
 
         public ShutdownSiloTests()
         {
-            this.EnsurePreconditionsMet();
+            EnsurePreconditionsMet();
         }
 
         [Fact(Skip = "https://github.com/dotnet/orleans/issues/6423"), TestCategory("Forward"), TestCategory("Functional")]

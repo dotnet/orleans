@@ -15,7 +15,7 @@ namespace UnitTests.Grains
 
         public StatelessWorkerStreamConsumerGrain(ILoggerFactory loggerFactory)
         {
-            this.logger = loggerFactory.CreateLogger($"{this.GetType().Name}-{this.IdentityString}");
+            logger = loggerFactory.CreateLogger($"{GetType().Name}-{IdentityString}");
         }
 
         public Task OnCompletedAsync() => Task.CompletedTask;

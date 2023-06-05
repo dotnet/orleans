@@ -208,7 +208,7 @@ namespace Orleans.Tests.SqlUtils
             this.invariantName = invariantName;
             supportsCommandCancellation = DbConstantsStore.SupportsCommandCancellation(InvariantName);
             isSynchronousAdoNetImplementation = DbConstantsStore.IsSynchronousAdoNetImplementation(InvariantName);
-            this.databaseCommandInterceptor = DbConstantsStore.GetDatabaseCommandInterceptor(InvariantName);
+            databaseCommandInterceptor = DbConstantsStore.GetDatabaseCommandInterceptor(InvariantName);
         }
 
         private static async Task<Tuple<IEnumerable<TResult>, int>> SelectAsync<TResult>(DbDataReader reader, Func<IDataReader, int, CancellationToken, Task<TResult>> selector, CancellationToken cancellationToken)

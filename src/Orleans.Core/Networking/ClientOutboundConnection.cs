@@ -34,14 +34,14 @@ namespace Orleans.Runtime.Messaging
             this.connectionOptions = connectionOptions;
             this.connectionPreambleHelper = connectionPreambleHelper;
             this.clusterOptions = clusterOptions;
-            this.RemoteSiloAddress = remoteSiloAddress ?? throw new ArgumentNullException(nameof(remoteSiloAddress));
+            RemoteSiloAddress = remoteSiloAddress ?? throw new ArgumentNullException(nameof(remoteSiloAddress));
         }
 
         public SiloAddress RemoteSiloAddress { get; }
 
         protected override ConnectionDirection ConnectionDirection => ConnectionDirection.ClientToGateway;
 
-        protected override IMessageCenter MessageCenter => this.messageCenter;
+        protected override IMessageCenter MessageCenter => messageCenter;
 
         protected override void RecordMessageReceive(Message msg, int numTotalBytes, int headerBytes)
         {
@@ -55,7 +55,7 @@ namespace Orleans.Runtime.Messaging
 
         protected override void OnReceivedMessage(Message message)
         {
-            this.messageCenter.DispatchLocalMessage(message);
+            messageCenter.DispatchLocalMessage(message);
         }
 
         protected override async Task RunInternal()
@@ -63,21 +63,21 @@ namespace Orleans.Runtime.Messaging
             Exception error = default;
             try
             {
-                this.messageCenter.OnGatewayConnectionOpen();
+                messageCenter.OnGatewayConnectionOpen();
 
                 var myClusterId = clusterOptions.ClusterId;
                 await connectionPreambleHelper.Write(
-                    this.Context,
+                    Context,
                     new ConnectionPreamble
                     {
-                        NetworkProtocolVersion = this.connectionOptions.ProtocolVersion,
-                        NodeIdentity = this.messageCenter.ClientId.GrainId,
+                        NetworkProtocolVersion = connectionOptions.ProtocolVersion,
+                        NodeIdentity = messageCenter.ClientId.GrainId,
                         SiloAddress = null,
                         ClusterId = myClusterId
                     });
 
-                var preamble = await connectionPreambleHelper.Read(this.Context);
-                this.Log.LogInformation(
+                var preamble = await connectionPreambleHelper.Read(Context);
+                Log.LogInformation(
                     "Established connection to {Silo} with protocol version {ProtocolVersion}",
                     preamble.SiloAddress,
                     preamble.NetworkProtocolVersion.ToString());
@@ -95,25 +95,25 @@ namespace Orleans.Runtime.Messaging
             }
             finally
             {
-                this.connectionManager.OnConnectionTerminated(this.RemoteSiloAddress, this, error);
-                this.messageCenter.OnGatewayConnectionClosed();
+                connectionManager.OnConnectionTerminated(RemoteSiloAddress, this, error);
+                messageCenter.OnGatewayConnectionClosed();
             }
         }
 
         protected override bool PrepareMessageForSend(Message msg)
         {
             // Check to make sure we're not stopped
-            if (!this.IsValid)
+            if (!IsValid)
             {
                 // Recycle the message we've dequeued. Note that this will recycle messages that were queued up to be sent when the gateway connection is declared dead
                 msg.TargetSilo = null;
-                this.messageCenter.SendMessage(msg);
+                messageCenter.SendMessage(msg);
                 return false;
             }
 
             if (msg.TargetSilo != null) return true;
 
-            msg.TargetSilo = this.RemoteSiloAddress;
+            msg.TargetSilo = RemoteSiloAddress;
 
             return true;
         }
@@ -125,7 +125,7 @@ namespace Orleans.Runtime.Messaging
             if (msg.RetryCount < MessagingOptions.DEFAULT_MAX_MESSAGE_SEND_RETRIES)
             {
                 ++msg.RetryCount;
-                this.messageCenter.SendMessage(msg);
+                messageCenter.SendMessage(msg);
             }
             else
             {
@@ -143,10 +143,10 @@ namespace Orleans.Runtime.Messaging
         {
             MessagingInstruments.OnRejectedMessage(msg);
             if (string.IsNullOrEmpty(reason)) reason = "Rejection from silo - Unknown reason.";
-            var error = this.MessageFactory.CreateRejectionResponse(msg, rejectionType, reason);
+            var error = MessageFactory.CreateRejectionResponse(msg, rejectionType, reason);
 
             // rejection msgs are always originated locally, they are never remote.
-            this.OnReceivedMessage(error);
+            OnReceivedMessage(error);
         }
 
         public void FailMessage(Message msg, string reason)
@@ -154,13 +154,13 @@ namespace Orleans.Runtime.Messaging
             MessagingInstruments.OnFailedSentMessage(msg);
             if (msg.Direction == Message.Directions.Request)
             {
-                if (this.Log.IsEnabled(LogLevel.Debug)) this.Log.LogDebug((int)ErrorCode.MessagingSendingRejection, "Client is rejecting message: {Message}. Reason = {Reason}", msg, reason);
+                if (Log.IsEnabled(LogLevel.Debug)) Log.LogDebug((int)ErrorCode.MessagingSendingRejection, "Client is rejecting message: {Message}. Reason = {Reason}", msg, reason);
                 // Done retrying, send back an error instead
-                this.SendRejection(msg, Message.RejectionTypes.Transient, $"Client is rejecting message: {msg}. Reason = {reason}");
+                SendRejection(msg, Message.RejectionTypes.Transient, $"Client is rejecting message: {msg}. Reason = {reason}");
             }
             else
             {
-                this.Log.LogInformation((int)ErrorCode.Messaging_OutgoingMS_DroppingMessage, "Client is dropping message: {Message}. Reason = {Reason}", msg, reason);
+                Log.LogInformation((int)ErrorCode.Messaging_OutgoingMS_DroppingMessage, "Client is dropping message: {Message}. Reason = {Reason}", msg, reason);
                 MessagingInstruments.OnDroppedSentMessage(msg);
             }
         }
@@ -168,7 +168,7 @@ namespace Orleans.Runtime.Messaging
         protected override void OnSendMessageFailure(Message message, string error)
         {
             message.TargetSilo = null;
-            this.messageCenter.SendMessage(message);
+            messageCenter.SendMessage(message);
         }
     }
 }

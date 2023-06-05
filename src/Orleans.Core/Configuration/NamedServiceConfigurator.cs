@@ -45,8 +45,8 @@ namespace Orleans.Hosting
         /// </param>
         public NamedServiceConfigurator(string name, Action<Action<IServiceCollection>> configureDelegate)
         {
-            this.Name = name;
-            this.ConfigureDelegate = configureDelegate;
+            Name = name;
+            ConfigureDelegate = configureDelegate;
         }
     }
 

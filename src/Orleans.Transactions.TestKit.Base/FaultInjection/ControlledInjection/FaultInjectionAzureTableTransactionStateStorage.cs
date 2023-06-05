@@ -19,12 +19,12 @@ namespace Orleans.Transactions.TestKit
             AzureTableTransactionalStateStorage<TState> azureStateStorage)
         {
             this.faultInjector = faultInjector;
-            this.stateStorage = azureStateStorage;
+            stateStorage = azureStateStorage;
         }
 
         public Task<TransactionalStorageLoadResponse<TState>> Load()
         {
-            return this.stateStorage.Load();
+            return stateStorage.Load();
         }
 
         public async Task<string> Store(
@@ -43,7 +43,7 @@ namespace Orleans.Transactions.TestKit
         )
         {
             faultInjector.BeforeStore();
-            var result = await this.stateStorage.Store(expectedETag, metadata, statesToPrepare, commitUpTo, abortAfter);
+            var result = await stateStorage.Store(expectedETag, metadata, statesToPrepare, commitUpTo, abortAfter);
             faultInjector.AfterStore();
             return result;
         }
@@ -69,14 +69,14 @@ namespace Orleans.Transactions.TestKit
 
         public ITransactionalStateStorage<TState> Create<TState>(string stateName, IGrainContext context) where TState : class, new()
         {
-            var azureStateStorage = this.factory.Create<TState>(stateName, context);
+            var azureStateStorage = factory.Create<TState>(stateName, context);
             return ActivatorUtilities.CreateInstance<FaultInjectionAzureTableTransactionStateStorage<TState>>(
                 context.ActivationServices, azureStateStorage);
         }
 
         public void Participate(ISiloLifecycle lifecycle)
         {
-            this.factory.Participate(lifecycle);
+            factory.Participate(lifecycle);
         }
     }
 }

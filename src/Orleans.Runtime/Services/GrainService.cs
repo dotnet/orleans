@@ -49,7 +49,7 @@ namespace Orleans.Runtime
         internal GrainService(GrainId grainId, SiloAddress siloAddress, ILoggerFactory loggerFactory, IConsistentRingProvider ringProvider)
             : base(SystemTargetGrainId.Create(grainId.Type, siloAddress), siloAddress, loggerFactory: loggerFactory)
         {
-            typeName = this.GetType().FullName;
+            typeName = GetType().FullName;
             Logger = loggerFactory.CreateLogger(typeName);
 
             ring = ringProvider;
@@ -92,7 +92,7 @@ namespace Orleans.Runtime
             Logger.LogInformation(
                 (int)ErrorCode.RS_ServiceStarting,
                 "Starting {TypeName} grain service on: {Silo} x{HashCode}, with range {RingRange}",
-                this.typeName,
+                typeName,
                 Silo,
                 Silo.GetConsistentHashCode().ToString("X8"),
                 RingRange);
@@ -130,7 +130,7 @@ namespace Orleans.Runtime
         /// <inheritdoc/>
         void IRingRangeListener.RangeChangeNotification(IRingRange oldRange, IRingRange newRange, bool increased)
         {
-            this.WorkItemGroup.QueueTask(() => OnRangeChange(oldRange, newRange, increased), this).Ignore();
+            WorkItemGroup.QueueTask(() => OnRangeChange(oldRange, newRange, increased), this).Ignore();
         }
 
         /// <summary>

@@ -64,22 +64,22 @@ namespace Orleans.Runtime
 
         public MessagingTrace(ILoggerFactory loggerFactory) : base(Category)
         {
-            this.log = loggerFactory.CreateLogger(Category);
+            log = loggerFactory.CreateLogger(Category);
         }
 
         public void OnSendMessage(Message message)
         {
-            if (this.IsEnabled(SendMessageEventName))
+            if (IsEnabled(SendMessageEventName))
             {
-                this.Write(SendMessageEventName, message);
+                Write(SendMessageEventName, message);
             }
         }
 
         public void OnIncomingMessageAgentReceiveMessage(Message message)
         {
-            if (this.IsEnabled(IncomingMessageAgentReceiveMessageEventName))
+            if (IsEnabled(IncomingMessageAgentReceiveMessageEventName))
             {
-                this.Write(IncomingMessageAgentReceiveMessageEventName, message);
+                Write(IncomingMessageAgentReceiveMessageEventName, message);
             }
 
             OrleansIncomingMessageAgentEvent.Log.ReceiveMessage(message);
@@ -88,9 +88,9 @@ namespace Orleans.Runtime
 
         public void OnDispatcherReceiveMessage(Message message)
         {
-            if (this.IsEnabled(DispatcherReceiveMessageEventName))
+            if (IsEnabled(DispatcherReceiveMessageEventName))
             {
-                this.Write(DispatcherReceiveMessageEventName, message);
+                Write(DispatcherReceiveMessageEventName, message);
             }
 
             OrleansDispatcherEvent.Log.ReceiveMessage(message);
@@ -99,9 +99,9 @@ namespace Orleans.Runtime
 
         internal void OnDropExpiredMessage(Message message, MessagingInstruments.Phase phase)
         {
-            if (this.IsEnabled(DropExpiredMessageEventName))
+            if (IsEnabled(DropExpiredMessageEventName))
             {
-                this.Write(DropExpiredMessageEventName, new { Message = message, Phase = phase });
+                Write(DropExpiredMessageEventName, new { Message = message, Phase = phase });
             }
 
             MessagingInstruments.OnMessageExpired(phase);
@@ -110,9 +110,9 @@ namespace Orleans.Runtime
 
         internal void OnDropBlockedApplicationMessage(Message message)
         {
-            if (this.IsEnabled(DropBlockedApplicationMessageEventName))
+            if (IsEnabled(DropBlockedApplicationMessageEventName))
             {
-                this.Write(DropBlockedApplicationMessageEventName, message);
+                Write(DropBlockedApplicationMessageEventName, message);
             }
 
             LogDropBlockedApplicationMessage(this, message, null);
@@ -126,9 +126,9 @@ namespace Orleans.Runtime
 
         public void OnEnqueueInboundMessage(Message message)
         {
-            if (this.IsEnabled(EnqueueInboundMessageEventName))
+            if (IsEnabled(EnqueueInboundMessageEventName))
             {
-                this.Write(EnqueueInboundMessageEventName, message);
+                Write(EnqueueInboundMessageEventName, message);
             }
 
             LogEnqueueInboundMessage(this, message, null);
@@ -136,9 +136,9 @@ namespace Orleans.Runtime
 
         public void OnDequeueInboundMessage(Message message)
         {
-            if (this.IsEnabled(DequeueInboundMessageEventName))
+            if (IsEnabled(DequeueInboundMessageEventName))
             {
-                this.Write(DequeueInboundMessageEventName, message);
+                Write(DequeueInboundMessageEventName, message);
             }
 
             LogDequeueInboundMessage(this, message, null);
@@ -146,25 +146,25 @@ namespace Orleans.Runtime
 
         internal void OnCreateMessage(Message message)
         {
-            if (this.IsEnabled(CreateMessageEventName))
+            if (IsEnabled(CreateMessageEventName))
             {
-                this.Write(CreateMessageEventName, message);
+                Write(CreateMessageEventName, message);
             }
         }
 
         public void OnScheduleMessage(Message message)
         {
-            if (this.IsEnabled(ScheduleMessageEventName))
+            if (IsEnabled(ScheduleMessageEventName))
             {
-                this.Write(ScheduleMessageEventName, message);
+                Write(ScheduleMessageEventName, message);
             }
         }
 
         public void OnEnqueueMessageOnActivation(Message message, IGrainContext context)
         {
-            if (this.IsEnabled(EnqueueMessageOnActivationEventName))
+            if (IsEnabled(EnqueueMessageOnActivationEventName))
             {
-                this.Write(EnqueueMessageOnActivationEventName, message);
+                Write(EnqueueMessageOnActivationEventName, message);
             }
 
             MessagingProcessingInstruments.OnImaMessageEnqueued(context);
@@ -172,9 +172,9 @@ namespace Orleans.Runtime
 
         public void OnInvokeMessage(Message message)
         {
-            if (this.IsEnabled(InvokeMessageEventName))
+            if (IsEnabled(InvokeMessageEventName))
             {
-                this.Write(InvokeMessageEventName, message);
+                Write(InvokeMessageEventName, message);
             }
         }
 
@@ -182,9 +182,9 @@ namespace Orleans.Runtime
         {
             MessagingInstruments.OnFailedSentMessage(message);
 
-            if (this.IsEnabled(RejectSendMessageToDeadSiloEventName))
+            if (IsEnabled(RejectSendMessageToDeadSiloEventName))
             {
-                this.Write(RejectSendMessageToDeadSiloEventName, message);
+                Write(RejectSendMessageToDeadSiloEventName, message);
             }
 
             LogRejectSendMessageToDeadSilo(
@@ -202,18 +202,18 @@ namespace Orleans.Runtime
 
         public IDisposable BeginScope<TState>(TState state)
         {
-            return this.log.BeginScope(state);
+            return log.BeginScope(state);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool IsEnabled(LogLevel logLevel)
         {
-            return this.log.IsEnabled(logLevel);
+            return log.IsEnabled(logLevel);
         }
 
         public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception exception, Func<TState, Exception, string> formatter)
         {
-            this.log.Log(logLevel, eventId, state, exception, formatter);
+            log.Log(logLevel, eventId, state, exception, formatter);
         }
     }
 }

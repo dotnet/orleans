@@ -20,7 +20,7 @@ namespace Orleans.Networking.Shared
         public SocketConnectionFactory(ILoggerFactory loggerFactory, SocketSchedulers schedulers, SharedMemoryPool memoryPool)
         {
             var logger = loggerFactory.CreateLogger("Orleans.Sockets");
-            this.trace = new SocketsTrace(logger);
+            trace = new SocketsTrace(logger);
             this.schedulers = schedulers;
             this.memoryPool = memoryPool.Pool;
         }
@@ -54,8 +54,8 @@ namespace Orleans.Networking.Shared
                 throw new SocketConnectionException($"Unable to connect to {endpoint}. Error: {completion.SocketError}");
             }
 
-            var scheduler = this.schedulers.GetScheduler();
-            var connection = new SocketConnection(socket, this.memoryPool, scheduler, this.trace);
+            var scheduler = schedulers.GetScheduler();
+            var connection = new SocketConnection(socket, memoryPool, scheduler, trace);
             connection.Start();
             return connection;
         }
@@ -66,7 +66,7 @@ namespace Orleans.Networking.Shared
 
             public Task Task => completion.Task;
 
-            protected override void OnCompleted(SocketAsyncEventArgs _) => this.completion.TrySetResult(null);
+            protected override void OnCompleted(SocketAsyncEventArgs _) => completion.TrySetResult(null);
         }
     }
 

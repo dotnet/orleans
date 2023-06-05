@@ -15,13 +15,13 @@ namespace TestExtensions
 
         protected TestCluster HostedCluster { get; private set; }
 
-        internal IInternalClusterClient InternalClient => (IInternalClusterClient)this.Client;
+        internal IInternalClusterClient InternalClient => (IInternalClusterClient)Client;
 
-        public IClusterClient Client => this.HostedCluster.Client;
+        public IClusterClient Client => HostedCluster.Client;
 
-        protected IGrainFactory GrainFactory => this.Client;
+        protected IGrainFactory GrainFactory => Client;
 
-        protected ILogger Logger => this.logger;
+        protected ILogger Logger => logger;
         protected ILogger logger;
 
         protected TestClusterPerTest()
@@ -32,14 +32,14 @@ namespace TestExtensions
             }
             catch (Exception ex)
             {
-                this.preconditionsException = ExceptionDispatchInfo.Capture(ex);
+                preconditionsException = ExceptionDispatchInfo.Capture(ex);
                 return;
             }
         }
 
         public void EnsurePreconditionsMet()
         {
-            this.preconditionsException?.Throw();
+            preconditionsException?.Throw();
         }
 
         protected virtual void CheckPreconditionsOrThrow() { }
@@ -52,7 +52,7 @@ namespace TestExtensions
         {
             var builder = new TestClusterBuilder();
             TestDefaultConfiguration.ConfigureTestCluster(builder);
-            this.ConfigureTestCluster(builder);
+            ConfigureTestCluster(builder);
 
             var testCluster = builder.Build();
             if (testCluster.Primary == null)
@@ -60,13 +60,13 @@ namespace TestExtensions
                 await testCluster.DeployAsync().ConfigureAwait(false);
             }
 
-            this.HostedCluster = testCluster;
-            this.logger = this.Client.ServiceProvider.GetRequiredService<ILoggerFactory>().CreateLogger("Application");
+            HostedCluster = testCluster;
+            logger = Client.ServiceProvider.GetRequiredService<ILoggerFactory>().CreateLogger("Application");
         }
 
         public virtual async Task DisposeAsync()
         {
-            var cluster = this.HostedCluster;
+            var cluster = HostedCluster;
             if (cluster is null) return;
 
             try

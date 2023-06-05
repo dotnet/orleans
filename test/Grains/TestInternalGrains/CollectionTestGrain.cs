@@ -28,7 +28,7 @@ namespace UnitTests.Grains
 
         public override Task OnActivateAsync(CancellationToken cancellationToken)
         {
-            logger = this.ServiceProvider.GetRequiredService<ILoggerFactory>()
+            logger = ServiceProvider.GetRequiredService<ILoggerFactory>()
                 .CreateLogger(string.Format("CollectionTestGrain {0} {1} on {2}.", GrainId, _grainContext.ActivationId, RuntimeIdentity));
             logger.LogInformation("OnActivateAsync.");
             activated = DateTime.UtcNow;
@@ -126,7 +126,7 @@ namespace UnitTests.Grains
 
         public override Task OnActivateAsync(CancellationToken cancellationToken)
         {
-            logger = this.ServiceProvider.GetRequiredService<ILoggerFactory>()
+            logger = ServiceProvider.GetRequiredService<ILoggerFactory>()
                 .CreateLogger($"CollectionTestGrain {GrainId} {_grainContext.ActivationId} on {RuntimeIdentity}.");
             logger.LogInformation("OnActivateAsync.");
             counter = 0;

@@ -19,19 +19,19 @@ namespace Orleans.Runtime
             MessagingOptions messagingOptions,
             TimeSpan responseTimeout)
         {
-            this.Unregister = unregister;
-            this.Logger = logger;
-            this.MessagingOptions = messagingOptions;
-            this.ResponseTimeout = responseTimeout;
+            Unregister = unregister;
+            Logger = logger;
+            MessagingOptions = messagingOptions;
+            ResponseTimeout = responseTimeout;
         }
 
         public TimeSpan ResponseTimeout
         {
-            get => this.responseTimeout;
+            get => responseTimeout;
             set
             {
-                this.responseTimeout = value;
-                this.ResponseTimeoutStopwatchTicks = (long)(value.TotalSeconds * Stopwatch.Frequency);
+                responseTimeout = value;
+                ResponseTimeoutStopwatchTicks = (long)(value.TotalSeconds * Stopwatch.Frequency);
             }
         }
     }

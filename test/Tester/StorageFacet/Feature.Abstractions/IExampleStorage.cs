@@ -32,7 +32,7 @@
     {
         public ExampleStorageConfig(string stateName)
         {
-            this.StateName = stateName;
+            StateName = stateName;
         }
 
         public string StateName { get; }

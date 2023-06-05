@@ -23,15 +23,15 @@ namespace UnitTests.Directory
         public DhtGrainLocatorTests(ITestOutputHelper output)
         {
             this.output = output;
-            this.loggerFactory = new LoggerFactory(new[] { new XunitLoggerProvider(output) });
-            this.rootContext = new UnitTestSchedulingContext()
+            loggerFactory = new LoggerFactory(new[] { new XunitLoggerProvider(output) });
+            rootContext = new UnitTestSchedulingContext()
             {
-                Scheduler = SchedulingHelper.CreateWorkItemGroupForTesting(this.rootContext, this.loggerFactory)
+                Scheduler = SchedulingHelper.CreateWorkItemGroupForTesting(rootContext, loggerFactory)
             };
-            this.localGrainDirectory = new MockLocalGrainDirectory(
+            localGrainDirectory = new MockLocalGrainDirectory(
                 TimeSpan.FromMilliseconds(100),
                 TimeSpan.FromMilliseconds(200));
-            this.target = new DhtGrainLocator(this.localGrainDirectory, this.rootContext);
+            target = new DhtGrainLocator(localGrainDirectory, rootContext);
         }
 
         [Fact]
@@ -41,13 +41,13 @@ namespace UnitTests.Directory
              {
                 var activationAddress = GenerateActivationAddress();
 
-                await this.target.Unregister(activationAddress, cause);
+                await target.Unregister(activationAddress, cause);
 
-                Assert.Single(this.localGrainDirectory.UnregistrationReceived);
-                Assert.Equal(cause, this.localGrainDirectory.UnregistrationReceived[0].cause);
-                Assert.Equal(activationAddress, this.localGrainDirectory.UnregistrationReceived[0].activationAddress);
+                Assert.Single(localGrainDirectory.UnregistrationReceived);
+                Assert.Equal(cause, localGrainDirectory.UnregistrationReceived[0].cause);
+                Assert.Equal(activationAddress, localGrainDirectory.UnregistrationReceived[0].activationAddress);
 
-                this.localGrainDirectory.Reset();
+                localGrainDirectory.Reset();
             }
         }
 
@@ -67,17 +67,17 @@ namespace UnitTests.Directory
 
                 foreach (var addr in addresses)
                 {
-                    tasks.Add(this.target.Unregister(addr, cause));
+                    tasks.Add(target.Unregister(addr, cause));
                 }
 
                 await Task.WhenAll(tasks);
 
-                Assert.True(batchn > this.localGrainDirectory.UnregistrationCounter);
+                Assert.True(batchn > localGrainDirectory.UnregistrationCounter);
 
-                Assert.All(this.localGrainDirectory.UnregistrationReceived, item => Assert.Equal(cause, item.cause));
-                Assert.Equal(addresses, this.localGrainDirectory.UnregistrationReceived.Select(item => item.activationAddress));
+                Assert.All(localGrainDirectory.UnregistrationReceived, item => Assert.Equal(cause, item.cause));
+                Assert.Equal(addresses, localGrainDirectory.UnregistrationReceived.Select(item => item.activationAddress));
 
-                this.localGrainDirectory.Reset();
+                localGrainDirectory.Reset();
             }
         }
 
@@ -97,16 +97,16 @@ namespace UnitTests.Directory
                     var addr = GenerateActivationAddress();
                     addresses.Add(addr);
                     map.Add(addr, cause);
-                    tasks.Add(this.target.Unregister(addr, cause));
+                    tasks.Add(target.Unregister(addr, cause));
                 }
             }
 
             await Task.WhenAll(tasks);
 
-            Assert.All(this.localGrainDirectory.UnregistrationReceived, item => Assert.Equal(map[item.activationAddress], item.cause));
-            Assert.Equal(addresses.ToHashSet(), this.localGrainDirectory.UnregistrationReceived.Select(item => item.activationAddress).ToHashSet());
+            Assert.All(localGrainDirectory.UnregistrationReceived, item => Assert.Equal(map[item.activationAddress], item.cause));
+            Assert.Equal(addresses.ToHashSet(), localGrainDirectory.UnregistrationReceived.Select(item => item.activationAddress).ToHashSet());
 
-            this.localGrainDirectory.Reset();
+            localGrainDirectory.Reset();
         }
 
         private int generation = 0;

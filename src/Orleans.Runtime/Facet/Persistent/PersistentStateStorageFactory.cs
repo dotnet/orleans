@@ -70,32 +70,32 @@ namespace Orleans.Runtime
 
             public TState State
             {
-                get { return this.storage.State; }
-                set { this.storage.State = value; }
+                get { return storage.State; }
+                set { storage.State = value; }
             }
 
-            public string Etag => this.storage.Etag;
+            public string Etag => storage.Etag;
 
-            public bool RecordExists => this.storage.RecordExists;
+            public bool RecordExists => storage.RecordExists;
 
             public Task ClearStateAsync()
             {
-                return this.storage.ClearStateAsync();
+                return storage.ClearStateAsync();
             }
 
             public Task ReadStateAsync()
             {
-                return this.storage.ReadStateAsync();
+                return storage.ReadStateAsync();
             }
 
             public Task WriteStateAsync()
             {
-                return this.storage.WriteStateAsync();
+                return storage.WriteStateAsync();
             }
 
             public void Participate(IGrainLifecycle lifecycle)
             {
-                lifecycle.Subscribe(this.GetType().FullName, GrainLifecycleStage.SetupState, OnSetupState);
+                lifecycle.Subscribe(GetType().FullName, GrainLifecycleStage.SetupState, OnSetupState);
             }
 
             private Task OnSetupState(CancellationToken ct)
@@ -103,7 +103,7 @@ namespace Orleans.Runtime
                 if (ct.IsCancellationRequested)
                     return Task.CompletedTask;
                 storage = new(stateName, context.GrainId, storageProvider, context.ActivationServices.GetRequiredService<ILoggerFactory>());
-                return this.ReadStateAsync();
+                return ReadStateAsync();
             }
         }
     }

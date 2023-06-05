@@ -42,7 +42,7 @@ namespace Benchmarks.Ping
                 var host = hostBuilder.Build();
 
                 host.StartAsync().GetAwaiter().GetResult();
-                this.hosts.Add(host);
+                hosts.Add(host);
             }
 
             if (grainsOnSecondariesOnly) Thread.Sleep(4000);
@@ -63,14 +63,14 @@ namespace Benchmarks.Ping
                 });
 
                 //hostBuilder.ConfigureLogging(logging => logging.AddConsole().SetMinimumLevel(LogLevel.Debug));
-                this.clientHost = hostBuilder.Build();
-                this.clientHost.StartAsync().GetAwaiter().GetResult();
+                clientHost = hostBuilder.Build();
+                clientHost.StartAsync().GetAwaiter().GetResult();
 
-                this.client = this.clientHost.Services.GetRequiredService<IClusterClient>();
-                var grainFactory = this.client;
+                client = clientHost.Services.GetRequiredService<IClusterClient>();
+                var grainFactory = client;
 
-                this.grain = grainFactory.GetGrain<IPingGrain>(Guid.NewGuid().GetHashCode());
-                this.grain.Run().AsTask().GetAwaiter().GetResult();
+                grain = grainFactory.GetGrain<IPingGrain>(Guid.NewGuid().GetHashCode());
+                grain.Run().AsTask().GetAwaiter().GetResult();
             }
 
             _onCancelEvent = CancelPressed;
@@ -93,19 +93,19 @@ namespace Benchmarks.Ping
             }
         }
 
-        public Task PingConcurrentForever() => this.Run(
+        public Task PingConcurrentForever() => Run(
             runs: int.MaxValue,
-            grainFactory: this.client,
+            grainFactory: client,
             blocksPerWorker: 10);
 
-        public Task PingConcurrent() => this.Run(
+        public Task PingConcurrent() => Run(
             runs: 3,
-            grainFactory: this.client,
+            grainFactory: client,
             blocksPerWorker: 10);
 
-        public Task PingConcurrentHostedClient(int blocksPerWorker = 30) => this.Run(
+        public Task PingConcurrentHostedClient(int blocksPerWorker = 30) => Run(
             runs: 3,
-            grainFactory: (IGrainFactory)this.hosts[0].Services.GetService(typeof(IGrainFactory)),
+            grainFactory: (IGrainFactory)hosts[0].Services.GetService(typeof(IGrainFactory)),
             blocksPerWorker: blocksPerWorker);
 
         private async Task Run(int runs, IGrainFactory grainFactory, int blocksPerWorker)
@@ -122,7 +122,7 @@ namespace Benchmarks.Ping
 
         public async Task PingPongForever()
         {
-            var other = this.client.GetGrain<IPingGrain>(Guid.NewGuid().GetHashCode());
+            var other = client.GetGrain<IPingGrain>(Guid.NewGuid().GetHashCode());
             while (true)
             {
                 await grain.PingPongInterleave(other, 100);
@@ -144,8 +144,8 @@ namespace Benchmarks.Ping
                 }
             }
 
-            this.hosts.Reverse();
-            foreach (var host in this.hosts)
+            hosts.Reverse();
+            foreach (var host in hosts)
             {
                 await host.StopAsync();
                 if (host is IAsyncDisposable asyncDisposable)
@@ -162,8 +162,8 @@ namespace Benchmarks.Ping
         [GlobalCleanup]
         public void Dispose()
         {
-            (this.client as IDisposable)?.Dispose();
-            this.hosts.ForEach(h => h.Dispose());
+            (client as IDisposable)?.Dispose();
+            hosts.ForEach(h => h.Dispose());
 
             Console.CancelKeyPress -= _onCancelEvent;
         }

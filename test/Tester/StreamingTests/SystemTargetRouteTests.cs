@@ -54,7 +54,7 @@ namespace Tester.StreamingTests
         {
             const int streamCount = 100;
 
-            this.fixture.Logger.LogInformation("************************ PersistentStreamingOverSingleGatewayTest *********************************");
+            fixture.Logger.LogInformation("************************ PersistentStreamingOverSingleGatewayTest *********************************");
 
             // generate stream Id's
             List<Guid> streamIds = Enumerable.Range(0, streamCount)
@@ -64,14 +64,14 @@ namespace Tester.StreamingTests
             // subscribe to all streams
             foreach(Guid streamId in streamIds)
             {
-                IStreamProvider streamProvider = this.fixture.Client.GetStreamProvider(Fixture.StreamProviderName);
+                IStreamProvider streamProvider = fixture.Client.GetStreamProvider(Fixture.StreamProviderName);
                 IAsyncObservable<int> stream = streamProvider.GetStream<int>(streamId);
                 await stream.SubscribeAsync(OnNextAsync);
             }
 
             // create producer grains
             List<ISampleStreaming_ProducerGrain> producers = streamIds
-                .Select(id => this.fixture.GrainFactory.GetGrain<ISampleStreaming_ProducerGrain>(id))
+                .Select(id => fixture.GrainFactory.GetGrain<ISampleStreaming_ProducerGrain>(id))
                 .ToList();
 
             // become producers
@@ -90,13 +90,13 @@ namespace Tester.StreamingTests
 
         Task OnNextAsync(int e, StreamSequenceToken token)
         {
-            Interlocked.Increment(ref this.eventsConsumed);
+            Interlocked.Increment(ref eventsConsumed);
             return Task.CompletedTask;
         }
 
         private Task<bool> CheckCounters(int eventsProduced, bool assertIsTrue)
         {
-            int numConsumed = this.eventsConsumed;
+            int numConsumed = eventsConsumed;
             if (!assertIsTrue) return Task.FromResult(eventsProduced == numConsumed);
             Assert.Equal(eventsProduced, numConsumed);
             return Task.FromResult(true);

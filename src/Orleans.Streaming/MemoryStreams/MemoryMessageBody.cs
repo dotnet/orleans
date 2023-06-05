@@ -61,7 +61,7 @@ namespace Orleans.Providers
         /// <inheritdoc />
         void IOnDeserialized.OnDeserialized(DeserializationContext context)
         {
-            this.serializer = context.ServiceProvider.GetRequiredService<Serializer<MemoryMessageBody>>();
+            serializer = context.ServiceProvider.GetRequiredService<Serializer<MemoryMessageBody>>();
         }
     }
 

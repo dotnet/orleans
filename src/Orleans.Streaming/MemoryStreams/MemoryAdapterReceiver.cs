@@ -29,7 +29,7 @@ namespace Orleans.Providers
 
         public Task Initialize(TimeSpan timeout)
         {
-            this.receiverMonitor?.TrackInitialization(true, TimeSpan.MinValue, null);
+            receiverMonitor?.TrackInitialization(true, TimeSpan.MinValue, null);
             return Task.CompletedTask;
         }
 
@@ -43,21 +43,21 @@ namespace Orleans.Providers
                 task = queueGrain.Dequeue(maxCount);
                 awaitingTasks.Add(task);
                 var eventData = await task;
-                batches = eventData.Select(data => new MemoryBatchContainer<TSerializer>(data, this.serializer)).ToList<IBatchContainer>();
+                batches = eventData.Select(data => new MemoryBatchContainer<TSerializer>(data, serializer)).ToList<IBatchContainer>();
                 watch.Stop();
-                this.receiverMonitor?.TrackRead(true, watch.Elapsed, null);
+                receiverMonitor?.TrackRead(true, watch.Elapsed, null);
                 if (eventData.Count > 0)
                 {
                     var oldestMessage = eventData[0];
                     var newestMessage = eventData[eventData.Count - 1];
-                    this.receiverMonitor?.TrackMessagesReceived(eventData.Count, oldestMessage.EnqueueTimeUtc, newestMessage.EnqueueTimeUtc);
+                    receiverMonitor?.TrackMessagesReceived(eventData.Count, oldestMessage.EnqueueTimeUtc, newestMessage.EnqueueTimeUtc);
                 }
             }
             catch (Exception exc)
             {
                 logger.LogError((int)ProviderErrorCode.MemoryStreamProviderBase_GetQueueMessagesAsync, exc, "Exception thrown in MemoryAdapterFactory.GetQueueMessagesAsync.");
                 watch.Stop();
-                this.receiverMonitor?.TrackRead(true, watch.Elapsed, exc);
+                receiverMonitor?.TrackRead(true, watch.Elapsed, exc);
                 throw;
             }
             finally
@@ -82,12 +82,12 @@ namespace Orleans.Providers
                     await Task.WhenAll(awaitingTasks);
                 }
                 watch.Stop();
-                this.receiverMonitor?.TrackShutdown(true, watch.Elapsed, null);
+                receiverMonitor?.TrackShutdown(true, watch.Elapsed, null);
             }
             catch (Exception ex)
             {
                 watch.Stop();
-                this.receiverMonitor?.TrackShutdown(false, watch.Elapsed, ex);
+                receiverMonitor?.TrackShutdown(false, watch.Elapsed, ex);
             }
         }
     }

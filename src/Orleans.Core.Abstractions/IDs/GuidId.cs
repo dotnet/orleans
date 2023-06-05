@@ -28,7 +28,7 @@ namespace Orleans.Runtime
         /// </param>
         private GuidId(Guid guid)
         {
-            this.Guid = guid;
+            Guid = guid;
         }
 
         /// <summary>

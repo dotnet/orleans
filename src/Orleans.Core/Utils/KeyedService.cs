@@ -27,7 +27,7 @@ namespace Orleans.Runtime
         /// <param name="factory">The factory.</param>
         public KeyedService(TKey key, Func<IServiceProvider, TKey, TService> factory)
         {
-            this.Key = key;
+            Key = key;
             this.factory = factory;
         }
 
@@ -79,12 +79,12 @@ namespace Orleans.Runtime
         /// <param name="factory">The factory.</param>
         public KeyedSingletonService(TKey key, IServiceProvider services, Func<IServiceProvider, TKey, TService> factory)
         {
-            this.Key = key;
-            this.instance = new Lazy<TService>(() => factory(services, Key));
+            Key = key;
+            instance = new Lazy<TService>(() => factory(services, Key));
         }
 
         /// <inheritdoc/>
-        public TService GetService(IServiceProvider services) => this.instance.Value;
+        public TService GetService(IServiceProvider services) => instance.Value;
 
         /// <inheritdoc/>
         public bool Equals(TKey other)
@@ -122,7 +122,7 @@ namespace Orleans.Runtime
         /// <inheritdoc/>
         public TService GetService(IServiceProvider services, TKey key)
         {
-            return this.GetServices(services).LastOrDefault(s => s.Equals(key))?.GetService(services);
+            return GetServices(services).LastOrDefault(s => s.Equals(key))?.GetService(services);
         }
 
         /// <inheritdoc/>

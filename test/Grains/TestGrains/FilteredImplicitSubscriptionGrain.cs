@@ -12,7 +12,7 @@ namespace UnitTests.Grains
 
         public FilteredImplicitSubscriptionGrain(ILoggerFactory loggerFactory)
         {
-            this.logger = loggerFactory.CreateLogger($"{nameof(FilteredImplicitSubscriptionGrain)} {IdentityString}");
+            logger = loggerFactory.CreateLogger($"{nameof(FilteredImplicitSubscriptionGrain)} {IdentityString}");
         }
 
         public override async Task OnActivateAsync(CancellationToken cancellationToken)

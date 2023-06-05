@@ -54,13 +54,13 @@ namespace UnitTests.StuckGrainTests
         public async Task StuckGrainTest_Basic()
         {
             var id = Guid.NewGuid();
-            var stuckGrain = this.fixture.GrainFactory.GetGrain<IStuckGrain>(id);
+            var stuckGrain = fixture.GrainFactory.GetGrain<IStuckGrain>(id);
             var task = stuckGrain.RunForever();
 
             // Should timeout
             await Assert.ThrowsAsync<TimeoutException>(() => task.WithTimeout(TimeSpan.FromSeconds(1)));
 
-            var cleaner = this.fixture.GrainFactory.GetGrain<IStuckCleanGrain>(id);
+            var cleaner = fixture.GrainFactory.GetGrain<IStuckCleanGrain>(id);
             await cleaner.Release(id);
 
             // Should complete now
@@ -76,7 +76,7 @@ namespace UnitTests.StuckGrainTests
         public async Task StuckGrainTest_StuckDetectionAndForward()
         {
             var id = Guid.NewGuid();
-            var stuckGrain = this.fixture.GrainFactory.GetGrain<IStuckGrain>(id);
+            var stuckGrain = fixture.GrainFactory.GetGrain<IStuckGrain>(id);
             var task = stuckGrain.RunForever();
 
             // Should timeout
@@ -102,7 +102,7 @@ namespace UnitTests.StuckGrainTests
         public async Task StuckGrainTest_StuckDetectionOnDeactivation()
         {
             var id = Guid.NewGuid();
-            var stuckGrain = this.fixture.GrainFactory.GetGrain<IStuckGrain>(id);
+            var stuckGrain = fixture.GrainFactory.GetGrain<IStuckGrain>(id);
             await stuckGrain.BlockingDeactivation();
 
             await StuckGrain.WaitForDeactivationStart(stuckGrain.GetGrainId());
@@ -127,7 +127,7 @@ namespace UnitTests.StuckGrainTests
         public async Task StuckGrainTest_StuckDetectionOnActivation()
         {
             var id = Guid.NewGuid();
-            var stuckGrain = this.fixture.GrainFactory.GetGrain<IStuckGrain>(id);
+            var stuckGrain = fixture.GrainFactory.GetGrain<IStuckGrain>(id);
 
             // The cancellation token passed to OnActivateAsync should become cancelled and this will cause activation to fail.
             RequestContext.Set("block_activation_seconds", 30);
@@ -135,7 +135,7 @@ namespace UnitTests.StuckGrainTests
 
             // Check to see that it did try to activate.
             RequestContext.Clear();
-            var unstuckGrain = this.fixture.GrainFactory.GetGrain<IStuckGrain>(Guid.NewGuid());
+            var unstuckGrain = fixture.GrainFactory.GetGrain<IStuckGrain>(Guid.NewGuid());
             await unstuckGrain.NonBlockingCall();
 
             var activationAttempted = await unstuckGrain.DidActivationTryToStart(stuckGrain.GetGrainId());

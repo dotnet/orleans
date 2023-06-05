@@ -33,12 +33,12 @@ namespace Orleans.Runtime.MembershipService
         {
             if (snapshot.Version != MembershipVersion.MinValue)
             {
-                await this.membershipTableManager.RefreshFromSnapshot(snapshot);
+                await membershipTableManager.RefreshFromSnapshot(snapshot);
             }
             else
             {
-                if (this.log.IsEnabled(LogLevel.Trace))
-                    this.log.LogTrace("-Received GOSSIP MembershipChangeNotification with MembershipVersion.MinValue. Going to read the table");
+                if (log.IsEnabled(LogLevel.Trace))
+                    log.LogTrace("-Received GOSSIP MembershipChangeNotification with MembershipVersion.MinValue. Going to read the table");
 
                 await ReadTable();
             }
@@ -66,7 +66,7 @@ namespace Orleans.Runtime.MembershipService
         {
             Task<IndirectProbeResponse> ProbeIndirectly()
             {
-                var remoteOracle = this.grainFactory.GetSystemTarget<IMembershipService>(Constants.MembershipServiceType, intermediary);
+                var remoteOracle = grainFactory.GetSystemTarget<IMembershipService>(Constants.MembershipServiceType, intermediary);
                 return remoteOracle.ProbeIndirectly(target, probeTimeout, probeNumber);
             }
 
@@ -78,11 +78,11 @@ namespace Orleans.Runtime.MembershipService
         public async Task<IndirectProbeResponse> ProbeIndirectly(SiloAddress target, TimeSpan probeTimeout, int probeNumber)
         {
             IndirectProbeResponse result;
-            var healthScore = this.ActivationServices.GetRequiredService<LocalSiloHealthMonitor>().GetLocalHealthDegradationScore(DateTime.UtcNow);
+            var healthScore = ActivationServices.GetRequiredService<LocalSiloHealthMonitor>().GetLocalHealthDegradationScore(DateTime.UtcNow);
             var probeResponseTimer = ValueStopwatch.StartNew();
             try
             {
-                var probeTask = this.ProbeInternal(target, probeNumber);
+                var probeTask = ProbeInternal(target, probeNumber);
                 await probeTask.WithTimeout(probeTimeout, exceptionMessage: $"Requested probe timeout {probeTimeout} exceeded");
 
                 result = new IndirectProbeResponse
@@ -117,7 +117,7 @@ namespace Orleans.Runtime.MembershipService
                 var tasks = new List<Task>(gossipPartners.Count);
                 foreach (var silo in gossipPartners)
                 {
-                    tasks.Add(this.GossipToRemoteSilo(silo, snapshot, updatedSilo, updatedStatus));
+                    tasks.Add(GossipToRemoteSilo(silo, snapshot, updatedSilo, updatedStatus));
                 }
 
                 await Task.WhenAll(tasks);
@@ -132,9 +132,9 @@ namespace Orleans.Runtime.MembershipService
             SiloAddress updatedSilo,
             SiloStatus updatedStatus)
         {
-            if (this.log.IsEnabled(LogLevel.Trace))
+            if (log.IsEnabled(LogLevel.Trace))
             {
-                this.log.LogTrace(
+                log.LogTrace(
                     "-Sending status update GOSSIP notification about silo {UpdatedSilo}, status {UpdatedStatus}, to silo {RemoteSilo}",
                     updatedSilo,
                     updatedStatus,
@@ -143,12 +143,12 @@ namespace Orleans.Runtime.MembershipService
 
             try
             {
-                var remoteOracle = this.grainFactory.GetSystemTarget<IMembershipService>(Constants.MembershipServiceType, silo);
+                var remoteOracle = grainFactory.GetSystemTarget<IMembershipService>(Constants.MembershipServiceType, silo);
                 await remoteOracle.MembershipChangeNotification(snapshot);
             }
             catch (Exception exception)
             {
-                this.log.LogError(
+                log.LogError(
                     (int)ErrorCode.MembershipGossipSendFailure,
                     exception,
                     "Exception while sending gossip notification to remote silo {Silo}",
@@ -160,11 +160,11 @@ namespace Orleans.Runtime.MembershipService
         {
             try
             {
-                await this.membershipTableManager.Refresh();
+                await membershipTableManager.Refresh();
             }
             catch (Exception exception)
             {
-                this.log.LogError(
+                log.LogError(
                     (int)ErrorCode.MembershipGossipProcessingFailure,
                     exception,
                     "Error refreshing membership table");
@@ -177,7 +177,7 @@ namespace Orleans.Runtime.MembershipService
             try
             {
                 RequestContext.Set(RequestContext.PING_APPLICATION_HEADER, true);
-                var remoteOracle = this.grainFactory.GetSystemTarget<IMembershipService>(Constants.MembershipServiceType, remoteSilo);
+                var remoteOracle = grainFactory.GetSystemTarget<IMembershipService>(Constants.MembershipServiceType, remoteSilo);
                 task = remoteOracle.Ping(probeNumber);
 
                 // Update stats counter. Only count Pings that were successfuly sent, but not necessarily replied to.

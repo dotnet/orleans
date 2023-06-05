@@ -9,7 +9,7 @@ namespace UnitTests.Grains.Directories
 
         public const string DIRECTORY = "Default";
 
-        public Task<int> Ping() => Task.FromResult(++this.counter);
+        public Task<int> Ping() => Task.FromResult(++counter);
 
         public Task Reset()
         {
@@ -19,7 +19,7 @@ namespace UnitTests.Grains.Directories
 
         public Task<string> GetRuntimeInstanceId()
         {
-            return Task.FromResult(this.RuntimeIdentity);
+            return Task.FromResult(RuntimeIdentity);
         }
 
         public Task<int> ProxyPing(ICommonDirectoryGrain grain)

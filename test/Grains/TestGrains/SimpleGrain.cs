@@ -15,7 +15,7 @@ namespace UnitTests.Grains
 
         public SimpleGrain(ILoggerFactory loggerFactory)
         {
-            this.logger = loggerFactory.CreateLogger($"{this.GetType().Name}-{this.IdentityString}");
+            logger = loggerFactory.CreateLogger($"{GetType().Name}-{IdentityString}");
         }
 
         protected int A { get; set; }
@@ -36,7 +36,7 @@ namespace UnitTests.Grains
 
         public Task SetB(int b)
         {
-            this.B = b;
+            B = b;
             return Task.CompletedTask;
         }
 

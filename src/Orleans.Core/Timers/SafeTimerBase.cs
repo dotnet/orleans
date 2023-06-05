@@ -81,10 +81,10 @@ namespace Orleans.Runtime
             if (periodTm < -1) throw new ArgumentOutOfRangeException(nameof(period), "The period must not be less than -1.");
             if (periodTm > MaxSupportedTimeout) throw new ArgumentOutOfRangeException(nameof(period), "The period interval must be less than 2^32-2.");
 
-            this.asyncTaskCallback = asynCallback;
+            asyncTaskCallback = asynCallback;
             syncCallbackFunc = synCallback;
             timerFrequency = period;
-            this.dueTime = due;
+            dueTime = due;
             totalNumTicks = 0;
             this.logger = logger;
             if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug((int)ErrorCode.TimerChanging, "Creating timer {Name} with dueTime={DueTime} period={period}", GetFullName(), due, period);

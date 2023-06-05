@@ -120,8 +120,8 @@ namespace Orleans
                 this.onStop = onStop;
             }
 
-            public Task OnStart(CancellationToken ct) => this.onStart(ct);
-            public Task OnStop(CancellationToken ct) => this.onStop(ct);
+            public Task OnStart(CancellationToken ct) => onStart(ct);
+            public Task OnStop(CancellationToken ct) => onStop(ct);
         }
 
         private sealed class StartupObserver : ILifecycleObserver

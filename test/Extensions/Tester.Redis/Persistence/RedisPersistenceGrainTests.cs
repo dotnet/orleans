@@ -70,9 +70,9 @@ namespace Tester.Redis.Persistence
 
             var redisOptions = ConfigurationOptions.Parse(TestDefaultConfiguration.RedisConnectionString);
             var redis = ConnectionMultiplexer.ConnectAsync(redisOptions).Result;
-            this.database = redis.GetDatabase();
+            database = redis.GetDatabase();
 
-            this.state = new()
+            state = new()
             {
                 DateTimeValue = DateTime.UtcNow,
                 GuidValue = Guid.NewGuid(),

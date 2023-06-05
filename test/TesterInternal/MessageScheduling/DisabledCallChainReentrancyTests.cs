@@ -18,25 +18,25 @@ namespace UnitTests.General
 
         public DisabledCallChainReentrancyTests(Fixture fixture)
         {
-            this.runner = new DisabledCallChainReentrancyTestRunner(fixture.GrainFactory, fixture.Logger);
+            runner = new DisabledCallChainReentrancyTestRunner(fixture.GrainFactory, fixture.Logger);
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Tasks"), TestCategory("Reentrancy")]
         public void NonReentrantGrain()
         {
-            this.runner.NonReentrantGrain(false);
+            runner.NonReentrantGrain(false);
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Tasks"), TestCategory("Reentrancy")]
         public void NonReentrantGrain_WithMayInterleavePredicate_WhenPredicateReturnsFalse()
         {
-            this.runner.NonReentrantGrain_WithMayInterleavePredicate_WhenPredicateReturnsFalse(false);
+            runner.NonReentrantGrain_WithMayInterleavePredicate_WhenPredicateReturnsFalse(false);
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Tasks"), TestCategory("Reentrancy")]
         public void UnorderedNonReentrantGrain()
         {
-            this.runner.UnorderedNonReentrantGrain(false);
+            runner.UnorderedNonReentrantGrain(false);
         }
     }
 }

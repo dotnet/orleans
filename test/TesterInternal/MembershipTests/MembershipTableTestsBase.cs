@@ -43,41 +43,41 @@ namespace UnitTests.MembershipTests
         protected MembershipTableTestsBase(ConnectionStringFixture fixture, TestEnvironmentFixture environment, LoggerFilterOptions filters)
         {
             this.environment = environment;
-            loggerFactory = TestingUtils.CreateDefaultLoggerFactory($"{this.GetType()}.log", filters);
-            logger = loggerFactory.CreateLogger(this.GetType().FullName);
+            loggerFactory = TestingUtils.CreateDefaultLoggerFactory($"{GetType()}.log", filters);
+            logger = loggerFactory.CreateLogger(GetType().FullName);
 
-            this.clusterId = "test-" + Guid.NewGuid();
+            clusterId = "test-" + Guid.NewGuid();
 
-            logger.LogInformation("ClusterId={ClusterId}", this.clusterId);
+            logger.LogInformation("ClusterId={ClusterId}", clusterId);
 
             fixture.InitializeConnectionStringAccessor(GetConnectionString);
-            this.connectionString = fixture.ConnectionString;
-            if (string.IsNullOrEmpty(this.connectionString))
+            connectionString = fixture.ConnectionString;
+            if (string.IsNullOrEmpty(connectionString))
             {
                 throw new SkipException("No connection string configured");
             }
-            this.clusterOptions = Options.Create(new ClusterOptions { ClusterId = this.clusterId });
+            clusterOptions = Options.Create(new ClusterOptions { ClusterId = clusterId });
             var adoVariant = GetAdoInvariant();
 
             membershipTable = CreateMembershipTable(logger);
             membershipTable.InitializeMembershipTable(true).WithTimeout(TimeSpan.FromMinutes(1)).Wait();
 
-            this.gatewayOptions = Options.Create(new GatewayOptions());
+            gatewayOptions = Options.Create(new GatewayOptions());
             gatewayListProvider = CreateGatewayListProvider(logger);
             gatewayListProvider.InitializeGatewayListProvider().WithTimeout(TimeSpan.FromMinutes(1)).Wait();
         }
 
-        public IGrainFactory GrainFactory => this.environment.GrainFactory;
+        public IGrainFactory GrainFactory => environment.GrainFactory;
 
-        public IServiceProvider Services => this.environment.Services;
+        public IServiceProvider Services => environment.Services;
 
         public void Dispose()
         {
             if (membershipTable != null && SiloInstanceTableTestConstants.DeleteEntriesAfterTest)
             {
-                membershipTable.DeleteMembershipTableEntries(this.clusterId).Wait();
+                membershipTable.DeleteMembershipTableEntries(clusterId).Wait();
             }
-            this.loggerFactory.Dispose();
+            loggerFactory.Dispose();
         }
 
         protected abstract IGatewayListProvider CreateGatewayListProvider(ILogger logger);

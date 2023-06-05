@@ -52,11 +52,11 @@ namespace UnitTests.StorageTests.Relational
         /// </summary>
         public CommonFixture()
         {
-            _ = this.Services.GetRequiredService<IOptions<ClusterOptions>>();
+            _ = Services.GetRequiredService<IOptions<ClusterOptions>>();
             DefaultProviderRuntime = new ClientProviderRuntime(
-                this.InternalGrainFactory,
-                this.Services,
-                this.Services.GetRequiredService<ClientGrainContext>());
+                InternalGrainFactory,
+                Services,
+                Services.GetRequiredService<ClientGrainContext>());
         }
 
         /// <summary>
@@ -88,7 +88,7 @@ namespace UnitTests.StorageTests.Relational
                             {
                                 ConnectionString = Storage.Storage.ConnectionString,
                                 Invariant = storageInvariant,
-                                GrainStorageSerializer = new JsonGrainStorageSerializer(this.DefaultProviderRuntime.ServiceProvider.GetService<OrleansJsonSerializer>())
+                                GrainStorageSerializer = new JsonGrainStorageSerializer(DefaultProviderRuntime.ServiceProvider.GetService<OrleansJsonSerializer>())
                             };
                             var clusterOptions = new ClusterOptions()
                             {

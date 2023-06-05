@@ -9,34 +9,34 @@ namespace Orleans.Runtime.Scheduler
         private readonly Func<Task> continuation;
         private readonly string name;
 
-        public override string Name => this.name ?? GetMethodName(this.continuation);
-        public Task Task => this.completion.Task;
+        public override string Name => name ?? GetMethodName(continuation);
+        public Task Task => completion.Task;
 
         public AsyncClosureWorkItem(Func<Task> closure, string name, IGrainContext grainContext)
         {
-            this.continuation = closure;
+            continuation = closure;
             this.name = name;
-            this.GrainContext = grainContext;
+            GrainContext = grainContext;
         }
 
         public AsyncClosureWorkItem(Func<Task> closure, IGrainContext grainContext)
         {
-            this.continuation = closure;
-            this.GrainContext = grainContext;
+            continuation = closure;
+            GrainContext = grainContext;
         }
 
         public override async void Execute()
         {
             try
             {
-                RuntimeContext.SetExecutionContext(this.GrainContext);
+                RuntimeContext.SetExecutionContext(GrainContext);
                 RequestContext.Clear();
-                await this.continuation();
-                this.completion.TrySetResult(true);
+                await continuation();
+                completion.TrySetResult(true);
             }
             catch (Exception exception)
             {
-                this.completion.TrySetException(exception);
+                completion.TrySetException(exception);
             }
             finally
             {
@@ -55,34 +55,34 @@ namespace Orleans.Runtime.Scheduler
         private readonly Func<Task<T>> continuation;
         private readonly string name;
 
-        public override string Name => this.name ?? AsyncClosureWorkItem.GetMethodName(this.continuation);
-        public Task<T> Task => this.completion.Task;
+        public override string Name => name ?? AsyncClosureWorkItem.GetMethodName(continuation);
+        public Task<T> Task => completion.Task;
 
         public AsyncClosureWorkItem(Func<Task<T>> closure, string name, IGrainContext grainContext)
         {
-            this.continuation = closure;
+            continuation = closure;
             this.name = name;
-            this.GrainContext = grainContext;
+            GrainContext = grainContext;
         }
 
         public AsyncClosureWorkItem(Func<Task<T>> closure, IGrainContext grainContext)
         {
-            this.continuation = closure;
-            this.GrainContext = grainContext;
+            continuation = closure;
+            GrainContext = grainContext;
         }
 
         public override async void Execute()
         {
             try
             {
-                RuntimeContext.SetExecutionContext(this.GrainContext);
+                RuntimeContext.SetExecutionContext(GrainContext);
                 RequestContext.Clear();
-                var result = await this.continuation();
-                this.completion.TrySetResult(result);
+                var result = await continuation();
+                completion.TrySetResult(result);
             }
             catch (Exception exception)
             {
-                this.completion.TrySetException(exception);
+                completion.TrySetException(exception);
             }
             finally
             {

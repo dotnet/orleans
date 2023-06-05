@@ -22,7 +22,7 @@ namespace UnitTests.General
         public IdentifierTests(ITestOutputHelper output, TestEnvironmentFixture fixture)
         {
             this.output = output;
-            this.environment = fixture;
+            environment = fixture;
         }
 
         [Fact]
@@ -195,7 +195,7 @@ namespace UnitTests.General
             Assert.Equal(gid1, gid2); // Should be equal GrainId's
 
             // Round-trip through Serializer
-            GrainId gid3 = this.environment.Serializer.Deserialize<GrainId>(environment.Serializer.SerializeToArray(gid1));
+            GrainId gid3 = environment.Serializer.Deserialize<GrainId>(environment.Serializer.SerializeToArray(gid1));
             Assert.Equal(gid1, gid3); // Should be equal GrainId's
             Assert.Equal(gid2, gid3); // Should be equal GrainId's
         }
@@ -212,7 +212,7 @@ namespace UnitTests.General
             Assert.Same(r1, r2); // 2: Objects should be same / intern'ed
 
             // Round-trip through Serializer
-            string r3 = this.environment.Serializer.Deserialize<string>(environment.Serializer.SerializeToArray(r1));
+            string r3 = environment.Serializer.Deserialize<string>(environment.Serializer.SerializeToArray(r1));
 
             Assert.Equal(r1, r3); // 3: Should be equal
             Assert.Equal(r2, r3); // 4: Should be equal
@@ -260,7 +260,7 @@ namespace UnitTests.General
             Assert.Same(a1, a2); // Should be same / intern'ed SiloAddress object
 
             // Round-trip through Serializer
-            SiloAddress a3 = this.environment.Serializer.Deserialize<SiloAddress>(environment.Serializer.SerializeToArray(a1));
+            SiloAddress a3 = environment.Serializer.Deserialize<SiloAddress>(environment.Serializer.SerializeToArray(a1));
             Assert.Equal(a1, a3); // Should be equal SiloAddress's
             Assert.Equal(a2, a3); // Should be equal SiloAddress's
             Assert.Same(a1, a3); // Should be same / intern'ed SiloAddress object
@@ -282,7 +282,7 @@ namespace UnitTests.General
             SiloAddress a1 = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 1111), 12345);
 
             // Round-trip through Serializer
-            SiloAddress a3 = this.environment.Serializer.Deserialize<SiloAddress>(environment.Serializer.SerializeToArray(a1));
+            SiloAddress a3 = environment.Serializer.Deserialize<SiloAddress>(environment.Serializer.SerializeToArray(a1));
             Assert.Equal(a1, a3); // Should be equal SiloAddress's
             Assert.Same(a1, a3); // Should be same / intern'ed SiloAddress object
         }
@@ -315,10 +315,10 @@ namespace UnitTests.General
         {
             Guid guid = Guid.NewGuid();
             GrainId regularGrainId = LegacyGrainId.GetGrainIdForTesting(guid);
-            GrainReference grainRef = (GrainReference)this.environment.InternalGrainFactory.GetGrain(regularGrainId);
+            GrainReference grainRef = (GrainReference)environment.InternalGrainFactory.GetGrain(regularGrainId);
             TestGrainReference(grainRef);
 
-            grainRef = (GrainReference)this.environment.InternalGrainFactory.GetGrain(regularGrainId);
+            grainRef = (GrainReference)environment.InternalGrainFactory.GetGrain(regularGrainId);
             TestGrainReference(grainRef);
         }
 
@@ -327,14 +327,14 @@ namespace UnitTests.General
             GrainReference roundTripped = RoundTripGrainReferenceToKey(grainRef);
             Assert.Equal(grainRef, roundTripped); // GrainReference.ToKeyString
 
-            roundTripped = this.environment.Serializer.Deserialize<GrainReference>(environment.Serializer.SerializeToArray(grainRef));
+            roundTripped = environment.Serializer.Deserialize<GrainReference>(environment.Serializer.SerializeToArray(grainRef));
             Assert.Equal(grainRef, roundTripped); // GrainReference.OrleansSerializer
         }
 
         private GrainReference RoundTripGrainReferenceToKey(GrainReference input)
         {
             string str = input.GrainId.ToString();
-            GrainReference output = this.environment.Services.GetRequiredService<GrainReferenceActivator>().CreateReference(GrainId.Parse(str), default);
+            GrainReference output = environment.Services.GetRequiredService<GrainReferenceActivator>().CreateReference(GrainId.Parse(str), default);
             return output;
         }
     }

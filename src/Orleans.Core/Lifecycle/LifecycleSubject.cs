@@ -31,7 +31,7 @@ namespace Orleans
         {
             if (logger == null) throw new ArgumentNullException(nameof(logger));
             this.logger = logger;
-            this.subscribers = new List<OrderedObserver>();
+            subscribers = new List<OrderedObserver>();
         }
 
         /// <summary>
@@ -87,9 +87,9 @@ namespace Orleans
         /// <param name="elapsed">The period of time which elapsed before <see cref="OnStart"/> completed once it was initiated.</param>
         protected virtual void PerfMeasureOnStart(int stage, TimeSpan elapsed)
         {
-            if (this.logger.IsEnabled(LogLevel.Trace))
+            if (logger.IsEnabled(LogLevel.Trace))
             {
-                this.logger.LogTrace(
+                logger.LogTrace(
                     (int)ErrorCode.SiloStartPerfMeasure,
                     "Starting lifecycle stage {Stage} took {Elapsed} Milliseconds",
                     stage,
@@ -100,10 +100,10 @@ namespace Orleans
         /// <inheritdoc />
         public virtual async Task OnStart(CancellationToken cancellationToken = default)
         {
-            if (this.highStage.HasValue) throw new InvalidOperationException("Lifecycle has already been started.");
+            if (highStage.HasValue) throw new InvalidOperationException("Lifecycle has already been started.");
             try
             {
-                foreach (IGrouping<int, OrderedObserver> observerGroup in this.subscribers
+                foreach (IGrouping<int, OrderedObserver> observerGroup in subscribers
                     .GroupBy(orderedObserver => orderedObserver.Stage)
                     .OrderBy(group => group.Key))
                 {
@@ -113,22 +113,22 @@ namespace Orleans
                     }
 
                     var stage = observerGroup.Key;
-                    this.highStage = stage;
+                    highStage = stage;
                     var stopWatch = ValueStopwatch.StartNew();
                     await Task.WhenAll(observerGroup.Select(orderedObserver => CallOnStart(orderedObserver, cancellationToken)));
                     stopWatch.Stop();
-                    this.PerfMeasureOnStart(stage, stopWatch.Elapsed);
+                    PerfMeasureOnStart(stage, stopWatch.Elapsed);
 
-                    this.OnStartStageCompleted(stage);
+                    OnStartStageCompleted(stage);
                 }
             }
             catch (Exception ex) when (ex is not OrleansLifecycleCanceledException)
             {
-                this.logger.LogError(
+                logger.LogError(
                     (int)ErrorCode.LifecycleStartFailure,
                     ex,
                     "Lifecycle start canceled due to errors at stage {Stage}",
-                    this.highStage);
+                    highStage);
                 throw;
             }
 
@@ -158,9 +158,9 @@ namespace Orleans
         /// <param name="elapsed">The period of time which elapsed before <see cref="OnStop"/> completed once it was initiated.</param>
         protected virtual void PerfMeasureOnStop(int stage, TimeSpan elapsed)
         {
-            if (this.logger.IsEnabled(LogLevel.Trace))
+            if (logger.IsEnabled(LogLevel.Trace))
             {
-                this.logger.LogTrace(
+                logger.LogTrace(
                     (int)ErrorCode.SiloStartPerfMeasure,
                     "Stopping lifecycle stage {Stage} took {Elapsed} Milliseconds",
                     stage,
@@ -172,9 +172,9 @@ namespace Orleans
         public virtual async Task OnStop(CancellationToken cancellationToken = default)
         {
             // if not started, do nothing
-            if (!this.highStage.HasValue) return;
+            if (!highStage.HasValue) return;
             var loggedCancellation = false;
-            foreach (IGrouping<int, OrderedObserver> observerGroup in this.subscribers
+            foreach (IGrouping<int, OrderedObserver> observerGroup in subscribers
                 // include up to highest started stage
                 .Where(orderedObserver => orderedObserver.Stage <= highStage && orderedObserver.Observer != null)
                 .GroupBy(orderedObserver => orderedObserver.Stage)
@@ -182,29 +182,29 @@ namespace Orleans
             {
                 if (cancellationToken.IsCancellationRequested && !loggedCancellation)
                 {
-                    this.logger.LogWarning("Lifecycle stop operations canceled by request.");
+                    logger.LogWarning("Lifecycle stop operations canceled by request.");
                     loggedCancellation = true;
                 }
 
                 var stage = observerGroup.Key;
-                this.highStage = stage;
+                highStage = stage;
                 try
                 {
                     var stopwatch = ValueStopwatch.StartNew();
                     await Task.WhenAll(observerGroup.Select(orderedObserver => CallOnStop(orderedObserver, cancellationToken)));
                     stopwatch.Stop();
-                    this.PerfMeasureOnStop(stage, stopwatch.Elapsed);
+                    PerfMeasureOnStop(stage, stopwatch.Elapsed);
                 }
                 catch (Exception ex)
                 {
-                    this.logger.LogError(
+                    logger.LogError(
                         (int)ErrorCode.LifecycleStopFailure,
                         ex,
                         "Stopping lifecycle encountered an error at stage {Stage}. Continuing to stop.",
-                        this.highStage);
+                        highStage);
                 }
 
-                this.OnStopStageCompleted(stage);
+                OnStopStageCompleted(stage);
             }
 
             static Task CallOnStop(OrderedObserver observer, CancellationToken cancellationToken)
@@ -229,10 +229,10 @@ namespace Orleans
         public virtual IDisposable Subscribe(string observerName, int stage, ILifecycleObserver observer)
         {
             if (observer == null) throw new ArgumentNullException(nameof(observer));
-            if (this.highStage.HasValue) throw new InvalidOperationException("Lifecycle has already been started.");
+            if (highStage.HasValue) throw new InvalidOperationException("Lifecycle has already been started.");
 
             var orderedObserver = new OrderedObserver(stage, observer);
-            this.subscribers.Add(orderedObserver);
+            subscribers.Add(orderedObserver);
             return orderedObserver;
         }
 
@@ -258,8 +258,8 @@ namespace Orleans
             /// <param name="observer">The participating observer.</param>
             public OrderedObserver(int stage, ILifecycleObserver observer)
             {
-                this.Stage = stage;
-                this.Observer = observer;
+                Stage = stage;
+                Observer = observer;
             }
 
             /// <inheritdoc />

@@ -9,7 +9,7 @@ namespace Tester.StorageFacet.Implementations
         private IExampleStorageConfig config;
         private bool activateCalled;
 
-        public string Name => this.config.StateName;
+        public string Name => config.StateName;
         public TState State { get; set; }
 
         public Task Save()
@@ -19,23 +19,23 @@ namespace Tester.StorageFacet.Implementations
 
         public string GetExtendedInfo()
         {
-            return $"Table:{this.Name}-ActivateCalled:{this.activateCalled}, StateType:{typeof(TState).Name}";
+            return $"Table:{Name}-ActivateCalled:{activateCalled}, StateType:{typeof(TState).Name}";
         }
 
         public Task LoadState(CancellationToken ct)
         {
-            this.activateCalled = true;
+            activateCalled = true;
             return Task.CompletedTask;
         }
 
         public void Participate(IGrainLifecycle lifecycle)
         {
-            lifecycle.Subscribe(OptionFormattingUtilities.Name<TableExampleStorage<TState>>(this.Name), GrainLifecycleStage.SetupState, LoadState);
+            lifecycle.Subscribe(OptionFormattingUtilities.Name<TableExampleStorage<TState>>(Name), GrainLifecycleStage.SetupState, LoadState);
         }
 
         public void Configure(IExampleStorageConfig cfg)
         {
-            this.config = cfg;
+            config = cfg;
         }
     }
 
@@ -44,12 +44,12 @@ namespace Tester.StorageFacet.Implementations
         private readonly IGrainContextAccessor contextAccessor;
         public TableExampleStorageFactory(IGrainContextAccessor context)
         {
-            this.contextAccessor = context;
+            contextAccessor = context;
         }
 
         public IExampleStorage<TState> Create<TState>(IExampleStorageConfig config)
         {
-            var context = this.contextAccessor.GrainContext;
+            var context = contextAccessor.GrainContext;
             var storage = context.ActivationServices.GetRequiredService<TableExampleStorage<TState>>();
             storage.Configure(config);
             storage.Participate(context.ObservableLifecycle);

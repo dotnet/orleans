@@ -92,42 +92,42 @@ namespace Orleans.Providers.Streams.Common
             if (String.IsNullOrEmpty(name)) throw new ArgumentNullException(nameof(name));
             if (runtime == null) throw new ArgumentNullException(nameof(runtime));
             this.pubsubOptions = pubsubOptions ?? throw new ArgumentNullException(nameof(pubsubOptions));
-            this.Name = name;
+            Name = name;
             this.lifeCycleOptions = lifeCycleOptions ?? throw new ArgumentNullException(nameof(lifeCycleOptions));
             this.runtime = runtime.ServiceProvider.GetRequiredService<IStreamProviderRuntime>();
-            this.runtimeClient = runtime.ServiceProvider.GetRequiredService<IRuntimeClient>();
+            runtimeClient = runtime.ServiceProvider.GetRequiredService<IRuntimeClient>();
             this.deepCopier = deepCopier ?? throw new ArgumentNullException(nameof(deepCopier));
             this.logger = logger ?? throw new ArgumentNullException(nameof(logger));
         }
 
         private async Task Init(CancellationToken token) 
         {
-            if(!this.stateManager.PresetState(ProviderState.Initialized)) return;
-            this.adapterFactory = this.runtime.ServiceProvider.GetRequiredServiceByName<IQueueAdapterFactory>(this.Name);
-            this.queueAdapter = await adapterFactory.CreateAdapter();
+            if(!stateManager.PresetState(ProviderState.Initialized)) return;
+            adapterFactory = runtime.ServiceProvider.GetRequiredServiceByName<IQueueAdapterFactory>(Name);
+            queueAdapter = await adapterFactory.CreateAdapter();
 
-            if (this.pubsubOptions.PubSubType == StreamPubSubType.ExplicitGrainBasedAndImplicit 
-                || this.pubsubOptions.PubSubType == StreamPubSubType.ExplicitGrainBasedOnly)
+            if (pubsubOptions.PubSubType == StreamPubSubType.ExplicitGrainBasedAndImplicit 
+                || pubsubOptions.PubSubType == StreamPubSubType.ExplicitGrainBasedOnly)
             {
-                this.streamSubscriptionManager = this.runtime.ServiceProvider
+                streamSubscriptionManager = runtime.ServiceProvider
                     .GetService<IStreamSubscriptionManagerAdmin>().GetStreamSubscriptionManager(StreamSubscriptionManagerType.ExplicitSubscribeOnly);
             }
-            this.stateManager.CommitState();
+            stateManager.CommitState();
         }
 
         private async Task Start(CancellationToken token)
         {
-            if (!this.stateManager.PresetState(ProviderState.Started)) return;
-            if (this.queueAdapter.Direction.Equals(StreamProviderDirection.ReadOnly) ||
-                this.queueAdapter.Direction.Equals(StreamProviderDirection.ReadWrite))
+            if (!stateManager.PresetState(ProviderState.Started)) return;
+            if (queueAdapter.Direction.Equals(StreamProviderDirection.ReadOnly) ||
+                queueAdapter.Direction.Equals(StreamProviderDirection.ReadWrite))
             {
-                var siloRuntime = this.runtime as ISiloSideStreamProviderRuntime;
+                var siloRuntime = runtime as ISiloSideStreamProviderRuntime;
                 if (siloRuntime != null)
                 {
-                    this.pullingAgentManager = await siloRuntime.InitializePullingAgents(this.Name, this.adapterFactory, this.queueAdapter);
+                    pullingAgentManager = await siloRuntime.InitializePullingAgents(Name, adapterFactory, queueAdapter);
 
                     // TODO: No support yet for DeliveryDisabled, only Stopped and Started
-                    if (this.lifeCycleOptions.StartupState == StreamLifecycleOptions.RunState.AgentsStarted)
+                    if (lifeCycleOptions.StartupState == StreamLifecycleOptions.RunState.AgentsStarted)
                         await pullingAgentManager.StartAgents();
                 }
             }
@@ -136,14 +136,14 @@ namespace Orleans.Providers.Streams.Common
 
         public IStreamSubscriptionManager GetStreamSubscriptionManager()
         {
-            return this.streamSubscriptionManager;
+            return streamSubscriptionManager;
         }
 
         private async Task Close(CancellationToken token)
         {
             if (!stateManager.PresetState(ProviderState.Closed)) return;
             
-            var manager = this.pullingAgentManager;
+            var manager = pullingAgentManager;
             if (manager != null)
             {
                 await manager.Stop();
@@ -155,8 +155,8 @@ namespace Orleans.Providers.Streams.Common
         public IAsyncStream<T> GetStream<T>(StreamId streamId)
         {
             var id = new QualifiedStreamId(Name, streamId);
-            return this.runtime.GetStreamDirectory().GetOrAddStream<T>(
-                id, () => new StreamImpl<T>(id, this, IsRewindable, this.runtimeClient));
+            return runtime.GetStreamDirectory().GetOrAddStream<T>(
+                id, () => new StreamImpl<T>(id, this, IsRewindable, runtimeClient));
         }
 
         IInternalAsyncBatchObserver<T> IInternalStreamProvider.GetProducerInterface<T>(IAsyncStream<T> stream)
@@ -165,7 +165,7 @@ namespace Orleans.Providers.Streams.Common
             {
                 throw new InvalidOperationException($"Stream provider {queueAdapter.Name} is ReadOnly.");
             }
-            return new PersistentStreamProducer<T>((StreamImpl<T>)stream, this.runtime, queueAdapter, IsRewindable, this.deepCopier);
+            return new PersistentStreamProducer<T>((StreamImpl<T>)stream, runtime, queueAdapter, IsRewindable, deepCopier);
         }
 
         IInternalAsyncObservable<T> IInternalStreamProvider.GetConsumerInterface<T>(IAsyncStream<T> streamId)
@@ -175,7 +175,7 @@ namespace Orleans.Providers.Streams.Common
 
         private IInternalAsyncObservable<T> GetConsumerInterfaceImpl<T>(IAsyncStream<T> stream)
         {
-            return new StreamConsumer<T>((StreamImpl<T>)stream, Name, this.runtime, this.runtime.PubSub(this.pubsubOptions.PubSubType), this.logger, IsRewindable);
+            return new StreamConsumer<T>((StreamImpl<T>)stream, Name, runtime, runtime.PubSub(pubsubOptions.PubSubType), logger, IsRewindable);
         }
 
         public Task<object> ExecuteCommand(int command, object arg)
@@ -208,8 +208,8 @@ namespace Orleans.Providers.Streams.Common
 
         public void Participate(ILifecycleObservable lifecycle)
         {
-            lifecycle.Subscribe(OptionFormattingUtilities.Name<PersistentStreamProvider>(this.Name), this.lifeCycleOptions.InitStage, Init);
-            lifecycle.Subscribe(OptionFormattingUtilities.Name<PersistentStreamProvider>(this.Name), this.lifeCycleOptions.StartStage, Start, Close);
+            lifecycle.Subscribe(OptionFormattingUtilities.Name<PersistentStreamProvider>(Name), lifeCycleOptions.InitStage, Init);
+            lifecycle.Subscribe(OptionFormattingUtilities.Name<PersistentStreamProvider>(Name), lifeCycleOptions.StartStage, Start, Close);
         }
 
         public static IStreamProvider Create(IServiceProvider services, string name)

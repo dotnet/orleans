@@ -21,7 +21,7 @@ namespace Orleans.Runtime
         {
             var grainProperties = CreateGrainManifest(grainPropertiesProviders, grainTypeOptions, grainTypeResolver);
             var interfaces = CreateInterfaceManifest(grainInterfacePropertiesProviders, grainTypeOptions, interfaceTypeResolver);
-            this.ClientManifest = new GrainManifest(grainProperties, interfaces);
+            ClientManifest = new GrainManifest(grainProperties, interfaces);
         }
 
         /// <summary>

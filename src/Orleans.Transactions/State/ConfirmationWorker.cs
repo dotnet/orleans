@@ -38,21 +38,21 @@ namespace Orleans.Transactions.State
             this.logger = logger;
             this.timerManager = timerManager;
             this.activationLifetime = activationLifetime;
-            this.pending = new HashSet<Guid>();
+            pending = new HashSet<Guid>();
         }
 
         public void Add(Guid transactionId, DateTime timestamp, List<ParticipantId> participants)
         {
             if (!IsConfirmed(transactionId))
             {
-                this.pending.Add(transactionId);
+                pending.Add(transactionId);
                 SendConfirmation(transactionId, timestamp, participants).Ignore();
             }
         }
 
         public bool IsConfirmed(Guid transactionId)
         {
-            return this.pending.Contains(transactionId);
+            return pending.Contains(transactionId);
         }
 
         private async Task SendConfirmation(Guid transactionId, DateTime timestamp, List<ParticipantId> participants)
@@ -64,25 +64,25 @@ namespace Orleans.Transactions.State
         private async Task NotifyAll(Guid transactionId, DateTime timestamp, List<ParticipantId> participants)
         {
             List<Confirmation> confirmations = participants
-                    .Where(p => !p.Equals(this.me))
+                    .Where(p => !p.Equals(me))
                     .Select(p => new Confirmation(
                         p,
                         transactionId,
                         timestamp,
                         () => p.Reference.AsReference<ITransactionalResourceExtension>()
                             .Confirm(p.Name, transactionId, timestamp),
-                        this.logger))
+                        logger))
                     .ToList();
 
             if (confirmations.Count == 0) return;
 
             // attempts to confirm all, will retry every ConfirmationRetryDelay until all succeed
-            var ct = this.activationLifetime.OnDeactivating;
+            var ct = activationLifetime.OnDeactivating;
 
             bool hasPendingConfirmations = true;
             while (!ct.IsCancellationRequested && hasPendingConfirmations)
             {
-                using (this.activationLifetime.BlockDeactivation())
+                using (activationLifetime.BlockDeactivation())
                 {
                     var confirmationResults = await Task.WhenAll(confirmations.Select(c => c.Confirmed()));
                     hasPendingConfirmations = false;
@@ -91,7 +91,7 @@ namespace Orleans.Transactions.State
                         if (!confirmed)
                         {
                             hasPendingConfirmations = true;
-                            await this.timerManager.Delay(this.options.ConfirmationRetryDelay, ct);
+                            await timerManager.Delay(options.ConfirmationRetryDelay, ct);
                             break;
                         }
                     }
@@ -102,14 +102,14 @@ namespace Orleans.Transactions.State
         // retries collect until it succeeds
         private async Task Collect(Guid transactionId)
         {
-            var ct = this.activationLifetime.OnDeactivating;
+            var ct = activationLifetime.OnDeactivating;
             while (!ct.IsCancellationRequested)
             {
-                using (this.activationLifetime.BlockDeactivation())
+                using (activationLifetime.BlockDeactivation())
                 {
                     if (await TryCollect(transactionId)) break;
 
-                    await this.timerManager.Delay(this.options.ConfirmationRetryDelay, ct);
+                    await timerManager.Delay(options.ConfirmationRetryDelay, ct);
                 }
             }
         }
@@ -125,11 +125,11 @@ namespace Orleans.Transactions.State
                 storageBatch.Collect(transactionId);
                 storageBatch.FollowUpAction(() =>
                 {
-                    if (this.logger.IsEnabled(LogLevel.Trace))
+                    if (logger.IsEnabled(LogLevel.Trace))
                     {
-                        this.logger.LogTrace("Collection completed. TransactionId:{TransactionId}", transactionId);
+                        logger.LogTrace("Collection completed. TransactionId:{TransactionId}", transactionId);
                     }
-                    this.pending.Remove(transactionId);
+                    pending.Remove(transactionId);
                     storeComplete.TrySetResult(true);
                 });
 
@@ -140,7 +140,7 @@ namespace Orleans.Transactions.State
             }
             catch(Exception ex)
             {
-                this.logger.LogWarning(ex, "Error occured while cleaning up transaction {TransactionId} from commit log.  Will retry.", transactionId);
+                logger.LogWarning(ex, "Error occured while cleaning up transaction {TransactionId} from commit log.  Will retry.", transactionId);
             }
 
             return false;
@@ -159,30 +159,30 @@ namespace Orleans.Transactions.State
 
             public Confirmation(ParticipantId paricipant, Guid transactionId, DateTime timestamp, Func<Task> call, ILogger logger)
             {
-                this.participant = paricipant;
+                participant = paricipant;
                 this.transactionId = transactionId;
                 this.timestamp = timestamp;
                 this.call = call;
                 this.logger = logger;
-                this.pending = null;
-                this.complete = false;
+                pending = null;
+                complete = false;
             }
 
             public async Task<bool> Confirmed()
             {
-                if (this.complete) return this.complete;
-                this.pending = this.pending ?? call();
+                if (complete) return complete;
+                pending = pending ?? call();
                 try
                 {
-                    await this.pending;
-                    this.complete = true;
+                    await pending;
+                    complete = true;
                 }
                 catch (Exception ex)
                 {
-                    this.pending = null;
-                    logger.LogWarning(ex, "Confirmation of transaction {TransactionId} with timestamp {Timestamp} to participant {Participant} failed.  Retrying", this.transactionId, this.timestamp, this.participant);
+                    pending = null;
+                    logger.LogWarning(ex, "Confirmation of transaction {TransactionId} with timestamp {Timestamp} to participant {Participant} failed.  Retrying", transactionId, timestamp, participant);
                 }
-                return this.complete;
+                return complete;
             }
         }
     }

@@ -18,7 +18,7 @@ namespace Orleans.Runtime
 
         public ArgumentFactory CreateFactory(Type grainClass)
         {
-            return new ArgumentFactory(this.services, grainClass);
+            return new ArgumentFactory(services, grainClass);
         }
 
         /// <summary>
@@ -31,7 +31,7 @@ namespace Orleans.Runtime
 
             public ArgumentFactory(IServiceProvider services, Type type)
             {
-                this.argumentFactorys = new List<Factory<IGrainContext, object>>();
+                argumentFactorys = new List<Factory<IGrainContext, object>>();
                 List<Type> types = new List<Type>();
                 // find constructor - supports only single public constructor
                 IEnumerable<ParameterInfo> parameters = type.GetConstructors()
@@ -47,11 +47,11 @@ namespace Orleans.Runtime
                     MethodInfo getFactory = GetFactoryMethod.MakeGenericMethod(attribute.GetType());
                     var argumentFactory = (Factory<IGrainContext, object>)getFactory.Invoke(this, new object[] { services, parameter, attribute, type });
                     // cache argument factory
-                    this.argumentFactorys.Add(argumentFactory);
+                    argumentFactorys.Add(argumentFactory);
                     // cache argument type
                     types.Add(parameter.ParameterType);
                 }
-                this.ArgumentTypes = types.ToArray();
+                ArgumentTypes = types.ToArray();
             }
 
             public Type[] ArgumentTypes { get; }

@@ -16,10 +16,10 @@ namespace Orleans.Streams
         {
             // distinct randomly ordered readonly collection
             this.resources = resources.Distinct().OrderBy(_ => Random.Shared.Next()).ToList();
-            this.lastSelection = Random.Shared.Next(this.resources.Count);
+            lastSelection = Random.Shared.Next(this.resources.Count);
         }
 
-        public int Count => this.resources.Count;
+        public int Count => resources.Count;
 
         /// <summary>
         /// Try to select certain count of resources from resource list, which doesn't overlap with existing resources
@@ -29,13 +29,13 @@ namespace Orleans.Streams
         /// <returns></returns>
         public List<T> NextSelection(int newSelectionCount, List<T> existingSelection)
         {
-            var selection = new List<T>(Math.Min(newSelectionCount, this.resources.Count));
+            var selection = new List<T>(Math.Min(newSelectionCount, resources.Count));
             int tries = 0;
-            while (selection.Count < newSelectionCount && tries++ < this.resources.Count)
+            while (selection.Count < newSelectionCount && tries++ < resources.Count)
             {
-                this.lastSelection = (++this.lastSelection) % (this.resources.Count);
-                if (!existingSelection.Contains(this.resources[this.lastSelection]))
-                    selection.Add(this.resources[this.lastSelection]);
+                lastSelection = (++lastSelection) % (resources.Count);
+                if (!existingSelection.Contains(resources[lastSelection]))
+                    selection.Add(resources[lastSelection]);
             }
             return selection;
         }

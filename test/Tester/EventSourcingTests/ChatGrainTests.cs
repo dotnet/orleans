@@ -18,7 +18,7 @@ namespace Tester.EventSourcingTests
         [Fact, TestCategory("EventSourcing"), TestCategory("Functional")]
         public async Task Init()
         {
-            var chat = this.fixture.GrainFactory.GetGrain<IChatGrain>($"Chatroom-{Guid.NewGuid()}");
+            var chat = fixture.GrainFactory.GetGrain<IChatGrain>($"Chatroom-{Guid.NewGuid()}");
 
             var content = (await chat.GetChat()).ToString();
 
@@ -32,7 +32,7 @@ namespace Tester.EventSourcingTests
         [Fact, TestCategory("EventSourcing"), TestCategory("Functional")]
         public async Task PostThenDelete()
         {
-            var chat = this.fixture.GrainFactory.GetGrain<IChatGrain>($"Chatroom-{Guid.NewGuid()}");
+            var chat = fixture.GrainFactory.GetGrain<IChatGrain>($"Chatroom-{Guid.NewGuid()}");
             var guid = Guid.NewGuid();
 
             await chat.Post(guid, "Famous Athlete", "I am retiring");
@@ -57,7 +57,7 @@ namespace Tester.EventSourcingTests
         [Fact, TestCategory("EventSourcing"), TestCategory("Functional")]
         public async Task PostThenEdit()
         {
-            var chat = this.fixture.GrainFactory.GetGrain<IChatGrain>($"Chatroom-{Guid.NewGuid()}");
+            var chat = fixture.GrainFactory.GetGrain<IChatGrain>($"Chatroom-{Guid.NewGuid()}");
             var guid = Guid.NewGuid();
 
             await chat.Post(Guid.NewGuid(), "asdf", "asdf");
@@ -86,7 +86,7 @@ namespace Tester.EventSourcingTests
         [Fact, TestCategory("EventSourcing"), TestCategory("Functional")]
         public async Task Truncate()
         {
-            var chat = this.fixture.GrainFactory.GetGrain<IChatGrain>($"Chatroom-{Guid.NewGuid()}");
+            var chat = fixture.GrainFactory.GetGrain<IChatGrain>($"Chatroom-{Guid.NewGuid()}");
 
             for (int i = 0; i < ChatFormat.MaxNumPosts + 10; i++)
                 await chat.Post(Guid.NewGuid(), i.ToString(), i.ToString());

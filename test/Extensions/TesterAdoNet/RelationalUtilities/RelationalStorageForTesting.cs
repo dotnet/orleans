@@ -42,13 +42,13 @@ namespace UnitTests.General
         /// The script that creates Orleans schema in the database, usually CreateOrleansTables_xxxx.sql
         /// </summary>
         protected string[] SetupSqlScriptFileNames => new[] {
-                                $"{this.ProviderMoniker}-Main.sql",
-                                $"{this.ProviderMoniker}-Clustering.sql",
-                                $"{this.ProviderMoniker}-Persistence.sql",
-                                $"{this.ProviderMoniker}-Reminders.sql",
-                                }.Concat(Directory.GetFiles(Environment.CurrentDirectory, $"{this.ProviderMoniker}-Clustering-*.sql")
-                                .Concat(Directory.GetFiles(Environment.CurrentDirectory, $"{this.ProviderMoniker}-Persistence-*.sql"))
-                                .Concat(Directory.GetFiles(Environment.CurrentDirectory, $"{this.ProviderMoniker}-Reminders-*.sql"))
+                                $"{ProviderMoniker}-Main.sql",
+                                $"{ProviderMoniker}-Clustering.sql",
+                                $"{ProviderMoniker}-Persistence.sql",
+                                $"{ProviderMoniker}-Reminders.sql",
+                                }.Concat(Directory.GetFiles(Environment.CurrentDirectory, $"{ProviderMoniker}-Clustering-*.sql")
+                                .Concat(Directory.GetFiles(Environment.CurrentDirectory, $"{ProviderMoniker}-Persistence-*.sql"))
+                                .Concat(Directory.GetFiles(Environment.CurrentDirectory, $"{ProviderMoniker}-Reminders-*.sql"))
                                 .Select(f => Path.GetFileName(f))
                                 .OrderBy(f => f)).ToArray();
 

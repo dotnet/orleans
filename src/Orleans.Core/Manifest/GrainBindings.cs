@@ -21,8 +21,8 @@ namespace Orleans.Metadata
         /// <param name="bindings">The bindings for the specified grain type.</param>
         public GrainBindings(GrainType grainType, ImmutableArray<ImmutableDictionary<string, string>> bindings)
         {
-            this.GrainType = grainType;
-            this.Bindings = bindings;
+            GrainType = grainType;
+            Bindings = bindings;
         }
 
         /// <summary>
@@ -187,8 +187,8 @@ namespace Orleans.Metadata
         {
             public Cache(MajorMinorVersion version, ImmutableDictionary<GrainType, GrainBindings> map)
             {
-                this.Version = version;
-                this.Map = map;
+                Version = version;
+                Map = map;
             }
 
             public MajorMinorVersion Version { get; }

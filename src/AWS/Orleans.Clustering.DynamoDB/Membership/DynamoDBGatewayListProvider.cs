@@ -29,26 +29,26 @@ namespace Orleans.Clustering.DynamoDB
         {
             this.logger = logger;
             this.options = options.Value;
-            this.clusterId = clusterOptions.Value.ClusterId;
-            this.MaxStaleness = gatewayOptions.Value.GatewayListRefreshPeriod;
+            clusterId = clusterOptions.Value.ClusterId;
+            MaxStaleness = gatewayOptions.Value.GatewayListRefreshPeriod;
         }
 
         public Task InitializeGatewayListProvider()
         {
-            this.storage = new DynamoDBStorage(
-                this.logger,
-                this.options.Service,
-                this.options.AccessKey,
-                this.options.SecretKey,
-                this.options.Token,
-                this.options.ProfileName,
-                this.options.ReadCapacityUnits,
-                this.options.WriteCapacityUnits,
-                this.options.UseProvisionedThroughput,
-                this.options.CreateIfNotExists,
-                this.options.UpdateIfExists);
+            storage = new DynamoDBStorage(
+                logger,
+                options.Service,
+                options.AccessKey,
+                options.SecretKey,
+                options.Token,
+                options.ProfileName,
+                options.ReadCapacityUnits,
+                options.WriteCapacityUnits,
+                options.UseProvisionedThroughput,
+                options.CreateIfNotExists,
+                options.UpdateIfExists);
 
-            return this.storage.InitializeTable(this.options.TableName,
+            return storage.InitializeTable(options.TableName,
                 new List<KeySchemaElement>
                 {
                     new KeySchemaElement { AttributeName = SiloInstanceRecord.DEPLOYMENT_ID_PROPERTY_NAME, KeyType = KeyType.HASH },
@@ -65,7 +65,7 @@ namespace Orleans.Clustering.DynamoDB
         {
             var expressionValues = new Dictionary<string, AttributeValue>
             {
-                { $":{SiloInstanceRecord.DEPLOYMENT_ID_PROPERTY_NAME}", new AttributeValue(this.clusterId) },
+                { $":{SiloInstanceRecord.DEPLOYMENT_ID_PROPERTY_NAME}", new AttributeValue(clusterId) },
                 { $":{SiloInstanceRecord.STATUS_PROPERTY_NAME}", new AttributeValue { N = INSTANCE_STATUS_ACTIVE } },
                 { $":{SiloInstanceRecord.PROXY_PORT_PROPERTY_NAME}", new AttributeValue { N = "0"} }
             };
@@ -75,7 +75,7 @@ namespace Orleans.Clustering.DynamoDB
                 $"AND {SiloInstanceRecord.STATUS_PROPERTY_NAME} = :{SiloInstanceRecord.STATUS_PROPERTY_NAME} " +
                 $"AND {SiloInstanceRecord.PROXY_PORT_PROPERTY_NAME} > :{SiloInstanceRecord.PROXY_PORT_PROPERTY_NAME}";
 
-            var records = await storage.ScanAsync<Uri>(this.options.TableName, expressionValues,
+            var records = await storage.ScanAsync<Uri>(options.TableName, expressionValues,
                 expression, gateway =>
                 {
                     return SiloAddress.New(

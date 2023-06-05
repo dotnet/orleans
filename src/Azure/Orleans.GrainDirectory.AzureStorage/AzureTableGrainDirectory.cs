@@ -32,10 +32,10 @@ namespace Orleans.GrainDirectory.AzureStorage
             {
                 return new GrainAddress
                 {
-                    GrainId = RowKeyToGrainId(this.RowKey),
-                    SiloAddress = Runtime.SiloAddress.FromParsableString(this.SiloAddress),
-                    ActivationId = Runtime.ActivationId.FromParsableString(this.ActivationId),
-                    MembershipVersion = new MembershipVersion(this.MembershipVersion)
+                    GrainId = RowKeyToGrainId(RowKey),
+                    SiloAddress = Runtime.SiloAddress.FromParsableString(SiloAddress),
+                    ActivationId = Runtime.ActivationId.FromParsableString(ActivationId),
+                    MembershipVersion = new MembershipVersion(MembershipVersion)
                 };
             }
 
@@ -61,15 +61,15 @@ namespace Orleans.GrainDirectory.AzureStorage
             IOptions<ClusterOptions> clusterOptions,
             ILoggerFactory loggerFactory)
         {
-            this.tableDataManager = new AzureTableDataManager<GrainDirectoryEntity>(
+            tableDataManager = new AzureTableDataManager<GrainDirectoryEntity>(
                 directoryOptions,
                 loggerFactory.CreateLogger<AzureTableDataManager<GrainDirectoryEntity>>());
-            this.clusterId = clusterOptions.Value.ClusterId;
+            clusterId = clusterOptions.Value.ClusterId;
         }
 
         public async Task<GrainAddress> Lookup(GrainId grainId)
         {
-            var result = await this.tableDataManager.ReadSingleTableEntryAsync(this.clusterId, GrainDirectoryEntity.GrainIdToRowKey(grainId));
+            var result = await tableDataManager.ReadSingleTableEntryAsync(clusterId, GrainDirectoryEntity.GrainIdToRowKey(grainId));
 
             if (result.Entity is null)
             {
@@ -81,15 +81,15 @@ namespace Orleans.GrainDirectory.AzureStorage
 
         public async Task<GrainAddress> Register(GrainAddress address)
         {
-            var entry = GrainDirectoryEntity.FromGrainAddress(this.clusterId, address);
-            var result = await this.tableDataManager.InsertTableEntryAsync(entry);
+            var entry = GrainDirectoryEntity.FromGrainAddress(clusterId, address);
+            var result = await tableDataManager.InsertTableEntryAsync(entry);
             // Possible race condition?
             return result.isSuccess ? address : await Lookup(address.GrainId);
         }
 
         public async Task Unregister(GrainAddress address)
         {
-            var result = await this.tableDataManager.ReadSingleTableEntryAsync(this.clusterId, GrainDirectoryEntity.GrainIdToRowKey(address.GrainId));
+            var result = await tableDataManager.ReadSingleTableEntryAsync(clusterId, GrainDirectoryEntity.GrainIdToRowKey(address.GrainId));
 
             // No entry found
             if (result.Entity is null)
@@ -100,19 +100,19 @@ namespace Orleans.GrainDirectory.AzureStorage
             // Check if the entry in storage match the one we were asked to delete
             var entity = result.Item1;
             if (entity.ActivationId == address.ActivationId.ToParsableString())
-                await this.tableDataManager.DeleteTableEntryAsync(GrainDirectoryEntity.FromGrainAddress(this.clusterId, address), entity.ETag.ToString());
+                await tableDataManager.DeleteTableEntryAsync(GrainDirectoryEntity.FromGrainAddress(clusterId, address), entity.ETag.ToString());
         }
 
         public async Task UnregisterMany(List<GrainAddress> addresses)
         {
-            if (addresses.Count <= this.tableDataManager.StoragePolicyOptions.MaxBulkUpdateRows)
+            if (addresses.Count <= tableDataManager.StoragePolicyOptions.MaxBulkUpdateRows)
             {
                 await UnregisterManyBlock(addresses);
             }
             else
             {
                 var tasks = new List<Task>();
-                foreach (var subList in addresses.BatchIEnumerable(this.tableDataManager.StoragePolicyOptions.MaxBulkUpdateRows))
+                foreach (var subList in addresses.BatchIEnumerable(tableDataManager.StoragePolicyOptions.MaxBulkUpdateRows))
                 {
                     tasks.Add(UnregisterManyBlock(subList));
                 }
@@ -148,14 +148,14 @@ namespace Orleans.GrainDirectory.AzureStorage
             }
 
             queryBuilder.Append(')');
-            var entities = await this.tableDataManager.ReadTableEntriesAndEtagsAsync(queryBuilder.ToString());
-            await this.tableDataManager.DeleteTableEntriesAsync(entities);
+            var entities = await tableDataManager.ReadTableEntriesAndEtagsAsync(queryBuilder.ToString());
+            await tableDataManager.DeleteTableEntriesAsync(entities);
         }
 
         // Called by lifecycle, should not be called explicitely, except for tests
         public async Task InitializeIfNeeded(CancellationToken ct = default)
         {
-            await this.tableDataManager.InitTableAsync();
+            await tableDataManager.InitTableAsync();
         }
 
         public void Participate(ISiloLifecycle lifecycle)

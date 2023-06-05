@@ -21,13 +21,13 @@ namespace Orleans.Transactions.TestKit
 
         public override Task OnActivateAsync(CancellationToken cancellationToken)
         {
-            this.logger = this.loggerFactory.CreateLogger(this.GetGrainId().ToString());
+            logger = loggerFactory.CreateLogger(this.GetGrainId().ToString());
             return base.OnActivateAsync(cancellationToken);
         }
 
         public Task Commit(ITransactionCommitOperation<IRemoteCommitService> operation)
         {
-            return this.committer.OnCommit(operation);
+            return committer.OnCommit(operation);
         }
     }
 }

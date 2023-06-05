@@ -102,7 +102,7 @@ namespace TestGrains
 
             foreach (var u in updates)
             {
-                this.TransitionState(state, u);
+                TransitionState(state, u);
                 version++;
             }
 
@@ -116,7 +116,7 @@ namespace TestGrains
                 state = new MyGrainState();
                 version = 0;
             }
-            return Task.FromResult(new KeyValuePair<int, MyGrainState>(version, this.copier.Copy(state)));
+            return Task.FromResult(new KeyValuePair<int, MyGrainState>(version, copier.Copy(state)));
         }
     }
 

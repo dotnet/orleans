@@ -20,7 +20,7 @@ namespace Orleans.Runtime.Configuration
         /// <inheritdoc />
         public void ValidateConfiguration()
         {
-            var clusteringTableProvider = this.serviceProvider.GetService<IMembershipTable>();
+            var clusteringTableProvider = serviceProvider.GetService<IMembershipTable>();
             if (clusteringTableProvider == null)
             {
                 throw new OrleansConfigurationException(ClientClusteringValidator.ClusteringNotConfigured);

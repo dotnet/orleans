@@ -16,8 +16,8 @@ namespace Tester.StorageFacet.Infrastructure
         public IExampleStorage<TState> Create<TState>(string name, IExampleStorageConfig cfg)
         {
             IExampleStorageFactory factory = string.IsNullOrEmpty(name)
-                ? this.services.GetService<IExampleStorageFactory>()
-                : this.services.GetServiceByName<IExampleStorageFactory>(name);
+                ? services.GetService<IExampleStorageFactory>()
+                : services.GetServiceByName<IExampleStorageFactory>(name);
             if (factory != null) return factory.Create<TState>(cfg);
             throw new InvalidOperationException($"Storage feature with name {name} not found.");
         }

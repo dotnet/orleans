@@ -14,8 +14,8 @@ namespace Orleans.Transactions
 
         public TransactionalResourceExtension(IGrainContextAccessor contextAccessor)
         {
-            this.factories = contextAccessor.GrainContext.GetResourceFactoryRegistry<ITransactionalResource>();
-            this.resources = new Dictionary<string, ITransactionalResource>();
+            factories = contextAccessor.GrainContext.GetResourceFactoryRegistry<ITransactionalResource>();
+            resources = new Dictionary<string, ITransactionalResource>();
         }
 
         public Task<TransactionalStatus> CommitReadOnly(string resourceId, Guid transactionId, AccessCounter accessCount, DateTime timeStamp)
@@ -45,9 +45,9 @@ namespace Orleans.Transactions
 
         private ITransactionalResource GetResource(string resourceId)
         {
-            if (!this.resources.TryGetValue(resourceId, out ITransactionalResource resource))
+            if (!resources.TryGetValue(resourceId, out ITransactionalResource resource))
             {
-                this.resources[resourceId] = resource = this.factories[resourceId].Invoke();
+                resources[resourceId] = resource = factories[resourceId].Invoke();
             }
             return resource;
         }

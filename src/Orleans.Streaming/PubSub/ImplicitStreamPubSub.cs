@@ -20,7 +20,7 @@ namespace Orleans.Streams
             }
 
             this.grainFactory = grainFactory;
-            this.implicitTable = implicitPubSubTable;
+            implicitTable = implicitPubSubTable;
         }
 
         public Task<ISet<PubSubSubscriptionState>> RegisterProducer(QualifiedStreamId streamId, GrainId streamProducer)
@@ -28,7 +28,7 @@ namespace Orleans.Streams
             ISet<PubSubSubscriptionState> result = new HashSet<PubSubSubscriptionState>();
             if (!ImplicitStreamSubscriberTable.IsImplicitSubscribeEligibleNameSpace(streamId.GetNamespace())) return Task.FromResult(result);
 
-            IDictionary<Guid, GrainId> implicitSubscriptions = implicitTable.GetImplicitSubscribers(streamId, this.grainFactory);
+            IDictionary<Guid, GrainId> implicitSubscriptions = implicitTable.GetImplicitSubscribers(streamId, grainFactory);
             foreach (var kvp in implicitSubscriptions)
             {
                 GuidId subscriptionId = GuidId.GetGuidId(kvp.Key);
@@ -84,7 +84,7 @@ namespace Orleans.Streams
             }
             else
             {
-                var implicitConsumers = this.implicitTable.GetImplicitSubscribers(streamId, grainFactory);
+                var implicitConsumers = implicitTable.GetImplicitSubscribers(streamId, grainFactory);
                 var subscriptions = implicitConsumers.Select(consumer =>
                 {
                     var grainId = consumer.Value;

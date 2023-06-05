@@ -30,7 +30,7 @@ namespace Tester.Directories
             await Task.Delay(5000);
 
             // Shutdown the secondary silo
-            await this.HostedCluster.StopSecondarySilosAsync();
+            await HostedCluster.StopSecondarySilosAsync();
 
             // Activation on the primary silo should still be there, another activation should be
             // created for the other one
@@ -42,7 +42,7 @@ namespace Tester.Directories
         {
             while (true)
             {
-                var grain = this.GrainFactory.GetGrain<ICustomDirectoryGrain>(Guid.NewGuid());
+                var grain = GrainFactory.GetGrain<ICustomDirectoryGrain>(Guid.NewGuid());
                 var instanceId = await grain.GetRuntimeInstanceId();
                 if (instanceId.Contains(HostedCluster.Primary.SiloAddress.Endpoint.ToString()))
                     return grain;
@@ -53,7 +53,7 @@ namespace Tester.Directories
         {
             while (true)
             {
-                var grain = this.GrainFactory.GetGrain<ICustomDirectoryGrain>(Guid.NewGuid());
+                var grain = GrainFactory.GetGrain<ICustomDirectoryGrain>(Guid.NewGuid());
                 var instanceId = await grain.GetRuntimeInstanceId();
                 if (instanceId.Contains(HostedCluster.SecondarySilos[0].SiloAddress.Endpoint.ToString()))
                     return grain;

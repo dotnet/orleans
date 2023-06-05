@@ -56,7 +56,7 @@ namespace UnitTests.StreamingTests
         [SkippableFact, TestCategory("Functional"), TestCategory("Streaming")]
         public async Task PullingAgents_ControlCmd_1()
         {
-            var mgmt = this.fixture.GrainFactory.GetGrain<IManagementGrain>(0);;
+            var mgmt = fixture.GrainFactory.GetGrain<IManagementGrain>(0);;
 
             await ValidateAgentsState(StreamLifecycleOptions.RunState.AgentsStarted);
 
@@ -74,7 +74,7 @@ namespace UnitTests.StreamingTests
 
         private async Task ValidateAgentsState(StreamLifecycleOptions.RunState expectedState)
         {
-            var mgmt = this.fixture.GrainFactory.GetGrain<IManagementGrain>(0);
+            var mgmt = fixture.GrainFactory.GetGrain<IManagementGrain>(0);
 
             var states = await mgmt.SendControlCommandToProvider(adapterType, adapterName, (int)PersistentStreamProviderCommand.GetAgentsState);
             Assert.Equal(2, states.Length);

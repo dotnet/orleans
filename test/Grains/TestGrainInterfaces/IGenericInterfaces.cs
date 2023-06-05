@@ -8,7 +8,7 @@ namespace UnitTests.GrainInterfaces
     public class GenericGrainWithGenericState<TFirstTypeParam, TStateType, TLastTypeParam> : Grain<TStateType>,
         IGenericGrainWithGenericState<TFirstTypeParam, TStateType, TLastTypeParam> where TStateType : new()
     {
-        public Task<Type> GetStateType() => Task.FromResult(this.State.GetType());
+        public Task<Type> GetStateType() => Task.FromResult(State.GetType());
     }
 
     public interface IGenericGrain<T, U> : IGrainWithIntegerKey

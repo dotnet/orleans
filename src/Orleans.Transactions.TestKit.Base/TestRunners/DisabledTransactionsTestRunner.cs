@@ -28,7 +28,7 @@ namespace Orleans.Transactions.TestKit
                 Enumerable.Range(0, grainCount)
                     .Select(i => RandomTestGrain(transactionTestGrainClassName))
                     .ToList();
-            ITransactionCoordinatorGrain coordinator = this.grainFactory.GetGrain<ITransactionCoordinatorGrain>(Guid.NewGuid());
+            ITransactionCoordinatorGrain coordinator = grainFactory.GetGrain<ITransactionCoordinatorGrain>(Guid.NewGuid());
 
             Func<Task> task = () => coordinator.MultiGrainSet(grains, delta);
             var response = task.Should().ThrowAsync<OrleansTransactionsDisabledException>();

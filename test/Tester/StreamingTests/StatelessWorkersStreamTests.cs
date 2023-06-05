@@ -52,8 +52,8 @@ namespace UnitTests.StreamingTests
         [Fact, TestCategory("Functional")]
         public async Task SubscribeToStream_FromStatelessWorker_Fail()
         {
-            this.logger.LogInformation($"************************ { nameof(SubscribeToStream_FromStatelessWorker_Fail) } *********************************");
-            var runner = new StatelessWorkersStreamTestsRunner(StreamProvider, this.logger, this.fixture.HostedCluster);
+            logger.LogInformation($"************************ { nameof(SubscribeToStream_FromStatelessWorker_Fail) } *********************************");
+            var runner = new StatelessWorkersStreamTestsRunner(StreamProvider, logger, fixture.HostedCluster);
             await Assert.ThrowsAsync<InvalidOperationException>( () => runner.BecomeConsumer(Guid.NewGuid()));
         }
     }
@@ -75,13 +75,13 @@ namespace UnitTests.StreamingTests
 
         public async Task BecomeConsumer(Guid streamId)
         {
-            var consumer = this.cluster.GrainFactory.GetGrain<IStatelessWorkerStreamConsumerGrain>(0);
+            var consumer = cluster.GrainFactory.GetGrain<IStatelessWorkerStreamConsumerGrain>(0);
             await consumer.BecomeConsumer(streamId, streamProvider);
         }
 
         public async Task ProduceMessage(Guid streamId)
         {
-            var producer = this.cluster.GrainFactory.GetGrain<IStatelessWorkerStreamProducerGrain>(0);
+            var producer = cluster.GrainFactory.GetGrain<IStatelessWorkerStreamProducerGrain>(0);
             await producer.Produce(streamId, streamProvider, string.Empty);
         }
     }

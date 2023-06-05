@@ -22,8 +22,8 @@ namespace Orleans.Runtime.Providers
         private readonly ILogger logger;
         private readonly StreamDirectory hostedClientStreamDirectory = new StreamDirectory();
 
-        public IGrainFactory GrainFactory => this.runtimeClient.InternalGrainFactory;
-        public IServiceProvider ServiceProvider => this.runtimeClient.ServiceProvider;
+        public IGrainFactory GrainFactory => runtimeClient.InternalGrainFactory;
+        public IServiceProvider ServiceProvider => runtimeClient.ServiceProvider;
 
         public SiloStreamProviderRuntime(
             IConsistentRingProvider consistentRingProvider,
@@ -38,11 +38,11 @@ namespace Orleans.Runtime.Providers
             this.grainContextAccessor = grainContextAccessor;
             this.consistentRingProvider = consistentRingProvider;
             this.runtimeClient = runtimeClient;
-            this.logger = this.loggerFactory.CreateLogger<SiloProviderRuntime>();
-            this.grainBasedPubSub = new GrainBasedPubSubRuntime(this.GrainFactory);
+            logger = this.loggerFactory.CreateLogger<SiloProviderRuntime>();
+            grainBasedPubSub = new GrainBasedPubSubRuntime(GrainFactory);
             var tmp = new ImplicitStreamPubSub(this.runtimeClient.InternalGrainFactory, implicitStreamSubscriberTable);
-            this.implictPubSub = tmp;
-            this.combinedGrainBasedAndImplicitPubSub = new StreamPubSubImpl(this.grainBasedPubSub, tmp);
+            implictPubSub = tmp;
+            combinedGrainBasedAndImplicitPubSub = new StreamPubSubImpl(grainBasedPubSub, tmp);
         }
 
         public IStreamPubSub PubSub(StreamPubSubType pubSubType)
@@ -66,23 +66,23 @@ namespace Orleans.Runtime.Providers
             IQueueAdapter queueAdapter)
         {
             IStreamQueueBalancer queueBalancer = CreateQueueBalancer(streamProviderName);
-            var managerId = SystemTargetGrainId.Create(Constants.StreamPullingAgentManagerType, this.siloDetails.SiloAddress, streamProviderName);
-            var pubsubOptions = this.ServiceProvider.GetOptionsByName<StreamPubSubOptions>(streamProviderName);
-            var pullingAgentOptions = this.ServiceProvider.GetOptionsByName<StreamPullingAgentOptions>(streamProviderName);
-            var filter = this.ServiceProvider.GetServiceByName<IStreamFilter>(streamProviderName) ?? new NoOpStreamFilter();
+            var managerId = SystemTargetGrainId.Create(Constants.StreamPullingAgentManagerType, siloDetails.SiloAddress, streamProviderName);
+            var pubsubOptions = ServiceProvider.GetOptionsByName<StreamPubSubOptions>(streamProviderName);
+            var pullingAgentOptions = ServiceProvider.GetOptionsByName<StreamPullingAgentOptions>(streamProviderName);
+            var filter = ServiceProvider.GetServiceByName<IStreamFilter>(streamProviderName) ?? new NoOpStreamFilter();
             var manager = new PersistentStreamPullingManager(
                 managerId,
                 streamProviderName,
-                this.PubSub(pubsubOptions.PubSubType),
+                PubSub(pubsubOptions.PubSubType),
                 adapterFactory,
                 queueBalancer,
                 filter,
                 pullingAgentOptions,
-                this.loggerFactory,
-                this.siloDetails.SiloAddress,
+                loggerFactory,
+                siloDetails.SiloAddress,
                 queueAdapter);
 
-            var catalog = this.ServiceProvider.GetRequiredService<Catalog>();
+            var catalog = ServiceProvider.GetRequiredService<Catalog>();
             catalog.RegisterSystemTarget(manager);
 
             // Init the manager only after it was registered locally.
@@ -97,10 +97,10 @@ namespace Orleans.Runtime.Providers
         {
             try
             {
-                var balancer = this.ServiceProvider.GetServiceByName<IStreamQueueBalancer>(streamProviderName) ??this.ServiceProvider.GetService<IStreamQueueBalancer>();
+                var balancer = ServiceProvider.GetServiceByName<IStreamQueueBalancer>(streamProviderName) ??ServiceProvider.GetService<IStreamQueueBalancer>();
                 if (balancer == null)
                     throw new ArgumentOutOfRangeException("balancerType", $"Cannot create stream queue balancer for StreamProvider: {streamProviderName}.Please configure your stream provider with a queue balancer.");
-                this.logger.LogInformation(
+                logger.LogInformation(
                     "Successfully created queue balancer of type {BalancerType} for stream provider {StreamProviderName}",
                     balancer.GetType(),
                     streamProviderName);
@@ -131,19 +131,19 @@ namespace Orleans.Runtime.Providers
                 return directory;
             }
 
-            return this.hostedClientStreamDirectory;
+            return hostedClientStreamDirectory;
         }
 
         public (TExtension, TExtensionInterface) BindExtension<TExtension, TExtensionInterface>(Func<TExtension> newExtensionFunc)
             where TExtension : class, TExtensionInterface
             where TExtensionInterface : class, IGrainExtension
         {
-            if (this.grainContextAccessor.GrainContext is ActivationData activationData && activationData.IsStatelessWorker)
+            if (grainContextAccessor.GrainContext is ActivationData activationData && activationData.IsStatelessWorker)
             {
                 throw new InvalidOperationException($"The extension { typeof(TExtension) } cannot be bound to a Stateless Worker.");
             }
 
-            return this.grainContextAccessor.GrainContext.GetComponent<IGrainExtensionBinder>().GetOrSetExtension<TExtension, TExtensionInterface>(newExtensionFunc);
+            return grainContextAccessor.GrainContext.GetComponent<IGrainExtensionBinder>().GetOrSetExtension<TExtension, TExtensionInterface>(newExtensionFunc);
         }
     }
 }

@@ -18,7 +18,7 @@ namespace DefaultCluster.Tests.General
         private async Task PingTest<T>(T input)
         {
             var id = Guid.NewGuid();
-            var grain = this.GrainFactory.GetGrain<IGeneric1Argument<T>>(id, "UnitTests.Grains.Generic1ArgumentGrain");
+            var grain = GrainFactory.GetGrain<IGeneric1Argument<T>>(id, "UnitTests.Grains.Generic1ArgumentGrain");
             var output = await grain.Ping(input);
             Assert.Equal(input, output);
         }

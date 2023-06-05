@@ -60,7 +60,7 @@ namespace Orleans.Configuration
         /// <inheritdoc />
         public void ValidateConfiguration()
         {
-            if (string.IsNullOrWhiteSpace(this.options.ClusterId))
+            if (string.IsNullOrWhiteSpace(options.ClusterId))
             {
                 throw new OrleansConfigurationException(
                     $"Configuration for {nameof(ClusterOptions)} is invalid. " +
@@ -68,7 +68,7 @@ namespace Orleans.Configuration
                     $"See {Constants.TroubleshootingHelpLink} for more information.");
             }
 
-            if (string.IsNullOrWhiteSpace(this.options.ServiceId))
+            if (string.IsNullOrWhiteSpace(options.ServiceId))
             {
                 throw new OrleansConfigurationException(
                     $"Configuration for {nameof(ClusterOptions)} is invalid. " +

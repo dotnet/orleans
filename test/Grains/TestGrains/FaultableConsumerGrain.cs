@@ -18,7 +18,7 @@ namespace UnitTests.Grains
 
         public FaultableConsumerGrain(ILoggerFactory loggerFactory)
         {
-            this.logger = loggerFactory.CreateLogger("FaultableConsumerGrain " + base.IdentityString);
+            logger = loggerFactory.CreateLogger("FaultableConsumerGrain " + base.IdentityString);
         }
 
         public override Task OnActivateAsync(CancellationToken cancellationToken)

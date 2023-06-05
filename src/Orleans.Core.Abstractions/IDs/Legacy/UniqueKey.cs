@@ -165,7 +165,7 @@ namespace Orleans.Runtime
         {
             ThrowIfIsNotLong();
 
-            extendedKey = this.KeyExt;
+            extendedKey = KeyExt;
             return unchecked((long)N1);
         }
 
@@ -178,7 +178,7 @@ namespace Orleans.Runtime
 
         public Guid PrimaryKeyToGuid(out string extendedKey)
         {
-            extendedKey = this.KeyExt;
+            extendedKey = KeyExt;
             return Guid;
         }
 
@@ -227,7 +227,7 @@ namespace Orleans.Runtime
             {
                 if (KeyExt != null)
                 {
-                    uniformHashCache = StableHash.ComputeHash(this.ToByteArray());
+                    uniformHashCache = StableHash.ComputeHash(ToByteArray());
                 }
                 else
                 {
@@ -250,7 +250,7 @@ namespace Orleans.Runtime
         /// <returns></returns>
         internal ReadOnlySpan<byte> ToByteArray()
         {
-            var extBytes = this.KeyExt != null ? Encoding.UTF8.GetBytes(KeyExt) : null;
+            var extBytes = KeyExt != null ? Encoding.UTF8.GetBytes(KeyExt) : null;
             var extBytesLength = extBytes?.Length ?? 0;
             var sizeWithoutExtBytes = sizeof(ulong) * 3 + sizeof(int);
 
@@ -327,7 +327,7 @@ namespace Orleans.Runtime
             }
             else
             {
-                keyString = this.IsLongKey ? PrimaryKeyToLong().ToString() : this.PrimaryKeyToGuid().ToString();
+                keyString = IsLongKey ? PrimaryKeyToLong().ToString() : PrimaryKeyToGuid().ToString();
             }
             return keyString;
         }

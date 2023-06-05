@@ -36,32 +36,32 @@ namespace Orleans
 
         public bool TryRegister(IAddressable obj, ObserverGrainId objectId)
         {
-            return this.localObjects.TryAdd(objectId, new LocalObjectData(obj, objectId, this));
+            return localObjects.TryAdd(objectId, new LocalObjectData(obj, objectId, this));
         }
 
         public bool TryDeregister(ObserverGrainId objectId)
         {
-            return this.localObjects.TryRemove(objectId, out _);
+            return localObjects.TryRemove(objectId, out _);
         }
 
         public void Dispatch(Message message)
         {
             if (!ObserverGrainId.TryParse(message.TargetGrain, out var observerId))
             {
-                this.logger.LogError(
+                logger.LogError(
                     (int)ErrorCode.ProxyClient_OGC_TargetNotFound_2,
                     "Message is not addressed to an observer. {Message}",
                     message);
                 return;
             }
 
-            if (this.localObjects.TryGetValue(observerId, out var objectData))
+            if (localObjects.TryGetValue(observerId, out var objectData))
             {
                 objectData.ReceiveMessage(message);
             }
             else
             {
-                this.logger.LogError(
+                logger.LogError(
                     (int)ErrorCode.ProxyClient_OGC_TargetNotFound,
                     "Unexpected target grain in request: {TargetGrain}. Message: {Message}",
                     message.TargetGrain,
@@ -71,7 +71,7 @@ namespace Orleans
 
         public void Dispose()
         {
-            var tokenSource = this.disposed;
+            var tokenSource = disposed;
             Utils.SafeExecute(() => tokenSource?.Cancel(false));
             Utils.SafeExecute(() => tokenSource?.Dispose());
         }
@@ -83,10 +83,10 @@ namespace Orleans
 
             internal LocalObjectData(IAddressable obj, ObserverGrainId observerId, InvokableObjectManager manager)
             {
-                this.LocalObject = new WeakReference(obj);
-                this.ObserverId = observerId;
-                this.Messages = new Queue<Message>();
-                this.Running = false;
+                LocalObject = new WeakReference(obj);
+                ObserverId = observerId;
+                Messages = new Queue<Message>();
+                Running = false;
                 _manager = manager;
             }
 
@@ -95,12 +95,12 @@ namespace Orleans
             internal Queue<Message> Messages { get; }
             internal bool Running { get; set; }
 
-            GrainId IGrainContext.GrainId => this.ObserverId.GrainId;
+            GrainId IGrainContext.GrainId => ObserverId.GrainId;
 
             GrainReference IGrainContext.GrainReference =>
                 _manager.runtimeClient.InternalGrainFactory.GetGrain(ObserverId.GrainId).AsReference();
 
-            object IGrainContext.GrainInstance => this.LocalObject.Target;
+            object IGrainContext.GrainInstance => LocalObject.Target;
 
             ActivationId IGrainContext.ActivationId => throw new NotImplementedException();
 
@@ -114,7 +114,7 @@ namespace Orleans
 
             void IGrainContext.SetComponent<TComponent>(TComponent value) where TComponent : class
             {
-                if (this.LocalObject.Target is TComponent)
+                if (LocalObject.Target is TComponent)
                 {
                     throw new ArgumentException("Cannot override a component which is implemented by this grain");
                 }
@@ -124,7 +124,7 @@ namespace Orleans
 
             public TComponent GetComponent<TComponent>() where TComponent : class
             {
-                if (this.LocalObject.Target is TComponent component)
+                if (LocalObject.Target is TComponent component)
                 {
                     return component;
                 }
@@ -132,34 +132,34 @@ namespace Orleans
                 return _manager.rootGrainContext.GetComponent<TComponent>();
             }
 
-            public TTarget GetTarget<TTarget>() where TTarget : class => (TTarget)this.LocalObject.Target;
+            public TTarget GetTarget<TTarget>() where TTarget : class => (TTarget)LocalObject.Target;
 
             bool IEquatable<IGrainContext>.Equals(IGrainContext other) => ReferenceEquals(this, other);
 
             public void ReceiveMessage(object msg)
             {
                 var message = (Message)msg;
-                var obj = (IAddressable)this.LocalObject.Target;
+                var obj = (IAddressable)LocalObject.Target;
                 if (obj == null)
                 {
                     //// Remove from the dictionary record for the garbage collected object? But now we won't be able to detect invalid dispatch IDs anymore.
                     _manager.logger.LogWarning(
                         (int)ErrorCode.Runtime_Error_100162,
                         "Object associated with Observer ID {ObserverId} has been garbage collected. Deleting object reference and unregistering it. Message = {message}",
-                        this.ObserverId,
+                        ObserverId,
                         message);
 
                     // Try to remove. If it's not there, we don't care.
-                    _manager.TryDeregister(this.ObserverId);
+                    _manager.TryDeregister(ObserverId);
                     return;
                 }
 
                 bool start;
-                lock (this.Messages)
+                lock (Messages)
                 {
-                    this.Messages.Enqueue(message);
-                    start = !this.Running;
-                    this.Running = true;
+                    Messages.Enqueue(message);
+                    start = !Running;
+                    Running = true;
                 }
 
                 if (_manager.logger.IsEnabled(LogLevel.Trace))
@@ -202,15 +202,15 @@ namespace Orleans
                     try
                     {
                         Message message;
-                        lock (this.Messages)
+                        lock (Messages)
                         {
-                            if (this.Messages.Count == 0)
+                            if (Messages.Count == 0)
                             {
-                                this.Running = false;
+                                Running = false;
                                 break;
                             }
 
-                            message = this.Messages.Dequeue();
+                            message = Messages.Dequeue();
                         }
 
                         if (message.IsExpired)
@@ -249,12 +249,12 @@ namespace Orleans
                             var response = await request.Invoke();
                             if (message.Direction != Message.Directions.OneWay)
                             {
-                                this.SendResponseAsync(message, response);
+                                SendResponseAsync(message, response);
                             }
                         }
                         catch (Exception exc)
                         {
-                            this.ReportException(message, exc);
+                            ReportException(message, exc);
                         }
                     }
                     catch (Exception outerException)

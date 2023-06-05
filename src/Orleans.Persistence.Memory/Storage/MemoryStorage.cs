@@ -53,7 +53,7 @@ namespace Orleans.Storage
         {
             this.name = name;
             this.logger = logger;
-            this.storageSerializer = options.GrainStorageSerializer ?? defaultGrainStorageSerializer;
+            storageSerializer = options.GrainStorageSerializer ?? defaultGrainStorageSerializer;
 
             //Init
             logger.LogInformation("Init: Name={Name} NumStorageGrains={NumStorageGrains}", name, options.NumStorageGrains);
@@ -145,7 +145,7 @@ namespace Orleans.Storage
             T dataValue = default;
             try
             {
-                dataValue = this.storageSerializer.Deserialize<T>(data);
+                dataValue = storageSerializer.Deserialize<T>(data);
             }
             catch (Exception exc)
             {
@@ -179,7 +179,7 @@ namespace Orleans.Storage
         internal ReadOnlyMemory<byte> ConvertToStorageFormat<T>(T grainState)
         {
             // Convert to binary format
-            return this.storageSerializer.Serialize<T>(grainState);
+            return storageSerializer.Serialize<T>(grainState);
         }
     }
 

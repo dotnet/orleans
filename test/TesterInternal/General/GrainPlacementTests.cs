@@ -47,7 +47,7 @@ namespace UnitTests.General
         [Fact, TestCategory("Placement"), TestCategory("Functional")]
         public async Task RandomlyPlacedGrainShouldPlaceActivationsRandomly()
         {
-            await this.HostedCluster.WaitForLivenessToStabilizeAsync();
+            await HostedCluster.WaitForLivenessToStabilizeAsync();
             logger.LogInformation("********************** Starting the test RandomlyPlacedGrainShouldPlaceActivationsRandomly ******************************");
             TestSilosStarted(2);
 
@@ -57,7 +57,7 @@ namespace UnitTests.General
                 Enumerable.Range(0, 20).
                 Select(
                     n =>
-                        this.GrainFactory.GetGrain<IRandomPlacementTestGrain>(Guid.NewGuid()));
+                        GrainFactory.GetGrain<IRandomPlacementTestGrain>(Guid.NewGuid()));
             var places = grains.Select(g => g.GetRuntimeInstanceId().Result);
             var placesAsArray = places as string[] ?? places.ToArray();
             // consider: it seems like we should check that we get close to a 50/50 split for placement.
@@ -92,7 +92,7 @@ namespace UnitTests.General
         [Fact, TestCategory("Placement"), TestCategory("Functional")]
         public async Task PreferLocalPlacedGrainShouldPlaceActivationsLocally_TwoHops()
         {
-            await this.HostedCluster.WaitForLivenessToStabilizeAsync();
+            await HostedCluster.WaitForLivenessToStabilizeAsync();
             logger.LogInformation("********************** Starting the test PreferLocalPlacedGrainShouldPlaceActivationsLocally ******************************");
             TestSilosStarted(2);
 
@@ -101,7 +101,7 @@ namespace UnitTests.General
                 Enumerable.Range(0, numGrains).
                     Select(
                         n =>
-                            this.GrainFactory.GetGrain<IRandomPlacementTestGrain>(Guid.NewGuid())).ToList();
+                            GrainFactory.GetGrain<IRandomPlacementTestGrain>(Guid.NewGuid())).ToList();
             var randomGrainPlaces = randomGrains.Select(g => g.GetRuntimeInstanceId().Result).ToList();
 
             var preferLocalGrainKeys =
@@ -109,7 +109,7 @@ namespace UnitTests.General
                     Select(
                         (IRandomPlacementTestGrain g) =>
                             g.StartPreferLocalGrain(g.GetPrimaryKey()).Result).ToList();
-            var preferLocalGrainPlaces = preferLocalGrainKeys.Select(key => this.GrainFactory.GetGrain<IPreferLocalPlacementTestGrain>(key).GetRuntimeInstanceId().Result).ToList();
+            var preferLocalGrainPlaces = preferLocalGrainKeys.Select(key => GrainFactory.GetGrain<IPreferLocalPlacementTestGrain>(key).GetRuntimeInstanceId().Result).ToList();
 
             // check that every "prefer local grain" was placed on the same silo with its requesting random grain
             foreach(int key in Enumerable.Range(0, numGrains))
@@ -160,13 +160,13 @@ namespace UnitTests.General
         [Fact, TestCategory("Placement"), TestCategory("Functional")]
         public async Task LocallyPlacedGrainShouldCreateActivationsOnLocalSilo()
         {
-            await this.HostedCluster.WaitForLivenessToStabilizeAsync();
+            await HostedCluster.WaitForLivenessToStabilizeAsync();
             logger.LogInformation("********************** Starting the test LocallyPlacedGrainShouldCreateActivationsOnLocalSilo ******************************");
             TestSilosStarted(2);
 
             const int sampleSize = 5;
             var placement = new StatelessWorkerPlacement(sampleSize);
-            var proxy = this.GrainFactory.GetGrain<IRandomPlacementTestGrain>(Guid.NewGuid());
+            var proxy = GrainFactory.GetGrain<IRandomPlacementTestGrain>(Guid.NewGuid());
             await proxy.StartLocalGrains(new List<Guid> { Guid.Empty });
             var expected = await proxy.GetEndpoint();
             // locally placed grains are multi-activation and stateless. this means that we have to sample the value of

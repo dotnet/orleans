@@ -30,14 +30,14 @@ namespace OrleansAWSUtils.Streams
             this.loggerFactory = loggerFactory;
             this.serializer = serializer;
             DataConnectionString = dataConnectionString;
-            this.ServiceId = serviceId;
+            ServiceId = serviceId;
             Name = providerName;
             this.streamQueueMapper = streamQueueMapper;
         }
 
         public IQueueAdapterReceiver CreateReceiver(QueueId queueId)
         {
-            return SQSAdapterReceiver.Create(this.serializer, this.loggerFactory, queueId, DataConnectionString, this.ServiceId);
+            return SQSAdapterReceiver.Create(serializer, loggerFactory, queueId, DataConnectionString, ServiceId);
         }
 
         public async Task QueueMessageBatchAsync<T>(StreamId streamId, IEnumerable<T> events, StreamSequenceToken token, Dictionary<string, object> requestContext)
@@ -50,11 +50,11 @@ namespace OrleansAWSUtils.Streams
             SQSStorage queue;
             if (!Queues.TryGetValue(queueId, out queue))
             {
-                var tmpQueue = new SQSStorage(this.loggerFactory, queueId.ToString(), DataConnectionString, this.ServiceId);
+                var tmpQueue = new SQSStorage(loggerFactory, queueId.ToString(), DataConnectionString, ServiceId);
                 await tmpQueue.InitQueueAsync();
                 queue = Queues.GetOrAdd(queueId, tmpQueue);
             }
-            var msg = SQSBatchContainer.ToSQSMessage(this.serializer, streamId, events, requestContext);
+            var msg = SQSBatchContainer.ToSQSMessage(serializer, streamId, events, requestContext);
             await queue.AddMessage(msg);
         }
     }

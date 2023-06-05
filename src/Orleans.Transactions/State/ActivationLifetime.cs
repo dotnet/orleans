@@ -17,13 +17,13 @@ namespace Orleans.Transactions.State
             activationContext.ObservableLifecycle.Subscribe(GrainLifecycleStage.Last, this);
         }
 
-        public CancellationToken OnDeactivating => this.onDeactivating.Token;
+        public CancellationToken OnDeactivating => onDeactivating.Token;
 
         public Task OnStart(CancellationToken ct) => Task.CompletedTask;
 
         public Task OnStop(CancellationToken ct)
         {
-            this.onDeactivating.Cancel(throwOnFirstException: false);
+            onDeactivating.Cancel(throwOnFirstException: false);
 
             if (!ct.IsCancellationRequested && pendingDeactivationLocks > 0)
             {

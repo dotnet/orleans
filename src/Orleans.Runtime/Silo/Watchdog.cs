@@ -42,12 +42,12 @@ namespace Orleans.Runtime
             lastWatchdogCheck = now;
             cumulativeGCPauseDuration = GC.GetTotalPauseDuration();
 
-            this.thread = new Thread(this.Run)
+            thread = new Thread(Run)
             {
                 IsBackground = true,
                 Name = "Orleans.Runtime.Watchdog",
             };
-            this.thread.Start();
+            thread.Start();
         }
 
         public void Stop()
@@ -57,7 +57,7 @@ namespace Orleans.Runtime
 
         protected void Run()
         {
-            while (!this.cancellation.IsCancellationRequested)
+            while (!cancellation.IsCancellationRequested)
             {
                 try
                 {

@@ -21,19 +21,19 @@ namespace NonSilo.Tests.Membership
         public MembershipTableCleanupAgentTests(ITestOutputHelper output)
         {
             this.output = output;
-            this.loggerFactory = new LoggerFactory(new[] { new XunitLoggerProvider(this.output) });
+            loggerFactory = new LoggerFactory(new[] { new XunitLoggerProvider(this.output) });
         }
 
         [Fact]
         public async Task MembershipTableCleanupAgent_Enabled_BasicScenario()
         {
-            await this.BasicScenario(enabled: true);
+            await BasicScenario(enabled: true);
         }
 
         [Fact]
         public async Task MembershipTableCleanupAgent_Disabled_BasicScenario()
         {
-            await this.BasicScenario(enabled: false);
+            await BasicScenario(enabled: false);
         }
 
         private async Task BasicScenario(bool enabled)
@@ -60,9 +60,9 @@ namespace NonSilo.Tests.Membership
             var cleanupAgent = new MembershipTableCleanupAgent(
                 Options.Create(options),
                 table,
-                this.loggerFactory.CreateLogger<MembershipTableCleanupAgent>(),
+                loggerFactory.CreateLogger<MembershipTableCleanupAgent>(),
                 timerFactory);
-            var lifecycle = new SiloLifecycleSubject(this.loggerFactory.CreateLogger<SiloLifecycleSubject>());
+            var lifecycle = new SiloLifecycleSubject(loggerFactory.CreateLogger<SiloLifecycleSubject>());
             ((ILifecycleParticipant<ISiloLifecycle>)cleanupAgent).Participate(lifecycle);
 
             await lifecycle.OnStart();

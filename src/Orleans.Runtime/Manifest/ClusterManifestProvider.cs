@@ -36,11 +36,11 @@ namespace Orleans.Runtime.Metadata
             _services = services;
             _clusterMembershipService = clusterMembershipService;
             _fatalErrorHandler = fatalErrorHandler;
-            this.LocalGrainManifest = siloManifestProvider.SiloManifest;
+            LocalGrainManifest = siloManifestProvider.SiloManifest;
             _current = new ClusterManifest(
                 MajorMinorVersion.Zero,
-                ImmutableDictionary.CreateRange(new[] { new KeyValuePair<SiloAddress, GrainManifest>(localSiloDetails.SiloAddress, this.LocalGrainManifest) }),
-                ImmutableArray.Create(this.LocalGrainManifest));
+                ImmutableDictionary.CreateRange(new[] { new KeyValuePair<SiloAddress, GrainManifest>(localSiloDetails.SiloAddress, LocalGrainManifest) }),
+                ImmutableArray.Create(LocalGrainManifest));
             _updates = new AsyncEnumerable<ClusterManifest>(
                 (previous, proposed) => previous.Version <= MajorMinorVersion.Zero || proposed.Version > previous.Version,
                 _current)
@@ -71,7 +71,7 @@ namespace Orleans.Runtime.Metadata
                     {
                         var membershipSnapshot = _clusterMembershipService.CurrentSnapshot;
 
-                        var success = await this.UpdateManifest(membershipSnapshot);
+                        var success = await UpdateManifest(membershipSnapshot);
 
                         if (success || cancellation.IsCancellationRequested)
                         {
@@ -229,7 +229,7 @@ namespace Orleans.Runtime.Metadata
 
         public async ValueTask DisposeAsync()
         {
-            await this.StopAsync(CancellationToken.None);
+            await StopAsync(CancellationToken.None);
         }
 
         public void Dispose()

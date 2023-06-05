@@ -43,10 +43,10 @@ namespace Orleans.Providers.Streams.Common
             this.monitor = monitor;
             if (this.monitor != null && monitorWriteInterval.HasValue)
             {
-                this.periodicMonitoring = new PeriodicAction(monitorWriteInterval.Value, this.ReportObjectPoolStatistics);
+                periodicMonitoring = new PeriodicAction(monitorWriteInterval.Value, ReportObjectPoolStatistics);
             }
 
-            this.totalObjects = 0;
+            totalObjects = 0;
         }
 
         /// <summary>
@@ -60,10 +60,10 @@ namespace Orleans.Providers.Streams.Common
             if (!pool.TryPop(out resource))
             {
                 resource = factoryFunc();
-                Interlocked.Increment(ref this.totalObjects);
+                Interlocked.Increment(ref totalObjects);
             }
-            this.monitor?.TrackObjectAllocated();
-            this.periodicMonitoring?.TryAction(DateTime.UtcNow);
+            monitor?.TrackObjectAllocated();
+            periodicMonitoring?.TryAction(DateTime.UtcNow);
             resource.Pool = this;
             return resource;
         }
@@ -74,16 +74,16 @@ namespace Orleans.Providers.Streams.Common
         /// <param name="resource"></param>
         public virtual void Free(T resource)
         {
-            this.monitor?.TrackObjectReleased();
-            this.periodicMonitoring?.TryAction(DateTime.UtcNow);
+            monitor?.TrackObjectReleased();
+            periodicMonitoring?.TryAction(DateTime.UtcNow);
             pool.Push(resource);
         }
 
         private void ReportObjectPoolStatistics()
         {
-            var availableObjects = this.pool.Count;
-            long claimedObjects = this.totalObjects - availableObjects;
-            this.monitor.Report(this.totalObjects, availableObjects, claimedObjects);
+            var availableObjects = pool.Count;
+            long claimedObjects = totalObjects - availableObjects;
+            monitor.Report(totalObjects, availableObjects, claimedObjects);
         }
     }
 }

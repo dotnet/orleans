@@ -69,9 +69,9 @@ namespace Orleans.Runtime
 
         internal void OnDispatcherReceiveInvalidActivation(Message message, ActivationState activationState)
         {
-            if (this.IsEnabled(DispatcherReceiveInvalidActivationEventName))
+            if (IsEnabled(DispatcherReceiveInvalidActivationEventName))
             {
-                this.Write(DispatcherReceiveInvalidActivationEventName, new { Message = message, ActivationState = activationState });
+                Write(DispatcherReceiveInvalidActivationEventName, new { Message = message, ActivationState = activationState });
             }
 
             MessagingProcessingInstruments.OnDispatcherMessageProcessedError(message);
@@ -80,9 +80,9 @@ namespace Orleans.Runtime
 
         internal void OnDispatcherDiscardedRejection(Message message, Message.RejectionTypes rejectionType, string reason, Exception exception)
         {
-            if (this.IsEnabled(DispatcherDiscardedRejectionEventName))
+            if (IsEnabled(DispatcherDiscardedRejectionEventName))
             {
-                this.Write(DispatcherDiscardedRejectionEventName, new { Message = message, RejectionType = rejectionType, Reason = reason, Exception = exception });
+                Write(DispatcherDiscardedRejectionEventName, new { Message = message, RejectionType = rejectionType, Reason = reason, Exception = exception });
             }
 
             LogDispatcherDiscardedRejection(this, message, reason, rejectionType, exception);
@@ -90,14 +90,14 @@ namespace Orleans.Runtime
 
         internal void OnDispatcherRejectMessage(Message message, Message.RejectionTypes rejectionType, string reason, Exception exception)
         {
-            if (this.IsEnabled(DispatcherRejectedMessageEventName))
+            if (IsEnabled(DispatcherRejectedMessageEventName))
             {
-                this.Write(DispatcherRejectedMessageEventName, new { Message = message, RejectionType = rejectionType, Reason = reason, Exception = exception });
+                Write(DispatcherRejectedMessageEventName, new { Message = message, RejectionType = rejectionType, Reason = reason, Exception = exception });
             }
 
             MessagingInstruments.OnRejectedMessage(message);
 
-            if (this.IsEnabled(LogLevel.Debug))
+            if (IsEnabled(LogLevel.Debug))
             {
                 LogDispatcherRejectedMessage(this, message, reason, rejectionType, exception);
             }
@@ -105,12 +105,12 @@ namespace Orleans.Runtime
 
         internal void OnDispatcherForwarding(Message message, GrainAddress oldAddress, GrainAddress forwardingAddress, string failedOperation, Exception exception)
         {
-            if (this.IsEnabled(DispatcherForwardingEventName))
+            if (IsEnabled(DispatcherForwardingEventName))
             {
-                this.Write(DispatcherForwardingEventName, new { Message = message, OldAddress = oldAddress, ForwardingAddress = forwardingAddress, FailedOperation = failedOperation, Exception = exception });
+                Write(DispatcherForwardingEventName, new { Message = message, OldAddress = oldAddress, ForwardingAddress = forwardingAddress, FailedOperation = failedOperation, Exception = exception });
             }
 
-            if (this.IsEnabled(LogLevel.Information))
+            if (IsEnabled(LogLevel.Information))
             {
                 LogDispatcherForwarding(this, message, oldAddress, forwardingAddress, failedOperation, message.ForwardCount, exception);
             }
@@ -120,9 +120,9 @@ namespace Orleans.Runtime
 
         internal void OnDispatcherForwardingFailed(Message message, GrainAddress oldAddress, GrainAddress forwardingAddress, string failedOperation, Exception exception)
         {
-            if (this.IsEnabled(DispatcherForwardingFailedEventName))
+            if (IsEnabled(DispatcherForwardingFailedEventName))
             {
-                this.Write(DispatcherForwardingFailedEventName, new { Message = message, OldAddress = oldAddress, ForwardingAddress = forwardingAddress, FailedOperation = failedOperation, Exception = exception });
+                Write(DispatcherForwardingFailedEventName, new { Message = message, OldAddress = oldAddress, ForwardingAddress = forwardingAddress, FailedOperation = failedOperation, Exception = exception });
             }
 
             LogDispatcherForwardingFailed(this, message, oldAddress, forwardingAddress, failedOperation, message.ForwardCount, exception);
@@ -130,12 +130,12 @@ namespace Orleans.Runtime
 
         internal void OnDispatcherForwardingMultiple(int messageCount, GrainAddress oldAddress, GrainAddress forwardingAddress, string failedOperation, Exception exception)
         {
-            if (this.IsEnabled(DispatcherForwardingMultipleEventName))
+            if (IsEnabled(DispatcherForwardingMultipleEventName))
             {
-                this.Write(DispatcherForwardingMultipleEventName, new { MessageCount = messageCount, OldAddress = oldAddress, ForwardingAddress = forwardingAddress, FailedOperation = failedOperation, Exception = exception });
+                Write(DispatcherForwardingMultipleEventName, new { MessageCount = messageCount, OldAddress = oldAddress, ForwardingAddress = forwardingAddress, FailedOperation = failedOperation, Exception = exception });
             }
 
-            if (this.IsEnabled(LogLevel.Information))
+            if (IsEnabled(LogLevel.Information))
             {
                 LogDispatcherForwardingMultiple(this, messageCount, oldAddress, forwardingAddress, failedOperation, exception);
             }
@@ -143,9 +143,9 @@ namespace Orleans.Runtime
 
         internal void OnDispatcherSelectTargetFailed(Message message, Exception exception)
         {
-            if (this.IsEnabled(DispatcherSelectTargetFailedEventName))
+            if (IsEnabled(DispatcherSelectTargetFailedEventName))
             {
-                this.Write(DispatcherSelectTargetFailedEventName, new { Message = message, Exception = exception });
+                Write(DispatcherSelectTargetFailedEventName, new { Message = message, Exception = exception });
             }
 
             if (ShouldLogError(exception))

@@ -41,7 +41,7 @@ namespace Orleans.Runtime
         /// <param name="properties">The grain properties which will be populated by this method call.</param>
         public virtual void PopulateGrainProperties(IServiceProvider services, Type grainClass, GrainType grainType, Dictionary<string, string> properties)
         {
-            properties[WellKnownGrainTypeProperties.PlacementStrategy] = this.GetType().Name;
+            properties[WellKnownGrainTypeProperties.PlacementStrategy] = GetType().Name;
         }
     }
 }

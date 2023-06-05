@@ -40,7 +40,7 @@ namespace Orleans.Runtime.Placement
             ILogger<ActivationCountPlacementDirector> logger)
         {
             this.logger = logger;
-            this.localAddress = localSiloDetails.SiloAddress;
+            localAddress = localSiloDetails.SiloAddress;
 
             chooseHowMany = options.Value.ChooseOutOf;
             if (chooseHowMany <= 0) throw new ArgumentException("GlobalConfig.ActivationCountBasedPlacementChooseOutOf is " + chooseHowMany);
@@ -112,8 +112,8 @@ namespace Orleans.Runtime.Placement
             PlacementStrategy strategy, PlacementTarget target, IPlacementContext context)
         {
             // If the cache was not populated, just place locally
-            if (this.localCache.IsEmpty)
-                return Task.FromResult(this.localAddress);
+            if (localCache.IsEmpty)
+                return Task.FromResult(localAddress);
 
             return SelectSiloPowerOfK(target, context);
         }

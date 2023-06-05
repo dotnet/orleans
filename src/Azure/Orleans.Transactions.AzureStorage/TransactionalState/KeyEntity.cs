@@ -10,7 +10,7 @@ namespace Orleans.Transactions.AzureStorage
 
         public KeyEntity()
         {
-            this.RowKey = RK;
+            RowKey = RK;
         }
 
         public long CommittedSequenceId { get; set; }

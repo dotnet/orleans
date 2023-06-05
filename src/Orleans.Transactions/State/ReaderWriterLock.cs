@@ -55,7 +55,7 @@ namespace Orleans.Transactions.State
             this.storageWorker = storageWorker;
             this.logger = logger;
             this.activationLifetime = activationLifetime;
-            this.lockWorker = new BatchWorkerFromDelegate(LockWork, this.activationLifetime.OnDeactivating);
+            lockWorker = new BatchWorkerFromDelegate(LockWork, this.activationLifetime.OnDeactivating);
         }
 
         public async Task<TResult> EnterLock<TResult>(Guid transactionId, DateTime priority,
@@ -64,7 +64,7 @@ namespace Orleans.Transactions.State
             bool rollbacksOccurred = false;
             List<Task> cleanup = new List<Task>();
 
-            await this.queue.Ready();
+            await queue.Ready();
 
             // search active transactions
             if (Find(transactionId, isRead, out var group, out var record))
@@ -109,7 +109,7 @@ namespace Orleans.Transactions.State
                 // update the lock deadline
                 if (group == currentGroup)
                 {
-                    group.Deadline = DateTime.UtcNow + this.options.LockTimeout;
+                    group.Deadline = DateTime.UtcNow + options.LockTimeout;
 
                     if (logger.IsEnabled(LogLevel.Trace))
                         logger.LogTrace("Set lock expiration at {Deadline}", group.Deadline.Value.ToString("o"));
@@ -120,7 +120,7 @@ namespace Orleans.Transactions.State
                 {
                     TransactionId = transactionId,
                     Priority = priority,
-                    Deadline = DateTime.UtcNow + this.options.LockAcquireTimeout
+                    Deadline = DateTime.UtcNow + options.LockAcquireTimeout
                 };
 
                 group.Add(transactionId, record);
@@ -206,12 +206,12 @@ namespace Orleans.Transactions.State
 
         public void Notify()
         {
-            this.lockWorker.Notify();
+            lockWorker.Notify();
         }
 
         public bool TryGetRecord(Guid transactionId, out TransactionRecord<TState> record)
         {
-            return this.currentGroup.TryGetValue(transactionId, out record);
+            return currentGroup.TryGetValue(transactionId, out record);
         }
 
         public Task AbortExecutingTransactions(Exception exception)
@@ -230,7 +230,7 @@ namespace Orleans.Transactions.State
             if (logger.IsEnabled(LogLevel.Trace))
                 logger.LogTrace("Break-lock for transaction {TransactionId}", transactionId);
 
-            return this.queue.NotifyOfAbort(entry, TransactionalStatus.BrokenLock, exception);
+            return queue.NotifyOfAbort(entry, TransactionalStatus.BrokenLock, exception);
         }
 
         public void AbortQueuedTransactions()
@@ -270,8 +270,8 @@ namespace Orleans.Transactions.State
         private async Task LockWork()
         {
             // Stop pumping lock work if this activation is stopping/stopped.
-            if (this.activationLifetime.OnDeactivating.IsCancellationRequested) return;
-            using (this.activationLifetime.BlockDeactivation())
+            if (activationLifetime.OnDeactivating.IsCancellationRequested) return;
+            using (activationLifetime.BlockDeactivation())
             {
                 var now = DateTime.UtcNow;
 
@@ -284,13 +284,13 @@ namespace Orleans.Transactions.State
                         {
                             if (single != null)
                             {
-                                await this.queue.EnqueueCommit(single);
+                                await queue.EnqueueCommit(single);
                             }
                             else if (multiple != null)
                             {
                                 foreach (var r in multiple)
                                 {
-                                    await this.queue.EnqueueCommit(r);
+                                    await queue.EnqueueCommit(r);
                                 }
                             }
 
@@ -332,7 +332,7 @@ namespace Orleans.Transactions.State
 
                         if (currentGroup != null)
                         {
-                            currentGroup.Deadline = now + this.options.LockTimeout;
+                            currentGroup.Deadline = now + options.LockTimeout;
 
                             // discard expired waiters that have no chance to succeed
                             // because they have been waiting for the lock for a longer timespan than the 
@@ -397,7 +397,7 @@ namespace Orleans.Transactions.State
 
                     // if we have not found a place to insert this op yet, and there is room, and no conflicts, use this one
                     if (group == null
-                        && pos.FillCount < this.options.MaxLockGroupSize
+                        && pos.FillCount < options.MaxLockGroupSize
                         && !HasConflict(isRead, DateTime.MaxValue, guid, pos, out _))
                     {
                         group = pos;

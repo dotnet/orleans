@@ -33,7 +33,7 @@ namespace Orleans.Runtime
         {
             // If maxLocal was not specified on the StatelessWorkerAttribute,
             // we will use the defaultMaxStatelessWorkers, which is System.Environment.ProcessorCount.
-            this.MaxLocal = maxLocal > 0 ? maxLocal : DefaultMaxStatelessWorkers;
+            MaxLocal = maxLocal > 0 ? maxLocal : DefaultMaxStatelessWorkers;
         }
 
         /// <summary>
@@ -55,7 +55,7 @@ namespace Orleans.Runtime
             {
                 if (int.TryParse(value, out var maxLocal))
                 {
-                    this.MaxLocal = maxLocal;
+                    MaxLocal = maxLocal;
                 }
             }
         }
@@ -63,7 +63,7 @@ namespace Orleans.Runtime
         /// <inheritdoc/>
         public override void PopulateGrainProperties(IServiceProvider services, Type grainClass, GrainType grainType, Dictionary<string, string> properties)
         {
-            properties[MaxLocalPropertyKey] = this.MaxLocal.ToString(CultureInfo.InvariantCulture);
+            properties[MaxLocalPropertyKey] = MaxLocal.ToString(CultureInfo.InvariantCulture);
 
             base.PopulateGrainProperties(services, grainClass, grainType, properties);
         }

@@ -17,7 +17,7 @@ namespace Orleans.Transactions.TestKit
             const int expected = 5;
 
             ITransactionTestGrain grain = RandomTestGrain(grainStates);
-            ITransactionCoordinatorGrain coordinator = this.grainFactory.GetGrain<ITransactionCoordinatorGrain>(Guid.NewGuid());
+            ITransactionCoordinatorGrain coordinator = grainFactory.GetGrain<ITransactionCoordinatorGrain>(Guid.NewGuid());
 
             await coordinator.MultiGrainSet(new List<ITransactionTestGrain> { grain }, expected);
             Func<Task> task = () => coordinator.AddAndThrow(grain, expected);
@@ -43,7 +43,7 @@ namespace Orleans.Transactions.TestKit
                 Enumerable.Range(0, grainCount)
                     .Select(i => RandomTestGrain(grainStates))
                     .ToList();
-            ITransactionCoordinatorGrain coordinator = this.grainFactory.GetGrain<ITransactionCoordinatorGrain>(Guid.NewGuid());
+            ITransactionCoordinatorGrain coordinator = grainFactory.GetGrain<ITransactionCoordinatorGrain>(Guid.NewGuid());
 
             await throwGrain.Set(expected);
             await coordinator.MultiGrainSet(grains, expected);
@@ -80,7 +80,7 @@ namespace Orleans.Transactions.TestKit
                 Enumerable.Range(0, grainCount)
                     .Select(i => RandomTestGrain(grainStates))
                     .ToList();
-            ITransactionCoordinatorGrain coordinator = this.grainFactory.GetGrain<ITransactionCoordinatorGrain>(Guid.NewGuid());
+            ITransactionCoordinatorGrain coordinator = grainFactory.GetGrain<ITransactionCoordinatorGrain>(Guid.NewGuid());
 
             await coordinator.MultiGrainSet(throwGrains, expected);
             await coordinator.MultiGrainSet(grains, expected);
@@ -121,7 +121,7 @@ namespace Orleans.Transactions.TestKit
             const int expected = 5;
 
             ITransactionTestGrain grain = RandomTestGrain(grainStates);
-            ITransactionCoordinatorGrain coordinator = this.grainFactory.GetGrain<ITransactionCoordinatorGrain>(Guid.NewGuid());
+            ITransactionCoordinatorGrain coordinator = grainFactory.GetGrain<ITransactionCoordinatorGrain>(Guid.NewGuid());
 
             await grain.Set(expected);
             Func<Task> task = () => coordinator.OrphanCallTransaction(grain);

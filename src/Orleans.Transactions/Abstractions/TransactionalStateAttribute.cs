@@ -10,8 +10,8 @@ namespace Orleans.Transactions.Abstractions
 
         public TransactionalStateAttribute(string stateName, string storageName = null)
         {
-            this.StateName = stateName;
-            this.StorageName = storageName;
+            StateName = stateName;
+            StorageName = storageName;
         }
     }
 }

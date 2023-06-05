@@ -37,9 +37,9 @@ namespace ServiceBus.Tests.TestStreamProviders
             : base(name, options, ehOptions, receiverOptions, cacheOptions, streamCacheEvictionOptions, statisticOptions, dataAdapter, serviceProvider, loggerFactory, hostEnvironmentStatistics)
         {
             this.cacheOptions = cacheOptions;
-            this.staticticOptions = statisticOptions;
+            staticticOptions = statisticOptions;
             this.ehOptions = ehOptions;
-            this.evictionOptions = streamCacheEvictionOptions;
+            evictionOptions = streamCacheEvictionOptions;
         }
 
         public new static EHStreamProviderForMonitorTestsAdapterFactory Create(IServiceProvider services, string name)
@@ -61,28 +61,28 @@ namespace ServiceBus.Tests.TestStreamProviders
 
         public override void Init()
         {
-            this.ReceiverMonitorFactory = (dimensions, logger) => eventHubReceiverMonitorForTesting;
-            this.cachePressureInjectionMonitor = new CachePressureInjectionMonitor();
+            ReceiverMonitorFactory = (dimensions, logger) => eventHubReceiverMonitorForTesting;
+            cachePressureInjectionMonitor = new CachePressureInjectionMonitor();
             base.Init();
         }
 
         private void ChangeCachePressure()
         {
-            this.cachePressureInjectionMonitor.UnderPressure = !this.cachePressureInjectionMonitor.UnderPressure;
+            cachePressureInjectionMonitor.UnderPressure = !cachePressureInjectionMonitor.UnderPressure;
         }
 
         protected override IEventHubQueueCacheFactory CreateCacheFactory(EventHubStreamCachePressureOptions cacheOptions)
         {
-            var loggerFactory = this.serviceProvider.GetRequiredService<ILoggerFactory>();
-            var eventHubPath = this.ehOptions.EventHubName;
+            var loggerFactory = serviceProvider.GetRequiredService<ILoggerFactory>();
+            var eventHubPath = ehOptions.EventHubName;
             var sharedDimensions = new EventHubMonitorAggregationDimensions(eventHubPath);
-            ICacheMonitor cacheMonitorFactory(EventHubCacheMonitorDimensions dimensions, ILoggerFactory logger) => this.cacheMonitorForTesting;
-            IBlockPoolMonitor blockPoolMonitorFactory(EventHubBlockPoolMonitorDimensions dimensions, ILoggerFactory logger) => this.blockPoolMonitorForTesting;
+            ICacheMonitor cacheMonitorFactory(EventHubCacheMonitorDimensions dimensions, ILoggerFactory logger) => cacheMonitorForTesting;
+            IBlockPoolMonitor blockPoolMonitorFactory(EventHubBlockPoolMonitorDimensions dimensions, ILoggerFactory logger) => blockPoolMonitorForTesting;
             return new CacheFactoryForMonitorTesting(
-                this.cachePressureInjectionMonitor,
+                cachePressureInjectionMonitor,
                 this.cacheOptions,
-                this.evictionOptions,
-                this.staticticOptions,
+                evictionOptions,
+                staticticOptions,
                 base.dataAdapter,
                 sharedDimensions,
                 loggerFactory,
@@ -111,7 +111,7 @@ namespace ServiceBus.Tests.TestStreamProviders
             protected override void AddCachePressureMonitors(IEventHubQueueCache cache, EventHubStreamCachePressureOptions providerOptions,
                     ILogger cacheLogger)
             {
-                cache.AddCachePressureMonitor(this.cachePressureInjectionMonitor);
+                cache.AddCachePressureMonitor(cachePressureInjectionMonitor);
             }
         }
         public enum QueryCommands
@@ -128,13 +128,13 @@ namespace ServiceBus.Tests.TestStreamProviders
             switch (command)
             {
                 case (int)QueryCommands.GetCacheMonitorCallCounters:
-                    re = this.cacheMonitorForTesting.CallCounters;
+                    re = cacheMonitorForTesting.CallCounters;
                     break;
                 case (int)QueryCommands.GetReceiverMonitorCallCounters:
-                    re = this.eventHubReceiverMonitorForTesting.CallCounters;
+                    re = eventHubReceiverMonitorForTesting.CallCounters;
                     break;
                 case (int)QueryCommands.GetObjectPoolMonitorCallCounters:
-                    re = this.blockPoolMonitorForTesting.CallCounters;
+                    re = blockPoolMonitorForTesting.CallCounters;
                     break;
                 case (int)QueryCommands.ChangeCachePressure:
                     ChangeCachePressure();
@@ -153,8 +153,8 @@ namespace ServiceBus.Tests.TestStreamProviders
         public ICacheMonitor CacheMonitor { set; private get; }
         public CachePressureInjectionMonitor()
         {
-            this.UnderPressure = false;
-            this.wasUnderPressur = this.UnderPressure;
+            UnderPressure = false;
+            wasUnderPressur = UnderPressure;
         }
 
         public void RecordCachePressureContribution(double cachePressureContribution)
@@ -164,12 +164,12 @@ namespace ServiceBus.Tests.TestStreamProviders
 
         public bool IsUnderPressure(DateTime utcNow)
         {
-            if (this.wasUnderPressur != this.UnderPressure)
+            if (wasUnderPressur != UnderPressure)
             {
-                this.CacheMonitor?.TrackCachePressureMonitorStatusChange(this.GetType().Name, this.UnderPressure, null, null, null);
-                this.wasUnderPressur = this.UnderPressure;
+                CacheMonitor?.TrackCachePressureMonitorStatusChange(GetType().Name, UnderPressure, null, null, null);
+                wasUnderPressur = UnderPressure;
             }
-            return this.UnderPressure;
+            return UnderPressure;
         }
     }
 }

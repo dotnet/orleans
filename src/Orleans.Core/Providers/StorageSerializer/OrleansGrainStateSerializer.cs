@@ -24,14 +24,14 @@ namespace Orleans.Storage
         public BinaryData Serialize<T>(T value)
         {
             var buffer = new ArrayBufferWriter<byte>();
-            this.serializer.Serialize(value, buffer);
+            serializer.Serialize(value, buffer);
             return new BinaryData(buffer.WrittenMemory);
         }
 
         /// <inheritdoc/>
         public T Deserialize<T>(BinaryData input)
         {
-            return this.serializer.Deserialize<T>(input.ToMemory());
+            return serializer.Deserialize<T>(input.ToMemory());
         }
     }
 }

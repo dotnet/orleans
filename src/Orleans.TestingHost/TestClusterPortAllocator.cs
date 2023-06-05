@@ -148,7 +148,7 @@ namespace Orleans.TestingHost
                     IsBackground = true,
                 };
                 _thread.Start();
-                AppDomain.CurrentDomain.DomainUnload += this.OnAppDomainUnload;
+                AppDomain.CurrentDomain.DomainUnload += OnAppDomainUnload;
             }
 
             private void OnAppDomainUnload(object sender, EventArgs e)

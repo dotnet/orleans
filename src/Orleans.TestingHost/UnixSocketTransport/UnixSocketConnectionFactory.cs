@@ -24,8 +24,8 @@ internal class UnixSocketConnectionFactory : IConnectionFactory
         SharedMemoryPool memoryPool)
     {
         var logger = loggerFactory.CreateLogger("Orleans.UnixSocket");
-        this.trace = new SocketsTrace(logger);
-        this.socketConnectionOptions = options.Value;
+        trace = new SocketsTrace(logger);
+        socketConnectionOptions = options.Value;
         this.schedulers = schedulers;
         this.memoryPool = memoryPool.Pool;
     }
@@ -35,7 +35,7 @@ internal class UnixSocketConnectionFactory : IConnectionFactory
         var socket = new Socket(AddressFamily.Unix, SocketType.Stream, ProtocolType.Unspecified);
         var unixEndpoint = new UnixDomainSocketEndPoint(socketConnectionOptions.ConvertEndpointToPath(endpoint));
         await socket.ConnectAsync(unixEndpoint);
-        var scheduler = this.schedulers.GetScheduler();
+        var scheduler = schedulers.GetScheduler();
         var connection = new SocketConnection(socket, memoryPool, scheduler, trace);
         connection.Start();
         return connection;

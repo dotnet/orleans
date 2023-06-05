@@ -73,10 +73,10 @@ namespace Tester.CodeGenTests
 
         public void SetValue<T>(T value)
         {
-            this.state = value;
+            state = value;
         }
 
-        public Task<T> GetValue<T>() => Task.FromResult((T) this.state);
+        public Task<T> GetValue<T>() => Task.FromResult((T) state);
 
         public Task SetValueOnObserver<T>(IGrainObserverWithGenericMethods observer, T value)
         {
@@ -117,13 +117,13 @@ namespace Tester.CodeGenTests
     {
         public Task<@event> SetState(@event value)
         {
-            this.State.@event = value;
-            return Task.FromResult(this.State.@event);
+            State.@event = value;
+            return Task.FromResult(State.@event);
         }
 
         public Task<@event> @static()
         {
-            return Task.FromResult(this.State.@event);
+            return Task.FromResult(State.@event);
         }
     }
 
@@ -211,12 +211,12 @@ namespace Tester.CodeGenTests
         {
             get
             {
-                return this.privateId;
+                return privateId;
             }
 
             set
             {
-                this.privateId = value;
+                privateId = value;
             }
         }
 
@@ -230,22 +230,22 @@ namespace Tester.CodeGenTests
             {
                 return true;
             }
-            if (obj.GetType() != this.GetType())
+            if (obj.GetType() != GetType())
             {
                 return false;
             }
 
-            return this.Equals((@event)obj);
+            return Equals((@event)obj);
         }
 
         public override int GetHashCode()
         {
             unchecked
             {
-                var hashCode = (this.@if != null ? this.@if.GetHashCode() : 0);
-                hashCode = (hashCode * 397) ^ (this.@public != null ? this.@public.GetHashCode() : 0);
-                hashCode = (hashCode * 397) ^ this.privateId.GetHashCode();
-                hashCode = (hashCode * 397) ^ this.Id.GetHashCode();
+                var hashCode = (@if != null ? @if.GetHashCode() : 0);
+                hashCode = (hashCode * 397) ^ (@public != null ? @public.GetHashCode() : 0);
+                hashCode = (hashCode * 397) ^ privateId.GetHashCode();
+                hashCode = (hashCode * 397) ^ Id.GetHashCode();
                 return hashCode;
             }
         }
@@ -260,23 +260,23 @@ namespace Tester.CodeGenTests
             {
                 return true;
             }
-            if (this.@if != other.@if)
+            if (@if != other.@if)
             {
-                if (this.@if != null && !this.@if.SequenceEqual(other.@if, EventComparer))
+                if (@if != null && !@if.SequenceEqual(other.@if, EventComparer))
                 {
                     return false;
                 }
             }
 
-            if (!Equals(this.@public, other.@public))
+            if (!Equals(@public, other.@public))
             {
-                if (this.@public != null && !this.@public.Equals(other.@public))
+                if (@public != null && !@public.Equals(other.@public))
                 {
                     return false;
                 }
             }
 
-            return this.privateId.Equals(other.privateId) && this.Id.Equals(other.Id) && this.Enum == other.Enum;
+            return privateId.Equals(other.privateId) && Id.Equals(other.Id) && Enum == other.Enum;
         }
 
         private sealed class EventEqualityComparer : IEqualityComparer<@event>

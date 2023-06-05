@@ -122,7 +122,7 @@ namespace Orleans.Configuration
 
         public void ValidateConfiguration()
         {
-            if (this.options.CreateClient is null)
+            if (options.CreateClient is null)
             {
                 throw new OrleansConfigurationException($"No credentials specified. Use the {options.GetType().Name}.{nameof(AzureBlobStorageOptions.ConfigureBlobServiceClient)} method to configure the Azure Blob Service client.");
             }
@@ -130,12 +130,12 @@ namespace Orleans.Configuration
             try
             {
                 AzureBlobUtils.ValidateContainerName(options.ContainerName);
-                AzureBlobUtils.ValidateBlobName(this.name);
+                AzureBlobUtils.ValidateBlobName(name);
             }
             catch(ArgumentException e)
             {
                 throw new OrleansConfigurationException(
-                    $"Configuration for AzureBlobStorageOptions {name} is invalid. {nameof(this.options.ContainerName)} is not valid", e);
+                    $"Configuration for AzureBlobStorageOptions {name} is invalid. {nameof(options.ContainerName)} is not valid", e);
             }
         }
     }

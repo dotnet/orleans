@@ -15,7 +15,7 @@ namespace UnitTests.Grains
 
         public MultipleImplicitSubscriptionGrain(ILoggerFactory loggerFactory)
         {
-            this.logger = loggerFactory.CreateLogger("MultipleImplicitSubscriptionGrain " + base.IdentityString);
+            logger = loggerFactory.CreateLogger("MultipleImplicitSubscriptionGrain " + base.IdentityString);
         }
 
         public override async Task OnActivateAsync(CancellationToken cancellationToken)

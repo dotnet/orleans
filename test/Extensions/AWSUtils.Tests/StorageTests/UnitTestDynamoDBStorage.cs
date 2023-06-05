@@ -69,9 +69,9 @@ namespace AWSUtils.Tests.StorageTests
         {
             return new UnitTestDynamoDBTableData
             {
-                StringData = this.StringData,
-                PartitionKey = this.PartitionKey,
-                RowKey = this.RowKey
+                StringData = StringData,
+                PartitionKey = PartitionKey,
+                RowKey = RowKey
             };
         }
 

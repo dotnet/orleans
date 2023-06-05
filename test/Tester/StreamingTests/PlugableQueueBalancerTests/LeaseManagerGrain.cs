@@ -26,26 +26,26 @@ namespace Tester.StreamingTests
         private ISiloStatusOracle siloStatusOracle;
         public override Task OnActivateAsync(CancellationToken cancellationToken)
         {
-            this.siloStatusOracle = base.ServiceProvider.GetRequiredService<ISiloStatusOracle>();
-            this.queueLeaseToRenewTimeMap = new Dictionary<QueueId, DateTime>();
-            this.responsibilityMap = new Dictionary<string, int>();
+            siloStatusOracle = base.ServiceProvider.GetRequiredService<ISiloStatusOracle>();
+            queueLeaseToRenewTimeMap = new Dictionary<QueueId, DateTime>();
+            responsibilityMap = new Dictionary<string, int>();
             return Task.CompletedTask;
         }
         public Task<int> GetLeaseResposibility()
         {
-            var siloCount = this.siloStatusOracle.GetApproximateSiloStatuses(onlyActive: true).Count;
-            var resposibity = this.queueLeaseToRenewTimeMap.Count / siloCount;
+            var siloCount = siloStatusOracle.GetApproximateSiloStatuses(onlyActive: true).Count;
+            var resposibity = queueLeaseToRenewTimeMap.Count / siloCount;
             return Task.FromResult(resposibity);
         }
 
         public Task<QueueId> Acquire()
         {
-            foreach (var lease in this.queueLeaseToRenewTimeMap)
+            foreach (var lease in queueLeaseToRenewTimeMap)
             {
                 //find the first unassigned lease and assign it
                 if (lease.Value.Equals(UnAssignedLeaseTime))
                 {
-                    this.queueLeaseToRenewTimeMap[lease.Key] = DateTime.UtcNow;
+                    queueLeaseToRenewTimeMap[lease.Key] = DateTime.UtcNow;
                     return Task.FromResult(lease.Key);
                 }
             }
@@ -54,9 +54,9 @@ namespace Tester.StreamingTests
 
         public Task<bool> Renew(QueueId leaseNumber)
         {
-            if (this.queueLeaseToRenewTimeMap.ContainsKey(leaseNumber))
+            if (queueLeaseToRenewTimeMap.ContainsKey(leaseNumber))
             {
-                this.queueLeaseToRenewTimeMap[leaseNumber] = DateTime.UtcNow;
+                queueLeaseToRenewTimeMap[leaseNumber] = DateTime.UtcNow;
                 return Task.FromResult(true);
             }
             return Task.FromResult(false);
@@ -64,20 +64,20 @@ namespace Tester.StreamingTests
 
         public Task Release(QueueId leaseNumber)
         {
-            if (this.queueLeaseToRenewTimeMap.ContainsKey(leaseNumber))
-                this.queueLeaseToRenewTimeMap[leaseNumber] = UnAssignedLeaseTime;
+            if (queueLeaseToRenewTimeMap.ContainsKey(leaseNumber))
+                queueLeaseToRenewTimeMap[leaseNumber] = UnAssignedLeaseTime;
             return Task.CompletedTask;
         }
 
         public Task SetQueuesAsLeases(IEnumerable<QueueId> queueIds)
         {
             //if already set up, return
-            if (this.queueLeaseToRenewTimeMap.Count > 0)
+            if (queueLeaseToRenewTimeMap.Count > 0)
                 return Task.CompletedTask;
             //set up initial lease map
             foreach (var queueId in queueIds)
             {
-                this.queueLeaseToRenewTimeMap.Add(queueId, UnAssignedLeaseTime);
+                queueLeaseToRenewTimeMap.Add(queueId, UnAssignedLeaseTime);
             }
             return Task.CompletedTask;
         }

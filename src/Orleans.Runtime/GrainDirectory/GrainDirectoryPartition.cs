@@ -158,7 +158,7 @@ namespace Orleans.Runtime.GrainDirectory
 
             if (!IsValidSilo(address.SiloAddress))
             {
-                var siloStatus = this.siloStatusOracle.GetApproximateSiloStatus(address.SiloAddress);
+                var siloStatus = siloStatusOracle.GetApproximateSiloStatus(address.SiloAddress);
                 throw new OrleansException($"Trying to register {address.GrainId} on invalid silo: {address.SiloAddress}. Known status: {siloStatus}");
             }
 
@@ -194,7 +194,7 @@ namespace Orleans.Runtime.GrainDirectory
             var wasRemoved = false;
             lock (lockable)
             {
-                if (partitionData.TryGetValue(grain, out var value) && value.RemoveActivation(activation, cause, this.grainDirectoryOptions.Value.LazyDeregistrationDelay, out wasRemoved))
+                if (partitionData.TryGetValue(grain, out var value) && value.RemoveActivation(activation, cause, grainDirectoryOptions.Value.LazyDeregistrationDelay, out wasRemoved))
                 {
                     // if the last activation for the grain was removed, we remove the entire grain info 
                     partitionData.Remove(grain);

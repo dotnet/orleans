@@ -179,12 +179,12 @@ namespace Orleans.Configuration
 
             if (string.IsNullOrEmpty(options.ConsumerGroup))
             {
-                throw new OrleansConfigurationException($"{nameof(EventHubOptions)} on stream provider {this.name} is invalid. {nameof(EventHubOptions.ConsumerGroup)} is invalid");
+                throw new OrleansConfigurationException($"{nameof(EventHubOptions)} on stream provider {name} is invalid. {nameof(EventHubOptions.ConsumerGroup)} is invalid");
             }
 
             if (string.IsNullOrEmpty(options.EventHubName))
             {
-                throw new OrleansConfigurationException($"{nameof(EventHubOptions)} on stream provider {this.name} is invalid. {nameof(EventHubOptions.EventHubName)} is invalid");
+                throw new OrleansConfigurationException($"{nameof(EventHubOptions)} on stream provider {name} is invalid. {nameof(EventHubOptions.EventHubName)} is invalid");
             }
         }
     }
@@ -200,9 +200,9 @@ namespace Orleans.Configuration
         }
         public void ValidateConfiguration()
         {
-            var checkpointerFactory = services.GetServiceByName<IStreamQueueCheckpointerFactory>(this.name);
+            var checkpointerFactory = services.GetServiceByName<IStreamQueueCheckpointerFactory>(name);
             if (checkpointerFactory == null)
-                throw new OrleansConfigurationException($"No IStreamQueueCheckpointer is configured with PersistentStreamProvider {this.name}. Please configure one.");
+                throw new OrleansConfigurationException($"No IStreamQueueCheckpointer is configured with PersistentStreamProvider {name}. Please configure one.");
         }
     }
 

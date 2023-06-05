@@ -19,24 +19,24 @@ namespace UnitTests.PersistentState.Grains
 
         public Task<int> GetValue()
         {
-            return Task.FromResult(this.persistentState.State.Field1);
+            return Task.FromResult(persistentState.State.Field1);
         }
 
         public Task DoWrite(int val)
         {
-            this.persistentState.State.Field1 = val;
-            return this.persistentState.WriteStateAsync();
+            persistentState.State.Field1 = val;
+            return persistentState.WriteStateAsync();
         }
 
         public async Task<int> DoRead()
         {
-            await this.persistentState.ReadStateAsync(); // Re-read state from store
-            return this.persistentState.State.Field1;
+            await persistentState.ReadStateAsync(); // Re-read state from store
+            return persistentState.State.Field1;
         }
 
         public Task DoDelete()
         {
-            return this.persistentState.ClearStateAsync();
+            return persistentState.ClearStateAsync();
         }
     }
 
@@ -56,7 +56,7 @@ namespace UnitTests.PersistentState.Grains
 
         public Task<int> GetValue()
         {
-            return Task.FromResult(this.persistentState.State.Field1);
+            return Task.FromResult(persistentState.State.Field1);
         }
 
         public Task<string> GetExtendedKeyValue()
@@ -68,19 +68,19 @@ namespace UnitTests.PersistentState.Grains
 
         public Task DoWrite(int val)
         {
-            this.persistentState.State.Field1 = val;
-            return this.persistentState.WriteStateAsync();
+            persistentState.State.Field1 = val;
+            return persistentState.WriteStateAsync();
         }
 
         public async Task<int> DoRead()
         {
-            await this.persistentState.ReadStateAsync(); // Re-read state from store
-            return this.persistentState.State.Field1;
+            await persistentState.ReadStateAsync(); // Re-read state from store
+            return persistentState.State.Field1;
         }
 
         public Task DoDelete()
         {
-            return this.persistentState.ClearStateAsync();
+            return persistentState.ClearStateAsync();
         }
     }
 }

@@ -39,13 +39,13 @@ namespace UnitTests.Grains
 
         public async Task ThirdGrainMethod(Guid userId)
         {
-            this.inFlightCounter++;
+            inFlightCounter++;
 
-            if (this.inFlightCounter > 1)
+            if (inFlightCounter > 1)
                 throw new Exception("More than 1 in flight call too this method!");
 
-            await this.WriteStateAsync();
-            this.inFlightCounter--;
+            await WriteStateAsync();
+            inFlightCounter--;
         }
     }
 }

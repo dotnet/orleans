@@ -22,7 +22,7 @@ namespace DefaultCluster.Tests.SchedulerTests
             var grainFullName = typeof(ErrorGrain).FullName;
             for (int i = 0; i < 100; i++)
             {
-                grains.Add(this.GrainFactory.GetGrain<IErrorGrain>(GetRandomGrainId(), grainFullName));
+                grains.Add(GrainFactory.GetGrain<IErrorGrain>(GetRandomGrainId(), grainFullName));
             }
 
             // Send a bunch of do-nothing requests just to get the grains activated

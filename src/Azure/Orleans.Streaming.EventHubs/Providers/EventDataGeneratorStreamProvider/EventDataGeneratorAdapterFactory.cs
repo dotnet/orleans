@@ -35,12 +35,12 @@ namespace Orleans.Streaming.EventHubs.Testing
             IHostEnvironmentStatistics hostEnvironmentStatistics)
             : base(name, ehOptions, receiverOptions, cacheOptions, evictionOptions, statisticOptions, dataAdapter, serviceProvider, loggerFactory, hostEnvironmentStatistics)
         {
-            this.ehGeneratorOptions = options;
+            ehGeneratorOptions = options;
         }
 
         public override void Init()
         {
-            this.EventHubReceiverFactory = this.EHGeneratorReceiverFactory;
+            EventHubReceiverFactory = EHGeneratorReceiverFactory;
             base.Init();
         }
 
@@ -56,14 +56,14 @@ namespace Orleans.Streaming.EventHubs.Testing
         /// <returns></returns>
         protected override Task<string[]> GetPartitionIdsAsync()
         {
-            return Task.FromResult(GenerateEventHubPartitions(this.ehGeneratorOptions.EventHubPartitionCount));
+            return Task.FromResult(GenerateEventHubPartitions(ehGeneratorOptions.EventHubPartitionCount));
         }
 
         private IEventHubReceiver EHGeneratorReceiverFactory(EventHubPartitionSettings settings, string offset, ILogger logger)
         {
-            var streamGeneratorFactory = this.serviceProvider.GetServiceByName<Func<StreamId, IStreamDataGenerator<EventData>>>(this.Name)
-                ?? SimpleStreamEventDataGenerator.CreateFactory(this.serviceProvider);
-            var generator = new EventHubPartitionDataGenerator(this.ehGeneratorOptions, streamGeneratorFactory, logger);
+            var streamGeneratorFactory = serviceProvider.GetServiceByName<Func<StreamId, IStreamDataGenerator<EventData>>>(Name)
+                ?? SimpleStreamEventDataGenerator.CreateFactory(serviceProvider);
+            var generator = new EventHubPartitionDataGenerator(ehGeneratorOptions, streamGeneratorFactory, logger);
             return new EventHubPartitionGeneratorReceiver(generator);
         }
 
@@ -92,7 +92,7 @@ namespace Orleans.Streaming.EventHubs.Testing
 
         private void StopProducingOnStream(StreamId streamId)
         {
-            foreach (var ehReceiver in this.EventHubReceivers)
+            foreach (var ehReceiver in EventHubReceivers)
             {
                 //if the stream is assigned to this receiver/queue, then it will ask the data generator to stop producing
                 ehReceiver.Value.StopProducingOnStream(streamId);
@@ -148,8 +148,8 @@ namespace Orleans.Streaming.EventHubs.Testing
             /// <param name="randomNumber"></param>
             public StreamRandomPlacementArg(StreamId streamId, int randomNumber)
             {
-                this.StreamId = streamId;
-                this.RandomNumber = randomNumber;
+                StreamId = streamId;
+                RandomNumber = randomNumber;
             }
         }
 
@@ -164,10 +164,10 @@ namespace Orleans.Streaming.EventHubs.Testing
             switch (command)
             {
                 case (int)Commands.Randomly_Place_Stream_To_Queue:
-                    this.RandomlyPlaceStreamToQueue(arg as StreamRandomPlacementArg);
+                    RandomlyPlaceStreamToQueue(arg as StreamRandomPlacementArg);
                     break;
                 case (int)Commands.Stop_Producing_On_Stream:
-                    this.StopProducingOnStream((StreamId) arg);
+                    StopProducingOnStream((StreamId) arg);
                     break;
                 default: break;
 

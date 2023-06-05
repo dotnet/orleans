@@ -17,8 +17,8 @@ namespace Orleans.Streams
         /// <param name="token">The token.</param>
         public SequentialItem(T item, StreamSequenceToken token)
         {
-            this.Item = item;
-            this.Token = token;
+            Item = item;
+            Token = token;
         }
 
         /// <summary>

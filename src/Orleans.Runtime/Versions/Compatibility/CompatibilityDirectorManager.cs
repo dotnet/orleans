@@ -18,9 +18,9 @@ namespace Orleans.Runtime.Versions.Compatibility
         public CompatibilityDirectorManager(IServiceProvider serviceProvider, IOptions<GrainVersioningOptions> options)
         {
             this.serviceProvider = serviceProvider;
-            this.strategyFromConfig = serviceProvider.GetRequiredServiceByName<CompatibilityStrategy>(options.Value.DefaultCompatibilityStrategy);
-            this.compatibilityDirectors = new Dictionary<GrainInterfaceType, ICompatibilityDirector>();
-            Default = ResolveVersionDirector(serviceProvider, this.strategyFromConfig);
+            strategyFromConfig = serviceProvider.GetRequiredServiceByName<CompatibilityStrategy>(options.Value.DefaultCompatibilityStrategy);
+            compatibilityDirectors = new Dictionary<GrainInterfaceType, ICompatibilityDirector>();
+            Default = ResolveVersionDirector(serviceProvider, strategyFromConfig);
         }
 
         public ICompatibilityDirector GetDirector(GrainInterfaceType interfaceType)
@@ -32,7 +32,7 @@ namespace Orleans.Runtime.Versions.Compatibility
         }
         public void SetStrategy(CompatibilityStrategy strategy)
         {
-            var director = ResolveVersionDirector(this.serviceProvider, strategy ?? this.strategyFromConfig);
+            var director = ResolveVersionDirector(serviceProvider, strategy ?? strategyFromConfig);
             Default = director;
         }
 
@@ -44,7 +44,7 @@ namespace Orleans.Runtime.Versions.Compatibility
             }
             else
             {
-                var selector = ResolveVersionDirector(this.serviceProvider, strategy);
+                var selector = ResolveVersionDirector(serviceProvider, strategy);
                 compatibilityDirectors[interfaceType] = selector;
             }
         }

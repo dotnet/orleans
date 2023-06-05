@@ -443,7 +443,7 @@ namespace Tester
             public TestOptionsFormatter2(IOptions<TestOptions> options)
             {
                 this.options = options.Value;
-                this.Name = nameof(TestOptions);
+                Name = nameof(TestOptions);
             }
 
             public static TestOptionsFormatter2 CreateNamed(string name, IOptions<TestOptions> options)
@@ -473,7 +473,7 @@ namespace Tester
 
                 public IOptionFormatter<TestOptions> Resolve(string name)
                 {
-                    return TestOptionsFormatter2.CreateNamed(name, Options.Create(this.optionsMonitor.Get(name)));
+                    return TestOptionsFormatter2.CreateNamed(name, Options.Create(optionsMonitor.Get(name)));
                 }
             }
         }
@@ -486,7 +486,7 @@ namespace Tester
             public TestOptionsFormatter(IOptions<TestOptions> options)
             {
                 this.options = options.Value;
-                this.Name = typeof(TestOptions).FullName;
+                Name = typeof(TestOptions).FullName;
             }
 
             public static TestOptionsFormatter CreateNamed(string name, IOptions<TestOptions> options)
@@ -514,7 +514,7 @@ namespace Tester
 
                 public IOptionFormatter<TestOptions> Resolve(string name)
                 {
-                    return TestOptionsFormatter.CreateNamed(name, Options.Create(this.optionsMonitor.Get(name)));
+                    return TestOptionsFormatter.CreateNamed(name, Options.Create(optionsMonitor.Get(name)));
                 }
             }
         }
@@ -530,7 +530,7 @@ namespace Tester
 
             public ILogger CreateLogger(string categoryName)
             {
-                return this.loggers.GetOrAdd(categoryName, new Logger());
+                return loggers.GetOrAdd(categoryName, new Logger());
             }
 
             public void Dispose()
@@ -539,7 +539,7 @@ namespace Tester
 
             public override string ToString()
             {
-                return string.Join(":", this.loggers.Select(kvp => $"{kvp.Key} =\n{kvp.Value.ToString()}\n"));
+                return string.Join(":", loggers.Select(kvp => $"{kvp.Key} =\n{kvp.Value.ToString()}\n"));
             }
 
             private class Logger : ILogger
@@ -553,7 +553,7 @@ namespace Tester
 
                 public override string ToString()
                 {
-                    return string.Join(";", this.entries);
+                    return string.Join(";", entries);
                 }
 
                 public bool IsEnabled(LogLevel logLevel)
@@ -574,7 +574,7 @@ namespace Tester
 
             public TestLogger(ILoggerFactory loggerFactory)
             {
-                this.logger = loggerFactory.CreateLogger<T>();
+                logger = loggerFactory.CreateLogger<T>();
             }
 
             public IDisposable BeginScope<TState>(TState state)

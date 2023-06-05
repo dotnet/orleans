@@ -46,7 +46,7 @@ namespace Orleans.Runtime
             if (delay < TimeSpan.Zero) delay = TimeSpan.Zero;
 
             var dueTime = start.Add(delay);
-            this.expected = dueTime;
+            expected = dueTime;
             if (delay > TimeSpan.Zero)
             {
                 // for backwards compatibility, support timers with periods up to ReminderRegistry.MaxSupportedTimeout
@@ -72,11 +72,11 @@ namespace Orleans.Runtime
                 }
             }
 
-            var now = this.lastFired = DateTime.UtcNow;
+            var now = lastFired = DateTime.UtcNow;
             var overshoot = GetOvershootDelay(now, dueTime);
             if (overshoot > TimeSpan.Zero)
             {
-                this.log?.LogWarning(
+                log?.LogWarning(
                     "Timer should have fired at {DueTime} but fired at {CurrentTime}, which is {Overshoot} longer than expected",
                     dueTime,
                     now,
@@ -101,11 +101,11 @@ namespace Orleans.Runtime
         public bool CheckHealth(DateTime lastCheckTime, out string reason)
         {
             var now = DateTime.UtcNow;
-            var due = this.expected;
+            var due = expected;
             var overshoot = GetOvershootDelay(now, due);
             if (overshoot > TimeSpan.Zero)
             {
-                reason = $"{this.name} timer should have fired at {due}, which is {overshoot} ago";
+                reason = $"{name} timer should have fired at {due}, which is {overshoot} ago";
                 return false;
             }
 
@@ -115,8 +115,8 @@ namespace Orleans.Runtime
 
         public void Dispose()
         {
-            this.expected = default;
-            this.cancellation.Cancel();
+            expected = default;
+            cancellation.Cancel();
         }
     }
 }

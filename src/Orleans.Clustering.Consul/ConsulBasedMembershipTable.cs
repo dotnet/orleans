@@ -30,11 +30,11 @@ namespace Orleans.Runtime.Membership
             IOptions<ConsulClusteringOptions> membershipTableOptions, 
             IOptions<ClusterOptions> clusterOptions)
         {
-            this.clusterId = clusterOptions.Value.ClusterId;
-            this.kvRootFolder = membershipTableOptions.Value.KvRootFolder;
-            this._logger = logger;
-            this.clusteringSiloTableOptions = membershipTableOptions.Value;
-            this._consulClient = this.clusteringSiloTableOptions.CreateClient();
+            clusterId = clusterOptions.Value.ClusterId;
+            kvRootFolder = membershipTableOptions.Value.KvRootFolder;
+            _logger = logger;
+            clusteringSiloTableOptions = membershipTableOptions.Value;
+            _consulClient = clusteringSiloTableOptions.CreateClient();
             versionKey = ConsulSiloRegistrationAssembler.FormatVersionKey(clusterId, kvRootFolder);
         }
 
@@ -62,7 +62,7 @@ namespace Orleans.Runtime.Membership
 
         public Task<MembershipTableData> ReadAll()
         {
-            return ReadAll(this._consulClient, this.clusterId, this.kvRootFolder, this._logger, this.versionKey);
+            return ReadAll(_consulClient, clusterId, kvRootFolder, _logger, versionKey);
         }
 
         public static async Task<MembershipTableData> ReadAll(IConsulClient consulClient, string clusterId, string kvRootFolder, ILogger logger, string versionKey)
@@ -94,10 +94,10 @@ namespace Orleans.Runtime.Membership
             try
             {
                 //Use "0" as the eTag then Consul KV CAS will treat the operation as an insert and return false if the KV already exiats.
-                var siloRegistration = ConsulSiloRegistrationAssembler.FromMembershipEntry(this.clusterId, entry, "0");
-                var insertKV = ConsulSiloRegistrationAssembler.ToKVPair(siloRegistration, this.kvRootFolder);
+                var siloRegistration = ConsulSiloRegistrationAssembler.FromMembershipEntry(clusterId, entry, "0");
+                var insertKV = ConsulSiloRegistrationAssembler.ToKVPair(siloRegistration, kvRootFolder);
                 var rowInsert = new KVTxnOp(insertKV.Key, KVTxnVerb.CAS) { Index = siloRegistration.LastIndex, Value = insertKV.Value };
-                var versionUpdate = this.GetVersionRowUpdate(tableVersion);
+                var versionUpdate = GetVersionRowUpdate(tableVersion);
 
                 var responses = await _consulClient.KV.Txn(new List<KVTxnOp> { rowInsert, versionUpdate });
                 if (!responses.Response.Success)
@@ -120,11 +120,11 @@ namespace Orleans.Runtime.Membership
             //Update Silo Liveness
             try
             {
-                var siloRegistration = ConsulSiloRegistrationAssembler.FromMembershipEntry(this.clusterId, entry, etag);
-                var updateKV = ConsulSiloRegistrationAssembler.ToKVPair(siloRegistration, this.kvRootFolder);
+                var siloRegistration = ConsulSiloRegistrationAssembler.FromMembershipEntry(clusterId, entry, etag);
+                var updateKV = ConsulSiloRegistrationAssembler.ToKVPair(siloRegistration, kvRootFolder);
 
                 var rowUpdate = new KVTxnOp(updateKV.Key, KVTxnVerb.CAS) { Index = siloRegistration.LastIndex, Value = updateKV.Value };
-                var versionUpdate = this.GetVersionRowUpdate(tableVersion);
+                var versionUpdate = GetVersionRowUpdate(tableVersion);
 
                 var responses = await _consulClient.KV.Txn(new List<KVTxnOp> { rowUpdate, versionUpdate });
                 if (!responses.Response.Success)
@@ -144,13 +144,13 @@ namespace Orleans.Runtime.Membership
 
         public async Task UpdateIAmAlive(MembershipEntry entry)
         {
-            var iAmAliveKV = ConsulSiloRegistrationAssembler.ToIAmAliveKVPair(this.clusterId, this.kvRootFolder, entry.SiloAddress, entry.IAmAliveTime);
+            var iAmAliveKV = ConsulSiloRegistrationAssembler.ToIAmAliveKVPair(clusterId, kvRootFolder, entry.SiloAddress, entry.IAmAliveTime);
             await _consulClient.KV.Put(iAmAliveKV);
         }
 
         public async Task DeleteMembershipTableEntries(string clusterId)
         {
-            await _consulClient.KV.DeleteTree(ConsulSiloRegistrationAssembler.FormatDeploymentKVPrefix(this.clusterId, this.kvRootFolder));
+            await _consulClient.KV.DeleteTree(ConsulSiloRegistrationAssembler.FormatDeploymentKVPrefix(this.clusterId, kvRootFolder));
         }
 
         private static TableVersion GetTableVersion(string versionKey, QueryResult<KVPair[]> entries)
@@ -179,13 +179,13 @@ namespace Orleans.Runtime.Membership
         {
             ulong.TryParse(version.VersionEtag, out var index);
             var versionBytes = Encoding.UTF8.GetBytes(version.Version.ToString(CultureInfo.InvariantCulture));
-            return new KVTxnOp(this.versionKey, KVTxnVerb.CAS) { Index = index, Value = versionBytes };
+            return new KVTxnOp(versionKey, KVTxnVerb.CAS) { Index = index, Value = versionBytes };
         }
 
         private async Task<(ConsulSiloRegistration, TableVersion)> GetConsulSiloRegistration(SiloAddress siloAddress)
         {
-            var deploymentKey = ConsulSiloRegistrationAssembler.FormatDeploymentKVPrefix(this.clusterId, this.kvRootFolder);
-            var siloKey = ConsulSiloRegistrationAssembler.FormatDeploymentSiloKey(this.clusterId, this.kvRootFolder, siloAddress);
+            var deploymentKey = ConsulSiloRegistrationAssembler.FormatDeploymentKVPrefix(clusterId, kvRootFolder);
+            var siloKey = ConsulSiloRegistrationAssembler.FormatDeploymentSiloKey(clusterId, kvRootFolder, siloAddress);
             var entries = await _consulClient.KV.List(deploymentKey);
             if (entries.Response == null) return (null, NotFoundTableVersion);
 
@@ -193,7 +193,7 @@ namespace Orleans.Runtime.Membership
             var iAmAliveKV = entries.Response.SingleOrDefault(KV => KV.Key.Equals(ConsulSiloRegistrationAssembler.FormatSiloIAmAliveKey(siloKey), StringComparison.OrdinalIgnoreCase));
             var tableVersion = GetTableVersion(versionKey: versionKey, entries: entries);
 
-            var siloRegistration = ConsulSiloRegistrationAssembler.FromKVPairs(this.clusterId, siloKV, iAmAliveKV);
+            var siloRegistration = ConsulSiloRegistrationAssembler.FromKVPairs(clusterId, siloKV, iAmAliveKV);
 
             return (siloRegistration, tableVersion);
         }
@@ -210,10 +210,10 @@ namespace Orleans.Runtime.Membership
 
         public async Task CleanupDefunctSiloEntries(DateTimeOffset beforeDate)
         {
-            var allKVs = await _consulClient.KV.List(ConsulSiloRegistrationAssembler.FormatDeploymentKVPrefix(this.clusterId, this.kvRootFolder));
+            var allKVs = await _consulClient.KV.List(ConsulSiloRegistrationAssembler.FormatDeploymentKVPrefix(clusterId, kvRootFolder));
             if (allKVs.Response == null)
             {
-                _logger.LogDebug("Could not find any silo registrations for deployment {ClusterId}.", this.clusterId);
+                _logger.LogDebug("Could not find any silo registrations for deployment {ClusterId}.", clusterId);
                 return;
             }
 

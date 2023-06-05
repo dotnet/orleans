@@ -18,7 +18,7 @@ namespace Orleans.Streams
         private readonly List<IStreamQueueBalanceListener> queueBalanceListeners;
         private readonly CancellationTokenSource cts;
 
-        protected CancellationToken Cancellation => this.cts.Token;
+        protected CancellationToken Cancellation => cts.Token;
 
         protected SiloAddress SiloAddress { get; }
 
@@ -34,11 +34,11 @@ namespace Orleans.Streams
         /// </summary>
         private QueueBalancerBase(IClusterMembershipService clusterMembership, ILocalSiloDetails localSiloDetails, ILogger logger)
         {
-            this.clusterMembershipUpdates = clusterMembership.MembershipUpdates;
-            this.SiloAddress = localSiloDetails.SiloAddress;
-            this.Logger = logger;
-            this.queueBalanceListeners = new List<IStreamQueueBalanceListener>();
-            this.cts = new CancellationTokenSource();
+            clusterMembershipUpdates = clusterMembership.MembershipUpdates;
+            SiloAddress = localSiloDetails.SiloAddress;
+            Logger = logger;
+            queueBalanceListeners = new List<IStreamQueueBalanceListener>();
+            cts = new CancellationTokenSource();
         }
 
         /// <inheritdoc/>
@@ -53,7 +53,7 @@ namespace Orleans.Streams
 
         public virtual Task Shutdown()
         {
-            this.cts.Cancel(throwOnFirstException: false);
+            cts.Cancel(throwOnFirstException: false);
             return Task.CompletedTask;
         }
 
@@ -66,13 +66,13 @@ namespace Orleans.Streams
             {
                 throw new ArgumentNullException(nameof(observer));
             }
-            lock (this.queueBalanceListeners)
+            lock (queueBalanceListeners)
             {
-                if (this.queueBalanceListeners.Contains(observer))
+                if (queueBalanceListeners.Contains(observer))
                 {
                     return false;
                 }
-                this.queueBalanceListeners.Add(observer);
+                queueBalanceListeners.Add(observer);
                 return true;
             }
         }
@@ -83,15 +83,15 @@ namespace Orleans.Streams
             {
                 throw new ArgumentNullException(nameof(observer));
             }
-            lock (this.queueBalanceListeners)
+            lock (queueBalanceListeners)
             {
-                return this.queueBalanceListeners.Remove(observer);
+                return queueBalanceListeners.Remove(observer);
             }
         }
 
         protected Task NotifyListeners()
         {
-            if (this.Cancellation.IsCancellationRequested) return Task.CompletedTask;
+            if (Cancellation.IsCancellationRequested) return Task.CompletedTask;
             List<IStreamQueueBalanceListener> queueBalanceListenersCopy;
             lock (queueBalanceListeners)
             {
@@ -104,7 +104,7 @@ namespace Orleans.Streams
         private async Task ListenForClusterChanges()
         {
             var current = new HashSet<SiloAddress>();
-            await foreach (var membershipSnapshot in this.clusterMembershipUpdates.WithCancellation(this.Cancellation))
+            await foreach (var membershipSnapshot in clusterMembershipUpdates.WithCancellation(Cancellation))
             {
                 // get active members
                 var update = new HashSet<SiloAddress>(membershipSnapshot.Members.Values

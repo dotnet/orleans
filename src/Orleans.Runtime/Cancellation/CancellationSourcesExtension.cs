@@ -42,7 +42,7 @@ namespace Orleans.Runtime
                 _logger.LogWarning((int)ErrorCode.CancellationTokenCancelFailed, "Received a cancel call for token with id {TokenId}, but the token was not found", tokenId);
 
                 // Record the cancellation anyway, in case the call which would have registered the cancellation is still pending.
-                this.RecordCancellationToken(tokenId, isCancellationRequested: true);
+                RecordCancellationToken(tokenId, isCancellationRequested: true);
                 return Task.CompletedTask;
             }
 

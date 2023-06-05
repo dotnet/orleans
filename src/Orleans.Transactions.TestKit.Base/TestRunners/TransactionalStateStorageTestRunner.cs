@@ -37,7 +37,7 @@ namespace Orleans.Transactions.TestKit
 
         public virtual async Task FirstTime_Load_ShouldReturnEmptyLoadResponse()
         {
-            var stateStorage = await this.stateStorageFactory();
+            var stateStorage = await stateStorageFactory();
             var response = await stateStorage.Load();
             var defaultStateValue = new TState();
 
@@ -53,7 +53,7 @@ namespace Orleans.Transactions.TestKit
   
         public virtual async Task StoreWithoutChanges()
         {
-            var stateStorage = await this.stateStorageFactory();
+            var stateStorage = await stateStorageFactory();
 
             // load first time
             var loadresponse = await stateStorage.Load();
@@ -90,7 +90,7 @@ namespace Orleans.Transactions.TestKit
 
         public virtual async Task WrongEtags()
         {
-            var stateStorage = await this.stateStorageFactory();
+            var stateStorage = await stateStorageFactory();
 
             // load first time
             var loadresponse = await stateStorage.Load();
@@ -191,13 +191,13 @@ namespace Orleans.Transactions.TestKit
 
         private async Task PrepareOne()
         {
-            var stateStorage = await this.stateStorageFactory();
+            var stateStorage = await stateStorageFactory();
             var loadresponse = await stateStorage.Load();
             var etag = loadresponse.ETag;
             var metadata = loadresponse.Metadata;
             var initialstate = loadresponse.CommittedState;
 
-            var expectedState = this.stateFactory(123);
+            var expectedState = stateFactory(123);
             var pendingstate = MakePendingState(1, expectedState, false);
             _ = await stateStorage.Store(etag, metadata, new List<PendingTransactionState<TState>>() { pendingstate }, null, null);
 
@@ -218,13 +218,13 @@ namespace Orleans.Transactions.TestKit
 
         public virtual async Task ConfirmOne(bool useTwoSteps)
         { 
-            var stateStorage = await this.stateStorageFactory();
+            var stateStorage = await stateStorageFactory();
             var loadresponse = await stateStorage.Load();
             var etag = loadresponse.ETag;
             var metadata = loadresponse.Metadata;
             var initialstate = loadresponse.CommittedState;
 
-            var expectedState = this.stateFactory(123);
+            var expectedState = stateFactory(123);
             var pendingstate = MakePendingState(1, expectedState, false);
 
             if (useTwoSteps)
@@ -252,13 +252,13 @@ namespace Orleans.Transactions.TestKit
 
         public virtual async Task CancelOne()
         {
-            var stateStorage = await this.stateStorageFactory();
+            var stateStorage = await stateStorageFactory();
             var loadresponse = await stateStorage.Load();
             var etag = loadresponse.ETag;
             var metadata = loadresponse.Metadata;
             var initialstate = loadresponse.CommittedState;
             
-            var pendingstate = MakePendingState(1, this.stateFactory(123), false);
+            var pendingstate = MakePendingState(1, stateFactory(123), false);
 
             etag = await stateStorage.Store(etag, metadata, new List<PendingTransactionState<TState>>() { pendingstate }, null, null);
             _ = await stateStorage.Store(etag, metadata, emptyPendingStates, null, 0);
@@ -278,14 +278,14 @@ namespace Orleans.Transactions.TestKit
 
         public virtual async Task ReplaceOne()
         {
-            var stateStorage = await this.stateStorageFactory();
+            var stateStorage = await stateStorageFactory();
             var loadresponse = await stateStorage.Load();
             var etag = loadresponse.ETag;
             var metadata = loadresponse.Metadata;
             var initialstate = loadresponse.CommittedState;
 
-            var expectedState1 = this.stateFactory(123);
-            var expectedState2 = this.stateFactory(456);
+            var expectedState1 = stateFactory(123);
+            var expectedState2 = stateFactory(456);
             var pendingstate1 = MakePendingState(1, expectedState1, false);
             var pendingstate2 = MakePendingState(1, expectedState2, false);
 
@@ -310,15 +310,15 @@ namespace Orleans.Transactions.TestKit
 
         public virtual async Task ConfirmOneAndCancelOne(bool useTwoSteps = false, bool reverseOrder = false)
         {
-            var stateStorage = await this.stateStorageFactory();
+            var stateStorage = await stateStorageFactory();
             var loadresponse = await stateStorage.Load();
             var etag = loadresponse.ETag;
             var metadata = loadresponse.Metadata;
             var initialstate = loadresponse.CommittedState;
 
-            var expectedState = this.stateFactory(123);
+            var expectedState = stateFactory(123);
             var pendingstate1 = MakePendingState(1, expectedState, false);
-            var pendingstate2 = MakePendingState(2, this.stateFactory(456), false);
+            var pendingstate2 = MakePendingState(2, stateFactory(456), false);
 
             etag = await stateStorage.Store(etag, metadata, new List<PendingTransactionState<TState>>() { pendingstate1, pendingstate2 }, null, null);
 
@@ -355,7 +355,7 @@ namespace Orleans.Transactions.TestKit
 
         public virtual async Task PrepareMany(int count)
         {
-            var stateStorage = await this.stateStorageFactory();
+            var stateStorage = await stateStorageFactory();
             var loadresponse = await stateStorage.Load();
             var etag = loadresponse.ETag;
             var metadata = loadresponse.Metadata;
@@ -365,7 +365,7 @@ namespace Orleans.Transactions.TestKit
             var expectedStates = new List<TState>();
             for (int i = 0; i < count; i++)
             {
-                expectedStates.Add(this.stateFactory(i * 1000));
+                expectedStates.Add(stateFactory(i * 1000));
             }
 
             for (int i = 0; i < count; i++)
@@ -395,7 +395,7 @@ namespace Orleans.Transactions.TestKit
 
         public virtual async Task ConfirmMany(int count, bool useTwoSteps)
         {
-            var stateStorage = await this.stateStorageFactory();
+            var stateStorage = await stateStorageFactory();
             var loadresponse = await stateStorage.Load();
             var etag = loadresponse.ETag;
             var metadata = loadresponse.Metadata;
@@ -404,7 +404,7 @@ namespace Orleans.Transactions.TestKit
             var expectedStates = new List<TState>();
             for (int i = 0; i < count; i++)
             {
-                expectedStates.Add(this.stateFactory(i * 1000));
+                expectedStates.Add(stateFactory(i * 1000));
             }
             var pendingstates = new List<PendingTransactionState<TState>>();
             for (int i = 0; i < count; i++)
@@ -437,7 +437,7 @@ namespace Orleans.Transactions.TestKit
 
         public virtual async Task CancelMany(int count)
         {
-            var stateStorage = await this.stateStorageFactory();
+            var stateStorage = await stateStorageFactory();
             var loadresponse = await stateStorage.Load();
             var etag = loadresponse.ETag;
             var metadata = loadresponse.Metadata;
@@ -446,7 +446,7 @@ namespace Orleans.Transactions.TestKit
             var expectedStates = new List<TState>();
             for (int i = 0; i < count; i++)
             {
-                expectedStates.Add(this.stateFactory(i * 1000));
+                expectedStates.Add(stateFactory(i * 1000));
             }
 
             var pendingstates = new List<PendingTransactionState<TState>>();
@@ -473,7 +473,7 @@ namespace Orleans.Transactions.TestKit
 
         public virtual async Task ReplaceMany(int count)
         {
-            var stateStorage = await this.stateStorageFactory();
+            var stateStorage = await stateStorageFactory();
             var loadresponse = await stateStorage.Load();
             var etag = loadresponse.ETag;
             var metadata = loadresponse.Metadata;
@@ -482,13 +482,13 @@ namespace Orleans.Transactions.TestKit
             var expectedStates1 = new List<TState>();
             for (int i = 0; i < count; i++)
             {
-                expectedStates1.Add(this.stateFactory(i * 1000 + 1));
+                expectedStates1.Add(stateFactory(i * 1000 + 1));
             }
 
             var expectedStates2 = new List<TState>();
             for (int i = 0; i < count; i++)
             {
-                expectedStates2.Add(this.stateFactory(i * 1000));
+                expectedStates2.Add(stateFactory(i * 1000));
             }
 
             var pendingstates1 = new List<PendingTransactionState<TState>>();
@@ -527,25 +527,25 @@ namespace Orleans.Transactions.TestKit
 
         public virtual async Task GrowingBatch()
         {
-            var stateStorage = await this.stateStorageFactory();
+            var stateStorage = await stateStorageFactory();
             var loadresponse = await stateStorage.Load();
             var etag = loadresponse.ETag;
             var metadata = loadresponse.Metadata;
             var initialstate = loadresponse.CommittedState;
             
-            var pendingstate1 = MakePendingState(1, this.stateFactory(11), false);
-            var pendingstate2 = MakePendingState(2, this.stateFactory(22), false);
-            var pendingstate3a = MakePendingState(3, this.stateFactory(333), false);
-            var pendingstate4a = MakePendingState(4, this.stateFactory(444), false);
-            var pendingstate3b = MakePendingState(3, this.stateFactory(33), false);
-            var pendingstate4b = MakePendingState(4, this.stateFactory(44), false);
-            var pendingstate5 = MakePendingState(5, this.stateFactory(55), false);
+            var pendingstate1 = MakePendingState(1, stateFactory(11), false);
+            var pendingstate2 = MakePendingState(2, stateFactory(22), false);
+            var pendingstate3a = MakePendingState(3, stateFactory(333), false);
+            var pendingstate4a = MakePendingState(4, stateFactory(444), false);
+            var pendingstate3b = MakePendingState(3, stateFactory(33), false);
+            var pendingstate4b = MakePendingState(4, stateFactory(44), false);
+            var pendingstate5 = MakePendingState(5, stateFactory(55), false);
 
-            var expectedState6 = this.stateFactory(66);
+            var expectedState6 = stateFactory(66);
             var pendingstate6 = MakePendingState(6, expectedState6, false);
-            var expectedState7 = this.stateFactory(77);
+            var expectedState7 = stateFactory(77);
             var pendingstate7 = MakePendingState(7, expectedState7, false);
-            var expectedState8 = this.stateFactory(88);
+            var expectedState8 = stateFactory(88);
             var pendingstate8 = MakePendingState(8, expectedState8, false);
            
 
@@ -580,23 +580,23 @@ namespace Orleans.Transactions.TestKit
 
         public virtual async Task ShrinkingBatch()
         {
-            var stateStorage = await this.stateStorageFactory();
+            var stateStorage = await stateStorageFactory();
             var loadresponse = await stateStorage.Load();
             var etag = loadresponse.ETag;
             var metadata = loadresponse.Metadata;
             var initialstate = loadresponse.CommittedState;
 
-            var pendingstate1 = MakePendingState(1, this.stateFactory(11), false);
-            var pendingstate2 = MakePendingState(2, this.stateFactory(22), false);
-            var pendingstate3a = MakePendingState(3, this.stateFactory(333), false);
-            var pendingstate4a = MakePendingState(4, this.stateFactory(444), false);
-            var pendingstate5 = MakePendingState(5, this.stateFactory(55), false);
-            var pendingstate6 = MakePendingState(6, this.stateFactory(66), false);
-            var pendingstate7 = MakePendingState(7, this.stateFactory(77), false);
-            var pendingstate8 = MakePendingState(8, this.stateFactory(88), false);
-            var expectedState3b = this.stateFactory(33);
+            var pendingstate1 = MakePendingState(1, stateFactory(11), false);
+            var pendingstate2 = MakePendingState(2, stateFactory(22), false);
+            var pendingstate3a = MakePendingState(3, stateFactory(333), false);
+            var pendingstate4a = MakePendingState(4, stateFactory(444), false);
+            var pendingstate5 = MakePendingState(5, stateFactory(55), false);
+            var pendingstate6 = MakePendingState(6, stateFactory(66), false);
+            var pendingstate7 = MakePendingState(7, stateFactory(77), false);
+            var pendingstate8 = MakePendingState(8, stateFactory(88), false);
+            var expectedState3b = stateFactory(33);
             var pendingstate3b = MakePendingState(3, expectedState3b, false);
-            var expectedState4b = this.stateFactory(44);
+            var expectedState4b = stateFactory(44);
             var pendingstate4b = MakePendingState(4, expectedState4b, false);
 
 

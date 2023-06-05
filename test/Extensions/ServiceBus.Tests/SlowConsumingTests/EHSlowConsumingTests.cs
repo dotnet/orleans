@@ -69,16 +69,16 @@ namespace ServiceBus.Tests.SlowConsumingTests
             var streamGuid = Guid.NewGuid();
             var streamId = StreamId.Create(StreamNamespace, streamGuid);
             //set up one slow consumer grain
-            var slowConsumer = this.fixture.GrainFactory.GetGrain<ISlowConsumingGrain>(Guid.NewGuid());
+            var slowConsumer = fixture.GrainFactory.GetGrain<ISlowConsumingGrain>(Guid.NewGuid());
             await slowConsumer.BecomeConsumer(streamGuid, StreamNamespace, StreamProviderName);
 
             //set up 30 healthy consumer grain to show how much we favor slow consumer 
             int healthyConsumerCount = 30;
-            var healthyConsumers = await SetUpHealthyConsumerGrain(this.fixture.GrainFactory, streamGuid, StreamNamespace, StreamProviderName, healthyConsumerCount);
+            var healthyConsumers = await SetUpHealthyConsumerGrain(fixture.GrainFactory, streamGuid, StreamNamespace, StreamProviderName, healthyConsumerCount);
 
             //configure data generator for stream and start producing
-            var mgmtGrain = this.fixture.GrainFactory.GetGrain<IManagementGrain>(0);
-            var randomStreamPlacementArg = new EventDataGeneratorAdapterFactory.StreamRandomPlacementArg(streamId, this.seed.Next(100));
+            var mgmtGrain = fixture.GrainFactory.GetGrain<IManagementGrain>(0);
+            var randomStreamPlacementArg = new EventDataGeneratorAdapterFactory.StreamRandomPlacementArg(streamId, seed.Next(100));
             await mgmtGrain.SendControlCommandToProvider(typeof(PersistentStreamProvider).FullName, StreamProviderName,
                 (int)EventDataGeneratorAdapterFactory.Commands.Randomly_Place_Stream_To_Queue, randomStreamPlacementArg);
             //since there's an extreme slow consumer, so the back pressure algorithm should be triggered
@@ -138,7 +138,7 @@ namespace ServiceBus.Tests.SlowConsumingTests
 
         private async Task<bool> IsBackPressureTriggered()
         {
-            IManagementGrain mgmtGrain = this.fixture.HostedCluster.GrainFactory.GetGrain<IManagementGrain>(0);
+            IManagementGrain mgmtGrain = fixture.HostedCluster.GrainFactory.GetGrain<IManagementGrain>(0);
             object[] replies = await mgmtGrain.SendControlCommandToProvider(typeof(PersistentStreamProvider).FullName,
                              StreamProviderName, EHStreamProviderWithCreatedCacheListAdapterFactory.IsCacheBackPressureTriggeredCommand, null);
             foreach (var re in replies)

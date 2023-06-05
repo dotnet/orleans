@@ -40,7 +40,7 @@ namespace UnitTests.Grains
 
         public RequestContextTaskGrain(ILoggerFactory loggerFactory)
         {
-            this.logger = loggerFactory.CreateLogger($"{this.GetType().Name}-{this.IdentityString}");
+            logger = loggerFactory.CreateLogger($"{GetType().Name}-{IdentityString}");
         }
 
         public Task<string> TraceIdEcho()

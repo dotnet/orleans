@@ -27,7 +27,7 @@ namespace Orleans.Runtime
 
         public void OnFatalException(object sender, string context, Exception exception)
         {
-            this.log.LogError(
+            log.LogError(
                 (int)ErrorCode.Logger_ProcessCrashing,
                 exception,
                 "Fatal error from {Sender}. Context: {Context}",

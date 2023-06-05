@@ -80,7 +80,7 @@ namespace TestGrains
 
         public async Task<Tuple<int, bool>> SetAConditional(int x)
         {
-            int version = this.Version;
+            int version = Version;
             bool success = await RaiseConditionalEvent(new UpdateA() { Val = x });
             return new Tuple<int, bool>(version, success);
         }
@@ -162,7 +162,7 @@ namespace TestGrains
 
         public Task<int> GetConfirmedVersion()
         {
-            return Task.FromResult(this.Version);
+            return Task.FromResult(Version);
         }
 
         public async Task<KeyValuePair<int, object>> Read()
@@ -186,7 +186,7 @@ namespace TestGrains
         }
 
         public Task<IReadOnlyList<object>> GetEventLog() {
-            return this.RetrieveConfirmedEvents(0, Version);
+            return RetrieveConfirmedEvents(0, Version);
         }
 
     }

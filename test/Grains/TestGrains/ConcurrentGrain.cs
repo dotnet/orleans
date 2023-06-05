@@ -13,12 +13,12 @@ namespace UnitTests.Grains
 
         public ConcurrentGrain(ILoggerFactory loggerFactory)
         {
-            this.logger = loggerFactory.CreateLogger($"{this.GetType().Name}-{this.IdentityString}");
+            logger = loggerFactory.CreateLogger($"{GetType().Name}-{IdentityString}");
         }
 
         public async Task Initialize(int ind)
         {
-            this.index = ind;
+            index = ind;
             logger.LogInformation("Initialize({Index})", index);
             if (index == 0)
             {
@@ -115,7 +115,7 @@ namespace UnitTests.Grains
 
         public ConcurrentReentrantGrain(ILoggerFactory loggerFactory)
         {
-            this.logger = loggerFactory.CreateLogger($"{this.GetType().Name}-{this.IdentityString}");
+            logger = loggerFactory.CreateLogger($"{GetType().Name}-{IdentityString}");
         }
 
         public Task Initialize_2(int ind)

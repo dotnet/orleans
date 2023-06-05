@@ -63,7 +63,7 @@ namespace Orleans
         /// <summary>
         /// String representation of grain's SiloIdentity including type and primary key.
         /// </summary>
-        public string IdentityString => this.GrainId.ToString();
+        public string IdentityString => GrainId.ToString();
 
         /// <summary>
         /// A unique identifier for the current silo.
@@ -245,15 +245,15 @@ namespace Orleans
         /// <inheritdoc />
         public virtual void Participate(IGrainLifecycle lifecycle)
         {
-            lifecycle.Subscribe(this.GetType().FullName, GrainLifecycleStage.SetupState, OnSetupState);
+            lifecycle.Subscribe(GetType().FullName, GrainLifecycleStage.SetupState, OnSetupState);
         }
 
         private Task OnSetupState(CancellationToken ct)
         {
             if (ct.IsCancellationRequested)
                 return Task.CompletedTask;
-            this.storage = this.Runtime.GetStorage<TGrainState>(GrainContext);
-            return this.ReadStateAsync();
+            storage = Runtime.GetStorage<TGrainState>(GrainContext);
+            return ReadStateAsync();
         }
     }
 }

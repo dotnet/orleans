@@ -36,13 +36,13 @@ namespace Orleans
         /// <inheritdoc />
         public void Participate(IClusterClientLifecycle lifecycle)
         {
-            lifecycle.Subscribe<ClientOptionsLogger>(ClientOptionLoggerLifeCycleRing, this.OnStart);
+            lifecycle.Subscribe<ClientOptionsLogger>(ClientOptionLoggerLifeCycleRing, OnStart);
         }
 
         /// <inheritdoc />
         public Task OnStart(CancellationToken token)
         {
-            this.LogOptions();
+            LogOptions();
             return Task.CompletedTask;
         }
     }
@@ -75,7 +75,7 @@ namespace Orleans
         /// </summary>
         public void LogOptions()
         {
-            this.LogOptions(services.GetServices<IOptionFormatter>());
+            LogOptions(services.GetServices<IOptionFormatter>());
         }
 
         /// <summary>
@@ -86,7 +86,7 @@ namespace Orleans
         {
             foreach (var optionFormatter in formatters.OrderBy(f => f.Name))
             {
-                this.LogOption(optionFormatter);
+                LogOption(optionFormatter);
             }
         }
 
@@ -104,10 +104,10 @@ namespace Orleans
                 {
                     stringBuiler.AppendLine($"{setting}");
                 }
-                this.logger.LogInformation(stringBuiler.ToString());
+                logger.LogInformation(stringBuiler.ToString());
             } catch(Exception ex)
             {
-                this.logger.LogError(ex, $"An error occurred while logging options {formatter.Name}", formatter.Name);
+                logger.LogError(ex, $"An error occurred while logging options {formatter.Name}", formatter.Name);
                 throw;
             }
         }

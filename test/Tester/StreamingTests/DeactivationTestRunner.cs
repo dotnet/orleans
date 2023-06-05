@@ -45,8 +45,8 @@ namespace UnitTests.StreamingTests
         public async Task DeactivationTest(Guid streamGuid, string streamNamespace)
         {
             // get producer and consumer
-            var producer = this.client.GetGrain<ISampleStreaming_ProducerGrain>(Guid.NewGuid());
-            var consumer = this.client.GetGrain<IMultipleSubscriptionConsumerGrain>(Guid.NewGuid());
+            var producer = client.GetGrain<ISampleStreaming_ProducerGrain>(Guid.NewGuid());
+            var consumer = client.GetGrain<IMultipleSubscriptionConsumerGrain>(Guid.NewGuid());
 
             // subscribe (PubSubRendezvousGrain will have one consumer)
             StreamSubscriptionHandle<int> subscriptionHandle = await consumer.BecomeConsumer(streamGuid, streamNamespace, streamProviderName);
@@ -83,11 +83,11 @@ namespace UnitTests.StreamingTests
         public async Task DeactivationTest_ClientConsumer(Guid streamGuid, string streamNamespace)
         {
             // get producer and consumer
-            var producer = this.client.GetGrain<ISampleStreaming_ProducerGrain>(Guid.NewGuid());
+            var producer = client.GetGrain<ISampleStreaming_ProducerGrain>(Guid.NewGuid());
 
             var count = new Counter();
             // get stream and subscribe
-            IStreamProvider streamProvider = this.client.GetStreamProvider(streamProviderName);
+            IStreamProvider streamProvider = client.GetStreamProvider(streamProviderName);
             var stream = streamProvider.GetStream<int>(streamNamespace, streamGuid);
             StreamSubscriptionHandle<int> subscriptionHandle = await stream.SubscribeAsync((e, t) => count.Increment());
 

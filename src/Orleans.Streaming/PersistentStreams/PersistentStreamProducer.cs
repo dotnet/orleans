@@ -29,12 +29,12 @@ namespace Orleans.Streams
 
         public Task OnNextAsync(T item, StreamSequenceToken token)
         {
-            return this.queueAdapter.QueueMessageAsync(this.stream.StreamId, item, token, RequestContextExtensions.Export(this.deepCopier));
+            return queueAdapter.QueueMessageAsync(stream.StreamId, item, token, RequestContextExtensions.Export(deepCopier));
         }
         
         public Task OnNextBatchAsync(IEnumerable<T> batch, StreamSequenceToken token)
         {
-            return this.queueAdapter.QueueMessageBatchAsync(this.stream.StreamId, batch, token, RequestContextExtensions.Export(this.deepCopier));
+            return queueAdapter.QueueMessageBatchAsync(stream.StreamId, batch, token, RequestContextExtensions.Export(deepCopier));
 
         }
 

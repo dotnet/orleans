@@ -43,7 +43,7 @@ namespace Orleans.TestingHost.Logging
         /// <param name="fileName">Name of the log file.</param>
         public FileLoggingOutput(string fileName)
         {
-            this.logFileName = fileName;
+            logFileName = fileName;
             logOutput = new StreamWriter(File.Open(fileName, FileMode.Append, FileAccess.Write, FileShare.ReadWrite), Encoding.UTF8);
             Instances[this] = null;
         }
@@ -62,16 +62,16 @@ namespace Orleans.TestingHost.Logging
             Func<TState, Exception, string> formatter, string category)
         {
             var logMessage = FormatMessage(DateTime.UtcNow, logLevel, category, formatter(state, exception), exception, eventId);
-            lock (this.lockObj)
+            lock (lockObj)
             {
-                if (this.logOutput == null) return;
+                if (logOutput == null) return;
 
-                this.logOutput.WriteLine(logMessage);
+                logOutput.WriteLine(logMessage);
                 var now = DateTime.UtcNow;
-                if (now - this.lastFlush > flushInterval)
+                if (now - lastFlush > flushInterval)
                 {
-                    this.lastFlush = now;
-                    this.logOutput.Flush();
+                    lastFlush = now;
+                    logOutput.Flush();
                 }
             }
         }
@@ -110,11 +110,11 @@ namespace Orleans.TestingHost.Logging
         {
             try
             {
-                lock (this.lockObj)
+                lock (lockObj)
                 {
-                    if (this.logOutput is StreamWriter output)
+                    if (logOutput is StreamWriter output)
                     {
-                        this.logOutput = null;
+                        logOutput = null;
                         _ = Instances.TryRemove(this, out _);
 
                         // Dispose the output, which will flush all buffers.
@@ -124,7 +124,7 @@ namespace Orleans.TestingHost.Logging
             }
             catch (Exception exc)
             {
-                var msg = string.Format("Ignoring error closing log file {0} - {1}", this.logFileName,
+                var msg = string.Format("Ignoring error closing log file {0} - {1}", logFileName,
                     LogFormatter.PrintException(exc));
                 Console.WriteLine(msg);
             }
@@ -165,7 +165,7 @@ namespace Orleans.TestingHost.Logging
         /// <inheritdoc />
         public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception exception, Func<TState, Exception, string> formatter)
         {
-            this.output.Log(logLevel, eventId, state, exception, formatter, this.category);
+            output.Log(logLevel, eventId, state, exception, formatter, category);
 
         }
 

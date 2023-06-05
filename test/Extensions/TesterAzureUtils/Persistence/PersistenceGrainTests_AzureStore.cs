@@ -54,58 +54,58 @@ namespace Tester.AzureUtils.Persistence
         public Base_PersistenceGrainTests_AzureStore(ITestOutputHelper output, BaseTestClusterFixture fixture, string grainNamespace = "UnitTests.Grains")
         {
             this.output = output;
-            this.logger = fixture.Logger;
+            logger = fixture.Logger;
             HostedCluster = fixture.HostedCluster;
             GrainFactory = fixture.GrainFactory;
             timingFactor = TestUtils.CalibrateTimings();
-            this.basicPersistenceTestsRunner = new GrainPersistenceTestsRunner(output, fixture, grainNamespace);
+            basicPersistenceTestsRunner = new GrainPersistenceTestsRunner(output, fixture, grainNamespace);
         }
 
         public IGrainFactory GrainFactory { get; }
 
         protected Task Grain_AzureStore_Delete()
         {
-            return this.basicPersistenceTestsRunner.Grain_GrainStorage_Delete();
+            return basicPersistenceTestsRunner.Grain_GrainStorage_Delete();
         }
 
         protected Task Grain_AzureStore_Read()
         {
-            return this.basicPersistenceTestsRunner.Grain_GrainStorage_Read();
+            return basicPersistenceTestsRunner.Grain_GrainStorage_Read();
         }
 
         protected Task Grain_GuidKey_AzureStore_Read_Write()
         {
-            return this.basicPersistenceTestsRunner.Grain_GuidKey_GrainStorage_Read_Write();
+            return basicPersistenceTestsRunner.Grain_GuidKey_GrainStorage_Read_Write();
         }
 
         protected Task Grain_LongKey_AzureStore_Read_Write()
         {
-            return this.basicPersistenceTestsRunner.Grain_LongKey_GrainStorage_Read_Write();
+            return basicPersistenceTestsRunner.Grain_LongKey_GrainStorage_Read_Write();
         }
 
         protected Task Grain_LongKeyExtended_AzureStore_Read_Write()
         {
-            return this.basicPersistenceTestsRunner.Grain_LongKeyExtended_GrainStorage_Read_Write();
+            return basicPersistenceTestsRunner.Grain_LongKeyExtended_GrainStorage_Read_Write();
         }
 
         protected Task Grain_GuidKeyExtended_AzureStore_Read_Write()
         {
-            return this.basicPersistenceTestsRunner.Grain_GuidKeyExtended_GrainStorage_Read_Write();
+            return basicPersistenceTestsRunner.Grain_GuidKeyExtended_GrainStorage_Read_Write();
         }
 
         protected Task Grain_Generic_AzureStore_Read_Write()
         {
-            return this.basicPersistenceTestsRunner.Grain_Generic_GrainStorage_Read_Write();
+            return basicPersistenceTestsRunner.Grain_Generic_GrainStorage_Read_Write();
         }
 
         protected Task Grain_Generic_AzureStore_DiffTypes()
         {
-            return this.basicPersistenceTestsRunner.Grain_Generic_GrainStorage_DiffTypes();
+            return basicPersistenceTestsRunner.Grain_Generic_GrainStorage_DiffTypes();
         }
 
         protected Task Grain_AzureStore_SiloRestart()
         {
-            return this.basicPersistenceTestsRunner.Grain_GrainStorage_SiloRestart();
+            return basicPersistenceTestsRunner.Grain_GrainStorage_SiloRestart();
         }
 
         protected void Persistence_Perf_Activate()
@@ -160,10 +160,10 @@ namespace Tester.AzureUtils.Persistence
        
         protected async Task Persistence_Silo_StorageProvider_Azure(string providerName)
         {
-            List<SiloHandle> silos = this.HostedCluster.GetActiveSilos().ToList();
+            List<SiloHandle> silos = HostedCluster.GetActiveSilos().ToList();
             foreach (var silo in silos)
             {
-                var testHooks = this.HostedCluster.Client.GetTestHooks(silo);
+                var testHooks = HostedCluster.Client.GetTestHooks(silo);
                 List<string> providers = (await testHooks.GetStorageProviderNames()).ToList();
                 Assert.True(providers.Contains(providerName), $"No storage provider found: {providerName}");
             }
@@ -185,10 +185,10 @@ namespace Tester.AzureUtils.Persistence
             for (int i = 0; i < n; i++)
             {
                 Guid id = Guid.NewGuid();
-                noStateGrains[i] = this.GrainFactory.GetGrain<IEchoTaskGrain>(id);
-                memoryGrains[i] = this.GrainFactory.GetGrain<IPersistenceTestGrain>(id);
-                azureStoreGrains[i] = this.GrainFactory.GetGrain<IGrainStorageTestGrain>(id);
-                memoryStoreGrains[i] = this.GrainFactory.GetGrain<IMemoryStorageTestGrain>(id);
+                noStateGrains[i] = GrainFactory.GetGrain<IEchoTaskGrain>(id);
+                memoryGrains[i] = GrainFactory.GetGrain<IPersistenceTestGrain>(id);
+                azureStoreGrains[i] = GrainFactory.GetGrain<IGrainStorageTestGrain>(id);
+                memoryStoreGrains[i] = GrainFactory.GetGrain<IMemoryStorageTestGrain>(id);
             }
 
             TimeSpan baseline, elapsed;

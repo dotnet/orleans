@@ -29,9 +29,9 @@ namespace Orleans.Streaming.EventHubs.Testing
 
         public SimpleStreamEventDataGenerator(StreamId streamId, ILogger<SimpleStreamEventDataGenerator> logger, DeepCopier deepCopier, Serializer serializer)
         {
-            this.StreamId = streamId;
+            StreamId = streamId;
             this.logger = logger;
-            this.ShouldProduce = true;
+            ShouldProduce = true;
             this.deepCopier = deepCopier;
             this.serializer = serializer;
         }
@@ -39,7 +39,7 @@ namespace Orleans.Streaming.EventHubs.Testing
         /// <inheritdoc />
         public bool TryReadEvents(int maxCount, out IEnumerable<EventData> events)
         {
-            if (!this.ShouldProduce)
+            if (!ShouldProduce)
             {
                 events = null;
                 return false;
@@ -48,13 +48,13 @@ namespace Orleans.Streaming.EventHubs.Testing
             List<EventData> eventDataList = new List<EventData>();
             while (count-- > 0)
             {
-                this.SequenceNumberCounter.Increment();
+                SequenceNumberCounter.Increment();
 
                 var eventData = EventHubBatchContainer.ToEventData(
-                    this.serializer,
-                    this.StreamId,
-                    this.GenerateEvent(this.SequenceNumberCounter.Value),
-                    RequestContextExtensions.Export(this.deepCopier));
+                    serializer,
+                    StreamId,
+                    GenerateEvent(SequenceNumberCounter.Value),
+                    RequestContextExtensions.Export(deepCopier));
 
                var wrapper = new WrappedEventData(
                     eventData.Body,
@@ -62,11 +62,11 @@ namespace Orleans.Streaming.EventHubs.Testing
                     eventData.SystemProperties,
                     partitionKey: StreamId.GetKeyAsString(),
                     offset: DateTime.UtcNow.Ticks,
-                    sequenceNumber: this.SequenceNumberCounter.Value);
+                    sequenceNumber: SequenceNumberCounter.Value);
 
                 eventDataList.Add(wrapper);
 
-                this.logger.LogInformation("Generate data of SequenceNumber {SequenceNumber} for stream {StreamId}", SequenceNumberCounter.Value, this.StreamId);
+                logger.LogInformation("Generate data of SequenceNumber {SequenceNumber} for stream {StreamId}", SequenceNumberCounter.Value, StreamId);
             }
 
             events = eventDataList;
@@ -116,39 +116,39 @@ namespace Orleans.Streaming.EventHubs.Testing
         {
             this.options = options;
             this.generatorFactory = generatorFactory;
-            this.generators = new List<IStreamDataGenerator<EventData>>();
+            generators = new List<IStreamDataGenerator<EventData>>();
             this.logger = logger;
         }
         /// <inheritdoc />
         public void AddDataGeneratorForStream(StreamId streamId)
         {
-            var generator =  this.generatorFactory(streamId);
+            var generator =  generatorFactory(streamId);
             generator.SequenceNumberCounter = sequenceNumberCounter;
-            this.logger.LogInformation("Data generator set up on stream {StreamId}.", streamId);
-            this.generators.Add(generator);
+            logger.LogInformation("Data generator set up on stream {StreamId}.", streamId);
+            generators.Add(generator);
         }
         /// <inheritdoc />
         public void StopProducingOnStream(StreamId streamId)
         {
-            this.generators.ForEach(generator => {
+            generators.ForEach(generator => {
                 if (generator.StreamId.Equals(streamId))
                 {
                     generator.ShouldProduce = false;
-                    this.logger.LogInformation("Stop producing data on stream {StreamId}.", streamId);
+                    logger.LogInformation("Stop producing data on stream {StreamId}.", streamId);
                 }
             });
         }
         /// <inheritdoc />
         public bool TryReadEvents(int maxCount, out IEnumerable<EventData> events)
         {
-            if (this.generators.Count == 0)
+            if (generators.Count == 0)
             {
                 events = new List<EventData>();
                 return false;
             }
             var eventDataList = new List<EventData>();
-            var iterator = this.generators.AsEnumerable().GetEnumerator();
-            var batchCount = maxCount / this.generators.Count;
+            var iterator = generators.AsEnumerable().GetEnumerator();
+            var batchCount = maxCount / generators.Count;
             batchCount = batchCount == 0 ? batchCount + 1 : batchCount;
             while (eventDataList.Count < maxCount)
             {

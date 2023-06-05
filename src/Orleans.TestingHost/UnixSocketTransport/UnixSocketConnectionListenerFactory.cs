@@ -22,7 +22,7 @@ internal class UnixSocketConnectionListenerFactory : IConnectionListenerFactory
     {
         this.socketConnectionOptions = socketConnectionOptions.Value;
         var logger = loggerFactory.CreateLogger("Orleans.UnixSockets");
-        this.trace = new SocketsTrace(logger);
+        trace = new SocketsTrace(logger);
         this.schedulers = schedulers;
     }
 
@@ -30,7 +30,7 @@ internal class UnixSocketConnectionListenerFactory : IConnectionListenerFactory
     {
         var unixEndpoint = new UnixDomainSocketEndPoint(socketConnectionOptions.ConvertEndpointToPath(endpoint));
 
-        var listener = new UnixSocketConnectionListener(unixEndpoint, endpoint, this.socketConnectionOptions, this.trace, this.schedulers);
+        var listener = new UnixSocketConnectionListener(unixEndpoint, endpoint, socketConnectionOptions, trace, schedulers);
         listener.Bind();
         return new ValueTask<IConnectionListener>(listener);
     }

@@ -63,7 +63,7 @@ namespace Orleans.Streaming.EventHubs
 
         public int GetMaxAddCount()
         {
-            return this.flowController.GetMaxAddCount();
+            return flowController.GetMaxAddCount();
         }
 
         public EventHubAdapterReceiver(EventHubPartitionSettings settings,
@@ -79,7 +79,7 @@ namespace Orleans.Streaming.EventHubs
             this.cacheFactory = cacheFactory ?? throw new ArgumentNullException(nameof(cacheFactory));
             this.checkpointerFactory = checkpointerFactory ?? throw new ArgumentNullException(nameof(checkpointerFactory));
             this.loggerFactory = loggerFactory ?? throw new ArgumentNullException(nameof(loggerFactory));
-            this.logger = this.loggerFactory.CreateLogger<EventHubAdapterReceiver>();
+            logger = this.loggerFactory.CreateLogger<EventHubAdapterReceiver>();
             this.monitor = monitor ?? throw new ArgumentNullException(nameof(monitor));
             this.loadSheddingOptions = loadSheddingOptions ?? throw new ArgumentNullException(nameof(loadSheddingOptions));
             _hostEnvironmentStatistics = hostEnvironmentStatistics;
@@ -88,10 +88,10 @@ namespace Orleans.Streaming.EventHubs
 
         public Task Initialize(TimeSpan timeout)
         {
-            this.logger.LogInformation("Initializing EventHub partition {EventHubName}-{Partition}.", this.settings.Hub.EventHubName, this.settings.Partition);
+            logger.LogInformation("Initializing EventHub partition {EventHubName}-{Partition}.", settings.Hub.EventHubName, settings.Partition);
 
             // if receiver was already running, do nothing
-            return ReceiverRunning == Interlocked.Exchange(ref this.receiverState, ReceiverRunning)
+            return ReceiverRunning == Interlocked.Exchange(ref receiverState, ReceiverRunning)
                 ? Task.CompletedTask
                 : Initialize();
         }
@@ -106,41 +106,41 @@ namespace Orleans.Streaming.EventHubs
             var watch = Stopwatch.StartNew();
             try
             {
-                this.checkpointer = await this.checkpointerFactory(this.settings.Partition);
-                if(this.cache != null)
+                checkpointer = await checkpointerFactory(settings.Partition);
+                if(cache != null)
                 {
-                    this.cache.Dispose();
-                    this.cache = null;
+                    cache.Dispose();
+                    cache = null;
                 }
-                this.cache = this.cacheFactory(this.settings.Partition, this.checkpointer, this.loggerFactory);
-                this.flowController = new AggregatedQueueFlowController(MaxMessagesPerRead) { this.cache, LoadShedQueueFlowController.CreateAsPercentOfLoadSheddingLimit(this.loadSheddingOptions, _hostEnvironmentStatistics) };
-                string offset = await this.checkpointer.Load();
-                this.receiver = this.eventHubReceiverFactory(this.settings, offset, this.logger);
+                cache = cacheFactory(settings.Partition, checkpointer, loggerFactory);
+                flowController = new AggregatedQueueFlowController(MaxMessagesPerRead) { cache, LoadShedQueueFlowController.CreateAsPercentOfLoadSheddingLimit(loadSheddingOptions, _hostEnvironmentStatistics) };
+                string offset = await checkpointer.Load();
+                receiver = eventHubReceiverFactory(settings, offset, logger);
                 watch.Stop();
-                this.monitor?.TrackInitialization(true, watch.Elapsed, null);
+                monitor?.TrackInitialization(true, watch.Elapsed, null);
             }
             catch (Exception ex)
             {
                 watch.Stop();
-                this.monitor?.TrackInitialization(false, watch.Elapsed, ex);
+                monitor?.TrackInitialization(false, watch.Elapsed, ex);
                 throw;
             }
         }
 
         public async Task<IList<IBatchContainer>> GetQueueMessagesAsync(int maxCount)
         {
-            if (this.receiverState == ReceiverShutdown || maxCount <= 0)
+            if (receiverState == ReceiverShutdown || maxCount <= 0)
             {
                 return new List<IBatchContainer>();
             }
 
             // if receiver initialization failed, retry
-            if (this.receiver == null)
+            if (receiver == null)
             {
-                this.logger.Warn(OrleansEventHubErrorCode.FailedPartitionRead,
-                    "Retrying initialization of EventHub partition {0}-{1}.", this.settings.Hub.EventHubName, this.settings.Partition);
+                logger.Warn(OrleansEventHubErrorCode.FailedPartitionRead,
+                    "Retrying initialization of EventHub partition {0}-{1}.", settings.Hub.EventHubName, settings.Partition);
                 await Initialize();
-                if (this.receiver == null)
+                if (receiver == null)
                 {
                     // should not get here, should throw instead, but just incase.
                     return new List<IBatchContainer>();
@@ -151,25 +151,25 @@ namespace Orleans.Streaming.EventHubs
             try
             {
 
-                messages = (await this.receiver.ReceiveAsync(maxCount, ReceiveTimeout))?.ToList();
+                messages = (await receiver.ReceiveAsync(maxCount, ReceiveTimeout))?.ToList();
                 watch.Stop();
 
-                this.monitor?.TrackRead(true, watch.Elapsed, null);
+                monitor?.TrackRead(true, watch.Elapsed, null);
             }
             catch (Exception ex)
             {
                 watch.Stop();
-                this.monitor?.TrackRead(false, watch.Elapsed, ex);
-                this.logger.Warn(OrleansEventHubErrorCode.FailedPartitionRead,
-                    "Failed to read from EventHub partition {0}-{1}. : Exception: {2}.", this.settings.Hub.EventHubName,
-                    this.settings.Partition, ex);
+                monitor?.TrackRead(false, watch.Elapsed, ex);
+                logger.Warn(OrleansEventHubErrorCode.FailedPartitionRead,
+                    "Failed to read from EventHub partition {0}-{1}. : Exception: {2}.", settings.Hub.EventHubName,
+                    settings.Partition, ex);
                 throw;
             }
 
             var batches = new List<IBatchContainer>();
             if (messages == null || messages.Count == 0)
             {
-                this.monitor?.TrackMessagesReceived(0, null, null);
+                monitor?.TrackMessagesReceived(0, null, null);
                 return batches;
             }
 
@@ -179,16 +179,16 @@ namespace Orleans.Streaming.EventHubs
             DateTime oldestMessageEnqueueTime = messages[0].EnqueuedTime.UtcDateTime;
             DateTime newestMessageEnqueueTime = messages[messages.Count - 1].EnqueuedTime.UtcDateTime;
 
-            this.monitor?.TrackMessagesReceived(messages.Count, oldestMessageEnqueueTime, newestMessageEnqueueTime);
+            monitor?.TrackMessagesReceived(messages.Count, oldestMessageEnqueueTime, newestMessageEnqueueTime);
 
-            List<StreamPosition> messageStreamPositions = this.cache.Add(messages, dequeueTimeUtc);
+            List<StreamPosition> messageStreamPositions = cache.Add(messages, dequeueTimeUtc);
             foreach (var streamPosition in messageStreamPositions)
             {
                 batches.Add(new StreamActivityNotificationBatch(streamPosition));
             }
-            if (!this.checkpointer.CheckpointExists)
+            if (!checkpointer.CheckpointExists)
             {
-                this.checkpointer.Update(
+                checkpointer.Update(
                     messages[0].Offset.ToString(),
                     DateTime.UtcNow);
             }
@@ -206,19 +206,19 @@ namespace Orleans.Streaming.EventHubs
 
             //if not under pressure, signal the cache to do a time based purge
             //if under pressure, which means consuming speed is less than producing speed, then shouldn't purge, and don't read more message into the cache
-            if (!this.IsUnderPressure())
-                this.cache.SignalPurge();
+            if (!IsUnderPressure())
+                cache.SignalPurge();
             return false;
         }
 
         public IQueueCacheCursor GetCacheCursor(StreamId streamId, StreamSequenceToken token)
         {
-            return new Cursor(this.cache, streamId, token);
+            return new Cursor(cache, streamId, token);
         }
 
         public bool IsUnderPressure()
         {
-            return this.GetMaxAddCount() <= 0;
+            return GetMaxAddCount() <= 0;
         }
 
         public Task MessagesDeliveredAsync(IList<IBatchContainer> messages)
@@ -232,17 +232,17 @@ namespace Orleans.Streaming.EventHubs
             try
             {
                 // if receiver was already shutdown, do nothing
-                if (ReceiverShutdown == Interlocked.Exchange(ref this.receiverState, ReceiverShutdown))
+                if (ReceiverShutdown == Interlocked.Exchange(ref receiverState, ReceiverShutdown))
                 {
                     return;
                 }
 
-                this.logger.LogInformation("Stopping reading from EventHub partition {EventHubName}-{Partition}", this.settings.Hub.EventHubName, this.settings.Partition);
+                logger.LogInformation("Stopping reading from EventHub partition {EventHubName}-{Partition}", settings.Hub.EventHubName, settings.Partition);
 
                 // clear cache and receiver
-                IEventHubQueueCache localCache = Interlocked.Exchange(ref this.cache, null);
+                IEventHubQueueCache localCache = Interlocked.Exchange(ref cache, null);
 
-                var localReceiver = Interlocked.Exchange(ref this.receiver, null);
+                var localReceiver = Interlocked.Exchange(ref receiver, null);
 
                 // start closing receiver
                 Task closeTask = Task.CompletedTask;
@@ -256,12 +256,12 @@ namespace Orleans.Streaming.EventHubs
                 // finish return receiver closing task
                 await closeTask;
                 watch.Stop();
-                this.monitor?.TrackShutdown(true, watch.Elapsed, null);
+                monitor?.TrackShutdown(true, watch.Elapsed, null);
             }
             catch (Exception ex)
             {
                 watch.Stop();
-                this.monitor?.TrackShutdown(false, watch.Elapsed, ex);
+                monitor?.TrackShutdown(false, watch.Elapsed, ex);
                 throw;
             }
         }
@@ -277,12 +277,12 @@ namespace Orleans.Streaming.EventHubs
         /// <param name="streamId"></param>
         internal void ConfigureDataGeneratorForStream(StreamId streamId)
         {
-            (this.receiver as EventHubPartitionGeneratorReceiver)?.ConfigureDataGeneratorForStream(streamId);
+            (receiver as EventHubPartitionGeneratorReceiver)?.ConfigureDataGeneratorForStream(streamId);
         }
 
         internal void StopProducingOnStream(StreamId streamId)
         {
-            (this.receiver as EventHubPartitionGeneratorReceiver)?.StopProducingOnStream(streamId);
+            (receiver as EventHubPartitionGeneratorReceiver)?.StopProducingOnStream(streamId);
         }
 
         [GenerateSerializer]
@@ -291,12 +291,12 @@ namespace Orleans.Streaming.EventHubs
             [Id(0)]
             public StreamPosition Position { get; }
 
-            public StreamId StreamId => this.Position.StreamId;
-            public StreamSequenceToken SequenceToken => this.Position.SequenceToken;
+            public StreamId StreamId => Position.StreamId;
+            public StreamSequenceToken SequenceToken => Position.SequenceToken;
 
             public StreamActivityNotificationBatch(StreamPosition position)
             {
-                this.Position = position;
+                Position = position;
             }
 
             public IEnumerable<Tuple<T, StreamSequenceToken>> GetEvents<T>() { throw new NotSupportedException(); }
@@ -312,7 +312,7 @@ namespace Orleans.Streaming.EventHubs
             public Cursor(IEventHubQueueCache cache, StreamId streamId, StreamSequenceToken token)
             {
                 this.cache = cache;
-                this.cursor = cache.GetCursor(streamId, token);
+                cursor = cache.GetCursor(streamId, token);
             }
 
             public void Dispose()
@@ -322,18 +322,18 @@ namespace Orleans.Streaming.EventHubs
             public IBatchContainer GetCurrent(out Exception exception)
             {
                 exception = null;
-                return this.current;
+                return current;
             }
 
             public bool MoveNext()
             {
                 IBatchContainer next;
-                if (!this.cache.TryGetNextMessage(this.cursor, out next))
+                if (!cache.TryGetNextMessage(cursor, out next))
                 {
                     return false;
                 }
 
-                this.current = next;
+                current = next;
                 return true;
             }
 

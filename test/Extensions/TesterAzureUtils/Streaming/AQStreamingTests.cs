@@ -70,7 +70,7 @@ namespace Tester.AzureUtils.Streaming
         public override async Task InitializeAsync()
         {
             await base.InitializeAsync();
-            runner = new SingleStreamTestRunner(this.InternalClient, SingleStreamTestRunner.AQ_STREAM_PROVIDER_NAME);
+            runner = new SingleStreamTestRunner(InternalClient, SingleStreamTestRunner.AQ_STREAM_PROVIDER_NAME);
         }
 
         public override async Task DisposeAsync()
@@ -79,7 +79,7 @@ namespace Tester.AzureUtils.Streaming
             if (!string.IsNullOrWhiteSpace(TestDefaultConfiguration.DataConnectionString))
             {
                 await AzureQueueStreamProviderUtils.ClearAllUsedAzureQueues(NullLoggerFactory.Instance,
-                    AzureQueueUtilities.GenerateQueueNames(this.HostedCluster.Options.ClusterId, queueCount),
+                    AzureQueueUtilities.GenerateQueueNames(HostedCluster.Options.ClusterId, queueCount),
                     new AzureQueueOptions().ConfigureTestDefaults());
             }
         }
@@ -186,16 +186,16 @@ namespace Tester.AzureUtils.Streaming
         [SkippableFact, TestCategory("Functional")]
         public async Task AQ_16_MultipleStreams_ManyDifferent_ManyProducerGrainsManyConsumerGrains()
         {
-            var multiRunner = new MultipleStreamsTestRunner(this.InternalClient, SingleStreamTestRunner.AQ_STREAM_PROVIDER_NAME, 16, false);
+            var multiRunner = new MultipleStreamsTestRunner(InternalClient, SingleStreamTestRunner.AQ_STREAM_PROVIDER_NAME, 16, false);
             await multiRunner.StreamTest_MultipleStreams_ManyDifferent_ManyProducerGrainsManyConsumerGrains();
         }
 
         [SkippableFact, TestCategory("Functional")]
         public async Task AQ_17_MultipleStreams_1J_ManyProducerGrainsManyConsumerGrains()
         {
-            var multiRunner = new MultipleStreamsTestRunner(this.InternalClient, SingleStreamTestRunner.AQ_STREAM_PROVIDER_NAME, 17, false);
+            var multiRunner = new MultipleStreamsTestRunner(InternalClient, SingleStreamTestRunner.AQ_STREAM_PROVIDER_NAME, 17, false);
             await multiRunner.StreamTest_MultipleStreams_ManyDifferent_ManyProducerGrainsManyConsumerGrains(
-                this.HostedCluster.StartAdditionalSilo);
+                HostedCluster.StartAdditionalSilo);
         }
 
         //[SkippableFact, TestCategory("BVT")]

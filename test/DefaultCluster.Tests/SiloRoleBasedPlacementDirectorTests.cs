@@ -14,14 +14,14 @@ namespace DefaultCluster.Tests.General
         [Fact, TestCategory("Functional")]
         public async Task SiloRoleBasedPlacementDirector_CantFindSilo()
         {
-            var grain = this.GrainFactory.GetGrain<ISiloRoleBasedPlacementGrain>("Sibyl.Silo");
+            var grain = GrainFactory.GetGrain<ISiloRoleBasedPlacementGrain>("Sibyl.Silo");
             await Assert.ThrowsAsync<OrleansException>(() => grain.Ping());
         }
 
         [Fact, TestCategory("Functional")]
         public async Task SiloRoleBasedPlacementDirector_CanFindSilo()
         {
-            var grain = this.GrainFactory.GetGrain<ISiloRoleBasedPlacementGrain>("testhost");
+            var grain = GrainFactory.GetGrain<ISiloRoleBasedPlacementGrain>("testhost");
             bool result = await grain.Ping();
             Assert.True(result);
         }

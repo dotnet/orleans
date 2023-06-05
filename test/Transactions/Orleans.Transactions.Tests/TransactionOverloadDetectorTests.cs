@@ -38,7 +38,7 @@ namespace Orleans.Transactions.Tests
             }
             sw.Stop();
             double averageRate = (statistics.TransactionsStarted * 1000) / sw.ElapsedMilliseconds;
-            this.output.WriteLine($"Average of {averageRate}, with target of {options.Limit}.  Performed {statistics.TransactionsStarted} transactions of a max of {total} in {sw.ElapsedMilliseconds}ms.");
+            output.WriteLine($"Average of {averageRate}, with target of {options.Limit}.  Performed {statistics.TransactionsStarted} transactions of a max of {total} in {sw.ElapsedMilliseconds}ms.");
             // check to make sure average rate is withing rate +- 10%
             Assert.True(options.Limit * 0.9 <= averageRate);
             Assert.True(options.Limit * 1.1 >= averageRate);

@@ -44,14 +44,14 @@ namespace Orleans.Runtime.Messaging
             this.catalog = catalog;
             this.messagingOptions = messagingOptions.Value;
             this.siloStatusOracle = siloStatusOracle;
-            this.connectionManager = senderManager;
+            connectionManager = senderManager;
             this.messagingTrace = messagingTrace;
             this.placementService = placementService;
             this.localGrainDirectory = localGrainDirectory;
             this.activationDirectory = activationDirectory;
-            this.log = logger;
+            log = logger;
             this.messageFactory = messageFactory;
-            this._siloAddress = siloDetails.SiloAddress;
+            _siloAddress = siloDetails.SiloAddress;
 
             if (siloDetails.GatewayAddress != null)
             {
@@ -63,13 +63,13 @@ namespace Orleans.Runtime.Messaging
 
         internal bool IsBlockingApplicationMessages { get; private set; }
 
-        public void SetHostedClient(HostedClient client) => this.hostedClient = client;
+        public void SetHostedClient(HostedClient client) => hostedClient = client;
 
         public bool TryDeliverToProxy(Message msg)
         {
             if (!msg.TargetGrain.IsClient()) return false;
-            if (this.Gateway is Gateway gateway && gateway.TryDeliverToProxy(msg)) return true;
-            return this.hostedClient is HostedClient client && client.TryDispatchToClient(msg);
+            if (Gateway is Gateway gateway && gateway.TryDeliverToProxy(msg)) return true;
+            return hostedClient is HostedClient client && client.TryDispatchToClient(msg);
         }
 
         public async Task StopAsync()
@@ -121,15 +121,15 @@ namespace Orleans.Runtime.Messaging
         {
             set
             {
-                if (this.sniffIncomingMessageHandler != null)
+                if (sniffIncomingMessageHandler != null)
                 {
                     throw new InvalidOperationException("MessageCenter.SniffIncomingMessage already set");
                 }
 
-                this.sniffIncomingMessageHandler = value;
+                sniffIncomingMessageHandler = value;
             }
 
-            get => this.sniffIncomingMessageHandler;
+            get => sniffIncomingMessageHandler;
         }
 
         public void SendMessage(Message msg)
@@ -138,7 +138,7 @@ namespace Orleans.Runtime.Messaging
             if (IsBlockingApplicationMessages && !msg.IsSystemMessage && msg.Result is not Message.ResponseTypes.Rejection && !Constants.SystemMembershipTableType.Equals(msg.TargetGrain))
             {
                 // Drop the message on the floor if it's an application message that isn't a rejection
-                this.messagingTrace.OnDropBlockedApplicationMessage(msg);
+                messagingTrace.OnDropBlockedApplicationMessage(msg);
             }
             else
             {
@@ -154,7 +154,7 @@ namespace Orleans.Runtime.Messaging
                 // Don't process messages that have already timed out
                 if (msg.IsExpired)
                 {
-                    this.messagingTrace.OnDropExpiredMessage(msg, MessagingInstruments.Phase.Send);
+                    messagingTrace.OnDropExpiredMessage(msg, MessagingInstruments.Phase.Send);
                     return;
                 }
 
@@ -182,7 +182,7 @@ namespace Orleans.Runtime.Messaging
 
                     MessagingInstruments.LocalMessagesSentCounterAggregator.Add(1);
 
-                    this.ReceiveMessage(msg);
+                    ReceiveMessage(msg);
                 }
                 else
                 {
@@ -193,21 +193,21 @@ namespace Orleans.Runtime.Messaging
                         return;
                     }
 
-                    if (this.connectionManager.TryGetConnection(targetSilo, out var existingConnection))
+                    if (connectionManager.TryGetConnection(targetSilo, out var existingConnection))
                     {
                         existingConnection.Send(msg);
                         return;
                     }
-                    else if (this.siloStatusOracle.IsDeadSilo(targetSilo))
+                    else if (siloStatusOracle.IsDeadSilo(targetSilo))
                     {
                         // Do not try to establish
-                        this.messagingTrace.OnRejectSendMessageToDeadSilo(_siloAddress, msg);
-                        this.SendRejection(msg, Message.RejectionTypes.Transient, "Target silo is known to be dead");
+                        messagingTrace.OnRejectSendMessageToDeadSilo(_siloAddress, msg);
+                        SendRejection(msg, Message.RejectionTypes.Transient, "Target silo is known to be dead");
                         return;
                     }
                     else
                     {
-                        var connectionTask = this.connectionManager.GetConnection(targetSilo);
+                        var connectionTask = connectionManager.GetConnection(targetSilo);
                         if (connectionTask.IsCompletedSuccessfully)
                         {
                             var sender = connectionTask.Result;
@@ -246,15 +246,15 @@ namespace Orleans.Runtime.Messaging
             if (message.Direction == Message.Directions.Request
                 || (message.Direction == Message.Directions.OneWay && message.HasCacheInvalidationHeader))
             {
-                this.messagingTrace.OnDispatcherRejectMessage(message, rejectionType, rejectInfo, exc);
+                messagingTrace.OnDispatcherRejectMessage(message, rejectionType, rejectInfo, exc);
 
                 var str = $"{rejectInfo} {exc}";
-                var rejection = this.messageFactory.CreateRejectionResponse(message, rejectionType, str, exc);
+                var rejection = messageFactory.CreateRejectionResponse(message, rejectionType, str, exc);
                 SendMessage(rejection);
             }
             else
             {
-                this.messagingTrace.OnDispatcherDiscardedRejection(message, rejectionType, rejectInfo, exc);
+                messagingTrace.OnDispatcherDiscardedRejection(message, rejectionType, rejectInfo, exc);
             }
         }
 
@@ -280,7 +280,7 @@ namespace Orleans.Runtime.Messaging
             }
             else
             {
-                this.messagingTrace.OnDispatcherForwardingMultiple(messages.Count, oldAddress, forwardingAddress, failedOperation, exc);
+                messagingTrace.OnDispatcherForwardingMultiple(messages.Count, oldAddress, forwardingAddress, failedOperation, exc);
                 foreach (var message in messages)
                 {
                     TryForwardRequest(message, oldAddress, forwardingAddress, failedOperation, exc);
@@ -299,17 +299,17 @@ namespace Orleans.Runtime.Messaging
             // Just use this opportunity to invalidate local Cache Entry as well.
             if (oldAddress != null)
             {
-                this.localGrainDirectory.InvalidateCacheEntry(oldAddress);
+                localGrainDirectory.InvalidateCacheEntry(oldAddress);
             }
 
             // IMPORTANT: do not do anything on activation context anymore, since this activation is invalid already.
             if (rejectMessages)
             {
-                this.RejectMessage(message, Message.RejectionTypes.Transient, exc, failedOperation);
+                RejectMessage(message, Message.RejectionTypes.Transient, exc, failedOperation);
             }
             else
             {
-                this.TryForwardRequest(message, oldAddress, forwardingAddress, failedOperation, exc);
+                TryForwardRequest(message, oldAddress, forwardingAddress, failedOperation, exc);
             }
         }
 
@@ -318,14 +318,14 @@ namespace Orleans.Runtime.Messaging
             bool forwardingSucceded = false;
             try
             {
-                this.messagingTrace.OnDispatcherForwarding(message, oldAddress, forwardingAddress, failedOperation, exc);
+                messagingTrace.OnDispatcherForwarding(message, oldAddress, forwardingAddress, failedOperation, exc);
 
                 if (oldAddress != null)
                 {
                     message.AddToCacheInvalidationHeader(oldAddress);
                 }
 
-                forwardingSucceded = this.TryForwardMessage(message, forwardingAddress);
+                forwardingSucceded = TryForwardMessage(message, forwardingAddress);
             }
             catch (Exception exc2)
             {
@@ -339,7 +339,7 @@ namespace Orleans.Runtime.Messaging
                 // If the message was a one-way message, send a cache invalidation response even if the message was successfully forwarded.
                 if (message.Direction == Message.Directions.OneWay)
                 {
-                    this.RejectMessage(
+                    RejectMessage(
                         message,
                         Message.RejectionTypes.CacheInvalidation,
                         exc,
@@ -349,7 +349,7 @@ namespace Orleans.Runtime.Messaging
 
                 if (!forwardingSucceded)
                 {
-                    this.messagingTrace.OnDispatcherForwardingFailed(message, oldAddress, forwardingAddress, failedOperation, exc);
+                    messagingTrace.OnDispatcherForwardingFailed(message, oldAddress, forwardingAddress, failedOperation, exc);
                     if (!sentRejection)
                     {
                         var str = $"Forwarding failed: tried to forward message {message} for {message.ForwardCount} times after \"{failedOperation}\" to invalid activation. Rejecting now.";
@@ -370,7 +370,7 @@ namespace Orleans.Runtime.Messaging
 
         internal bool TryForwardMessage(Message message, GrainAddress forwardingAddress)
         {
-            if (!MayForward(message, this.messagingOptions)) return false;
+            if (!MayForward(message, messagingOptions)) return false;
 
             message.ForwardCount = message.ForwardCount + 1;
             MessagingProcessingInstruments.OnDispatcherMessageForwared(message);
@@ -449,7 +449,7 @@ namespace Orleans.Runtime.Messaging
 
             void OnAddressingFailure(Message m, Exception ex)
             {
-                this.messagingTrace.OnDispatcherSelectTargetFailed(m, ex);
+                messagingTrace.OnDispatcherSelectTargetFailed(m, ex);
                 RejectMessage(m, Message.RejectionTypes.Unrecoverable, ex);
             }
         }
@@ -457,7 +457,7 @@ namespace Orleans.Runtime.Messaging
         internal void SendResponse(Message request, Response response)
         {
             // create the response
-            var message = this.messageFactory.CreateResponseMessage(request);
+            var message = messageFactory.CreateResponseMessage(request);
             message.BodyObject = response;
 
             if (message.TargetGrain.IsSystemTarget())
@@ -472,14 +472,14 @@ namespace Orleans.Runtime.Messaging
         {
             try
             {
-                this.messagingTrace.OnIncomingMessageAgentReceiveMessage(msg);
+                messagingTrace.OnIncomingMessageAgentReceiveMessage(msg);
                 if (TryDeliverToProxy(msg))
                 {
                     return;
                 }
                 else if (msg.Direction == Message.Directions.Response)
                 {
-                    this.catalog.RuntimeClient.ReceiveResponse(msg);
+                    catalog.RuntimeClient.ReceiveResponse(msg);
                 }
                 else
                 {
@@ -512,7 +512,7 @@ namespace Orleans.Runtime.Messaging
                     msg.InterfaceType,
                     msg);
 
-                this.RejectMessage(msg, Message.RejectionTypes.Transient, ex);
+                RejectMessage(msg, Message.RejectionTypes.Transient, ex);
             }
         }
 
@@ -522,7 +522,7 @@ namespace Orleans.Runtime.Messaging
             if (target.IsSystemTarget())
             {
                 MessagingInstruments.OnRejectedMessage(msg);
-                this.log.LogWarning(
+                log.LogWarning(
                     (int) ErrorCode.MessagingMessageFromUnknownActivation,
                     "Received a message {Message} for an unknown SystemTarget: {Target}",
                      msg,
@@ -531,7 +531,7 @@ namespace Orleans.Runtime.Messaging
                 // Send a rejection only on a request
                 if (msg.Direction == Message.Directions.Request)
                 {
-                    var response = this.messageFactory.CreateRejectionResponse(
+                    var response = messageFactory.CreateRejectionResponse(
                         msg,
                         Message.RejectionTypes.Unrecoverable,
                         $"SystemTarget {msg.TargetGrain} not active on this silo. Msg={msg}");
@@ -560,14 +560,14 @@ namespace Orleans.Runtime.Messaging
             {
                 // Do not send reject a rejection locally, it will create a stack overflow
                 MessagingInstruments.OnDroppedSentMessage(msg);
-                if (this.log.IsEnabled(LogLevel.Debug)) log.LogDebug("Dropping rejection {Message}", msg);
+                if (log.IsEnabled(LogLevel.Debug)) log.LogDebug("Dropping rejection {Message}", msg);
             }
             else
             {
-                if (string.IsNullOrEmpty(reason)) reason = $"Rejection from silo {this._siloAddress} - Unknown reason.";
-                var error = this.messageFactory.CreateRejectionResponse(msg, rejectionType, reason);
+                if (string.IsNullOrEmpty(reason)) reason = $"Rejection from silo {_siloAddress} - Unknown reason.";
+                var error = messageFactory.CreateRejectionResponse(msg, rejectionType, reason);
                 // rejection msgs are always originated in the local silo, they are never remote.
-                this.ReceiveMessage(error);
+                ReceiveMessage(error);
             }
         }
 

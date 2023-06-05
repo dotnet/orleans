@@ -40,8 +40,8 @@ namespace Orleans.Runtime.Management
             GrainLocator grainLocator)
         {
             this.membershipTableManager = membershipTableManager;
-            this.siloManifest = clusterManifestProvider.LocalGrainManifest;
-            this.clusterManifest = clusterManifestProvider.Current;
+            siloManifest = clusterManifestProvider.LocalGrainManifest;
+            clusterManifest = clusterManifestProvider.Current;
             this.internalGrainFactory = internalGrainFactory;
             this.siloStatusOracle = siloStatusOracle;
             this.versionStore = versionStore;
@@ -52,17 +52,17 @@ namespace Orleans.Runtime.Management
 
         public async Task<Dictionary<SiloAddress, SiloStatus>> GetHosts(bool onlyActive = false)
         {
-            await this.membershipTableManager.Refresh();
-            return this.siloStatusOracle.GetApproximateSiloStatuses(onlyActive);
+            await membershipTableManager.Refresh();
+            return siloStatusOracle.GetApproximateSiloStatuses(onlyActive);
         }
 
         public async Task<MembershipEntry[]> GetDetailedHosts(bool onlyActive = false)
         {
             logger.LogInformation("GetDetailedHosts OnlyActive={OnlyActive}", onlyActive);
 
-            await this.membershipTableManager.Refresh();
+            await membershipTableManager.Refresh();
 
-            var table = this.membershipTableManager.MembershipTableSnapshot;
+            var table = membershipTableManager.MembershipTableSnapshot;
 
             MembershipEntry[] result;
             if (onlyActive)
@@ -279,7 +279,7 @@ namespace Orleans.Runtime.Management
                 lookupId = interfaceType;
             }
 
-            if (!this.siloManifest.Interfaces.TryGetValue(lookupId, out _))
+            if (!siloManifest.Interfaces.TryGetValue(lookupId, out _))
             {
                 throw new ArgumentException($"Interface '{interfaceType} not found", nameof(interfaceType));
             }
@@ -324,7 +324,7 @@ namespace Orleans.Runtime.Management
             if (silos != null && silos.Length > 0)
                 return silos;
 
-            return this.siloStatusOracle
+            return siloStatusOracle
                        .GetApproximateSiloStatuses(true).Keys.ToArray();
         }
 
@@ -349,7 +349,7 @@ namespace Orleans.Runtime.Management
 
         private ISiloControl GetSiloControlReference(SiloAddress silo)
         {
-            return this.internalGrainFactory.GetSystemTarget<ISiloControl>(Constants.SiloControlType, silo);
+            return internalGrainFactory.GetSystemTarget<ISiloControl>(Constants.SiloControlType, silo);
         }
 
         public async ValueTask<List<GrainId>> GetActiveGrains(GrainType grainType)

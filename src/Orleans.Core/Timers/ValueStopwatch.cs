@@ -28,18 +28,18 @@ namespace Orleans.Runtime
         
         private ValueStopwatch(long timestamp)
         {
-            this.value = timestamp;
+            value = timestamp;
         }
         
         /// <summary>
         /// Returns true if this instance is running or false otherwise.
         /// </summary>
-        public bool IsRunning => this.value > 0;
+        public bool IsRunning => value > 0;
         
         /// <summary>
         /// Returns the elapsed time.
         /// </summary>
-        public TimeSpan Elapsed => TimeSpan.FromTicks(this.ElapsedTicks);
+        public TimeSpan Elapsed => TimeSpan.FromTicks(ElapsedTicks);
 
         /// <summary>
         /// Returns the elapsed ticks.
@@ -50,10 +50,10 @@ namespace Orleans.Runtime
             {
                 // A positive timestamp value indicates the start time of a running stopwatch,
                 // a negative value indicates the negative total duration of a stopped stopwatch.
-                var timestamp = this.value;
+                var timestamp = value;
                 
                 long delta;
-                if (this.IsRunning)
+                if (IsRunning)
                 {
                     // The stopwatch is still running.
                     var start = timestamp;
@@ -92,49 +92,49 @@ namespace Orleans.Runtime
         /// a negative value indicates the negative total duration of a stopped stopwatch.
         /// </remarks>
         /// <returns>The raw counter value.</returns>
-        public long GetRawTimestamp() => this.value;
+        public long GetRawTimestamp() => value;
 
         /// <summary>
         /// Starts the stopwatch.
         /// </summary>
         public void Start()
         {
-            var timestamp = this.value;
+            var timestamp = value;
             
             // If already started, do nothing.
-            if (this.IsRunning) return;
+            if (IsRunning) return;
 
             // Stopwatch is stopped, therefore value is zero or negative.
             // Add the negative value to the current timestamp to start the stopwatch again.
             var newValue = GetTimestamp() + timestamp;
             if (newValue == 0) newValue = 1;
-            this.value = newValue;
+            value = newValue;
         }
 
         /// <summary>
         /// Restarts this stopwatch, beginning from zero time elapsed.
         /// </summary>
-        public void Restart() => this.value = GetTimestamp();
+        public void Restart() => value = GetTimestamp();
 
         /// <summary>
         /// Resets this stopwatch into a stopped state with no elapsed duration.
         /// </summary>
-        public void Reset() => this.value = 0;
+        public void Reset() => value = 0;
 
         /// <summary>
         /// Stops this stopwatch.
         /// </summary>
         public void Stop()
         {
-            var timestamp = this.value;
+            var timestamp = value;
 
             // If already stopped, do nothing.
-            if (!this.IsRunning) return;
+            if (!IsRunning) return;
 
             var end = GetTimestamp();
             var delta = end - timestamp;
 
-            this.value = -delta;
+            value = -delta;
         }
     }
 }

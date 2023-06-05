@@ -68,7 +68,7 @@ namespace Orleans
             if (initialSize >= InternerConstants.SIZE_MEDIUM) concurrencyLevel *= 4;
             if (initialSize >= InternerConstants.SIZE_LARGE) concurrencyLevel *= 4;
             concurrencyLevel = Math.Min(concurrencyLevel, 1024);
-            this.internCache = new ConcurrentDictionary<TKey, WeakReference<TValue>>(concurrencyLevel, initialSize);
+            internCache = new ConcurrentDictionary<TKey, WeakReference<TValue>>(concurrencyLevel, initialSize);
 
             var period = TimeSpan.FromMinutes(10);
             var dueTime = period + TimeSpan.FromTicks(Random.Shared.Next((int)TimeSpan.TicksPerMinute)); // add some initial jitter

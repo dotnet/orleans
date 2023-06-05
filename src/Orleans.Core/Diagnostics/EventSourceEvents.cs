@@ -17,9 +17,9 @@ namespace Orleans.Runtime
         [NonEvent]
         public void OnTimeout(Message message)
         {
-            if (this.IsEnabled())
+            if (IsEnabled())
             {
-                this.OnTimeout();
+                OnTimeout();
             }
         }
 
@@ -27,7 +27,7 @@ namespace Orleans.Runtime
         /// Indicates that a request timeout occurred.
         /// </summary>
         [Event(1, Level = EventLevel.Warning)]
-        private void OnTimeout() => this.WriteEvent(1);
+        private void OnTimeout() => WriteEvent(1);
 
         /// <summary>
         /// Indicates that a target silo failed.
@@ -36,9 +36,9 @@ namespace Orleans.Runtime
         [NonEvent]
         public void OnTargetSiloFail(Message message)
         {
-            if (this.IsEnabled())
+            if (IsEnabled())
             {
-                this.OnTargetSiloFail();
+                OnTargetSiloFail();
             }
         }
 
@@ -46,7 +46,7 @@ namespace Orleans.Runtime
         /// Indicates that a target silo failed.
         /// </summary>
         [Event(2, Level = EventLevel.Warning)]
-        private void OnTargetSiloFail() => this.WriteEvent(2);
+        private void OnTargetSiloFail() => WriteEvent(2);
 
         /// <summary>
         /// Indicates that a request completed.
@@ -54,9 +54,9 @@ namespace Orleans.Runtime
         [NonEvent]
         public void DoCallback(Message message)
         {
-            if (this.IsEnabled())
+            if (IsEnabled())
             {
-                this.DoCallback();
+                DoCallback();
             }
         }
 
@@ -64,7 +64,7 @@ namespace Orleans.Runtime
         /// Indicates that a request completed.
         /// </summary>
         [Event(3, Level = EventLevel.Verbose)]
-        private void DoCallback() => this.WriteEvent(3);
+        private void DoCallback() => WriteEvent(3);
     }
 
     [EventSource(Name = "Microsoft-Orleans-OutsideRuntimeClient")]
@@ -75,38 +75,38 @@ namespace Orleans.Runtime
         [NonEvent]
         public void SendRequest(Message message)
         {
-            if (this.IsEnabled())
+            if (IsEnabled())
             {
-                this.SendRequest();
+                SendRequest();
             }
         }
 
         [Event(1, Level = EventLevel.Verbose)]
-        private void SendRequest() => this.WriteEvent(1);
+        private void SendRequest() => WriteEvent(1);
 
         [NonEvent]
         public void ReceiveResponse(Message message)
         {
-            if (this.IsEnabled())
+            if (IsEnabled())
             {
-                this.ReceiveResponse();
+                ReceiveResponse();
             }
         }
 
         [Event(2, Level = EventLevel.Verbose)]
-        private void ReceiveResponse() => this.WriteEvent(2);
+        private void ReceiveResponse() => WriteEvent(2);
 
         [NonEvent]
         public void SendResponse(Message message)
         {
-            if (this.IsEnabled())
+            if (IsEnabled())
             {
-                this.SendResponse();
+                SendResponse();
             }
         }
 
         [Event(3, Level = EventLevel.Verbose)]
-        private void SendResponse() => this.WriteEvent(3);
+        private void SendResponse() => WriteEvent(3);
     }
 
     [EventSource(Name = "Microsoft-Orleans-Dispatcher")]
@@ -117,9 +117,9 @@ namespace Orleans.Runtime
         [NonEvent]
         public void ReceiveMessage(Message message)
         {
-            if (this.IsEnabled())
+            if (IsEnabled())
             {
-                this.ReceiveMessage();
+                ReceiveMessage();
             }
         }
 
@@ -135,9 +135,9 @@ namespace Orleans.Runtime
         [NonEvent]
         public void SendRequest(Message message)
         {
-            if (this.IsEnabled())
+            if (IsEnabled())
             {
-                this.SendRequest();
+                SendRequest();
             }
         }
 
@@ -147,9 +147,9 @@ namespace Orleans.Runtime
         [NonEvent]
         public void ReceiveResponse(Message message)
         {
-            if (this.IsEnabled())
+            if (IsEnabled())
             {
-                this.ReceiveResponse();
+                ReceiveResponse();
             }
         }
 
@@ -159,9 +159,9 @@ namespace Orleans.Runtime
         [NonEvent]
         public void SendResponse(Message message)
         {
-            if (this.IsEnabled())
+            if (IsEnabled())
             {
-                this.SendResponse();
+                SendResponse();
             }
         }
 
@@ -177,9 +177,9 @@ namespace Orleans.Runtime
         [NonEvent]
         public void ReceiveMessage(Message message)
         {
-            if (this.IsEnabled())
+            if (IsEnabled())
             {
-                this.ReceiveMessage();
+                ReceiveMessage();
             }
         }
 

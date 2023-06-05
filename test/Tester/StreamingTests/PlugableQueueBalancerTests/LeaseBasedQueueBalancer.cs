@@ -11,13 +11,13 @@ namespace Tester.StreamingTests
 
         public LeaseBasedQueueBalancerForTest(string name, IGrainFactory grainFactory)
         {
-            this.leaseManagerGrain = grainFactory.GetGrain<ILeaseManagerGrain>(name);
-            this.id = $"{name}-{Guid.NewGuid()}";
+            leaseManagerGrain = grainFactory.GetGrain<ILeaseManagerGrain>(name);
+            id = $"{name}-{Guid.NewGuid()}";
         }
 
         public async Task Initialize(IStreamQueueMapper queueMapper)
         {
-            await this.leaseManagerGrain.SetQueuesAsLeases(queueMapper.GetAllQueues());
+            await leaseManagerGrain.SetQueuesAsLeases(queueMapper.GetAllQueues());
             await GetInitialLease();
         }
 
@@ -28,23 +28,23 @@ namespace Tester.StreamingTests
 
         public IEnumerable<QueueId> GetMyQueues()
         {
-            return this.ownedQueues;
+            return ownedQueues;
         }
 
         private async Task GetInitialLease()
         {
-            var responsibilty = await this.leaseManagerGrain.GetLeaseResposibility();
-            this.ownedQueues = new List<QueueId>(responsibilty);
+            var responsibilty = await leaseManagerGrain.GetLeaseResposibility();
+            ownedQueues = new List<QueueId>(responsibilty);
             for(int i = 0; i < responsibilty; i++)
             {
                 try
                 {
-                    this.ownedQueues.Add(await this.leaseManagerGrain.Acquire());
+                    ownedQueues.Add(await leaseManagerGrain.Acquire());
                 }
                 catch (KeyNotFoundException)
                 { }   
             }
-            await this.leaseManagerGrain.RecordBalancerResponsibility(id.ToString(), this.ownedQueues.Count);
+            await leaseManagerGrain.RecordBalancerResponsibility(id.ToString(), ownedQueues.Count);
         }
 
         public bool SubscribeToQueueDistributionChangeEvents(IStreamQueueBalanceListener observer)

@@ -125,25 +125,25 @@ namespace Orleans.Configuration
         public void ValidateConfiguration()
         {
             // name can be null, but not empty or white space.
-            if(this.name != null && string.IsNullOrWhiteSpace(this.name))
+            if(name != null && string.IsNullOrWhiteSpace(name))
             {
-                throw new OrleansConfigurationException($"Named option {nameof(AzureBlobLeaseProviderOptions)} of name {this.name} is invalid.  Name cannot be empty or whitespace.");
+                throw new OrleansConfigurationException($"Named option {nameof(AzureBlobLeaseProviderOptions)} of name {name} is invalid.  Name cannot be empty or whitespace.");
             }
 
-            if (this.options.CreateClient is null)
+            if (options.CreateClient is null)
             {
                 throw new OrleansConfigurationException($"No credentials specified for Azure Blob Service lease provider \"{name}\". Use the {options.GetType().Name}.{nameof(AzureBlobLeaseProviderOptions.ConfigureBlobServiceClient)} method to configure the Azure Blob Service client.");
             }
 
             try
             {
-                AzureBlobUtils.ValidateContainerName(this.options.BlobContainerName);
+                AzureBlobUtils.ValidateContainerName(options.BlobContainerName);
             }
             catch (ArgumentException e)
             {
-                var errorStr = string.IsNullOrEmpty(this.name)
-                    ? $"Configuration for {nameof(AzureBlobLeaseProviderOptions)} {this.name} is invalid. {nameof(this.options.BlobContainerName)} is not valid"
-                    : $"Configuration for {nameof(AzureBlobLeaseProviderOptions)} is invalid. {nameof(this.options.BlobContainerName)} is not valid";
+                var errorStr = string.IsNullOrEmpty(name)
+                    ? $"Configuration for {nameof(AzureBlobLeaseProviderOptions)} {name} is invalid. {nameof(options.BlobContainerName)} is not valid"
+                    : $"Configuration for {nameof(AzureBlobLeaseProviderOptions)} is invalid. {nameof(options.BlobContainerName)} is not valid";
                 throw new OrleansConfigurationException(errorStr , e);
             }
         }

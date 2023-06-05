@@ -23,8 +23,8 @@ namespace Orleans.Metadata
         {
             var (grainProperties, grainTypes) = CreateGrainManifest(grainPropertiesProviders, grainTypeOptions, typeProvider);
             var interfaces = CreateInterfaceManifest(grainInterfacePropertiesProviders, grainTypeOptions, interfaceIdProvider);
-            this.SiloManifest = new GrainManifest(grainProperties, interfaces);
-            this.GrainTypeMap = new GrainClassMap(typeConverter, grainTypes);
+            SiloManifest = new GrainManifest(grainProperties, interfaces);
+            GrainTypeMap = new GrainClassMap(typeConverter, grainTypes);
         }
 
         public GrainManifest SiloManifest { get; }

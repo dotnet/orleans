@@ -15,7 +15,7 @@ namespace UnitTests.Grains
 
         public Task GetAbstractModel(IEnumerable<NameObjectCollectionBase> list)
         {
-            this.logger.LogDebug("GetAbstractModel: Success");
+            logger.LogDebug("GetAbstractModel: Success");
             return Task.CompletedTask;
         }
 

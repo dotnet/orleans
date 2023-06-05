@@ -81,14 +81,14 @@ namespace Orleans.Providers
             IGrainFactory grainFactory,
             ILoggerFactory loggerFactory)
         {
-            this.Name = providerName;
+            Name = providerName;
             this.queueMapperOptions = queueMapperOptions ?? throw new ArgumentNullException(nameof(queueMapperOptions));
             this.cacheOptions = cacheOptions ?? throw new ArgumentNullException(nameof(cacheOptions));
             this.statisticOptions = statisticOptions ?? throw new ArgumentException(nameof(statisticOptions));
             this.grainFactory = grainFactory ?? throw new ArgumentNullException(nameof(grainFactory));
             this.loggerFactory = loggerFactory ?? throw new ArgumentNullException(nameof(loggerFactory));
-            this.logger = loggerFactory.CreateLogger<ILogger<MemoryAdapterFactory<TSerializer>>>();
-            this.serializer = MemoryMessageBodySerializerFactory<TSerializer>.GetOrCreateSerializer(serviceProvider);
+            logger = loggerFactory.CreateLogger<ILogger<MemoryAdapterFactory<TSerializer>>>();
+            serializer = MemoryMessageBodySerializerFactory<TSerializer>.GetOrCreateSerializer(serviceProvider);
 
             var nameBytes = BitConverter.IsLittleEndian ? MemoryMarshal.AsBytes(Name.AsSpan()) : Encoding.Unicode.GetBytes(Name);
             XxHash64.Hash(nameBytes, MemoryMarshal.AsBytes(MemoryMarshal.CreateSpan(ref _nameHash, 1)));
@@ -99,26 +99,26 @@ namespace Orleans.Providers
         /// </summary>
         public void Init()
         {
-            this.queueGrains = new ConcurrentDictionary<QueueId, IMemoryStreamQueueGrain>();
+            queueGrains = new ConcurrentDictionary<QueueId, IMemoryStreamQueueGrain>();
             if (CacheMonitorFactory == null)
-                this.CacheMonitorFactory = (dimensions) => new DefaultCacheMonitor(dimensions);
-            if (this.BlockPoolMonitorFactory == null)
-                this.BlockPoolMonitorFactory = (dimensions) => new DefaultBlockPoolMonitor(dimensions);
-            if (this.ReceiverMonitorFactory == null)
-                this.ReceiverMonitorFactory = (dimensions) => new DefaultQueueAdapterReceiverMonitor(dimensions);
-            this.purgePredicate = new TimePurgePredicate(this.cacheOptions.DataMinTimeInCache, this.cacheOptions.DataMaxAgeInCache);
-            this.streamQueueMapper = new HashRingBasedStreamQueueMapper(this.queueMapperOptions, this.Name);
+                CacheMonitorFactory = (dimensions) => new DefaultCacheMonitor(dimensions);
+            if (BlockPoolMonitorFactory == null)
+                BlockPoolMonitorFactory = (dimensions) => new DefaultBlockPoolMonitor(dimensions);
+            if (ReceiverMonitorFactory == null)
+                ReceiverMonitorFactory = (dimensions) => new DefaultQueueAdapterReceiverMonitor(dimensions);
+            purgePredicate = new TimePurgePredicate(cacheOptions.DataMinTimeInCache, cacheOptions.DataMaxAgeInCache);
+            streamQueueMapper = new HashRingBasedStreamQueueMapper(queueMapperOptions, Name);
         }
 
         private void CreateBufferPoolIfNotCreatedYet()
         {
-            if (this.bufferPool == null)
+            if (bufferPool == null)
             {
                 // 1 meg block size pool
-                this.blockPoolMonitorDimensions = new BlockPoolMonitorDimensions($"BlockPool-{Guid.NewGuid()}");
+                blockPoolMonitorDimensions = new BlockPoolMonitorDimensions($"BlockPool-{Guid.NewGuid()}");
                 var oneMb = 1 << 20;
-                var objectPoolMonitor = new ObjectPoolMonitorBridge(this.BlockPoolMonitorFactory(blockPoolMonitorDimensions), oneMb);
-                this.bufferPool = new ObjectPool<FixedSizeBuffer>(() => new FixedSizeBuffer(oneMb), objectPoolMonitor, this.statisticOptions.StatisticMonitorWriteInterval);
+                var objectPoolMonitor = new ObjectPoolMonitorBridge(BlockPoolMonitorFactory(blockPoolMonitorDimensions), oneMb);
+                bufferPool = new ObjectPool<FixedSizeBuffer>(() => new FixedSizeBuffer(oneMb), objectPoolMonitor, statisticOptions.StatisticMonitorWriteInterval);
             }
         }
 
@@ -144,9 +144,9 @@ namespace Orleans.Providers
         public IQueueAdapterReceiver CreateReceiver(QueueId queueId)
         {
             var dimensions = new ReceiverMonitorDimensions(queueId.ToString());
-            var receiverLogger = this.loggerFactory.CreateLogger($"{typeof(MemoryAdapterReceiver<TSerializer>).FullName}.{this.Name}.{queueId}");
-            var receiverMonitor = this.ReceiverMonitorFactory(dimensions);
-            IQueueAdapterReceiver receiver = new MemoryAdapterReceiver<TSerializer>(GetQueueGrain(queueId), receiverLogger, this.serializer, receiverMonitor);
+            var receiverLogger = loggerFactory.CreateLogger($"{typeof(MemoryAdapterReceiver<TSerializer>).FullName}.{Name}.{queueId}");
+            var receiverMonitor = ReceiverMonitorFactory(dimensions);
+            IQueueAdapterReceiver receiver = new MemoryAdapterReceiver<TSerializer>(GetQueueGrain(queueId), receiverLogger, serializer, receiverMonitor);
             return receiver;
         }
 
@@ -173,9 +173,9 @@ namespace Orleans.Providers
         {
             //move block pool creation from init method to here, to avoid unnecessary block pool creation when stream provider is initialized in client side. 
             CreateBufferPoolIfNotCreatedYet();
-            var logger = this.loggerFactory.CreateLogger($"{typeof(MemoryPooledCache<TSerializer>).FullName}.{this.Name}.{queueId}");
-            var monitor = this.CacheMonitorFactory(new CacheMonitorDimensions(queueId.ToString(), this.blockPoolMonitorDimensions.BlockPoolId));
-            return new MemoryPooledCache<TSerializer>(bufferPool, purgePredicate, logger, this.serializer, monitor, this.statisticOptions.StatisticMonitorWriteInterval, this.cacheOptions.MetadataMinTimeInCache);
+            var logger = loggerFactory.CreateLogger($"{typeof(MemoryPooledCache<TSerializer>).FullName}.{Name}.{queueId}");
+            var monitor = CacheMonitorFactory(new CacheMonitorDimensions(queueId.ToString(), blockPoolMonitorDimensions.BlockPoolId));
+            return new MemoryPooledCache<TSerializer>(bufferPool, purgePredicate, logger, serializer, monitor, statisticOptions.StatisticMonitorWriteInterval, cacheOptions.MetadataMinTimeInCache);
         }
 
         /// <inheritdoc />

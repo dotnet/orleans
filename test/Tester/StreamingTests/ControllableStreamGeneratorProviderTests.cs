@@ -57,14 +57,14 @@ namespace UnitTests.StreamingTests
         [Fact, TestCategory("BVT"), TestCategory("Streaming")]
         public async Task ValidateControllableGeneratedStreamsTest()
         {
-            this.fixture.Logger.LogInformation("************************ ValidateControllableGeneratedStreamsTest *********************************");
+            fixture.Logger.LogInformation("************************ ValidateControllableGeneratedStreamsTest *********************************");
             await ValidateControllableGeneratedStreams();
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Streaming")]
         public async Task Validate2ControllableGeneratedStreamsTest()
         {
-            this.fixture.Logger.LogInformation("************************ Validate2ControllableGeneratedStreamsTest *********************************");
+            fixture.Logger.LogInformation("************************ Validate2ControllableGeneratedStreamsTest *********************************");
             await ValidateControllableGeneratedStreams();
             await ValidateControllableGeneratedStreams();
         }
@@ -79,7 +79,7 @@ namespace UnitTests.StreamingTests
                     EventsInStream = 100
                 };
 
-                var mgmt = this.fixture.GrainFactory.GetGrain<IManagementGrain>(0);
+                var mgmt = fixture.GrainFactory.GetGrain<IManagementGrain>(0);
                 object[] results = await mgmt.SendControlCommandToProvider(Fixture.StreamProviderTypeName, Fixture.StreamProviderName, (int)StreamGeneratorCommand.Configure, generatorConfig);
                 Assert.Equal(2, results.Length);
                 bool[] bResults = results.Cast<bool>().ToArray();
@@ -93,14 +93,14 @@ namespace UnitTests.StreamingTests
             }
             finally
             {
-                var reporter = this.fixture.GrainFactory.GetGrain<IGeneratedEventReporterGrain>(GeneratedStreamTestConstants.ReporterId);
+                var reporter = fixture.GrainFactory.GetGrain<IGeneratedEventReporterGrain>(GeneratedStreamTestConstants.ReporterId);
                 reporter.Reset().Ignore();
             }
         }
 
         private async Task<bool> CheckCounters(SimpleGeneratorOptions generatorConfig, bool assertIsTrue)
         {
-            var reporter = this.fixture.GrainFactory.GetGrain<IGeneratedEventReporterGrain>(GeneratedStreamTestConstants.ReporterId);
+            var reporter = fixture.GrainFactory.GetGrain<IGeneratedEventReporterGrain>(GeneratedStreamTestConstants.ReporterId);
 
             var report = await reporter.GetReport(GeneratedStreamTestConstants.StreamProviderName, GeneratedEventCollectorGrain.StreamNamespace);
             if (assertIsTrue)

@@ -49,10 +49,10 @@ namespace Orleans.GrainDirectory.Redis
         {
             try
             {
-                var result = (string)await this.database.StringGetAsync(GetKey(grainId));
+                var result = (string)await database.StringGetAsync(GetKey(grainId));
 
-                if (this.logger.IsEnabled(LogLevel.Debug))
-                    this.logger.LogDebug("Lookup {GrainId}: {Result}", grainId, string.IsNullOrWhiteSpace(result) ? "null" : result);
+                if (logger.IsEnabled(LogLevel.Debug))
+                    logger.LogDebug("Lookup {GrainId}: {Result}", grainId, string.IsNullOrWhiteSpace(result) ? "null" : result);
 
                 if (string.IsNullOrWhiteSpace(result))
                     return default;
@@ -61,7 +61,7 @@ namespace Orleans.GrainDirectory.Redis
             }
             catch (Exception ex)
             {
-                this.logger.LogError(ex, "Lookup failed for {GrainId}", grainId);
+                logger.LogError(ex, "Lookup failed for {GrainId}", grainId);
 
                 if (IsRedisException(ex))
                     throw new OrleansException($"Lookup failed for {grainId} : {ex.ToString()}");
@@ -76,14 +76,14 @@ namespace Orleans.GrainDirectory.Redis
 
             try
             {
-                var success = await this.database.StringSetAsync(
-                    this.GetKey(address.GrainId),
+                var success = await database.StringSetAsync(
+                    GetKey(address.GrainId),
                     value,
-                    this.directoryOptions.EntryExpiry,
+                    directoryOptions.EntryExpiry,
                     When.NotExists);
 
-                if (this.logger.IsEnabled(LogLevel.Debug))
-                    this.logger.LogDebug("Register {GrainId} ({Address}): {Result}", address.GrainId, value, success ? "OK" : "Conflict");
+                if (logger.IsEnabled(LogLevel.Debug))
+                    logger.LogDebug("Register {GrainId} ({Address}): {Result}", address.GrainId, value, success ? "OK" : "Conflict");
 
                 if (success)
                     return address;
@@ -92,7 +92,7 @@ namespace Orleans.GrainDirectory.Redis
             }
             catch (Exception ex)
             {
-                this.logger.LogError(ex, "Register failed for {GrainId} ({Address})", address.GrainId, value);
+                logger.LogError(ex, "Register failed for {GrainId} ({Address})", address.GrainId, value);
 
                 if (IsRedisException(ex))
                     throw new OrleansException($"Register failed for {address.GrainId} ({value}) : {ex.ToString()}");
@@ -105,19 +105,19 @@ namespace Orleans.GrainDirectory.Redis
         {
             try
             {
-                var result = (int) await this.database.ScriptEvaluateAsync(
+                var result = (int) await database.ScriptEvaluateAsync(
                     DeleteScript,
                     keys: new RedisKey[] { GetKey(address.GrainId) },
                     values: new RedisValue[] { address.ActivationId.ToParsableString() });
 
-                if (this.logger.IsEnabled(LogLevel.Debug))
-                    this.logger.LogDebug("Unregister {GrainId} ({Address}): {Result}", address.GrainId, JsonSerializer.Serialize(address), (result != 0) ? "OK" : "Conflict");
+                if (logger.IsEnabled(LogLevel.Debug))
+                    logger.LogDebug("Unregister {GrainId} ({Address}): {Result}", address.GrainId, JsonSerializer.Serialize(address), (result != 0) ? "OK" : "Conflict");
             }
             catch (Exception ex)
             {
                 var value = JsonSerializer.Serialize(address);
 
-                this.logger.LogError(ex, "Unregister failed for {GrainId} ({Address})", address.GrainId, value);
+                logger.LogError(ex, "Unregister failed for {GrainId} ({Address})", address.GrainId, value);
 
                 if (IsRedisException(ex))
                     throw new OrleansException($"Unregister failed for {address.GrainId} ({value}) : {ex.ToString()}");
@@ -138,25 +138,25 @@ namespace Orleans.GrainDirectory.Redis
 
         public async Task Initialize(CancellationToken ct = default)
         {
-            this.redis = await directoryOptions.CreateMultiplexer(directoryOptions);
+            redis = await directoryOptions.CreateMultiplexer(directoryOptions);
 
             // Configure logging
-            this.redis.ConnectionRestored += this.LogConnectionRestored;
-            this.redis.ConnectionFailed += this.LogConnectionFailed;
-            this.redis.ErrorMessage += this.LogErrorMessage;
-            this.redis.InternalError += this.LogInternalError;
+            redis.ConnectionRestored += LogConnectionRestored;
+            redis.ConnectionFailed += LogConnectionFailed;
+            redis.ErrorMessage += LogErrorMessage;
+            redis.InternalError += LogInternalError;
 
-            this.database = this.redis.GetDatabase();
+            database = redis.GetDatabase();
         }
 
         private async Task Uninitialize(CancellationToken arg)
         {
-            if (this.redis != null && this.redis.IsConnected)
+            if (redis != null && redis.IsConnected)
             {
-                await this.redis.CloseAsync();
-                this.redis.Dispose();
-                this.redis = null;
-                this.database = null;
+                await redis.CloseAsync();
+                redis.Dispose();
+                redis = null;
+                database = null;
             }
         }
 
@@ -164,16 +164,16 @@ namespace Orleans.GrainDirectory.Redis
 
         #region Logging
         private void LogConnectionRestored(object sender, ConnectionFailedEventArgs e)
-            => this.logger.LogInformation(e.Exception, "Connection to {EndPoint} failed: {FailureType}", e.EndPoint, e.FailureType);
+            => logger.LogInformation(e.Exception, "Connection to {EndPoint} failed: {FailureType}", e.EndPoint, e.FailureType);
 
         private void LogConnectionFailed(object sender, ConnectionFailedEventArgs e)
-            => this.logger.LogError(e.Exception, "Connection to {EndPoint} failed: {FailureType}", e.EndPoint, e.FailureType);
+            => logger.LogError(e.Exception, "Connection to {EndPoint} failed: {FailureType}", e.EndPoint, e.FailureType);
 
         private void LogErrorMessage(object sender, RedisErrorEventArgs e)
-            => this.logger.LogError(e.Message);
+            => logger.LogError(e.Message);
 
         private void LogInternalError(object sender, InternalErrorEventArgs e)
-            => this.logger.LogError(e.Exception, "Internal error");
+            => logger.LogError(e.Exception, "Internal error");
         #endregion
 
         // These exceptions are not serializable by the client

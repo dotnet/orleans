@@ -35,7 +35,7 @@ namespace AWSUtils.Tests.Streaming
 
             this.output = output;
             this.fixture = fixture;
-            this.clusterId = MakeClusterId();
+            clusterId = MakeClusterId();
         }
 
         public Task InitializeAsync() => Task.CompletedTask;
@@ -46,7 +46,7 @@ namespace AWSUtils.Tests.Streaming
             {
                 await SQSStreamProviderUtils.DeleteAllUsedQueues(
                     SQS_STREAM_PROVIDER_NAME,
-                    this.clusterId,
+                    clusterId,
                     AWSTestConstants.SqsConnectionString,
                     NullLoggerFactory.Instance);
             }
@@ -127,7 +127,7 @@ namespace AWSUtils.Tests.Streaming
                 .ToList()
                 .ForEach(streamId =>
                     adapter.QueueMessageBatchAsync(StreamId.Create(streamId.ToString(), streamId),
-                        events.Take(NumMessagesPerBatch).ToArray(), null, RequestContextExtensions.Export(this.fixture.DeepCopier)).Wait())));
+                        events.Take(NumMessagesPerBatch).ToArray(), null, RequestContextExtensions.Export(fixture.DeepCopier)).Wait())));
             await Task.WhenAll(work);
 
             // Make sure we got back everything we sent

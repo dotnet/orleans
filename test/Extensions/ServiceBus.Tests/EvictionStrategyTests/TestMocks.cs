@@ -14,7 +14,7 @@ namespace ServiceBus.Tests.EvictionStrategyTests
             :base("test", EventHubAdapterReceiver.MaxMessagesPerRead, bufferPool, dataAdapter, evictionStrategy, checkpointer, logger, null, null, null)
             { }
 
-        public int ItemCount => this.cache.ItemCount;
+        public int ItemCount => cache.ItemCount;
     }
     public class EHEvictionStrategyForTesting : ChronologicalEvictionStrategy
     {
@@ -22,7 +22,7 @@ namespace ServiceBus.Tests.EvictionStrategyTests
             :base(logger, timePurage, cacheMonitor, monitorWriteInterval)
         { }
 
-        public Queue<FixedSizeBuffer> InUseBuffers => this.inUseBuffers;
+        public Queue<FixedSizeBuffer> InUseBuffers => inUseBuffers;
     }
 
     public class MockEventHubCacheAdaptor : EventHubDataAdapter
@@ -36,7 +36,7 @@ namespace ServiceBus.Tests.EvictionStrategyTests
         public override StreamPosition GetStreamPosition(string partition, EventData queueMessage)
         {
             var steamIdentity = StreamId.Create("EmptySpace", Guid.NewGuid());
-            var sequenceToken = new EventHubSequenceTokenV2(this.eventHubOffset, this.sequenceNumberCounter++, this.eventIndex);
+            var sequenceToken = new EventHubSequenceTokenV2(eventHubOffset, sequenceNumberCounter++, eventIndex);
             return new StreamPosition(steamIdentity, sequenceToken);
         }
     }
@@ -47,7 +47,7 @@ namespace ServiceBus.Tests.EvictionStrategyTests
         public ICacheMonitor CacheMonitor { set; private get; }
         public CachePressureInjectionMonitor()
         {
-            this.isUnderPressure = false;
+            isUnderPressure = false;
         }
 
         public void RecordCachePressureContribution(double cachePressureContribution)
@@ -57,7 +57,7 @@ namespace ServiceBus.Tests.EvictionStrategyTests
 
         public bool IsUnderPressure(DateTime utcNow)
         {
-            return this.isUnderPressure;
+            return isUnderPressure;
         }
     }
 
@@ -67,12 +67,12 @@ namespace ServiceBus.Tests.EvictionStrategyTests
         public PurgeDecisionInjectionPredicate(TimeSpan minTimeInCache, TimeSpan maxRelativeMessageAge)
             : base(minTimeInCache, maxRelativeMessageAge)
         {
-            this.ShouldPurge = false;
+            ShouldPurge = false;
         }
 
         public override bool ShouldPurgeFromTime(TimeSpan timeInCache, TimeSpan relativeAge)
         {
-            return this.ShouldPurge;
+            return ShouldPurge;
         }
     }
 }

@@ -21,7 +21,7 @@ namespace Orleans.Transactions
         public ITransactionalStateStorage<TState> Create<TState>(string storageName, string stateName)
             where TState : class, new()
         {
-            var currentContext = this.contextAccessor.GrainContext;
+            var currentContext = contextAccessor.GrainContext;
 
             // Try to get ITransactionalStateStorage from factory
             ITransactionalStateStorageFactory factory = string.IsNullOrEmpty(storageName)
@@ -33,7 +33,7 @@ namespace Orleans.Transactions
             IGrainStorage grainStorage = string.IsNullOrEmpty(storageName)
                 ? currentContext.ActivationServices.GetService<IGrainStorage>()
                 : currentContext.ActivationServices.GetServiceByName<IGrainStorage>(storageName);
-            if (grainStorage != null) return new TransactionalStateStorageProviderWrapper<TState>(grainStorage, stateName, currentContext, this.loggerFactory);
+            if (grainStorage != null) return new TransactionalStateStorageProviderWrapper<TState>(grainStorage, stateName, currentContext, loggerFactory);
             throw (string.IsNullOrEmpty(storageName))
                 ? new InvalidOperationException($"No default {nameof(ITransactionalStateStorageFactory)} nor {nameof(IGrainStorage)} was found while attempting to create transactional state storage.")
                 : new InvalidOperationException($"No {nameof(ITransactionalStateStorageFactory)} nor {nameof(IGrainStorage)} with the name {storageName} was found while attempting to create transactional state storage.");

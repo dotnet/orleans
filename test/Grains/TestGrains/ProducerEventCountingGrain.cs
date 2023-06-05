@@ -12,7 +12,7 @@ namespace UnitTests.Grains
 
         public ProducerEventCountingGrain(ILoggerFactory loggerFactory)
         {
-            _logger = loggerFactory.CreateLogger($"{this.GetType().Name}-{this.IdentityString}");
+            _logger = loggerFactory.CreateLogger($"{GetType().Name}-{IdentityString}");
         }
 
         public override Task OnActivateAsync(CancellationToken cancellationToken)

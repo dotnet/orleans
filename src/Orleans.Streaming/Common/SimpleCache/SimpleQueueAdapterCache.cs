@@ -26,7 +26,7 @@ namespace Orleans.Providers.Streams.Common
         /// <param name="loggerFactory">The logger factory.</param>
         public SimpleQueueAdapterCache(SimpleQueueCacheOptions options, string providerName, ILoggerFactory loggerFactory)
         {
-            this.cacheSize = options.CacheSize;
+            cacheSize = options.CacheSize;
             this.loggerFactory = loggerFactory;
             this.providerName = providerName;
         }
@@ -34,7 +34,7 @@ namespace Orleans.Providers.Streams.Common
         /// <inheritdoc />
         public IQueueCache CreateQueueCache(QueueId queueId)
         {
-            return new SimpleQueueCache(cacheSize, this.loggerFactory.CreateLogger($"{typeof(SimpleQueueCache).FullName}.{providerName}.{queueId}"));
+            return new SimpleQueueCache(cacheSize, loggerFactory.CreateLogger($"{typeof(SimpleQueueCache).FullName}.{providerName}.{queueId}"));
         }
     }
 }

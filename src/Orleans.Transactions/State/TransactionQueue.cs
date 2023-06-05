@@ -36,7 +36,7 @@ namespace Orleans.Transactions.State
         {
             public PreparedMessages(TransactionalStatus status)
             {
-                this.Status = status;
+                Status = status;
             }
             public int Count;
             public TransactionalStatus Status;
@@ -61,15 +61,15 @@ namespace Orleans.Transactions.State
             this.resource = resource;
             this.deactivate = deactivate;
             this.storage = storage;
-            this.Clock = new CausalClock(clock);
+            Clock = new CausalClock(clock);
             this.logger = logger;
             this.activationLifetime = activationLifetime;
-            this.storageWorker = new BatchWorkerFromDelegate(StorageWork, this.activationLifetime.OnDeactivating);
-            this.RWLock = new ReadWriteLock<TState>(options, this, this.storageWorker, logger, activationLifetime);
-            this.confirmationWorker = new ConfirmationWorker<TState>(options, this.resource, this.storageWorker, () => this.storageBatch, this.logger, timerManager, activationLifetime);
-            this.unprocessedPreparedMessages = new Dictionary<DateTime, PreparedMessages>();
-            this.commitQueue = new CommitQueue<TState>();
-            this.readyTask = Task.CompletedTask;
+            storageWorker = new BatchWorkerFromDelegate(StorageWork, this.activationLifetime.OnDeactivating);
+            RWLock = new ReadWriteLock<TState>(options, this, storageWorker, logger, activationLifetime);
+            confirmationWorker = new ConfirmationWorker<TState>(options, this.resource, storageWorker, () => storageBatch, this.logger, timerManager, activationLifetime);
+            unprocessedPreparedMessages = new Dictionary<DateTime, PreparedMessages>();
+            commitQueue = new CommitQueue<TState>();
+            readyTask = Task.CompletedTask;
         }
 
         public async Task EnqueueCommit(TransactionRecord<TState> record)
@@ -103,7 +103,7 @@ namespace Orleans.Transactions.State
                                 {
                                     await AbortCommits(info.Status, commitQueue.Count - 1);
 
-                                    this.RWLock.Notify();
+                                    RWLock.Notify();
                                 }
                                 unprocessedPreparedMessages.Remove(record.Timestamp);
                             }
@@ -124,14 +124,14 @@ namespace Orleans.Transactions.State
 
                             if (record.NumberWrites > 0)
                             {
-                                this.storageBatch.Prepare(record.SequenceNumber, record.TransactionId, record.Timestamp, record.TransactionManager, record.State);
+                                storageBatch.Prepare(record.SequenceNumber, record.TransactionId, record.Timestamp, record.TransactionManager, record.State);
                             }
                             else
                             {
-                                this.storageBatch.Read(record.Timestamp);
+                                storageBatch.Read(record.Timestamp);
                             }
 
-                            this.storageBatch.FollowUpAction(() =>
+                            storageBatch.FollowUpAction(() =>
                             {
                                 if (logger.IsEnabled(LogLevel.Trace))
                                 {
@@ -148,7 +148,7 @@ namespace Orleans.Transactions.State
                                     }
                                     // can send prepared message immediately after persisting prepare record
                                     record.TransactionManager.Reference.AsReference<ITransactionManagerExtension>()
-                                          .Prepared(record.TransactionManager.Name, record.TransactionId, record.Timestamp, this.resource, TransactionalStatus.Ok)
+                                          .Prepared(record.TransactionManager.Name, record.TransactionId, record.Timestamp, resource, TransactionalStatus.Ok)
                                           .Ignore();
                                     record.LastSent = DateTime.UtcNow;
                                 }
@@ -197,15 +197,15 @@ namespace Orleans.Transactions.State
                 {
                     await AbortCommits(status, pos);
 
-                    this.RWLock.Notify();
+                    RWLock.Notify();
                 }
             }
             else
             {
                 // this message has arrived ahead of the commit request - we need to remember it
-                if (!this.unprocessedPreparedMessages.TryGetValue(timeStamp, out PreparedMessages info))
+                if (!unprocessedPreparedMessages.TryGetValue(timeStamp, out PreparedMessages info))
                 {
-                    this.unprocessedPreparedMessages[timeStamp] = info = new PreparedMessages(status);
+                    unprocessedPreparedMessages[timeStamp] = info = new PreparedMessages(status);
                 }
                 if (status == TransactionalStatus.Ok)
                 {
@@ -222,7 +222,7 @@ namespace Orleans.Transactions.State
 
         public async Task NotifyOfPrepare(Guid transactionId, AccessCounter accessCount, DateTime timeStamp, ParticipantId transactionManager)
         {
-            var locked = await this.RWLock.ValidateLock(transactionId, accessCount);
+            var locked = await RWLock.ValidateLock(transactionId, accessCount);
             var status = locked.Item1;
             var record = locked.Item2;
             var valid = status == TransactionalStatus.Ok;
@@ -235,14 +235,14 @@ namespace Orleans.Transactions.State
 
             if (!valid)
             {
-                await this.NotifyOfAbort(record, status, exception: null);
+                await NotifyOfAbort(record, status, exception: null);
             }
             else
             {
-                this.Clock.Merge(record.Timestamp);
+                Clock.Merge(record.Timestamp);
             }
 
-            this.RWLock.Notify();
+            RWLock.Notify();
         }
 
         public async Task NotifyOfAbort(TransactionRecord<TState> entry, TransactionalStatus status, Exception exception)
@@ -287,7 +287,7 @@ namespace Orleans.Transactions.State
                         }
                         catch(Exception ex)
                         {
-                            this.logger.LogWarning(ex, "Failed to notify all transaction participants of cancellation.  TransactionId: {TransactionId}, Timestamp: {Timestamp}, Status: {Status}", entry.TransactionId, entry.Timestamp, status);
+                            logger.LogWarning(ex, "Failed to notify all transaction participants of cancellation.  TransactionId: {TransactionId}, Timestamp: {Timestamp}, Status: {Status}", entry.TransactionId, entry.Timestamp, status);
                         }
 
                         // reply to transaction agent
@@ -329,7 +329,7 @@ namespace Orleans.Transactions.State
 
         public async Task NotifyOfPing(Guid transactionId, DateTime timeStamp, ParticipantId resource)
         {
-            if (this.commitQueue.Find(transactionId, timeStamp) != -1)
+            if (commitQueue.Find(transactionId, timeStamp) != -1)
             {
                 // no need to take special action now - the transaction is still
                 // in the commit queue and its status is not yet determined.
@@ -338,11 +338,11 @@ namespace Orleans.Transactions.State
                 if (logger.IsEnabled(LogLevel.Trace))
                     logger.LogTrace("Received ping for {TransactionId}, irrelevant (still processing)", transactionId);
 
-                this.storageWorker.Notify(); // just in case the worker fell asleep or something
+                storageWorker.Notify(); // just in case the worker fell asleep or something
             }
             else
             {
-                if (!this.confirmationWorker.IsConfirmed(transactionId))
+                if (!confirmationWorker.IsConfirmed(transactionId))
                 {
                     if (logger.IsEnabled(LogLevel.Trace))
                         logger.LogTrace("Received ping for {TransactionId}, unknown - presumed abort", transactionId);
@@ -395,13 +395,13 @@ namespace Orleans.Transactions.State
             if (pos == -1)
                 return;
 
-            this.storageBatch.Cancel(commitQueue[pos].SequenceNumber);
+            storageBatch.Cancel(commitQueue[pos].SequenceNumber);
 
             await AbortCommits(status, pos);
 
             storageWorker.Notify();
 
-            this.RWLock.Notify();
+            RWLock.Notify();
         }
 
         /// <summary>
@@ -415,9 +415,9 @@ namespace Orleans.Transactions.State
             }
             finally
             {
-                this.readyTask = Restore();
+                readyTask = Restore();
             }
-            await this.readyTask;
+            await readyTask;
         }
 
         /// <summary>
@@ -426,7 +426,7 @@ namespace Orleans.Transactions.State
         /// <returns></returns>
         public Task Ready()
         {
-            if (this.readyTask.Status == TaskStatus.RanToCompletion)
+            if (readyTask.Status == TaskStatus.RanToCompletion)
             {
                 return readyTask;
             }
@@ -449,22 +449,22 @@ namespace Orleans.Transactions.State
         {
             TransactionalStorageLoadResponse<TState> loadresponse = await storage.Load();
 
-            this.storageBatch = new StorageBatch<TState>(loadresponse);
+            storageBatch = new StorageBatch<TState>(loadresponse);
 
-            this.stableState = loadresponse.CommittedState;
-            this.stableSequenceNumber = loadresponse.CommittedSequenceId;
+            stableState = loadresponse.CommittedState;
+            stableSequenceNumber = loadresponse.CommittedSequenceId;
 
             if (logger.IsEnabled(LogLevel.Debug))
             {
                 logger.LogDebug(
                     "Load v{StableSequenceNumber} {PendingStatesCount}p {CommitRecordsCount}c",
-                    this.stableSequenceNumber,
+                    stableSequenceNumber,
                     loadresponse.PendingStates.Count,
                     storageBatch.MetaData.CommitRecords.Count);
             }
 
             // ensure clock is consistent with loaded state
-            this.Clock.Merge(storageBatch.MetaData.TimeStamp);
+            Clock.Merge(storageBatch.MetaData.TimeStamp);
 
             // resume prepared transactions (not TM)
             foreach (var pr in loadresponse.PendingStates.OrderBy(ps => ps.TimeStamp))
@@ -489,7 +489,7 @@ namespace Orleans.Transactions.State
                         ConfirmationResponsePromise = null,
                         NumberWrites = 1 // was a writing transaction
                     });
-                    this.stableSequenceNumber = pr.SequenceId;
+                    stableSequenceNumber = pr.SequenceId;
                 }
             }
 
@@ -500,20 +500,20 @@ namespace Orleans.Transactions.State
                     logger.LogDebug(
                         "Recover commit confirmation {Key}",
                         kvp.Key);
-                this.confirmationWorker.Add(kvp.Key, kvp.Value.Timestamp, kvp.Value.WriteParticipants);
+                confirmationWorker.Add(kvp.Key, kvp.Value.Timestamp, kvp.Value.WriteParticipants);
             }
 
             // check for work
-            this.storageWorker.Notify();
-            this.RWLock.Notify();
+            storageWorker.Notify();
+            RWLock.Notify();
         }
 
         public void GetMostRecentState(out TState state, out long sequenceNumber)
         {
             if (commitQueue.Count == 0)
             {
-                state = this.stableState;
-                sequenceNumber = this.stableSequenceNumber;
+                state = stableState;
+                sequenceNumber = stableSequenceNumber;
             }
             else
             {
@@ -538,9 +538,9 @@ namespace Orleans.Transactions.State
         private async Task StorageWork()
         {
             // Stop if this activation is stopping/stopped.
-            if (this.activationLifetime.OnDeactivating.IsCancellationRequested) return;
+            if (activationLifetime.OnDeactivating.IsCancellationRequested) return;
 
-            using (this.activationLifetime.BlockDeactivation())
+            using (activationLifetime.BlockDeactivation())
             {
                 try
                 {
@@ -575,18 +575,18 @@ namespace Orleans.Transactions.State
 
                     // store the current storage batch, if it is not empty
                     StorageBatch<TState> batchBeingSentToStorage = null;
-                    if (this.storageBatch.BatchSize > 0)
+                    if (storageBatch.BatchSize > 0)
                     {
                         // get the next batch in place so it can be filled while we store the old one
-                        batchBeingSentToStorage = this.storageBatch;
-                        this.storageBatch = new StorageBatch<TState>(batchBeingSentToStorage);
+                        batchBeingSentToStorage = storageBatch;
+                        storageBatch = new StorageBatch<TState>(batchBeingSentToStorage);
 
                         try
                         {
                             if (await batchBeingSentToStorage.CheckStorePreConditions())
                             {
                                 // perform the actual store, and record the e-tag
-                                this.storageBatch.ETag = await batchBeingSentToStorage.Store(storage);
+                                storageBatch.ETag = await batchBeingSentToStorage.Store(storage);
                                 failCounter = 0;
                             }
                             else
@@ -614,8 +614,8 @@ namespace Orleans.Transactions.State
                     {
                         // update stable state
                         var lastCommittedEntry = commitQueue[committableEntries - 1];
-                        this.stableState = lastCommittedEntry.State;
-                        this.stableSequenceNumber = lastCommittedEntry.SequenceNumber;
+                        stableState = lastCommittedEntry.State;
+                        stableSequenceNumber = lastCommittedEntry.SequenceNumber;
                         if (logger.IsEnabled(LogLevel.Trace))
                             logger.LogTrace("Stable state version: {StableSequenceNumber}", stableSequenceNumber);
 
@@ -640,15 +640,15 @@ namespace Orleans.Transactions.State
 
         private Task AbortAndRestore(TransactionalStatus status, Exception exception, bool force = false)
         {
-            this.readyTask = Bail(status, exception, force);
-            return this.readyTask;
+            readyTask = Bail(status, exception, force);
+            return readyTask;
         }
 
         private async Task Bail(TransactionalStatus status, Exception exception, bool force = false)
         {
             List<Task> pending = new List<Task>();
             pending.Add(RWLock.AbortExecutingTransactions(exception));
-            this.RWLock.AbortQueuedTransactions();
+            RWLock.AbortQueuedTransactions();
 
             // abort all entries in the commit queue
             foreach (var entry in commitQueue.Elements)
@@ -662,9 +662,9 @@ namespace Orleans.Transactions.State
             if (++failCounter >= 10 || force)
             {
                 logger.LogDebug("StorageWorker triggering grain Deactivation");
-                this.deactivate();
+                deactivate();
             }
-            await this.Restore();
+            await Restore();
         }
 
         private async Task CheckProgressOfCommitQueue()
@@ -682,14 +682,14 @@ namespace Orleans.Transactions.State
                     case CommitRole.LocalCommit:
                         {
                             // check for timeout periodically
-                            if (bottom.WaitingSince + this.options.PrepareTimeout <= now)
+                            if (bottom.WaitingSince + options.PrepareTimeout <= now)
                             {
                                 await AbortCommits(TransactionalStatus.PrepareTimeout);
-                                this.RWLock.Notify();
+                                RWLock.Notify();
                             }
                             else
                             {
-                                storageWorker.Notify(bottom.WaitingSince + this.options.PrepareTimeout);
+                                storageWorker.Notify(bottom.WaitingSince + options.PrepareTimeout);
                             }
                             break;
                         }
@@ -714,14 +714,14 @@ namespace Orleans.Transactions.State
                                 }
                                 else
                                 {
-                                    storageWorker.Notify(bottom.LastSent.Value + this.options.RemoteTransactionPingFrequency);
+                                    storageWorker.Notify(bottom.LastSent.Value + options.RemoteTransactionPingFrequency);
                                 }
                             }
                             else if (!bottom.IsReadOnly && bottom.LastSent.HasValue)
                             {
                                 // send ping messages periodically to reactivate crashed TMs
 
-                                if (bottom.LastSent + this.options.RemoteTransactionPingFrequency <= now)
+                                if (bottom.LastSent + options.RemoteTransactionPingFrequency <= now)
                                 {
                                     if (logger.IsEnabled(LogLevel.Trace))
                                         logger.LogTrace("Sent ping {BottomEntry}", bottom);
@@ -729,7 +729,7 @@ namespace Orleans.Transactions.State
                                           .Ping(bottom.TransactionManager.Name, bottom.TransactionId, bottom.Timestamp, resource).Ignore();
                                     bottom.LastSent = now;
                                 }
-                                storageWorker.Notify(bottom.LastSent.Value + this.options.RemoteTransactionPingFrequency);
+                                storageWorker.Notify(bottom.LastSent.Value + options.RemoteTransactionPingFrequency);
                             }
 
                             break;
@@ -775,13 +775,13 @@ namespace Orleans.Transactions.State
                             else
                             {
                                 // we must confirm in storage, and then respond to TM so it can collect
-                                this.storageBatch.Confirm(entry.SequenceNumber);
-                                this.storageBatch.FollowUpAction(() =>
+                                storageBatch.Confirm(entry.SequenceNumber);
+                                storageBatch.FollowUpAction(() =>
                                 {
                                     entry.ConfirmationResponsePromise.TrySetResult(true);
-                                    if (this.logger.IsEnabled(LogLevel.Trace))
+                                    if (logger.IsEnabled(LogLevel.Trace))
                                     {
-                                        this.logger.LogTrace(
+                                        logger.LogTrace(
                                             "Confirmed remote commit v{SequenceNumber}. TransactionId:{TransactionId} Timestamp:{Timestamp} TransactionManager:{TransactionManager}",
                                             entry.SequenceNumber,
                                             entry.TransactionId,
@@ -797,8 +797,8 @@ namespace Orleans.Transactions.State
                     case CommitRole.ReadOnly:
                         {
                             // we are a participant of a read-only transaction. Must store timestamp and then respond.
-                            this.storageBatch.Read(entry.Timestamp);
-                            this.storageBatch.FollowUpAction(() =>
+                            storageBatch.Read(entry.Timestamp);
+                            storageBatch.FollowUpAction(() =>
                             {
                                 entry.PromiseForTA.TrySetResult(TransactionalStatus.Ok);
                             });
@@ -817,16 +817,16 @@ namespace Orleans.Transactions.State
 
         protected virtual void OnLocalCommit(TransactionRecord<TState> entry)
         {
-            this.storageBatch.Prepare(entry.SequenceNumber, entry.TransactionId, entry.Timestamp, entry.TransactionManager, entry.State);
-            this.storageBatch.Commit(entry.TransactionId, entry.Timestamp, entry.WriteParticipants);
-            this.storageBatch.Confirm(entry.SequenceNumber);
+            storageBatch.Prepare(entry.SequenceNumber, entry.TransactionId, entry.Timestamp, entry.TransactionManager, entry.State);
+            storageBatch.Commit(entry.TransactionId, entry.Timestamp, entry.WriteParticipants);
+            storageBatch.Confirm(entry.SequenceNumber);
 
             // after store, send response back to TA
-            this.storageBatch.FollowUpAction(() =>
+            storageBatch.FollowUpAction(() =>
             {
-                if (this.logger.IsEnabled(LogLevel.Trace))
+                if (logger.IsEnabled(LogLevel.Trace))
                 {
-                    this.logger.LogTrace(
+                    logger.LogTrace(
                         "Locally committed {TransactionId} {Timestamp}",
                         entry.TransactionId,
                         entry.Timestamp.ToString("O"));
@@ -837,22 +837,22 @@ namespace Orleans.Transactions.State
             if (entry.WriteParticipants.Count > 1)
             {
                 // after committing, we need to run a task to confirm and collect
-                this.storageBatch.FollowUpAction(() =>
+                storageBatch.FollowUpAction(() =>
                 {
-                    if (this.logger.IsEnabled(LogLevel.Trace))
+                    if (logger.IsEnabled(LogLevel.Trace))
                     {
-                        this.logger.LogTrace(
+                        logger.LogTrace(
                             "Adding confirmation to worker for {TransactionId} {Timestamp}",
                             entry.TransactionId,
                             entry.Timestamp.ToString("O"));
                     }
-                    this.confirmationWorker.Add(entry.TransactionId, entry.Timestamp, entry.WriteParticipants);
+                    confirmationWorker.Add(entry.TransactionId, entry.Timestamp, entry.WriteParticipants);
                 });
             }
             else
             {
                 // there are no remote write participants to notify, so we can finish it all in one shot
-                this.storageBatch.Collect(entry.TransactionId);
+                storageBatch.Collect(entry.TransactionId);
             }
         }
 
@@ -866,7 +866,7 @@ namespace Orleans.Transactions.State
             }
             commitQueue.RemoveFromBack(commitQueue.Count - from);
 
-            pending.Add(this.RWLock.AbortExecutingTransactions(exception: null));
+            pending.Add(RWLock.AbortExecutingTransactions(exception: null));
             await Task.WhenAll(pending);
         }
     }

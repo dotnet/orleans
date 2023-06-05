@@ -16,7 +16,7 @@ namespace DefaultCluster.Tests.General
         public async Task DeactivateReactivateTiming()
         {
             var x = GetRandomGrainId();
-            var grain = this.GrainFactory.GetGrain<ISimplePersistentGrain>(x);
+            var grain = GrainFactory.GetGrain<ISimplePersistentGrain>(x);
             var originalVersion = await grain.GetVersion();
 
             var sw = Stopwatch.StartNew();
@@ -28,7 +28,7 @@ namespace DefaultCluster.Tests.General
             sw.Stop();
 
             Assert.True(sw.ElapsedMilliseconds < 1000);
-            this.Logger.LogInformation("Took {ElapsedMilliseconds}ms to deactivate and reactivate the grain", sw.ElapsedMilliseconds);
+            Logger.LogInformation("Took {ElapsedMilliseconds}ms to deactivate and reactivate the grain", sw.ElapsedMilliseconds);
 
             var a = await grain.GetA();
             Assert.Equal(99, a); // value of A survive deactivation and reactivation of the grain

@@ -29,7 +29,7 @@ namespace Orleans.Hosting.Developer
             Action<Action<IServiceCollection>> configureServicesDelegate)
             : base(name, configureServicesDelegate, EventDataGeneratorAdapterFactory.Create)
         {
-            this.ConfigureDelegate(services => services.ConfigureNamedOptionForLogging<EventHubOptions>(name)
+            ConfigureDelegate(services => services.ConfigureNamedOptionForLogging<EventHubOptions>(name)
                 .ConfigureNamedOptionForLogging<EventHubReceiverOptions>(name)
                 .ConfigureNamedOptionForLogging<EventHubStreamCachePressureOptions>(name)
                 .AddTransient<IConfigurationValidator>(sp => new EventHubOptionsValidator(sp.GetOptionsByName<EventHubOptions>(name), name))

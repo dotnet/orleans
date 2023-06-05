@@ -43,7 +43,7 @@ namespace Tester.AzureUtils.Streaming
             if (!string.IsNullOrWhiteSpace(TestDefaultConfiguration.DataConnectionString))
             {
                 await AzureQueueStreamProviderUtils.DeleteAllUsedAzureQueues(NullLoggerFactory.Instance,
-                    AzureQueueUtilities.GenerateQueueNames(this.HostedCluster.Options.ClusterId, queueCount),
+                    AzureQueueUtilities.GenerateQueueNames(HostedCluster.Options.ClusterId, queueCount),
                     new AzureQueueOptions().ConfigureTestDefaults());
             }
         }
@@ -52,7 +52,7 @@ namespace Tester.AzureUtils.Streaming
         public async Task SampleStreamingTests_4()
         {
             logger.LogInformation("************************ SampleStreamingTests_4 *********************************");
-            var runner = new SampleStreamingTests(StreamProvider, this.logger, this.HostedCluster);
+            var runner = new SampleStreamingTests(StreamProvider, logger, HostedCluster);
             await runner.StreamingTests_Consumer_Producer(Guid.NewGuid());
         }
 
@@ -60,7 +60,7 @@ namespace Tester.AzureUtils.Streaming
         public async Task SampleStreamingTests_5()
         {
             logger.LogInformation("************************ SampleStreamingTests_5 *********************************");
-            var runner = new SampleStreamingTests(StreamProvider, this.logger, this.HostedCluster);
+            var runner = new SampleStreamingTests(StreamProvider, logger, HostedCluster);
             await runner.StreamingTests_Producer_Consumer(Guid.NewGuid());
         }
     }

@@ -218,7 +218,7 @@ namespace UnitTests.GrainInterfaces
 
         public MyPredicate(int filter)
         {
-            this.filterValue = filter;
+            filterValue = filter;
         }
 
         public bool FilterFunc(int i)

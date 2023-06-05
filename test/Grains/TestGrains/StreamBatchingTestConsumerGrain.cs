@@ -10,7 +10,7 @@ namespace UnitTests.Grains.Batching
     {
         private readonly ConsumptionReport report = new ConsumptionReport();
         
-        public Task<ConsumptionReport> GetConsumptionReport() => Task.FromResult(this.report);
+        public Task<ConsumptionReport> GetConsumptionReport() => Task.FromResult(report);
 
         public Task OnSubscribed(IStreamSubscriptionHandleFactory handleFactory)
         {
@@ -22,15 +22,15 @@ namespace UnitTests.Grains.Batching
 
         private async Task OnNextBatch(IList<SequentialItem<string>> items)
         {
-            this.report.Consumed += items.Count;
-            this.report.MaxBatchSize = Math.Max(this.report.MaxBatchSize, items.Count);
+            report.Consumed += items.Count;
+            report.MaxBatchSize = Math.Max(report.MaxBatchSize, items.Count);
             await Task.Delay(500);
         }
 
         private Task OnNext(string item, StreamSequenceToken token)
         {
-            this.report.Consumed++;
-            this.report.MaxBatchSize = 1;
+            report.Consumed++;
+            report.MaxBatchSize = 1;
             return Task.CompletedTask;
         }
     }

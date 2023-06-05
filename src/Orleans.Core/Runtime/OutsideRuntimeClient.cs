@@ -64,16 +64,16 @@ namespace Orleans
             MessagingTrace messagingTrace,
             IServiceProvider serviceProvider)
         {
-            this.ServiceProvider = serviceProvider;
+            ServiceProvider = serviceProvider;
             this.loggerFactory = loggerFactory;
             this.messagingTrace = messagingTrace;
-            this.logger = loggerFactory.CreateLogger<OutsideRuntimeClient>();
-            this.clientId = ClientGrainId.Create();
+            logger = loggerFactory.CreateLogger<OutsideRuntimeClient>();
+            clientId = ClientGrainId.Create();
             callbacks = new ConcurrentDictionary<CorrelationId, CallbackData>();
             this.clientMessagingOptions = clientMessagingOptions.Value;
 
-            this.sharedCallbackData = new SharedCallbackData(
-                msg => this.UnregisterCallback(msg.Id),
+            sharedCallbackData = new SharedCallbackData(
+                msg => UnregisterCallback(msg.Id),
                 this.loggerFactory.CreateLogger<CallbackData>(),
                 this.clientMessagingOptions,
                 this.clientMessagingOptions.ResponseTimeout);
@@ -83,37 +83,37 @@ namespace Orleans
         {
             try
             {
-                var connectionLostHandlers = this.ServiceProvider.GetServices<ConnectionToClusterLostHandler>();
+                var connectionLostHandlers = ServiceProvider.GetServices<ConnectionToClusterLostHandler>();
                 foreach (var handler in connectionLostHandlers)
                 {
-                    this.ClusterConnectionLost += handler;
+                    ClusterConnectionLost += handler;
                 }
 
-                var gatewayCountChangedHandlers = this.ServiceProvider.GetServices<GatewayCountChangedHandler>();
+                var gatewayCountChangedHandlers = ServiceProvider.GetServices<GatewayCountChangedHandler>();
                 foreach (var handler in gatewayCountChangedHandlers)
                 {
-                    this.GatewayCountChanged += handler;
+                    GatewayCountChanged += handler;
                 }
 
-                this.InternalGrainFactory = this.ServiceProvider.GetRequiredService<IInternalGrainFactory>();
-                this.messageFactory = this.ServiceProvider.GetService<MessageFactory>();
+                InternalGrainFactory = ServiceProvider.GetRequiredService<IInternalGrainFactory>();
+                messageFactory = ServiceProvider.GetService<MessageFactory>();
 
-                var copier = this.ServiceProvider.GetRequiredService<DeepCopier>();
-                this.localObjects = new InvokableObjectManager(
+                var copier = ServiceProvider.GetRequiredService<DeepCopier>();
+                localObjects = new InvokableObjectManager(
                     ServiceProvider.GetRequiredService<ClientGrainContext>(),
                     this,
                     copier,
-                    this.messagingTrace,
-                    this.loggerFactory.CreateLogger<ClientGrainContext>());
+                    messagingTrace,
+                    loggerFactory.CreateLogger<ClientGrainContext>());
 
-                var timerLogger = this.loggerFactory.CreateLogger<SafeTimer>();
-                var minTicks = Math.Min(this.clientMessagingOptions.ResponseTimeout.Ticks, TimeSpan.FromSeconds(1).Ticks);
+                var timerLogger = loggerFactory.CreateLogger<SafeTimer>();
+                var minTicks = Math.Min(clientMessagingOptions.ResponseTimeout.Ticks, TimeSpan.FromSeconds(1).Ticks);
                 var period = TimeSpan.FromTicks(minTicks);
-                this.callbackTimer = new SafeTimer(timerLogger, this.OnCallbackExpiryTick, null, period, period);
+                callbackTimer = new SafeTimer(timerLogger, OnCallbackExpiryTick, null, period, period);
 
-                this.GrainReferenceRuntime = this.ServiceProvider.GetRequiredService<IGrainReferenceRuntime>();
+                GrainReferenceRuntime = ServiceProvider.GetRequiredService<IGrainReferenceRuntime>();
 
-                this.localAddress = this.clientMessagingOptions.LocalAddress ?? ConfigUtilities.GetLocalIPAddress(this.clientMessagingOptions.PreferredFamily, this.clientMessagingOptions.NetworkInterfaceName);
+                localAddress = clientMessagingOptions.LocalAddress ?? ConfigUtilities.GetLocalIPAddress(clientMessagingOptions.PreferredFamily, clientMessagingOptions.NetworkInterfaceName);
 
                 // Client init / sign-on message
                 logger.LogInformation((int)ErrorCode.ClientStarting, "Starting Orleans client with runtime version \"{RuntimeVersion}\", local address {LocalAddress} and client id {ClientId}", RuntimeVersion.Current, localAddress, clientId);
@@ -139,7 +139,7 @@ namespace Orleans
 
             // Deliberately avoid capturing the current synchronization context during startup and execute on the default scheduler.
             // This helps to avoid any issues (such as deadlocks) caused by executing with the client's synchronization context/scheduler.
-            await Task.Run(() => this.StartInternal(cancellationToken)).ConfigureAwait(false);
+            await Task.Run(() => StartInternal(cancellationToken)).ConfigureAwait(false);
 
             logger.LogInformation((int)ErrorCode.ProxyClient_StartDone, "Started client with address {ActivationAddress} and id {ClientId}", CurrentActivationAddress.ToString(), clientId);
         }
@@ -149,26 +149,26 @@ namespace Orleans
         {
             var retryFilter = ServiceProvider.GetService<IClientConnectionRetryFilter>();
 
-            var gatewayManager = this.ServiceProvider.GetRequiredService<GatewayManager>();
+            var gatewayManager = ServiceProvider.GetRequiredService<GatewayManager>();
             await ExecuteWithRetries(
                 async () => await gatewayManager.StartAsync(cancellationToken),
                 retryFilter,
                 cancellationToken);
 
             var generation = -SiloAddress.AllocateNewGeneration(); // Client generations are negative
-            MessageCenter = ActivatorUtilities.CreateInstance<ClientMessageCenter>(this.ServiceProvider, localAddress, generation, clientId);
-            MessageCenter.RegisterLocalMessageHandler(this.HandleMessage);
+            MessageCenter = ActivatorUtilities.CreateInstance<ClientMessageCenter>(ServiceProvider, localAddress, generation, clientId);
+            MessageCenter.RegisterLocalMessageHandler(HandleMessage);
             await ExecuteWithRetries(
                 async () => await MessageCenter.StartAsync(cancellationToken),
                 retryFilter,
                 cancellationToken);
             CurrentActivationAddress = GrainAddress.NewActivationAddress(MessageCenter.MyAddress, clientId.GrainId);
 
-            this.gatewayObserver = new ClientGatewayObserver(gatewayManager);
-            this.InternalGrainFactory.CreateObjectReference<IClientGatewayObserver>(this.gatewayObserver);
+            gatewayObserver = new ClientGatewayObserver(gatewayManager);
+            InternalGrainFactory.CreateObjectReference<IClientGatewayObserver>(gatewayObserver);
 
             await ExecuteWithRetries(
-                async () => await this.ServiceProvider.GetRequiredService<ClientClusterManifestProvider>().StartAsync(),
+                async () => await ServiceProvider.GetRequiredService<ClientClusterManifestProvider>().StartAsync(),
                 retryFilter,
                 cancellationToken);
 
@@ -206,7 +206,7 @@ namespace Orleans
                 case Message.Directions.OneWay:
                 case Message.Directions.Request:
                     {
-                        this.localObjects.Dispatch(message);
+                        localObjects.Dispatch(message);
                         break;
                     }
                 default:
@@ -218,7 +218,7 @@ namespace Orleans
         public void SendResponse(Message request, Response response)
         {
             ThrowIfDisposed();
-            var message = this.messageFactory.CreateResponseMessage(request);
+            var message = messageFactory.CreateResponseMessage(request);
             OrleansOutsideRuntimeClientEvent.Log.SendResponse(message);
             message.BodyObject = response;
 
@@ -228,7 +228,7 @@ namespace Orleans
         public void SendRequest(GrainReference target, IInvokable request, IResponseCompletionSource context, InvokeMethodOptions options)
         {
             ThrowIfDisposed();
-            var message = this.messageFactory.CreateMessage(request, options);
+            var message = messageFactory.CreateMessage(request, options);
             OrleansOutsideRuntimeClientEvent.Log.SendRequest(message);
 
             SendRequestMessage(target, message, context, options);
@@ -249,15 +249,15 @@ namespace Orleans
                 message.TargetSilo = systemTargetGrainId.GetSiloAddress();
             }
 
-            if (message.IsExpirableMessage(this.clientMessagingOptions.DropExpiredMessages))
+            if (message.IsExpirableMessage(clientMessagingOptions.DropExpiredMessages))
             {
                 // don't set expiration for system target messages.
-                message.TimeToLive = this.clientMessagingOptions.ResponseTimeout;
+                message.TimeToLive = clientMessagingOptions.ResponseTimeout;
             }
 
             if (!oneWay)
             {
-                var callbackData = new CallbackData(this.sharedCallbackData, context, message);
+                var callbackData = new CallbackData(sharedCallbackData, context, message);
                 callbacks.TryAdd(message.Id, callbackData);
             }
             else
@@ -287,7 +287,7 @@ namespace Orleans
                     if (status.Diagnostics != null && status.Diagnostics.Count > 0 && logger.IsEnabled(LogLevel.Information))
                     {
                         var diagnosticsString = string.Join("\n", status.Diagnostics);
-                        this.logger.LogInformation("Received status update for pending request, Request: {RequestMessage}. Status: {Diagnostics}", request, diagnosticsString);
+                        logger.LogInformation("Received status update for pending request, Request: {RequestMessage}. Status: {Diagnostics}", request, diagnosticsString);
                     }
                 }
                 else
@@ -295,7 +295,7 @@ namespace Orleans
                     if (status.Diagnostics != null && status.Diagnostics.Count > 0 && logger.IsEnabled(LogLevel.Information))
                     {
                         var diagnosticsString = string.Join("\n", status.Diagnostics);
-                        this.logger.LogInformation("Received status update for unknown request. Message: {StatusMessage}. Status: {Diagnostics}", response, diagnosticsString);
+                        logger.LogInformation("Received status update for unknown request. Message: {StatusMessage}. Status: {Diagnostics}", response, diagnosticsString);
                     }
                 }
 
@@ -336,14 +336,14 @@ namespace Orleans
 
         private void ConstructorReset()
         {
-            Utils.SafeExecute(() => this.Dispose());
+            Utils.SafeExecute(() => Dispose());
         }
 
         /// <inheritdoc />
-        public TimeSpan GetResponseTimeout() => this.sharedCallbackData.ResponseTimeout;
+        public TimeSpan GetResponseTimeout() => sharedCallbackData.ResponseTimeout;
 
         /// <inheritdoc />
-        public void SetResponseTimeout(TimeSpan timeout) => this.sharedCallbackData.ResponseTimeout = timeout;
+        public void SetResponseTimeout(TimeSpan timeout) => sharedCallbackData.ResponseTimeout = timeout;
 
         public IAddressable CreateObjectReference(IAddressable obj)
         {
@@ -354,9 +354,9 @@ namespace Orleans
                 throw new ArgumentException("Argument must not be a grain class.", nameof(obj));
 
             var observerId = obj is ClientObserver clientObserver
-                ? clientObserver.GetObserverGrainId(this.clientId)
-                : ObserverGrainId.Create(this.clientId);
-            var reference = this.InternalGrainFactory.GetGrain(observerId.GrainId);
+                ? clientObserver.GetObserverGrainId(clientId)
+                : ObserverGrainId.Create(clientId);
+            var reference = InternalGrainFactory.GetGrain(observerId.GrainId);
 
             if (!localObjects.TryRegister(obj, observerId))
             {
@@ -386,15 +386,15 @@ namespace Orleans
 
         public void Dispose()
         {
-            if (this.disposing) return;
-            this.disposing = true;
+            if (disposing) return;
+            disposing = true;
 
-            Utils.SafeExecute(() => this.callbackTimer?.Dispose());
+            Utils.SafeExecute(() => callbackTimer?.Dispose());
 
             Utils.SafeExecute(() => MessageCenter?.Dispose());
 
-            this.ClusterConnectionLost = null;
-            this.GatewayCountChanged = null;
+            ClusterConnectionLost = null;
+            GatewayCountChanged = null;
 
             GC.SuppressFinalize(this);
             disposed = true;
@@ -422,11 +422,11 @@ namespace Orleans
         {
             try
             {
-                this.ClusterConnectionLost?.Invoke(this, EventArgs.Empty);
+                ClusterConnectionLost?.Invoke(this, EventArgs.Empty);
             }
             catch (Exception ex)
             {
-                this.logger.LogError((int)ErrorCode.ClientError, ex, "Error when sending cluster disconnection notification");
+                logger.LogError((int)ErrorCode.ClientError, ex, "Error when sending cluster disconnection notification");
             }
         }
 
@@ -435,11 +435,11 @@ namespace Orleans
         {
             try
             {
-                this.GatewayCountChanged?.Invoke(this, new GatewayCountChangedEventArgs(currentNumberOfGateways, previousNumberOfGateways));
+                GatewayCountChanged?.Invoke(this, new GatewayCountChangedEventArgs(currentNumberOfGateways, previousNumberOfGateways));
             }
             catch (Exception ex)
             {
-                this.logger.LogError((int)ErrorCode.ClientError, ex, "Error when sending gateway count changed notification");
+                logger.LogError((int)ErrorCode.ClientError, ex, "Error when sending gateway count changed notification");
             }
         }
 
@@ -450,7 +450,7 @@ namespace Orleans
             {
                 var callback = pair.Value;
                 if (callback.IsCompleted) continue;
-                if (callback.IsExpired(currentStopwatchTicks)) callback.OnTimeout(this.clientMessagingOptions.ResponseTimeout);
+                if (callback.IsExpired(currentStopwatchTicks)) callback.OnTimeout(clientMessagingOptions.ResponseTimeout);
             }
         }
 

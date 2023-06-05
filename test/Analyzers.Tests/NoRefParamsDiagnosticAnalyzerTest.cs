@@ -15,7 +15,7 @@ namespace Analyzers.Tests
                             Task GetSomeOtherThing(int a, ref int i);
                         }";
 
-            var (diagnostics, _) = await this.GetDiagnosticsAsync(code, new string[0]);
+            var (diagnostics, _) = await GetDiagnosticsAsync(code, new string[0]);
 
             Assert.NotEmpty(diagnostics);
             Assert.Single(diagnostics);
@@ -34,7 +34,7 @@ namespace Analyzers.Tests
                             Task GetSomeOtherThing(out int i);
                         }";
 
-            var (diagnostics, _) = await this.GetDiagnosticsAsync(code, new string[0]);
+            var (diagnostics, _) = await GetDiagnosticsAsync(code, new string[0]);
 
             Assert.NotEmpty(diagnostics);
             Assert.Single(diagnostics);
@@ -65,7 +65,7 @@ namespace Analyzers.Tests
                         }
                         ";
 
-            var (diagnostics, _) = await this.GetDiagnosticsAsync(code, new string[0]);
+            var (diagnostics, _) = await GetDiagnosticsAsync(code, new string[0]);
 
             Assert.NotEmpty(diagnostics);
             Assert.Equal(2, diagnostics.Length);
@@ -96,7 +96,7 @@ namespace Analyzers.Tests
                         }
                         ";
 
-            var (diagnostics, _) = await this.GetDiagnosticsAsync(code, new string[0]);
+            var (diagnostics, _) = await GetDiagnosticsAsync(code, new string[0]);
 
             Assert.Empty(diagnostics);
         }

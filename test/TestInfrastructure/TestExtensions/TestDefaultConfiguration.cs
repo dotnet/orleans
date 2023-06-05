@@ -90,22 +90,22 @@ namespace TestExtensions
 
             public IDirectoryContents GetDirectoryContents(string subpath)
             {
-                return this.FileProvider().GetDirectoryContents(subpath);
+                return FileProvider().GetDirectoryContents(subpath);
             }
 
             public IFileInfo GetFileInfo(string subpath)
             {
-                return this.FileProvider().GetFileInfo(subpath);
+                return FileProvider().GetFileInfo(subpath);
             }
 
             public IChangeToken Watch(string filter)
             {
-                return this.FileProvider().Watch(filter);
+                return FileProvider().Watch(filter);
             }
 
             private PhysicalFileProvider FileProvider()
             {
-                return this.fileProvider ?? (this.fileProvider = new PhysicalFileProvider(this.Root));
+                return fileProvider ?? (fileProvider = new PhysicalFileProvider(Root));
             }
         }
 

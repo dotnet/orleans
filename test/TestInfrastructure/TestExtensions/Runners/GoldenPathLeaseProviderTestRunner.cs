@@ -24,7 +24,7 @@ namespace TestExtensions.Runners
                 new LeaseRequest(Guid.NewGuid().ToString(), TimeSpan.FromSeconds(15)), new LeaseRequest(Guid.NewGuid().ToString(), TimeSpan.FromSeconds(15))
             };
             //acquire
-            AcquireLeaseResult[] results = await this.leaseProvider.Acquire(LeaseCategory, leaseRequests.ToArray());
+            AcquireLeaseResult[] results = await leaseProvider.Acquire(LeaseCategory, leaseRequests.ToArray());
             for (int i = 0; i < results.Length; i++)
             {
                 var result = results[i];
@@ -41,9 +41,9 @@ namespace TestExtensions.Runners
                 new LeaseRequest(Guid.NewGuid().ToString(), TimeSpan.FromSeconds(15)), new LeaseRequest(Guid.NewGuid().ToString(), TimeSpan.FromSeconds(15))
             };
             //acquire
-            var results = await this.leaseProvider.Acquire(LeaseCategory, leaseRequests.ToArray());
+            var results = await leaseProvider.Acquire(LeaseCategory, leaseRequests.ToArray());
             //release
-            await this.leaseProvider.Release(LeaseCategory, results.Select(result => result.AcquiredLease).ToArray());
+            await leaseProvider.Release(LeaseCategory, results.Select(result => result.AcquiredLease).ToArray());
         }
 
         [SkippableFact]
@@ -53,9 +53,9 @@ namespace TestExtensions.Runners
                 new LeaseRequest(Guid.NewGuid().ToString(), TimeSpan.FromSeconds(15)), new LeaseRequest(Guid.NewGuid().ToString(), TimeSpan.FromSeconds(15))
             };
             //acquire
-            var acquireResults = await this.leaseProvider.Acquire(LeaseCategory, leaseRequests.ToArray());
+            var acquireResults = await leaseProvider.Acquire(LeaseCategory, leaseRequests.ToArray());
             //renew
-            var renewResults = await this.leaseProvider.Renew(LeaseCategory, acquireResults.Select(result => result.AcquiredLease).ToArray());
+            var renewResults = await leaseProvider.Renew(LeaseCategory, acquireResults.Select(result => result.AcquiredLease).ToArray());
             for (int i = 0; i < renewResults.Count(); i++)
             {
                 var result = renewResults[i];
@@ -73,7 +73,7 @@ namespace TestExtensions.Runners
                 new LeaseRequest(resourceId, TimeSpan.FromSeconds(15)), new LeaseRequest(resourceId, TimeSpan.FromSeconds(15))
             };
             //two entity tries to acquire lease on the same release
-            var results = await this.leaseProvider.Acquire(LeaseCategory, leaseRequests.ToArray());
+            var results = await leaseProvider.Acquire(LeaseCategory, leaseRequests.ToArray());
             //one attempt succeeded and one attemp failed
             Assert.Contains(results, result => result.StatusCode == ResponseCode.OK);
             Assert.Contains(results, result => result.StatusCode == ResponseCode.LeaseNotAvailable);
@@ -86,10 +86,10 @@ namespace TestExtensions.Runners
                 new LeaseRequest(Guid.NewGuid().ToString(), TimeSpan.FromSeconds(15)), new LeaseRequest(Guid.NewGuid().ToString(), TimeSpan.FromSeconds(15))
             };
             //acquire
-            var results = await this.leaseProvider.Acquire(LeaseCategory, leaseRequests.ToArray());
+            var results = await leaseProvider.Acquire(LeaseCategory, leaseRequests.ToArray());
             var acquiredLeaseWithWrongToken = results.Select(result => new AcquiredLease(result.AcquiredLease.ResourceKey, result.AcquiredLease.Duration, Guid.NewGuid().ToString(), result.AcquiredLease.StartTimeUtc));
             //renew with wrong token
-            var renewResults = await this.leaseProvider.Renew(LeaseCategory, acquiredLeaseWithWrongToken.ToArray());
+            var renewResults = await leaseProvider.Renew(LeaseCategory, acquiredLeaseWithWrongToken.ToArray());
             for (int i = 0; i < renewResults.Count(); i++)
             {
                 LeaseRequest request = leaseRequests[i];
@@ -108,9 +108,9 @@ namespace TestExtensions.Runners
             };
 
             //acquire first time
-            var acquireResults1 = await this.leaseProvider.Acquire(LeaseCategory, leaseRequests.ToArray());
+            var acquireResults1 = await leaseProvider.Acquire(LeaseCategory, leaseRequests.ToArray());
             //renew
-            var renewResults = await this.leaseProvider.Renew(LeaseCategory, acquireResults1.Select(result => result.AcquiredLease).ToArray());
+            var renewResults = await leaseProvider.Renew(LeaseCategory, acquireResults1.Select(result => result.AcquiredLease).ToArray());
             for (int i = 0; i < renewResults.Count(); i++)
             {
                 var result = renewResults[i];
@@ -119,10 +119,10 @@ namespace TestExtensions.Runners
                 Assert.Equal(leaseRequests[i].ResourceKey, result.AcquiredLease.ResourceKey);
             }
             //release
-            await this.leaseProvider.Release(LeaseCategory, renewResults.Select(result => result.AcquiredLease).ToArray());
+            await leaseProvider.Release(LeaseCategory, renewResults.Select(result => result.AcquiredLease).ToArray());
 
             //acquire second time, acquire lease on the same resource after their leases got released
-            var acquireResults2 = await this.leaseProvider.Acquire(LeaseCategory, leaseRequests.ToArray());
+            var acquireResults2 = await leaseProvider.Acquire(LeaseCategory, leaseRequests.ToArray());
             for (int i = 0; i < acquireResults2.Count(); i++)
             {
                 var result = acquireResults2[i];

@@ -26,21 +26,21 @@ namespace Orleans.Transactions.TestKit
 
         public async Task<bool> Pass(Guid transactionId, string data)
         {
-            this.logger.LogInformation("Transaction {TransactionId} Passed with data: {Data}", transactionId, data);
+            logger.LogInformation("Transaction {TransactionId} Passed with data: {Data}", transactionId, data);
             await Task.Delay(30);
             return true;
         }
 
         public async Task<bool> Fail(Guid transactionId, string data)
         {
-            this.logger.LogInformation("Transaction {TransactionId} Failed with data: {Data}", transactionId, data);
+            logger.LogInformation("Transaction {TransactionId} Failed with data: {Data}", transactionId, data);
             await Task.Delay(30);
             return false;
         }
 
         public async Task<bool> Throw(Guid transactionId, string data)
         {
-            this.logger.LogInformation("Transaction {TransactionId} Threw with data: {Data}", transactionId, data);
+            logger.LogInformation("Transaction {TransactionId} Threw with data: {Data}", transactionId, data);
             await Task.Delay(30);
             throw new ApplicationException("Transaction {transactionId} Threw with data: {data}");
         }
@@ -55,12 +55,12 @@ namespace Orleans.Transactions.TestKit
 
         public PassOperation(string data)
         {
-            this.Data = data;
+            Data = data;
         }
 
         public async Task<bool> Commit(Guid transactionId, IRemoteCommitService service)
         {
-            return await service.Pass(transactionId, this.Data);
+            return await service.Pass(transactionId, Data);
         }
     }
 
@@ -73,12 +73,12 @@ namespace Orleans.Transactions.TestKit
 
         public FailOperation(string data)
         {
-            this.Data = data;
+            Data = data;
         }
 
         public async Task<bool> Commit(Guid transactionId, IRemoteCommitService service)
         {
-            return await service.Fail(transactionId, this.Data);
+            return await service.Fail(transactionId, Data);
         }
     }
 
@@ -91,12 +91,12 @@ namespace Orleans.Transactions.TestKit
 
         public ThrowOperation(string data)
         {
-            this.Data = data;
+            Data = data;
         }
 
         public async Task<bool> Commit(Guid transactionId, IRemoteCommitService service)
         {
-            return await service.Throw(transactionId, this.Data);
+            return await service.Throw(transactionId, Data);
         }
     }
 }

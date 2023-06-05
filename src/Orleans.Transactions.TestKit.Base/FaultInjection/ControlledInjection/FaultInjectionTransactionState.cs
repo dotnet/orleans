@@ -18,8 +18,8 @@ namespace Orleans.Transactions.TestKit
 
         public void Reset()
         {
-            this.FaultInjectionType = FaultInjectionType.None;
-            this.FaultInjectionPhase = TransactionFaultInjectPhase.None;
+            FaultInjectionType = FaultInjectionType.None;
+            FaultInjectionPhase = TransactionFaultInjectPhase.None;
         }
     }
 
@@ -64,39 +64,39 @@ namespace Orleans.Transactions.TestKit
         private readonly ILogger logger;
         public FaultInjectionControl FaultInjectionControl { get; set; }
         private IControlledTransactionFaultInjector faultInjector;
-        public string CurrentTransactionId => this.txState.CurrentTransactionId;
+        public string CurrentTransactionId => txState.CurrentTransactionId;
         public FaultInjectionTransactionalState(TransactionalState<TState> txState, IControlledTransactionFaultInjector faultInjector, IGrainRuntime grainRuntime, ILogger<FaultInjectionTransactionalState<TState>> logger)
         {
             this.grainRuntime = grainRuntime;
             this.txState = txState;
             this.logger = logger;
-            this.FaultInjectionControl = new FaultInjectionControl();
+            FaultInjectionControl = new FaultInjectionControl();
             this.faultInjector = faultInjector;
         }
 
         public void Participate(IGrainLifecycle lifecycle)
         {
             lifecycle.Subscribe<FaultInjectionTransactionalState<TState>>(GrainLifecycleStage.SetupState,
-                (ct) => this.txState.OnSetupState(ct, this.SetupResourceFactory));
+                (ct) => txState.OnSetupState(ct, SetupResourceFactory));
         }
 
         internal void SetupResourceFactory(IGrainContext context, string stateName, TransactionQueue<TState> queue)
         {
             // Add resources factory to the grain context
-            context.RegisterResourceFactory<ITransactionalResource>(stateName, () => new FaultInjectionTransactionalResource<TState>(this.faultInjector, FaultInjectionControl, new TransactionalResource<TState>(queue), context, logger,  grainRuntime));
+            context.RegisterResourceFactory<ITransactionalResource>(stateName, () => new FaultInjectionTransactionalResource<TState>(faultInjector, FaultInjectionControl, new TransactionalResource<TState>(queue), context, logger,  grainRuntime));
 
             // Add tm factory to the grain context
-            context.RegisterResourceFactory<ITransactionManager>(stateName, () => new FaultInjectionTransactionManager<TState>(this.faultInjector, FaultInjectionControl, new TransactionManager<TState>(queue), context, logger, grainRuntime));
+            context.RegisterResourceFactory<ITransactionManager>(stateName, () => new FaultInjectionTransactionManager<TState>(faultInjector, FaultInjectionControl, new TransactionManager<TState>(queue), context, logger, grainRuntime));
         }
 
         public Task<TResult> PerformRead<TResult>(Func<TState, TResult> readFunction)
         {
-            return this.txState.PerformRead(readFunction);
+            return txState.PerformRead(readFunction);
         }
 
         public Task<TResult> PerformUpdate<TResult>(Func<TState, TResult> updateFunction)
         {
-            return this.txState.PerformUpdate(updateFunction);
+            return txState.PerformUpdate(updateFunction);
         }
     }
 }

@@ -29,16 +29,16 @@ namespace Orleans.LeaseProviders
 
         private async Task InitContainerIfNotExistsAsync()
         {
-            if (this.container == null)
+            if (container == null)
             {
-                this.blobClient = await options.CreateClient();
-                var tmpContainer = blobClient.GetBlobContainerClient(this.options.BlobContainerName);
+                blobClient = await options.CreateClient();
+                var tmpContainer = blobClient.GetBlobContainerClient(options.BlobContainerName);
                 await tmpContainer.CreateIfNotExistsAsync().ConfigureAwait(false);
-                this.container = tmpContainer;
+                container = tmpContainer;
             }
         }
 
-        private BlobClient GetBlobClient(string category, string resourceKey) => this.container.GetBlobClient($"{category.ToLowerInvariant()}-{resourceKey.ToLowerInvariant()}.json");
+        private BlobClient GetBlobClient(string category, string resourceKey) => container.GetBlobClient($"{category.ToLowerInvariant()}-{resourceKey.ToLowerInvariant()}.json");
 
         public async Task<AcquireLeaseResult[]> Acquire(string category, LeaseRequest[] leaseRequests)
         {

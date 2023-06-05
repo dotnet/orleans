@@ -119,7 +119,7 @@ namespace Orleans.Providers.Streams.Common
         private bool IsInStream(IBatchContainer batchContainer)
         {
             return batchContainer != null &&
-                    batchContainer.StreamId.Equals(this.streamId);
+                    batchContainer.StreamId.Equals(streamId);
         }
 
         /// <inheritdoc />

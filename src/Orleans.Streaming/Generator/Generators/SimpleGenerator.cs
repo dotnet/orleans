@@ -37,7 +37,7 @@ namespace Orleans.Providers.Streams.Generator
         public bool TryReadEvents(DateTime utcNow, int maxCount, out List<IBatchContainer> events)
         {
             events = new List<IBatchContainer>();
-            if (sequenceId >= this.options.EventsInStream)
+            if (sequenceId >= options.EventsInStream)
             {
                 return false;
             }
@@ -55,7 +55,7 @@ namespace Orleans.Providers.Streams.Generator
         private bool TryGenerateBatch(out GeneratedBatchContainer batch)
         {
             batch = null;
-            if (sequenceId >= this.options.EventsInStream)
+            if (sequenceId >= options.EventsInStream)
             {
                 return false;
             }
@@ -63,7 +63,7 @@ namespace Orleans.Providers.Streams.Generator
             var evt = new GeneratedEvent
             {
                 // If this is the last event generated, mark it as such, so test grains know to report results.
-                EventType = (sequenceId != this.options.EventsInStream)
+                EventType = (sequenceId != options.EventsInStream)
                         ? GeneratedEvent.GeneratedEventType.Fill
                         : GeneratedEvent.GeneratedEventType.Report
             };

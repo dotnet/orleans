@@ -11,8 +11,8 @@ namespace Orleans.Runtime
             MembershipVersion version,
             ImmutableDictionary<SiloAddress, MembershipEntry> entries)
         {
-            this.Version = version;
-            this.Entries = entries;
+            Version = version;
+            Entries = entries;
         }
 
         public static MembershipTableSnapshot Create(MembershipEntry localSiloEntry, MembershipTableData table)
@@ -81,7 +81,7 @@ namespace Orleans.Runtime
             get
             {
                 var count = 0;
-                foreach (var entry in this.Entries)
+                foreach (var entry in Entries)
                 {
                     if (entry.Value.Status == SiloStatus.Active)
                     {
@@ -95,10 +95,10 @@ namespace Orleans.Runtime
 
         public SiloStatus GetSiloStatus(SiloAddress silo)
         {
-            var status = this.Entries.TryGetValue(silo, out var entry) ? entry.Status : SiloStatus.None;
+            var status = Entries.TryGetValue(silo, out var entry) ? entry.Status : SiloStatus.None;
             if (status == SiloStatus.None)
             {
-                foreach (var member in this.Entries)
+                foreach (var member in Entries)
                 {
                     if (member.Key.IsSuccessorOf(silo))
                     {
@@ -114,8 +114,8 @@ namespace Orleans.Runtime
         public override string ToString()
         {
             var sb = new StringBuilder();
-            sb.Append($"[Version: {this.Version}, {this.Entries.Count} silos");
-            foreach (var entry in this.Entries) sb.Append($", {entry.Value}");
+            sb.Append($"[Version: {Version}, {Entries.Count} silos");
+            foreach (var entry in Entries) sb.Append($", {entry.Value}");
             sb.Append(']');
             return sb.ToString();
         }

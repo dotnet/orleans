@@ -26,8 +26,8 @@ namespace Orleans.Transactions.TestKit
             List<ITransactionTestGrain> transaction1Members = new List<ITransactionTestGrain>(new[] { grain1, sharedGrain });
             List<ITransactionTestGrain> transaction2Members = new List<ITransactionTestGrain>(new[] { grain2, sharedGrain });
             
-            ITransactionCoordinatorGrain coordinator1 = this.grainFactory.GetGrain<ITransactionCoordinatorGrain>(Guid.NewGuid());
-            ITransactionCoordinatorGrain coordinator2 = this.grainFactory.GetGrain<ITransactionCoordinatorGrain>(Guid.NewGuid());
+            ITransactionCoordinatorGrain coordinator1 = grainFactory.GetGrain<ITransactionCoordinatorGrain>(Guid.NewGuid());
+            ITransactionCoordinatorGrain coordinator2 = grainFactory.GetGrain<ITransactionCoordinatorGrain>(Guid.NewGuid());
             await Task.WhenAll(
                 coordinator1.MultiGrainAdd(transaction1Members, expected),
                 coordinator2.MultiGrainAdd(transaction2Members, expected));
@@ -59,10 +59,10 @@ namespace Orleans.Transactions.TestKit
             List<ITransactionTestGrain> transaction3Members = new List<ITransactionTestGrain>(new[] { grain3, grain4 });
             List<ITransactionTestGrain> transaction4Members = new List<ITransactionTestGrain>(new[] { grain4, grain5 });
 
-            ITransactionCoordinatorGrain coordinator1 = this.grainFactory.GetGrain<ITransactionCoordinatorGrain>(Guid.NewGuid());
-            ITransactionCoordinatorGrain coordinator2 = this.grainFactory.GetGrain<ITransactionCoordinatorGrain>(Guid.NewGuid());
-            ITransactionCoordinatorGrain coordinator3 = this.grainFactory.GetGrain<ITransactionCoordinatorGrain>(Guid.NewGuid());
-            ITransactionCoordinatorGrain coordinator4 = this.grainFactory.GetGrain<ITransactionCoordinatorGrain>(Guid.NewGuid());
+            ITransactionCoordinatorGrain coordinator1 = grainFactory.GetGrain<ITransactionCoordinatorGrain>(Guid.NewGuid());
+            ITransactionCoordinatorGrain coordinator2 = grainFactory.GetGrain<ITransactionCoordinatorGrain>(Guid.NewGuid());
+            ITransactionCoordinatorGrain coordinator3 = grainFactory.GetGrain<ITransactionCoordinatorGrain>(Guid.NewGuid());
+            ITransactionCoordinatorGrain coordinator4 = grainFactory.GetGrain<ITransactionCoordinatorGrain>(Guid.NewGuid());
             await Task.WhenAll(
                 coordinator1.MultiGrainAdd(transaction1Members, expected),
                 coordinator2.MultiGrainAdd(transaction2Members, expected),
@@ -98,9 +98,9 @@ namespace Orleans.Transactions.TestKit
             List<ITransactionTestGrain> transaction2Members = new List<ITransactionTestGrain>(new[] { grain3, grain4 });
             List<ITransactionTestGrain> transaction3Members = new List<ITransactionTestGrain>(new[] { grain2, grain3 });
 
-            ITransactionCoordinatorGrain coordinator1 = this.grainFactory.GetGrain<ITransactionCoordinatorGrain>(Guid.NewGuid());
-            ITransactionCoordinatorGrain coordinator2 = this.grainFactory.GetGrain<ITransactionCoordinatorGrain>(Guid.NewGuid());
-            ITransactionCoordinatorGrain coordinator3 = this.grainFactory.GetGrain<ITransactionCoordinatorGrain>(Guid.NewGuid());
+            ITransactionCoordinatorGrain coordinator1 = grainFactory.GetGrain<ITransactionCoordinatorGrain>(Guid.NewGuid());
+            ITransactionCoordinatorGrain coordinator2 = grainFactory.GetGrain<ITransactionCoordinatorGrain>(Guid.NewGuid());
+            ITransactionCoordinatorGrain coordinator3 = grainFactory.GetGrain<ITransactionCoordinatorGrain>(Guid.NewGuid());
             await Task.WhenAll(
                 coordinator1.MultiGrainAdd(transaction1Members, expected),
                 coordinator2.MultiGrainAdd(transaction2Members, expected),

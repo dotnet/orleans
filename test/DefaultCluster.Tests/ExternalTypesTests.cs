@@ -13,7 +13,7 @@ namespace DefaultCluster.Tests.General
         [Fact, TestCategory("BVT"), TestCategory("Serialization")]
         public async Task ExternalTypesTest_GrainWithEnumExternalTypeParam()
         {
-            var grainWithEnumTypeParam = this.GrainFactory.GetGrain<IExternalTypeGrain>(0);
+            var grainWithEnumTypeParam = GrainFactory.GetGrain<IExternalTypeGrain>(0);
             await grainWithEnumTypeParam.GetEnumModel();
         }
     }

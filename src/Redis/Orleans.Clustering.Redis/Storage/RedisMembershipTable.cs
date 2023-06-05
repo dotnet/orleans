@@ -52,7 +52,7 @@ namespace Orleans.Clustering.Redis
                 }
             }
 
-            this.IsInitialized = true;
+            IsInitialized = true;
         }
 
         public async Task<bool> InsertRow(MembershipEntry entry, TableVersion tableVersion)
@@ -180,7 +180,7 @@ namespace Orleans.Clustering.Redis
 
         public async Task CleanupDefunctSiloEntries(DateTimeOffset beforeDate)
         {
-            var entries = await this.ReadAll();
+            var entries = await ReadAll();
             foreach (var (entry, _) in entries.Members)
             {
                 if (entry.Status != SiloStatus.Active

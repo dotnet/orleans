@@ -39,14 +39,14 @@ namespace Orleans.Streams
         public string Namespace { get; }
 
         /// <inheritdoc />
-        public override bool Equals(object obj) => obj is StreamIdentity identity && this.Guid.Equals(identity.Guid) && this.Namespace == identity.Namespace;
+        public override bool Equals(object obj) => obj is StreamIdentity identity && Guid.Equals(identity.Guid) && Namespace == identity.Namespace;
 
         /// <inheritdoc />
         public override int GetHashCode()
         {
             var hashCode = -1455462324;
-            hashCode = hashCode * -1521134295 + this.Guid.GetHashCode();
-            hashCode = hashCode * -1521134295 + EqualityComparer<string>.Default.GetHashCode(this.Namespace);
+            hashCode = hashCode * -1521134295 + Guid.GetHashCode();
+            hashCode = hashCode * -1521134295 + EqualityComparer<string>.Default.GetHashCode(Namespace);
             return hashCode;
         }
     }

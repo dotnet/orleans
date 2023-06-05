@@ -32,35 +32,35 @@ namespace Orleans.Transactions.AzureStorage
             this.name = name;
             this.options = options;
             this.clusterOptions = clusterOptions.Value;
-            this.jsonSettings = TransactionalStateFactory.GetJsonSerializerSettings(services);
+            jsonSettings = TransactionalStateFactory.GetJsonSerializerSettings(services);
             this.loggerFactory = loggerFactory;
         }
 
         public ITransactionalStateStorage<TState> Create<TState>(string stateName, IGrainContext context) where TState : class, new()
         {
             string partitionKey = MakePartitionKey(context, stateName);
-            return ActivatorUtilities.CreateInstance<AzureTableTransactionalStateStorage<TState>>(context.ActivationServices, this.table, partitionKey, this.jsonSettings);
+            return ActivatorUtilities.CreateInstance<AzureTableTransactionalStateStorage<TState>>(context.ActivationServices, table, partitionKey, jsonSettings);
         }
 
         public void Participate(ISiloLifecycle lifecycle)
         {
-            lifecycle.Subscribe(OptionFormattingUtilities.Name<AzureTableTransactionalStateStorageFactory>(this.name), this.options.InitStage, Init);
+            lifecycle.Subscribe(OptionFormattingUtilities.Name<AzureTableTransactionalStateStorageFactory>(name), options.InitStage, Init);
         }
 
         private string MakePartitionKey(IGrainContext context, string stateName)
         {
             string grainKey = context.GrainReference.GrainId.ToString();
-            var key = $"{grainKey}_{this.clusterOptions.ServiceId}_{stateName}";
+            var key = $"{grainKey}_{clusterOptions.ServiceId}_{stateName}";
             return AzureTableUtils.SanitizeTableProperty(key);
         }
 
         private async Task CreateTable()
         {
             var tableManager = new AzureTableDataManager<TableEntity>(
-                this.options,
-                this.loggerFactory.CreateLogger<AzureTableDataManager<TableEntity>>());
+                options,
+                loggerFactory.CreateLogger<AzureTableDataManager<TableEntity>>());
             await tableManager.InitTableAsync();
-            this.table = tableManager.Table;
+            table = tableManager.Table;
         }
 
         private Task Init(CancellationToken cancellationToken)

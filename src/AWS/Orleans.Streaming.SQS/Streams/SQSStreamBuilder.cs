@@ -11,7 +11,7 @@ namespace Orleans.Hosting
         public SiloSqsStreamConfigurator(string name, Action<Action<IServiceCollection>> configureServicesDelegate)
             : base(name, configureServicesDelegate, SQSAdapterFactory.Create)
         {
-            this.ConfigureDelegate(services =>
+            ConfigureDelegate(services =>
             {
                 services.ConfigureNamedOptionForLogging<SqsOptions>(name)
                     .ConfigureNamedOptionForLogging<SimpleQueueCacheOptions>(name)

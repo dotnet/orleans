@@ -85,7 +85,7 @@ namespace UnitTests.Grains
 
         public Task<string> CheckProviderType()
         {
-            IGrainStorage grainStorage = GrainStorageHelpers.GetGrainStorage(GetType(), this.ServiceProvider);
+            IGrainStorage grainStorage = GrainStorageHelpers.GetGrainStorage(GetType(), ServiceProvider);
             Assert.NotNull(grainStorage);
             return Task.FromResult(grainStorage.GetType().FullName);
         }
@@ -163,7 +163,7 @@ namespace UnitTests.Grains
 
         public PersistenceUserHandledErrorGrain(ILoggerFactory loggerFactory, DeepCopier<PersistenceTestGrainState> copier)
         {
-            this.logger = loggerFactory.CreateLogger($"{this.GetType().Name}-{this.IdentityString}");
+            logger = loggerFactory.CreateLogger($"{GetType().Name}-{IdentityString}");
             this.copier = copier;
         }
 
@@ -174,7 +174,7 @@ namespace UnitTests.Grains
 
         public async Task DoWrite(int val, bool recover)
         {
-            var original = this.copier.Copy(State);
+            var original = copier.Copy(State);
             try
             {
                 State.Field1 = val;
@@ -184,14 +184,14 @@ namespace UnitTests.Grains
             {
                 if (!recover) throw;
 
-                this.logger.LogWarning(exc, "Grain is handling error in DoWrite - Resetting value to {Original}", original);
+                logger.LogWarning(exc, "Grain is handling error in DoWrite - Resetting value to {Original}", original);
                 State = (PersistenceTestGrainState)original;
             }
         }
 
         public async Task<int> DoRead(bool recover)
         {
-            var original = this.copier.Copy(State);
+            var original = copier.Copy(State);
             try
             {
                 await ReadStateAsync();
@@ -200,7 +200,7 @@ namespace UnitTests.Grains
             {
                 if (!recover) throw;
 
-                this.logger.LogWarning(exc, "Grain is handling error in DoRead - Resetting value to {Original}", original);
+                logger.LogWarning(exc, "Grain is handling error in DoRead - Resetting value to {Original}", original);
                 State = (PersistenceTestGrainState)original;
             }
             return State.Field1;
@@ -268,18 +268,18 @@ namespace UnitTests.Grains
 
         public BadProviderTestGrain(ILoggerFactory loggerFactory)
         {
-            this.logger = loggerFactory.CreateLogger($"{this.GetType().Name}-{this.IdentityString}");
+            logger = loggerFactory.CreateLogger($"{GetType().Name}-{IdentityString}");
         }
 
         public override Task OnActivateAsync(CancellationToken cancellationToken)
         {
-            this.logger.LogWarning("OnActivateAsync");
+            logger.LogWarning("OnActivateAsync");
             return Task.CompletedTask;
         }
 
         public Task DoSomething()
         {
-            this.logger.LogWarning("DoSomething");
+            logger.LogWarning("DoSomething");
             throw new ApplicationException(
                 "BadProviderTestGrain.DoSomething should never get called when provider is missing");
         }
@@ -292,18 +292,18 @@ namespace UnitTests.Grains
 
         public PersistenceNoStateTestGrain(ILoggerFactory loggerFactory)
         {
-            this.logger = loggerFactory.CreateLogger($"{this.GetType().Name}-{this.IdentityString}");
+            logger = loggerFactory.CreateLogger($"{GetType().Name}-{IdentityString}");
         }
 
         public override Task OnActivateAsync(CancellationToken cancellationToken)
         {
-            this.logger.LogInformation("OnActivateAsync");
+            logger.LogInformation("OnActivateAsync");
             return Task.CompletedTask;
         }
 
         public Task DoSomething()
         {
-            this.logger.LogInformation("DoSomething");
+            logger.LogInformation("DoSomething");
             return Task.CompletedTask;
         }
     }
@@ -704,7 +704,7 @@ namespace UnitTests.Grains
 
         public ReentrentGrainWithState(ILoggerFactory loggerFactory)
         {
-            this.logger = loggerFactory.CreateLogger($"{this.GetType().Name}-{this.IdentityString}");
+            logger = loggerFactory.CreateLogger($"{GetType().Name}-{IdentityString}");
         }
 
         public override Task OnActivateAsync(CancellationToken cancellationToken)
@@ -856,7 +856,7 @@ namespace UnitTests.Grains
                 var errorMsg = "Found out that this grain is already in the middle of execution."
                                + " Single threaded-ness violation!\n" +
                                TestRuntimeEnvironmentUtility.CaptureRuntimeEnvironment();
-                this.logger.LogError(1, "{Message}", "\n\n\n\n" + errorMsg + "\n\n\n\n");
+                logger.LogError(1, "{Message}", "\n\n\n\n" + errorMsg + "\n\n\n\n");
                 throw new Exception(errorMsg);
                 //Environment.Exit(1);
             }
@@ -864,7 +864,7 @@ namespace UnitTests.Grains
             if (RuntimeContext.Current == null)
             {
                 var errorMsg = "Found RuntimeContext.Current == null.\n" + TestRuntimeEnvironmentUtility.CaptureRuntimeEnvironment();
-                this.logger.LogError(1, "{Message}", "\n\n\n\n" + errorMsg + "\n\n\n\n");
+                logger.LogError(1, "{Message}", "\n\n\n\n" + errorMsg + "\n\n\n\n");
                 throw new Exception(errorMsg);
                 //Environment.Exit(1);
             }
@@ -893,7 +893,7 @@ namespace UnitTests.Grains
         public override Task OnActivateAsync(CancellationToken cancellationToken)
         {
             _id = _counter++;
-            var loggerFactory = this.ServiceProvider?.GetService<ILoggerFactory>();
+            var loggerFactory = ServiceProvider?.GetService<ILoggerFactory>();
             //if grain created outside a cluster
             if (loggerFactory == null)
                 loggerFactory = NullLoggerFactory.Instance;
@@ -998,10 +998,10 @@ namespace UnitTests.Grains
                     "Found out that grain {0} is already in the middle of execution."
                     + "\n Single threaded-ness violation!"
                     + "\n {1} \n Call Stack={2}",
-                    this._id,
+                    _id,
                     TestRuntimeEnvironmentUtility.CaptureRuntimeEnvironment(),
                     callStack);
-                this.logger.LogError(1, "{Message}", "\n\n\n\n" + errorMsg + "\n\n\n\n");
+                logger.LogError(1, "{Message}", "\n\n\n\n" + errorMsg + "\n\n\n\n");
                 //Environment.Exit(1);
                 throw new Exception(errorMsg);
             }
@@ -1029,7 +1029,7 @@ namespace UnitTests.Grains
 
         public InternalGrainWithState(ILoggerFactory loggerFactory)
         {
-            this.logger = loggerFactory.CreateLogger($"{this.GetType().Name}-{this.IdentityString}");
+            logger = loggerFactory.CreateLogger($"{GetType().Name}-{IdentityString}");
         }
 
         public Task SetOne(int val)
@@ -1063,7 +1063,7 @@ namespace UnitTests.Grains
 
         public StateInheritanceTestGrain(ILoggerFactory loggerFactory)
         {
-            this.logger = loggerFactory.CreateLogger($"{this.GetType().Name}-{this.IdentityString}");
+            logger = loggerFactory.CreateLogger($"{GetType().Name}-{IdentityString}");
         }
 
         public override Task OnActivateAsync(CancellationToken cancellationToken)

@@ -108,8 +108,8 @@ namespace Orleans.Providers.Streams.PersistentStreams
             failureEntity.StreamProviderName = streamProviderName;
             failureEntity.StreamGuid = streamId.GetKeyAsString();
             failureEntity.StreamNamespace = streamId.GetNamespace();
-            failureEntity.SetSequenceToken(this.serializer, sequenceToken);
-            failureEntity.SetPartitionKey(this.clusterId);
+            failureEntity.SetSequenceToken(serializer, sequenceToken);
+            failureEntity.SetPartitionKey(clusterId);
             failureEntity.SetRowkey();
             await dataManager.CreateTableEntryAsync(failureEntity);
         }

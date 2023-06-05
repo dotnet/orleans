@@ -44,19 +44,19 @@ namespace Orleans.Runtime
             GrainPropertiesResolver grainPropertiesResolver)
             : base(Constants.CatalogType, localSiloDetails.SiloAddress, loggerFactory)
         {
-            this.LocalSilo = localSiloDetails.SiloAddress;
-            this.localSiloName = localSiloDetails.Name;
+            LocalSilo = localSiloDetails.SiloAddress;
+            localSiloName = localSiloDetails.Name;
             this.grainLocator = grainLocator;
             this.grainDirectoryResolver = grainDirectoryResolver;
-            this.directory = grainDirectory;
-            this.activations = activationDirectory;
+            directory = grainDirectory;
+            activations = activationDirectory;
             this.serviceProvider = serviceProvider;
             this.collectionOptions = collectionOptions;
             this.grainActivator = grainActivator;
             this.grainPropertiesResolver = grainPropertiesResolver;
-            this.logger = loggerFactory.CreateLogger<Catalog>();
+            logger = loggerFactory.CreateLogger<Catalog>();
             this.activationCollector = activationCollector;
-            this.RuntimeClient = serviceProvider.GetRequiredService<InsideRuntimeClient>();
+            RuntimeClient = serviceProvider.GetRequiredService<InsideRuntimeClient>();
 
             GC.GetTotalMemory(true); // need to call once w/true to ensure false returns OK value
 
@@ -75,7 +75,7 @@ namespace Orleans.Runtime
                 }
                 return counter;
             });
-            grainDirectory.SetSiloRemovedCatalogCallback(this.OnSiloStatusChange);
+            grainDirectory.SetSiloRemovedCatalogCallback(OnSiloStatusChange);
             RegisterSystemTarget(this);
         }
 
@@ -139,7 +139,7 @@ namespace Orleans.Runtime
             string grainClassName;
             try
             {
-                var properties = this.grainPropertiesResolver.GetGrainProperties(grain.Type);
+                var properties = grainPropertiesResolver.GetGrainProperties(grain.Type);
                 properties.Properties.TryGetValue(WellKnownGrainTypeProperties.TypeName, out grainClassName);
             }
             catch (Exception exc)
@@ -215,8 +215,8 @@ namespace Orleans.Runtime
         {
             var systemTarget = target as SystemTarget;
             if (systemTarget == null) throw new ArgumentException($"Parameter must be of type {typeof(SystemTarget)}", nameof(target));
-            systemTarget.RuntimeClient = this.RuntimeClient;
-            var sp = this.serviceProvider;
+            systemTarget.RuntimeClient = RuntimeClient;
+            var sp = serviceProvider;
             systemTarget.WorkItemGroup = new WorkItemGroup(
                 systemTarget,
                 sp.GetRequiredService<ILogger<WorkItemGroup>>(),
@@ -267,7 +267,7 @@ namespace Orleans.Runtime
                 if (!SiloStatusOracle.CurrentStatus.IsTerminating())
                 {
                     var address = GrainAddress.GetAddress(Silo, grainId, new ActivationId(Guid.NewGuid()));
-                    result = this.grainActivator.CreateInstance(address);
+                    result = grainActivator.CreateInstance(address);
                     RegisterMessageTarget(result);
                 }
             } // End lock
@@ -282,7 +282,7 @@ namespace Orleans.Runtime
 
                 CatalogInstruments.NonExistentActivations.Add(1);
 
-                this.directory.InvalidateCacheEntry(grainId);
+                directory.InvalidateCacheEntry(grainId);
 
                 // Unregister the target activation so we don't keep getting spurious messages.
                 // The time delay (one minute, as of this writing) is to handle the unlikely but possible race where
@@ -290,7 +290,7 @@ namespace Orleans.Runtime
                 // If the activation registration request from the new placement somehow sneaks ahead of this unregistration,
                 // we want to make sure that we don't unregister the activation we just created.
                 var address = new GrainAddress { SiloAddress = Silo, GrainId = grainId };
-                _ = this.UnregisterNonExistentActivation(address);
+                _ = UnregisterNonExistentActivation(address);
                 return null;
             }
             else
@@ -306,7 +306,7 @@ namespace Orleans.Runtime
         {
             try
             {
-                await this.grainLocator.Unregister(address, UnregistrationCause.NonexistentActivation);
+                await grainLocator.Unregister(address, UnregistrationCause.NonexistentActivation);
             }
             catch (Exception exc)
             {
@@ -338,7 +338,7 @@ namespace Orleans.Runtime
 
             if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug("DeactivateActivations: {Count} activations.", list.Count);
 
-            var timeoutTokenSource = new CancellationTokenSource(this.collectionOptions.Value.DeactivationTimeout);
+            var timeoutTokenSource = new CancellationTokenSource(collectionOptions.Value.DeactivationTimeout);
             await Task.WhenAll(list.Select(activation => activation.DeactivateAsync(reason, timeoutTokenSource.Token)));
         }
 
@@ -348,7 +348,7 @@ namespace Orleans.Runtime
 
             if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug("DeactivateActivations: {Count} activations.", list.Count);
 
-            var timeoutTokenSource = new CancellationTokenSource(this.collectionOptions.Value.DeactivationTimeout);
+            var timeoutTokenSource = new CancellationTokenSource(collectionOptions.Value.DeactivationTimeout);
             foreach (var activation in list)
             {
                 activation.DeactivateAsync(reason, timeoutTokenSource.Token);
@@ -387,7 +387,7 @@ namespace Orleans.Runtime
 
         public Task DeleteActivations(List<GrainAddress> addresses, DeactivationReasonCode reasonCode, string reasonText)
         {
-            var timeoutTokenSource = new CancellationTokenSource(this.collectionOptions.Value.DeactivationTimeout);
+            var timeoutTokenSource = new CancellationTokenSource(collectionOptions.Value.DeactivationTimeout);
             var tasks = new List<Task>(addresses.Count);
             var deactivationReason = new DeactivationReason(reasonCode, reasonText);
             foreach (var activationAddress in addresses)
@@ -414,7 +414,7 @@ namespace Orleans.Runtime
             if (!status.IsTerminating()) return;
             if (status == SiloStatus.Dead)
             {
-                this.RuntimeClient.BreakOutstandingMessagesToDeadSilo(updatedSilo);
+                RuntimeClient.BreakOutstandingMessagesToDeadSilo(updatedSilo);
             }
 
             var activationsToShutdown = new List<IGrainContext>();

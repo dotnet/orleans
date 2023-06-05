@@ -31,17 +31,17 @@ namespace UnitTests.MembershipTests
         protected override IMembershipTable CreateMembershipTable(ILogger logger)
         {
             var options = new ZooKeeperClusteringSiloOptions();
-            options.ConnectionString = this.connectionString;
+            options.ConnectionString = connectionString;
            
-            return new ZooKeeperBasedMembershipTable(this.Services.GetService<ILogger<ZooKeeperBasedMembershipTable>>(), Options.Create(options), this.clusterOptions);
+            return new ZooKeeperBasedMembershipTable(Services.GetService<ILogger<ZooKeeperBasedMembershipTable>>(), Options.Create(options), clusterOptions);
         }
 
         protected override IGatewayListProvider CreateGatewayListProvider(ILogger logger)
         {
             var options = new ZooKeeperGatewayListProviderOptions();
-            options.ConnectionString = this.connectionString;
+            options.ConnectionString = connectionString;
 
-            return ActivatorUtilities.CreateInstance<ZooKeeperGatewayListProvider>(this.Services, Options.Create(options), this.clusterOptions);
+            return ActivatorUtilities.CreateInstance<ZooKeeperGatewayListProvider>(Services, Options.Create(options), clusterOptions);
         }
 
         protected override async Task<string> GetConnectionString()

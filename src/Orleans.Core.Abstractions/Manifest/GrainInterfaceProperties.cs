@@ -20,7 +20,7 @@ namespace Orleans.Metadata
         /// </param>
         public GrainInterfaceProperties(ImmutableDictionary<string, string> values)
         {
-            this.Properties = values;
+            Properties = values;
         }
 
         /// <summary>
@@ -37,10 +37,10 @@ namespace Orleans.Metadata
         /// </returns>
         public string ToDetailedString()
         {
-            if (this.Properties is null) return string.Empty;
+            if (Properties is null) return string.Empty;
             var result = new StringBuilder("[");
             bool first = true;
-            foreach (var entry in this.Properties)
+            foreach (var entry in Properties)
             {
                 if (!first)
                 {
@@ -144,7 +144,7 @@ namespace Orleans.Metadata
             {
                 if (attr is IGrainInterfacePropertiesProviderAttribute providerAttribute)
                 {
-                    providerAttribute.Populate(this.serviceProvider, interfaceType, properties);
+                    providerAttribute.Populate(serviceProvider, interfaceType, properties);
                 }
             }
         }
@@ -172,7 +172,7 @@ namespace Orleans.Metadata
         /// <inheritdoc />
         void IGrainInterfacePropertiesProviderAttribute.Populate(IServiceProvider services, Type type, Dictionary<string, string> properties)
         {
-            properties[WellKnownGrainInterfaceProperties.DefaultGrainType] = this.grainType;
+            properties[WellKnownGrainInterfaceProperties.DefaultGrainType] = grainType;
         }
     }
 }

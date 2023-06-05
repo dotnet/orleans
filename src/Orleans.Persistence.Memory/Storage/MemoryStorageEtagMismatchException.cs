@@ -35,8 +35,8 @@ namespace Orleans.Storage.Internal
         private MemoryStorageEtagMismatchException(SerializationInfo info, StreamingContext context)
             : base(info, context)
         {
-            this.StoredEtag = info.GetString(nameof(StoredEtag));
-            this.ReceivedEtag = info.GetString(nameof(ReceivedEtag));
+            StoredEtag = info.GetString(nameof(StoredEtag));
+            ReceivedEtag = info.GetString(nameof(ReceivedEtag));
         }
 
         /// <inheritdoc/>
@@ -44,8 +44,8 @@ namespace Orleans.Storage.Internal
         {
             if (info == null) throw new ArgumentNullException(nameof(info));
 
-            info.AddValue(nameof(StoredEtag), this.StoredEtag);
-            info.AddValue(nameof(ReceivedEtag), this.ReceivedEtag);
+            info.AddValue(nameof(StoredEtag), StoredEtag);
+            info.AddValue(nameof(ReceivedEtag), ReceivedEtag);
             base.GetObjectData(info, context);
         }
 

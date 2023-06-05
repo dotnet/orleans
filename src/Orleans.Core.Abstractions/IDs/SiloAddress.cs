@@ -285,7 +285,7 @@ namespace Orleans.Runtime
         internal void InternalSetConsistentHashCode(int hashCode)
         {
             this.hashCode = hashCode;
-            this.hashCodeSet = true;
+            hashCodeSet = true;
         }
 
         /// <summary>

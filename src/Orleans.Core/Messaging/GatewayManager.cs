@@ -45,45 +45,45 @@ namespace Orleans.Messaging
             ConnectionManager connectionManager)
         {
             this.gatewayOptions = gatewayOptions.Value;
-            this.logger = loggerFactory.CreateLogger<GatewayManager>();
+            logger = loggerFactory.CreateLogger<GatewayManager>();
             this.connectionManager = connectionManager;
             this.gatewayListProvider = gatewayListProvider;
-            this.timerLogger = loggerFactory.CreateLogger<SafeTimer>();
+            timerLogger = loggerFactory.CreateLogger<SafeTimer>();
         }
 
         public async Task StartAsync(CancellationToken cancellationToken)
         {
             if (!gatewayListProviderInitialized)
             {
-                await this.gatewayListProvider.InitializeGatewayListProvider();
+                await gatewayListProvider.InitializeGatewayListProvider();
                 gatewayListProviderInitialized = true;
             }
 
-            this.gatewayRefreshTimer = new AsyncTaskSafeTimer(
-                this.timerLogger,
+            gatewayRefreshTimer = new AsyncTaskSafeTimer(
+                timerLogger,
                 RefreshSnapshotLiveGateways_TimerCallback,
                 null,
-                this.gatewayOptions.GatewayListRefreshPeriod,
-                this.gatewayOptions.GatewayListRefreshPeriod);
+                gatewayOptions.GatewayListRefreshPeriod,
+                gatewayOptions.GatewayListRefreshPeriod);
 
-            var knownGateways = await this.gatewayListProvider.GetGateways();
+            var knownGateways = await gatewayListProvider.GetGateways();
             if (knownGateways.Count == 0)
             {
-                var err = $"Could not find any gateway in {this.gatewayListProvider.GetType().FullName}. Orleans client cannot initialize.";
-                this.logger.LogError((int)ErrorCode.GatewayManager_NoGateways, err);
+                var err = $"Could not find any gateway in {gatewayListProvider.GetType().FullName}. Orleans client cannot initialize.";
+                logger.LogError((int)ErrorCode.GatewayManager_NoGateways, err);
                 throw new SiloUnavailableException(err);
             }
 
-            this.logger.LogInformation(
+            logger.LogInformation(
                 (int)ErrorCode.GatewayManager_FoundKnownGateways,
                 "Found {GatewayCount} gateways: {Gateways}",
                 knownGateways.Count,
                 Utils.EnumerableToString(knownGateways));
 
-            this.roundRobinCounter = this.gatewayOptions.PreferedGatewayIndex >= 0 ? this.gatewayOptions.PreferedGatewayIndex : Random.Shared.Next(knownGateways.Count);
-            this.knownGateways = this.cachedLiveGateways = knownGateways.Select(gw => gw.ToGatewayAddress()).ToList();
-            this.cachedLiveGatewaysSet = new HashSet<SiloAddress>(cachedLiveGateways);
-            this.lastRefreshTime = DateTime.UtcNow;
+            roundRobinCounter = gatewayOptions.PreferedGatewayIndex >= 0 ? gatewayOptions.PreferedGatewayIndex : Random.Shared.Next(knownGateways.Count);
+            this.knownGateways = cachedLiveGateways = knownGateways.Select(gw => gw.ToGatewayAddress()).ToList();
+            cachedLiveGatewaysSet = new HashSet<SiloAddress>(cachedLiveGateways);
+            lastRefreshTime = DateTime.UtcNow;
         }
 
         public void Stop()
@@ -179,11 +179,11 @@ namespace Orleans.Messaging
 
                 if (knownGateways.Count > 0)
                 {
-                    lock (this.lockable)
+                    lock (lockable)
                     {
                         if (cachedLiveGateways.Count == 0 && knownGateways.Count > 0)
                         {
-                            this.logger.LogWarning("All known gateways have been marked dead locally. Expediting gateway refresh and resetting all gateways to live status.");
+                            logger.LogWarning("All known gateways have been marked dead locally. Expediting gateway refresh and resetting all gateways to live status.");
 
                             cachedLiveGateways = knownGateways;
                             cachedLiveGatewaysSet = new HashSet<SiloAddress>(knownGateways);
@@ -255,7 +255,7 @@ namespace Orleans.Messaging
                 var live = new List<SiloAddress>();
                 var now = DateTime.UtcNow;
 
-                this.knownGateways = refreshedGateways as List<SiloAddress> ?? refreshedGateways.ToList();
+                knownGateways = refreshedGateways as List<SiloAddress> ?? refreshedGateways.ToList();
                 foreach (SiloAddress trial in knownGateways)
                 {
                     var address = trial.Generation == 0 ? trial : SiloAddress.New(trial.Endpoint, 0);
@@ -330,14 +330,14 @@ namespace Orleans.Messaging
                 connectionsToKeepAlive.AddRange(knownMasked.Select(e => e.Key));
             }
 
-            await this.CloseEvictedGatewayConnections(connectionsToKeepAlive);
+            await CloseEvictedGatewayConnections(connectionsToKeepAlive);
         }
 
         private async Task CloseEvictedGatewayConnections(List<SiloAddress> liveGateways)
         {
-            if (this.connectionManager == null) return;
+            if (connectionManager == null) return;
 
-            var connectedGateways = this.connectionManager.GetConnectedAddresses();
+            var connectedGateways = connectionManager.GetConnectedAddresses();
             foreach (var address in connectedGateways)
             {
                 var isLiveGateway = false;
@@ -354,17 +354,17 @@ namespace Orleans.Messaging
                 {
                     if (logger.IsEnabled(LogLevel.Information))
                     {
-                        this.logger.LogInformation("Closing connection to {Endpoint} because it has been marked as dead", address);
+                        logger.LogInformation("Closing connection to {Endpoint} because it has been marked as dead", address);
                     }
 
-                    await this.connectionManager.CloseAsync(address);
+                    await connectionManager.CloseAsync(address);
                 }
             }
         }
 
         public void Dispose()
         {
-            this.gatewayRefreshTimer?.Dispose();
+            gatewayRefreshTimer?.Dispose();
         }
     }
 }

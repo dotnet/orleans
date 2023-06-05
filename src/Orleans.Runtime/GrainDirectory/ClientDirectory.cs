@@ -530,7 +530,7 @@ namespace Orleans.Runtime.GrainDirectory
                 ServiceLifecycleStage.RuntimeGrainServices,
                 ct =>
                 {
-                    this.RunOrQueueTask(() => _runTask = this.Run()).Ignore();
+                    this.RunOrQueueTask(() => _runTask = Run()).Ignore();
                     return Task.CompletedTask;
                 },
                 async ct =>

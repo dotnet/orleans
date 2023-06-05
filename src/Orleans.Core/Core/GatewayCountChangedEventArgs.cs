@@ -34,7 +34,7 @@ namespace Orleans
         /// <summary>
         /// Helper to detect situations where cluster connectivity was regained.
         /// </summary>
-        public bool ConnectionRecovered => this.NumberOfConnectedGateways > 0 && this.PreviousNumberOfConnectedGateways <= 0;
+        public bool ConnectionRecovered => NumberOfConnectedGateways > 0 && PreviousNumberOfConnectedGateways <= 0;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="GatewayCountChangedEventArgs"/> class.
@@ -47,8 +47,8 @@ namespace Orleans
         /// </param>
         public GatewayCountChangedEventArgs(int currentNumberOfConnectedGateways, int previousNumberOfConnectedGateways)
         {
-            this.NumberOfConnectedGateways = currentNumberOfConnectedGateways;
-            this.PreviousNumberOfConnectedGateways = previousNumberOfConnectedGateways;
+            NumberOfConnectedGateways = currentNumberOfConnectedGateways;
+            PreviousNumberOfConnectedGateways = previousNumberOfConnectedGateways;
         }
     }
 }

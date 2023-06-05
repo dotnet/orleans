@@ -29,7 +29,7 @@ namespace UnitTests.General
         [Fact]
         public async Task GrainCallFilter_Incoming_GrainLevel_Without_Global_Filter_Test()
         {
-            var grain = this.fixture.GrainFactory.GetGrain<IMethodInterceptionGrain>(0);
+            var grain = fixture.GrainFactory.GetGrain<IMethodInterceptionGrain>(0);
             var result = await grain.One();
             Assert.Equal("intercepted one with no args", result);
 

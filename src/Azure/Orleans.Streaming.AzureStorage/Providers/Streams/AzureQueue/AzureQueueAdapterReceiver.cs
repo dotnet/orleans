@@ -40,8 +40,8 @@ namespace Orleans.Providers.Streams.AzureQueue
             this.azureQueueName = azureQueueName ?? throw new ArgumentNullException(nameof(azureQueueName));
             this.queue = queue?? throw new ArgumentNullException(nameof(queue));
             this.dataAdapter = dataAdapter?? throw new ArgumentNullException(nameof(dataAdapter));
-            this.logger = loggerFactory.CreateLogger<AzureQueueAdapterReceiver>();
-            this.pending = new List<PendingDelivery>();
+            logger = loggerFactory.CreateLogger<AzureQueueAdapterReceiver>();
+            pending = new List<PendingDelivery>();
         }
 
         public Task Initialize(TimeSpan timeout)
@@ -87,9 +87,9 @@ namespace Orleans.Providers.Streams.AzureQueue
                 List<IBatchContainer> azureQueueMessages = new List<IBatchContainer>();
                 foreach (var message in messages)
                 {
-                    IBatchContainer container = this.dataAdapter.FromQueueMessage(message.MessageText, lastReadMessage++);
+                    IBatchContainer container = dataAdapter.FromQueueMessage(message.MessageText, lastReadMessage++);
                     azureQueueMessages.Add(container);
-                    this.pending.Add(new PendingDelivery(container.SequenceToken, message));
+                    pending.Add(new PendingDelivery(container.SequenceToken, message));
                 }
 
                 return azureQueueMessages;
@@ -133,7 +133,7 @@ namespace Orleans.Providers.Streams.AzureQueue
                 {
                     logger.LogWarning((int)AzureQueueErrorCode.AzureQueue_15,
                         exc,
-                        "Exception upon DeleteQueueMessage on queue {QueueName}. Ignoring.", this.azureQueueName);
+                        "Exception upon DeleteQueueMessage on queue {QueueName}. Ignoring.", azureQueueName);
                 }
             }
             finally
@@ -146,8 +146,8 @@ namespace Orleans.Providers.Streams.AzureQueue
         {
             public PendingDelivery(StreamSequenceToken token, QueueMessage message)
             {
-                this.Token = token;
-                this.Message = message;
+                Token = token;
+                Message = message;
             }
 
             public QueueMessage Message { get; }

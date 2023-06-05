@@ -23,7 +23,7 @@ namespace Orleans.BroadcastChannel
         }
 
         /// <inheritdoc/>
-        public string PredicatePattern => $"{Prefix}{this.targetStreamNamespace}";
+        public string PredicatePattern => $"{Prefix}{targetStreamNamespace}";
 
         /// <inheritdoc/>
         public bool IsMatch(string streamNamespace)

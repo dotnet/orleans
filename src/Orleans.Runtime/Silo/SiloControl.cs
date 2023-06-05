@@ -61,7 +61,7 @@ namespace Orleans.Runtime
         {
             this.localSiloDetails = localSiloDetails;
 
-            this.logger = loggerFactory.CreateLogger<SiloControl>();
+            logger = loggerFactory.CreateLogger<SiloControl>();
             this.deploymentLoadPublisher = deploymentLoadPublisher;
             this.catalog = catalog;
             this.cachedVersionSelectorManager = cachedVersionSelectorManager;
@@ -74,14 +74,14 @@ namespace Orleans.Runtime
             this.hostEnvironmentStatistics = hostEnvironmentStatistics;
             this.loadSheddingOptions = loadSheddingOptions;
             _grainCountStatistics = grainCountStatistics;
-            this.controllables = new Dictionary<Tuple<string, string>, IControllable>();
+            controllables = new Dictionary<Tuple<string, string>, IControllable>();
             IEnumerable<IKeyedServiceCollection<string, IControllable>> namedIControllableCollections = services.GetServices<IKeyedServiceCollection<string, IControllable>>();
             foreach (IKeyedService<string, IControllable> keyedService in namedIControllableCollections.SelectMany(c => c.GetServices(services)))
             {
                 IControllable controllable = keyedService.GetService(services);
                 if(controllable != null)
                 {
-                    this.controllables.Add(Tuple.Create(controllable.GetType().FullName, keyedService.Key), controllable);
+                    controllables.Add(Tuple.Create(controllable.GetType().FullName, keyedService.Key), controllable);
                 }
             }
 
@@ -110,19 +110,19 @@ namespace Orleans.Runtime
         public Task ForceRuntimeStatisticsCollection()
         {
             if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug("ForceRuntimeStatisticsCollection");
-            return this.deploymentLoadPublisher.RefreshStatistics();
+            return deploymentLoadPublisher.RefreshStatistics();
         }
 
         public Task<SiloRuntimeStatistics> GetRuntimeStatistics()
         {
             if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug("GetRuntimeStatistics");
-            var activationCount = this.activationDirectory.Count;
+            var activationCount = activationDirectory.Count;
             var stats = new SiloRuntimeStatistics(
                 activationCount,
                 activationWorkingSet.Count,
-                this.appEnvironmentStatistics,
-                this.hostEnvironmentStatistics,
-                this.loadSheddingOptions,
+                appEnvironmentStatistics,
+                hostEnvironmentStatistics,
+                loadSheddingOptions,
                 DateTime.UtcNow);
             return Task.FromResult(stats);
         }
@@ -130,37 +130,37 @@ namespace Orleans.Runtime
         public Task<List<Tuple<GrainId, string, int>>> GetGrainStatistics()
         {
             logger.LogInformation("GetGrainStatistics");
-            return Task.FromResult(this.catalog.GetGrainStatistics());
+            return Task.FromResult(catalog.GetGrainStatistics());
         }
 
         public Task<List<DetailedGrainStatistic>> GetDetailedGrainStatistics(string[] types=null)
         {
             if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug("GetDetailedGrainStatistics");
-            return Task.FromResult(this.catalog.GetDetailedGrainStatistics(types));
+            return Task.FromResult(catalog.GetDetailedGrainStatistics(types));
         }
 
         public Task<SimpleGrainStatistic[]> GetSimpleGrainStatistics()
         {
             logger.LogInformation("GetSimpleGrainStatistics");
             return Task.FromResult( _grainCountStatistics.GetSimpleGrainStatistics().Select(p =>
-                new SimpleGrainStatistic { SiloAddress = this.localSiloDetails.SiloAddress, GrainType = p.Key, ActivationCount = (int)p.Value }).ToArray());
+                new SimpleGrainStatistic { SiloAddress = localSiloDetails.SiloAddress, GrainType = p.Key, ActivationCount = (int)p.Value }).ToArray());
         }
 
         public Task<DetailedGrainReport> GetDetailedGrainReport(GrainId grainId)
         {
             logger.LogInformation("DetailedGrainReport for grain id {GrainId}", grainId);
-            return Task.FromResult( this.catalog.GetDetailedGrainReport(grainId));
+            return Task.FromResult( catalog.GetDetailedGrainReport(grainId));
         }
 
         public Task<int> GetActivationCount()
         {
-            return Task.FromResult(this.catalog.ActivationCount);
+            return Task.FromResult(catalog.ActivationCount);
         }
 
         public Task<object> SendControlCommandToProvider(string providerTypeFullName, string providerName, int command, object arg)
         {
             IControllable controllable;
-            if(!this.controllables.TryGetValue(Tuple.Create(providerTypeFullName, providerName), out controllable))
+            if(!controllables.TryGetValue(Tuple.Create(providerTypeFullName, providerName), out controllable))
             {
                 logger.LogError(
                     (int)ErrorCode.Provider_ProviderNotFound,
@@ -175,29 +175,29 @@ namespace Orleans.Runtime
 
         public Task SetCompatibilityStrategy(CompatibilityStrategy strategy)
         {
-            this.compatibilityDirectorManager.SetStrategy(strategy);
-            this.cachedVersionSelectorManager.ResetCache();
+            compatibilityDirectorManager.SetStrategy(strategy);
+            cachedVersionSelectorManager.ResetCache();
             return Task.CompletedTask;
         }
 
         public Task SetSelectorStrategy(VersionSelectorStrategy strategy)
         {
-            this.selectorManager.SetSelector(strategy);
-            this.cachedVersionSelectorManager.ResetCache();
+            selectorManager.SetSelector(strategy);
+            cachedVersionSelectorManager.ResetCache();
             return Task.CompletedTask;
         }
 
         public Task SetCompatibilityStrategy(GrainInterfaceType interfaceId, CompatibilityStrategy strategy)
         {
-            this.compatibilityDirectorManager.SetStrategy(interfaceId, strategy);
-            this.cachedVersionSelectorManager.ResetCache();
+            compatibilityDirectorManager.SetStrategy(interfaceId, strategy);
+            cachedVersionSelectorManager.ResetCache();
             return Task.CompletedTask;
         }
 
         public Task SetSelectorStrategy(GrainInterfaceType interfaceType, VersionSelectorStrategy strategy)
         {
-            this.selectorManager.SetSelector(interfaceType, strategy);
-            this.cachedVersionSelectorManager.ResetCache();
+            selectorManager.SetSelector(interfaceType, strategy);
+            cachedVersionSelectorManager.ResetCache();
             return Task.CompletedTask;
         }
 

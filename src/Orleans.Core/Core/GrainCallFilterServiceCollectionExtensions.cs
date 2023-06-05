@@ -133,7 +133,7 @@ namespace Orleans.Hosting
             }
 
             /// <inheritdoc />
-            public Task Invoke(IOutgoingGrainCallContext context) => this.interceptor.Invoke(context);
+            public Task Invoke(IOutgoingGrainCallContext context) => interceptor.Invoke(context);
         }
 
         /// <summary>
@@ -159,7 +159,7 @@ namespace Orleans.Hosting
             /// </summary>
             /// <param name="context">The grain call context.</param>
             /// <returns>A <see cref="Task"/> representing the work performed.</returns>
-            public Task Invoke(IIncomingGrainCallContext context) => this.interceptor.Invoke(context);
+            public Task Invoke(IIncomingGrainCallContext context) => interceptor.Invoke(context);
         }
     }
 }

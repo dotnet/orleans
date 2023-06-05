@@ -39,14 +39,14 @@ namespace Orleans.TestingHost
         /// <summary>Performs application-defined tasks associated with freeing, releasing, or resetting unmanaged resources.</summary>
         public void Dispose()
         {
-            this.Dispose(true);
+            Dispose(true);
             GC.SuppressFinalize(this);
         }
 
         /// <summary>Performs application-defined tasks associated with freeing, releasing, or resetting unmanaged resources.</summary>
         protected virtual void Dispose(bool disposing)
         {
-            if (!this.IsActive) return;
+            if (!IsActive) return;
 
             // Do not attempt to perform expensive blocking operations in the finalizer thread.
             // Concrete SiloHandle implementations can do have their own cleanup functionality

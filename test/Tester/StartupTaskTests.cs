@@ -48,7 +48,7 @@ namespace DefaultCluster.Tests
 
             public async Task Execute(CancellationToken cancellationToken)
             {
-                var grain = this.grainFactory.GetGrain<ISimpleGrain>(2);
+                var grain = grainFactory.GetGrain<ISimpleGrain>(2);
                 await grain.SetA(777);
             }
         }
@@ -66,11 +66,11 @@ namespace DefaultCluster.Tests
         [Fact]
         public async Task StartupTaskCanCallGrains()
         {
-            var grain = this.fixture.GrainFactory.GetGrain<ISimpleGrain>(1);
+            var grain = fixture.GrainFactory.GetGrain<ISimpleGrain>(1);
             var value = await grain.GetA();
             Assert.Equal(888, value);
 
-            grain = this.fixture.GrainFactory.GetGrain<ISimpleGrain>(2);
+            grain = fixture.GrainFactory.GetGrain<ISimpleGrain>(2);
             value = await grain.GetA();
             Assert.Equal(777, value);
         }

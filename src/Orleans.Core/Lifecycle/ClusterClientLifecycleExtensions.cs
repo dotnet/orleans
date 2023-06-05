@@ -33,7 +33,7 @@ namespace Orleans.Runtime
 
             public void Participate(TLifecycle lifecycle)
             {
-                this.participant?.Participate(lifecycle);
+                participant?.Participate(lifecycle);
             }
         }
     }

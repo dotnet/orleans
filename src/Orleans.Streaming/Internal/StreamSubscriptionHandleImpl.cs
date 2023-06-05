@@ -33,7 +33,7 @@ namespace Orleans.Streams
         internal GuidId SubscriptionId { get { return subscriptionId; } }
         internal bool IsRewindable { get { return isRewindable; } }
 
-        public override string ProviderName { get { return this.streamImpl.ProviderName; } }
+        public override string ProviderName { get { return streamImpl.ProviderName; } }
         public override StreamId StreamId { get { return streamImpl.StreamId; } }
         public override Guid HandleId { get { return subscriptionId.Guid; } }
 
@@ -62,7 +62,7 @@ namespace Orleans.Streams
             this.batchObserver = batchObserver;
             this.streamImpl = streamImpl ?? throw new ArgumentNullException("streamImpl");
             this.filterData = filterData;
-            this.isRewindable = streamImpl.IsRewindable;
+            isRewindable = streamImpl.IsRewindable;
             if (IsRewindable)
             {
                 expectedToken = StreamHandshakeToken.CreateStartToken(token);
@@ -71,42 +71,42 @@ namespace Orleans.Streams
 
         public void Invalidate()
         {
-            this.streamImpl = null;
-            this.observer = null;
-            this.batchObserver = null;
+            streamImpl = null;
+            observer = null;
+            batchObserver = null;
         }
 
         public StreamHandshakeToken GetSequenceToken()
         {
-            return this.expectedToken;
+            return expectedToken;
         }
 
         public override Task UnsubscribeAsync()
         {
             if (!IsValid) throw new InvalidOperationException("Handle is no longer valid. It has been used to unsubscribe or resume.");
-            return this.streamImpl.UnsubscribeAsync(this);
+            return streamImpl.UnsubscribeAsync(this);
         }
 
         public override Task<StreamSubscriptionHandle<T>> ResumeAsync(IAsyncObserver<T> obs, StreamSequenceToken token = null)
         {
             if (!IsValid) throw new InvalidOperationException("Handle is no longer valid. It has been used to unsubscribe or resume.");
-            return this.streamImpl.ResumeAsync(this, obs, token);
+            return streamImpl.ResumeAsync(this, obs, token);
         }
 
 
         public override Task<StreamSubscriptionHandle<T>> ResumeAsync(IAsyncBatchObserver<T> observer, StreamSequenceToken token = null)
         {
             if (!IsValid) throw new InvalidOperationException("Handle is no longer valid. It has been used to unsubscribe or resume.");
-            return this.streamImpl.ResumeAsync(this, observer, token);
+            return streamImpl.ResumeAsync(this, observer, token);
         }
 
         public async Task<StreamHandshakeToken> DeliverBatch(IBatchContainer batch, StreamHandshakeToken handshakeToken)
         {
             // we validate expectedToken only for ordered (rewindable) streams
-            if (this.expectedToken != null)
+            if (expectedToken != null)
             {
-                if (!this.expectedToken.Equals(handshakeToken))
-                    return this.expectedToken;
+                if (!expectedToken.Equals(handshakeToken))
+                    return expectedToken;
             }
 
             if (batch is IBatchContainerBatch)
@@ -116,7 +116,7 @@ namespace Orleans.Streams
             }
             else
             {
-                if (this.observer != null)
+                if (observer != null)
                 {
                     foreach (var itemTuple in batch.GetEvents<T>())
                     {
@@ -130,17 +130,17 @@ namespace Orleans.Streams
 
             if (IsRewindable)
             {
-                this.expectedToken = StreamHandshakeToken.CreateDeliveyToken(batch.SequenceToken);
+                expectedToken = StreamHandshakeToken.CreateDeliveyToken(batch.SequenceToken);
             }
             return null;
         }
 
         public async Task<StreamHandshakeToken> DeliverItem(object item, StreamSequenceToken currentToken, StreamHandshakeToken handshakeToken)
         {
-            if (this.expectedToken != null)
+            if (expectedToken != null)
             {
-                if (!this.expectedToken.Equals(handshakeToken))
-                    return this.expectedToken;
+                if (!expectedToken.Equals(handshakeToken))
+                    return expectedToken;
             }
 
             T typedItem;
@@ -154,26 +154,26 @@ namespace Orleans.Streams
                 throw new InvalidCastException("Received an item of type " + item.GetType().Name + ", expected " + typeof(T).FullName);
             }
 
-            await ((this.observer != null)
+            await ((observer != null)
                 ? NextItem(typedItem, currentToken)
                 : NextItems(new[] { Tuple.Create(typedItem, currentToken) }));
 
             // check again, in case the expectedToken was changed indiretly via ResumeAsync()
-            if (this.expectedToken != null)
+            if (expectedToken != null)
             {
-                if (!this.expectedToken.Equals(handshakeToken))
-                    return this.expectedToken;
+                if (!expectedToken.Equals(handshakeToken))
+                    return expectedToken;
             }
             if (IsRewindable)
             {
-                this.expectedToken = StreamHandshakeToken.CreateDeliveyToken(currentToken);
+                expectedToken = StreamHandshakeToken.CreateDeliveyToken(currentToken);
             }
             return null;
         }
 
         public async Task NextBatch(IBatchContainerBatch batchContainerBatch)
         {
-            if (this.observer != null)
+            if (observer != null)
             {
                 foreach (var batchContainer in batchContainerBatch.BatchContainers)
                 {
@@ -204,42 +204,42 @@ namespace Orleans.Streams
         {
             // This method could potentially be invoked after Dispose() has been called, 
             // so we have to ignore the request or we risk breaking unit tests AQ_01 - AQ_04.
-            if (this.observer == null || !IsValid)
+            if (observer == null || !IsValid)
                 return Task.CompletedTask;
 
-            return this.observer.OnNextAsync(item, token);
+            return observer.OnNextAsync(item, token);
         }
 
         private Task NextItems(IEnumerable<Tuple<T, StreamSequenceToken>> items)
         {
             // This method could potentially be invoked after Dispose() has been called, 
             // so we have to ignore the request or we risk breaking unit tests AQ_01 - AQ_04.
-            if (this.batchObserver == null || !IsValid)
+            if (batchObserver == null || !IsValid)
                 return Task.CompletedTask;
 
             IList<SequentialItem<T>> batch = items
                 .Select(item => new SequentialItem<T>(item.Item1, item.Item2))
                 .ToList();
 
-            return batch.Count != 0 ? this.batchObserver.OnNextAsync(batch) : Task.CompletedTask;
+            return batch.Count != 0 ? batchObserver.OnNextAsync(batch) : Task.CompletedTask;
         }
 
         public Task CompleteStream()
         {
-            return this.observer is null
-                ? this.batchObserver is null
+            return observer is null
+                ? batchObserver is null
                     ? Task.CompletedTask
-                    : this.batchObserver.OnCompletedAsync()
-                : this.observer.OnCompletedAsync();
+                    : batchObserver.OnCompletedAsync()
+                : observer.OnCompletedAsync();
         }
 
         public Task ErrorInStream(Exception ex)
         {
-            return this.observer is null
-                ? this.batchObserver is null
+            return observer is null
+                ? batchObserver is null
                     ? Task.CompletedTask
-                    : this.batchObserver.OnErrorAsync(ex)
-                : this.observer.OnErrorAsync(ex);
+                    : batchObserver.OnErrorAsync(ex)
+                : observer.OnErrorAsync(ex);
         }
 
         internal bool SameStreamId(QualifiedStreamId streamId)

@@ -40,7 +40,7 @@ namespace Orleans.Providers.GCP.Streams.PubSub
             if (string.IsNullOrEmpty(topicId)) throw new ArgumentNullException(nameof(topicId));
             if (string.IsNullOrEmpty(serviceId)) throw new ArgumentNullException(nameof(serviceId));
 
-            _logger = loggerFactory.CreateLogger($"{this.GetType().FullName}.{providerName}");
+            _logger = loggerFactory.CreateLogger($"{GetType().FullName}.{providerName}");
             this.loggerFactory = loggerFactory;
             ProjectId = projectId;
             TopicId = topicId;
@@ -54,7 +54,7 @@ namespace Orleans.Providers.GCP.Streams.PubSub
 
         public IQueueAdapterReceiver CreateReceiver(QueueId queueId)
         {
-            return PubSubAdapterReceiver.Create(this.loggerFactory, queueId, ProjectId, TopicId, ServiceId, _dataAdapter, Deadline, _customEndpoint);
+            return PubSubAdapterReceiver.Create(loggerFactory, queueId, ProjectId, TopicId, ServiceId, _dataAdapter, Deadline, _customEndpoint);
         }
 
         public async Task QueueMessageBatchAsync<T>(StreamId streamId, IEnumerable<T> events, StreamSequenceToken token, Dictionary<string, object> requestContext)
@@ -65,7 +65,7 @@ namespace Orleans.Providers.GCP.Streams.PubSub
             PubSubDataManager pubSub;
             if (!Subscriptions.TryGetValue(queueId, out pubSub))
             {
-                var tmpPubSub = new PubSubDataManager(this.loggerFactory, ProjectId, TopicId, queueId.ToString(), ServiceId, Deadline);
+                var tmpPubSub = new PubSubDataManager(loggerFactory, ProjectId, TopicId, queueId.ToString(), ServiceId, Deadline);
                 await tmpPubSub.Initialize();
                 pubSub = Subscriptions.GetOrAdd(queueId, tmpPubSub);
             }

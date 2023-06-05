@@ -60,7 +60,7 @@ namespace UnitTests.StreamingTests
             StreamId = Guid.NewGuid();
             StreamProviderName = StreamTestsConstants.SMS_STREAM_PROVIDER_NAME;
             StreamNamespace = StreamTestsConstants.StreamLifecycleTestsNamespace;
-            this.HostedCluster = fixture.HostedCluster;
+            HostedCluster = fixture.HostedCluster;
             _fixture = fixture;
         }
 
@@ -105,12 +105,12 @@ namespace UnitTests.StreamingTests
         private async Task Test_PubSub_Stream(string streamProviderName, Guid streamId)
         {
             // Consumer
-            IStreamLifecycleConsumerGrain consumer = this.GrainFactory.GetGrain<IStreamLifecycleConsumerGrain>(Guid.NewGuid());
-            await consumer.BecomeConsumer(streamId, this.StreamNamespace, streamProviderName);
+            IStreamLifecycleConsumerGrain consumer = GrainFactory.GetGrain<IStreamLifecycleConsumerGrain>(Guid.NewGuid());
+            await consumer.BecomeConsumer(streamId, StreamNamespace, streamProviderName);
 
             // Producer
-            IStreamLifecycleProducerGrain producer = this.GrainFactory.GetGrain<IStreamLifecycleProducerGrain>(Guid.NewGuid());
-            await producer.BecomeProducer(StreamId, this.StreamNamespace, streamProviderName);
+            IStreamLifecycleProducerGrain producer = GrainFactory.GetGrain<IStreamLifecycleProducerGrain>(Guid.NewGuid());
+            await producer.BecomeProducer(StreamId, StreamNamespace, streamProviderName);
 
             await producer.SendItem(1);
 
@@ -142,7 +142,7 @@ namespace UnitTests.StreamingTests
             await ErrorInjectionStorageProvider.SetErrorInjection(
                 providerName,
                 new ErrorInjectionBehavior { ErrorInjectionPoint = errorInjectionPoint },
-                this.HostedCluster.GrainFactory);
+                HostedCluster.GrainFactory);
         }
     }
 }

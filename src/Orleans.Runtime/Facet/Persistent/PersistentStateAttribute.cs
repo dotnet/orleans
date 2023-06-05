@@ -18,8 +18,8 @@ namespace Orleans.Runtime
         /// <param name="storageName">Name of the storage provider.</param>
         public PersistentStateAttribute(string stateName, string storageName = null)
         {
-            this.StateName = stateName;
-            this.StorageName = storageName;
+            StateName = stateName;
+            StorageName = storageName;
         }
 
         /// <summary>

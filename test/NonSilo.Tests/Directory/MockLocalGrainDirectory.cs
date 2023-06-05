@@ -22,24 +22,24 @@ namespace UnitTests.Directory
 
         public void Reset()
         {
-            this.UnregistrationCounter = 0;
-            this.UnregistrationReceived = new List<(GrainAddress activationAddress, UnregistrationCause cause)>();
+            UnregistrationCounter = 0;
+            UnregistrationReceived = new List<(GrainAddress activationAddress, UnregistrationCause cause)>();
         }
 
         public async Task UnregisterAsync(GrainAddress address, UnregistrationCause cause, int hopCount = 0)
         {
-            this.UnregistrationCounter++;
+            UnregistrationCounter++;
             await Task.Delay(singleOperationDelay);
-            this.UnregistrationReceived.Add((address, cause));
+            UnregistrationReceived.Add((address, cause));
         }
 
         public async Task UnregisterManyAsync(List<GrainAddress> addresses, UnregistrationCause cause, int hopCount = 0)
         {
-            this.UnregistrationCounter++;
+            UnregistrationCounter++;
             await Task.Delay(batchOperationDelay);
             foreach(var addr in addresses)
             {
-                this.UnregistrationReceived.Add((addr, cause));
+                UnregistrationReceived.Add((addr, cause));
             }
         }
 

@@ -18,7 +18,7 @@ namespace UnitTests.GrainInterfaces
 
         void IOnDeserialized.OnDeserialized(DeserializationContext context)
         {
-            this.Context = context;
+            Context = context;
         }
     }
 

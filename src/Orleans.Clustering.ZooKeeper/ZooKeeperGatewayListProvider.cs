@@ -47,7 +47,7 @@ namespace Orleans.Runtime.Membership
         /// </summary>
         public async Task<IList<Uri>> GetGateways()
         {
-            var membershipTableData = await ZooKeeperBasedMembershipTable.ReadAll(this._deploymentConnectionString, this._watcher);
+            var membershipTableData = await ZooKeeperBasedMembershipTable.ReadAll(_deploymentConnectionString, _watcher);
             return membershipTableData.Members.Select(e => e.Item1).
                 Where(m => m.Status == SiloStatus.Active && m.ProxyPort != 0).
                 Select(m =>

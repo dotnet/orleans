@@ -50,11 +50,11 @@ namespace Orleans.Core
             ArgumentNullException.ThrowIfNull(store);
             ArgumentNullException.ThrowIfNull(loggerFactory);
 
-            this.logger = loggerFactory.CreateLogger(store.GetType());
+            logger = loggerFactory.CreateLogger(store.GetType());
             this.name = name;
             this.grainId = grainId;
             this.store = store;
-            this.grainState = new GrainState<TState>(Activator.CreateInstance<TState>());
+            grainState = new GrainState<TState>(Activator.CreateInstance<TState>());
         }
 
         /// <inheritdoc />
@@ -73,7 +73,7 @@ namespace Orleans.Core
                 StorageInstruments.OnStorageReadError();
 
                 string errMsg = MakeErrorMsg("ReadState", exc);
-                this.logger.LogError((int)ErrorCode.StorageProvider_ReadFailed, exc, "{Message}", errMsg);
+                logger.LogError((int)ErrorCode.StorageProvider_ReadFailed, exc, "{Message}", errMsg);
                 if (!(exc is OrleansException))
                 {
                     throw new OrleansException(errMsg, exc);
@@ -97,7 +97,7 @@ namespace Orleans.Core
             {
                 StorageInstruments.OnStorageWriteError();
                 string errMsgToLog = MakeErrorMsg("WriteState", exc);
-                this.logger.LogError((int)ErrorCode.StorageProvider_WriteFailed, exc, "{Message}", errMsgToLog);
+                logger.LogError((int)ErrorCode.StorageProvider_WriteFailed, exc, "{Message}", errMsgToLog);
                 // If error is not specialization of OrleansException, wrap it
                 if (!(exc is OrleansException))
                 {
@@ -130,7 +130,7 @@ namespace Orleans.Core
                 StorageInstruments.OnStorageDeleteError();
 
                 string errMsg = MakeErrorMsg("ClearState", exc);
-                this.logger.LogError((int)ErrorCode.StorageProvider_DeleteFailed, exc, "{Message}", errMsg);
+                logger.LogError((int)ErrorCode.StorageProvider_DeleteFailed, exc, "{Message}", errMsg);
                 if (!(exc is OrleansException))
                 {
                     throw new OrleansException(errMsg, exc);

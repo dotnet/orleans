@@ -72,8 +72,8 @@ namespace Orleans
             var binding = new Dictionary<string, string>
             {
                 [WellKnownGrainTypeProperties.BindingTypeKey] = WellKnownGrainTypeProperties.StreamBindingTypeValue,
-                [WellKnownGrainTypeProperties.StreamBindingPatternKey] = this.Predicate.PredicatePattern,
-                [WellKnownGrainTypeProperties.StreamIdMapperKey] = this.StreamIdMapper,
+                [WellKnownGrainTypeProperties.StreamBindingPatternKey] = Predicate.PredicatePattern,
+                [WellKnownGrainTypeProperties.StreamIdMapperKey] = StreamIdMapper,
             };
 
             if (LegacyGrainId.IsLegacyGrainType(grainClass))

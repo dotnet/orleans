@@ -29,7 +29,7 @@ namespace Orleans.Streaming.EventHubs
         /// <returns></returns>
         public virtual IBatchContainer GetBatchContainer(ref CachedMessage cachedMessage)
         {
-            var evenHubMessage = new EventHubMessage(cachedMessage, this.serializer);
+            var evenHubMessage = new EventHubMessage(cachedMessage, serializer);
             return GetBatchContainer(evenHubMessage);
         }
 
@@ -40,7 +40,7 @@ namespace Orleans.Streaming.EventHubs
         /// <returns></returns>
         protected virtual IBatchContainer GetBatchContainer(EventHubMessage eventHubMessage)
         {
-            return new EventHubBatchContainer(eventHubMessage, this.serializer);
+            return new EventHubBatchContainer(eventHubMessage, serializer);
         }
 
         /// <summary>
@@ -56,7 +56,7 @@ namespace Orleans.Streaming.EventHubs
         public virtual EventData ToQueueMessage<T>(StreamId streamId, IEnumerable<T> events, StreamSequenceToken token, Dictionary<string, object> requestContext)
         {
             if (token != null) throw new ArgumentException("EventHub streams currently does not support non-null StreamSequenceToken.", nameof(token));
-            return EventHubBatchContainer.ToEventData(this.serializer, streamId, events, requestContext);
+            return EventHubBatchContainer.ToEventData(serializer, streamId, events, requestContext);
         }
 
         public virtual CachedMessage FromQueueMessage(StreamPosition streamPosition, EventData queueMessage, DateTime dequeueTime, Func<int, ArraySegment<byte>> getSegment)
@@ -74,7 +74,7 @@ namespace Orleans.Streaming.EventHubs
 
         public virtual StreamPosition GetStreamPosition(string partition, EventData queueMessage)
         {
-            StreamId streamId = this.GetStreamIdentity(queueMessage);
+            StreamId streamId = GetStreamIdentity(queueMessage);
             StreamSequenceToken token =
                 new EventHubSequenceTokenV2(queueMessage.Offset.ToString(), queueMessage.SequenceNumber, 0);
             return new StreamPosition(streamId, token);
@@ -112,7 +112,7 @@ namespace Orleans.Streaming.EventHubs
         // Placed object message payload into a segment.
         protected virtual ArraySegment<byte> EncodeMessageIntoSegment(EventData queueMessage, Func<int, ArraySegment<byte>> getSegment)
         {
-            byte[] propertiesBytes = queueMessage.SerializeProperties(this.serializer);
+            byte[] propertiesBytes = queueMessage.SerializeProperties(serializer);
             var payload = queueMessage.Body.Span;
             var offset = queueMessage.Offset.ToString();
             // get size of namespace, offset, partitionkey, properties, and payload

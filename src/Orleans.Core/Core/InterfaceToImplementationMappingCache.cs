@@ -90,7 +90,7 @@ namespace Orleans
         public Dictionary<MethodInfo, Entry> GetOrCreate(Type implementationType, Type interfaceType)
         {
             // Get or create the mapping between interfaceId and invoker for the provided type.
-            if (!this.mappings.TryGetValue(implementationType, out var invokerMap))
+            if (!mappings.TryGetValue(implementationType, out var invokerMap))
             {
                 // Generate an the invoker mapping using the provided invoker.
                 invokerMap = mappings.GetOrAdd(implementationType, CreateInterfaceToImplementationMap(implementationType));

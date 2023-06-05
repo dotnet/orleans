@@ -37,7 +37,7 @@ namespace Samples.StorageProviders
     {
         public OrleansFileStorage(string rootDirectory)
         {
-            this.RootDirectory = rootDirectory;
+            RootDirectory = rootDirectory;
             if (string.IsNullOrWhiteSpace(RootDirectory)) throw new ArgumentException("RootDirectory property not set");
             DataManager = new GrainStateFileDataManager(RootDirectory);
         }

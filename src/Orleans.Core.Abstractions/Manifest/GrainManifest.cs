@@ -23,8 +23,8 @@ namespace Orleans.Metadata
             ImmutableDictionary<GrainType, GrainProperties> grains,
             ImmutableDictionary<GrainInterfaceType, GrainInterfaceProperties> interfaces)
         {
-            this.Interfaces = interfaces;
-            this.Grains = grains;
+            Interfaces = interfaces;
+            Grains = grains;
         }
 
         /// <summary>

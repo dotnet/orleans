@@ -33,7 +33,7 @@ namespace Orleans.TestingHost
         /// <param name="initialSilosCount">The number of initial silos to deploy.</param>
         public TestClusterBuilder(short initialSilosCount)
         {
-            this.Options = new TestClusterOptions
+            Options = new TestClusterOptions
             {
                 InitialSilosCount = initialSilosCount,
                 ClusterId = CreateClusterId(),
@@ -44,8 +44,8 @@ namespace Orleans.TestingHost
                 AssumeHomogenousSilosForTesting = true
             };
 
-            this.AddSiloBuilderConfigurator<ConfigureStaticClusterDeploymentOptions>();
-            this.ConfigureBuilder(ConfigureDefaultPorts);
+            AddSiloBuilderConfigurator<ConfigureStaticClusterDeploymentOptions>();
+            ConfigureBuilder(ConfigureDefaultPorts);
         }
 
         /// <summary>
@@ -85,7 +85,7 @@ namespace Orleans.TestingHost
         /// <param name="configureDelegate">The configuration delegate.</param>
         public TestClusterBuilder ConfigureBuilder(Action configureDelegate)
         {
-            this.configureBuilderActions.Add(configureDelegate ?? throw new ArgumentNullException(nameof(configureDelegate)));
+            configureBuilderActions.Add(configureDelegate ?? throw new ArgumentNullException(nameof(configureDelegate)));
             return this;
         }
 
@@ -98,7 +98,7 @@ namespace Orleans.TestingHost
         /// <returns>The same instance of the host builder for chaining.</returns>
         public TestClusterBuilder ConfigureHostConfiguration(Action<IConfigurationBuilder> configureDelegate)
         {
-            this.configureHostConfigActions.Add(configureDelegate ?? throw new ArgumentNullException(nameof(configureDelegate)));
+            configureHostConfigActions.Add(configureDelegate ?? throw new ArgumentNullException(nameof(configureDelegate)));
             return this;
         }
 
@@ -114,7 +114,7 @@ namespace Orleans.TestingHost
                 throw new ArgumentException($"The type {typeof(T)} is not assignable to either {nameof(ISiloConfigurator)} or {nameof(IHostConfigurator)}");
             }
 
-            this.Options.SiloBuilderConfiguratorTypes.Add(typeof(T).AssemblyQualifiedName);
+            Options.SiloBuilderConfiguratorTypes.Add(typeof(T).AssemblyQualifiedName);
             return this;
         }
 
@@ -130,7 +130,7 @@ namespace Orleans.TestingHost
                 throw new ArgumentException($"The type {typeof(T)} is not assignable to either {nameof(IClientBuilderConfigurator)} or {nameof(IHostConfigurator)}");
             }
 
-            this.Options.ClientBuilderConfiguratorTypes.Add(typeof(T).AssemblyQualifiedName);
+            Options.ClientBuilderConfiguratorTypes.Add(typeof(T).AssemblyQualifiedName);
             return this;
         }
 
@@ -140,7 +140,7 @@ namespace Orleans.TestingHost
         /// <returns>TestCluster.</returns>
         public TestCluster Build()
         {
-            var portAllocator = this.PortAllocator;
+            var portAllocator = PortAllocator;
             var configBuilder = new ConfigurationBuilder();
 
             foreach (var action in configureBuilderActions)
@@ -148,9 +148,9 @@ namespace Orleans.TestingHost
                 action();
             }
 
-            configBuilder.AddInMemoryCollection(this.Properties);
-            configBuilder.AddInMemoryCollection(this.Options.ToDictionary());
-            foreach (var buildAction in this.configureHostConfigActions)
+            configBuilder.AddInMemoryCollection(Properties);
+            configBuilder.AddInMemoryCollection(Options.ToDictionary());
+            foreach (var buildAction in configureHostConfigActions)
             {
                 buildAction(configBuilder);
             }
@@ -181,9 +181,9 @@ namespace Orleans.TestingHost
         private void ConfigureDefaultPorts()
         {
             // Set base ports if none are currently set.
-            (int baseSiloPort, int baseGatewayPort) = this.PortAllocator.AllocateConsecutivePortPairs(this.Options.InitialSilosCount + 3);
-            if (this.Options.BaseSiloPort == 0) this.Options.BaseSiloPort = baseSiloPort;
-            if (this.Options.BaseGatewayPort == 0) this.Options.BaseGatewayPort = baseGatewayPort;
+            (int baseSiloPort, int baseGatewayPort) = PortAllocator.AllocateConsecutivePortPairs(Options.InitialSilosCount + 3);
+            if (Options.BaseSiloPort == 0) Options.BaseSiloPort = baseSiloPort;
+            if (Options.BaseGatewayPort == 0) Options.BaseGatewayPort = baseGatewayPort;
         }
 
         internal class ConfigureStaticClusterDeploymentOptions : IHostConfigurator

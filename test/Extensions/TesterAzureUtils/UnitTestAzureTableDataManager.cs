@@ -33,9 +33,9 @@ namespace Tester.AzureUtils
         {
             return new UnitTestAzureTableData
             {
-                StringData = this.StringData,
-                PartitionKey = this.PartitionKey,
-                RowKey = this.RowKey
+                StringData = StringData,
+                PartitionKey = PartitionKey,
+                RowKey = RowKey
             };
         }
 

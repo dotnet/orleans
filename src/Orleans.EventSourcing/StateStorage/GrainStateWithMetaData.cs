@@ -104,7 +104,7 @@ namespace Orleans.EventSourcing.StateStorage
         /// <param name="initialstate">The initial state of the view</param>
         public GrainStateWithMetaData(TView initialstate)
         {
-            this.State = initialstate;
+            State = initialstate;
             GlobalVersion = 0;
             WriteVector = "";
         }

@@ -22,7 +22,7 @@ namespace Tester.StreamingTests.ProgrammaticSubscribeTests
         [SkippableFact]
         public async Task StreamingTests_ImplicitSubscribProvider_DontHaveSubscriptionManager()
         {
-            var subGrain = this.fixture.GrainFactory.GetGrain<ISubscribeGrain>(Guid.NewGuid());
+            var subGrain = fixture.GrainFactory.GetGrain<ISubscribeGrain>(Guid.NewGuid());
             Assert.False(await subGrain.CanGetSubscriptionManager(StreamProviderName));
         }
 
@@ -30,7 +30,7 @@ namespace Tester.StreamingTests.ProgrammaticSubscribeTests
         public async Task StreamingTests_Consumer_Producer_Subscribe()
         {
             var streamId = new FullStreamIdentity(Guid.NewGuid(), ImplicitSubscribeGrain.StreamNameSpace, StreamProviderName);
-            var producer = this.fixture.HostedCluster.GrainFactory.GetGrain<ITypedProducerGrainProducingApple>(Guid.NewGuid());
+            var producer = fixture.HostedCluster.GrainFactory.GetGrain<ITypedProducerGrainProducingApple>(Guid.NewGuid());
             await producer.BecomeProducer(streamId.Guid, streamId.Namespace, streamId.ProviderName);
 
             await producer.StartPeriodicProducing();
@@ -40,9 +40,9 @@ namespace Tester.StreamingTests.ProgrammaticSubscribeTests
             await producer.StopPeriodicProducing();
 
             var implicitConsumer =
-                this.fixture.HostedCluster.GrainFactory.GetGrain<IImplicitSubscribeGrain>(streamId.Guid);
+                fixture.HostedCluster.GrainFactory.GetGrain<IImplicitSubscribeGrain>(streamId.Guid);
              await TestingUtils.WaitUntilAsync(lastTry => ProgrammaticSubcribeTestsRunner.CheckCounters(new List<ITypedProducerGrain> { producer },
-                    implicitConsumer, lastTry, this.fixture.Logger), _timeout);
+                    implicitConsumer, lastTry, fixture.Logger), _timeout);
 
             //clean up test
             await implicitConsumer.StopConsuming();
@@ -53,7 +53,7 @@ namespace Tester.StreamingTests.ProgrammaticSubscribeTests
         {
             var streamId = new FullStreamIdentity(Guid.NewGuid(), ImplicitSubscribeGrain.StreamNameSpace, StreamProviderName);
 
-            var producer = this.fixture.GrainFactory.GetGrain<ITypedProducerGrainProducingApple>(Guid.NewGuid());
+            var producer = fixture.GrainFactory.GetGrain<ITypedProducerGrainProducingApple>(Guid.NewGuid());
             await producer.BecomeProducer(streamId.Guid, streamId.Namespace, streamId.ProviderName);
             await producer.StartPeriodicProducing();
             int numProduced = 0;
@@ -61,7 +61,7 @@ namespace Tester.StreamingTests.ProgrammaticSubscribeTests
 
             // set up the new stream with the same guid, but different namespace, so it would invoke the same consumer grain
             var streamId2 = new FullStreamIdentity(streamId.Guid, ImplicitSubscribeGrain.StreamNameSpace2, StreamProviderName);
-            var producer2 = this.fixture.GrainFactory.GetGrain<ITypedProducerGrainProducingApple>(Guid.NewGuid());
+            var producer2 = fixture.GrainFactory.GetGrain<ITypedProducerGrainProducingApple>(Guid.NewGuid());
             await producer2.BecomeProducer(streamId2.Guid, streamId2.Namespace, streamId2.ProviderName);
             await producer2.StartPeriodicProducing();
             await TestingUtils.WaitUntilAsync(lastTry => ProgrammaticSubcribeTestsRunner.ProducerHasProducedSinceLastCheck(numProduced, producer2, lastTry), _timeout);
@@ -70,9 +70,9 @@ namespace Tester.StreamingTests.ProgrammaticSubscribeTests
             await producer2.StopPeriodicProducing();
 
             var implicitConsumer =
-                this.fixture.HostedCluster.GrainFactory.GetGrain<IImplicitSubscribeGrain>(streamId.Guid);
+                fixture.HostedCluster.GrainFactory.GetGrain<IImplicitSubscribeGrain>(streamId.Guid);
             await TestingUtils.WaitUntilAsync(lastTry => ProgrammaticSubcribeTestsRunner.CheckCounters(new List<ITypedProducerGrain> { producer, producer2 },
-                implicitConsumer, lastTry, this.fixture.Logger), _timeout);
+                implicitConsumer, lastTry, fixture.Logger), _timeout);
 
             //clean up test
             await implicitConsumer.StopConsuming();
@@ -83,7 +83,7 @@ namespace Tester.StreamingTests.ProgrammaticSubscribeTests
         {
             var streamId = new FullStreamIdentity(Guid.NewGuid(), ImplicitSubscribeGrain.StreamNameSpace, StreamProviderName);
 
-            var producer = this.fixture.GrainFactory.GetGrain<ITypedProducerGrainProducingApple>(Guid.NewGuid());
+            var producer = fixture.GrainFactory.GetGrain<ITypedProducerGrainProducingApple>(Guid.NewGuid());
             await producer.BecomeProducer(streamId.Guid, streamId.Namespace, streamId.ProviderName);
             await producer.StartPeriodicProducing();
             int numProduced = 0;
@@ -91,7 +91,7 @@ namespace Tester.StreamingTests.ProgrammaticSubscribeTests
 
             // set up the new stream with the same guid, but different namespace, so it would invoke the same consumer grain
             var streamId2 = new FullStreamIdentity(streamId.Guid, ImplicitSubscribeGrain.StreamNameSpace2, StreamProviderName2);
-            var producer2 = this.fixture.GrainFactory.GetGrain<ITypedProducerGrainProducingApple>(Guid.NewGuid());
+            var producer2 = fixture.GrainFactory.GetGrain<ITypedProducerGrainProducingApple>(Guid.NewGuid());
             await producer2.BecomeProducer(streamId2.Guid, streamId2.Namespace, streamId2.ProviderName);
             await producer2.StartPeriodicProducing();
             await TestingUtils.WaitUntilAsync(lastTry => ProgrammaticSubcribeTestsRunner.ProducerHasProducedSinceLastCheck(numProduced, producer2, lastTry), _timeout);
@@ -99,9 +99,9 @@ namespace Tester.StreamingTests.ProgrammaticSubscribeTests
             await producer2.StopPeriodicProducing();
             
             var implicitConsumer =
-                this.fixture.HostedCluster.GrainFactory.GetGrain<IImplicitSubscribeGrain>(streamId.Guid);
+                fixture.HostedCluster.GrainFactory.GetGrain<IImplicitSubscribeGrain>(streamId.Guid);
             await TestingUtils.WaitUntilAsync(lastTry => ProgrammaticSubcribeTestsRunner.CheckCounters(new List<ITypedProducerGrain> { producer, producer2 },
-                implicitConsumer, lastTry, this.fixture.Logger), _timeout);
+                implicitConsumer, lastTry, fixture.Logger), _timeout);
 
             //clean up test
             await implicitConsumer.StopConsuming();

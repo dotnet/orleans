@@ -33,8 +33,8 @@ namespace Orleans.Providers.Streams.Common
                 throw new ArgumentOutOfRangeException(nameof(blockSizeInByte), "blockSize must be positive value.");
             }
             count = 0;
-            this.SizeInByte = blockSizeInByte;
-            buffer = new byte[this.SizeInByte];
+            SizeInByte = blockSizeInByte;
+            buffer = new byte[SizeInByte];
         }
 
         /// <summary>
@@ -47,7 +47,7 @@ namespace Orleans.Providers.Streams.Common
         public bool TryGetSegment(int size, out ArraySegment<byte> value)
         {
             value = default(ArraySegment<byte>);
-            if (size > this.SizeInByte - count)
+            if (size > SizeInByte - count)
             {
                 return false;
             }

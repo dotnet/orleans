@@ -16,7 +16,7 @@ namespace UnitTests.Grains
 
         public StressTestGrain(ILoggerFactory loggerFactory)
         {
-            this.logger = loggerFactory.CreateLogger($"{this.GetType().Name}-{this.IdentityString}");
+            logger = loggerFactory.CreateLogger($"{GetType().Name}-{IdentityString}");
         }
 
         public override Task OnActivateAsync(CancellationToken cancellationToken)
@@ -24,15 +24,15 @@ namespace UnitTests.Grains
             if (this.GetPrimaryKeyLong() == -2)
                 throw new ArgumentException("Primary key cannot be -2 for this test case");
 
-            this.label = this.GetPrimaryKeyLong().ToString();
-            this.logger.LogInformation("OnActivateAsync");
+            label = this.GetPrimaryKeyLong().ToString();
+            logger.LogInformation("OnActivateAsync");
 
             return Task.CompletedTask;
         }
 
         public Task<string> GetLabel()
         {
-            return Task.FromResult(this.label);
+            return Task.FromResult(label);
         }
 
         public Task SetLabel(string label)
@@ -53,7 +53,7 @@ namespace UnitTests.Grains
             List<Task> promises = new List<Task>();
             foreach (long key in others)
             {
-                IStressTestGrain g1 = this.GrainFactory.GetGrain<IStressTestGrain>(key);
+                IStressTestGrain g1 = GrainFactory.GetGrain<IStressTestGrain>(key);
                 Task promise = g1.GetLabel();
                 promises.Add(promise);
             }
@@ -113,19 +113,19 @@ namespace UnitTests.Grains
 
         public ReentrantStressTestGrain(ILoggerFactory loggerFactory)
         {
-            this.logger = loggerFactory.CreateLogger($"{this.GetType().Name}-{this.IdentityString}");
+            logger = loggerFactory.CreateLogger($"{GetType().Name}-{IdentityString}");
         }
 
         public override Task OnActivateAsync(CancellationToken cancellationToken)
         {
-            this.label = this.GetPrimaryKeyLong().ToString();
-            this.logger.LogInformation("OnActivateAsync");
+            label = this.GetPrimaryKeyLong().ToString();
+            logger.LogInformation("OnActivateAsync");
             return Task.CompletedTask;
         }
 
         public Task<string> GetRuntimeInstanceId()
         {
-            return Task.FromResult(this.RuntimeIdentity);
+            return Task.FromResult(RuntimeIdentity);
         }
 
         public Task<byte[]> Echo(byte[] data)
@@ -149,9 +149,9 @@ namespace UnitTests.Grains
             {
                 if (nextGrainIsRemote)
                 {
-                    return this.GrainFactory.GetGrain<IReentrantStressTestGrain>(nextGrain).PingMutableArray(data, -1, false);
+                    return GrainFactory.GetGrain<IReentrantStressTestGrain>(nextGrain).PingMutableArray(data, -1, false);
                 }
-                return this.GrainFactory.GetGrain<IReentrantLocalStressTestGrain>(nextGrain)
+                return GrainFactory.GetGrain<IReentrantLocalStressTestGrain>(nextGrain)
                     .PingMutableArray(data, -1, false);
             }
             return Task.CompletedTask;
@@ -163,10 +163,10 @@ namespace UnitTests.Grains
             {
                 if (nextGrainIsRemote)
                 {
-                    return this.GrainFactory.GetGrain<IReentrantStressTestGrain>(nextGrain)
+                    return GrainFactory.GetGrain<IReentrantStressTestGrain>(nextGrain)
                         .PingImmutableArray(data, -1, false);
                 }
-                return this.GrainFactory.GetGrain<IReentrantLocalStressTestGrain>(nextGrain)
+                return GrainFactory.GetGrain<IReentrantLocalStressTestGrain>(nextGrain)
                     .PingImmutableArray(data, -1, false);
             }
             return Task.CompletedTask;
@@ -178,10 +178,10 @@ namespace UnitTests.Grains
             {
                 if (nextGrainIsRemote)
                 {
-                    return this.GrainFactory.GetGrain<IReentrantStressTestGrain>(nextGrain)
+                    return GrainFactory.GetGrain<IReentrantStressTestGrain>(nextGrain)
                         .PingMutableDictionary(data, -1, false);
                 }
-                return this.GrainFactory.GetGrain<IReentrantLocalStressTestGrain>(nextGrain)
+                return GrainFactory.GetGrain<IReentrantLocalStressTestGrain>(nextGrain)
                     .PingMutableDictionary(data, -1, false);
             }
             return Task.CompletedTask;
@@ -194,10 +194,10 @@ namespace UnitTests.Grains
             {
                 if (nextGrainIsRemote)
                 {
-                    return this.GrainFactory.GetGrain<IReentrantStressTestGrain>(nextGrain)
+                    return GrainFactory.GetGrain<IReentrantStressTestGrain>(nextGrain)
                         .PingImmutableDictionary(data, -1, false);
                 }
-                return this.GrainFactory.GetGrain<IReentrantLocalStressTestGrain>(nextGrain)
+                return GrainFactory.GetGrain<IReentrantLocalStressTestGrain>(nextGrain)
                     .PingImmutableDictionary(data, -1, false);
             }
             return Task.CompletedTask;
@@ -270,13 +270,13 @@ namespace UnitTests.Grains
 
         public ReentrantLocalStressTestGrain(ILoggerFactory loggerFactory)
         {
-            this.logger = loggerFactory.CreateLogger($"{this.GetType().Name}-{this.IdentityString}");
+            logger = loggerFactory.CreateLogger($"{GetType().Name}-{IdentityString}");
         }
 
         public override Task OnActivateAsync(CancellationToken cancellationToken)
         {
-            this.label = this.GetPrimaryKeyLong().ToString();
-            this.logger.LogInformation("OnActivateAsync");
+            label = this.GetPrimaryKeyLong().ToString();
+            logger.LogInformation("OnActivateAsync");
             return Task.CompletedTask;
         }
 
@@ -287,7 +287,7 @@ namespace UnitTests.Grains
 
         public Task<string> GetRuntimeInstanceId()
         {
-            return Task.FromResult(this.RuntimeIdentity);
+            return Task.FromResult(RuntimeIdentity);
         }
 
         public Task Ping(byte[] data)
@@ -306,9 +306,9 @@ namespace UnitTests.Grains
             {
                 if (nextGrainIsRemote)
                 {
-                    return this.GrainFactory.GetGrain<IReentrantStressTestGrain>(nextGrain).PingMutableArray(data, -1, false);
+                    return GrainFactory.GetGrain<IReentrantStressTestGrain>(nextGrain).PingMutableArray(data, -1, false);
                 }
-                return this.GrainFactory.GetGrain<IReentrantLocalStressTestGrain>(nextGrain)
+                return GrainFactory.GetGrain<IReentrantLocalStressTestGrain>(nextGrain)
                     .PingMutableArray(data, -1, false);
             }
             return Task.CompletedTask;
@@ -320,10 +320,10 @@ namespace UnitTests.Grains
             {
                 if (nextGrainIsRemote)
                 {
-                    return this.GrainFactory.GetGrain<IReentrantStressTestGrain>(nextGrain)
+                    return GrainFactory.GetGrain<IReentrantStressTestGrain>(nextGrain)
                         .PingImmutableArray(data, -1, false);
                 }
-                return this.GrainFactory.GetGrain<IReentrantLocalStressTestGrain>(nextGrain)
+                return GrainFactory.GetGrain<IReentrantLocalStressTestGrain>(nextGrain)
                     .PingImmutableArray(data, -1, false);
             }
             return Task.CompletedTask;
@@ -335,10 +335,10 @@ namespace UnitTests.Grains
             {
                 if (nextGrainIsRemote)
                 {
-                    return this.GrainFactory.GetGrain<IReentrantStressTestGrain>(nextGrain)
+                    return GrainFactory.GetGrain<IReentrantStressTestGrain>(nextGrain)
                         .PingMutableDictionary(data, -1, false);
                 }
-                return this.GrainFactory.GetGrain<IReentrantLocalStressTestGrain>(nextGrain)
+                return GrainFactory.GetGrain<IReentrantLocalStressTestGrain>(nextGrain)
                     .PingMutableDictionary(data, -1, false);
             }
             return Task.CompletedTask;
@@ -351,10 +351,10 @@ namespace UnitTests.Grains
             {
                 if (nextGrainIsRemote)
                 {
-                    return this.GrainFactory.GetGrain<IReentrantStressTestGrain>(nextGrain)
+                    return GrainFactory.GetGrain<IReentrantStressTestGrain>(nextGrain)
                         .PingImmutableDictionary(data, -1, false);
                 }
-                return this.GrainFactory.GetGrain<IReentrantLocalStressTestGrain>(nextGrain)
+                return GrainFactory.GetGrain<IReentrantLocalStressTestGrain>(nextGrain)
                     .PingImmutableDictionary(data, -1, false);
             }
             return Task.CompletedTask;

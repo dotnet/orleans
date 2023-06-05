@@ -17,19 +17,19 @@ namespace TestGrains
 
         public void Apply(PersonRegistered @event)
         {
-            this.FirstName = @event.FirstName;
-            this.LastName = @event.LastName;
-            this.Gender = @event.Gender;
+            FirstName = @event.FirstName;
+            LastName = @event.LastName;
+            Gender = @event.Gender;
         }
 
         public void Apply(PersonMarried @event)
         {
-            this.IsMarried = true;
+            IsMarried = true;
         }
 
         public void Apply(PersonLastNameChanged @event)
         {
-            this.LastName = @event.LastName;
+            LastName = @event.LastName;
         }
     }
 }

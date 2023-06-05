@@ -22,7 +22,7 @@ namespace UnitTests.Streaming
 
             protected override void ConfigureTestCluster(TestClusterBuilder builder)
             {
-                this.ServiceId = builder.Options.ServiceId;
+                ServiceId = builder.Options.ServiceId;
                 builder.Options.InitialSilosCount = 4;
                 builder.AddSiloBuilderConfigurator<SiloHostConfigurator>();
             }
@@ -46,7 +46,7 @@ namespace UnitTests.Streaming
         public static readonly string STREAM_PROVIDER_NAME = StreamTestsConstants.SMS_STREAM_PROVIDER_NAME;
         private readonly ITestOutputHelper output;
         private readonly Fixture fixture;
-        protected TestCluster HostedCluster => this.fixture.HostedCluster;
+        protected TestCluster HostedCluster => fixture.HostedCluster;
 
         public StreamProvidersTests_ProviderConfigNotLoaded(ITestOutputHelper output, Fixture fixture)
         {
@@ -60,47 +60,47 @@ namespace UnitTests.Streaming
             Guid streamId = Guid.NewGuid();
             var grainFullName = typeof(Streaming_ConsumerGrain).FullName;
             // consumer joins first, producer later
-            IStreaming_ConsumerGrain consumer = this.HostedCluster.GrainFactory.GetGrain<IStreaming_ConsumerGrain>(Guid.NewGuid(), grainFullName);
+            IStreaming_ConsumerGrain consumer = HostedCluster.GrainFactory.GetGrain<IStreaming_ConsumerGrain>(Guid.NewGuid(), grainFullName);
             await Assert.ThrowsAsync<KeyNotFoundException>(() => consumer.BecomeConsumer(streamId, STREAM_PROVIDER_NAME, null));
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Config"), TestCategory("ServiceId"), TestCategory("Providers")]
         public async Task ServiceId_ProviderRuntime()
         {
-            var thisRunServiceId = this.fixture.ServiceId;
+            var thisRunServiceId = fixture.ServiceId;
 
-            SiloHandle siloHandle = this.HostedCluster.GetActiveSilos().First();
-            var serviceId = await this.fixture.Client.GetTestHooks(siloHandle).GetServiceId();
+            SiloHandle siloHandle = HostedCluster.GetActiveSilos().First();
+            var serviceId = await fixture.Client.GetTestHooks(siloHandle).GetServiceId();
             Assert.Equal(thisRunServiceId, serviceId);  // "ServiceId active in silo"
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Config"), TestCategory("ServiceId")]
         public async Task ServiceId_SiloRestart()
         {
-            var configServiceId = this.fixture.GetClientServiceId();
-            output.WriteLine("ServiceId={0}", this.fixture.ServiceId);
+            var configServiceId = fixture.GetClientServiceId();
+            output.WriteLine("ServiceId={0}", fixture.ServiceId);
 
-            Assert.Equal(this.fixture.ServiceId, configServiceId);  // "ServiceId in test config"
+            Assert.Equal(fixture.ServiceId, configServiceId);  // "ServiceId in test config"
 
             output.WriteLine("About to reset Silos .....");
             output.WriteLine("Restarting Silos ...");
 
-            foreach (var silo in this.HostedCluster.GetActiveSilos().ToList())
+            foreach (var silo in HostedCluster.GetActiveSilos().ToList())
             {
-                await this.HostedCluster.RestartSiloAsync(silo);
+                await HostedCluster.RestartSiloAsync(silo);
             }
 
             output.WriteLine("..... Silos restarted");
             
-            var activeSilos = this.HostedCluster.GetActiveSilos().ToArray();
+            var activeSilos = HostedCluster.GetActiveSilos().ToArray();
             Assert.True(activeSilos.Length > 0);
 
             foreach (var siloHandle in activeSilos)
             {
                 await AsyncExecutorWithRetries.ExecuteWithRetries(async _ =>
                     {
-                        var serviceId = await this.fixture.Client.GetTestHooks(siloHandle).GetServiceId();
-                        Assert.Equal(this.fixture.ServiceId, serviceId); // "ServiceId active in silo"
+                        var serviceId = await fixture.Client.GetTestHooks(siloHandle).GetServiceId();
+                        Assert.Equal(fixture.ServiceId, serviceId); // "ServiceId active in silo"
                     },
                     30,
                     (ex, i) => ex is OrleansException,

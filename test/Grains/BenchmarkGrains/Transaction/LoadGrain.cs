@@ -11,15 +11,15 @@ namespace BenchmarkGrains.Transaction
 
         public Task Generate(int run, int transactions, int conncurrent)
         {
-            this.runTask = RunGeneration(run, transactions, conncurrent);
-            this.runTask.Ignore();
+            runTask = RunGeneration(run, transactions, conncurrent);
+            runTask.Ignore();
             return Task.CompletedTask;
         }
 
         public async Task<Report> TryGetReport()
         {
-            if (!this.runTask.IsCompleted) return default(Report);
-            return await this.runTask;
+            if (!runTask.IsCompleted) return default(Report);
+            return await runTask;
         }
 
         private async Task<Report> RunGeneration(int run, int transactions, int conncurrent)

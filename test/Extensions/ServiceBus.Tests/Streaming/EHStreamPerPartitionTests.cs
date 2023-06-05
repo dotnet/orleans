@@ -78,7 +78,7 @@ namespace ServiceBus.Tests.StreamingTests
                               "left from previous tests")]
         public async Task EH100StreamsTo4PartitionStreamsTest()
         {
-            this.fixture.Logger.LogInformation("************************ EH100StreamsTo4PartitionStreamsTest *********************************");
+            fixture.Logger.LogInformation("************************ EH100StreamsTo4PartitionStreamsTest *********************************");
 
             int streamCount = 100;
             int eventsInStream = 10;
@@ -87,7 +87,7 @@ namespace ServiceBus.Tests.StreamingTests
             List<ISampleStreaming_ConsumerGrain> consumers = new List<ISampleStreaming_ConsumerGrain>(partitionCount);
             for (int i = 0; i < partitionCount; i++)
             {
-                consumers.Add(this.fixture.GrainFactory.GetGrain<ISampleStreaming_ConsumerGrain>(Guid.NewGuid()));
+                consumers.Add(fixture.GrainFactory.GetGrain<ISampleStreaming_ConsumerGrain>(Guid.NewGuid()));
             }
 
             // subscribe to each partition
@@ -102,7 +102,7 @@ namespace ServiceBus.Tests.StreamingTests
 
         private async Task GenerateEvents(int streamCount, int eventsInStream)
         {
-            IStreamProvider streamProvider = this.fixture.Client.GetStreamProvider(StreamProviderName);
+            IStreamProvider streamProvider = fixture.Client.GetStreamProvider(StreamProviderName);
             IAsyncStream<int>[] producers =
                 Enumerable.Range(0, streamCount)
                     .Select(i => streamProvider.GetStream<int>(Guid.NewGuid()))

@@ -35,7 +35,7 @@ namespace DefaultCluster.Tests
         [Fact, TestCategory("BVT"), TestCategory("Providers")]
         public void Providers_TestExtensions()
         {
-            IExtensionTestGrain grain = this.fixture.GrainFactory.GetGrain<IExtensionTestGrain>(GetRandomGrainId());
+            IExtensionTestGrain grain = fixture.GrainFactory.GetGrain<IExtensionTestGrain>(GetRandomGrainId());
             ITestExtension extension = grain.AsReference<ITestExtension>();
             bool exceptionThrown = true;
 
@@ -100,7 +100,7 @@ namespace DefaultCluster.Tests
         [Fact, TestCategory("Providers"), TestCategory("BVT"), TestCategory("Cast"), TestCategory("Generics")]
         public async Task Providers_ActivateNonGenericExtensionOfGenericInterface()
         {
-            var grain = this.fixture.GrainFactory.GetGrain<IGenericGrainWithNonGenericExtension<int>>(GetRandomGrainId());
+            var grain = fixture.GrainFactory.GetGrain<IGenericGrainWithNonGenericExtension<int>>(GetRandomGrainId());
             var extension = grain.AsReference<ISimpleExtension>(); //generic base grain not yet activated - virt refs only
 
             try
@@ -117,7 +117,7 @@ namespace DefaultCluster.Tests
 
         [Fact, TestCategory("Providers"), TestCategory("BVT"), TestCategory("Cast"), TestCategory("Generics")]
         public async Task Providers_ReferenceNonGenericExtensionOfGenericInterface() {
-            var grain = this.fixture.GrainFactory.GetGrain<IGenericGrainWithNonGenericExtension<int>>(GetRandomGrainId());
+            var grain = fixture.GrainFactory.GetGrain<IGenericGrainWithNonGenericExtension<int>>(GetRandomGrainId());
             await grain.DoSomething(); //original generic grain activates here
 
             var extension = grain.AsReference<ISimpleExtension>();
@@ -134,7 +134,7 @@ namespace DefaultCluster.Tests
         [Fact, TestCategory("BVT"), TestCategory("Providers")]
         public async Task Providers_AutoInstallExtensionTest()
         {
-            INoOpTestGrain grain = this.fixture.GrainFactory.GetGrain<INoOpTestGrain>(GetRandomGrainId());
+            INoOpTestGrain grain = fixture.GrainFactory.GetGrain<INoOpTestGrain>(GetRandomGrainId());
             ISimpleExtension uninstalled = grain.AsReference<ISimpleExtension>();
             IAutoExtension autoInstalled = grain.AsReference<IAutoExtension>();
             await Assert.ThrowsAsync<GrainExtensionNotInstalledException>(() => uninstalled.CheckExtension_1());

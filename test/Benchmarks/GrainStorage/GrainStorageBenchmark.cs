@@ -23,32 +23,32 @@ namespace Benchmarks.GrainStorage
         {
             var builder = new TestClusterBuilder();
             builder.AddSiloBuilderConfigurator<SiloMemoryStorageConfigurator>();
-            this.host = builder.Build();
-            this.host.Deploy();
+            host = builder.Build();
+            host.Deploy();
         }
 
         public void AzureTableSetup()
         {
             var builder = new TestClusterBuilder();
             builder.AddSiloBuilderConfigurator<SiloAzureTableStorageConfigurator>();
-            this.host = builder.Build();
-            this.host.Deploy();
+            host = builder.Build();
+            host.Deploy();
         }
 
         public void AzureBlobSetup()
         {
             var builder = new TestClusterBuilder();
             builder.AddSiloBuilderConfigurator<SiloAzureBlobStorageConfigurator>();
-            this.host = builder.Build();
-            this.host.Deploy();
+            host = builder.Build();
+            host.Deploy();
         }
 
         public void AdoNetSetup()
         {
             var builder = new TestClusterBuilder();
             builder.AddSiloBuilderConfigurator<SiloAdoNetStorageConfigurator>();
-            this.host = builder.Build();
-            this.host.Deploy();
+            host = builder.Build();
+            host.Deploy();
         }
 
         public class SiloMemoryStorageConfigurator : ISiloConfigurator
@@ -118,7 +118,7 @@ namespace Benchmarks.GrainStorage
 
         public async Task<List<Report>> RunAsync(int instance, Func<bool> running)
         {
-            var persistentGrain = this.host.Client.GetGrain<IPersistentGrain>(Guid.NewGuid());
+            var persistentGrain = host.Client.GetGrain<IPersistentGrain>(Guid.NewGuid());
             // activate grain
             await persistentGrain.Init(payloadSize);
             var iteration = instance % payloadSize;

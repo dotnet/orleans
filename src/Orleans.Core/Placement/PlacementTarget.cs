@@ -16,10 +16,10 @@ namespace Orleans.Runtime.Placement
         /// <param name="interfaceVersion">The interface version being requested.</param>
         public PlacementTarget(GrainId grainIdentity, Dictionary<string, object> requestContextData, GrainInterfaceType interfaceType, ushort interfaceVersion)
         {
-            this.GrainIdentity = grainIdentity;
-            this.InterfaceType = interfaceType;
-            this.InterfaceVersion = interfaceVersion;
-            this.RequestContextData = requestContextData;
+            GrainIdentity = grainIdentity;
+            InterfaceType = interfaceType;
+            InterfaceVersion = interfaceVersion;
+            RequestContextData = requestContextData;
         }
 
         /// <summary>

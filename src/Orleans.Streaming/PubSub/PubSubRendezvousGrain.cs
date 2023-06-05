@@ -442,7 +442,7 @@ namespace Orleans.Streams
                 await Task.WhenAll(tasks);
                 //if producers got removed
                 if (State.Producers.Count < numProducersBeforeNotify)
-                    await this.WriteStateAsync();
+                    await WriteStateAsync();
             }
         }
 
@@ -464,7 +464,7 @@ namespace Orleans.Streams
         {
             try
             {
-                var extension = this.GrainFactory
+                var extension = GrainFactory
                     .GetGrain(producer.Producer)
                     .AsReference<IStreamProducerExtension>();
                 await producerTask(extension);

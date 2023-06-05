@@ -16,7 +16,7 @@ namespace UnitTests.Serialization
 
         void RoundTripCollectionSerializationTest<T>(IEnumerable<T> input)
         {
-            var output = this.fixture.Serializer.RoundTripSerializationForTesting(input);
+            var output = fixture.Serializer.RoundTripSerializationForTesting(input);
             Assert.Equal(input,output);
         }
 
@@ -42,7 +42,7 @@ namespace UnitTests.Serialization
         public void SerializationTests_ImmutableCollections_ArrayDefault()
         {
             var input = default(ImmutableArray<int>);
-            var output = this.fixture.Serializer.RoundTripSerializationForTesting(input);
+            var output = fixture.Serializer.RoundTripSerializationForTesting(input);
             Assert.Equal(input, output);
         }
 

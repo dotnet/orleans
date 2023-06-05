@@ -88,7 +88,7 @@ namespace Tester.AzureUtils.Streaming
             {
                 await AzureQueueStreamProviderUtils.ClearAllUsedAzureQueues(
                   NullLoggerFactory.Instance,
-                  AzureQueueUtilities.GenerateQueueNames(this.fixture.HostedCluster.Options.ClusterId, queueCount),
+                  AzureQueueUtilities.GenerateQueueNames(fixture.HostedCluster.Options.ClusterId, queueCount),
                   new AzureQueueOptions().ConfigureTestDefaults());
             }
         }

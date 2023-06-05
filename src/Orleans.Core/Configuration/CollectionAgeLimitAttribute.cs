@@ -63,7 +63,7 @@ namespace Orleans
             }
             else
             {
-                idleDeactivationPeriod = this.Amount.ToString("c");
+                idleDeactivationPeriod = Amount.ToString("c");
             }
 
             properties[WellKnownGrainTypeProperties.IdleDeactivationPeriod] = idleDeactivationPeriod;

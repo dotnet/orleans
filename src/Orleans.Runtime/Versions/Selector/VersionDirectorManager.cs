@@ -17,22 +17,22 @@ namespace Orleans.Runtime.Versions.Selector
         public VersionSelectorManager(IServiceProvider serviceProvider, IOptions<GrainVersioningOptions> options)
         {
             this.serviceProvider = serviceProvider;
-            this.strategyFromConfig = serviceProvider.GetRequiredServiceByName<VersionSelectorStrategy>(options.Value.DefaultVersionSelectorStrategy);
-            Default = ResolveVersionSelector(serviceProvider, this.strategyFromConfig);
+            strategyFromConfig = serviceProvider.GetRequiredServiceByName<VersionSelectorStrategy>(options.Value.DefaultVersionSelectorStrategy);
+            Default = ResolveVersionSelector(serviceProvider, strategyFromConfig);
             versionSelectors = new Dictionary<GrainInterfaceType, IVersionSelector>();
         }
 
         public IVersionSelector GetSelector(GrainInterfaceType interfaceType)
         {
             IVersionSelector selector;
-            return this.versionSelectors.TryGetValue(interfaceType, out selector)
+            return versionSelectors.TryGetValue(interfaceType, out selector)
                 ? selector
                 : Default;
         }
 
         public void SetSelector(VersionSelectorStrategy strategy)
         {
-            var selector = ResolveVersionSelector(this.serviceProvider, strategy ?? this.strategyFromConfig);
+            var selector = ResolveVersionSelector(serviceProvider, strategy ?? strategyFromConfig);
             Default = selector;
         }
 
@@ -44,7 +44,7 @@ namespace Orleans.Runtime.Versions.Selector
             }
             else
             {
-                var selector = ResolveVersionSelector(this.serviceProvider, strategy);
+                var selector = ResolveVersionSelector(serviceProvider, strategy);
                 versionSelectors[interfaceType] = selector;
             }
         }

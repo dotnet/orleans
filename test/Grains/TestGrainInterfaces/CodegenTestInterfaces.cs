@@ -171,27 +171,27 @@ namespace UnitTests.GrainInterfaces
         public SomeStruct(int readonlyField)
             : this()
         {
-            this.ReadonlyField = readonlyField;
+            ReadonlyField = readonlyField;
         }
 
         public int GetValueWithPrivateGetter()
         {
-            return this.ValueWithPrivateGetter;
+            return ValueWithPrivateGetter;
         }
 
         public int GetPrivateValue()
         {
-            return this.PrivateValue;
+            return PrivateValue;
         }
 
         public void SetPrivateValue(int value)
         {
-            this.PrivateValue = value;
+            PrivateValue = value;
         }
 
         public void SetValueWithPrivateSetter(int value)
         {
-            this.ValueWithPrivateSetter = value;
+            ValueWithPrivateSetter = value;
         }
     }
 
@@ -224,10 +224,10 @@ namespace UnitTests.GrainInterfaces
         public IEchoGrain SomeGrainReference { get; set; }
         
 #pragma warning disable 618
-        public int GetObsoleteInt() => this.ObsoleteInt;
+        public int GetObsoleteInt() => ObsoleteInt;
         public void SetObsoleteInt(int value)
         {
-            this.ObsoleteInt = value;
+            ObsoleteInt = value;
         }
 #pragma warning restore 618
 
@@ -238,12 +238,12 @@ namespace UnitTests.GrainInterfaces
         {
             get
             {
-                return this.nonSerializedIntField;
+                return nonSerializedIntField;
             }
 
             set
             {
-                this.nonSerializedIntField = value;
+                nonSerializedIntField = value;
             }
         }
 
@@ -319,7 +319,7 @@ namespace UnitTests.GrainInterfaces
             new NestedPrivateClass()
         };
 
-        public IEnumerable CoolBeans => this.coolBeans;
+        public IEnumerable CoolBeans => coolBeans;
 
         private class NestedPrivateClass
         {
@@ -340,6 +340,6 @@ namespace UnitTests.GrainInterfaces
 
         public ReadOnlyStructWithReadOnlyArray(byte[] value) => this.value = value;
 
-        public byte[] Value => this.value;
+        public byte[] Value => value;
     }
 }

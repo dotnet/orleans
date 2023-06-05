@@ -27,12 +27,12 @@ namespace UnitTests.SchedulerTests
         public OrleansTaskSchedulerAdvancedTests(ITestOutputHelper output)
         {
             this.output = output;
-            this.loggerFactory = OrleansTaskSchedulerBasicTests.InitSchedulerLogging();
+            loggerFactory = OrleansTaskSchedulerBasicTests.InitSchedulerLogging();
         }
 
         public void Dispose()
         {
-            this.loggerFactory.Dispose();
+            loggerFactory.Dispose();
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Scheduler")]
@@ -44,7 +44,7 @@ namespace UnitTests.SchedulerTests
             var workItemGroup = SchedulingHelper.CreateWorkItemGroupForTesting(context, loggerFactory);
             context.Scheduler = workItemGroup;
 
-            this.output.WriteLine("Running Main in Context=" + RuntimeContext.Current);
+            output.WriteLine("Running Main in Context=" + RuntimeContext.Current);
             context.Scheduler.QueueAction(() =>
                 {
                     for (int i = 0; i < 10; i++)
@@ -52,7 +52,7 @@ namespace UnitTests.SchedulerTests
                         Task.Factory.StartNew(() =>
                         {
                             // ReSharper disable AccessToModifiedClosure
-                            this.output.WriteLine("Starting " + i + " in Context=" + RuntimeContext.Current);
+                            output.WriteLine("Starting " + i + " in Context=" + RuntimeContext.Current);
                             Assert.False(insideTask, $"Starting new task when I am already inside task of iteration {n}");
                             insideTask = true;
                             int k = n;
@@ -87,24 +87,24 @@ namespace UnitTests.SchedulerTests
                 {
                     var task1 = Task.Factory.StartNew(() => 
                     {
-                        this.output.WriteLine("Starting 1"); 
+                        output.WriteLine("Starting 1"); 
                         Assert.False(insideTask, $"Starting new task when I am already inside task of iteration {n}");
                         insideTask = true;
-                        this.output.WriteLine("===> 1a"); 
+                        output.WriteLine("===> 1a"); 
                         Thread.Sleep(1000); n = n + 3;
-                        this.output.WriteLine("===> 1b");
+                        output.WriteLine("===> 1b");
                         insideTask = false;
                     });
                     var task2 = Task.Factory.StartNew(() =>
                     {
-                        this.output.WriteLine("Starting 2");
+                        output.WriteLine("Starting 2");
                         Assert.False(insideTask, $"Starting new task when I am already inside task of iteration {n}");
                         insideTask = true;
-                        this.output.WriteLine("===> 2a");
+                        output.WriteLine("===> 2a");
                         task1.Wait();
-                        this.output.WriteLine("===> 2b");
+                        output.WriteLine("===> 2b");
                         n = n * 5;
-                        this.output.WriteLine("===> 2c");
+                        output.WriteLine("===> 2c");
                         insideTask = false;
                         result.SetResult(true);
                     });
@@ -128,18 +128,18 @@ namespace UnitTests.SchedulerTests
 
         private void SubProcess1(int n)
         {
-            string msg = string.Format("1-{0} MainDone={1} inside Task {2}", n, this.mainDone, Task.CurrentId);
-            this.output.WriteLine("1 ===> " + msg);
-            Assert.True(this.mainDone, msg + " -- Main turn should be finished");
-            this.stageNum1 = n;
+            string msg = string.Format("1-{0} MainDone={1} inside Task {2}", n, mainDone, Task.CurrentId);
+            output.WriteLine("1 ===> " + msg);
+            Assert.True(mainDone, msg + " -- Main turn should be finished");
+            stageNum1 = n;
         }
 
         private void SubProcess2(int n)
         {
-            string msg = string.Format("2-{0} MainDone={1} inside Task {2}", n, this.mainDone, Task.CurrentId);
-            this.output.WriteLine("2 ===> " + msg);
-            Assert.True(this.mainDone, msg + " -- Main turn should be finished");
-            this.stageNum2 = n;
+            string msg = string.Format("2-{0} MainDone={1} inside Task {2}", n, mainDone, Task.CurrentId);
+            output.WriteLine("2 ===> " + msg);
+            Assert.True(mainDone, msg + " -- Main turn should be finished");
+            stageNum2 = n;
         }
     
         [Fact, TestCategory("Functional"), TestCategory("Scheduler")]
@@ -158,8 +158,8 @@ namespace UnitTests.SchedulerTests
 
             context.Scheduler.QueueAction(() =>
             {
-                this.mainDone = false;
-                this.stageNum1 = this.stageNum2 = 0;
+                mainDone = false;
+                stageNum1 = stageNum2 = 0;
 
                 Task task1 = Task.Factory.StartNew(() => SubProcess1(11));
                 Task task2 = task1.ContinueWith((_) => SubProcess1(12));
@@ -172,7 +172,7 @@ namespace UnitTests.SchedulerTests
                 task22.Ignore();
 
                 Thread.Sleep(TimeSpan.FromSeconds(1));
-                this.mainDone = true;
+                mainDone = true;
             });
 
             try { await result1.Task.WithTimeout(TimeSpan.FromSeconds(3)); }
@@ -180,10 +180,10 @@ namespace UnitTests.SchedulerTests
             try { await result2.Task.WithTimeout(TimeSpan.FromSeconds(3)); }
             catch (TimeoutException) { Assert.True(false, "Timeout-2"); }
 
-            Assert.NotEqual(0, this.stageNum1); // "Work items did not get executed-1"
-            Assert.NotEqual(0, this.stageNum2);  // "Work items did not get executed-2"
-            Assert.Equal(14, this.stageNum1);  // "Work items executed out of order-1"
-            Assert.Equal(22, this.stageNum2);  // "Work items executed out of order-2"
+            Assert.NotEqual(0, stageNum1); // "Work items did not get executed-1"
+            Assert.NotEqual(0, stageNum2);  // "Work items did not get executed-2"
+            Assert.Equal(14, stageNum1);  // "Work items executed out of order-1"
+            Assert.Equal(22, stageNum2);  // "Work items executed out of order-2"
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Scheduler")]
@@ -247,12 +247,12 @@ namespace UnitTests.SchedulerTests
             // You test that no CW/StartNew runs until the main turn is fully done. And run in stress.
 
             UnitTestSchedulingContext context = new UnitTestSchedulingContext();
-            WorkItemGroup workItemGroup = SchedulingHelper.CreateWorkItemGroupForTesting(context, this.loggerFactory);
+            WorkItemGroup workItemGroup = SchedulingHelper.CreateWorkItemGroupForTesting(context, loggerFactory);
             context.Scheduler = workItemGroup;
             ActivationTaskScheduler activationScheduler = workItemGroup.TaskScheduler;
 
-            this.mainDone = false;
-            this.stageNum1 = this.stageNum2 = 0;
+            mainDone = false;
+            stageNum1 = stageNum2 = 0;
 
             var result1 = new TaskCompletionSource<bool>();
             var result2 = new TaskCompletionSource<bool>();
@@ -330,7 +330,7 @@ namespace UnitTests.SchedulerTests
                 Log(15, "Outer ClosureWorkItem Task Id=" + Task.CurrentId + " awake");
 
                 Log(16, "Finished Outer ClosureWorkItem Task Id=" + wrapper.Id);
-                this.mainDone = true;
+                mainDone = true;
             });
 
             Log(17, "Waiting for ClosureWorkItem to spawn wrapper Task");
@@ -351,11 +351,11 @@ namespace UnitTests.SchedulerTests
             Log(20, "Waiting for TaskWorkItem to complete");
             for (int i = 0; i < 15 * WaitFactor; i++)
             {
-                if (this.mainDone) break;
+                if (mainDone) break;
                 Thread.Sleep(1000 * WaitFactor);
             }
-            Log(21, "Done waiting for TaskWorkItem to complete MainDone=" + this.mainDone);
-            Assert.True(this.mainDone, "Main Task should be completed");
+            Log(21, "Done waiting for TaskWorkItem to complete MainDone=" + mainDone);
+            Assert.True(mainDone, "Main Task should be completed");
             Assert.NotNull(finalTask1); // Task chain #1 not created
             Assert.NotNull(finalPromise2); // Task chain #2 not created
 
@@ -374,10 +374,10 @@ namespace UnitTests.SchedulerTests
             Assert.True(finalPromise2.IsCompleted, "Final Task completed");
             Assert.True(result2.Task.Result, "Timeout-2");
 
-            Assert.NotEqual(0, this.stageNum1);  // "Work items did not get executed-1"
-            Assert.Equal(14, this.stageNum1);  // "Work items executed out of order-1"
-            Assert.NotEqual(0, this.stageNum2);  // "Work items did not get executed-2"
-            Assert.Equal(22, this.stageNum2);  // "Work items executed out of order-2"
+            Assert.NotEqual(0, stageNum1);  // "Work items did not get executed-1"
+            Assert.Equal(14, stageNum1);  // "Work items executed out of order-1"
+            Assert.NotEqual(0, stageNum2);  // "Work items did not get executed-2"
+            Assert.Equal(22, stageNum2);  // "Work items executed out of order-2"
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Scheduler")]
@@ -388,7 +388,7 @@ namespace UnitTests.SchedulerTests
             context.Scheduler = workItemGroup;
             ActivationTaskScheduler activationScheduler = workItemGroup.TaskScheduler;
 
-            this.mainDone = false;
+            mainDone = false;
 
             var result = new TaskCompletionSource<bool>();
 
@@ -438,7 +438,7 @@ namespace UnitTests.SchedulerTests
                 Log(11, "Outer ClosureWorkItem Task Id=" + Task.CurrentId + " awake");
 
                 Log(12, "Finished Outer TaskWorkItem Task Id=" + wrapper.Id);
-                this.mainDone = true;
+                mainDone = true;
             });
 
             Log(13, "Waiting for ClosureWorkItem to spawn wrapper Task");
@@ -459,11 +459,11 @@ namespace UnitTests.SchedulerTests
             Log(16, "Waiting for TaskWorkItem to complete");
             for (int i = 0; i < 15 * WaitFactor; i++)
             {
-                if (this.mainDone) break;
+                if (mainDone) break;
                 Thread.Sleep(1000 * WaitFactor);
             }
-            Log(17, "Done waiting for TaskWorkItem to complete MainDone=" + this.mainDone);
-            Assert.True(this.mainDone, "Main Task should be completed");
+            Log(17, "Done waiting for TaskWorkItem to complete MainDone=" + mainDone);
+            Assert.True(mainDone, "Main Task should be completed");
             Assert.NotNull(finalPromise); // AC chain not created
 
             Log(18, "Waiting for final AC promise to complete");
@@ -473,8 +473,8 @@ namespace UnitTests.SchedulerTests
             Assert.True(finalPromise.IsCompleted, "Final AC completed");
             Assert.True(result.Task.Result, "Timeout-1");
 
-            Assert.NotEqual(0, this.stageNum1);  // "Work items did not get executed-1"
-            Assert.Equal(3, this.stageNum1);  // "Work items executed out of order-1"
+            Assert.NotEqual(0, stageNum1);  // "Work items did not get executed-1"
+            Assert.Equal(3, stageNum1);  // "Work items executed out of order-1"
         }
         
         [Fact, TestCategory("Functional"), TestCategory("Scheduler")]
@@ -489,10 +489,10 @@ namespace UnitTests.SchedulerTests
             // ReSharper disable AccessToModifiedClosure
             context.Scheduler.QueueAction(() =>
             {
-                Task task1 = Task.Factory.StartNew(() => { this.output.WriteLine("===> 1a"); Thread.Sleep(OneSecond); n = n + 3; this.output.WriteLine("===> 1b"); });
-                Task task2 = task1.ContinueWith((_) => { n = n * 5; this.output.WriteLine("===> 2"); });
-                Task task3 = task2.ContinueWith((_) => { n = n / 5; this.output.WriteLine("===> 3"); });
-                Task task4 = task3.ContinueWith((_) => { n = n - 2; this.output.WriteLine("===> 4"); result.SetResult(true); });
+                Task task1 = Task.Factory.StartNew(() => { output.WriteLine("===> 1a"); Thread.Sleep(OneSecond); n = n + 3; output.WriteLine("===> 1b"); });
+                Task task2 = task1.ContinueWith((_) => { n = n * 5; output.WriteLine("===> 2"); });
+                Task task3 = task2.ContinueWith((_) => { n = n / 5; output.WriteLine("===> 3"); });
+                Task task4 = task3.ContinueWith((_) => { n = n - 2; output.WriteLine("===> 4"); result.SetResult(true); });
                 task4.Ignore();
             });
             // ReSharper restore AccessToModifiedClosure
@@ -519,10 +519,10 @@ namespace UnitTests.SchedulerTests
             // ReSharper disable AccessToModifiedClosure
             context.Scheduler.QueueAction(() =>
             {
-                Task<int> task1 = Task<int>.Factory.StartNew(() => { this.output.WriteLine("===> 1a"); Thread.Sleep(OneSecond); n = n + 3; this.output.WriteLine("===> 1b"); return 1; });
-                Task<int> task2 = Task<int>.Factory.StartNew(() => { this.output.WriteLine("===> 2a"); Thread.Sleep(OneSecond); n = n + 3; this.output.WriteLine("===> 2b"); return 2; });
-                Task<int> task3 = Task<int>.Factory.StartNew(() => { this.output.WriteLine("===> 3a"); Thread.Sleep(OneSecond); n = n + 3; this.output.WriteLine("===> 3b"); return 3; });
-                Task<int> task4 = Task<int>.Factory.StartNew(() => { this.output.WriteLine("===> 4a"); Thread.Sleep(OneSecond); n = n + 3; this.output.WriteLine("===> 4b"); return 4; });
+                Task<int> task1 = Task<int>.Factory.StartNew(() => { output.WriteLine("===> 1a"); Thread.Sleep(OneSecond); n = n + 3; output.WriteLine("===> 1b"); return 1; });
+                Task<int> task2 = Task<int>.Factory.StartNew(() => { output.WriteLine("===> 2a"); Thread.Sleep(OneSecond); n = n + 3; output.WriteLine("===> 2b"); return 2; });
+                Task<int> task3 = Task<int>.Factory.StartNew(() => { output.WriteLine("===> 3a"); Thread.Sleep(OneSecond); n = n + 3; output.WriteLine("===> 3b"); return 3; });
+                Task<int> task4 = Task<int>.Factory.StartNew(() => { output.WriteLine("===> 4a"); Thread.Sleep(OneSecond); n = n + 3; output.WriteLine("===> 4b"); return 4; });
                 tasks = new Task<int>[] { task1, task2, task3, task4 };
                 result.SetResult(true);
             });
@@ -567,17 +567,17 @@ namespace UnitTests.SchedulerTests
             bool failed2 = false;
 
             Task task1 = Task.Factory.StartNew(
-                () => { this.output.WriteLine("===> 1a"); Thread.Sleep(OneSecond); throw new ArgumentException(); },
+                () => { output.WriteLine("===> 1a"); Thread.Sleep(OneSecond); throw new ArgumentException(); },
                 CancellationToken.None,
                 TaskCreationOptions.RunContinuationsAsynchronously,
                 workItemGroup.TaskScheduler);
             
             Task task2 = task1.ContinueWith((Task t) =>
             {
-                if (!t.IsFaulted) this.output.WriteLine("===> 2");
+                if (!t.IsFaulted) output.WriteLine("===> 2");
                 else
                 {
-                    this.output.WriteLine("===> 3");
+                    output.WriteLine("===> 3");
                     failed1 = true; 
                     result1.SetResult(true);
                 }
@@ -585,10 +585,10 @@ namespace UnitTests.SchedulerTests
             workItemGroup.TaskScheduler);
             Task task3 = task1.ContinueWith((Task t) =>
             {
-                if (!t.IsFaulted) this.output.WriteLine("===> 4");
+                if (!t.IsFaulted) output.WriteLine("===> 4");
                 else
                 {
-                    this.output.WriteLine("===> 5");
+                    output.WriteLine("===> 5");
                     failed2 = true; 
                     result2.SetResult(true);
                 }
@@ -622,28 +622,28 @@ namespace UnitTests.SchedulerTests
                 // ReSharper disable AccessToModifiedClosure
                 Task task1 = Task.Factory.StartNew(() =>
                 {
-                    this.output.WriteLine("===> 1a ");
+                    output.WriteLine("===> 1a ");
                     CheckRuntimeContext(context);
                     Thread.Sleep(1000); 
                     n = n + 3;
-                    this.output.WriteLine("===> 1b");
+                    output.WriteLine("===> 1b");
                     CheckRuntimeContext(context);
                 });
                 Task task2 = task1.ContinueWith(task =>
                 {
-                    this.output.WriteLine("===> 2");
+                    output.WriteLine("===> 2");
                     CheckRuntimeContext(context);
                     n = n * 5; 
                 });
                 Task task3 = task2.ContinueWith(task => 
                 {
-                    this.output.WriteLine("===> 3");
+                    output.WriteLine("===> 3");
                     n = n / 5;
                     CheckRuntimeContext(context);
                 });
                 Task task4 = task3.ContinueWith(task => 
                 {
-                    this.output.WriteLine("===> 4"); 
+                    output.WriteLine("===> 4"); 
                     n = n - 2;
                     result.SetResult(true);
                     CheckRuntimeContext(context);
@@ -651,7 +651,7 @@ namespace UnitTests.SchedulerTests
                 // ReSharper restore AccessToModifiedClosure
                 endOfChain = task4.ContinueWith(task =>
                 {
-                    this.output.WriteLine("Done Faulted={0}", task.IsFaulted);
+                    output.WriteLine("Done Faulted={0}", task.IsFaulted);
                     CheckRuntimeContext(context);
                     Assert.False(task.IsFaulted, "Faulted with Exception=" + task.Exception);
                 });
@@ -672,7 +672,7 @@ namespace UnitTests.SchedulerTests
 
         private void Log(int level, string what)
         {
-            this.output.WriteLine("#{0} - {1} -- Thread={2} Worker={3} TaskScheduler.Current={4}",
+            output.WriteLine("#{0} - {1} -- Thread={2} Worker={3} TaskScheduler.Current={4}",
                 level, what,
                 Thread.CurrentThread.ManagedThreadId,
                 Thread.CurrentThread.Name,

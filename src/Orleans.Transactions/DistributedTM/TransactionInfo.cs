@@ -12,16 +12,16 @@ namespace Orleans.Transactions
     {
         public TransactionInfo()
         {
-            this.Participants = new Dictionary<ParticipantId, AccessCounter>(ParticipantId.Comparer);
-            this.joined = new ConcurrentQueue<TransactionInfo>();
+            Participants = new Dictionary<ParticipantId, AccessCounter>(ParticipantId.Comparer);
+            joined = new ConcurrentQueue<TransactionInfo>();
         }
 
         public TransactionInfo(Guid id, DateTime timeStamp, DateTime priority, bool readOnly = false) : this()
         {
-            this.TransactionId = id;
-            this.IsReadOnly = readOnly;
-            this.TimeStamp = timeStamp;
-            this.Priority = priority;
+            TransactionId = id;
+            IsReadOnly = readOnly;
+            TimeStamp = timeStamp;
+            Priority = priority;
         }
 
         /// <summary>
@@ -30,11 +30,11 @@ namespace Orleans.Transactions
         /// <param name="other"></param>
         public TransactionInfo(TransactionInfo other) : this()
         {
-            this.TransactionId = other.TransactionId;
-            this.TryToCommit = other.TryToCommit;
-            this.IsReadOnly = other.IsReadOnly;
-            this.TimeStamp = other.TimeStamp;
-            this.Priority = other.Priority;
+            TransactionId = other.TransactionId;
+            TryToCommit = other.TryToCommit;
+            IsReadOnly = other.IsReadOnly;
+            TimeStamp = other.TimeStamp;
+            Priority = other.Priority;
         }
 
         public string Id => TransactionId.ToString();
@@ -113,7 +113,7 @@ namespace Orleans.Transactions
         public void ReconcilePending()
         {
             TransactionInfo transactionInfo;
-            while (this.joined.TryDequeue(out transactionInfo))
+            while (joined.TryDequeue(out transactionInfo))
             {
                 Union(transactionInfo);
                 PendingCalls--;
@@ -130,13 +130,13 @@ namespace Orleans.Transactions
             // Take sum of write counts
             foreach (KeyValuePair<ParticipantId, AccessCounter> participant in other.Participants)
             {
-                if (!this.Participants.TryGetValue(participant.Key, out var existing))
+                if (!Participants.TryGetValue(participant.Key, out var existing))
                 {
-                    this.Participants[participant.Key] = participant.Value;
+                    Participants[participant.Key] = participant.Value;
                 }
                 else
                 {
-                    this.Participants[participant.Key] = existing + participant.Value;
+                    Participants[participant.Key] = existing + participant.Value;
                 }
             }
 
@@ -151,11 +151,11 @@ namespace Orleans.Transactions
 
         public void RecordRead(ParticipantId id, DateTime minTime)
         {
-            this.Participants.TryGetValue(id, out AccessCounter count);
+            Participants.TryGetValue(id, out AccessCounter count);
 
             count.Reads++;
 
-            this.Participants[id] = count;
+            Participants[id] = count;
 
             if (minTime > TimeStamp)
             {
@@ -165,11 +165,11 @@ namespace Orleans.Transactions
 
         public void RecordWrite(ParticipantId id, DateTime minTime)
         {
-            this.Participants.TryGetValue(id, out AccessCounter count);
+            Participants.TryGetValue(id, out AccessCounter count);
 
             count.Writes++;
 
-            this.Participants[id] = count;
+            Participants[id] = count;
 
             if (minTime > TimeStamp)
             {
@@ -187,7 +187,7 @@ namespace Orleans.Transactions
                 (IsReadOnly ? " RO" : ""),
                 (TryToCommit ? " Committing" : ""),
                 (OriginalException != null ? " Aborting" : ""),
-                $" {{{string.Join(" ", this.Participants.Select(kvp => $"{kvp.Key}:{kvp.Value.Reads},{kvp.Value.Writes}"))}}}"
+                $" {{{string.Join(" ", Participants.Select(kvp => $"{kvp.Key}:{kvp.Value.Reads},{kvp.Value.Writes}"))}}}"
             );
         }
     }

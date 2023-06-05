@@ -13,7 +13,7 @@ namespace UnitTests.Grains.ProgrammaticSubscribe
     {
         public Task<bool> CanGetSubscriptionManager(string providerName)
         {
-            return Task.FromResult(this.ServiceProvider.GetServiceByName<IStreamProvider>(providerName).TryGetStreamSubscriptionManager(out _));
+            return Task.FromResult(ServiceProvider.GetServiceByName<IStreamProvider>(providerName).TryGetStreamSubscriptionManager(out _));
         }
     }
 
@@ -25,7 +25,7 @@ namespace UnitTests.Grains.ProgrammaticSubscribe
         {
             Guid = streamGuid;
             Namespace = streamNamespace;
-            this.ProviderName = providerName;
+            ProviderName = providerName;
         }
 
         [Id(0)]

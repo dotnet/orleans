@@ -35,14 +35,14 @@ namespace Orleans.GrainDirectory.AzureStorage
 
         public TimeSpan CreationTimeout
         {
-            get => this.creationTimeout ?? TimeSpan.FromMilliseconds(this.PauseBetweenCreationRetries.TotalMilliseconds * this.MaxCreationRetries * 3);
-            set => SetIfValidTimeout(ref this.creationTimeout, value, nameof(CreationTimeout));
+            get => creationTimeout ?? TimeSpan.FromMilliseconds(PauseBetweenCreationRetries.TotalMilliseconds * MaxCreationRetries * 3);
+            set => SetIfValidTimeout(ref creationTimeout, value, nameof(CreationTimeout));
         }
 
         public TimeSpan OperationTimeout
         {
-            get => this.operationTimeout ?? TimeSpan.FromMilliseconds(this.PauseBetweenOperationRetries.TotalMilliseconds * this.MaxOperationRetries * 6);
-            set => SetIfValidTimeout(ref this.operationTimeout, value, nameof(OperationTimeout));
+            get => operationTimeout ?? TimeSpan.FromMilliseconds(PauseBetweenOperationRetries.TotalMilliseconds * MaxOperationRetries * 6);
+            set => SetIfValidTimeout(ref operationTimeout, value, nameof(OperationTimeout));
         }
 
         private static void SetIfValidTimeout(ref TimeSpan? field, TimeSpan value, string propertyName)

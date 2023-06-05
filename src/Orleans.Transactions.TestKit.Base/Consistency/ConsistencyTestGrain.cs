@@ -33,7 +33,7 @@ namespace Orleans.Transactions.TestKit.Consistency
             )
         {
             this.data = data;
-            this.logger = loggerFactory.CreateLogger(nameof(ConsistencyTestGrain) + ".graincall");
+            logger = loggerFactory.CreateLogger(nameof(ConsistencyTestGrain) + ".graincall");
         }
 
         private int MyNumber => (int)(this.GetPrimaryKeyLong() % ConsistencyTestOptions.MaxGrains);

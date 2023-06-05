@@ -73,7 +73,7 @@ namespace UnitTests.Grains
         public StreamReliabilityTestGrain(ILoggerFactory loggerFactory, IGrainContext grainContext)
         {
             _grainContext = grainContext;
-            this.logger = loggerFactory.CreateLogger($"{this.GetType().Name}-{this.IdentityString}");
+            logger = loggerFactory.CreateLogger($"{GetType().Name}-{IdentityString}");
         }
 
         public override async Task OnActivateAsync(CancellationToken cancellationToken)
@@ -360,7 +360,7 @@ namespace UnitTests.Grains
 
         public StreamUnsubscribeTestGrain(ILoggerFactory loggerFactory)
         {
-            this.logger = loggerFactory.CreateLogger($"{this.GetType().Name}-{this.IdentityString}");
+            logger = loggerFactory.CreateLogger($"{GetType().Name}-{IdentityString}");
         }
 
         public override Task OnActivateAsync(CancellationToken cancellationToken)
