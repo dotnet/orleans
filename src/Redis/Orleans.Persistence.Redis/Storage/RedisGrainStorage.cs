@@ -110,8 +110,8 @@ namespace Orleans.Persistence
                 var hashEntries = await _db.HashGetAllAsync(key).ConfigureAwait(false);
                 if (hashEntries.Length == 2)
                 {
-                    string eTag = hashEntries.Single(e => e.Name == "etag").Value;
-                    ReadOnlyMemory<byte> data = hashEntries.Single(e => e.Name == "data").Value;
+                    string eTag = hashEntries.Single(static e => e.Name == "etag").Value;
+                    ReadOnlyMemory<byte> data = hashEntries.Single(static e => e.Name == "data").Value;
 
                     if (data.Length > 0)
                     {

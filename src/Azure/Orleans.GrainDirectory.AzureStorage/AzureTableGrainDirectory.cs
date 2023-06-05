@@ -87,16 +87,22 @@ namespace Orleans.GrainDirectory.AzureStorage
             (bool isSuccess, string eTag) result;
             if (previousAddress is not null)
             {
+                var entry = GrainDirectoryEntity.FromGrainAddress(this.clusterId, address);
                 var previousEntry = GrainDirectoryEntity.FromGrainAddress(this.clusterId, previousAddress);
-                var (storedEntry, eTag) = await tableDataManager.ReadSingleTableEntryAsync(previousEntry.PartitionKey, previousEntry.RowKey);
-                if (storedEntry.ActivationId != previousEntry.ActivationId || storedEntry.SiloAddress != previousEntry.SiloAddress)
+                var (storedEntry, eTag) = await tableDataManager.ReadSingleTableEntryAsync(entry.PartitionKey, entry.RowKey);
+                if (storedEntry is null)
+                {
+                    result = await this.tableDataManager.InsertTableEntryAsync(entry);
+                }
+                else if (storedEntry.ActivationId != previousEntry.ActivationId || storedEntry.SiloAddress != previousEntry.SiloAddress)
                 {
                     return await Lookup(address.GrainId);
                 }
-
-                var entry = GrainDirectoryEntity.FromGrainAddress(this.clusterId, address);
-                _ = await tableDataManager.UpdateTableEntryAsync(entry, eTag);
-                return address;
+                else
+                {
+                    _ = await tableDataManager.UpdateTableEntryAsync(entry, eTag);
+                    return address;
+                }
             }
             else
             {

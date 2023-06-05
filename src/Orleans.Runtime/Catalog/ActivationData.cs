@@ -76,7 +76,6 @@ namespace Orleans.Runtime
         public DateTime CollectionTicket { get; set; }
         public IServiceProvider ActivationServices => _serviceScope.ServiceProvider;
         public ActivationId ActivationId => Address.ActivationId;
-        public IServiceProvider ServiceProvider => _serviceScope?.ServiceProvider;
         public IGrainLifecycle ObservableLifecycle => Lifecycle;
         internal GrainLifecycle Lifecycle
         {
