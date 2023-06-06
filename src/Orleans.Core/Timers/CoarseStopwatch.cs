@@ -40,7 +40,7 @@ namespace Orleans.Runtime
         /// <summary>
         /// Returns true if this instance is running or false otherwise.
         /// </summary>
-        public bool IsRunning => _value > 0;
+        public readonly bool IsRunning => _value > 0;
         
         /// <summary>
         /// Returns the elapsed time.
@@ -50,7 +50,7 @@ namespace Orleans.Runtime
         /// <summary>
         /// Returns a value indicating whether this instance has the default value.
         /// </summary>
-        public bool IsDefault => _value == 0;
+        public readonly bool IsDefault => _value == 0;
 
         /// <summary>
         /// Returns the elapsed ticks.
@@ -103,7 +103,7 @@ namespace Orleans.Runtime
         /// a negative value indicates the negative total duration of a stopped stopwatch.
         /// </remarks>
         /// <returns>The raw counter value.</returns>
-        public long GetRawTimestamp() => _value;
+        public readonly long GetRawTimestamp() => _value;
 
         /// <summary>
         /// Starts the stopwatch.
@@ -148,9 +148,9 @@ namespace Orleans.Runtime
             _value = -delta;
         }
 
-        public override bool Equals(object obj) => obj is CoarseStopwatch stopwatch && _value == stopwatch._value;
-        public bool Equals(CoarseStopwatch other) => _value == other._value;
-        public override int GetHashCode() => HashCode.Combine(_value);
+        public override readonly bool Equals(object obj) => obj is CoarseStopwatch stopwatch && _value == stopwatch._value;
+        public readonly bool Equals(CoarseStopwatch other) => _value == other._value;
+        public override readonly int GetHashCode() => HashCode.Combine(_value);
         public static bool operator== (CoarseStopwatch left, CoarseStopwatch right) => left.Equals(right);
         public static bool operator!= (CoarseStopwatch left, CoarseStopwatch right) => !left.Equals(right);
     }

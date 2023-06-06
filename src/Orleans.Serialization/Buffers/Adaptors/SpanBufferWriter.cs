@@ -35,7 +35,7 @@ namespace Orleans.Serialization.Buffers.Adaptors
         /// <inheritdoc />
         public Span<byte> GetSpan(int sizeHint = 0) => throw GetException(sizeHint);
 
-        private Exception GetException(int sizeHint)
+        private readonly Exception GetException(int sizeHint)
         {
             return BytesWritten + sizeHint > _maxLength
                 ? new InvalidOperationException($"Insufficient capacity to perform the requested operation. Buffer size is {_maxLength}. Current length is {BytesWritten} and requested size increase is {sizeHint}")

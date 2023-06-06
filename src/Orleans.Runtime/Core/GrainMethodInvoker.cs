@@ -38,8 +38,8 @@ namespace Orleans.Runtime
             DeepCopier<Response> responseCopier)
         {
             this.message = message;
-            this.Request = request;
-            this.TargetContext = grainContext;
+            Request = request;
+            TargetContext = grainContext;
             this.filters = filters;
             this.interfaceToImplementationMapping = interfaceToImplementationMapping;
             this.responseCopier = responseCopier;

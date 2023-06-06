@@ -16,7 +16,7 @@ namespace Orleans.Transactions
         public int Count { get; private set; }
 
         // Indexer to provide read/write access to the file.
-        public TransactionRecord<T> this[int index]
+        public readonly TransactionRecord<T> this[int index]
         {
             get
             {
@@ -27,7 +27,7 @@ namespace Orleans.Transactions
             }
         }
 
-        public IEnumerable<TransactionRecord<T>> Elements
+        public readonly IEnumerable<TransactionRecord<T>> Elements
         {
             get
             {
@@ -39,9 +39,9 @@ namespace Orleans.Transactions
             }
         }
 
-        public TransactionRecord<T> First => buffer[pos];
+        public readonly TransactionRecord<T> First => buffer[pos];
 
-        public TransactionRecord<T> Last => buffer[(pos + Count - 1) % buffer.Length];
+        public readonly TransactionRecord<T> Last => buffer[(pos + Count - 1) % buffer.Length];
 
         public void Add(TransactionRecord<T> entry)
         {
@@ -108,7 +108,7 @@ namespace Orleans.Transactions
             Count -= howMany;
         }
 
-        public int Find(Guid TransactionId, DateTime key)
+        public readonly int Find(Guid TransactionId, DateTime key)
         {
             // do a binary search
             var left = 0;

@@ -101,12 +101,6 @@ namespace Orleans.Serialization.Buffers
     /// <typeparam name="TBufferWriter">The underlying buffer writer type.</typeparam>
     public ref partial struct Writer<TBufferWriter> where TBufferWriter : IBufferWriter<byte>
     {
-#pragma warning disable IDE0044 // Add readonly modifier        
-        /// <summary>
-        /// The output buffer writer.
-        /// </summary>
-#pragma warning restore IDE0044 // Add readonly modifier
-
         /// <summary>
         /// The current write span.
         /// </summary>
@@ -151,7 +145,7 @@ namespace Orleans.Serialization.Buffers
 
         /// <inheritdoc/>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void Dispose()
+        public readonly void Dispose()
         {
             if (typeof(TBufferWriter).IsValueType)
             {
@@ -182,13 +176,13 @@ namespace Orleans.Serialization.Buffers
         /// Gets the position.
         /// </summary>
         /// <value>The position.</value>
-        public int Position => _previousBuffersSize + _bufferPos;
+        public readonly int Position => _previousBuffersSize + _bufferPos;
 
         /// <summary>
         /// Gets the current writable span.
         /// </summary>
         /// <value>The current writable span.</value>
-        public Span<byte> WritableSpan
+        public readonly Span<byte> WritableSpan
         {
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             get => _currentSpan[_bufferPos..];
@@ -197,7 +191,7 @@ namespace Orleans.Serialization.Buffers
         /// <summary>
         /// Advance the write position in the current span.
         /// </summary>
-        /// <param name="length">The number of bytes to advance wirte position by.</param>
+        /// <param name="length">The number of bytes to advance write position by.</param>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void AdvanceSpan(int length) => _bufferPos += length;
 

@@ -12,8 +12,8 @@ namespace Benchmarks.Ping
             public long EndTimestamp { get; set; }
             public int Successes { get; set; }
             public int Failures { get; set; }
-            public int Completed => Successes + Failures;
-            public double ElapsedSeconds => (EndTimestamp - StartTimestamp) / StopwatchTickPerSecond;
+            public readonly int Completed => Successes + Failures;
+            public readonly double ElapsedSeconds => (EndTimestamp - StartTimestamp) / StopwatchTickPerSecond;
             public double RequestsPerSecond => Completed / ElapsedSeconds;
         }
 

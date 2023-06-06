@@ -16,7 +16,7 @@ namespace DistributedTests.Client
 
         public int BlocksCompleted { get; set; }
 
-        public long RatePerSecond => (long)(Completed / TotalDuration);
+        public readonly long RatePerSecond => (long)(Completed / TotalDuration);
 
         public override string ToString()
         {
@@ -35,8 +35,8 @@ namespace DistributedTests.Client
             public long EndTimestamp { get; set; }
             public int Successes { get; set; }
             public int Failures { get; set; }
-            public int Completed => Successes + Failures;
-            public double ElapsedSeconds => (EndTimestamp - StartTimestamp) / StopwatchTickPerSecond;
+            public readonly int Completed => Successes + Failures;
+            public readonly double ElapsedSeconds => (EndTimestamp - StartTimestamp) / StopwatchTickPerSecond;
             public double RequestsPerSecond => Completed / ElapsedSeconds;
         }
 

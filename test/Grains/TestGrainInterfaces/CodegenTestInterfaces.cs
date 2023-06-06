@@ -159,9 +159,9 @@ namespace UnitTests.GrainInterfaces
             ReadonlyField = readonlyField;
         }
 
-        public int GetValueWithPrivateGetter() => ValueWithPrivateGetter;
+        public readonly int GetValueWithPrivateGetter() => ValueWithPrivateGetter;
 
-        public int GetPrivateValue() => PrivateValue;
+        public readonly int GetPrivateValue() => PrivateValue;
 
         public void SetPrivateValue(int value) => PrivateValue = value;
 

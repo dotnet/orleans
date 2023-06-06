@@ -134,7 +134,7 @@ namespace Orleans.TestingHost
             IReadOnlyList<IConfigurationSource> configurationSources,
             ITestClusterPortAllocator portAllocator)
         {
-            this.Options = options;
+            Options = options;
             ConfigurationSources = configurationSources.ToArray();
             PortAllocator = portAllocator;
             CreateSiloAsync = DefaultCreateSiloAsync;

@@ -34,7 +34,7 @@ namespace Orleans.Runtime
             Action<GrainReference, IResponseCompletionSource, IInvokable, InvokeMethodOptions> sendRequest,
             IOutgoingGrainCallFilter[] filters)
         {
-            this.Request = request;
+            Request = request;
             this.options = options;
             this.sendRequest = sendRequest;
             grainReference = grain;

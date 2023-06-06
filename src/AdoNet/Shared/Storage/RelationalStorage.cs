@@ -188,7 +188,7 @@ namespace Orleans.Tests.SqlUtils
         /// <param name="connectionString">The connection string this database should use for database operations.</param>
         private RelationalStorage(string invariantName, string connectionString)
         {
-            this.ConnectionString = connectionString;
+            ConnectionString = connectionString;
             this.invariantName = invariantName;
             supportsCommandCancellation = DbConstantsStore.SupportsCommandCancellation(InvariantName);
             isSynchronousAdoNetImplementation = DbConstantsStore.IsSynchronousAdoNetImplementation(InvariantName);

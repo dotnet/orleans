@@ -31,7 +31,7 @@ public struct BufferSliceReaderInput
     internal readonly int Length => _slice._length;
     internal long PreviousBuffersSize;
 
-    internal BufferSliceReaderInput ForkFrom(int position)
+    internal readonly BufferSliceReaderInput ForkFrom(int position)
     {
         var sliced = _slice.Slice(position);
         return new BufferSliceReaderInput(in sliced);
@@ -41,7 +41,7 @@ public struct BufferSliceReaderInput
     {
         if (ReferenceEquals(_segment, InitialSegmentSentinel))
         {
-            _segment = _slice._buffer._first;
+            _segment = _slice._buffer.First;
         }
 
         var endPosition = Offset + Length;
@@ -84,10 +84,10 @@ public struct BufferSliceReaderInput
             return result;
         }
 
-        if (_segment != FinalSegmentSentinel && Buffer._currentPosition > 0 && Buffer._writeHead is { } head && Position < endPosition)
+        if (_segment != FinalSegmentSentinel && Buffer.CurrentPosition > 0 && Buffer.WriteHead is { } head && Position < endPosition)
         {
             var finalOffset = Math.Max(Offset - Position, 0);
-            var finalLength = Math.Min(Buffer._currentPosition, endPosition - (Position + finalOffset));
+            var finalLength = Math.Min(Buffer.CurrentPosition, endPosition - (Position + finalOffset));
             if (finalLength == 0)
             {
                 ThrowInsufficientData();

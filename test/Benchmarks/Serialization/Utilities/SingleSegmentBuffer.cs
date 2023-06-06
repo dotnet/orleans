@@ -17,12 +17,12 @@ namespace Benchmarks.Utilities
         public void Advance(int bytes) => Length += bytes;
 
         [Pure]
-        public Memory<byte> GetMemory(int sizeHint = 0) => _buffer.AsMemory(Length);
+        public readonly Memory<byte> GetMemory(int sizeHint = 0) => _buffer.AsMemory(Length);
 
         [Pure]
-        public Span<byte> GetSpan(int sizeHint) => _buffer.AsSpan(Length);
+        public readonly Span<byte> GetSpan(int sizeHint) => _buffer.AsSpan(Length);
 
-        public byte[] ToArray() => _buffer.AsSpan(0, Length).ToArray();
+        public readonly byte[] ToArray() => _buffer.AsSpan(0, Length).ToArray();
 
         public void Reset() => Length = 0;
 
@@ -30,8 +30,8 @@ namespace Benchmarks.Utilities
         public int Length { get; private set; }
 
         [Pure]
-        public ReadOnlySpan<byte> GetReadOnlySpan() => new(_buffer, 0, Length);
+        public readonly ReadOnlySpan<byte> GetReadOnlySpan() => new(_buffer, 0, Length);
 
-        public override string ToString() => Encoding.UTF8.GetString(_buffer.AsSpan(0, Length).ToArray());
+        public override readonly string ToString() => Encoding.UTF8.GetString(_buffer.AsSpan(0, Length).ToArray());
     }
 }

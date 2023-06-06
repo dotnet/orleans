@@ -34,7 +34,7 @@ namespace Orleans.Runtime
         /// <summary>
         /// Returns true if this instance is running or false otherwise.
         /// </summary>
-        public bool IsRunning => value > 0;
+        public readonly bool IsRunning => value > 0;
         
         /// <summary>
         /// Returns the elapsed time.
@@ -92,7 +92,7 @@ namespace Orleans.Runtime
         /// a negative value indicates the negative total duration of a stopped stopwatch.
         /// </remarks>
         /// <returns>The raw counter value.</returns>
-        public long GetRawTimestamp() => value;
+        public readonly long GetRawTimestamp() => value;
 
         /// <summary>
         /// Starts the stopwatch.
