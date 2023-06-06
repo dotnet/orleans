@@ -12,7 +12,6 @@ namespace Orleans.TestingHost.UnixSocketTransport;
 internal class UnixSocketConnectionListener : IConnectionListener
 {
     private UnixDomainSocketEndPoint _unixEndpoint;
-    private EndPoint _endpoint;
     private UnixSocketConnectionOptions _socketConnectionOptions;
     private SocketsTrace _trace;
     private SocketSchedulers _schedulers;
@@ -22,14 +21,14 @@ internal class UnixSocketConnectionListener : IConnectionListener
     public UnixSocketConnectionListener(UnixDomainSocketEndPoint unixEndpoint, EndPoint endpoint, UnixSocketConnectionOptions socketConnectionOptions, SocketsTrace trace, SocketSchedulers schedulers)
     {
         _unixEndpoint = unixEndpoint;
-        _endpoint = endpoint;
+        EndPoint = endpoint;
         _socketConnectionOptions = socketConnectionOptions;
         _trace = trace;
         _schedulers = schedulers;
         _memoryPool = socketConnectionOptions.MemoryPoolFactory();
     }
 
-    public EndPoint EndPoint => _endpoint;
+    public EndPoint EndPoint { get; }
 
     public void Bind()
     {

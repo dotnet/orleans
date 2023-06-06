@@ -12,7 +12,6 @@ namespace Orleans.Messaging
     public class StaticGatewayListProvider : IGatewayListProvider
     {
         private readonly StaticGatewayListProviderOptions options;
-        private readonly TimeSpan maxStaleness;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="StaticGatewayListProvider"/> class.
@@ -22,7 +21,7 @@ namespace Orleans.Messaging
         public StaticGatewayListProvider(IOptions<StaticGatewayListProviderOptions> options, IOptions<GatewayOptions> gatewayOptions)
         {
             this.options = options.Value;
-            maxStaleness = gatewayOptions.Value.GatewayListRefreshPeriod;
+            MaxStaleness = gatewayOptions.Value.GatewayListRefreshPeriod;
         }
 
         /// <inheritdoc />
@@ -32,7 +31,7 @@ namespace Orleans.Messaging
         public Task<IList<Uri>> GetGateways() => Task.FromResult<IList<Uri>>(options.Gateways);
 
         /// <inheritdoc />
-        public TimeSpan MaxStaleness => maxStaleness;
+        public TimeSpan MaxStaleness { get; }
 
         /// <inheritdoc />
         public bool IsUpdatable => true;

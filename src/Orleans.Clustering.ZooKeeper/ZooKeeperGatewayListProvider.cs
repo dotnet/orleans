@@ -22,7 +22,6 @@ namespace Orleans.Runtime.Membership
         /// The deployment connection string. for eg. "192.168.1.1,192.168.1.2/ClusterId"
         /// </summary>
         private readonly string _deploymentConnectionString;
-        private readonly TimeSpan _maxStaleness;
 
         public ZooKeeperGatewayListProvider(
             ILogger<ZooKeeperGatewayListProvider> logger,
@@ -33,7 +32,7 @@ namespace Orleans.Runtime.Membership
             _watcher = new ZooKeeperWatcher(logger);
             _deploymentPath = "/" + clusterOptions.Value.ClusterId;
             _deploymentConnectionString = options.Value.ConnectionString + _deploymentPath;
-            _maxStaleness = gatewayOptions.Value.GatewayListRefreshPeriod;
+            MaxStaleness = gatewayOptions.Value.GatewayListRefreshPeriod;
         }
 
         /// <summary>
@@ -60,7 +59,7 @@ namespace Orleans.Runtime.Membership
         /// <summary>
         /// Specifies how often this IGatewayListProvider is refreshed, to have a bound on max staleness of its returned information.
         /// </summary>
-        public TimeSpan MaxStaleness => _maxStaleness;
+        public TimeSpan MaxStaleness { get; }
 
         /// <summary>
         /// Specifies whether this IGatewayListProvider ever refreshes its returned information, or always returns the same gw list.

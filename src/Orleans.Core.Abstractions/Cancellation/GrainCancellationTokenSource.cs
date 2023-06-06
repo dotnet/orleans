@@ -9,17 +9,13 @@ namespace Orleans
     /// </summary>
     public sealed class GrainCancellationTokenSource : IDisposable
     {
-        /// <summary>
-        /// The underlying grain cancellation token.
-        /// </summary>
-        private readonly GrainCancellationToken _grainCancellationToken;
 
         /// <summary>
         /// Initializes the <see cref="T:Orleans.GrainCancellationTokenSource"/>.
         /// </summary>
         public GrainCancellationTokenSource()
         {
-            _grainCancellationToken = new GrainCancellationToken(Guid.NewGuid());
+            Token = new GrainCancellationToken(Guid.NewGuid());
         }
 
         /// <summary>
@@ -28,7 +24,7 @@ namespace Orleans
         /// </summary>
         /// <value>The <see cref="GrainCancellationToken">CancellationToken</see>
         /// associated with this <see cref="GrainCancellationToken"/>.</value>
-        public GrainCancellationToken Token => _grainCancellationToken;
+        public GrainCancellationToken Token { get; }
 
         /// <summary>
         /// Gets a value indicating whether cancellation has been requested.
@@ -43,7 +39,7 @@ namespace Orleans
         /// concurrently.
         /// </para>
         /// </remarks>
-        public bool IsCancellationRequested => _grainCancellationToken.IsCancellationRequested;
+        public bool IsCancellationRequested => Token.IsCancellationRequested;
 
         /// <summary>
         /// Communicates a request for cancellation.
@@ -62,7 +58,7 @@ namespace Orleans
         /// </remarks>
         /// <exception cref="AggregateException">An aggregate exception containing all the exceptions thrown by the registered callbacks on the associated <see cref="GrainCancellationToken" /> .</exception>
         /// <exception cref="ObjectDisposedException">This <see cref="GrainCancellationTokenSource" /> has been disposed.</exception>
-        public Task Cancel() => _grainCancellationToken.Cancel();
+        public Task Cancel() => Token.Cancel();
 
         /// <summary>
         /// Releases the resources used by this <see cref="T:Orleans.Async.GrainCancellationTokenSource" />.
@@ -70,6 +66,6 @@ namespace Orleans
         /// <remarks>
         /// This method is not thread-safe for any other concurrent calls.
         /// </remarks>
-        public void Dispose() => _grainCancellationToken.Dispose();
+        public void Dispose() => Token.Dispose();
     }
 }

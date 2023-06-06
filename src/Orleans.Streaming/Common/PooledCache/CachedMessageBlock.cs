@@ -19,7 +19,6 @@ namespace Orleans.Providers.Streams.Common
         private readonly CachedMessage[] cachedMessages;
         private readonly int blockSize;
         private int writeIndex;
-        private int readIndex;
 
         /// <summary>
         /// Linked list node, so this message block can be kept in a linked list.
@@ -34,7 +33,7 @@ namespace Orleans.Providers.Streams.Common
         /// <summary>
         /// Gets a value indicating whether this block is empty.
         /// </summary>
-        public bool IsEmpty => readIndex >= writeIndex;
+        public bool IsEmpty => OldestMessageIndex >= writeIndex;
 
         /// <summary>
         /// Gets the index of most recent message added to the block.
@@ -44,7 +43,7 @@ namespace Orleans.Providers.Streams.Common
         /// <summary>
         /// Gets the index of the oldest message in this block.
         /// </summary>
-        public int OldestMessageIndex => readIndex;
+        public int OldestMessageIndex { get; private set; }
 
         /// <summary>
         /// Gets the oldest message in the block.
@@ -61,7 +60,7 @@ namespace Orleans.Providers.Streams.Common
         /// </summary>
         public int ItemCount { get
             {
-                var count = writeIndex - readIndex;
+                var count = writeIndex - OldestMessageIndex;
                 return count >= 0 ? count : 0;
             }  
         }
@@ -75,7 +74,7 @@ namespace Orleans.Providers.Streams.Common
             this.blockSize = blockSize;
             cachedMessages = new CachedMessage[blockSize];
             writeIndex = 0;
-            readIndex = 0;
+            OldestMessageIndex = 0;
             Node = new LinkedListNode<CachedMessageBlock>(this);
         }
 
@@ -85,9 +84,9 @@ namespace Orleans.Providers.Streams.Common
         /// <returns><see langword="true"/> if there are more items remaining; otherwise <see langword="false"/>.</returns>
         public bool Remove()
         {
-            if (readIndex < writeIndex)
+            if (OldestMessageIndex < writeIndex)
             {
-                readIndex++;
+                OldestMessageIndex++;
                 return true;
             }
             return false;
@@ -120,7 +119,7 @@ namespace Orleans.Providers.Streams.Common
         {
             get
             {
-                if (index >= writeIndex || index < readIndex)
+                if (index >= writeIndex || index < OldestMessageIndex)
                 {
                     throw new ArgumentOutOfRangeException("index");
                 }
@@ -136,7 +135,7 @@ namespace Orleans.Providers.Streams.Common
         /// <returns>The sequence token.</returns>
         public StreamSequenceToken GetSequenceToken(int index, ICacheDataAdapter dataAdapter)
         {
-            if (index >= writeIndex || index < readIndex)
+            if (index >= writeIndex || index < OldestMessageIndex)
             {
                 throw new ArgumentOutOfRangeException(nameof(index));
             }
@@ -164,7 +163,7 @@ namespace Orleans.Providers.Streams.Common
         /// <returns>The index of the first message in this block that has a sequence token equal to or before the provided token.</returns>
         public int GetIndexOfFirstMessageLessThanOrEqualTo(StreamSequenceToken token)
         {
-            for (var i = writeIndex - 1; i >= readIndex; i--)
+            for (var i = writeIndex - 1; i >= OldestMessageIndex; i--)
             {
                 if (cachedMessages[i].Compare(token) <= 0)
                 {
@@ -181,7 +180,7 @@ namespace Orleans.Providers.Streams.Common
         /// <param name="dataAdapter">The data adapter.</param>
         /// <param name="index">The index.</param>
         /// <returns><see langword="true" /> if the message was found, <see langword="false" /> otherwise.</returns>
-        public bool TryFindFirstMessage(StreamId streamId, ICacheDataAdapter dataAdapter, out int index) => TryFindNextMessage(readIndex, streamId, dataAdapter, out index);
+        public bool TryFindFirstMessage(StreamId streamId, ICacheDataAdapter dataAdapter, out int index) => TryFindNextMessage(OldestMessageIndex, streamId, dataAdapter, out index);
 
         /// <summary>
         /// Tries to get the next message from the provided stream, starting at the start index.
@@ -193,7 +192,7 @@ namespace Orleans.Providers.Streams.Common
         /// <returns><see langword="true" /> if the message was found, <see langword="false" /> otherwise.</returns>
         public bool TryFindNextMessage(int start, StreamId streamId, ICacheDataAdapter dataAdapter, out int index)
         {
-            if (start < readIndex)
+            if (start < OldestMessageIndex)
             {
                 throw new ArgumentOutOfRangeException("start");
             }
@@ -215,7 +214,7 @@ namespace Orleans.Providers.Streams.Common
         public override void OnResetState()
         {
             writeIndex = 0;
-            readIndex = 0;
+            OldestMessageIndex = 0;
         }
     }
 }

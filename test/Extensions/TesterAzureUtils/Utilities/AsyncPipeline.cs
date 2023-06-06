@@ -15,14 +15,13 @@ namespace Tester.AzureUtils.Utilities
         public const int DEFAULT_CAPACITY = 10;
 
         private readonly HashSet<Task> running;
-        private readonly int capacity;
         private readonly LinkedList<Tuple<Task,TaskCompletionSource<bool>>> waiting;
         private readonly object lockable;
 
         /// <summary>
         /// The maximal number of async in-flight operations that can be enqueued into this async pipeline.
         /// </summary>
-        public int Capacity => capacity;
+        public int Capacity { get; }
 
         /// <summary>
         /// The number of items currently enqueued into this async pipeline.
@@ -46,7 +45,7 @@ namespace Tester.AzureUtils.Utilities
                 throw new ArgumentOutOfRangeException("capacity", "The pipeline size must be larger than 0.");
             running = new HashSet<Task>();
             waiting = new LinkedList<Tuple<Task, TaskCompletionSource<bool>>>();
-            this.capacity = capacity;
+            this.Capacity = capacity;
             lockable = new object();
         }
 
@@ -101,7 +100,7 @@ namespace Tester.AzureUtils.Utilities
             }
         }
 
-        private bool IsFull => Count >= capacity;
+        private bool IsFull => Count >= Capacity;
 
         internal void Add(Task task, WhiteBox whiteBox)
         {

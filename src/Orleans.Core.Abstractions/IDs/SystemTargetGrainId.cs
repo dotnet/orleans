@@ -14,7 +14,6 @@ namespace Orleans.Runtime
     public readonly struct SystemTargetGrainId : IEquatable<SystemTargetGrainId>, IComparable<SystemTargetGrainId>, ISpanFormattable
     {
         private const char SegmentSeparator = '+';
-        private readonly GrainId _grainId;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="SystemTargetGrainId"/> struct.
@@ -22,12 +21,12 @@ namespace Orleans.Runtime
         /// <param name="grainId">
         /// The grain id.
         /// </param>
-        private SystemTargetGrainId(GrainId grainId) => _grainId = grainId;
+        private SystemTargetGrainId(GrainId grainId) => GrainId = grainId;
 
         /// <summary>
         /// Gets the underlying identity.
         /// </summary>
-        public GrainId GrainId => _grainId;
+        public GrainId GrainId { get; }
 
         /// <summary>
         /// Creates a new <see cref="SystemTargetGrainId"/> instance.
@@ -121,7 +120,7 @@ namespace Orleans.Runtime
         public SystemTargetGrainId WithSiloAddress(SiloAddress siloAddress)
         {
             var addr = siloAddress.ToUtf8String();
-            var key = _grainId.Key.AsSpan();
+            var key = GrainId.Key.AsSpan();
             if (key.IndexOf((byte)SegmentSeparator) is int index && index >= 0)
             {
                 var extraIdentifier = key[(index + 1)..];
@@ -133,7 +132,7 @@ namespace Orleans.Runtime
                 addr = buf;
             }
 
-            return new SystemTargetGrainId(new GrainId(_grainId.Type, new IdSpan(addr)));
+            return new SystemTargetGrainId(new GrainId(GrainId.Type, new IdSpan(addr)));
         }
 
         /// <summary>
@@ -144,7 +143,7 @@ namespace Orleans.Runtime
         /// </returns>
         public SiloAddress GetSiloAddress()
         {
-            var key = _grainId.Key.AsSpan();
+            var key = GrainId.Key.AsSpan();
             if (key.IndexOf((byte)SegmentSeparator) is int index && index >= 0)
             {
                 key = key[..index];
@@ -215,24 +214,24 @@ namespace Orleans.Runtime
         public static GrainType CreateGrainType(string name) => GrainType.Create($"{GrainTypePrefix.SystemTargetPrefix}{name}");
 
         /// <inheritdoc/>
-        public bool Equals(SystemTargetGrainId other) => _grainId.Equals(other._grainId);
+        public bool Equals(SystemTargetGrainId other) => GrainId.Equals(other.GrainId);
 
         /// <inheritdoc/>
         public override bool Equals(object? obj) => obj is SystemTargetGrainId observer && Equals(observer);
 
         /// <inheritdoc/>
-        public override int GetHashCode() => _grainId.GetHashCode();
+        public override int GetHashCode() => GrainId.GetHashCode();
 
         /// <inheritdoc/>
-        public override string ToString() => _grainId.ToString();
+        public override string ToString() => GrainId.ToString();
 
         string IFormattable.ToString(string? format, IFormatProvider? formatProvider) => ToString();
 
         bool ISpanFormattable.TryFormat(Span<char> destination, out int charsWritten, ReadOnlySpan<char> format, IFormatProvider? provider)
-            => ((ISpanFormattable)_grainId).TryFormat(destination, out charsWritten, format, provider);
+            => ((ISpanFormattable)GrainId).TryFormat(destination, out charsWritten, format, provider);
 
         /// <inheritdoc/>
-        public int CompareTo(SystemTargetGrainId other) => _grainId.CompareTo(other._grainId);
+        public int CompareTo(SystemTargetGrainId other) => GrainId.CompareTo(other.GrainId);
 
         /// <summary>
         /// Compares the provided operands for equality.

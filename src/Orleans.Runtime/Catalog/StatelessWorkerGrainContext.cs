@@ -10,7 +10,6 @@ namespace Orleans.Runtime
 {
     internal class StatelessWorkerGrainContext : IGrainContext, IAsyncDisposable, IActivationLifecycleObserver
     {
-        private readonly GrainAddress _address;
         private readonly GrainTypeSharedContext _shared;
         private readonly IGrainContextActivator _innerActivator;
         private readonly int _maxWorkers;
@@ -35,7 +34,7 @@ namespace Orleans.Runtime
             GrainTypeSharedContext sharedContext,
             IGrainContextActivator innerActivator)
         {
-            _address = address;
+            Address = address;
             _shared = sharedContext;
             _innerActivator = innerActivator;
             _maxWorkers = ((StatelessWorkerPlacement)_shared.PlacementStrategy).MaxLocal;
@@ -45,13 +44,13 @@ namespace Orleans.Runtime
 
         public GrainReference GrainReference => _grainReference ??= _shared.GrainReferenceActivator.CreateReference(GrainId, default);
 
-        public GrainId GrainId => _address.GrainId;
+        public GrainId GrainId => Address.GrainId;
 
         public object GrainInstance => null;
 
-        public ActivationId ActivationId => _address.ActivationId;
+        public ActivationId ActivationId => Address.ActivationId;
 
-        public GrainAddress Address => _address;
+        public GrainAddress Address { get; }
 
         public IServiceProvider ActivationServices => throw new NotImplementedException();
 
@@ -237,7 +236,7 @@ namespace Orleans.Runtime
 
         private ActivationData CreateWorker(object message)
         {
-            var address = GrainAddress.GetAddress(_address.SiloAddress, _address.GrainId, ActivationId.NewId());
+            var address = GrainAddress.GetAddress(Address.SiloAddress, Address.GrainId, ActivationId.NewId());
             var newWorker = (ActivationData)_innerActivator.CreateContext(address);
 
             // Observe the create/destroy lifecycle of the activation

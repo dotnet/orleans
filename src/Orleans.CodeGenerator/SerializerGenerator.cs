@@ -1122,35 +1122,33 @@ namespace Orleans.CodeGenerator
         /// </summary>
         internal class SerializableMethodMember : ISerializableMember
         {
-            private readonly MethodParameterFieldDescription _member;
-
             public SerializableMethodMember(MethodParameterFieldDescription member)
             {
-                _member = member;
+                Member = member;
             }
 
-            IMemberDescription ISerializableMember.Member => _member;
-            public MethodParameterFieldDescription Member => _member;
+            IMemberDescription ISerializableMember.Member => Member;
+            public MethodParameterFieldDescription Member { get; }
 
-            private LibraryTypes LibraryTypes => _member.Method.ContainingInterface.CodeGenerator.LibraryTypes;
+            private LibraryTypes LibraryTypes => Member.Method.ContainingInterface.CodeGenerator.LibraryTypes;
 
-            public bool IsShallowCopyable => LibraryTypes.IsShallowCopyable(_member.Parameter.Type) || _member.Parameter.HasAnyAttribute(LibraryTypes.ImmutableAttributes);
+            public bool IsShallowCopyable => LibraryTypes.IsShallowCopyable(Member.Parameter.Type) || Member.Parameter.HasAnyAttribute(LibraryTypes.ImmutableAttributes);
 
             /// <summary>
             /// Gets syntax representing the type of this field.
             /// </summary>
-            public TypeSyntax TypeSyntax => _member.TypeSyntax;
+            public TypeSyntax TypeSyntax => Member.TypeSyntax;
 
-            public bool IsValueType => _member.Type.IsValueType;
+            public bool IsValueType => Member.Type.IsValueType;
 
-            public bool IsPrimaryConstructorParameter => _member.IsPrimaryConstructorParameter;
+            public bool IsPrimaryConstructorParameter => Member.IsPrimaryConstructorParameter;
 
             /// <summary>
             /// Returns syntax for retrieving the value of this field, deep copying it if necessary.
             /// </summary>
             /// <param name="instance">The instance of the containing type.</param>
             /// <returns>Syntax for retrieving the value of this field.</returns>
-            public ExpressionSyntax GetGetter(ExpressionSyntax instance) => instance.Member(_member.FieldName);
+            public ExpressionSyntax GetGetter(ExpressionSyntax instance) => instance.Member(Member.FieldName);
 
             /// <summary>
             /// Returns syntax for setting the value of this field.
@@ -1160,7 +1158,7 @@ namespace Orleans.CodeGenerator
             /// <returns>Syntax for setting the value of this field.</returns>
             public ExpressionSyntax GetSetter(ExpressionSyntax instance, ExpressionSyntax value) => AssignmentExpression(
                         SyntaxKind.SimpleAssignmentExpression,
-                        instance.Member(_member.FieldName),
+                        instance.Member(Member.FieldName),
                         value);
 
             public FieldAccessorDescription GetGetterFieldDescription() => null;
@@ -1175,7 +1173,6 @@ namespace Orleans.CodeGenerator
             private readonly SemanticModel _model;
             private readonly LibraryTypes _libraryTypes;
             private IPropertySymbol _property;
-            private readonly IMemberDescription _member;
 
             /// <summary>
             /// The ordinal assigned to this field.
@@ -1187,23 +1184,23 @@ namespace Orleans.CodeGenerator
                 _libraryTypes = libraryTypes;
                 _model = type.SemanticModel;
                 _ordinal = ordinal;
-                _member = member;
+                Member = member;
             }
 
-            public bool IsShallowCopyable => _libraryTypes.IsShallowCopyable(_member.Type) || (Property is { } prop && prop.HasAnyAttribute(_libraryTypes.ImmutableAttributes)) || _member.Symbol.HasAnyAttribute(_libraryTypes.ImmutableAttributes);
+            public bool IsShallowCopyable => _libraryTypes.IsShallowCopyable(Member.Type) || (Property is { } prop && prop.HasAnyAttribute(_libraryTypes.ImmutableAttributes)) || Member.Symbol.HasAnyAttribute(_libraryTypes.ImmutableAttributes);
 
             public bool IsValueType => Type.IsValueType;
 
-            public IMemberDescription Member => _member;
+            public IMemberDescription Member { get; }
 
             /// <summary>
             /// Gets the underlying <see cref="Field"/> instance.
             /// </summary>
-            private IFieldSymbol Field => (_member as IFieldDescription)?.Field;
+            private IFieldSymbol Field => (Member as IFieldDescription)?.Field;
 
-            public ITypeSymbol Type => _member.Type;
+            public ITypeSymbol Type => Member.Type;
 
-            public INamedTypeSymbol ContainingType => _member.ContainingType;
+            public INamedTypeSymbol ContainingType => Member.ContainingType;
 
             public string MemberName => Field?.Name ?? Property?.Name;
 
@@ -1247,7 +1244,7 @@ namespace Orleans.CodeGenerator
             /// </summary>
             public TypeSyntax TypeSyntax => Member.Type.TypeKind == TypeKind.Dynamic
                 ? PredefinedType(Token(SyntaxKind.ObjectKeyword))
-                : _member.GetTypeSyntax(Member.Type);
+                : Member.GetTypeSyntax(Member.Type);
 
             /// <summary>
             /// Gets the <see cref="Property"/> which this field is the backing property for, or
@@ -1261,7 +1258,7 @@ namespace Orleans.CodeGenerator
             private bool IsObsolete => Member.Symbol.HasAttribute(_libraryTypes.ObsoleteAttribute) ||
                                        Property != null && Property.HasAttribute(_libraryTypes.ObsoleteAttribute);
 
-            public bool IsPrimaryConstructorParameter => _member.IsPrimaryConstructorParameter;
+            public bool IsPrimaryConstructorParameter => Member.IsPrimaryConstructorParameter;
 
             /// <summary>
             /// Returns syntax for retrieving the value of this field, deep copying it if necessary.

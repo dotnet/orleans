@@ -47,7 +47,6 @@ namespace Orleans.Serialization.Serializers
         private readonly ObjectCodec _objectCodec = new();
         private readonly VoidCodec _voidCodec = new();
         private readonly ObjectCopier _objectCopier = new();
-        private readonly IServiceProvider _serviceProvider;
         private readonly VoidCopier _voidCopier = new();
         private bool _initialized;
 
@@ -58,13 +57,13 @@ namespace Orleans.Serialization.Serializers
         /// <param name="codecConfiguration">The codec configuration.</param>
         public CodecProvider(IServiceProvider serviceProvider, IOptions<TypeManifestOptions> codecConfiguration)
         {
-            _serviceProvider = serviceProvider;
+            Services = serviceProvider;
 
             ConsumeMetadata(codecConfiguration);
         }
 
         /// <inheritdoc/>
-        public IServiceProvider Services => _serviceProvider;
+        public IServiceProvider Services { get; }
 
         private void Initialize()
         {
@@ -75,13 +74,13 @@ namespace Orleans.Serialization.Serializers
                     return;
                 }
 
-                _generalizedCodecs.AddRange(_serviceProvider.GetServices<IGeneralizedCodec>());
-                _generalizedBaseCodecs.AddRange(_serviceProvider.GetServices<IGeneralizedBaseCodec>());
-                _generalizedCopiers.AddRange(_serviceProvider.GetServices<IGeneralizedCopier>());
+                _generalizedCodecs.AddRange(Services.GetServices<IGeneralizedCodec>());
+                _generalizedBaseCodecs.AddRange(Services.GetServices<IGeneralizedBaseCodec>());
+                _generalizedCopiers.AddRange(Services.GetServices<IGeneralizedCopier>());
 
-                _specializableCodecs.AddRange(_serviceProvider.GetServices<ISpecializableCodec>());
-                _specializableCopiers.AddRange(_serviceProvider.GetServices<ISpecializableCopier>());
-                _specializableBaseCodecs.AddRange(_serviceProvider.GetServices<ISpecializableBaseCodec>());
+                _specializableCodecs.AddRange(Services.GetServices<ISpecializableCodec>());
+                _specializableCopiers.AddRange(Services.GetServices<ISpecializableCopier>());
+                _specializableBaseCodecs.AddRange(Services.GetServices<ISpecializableBaseCodec>());
 
                 _initialized = true;
             }
@@ -473,13 +472,13 @@ namespace Orleans.Serialization.Serializers
                 return result;
             }
 
-            result = _serviceProvider.GetService(type);
+            result = Services.GetService(type);
             if (result != null)
             {
                 return result;
             }
 
-            result = ActivatorUtilities.CreateInstance(_serviceProvider, type, constructorArguments ?? Array.Empty<object>());
+            result = ActivatorUtilities.CreateInstance(Services, type, constructorArguments ?? Array.Empty<object>());
             return result;
         }
 

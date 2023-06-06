@@ -8,7 +8,6 @@ namespace Orleans.TestingHost.Utils
     /// </summary>
     public class AsyncResultHandle
     {
-        private bool done = false;
         private bool continueFlag = false;
 
         /// <summary> Reset the current result handle </summary>
@@ -16,16 +15,12 @@ namespace Orleans.TestingHost.Utils
         {
             Exception = null;
             Result = null;
-            done = false;
+            Done = false;
             continueFlag = false;
         }
 
         /// <summary> Get or set the Done flag </summary>
-        public bool Done
-        {
-            get { return done; }
-            set { done = value; }
-        }
+        public bool Done { get; set; } = false;
 
         /// <summary> Get or set the Continue flag </summary>
         public bool Continue
@@ -44,7 +39,7 @@ namespace Orleans.TestingHost.Utils
         /// </summary>
         /// <param name="timeout"></param>
         /// <returns>Returns <c>true</c> if operation completes before timeout</returns>
-        public Task<bool> WaitForFinished(TimeSpan timeout) => WaitFor(timeout, () => done);
+        public Task<bool> WaitForFinished(TimeSpan timeout) => WaitFor(timeout, () => Done);
 
         /// <summary>
         /// </summary>

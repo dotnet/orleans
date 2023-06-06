@@ -947,7 +947,7 @@ namespace UnitTests.Streaming.Reliability
             output.WriteLine("\n\n\n\n-----------------------------------------------------\n" +
                             "Restarting all silos - Old Primary={0} Secondary={1}" +
                             "\n-----------------------------------------------------\n\n\n",
-                            HostedCluster.Primary?.SiloAddress, HostedCluster.SecondarySilos.FirstOrDefault()?.SiloAddress);
+                            HostedCluster.Primary?.SiloAddress, HostedCluster.SecondarySilos[0]?.SiloAddress);
 
             foreach (var silo in HostedCluster.GetActiveSilos().ToList())
             {
@@ -960,7 +960,7 @@ namespace UnitTests.Streaming.Reliability
             output.WriteLine("\n\n\n\n-----------------------------------------------------\n" +
                             "Restarted new silos - New Primary={0} Secondary={1}" +
                             "\n-----------------------------------------------------\n\n\n",
-                            HostedCluster.Primary?.SiloAddress, HostedCluster.SecondarySilos.FirstOrDefault()?.SiloAddress);
+                            HostedCluster.Primary?.SiloAddress, HostedCluster.SecondarySilos[0]?.SiloAddress);
         }
 
         private async Task StopSilo(SiloHandle silo, bool kill, bool restart)

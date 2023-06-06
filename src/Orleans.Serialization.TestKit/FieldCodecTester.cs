@@ -21,7 +21,6 @@ namespace Orleans.Serialization.TestKit
     [ExcludeFromCodeCoverage]
     public abstract class FieldCodecTester<TValue, TCodec> : IDisposable where TCodec : class, IFieldCodec<TValue>
     {
-        private readonly IServiceProvider _serviceProvider;
         private readonly SerializerSessionPool _sessionPool;
 
         protected FieldCodecTester(ITestOutputHelper output)
@@ -43,13 +42,13 @@ namespace Orleans.Serialization.TestKit
 
             _ = services.AddSerializer(Configure);
 
-            _serviceProvider = services.BuildServiceProvider();
-            _sessionPool = _serviceProvider.GetService<SerializerSessionPool>();
+            ServiceProvider = services.BuildServiceProvider();
+            _sessionPool = ServiceProvider.GetService<SerializerSessionPool>();
         }
 
         protected Random Random { get; }
 
-        protected IServiceProvider ServiceProvider => _serviceProvider;
+        protected IServiceProvider ServiceProvider { get; }
 
         protected SerializerSessionPool SessionPool => _sessionPool;
 
@@ -59,14 +58,14 @@ namespace Orleans.Serialization.TestKit
         {
         }
 
-        protected virtual TCodec CreateCodec() => _serviceProvider.GetRequiredService<TCodec>();
+        protected virtual TCodec CreateCodec() => ServiceProvider.GetRequiredService<TCodec>();
         protected abstract TValue CreateValue();
         protected abstract TValue[] TestValues { get; }
         protected virtual bool Equals(TValue left, TValue right) => EqualityComparer<TValue>.Default.Equals(left, right);
 
         protected virtual Action<Action<TValue>> ValueProvider { get; }
 
-        void IDisposable.Dispose() => (_serviceProvider as IDisposable)?.Dispose();
+        void IDisposable.Dispose() => (ServiceProvider as IDisposable)?.Dispose();
 
         [Fact]
         public void CorrectlyAdvancesReferenceCounterStream()
@@ -168,7 +167,7 @@ namespace Orleans.Serialization.TestKit
         [Fact]
         public void CanRoundTripViaSerializer_StreamPooled()
         {
-            var serializer = _serviceProvider.GetRequiredService<Serializer<TValue>>();
+            var serializer = ServiceProvider.GetRequiredService<Serializer<TValue>>();
 
             foreach (var original in TestValues)
             {
@@ -202,7 +201,7 @@ namespace Orleans.Serialization.TestKit
         [Fact]
         public void CanRoundTripViaSerializer_Span()
         {
-            var serializer = _serviceProvider.GetRequiredService<Serializer<TValue>>();
+            var serializer = ServiceProvider.GetRequiredService<Serializer<TValue>>();
 
             foreach (var original in TestValues)
             {
@@ -234,7 +233,7 @@ namespace Orleans.Serialization.TestKit
         [Fact]
         public void CanRoundTripViaSerializer_Array()
         {
-            var serializer = _serviceProvider.GetRequiredService<Serializer<TValue>>();
+            var serializer = ServiceProvider.GetRequiredService<Serializer<TValue>>();
 
             foreach (var original in TestValues)
             {
@@ -266,7 +265,7 @@ namespace Orleans.Serialization.TestKit
         [Fact]
         public void CanRoundTripViaSerializer_Memory()
         {
-            var serializer = _serviceProvider.GetRequiredService<Serializer<TValue>>();
+            var serializer = ServiceProvider.GetRequiredService<Serializer<TValue>>();
 
             foreach (var original in TestValues)
             {
@@ -298,7 +297,7 @@ namespace Orleans.Serialization.TestKit
         [Fact]
         public void CanRoundTripViaSerializer_MemoryStream()
         {
-            var serializer = _serviceProvider.GetRequiredService<Serializer<TValue>>();
+            var serializer = ServiceProvider.GetRequiredService<Serializer<TValue>>();
 
             foreach (var original in TestValues)
             {
@@ -337,7 +336,7 @@ namespace Orleans.Serialization.TestKit
         [Fact]
         public void CanRoundTripViaSerializer_ReadByteByByte()
         {
-            var serializer = _serviceProvider.GetRequiredService<Serializer<TValue>>();
+            var serializer = ServiceProvider.GetRequiredService<Serializer<TValue>>();
 
             foreach (var original in TestValues)
             {
@@ -372,7 +371,7 @@ namespace Orleans.Serialization.TestKit
         [Fact]
         public void ProducesValidBitStream()
         {
-            var serializer = _serviceProvider.GetRequiredService<Serializer<TValue>>();
+            var serializer = ServiceProvider.GetRequiredService<Serializer<TValue>>();
             foreach (var value in TestValues)
             {
                 Test(value);
@@ -404,7 +403,7 @@ namespace Orleans.Serialization.TestKit
         [Fact]
         public void WritersProduceSameResults()
         {
-            var serializer = _serviceProvider.GetRequiredService<Serializer<TValue>>();
+            var serializer = ServiceProvider.GetRequiredService<Serializer<TValue>>();
 
             foreach (var original in TestValues)
             {
@@ -507,7 +506,7 @@ namespace Orleans.Serialization.TestKit
         [Fact]
         public void CanRoundTripCollectionViaSerializer()
         {
-            var serializer = _serviceProvider.GetRequiredService<Serializer<List<TValue>>>();
+            var serializer = ServiceProvider.GetRequiredService<Serializer<List<TValue>>>();
 
             var original = new List<TValue>();
             original.AddRange(TestValues);
@@ -539,7 +538,7 @@ namespace Orleans.Serialization.TestKit
         [Fact]
         public void CanCopyCollectionViaSerializer()
         {
-            var copier = _serviceProvider.GetRequiredService<DeepCopier<List<TValue>>>();
+            var copier = ServiceProvider.GetRequiredService<DeepCopier<List<TValue>>>();
 
             var original = new List<TValue>();
             original.AddRange(TestValues);
@@ -563,7 +562,7 @@ namespace Orleans.Serialization.TestKit
         [Fact]
         public void CanCopyCollectionViaUntypedSerializer()
         {
-            var copier = _serviceProvider.GetRequiredService<DeepCopier<List<object>>>();
+            var copier = ServiceProvider.GetRequiredService<DeepCopier<List<object>>>();
 
             var original = new List<object>();
             foreach (var value in TestValues)
@@ -591,7 +590,7 @@ namespace Orleans.Serialization.TestKit
         [Fact]
         public void CanCopyTupleViaSerializer_Untyped()
         {
-            var copier = _serviceProvider.GetRequiredService<DeepCopier<(string, object, object, string)>>();
+            var copier = ServiceProvider.GetRequiredService<DeepCopier<(string, object, object, string)>>();
             var value = TestValues.Reverse().Concat(new[] { CreateValue(), CreateValue() }).Take(2).ToArray();
 
             var original = (Guid.NewGuid().ToString(), (object)value[0], (object)value[1], Guid.NewGuid().ToString());
@@ -619,7 +618,7 @@ namespace Orleans.Serialization.TestKit
         [Fact]
         public void CanCopyTupleViaSerializer()
         {
-            var copier = _serviceProvider.GetRequiredService<DeepCopier<(string, TValue, TValue, string)>>();
+            var copier = ServiceProvider.GetRequiredService<DeepCopier<(string, TValue, TValue, string)>>();
 
             var original = (Guid.NewGuid().ToString(), CreateValue(), CreateValue(), Guid.NewGuid().ToString());
 
@@ -646,7 +645,7 @@ namespace Orleans.Serialization.TestKit
         [Fact]
         public void CanRoundTripTupleViaSerializer()
         {
-            var serializer = _serviceProvider.GetRequiredService<Serializer<(string, TValue, TValue, string)>>();
+            var serializer = ServiceProvider.GetRequiredService<Serializer<(string, TValue, TValue, string)>>();
 
             var original = (Guid.NewGuid().ToString(), CreateValue(), CreateValue(), Guid.NewGuid().ToString());
 
@@ -681,7 +680,7 @@ namespace Orleans.Serialization.TestKit
         [Fact]
         public void CanRoundTripViaSerializer()
         {
-            var serializer = _serviceProvider.GetRequiredService<Serializer<TValue>>();
+            var serializer = ServiceProvider.GetRequiredService<Serializer<TValue>>();
 
             foreach (var original in TestValues)
             {
@@ -715,7 +714,7 @@ namespace Orleans.Serialization.TestKit
         [Fact]
         public void CanRoundTripViaObjectSerializer()
         {
-            var serializer = _serviceProvider.GetRequiredService<Serializer<object>>();
+            var serializer = ServiceProvider.GetRequiredService<Serializer<object>>();
 
             var buffer = new byte[10240];
 
@@ -770,7 +769,7 @@ namespace Orleans.Serialization.TestKit
         [Fact]
         public void CorrectlyHandlesBuffers()
         {
-            var testers = BufferTestHelper<TValue>.GetTestSerializers(_serviceProvider, MaxSegmentSizes);
+            var testers = BufferTestHelper<TValue>.GetTestSerializers(ServiceProvider, MaxSegmentSizes);
 
             foreach (var tester in testers)
             {

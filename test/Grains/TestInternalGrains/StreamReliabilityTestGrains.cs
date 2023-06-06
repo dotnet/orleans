@@ -361,8 +361,10 @@ namespace UnitTests.Grains
 
         public override Task OnActivateAsync(CancellationToken cancellationToken)
         {
-            logger.LogInformation(string.Format("OnActivateAsync IsProducer = {0}, IsConsumer = {1}.",
-                State.IsProducer, State.ConsumerSubscriptionHandles != null && State.ConsumerSubscriptionHandles.Count > 0));
+            logger.LogInformation(
+                "OnActivateAsync IsProducer = {IsProducer}, IsConsumer = {IsConsumer}.",
+                State.IsProducer, State.ConsumerSubscriptionHandles != null && State.ConsumerSubscriptionHandles.Count > 0);
+
             return Task.CompletedTask;
         }
 

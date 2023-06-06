@@ -8,11 +8,9 @@ namespace Orleans.CodeGenerator
 {
     internal class MethodDescription
     {
-        private readonly InvokableInterfaceDescription _iface;
-
         public MethodDescription(InvokableInterfaceDescription containingType, IMethodSymbol method, string methodId, bool hasCollision)
         {
-            _iface = containingType;
+            ContainingInterface = containingType;
             Method = method;
             MethodId = methodId;
             HasCollision = hasCollision;
@@ -21,7 +19,7 @@ namespace Orleans.CodeGenerator
             AllTypeParameters = new List<(string Name, ITypeParameterSymbol Parameter)>();
             MethodTypeParameters = new List<(string Name, ITypeParameterSymbol Parameter)>();
 
-            foreach (var tp in _iface.InterfaceType.GetAllTypeParameters())
+            foreach (var tp in ContainingInterface.InterfaceType.GetAllTypeParameters())
             {
                 var tpName = GetTypeParameterName(names, tp);
                 AllTypeParameters.Add((tpName, tp));
@@ -144,7 +142,7 @@ namespace Orleans.CodeGenerator
 
         public IMethodSymbol Method { get; }
 
-        public InvokableInterfaceDescription ContainingInterface => _iface;
+        public InvokableInterfaceDescription ContainingInterface { get; }
 
         public bool HasCollision { get; }
 

@@ -16,7 +16,7 @@ namespace Orleans.Runtime.Membership
         private readonly AdoNetClusteringClientOptions options;
         private RelationalOrleansQueries orleansQueries;
         private readonly IServiceProvider serviceProvider;
-        private readonly TimeSpan maxStaleness;
+
         public AdoNetGatewayListProvider(
             ILogger<AdoNetGatewayListProvider> logger, 
             IServiceProvider serviceProvider,
@@ -28,10 +28,10 @@ namespace Orleans.Runtime.Membership
             this.serviceProvider = serviceProvider;
             this.options = options.Value;
             clusterId = clusterOptions.Value.ClusterId;
-            maxStaleness = gatewayOptions.Value.GatewayListRefreshPeriod;
+            MaxStaleness = gatewayOptions.Value.GatewayListRefreshPeriod;
         }
 
-        public TimeSpan MaxStaleness => maxStaleness;
+        public TimeSpan MaxStaleness { get; }
 
         public bool IsUpdatable => true;
 

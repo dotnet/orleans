@@ -24,14 +24,12 @@ namespace Orleans.Runtime
         private readonly IAppEnvironmentStatistics appEnvironmentStatistics;
         private readonly IHostEnvironmentStatistics hostEnvironmentStatistics;
         private readonly IOptions<LoadSheddingOptions> loadSheddingOptions;
-
-        private readonly ConcurrentDictionary<SiloAddress, SiloRuntimeStatistics> periodicStats;
         private readonly TimeSpan statisticsRefreshTime;
         private readonly IList<ISiloStatisticsChangeListener> siloStatisticsChangeListeners;
         private readonly ILogger logger;
         private IDisposable publishTimer;
 
-        public ConcurrentDictionary<SiloAddress, SiloRuntimeStatistics> PeriodicStatistics => periodicStats;
+        public ConcurrentDictionary<SiloAddress, SiloRuntimeStatistics> PeriodicStatistics { get; }
 
         public DeploymentLoadPublisher(
             ILocalSiloDetails siloDetails,
@@ -56,7 +54,7 @@ namespace Orleans.Runtime
             this.hostEnvironmentStatistics = hostEnvironmentStatistics;
             this.loadSheddingOptions = loadSheddingOptions;
             statisticsRefreshTime = options.Value.DeploymentLoadPublisherRefreshTime;
-            periodicStats = new ConcurrentDictionary<SiloAddress, SiloRuntimeStatistics>();
+            PeriodicStatistics = new ConcurrentDictionary<SiloAddress, SiloRuntimeStatistics>();
             siloStatisticsChangeListeners = new List<ISiloStatisticsChangeListener>();
         }
 
@@ -127,10 +125,10 @@ namespace Orleans.Runtime
 
             SiloRuntimeStatistics old;
             // Take only if newer.
-            if (periodicStats.TryGetValue(siloAddress, out old) && old.DateTime > siloStats.DateTime)
+            if (PeriodicStatistics.TryGetValue(siloAddress, out old) && old.DateTime > siloStats.DateTime)
                 return Task.CompletedTask;
 
-            periodicStats[siloAddress] = siloStats;
+            PeriodicStatistics[siloAddress] = siloStats;
             NotifyAllStatisticsChangeEventsSubscribers(siloAddress, siloStats);
             return Task.CompletedTask;
         }
@@ -167,7 +165,7 @@ namespace Orleans.Runtime
                     }
                     return Task.WhenAll(tasks);
                 });
-            return periodicStats;
+            return PeriodicStatistics;
         }
 
         public bool SubscribeToStatisticsChangeEvents(ISiloStatisticsChangeListener observer)
@@ -223,7 +221,7 @@ namespace Orleans.Runtime
 
             if (Equals(updatedSilo, Silo))
                 publishTimer.Dispose();
-            periodicStats.TryRemove(updatedSilo, out _);
+            PeriodicStatistics.TryRemove(updatedSilo, out _);
             NotifyAllStatisticsChangeEventsSubscribers(updatedSilo, null);
         }
     }

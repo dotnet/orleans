@@ -42,9 +42,6 @@ namespace Orleans.Transactions
         // follow-up actions, to be executed after storing this batch
         private List<Action> followUpActions;
         private List<Func<Task<bool>>> storeConditions;
-        
-        // counters for each type of event
-        private int total = 0;
         private int prepare = 0;
         private int read = 0;
         private int commit = 0;
@@ -56,8 +53,8 @@ namespace Orleans.Transactions
 
         public string ETag { get; set; }
 
-        public int BatchSize => total;
-        public override string ToString() => $"batchsize={total} [{read}r {prepare}p {commit}c {confirm}cf {collect}cl {cancel}cc]";
+        public int BatchSize { get; private set; } = 0;
+        public override string ToString() => $"batchsize={BatchSize} [{read}r {prepare}p {commit}c {confirm}cf {collect}cl {cancel}cc]";
 
         public StorageBatch(TransactionalStateMetaData metaData, string etag, long confirmUpTo, long cancelAbove)
         {
@@ -100,7 +97,7 @@ namespace Orleans.Transactions
         public void Read(DateTime timestamp)
         {
             read++;
-            total++;
+            BatchSize++;
 
             if (MetaData.TimeStamp < timestamp)
             {
@@ -112,7 +109,7 @@ namespace Orleans.Transactions
           ParticipantId transactionManager, TState state)
         {
             prepare++;
-            total++;
+            BatchSize++;
 
             if (MetaData.TimeStamp < timestamp)
                 MetaData.TimeStamp = timestamp;
@@ -135,7 +132,7 @@ namespace Orleans.Transactions
         public void Cancel(long sequenceNumber)
         {
             cancel++;
-            total++;
+            BatchSize++;
 
             prepares.Remove(sequenceNumber);
 
@@ -148,7 +145,7 @@ namespace Orleans.Transactions
         public void Confirm(long sequenceNumber)
         {
             confirm++;
-            total++;
+            BatchSize++;
 
             confirmUpTo = sequenceNumber;
 
@@ -171,7 +168,7 @@ namespace Orleans.Transactions
         public void Commit(Guid transactionId, DateTime timestamp, List<ParticipantId> WriteParticipants)
         {
             commit++;
-            total++;
+            BatchSize++;
 
             MetaData.CommitRecords.Add(transactionId, new CommitRecord()
             {
@@ -183,7 +180,7 @@ namespace Orleans.Transactions
         public void Collect(Guid transactionId)
         {
             collect++;
-            total++;
+            BatchSize++;
 
             MetaData.CommitRecords.Remove(transactionId);
         }
