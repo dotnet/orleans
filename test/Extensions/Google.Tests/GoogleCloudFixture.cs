@@ -1,10 +1,12 @@
+using TestExtensions;
+
 namespace Orleans.Tests.Google;
 
-public class GoogleCloudFixture : IAsyncLifetime
+public class GoogleCloudFixture : TestEnvironmentFixture, IAsyncLifetime
 {
     public GoogleEmulatorHost Emulator { get; }
 
-    public GoogleCloudFixture()
+    public GoogleCloudFixture() : base()
     {
         this.Emulator = new();
     }

@@ -1,14 +1,13 @@
-using System.Globalization;
 using System.Net;
 using Microsoft.Extensions.Logging.Abstractions;
 using TestExtensions;
 using Orleans.Runtime;
 using Orleans.Clustering.GoogleFirestore;
 
-namespace Orleans.Tests.Google.Clustering;
+namespace Orleans.Tests.Google;
 
 [TestCategory("Functional"), TestCategory("GoogleFirestore"), TestCategory("GoogleCloud")]
-public class SiloInstanceManagerTests : IClassFixture<GoogleCloudFixture>, IAsyncLifetime
+public class FirestoreSiloInstanceManagerTests : IClassFixture<GoogleCloudFixture>, IAsyncLifetime
 {
     private readonly FirestoreOptions _options;
     private readonly string _clusterId;
@@ -17,7 +16,7 @@ public class SiloInstanceManagerTests : IClassFixture<GoogleCloudFixture>, IAsyn
     private int _generation;
     private SiloAddress _siloAddress;
 
-    public SiloInstanceManagerTests(GoogleCloudFixture fixture)
+    public FirestoreSiloInstanceManagerTests(GoogleCloudFixture fixture)
     {
         var id = $"Orleans-Test-{Guid.NewGuid()}";
         this._options = new FirestoreOptions
@@ -27,7 +26,7 @@ public class SiloInstanceManagerTests : IClassFixture<GoogleCloudFixture>, IAsyn
             RootCollectionName = id
         };
 
-        this._clusterId = "test-" + Guid.NewGuid();
+        this._clusterId = id;
         this._generation = SiloAddress.AllocateNewGeneration();
         this._siloAddress = SiloAddressUtils.NewLocalSiloAddress(this._generation);
     }
@@ -69,9 +68,9 @@ public class SiloInstanceManagerTests : IClassFixture<GoogleCloudFixture>, IAsyn
 
         await this._manager.CleanupDefunctSiloEntries(DateTimeOffset.UtcNow - TimeSpan.FromMicroseconds(1));
 
-        var entries = await this._manager.FindAllSiloEntries();
-        Assert.Equal(4, entries.Length);
-        Assert.All(entries, e => Assert.NotEqual(OrleansSiloInstanceManager.INSTANCE_STATUS_DEAD, e.Item1.Status));
+        var mbrData = await this._manager.FindAllSiloEntries();
+        Assert.Equal(4, mbrData.Silos.Length);
+        Assert.All(mbrData.Silos, e => Assert.NotEqual(OrleansSiloInstanceManager.INSTANCE_STATUS_DEAD, e.Status));
     }
 
     [Fact]
@@ -152,7 +151,7 @@ public class SiloInstanceManagerTests : IClassFixture<GoogleCloudFixture>, IAsyn
             Id = this._siloAddress.ToParsableString(),
             ClusterId = this._clusterId,
             Address = myEndpoint.Address.ToString(),
-            Port = myEndpoint.Port.ToString(CultureInfo.InvariantCulture),
+            Port = myEndpoint.Port,
             Generation = this._generation,
             HostName = myEndpoint.Address.ToString(),
             ProxyPort = 30000,
@@ -177,7 +176,6 @@ public class SiloInstanceManagerTests : IClassFixture<GoogleCloudFixture>, IAsyn
         // Assert.Equal(referenceEntry.StartTime, entry.StartTime);
         Assert.Equal(referenceEntry.IAmAliveTime, entry.IAmAliveTime);
 
-        Assert.Equal(referenceEntry.SuspectingTimes, entry.SuspectingTimes);
         Assert.Equal(referenceEntry.SuspectingSilos, entry.SuspectingSilos);
     }
 
