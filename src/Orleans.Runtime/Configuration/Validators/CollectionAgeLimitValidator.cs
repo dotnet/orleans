@@ -6,7 +6,7 @@ namespace Orleans.Configuration
 {
     internal class GrainCollectionOptionsValidator : IConfigurationValidator
     {
-        private IOptions<GrainCollectionOptions> options;
+        private readonly IOptions<GrainCollectionOptions> options;
 
         public GrainCollectionOptionsValidator(IOptions<GrainCollectionOptions> options)
         {

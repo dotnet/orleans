@@ -38,7 +38,7 @@ namespace Orleans.Runtime
         private Catalog catalog;
         private MessageCenter messageCenter;
         private List<IIncomingGrainCallFilter> grainCallFilters;
-        private DeepCopier _deepCopier;
+        private readonly DeepCopier _deepCopier;
         private readonly InterfaceToImplementationMappingCache interfaceToImplementationMapping;
         private HostedClient hostedClient;
 

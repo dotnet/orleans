@@ -20,7 +20,7 @@ namespace UnitTests.StreamingTests
         private ConsumerProxy consumer;
         private const int Many = 3;
         private const int ItemCount = 10;
-        private ILogger logger;
+        private readonly ILogger logger;
         private readonly string streamProviderName;
         private readonly int testNumber;
         private readonly bool runFullTest;

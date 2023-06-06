@@ -12,7 +12,7 @@ namespace DefaultCluster.Tests.General
 
         //int eventCounter;
         private const int EXPECTED_NUMBER_OF_EVENTS = 4;
-        private TimeSpan timeout = TimeSpan.FromSeconds(5);
+        private readonly TimeSpan timeout = TimeSpan.FromSeconds(5);
 
         public MultifacetGrainTest(DefaultClusterFixture fixture) : base(fixture)
         {

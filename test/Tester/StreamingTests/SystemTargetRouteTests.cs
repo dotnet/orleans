@@ -42,7 +42,7 @@ namespace Tester.StreamingTests
             }
         }
 
-        private Fixture fixture;
+        private readonly Fixture fixture;
 
         public SystemTargetRouteTests(Fixture fixture)
         {

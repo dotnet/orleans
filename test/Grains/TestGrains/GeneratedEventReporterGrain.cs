@@ -6,7 +6,7 @@ namespace TestGrains
 {
     internal class GeneratedEventReporterGrain : Grain, IGeneratedEventReporterGrain
     {
-        private ILogger logger;
+        private readonly ILogger logger;
 
         private Dictionary<Tuple<string, string>, Dictionary<Guid, int>> reports;
 

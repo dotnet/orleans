@@ -27,7 +27,7 @@ namespace Tester.AzureUtils
             public void Dispose() => LoggerFactory.Dispose();
         }
 
-        private string clusterId;
+        private readonly string clusterId;
         private int generation;
         private SiloAddress siloAddress;
         private SiloInstanceTableEntry myEntry;

@@ -67,7 +67,7 @@ namespace TestGrains
         private FaultsState Faults => myFaults ??= FaultInjectionTracker.GetOrAdd(this.GetPrimaryKey(), key => new FaultsState());
 
         // grain instance state
-        private ILogger logger;
+        private readonly ILogger logger;
         private IAsyncStream<GeneratedEvent> stream;
 
         public ImplicitSubscription_TransientError_RecoverableStream_CollectorGrain(ILoggerFactory loggerFactory)

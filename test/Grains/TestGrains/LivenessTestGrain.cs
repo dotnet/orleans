@@ -6,7 +6,7 @@ namespace UnitTests.Grains
     internal class LivenessTestGrain : Grain, ILivenessTestGrain
     {
         private string label;
-        private ILogger logger;
+        private readonly ILogger logger;
         private Guid uniqueId;
 
         public LivenessTestGrain(ILoggerFactory loggerFactory)

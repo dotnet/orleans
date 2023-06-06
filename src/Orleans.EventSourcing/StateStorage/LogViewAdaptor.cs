@@ -33,8 +33,8 @@ namespace Orleans.EventSourcing.StateStorage
 
 
         private const int maxEntriesInNotifications = 200;
-        private IGrainStorage globalGrainStorage;
-        private string grainTypeName;        // stores the confirmed state including metadata
+        private readonly IGrainStorage globalGrainStorage;
+        private readonly string grainTypeName;        // stores the confirmed state including metadata
         private GrainStateWithMetaDataAndETag<TLogView> GlobalStateCache;
 
         /// <inheritdoc/>
@@ -247,7 +247,7 @@ namespace Orleans.EventSourcing.StateStorage
                 return base.Merge(earlierMessage, laterMessage); // keep only the version number
         }
 
-        private SortedList<long, UpdateNotificationMessage> notifications = new SortedList<long,UpdateNotificationMessage>();
+        private readonly SortedList<long, UpdateNotificationMessage> notifications = new SortedList<long,UpdateNotificationMessage>();
 
         /// <inheritdoc/>
         protected override void OnNotificationReceived(INotificationMessage payload)

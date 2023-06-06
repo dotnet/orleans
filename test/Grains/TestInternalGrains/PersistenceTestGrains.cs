@@ -596,7 +596,7 @@ namespace UnitTests.Grains
         private IReentrentGrainWithState _other;
         private IGrainContext _context;
         private TaskScheduler _scheduler;
-        private ILogger logger;
+        private readonly ILogger logger;
         private bool executing;
         private Task outstandingWriteStateOperation;
 
@@ -922,7 +922,7 @@ namespace UnitTests.Grains
     [Orleans.Providers.StorageProvider(ProviderName = "MemoryStore")]
     internal class InternalGrainWithState : Grain<InternalGrainStateData>, IInternalGrainWithState
     {
-        private ILogger logger;
+        private readonly ILogger logger;
 
         public InternalGrainWithState(ILoggerFactory loggerFactory)
         {
@@ -956,7 +956,7 @@ namespace UnitTests.Grains
     [Orleans.Providers.StorageProvider(ProviderName = "MemoryStore")]
     public class StateInheritanceTestGrain : Grain<StateInheritanceTestGrainData>, IStateInheritanceTestGrain
     {
-        private ILogger logger;
+        private readonly ILogger logger;
 
         public StateInheritanceTestGrain(ILoggerFactory loggerFactory)
         {

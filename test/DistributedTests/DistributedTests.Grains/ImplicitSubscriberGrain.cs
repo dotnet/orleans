@@ -8,7 +8,7 @@ namespace DistributedTests.Grains
     [ImplicitStreamSubscription(StreamingConstants.StreamingNamespace)]
     public class ImplicitSubscriberGrain : Grain, IImplicitSubscriberGrain, IStreamSubscriptionObserver, IAsyncObserver<object>
     {
-        private ILogger _logger;
+        private readonly ILogger _logger;
         private int _requestCounter;
         private int _errorCounter;
 

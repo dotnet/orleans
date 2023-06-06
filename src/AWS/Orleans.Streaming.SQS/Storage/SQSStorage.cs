@@ -24,7 +24,7 @@ namespace OrleansAWSUtils.Storage
         private const string AccessKeyPropertyName = "AccessKey";
         private const string SecretKeyPropertyName = "SecretKey";
         private const string ServicePropertyName = "Service";
-        private ILogger Logger;
+        private readonly ILogger Logger;
         private string accessKey;
         private string secretKey;
         private string service;

@@ -250,13 +250,13 @@ namespace Orleans.Runtime
         /// The grain reference functionality which is shared by all grain references of a given type.
         /// </summary>
         [NonSerialized]
-        private GrainReferenceShared _shared;
+        private readonly GrainReferenceShared _shared;
 
         /// <summary>
         /// The underlying grain id key.
         /// </summary>
         [NonSerialized]
-        private IdSpan _key;
+        private readonly IdSpan _key;
 
         /// <summary>
         /// Gets the grain reference functionality which is shared by all grain references of a given type.

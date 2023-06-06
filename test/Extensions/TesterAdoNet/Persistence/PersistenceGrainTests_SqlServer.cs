@@ -58,7 +58,7 @@ namespace Tester.AdoNet.Persistence
             }
         }
 
-        private Fixture fixture;
+        private readonly Fixture fixture;
 
         public PersistenceGrainTests_SqlServer(ITestOutputHelper output, Fixture fixture) : base(output, fixture)
         {

@@ -15,7 +15,7 @@ namespace Orleans.LeaseProviders
     public class AzureBlobLeaseProvider : ILeaseProvider
     {
         private BlobContainerClient container;
-        private AzureBlobLeaseProviderOptions options;
+        private readonly AzureBlobLeaseProviderOptions options;
         private BlobServiceClient blobClient;
         public AzureBlobLeaseProvider(IOptions<AzureBlobLeaseProviderOptions> options)
             : this(options.Value)

@@ -231,7 +231,7 @@ namespace Orleans.EventSourcing.Common
         /// <summary>
         /// Background worker which asynchronously sends operations to the leader
         /// </summary>
-        private BatchWorker worker;
+        private readonly BatchWorker worker;
 
 
 

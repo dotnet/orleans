@@ -17,7 +17,7 @@ namespace Orleans.Transactions.TestKit
     // - can produce errors for fault senarios.
     public class RemoteCommitService : IRemoteCommitService
     {
-        private ILogger logger;
+        private readonly ILogger logger;
 
         public RemoteCommitService(ILogger<RemoteCommitService> logger)
         {

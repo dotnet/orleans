@@ -14,8 +14,8 @@ namespace Orleans.Transactions.State
     {
         private readonly TransactionalStateOptions options;
         private readonly TransactionQueue<TState> queue;
-        private BatchWorker lockWorker;
-        private BatchWorker storageWorker;
+        private readonly BatchWorker lockWorker;
+        private readonly BatchWorker storageWorker;
         private readonly ILogger logger;
         private readonly IActivationLifetime activationLifetime;
 

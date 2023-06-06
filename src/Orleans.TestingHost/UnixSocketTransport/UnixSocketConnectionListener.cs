@@ -11,11 +11,11 @@ namespace Orleans.TestingHost.UnixSocketTransport;
 
 internal class UnixSocketConnectionListener : IConnectionListener
 {
-    private UnixDomainSocketEndPoint _unixEndpoint;
-    private UnixSocketConnectionOptions _socketConnectionOptions;
-    private SocketsTrace _trace;
-    private SocketSchedulers _schedulers;
-    private MemoryPool<byte> _memoryPool;
+    private readonly UnixDomainSocketEndPoint _unixEndpoint;
+    private readonly UnixSocketConnectionOptions _socketConnectionOptions;
+    private readonly SocketsTrace _trace;
+    private readonly SocketSchedulers _schedulers;
+    private readonly MemoryPool<byte> _memoryPool;
     private Socket _listenSocket;
 
     public UnixSocketConnectionListener(UnixDomainSocketEndPoint unixEndpoint, EndPoint endpoint, UnixSocketConnectionOptions socketConnectionOptions, SocketsTrace trace, SocketSchedulers schedulers)

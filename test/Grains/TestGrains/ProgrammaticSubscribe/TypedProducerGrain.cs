@@ -119,7 +119,7 @@ namespace UnitTests.Grains.ProgrammaticSubscribe
     public class Apple : IFruit
     {
         [Id(0)]
-        private int number;
+        private readonly int number;
 
         public Apple(int number)
         {

@@ -8,7 +8,7 @@ namespace UnitTests.Grains
     {
         private IAsyncObserver<int> _producer;
         private int _numProducedItems;
-        private ILogger _logger;
+        private readonly ILogger _logger;
 
         public ProducerEventCountingGrain(ILoggerFactory loggerFactory)
         {

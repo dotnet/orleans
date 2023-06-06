@@ -56,7 +56,7 @@ namespace Tester.Redis.Persistence
             protected override void CheckPreconditionsOrThrow() => TestUtils.CheckForRedis();
         }
 
-        private Fixture fixture;
+        private readonly Fixture fixture;
 
         public RedisPersistenceGrainTests(ITestOutputHelper output, Fixture fixture) : base(output, fixture)
         {
@@ -84,8 +84,8 @@ namespace Tester.Redis.Persistence
 
         // Redis specific tests
 
-        private GrainState state;
-        private IDatabase database;
+        private readonly GrainState state;
+        private readonly IDatabase database;
 
         [SkippableFact]
         public async Task Redis_InitializeWithNoStateTest()

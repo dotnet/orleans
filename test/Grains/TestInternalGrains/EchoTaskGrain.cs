@@ -22,7 +22,7 @@ namespace UnitTests.Grains
     [StorageProvider(ProviderName = "MemoryStore")]
     public class EchoGrain : Grain<EchoTaskGrainState>, IEchoGrain
     {
-        private ILogger logger;
+        private readonly ILogger logger;
 
         public EchoGrain(ILoggerFactory loggerFactory)
         {
@@ -59,7 +59,7 @@ namespace UnitTests.Grains
     {
         private readonly IInternalGrainFactory internalGrainFactory;
         private readonly IGrainContext _grainContext;
-        private ILogger logger;
+        private readonly ILogger logger;
 
         public EchoTaskGrain(IInternalGrainFactory internalGrainFactory, ILogger<EchoTaskGrain> logger, IGrainContext grainContext)
         {
@@ -201,7 +201,7 @@ namespace UnitTests.Grains
     [StorageProvider(ProviderName = "MemoryStore")]
     public class BlockingEchoTaskGrain : Grain<EchoTaskGrainState>, IBlockingEchoTaskGrain
     {
-        private ILogger logger;
+        private readonly ILogger logger;
 
         public BlockingEchoTaskGrain(ILoggerFactory loggerFactory)
         {
@@ -288,7 +288,7 @@ namespace UnitTests.Grains
     [StorageProvider(ProviderName = "MemoryStore")]
     public class ReentrantBlockingEchoTaskGrain : Grain<EchoTaskGrainState>, IReentrantBlockingEchoTaskGrain
     {
-        private ILogger logger;
+        private readonly ILogger logger;
 
         public ReentrantBlockingEchoTaskGrain(ILoggerFactory loggerFactory)
         {

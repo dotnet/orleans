@@ -11,7 +11,7 @@ namespace UnitTests.StreamingTests
     {
         private static readonly TimeSpan Timeout = TimeSpan.FromSeconds(10);
         private readonly string streamProviderName;
-        private IClusterClient client;
+        private readonly IClusterClient client;
 
         private class Counter
         {

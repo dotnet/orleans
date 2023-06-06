@@ -11,7 +11,7 @@ namespace Orleans.Transactions.TestKit
         public bool InjectAfterStore { get; set; }
         private int injectionBeforeStoreCounter = 0;
         private int injectionAfterStoreCounter = 0;
-        private ILogger logger;
+        private readonly ILogger logger;
         public SimpleAzureStorageExceptionInjector(ILogger<SimpleAzureStorageExceptionInjector> logger)
         {
             this.logger = logger;

@@ -95,7 +95,7 @@ public class GrainDirectoryPartitionTests
 
     private class MockSiloStatusOracle : ISiloStatusOracle
     {
-        private Dictionary<SiloAddress, SiloStatus> _content = new();
+        private readonly Dictionary<SiloAddress, SiloStatus> _content = new();
 
         public MockSiloStatusOracle(SiloAddress siloAddress = null)
         {

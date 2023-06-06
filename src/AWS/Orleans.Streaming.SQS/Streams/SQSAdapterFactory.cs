@@ -20,8 +20,8 @@ namespace OrleansAWSUtils.Streams
         private readonly ClusterOptions clusterOptions;
         private readonly Serializer<SQSBatchContainer> serializer;
         private readonly ILoggerFactory loggerFactory;
-        private HashRingBasedStreamQueueMapper streamQueueMapper;
-        private IQueueAdapterCache adapterCache;
+        private readonly HashRingBasedStreamQueueMapper streamQueueMapper;
+        private readonly IQueueAdapterCache adapterCache;
 
         /// <summary>
         /// Application level failure handler override.

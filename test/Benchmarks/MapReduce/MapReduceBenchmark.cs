@@ -96,7 +96,7 @@ namespace Benchmarks.MapReduce
 
         public void Dispose() => _host?.Dispose();
 
-        private string _text = @"Historically, the world of data and the world of objects" +
+        private readonly string _text = @"Historically, the world of data and the world of objects" +
           @" have not been well integrated. Programmers work in C# or Visual Basic" +
           @" and also in SQL or XQuery. On the one side are concepts such as classes," +
           @" objects, fields, inheritance, and .NET Framework APIs. On the other side" +

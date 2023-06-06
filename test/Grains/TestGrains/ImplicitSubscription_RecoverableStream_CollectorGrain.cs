@@ -15,7 +15,7 @@ namespace TestGrains
         public const string StorageProviderName = "AzureStorage";
         
         // grain instance state
-        private ILogger logger;
+        private readonly ILogger logger;
         private IAsyncStream<GeneratedEvent> stream;
 
         public ImplicitSubscription_RecoverableStream_CollectorGrain(ILoggerFactory loggerFactory)

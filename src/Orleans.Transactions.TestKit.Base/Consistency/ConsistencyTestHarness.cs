@@ -23,7 +23,7 @@ namespace Orleans.Transactions.TestKit.Consistency
         private readonly HashSet<string> aborted;
         private readonly Dictionary<string, string> indoubt;
         private bool timeoutsOccurred;
-        private bool tolerateUnknownExceptions;
+        private readonly bool tolerateUnknownExceptions;
         private readonly IGrainFactory grainFactory;
 
         private readonly Dictionary<string, HashSet<string>> orderEdges = new Dictionary<string, HashSet<string>>();

@@ -34,8 +34,8 @@ namespace Orleans.Providers.Streams.Common
     /// </summary>
     public class ObjectPoolMonitorBridge : IObjectPoolMonitor
     {
-        private IBlockPoolMonitor blockPoolMonitor;
-        private int blockSizeInBytes;
+        private readonly IBlockPoolMonitor blockPoolMonitor;
+        private readonly int blockSizeInBytes;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="ObjectPoolMonitorBridge"/> class.

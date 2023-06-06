@@ -63,7 +63,7 @@ namespace Orleans.Transactions.TestKit
         private readonly TransactionalState<TState> txState;
         private readonly ILogger logger;
         public FaultInjectionControl FaultInjectionControl { get; set; }
-        private IControlledTransactionFaultInjector faultInjector;
+        private readonly IControlledTransactionFaultInjector faultInjector;
         public string CurrentTransactionId => txState.CurrentTransactionId;
         public FaultInjectionTransactionalState(TransactionalState<TState> txState, IControlledTransactionFaultInjector faultInjector, IGrainRuntime grainRuntime, ILogger<FaultInjectionTransactionalState<TState>> logger)
         {

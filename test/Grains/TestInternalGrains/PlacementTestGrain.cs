@@ -182,7 +182,7 @@ namespace UnitTests.Grains
     [PreferLocalPlacement]
     public class LocalContentGrain : Grain, ILocalContentGrain
     {
-        private ILogger logger;
+        private readonly ILogger logger;
         private object cachedContent;
         internal static ILocalContentGrain InstanceIdForThisSilo;
 
@@ -211,7 +211,7 @@ namespace UnitTests.Grains
 
     public class TestContentGrain : Grain, ITestContentGrain
     {
-        private ILogger logger;
+        private readonly ILogger logger;
 
         public TestContentGrain(ILoggerFactory loggerFactory)
         {

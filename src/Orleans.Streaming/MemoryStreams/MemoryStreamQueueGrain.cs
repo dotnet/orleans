@@ -17,7 +17,7 @@ namespace Orleans.Providers
         /// <summary>
         /// max event count. 
         /// </summary>
-        private int maxEventCount = 16384;
+        private readonly int maxEventCount = 16384;
 
         /// <summary>
         /// Enqueues an event data. If the current total count reaches the max limit. throws an exception.

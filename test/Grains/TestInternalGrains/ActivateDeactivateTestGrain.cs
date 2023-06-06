@@ -7,7 +7,7 @@ namespace UnitTests.Grains
 {
     internal class SimpleActivateDeactivateTestGrain : Grain, ISimpleActivateDeactivateTestGrain
     {
-        private ILogger logger;
+        private readonly ILogger logger;
 
         private IActivateDeactivateWatcherGrain watcher;
 
@@ -62,7 +62,7 @@ namespace UnitTests.Grains
 
     internal class TailCallActivateDeactivateTestGrain : Grain, ITailCallActivateDeactivateTestGrain
     {
-        private ILogger logger;
+        private readonly ILogger logger;
 
         private IActivateDeactivateWatcherGrain watcher;
 
@@ -125,7 +125,7 @@ namespace UnitTests.Grains
 
     internal class LongRunningActivateDeactivateTestGrain : Grain, ILongRunningActivateDeactivateTestGrain
     {
-        private ILogger logger;
+        private readonly ILogger logger;
 
         private IActivateDeactivateWatcherGrain watcher;
 
@@ -210,7 +210,7 @@ namespace UnitTests.Grains
 
     internal class TaskActionActivateDeactivateTestGrain : Grain, ITaskActionActivateDeactivateTestGrain
     {
-        private ILogger logger;
+        private readonly ILogger logger;
 
         private IActivateDeactivateWatcherGrain watcher;
 
@@ -318,7 +318,7 @@ namespace UnitTests.Grains
 
     public class BadActivateDeactivateTestGrain : Grain, IBadActivateDeactivateTestGrain
     {
-        private ILogger logger;
+        private readonly ILogger logger;
 
         public BadActivateDeactivateTestGrain(ILoggerFactory loggerFactory)
         {
@@ -367,7 +367,7 @@ namespace UnitTests.Grains
 
     internal class DeactivatingWhileActivatingTestGrain : Grain, IDeactivatingWhileActivatingTestGrain
     {
-        private ILogger logger;
+        private readonly ILogger logger;
 
         public DeactivatingWhileActivatingTestGrain(ILoggerFactory loggerFactory)
         {
@@ -396,7 +396,7 @@ namespace UnitTests.Grains
 
     internal class CreateGrainReferenceTestGrain : Grain, ICreateGrainReferenceTestGrain
     {
-        private ILogger logger;
+        private readonly ILogger logger;
 
         //private IEchoGrain orleansManagedGrain;
         private ITestGrain grain;

@@ -7,7 +7,7 @@ namespace Orleans.Transactions
 {
     public class TransactionCommitterFactory : ITransactionCommitterFactory
     {
-        private IGrainContextAccessor contextAccessor;
+        private readonly IGrainContextAccessor contextAccessor;
 
         public TransactionCommitterFactory(IGrainContextAccessor contextAccessor)
         {

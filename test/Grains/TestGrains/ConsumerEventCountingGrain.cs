@@ -7,7 +7,7 @@ namespace UnitTests.Grains
     public class ConsumerEventCountingGrain : Grain, IConsumerEventCountingGrain
     {
         private int _numConsumedItems;
-        private ILogger _logger;
+        private readonly ILogger _logger;
         private IAsyncObservable<int> _consumer;
         private StreamSubscriptionHandle<int> _subscriptionHandle;
         internal const string StreamNamespace = "HaloStreamingNamespace";

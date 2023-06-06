@@ -31,7 +31,7 @@ namespace Orleans.EventSourcing.CustomStorage
             this.primaryCluster = primaryCluster;
         }
 
-        private string primaryCluster;
+        private readonly string primaryCluster;
 
         private TLogView cached;
         private int version;
@@ -257,7 +257,7 @@ namespace Orleans.EventSourcing.CustomStorage
             public override string ToString() => string.Format("v{0} ({1} updates)", Version, Updates.Count);
         }
    
-        private SortedList<long, UpdateNotificationMessage> notifications = new SortedList<long,UpdateNotificationMessage>();
+        private readonly SortedList<long, UpdateNotificationMessage> notifications = new SortedList<long,UpdateNotificationMessage>();
 
         /// <inheritdoc/>
         protected override void OnNotificationReceived(INotificationMessage payload)

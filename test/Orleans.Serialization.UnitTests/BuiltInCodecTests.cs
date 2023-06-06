@@ -2152,7 +2152,7 @@ namespace Orleans.Serialization.UnitTests
     {
         protected override int[] MaxSegmentSizes => new[] { 1024 };
         private int _nextComparer;
-        private IEqualityComparer<string>[] _comparers = new IEqualityComparer<string>[]
+        private readonly IEqualityComparer<string>[] _comparers = new IEqualityComparer<string>[]
         {
             new CaseInsensitiveEqualityComparer(),
 #if NETCOREAPP3_1_OR_GREATER

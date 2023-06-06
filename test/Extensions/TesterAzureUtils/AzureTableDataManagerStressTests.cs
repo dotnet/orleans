@@ -12,8 +12,8 @@ namespace Tester.AzureUtils
     public class AzureTableDataManagerStressTests : AzureStorageBasicTests
     {
         private readonly ITestOutputHelper output;
-        private string PartitionKey;
-        private UnitTestAzureTableDataManager manager;
+        private readonly string PartitionKey;
+        private readonly UnitTestAzureTableDataManager manager;
 
         public AzureTableDataManagerStressTests(ITestOutputHelper output)
         {

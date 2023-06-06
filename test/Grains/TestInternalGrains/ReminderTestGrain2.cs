@@ -21,11 +21,11 @@ namespace UnitTests.Grains
         private Dictionary<string, long> sequence;
         private TimeSpan period;
 
-        private static long aCCURACY = 50 * TimeSpan.TicksPerMillisecond; // when we use ticks to compute sequence numbers, we might get wrong results as timeouts don't happen with precision of ticks  ... we keep this as a leeway
+        private static readonly long aCCURACY = 50 * TimeSpan.TicksPerMillisecond; // when we use ticks to compute sequence numbers, we might get wrong results as timeouts don't happen with precision of ticks  ... we keep this as a leeway
 
-        private IOptions<ReminderOptions> reminderOptions;
+        private readonly IOptions<ReminderOptions> reminderOptions;
 
-        private ILogger logger;
+        private readonly ILogger logger;
         private string _id; // used to distinguish during debugging between multiple activations of the same grain
 
         private string filePrefix;
@@ -218,9 +218,9 @@ namespace UnitTests.Grains
         private Dictionary<string, long> sequence;
         private TimeSpan period;
 
-        private static long aCCURACY = 50 * TimeSpan.TicksPerMillisecond; // when we use ticks to compute sequence numbers, we might get wrong results as timeouts don't happen with precision of ticks  ... we keep this as a leeway
+        private static readonly long aCCURACY = 50 * TimeSpan.TicksPerMillisecond; // when we use ticks to compute sequence numbers, we might get wrong results as timeouts don't happen with precision of ticks  ... we keep this as a leeway
 
-        private ILogger logger;
+        private readonly ILogger logger;
         private long myId; // used to distinguish during debugging between multiple activations of the same grain
 
         private string filePrefix;
@@ -368,7 +368,7 @@ namespace UnitTests.Grains
 
     public class WrongReminderGrain : Grain, IReminderGrainWrong
     {
-        private ILogger logger;
+        private readonly ILogger logger;
 
         public WrongReminderGrain(ILoggerFactory loggerFactory)
         {

@@ -13,7 +13,7 @@ namespace Orleans.Transactions.AzureStorage.Tests
     public class TransactionRecoveryTests : TestClusterPerTest
     {
         private TransactionRecoveryTestsRunnerxUnit testRunner;
-        private ITestOutputHelper helper;
+        private readonly ITestOutputHelper helper;
 
         public TransactionRecoveryTests(ITestOutputHelper helper)
         {

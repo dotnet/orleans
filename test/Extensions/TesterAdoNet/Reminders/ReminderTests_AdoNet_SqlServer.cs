@@ -20,7 +20,7 @@ namespace Tester.AdoNet.Reminders
     public class ReminderTests_AdoNet_SqlServer : ReminderTests_Base, IClassFixture<ReminderTests_AdoNet_SqlServer.Fixture>
     {
         private const string TestDatabaseName = "OrleansTest_SqlServer_Reminders";
-        private static string AdoInvariant = AdoNetInvariants.InvariantNameSqlServer;
+        private static readonly string AdoInvariant = AdoNetInvariants.InvariantNameSqlServer;
         private const string ConnectionStringKey = "ReminderConnectionString";
 
         public class Fixture : BaseTestClusterFixture

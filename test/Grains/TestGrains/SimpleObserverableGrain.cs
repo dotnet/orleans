@@ -6,7 +6,7 @@ namespace UnitTests.Grains
 {
     public class SimpleObserverableGrain : Grain, ISimpleObserverableGrain
     {
-        private ILogger logger;
+        private readonly ILogger logger;
         internal int A { get; set; }
         internal int B { get; set; }
         internal int EventDelay { get; set; }

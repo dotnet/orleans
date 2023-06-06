@@ -9,9 +9,9 @@ namespace Benchmarks.Transactions
     public class TransactionBenchmark : IDisposable
     {
         private TestCluster host;
-        private int runs;
-        private int transactionsPerRun;
-        private int concurrent;
+        private readonly int runs;
+        private readonly int transactionsPerRun;
+        private readonly int concurrent;
 
         public TransactionBenchmark(int runs, int transactionsPerRun, int concurrent)
         {

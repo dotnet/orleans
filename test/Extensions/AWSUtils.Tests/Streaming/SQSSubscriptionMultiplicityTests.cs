@@ -14,7 +14,7 @@ namespace AWSUtils.Tests.Streaming
     {
         private const string SQSStreamProviderName = "SQSProvider";
         private const string StreamNamespace = "SQSSubscriptionMultiplicityTestsNamespace";
-        private string StreamConnectionString = AWSTestConstants.SqsConnectionString;
+        private readonly string StreamConnectionString = AWSTestConstants.SqsConnectionString;
         private SubscriptionMultiplicityTestRunner runner;
 
         protected override void ConfigureTestCluster(TestClusterBuilder builder)

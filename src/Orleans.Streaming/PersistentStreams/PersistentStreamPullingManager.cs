@@ -31,7 +31,7 @@ namespace Orleans.Streams
         private readonly ILoggerFactory loggerFactory;
         private int latestRingNotificationSequenceNumber;
         private int latestCommandNumber;
-        private IQueueAdapter queueAdapter;
+        private readonly IQueueAdapter queueAdapter;
         private readonly IQueueAdapterCache queueAdapterCache;
         private IStreamQueueBalancer queueBalancer;
         private readonly IStreamFilter streamFilter;

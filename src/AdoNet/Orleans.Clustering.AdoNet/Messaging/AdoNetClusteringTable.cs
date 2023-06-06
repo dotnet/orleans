@@ -9,9 +9,9 @@ namespace Orleans.Runtime.MembershipService
 {
     public class AdoNetClusteringTable : IMembershipTable
     {
-        private string clusterId;
+        private readonly string clusterId;
         private readonly IServiceProvider serviceProvider;
-        private ILogger logger;
+        private readonly ILogger logger;
         private RelationalOrleansQueries orleansQueries;
         private readonly AdoNetClusteringSiloOptions clusteringTableOptions;
 

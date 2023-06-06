@@ -8,7 +8,7 @@ namespace UnitTests.Grains
     public class MultipleSubscriptionConsumerGrain : Grain, IMultipleSubscriptionConsumerGrain
     {
         private readonly Dictionary<StreamSubscriptionHandle<int>, Tuple<Counter,Counter>> consumedMessageCounts;
-        private ILogger logger;
+        private readonly ILogger logger;
         private int consumerCount = 0;
 
         public MultipleSubscriptionConsumerGrain(ILoggerFactory loggerFactory)

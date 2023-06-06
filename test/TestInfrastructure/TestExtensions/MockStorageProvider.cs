@@ -61,14 +61,16 @@ namespace UnitTests.StorageTests
 
         private static int _instanceNum;
         private readonly int _id;
-
-        private int initCount, closeCount, readCount, writeCount, deleteCount;
-
+        private readonly int initCount;
+        private int closeCount;
+        private int readCount;
+        private int writeCount;
+        private int deleteCount;
         private readonly int numKeys;
         private readonly DeepCopier copier;
-        private ILocalDataStore StateStore;
+        private readonly ILocalDataStore StateStore;
         private const string stateStoreKey = "State";
-        private ILogger logger;
+        private readonly ILogger logger;
         public string LastId { get; private set; }
         public object LastState { get; private set; }
 

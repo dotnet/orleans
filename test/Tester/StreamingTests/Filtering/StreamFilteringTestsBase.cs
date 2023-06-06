@@ -10,7 +10,7 @@ namespace Tester.StreamingTests.Filtering
 {
     public class CustomStreamFilter : IStreamFilter
     {
-        private ILogger<CustomStreamFilter> logger;
+        private readonly ILogger<CustomStreamFilter> logger;
 
         public CustomStreamFilter(ILogger<CustomStreamFilter> logger)
         {
