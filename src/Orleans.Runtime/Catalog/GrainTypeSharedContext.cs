@@ -53,6 +53,7 @@ namespace Orleans.Runtime
             PlacementStrategy = placementStrategyResolver.GetPlacementStrategy(grainType);
             SchedulingOptions = schedulingOptions.Value;
             Runtime = grainRuntime;
+            MigrationManager = _serviceProvider.GetService<IActivationMigrationManager>();
 
             CollectionAgeLimit = GetCollectionAgeLimit(
                 grainType,
@@ -171,6 +172,14 @@ namespace Orleans.Runtime
         /// </summary>
         public IGrainRuntime Runtime { get; }
 
+        /// <summary>
+        /// Gets the local activation migration manager.
+        /// </summary>
+        internal IActivationMigrationManager? MigrationManager { get; }
+
+        /// <summary>
+        /// Gets the internal grain runtime.
+        /// </summary>
         internal InternalGrainRuntime InternalRuntime => _internalGrainRuntime ??= _serviceProvider.GetRequiredService<InternalGrainRuntime>();
 
         /// <summary>

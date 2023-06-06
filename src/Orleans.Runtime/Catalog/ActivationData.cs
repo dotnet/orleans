@@ -1604,7 +1604,7 @@ namespace Orleans.Runtime
                 await WaitForAllTimersToFinish(cancellationToken);
                 await CallGrainDeactivate(cancellationToken);
 
-                if (DehydrationContext is { } context)
+                if (DehydrationContext is { } context && _shared.MigrationManager is { } migrationManager)
                 {
                     Debug.Assert(ForwardingAddress is not null);
 
@@ -1622,10 +1622,8 @@ namespace Orleans.Runtime
 
                         OnDehydrate(context.Value);
 
-                        // Send the dehydration context to the target host
-                        // TODO: Coalesce concurrent requests into fewer calls by delegating to a shared service.
-                        var remoteCatalog = _shared.Runtime.ServiceProvider.GetRequiredService<IInternalGrainFactory>().GetSystemTarget<ICatalog>(Constants.CatalogType, ForwardingAddress);
-                        await remoteCatalog.AcceptMigratingGrains(new List<GrainMigrationPackage>() { new GrainMigrationPackage() { GrainId = GrainId, MigrationContext = context.Value } });
+                        // Send the dehydration context to the target host.
+                        await migrationManager.MigrateAsync(ForwardingAddress, GrainId, context.Value);
                         migrated = true;
                     }
                     catch (Exception exception)
