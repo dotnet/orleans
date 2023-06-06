@@ -8,9 +8,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Orleans.Hosting;
-using Orleans.Internal;
 using Orleans.Runtime;
-using Orleans.Runtime.TestHooks;
 
 namespace Orleans.TestingHost
 {
@@ -80,7 +78,7 @@ namespace Orleans.TestingHost
                 Options.ConnectionTransport = ConnectionTransportType.TcpSocket;
             }
         }
-        
+
         /// <summary>
         /// Adds a configuration delegate to the builder
         /// </summary>        
@@ -121,13 +119,18 @@ namespace Orleans.TestingHost
         }
 
         /// <summary>
-        /// Adds the client builder configurator, which must implement <see cref="IClientBuilderConfigurator"/> or <see cref="IHostConfigurator"/>.
+        /// Adds an implementation of <see cref="IClientBuilderConfigurator"/> or <see cref="IHostConfigurator"/> to configure the client created for the test cluster
         /// </summary>
-        /// <typeparam name="TClientBuilderConfigurator">The client builder type</typeparam>
+        /// <typeparam name="T">The client builder type</typeparam>
         /// <returns>The builder.</returns>
-        public TestClusterBuilder AddClientBuilderConfigurator<TClientBuilderConfigurator>() where TClientBuilderConfigurator : IClientBuilderConfigurator, new()
+        public TestClusterBuilder AddClientBuilderConfigurator<T>() where T : new()
         {
-            this.Options.ClientBuilderConfiguratorTypes.Add(typeof(TClientBuilderConfigurator).AssemblyQualifiedName);
+            if (!typeof(IClientBuilderConfigurator).IsAssignableFrom(typeof(T)) && !typeof(IHostConfigurator).IsAssignableFrom(typeof(T)))
+            {
+                throw new ArgumentException($"The type {typeof(T)} is not assignable to either {nameof(IClientBuilderConfigurator)} or {nameof(IHostConfigurator)}");
+            }
+
+            this.Options.ClientBuilderConfiguratorTypes.Add(typeof(T).AssemblyQualifiedName);
             return this;
         }
 
@@ -155,7 +158,7 @@ namespace Orleans.TestingHost
             var configuration = configBuilder.Build();
             var finalOptions = new TestClusterOptions();
             configuration.Bind(finalOptions);
-            
+
             var configSources = new ReadOnlyCollection<IConfigurationSource>(configBuilder.Sources);
             var testCluster = new TestCluster(finalOptions, configSources, portAllocator);
             if (CreateSiloAsync != null) testCluster.CreateSiloAsync = CreateSiloAsync;

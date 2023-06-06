@@ -1,6 +1,6 @@
-using System;
-using System.Threading.Tasks;
-using Orleans.Hosting;
+using FluentAssertions;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Hosting;
 using Orleans.TestingHost.Tests.Grains;
 using TestExtensions;
 using Xunit;
@@ -154,6 +154,58 @@ namespace Orleans.TestingHost.Tests
             await testCluster.StopAllSilosAsync();
         }
     }
+
+    public class T10
+    {
+        private static bool _hostWasInvoked;
+        private static bool _clientWasInvoked;
+
+        [Fact, TestCategory("Functional")]
+        public async Task ClientBuilder_HostConfigurator() => await Test<HostConfigurator>(true, false);
+
+        [Fact, TestCategory("Functional")]
+        public async Task ClientBuilder_ClientHostConfigurator() => await Test<ClientHostConfigurator>(true, true);
+
+        [Fact, TestCategory("Functional")]
+        public async Task ClientBuilder_ClientConfigurator() => await Test<ClientConfigurator>(false, true);
+
+        private static async Task Test<TConfigurator>(bool hostInvoked, bool clientInvoked)
+            where TConfigurator : new()
+        {
+            _hostWasInvoked = false;
+            _clientWasInvoked = false;
+
+            var builder = new TestClusterBuilder(2);
+            builder.Options.ServiceId = Guid.NewGuid().ToString();
+            builder.AddClientBuilderConfigurator<TConfigurator>();
+            using var testCluster = builder.Build();
+
+            await testCluster.DeployAsync();
+            await testCluster.StopAllSilosAsync();
+
+            _hostWasInvoked.Should().Be(hostInvoked);
+            _clientWasInvoked.Should().Be(clientInvoked);
+        }
+
+        private class HostConfigurator : IHostConfigurator
+        {
+            public void Configure(IHostBuilder hostBuilder) => _hostWasInvoked = true;
+        }
+
+        private class ClientHostConfigurator : IHostConfigurator, IClientBuilderConfigurator
+        {
+
+            public void Configure(IHostBuilder hostBuilder) => _hostWasInvoked = true;
+            public void Configure(IConfiguration configuration, IClientBuilder clientBuilder) => _clientWasInvoked = true;
+        }
+
+        private class ClientConfigurator : IClientBuilderConfigurator
+        {
+            public void Configure(IConfiguration configuration, IClientBuilder clientBuilder) => _clientWasInvoked = true;
+        }
+    }
+
+
 
     public class TestClusterTests : IDisposable, IAsyncLifetime
     {
