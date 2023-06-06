@@ -6,7 +6,6 @@
     <Description>Microsoft Orleans Reminders implementation that uses Redis</Description>
     <PackageTags>$(PackageTags) Redis Reminders</PackageTags>
     <TargetFrameworks>$(DefaultTargetFrameworks)</TargetFrameworks>
-    <VersionSuffix Condition="$(VersionSuffix) == ''">beta1</VersionSuffix>
     <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
   </PropertyGroup>
 
