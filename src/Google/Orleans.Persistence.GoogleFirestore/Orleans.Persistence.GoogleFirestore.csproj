@@ -17,6 +17,7 @@
     <Compile Include="..\Shared\Storage\FirestoreEntity.cs" Link="Storage\FirestoreEntity.cs" />
     <Compile Include="..\Shared\Storage\FirestoreOptions.cs" Link="Storage\FirestoreOptions.cs" />
     <Compile Include="..\Shared\Storage\GoogleCloudOptions.cs" Link="Storage\GoogleCloudOptions.cs" />
+    <Compile Include="..\Shared\Utils\Utils.cs" Link="Utils\Utils.cs" />
   </ItemGroup>
 
   <ItemGroup>

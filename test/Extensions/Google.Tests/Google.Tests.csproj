@@ -25,10 +25,11 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Compile Include="..\..\..\src\Google\Shared\Storage\FirestoreDataManager.cs" Link="Shared\Storage\FirestoreDataManager.cs" />
-    <Compile Include="..\..\..\src\Google\Shared\Storage\FirestoreEntity.cs" Link="Shared\Storage\FirestoreEntity.cs" />
-    <Compile Include="..\..\..\src\Google\Shared\Storage\FirestoreOptions.cs" Link="Shared\Storage\FirestoreOptions.cs" />
-    <Compile Include="..\..\..\src\Google\Shared\Storage\GoogleCloudOptions.cs" Link="Shared\Storage\GoogleCloudOptions.cs" />
+    <Compile Include="$(SourceRoot)src\Google\Shared\Storage\FirestoreDataManager.cs" Link="Shared\Storage\FirestoreDataManager.cs" />
+    <Compile Include="$(SourceRoot)src\Google\Shared\Storage\FirestoreEntity.cs" Link="Shared\Storage\FirestoreEntity.cs" />
+    <Compile Include="$(SourceRoot)src\Google\Shared\Storage\FirestoreOptions.cs" Link="Shared\Storage\FirestoreOptions.cs" />
+    <Compile Include="$(SourceRoot)src\Google\Shared\Storage\GoogleCloudOptions.cs" Link="Shared\Storage\GoogleCloudOptions.cs" />
+    <Compile Include="$(SourceRoot)src\Google\Shared\Utils\Utils.cs" Link="Shared\Utils\Utils.cs" />
   </ItemGroup>
   
 </Project>

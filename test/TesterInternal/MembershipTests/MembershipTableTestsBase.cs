@@ -32,11 +32,11 @@ namespace UnitTests.MembershipTests
     [Collection(TestEnvironmentFixture.DefaultCollection)]
     public abstract class MembershipTableTestsBase : IDisposable, IClassFixture<ConnectionStringFixture>
     {
-        private readonly TestEnvironmentFixture environment;
         private static readonly string hostName = Dns.GetHostName();
         private readonly ILogger logger;
         private readonly IMembershipTable membershipTable;
         private readonly IGatewayListProvider gatewayListProvider;
+        protected readonly TestEnvironmentFixture environment;
         protected readonly string clusterId;
         protected readonly string connectionString;
         protected ILoggerFactory loggerFactory;
