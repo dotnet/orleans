@@ -37,12 +37,19 @@ namespace Orleans
     public static class GrainBaseExtensions
     {
         /// <summary>
-        /// Deactivate this activation of the grain after the current grain method call is completed.
+        /// Deactivate this grain activation after the current grain method call is completed.
         /// This call will mark this activation of the current grain to be deactivated and removed at the end of the current method.
         /// The next call to this grain will result in a different activation to be used, which typical means a new activation will be created automatically by the runtime.
         /// </summary>
         public static void DeactivateOnIdle(this IGrainBase grain) => 
             grain.GrainContext.Deactivate(new(DeactivationReasonCode.ApplicationRequested, $"{nameof(DeactivateOnIdle)} was called."));
+
+        /// <summary>
+        /// Starts an attempt to migrating this instance to another location.
+        /// Migration captures the current <see cref="RequestContext"/>, making it available to the activation's placement director so that it can consider it when selecting a new location.
+        /// Migration will occur asynchronously, when no requests are executing, and will not occur if the activation's placement director does not select an alternative location.
+        /// </summary>
+        public static void MigrateOnIdle(this IGrainBase grain) => grain.GrainContext.Migrate(RequestContext.CallContextData?.Value.Values); 
     }
 
     /// <summary>
@@ -103,5 +110,10 @@ namespace Orleans
         /// The application requested that this activation deactivate.
         /// </summary>
         ApplicationRequested,
+
+        /// <summary>
+        /// This activation is migrating to a new location.
+        /// </summary>
+        Migrating,
     }
 }

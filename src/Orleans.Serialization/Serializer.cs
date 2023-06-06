@@ -5,7 +5,6 @@ using Orleans.Serialization.Codecs;
 using Orleans.Serialization.GeneratedCodeHelpers;
 using Orleans.Serialization.Serializers;
 using Orleans.Serialization.Session;
-using Orleans.Serialization.WireProtocol;
 using System;
 using System.Buffers;
 using System.IO;
@@ -24,6 +23,11 @@ namespace Orleans.Serialization
         /// </summary>
         /// <param name="sessionPool">The session pool.</param>
         public Serializer(SerializerSessionPool sessionPool) => _sessionPool = sessionPool;
+
+        /// <summary>
+        /// Gets the serializer session pool.
+        /// </summary>
+        public SerializerSessionPool SessionPool => _sessionPool;
 
         /// <summary>
         /// Returns a serializer which is specialized to the provided type parameter.
@@ -382,6 +386,36 @@ namespace Orleans.Serialization
         /// <typeparam name="T">The serialized type.</typeparam>
         /// <param name="source">The source buffer.</param>
         /// <returns>The deserialized value.</returns>
+        public T Deserialize<T>(PooledBuffer.BufferSlice source)
+        {
+            using var session = _sessionPool.GetSession();
+            var reader = Reader.Create(source, session);
+            var codec = session.CodecProvider.GetCodec<T>();
+            var field = reader.ReadFieldHeader();
+            return codec.ReadValue(ref reader, field);
+        }
+
+        /// <summary>
+        /// Deserialize a value of type <typeparamref name="T"/> from <paramref name="source"/>.
+        /// </summary>
+        /// <typeparam name="T">The serialized type.</typeparam>
+        /// <param name="source">The source buffer.</param>
+        /// <param name="session">The serializer session.</param>
+        /// <returns>The deserialized value.</returns>
+        public T Deserialize<T>(PooledBuffer.BufferSlice source, SerializerSession session)
+        {
+            var reader = Reader.Create(source, session);
+            var codec = session.CodecProvider.GetCodec<T>();
+            var field = reader.ReadFieldHeader();
+            return codec.ReadValue(ref reader, field);
+        }
+
+        /// <summary>
+        /// Deserialize a value of type <typeparamref name="T"/> from <paramref name="source"/>.
+        /// </summary>
+        /// <typeparam name="T">The serialized type.</typeparam>
+        /// <param name="source">The source buffer.</param>
+        /// <returns>The deserialized value.</returns>
         public T Deserialize<T>(ReadOnlySpan<byte> source)
         {
             using var session = _sessionPool.GetSession();
@@ -484,9 +518,18 @@ namespace Orleans.Serialization
         /// Initializes a new instance of the <see cref="Serializer{T}"/> class.
         /// </summary>
         /// <param name="sessionPool">The session pool.</param>
-        public Serializer(SerializerSessionPool sessionPool)
+        public Serializer(SerializerSessionPool sessionPool) : this(OrleansGeneratedCodeHelper.UnwrapService(null, sessionPool.CodecProvider.GetCodec<T>()), sessionPool)
         {
-            _codec = OrleansGeneratedCodeHelper.UnwrapService(null, sessionPool.CodecProvider.GetCodec<T>());
+        }
+
+        /// <summary>
+        /// Initializes a new instance of the <see cref="Serializer{T}"/> class.
+        /// </summary>
+        /// <param name="codec">The codec.</param>
+        /// <param name="sessionPool">The session pool.</param>
+        public Serializer(IFieldCodec<T> codec, SerializerSessionPool sessionPool)
+        {
+            _codec = codec;
             _sessionPool = sessionPool;
         }
 
@@ -775,6 +818,32 @@ namespace Orleans.Serialization
         /// <param name="session">The serializer session.</param>
         /// <returns>The deserialized value.</returns>
         public T Deserialize(ReadOnlySequence<byte> source, SerializerSession session)
+        {
+            var reader = Reader.Create(source, session);
+            var field = reader.ReadFieldHeader();
+            return _codec.ReadValue(ref reader, field);
+        }
+
+        /// <summary>
+        /// Deserialize a value of type <typeparamref name="T"/> from <paramref name="source"/>.
+        /// </summary>
+        /// <param name="source">The source buffer.</param>
+        /// <returns>The deserialized value.</returns>
+        public T Deserialize(PooledBuffer.BufferSlice source)
+        {
+            using var session = _sessionPool.GetSession();
+            var reader = Reader.Create(source, session);
+            var field = reader.ReadFieldHeader();
+            return _codec.ReadValue(ref reader, field);
+        }
+
+        /// <summary>
+        /// Deserialize a value of type <typeparamref name="T"/> from <paramref name="source"/>.
+        /// </summary>
+        /// <param name="source">The source buffer.</param>
+        /// <param name="session">The serializer session.</param>
+        /// <returns>The deserialized value.</returns>
+        public T Deserialize(PooledBuffer.BufferSlice source, SerializerSession session)
         {
             var reader = Reader.Create(source, session);
             var field = reader.ReadFieldHeader();

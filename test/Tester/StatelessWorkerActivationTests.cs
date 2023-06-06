@@ -40,9 +40,9 @@ public class StatelessWorkerActivationTests : IClassFixture<StatelessWorkerActiv
     [Fact, TestCategory("BVT"), TestCategory("StatelessWorker")]
     public async Task SingleWorkerInvocationUnderLoad()
     {
-        var workerGrain = _fixture.GrainFactory.GetGrain<IStatelessWorkerScalingGrain>(0);
+        var workerGrain = _fixture.GrainFactory.GetGrain<IStatelessWorkerScalingGrain>(Random.Shared.Next());
 
-        for (var i = 0; i < 10; i++)
+        for (var i = 0; i < 100; i++)
         {
             var activationCount = await workerGrain.GetActivationCount();
             Assert.Equal(1, activationCount);

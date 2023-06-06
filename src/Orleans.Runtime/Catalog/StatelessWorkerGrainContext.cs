@@ -327,6 +327,17 @@ namespace Orleans.Runtime
             }
         }
 
+        public void Rehydrate(IRehydrationContext context)
+        {
+            // Migration is not supported, but we need to dispose of the context if it's provided
+            (context as IDisposable)?.Dispose();
+        }
+
+        public void Migrate(Dictionary<string, object> requestContext, CancellationToken? cancellationToken = null)
+        {
+            // Migration is not supported. Do nothing: the contract is that this method attempts migration, but does not guarantee it will occur.
+        }
+
         private enum WorkItemType
         {
             Activate = 0,

@@ -116,7 +116,7 @@ namespace Orleans.Runtime.GrainDirectory
                 this.logger.LogDebug($"{nameof(AcceptExistingRegistrations)}: accepting {{Count}} single-activation registrations", singleActivations.Count);
             }
 
-            var tasks = singleActivations.Select(addr => this.localDirectory.RegisterAsync(addr, 1)).ToArray();
+            var tasks = singleActivations.Select(addr => this.localDirectory.RegisterAsync(addr, previousAddress: null, 1)).ToArray();
             try
             {
                 await Task.WhenAll(tasks);
@@ -137,7 +137,7 @@ namespace Orleans.Runtime.GrainDirectory
 
                     // Record the applications which lost the registration race (duplicate activations).
                     var winner = tasks[i].Result;
-                    if (!winner.Address.Equals(singleActivations[i]))
+                    if (winner.Address is not { } winnerAddress || !winnerAddress.Equals(singleActivations[i]))
                     {
                         var duplicate = singleActivations[i];
                         (CollectionsMarshal.GetValueRefOrAddDefault(duplicates ??= new(), duplicate.SiloAddress!, out _) ??= new()).Add(duplicate);

@@ -12,9 +12,10 @@ using Orleans.Configuration;
 using Orleans.Core.Internal;
 using Orleans.GrainDirectory;
 using Orleans.Internal;
+using Orleans.Runtime.Placement;
 using Orleans.Runtime.Scheduler;
-using Orleans.Serialization;
 using Orleans.Serialization.Invocation;
+using Orleans.Serialization.Session;
 using Orleans.Serialization.TypeSystem;
 
 namespace Orleans.Runtime
@@ -32,7 +33,7 @@ namespace Orleans.Runtime
         private readonly List<(Message Message, CoarseStopwatch QueuedTime)> _waitingRequests = new();
         private readonly Dictionary<Message, CoarseStopwatch> _runningRequests = new();
         private readonly SingleWaiterAutoResetEvent _workSignal = new() { RunContinuationsAsynchronously = true };
-        private readonly GrainLifecycle _lifecycle;
+        private GrainLifecycle _lifecycle;
         private List<object> _pendingOperations;
         private Message _blockingRequest;
         private bool _isInWorkingSet;
@@ -59,7 +60,6 @@ namespace Orleans.Runtime
         {
             _shared = shared;
             Address = addr ?? throw new ArgumentNullException(nameof(addr));
-            _lifecycle = new GrainLifecycle(_shared.Logger);
             State = ActivationState.Create;
             _serviceScope = applicationServices.CreateScope();
             _isInWorkingSet = true;
@@ -76,9 +76,16 @@ namespace Orleans.Runtime
         public DateTime CollectionTicket { get; set; }
         public IServiceProvider ActivationServices => _serviceScope.ServiceProvider;
         public ActivationId ActivationId => Address.ActivationId;
-        public IServiceProvider ServiceProvider => _serviceScope?.ServiceProvider;
-        public IGrainLifecycle ObservableLifecycle => _lifecycle;
-        internal ILifecycleObserver Lifecycle => _lifecycle;
+        public IGrainLifecycle ObservableLifecycle => Lifecycle;
+        internal GrainLifecycle Lifecycle
+        {
+            get
+            {
+                if (_lifecycle is { } lifecycle) return lifecycle;
+                lock (this) { return _lifecycle ??= new GrainLifecycle(_shared.Logger); }
+            }
+        }
+
         public GrainId GrainId => Address.GrainId;
         public bool IsExemptFromCollection => _shared.CollectionAgeLimit == Timeout.InfiniteTimeSpan;
         public DateTime KeepAliveUntil { get; set; } = DateTime.MinValue;
@@ -99,7 +106,7 @@ namespace Orleans.Runtime
         public IWorkItemScheduler Scheduler => _workItemGroup;
         public Task Deactivated => GetDeactivationCompletionSource().Task;
 
-        public GrainAddress ForwardingAddress
+        public SiloAddress ForwardingAddress
         {
             get => _extras?.ForwardingAddress;
             set
@@ -179,6 +186,19 @@ namespace Orleans.Runtime
             }
         }
 
+        private DehydrationContextHolder DehydrationContext
+        {
+            get => _extras?.DehydrationContext;
+            set
+            {
+                lock (this)
+                {
+                    _extras ??= new();
+                    _extras.DehydrationContext = value;
+                }
+            }
+        }
+
         public TimeSpan CollectionAgeLimit => _shared.CollectionAgeLimit;
 
         public TTarget GetTarget<TTarget>() where TTarget : class => (TTarget)GrainInstance;
@@ -212,7 +232,7 @@ namespace Orleans.Runtime
             {
                 result = contextResult;
             }
-            else if (_extras?.Components is { } components && components.TryGetValue(typeof(TComponent), out var resultObj))
+            else if (_extras is { } components && components.TryGetValue(typeof(TComponent), out var resultObj))
             {
                 result = (TComponent)resultObj;
             }
@@ -245,13 +265,12 @@ namespace Orleans.Runtime
             {
                 if (instance == null)
                 {
-                    _extras?.Components?.Remove(typeof(TComponent));
+                    _extras?.Remove(typeof(TComponent));
                     return;
                 }
 
                 _extras ??= new();
-                var components = _extras.Components ??= new();
-                components[typeof(TComponent)] = instance;
+                _extras[typeof(TComponent)] = instance;
             }
         }
 
@@ -361,7 +380,7 @@ namespace Orleans.Runtime
         {
             if (timespan <= TimeSpan.Zero)
             {
-                // reset any current keepAliveUntill
+                // reset any current keepAliveUntil
                 ResetKeepAliveRequest();
             }
             else if (timespan == TimeSpan.MaxValue)
@@ -389,6 +408,90 @@ namespace Orleans.Runtime
             }
 
             _workSignal.Signal();
+        }
+
+        public void Migrate(Dictionary<string, object> requestContext, CancellationToken? cancellationToken = default)
+        {
+            if (!cancellationToken.HasValue)
+            {
+                cancellationToken = new CancellationTokenSource(_shared.InternalRuntime.CollectionOptions.Value.DeactivationTimeout).Token;
+            }
+
+            // We use a named work item since it is cheaper than allocating a Task and has the benefit of being named.
+            _workItemGroup.QueueWorkItem(new MigrateWorkItem(this, requestContext, cancellationToken.Value));
+        }
+
+        private async Task StartMigratingAsync(Dictionary<string, object> requestContext, CancellationToken cancellationToken)
+        {
+            lock (this)
+            {
+                // Avoid the cost of selecting a new location if the activation is not currently valid.
+                if (State is not ActivationState.Valid)
+                {
+                    return;
+                }
+            }
+
+            SiloAddress newLocation;
+            try
+            {
+                // Run placement to select a new host. If a new (different) host is not selected, do not migrate.
+                var placementService = _shared.Runtime.ServiceProvider.GetRequiredService<PlacementService>();
+                newLocation = await placementService.PlaceGrainAsync(GrainId, requestContext, PlacementStrategy);
+                if (newLocation == Address.SiloAddress || newLocation is null)
+                {
+                    // No more appropriate silo was selected for this grain. The migration attempt will be aborted.
+                    // This could be because this is the only (compatible) silo for the grain or because the placement director chose this
+                    // silo for some other reason.
+                    if (_shared.Logger.IsEnabled(LogLevel.Debug))
+                    {
+                        if (newLocation is null)
+                        {
+                            _shared.Logger.LogDebug("Placement strategy {PlacementStrategy} failed to select a destination for migration of {GrainId}", PlacementStrategy, GrainId);
+                        }
+                        else
+                        {
+                            _shared.Logger.LogDebug("Placement strategy {PlacementStrategy} selected the current silo as the destination for migration of {GrainId}", PlacementStrategy, GrainId);
+                        }
+                    }
+
+                    // Will not deactivate/migrate.
+                    return;
+                }
+
+                lock (this)
+                {
+                    if (!StartDeactivating(new DeactivationReason(DeactivationReasonCode.Migrating, "Migrating to a new location")))
+                    {
+                        // Grain is already deactivating, ignore the migration request.
+                        return;
+                    }
+
+                    if (DehydrationContext is not null)
+                    {
+                        // Migration has already started.
+                        return;
+                    }
+
+                    // Set a migration context to capture any state which should be transferred.
+                    // Doing this signals to the deactivation process that a migration is occurring, so it is important that this happens before we begin deactivation.
+                    DehydrationContext = new(_shared.SerializerSessionPool, requestContext);
+                    ForwardingAddress = newLocation;
+                }
+
+                if (_shared.Logger.IsEnabled(LogLevel.Debug))
+                {
+                    _shared.Logger.LogDebug("Migrating {GrainId} to {SiloAddress}", GrainId, newLocation);
+                }
+
+                // Start deactivation to prevent any other.
+                ScheduleOperation(new Command.Deactivate(cancellationToken));
+            }
+            catch (Exception exception)
+            {
+                _shared.Logger.LogError(exception, "Error while selecting a migration destination for {GrainId}", GrainId);
+                return;
+            }
         }
 
         public void Deactivate(DeactivationReason reason, CancellationToken? token = default)
@@ -593,7 +696,12 @@ namespace Orleans.Runtime
         private string GetActivationInfoString()
         {
             var placement = PlacementStrategy?.GetType().Name;
-            return GrainInstance is null ? $"#Placement={placement}" : $"#GrainType={RuntimeTypeNameFormatter.Format(GrainInstance?.GetType())} Placement={placement}";
+            var grainTypeName = _shared.GrainTypeName ?? GrainInstance switch
+            {
+                { } grainInstance => RuntimeTypeNameFormatter.Format(grainInstance.GetType()),
+                _ => null
+            };
+            return grainTypeName is null ? $"#Placement={placement}" : $"#GrainType={grainTypeName} Placement={placement}";
         }
 
         public async ValueTask DisposeAsync()
@@ -927,14 +1035,17 @@ namespace Orleans.Runtime
                     {
                         switch (op)
                         {
-                            case Command.Activate activation:
-                                await ActivateAsync(activation.RequestContext, activation.CancellationToken);
+                            case Command.Rehydrate command:
+                                RehydrateInternal(command.Context);
                                 break;
-                            case Command.Deactivate deactivation:
-                                await FinishDeactivating(deactivation.CancellationToken);
+                            case Command.Activate command:
+                                await ActivateAsync(command.RequestContext, command.CancellationToken);
                                 break;
-                            case Command.Delay delay:
-                                await Task.Delay(delay.Duration);
+                            case Command.Deactivate command:
+                                await FinishDeactivating(command.CancellationToken);
+                                break;
+                            case Command.Delay command:
+                                await Task.Delay(command.Duration);
                                 break;
                             case Command.UnregisterFromCatalog:
                                 UnregisterMessageTarget();
@@ -948,6 +1059,92 @@ namespace Orleans.Runtime
                         _shared.Logger.LogError(exception, "Error in RunOnInactive for grain activation {Activation}", this);
                     }
                 }
+            }
+        }
+
+        private void RehydrateInternal(IRehydrationContext context)
+        {
+            try
+            {
+                if (_shared.Logger.IsEnabled(LogLevel.Debug))
+                {
+                    _shared.Logger.LogDebug("Rehydrating grain from previous activation");
+                }
+
+                lock (this)
+                {
+                    if (State != ActivationState.Create)
+                    {
+                        throw new InvalidOperationException($"Attempted to rehydrate a grain in the {State} state");
+                    }
+
+                    if (context.TryGetValue("sys.addr", out GrainAddress previousRegistration) && previousRegistration is not null)
+                    {
+                        // Propagate the previous registration, so that the new activation can atomically replace it with its new address.
+                        (_extras ??= new()).PreviousRegistration = previousRegistration;
+                        if (_shared.Logger.IsEnabled(LogLevel.Debug))
+                        {
+                            _shared.Logger.LogDebug("Previous activation address was {PreviousRegistration}", previousRegistration);
+                        }
+                    }
+
+                    if (_lifecycle is { } lifecycle)
+                    {
+                        foreach (var participant in lifecycle.GetMigrationParticipants())
+                        {
+                            participant.OnRehydrate(context);
+                        }
+                    }
+
+                    (GrainInstance as IGrainMigrationParticipant)?.OnRehydrate(context);
+                }
+
+                if (_shared.Logger.IsEnabled(LogLevel.Debug))
+                {
+                    _shared.Logger.LogDebug("Rehydrated grain from previous activation");
+                }
+            }
+            catch (Exception exception)
+            {
+                _shared.Logger.LogError(exception, "Error while rehydrating activation");
+            }
+            finally
+            {
+                (context as IDisposable)?.Dispose();
+            }
+        }
+
+        private void OnDehydrate(IDehydrationContext context)
+        {
+            if (_shared.Logger.IsEnabled(LogLevel.Debug))
+            {
+                _shared.Logger.LogDebug("Dehydrating grain activation");
+            }
+
+            lock (this)
+            {
+                Debug.Assert(context is not null);
+
+                // Note that these calls are in reverse order from Rehydrate, not for any particular reason other than symmetry.
+                (GrainInstance as IGrainMigrationParticipant)?.OnDehydrate(context);
+
+                if (_lifecycle is { } lifecycle)
+                {
+                    foreach (var participant in lifecycle.GetMigrationParticipants())
+                    {
+                        participant.OnDehydrate(context);
+                    }
+                }
+
+                if (IsUsingGrainDirectory)
+                {
+                    context.TryAddValue("sys.addr", Address);
+                }
+            }
+
+            if (_shared.Logger.IsEnabled(LogLevel.Debug))
+            {
+                _shared.Logger.LogDebug("Dehydrated grain activation");
             }
         }
 
@@ -1108,7 +1305,7 @@ namespace Orleans.Runtime
                 _shared.InternalRuntime.MessageCenter.ProcessRequestsToInvalidActivation(
                     msgs,
                     Address,
-                    forwardingAddress: null,
+                    forwardingAddress: ForwardingAddress,
                     failedOperation: DeactivationReason.Description,
                     exc: DeactivationException,
                     rejectMessages: true);
@@ -1132,6 +1329,11 @@ namespace Orleans.Runtime
         }
 
         #region Activation
+
+        public void Rehydrate(IRehydrationContext context)
+        {
+            ScheduleOperation(new Command.Rehydrate(context));
+        }
 
         public void Activate(Dictionary<string, object> requestContext, CancellationToken? cancellationToken)
         {
@@ -1286,7 +1488,7 @@ namespace Orleans.Runtime
                 Exception registrationException;
                 try
                 {
-                    var result = await _shared.InternalRuntime.GrainLocator.Register(Address);
+                    var result = await _shared.InternalRuntime.GrainLocator.Register(Address, _extras?.PreviousRegistration);
                     if (Address.Matches(result))
                     {
                         success = true;
@@ -1295,7 +1497,7 @@ namespace Orleans.Runtime
                     {
                         // Set the forwarding address so that messages enqueued on this activation can be forwarded to
                         // the existing activation.
-                        ForwardingAddress = result;
+                        ForwardingAddress = result?.SiloAddress;
                         DeactivationReason = new(DeactivationReasonCode.DuplicateActivation, "This grain has been activated elsewhere.");
                         success = false;
                         CatalogInstruments.ActivationConcurrentRegistrationAttempts.Add(1);
@@ -1303,7 +1505,7 @@ namespace Orleans.Runtime
                         {
                             // If this was a duplicate, it's not an error, just a race.
                             // Forward on all of the pending messages, and then forget about this activation.
-                            var primary = _shared.InternalRuntime.LocalGrainDirectory.GetPrimaryForGrain(ForwardingAddress.GrainId);
+                            var primary = _shared.InternalRuntime.LocalGrainDirectory.GetPrimaryForGrain(GrainId);
                             _shared.Logger.LogDebug(
                                 (int)ErrorCode.Catalog_DuplicateActivation,
                                 "Tried to create a duplicate activation {Address}, but we'll use {ForwardingAddress} instead. "
@@ -1348,19 +1550,21 @@ namespace Orleans.Runtime
         /// <summary>
         /// Starts the deactivation process.
         /// </summary>
-        public void StartDeactivating(DeactivationReason reason)
+        public bool StartDeactivating(DeactivationReason reason)
         {
             lock (this)
             {
                 if (State is ActivationState.Deactivating or ActivationState.Invalid or ActivationState.FailedToActivate)
                 {
-                    return;
+                    return false;
                 }
 
                 if (State is ActivationState.Activating or ActivationState.Create)
                 {
                     throw new InvalidOperationException("Calling DeactivateOnIdle from within OnActivateAsync is not supported");
                 }
+
+                // If State is Valid, then begin deactivation.
 
                 if (DeactivationReason.ReasonCode == DeactivationReasonCode.None)
                 {
@@ -1376,6 +1580,8 @@ namespace Orleans.Runtime
 
                 _shared.InternalRuntime.ActivationWorkingSet.OnDeactivating(this);
             }
+
+            return true;
         }
 
         /// <summary>
@@ -1384,6 +1590,7 @@ namespace Orleans.Runtime
         /// <param name="cancellationToken">A cancellation which terminates graceful deactivation when cancelled.</param>
         private async Task FinishDeactivating(CancellationToken cancellationToken)
         {
+            var migrated = false;
             try
             {
                 if (_shared.Logger.IsEnabled(LogLevel.Trace))
@@ -1397,8 +1604,46 @@ namespace Orleans.Runtime
                 await WaitForAllTimersToFinish(cancellationToken);
                 await CallGrainDeactivate(cancellationToken);
 
-                // Unregister from directory
-                await _shared.InternalRuntime.GrainLocator.Unregister(Address, UnregistrationCause.Force);
+                if (DehydrationContext is { } context)
+                {
+                    Debug.Assert(ForwardingAddress is not null);
+
+                    try
+                    {
+                        // Populate the dehydration context.
+                        if (context.RequestContext is { } requestContext)
+                        {
+                            RequestContextExtensions.Import(requestContext);
+                        }
+                        else
+                        {
+                            RequestContext.Clear();
+                        }
+
+                        OnDehydrate(context.Value);
+
+                        // Send the dehydration context to the target host
+                        // TODO: Coalesce concurrent requests into fewer calls by delegating to a shared service.
+                        var remoteCatalog = _shared.Runtime.ServiceProvider.GetRequiredService<IInternalGrainFactory>().GetSystemTarget<ICatalog>(Constants.CatalogType, ForwardingAddress);
+                        await remoteCatalog.AcceptMigratingGrains(new List<GrainMigrationPackage>() { new GrainMigrationPackage() { GrainId = GrainId, MigrationContext = context.Value } });
+                        migrated = true;
+                    }
+                    catch (Exception exception)
+                    {
+                        _shared.Logger.LogWarning(exception, "Failed to migrate grain {GrainId} to {SiloAddress}", GrainId, ForwardingAddress);
+                    }
+                    finally
+                    {
+                        RequestContext.Clear();
+                    }
+                }
+
+                if (!migrated)
+                {
+                    // Unregister from directory
+                    await _shared.InternalRuntime.GrainLocator.Unregister(Address, UnregistrationCause.Force);
+                }
+
                 if (_shared.Logger.IsEnabled(LogLevel.Trace))
                 {
                     _shared.Logger.LogTrace("Completed async portion of FinishDeactivating for activation {Activation}", this.ToDetailedString());
@@ -1417,6 +1662,10 @@ namespace Orleans.Runtime
             if (IsStuckDeactivating)
             {
                 CatalogInstruments.ActiviationShutdownViaDeactivateStuckActivation();
+            }
+            else if (migrated)
+            {
+                CatalogInstruments.ActiviationShutdownViaMigration();
             }
             else if (_isInWorkingSet)
             {
@@ -1512,10 +1761,16 @@ namespace Orleans.Runtime
             }
         }
 
-        Task IGrainManagementExtension.DeactivateOnIdle()
+        ValueTask IGrainManagementExtension.DeactivateOnIdle()
         {
             Deactivate(new(DeactivationReasonCode.ApplicationRequested, $"{nameof(IGrainManagementExtension.DeactivateOnIdle)} was called."));
-            return Task.CompletedTask;
+            return default;
+        }
+
+        ValueTask IGrainManagementExtension.MigrateOnIdle()
+        {
+            Migrate(RequestContext.CallContextData?.Value.Values);
+            return default;
         }
 
         private void UnregisterMessageTarget()
@@ -1571,34 +1826,53 @@ namespace Orleans.Runtime
         /// <summary>
         /// Additional properties which are not needed for the majority of an activation's lifecycle.
         /// </summary>
-        private class ActivationDataExtra
+        private class ActivationDataExtra : Dictionary<object, object>
         {
             private const int IsStuckProcessingMessageFlag = 1 << 0;
             private const int IsStuckDeactivatingFlag = 1 << 1;
             private const int IsDisposingFlag = 1 << 2;
             private byte _flags;
 
-            public Dictionary<Type, object> Components { get; set; }
+            public HashSet<IGrainTimer> Timers { get => GetValueOrDefault<HashSet<IGrainTimer>>(nameof(Timers)); set => SetOrRemoveValue(nameof(Timers), value); }
 
-            public HashSet<IGrainTimer> Timers { get; set; }
+            /// <summary>
+            /// During rehydration, this may contain the address for the previous (recently dehydrated) activation of this grain.
+            /// </summary>
+            public GrainAddress PreviousRegistration { get => GetValueOrDefault<GrainAddress>(nameof(PreviousRegistration)); set => SetOrRemoveValue(nameof(PreviousRegistration), value); }
 
             /// <summary>
             /// If State == Invalid, this may contain a forwarding address for incoming messages
             /// </summary>
-            public GrainAddress ForwardingAddress { get; set; }
+            public SiloAddress ForwardingAddress { get => GetValueOrDefault<SiloAddress>(nameof(ForwardingAddress)); set => SetOrRemoveValue(nameof(ForwardingAddress), value); }
 
             /// <summary>
             /// A <see cref="TaskCompletionSource{TResult}"/> which completes when a grain has deactivated.
             /// </summary>
-            public TaskCompletionSource<bool> DeactivationTask { get; set; }
+            public TaskCompletionSource<bool> DeactivationTask { get => GetDeactivationInfoOrDefault()?.DeactivationTask; set => EnsureDeactivationInfo().DeactivationTask = value; }
 
-            public DateTime? DeactivationStartTime { get; set; }
+            public DateTime? DeactivationStartTime { get => GetDeactivationInfoOrDefault()?.DeactivationStartTime; set => EnsureDeactivationInfo().DeactivationStartTime = value; }
+
+            public DeactivationReason DeactivationReason { get => GetDeactivationInfoOrDefault()?.DeactivationReason ?? default; set => EnsureDeactivationInfo().DeactivationReason = value; }
+
+            /// <summary>
+            /// When migrating to another location, this contains the information to preserve across activations.
+            /// </summary>
+            public DehydrationContextHolder DehydrationContext { get => GetValueOrDefault<DehydrationContextHolder>(nameof(DehydrationContext)); set => SetOrRemoveValue(nameof(DehydrationContext), value); }
+
+            private DeactivationInfo GetDeactivationInfoOrDefault() => GetValueOrDefault<DeactivationInfo>(nameof(DeactivationInfo));
+            private DeactivationInfo EnsureDeactivationInfo()
+            {
+                if (!TryGetValue(nameof(DeactivationInfo), out var info))
+                {
+                    info = base[nameof(DeactivationInfo)] = new DeactivationInfo();
+                }
+
+                return (DeactivationInfo)info;
+            }
 
             public bool IsStuckProcessingMessage { get => GetFlag(IsStuckProcessingMessageFlag); set => SetFlag(IsStuckProcessingMessageFlag, value); }
             public bool IsStuckDeactivating { get => GetFlag(IsStuckDeactivatingFlag); set => SetFlag(IsStuckDeactivatingFlag, value); }
             public bool IsDisposing { get => GetFlag(IsDisposingFlag); set => SetFlag(IsDisposingFlag, value); }
-
-            public DeactivationReason DeactivationReason { get; set; }
 
             private void SetFlag(int flag, bool value)
             {
@@ -1613,6 +1887,30 @@ namespace Orleans.Runtime
             }
 
             private bool GetFlag(int flag) => (_flags & flag) != 0;
+            private T GetValueOrDefault<T>(object key)
+            {
+                TryGetValue(key, out var result);
+                return (T)result;
+            }
+
+            private void SetOrRemoveValue(object key, object value)
+            {
+                if (value is null)
+                {
+                    Remove(key);
+                }
+                else
+                {
+                    base[key] = value;
+                }
+            }
+
+            private sealed class DeactivationInfo
+            {
+                public DateTime? DeactivationStartTime;
+                public DeactivationReason DeactivationReason;
+                public TaskCompletionSource<bool> DeactivationTask;
+            }
         }
 
         private class Command
@@ -1635,6 +1933,16 @@ namespace Orleans.Runtime
 
                 public Dictionary<string, object> RequestContext { get; }
                 public CancellationToken CancellationToken { get; }
+            }
+
+            public class Rehydrate : Command
+            {
+                public readonly IRehydrationContext Context;
+
+                public Rehydrate(IRehydrationContext context)
+                {
+                    Context = context;
+                }
             }
 
             public class Delay : Command
@@ -1681,6 +1989,35 @@ namespace Orleans.Runtime
                 Debug.Assert(reentrancyId != Guid.Empty);
                 return TryGetValue(reentrancyId, out var count) && count > 0;
             }
+        }
+
+        private class DehydrationContextHolder
+        {
+            public readonly MigrationContext Value;
+            public readonly Dictionary<string, object> RequestContext;
+            public DehydrationContextHolder(SerializerSessionPool sessionPool, Dictionary<string, object> requestContext)
+            {
+                RequestContext = requestContext;
+                Value = new MigrationContext(sessionPool);
+            }
+        }
+
+        private class MigrateWorkItem : IWorkItem
+        {
+            private readonly ActivationData _activation;
+            private readonly Dictionary<string, object> _requestContext;
+            private readonly CancellationToken _cancellationToken;
+
+            public MigrateWorkItem(ActivationData activation, Dictionary<string, object> requestContext, CancellationToken cancellationToken)
+            {
+                _activation = activation;
+                _requestContext = requestContext;
+                _cancellationToken = cancellationToken;
+            }
+
+            public string Name => "Migrate";
+            public IGrainContext GrainContext => _activation;
+            public void Execute() => _activation.StartMigratingAsync(_requestContext, _cancellationToken).Ignore();
         }
     }
 }

@@ -7,9 +7,9 @@ namespace Orleans.Runtime
         /// </summary>
         Create,
         
-        ///// <summary>
-        ///// Activation is in the middle of activation process.
-        ///// </summary>
+        //// <summary>
+        //// Activation is in the middle of activation process.
+        //// </summary>
         Activating,
         
         /// <summary>
@@ -17,9 +17,9 @@ namespace Orleans.Runtime
         /// </summary>
         Valid,
         
-        ///// <summary>
-        ///// Activation is in the middle of deactivation process.
-        ///// </summary>
+        /// <summary>
+        /// Activation is in the middle of deactivation process.
+        /// </summary>
         Deactivating,
         
         /// <summary>

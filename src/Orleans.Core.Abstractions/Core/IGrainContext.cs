@@ -73,15 +73,29 @@ namespace Orleans.Runtime
         /// Start activating this instance.
         /// </summary>
         /// <param name="requestContext">The request context of the request which is causing this instance to be activated, if any.</param>
-        /// <param name="cancellationToken">A cancellation token which when canceled, indicates that the process should complete promptly.</param>
+        /// <param name="cancellationToken">A cancellation token which, when canceled, indicates that the process should complete promptly.</param>
         void Activate(Dictionary<string, object> requestContext, CancellationToken? cancellationToken = default);
 
         /// <summary>
         /// Start deactivating this instance.
         /// </summary>
         /// <param name="deactivationReason">The reason for deactivation, for informational purposes.</param>
-        /// <param name="cancellationToken">A cancellation token which when canceled, indicates that the process should complete promptly.</param>
+        /// <param name="cancellationToken">A cancellation token which, when canceled, indicates that the process should complete promptly.</param>
         void Deactivate(DeactivationReason deactivationReason, CancellationToken? cancellationToken = default);
+
+        /// <summary>
+        /// Start rehydrating this instance from the provided rehydration context.
+        /// </summary>
+        void Rehydrate(IRehydrationContext context);
+
+        /// <summary>
+        /// Starts an attempt to migrating this instance to another location.
+        /// Migration captures the current <see cref="RequestContext"/>, making it available to the activation's placement director so that it can consider it when selecting a new location.
+        /// Migration will occur asynchronously, when no requests are executing, and will not occur if the activation's placement director does not select an alternative location.
+        /// </summary>
+        /// <param name="requestContext">The request context, which is provided to the placement director so that it can be examined when selecting a new location.</param>
+        /// <param name="cancellationToken">A cancellation token which, when canceled, indicates that the process should complete promptly.</param>
+        void Migrate(Dictionary<string, object> requestContext, CancellationToken? cancellationToken = default);
     }
 
     /// <summary>
