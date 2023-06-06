@@ -27,10 +27,7 @@ namespace Orleans.Providers.Streams.AzureQueue
         [Id(3)]
         public StreamId StreamId { get; private set; }
 
-        public StreamSequenceToken SequenceToken
-        {
-            get { return sequenceToken; }
-        }
+        public StreamSequenceToken SequenceToken => sequenceToken;
 
         internal EventSequenceToken RealSequenceToken
         {

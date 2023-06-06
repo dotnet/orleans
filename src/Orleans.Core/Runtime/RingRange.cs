@@ -61,12 +61,12 @@ namespace Orleans.Runtime
         /// <summary>
         /// Exclusive
         /// </summary>
-        public uint Begin { get { return begin; } }
+        public uint Begin => begin;
 
         /// <summary>
         /// Inclusive
         /// </summary>
-        public uint End { get { return end; } }
+        public uint End => end;
 
         public SingleRange(uint begin, uint end)
         {

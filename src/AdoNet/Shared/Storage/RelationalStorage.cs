@@ -56,25 +56,13 @@ namespace Orleans.Tests.SqlUtils
         /// <summary>
         /// The invariant name of the connector for this database.
         /// </summary>
-        public string InvariantName
-        {
-            get
-            {
-                return invariantName;
-            }
-        }
+        public string InvariantName => invariantName;
 
 
         /// <summary>
         /// The connection string used to connect to the database.
         /// </summary>
-        public string ConnectionString
-        {
-            get
-            {
-                return connectionString;
-            }
-        }
+        public string ConnectionString => connectionString;
 
 
         /// <summary>

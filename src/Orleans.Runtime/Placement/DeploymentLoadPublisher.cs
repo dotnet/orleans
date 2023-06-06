@@ -31,7 +31,7 @@ namespace Orleans.Runtime
         private readonly ILogger logger;
         private IDisposable publishTimer;
 
-        public ConcurrentDictionary<SiloAddress, SiloRuntimeStatistics> PeriodicStatistics { get { return periodicStats; } }
+        public ConcurrentDictionary<SiloAddress, SiloRuntimeStatistics> PeriodicStatistics => periodicStats;
 
         public DeploymentLoadPublisher(
             ILocalSiloDetails siloDetails,

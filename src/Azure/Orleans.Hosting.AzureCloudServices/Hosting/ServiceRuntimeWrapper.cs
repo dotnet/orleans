@@ -110,10 +110,7 @@ namespace Orleans.Runtime.Host
         public int UpdateDomain { get; private set; }
         public int FaultDomain { get; private set; }
 
-        public string InstanceName
-        {
-            get { return ExtractInstanceName(InstanceId, DeploymentId); }
-        }
+        public string InstanceName => ExtractInstanceName(InstanceId, DeploymentId);
 
         public int RoleInstanceCount
         {
@@ -225,7 +222,7 @@ namespace Orleans.Runtime.Host
         private static string ExtractInstanceName(string instanceId, string deploymentId)
         {
             return instanceId.Length > deploymentId.Length && instanceId.StartsWith(deploymentId, StringComparison.Ordinal)
-                ? instanceId.Substring(deploymentId.Length + 1)
+                ? instanceId[(deploymentId.Length + 1)..]
                 : instanceId;
         }
     }

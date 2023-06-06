@@ -56,10 +56,7 @@ namespace Orleans.Streams
         }
 
 
-        public int Count
-        {
-            get { return queueData.Count; }
-        }
+        public int Count => queueData.Count;
 
         public void RefreshActivity(DateTime now) => lastActivityTime = now;
 

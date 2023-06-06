@@ -93,19 +93,13 @@ namespace Orleans.EventSourcing
         /// Gets the current confirmed state. 
         /// Includes only confirmed events.
         /// </summary>
-        protected TGrainState State
-        {
-            get { return LogViewAdaptor.ConfirmedView; }
-        }
+        protected TGrainState State => LogViewAdaptor.ConfirmedView;
 
         /// <summary>
         /// Gets the version of the current confirmed state. 
         /// Equals the total number of confirmed events.
         /// </summary>
-        protected int Version
-        {
-            get { return LogViewAdaptor.ConfirmedVersion; }
-        }
+        protected int Version => LogViewAdaptor.ConfirmedVersion;
 
         /// <summary>
         /// Called whenever the tentative state may have changed due to local or remote events.
@@ -119,10 +113,7 @@ namespace Orleans.EventSourcing
         /// Gets the current tentative state.
         /// Includes both confirmed and unconfirmed events.
         /// </summary>
-        protected TGrainState TentativeState
-        {
-            get { return LogViewAdaptor.TentativeView; }
-        }
+        protected TGrainState TentativeState => LogViewAdaptor.TentativeView;
 
         /// <summary>
         /// Called after the confirmed state may have changed (i.e. the confirmed version number is larger).
@@ -151,10 +142,7 @@ namespace Orleans.EventSourcing
         /// <summary>
         /// Returns the current queue of unconfirmed events.
         /// </summary>
-        public IEnumerable<TEventBase> UnconfirmedEvents
-        {
-            get { return LogViewAdaptor.UnconfirmedSuffix; }
-        }
+        public IEnumerable<TEventBase> UnconfirmedEvents => LogViewAdaptor.UnconfirmedSuffix;
 
         /// <summary>
         /// By default, upon activation, the journaled grain waits until it has loaded the latest
@@ -241,13 +229,7 @@ namespace Orleans.EventSourcing
         /// <summary>
         /// If there is no log-consistency provider specified, store versioned state using default storage provider
         /// </summary>
-        protected override ILogViewAdaptorFactory DefaultAdaptorFactory
-        {
-            get
-            {
-                return new StateStorage.DefaultAdaptorFactory();
-            }
-        }
+        protected override ILogViewAdaptorFactory DefaultAdaptorFactory => new StateStorage.DefaultAdaptorFactory();
 
         /// <summary>
         /// Called by adaptor to update the view when entries are appended.

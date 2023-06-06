@@ -20,25 +20,19 @@ namespace Orleans
 
         IGrainContext IGrainBase.GrainContext => GrainContext;
 
-        public GrainReference GrainReference { get { return GrainContext.GrainReference; } }
+        public GrainReference GrainReference => GrainContext.GrainReference;
 
         internal IGrainRuntime Runtime { get; }
 
         /// <summary>
         /// Gets an object which can be used to access other grains. Null if this grain is not associated with a Runtime, such as when created directly for unit testing.
         /// </summary>
-        protected IGrainFactory GrainFactory
-        {
-            get { return Runtime?.GrainFactory; }
-        }
+        protected IGrainFactory GrainFactory => Runtime?.GrainFactory;
 
         /// <summary>
         /// Gets the IServiceProvider managed by the runtime. Null if this grain is not associated with a Runtime, such as when created directly for unit testing.
         /// </summary>
-        protected internal IServiceProvider ServiceProvider
-        {
-            get { return GrainContext?.ActivationServices ?? Runtime?.ServiceProvider; }
-        }
+        protected internal IServiceProvider ServiceProvider => GrainContext?.ActivationServices ?? Runtime?.ServiceProvider;
 
         internal GrainId GrainId => GrainContext.GrainId;
 
@@ -69,10 +63,7 @@ namespace Orleans
         /// A unique identifier for the current silo.
         /// There is no semantic content to this string, but it may be useful for logging.
         /// </summary>
-        public string RuntimeIdentity
-        {
-            get { return Runtime?.SiloIdentity ?? string.Empty; }
-        }
+        public string RuntimeIdentity => Runtime?.SiloIdentity ?? string.Empty;
 
         /// <summary>
         /// Registers a timer to send periodic callbacks to this grain.
@@ -124,9 +115,9 @@ namespace Orleans
 
         /// <summary>
         /// Delay Deactivation of this activation at least for the specified time duration.
-        /// A positive <c>timeSpan</c> value means “prevent GC of this activation for that time span”.
-        /// A negative <c>timeSpan</c> value means “cancel the previous setting of the DelayDeactivation call and make this activation behave based on the regular Activation Garbage Collection settings”.
-        /// DeactivateOnIdle method would undo / override any current “keep alive” setting,
+        /// A positive <c>timeSpan</c> value means ?prevent GC of this activation for that time span?.
+        /// A negative <c>timeSpan</c> value means ?cancel the previous setting of the DelayDeactivation call and make this activation behave based on the regular Activation Garbage Collection settings?.
+        /// DeactivateOnIdle method would undo / override any current ?keep alive? setting,
         /// making this grain immediately available for deactivation.
         /// </summary>
         protected void DelayDeactivation(TimeSpan timeSpan)

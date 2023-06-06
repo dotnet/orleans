@@ -87,7 +87,7 @@ namespace Orleans.Streams
             if (logger.IsEnabled(LogLevel.Trace))
             {
                 var itemString = item.ToString();
-                itemString = (itemString.Length > MAXIMUM_ITEM_STRING_LOG_LENGTH) ? itemString.Substring(0, MAXIMUM_ITEM_STRING_LOG_LENGTH) + "..." : itemString;
+                itemString = (itemString.Length > MAXIMUM_ITEM_STRING_LOG_LENGTH) ? itemString[..MAXIMUM_ITEM_STRING_LOG_LENGTH] + "..." : itemString;
                 logger.LogTrace("DeliverItem {Item} for subscription {Subscription}", itemString, subscriptionId);
             }
             IStreamSubscriptionHandle observer;

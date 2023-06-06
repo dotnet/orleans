@@ -19,9 +19,9 @@ namespace OrleansAWSUtils.Streams
         protected readonly ConcurrentDictionary<QueueId, SQSStorage> Queues = new ConcurrentDictionary<QueueId, SQSStorage>();
         private readonly ILoggerFactory loggerFactory;
         public string Name { get; private set; }
-        public bool IsRewindable { get { return false; } }
+        public bool IsRewindable => false;
 
-        public StreamProviderDirection Direction { get { return StreamProviderDirection.ReadWrite; } }
+        public StreamProviderDirection Direction => StreamProviderDirection.ReadWrite;
 
         public SQSAdapter(Serializer<SQSBatchContainer> serializer, IConsistentRingStreamQueueMapper streamQueueMapper, ILoggerFactory loggerFactory, string dataConnectionString, string serviceId, string providerName)
         {

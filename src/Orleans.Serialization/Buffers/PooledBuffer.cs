@@ -204,9 +204,9 @@ public partial struct PooledBuffer : IBufferWriter<byte>, IDisposable
         while (true)
         {
             var writeSize = Math.Min(destination.Length, input.Length);
-            input.Slice(0, writeSize).CopyTo(destination);
+            input[..writeSize].CopyTo(destination);
             writer.Advance(writeSize);
-            input = input.Slice(writeSize);
+            input = input[writeSize..];
             if (input.Length > 0)
             {
                 destination = writer.GetSpan();
@@ -315,9 +315,9 @@ public partial struct PooledBuffer : IBufferWriter<byte>, IDisposable
         while (true)
         {
             var writeSize = Math.Min(destination.Length, input.Length);
-            input.Slice(0, writeSize).CopyTo(destination);
+            input[..writeSize].CopyTo(destination);
             Advance(writeSize);
-            input = input.Slice(writeSize);
+            input = input[writeSize..];
             if (input.Length > 0)
             {
                 destination = GetSpan();
@@ -680,7 +680,8 @@ public partial struct PooledBuffer : IBufferWriter<byte>, IDisposable
         public bool IsValid => Array is { Length: > 0 };
         public bool IsMinimumSize => Array.Length == SequenceSegmentPool.MinimumBlockSize;
 
-        public Memory<byte> AsMemory(int offset) =>
+        public Memory<byte> AsMemory(int offset)
+        {
 #if NET6_0_OR_GREATER
             if (IsMinimumSize)
             {
@@ -688,9 +689,11 @@ public partial struct PooledBuffer : IBufferWriter<byte>, IDisposable
             }
 #endif
 
-            Array.AsMemory(offset);
+            return Array.AsMemory(offset);
+        }
 
-        public Memory<byte> AsMemory(int offset, int length) =>
+        public Memory<byte> AsMemory(int offset, int length)
+        {
 #if NET6_0_OR_GREATER
             if (IsMinimumSize)
             {
@@ -698,7 +701,8 @@ public partial struct PooledBuffer : IBufferWriter<byte>, IDisposable
             }
 #endif
 
-            Array.AsMemory(offset, length);
+            return Array.AsMemory(offset, length);
+        }
 
         public void Commit(long runningIndex, int length)
         {

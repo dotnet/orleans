@@ -149,8 +149,8 @@ public class ClassWithEnumTestData
         [Id(1)]
         private readonly int b;
 
-        public int A { get { return a; } }
-        public int B { get { return b; } }
+        public int A => a;
+        public int B => b;
 
         public ImmutableType(int aval, int bval)
         {
@@ -168,7 +168,7 @@ public class ClassWithEnumTestData
 
         [Id(1)]
         private readonly Immutable<List<int>> list;
-        public Immutable<List<int>> B { get { return list; } }
+        public Immutable<List<int>> B => list;
 
         public EmbeddedImmutable(string a, params int[] listOfInts)
         {

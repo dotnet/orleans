@@ -56,9 +56,9 @@ namespace Orleans.AzureUtils
                 debugInfo = string.Format("UnpackRowKey: RowKey={0} Idx1={1} Idx2={2}", rowKey, idx1, idx2);
 #endif
                 var rowKeySpan = rowKey.AsSpan();
-                var addressStr = rowKeySpan.Slice(0, idx1);
+                var addressStr = rowKeySpan[..idx1];
                 var portStr = rowKeySpan.Slice(idx1 + 1, idx2 - idx1 - 1);
-                var genStr = rowKeySpan.Slice(idx2 + 1);
+                var genStr = rowKeySpan[(idx2 + 1)..];
 #if DEBUG
                 debugInfo = string.Format("UnpackRowKey: RowKey={0} -> Address={1} Port={2} Generation={3}",
                     rowKey, addressStr.ToString(), portStr.ToString(), genStr.ToString());

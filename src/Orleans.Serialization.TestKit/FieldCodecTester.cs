@@ -451,7 +451,7 @@ namespace Orleans.Serialization.TestKit
                     var buffer = bytes.AsMemory();
                     var writer = Writer.Create(buffer, _sessionPool.GetSession());
                     serializer.Serialize(original, ref writer);
-                    var result = buffer.Slice(0, writer.Output.BytesWritten).ToArray();
+                    var result = buffer[..writer.Output.BytesWritten].ToArray();
                     Assert.Equal(expected, result);
                 }
 
@@ -461,7 +461,7 @@ namespace Orleans.Serialization.TestKit
                     var buffer = bytes.AsSpan();
                     var writer = Writer.Create(buffer, _sessionPool.GetSession());
                     serializer.Serialize(original, ref writer);
-                    var result = buffer.Slice(0, writer.Output.BytesWritten).ToArray();
+                    var result = buffer[..writer.Output.BytesWritten].ToArray();
                     Assert.Equal(expected, result);
                 }
 

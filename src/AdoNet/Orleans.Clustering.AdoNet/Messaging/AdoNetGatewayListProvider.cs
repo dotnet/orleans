@@ -31,15 +31,9 @@ namespace Orleans.Runtime.Membership
             maxStaleness = gatewayOptions.Value.GatewayListRefreshPeriod;
         }
 
-        public TimeSpan MaxStaleness
-        {
-            get { return maxStaleness; }
-        }
+        public TimeSpan MaxStaleness => maxStaleness;
 
-        public bool IsUpdatable
-        {
-            get { return true; }
-        }
+        public bool IsUpdatable => true;
 
         public async Task InitializeGatewayListProvider()
         {

@@ -12,7 +12,7 @@
             _value = 0;
         }
 
-        public bool IsSet { get { return _value != 0; } }
+        public bool IsSet => _value != 0;
 
         public bool TrySet() =>
             // attempt to set _value; if we're the first to attempt to do it, return true;

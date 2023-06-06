@@ -164,7 +164,7 @@ namespace Orleans.GrainDirectory.AzureStorage
             // http://msdn.microsoft.com/en-us/library/dd179382.aspx
 
             if (httpStatusCode == HttpStatusCode.PreconditionFailed) return true;
-            if (httpStatusCode == HttpStatusCode.Conflict) return true;     //Primary key violation. The app is trying to insert an entity, but there’s an entity on the table with the same values for PartitionKey and RowKey properties on the entity being inserted.
+            if (httpStatusCode == HttpStatusCode.Conflict) return true;     //Primary key violation. The app is trying to insert an entity, but there?s an entity on the table with the same values for PartitionKey and RowKey properties on the entity being inserted.
             if (httpStatusCode == HttpStatusCode.NotFound) return true;
             if (httpStatusCode == HttpStatusCode.NotImplemented) return true; // New table: Azure table schema not yet initialized, so need to do first create
             return false;

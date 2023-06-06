@@ -5,7 +5,7 @@ using System.Threading.Tasks;
 namespace Orleans
 {
     /// <summary>
-    /// An async mutual exclusion mechanism that supports scoping via ‘using’.
+    /// An async mutual exclusion mechanism that supports scoping via ?using?.
     /// </summary>
     /// <remarks>
     /// (Adapted from http://blogs.msdn.com/b/pfxteam/archive/2012/02/12/10266988.aspx)

@@ -192,7 +192,7 @@ namespace Orleans.Serialization.Buffers
         public Span<byte> WritableSpan
         {
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            get => _currentSpan.Slice(_bufferPos);
+            get => _currentSpan[_bufferPos..];
         }
 
         /// <summary>
@@ -550,7 +550,7 @@ namespace Orleans.Serialization.Buffers
 
             // Write the 2 byte overflow unconditionally
             var upper = value >> (63 - neededBytes);
-            BinaryPrimitives.WriteUInt16LittleEndian(_currentSpan.Slice(sizeof(ulong)), (ushort)upper);
+            BinaryPrimitives.WriteUInt16LittleEndian(_currentSpan[sizeof(ulong)..], (ushort)upper);
         }
     }
 }

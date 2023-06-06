@@ -87,7 +87,7 @@ namespace Orleans.Serialization.Codecs
         {
             writer.EnsureContiguous(1 + 16);
             var span = writer.WritableSpan;
-            if (!value.TryWriteBytes(span.Slice(1), out var length)) ThrowNotSupported();
+            if (!value.TryWriteBytes(span[1..], out var length)) ThrowNotSupported();
             span[0] = (byte)(length * 2 + 1); // VarInt length
             writer.AdvanceSpan(1 + length);
         }

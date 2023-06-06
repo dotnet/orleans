@@ -49,7 +49,7 @@ namespace Orleans.Runtime
         /// Gets the type of this
         /// </summary>
         internal string Name => siloDetails.Name;
-        internal ILocalGrainDirectory LocalGrainDirectory { get { return localGrainDirectory; } }
+        internal ILocalGrainDirectory LocalGrainDirectory => localGrainDirectory;
         internal IConsistentRingProvider RingProvider { get; private set; }
         internal List<GrainService> GrainServices => grainServices;
 
@@ -63,7 +63,7 @@ namespace Orleans.Runtime
         /// <summary>
         /// Gets a <see cref="Task"/> which completes once the silo has terminated.
         /// </summary>
-        public Task SiloTerminated { get { return siloTerminatedTask.Task; } } // one event for all types of termination (shutdown, stop and fast kill).
+        public Task SiloTerminated => siloTerminatedTask.Task;  // one event for all types of termination (shutdown, stop and fast kill).
 
         private bool isFastKilledNeeded = false; // Set to true if something goes wrong in the shutdown/stop phase
 

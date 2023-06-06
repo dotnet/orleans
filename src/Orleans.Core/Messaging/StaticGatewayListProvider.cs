@@ -32,15 +32,9 @@ namespace Orleans.Messaging
         public Task<IList<Uri>> GetGateways() => Task.FromResult<IList<Uri>>(options.Gateways);
 
         /// <inheritdoc />
-        public TimeSpan MaxStaleness
-        {
-            get => maxStaleness;
-        }
+        public TimeSpan MaxStaleness => maxStaleness;
 
         /// <inheritdoc />
-        public bool IsUpdatable
-        {
-            get => true;
-        }
+        public bool IsUpdatable => true;
     }
 }

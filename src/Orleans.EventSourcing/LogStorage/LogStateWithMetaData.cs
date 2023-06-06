@@ -63,7 +63,7 @@ namespace Orleans.EventSourcing.LogStorage
         /// <summary>
         /// The length of the log
         /// </summary>
-        public int GlobalVersion { get { return Log.Count; } }
+        public int GlobalVersion => Log.Count;
 
 
         /// <summary>

@@ -77,7 +77,7 @@ namespace Orleans.Serialization
             var codec = session.CodecProvider.GetCodec<T>();
             codec.WriteField(ref writer, 0, typeof(T), value);
             writer.Commit();
-            destination = destination.Slice(0, writer.Position);
+            destination = destination[..writer.Position];
         }
 
         /// <summary>
@@ -94,7 +94,7 @@ namespace Orleans.Serialization
             var codec = session.CodecProvider.GetCodec<T>();
             codec.WriteField(ref writer, 0, typeof(T), value);
             writer.Commit();
-            destination = destination.Slice(0, writer.Position);
+            destination = destination[..writer.Position];
         }
 
         /// <summary>
@@ -232,7 +232,7 @@ namespace Orleans.Serialization
             var codec = session.CodecProvider.GetCodec<T>();
             codec.WriteField(ref writer, 0, typeof(T), value);
             writer.Commit();
-            destination = destination.Slice(0, writer.Position);
+            destination = destination[..writer.Position];
         }
 
         /// <summary>
@@ -249,7 +249,7 @@ namespace Orleans.Serialization
             var codec = session.CodecProvider.GetCodec<T>();
             codec.WriteField(ref writer, 0, typeof(T), value);
             writer.Commit();
-            destination = destination.Slice(0, writer.Position);
+            destination = destination[..writer.Position];
         }
 
         /// <summary>
@@ -566,7 +566,7 @@ namespace Orleans.Serialization
             var writer = Writer.Create(destination, session);
             _codec.WriteField(ref writer, 0, typeof(T), value);
             writer.Commit();
-            destination = destination.Slice(0, writer.Position);
+            destination = destination[..writer.Position];
         }
 
         /// <summary>
@@ -581,7 +581,7 @@ namespace Orleans.Serialization
             var writer = Writer.Create(destination, session);
             _codec.WriteField(ref writer, 0, typeof(T), value);
             writer.Commit();
-            destination = destination.Slice(0, writer.Position);
+            destination = destination[..writer.Position];
         }
 
         /// <summary>
@@ -596,7 +596,7 @@ namespace Orleans.Serialization
             var writer = Writer.Create(destination, session);
             _codec.WriteField(ref writer, 0, typeof(T), value);
             writer.Commit();
-            destination = destination.Slice(0, writer.Position);
+            destination = destination[..writer.Position];
         }
 
         /// <summary>
@@ -611,7 +611,7 @@ namespace Orleans.Serialization
             var writer = Writer.Create(destination, session);
             _codec.WriteField(ref writer, 0, typeof(T), value);
             writer.Commit();
-            destination = destination.Slice(0, writer.Position);
+            destination = destination[..writer.Position];
         }
 
         /// <summary>
@@ -959,7 +959,7 @@ namespace Orleans.Serialization
             _codec.Serialize(ref writer, ref value);
             writer.WriteEndObject();
             writer.Commit();
-            destination = destination.Slice(0, writer.Position);
+            destination = destination[..writer.Position];
         }
 
         /// <summary>
@@ -975,7 +975,7 @@ namespace Orleans.Serialization
             _codec.Serialize(ref writer, ref value);
             writer.WriteEndObject();
             writer.Commit();
-            destination = destination.Slice(0, writer.Position);
+            destination = destination[..writer.Position];
         }
 
         /// <summary>
@@ -991,7 +991,7 @@ namespace Orleans.Serialization
             _codec.Serialize(ref writer, ref value);
             writer.WriteEndObject();
             writer.Commit();
-            destination = destination.Slice(0, writer.Position);
+            destination = destination[..writer.Position];
         }
 
         /// <summary>
@@ -1007,7 +1007,7 @@ namespace Orleans.Serialization
             _codec.Serialize(ref writer, ref value);
             writer.WriteEndObject();
             writer.Commit();
-            destination = destination.Slice(0, writer.Position);
+            destination = destination[..writer.Position];
         }
 
         /// <summary>
@@ -1281,7 +1281,7 @@ namespace Orleans.Serialization
             var writer = Writer.Create(destination, session);
             ObjectCodec.WriteField(ref writer, 0, type, value);
             writer.Commit();
-            destination = destination.Slice(0, writer.Position);
+            destination = destination[..writer.Position];
         }
 
         /// <summary>
@@ -1297,7 +1297,7 @@ namespace Orleans.Serialization
             var writer = Writer.Create(destination, session);
             ObjectCodec.WriteField(ref writer, 0, type, value);
             writer.Commit();
-            destination = destination.Slice(0, writer.Position);
+            destination = destination[..writer.Position];
         }
 
         /// <summary>
@@ -1427,7 +1427,7 @@ namespace Orleans.Serialization
             var writer = Writer.Create(destination, session);
             ObjectCodec.WriteField(ref writer, 0, type, value);
             writer.Commit();
-            destination = destination.Slice(0, writer.Position);
+            destination = destination[..writer.Position];
         }
 
         /// <summary>
@@ -1443,7 +1443,7 @@ namespace Orleans.Serialization
             var writer = Writer.Create(destination, session);
             ObjectCodec.WriteField(ref writer, 0, type, value);
             writer.Commit();
-            destination = destination.Slice(0, writer.Position);
+            destination = destination[..writer.Position];
         }
 
         /// <summary>

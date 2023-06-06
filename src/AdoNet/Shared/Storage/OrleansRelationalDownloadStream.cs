@@ -74,49 +74,34 @@ namespace Orleans.Tests.SqlUtils
         /// <summary>
         /// Can the stream be read.
         /// </summary>
-        public override bool CanRead
-        {
-            get { return ((reader != null) && (!reader.IsClosed)); }
-        }
+        public override bool CanRead => ((reader != null) && (!reader.IsClosed));
 
 
         /// <summary>
         /// Are seeks supported.
         /// </summary>
         /// <remarks>Returns <em>FALSE</em>.</remarks>
-        public override bool CanSeek
-        {
-            get { return false; }
-        }
+        public override bool CanSeek => false;
 
 
         /// <summary>
         /// Can the stream timeout.
         /// </summary>
         /// <remarks>Returns <em>FALSE</em>.</remarks>
-        public override bool CanTimeout
-        {
-            get { return true; }
-        }
+        public override bool CanTimeout => true;
 
 
         /// <summary>
         /// Can the stream write.
         /// </summary>
         /// <remarks>Returns <em>FALSE</em>.</remarks>
-        public override bool CanWrite
-        {
-            get { return false; }
-        }
+        public override bool CanWrite => false;
 
 
         /// <summary>
         /// The length of the stream.
         /// </summary>        
-        public override long Length
-        {
-            get { return totalBytes; }
-        }
+        public override long Length => totalBytes;
 
 
         /// <summary>

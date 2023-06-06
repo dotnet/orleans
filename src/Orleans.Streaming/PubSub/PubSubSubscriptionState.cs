@@ -39,7 +39,7 @@ namespace Orleans.Streams
         public SubscriptionStates state;
 
         [JsonIgnore]
-        public bool IsFaulted { get { return state == SubscriptionStates.Faulted; } }
+        public bool IsFaulted => state == SubscriptionStates.Faulted;
 
         // This constructor has to be public for JSonSerialization to work!
         // Implement ISerializable if changing it to non-public

@@ -89,9 +89,6 @@ namespace Orleans.Clustering.DynamoDB
 
         public TimeSpan MaxStaleness { get; }
 
-        public bool IsUpdatable
-        {
-            get { return true; }
-        }
+        public bool IsUpdatable => true;
     }
 }

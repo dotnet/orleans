@@ -20,7 +20,7 @@ namespace Orleans.Runtime
 
         public string Name { get; }
 
-        private bool TimerAlreadyStopped { get { return timer == null || asyncCallback == null; } }
+        private bool TimerAlreadyStopped => timer == null || asyncCallback == null;
 
         private GrainTimer(IGrainContext activationData, ILogger logger, Func<object, Task> asyncCallback, object state, TimeSpan dueTime, TimeSpan period, string name)
         {

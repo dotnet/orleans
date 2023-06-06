@@ -47,10 +47,7 @@ namespace Orleans
         }
         public ClientGatewayObserver gatewayObserver { get; private set; }
 
-        public string CurrentActivationIdentity
-        {
-            get { return CurrentActivationAddress.ToString(); }
-        }
+        public string CurrentActivationIdentity => CurrentActivationAddress.ToString();
 
         public IGrainReferenceRuntime GrainReferenceRuntime { get; private set; }
 

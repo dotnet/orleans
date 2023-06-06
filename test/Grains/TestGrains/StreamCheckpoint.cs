@@ -17,7 +17,7 @@ namespace TestGrains
         [Orleans.Id(4)]
         public TState Accumulator { get; set; }
 
-        public StreamSequenceToken RecoveryToken { get { return LastProcessedToken ?? StartToken; } }
+        public StreamSequenceToken RecoveryToken => LastProcessedToken ?? StartToken;
 
         public bool IsDuplicate(StreamSequenceToken sequenceToken)
         {

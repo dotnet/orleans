@@ -34,7 +34,7 @@ namespace Orleans.Streams
     {
         private readonly Dictionary<TBucket, List<TResource>> idealDistribution;
 
-        public Dictionary<TBucket, List<TResource>> IdealDistribution { get { return idealDistribution; } }
+        public Dictionary<TBucket, List<TResource>> IdealDistribution => idealDistribution;
 
         /// <summary>
         /// Constructor.

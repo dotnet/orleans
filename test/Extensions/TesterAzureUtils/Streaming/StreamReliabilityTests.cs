@@ -46,7 +46,7 @@ namespace UnitTests.Streaming.Reliability
 
             numExpectedSilos = 2;
             builder.CreateSiloAsync = StandaloneSiloHandle.CreateForAssembly(GetType().Assembly);
-            builder.Options.InitialSilosCount = (short) numExpectedSilos;
+            builder.Options.InitialSilosCount = (short)numExpectedSilos;
             builder.Options.UseTestClusterMembership = false;
 
             builder.AddSiloBuilderConfigurator<SiloBuilderConfigurator>();
@@ -57,10 +57,8 @@ namespace UnitTests.Streaming.Reliability
         {
             public void Configure(IConfiguration configuration, IClientBuilder clientBuilder)
             {
-                clientBuilder.UseAzureStorageClustering(gatewayOptions =>
-                {
-                    gatewayOptions.ConfigureTestDefaults();
-                })
+                clientBuilder.UseAzureStorageClustering(
+                    gatewayOptions => gatewayOptions.ConfigureTestDefaults())
                 .AddAzureQueueStreams(AZURE_QUEUE_STREAM_PROVIDER_NAME, ob => ob.Configure<IOptions<ClusterOptions>>(
                     (options, dep) =>
                     {
@@ -76,15 +74,13 @@ namespace UnitTests.Streaming.Reliability
         {
             public void Configure(ISiloBuilder hostBuilder)
             {
-                hostBuilder.UseAzureStorageClustering(options =>
+                hostBuilder.UseAzureStorageClustering(
+                    options => options.ConfigureTestDefaults())
+                .AddAzureTableGrainStorage("AzureStore", builder => builder.Configure<IOptions<ClusterOptions>>((options, silo) =>
                 {
                     options.ConfigureTestDefaults();
-                })
-                .AddAzureTableGrainStorage("AzureStore", builder => builder.Configure<IOptions<ClusterOptions>>((options, silo) =>
-                    {
-                        options.ConfigureTestDefaults();
-                        options.DeleteStateOnClear = true;
-                    }))
+                    options.DeleteStateOnClear = true;
+                }))
                 .AddMemoryGrainStorage("MemoryStore", options => options.NumStorageGrains = 1)
                 .AddMemoryStreams<DefaultMemoryMessageBodySerializer>(SMS_STREAM_PROVIDER_NAME)
                 .AddAzureTableGrainStorage("PubSubStore", builder => builder.Configure<IOptions<ClusterOptions>>((options, silo) =>
@@ -210,7 +206,7 @@ namespace UnitTests.Streaming.Reliability
             StreamTestUtils.LogEndTest(testName, logger);
         }
 
-        [SkippableFact(Skip ="Ignore"), TestCategory("Failures"), TestCategory("Streaming"), TestCategory("Reliability")]
+        [SkippableFact(Skip = "Ignore"), TestCategory("Failures"), TestCategory("Streaming"), TestCategory("Reliability")]
         public async Task SMS_AddMany_Consumers()
         {
             const string testName = "SMS_AddMany_Consumers";
@@ -458,7 +454,7 @@ namespace UnitTests.Streaming.Reliability
             }
             ////Thread.Sleep(TimeSpan.FromSeconds(2));
             // Messages received by original consumer grain
-            await CheckReceivedCounts(when2, consumerGrain, numLoops*2 + 1, 0);
+            await CheckReceivedCounts(when2, consumerGrain, numLoops * 2 + 1, 0);
             // Messages received by new consumer grains
             await Task.WhenAll(grains2.Select(g => CheckReceivedCounts(when2, g, numLoops, 0)));
 
@@ -937,9 +933,9 @@ namespace UnitTests.Streaming.Reliability
             }
             expectedReceived += numLoops;
             // Old consumer received the newly published messages
-            await CheckReceivedCounts(when+"-Old", consumerGrain, expectedReceived, 0);
+            await CheckReceivedCounts(when + "-Old", consumerGrain, expectedReceived, 0);
             // New consumer received the newly published messages
-            await CheckReceivedCounts(when+"-New", newConsumer, numLoops, 0);
+            await CheckReceivedCounts(when + "-New", newConsumer, numLoops, 0);
 
             StreamTestUtils.LogEndTest(testName, logger);
         }
@@ -993,13 +989,13 @@ namespace UnitTests.Streaming.Reliability
             }
             else if (kill)
             {
-               await HostedCluster.KillSiloAsync(silo);
-               Assert.False(silo.IsActive);
+                await HostedCluster.KillSiloAsync(silo);
+                Assert.False(silo.IsActive);
             }
             else
             {
-               await HostedCluster.StopSiloAsync(silo);
-               Assert.False(silo.IsActive);
+                await HostedCluster.StopSiloAsync(silo);
+                Assert.False(silo.IsActive);
             }
 
             // WaitForLivenessToStabilize(!kill);
@@ -1007,15 +1003,12 @@ namespace UnitTests.Streaming.Reliability
         }
 
 #if USE_GENERICS
-        protected IStreamReliabilityTestGrain<int> GetGrain(long grainId)
+        protected IStreamReliabilityTestGrain<int> GetGrain(long grainId) =>
+            StreamReliabilityTestGrainFactory<int>.GetGrain(grainId);
 #else
         protected IStreamReliabilityTestGrain GetGrain(long grainId) =>
-#if USE_GENERICS
-            return StreamReliabilityTestGrainFactory<int>.GetGrain(grainId);
-#else
             GrainFactory.GetGrain<IStreamReliabilityTestGrain>(grainId);
 #endif
-
 
 #if USE_GENERICS
         private IStreamReliabilityTestGrain<int> CreateGrainOnSilo(SiloHandle silo)
@@ -1062,7 +1055,10 @@ namespace UnitTests.Streaming.Reliability
             Assert.Equal(expectedNumConsumers, consumerHandleCount);
             Assert.Equal(expectedNumConsumers, consumerObserverCount);
         }
-        private void CheckSilosRunning(string when, int expectedNumSilos) => Assert.Equal(expectedNumSilos, HostedCluster.GetActiveSilos().Count());
+
+        private void CheckSilosRunning(string when, int expectedNumSilos) =>
+            Assert.Equal(expectedNumSilos, HostedCluster.GetActiveSilos().Count());
+
         protected async Task<bool> CheckGrainCounts()
         {
 #if USE_GENERICS

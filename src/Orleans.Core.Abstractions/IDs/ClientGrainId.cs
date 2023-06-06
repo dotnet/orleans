@@ -48,7 +48,7 @@ namespace Orleans.Runtime
             var key = grainId.Key.AsSpan();
             if (key.IndexOf((byte)ObserverGrainId.SegmentSeparator) is int index && index >= 0)
             {
-                key = key.Slice(0, index);
+                key = key[..index];
                 grainId = new GrainId(grainId.Type, new IdSpan(key.ToArray()));
             }
 

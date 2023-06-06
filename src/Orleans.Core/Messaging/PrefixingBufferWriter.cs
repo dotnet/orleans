@@ -109,7 +109,7 @@ namespace Orleans.Runtime.Messaging
                 if (prefixMemory.IsEmpty)
                     Initialize(sizeHint);
 
-                var res = realMemory.Slice(advanced);
+                var res = realMemory[advanced..];
                 if (!res.IsEmpty && (uint)sizeHint <= (uint)res.Length)
                     return res;
 
@@ -124,7 +124,7 @@ namespace Orleans.Runtime.Messaging
         {
             if (privateWriter == null)
             {
-                var res = realMemory.Span.Slice(advanced);
+                var res = realMemory.Span[advanced..];
                 if ((uint)sizeHint < (uint)res.Length)
                     return res;
             }
@@ -197,8 +197,8 @@ namespace Orleans.Runtime.Messaging
         {
             var sizeToRequest = expectedPrefixSize + Math.Max(sizeHint, payloadSizeHint);
             var memory = innerWriter.GetMemory(sizeToRequest);
-            prefixMemory = memory.Slice(0, expectedPrefixSize);
-            realMemory = memory.Slice(expectedPrefixSize);
+            prefixMemory = memory[..expectedPrefixSize];
+            realMemory = memory[expectedPrefixSize..];
         }
 
         /// <summary>
@@ -349,7 +349,7 @@ namespace Orleans.Runtime.Messaging
                 /// </remarks>
                 internal int End { get; private set; }
 
-                internal Memory<byte> TrailingSlack => AvailableMemory.Slice(End);
+                internal Memory<byte> TrailingSlack => AvailableMemory[End..];
 
                 private IMemoryOwner<byte> MemoryOwner;
 
@@ -396,7 +396,7 @@ namespace Orleans.Runtime.Messaging
                     // If we ever support creating these instances on existing arrays, such that
                     // this.Start isn't 0 at the beginning, we'll have to "pin" this.Start and remove
                     // Advance, forcing Sequence<T> itself to track it, the way Pipe does it internally.
-                    Memory = AvailableMemory.Slice(0, value);
+                    Memory = AvailableMemory[..value];
                     End = value;
 
                     static void ThrowNegative() => throw new ArgumentOutOfRangeException(

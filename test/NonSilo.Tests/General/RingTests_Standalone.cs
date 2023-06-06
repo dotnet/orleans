@@ -206,7 +206,7 @@ namespace UnitTests.General
     internal class RangeBreakable
     {
         private List<SingleRange> ranges { get; set; }
-        internal int NumRanges { get { return ranges.Count(); } }
+        internal int NumRanges => ranges.Count();
 
         public RangeBreakable()
         {

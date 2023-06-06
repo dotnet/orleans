@@ -115,7 +115,7 @@ namespace Orleans.Runtime.GrainDirectory
         private readonly ISiloStatusOracle siloStatusOracle;
         private readonly IOptions<GrainDirectoryOptions> grainDirectoryOptions;
 
-        internal int Count { get { return partitionData.Count; } }
+        internal int Count => partitionData.Count;
 
         public GrainDirectoryPartition(ISiloStatusOracle siloStatusOracle, IOptions<GrainDirectoryOptions> grainDirectoryOptions, ILoggerFactory loggerFactory)
         {

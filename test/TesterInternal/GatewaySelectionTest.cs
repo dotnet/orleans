@@ -89,15 +89,9 @@ namespace UnitTests.MessageCenterTests
 
             public Task<IList<Uri>> GetGateways() => Task.FromResult(list);
 
-            public TimeSpan MaxStaleness
-            {
-                get { return TimeSpan.FromMinutes(1); }
-            }
+            public TimeSpan MaxStaleness => TimeSpan.FromMinutes(1);
 
-            public bool IsUpdatable
-            {
-                get { return false; }
-            }
+            public bool IsUpdatable => false;
             public Task InitializeGatewayListProvider() => Task.CompletedTask;
         }
     }

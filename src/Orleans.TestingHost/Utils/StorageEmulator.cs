@@ -43,13 +43,7 @@ namespace Orleans.TestingHost.Utils
         /// Checks if the storage emulator exists, i.e. is installed.
         /// </summary>
         /// <value><see langword="true" /> if the storage emulator exists; otherwise, <see langword="false" />.</value>
-        public static bool Exists
-        {
-            get
-            {
-                return GetStorageEmulatorPath() != null;
-            }
-        }
+        public static bool Exists => GetStorageEmulatorPath() != null;
 
         /// <summary>
         /// Storage Emulator help.

@@ -80,30 +80,15 @@ namespace Orleans.Runtime
 
         internal static LegacyGrainId GetGrainServiceGrainId(int typeData, string systemGrainId) => FindOrCreateGrainId(UniqueKey.NewGrainServiceKey(systemGrainId, typeData));
 
-        public Guid PrimaryKey
-        {
-            get { return GetPrimaryKey(); }
-        }
+        public Guid PrimaryKey => GetPrimaryKey();
 
-        public long PrimaryKeyLong
-        {
-            get { return GetPrimaryKeyLong(); }
-        }
+        public long PrimaryKeyLong => GetPrimaryKeyLong();
 
-        public string PrimaryKeyString
-        {
-            get { return GetPrimaryKeyString(); }
-        }
+        public string PrimaryKeyString => GetPrimaryKeyString();
 
-        public string IdentityString
-        {
-            get { return ToDetailedString(); }
-        }
+        public string IdentityString => ToDetailedString();
 
-        public bool IsLongKey
-        {
-            get { return Key.IsLongKey; }
-        }
+        public bool IsLongKey => Key.IsLongKey;
 
         public long GetPrimaryKeyLong(out string keyExt) => Key.PrimaryKeyToLong(out keyExt);
 
@@ -176,7 +161,7 @@ namespace Orleans.Runtime
             var keySpan = id.Key.Value.Span;
             if (keySpan.Length < 32) return null;
 
-            if (!Utf8Parser.TryParse(keySpan.Slice(0, 16), out ulong n0, out len, 'X') || len < 16)
+            if (!Utf8Parser.TryParse(keySpan[..16], out ulong n0, out len, 'X') || len < 16)
                 return null;
 
             if (!Utf8Parser.TryParse(keySpan.Slice(16, 16), out ulong n1, out len, 'X') || len < 16)
@@ -185,7 +170,7 @@ namespace Orleans.Runtime
             if (keySpan.Length > 32)
             {
                 if (keySpan[32] != '+') return null;
-                keyExt = Encoding.UTF8.GetString(keySpan.Slice(33));
+                keyExt = Encoding.UTF8.GetString(keySpan[33..]);
             }
 
             return FindOrCreateGrainId(UniqueKey.NewKey(n0, n1, typeCodeData, keyExt));
@@ -229,7 +214,7 @@ namespace Orleans.Runtime
             if (!detailed)
             {
                 if (keyString.Length >= 48)
-                    idString = keyString.Substring(24, 8) + keyString.Substring(48);
+                    idString = keyString.Substring(24, 8) + keyString[48..];
                 else
                     idString = keyString.Substring(24, 8);
             }
@@ -240,7 +225,7 @@ namespace Orleans.Runtime
                 case UniqueKey.Category.Grain:
                 case UniqueKey.Category.KeyExtGrain:
                     var typeString = TypeCode.ToString("X");
-                    if (!detailed) typeString = typeString.Substring(Math.Max(0, typeString.Length - 8));
+                    if (!detailed) typeString = typeString[Math.Max(0, typeString.Length - 8)..];
                     fullString = $"*grn/{typeString}/{idString}";
                     break;
                 case UniqueKey.Category.Client:

@@ -41,9 +41,6 @@ namespace UnitTests.Grains
             return MySimpleGrain;
         }
 
-        public Task<int> A
-        {
-            get { return Task.FromResult(State.A); }
-        }
+        public Task<int> A => Task.FromResult(State.A);
     }
 }
