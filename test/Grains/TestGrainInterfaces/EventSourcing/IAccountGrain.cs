@@ -29,7 +29,7 @@
 
         /// <summary> A description for this transaction  </summary>
         [Id(1)]
-        public String Description { get; set; }
+        public string Description { get; set; }
 
         /// <summary> time on which the request entered the system  </summary>
         [Id(2)]

@@ -254,7 +254,7 @@ namespace Orleans.Runtime
             lock (lockable)
             {
                 if (!SystemStatus.Equals(SystemStatus.Created))
-                    throw new InvalidOperationException(String.Format("Calling Silo.Start() on a silo which is not in the Created state. This silo is in the {0} state.", SystemStatus));
+                    throw new InvalidOperationException(string.Format("Calling Silo.Start() on a silo which is not in the Created state. This silo is in the {0} state.", SystemStatus));
 
                 SystemStatus = SystemStatus.Starting;
             }

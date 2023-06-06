@@ -205,7 +205,7 @@ namespace UnitTests.General
         private static void AssertIsInRange(int actual, double expected, int leavy)
         {
             Assert.True(expected - leavy <= actual && actual <= expected + leavy,
-                String.Format("Expecting a value in the range between {0} and {1}, but instead got {2} outside the range.",
+                string.Format("Expecting a value in the range between {0} and {1}, but instead got {2} outside the range.",
                     expected - leavy, expected + leavy, actual));
         }
 

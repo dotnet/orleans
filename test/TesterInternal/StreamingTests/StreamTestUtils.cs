@@ -74,7 +74,7 @@ namespace UnitTests.StreamingTests
         {
             // expected == -1 means don't care / don't assert check value.
             var prefix = expected == -1 ? "Not-checked" : actual == expected ? "True" : "FALSE";
-            var fmtMsg = String.Format("--> {0}: ", prefix) + String.Format(msg, args);
+            var fmtMsg = string.Format("--> {0}: ", prefix) + string.Format(msg, args);
             output.WriteLine(fmtMsg);
             if (expected != -1)
             {

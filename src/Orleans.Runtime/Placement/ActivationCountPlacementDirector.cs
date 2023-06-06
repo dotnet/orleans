@@ -97,7 +97,7 @@ namespace Orleans.Runtime.Placement
             var debugLog = string.Format("Unable to select a candidate from {0} silos: {1}", all.Count,
                 Utils.EnumerableToString(
                     all,
-                    kvp => String.Format("SiloAddress = {0} -> {1}", kvp.Key.ToString(), kvp.Value.ToString())));
+                    kvp => string.Format("SiloAddress = {0} -> {1}", kvp.Key.ToString(), kvp.Value.ToString())));
             logger.LogWarning((int)ErrorCode.Placement_ActivationCountBasedDirector_NoSilos, "{Message}", debugLog);
             throw new OrleansException(debugLog);
         }

@@ -194,7 +194,7 @@ namespace AWSUtils.Tests.Streaming
         {
             const string DeploymentIdFormat = "cluster-{0}";
             var now = DateTime.UtcNow.ToString("yyyy-MM-dd-hh-mm-ss-ffff");
-            return String.Format(DeploymentIdFormat, now);
+            return string.Format(DeploymentIdFormat, now);
         }
     }
 }

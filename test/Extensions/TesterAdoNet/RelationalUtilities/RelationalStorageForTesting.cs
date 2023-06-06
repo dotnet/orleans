@@ -108,7 +108,7 @@ namespace UnitTests.General
 
             Console.WriteLine("Creating database tables...");
 
-            var setupScript = String.Empty;
+            var setupScript = string.Empty;
 
             // Concatenate scripts
             foreach (var fileName in testStorage.SetupSqlScriptFileNames)

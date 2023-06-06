@@ -37,7 +37,7 @@ namespace UnitTests.Grains
     {
         private readonly ILogger logger;
         public DeadlockNonReentrantGrain(ILoggerFactory loggerFactory) => logger = loggerFactory.CreateLogger(Id);
-        private string Id => String.Format("DeadlockNonReentrantGrain {0}", base.IdentityString);
+        private string Id => string.Format("DeadlockNonReentrantGrain {0}", base.IdentityString);
 
         public async Task CallNext_1(List<(long GrainId, bool Blocking)> callChain, int currCallIndex)
         {

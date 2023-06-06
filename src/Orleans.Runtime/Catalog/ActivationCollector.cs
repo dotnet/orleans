@@ -355,7 +355,7 @@ namespace Orleans.Runtime
         {
             if (timeout < quantum)
             {
-                throw new ArgumentException(String.Format("timeout must be at least {0}, but it is {1}", quantum, timeout), "timeout");
+                throw new ArgumentException(string.Format("timeout must be at least {0}, but it is {1}", quantum, timeout), "timeout");
             }
 
             return MakeTicketFromDateTime(DateTime.UtcNow + timeout);

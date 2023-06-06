@@ -251,6 +251,6 @@ namespace Orleans.Streams
 
         public override int GetHashCode() => SubscriptionId.GetHashCode();
 
-        public override string ToString() => String.Format("StreamSubscriptionHandleImpl:Stream={0},HandleId={1}", IsValid ? streamImpl.InternalStreamId.ToString() : "null", HandleId);
+        public override string ToString() => string.Format("StreamSubscriptionHandleImpl:Stream={0},HandleId={1}", IsValid ? streamImpl.InternalStreamId.ToString() : "null", HandleId);
     }
 }

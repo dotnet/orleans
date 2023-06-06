@@ -48,7 +48,7 @@ namespace Orleans.Runtime
 
         public void Start(TimeSpan due, TimeSpan period)
         {
-            if (timerStarted) throw new InvalidOperationException(String.Format("Calling start on timer {0} is not allowed, since it was already created in a started mode with specified due.", GetFullName()));
+            if (timerStarted) throw new InvalidOperationException(string.Format("Calling start on timer {0} is not allowed, since it was already created in a started mode with specified due.", GetFullName()));
             if (period == TimeSpan.Zero) throw new ArgumentOutOfRangeException("period", period, "Cannot use TimeSpan.Zero for timer period");
 
             var dueTm = (long)dueTime.TotalMilliseconds;
@@ -146,7 +146,7 @@ namespace Orleans.Runtime
         public bool CheckTimerFreeze(DateTime lastCheckTime, Func<string> callerName)
         {
             return CheckTimerDelay(previousTickTime, totalNumTicks,
-                        dueTime, timerFrequency, logger, () => String.Format("{0}.{1}", GetFullName(), callerName()), ErrorCode.Timer_SafeTimerIsNotTicking, true);
+                        dueTime, timerFrequency, logger, () => string.Format("{0}.{1}", GetFullName(), callerName()), ErrorCode.Timer_SafeTimerIsNotTicking, true);
         }
 
         public static bool CheckTimerDelay(DateTime previousTickTime, int totalNumTicks, 

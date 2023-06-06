@@ -8,7 +8,7 @@ namespace UnitTests.Grains
         {
             var strAll = string.Empty;
             foreach(var str in strArray)
-                strAll = String.Concat(strAll, str);
+                strAll = string.Concat(strAll, str);
 
             return Task.FromResult(strAll);
         }

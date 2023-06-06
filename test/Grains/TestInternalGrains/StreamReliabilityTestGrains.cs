@@ -264,7 +264,7 @@ namespace UnitTests.Grains
 
         private void TryInitStream(Guid streamId, string providerName)
         {
-            if (providerName == null) throw new ArgumentNullException(nameof(providerName));
+            ArgumentNullException.ThrowIfNull(providerName);
 
             State.StreamProviderName = providerName;
 
@@ -361,7 +361,7 @@ namespace UnitTests.Grains
 
         public override Task OnActivateAsync(CancellationToken cancellationToken)
         {
-            logger.LogInformation(String.Format("OnActivateAsync IsProducer = {0}, IsConsumer = {1}.",
+            logger.LogInformation(string.Format("OnActivateAsync IsProducer = {0}, IsConsumer = {1}.",
                 State.IsProducer, State.ConsumerSubscriptionHandles != null && State.ConsumerSubscriptionHandles.Count > 0));
             return Task.CompletedTask;
         }

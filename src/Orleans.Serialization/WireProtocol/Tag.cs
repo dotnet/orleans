@@ -52,14 +52,14 @@ namespace Orleans.Serialization.WireProtocol
         internal Tag(uint tag) => _tag = tag;
 
         /// <summary>
-        /// Performs an implicit conversion from <see cref="System.Byte"/> to <see cref="Tag"/>.
+        /// Performs an implicit conversion from <see cref="byte"/> to <see cref="Tag"/>.
         /// </summary>
         /// <param name="tag">The tag.</param>
         /// <returns>The result of the conversion.</returns>
         public static implicit operator Tag(byte tag) => new Tag(tag);
 
         /// <summary>
-        /// Performs an implicit conversion from <see cref="Tag"/> to <see cref="System.Byte"/>.
+        /// Performs an implicit conversion from <see cref="Tag"/> to <see cref="byte"/>.
         /// </summary>
         /// <param name="tag">The tag.</param>
         /// <returns>The result of the conversion.</returns>

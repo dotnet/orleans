@@ -110,7 +110,7 @@ namespace UnitTests.OrleansRuntime.Streams
                     // if this fails with clean block, then requested size is too big
                     if (!currentBuffer.TryGetSegment(size, out segment))
                     {
-                        var errmsg = String.Format(CultureInfo.InvariantCulture,
+                        var errmsg = string.Format(CultureInfo.InvariantCulture,
                             "Message size is too big. MessageSize: {0}", size);
                         throw new ArgumentOutOfRangeException(nameof(queueMessage), errmsg);
                     }

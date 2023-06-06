@@ -242,7 +242,7 @@ namespace Orleans.Runtime
                     fullString = "???/" + idString;
                     break;
             }
-            return detailed ? String.Format("{0}-0x{1, 8:X8}", fullString, GetUniformHashCode()) : fullString;
+            return detailed ? string.Format("{0}-0x{1, 8:X8}", fullString, GetUniformHashCode()) : fullString;
         }
 
         public static bool IsLegacyGrainType(Type type)

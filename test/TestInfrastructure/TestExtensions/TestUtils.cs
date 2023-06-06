@@ -94,7 +94,7 @@ namespace Tester
             if (baseline > TimeSpan.Zero)
             {
                 var delta = (duration - baseline).TotalMilliseconds / baseline.TotalMilliseconds;
-                timeDeltaStr = String.Format("-- Change = {0}%", 100.0 * delta);
+                timeDeltaStr = string.Format("-- Change = {0}%", 100.0 * delta);
             }
             Console.WriteLine("Time for {0} loops doing {1} = {2} {3} Memory used={4}", numIterations, what, duration, timeDeltaStr, memUsed);
             return duration;
