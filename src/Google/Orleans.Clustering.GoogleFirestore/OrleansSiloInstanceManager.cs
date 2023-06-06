@@ -46,7 +46,7 @@ internal class OrleansSiloInstanceManager
         }
     }
 
-    public MembershipEntity CreateClusterVersionEntity(int version)
+    public ClusterVersionEntity CreateClusterVersionEntity(int version)
     {
         return new ClusterVersionEntity
         {
@@ -94,6 +94,7 @@ internal class OrleansSiloInstanceManager
 
         try
         {
+            var e = await this._storage.ReadAllEntities<SiloInstanceEntity>();
             var results = await this._storage.QueryEntities<SiloInstanceEntity>(
                 silo => silo
                     .WhereEqualTo(nameof(SiloInstanceEntity.Status), INSTANCE_STATUS_ACTIVE)
@@ -112,7 +113,7 @@ internal class OrleansSiloInstanceManager
         }
     }
 
-    internal Task<string> MergeTableEntryAsync(SiloInstanceEntity data) => this._storage.UpsertEntity(data); // we merge this without checking eTags.
+    internal Task<string> MergeTableEntryAsync(IDictionary<string, object?> fields, string id) => this._storage.MergeEntity(fields, id); // we merge this without checking eTags.
 
     internal Task<SiloInstanceEntity?> ReadSingleTableEntryAsync(string id) => this._storage.ReadEntity<SiloInstanceEntity>(id);
 
@@ -130,14 +131,11 @@ internal class OrleansSiloInstanceManager
 
     public async Task CleanupDefunctSiloEntries(DateTimeOffset beforeDate)
     {
-        var e = await this._storage.ReadAllEntities<SiloInstanceEntity>();
         var entities = await this._storage.QueryEntities<SiloInstanceEntity>(
             silo => silo
-                // .WhereLessThan(nameof(SiloInstanceEntity.ETag), beforeDate)
+                .WhereLessThan(nameof(SiloInstanceEntity.IAmAliveTime), beforeDate)
                 .WhereNotEqualTo(nameof(SiloInstanceEntity.Status), INSTANCE_STATUS_ACTIVE)
             );
-
-        entities = entities.Where(e => e.Id != this._clusterId && e.ETag < beforeDate).ToArray();
 
         if (entities.Length > 0)
         {
@@ -184,14 +182,14 @@ internal class OrleansSiloInstanceManager
         return (silo, version);
     }
 
-    internal async Task<(SiloInstanceEntity Silo, ClusterVersionEntity Version)[]> FindAllSiloEntries()
+    internal async Task<(SiloInstanceEntity[] Silos, ClusterVersionEntity Version)> FindAllSiloEntries()
     {
         var version = await this._storage.ReadEntity<ClusterVersionEntity>(this._clusterId) ?? throw new KeyNotFoundException($"Could not find cluster version entry for {this._clusterId}");
 
         var silos = await this._storage.ReadAllEntities<SiloInstanceEntity>();
         silos = silos.Where(e => e.Id != this._clusterId).ToArray(); // Exclude the cluster version entry
 
-        return silos.Select(silo => (silo, version)).ToArray();
+        return (silos, version);
     }
 
     /// <summary>
@@ -234,7 +232,7 @@ internal class OrleansSiloInstanceManager
         {
             result = await this._storage.ExecuteTransaction(trx =>
             {
-                trx.Set(siloReference, silo);
+                trx.Create(siloReference, silo);
                 trx.Update(versionReference, version.GetFields(), Precondition.LastUpdated(Timestamp.FromDateTimeOffset(version.ETag)));
                 return Task.FromResult(true);
             });

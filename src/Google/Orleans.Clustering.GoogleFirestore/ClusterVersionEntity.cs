@@ -27,4 +27,6 @@ internal class ClusterVersionEntity : MembershipEntity
 
         return sb.ToString();
     }
+
+    public TableVersion ToTableVersion() => new(this.MembershipVersion, Utils.FormatTimestamp(this.ETag));
 }

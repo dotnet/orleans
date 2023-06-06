@@ -5,6 +5,7 @@ using Microsoft.Extensions.Logging;
 using Google.Api.Gax;
 using Google.Cloud.Firestore;
 using System.Globalization;
+using System.Collections.Generic;
 
 #if ORLEANS_CLUSTERING
 namespace Orleans.Clustering.GoogleFirestore;
@@ -111,7 +112,7 @@ internal class FirestoreDataManager
             var docRef = collection.Document(entity.Id);
             var result = await docRef.CreateAsync(entity);
 
-            return FormatTimestamp(result.UpdateTime);
+            return Utils.FormatTimestamp(result.UpdateTime);
         }
         catch (Exception ex)
         {
@@ -137,11 +138,30 @@ internal class FirestoreDataManager
             var docRef = collection.Document(entity.Id);
 
             var result = await docRef.SetAsync(entity, SetOptions.MergeAll);
-            return FormatTimestamp(result.UpdateTime);
+            return Utils.FormatTimestamp(result.UpdateTime);
         }
         catch (Exception ex)
         {
             this.LogError(ex, nameof(this.UpsertEntity));
+            throw;
+        }
+    }
+
+    public async Task<string> MergeEntity(IDictionary<string, object?> fields, string id)
+    {
+        var collection = this.GetCollection();
+        if (this.Logger.IsEnabled(LogLevel.Trace)) this.Logger.LogTrace("Merging entity {id} on collection {collection}", id, this._partition);
+
+        try
+        {
+            var docRef = collection.Document(id);
+
+            var result = await docRef.SetAsync(fields, SetOptions.MergeAll);
+            return Utils.FormatTimestamp(result.UpdateTime);
+        }
+        catch (Exception ex)
+        {
+            this.LogError(ex, nameof(this.MergeEntity));
             throw;
         }
     }
@@ -163,7 +183,7 @@ internal class FirestoreDataManager
             var docRef = collection.Document(entity.Id);
 
             var result = await docRef.UpdateAsync(entity.GetFields(), Precondition.LastUpdated(Timestamp.FromDateTimeOffset(entity.ETag)));
-            return FormatTimestamp(result.UpdateTime);
+            return Utils.FormatTimestamp(result.UpdateTime);
         }
         catch (Exception ex)
         {
@@ -177,7 +197,7 @@ internal class FirestoreDataManager
     /// </summary>
     /// <param name="id">The entity's id</param>
     /// <param name="eTag">The entity's eTag</param>
-    public Task DeleteEntity(string id, string eTag) => this.DeleteEntity(id, ParseTimestamp(eTag));
+    public Task DeleteEntity(string id, string eTag) => this.DeleteEntity(id, Utils.ParseTimestamp(eTag));
 
     /// <summary>
     /// Delete an entity.
@@ -351,12 +371,6 @@ internal class FirestoreDataManager
             if (entity.ETag < DateTimeOffset.UnixEpoch) throw new InvalidOperationException("ETag must be greater than 1970-01-01T00:00:00Z");
         }
     }
-
-    private static string FormatTimestamp(Timestamp ts) =>
-        ts.ToDateTimeOffset().ToString("O", CultureInfo.InvariantCulture);
-
-    private static DateTimeOffset ParseTimestamp(string ts) =>
-        DateTimeOffset.ParseExact(ts, "O", CultureInfo.InvariantCulture);
 
     public CollectionReference GetCollection() =>
         this._db.Collection($"{this._options.RootCollectionName}").Document(this._group).Collection(this._partition);

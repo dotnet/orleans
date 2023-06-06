@@ -1,7 +1,10 @@
 using System;
+using System.Net;
 using System.Text;
+using System.Linq;
 using System.Collections.Generic;
 using Google.Cloud.Firestore;
+using Orleans.Runtime;
 
 namespace Orleans.Clustering.GoogleFirestore;
 
@@ -12,7 +15,7 @@ internal class SiloInstanceEntity : MembershipEntity
     public string Address { get; set; } = default!;
 
     [FirestoreProperty("Port")]
-    public string Port { get; set; } = default!;
+    public int Port { get; set; } = default!;
 
     [FirestoreProperty("Generation")]
     public int Generation { get; set; }
@@ -30,16 +33,13 @@ internal class SiloInstanceEntity : MembershipEntity
     public string SiloName { get; set; } = default!;
 
     [FirestoreProperty("SuspectingSilos")]
-    public string? SuspectingSilos { get; set; }
-
-    [FirestoreProperty("SuspectingTimes")]
-    public string? SuspectingTimes { get; set; }
+    public Dictionary<string, DateTimeOffset>? SuspectingSilos { get; set; }
 
     [FirestoreProperty("StartTime")]
     public DateTimeOffset StartTime { get; set; } = default!;
 
     [FirestoreProperty("IAmAliveTime")]
-    public string IAmAliveTime { get; set; } = default!;
+    public DateTimeOffset IAmAliveTime { get; set; } = default!;
 
     public override IDictionary<string, object?> GetFields()
     {
@@ -52,8 +52,14 @@ internal class SiloInstanceEntity : MembershipEntity
         fields.Add("ProxyPort", this.ProxyPort);
         fields.Add("SiloName", this.SiloName);
         fields.Add("SuspectingSilos", this.SuspectingSilos);
-        fields.Add("SuspectingTimes", this.SuspectingTimes);
         fields.Add("StartTime", this.StartTime);
+        fields.Add("IAmAliveTime", this.IAmAliveTime);
+        return fields;
+    }
+
+    public IDictionary<string, object?> GetIAmAliveFields()
+    {
+        var fields = base.GetFields();
         fields.Add("IAmAliveTime", this.IAmAliveTime);
         return fields;
     }
@@ -72,12 +78,66 @@ internal class SiloInstanceEntity : MembershipEntity
         sb.Append(" ProxyPort=").Append(this.ProxyPort);
         sb.Append(" SiloName=").Append(this.SiloName);
 
-        if (!string.IsNullOrEmpty(this.SuspectingSilos)) sb.Append(" SuspectingSilos=").Append(this.SuspectingSilos);
-        if (!string.IsNullOrEmpty(this.SuspectingTimes)) sb.Append(" SuspectingTimes=").Append(this.SuspectingTimes);
-        sb.Append(" StartTime=").Append(this.StartTime);
-        sb.Append(" IAmAliveTime=").Append(this.IAmAliveTime);
+        sb.Append(" SuspectingSilos=")
+            .Append(string.Join("|", this.SuspectingSilos?.Select(s => $"({s.Key}|{Utils.FormatTimestamp(s.Value)}") ?? Enumerable.Empty<string>()));
+
+        sb.Append(" StartTime=").Append(Utils.FormatTimestamp(this.StartTime));
+        sb.Append(" IAmAliveTime=").Append(Utils.FormatTimestamp(this.IAmAliveTime));
         sb.Append(']');
 
         return sb.ToString();
+    }
+
+    public MembershipEntry ToMembershipEntry()
+    {
+        var entry = new MembershipEntry
+        {
+            HostName = this.HostName,
+            Status = (SiloStatus)Enum.Parse(typeof(SiloStatus), this.Status),
+            ProxyPort = this.ProxyPort,
+            SiloAddress = SiloAddress.New(IPAddress.Parse(this.Address), this.Port, this.Generation),
+            SiloName = this.SiloName,
+            StartTime = this.StartTime.UtcDateTime,
+            IAmAliveTime = this.IAmAliveTime.UtcDateTime,
+        };
+
+        if (this.SuspectingSilos is not null)
+        {
+            foreach (var silo in this.SuspectingSilos.OrderBy(t => t.Value))
+            {
+                entry.AddSuspector(SiloAddress.FromParsableString(silo.Key), silo.Value.UtcDateTime);
+            }
+        }
+
+        return entry;
+    }
+
+    public static SiloInstanceEntity FromMembershipEntry(MembershipEntry entry, string clusterId)
+    {
+        var siloInstance = new SiloInstanceEntity
+        {
+            Id = entry.SiloAddress.ToParsableString(),
+            ClusterId = clusterId,
+            Address = entry.SiloAddress.Endpoint.Address.ToString(),
+            Port = entry.SiloAddress.Endpoint.Port,
+            Generation = entry.SiloAddress.Generation,
+            HostName = entry.HostName,
+            Status = entry.Status.ToString(),
+            ProxyPort = entry.ProxyPort,
+            SiloName = entry.SiloName,
+            StartTime = entry.StartTime,
+            IAmAliveTime = entry.IAmAliveTime,
+        };
+
+        if (entry.SuspectTimes is not null)
+        {
+            siloInstance.SuspectingSilos = new Dictionary<string, DateTimeOffset>();
+            foreach (var silo in entry.SuspectTimes.OrderBy(t => t.Item2))
+            {
+                siloInstance.SuspectingSilos.Add(silo.Item1.ToParsableString(), silo.Item2);
+            }
+        }
+
+        return siloInstance;
     }
 }
