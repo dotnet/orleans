@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using UnitTests;
+using TestExtensions;
 using Orleans.Messaging;
 using UnitTests.MembershipTests;
 using Orleans.Clustering.GoogleFirestore;
@@ -8,13 +9,11 @@ using Orleans.Clustering.GoogleFirestore;
 namespace Orleans.Tests.Google;
 
 [TestCategory("Functional"), TestCategory("GoogleFirestore"), TestCategory("GoogleCloud")]
-public class FirestoreMembershipTableTests : MembershipTableTestsBase, IClassFixture<GoogleCloudFixture>
+public class FirestoreMembershipTableTests : MembershipTableTestsBase, IClassFixture<TestEnvironmentFixture>
 {
-    private const string PROJECT_ID = "orleans-test";
-
     public FirestoreMembershipTableTests(
         ConnectionStringFixture csFixture,
-        GoogleCloudFixture googleFixture) : base(csFixture, googleFixture, CreateFilters())
+        TestEnvironmentFixture environment) : base(csFixture, environment, CreateFilters())
     {
     }
 
@@ -30,10 +29,12 @@ public class FirestoreMembershipTableTests : MembershipTableTestsBase, IClassFix
 
     protected override IMembershipTable CreateMembershipTable(ILogger logger)
     {
+        GoogleEmulatorHost.Instance.EnsureStarted().GetAwaiter().GetResult();
+
         var options = new FirestoreOptions
         {
-            ProjectId = PROJECT_ID,
-            EmulatorHost = (this.environment as GoogleCloudFixture)!.Emulator.FirestoreEndpoint
+            ProjectId = "orleans-test",
+            EmulatorHost = GoogleEmulatorHost.FirestoreEndpoint
         };
 
         return new GoogleFirestoreMembershipTable(this.loggerFactory, Options.Create(options), this.clusterOptions);
@@ -41,10 +42,12 @@ public class FirestoreMembershipTableTests : MembershipTableTestsBase, IClassFix
 
     protected override IGatewayListProvider CreateGatewayListProvider(ILogger logger)
     {
+        GoogleEmulatorHost.Instance.EnsureStarted().GetAwaiter().GetResult();
+
         var options = new FirestoreOptions
         {
-            ProjectId = PROJECT_ID,
-            EmulatorHost = (this.environment as GoogleCloudFixture)!.Emulator.FirestoreEndpoint
+            ProjectId = GoogleEmulatorHost.ProjectId,
+            EmulatorHost = GoogleEmulatorHost.FirestoreEndpoint
         };
 
         return new GoogleFirestoreGatewayListProvider(this.loggerFactory, Options.Create(options), this.clusterOptions, this.gatewayOptions);

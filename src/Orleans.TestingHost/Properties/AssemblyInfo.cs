@@ -4,3 +4,4 @@
 [assembly: InternalsVisibleTo("Tester.AzureUtils")]
 [assembly: InternalsVisibleTo("Tester.AdoNet")]
 [assembly: InternalsVisibleTo("TesterInternal")]
+[assembly: InternalsVisibleTo("Orleans.Tests.Google")]

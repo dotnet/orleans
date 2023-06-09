@@ -6,6 +6,8 @@ using Google.Api.Gax;
 using Google.Cloud.Firestore;
 using System.Globalization;
 using System.Collections.Generic;
+using Grpc.Core;
+
 
 #if ORLEANS_CLUSTERING
 namespace Orleans.Clustering.GoogleFirestore;
@@ -41,7 +43,7 @@ internal class FirestoreDataManager
             ? new FirestoreDbBuilder
             {
                 ProjectId = this._options.ProjectId,
-                EmulatorDetection = EmulatorDetection.EmulatorOnly
+                EmulatorDetection = EmulatorDetection.EmulatorOrProduction
             }.Build()
             : FirestoreDb.Create(this._options.ProjectId);
     }
@@ -63,6 +65,13 @@ internal class FirestoreDataManager
             {
                 // Create a header document to ensure the subcollection can be created afterwards
                 await group.CreateAsync(new { StorageGroup = this._group });
+            }
+        }
+        catch (RpcException ex)
+        {
+            if (ex.StatusCode != StatusCode.AlreadyExists)
+            {
+                throw;
             }
         }
         catch (Exception ex)
@@ -121,11 +130,6 @@ internal class FirestoreDataManager
         }
     }
 
-    /// <summary>
-    /// Conditionaly update or create an entity.
-    /// </summary>
-    /// <param name="entity">The entity</param>
-    /// <returns>The entity's eTag</returns>
     public async Task<string> UpsertEntity<TEntity>(TEntity entity) where TEntity : FirestoreEntity, new()
     {
         var collection = this.GetCollection();

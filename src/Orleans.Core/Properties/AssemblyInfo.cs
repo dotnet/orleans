@@ -10,6 +10,7 @@ using System.Runtime.CompilerServices;
 [assembly: InternalsVisibleTo("AWSUtils.Tests")]
 [assembly: InternalsVisibleTo("DefaultCluster.Tests")]
 [assembly: InternalsVisibleTo("GoogleUtils.Tests")]
+[assembly: InternalsVisibleTo("Orleans.Tests.Google")]
 [assembly: InternalsVisibleTo("LoadTestGrains")]
 [assembly: InternalsVisibleTo("NonSilo.Tests")]
 [assembly: InternalsVisibleTo("Benchmarks")]

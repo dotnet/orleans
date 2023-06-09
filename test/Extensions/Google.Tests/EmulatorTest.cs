@@ -7,29 +7,16 @@ using Google.Cloud.Storage.V1;
 namespace Orleans.Tests.Google;
 
 [TestCategory("GoogleCloud")]
-public class GoogleEmulatorTest : IClassFixture<GoogleCloudFixture>
+public class GoogleEmulatorTest : IAsyncLifetime
 {
-    private readonly GoogleEmulatorHost _emulator;
-
-    public GoogleEmulatorTest(GoogleCloudFixture fixture)
-    {
-        this._emulator = fixture.Emulator;
-    }
-
-    [Fact]
-    public void EnsureEmulatorTest()
-    {
-        Assert.NotNull(this._emulator.StorageEndpoint);
-        Assert.NotNull(this._emulator.PubSubEndpoint);
-        Assert.NotNull(this._emulator.FirestoreEndpoint);
-    }
-
     [Fact]
     public async Task EnsureFirestoreTest()
     {
+        var id = $"orleans-test-{Guid.NewGuid():N}";
+
         var db = new FirestoreDbBuilder
         {
-            ProjectId = GoogleEmulatorHost.GOOGLE_PROJECT_ID,
+            ProjectId = id,
             EmulatorDetection = EmulatorDetection.EmulatorOnly
         }.Build();
 
@@ -45,6 +32,8 @@ public class GoogleEmulatorTest : IClassFixture<GoogleCloudFixture>
     [Fact]
     public async Task EnsurePubSubTest()
     {
+        var id = $"orleans-test-{Guid.NewGuid():N}";
+
         var topicId = "test-topic";
         var subscriptionId = "test-subscription";
 
@@ -53,15 +42,15 @@ public class GoogleEmulatorTest : IClassFixture<GoogleCloudFixture>
             EmulatorDetection = EmulatorDetection.EmulatorOnly
         }.Build();
 
-        var topicName = new TopicName(GoogleEmulatorHost.GOOGLE_PROJECT_ID, topicId);
+        var topicName = new TopicName(id, topicId);
         publisher.CreateTopic(topicName);
 
         var subscriber = new SubscriberServiceApiClientBuilder
         {
             EmulatorDetection = EmulatorDetection.EmulatorOnly
         }.Build();
-        
-        var subscriptionName = new SubscriptionName(GoogleEmulatorHost.GOOGLE_PROJECT_ID, subscriptionId);
+
+        var subscriptionName = new SubscriptionName(id, subscriptionId);
         await subscriber.CreateSubscriptionAsync(subscriptionName, topicName, pushConfig: null, ackDeadlineSeconds: 60);
 
         var message = new PubsubMessage
@@ -88,6 +77,10 @@ public class GoogleEmulatorTest : IClassFixture<GoogleCloudFixture>
         await publisher.DeleteTopicAsync(topicName);
     }
 
+    public Task InitializeAsync() => GoogleEmulatorHost.Instance.EnsureStarted();
+
+    public Task DisposeAsync() => Task.CompletedTask;
+
     // [Fact]
     // public async Task EnsureStorageTest()
     // {
@@ -98,7 +91,7 @@ public class GoogleEmulatorTest : IClassFixture<GoogleCloudFixture>
     //     }.Build();
 
     //     var bucketName = Guid.NewGuid().ToString();
-    //     await client.CreateBucketAsync(GoogleEmulatorHost.GOOGLE_PROJECT_ID, bucketName);
+    //     await client.CreateBucketAsync(_id, bucketName);
 
     //     var content = System.Text.Encoding.UTF8.GetBytes("hello, world");
 

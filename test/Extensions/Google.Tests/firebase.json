@@ -1,0 +1,21 @@
+{
+  "emulators": {
+    "firestore": {
+      "port": 8080
+    },
+    "pubsub": {
+      "port": 8085
+    },
+    "storage": {
+      "port": 9199
+    },
+    "ui": {
+      "enabled": true,
+      "port": 9000
+    },
+    "singleProjectMode": false
+  },
+  "storage": {
+    "rules": "storage.rules"
+  }
+}

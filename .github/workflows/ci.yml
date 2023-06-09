@@ -400,6 +400,15 @@ jobs:
         dotnet-version: |
           3.1.x
           7.0.x
+    - name: Setup Google Emulators      
+      working-directory: test/Extensions/Google.Tests
+      run: |
+        curl -sL firebase.tools | bash
+        firebase setup:emulators:storage
+        firebase setup:emulators:firestore
+        firebase setup:emulators:pubsub
+        firebase emulators:start --only firestore,pubsub,storage --project orleans-test &
+        sleep 10
     - name: Test
       run: dotnet test --filter "Category=${{ matrix.provider }}" --blame-hang-timeout 10m --logger "trx" -- -parallel none -noshadow
     - name: Archive Test Results
