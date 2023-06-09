@@ -25,4 +25,11 @@
     <PackageReference Include="Google.Cloud.Firestore" />
     <PackageReference Include="System.Net.NameResolution" />
   </ItemGroup>
+
+  <ItemGroup>
+    <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleToAttribute">
+      <_Parameter1>Orleans.Tests.Google</_Parameter1>
+    </AssemblyAttribute>
+  </ItemGroup>
+
 </Project>

@@ -421,6 +421,113 @@ namespace UnitTests.Grains
         }
     }
 
+    [Orleans.Providers.StorageProvider(ProviderName = "GoogleStorage")]
+    public class GoogleStorageTestGrain : Grain<PersistenceTestGrainState>,
+        IGoogleStorageTestGrain, IGoogleStorageTestGrain_LongKey
+    {
+        private readonly string _id = Guid.NewGuid().ToString();
+
+        public override Task OnActivateAsync(CancellationToken cancellationToken)
+        {
+            return Task.CompletedTask;
+        }
+
+        public Task<int> GetValue()
+        {
+            return Task.FromResult(State.Field1);
+        }
+
+        public Task DoWrite(int val)
+        {
+            State.Field1 = val;
+            return WriteStateAsync();
+        }
+
+        public async Task<int> DoRead()
+        {
+            await ReadStateAsync(); // Re-read state from store
+            return State.Field1;
+        }
+
+        public Task<string> GetActivationId() => Task.FromResult(_id);
+
+        public Task DoDelete()
+        {
+            return ClearStateAsync();
+        }
+    }
+
+    [Orleans.Providers.StorageProvider(ProviderName = "GoogleStorage")]
+    public class GoogleStorageGenericGrain<T> : Grain<PersistenceGenericGrainState<T>>,
+        IGoogleStorageGenericGrain<T>
+    {
+        public override Task OnActivateAsync(CancellationToken cancellationToken)
+        {
+            return Task.CompletedTask;
+        }
+
+        public Task<T> GetValue()
+        {
+            return Task.FromResult(State.Field1);
+        }
+
+        public Task DoWrite(T val)
+        {
+            State.Field1 = val;
+            return WriteStateAsync();
+        }
+
+        public async Task<T> DoRead()
+        {
+            await ReadStateAsync(); // Re-read state from store
+            return State.Field1;
+        }
+
+        public Task DoDelete()
+        {
+            return ClearStateAsync();
+        }
+    }
+
+    [Orleans.Providers.StorageProvider(ProviderName = "GoogleStorage")]
+    public class GoogleStorageTestGrainExtendedKey : Grain<PersistenceTestGrainState>,
+        IGoogleStorageTestGrain_GuidExtendedKey, IGoogleStorageTestGrain_LongExtendedKey
+    {
+        public override Task OnActivateAsync(CancellationToken cancellationToken)
+        {
+            return Task.CompletedTask;
+        }
+
+        public Task<int> GetValue()
+        {
+            return Task.FromResult(State.Field1);
+        }
+
+        public Task<string> GetExtendedKeyValue()
+        {
+            string extKey;
+            _ = this.GetPrimaryKey(out extKey);
+            return Task.FromResult(extKey);
+        }
+
+        public Task DoWrite(int val)
+        {
+            State.Field1 = val;
+            return WriteStateAsync();
+        }
+
+        public async Task<int> DoRead()
+        {
+            await ReadStateAsync(); // Re-read state from store
+            return State.Field1;
+        }
+
+        public Task DoDelete()
+        {
+            return ClearStateAsync();
+        }
+    }
+
     [Orleans.Providers.StorageProvider(ProviderName = "MemoryStore")]
     //[Orleans.Providers.StorageProvider(ProviderName = "AzureStorageEmulator")]
     public class MemoryStorageTestGrain : Grain<MemoryStorageTestGrain.NestedPersistenceTestGrainState>,
@@ -663,7 +770,7 @@ namespace UnitTests.Grains
         {
             logger.LogInformation(" ==================================== Test1 Started");
             CheckRuntimeEnvironment();
-            for (var i = 1*Multiple; i < 2*Multiple; i++)
+            for (var i = 1 * Multiple; i < 2 * Multiple; i++)
             {
                 var t1 = SetOne(i);
                 await t1;
@@ -689,7 +796,7 @@ namespace UnitTests.Grains
         {
             logger.LogInformation("==================================== Test2 Started");
             CheckRuntimeEnvironment();
-            for (var i = 2*Multiple; i < 3*Multiple; i++)
+            for (var i = 2 * Multiple; i < 3 * Multiple; i++)
             {
                 var t1 = _other.SetOne(i);
                 await t1;

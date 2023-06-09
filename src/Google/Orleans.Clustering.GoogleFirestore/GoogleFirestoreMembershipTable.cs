@@ -14,7 +14,7 @@ internal class GoogleFirestoreMembershipTable : IMembershipTable
     private readonly ILoggerFactory _loggerFactory;
     private readonly ILogger _logger;
     private readonly string _clusterId;
-    private OrleansSiloInstanceManager _tableManager = default!;
+    private OrleansSiloInstanceManager _instanceManager = default!;
 
     public GoogleFirestoreMembershipTable(
         ILoggerFactory loggerFactory,
@@ -29,27 +29,27 @@ internal class GoogleFirestoreMembershipTable : IMembershipTable
 
     public async Task InitializeMembershipTable(bool tryInitTableVersion)
     {
-        this._tableManager = await OrleansSiloInstanceManager.GetManager(
+        this._instanceManager = await OrleansSiloInstanceManager.GetManager(
             this._clusterId,
             this._loggerFactory,
             this._options);
 
         if (tryInitTableVersion)
         {
-            var created = await this._tableManager.TryCreateTableVersionEntryAsync();
+            var created = await this._instanceManager.TryCreateTableVersionEntryAsync();
             if (created) this._logger.LogInformation("Created new table version row.");
         }
     }
 
-    public Task DeleteMembershipTableEntries(string clusterId) => this._tableManager.DeleteTableEntries();
+    public Task DeleteMembershipTableEntries(string clusterId) => this._instanceManager.DeleteTableEntries();
 
-    public Task CleanupDefunctSiloEntries(DateTimeOffset beforeDate) => this._tableManager.CleanupDefunctSiloEntries(beforeDate);
+    public Task CleanupDefunctSiloEntries(DateTimeOffset beforeDate) => this._instanceManager.CleanupDefunctSiloEntries(beforeDate);
 
     public async Task<MembershipTableData> ReadRow(SiloAddress key)
     {
         try
         {
-            var data = await this._tableManager.FindSiloAndVersionEntities(key);
+            var data = await this._instanceManager.FindSiloAndVersionEntities(key);
 
             var table = Convert((new[] { data.Silo }, data.Version));
 
@@ -69,7 +69,7 @@ internal class GoogleFirestoreMembershipTable : IMembershipTable
     {
         try
         {
-            var entries = await this._tableManager.FindAllSiloEntries();
+            var entries = await this._instanceManager.FindAllSiloEntries();
             var data = Convert(entries);
             if (this._logger.IsEnabled(LogLevel.Trace)) this._logger.LogTrace("ReadAll Table={Data}", data.ToString());
 
@@ -91,10 +91,10 @@ internal class GoogleFirestoreMembershipTable : IMembershipTable
             if (this._logger.IsEnabled(LogLevel.Debug)) this._logger.LogDebug("InsertRow entry = {Data}, table version = {TableVersion}", entry.ToString(), tableVersion);
 
             var silo = SiloInstanceEntity.FromMembershipEntry(entry, this._clusterId);
-            var version = this._tableManager.CreateClusterVersionEntity(tableVersion.Version);
+            var version = this._instanceManager.CreateClusterVersionEntity(tableVersion.Version);
             version.ETag = Utils.ParseTimestamp(tableVersion.VersionEtag);
 
-            var result = await this._tableManager.InsertSiloEntryConditionally(silo, version);
+            var result = await this._instanceManager.InsertSiloEntryConditionally(silo, version);
 
             if (result == false)
                 this._logger.LogWarning(
@@ -118,10 +118,10 @@ internal class GoogleFirestoreMembershipTable : IMembershipTable
 
             var silo = SiloInstanceEntity.FromMembershipEntry(entry, this._clusterId);
             silo.ETag = Utils.ParseTimestamp(etag);
-            var version = this._tableManager.CreateClusterVersionEntity(tableVersion.Version);
+            var version = this._instanceManager.CreateClusterVersionEntity(tableVersion.Version);
             version.ETag = Utils.ParseTimestamp(tableVersion.VersionEtag);
 
-            var result = await this._tableManager.UpdateSiloEntryConditionally(silo, version);
+            var result = await this._instanceManager.UpdateSiloEntryConditionally(silo, version);
             if (result == false)
                 this._logger.LogWarning(
                     "Update failed due to contention on the table. Will retry. Entry {Data}, eTag {ETag}, table version = {TableVersion}",
@@ -147,7 +147,7 @@ internal class GoogleFirestoreMembershipTable : IMembershipTable
 
             var silo = SiloInstanceEntity.FromMembershipEntry(entry, this._clusterId);
 
-            await this._tableManager.MergeTableEntryAsync(silo.GetIAmAliveFields(), silo.Id);
+            await this._instanceManager.MergeTableEntryAsync(silo.GetIAmAliveFields(), silo.Id);
         }
         catch (Exception exc)
         {
