@@ -7,29 +7,14 @@ using Orleans.Clustering.GoogleFirestore;
 namespace Orleans.Tests.Google;
 
 [TestCategory("Functional"), TestCategory("GoogleFirestore"), TestCategory("GoogleCloud")]
-public class FirestoreSiloInstanceManagerTests : IClassFixture<GoogleCloudFixture>, IAsyncLifetime
+public class FirestoreSiloInstanceManagerTests : IAsyncLifetime
 {
-    private readonly FirestoreOptions _options;
-    private readonly string _clusterId;
+    private FirestoreOptions _options = default!;
+    private string _clusterId = default!;
     private OrleansSiloInstanceManager _manager = default!;
     private SiloInstanceEntity _entity = default!;
-    private int _generation;
-    private SiloAddress _siloAddress;
-
-    public FirestoreSiloInstanceManagerTests(GoogleCloudFixture fixture)
-    {
-        var id = $"Orleans-Test-{Guid.NewGuid()}";
-        this._options = new FirestoreOptions
-        {
-            ProjectId = "orleans-test",
-            EmulatorHost = fixture.Emulator.FirestoreEndpoint,
-            RootCollectionName = id
-        };
-
-        this._clusterId = id;
-        this._generation = SiloAddress.AllocateNewGeneration();
-        this._siloAddress = SiloAddressUtils.NewLocalSiloAddress(this._generation);
-    }
+    private int _generation = default!;
+    private SiloAddress _siloAddress = default!;
 
     [Fact]
     public async Task ActivateSiloInstance()
@@ -173,7 +158,6 @@ public class FirestoreSiloInstanceManagerTests : IClassFixture<GoogleCloudFixtur
         Assert.Equal(referenceEntry.HostName, entry.HostName);
         Assert.Equal(referenceEntry.ProxyPort, entry.ProxyPort);
         Assert.Equal(referenceEntry.SiloName, entry.SiloName);
-        // Assert.Equal(referenceEntry.StartTime, entry.StartTime);
         Assert.Equal(referenceEntry.IAmAliveTime, entry.IAmAliveTime);
 
         Assert.Equal(referenceEntry.SuspectingSilos, entry.SuspectingSilos);
@@ -181,6 +165,20 @@ public class FirestoreSiloInstanceManagerTests : IClassFixture<GoogleCloudFixtur
 
     public async Task InitializeAsync()
     {
+        await GoogleEmulatorHost.Instance.EnsureStarted();
+
+        var id = $"orleans-test-{Guid.NewGuid():N}";
+        this._options = new FirestoreOptions
+        {
+            ProjectId = GoogleEmulatorHost.ProjectId,
+            EmulatorHost = GoogleEmulatorHost.FirestoreEndpoint,
+            RootCollectionName = id
+        };
+
+        this._clusterId = id;
+        this._generation = SiloAddress.AllocateNewGeneration();
+        this._siloAddress = SiloAddressUtils.NewLocalSiloAddress(this._generation);
+
         this._manager = await OrleansSiloInstanceManager.GetManager(
             this._clusterId,
             NullLoggerFactory.Instance,

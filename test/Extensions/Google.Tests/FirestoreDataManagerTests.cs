@@ -8,26 +8,10 @@ using Orleans.Tests.GoogleFirestore;
 namespace Orleans.Tests.Google;
 
 [TestCategory("Functional"), TestCategory("GoogleFirestore"), TestCategory("GoogleCloud")]
-public class FirestoreDataManagerTests : IClassFixture<GoogleCloudFixture>, IAsyncLifetime
+public class FirestoreDataManagerTests : IAsyncLifetime
 {
     private const string TEST_PARTITION = "Test";
-    private readonly FirestoreDataManager _manager;
-
-    public FirestoreDataManagerTests(GoogleCloudFixture fixture)
-    {
-        var id = $"Orleans-Test-{Guid.NewGuid()}";
-        var opt = new FirestoreOptions
-        {
-            ProjectId = "orleans-test",
-            EmulatorHost = fixture.Emulator.FirestoreEndpoint,
-            RootCollectionName = id
-        };
-        this._manager = new FirestoreDataManager(
-            "Test",
-            TEST_PARTITION,
-            opt,
-            NullLoggerFactory.Instance.CreateLogger<FirestoreDataManager>());
-    }
+    private FirestoreDataManager _manager = default!;
 
     [Fact]
     public async Task CreateEntry()
@@ -249,7 +233,7 @@ public class FirestoreDataManagerTests : IClassFixture<GoogleCloudFixture>, IAsy
 
         entities = await this._manager.ReadAllEntities<DummyFirestoreEntity>();
         var correctEtag = entities[0].ETag;
-        
+
         try
         {
             entities[0].ETag = new DateTimeOffset(2021, 1, 1, 0, 0, 0, TimeSpan.Zero);
@@ -261,10 +245,10 @@ public class FirestoreDataManagerTests : IClassFixture<GoogleCloudFixture>, IAsy
             Assert.Equal(StatusCode.FailedPrecondition, exc.StatusCode);  // "Wrong eTag."
         }
 
-        
+
         entities[0].ETag = DateTimeOffset.MinValue;
         await Assert.ThrowsAsync<InvalidOperationException>(() => this._manager.DeleteEntities(entities)); // "Deleting an entry with a wrong data."
-        
+
         entities[0].ETag = correctEtag;
 
         await this._manager.DeleteEntities(entities);
@@ -333,7 +317,27 @@ public class FirestoreDataManagerTests : IClassFixture<GoogleCloudFixture>, IAsy
         };
     }
 
-    public Task InitializeAsync() => this._manager.Initialize();
+    public async Task InitializeAsync()
+    {
+        await GoogleEmulatorHost.Instance.EnsureStarted();
+
+        var id = $"Orleans-Test-{Guid.NewGuid()}";
+        var opt = new FirestoreOptions
+        {
+            ProjectId = "orleans-test",
+            EmulatorHost = GoogleEmulatorHost.FirestoreEndpoint,
+            RootCollectionName = id
+        };
+
+        this._manager = new FirestoreDataManager(
+            "Test",
+            TEST_PARTITION,
+            opt,
+            NullLoggerFactory.Instance.CreateLogger<FirestoreDataManager>());
+
+        await this._manager.Initialize();
+    }
+
     public Task DisposeAsync() => Task.CompletedTask;
 
     [FirestoreData]
