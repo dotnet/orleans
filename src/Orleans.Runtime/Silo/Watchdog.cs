@@ -19,7 +19,8 @@ namespace Orleans.Runtime
 
         private readonly List<IHealthCheckParticipant> participants;
         private readonly ILogger logger;
-        private Thread thread;
+        private Thread selfThread;
+        private Thread participantThread;
 
         public Watchdog(TimeSpan watchdogPeriod, List<IHealthCheckParticipant> watchables, ILogger<Watchdog> logger)
         {
@@ -32,22 +33,30 @@ namespace Orleans.Runtime
         {
             logger.LogInformation("Starting Silo Watchdog.");
 
-            if (thread is not null)
+            if (selfThread is not null)
             {
                 throw new InvalidOperationException("Watchdog.Start may not be called more than once");
             }
 
             var now = DateTime.UtcNow;
             lastHeartbeat = now;
-            lastWatchdogCheck = now;
             cumulativeGCPauseDuration = GC.GetTotalPauseDuration();
 
-            this.thread = new Thread(this.Run)
+            this.selfThread = new Thread(this.RunSelfCheck)
             {
                 IsBackground = true,
                 Name = "Orleans.Runtime.Watchdog",
             };
-            this.thread.Start();
+            this.selfThread.Start();
+
+            lastWatchdogCheck = now;
+
+            this.participantThread = new Thread(this.RunParticipantCheck)
+            {
+                IsBackground = true,
+                Name = "Orleans.Runtime.Watchdog",
+            };
+            this.participantThread.Start();
         }
 
         public void Stop()
@@ -55,13 +64,13 @@ namespace Orleans.Runtime
             cancellation.Cancel();
         }
 
-        protected void Run()
+        protected void RunSelfCheck()
         {
             while (!this.cancellation.IsCancellationRequested)
             {
                 try
                 {
-                    WatchdogHeartbeatTick();
+                    SelfWatchdogHeartbeatTick();
                     Thread.Sleep(heartbeatPeriod);
                 }
                 catch (ThreadAbortException)
@@ -75,7 +84,27 @@ namespace Orleans.Runtime
             }
         }
 
-        private void WatchdogHeartbeatTick()
+        protected void RunParticipantCheck()
+        {
+            while (!this.cancellation.IsCancellationRequested)
+            {
+                try
+                {
+                    ParticipantWatchdogHeartbeatTick();
+                    Thread.Sleep(healthCheckPeriod);
+                }
+                catch (ThreadAbortException)
+                {
+                    // Silo is probably shutting-down, so just ignore and exit
+                }
+                catch (Exception exc)
+                {
+                    logger.LogError((int)ErrorCode.Watchdog_InternalError, exc, "Watchdog encountered an internal error");
+                }
+            }
+        }
+
+        private void SelfWatchdogHeartbeatTick()
         {
             try
             {
@@ -86,7 +115,10 @@ namespace Orleans.Runtime
                 lastHeartbeat = DateTime.UtcNow;
                 cumulativeGCPauseDuration = GC.GetTotalPauseDuration();
             }
+        }
 
+        private void ParticipantWatchdogHeartbeatTick()
+        {
             var timeSinceLastWatchdogCheck = DateTime.UtcNow - lastWatchdogCheck;
             if (timeSinceLastWatchdogCheck <= healthCheckPeriod)
             {
@@ -152,4 +184,3 @@ namespace Orleans.Runtime
         }
     }
 }
-
