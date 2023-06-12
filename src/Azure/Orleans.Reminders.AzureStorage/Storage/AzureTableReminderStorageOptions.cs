@@ -1,22 +1,4 @@
-#if ORLEANS_CLUSTERING
-namespace Orleans.Clustering.AzureStorage
-#elif ORLEANS_PERSISTENCE
-namespace Orleans.Persistence.AzureStorage
-#elif ORLEANS_REMINDERS
 namespace Orleans.Reminders.AzureStorage
-#elif ORLEANS_STREAMING
-namespace Orleans.Streaming.AzureStorage
-#elif ORLEANS_EVENTHUBS
-namespace Orleans.Streaming.EventHubs
-#elif TESTER_AZUREUTILS
-namespace Orleans.Tests.AzureUtils
-#elif ORLEANS_TRANSACTIONS
-namespace Orleans.Transactions.AzureStorage
-#elif ORLEANS_DIRECTORY
-namespace Orleans.GrainDirectory.AzureStorage
-#else
-// No default namespace intentionally to cause compile errors if something is not defined
-#endif
 {
     /// <summary>Options for Azure Table based reminder table.</summary>
     public class AzureTableReminderStorageOptions : AzureStorageOperationOptions
@@ -26,5 +8,20 @@ namespace Orleans.GrainDirectory.AzureStorage
         /// </summary>
         public override string TableName { get; set; } = DEFAULT_TABLE_NAME;
         public const string DEFAULT_TABLE_NAME = "OrleansReminders";
+    }
+
+    /// <summary>
+    /// Configuration validator for <see cref="AzureTableReminderStorageOptions"/>.
+    /// </summary>
+    public class AzureTableReminderStorageOptionsValidator : AzureStorageOperationOptionsValidator<AzureTableReminderStorageOptions>
+    {
+        /// <summary>
+        /// Initializes a new instance of the <see cref="AzureTableReminderStorageOptionsValidator"/> class.
+        /// </summary>
+        /// <param name="options">The option to be validated.</param>
+        /// <param name="name">The option name to be validated.</param>
+        public AzureTableReminderStorageOptionsValidator(AzureTableReminderStorageOptions options, string name) : base(options, name)
+        {
+        }
     }
 }

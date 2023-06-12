@@ -2,7 +2,6 @@ using System;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Options;
-using Orleans;
 using Orleans.Configuration;
 using Orleans.Providers;
 using Orleans.Runtime;
@@ -20,6 +19,7 @@ namespace Orleans.Hosting
             Action<OptionsBuilder<AzureTableTransactionalStateOptions>> configureOptions = null)
         {
             configureOptions?.Invoke(services.AddOptions<AzureTableTransactionalStateOptions>(name));
+            services.AddTransient<IConfigurationValidator>(sp => new AzureTableTransactionalStateOptionsValidator(sp.GetRequiredService<IOptionsMonitor<AzureTableTransactionalStateOptions>>().Get(name), name));
 
             services.TryAddSingleton<ITransactionalStateStorageFactory>(sp => sp.GetServiceByName<ITransactionalStateStorageFactory>(ProviderConstants.DEFAULT_STORAGE_PROVIDER_NAME));
             services.AddSingletonNamedService<ITransactionalStateStorageFactory>(name, AzureTableTransactionalStateStorageFactory.Create);

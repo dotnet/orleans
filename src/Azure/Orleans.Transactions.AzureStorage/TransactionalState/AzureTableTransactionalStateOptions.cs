@@ -15,4 +15,19 @@ namespace Orleans.Configuration
         public int InitStage { get; set; } = DEFAULT_INIT_STAGE;
         public const int DEFAULT_INIT_STAGE = ServiceLifecycleStage.ApplicationServices;
     }
+
+    /// <summary>
+    /// Configuration validator for <see cref="AzureTableTransactionalStateOptions"/>.
+    /// </summary>
+    public class AzureTableTransactionalStateOptionsValidator : AzureStorageOperationOptionsValidator<AzureTableTransactionalStateOptions>
+    {
+        /// <summary>
+        /// Initializes a new instance of the <see cref="AzureTableTransactionalStateOptionsValidator"/> class.
+        /// </summary>
+        /// <param name="options">The option to be validated.</param>
+        /// <param name="name">The option name to be validated.</param>
+        public AzureTableTransactionalStateOptionsValidator(AzureTableTransactionalStateOptions options, string name) : base(options, name)
+        {
+        }
+    }
 }
