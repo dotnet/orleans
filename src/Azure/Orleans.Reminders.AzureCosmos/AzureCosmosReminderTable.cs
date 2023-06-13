@@ -1,7 +1,6 @@
 using System.Net;
 using System.Diagnostics;
 using Orleans.Reminders.AzureCosmos.Models;
-using System.Security.Cryptography.X509Certificates;
 
 namespace Orleans.Reminders.AzureCosmos;
 

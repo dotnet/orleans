@@ -1,8 +1,5 @@
-using System.Buffers;
-using System.Drawing.Text;
-using System.Text.RegularExpressions;
 using Newtonsoft.Json;
-using static Orleans.Reminders.AzureCosmos.Models.IdSanitizer;
+using static Orleans.Reminders.AzureCosmos.CosmosDbIdSanitizer;
 
 namespace Orleans.Reminders.AzureCosmos.Models;
 
@@ -58,6 +55,6 @@ internal class ReminderEntity : BaseEntity
         // the idea is that when converting to string, negative numbers start with 0, and positive start with 1. Now,
         // when comparisons will be done on strings, this will ensure that positive numbers are always greater than negative
         // string grainHash = number < 0 ? string.Format("0{0}", number.ToString("X")) : string.Format("1{0:d16}", number);
-        return $"{Sanitize(serviceId)}_{grainId.GetUniformHashCode():X}";
+        return $"{Sanitize(serviceId)}{SeparatorChar}{grainId.GetUniformHashCode():X}";
     }
 }

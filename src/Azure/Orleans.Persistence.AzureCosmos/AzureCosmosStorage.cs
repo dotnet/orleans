@@ -3,7 +3,7 @@ using System.Threading;
 using System.Diagnostics;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Storage;
-using static Orleans.Persistence.AzureCosmos.Models.IdSanitizer;
+using static Orleans.Persistence.AzureCosmos.CosmosDbIdSanitizer;
 
 namespace Orleans.Persistence.AzureCosmos;
 
@@ -46,9 +46,16 @@ internal class AzureCosmosStorage : IGrainStorage, ILifecycleParticipant<ISiloLi
         var id = GetKeyString(grainId);
         var partitionKey = await BuildPartitionKey(grainType, grainId);
 
-        if (_logger.IsEnabled(LogLevel.Trace)) _logger.LogTrace(
-            "Reading: GrainType={grainType} Key={id} Grainid={grainReference} from Container={container} with PartitionKey={pk}",
-            grainType, id, grainId, _options.Container, partitionKey);
+        if (_logger.IsEnabled(LogLevel.Trace))
+        {
+            _logger.LogTrace(
+                "Reading: GrainType={GrainType} Key={Id} GrainId={GrainId} from Container={Container} with PartitionKey={PartitionKey}",
+                grainType,
+                id,
+                grainId,
+                _options.Container,
+                partitionKey);
+        }
 
         try
         {
@@ -83,13 +90,13 @@ internal class AzureCosmosStorage : IGrainStorage, ILifecycleParticipant<ISiloLi
                 return;
             }
 
-            _logger.LogError(dce, "Failure reading state for Grain Type {GrainType} with Id {id}", grainType, id);
+            _logger.LogError(dce, "Failure reading state for Grain Type {GrainType} with Id {Id}", grainType, id);
             WrappedException.CreateAndRethrow(dce);
             throw;
         }
         catch (Exception exc)
         {
-            _logger.LogError(exc, "Failure reading state for Grain Type {GrainType} with Id {Id}", grainType, id);
+            _logger.LogError(exc, "Failure reading state for Grain Type {GrainType} with Id {id}", grainType, id);
             WrappedException.CreateAndRethrow(exc);
             throw;
         }
@@ -101,9 +108,17 @@ internal class AzureCosmosStorage : IGrainStorage, ILifecycleParticipant<ISiloLi
 
         var partitionKey = await BuildPartitionKey(grainType, grainId);
 
-        if (_logger.IsEnabled(LogLevel.Trace)) _logger.LogTrace(
-            "Writing: GrainType={grainType} Key={id} Grainid={grainReference} ETag={etag} from Container={container} with PartitionKey={pk}",
-            grainType, id, grainId, grainState.ETag, _options.Container, partitionKey);
+        if (_logger.IsEnabled(LogLevel.Trace))
+        {
+            _logger.LogTrace(
+                "Writing: GrainType={GrainType} Key={id} GrainId={GrainId} ETag={ETag} from Container={Container} with PartitionKey={PartitionKey}",
+                grainType,
+                id,
+                grainId,
+                grainState.ETag,
+                _options.Container,
+                partitionKey);
+        }
 
         ItemResponse<GrainStateEntity<T>>? response = null;
 
@@ -175,7 +190,7 @@ internal class AzureCosmosStorage : IGrainStorage, ILifecycleParticipant<ISiloLi
         var id = GetKeyString(grainId);
         var partitionKey = await BuildPartitionKey(grainType, grainId);
         if (_logger.IsEnabled(LogLevel.Trace)) _logger.LogTrace(
-            "Clearing: GrainType={grainType} Key={id} Grainid={grainReference} ETag={etag} DeleteStateOnClear={deleteOnClear} from Container={container} with PartitionKey {pk}",
+            "Clearing: GrainType={GrainType} Key={Id} GrainId={GrainId} ETag={ETag} DeleteStateOnClear={DeleteOnClear} from Container={Container} with PartitionKey {PartitionKey}",
             grainType, id, grainId, grainState.ETag, _options.DeleteStateOnClear, _options.Container, partitionKey);
 
         var pk = new PartitionKey(partitionKey);
@@ -248,10 +263,16 @@ internal class AzureCosmosStorage : IGrainStorage, ILifecycleParticipant<ISiloLi
 
         try
         {
-            var initMsg = string.Format("Init: Name={0} ServiceId={1} Collection={2} DeleteStateOnClear={3}",
-                _name, _serviceId, _options.Container, _options.DeleteStateOnClear);
 
-            _logger.LogInformation(initMsg);
+            if (_logger.IsEnabled(LogLevel.Debug))
+            {
+                _logger.LogDebug(
+                    "Initializing: Name={Name} ServiceId={ServiceId} Collection={Collection} DeleteStateOnClear={DeleteStateOnClear}",
+                    _name,
+                    _serviceId,
+                    _options.Container,
+                    _options.DeleteStateOnClear);
+            }
 
             await InitializeCosmosClient().ConfigureAwait(false);
 
@@ -268,12 +289,15 @@ internal class AzureCosmosStorage : IGrainStorage, ILifecycleParticipant<ISiloLi
             _container = _client.GetContainer(_options.Database, _options.Container);
 
             stopWatch.Stop();
-            _logger.LogInformation(
-                "Initializing provider {ProviderName} of type {ProviderType} in stage {Stage} took {ElapsedMilliseconds} milliseconds",
-                _name,
-                GetType().Name,
-                _options.InitStage,
-                stopWatch.ElapsedMilliseconds);
+            if (_logger.IsEnabled(LogLevel.Debug))
+            {
+                _logger.LogDebug(
+                    "Initializing provider {ProviderName} of type {ProviderType} in stage {Stage} took {ElapsedMilliseconds} milliseconds",
+                    _name,
+                    GetType().Name,
+                    _options.InitStage,
+                    stopWatch.ElapsedMilliseconds);
+            }
         }
         catch (Exception ex)
         {
@@ -387,6 +411,7 @@ internal class AzureCosmosStorage : IGrainStorage, ILifecycleParticipant<ISiloLi
             {
                 sleepTime = dce.RetryAfter ?? TimeSpan.Zero;
             }
+
             await Task.Delay(sleepTime);
         }
     }

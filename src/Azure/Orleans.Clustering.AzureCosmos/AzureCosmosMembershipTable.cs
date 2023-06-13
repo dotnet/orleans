@@ -27,7 +27,8 @@ internal class AzureCosmosMembershipTable : IMembershipTable
         _serviceProvider = serviceProvider;
         _options = options.Value;
         _clusterId = clusterOptions.Value.ClusterId;
-        _partitionKey = new(_clusterId);
+        _partitionKey = new(CosmosDbIdSanitizer.Sanitize(_clusterId));
+
         _queryRequestOptions = new() { PartitionKey = _partitionKey };
     }
 
@@ -51,9 +52,7 @@ internal class AzureCosmosMembershipTable : IMembershipTable
 
         try
         {
-            versionEntity = (await _container.ReadItemAsync<ClusterVersionEntity>(
-                CLUSTER_VERSION_ID,
-                new PartitionKey(_clusterId)).ConfigureAwait(false)).Resource;
+            versionEntity = (await _container.ReadItemAsync<ClusterVersionEntity>(CLUSTER_VERSION_ID, _partitionKey).ConfigureAwait(false)).Resource;
         }
         catch (CosmosException ce) when (ce.StatusCode == HttpStatusCode.NotFound)
         {
@@ -66,10 +65,7 @@ internal class AzureCosmosMembershipTable : IMembershipTable
                     Id = CLUSTER_VERSION_ID
                 };
 
-                var response = await _container.CreateItemAsync(
-                    versionEntity,
-                    new PartitionKey(versionEntity.ClusterId)
-                ).ConfigureAwait(false);
+                var response = await _container.CreateItemAsync(versionEntity, _partitionKey).ConfigureAwait(false);
 
                 if (response.StatusCode == HttpStatusCode.Created)
                     _logger?.LogInformation("Created new Cluster Version entity.");
@@ -105,8 +101,11 @@ internal class AzureCosmosMembershipTable : IMembershipTable
     {
         try
         {
-            var silos = (await ReadSilos(SiloStatus.Dead).ConfigureAwait(false)).Where(s => s.IAmAliveTime < beforeDate).ToArray();
-            if (silos.Length == 0) return;
+            var silos = (await ReadSilos(SiloStatus.Dead).ConfigureAwait(false)).Where(s => s.IAmAliveTime < beforeDate).ToList();
+            if (silos.Count == 0)
+            {
+                return;
+            }
 
             var batch = _container.CreateTransactionalBatch(_partitionKey);
 
@@ -218,7 +217,7 @@ internal class AzureCosmosMembershipTable : IMembershipTable
             var siloEntity = ConvertToEntity(entry, _clusterId);
             var versionEntity = BuildVersionEntity(tableVersion);
 
-            var response = await _container.CreateTransactionalBatch(new PartitionKey(_clusterId))
+            var response = await _container.CreateTransactionalBatch(_partitionKey)
                 .ReplaceItem(versionEntity.Id, versionEntity, new TransactionalBatchItemRequestOptions { IfMatchEtag = tableVersion.VersionEtag })
                 .CreateItem(siloEntity)
                 .ExecuteAsync().ConfigureAwait(false);
@@ -242,7 +241,7 @@ internal class AzureCosmosMembershipTable : IMembershipTable
 
             var versionEntity = BuildVersionEntity(tableVersion);
 
-            var response = await _container.CreateTransactionalBatch(new PartitionKey(_clusterId))
+            var response = await _container.CreateTransactionalBatch(_partitionKey)
                 .ReplaceItem(versionEntity.Id, versionEntity, new TransactionalBatchItemRequestOptions { IfMatchEtag = tableVersion.VersionEtag })
                 .ReplaceItem(siloEntity.Id, siloEntity, new TransactionalBatchItemRequestOptions { IfMatchEtag = siloEntity.ETag })
                 .ExecuteAsync().ConfigureAwait(false);
@@ -263,7 +262,7 @@ internal class AzureCosmosMembershipTable : IMembershipTable
 
         if (_self is not { } selfRow)
         {
-            var response = await _container.ReadItemAsync<SiloEntity>(siloEntityId, new PartitionKey(_clusterId)).ConfigureAwait(false);
+            var response = await _container.ReadItemAsync<SiloEntity>(siloEntityId, _partitionKey).ConfigureAwait(false);
 
             if (response.StatusCode != HttpStatusCode.OK)
             {
@@ -281,7 +280,7 @@ internal class AzureCosmosMembershipTable : IMembershipTable
             var replaceResponse = await _container.ReplaceItemAsync(
                 selfRow,
                 siloEntityId,
-                new PartitionKey(_clusterId),
+                _partitionKey,
                 new ItemRequestOptions { IfMatchEtag = selfRow.ETag }).ConfigureAwait(false);
             _self = replaceResponse.Resource;
         }
@@ -451,10 +450,14 @@ internal class AzureCosmosMembershipTable : IMembershipTable
         }
 
         if (suspectingSilos.Count != suspectingTimes.Count)
+        {
             throw new OrleansException($"SuspectingSilos.Length of {suspectingSilos.Count} as read from Azure Cosmos DB is not equal to SuspectingTimes.Length of {suspectingTimes.Count}");
+        }
 
         for (var i = 0; i < suspectingSilos.Count; i++)
+        {
             entry.AddSuspector(suspectingSilos[i], suspectingTimes[i]);
+        }
 
         return entry;
     }
