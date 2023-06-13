@@ -18,8 +18,6 @@ public static class AzureCosmosOptionsExtensions
         }
 
         options.IsResourceCreationEnabled = true;
-        options.DatabaseThroughput = 10000;
-
         return options;
     }
 
@@ -35,8 +33,6 @@ public static class AzureCosmosOptionsExtensions
         }
 
         options.IsResourceCreationEnabled = true;
-        options.DatabaseThroughput = 10000;
-
         return options;
     }
 
@@ -52,8 +48,6 @@ public static class AzureCosmosOptionsExtensions
         }
 
         options.IsResourceCreationEnabled = true;
-        options.DatabaseThroughput = 10000;
-
         return options;
     }
 

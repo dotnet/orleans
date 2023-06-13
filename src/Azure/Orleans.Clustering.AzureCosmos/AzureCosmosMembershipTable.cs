@@ -46,7 +46,7 @@ internal class AzureCosmosMembershipTable : IMembershipTable
             await TryCreateCosmosResources().ConfigureAwait(false);
         }
 
-        _container = _client.GetContainer(_options.Database, _options.Container);
+        _container = _client.GetContainer(_options.DatabaseName, _options.ContainerName);
 
         ClusterVersionEntity? versionEntity = null;
 
@@ -310,7 +310,7 @@ internal class AzureCosmosMembershipTable : IMembershipTable
     {
         try
         {
-            await _client.GetDatabase(_options.Database).DeleteAsync().ConfigureAwait(false);
+            await _client.GetDatabase(_options.DatabaseName).DeleteAsync().ConfigureAwait(false);
         }
         catch (CosmosException dce) when (dce.StatusCode == System.Net.HttpStatusCode.NotFound)
         {
@@ -326,15 +326,10 @@ internal class AzureCosmosMembershipTable : IMembershipTable
 
     private async Task TryCreateCosmosResources()
     {
-        var offerThroughput =
-            _options.DatabaseThroughput >= 400
-            ? (int?)_options.DatabaseThroughput
-            : null;
-
-        var dbResponse = await _client.CreateDatabaseIfNotExistsAsync(_options.Database, offerThroughput).ConfigureAwait(false);
+        var dbResponse = await _client.CreateDatabaseIfNotExistsAsync(_options.DatabaseName, _options.DatabaseThroughput).ConfigureAwait(false);
         var db = dbResponse.Database;
 
-        var containerProperties = new ContainerProperties(_options.Container, PARTITION_KEY);
+        var containerProperties = new ContainerProperties(_options.ContainerName, PARTITION_KEY);
         containerProperties.IndexingPolicy.IndexingMode = IndexingMode.Consistent;
         containerProperties.IndexingPolicy.IncludedPaths.Add(new IncludedPath { Path = "/*" });
         containerProperties.IndexingPolicy.ExcludedPaths.Add(new ExcludedPath { Path = "/Address/*" });
@@ -350,10 +345,11 @@ internal class AzureCosmosMembershipTable : IMembershipTable
         const int maxRetries = 3;
         for (var retry = 0; retry <= maxRetries; ++retry)
         {
-            var continerResponse = await db.CreateContainerIfNotExistsAsync(
-               containerProperties, _options.GetThroughputProperties()).ConfigureAwait(false);
+            var containerResponse = await db.CreateContainerIfNotExistsAsync(
+                containerProperties,
+                _options.ContainerThroughputProperties).ConfigureAwait(false);
 
-            if (retry == maxRetries || dbResponse.StatusCode != HttpStatusCode.Created || continerResponse.StatusCode == HttpStatusCode.Created)
+            if (retry == maxRetries || dbResponse.StatusCode != HttpStatusCode.Created || containerResponse.StatusCode == HttpStatusCode.Created)
             {
                 break;  // Apparently some throttling logic returns HttpStatusCode.OK (not 429) when the collection wasn't created in a new DB.
             }

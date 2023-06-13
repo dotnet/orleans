@@ -38,7 +38,7 @@ internal class AzureCosmosGatewayListProvider : IGatewayListProvider
         try
         {
             var client = await _options.CreateClient!(_serviceProvider).ConfigureAwait(false);
-            _container = client.GetContainer(_options.Database, _options.Container);
+            _container = client.GetContainer(_options.DatabaseName, _options.ContainerName);
         }
         catch (Exception ex)
         {

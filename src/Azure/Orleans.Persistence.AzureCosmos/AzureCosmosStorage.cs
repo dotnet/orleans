@@ -53,7 +53,7 @@ internal class AzureCosmosStorage : IGrainStorage, ILifecycleParticipant<ISiloLi
                 grainType,
                 id,
                 grainId,
-                _options.Container,
+                _options.ContainerName,
                 partitionKey);
         }
 
@@ -116,7 +116,7 @@ internal class AzureCosmosStorage : IGrainStorage, ILifecycleParticipant<ISiloLi
                 id,
                 grainId,
                 grainState.ETag,
-                _options.Container,
+                _options.ContainerName,
                 partitionKey);
         }
 
@@ -175,7 +175,7 @@ internal class AzureCosmosStorage : IGrainStorage, ILifecycleParticipant<ISiloLi
         }
         catch (CosmosException dce) when (dce.StatusCode == HttpStatusCode.PreconditionFailed)
         {
-            throw new CosmosConditionNotSatisfiedException(grainType, grainId, _options.Container, "Unknown", grainState.ETag);
+            throw new CosmosConditionNotSatisfiedException(grainType, grainId, _options.ContainerName, "Unknown", grainState.ETag);
         }
         catch (Exception exc)
         {
@@ -191,7 +191,7 @@ internal class AzureCosmosStorage : IGrainStorage, ILifecycleParticipant<ISiloLi
         var partitionKey = await BuildPartitionKey(grainType, grainId);
         if (_logger.IsEnabled(LogLevel.Trace)) _logger.LogTrace(
             "Clearing: GrainType={GrainType} Key={Id} GrainId={GrainId} ETag={ETag} DeleteStateOnClear={DeleteOnClear} from Container={Container} with PartitionKey {PartitionKey}",
-            grainType, id, grainId, grainState.ETag, _options.DeleteStateOnClear, _options.Container, partitionKey);
+            grainType, id, grainId, grainState.ETag, _options.DeleteStateOnClear, _options.ContainerName, partitionKey);
 
         var pk = new PartitionKey(partitionKey);
         var requestOptions = new ItemRequestOptions { IfMatchEtag = grainState.ETag };
@@ -270,7 +270,7 @@ internal class AzureCosmosStorage : IGrainStorage, ILifecycleParticipant<ISiloLi
                     "Initializing: Name={Name} ServiceId={ServiceId} Collection={Collection} DeleteStateOnClear={DeleteStateOnClear}",
                     _name,
                     _serviceId,
-                    _options.Container,
+                    _options.ContainerName,
                     _options.DeleteStateOnClear);
             }
 
@@ -286,7 +286,7 @@ internal class AzureCosmosStorage : IGrainStorage, ILifecycleParticipant<ISiloLi
                 await TryCreateResources().ConfigureAwait(false);
             }
 
-            _container = _client.GetContainer(_options.Database, _options.Container);
+            _container = _client.GetContainer(_options.DatabaseName, _options.ContainerName);
 
             stopWatch.Stop();
             if (_logger.IsEnabled(LogLevel.Debug))
@@ -335,10 +335,10 @@ internal class AzureCosmosStorage : IGrainStorage, ILifecycleParticipant<ISiloLi
             ? (int?)_options.DatabaseThroughput
             : null;
 
-        var dbResponse = await _client.CreateDatabaseIfNotExistsAsync(_options.Database, dbThroughput);
+        var dbResponse = await _client.CreateDatabaseIfNotExistsAsync(_options.DatabaseName, dbThroughput);
         var db = dbResponse.Database;
 
-        var stateContainer = new ContainerProperties(_options.Container, DEFAULT_PARTITION_KEY_PATH);
+        var stateContainer = new ContainerProperties(_options.ContainerName, DEFAULT_PARTITION_KEY_PATH);
         stateContainer.IndexingPolicy.IndexingMode = IndexingMode.Consistent;
         stateContainer.IndexingPolicy.IncludedPaths.Add(new IncludedPath { Path = "/*" });
         stateContainer.IndexingPolicy.ExcludedPaths.Add(new ExcludedPath { Path = "/\"State\"/*" });
@@ -356,7 +356,7 @@ internal class AzureCosmosStorage : IGrainStorage, ILifecycleParticipant<ISiloLi
         for (var retry = 0; retry <= maxRetries; ++retry)
         {
             var containerResponse = await db.CreateContainerIfNotExistsAsync(
-                stateContainer, _options.GetThroughputProperties());
+                stateContainer, _options.ContainerThroughputProperties);
 
             if (containerResponse.StatusCode == HttpStatusCode.OK || containerResponse.StatusCode == HttpStatusCode.Created)
             {
@@ -379,7 +379,7 @@ internal class AzureCosmosStorage : IGrainStorage, ILifecycleParticipant<ISiloLi
     {
         try
         {
-            await _client.GetDatabase(_options.Database).DeleteAsync().ConfigureAwait(false);
+            await _client.GetDatabase(_options.DatabaseName).DeleteAsync().ConfigureAwait(false);
         }
         catch (CosmosException dce) when (dce.StatusCode == System.Net.HttpStatusCode.NotFound)
         {

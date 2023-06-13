@@ -35,17 +35,13 @@ public class AzureCosmosOptionsValidator<TOptions> : IConfigurationValidator whe
     /// <inheritdoc/>
     public void ValidateConfiguration()
     {
-        if (string.IsNullOrWhiteSpace(_options.Database))
+        if (string.IsNullOrWhiteSpace(_options.DatabaseName))
             throw new OrleansConfigurationException(
-                $"Configuration for Azure Cosmos DB provider {_name} is invalid. {nameof(_options.Database)} is not valid.");
+                $"Configuration for Azure Cosmos DB provider {_name} is invalid. {nameof(_options.DatabaseName)} is not valid.");
 
-        if (string.IsNullOrWhiteSpace(_options.Container))
+        if (string.IsNullOrWhiteSpace(_options.ContainerName))
             throw new OrleansConfigurationException(
-                $"Configuration for Azure Cosmos DB provider {_name} is invalid. {nameof(_options.Container)} is not valid.");
-
-        if (_options.ContainerThroughput < 400 && _options.DatabaseThroughput < 400)
-            throw new OrleansConfigurationException(
-                $"Configuration for Azure Cosmos DB provider {_name} is invalid. Either {nameof(_options.ContainerThroughput)} or {nameof(_options.DatabaseThroughput)} must exceed 400.");
+                $"Configuration for Azure Cosmos DB provider {_name} is invalid. {nameof(_options.ContainerName)} is not valid.");
 
         if (_options.CreateClient is null)
         {

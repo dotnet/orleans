@@ -19,44 +19,38 @@ namespace Orleans.GrainDirectory.AzureCosmos;
 
 public abstract class AzureCosmosOptions
 {
-    private const string ORLEANS_DB = "Orleans";
-    private const int ORLEANS_DEFAULT_RU_THROUGHPUT = 400;
-
     /// <summary>
     /// Tries to create the database and container used for clustering if it does not exist.
     /// </summary>
     public bool IsResourceCreationEnabled { get; set; }
 
     /// <summary>
-    /// Database configured throughput, if set to 0 it will not be configured and container throughput must be set. See https://docs.microsoft.com/en-us/azure/cosmos-db/set-throughput
+    /// Database configured throughput. If set to <see langword="null"/>, which is the default value, it will not be configured. 
     /// </summary>
-    public int DatabaseThroughput { get; set; } = ORLEANS_DEFAULT_RU_THROUGHPUT;
+    /// <seealso href="https://docs.microsoft.com/en-us/azure/cosmos-db/set-throughput"/>
+    public int? DatabaseThroughput { get; set; }
 
     /// <summary>
     /// The name of the database to use for clustering information.
     /// </summary>
-    public string Database { get; set; } = ORLEANS_DB;
+    public string DatabaseName { get; set; } = "Orleans";
 
     /// <summary>
     /// The name of the container to use to store clustering information.
     /// </summary>
-    public string Container { get; set; } = default!;
+    public string ContainerName { get; set; } = default!;
 
     /// <summary>
-    /// RU units for container, can be set to 0 if throughput is specified on database level. See https://docs.microsoft.com/en-us/azure/cosmos-db/set-throughput
+    /// Throughput properties for containers. The default value is <see langword="null"/>, which indicates that the serverless throughput mode will be used.
     /// </summary>
-    public int ContainerThroughput { get; set; } = ORLEANS_DEFAULT_RU_THROUGHPUT;
+    /// <seealso href="https://docs.microsoft.com/en-us/azure/cosmos-db/set-throughput"/>
+    public ThroughputProperties? ContainerThroughputProperties { get; set; }
 
     /// <summary>
-    /// Delete the database on initialization.  Useful for testing scenarios.
+    /// Delete the database on initialization. Intended only for testing scenarios.
     /// </summary>
+    /// <remarks>This is only intended for use in testing scenarios.</remarks>
     public bool CleanResourcesOnInitialization { get; set; }
-
-    /// <summary>
-    /// The throughput mode to use for the container used for clustering.
-    /// </summary>
-    /// <remarks>If the throughput mode is set to <see cref="AzureCosmosThroughputMode.Autoscale"/>, the <see cref="ContainerThroughput"/> will need to be at least <code>4000</code> RU.</remarks>
-    public AzureCosmosThroughputMode ThroughputMode { get; set; } = AzureCosmosThroughputMode.Manual;
 
     /// <summary>
     /// The options passed to the Cosmos DB client, or <see langword="null"/> to use default options.
@@ -119,14 +113,4 @@ public abstract class AzureCosmosOptions
     /// Factory method for creating a <see cref="CosmosClient"/>.
     /// </summary>
     internal Func<IServiceProvider, ValueTask<CosmosClient>> CreateClient { get; private set; } = null!;
-
-    internal ThroughputProperties? GetThroughputProperties() =>
-        ThroughputMode switch
-        {
-            AzureCosmosThroughputMode.Manual => ThroughputProperties.CreateManualThroughput(ContainerThroughput),
-            AzureCosmosThroughputMode.Autoscale => ThroughputProperties.CreateAutoscaleThroughput(
-                ContainerThroughput == 400 ? 4000 : ContainerThroughput),
-            AzureCosmosThroughputMode.Serverless => null,
-            _ => throw new ArgumentOutOfRangeException(nameof(ThroughputMode), $"There is no setup for throughput mode {ThroughputMode}")
-        };
 }

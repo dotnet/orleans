@@ -36,7 +36,7 @@ internal class AzureCosmosReminderTable : IReminderTable
             _logger.LogInformation(
                 "Azure Cosmos DB Reminder Storage AzureCosmosReminderTable is initializing: Name=AzureCosmosReminderTable ServiceId={ServiceId} Collection={Container}",
                 _clusterOptions.ServiceId,
-                _options.Container);
+                _options.ContainerName);
 
             await InitializeCosmosClient();
 
@@ -50,7 +50,7 @@ internal class AzureCosmosReminderTable : IReminderTable
                 await TryCreateCosmosDBResources();
             }
 
-            _container = _client.GetContainer(_options.Database, _options.Container);
+            _container = _client.GetContainer(_options.DatabaseName, _options.ContainerName);
 
             stopWatch.Stop();
 
@@ -301,7 +301,7 @@ internal class AzureCosmosReminderTable : IReminderTable
     {
         try
         {
-            await _client.GetDatabase(_options.Database).DeleteAsync();
+            await _client.GetDatabase(_options.DatabaseName).DeleteAsync();
         }
         catch (CosmosException dce) when (dce.StatusCode == System.Net.HttpStatusCode.NotFound)
         {
@@ -322,10 +322,10 @@ internal class AzureCosmosReminderTable : IReminderTable
             ? (int?)_options.DatabaseThroughput
             : null;
 
-        var dbResponse = await _client.CreateDatabaseIfNotExistsAsync(_options.Database, offerThroughput);
+        var dbResponse = await _client.CreateDatabaseIfNotExistsAsync(_options.DatabaseName, offerThroughput);
         var db = dbResponse.Database;
 
-        var remindersCollection = new ContainerProperties(_options.Container, PARTITION_KEY_PATH);
+        var remindersCollection = new ContainerProperties(_options.ContainerName, PARTITION_KEY_PATH);
 
         remindersCollection.IndexingPolicy.IndexingMode = IndexingMode.Consistent;
         remindersCollection.IndexingPolicy.IncludedPaths.Add(new IncludedPath { Path = "/*" });
@@ -336,7 +336,7 @@ internal class AzureCosmosReminderTable : IReminderTable
         const int maxRetries = 3;
         for (var retry = 0; retry <= maxRetries; ++retry)
         {
-            var collResponse = await db.CreateContainerIfNotExistsAsync(remindersCollection, _options.GetThroughputProperties());
+            var collResponse = await db.CreateContainerIfNotExistsAsync(remindersCollection, _options.ContainerThroughputProperties);
 
             if (retry == maxRetries || dbResponse.StatusCode != HttpStatusCode.Created || collResponse.StatusCode == HttpStatusCode.Created)
             {

@@ -6,6 +6,6 @@ public class AzureCosmosClusteringOptions : AzureCosmosOptions
 
     public AzureCosmosClusteringOptions()
     {
-        Container = ORLEANS_CLUSTER_CONTAINER;
+        ContainerName = ORLEANS_CLUSTER_CONTAINER;
     }
 }

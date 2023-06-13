@@ -29,6 +29,6 @@ public class AzureCosmosGrainStorageOptions : AzureCosmosOptions
 
     public AzureCosmosGrainStorageOptions()
     {
-        Container = ORLEANS_STORAGE_CONTAINER;
+        ContainerName = ORLEANS_STORAGE_CONTAINER;
     }
 }

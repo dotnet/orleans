@@ -6,6 +6,6 @@ public class AzureCosmosReminderTableOptions : AzureCosmosOptions
 
     public AzureCosmosReminderTableOptions()
     {
-        Container = ORLEANS_REMINDERS_CONTAINER;
+        ContainerName = ORLEANS_REMINDERS_CONTAINER;
     }
 }
