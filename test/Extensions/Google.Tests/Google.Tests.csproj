@@ -11,6 +11,7 @@
   <ItemGroup>
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="$(MicrosoftTestSdkVersion)" />
     <PackageReference Include="Testcontainers" />
+    <PackageReference Include="Google.Cloud.Firestore" />
   </ItemGroup>
 
   <ItemGroup>
@@ -30,6 +31,10 @@
     <Compile Include="$(SourceRoot)src\Google\Shared\Storage\FirestoreOptions.cs" Link="Shared\Storage\FirestoreOptions.cs" />
     <Compile Include="$(SourceRoot)src\Google\Shared\Storage\GoogleCloudOptions.cs" Link="Shared\Storage\GoogleCloudOptions.cs" />
     <Compile Include="$(SourceRoot)src\Google\Shared\Utils\Utils.cs" Link="Shared\Utils\Utils.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Folder Include="Emulators/" />
   </ItemGroup>
   
 </Project>

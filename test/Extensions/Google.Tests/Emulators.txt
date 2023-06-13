@@ -1,5 +1,0 @@
-docker run --name gcp-firestore-emulator -d -p 9595:9595 gcr.io/google.com/cloudsdktool/google-cloud-cli:emulators gcloud emulators firestore start --host-port=0.0.0.0:9595 --project=orleans-test
-docker run --name gcp-pubsub-emulator -d -p 9596:9596 gcr.io/google.com/cloudsdktool/google-cloud-cli:emulators gcloud beta emulators pubsub start --host-port=0.0.0.0:9596 --project=orleans-test
-docker run --name gcp-storage-emulator -d -p 9597:9597 -e PORT=9597 oittaa/gcp-storage-emulator
-
-firebase emulators:start --only firestore,pubsub,storage --project orleans-test
