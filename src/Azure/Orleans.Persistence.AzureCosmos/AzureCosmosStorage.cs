@@ -3,6 +3,7 @@ using System.Threading;
 using System.Diagnostics;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Storage;
+using static Orleans.Persistence.AzureCosmos.Models.IdSanitizer;
 
 namespace Orleans.Persistence.AzureCosmos;
 
@@ -236,7 +237,7 @@ internal class AzureCosmosStorage : IGrainStorage, ILifecycleParticipant<ISiloLi
         lifecycle.Subscribe(OptionFormattingUtilities.Name<AzureCosmosStorage>(_name), _options.InitStage, Init);
     }
 
-    private string GetKeyString(GrainId grainId) => $"{_serviceId}{KEY_STRING_SEPARATOR}{System.Net.WebUtility.UrlEncode(grainId.ToString())}";
+    private string GetKeyString(GrainId grainId) => $"{Sanitize(_serviceId)}{KEY_STRING_SEPARATOR}{Sanitize(grainId.Type.ToString()!)}{SeparatorChar}{Sanitize(grainId.Key.ToString()!)}";
 
     private ValueTask<string> BuildPartitionKey(string grainType, GrainId grainId) =>
         _partitionKeyProvider.GetPartitionKey(grainType, grainId);

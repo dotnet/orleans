@@ -18,6 +18,7 @@ public static class AzureCosmosOptionsExtensions
             {
                 var cosmosClientOptions = new CosmosClientOptions()
                 {
+                    /*
                     HttpClientFactory = () =>
                     {
                         HttpMessageHandler httpMessageHandler = new HttpClientHandler()
@@ -26,15 +27,16 @@ public static class AzureCosmosOptionsExtensions
                         };
                         return new HttpClient(httpMessageHandler);
                     },
+                    */
                     ConnectionMode = ConnectionMode.Gateway
                 };
 
-                return new(new CosmosClient(TestDefaultConfiguration.CosmosDBAccountEndpoint, TestDefaultConfiguration.CosmosDBAccountKey, cosmosClientOptions));
+                return new(new CosmosClient(TestDefaultConfiguration.CosmosDBAccountEndpoint, TestDefaultConfiguration.CosmosDBAccountKey));
             });
         }
 
         options.IsResourceCreationEnabled = true;
-        options.DatabaseThroughput = 4000;
+        options.DatabaseThroughput = 10000;
 
         return options;
     }
@@ -51,6 +53,7 @@ public static class AzureCosmosOptionsExtensions
             {
                 var cosmosClientOptions = new CosmosClientOptions()
                 {
+                    /*
                     HttpClientFactory = () =>
                     {
                         HttpMessageHandler httpMessageHandler = new HttpClientHandler()
@@ -59,6 +62,7 @@ public static class AzureCosmosOptionsExtensions
                         };
                         return new HttpClient(httpMessageHandler);
                     },
+                    */
                     ConnectionMode = ConnectionMode.Gateway
                 };
 
@@ -67,7 +71,7 @@ public static class AzureCosmosOptionsExtensions
         }
 
         options.IsResourceCreationEnabled = true;
-        options.DatabaseThroughput = 4000;
+        options.DatabaseThroughput = 10000;
 
         return options;
     }
@@ -84,6 +88,7 @@ public static class AzureCosmosOptionsExtensions
             {
                 var cosmosClientOptions = new CosmosClientOptions()
                 {
+                    /*
                     HttpClientFactory = () =>
                     {
                         HttpMessageHandler httpMessageHandler = new HttpClientHandler()
@@ -92,6 +97,7 @@ public static class AzureCosmosOptionsExtensions
                         };
                         return new HttpClient(httpMessageHandler);
                     },
+                    */
                     ConnectionMode = ConnectionMode.Gateway
                 };
 
@@ -100,7 +106,7 @@ public static class AzureCosmosOptionsExtensions
         }
 
         options.IsResourceCreationEnabled = true;
-        options.DatabaseThroughput = 4000;
+        options.DatabaseThroughput = 10000;
 
         return options;
     }

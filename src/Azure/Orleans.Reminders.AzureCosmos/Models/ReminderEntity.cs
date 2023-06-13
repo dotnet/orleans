@@ -1,4 +1,8 @@
+using System.Buffers;
+using System.Drawing.Text;
+using System.Text.RegularExpressions;
 using Newtonsoft.Json;
+using static Orleans.Reminders.AzureCosmos.Models.IdSanitizer;
 
 namespace Orleans.Reminders.AzureCosmos.Models;
 
@@ -32,16 +36,28 @@ internal class ReminderEntity : BaseEntity
     [JsonPropertyName(nameof(GrainHash))]
     public uint GrainHash { get; set; }
 
-    public static string ConstructId(GrainId grainId, string reminderName) => $"{System.Net.WebUtility.UrlEncode(grainId.ToString())}-{reminderName}";
+    public static string ConstructId(GrainId grainId, string reminderName)
+    {
+        var grainType = grainId.Type.ToString();
+        var grainKey = grainId.Key.ToString();
 
-    public static string ConstructPartitionKey(string serviceId, GrainId grainId) => ConstructPartitionKey(serviceId, grainId.GetUniformHashCode());
+        if (grainType is null || grainKey is null)
+        {
+            throw new ArgumentNullException(nameof(grainId));
+        }
 
-    // IMPORTANT NOTE: Other code using this return data is very sensitive to format changes,
-    //       so take great care when making any changes here!!!
+        return $"{Sanitize(grainType)}{SeparatorChar}{Sanitize(grainKey)}{SeparatorChar}{Sanitize(reminderName)}";
+    }
 
-    // this format of partition key makes sure that the comparisons in FindReminderEntries(begin, end) work correctly
-    // the idea is that when converting to string, negative numbers start with 0, and positive start with 1. Now,
-    // when comparisons will be done on strings, this will ensure that positive numbers are always greater than negative
-    // string grainHash = number < 0 ? string.Format("0{0}", number.ToString("X")) : string.Format("1{0:d16}", number);
-    public static string ConstructPartitionKey(string serviceId, uint number) => $"{serviceId}_{number:X8}";
+    public static string ConstructPartitionKey(string serviceId, GrainId grainId)
+    {
+        // IMPORTANT NOTE: Other code using this return data is very sensitive to format changes,
+        //       so take great care when making any changes here!!!
+
+        // this format of partition key makes sure that the comparisons in FindReminderEntries(begin, end) work correctly
+        // the idea is that when converting to string, negative numbers start with 0, and positive start with 1. Now,
+        // when comparisons will be done on strings, this will ensure that positive numbers are always greater than negative
+        // string grainHash = number < 0 ? string.Format("0{0}", number.ToString("X")) : string.Format("1{0:d16}", number);
+        return $"{Sanitize(serviceId)}_{grainId.GetUniformHashCode():X}";
+    }
 }

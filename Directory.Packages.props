@@ -20,7 +20,7 @@
     <PackageVersion Include="System.Net.NameResolution" Version="4.3.0" />
     <PackageVersion Include="System.Collections.Immutable" Version="7.0.0" />
     <!-- Microsoft packages -->
-    <PackageVersion Include="Microsoft.Azure.Cosmos" Version="3.31.2" />
+    <PackageVersion Include="Microsoft.Azure.Cosmos" Version="3.34.0" />
     <PackageVersion Include="Microsoft.Build" Version="17.3.2" />
     <PackageVersion Include="Microsoft.CSharp" Version="4.7.0" />
     <PackageVersion Include="Microsoft.CodeAnalysis" Version="4.4.0" />
