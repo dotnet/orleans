@@ -110,7 +110,7 @@ namespace Orleans.Runtime
         public Task ForceRuntimeStatisticsCollection()
         {
             if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug("ForceRuntimeStatisticsCollection");
-            return this.deploymentLoadPublisher.RefreshStatistics();
+            return this.deploymentLoadPublisher.RefreshClusterStatistics();
         }
 
         public Task<SiloRuntimeStatistics> GetRuntimeStatistics()

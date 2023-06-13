@@ -65,7 +65,6 @@ namespace Orleans.Runtime
         [Id(9)]
         public long SentMessages { get; }
 
-
         /// <summary>
         /// The DateTime when this statistics was created.
         /// </summary>
