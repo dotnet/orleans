@@ -1,17 +1,12 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
-using Orleans;
-using Orleans.Runtime;
-using TestExtensions;
-using UnitTests.MembershipTests;
-using Xunit;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Xunit;
+using UnitTests.MembershipTests;
+using TestExtensions;
+using Orleans.Runtime;
+using Orleans.Internal;
 using Orleans.Configuration;
 using Orleans.TestingHost.Utils;
-using Orleans.Internal;
 
 namespace UnitTests.RemindersTest
 {
@@ -73,6 +68,7 @@ namespace UnitTests.RemindersTest
                 var reminder = CreateReminder(MakeTestGrainReference(), i.ToString());
                 return Task.WhenAll(Enumerable.Range(1, 5).Select(j =>
                 {
+                    reminder.StartAt = DateTime.UtcNow;
                     return RetryHelper.RetryOnExceptionAsync(5, RetryOperation.Sigmoid, async () =>
                     {
                         return await remindersTable.UpsertRow(reminder);
@@ -90,7 +86,6 @@ namespace UnitTests.RemindersTest
             var readReminder = await remindersTable.ReadRow(reminder.GrainId, reminder.ReminderName);
 
             string etagTemp = reminder.ETag = readReminder.ETag;
-
             Assert.Equal(readReminder.ETag, reminder.ETag);
             Assert.Equal(readReminder.GrainId, reminder.GrainId);
             Assert.Equal(readReminder.Period, reminder.Period);
@@ -98,6 +93,7 @@ namespace UnitTests.RemindersTest
             Assert.Equal(readReminder.StartAt, reminder.StartAt);
             Assert.NotNull(etagTemp);
 
+            reminder.StartAt = DateTime.UtcNow;
             reminder.ETag = await remindersTable.UpsertRow(reminder);
 
             var removeRowRes = await remindersTable.RemoveRow(reminder.GrainId, reminder.ReminderName, etagTemp);
@@ -160,7 +156,7 @@ namespace UnitTests.RemindersTest
         private static ReminderEntry CreateReminder(GrainId grainId, string reminderName)
         {
             var now = DateTime.UtcNow;
-            now = new DateTime(now.Year, now.Month, now.Day, now.Hour, now.Minute, now.Second);
+            now = new DateTime(now.Year, now.Month, now.Day, now.Hour, now.Minute, now.Second, DateTimeKind.Utc);
             return new ReminderEntry
             {
                 GrainId = grainId,
@@ -170,6 +166,7 @@ namespace UnitTests.RemindersTest
             };
         }
 
-        private static GrainId MakeTestGrainReference() => LegacyGrainId.GetGrainId(12345, Guid.NewGuid(), "foo/bar\\#baz?");
+        private static GrainId MakeTestGrainReference() => 
+            GrainId.Create(GrainType.Create("my-remindable-grain"), GrainIdKeyExtensions.CreateGuidKey(Guid.NewGuid(), "foo/bar\\#baz?"));
     }
 }

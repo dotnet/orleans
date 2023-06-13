@@ -30,7 +30,7 @@ internal class GoogleFirestoreMembershipTable : IMembershipTable
     public async Task InitializeMembershipTable(bool tryInitTableVersion)
     {
         this._instanceManager = await OrleansSiloInstanceManager.GetManager(
-            this._clusterId,
+            Utils.SanitizeId(this._clusterId),
             this._loggerFactory,
             this._options);
 
@@ -163,7 +163,7 @@ internal class GoogleFirestoreMembershipTable : IMembershipTable
     {
         return new MembershipTableData
         (
-            data.Silos.Select(s => Tuple.Create(s.ToMembershipEntry(), Utils.FormatTimestamp(s.ETag))).ToList(),
+            data.Silos.Select(s => Tuple.Create(s.ToMembershipEntry(), Utils.FormatTimestamp(s.ETag!.Value))).ToList(),
             data.Version.ToTableVersion()
         );
     }

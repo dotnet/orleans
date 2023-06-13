@@ -35,17 +35,18 @@ public class FirestoreDataManagerTests : IAsyncLifetime
         Assert.Equal(data.Id, returned.Id);
         Assert.Equal(data.Name, returned.Name);
         Assert.Equal(data.Age, returned.Age);
-        Assert.Equal(DateTimeOffset.ParseExact(eTag, "O", CultureInfo.InvariantCulture), returned.ETag);
+        Assert.Equal(Utils.ParseTimestamp(eTag), returned.ETag);
     }
 
     [Fact]
     public async Task UpsertEntry()
     {
         var data = GetDummyEntity();
-        await this._manager.UpsertEntity(data);
+        var etag1 = await this._manager.UpsertEntity(data);
 
         var data2 = data.Clone();
         data2.Age = 99;
+
         var eTag2 = await this._manager.UpsertEntity(data2);
 
         var returned = await this._manager.ReadEntity<DummyFirestoreEntity>(data.Id);
@@ -53,7 +54,7 @@ public class FirestoreDataManagerTests : IAsyncLifetime
         Assert.Equal(data.Id, returned.Id);
         Assert.Equal(data2.Name, returned.Name);
         Assert.Equal(data2.Age, returned.Age);
-        Assert.Equal(DateTimeOffset.ParseExact(eTag2, "O", CultureInfo.InvariantCulture), returned.ETag);
+        Assert.Equal(Utils.ParseTimestamp(eTag2), returned.ETag);
     }
 
     [Fact]
@@ -64,7 +65,7 @@ public class FirestoreDataManagerTests : IAsyncLifetime
         await Assert.ThrowsAsync<InvalidOperationException>(() => this._manager.Update(data));
         data.Id = Guid.NewGuid().ToString();
         await Assert.ThrowsAsync<InvalidOperationException>(() => this._manager.Update(data));
-        data.ETag = new DateTimeOffset(2021, 1, 1, 0, 0, 0, TimeSpan.Zero);
+        data.ETag = Timestamp.FromDateTimeOffset(new DateTimeOffset(2021, 1, 1, 0, 0, 0, TimeSpan.Zero));
 
         var found = await this._manager.ReadEntity<DummyFirestoreEntity>(data.Id);
         Assert.Null(found);
@@ -83,7 +84,7 @@ public class FirestoreDataManagerTests : IAsyncLifetime
 
         var data2 = data.Clone();
         data2.Age = 99;
-        data2.ETag = new DateTimeOffset(2021, 1, 1, 0, 0, 0, TimeSpan.Zero);
+        data2.ETag = Timestamp.FromDateTimeOffset(new DateTimeOffset(2021, 1, 1, 0, 0, 0, TimeSpan.Zero));
 
         string eTag2 = default!;
 
@@ -97,7 +98,7 @@ public class FirestoreDataManagerTests : IAsyncLifetime
             Assert.Equal(StatusCode.FailedPrecondition, exc.StatusCode);  // "Wrong eTag."
         }
 
-        data2.ETag = DateTimeOffset.ParseExact(eTag, "O", CultureInfo.InvariantCulture);
+        data2.ETag = Utils.ParseTimestamp(eTag);
 
         eTag2 = await this._manager.Update(data2);
 
@@ -106,7 +107,7 @@ public class FirestoreDataManagerTests : IAsyncLifetime
         Assert.Equal(data.Id, returned.Id);
         Assert.Equal(data2.Name, returned.Name);
         Assert.Equal(data2.Age, returned.Age);
-        Assert.Equal(DateTimeOffset.ParseExact(eTag2, "O", CultureInfo.InvariantCulture), returned.ETag);
+        Assert.Equal(Utils.ParseTimestamp(eTag2), returned.ETag!.Value);
     }
 
     [Fact]
@@ -114,45 +115,25 @@ public class FirestoreDataManagerTests : IAsyncLifetime
     {
         var data = GetDummyEntity();
 
-        try
-        {
-            await this._manager.DeleteEntity(data.Id);
-            Assert.True(false, "Should have thrown RpcException.");
-        }
-        catch (RpcException exc)
-        {
-            Assert.Equal(StatusCode.NotFound, exc.StatusCode);  // "Deleting a non-existing entry."
-        }
+        var result = await this._manager.DeleteEntity(data.Id);
+        Assert.False(result, "Should have thrown RpcException.");
 
         await this._manager.CreateEntity(data);
 
         var found = await this._manager.ReadEntity<DummyFirestoreEntity>(data.Id);
         Assert.NotNull(found);
 
-        try
-        {
-            await this._manager.DeleteEntity(data.Id, new DateTimeOffset(2021, 1, 1, 0, 0, 0, TimeSpan.Zero));
-            Assert.True(false, "Should have thrown RpcException.");
-        }
-        catch (RpcException exc)
-        {
-            Assert.Equal(StatusCode.FailedPrecondition, exc.StatusCode);  // "Wrong eTag."
-        }
+        result = await this._manager.DeleteEntity(data.Id, Utils.FormatTimestamp(Timestamp.FromDateTimeOffset(new DateTimeOffset(2021, 1, 1, 0, 0, 0, TimeSpan.Zero))));
+        Assert.False(result, "Should have not deleted.");
 
-        await this._manager.DeleteEntity(data.Id, found.ETag);
+        result = await this._manager.DeleteEntity(data.Id, Utils.FormatTimestamp(found.ETag!.Value));
+        Assert.True(result, "Should have deleted.");
 
         found = await this._manager.ReadEntity<DummyFirestoreEntity>(data.Id);
         Assert.Null(found);
 
-        try
-        {
-            await this._manager.DeleteEntity(data.Id);
-            Assert.True(false, "Should have thrown RpcException.");
-        }
-        catch (RpcException exc)
-        {
-            Assert.Equal(StatusCode.NotFound, exc.StatusCode);  // "Deleting a non-existing entry."
-        }
+        result = await this._manager.DeleteEntity(data.Id);
+        Assert.False(result, "Should have not deleted as it wasn't found.");
     }
 
     [Fact]
@@ -176,21 +157,21 @@ public class FirestoreDataManagerTests : IAsyncLifetime
         Assert.Equal(data.Id, found.Id);
         Assert.Equal(data.Name, found.Name);
         Assert.Equal(data.Age, found.Age);
-        Assert.Equal(DateTimeOffset.ParseExact(eTag, "O", CultureInfo.InvariantCulture), found.ETag);
+        Assert.Equal(Utils.ParseTimestamp(eTag), found.ETag);
 
         found = all.FirstOrDefault(x => x.Id == data2.Id);
         Assert.NotNull(found);
         Assert.Equal(data2.Id, found.Id);
         Assert.Equal(data2.Name, found.Name);
         Assert.Equal(data2.Age, found.Age);
-        Assert.Equal(DateTimeOffset.ParseExact(eTag2, "O", CultureInfo.InvariantCulture), found.ETag);
+        Assert.Equal(Utils.ParseTimestamp(eTag2), found.ETag);
 
         found = all.FirstOrDefault(x => x.Id == data3.Id);
         Assert.NotNull(found);
         Assert.Equal(data3.Id, found.Id);
         Assert.Equal(data3.Name, found.Name);
         Assert.Equal(data3.Age, found.Age);
-        Assert.Equal(DateTimeOffset.ParseExact(eTag3, "O", CultureInfo.InvariantCulture), found.ETag);
+        Assert.Equal(Utils.ParseTimestamp(eTag3), found.ETag);
 
         await this._manager.DeleteEntity(data.Id, eTag);
         await this._manager.DeleteEntity(data2.Id, eTag2);
@@ -205,7 +186,7 @@ public class FirestoreDataManagerTests : IAsyncLifetime
         Assert.Equal(data3.Id, found.Id);
         Assert.Equal(data3.Name, found.Name);
         Assert.Equal(data3.Age, found.Age);
-        Assert.Equal(DateTimeOffset.ParseExact(eTag3, "O", CultureInfo.InvariantCulture), found.ETag);
+        Assert.Equal(Utils.ParseTimestamp(eTag3), found.ETag);
 
         await this._manager.DeleteEntity(data3.Id, eTag3);
 
@@ -229,14 +210,14 @@ public class FirestoreDataManagerTests : IAsyncLifetime
 
         await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() => this._manager.DeleteEntities(entities)); // "Deleting more than 500 entries at once."
 
-        await this._manager.DeleteEntity(entities[0].Id, entities[0].ETag);
+        await this._manager.DeleteEntity(entities[0].Id, Utils.FormatTimestamp(entities[0].ETag!.Value));
 
         entities = await this._manager.ReadAllEntities<DummyFirestoreEntity>();
         var correctEtag = entities[0].ETag;
 
         try
         {
-            entities[0].ETag = new DateTimeOffset(2021, 1, 1, 0, 0, 0, TimeSpan.Zero);
+            entities[0].ETag = Timestamp.FromDateTimeOffset(new DateTimeOffset(2021, 1, 1, 0, 0, 0, TimeSpan.Zero));
             await this._manager.DeleteEntities(entities);
             Assert.True(false, "Should have thrown RpcException.");
         }
@@ -246,7 +227,7 @@ public class FirestoreDataManagerTests : IAsyncLifetime
         }
 
 
-        entities[0].ETag = DateTimeOffset.MinValue;
+        entities[0].ETag = Timestamp.FromDateTimeOffset(DateTimeOffset.MinValue);
         await Assert.ThrowsAsync<InvalidOperationException>(() => this._manager.DeleteEntities(entities)); // "Deleting an entry with a wrong data."
 
         entities[0].ETag = correctEtag;

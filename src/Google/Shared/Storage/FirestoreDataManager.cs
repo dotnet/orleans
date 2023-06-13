@@ -1,12 +1,11 @@
 using System;
 using System.Linq;
 using System.Threading.Tasks;
+using System.Collections.Generic;
 using Microsoft.Extensions.Logging;
+using Grpc.Core;
 using Google.Api.Gax;
 using Google.Cloud.Firestore;
-using System.Globalization;
-using System.Collections.Generic;
-using Grpc.Core;
 
 
 #if ORLEANS_CLUSTERING
@@ -141,7 +140,8 @@ internal class FirestoreDataManager
 
             var docRef = collection.Document(entity.Id);
 
-            var result = await docRef.SetAsync(entity, SetOptions.MergeAll);
+            var result = await docRef.SetAsync(entity, SetOptions.Overwrite);
+
             return Utils.FormatTimestamp(result.UpdateTime);
         }
         catch (Exception ex)
@@ -186,7 +186,7 @@ internal class FirestoreDataManager
 
             var docRef = collection.Document(entity.Id);
 
-            var result = await docRef.UpdateAsync(entity.GetFields(), Precondition.LastUpdated(Timestamp.FromDateTimeOffset(entity.ETag)));
+            var result = await docRef.UpdateAsync(entity.GetFields(), Precondition.LastUpdated(entity.ETag!.Value));
             return Utils.FormatTimestamp(result.UpdateTime);
         }
         catch (Exception ex)
@@ -201,14 +201,8 @@ internal class FirestoreDataManager
     /// </summary>
     /// <param name="id">The entity's id</param>
     /// <param name="eTag">The entity's eTag</param>
-    public Task DeleteEntity(string id, string eTag) => this.DeleteEntity(id, Utils.ParseTimestamp(eTag));
-
-    /// <summary>
-    /// Delete an entity.
-    /// </summary>
-    /// <param name="id">The entity's id</param>
-    /// <param name="eTag">The entity's eTag</param>
-    public async Task DeleteEntity(string id, DateTimeOffset? eTag = null)
+    /// <returns>Wether or not the update happened successfuly</returns>
+    public async Task<bool> DeleteEntity(string id, string? eTag = null)
     {
         var collection = this.GetCollection();
         if (this.Logger.IsEnabled(LogLevel.Trace)) this.Logger.LogTrace("Deleting entity {id} on collection {collection}", id, this._partition);
@@ -217,14 +211,23 @@ internal class FirestoreDataManager
         {
             var docRef = collection.Document(id);
 
-            if (eTag.HasValue)
+            if (!string.IsNullOrWhiteSpace(eTag))
             {
-                await docRef.DeleteAsync(Precondition.LastUpdated(Timestamp.FromDateTimeOffset(eTag.Value)));
+                await docRef.DeleteAsync(Precondition.LastUpdated(Utils.ParseTimestamp(eTag)));
             }
             else
             {
                 await docRef.DeleteAsync(Precondition.MustExist);
             }
+            return true;
+        }
+        catch (RpcException ex)
+        {
+            if (ex.StatusCode == StatusCode.FailedPrecondition || ex.StatusCode == StatusCode.NotFound)
+            {
+                return false;
+            }
+            throw;
         }
         catch (Exception ex)
         {
@@ -320,7 +323,7 @@ internal class FirestoreDataManager
 
                 var docRef = collection.Document(entity.Id);
 
-                batch.Delete(docRef, Precondition.LastUpdated(Timestamp.FromDateTimeOffset(entity.ETag)));
+                batch.Delete(docRef, Precondition.LastUpdated(entity.ETag!.Value));
             }
 
             await batch.CommitAsync();
@@ -371,8 +374,8 @@ internal class FirestoreDataManager
         if (entity.Id == default) throw new InvalidOperationException("Id is required to create or update an entity");
         if (updating)
         {
-            if (entity.ETag == default) throw new InvalidOperationException("ETag is required to update an entity");
-            if (entity.ETag < DateTimeOffset.UnixEpoch) throw new InvalidOperationException("ETag must be greater than 1970-01-01T00:00:00Z");
+            if (!entity.ETag.HasValue) throw new InvalidOperationException("ETag is required to update an entity");
+            if (entity.ETag.Value.ToDateTimeOffset() < DateTimeOffset.UnixEpoch) throw new InvalidOperationException("ETag must be greater than 1970-01-01T00:00:00Z");
         }
     }
 

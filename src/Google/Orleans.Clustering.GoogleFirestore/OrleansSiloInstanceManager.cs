@@ -233,7 +233,7 @@ internal class OrleansSiloInstanceManager
             result = await this._storage.ExecuteTransaction(trx =>
             {
                 trx.Create(siloReference, silo);
-                trx.Update(versionReference, version.GetFields(), Precondition.LastUpdated(Timestamp.FromDateTimeOffset(version.ETag)));
+                trx.Update(versionReference, version.GetFields(), Precondition.LastUpdated(version.ETag!.Value));
                 return Task.FromResult(true);
             });
         }
@@ -256,8 +256,8 @@ internal class OrleansSiloInstanceManager
         {
             result = await this._storage.ExecuteTransaction(trx =>
             {
-                trx.Update(siloReference, silo.GetFields(), Precondition.LastUpdated(Timestamp.FromDateTimeOffset(silo.ETag)));
-                trx.Update(versionReference, version.GetFields(), Precondition.LastUpdated(Timestamp.FromDateTimeOffset(version.ETag)));
+                trx.Update(siloReference, silo.GetFields(), Precondition.LastUpdated(silo.ETag!.Value));
+                trx.Update(versionReference, version.GetFields(), Precondition.LastUpdated(version.ETag!.Value));
                 return Task.FromResult(true);
             });
         }

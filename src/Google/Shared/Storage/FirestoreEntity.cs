@@ -1,4 +1,3 @@
-using System;
 using System.Collections.Generic;
 using Google.Cloud.Firestore;
 
@@ -22,7 +21,7 @@ public abstract class FirestoreEntity
     public string Id { get; set; } = default!;
 
     [FirestoreDocumentUpdateTimestamp]
-    public DateTimeOffset ETag { get; set; }
+    public Timestamp? ETag { get; set; }
 
     public abstract IDictionary<string, object?> GetFields();
 }

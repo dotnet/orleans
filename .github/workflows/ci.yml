@@ -401,7 +401,7 @@ jobs:
           3.1.x
           7.0.x
     - name: Setup Google Emulators      
-      working-directory: test/Extensions/Google.Tests
+      working-directory: test/Extensions/Google.Tests/Emulators
       run: |
         curl -sL firebase.tools | bash
         firebase setup:emulators:storage

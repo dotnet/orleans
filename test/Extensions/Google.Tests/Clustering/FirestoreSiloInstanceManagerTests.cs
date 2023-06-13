@@ -144,7 +144,9 @@ public class FirestoreSiloInstanceManagerTests : IAsyncLifetime
             StartTime = DateTimeOffset.UtcNow
         };
 
-        await this._manager.RegisterSiloInstance(this._entity);
+        var etag = await this._manager.RegisterSiloInstance(this._entity);
+        this._entity.ETag = Clustering.GoogleFirestore.Utils.ParseTimestamp(etag);
+
         return this._entity;
     }
 

@@ -46,7 +46,7 @@ internal class GoogleFirestoreStorage : IGrainStorage, ILifecycleParticipant<ISi
                 stateName,
                 grainId);
 
-        var entity = await this._dataManager.ReadEntity<GrainStateEntity>(SanitizeGrainId(grainId)).ConfigureAwait(false);
+        var entity = await this._dataManager.ReadEntity<GrainStateEntity>(Utils.SanitizeGrainId(grainId)).ConfigureAwait(false);
 
         if (entity is null)
         {
@@ -65,7 +65,7 @@ internal class GoogleFirestoreStorage : IGrainStorage, ILifecycleParticipant<ISi
             {
                 grainState.State = Activator.CreateInstance<T>();
             }
-            grainState.ETag = Utils.FormatTimestamp(entity.ETag);
+            grainState.ETag = Utils.FormatTimestamp(entity.ETag!.Value);
         }
     }
 
@@ -81,7 +81,7 @@ internal class GoogleFirestoreStorage : IGrainStorage, ILifecycleParticipant<ISi
 
         var entity = new GrainStateEntity
         {
-            Id = SanitizeGrainId(grainId),
+            Id = Utils.SanitizeGrainId(grainId),
             Name = stateName,
             Payload = JsonSerializer.SerializeToUtf8Bytes(grainState.State, this._options.SerializerOptions)
         };
@@ -126,13 +126,13 @@ internal class GoogleFirestoreStorage : IGrainStorage, ILifecycleParticipant<ISi
             if (this._options.DeleteStateOnClear)
             {
                 operation = "Deleting";
-                await this._dataManager.DeleteEntity(SanitizeGrainId(grainId), grainState.ETag).ConfigureAwait(false);
+                await this._dataManager.DeleteEntity(Utils.SanitizeGrainId(grainId), grainState.ETag).ConfigureAwait(false);
             }
             else
             {
                 var entity = new GrainStateEntity
                 {
-                    Id = SanitizeGrainId(grainId),
+                    Id = Utils.SanitizeGrainId(grainId),
                     Name = stateName,
                     ETag = Utils.ParseTimestamp(grainState.ETag)
                 };
@@ -163,7 +163,7 @@ internal class GoogleFirestoreStorage : IGrainStorage, ILifecycleParticipant<ISi
             this._logger.LogInformation("Initializing GoogleFirestoreStorage {ProviderName}...", this._name);
             this._dataManager = new FirestoreDataManager(
                 PERSISTENCE_GROUP,
-                this._clusterOptions.ServiceId,
+                Utils.SanitizeId(this._clusterOptions.ServiceId),
                 this._options,
                 this._loggerFactory.CreateLogger<FirestoreDataManager>());
 
@@ -181,8 +181,6 @@ internal class GoogleFirestoreStorage : IGrainStorage, ILifecycleParticipant<ISi
             sw.Stop();
         }
     }
-
-    private static string SanitizeGrainId(GrainId grainId) => grainId.ToString().Replace("/", "_");
 
     private Task Close(CancellationToken ct) => Task.CompletedTask;
 
