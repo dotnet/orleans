@@ -79,10 +79,10 @@ internal class SiloInstanceEntity : MembershipEntity
         sb.Append(" SiloName=").Append(this.SiloName);
 
         sb.Append(" SuspectingSilos=")
-            .Append(string.Join("|", this.SuspectingSilos?.Select(s => $"({s.Key}|{Utils.FormatTimestamp(s.Value)}") ?? Enumerable.Empty<string>()));
+            .Append(string.Join("|", this.SuspectingSilos?.Select(s => $"({s.Key}|{Utils.FormatDateTime(s.Value)}") ?? Enumerable.Empty<string>()));
 
-        sb.Append(" StartTime=").Append(Utils.FormatTimestamp(this.StartTime));
-        sb.Append(" IAmAliveTime=").Append(Utils.FormatTimestamp(this.IAmAliveTime));
+        sb.Append(" StartTime=").Append(Utils.FormatDateTime(this.StartTime));
+        sb.Append(" IAmAliveTime=").Append(Utils.FormatDateTime(this.IAmAliveTime));
         sb.Append(']');
 
         return sb.ToString();
