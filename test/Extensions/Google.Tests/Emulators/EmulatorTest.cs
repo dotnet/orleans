@@ -6,12 +6,14 @@ using Google.Cloud.Storage.V1;
 
 namespace Orleans.Tests.Google;
 
-[TestCategory("GoogleCloud")]
-public class GoogleEmulatorTest : IAsyncLifetime
+[TestCategory("GoogleCloud"), TestCategory("Functional")]
+public class GoogleEmulatorTest
 {
-    [Fact]
+    [SkippableFact]
     public async Task EnsureFirestoreTest()
     {
+        Assert.NotNull(GoogleEmulatorHost.FirestoreEndpoint);
+
         var id = $"orleans-test-{Guid.NewGuid():N}";
 
         var db = new FirestoreDbBuilder
@@ -29,9 +31,11 @@ public class GoogleEmulatorTest : IAsyncLifetime
         Assert.Equal(1815, snapshot.GetValue<int>("Born"));
     }
 
-    [Fact]
+    [SkippableFact]
     public async Task EnsurePubSubTest()
     {
+        Assert.NotNull(GoogleEmulatorHost.PubSubEndpoint);
+
         var id = $"orleans-test-{Guid.NewGuid():N}";
 
         var topicId = "test-topic";
@@ -77,21 +81,20 @@ public class GoogleEmulatorTest : IAsyncLifetime
         await publisher.DeleteTopicAsync(topicName);
     }
 
-    public Task InitializeAsync() => GoogleEmulatorHost.Instance.EnsureStarted();
-
-    public Task DisposeAsync() => Task.CompletedTask;
-
-    // [Fact]
+    // [SkippableFact]
     // public async Task EnsureStorageTest()
     // {
+    //     Assert.NotNull(GoogleEmulatorHost.StorageEndpoint);
+
     //     var client = new StorageClientBuilder()
     //     {
-    //         BaseUri = this._emulator.StorageEndpoint,
+    //         BaseUri = GoogleEmulatorHost.StorageEndpoint,
     //         UnauthenticatedAccess = true
     //     }.Build();
 
+    //     var id = $"orleans-test-{Guid.NewGuid():N}";
     //     var bucketName = Guid.NewGuid().ToString();
-    //     await client.CreateBucketAsync(_id, bucketName);
+    //     await client.CreateBucketAsync(id, bucketName);
 
     //     var content = System.Text.Encoding.UTF8.GetBytes("hello, world");
 

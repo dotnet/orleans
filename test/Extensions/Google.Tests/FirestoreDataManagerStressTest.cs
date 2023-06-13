@@ -19,7 +19,7 @@ public class FirestoreDataManagerStressTests : IAsyncLifetime
         this._output = output;
     }
 
-    [Fact]
+    [SkippableFact]
     public void WriteAlot_SinglePartition()
     {
         const string testName = "WriteAlot_SinglePartition";
@@ -31,7 +31,7 @@ public class FirestoreDataManagerStressTests : IAsyncLifetime
         WriteAlot_Async(testName, numPartitions, iterations, batchSize);
     }
 
-    [Fact]
+    [SkippableFact]
     public void WriteAlot_MultiPartition()
     {
         const string testName = "WriteAlot_MultiPartition";
@@ -76,8 +76,6 @@ public class FirestoreDataManagerStressTests : IAsyncLifetime
 
     public async Task InitializeAsync()
     {
-        await GoogleEmulatorHost.Instance.EnsureStarted();
-
         var options = new FirestoreOptions
         {
             ProjectId = $"orleans-test-{Guid.NewGuid():N}",

@@ -1,107 +1,73 @@
-using DotNet.Testcontainers.Builders;
-using DotNet.Testcontainers.Containers;
+using System.Net.Sockets;
 
 namespace Orleans.Tests.Google;
 
-public class GoogleEmulatorNotAvailableException : Exception
-{
-    public GoogleEmulatorNotAvailableException(string message) : base(message) { }
-}
-
-/// <summary>
-/// Manages the lifecycle of the Google Cloud Platform emulators.
-/// </summary>
-public class GoogleEmulatorHost : IAsyncDisposable
+public static class GoogleEmulatorHost
 {
     private const int STORAGE_PORT = 9199;
     private const int PUBSUB_PORT = 8085;
     private const int FIRESTORE_PORT = 8080;
-    // private IContainer? _storage;
-    // private IContainer? _pubsub;
-    // private IContainer? _firestore;
-    private readonly SemaphoreSlim _semaphore = new(1, 1);
 
-    public static readonly string ProjectId = "orleans-test";
-    // public static readonly string StorageEndpoint = $"http://localhost:{STORAGE_PORT}";
-    public static readonly string PubSubEndpoint = $"http://localhost:{PUBSUB_PORT}";
-    public static readonly string FirestoreEndpoint = $"http://localhost:{FIRESTORE_PORT}";
+    public const string ProjectId = "orleans-test";
 
-    private GoogleEmulatorHost() { }
-
-    private static GoogleEmulatorHost? _instance;
-
-    public static GoogleEmulatorHost Instance => _instance ??= new GoogleEmulatorHost();
-
-    public async Task EnsureStarted()
+    private static string? _storageEndpoint;
+    public static string StorageEndpoint
     {
-        await this._semaphore.WaitAsync();
-
-        try
+        get
         {
-            // if (this._storage is not null && this._pubsub is not null && this._firestore is not null) return;
+            if (_storageEndpoint is null)
+            {
+                EnsureEmulator(STORAGE_PORT);
+                _storageEndpoint = $"http://localhost:{STORAGE_PORT}";
+                Environment.SetEnvironmentVariable("STORAGE_EMULATOR_HOST", _storageEndpoint);
+            }
 
-            // var tasks = new List<Task>();
-
-            // this._storage = new ContainerBuilder()
-            //     .WithImage("oittaa/gcp-storage-emulator:latest")
-            //     .WithPortBinding(STORAGE_PORT, STORAGE_PORT)
-            //     .WithEnvironment("PORT", STORAGE_PORT.ToString())
-            //     .WithWaitStrategy(Wait.ForUnixContainer().UntilPortIsAvailable(STORAGE_PORT))
-            //     .Build();
-            // tasks.Add(this._storage.StartAsync());
-
-            // this._firestore = new ContainerBuilder()
-            //     .WithImage("gcr.io/google.com/cloudsdktool/google-cloud-cli:emulators")
-            //     .WithPortBinding(FIRESTORE_PORT, FIRESTORE_PORT)
-            //     .WithCommand("gcloud", "emulators", "firestore", "start", $"--host-port=0.0.0.0:{FIRESTORE_PORT}")
-            //     .WithWaitStrategy(Wait.ForUnixContainer().UntilPortIsAvailable(FIRESTORE_PORT))
-            //     .Build();
-            // tasks.Add(this._firestore.StartAsync());
-
-            // this._pubsub = new ContainerBuilder()
-            //     .WithImage("gcr.io/google.com/cloudsdktool/google-cloud-cli:emulators")
-            //     .WithPortBinding(PUBSUB_PORT, PUBSUB_PORT)
-            //     .WithCommand("gcloud", "beta", "emulators", "pubsub", "start", $"--host-port=0.0.0.0:{PUBSUB_PORT}")
-            //     .WithWaitStrategy(Wait.ForUnixContainer().UntilPortIsAvailable(PUBSUB_PORT))
-            //     .Build();
-            // tasks.Add(this._pubsub.StartAsync());
-
-            // await Task.WhenAll(tasks);
-
-            Environment.SetEnvironmentVariable("PUBSUB_EMULATOR_HOST", "http://127.0.0.1:8085");
-            Environment.SetEnvironmentVariable("FIRESTORE_EMULATOR_HOST", "http://127.0.0.1:8080");
-            // Environment.SetEnvironmentVariable("STORAGE_EMULATOR_HOST", StorageEndpoint);
-        }
-        catch (Exception ex)
-        {
-            throw new InvalidOperationException("Unable to start Google Cloud Platform emulators.", ex);
-            throw;
-        }
-        finally
-        {
-            this._semaphore.Release();
+            return _storageEndpoint;
         }
     }
 
-    public async ValueTask DisposeAsync()
+    public static string? _pubSubEndpoint;
+    public static string PubSubEndpoint
     {
-        var tasks = new List<Task>();
+        get
+        {
+            if (_pubSubEndpoint is null)
+            {
+                EnsureEmulator(PUBSUB_PORT);
+                _pubSubEndpoint = $"http://localhost:{PUBSUB_PORT}";
+                Environment.SetEnvironmentVariable("PUBSUB_EMULATOR_HOST", _pubSubEndpoint);
+            }
 
-        // if (this._storage is not null)
-        // {
-        //     tasks.Add(this._storage.StopAsync());
-        // }
+            return _pubSubEndpoint;
+        }
+    }
 
-        // if (this._pubsub is not null)
-        // {
-        //     tasks.Add(this._pubsub.StopAsync());
-        // }
+    public static string? _firestoreEndpoint;
+    public static string FirestoreEndpoint
+    {
+        get
+        {
+            if (_firestoreEndpoint is null)
+            {
+                EnsureEmulator(FIRESTORE_PORT);
+                _firestoreEndpoint = $"http://localhost:{FIRESTORE_PORT}";
+                Environment.SetEnvironmentVariable("FIRESTORE_EMULATOR_HOST", _firestoreEndpoint);
+            }
 
-        // if (this._firestore is not null)
-        // {
-        //     tasks.Add(this._firestore.StopAsync());
-        // }
+            return _firestoreEndpoint;
+        }
+    }
 
-        await Task.WhenAll(tasks);
+    private static void EnsureEmulator(int port)
+    {
+        using var client = new TcpClient();
+        var result = client.BeginConnect("localhost", port, null, null);
+        var success = result.AsyncWaitHandle.WaitOne(TimeSpan.FromSeconds(1));
+        if (!success)
+        {
+            throw new SkipException();
+        }
+
+        client.EndConnect(result);
     }
 }

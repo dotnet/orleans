@@ -13,7 +13,7 @@ public class FirestoreDataManagerTests : IAsyncLifetime
     private const string TEST_PARTITION = "Test";
     private FirestoreDataManager _manager = default!;
 
-    [Fact]
+    [SkippableFact]
     public async Task CreateEntry()
     {
         var data = GetDummyEntity();
@@ -38,7 +38,7 @@ public class FirestoreDataManagerTests : IAsyncLifetime
         Assert.Equal(Utils.ParseTimestamp(eTag), returned.ETag);
     }
 
-    [Fact]
+    [SkippableFact]
     public async Task UpsertEntry()
     {
         var data = GetDummyEntity();
@@ -57,7 +57,7 @@ public class FirestoreDataManagerTests : IAsyncLifetime
         Assert.Equal(Utils.ParseTimestamp(eTag2), returned.ETag);
     }
 
-    [Fact]
+    [SkippableFact]
     public async Task UpdateEntry()
     {
         var data = GetDummyEntity();
@@ -110,7 +110,7 @@ public class FirestoreDataManagerTests : IAsyncLifetime
         Assert.Equal(Utils.ParseTimestamp(eTag2), returned.ETag!.Value);
     }
 
-    [Fact]
+    [SkippableFact]
     public async Task DeleteEntry()
     {
         var data = GetDummyEntity();
@@ -136,7 +136,7 @@ public class FirestoreDataManagerTests : IAsyncLifetime
         Assert.False(result, "Should have not deleted as it wasn't found.");
     }
 
-    [Fact]
+    [SkippableFact]
     public async Task ReadAllEntries()
     {
         var data = GetDummyEntity();
@@ -195,7 +195,7 @@ public class FirestoreDataManagerTests : IAsyncLifetime
         Assert.Empty(all);
     }
 
-    [Fact]
+    [SkippableFact]
     public async Task DeleteEntities()
     {
         var tasks = Enumerable.Range(0, 501).Select(x =>
@@ -241,7 +241,7 @@ public class FirestoreDataManagerTests : IAsyncLifetime
         await this._manager.DeleteEntities(entities);
     }
 
-    [Fact]
+    [SkippableFact]
     public async Task QueryEntities()
     {
         var data = GetDummyEntity();
@@ -300,8 +300,6 @@ public class FirestoreDataManagerTests : IAsyncLifetime
 
     public async Task InitializeAsync()
     {
-        await GoogleEmulatorHost.Instance.EnsureStarted();
-
         var id = $"Orleans-Test-{Guid.NewGuid()}";
         var opt = new FirestoreOptions
         {
