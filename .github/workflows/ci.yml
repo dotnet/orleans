@@ -258,8 +258,8 @@ jobs:
       run: |
         Write-Host "Launching Cosmos DB Emulator"
         Import-Module "$env:ProgramFiles\Azure Cosmos DB Emulator\PSModules\Microsoft.Azure.CosmosDB.Emulator"
-        Start-CosmosDbEmulator -NoFirewall -NoUI
-        $IPAddress = (Get-NetIPAddress -AddressFamily IPV4 -AddressState Preferred -PrefixOrigin Manual | Select-Object IPAddress -First 1).IPAddress
+        Start-CosmosDbEmulator -NoUI -Consistency Strong -PartitionCount 2 -DefaultPartitionCount 2
+        $IPAddress = (Get-NetIPAddress -AddressFamily IPV4 -AddressState Preferred -PrefixOrigin Manual | Select-Object IPAddress -First 1).IPAddress ?? "127.0.0.1"
         Add-Content -Path $env:GITHUB_ENV -Value "ORLEANSCOSMOSDBACCOUNTENDPOINT=https://$($IPAddress):8081/"
     - name: Test
       run: dotnet test --filter "Category=${{ matrix.provider }}&(Category=BVT|Category=SlowBVT|Category=Functional)" --framework ${{ matrix.framework }} --blame-hang-timeout 10m --logger "trx" -- -parallel none -noshadow
