@@ -10,7 +10,6 @@
 
   <ItemGroup>
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="$(MicrosoftTestSdkVersion)" />
-    <PackageReference Include="Testcontainers" />
     <PackageReference Include="Google.Cloud.Firestore" />
   </ItemGroup>
 
