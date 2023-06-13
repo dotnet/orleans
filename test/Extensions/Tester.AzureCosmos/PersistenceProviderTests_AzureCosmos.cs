@@ -1,23 +1,15 @@
-using System;
 using System.Diagnostics;
 using System.Globalization;
-using System.Threading.Tasks;
-using System.Collections.Generic;
 using System.Text.Json.Serialization;
-using Microsoft.Extensions.Options;
 using Microsoft.Extensions.DependencyInjection;
-using Xunit;
 using Xunit.Abstractions;
 using TestExtensions;
-using Orleans;
 using Orleans.Runtime;
 using Orleans.Storage;
-using Orleans.Internal;
 using Orleans.Providers;
 using Orleans.Configuration;
 using Orleans.Persistence.AzureCosmos;
 using UnitTests.Persistence;
-using Tester.AzureCosmos;
 
 namespace Tester.AzureCosmos.Persistence;
 
@@ -47,7 +39,7 @@ public class PersistenceProviderTests_AzureCosmos
         _serviceId = Guid.NewGuid().ToString("N");
     }
 
-    private async Task<AzureCosmosStorage> InitAzureCosmosDBGrainStorage()
+    private async Task<AzureCosmosGrainStorage> InitAzureCosmosDBGrainStorage()
     {
         var options = new AzureCosmosGrainStorageOptions();
 
@@ -56,7 +48,7 @@ public class PersistenceProviderTests_AzureCosmos
         var pkProvider = new DefaultPartitionKeyProvider();
         var clusterOptions = new ClusterOptions { ClusterId = _clusterId, ServiceId = _serviceId };
 
-        var store = ActivatorUtilities.CreateInstance<AzureCosmosStorage>(providerRuntime.ServiceProvider, options, clusterOptions, "TestStorage", pkProvider);
+        var store = ActivatorUtilities.CreateInstance<AzureCosmosGrainStorage>(providerRuntime.ServiceProvider, options, clusterOptions, "TestStorage", pkProvider);
         var lifecycle = ActivatorUtilities.CreateInstance<SiloLifecycleSubject>(providerRuntime.ServiceProvider);
         store.Participate(lifecycle);
         await lifecycle.OnStart();

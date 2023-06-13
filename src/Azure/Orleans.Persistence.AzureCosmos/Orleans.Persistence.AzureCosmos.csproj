@@ -17,7 +17,6 @@
     <Compile Include="..\Shared\Cosmos\AzureCosmosOptionsValidator.cs" Link="Storage\AzureCosmosOptionsValidator.cs" />
     <Compile Include="..\Shared\Cosmos\BaseEntity.cs" Link="Storage\BaseEntity.cs" />
     <Compile Include="..\Shared\Cosmos\Usings.cs" Link="Storage\Usings.cs" />
-    <Compile Include="..\Shared\Cosmos\AzureCosmosThroughputMode.cs" Link="Storage\AzureCosmosThroughputMode.cs" />
     <Compile Include="..\Shared\Cosmos\CosmosDbIdSanitizer.cs" Link="Storage\CosmosDbIdSanitizer.cs" />
   </ItemGroup>
 

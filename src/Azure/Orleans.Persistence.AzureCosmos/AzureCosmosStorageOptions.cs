@@ -3,7 +3,7 @@ using Orleans.Core;
 namespace Orleans.Persistence.AzureCosmos;
 
 /// <summary>
-/// Options for Azure Cosmos DB grain persistance.
+/// Options for Azure Cosmos DB grain persistence.
 /// </summary>
 public class AzureCosmosGrainStorageOptions : AzureCosmosOptions
 {
@@ -27,6 +27,9 @@ public class AzureCosmosGrainStorageOptions : AzureCosmosOptions
     /// </summary>
     public List<string> StateFieldsToIndex { get; set; } = new();
 
+    /// <summary>
+    /// Initializes a new <see cref="AzureCosmosGrainStorageOptions"/> instance.
+    /// </summary>
     public AzureCosmosGrainStorageOptions()
     {
         ContainerName = ORLEANS_STORAGE_CONTAINER;

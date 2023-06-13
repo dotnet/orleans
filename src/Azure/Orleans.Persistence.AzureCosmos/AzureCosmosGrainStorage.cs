@@ -7,7 +7,7 @@ using static Orleans.Persistence.AzureCosmos.CosmosDbIdSanitizer;
 
 namespace Orleans.Persistence.AzureCosmos;
 
-internal class AzureCosmosStorage : IGrainStorage, ILifecycleParticipant<ISiloLifecycle>
+internal class AzureCosmosGrainStorage : IGrainStorage, ILifecycleParticipant<ISiloLifecycle>
 {
     private const string ANY_ETAG = "*";
     private const string KEY_STRING_SEPARATOR = "__";
@@ -24,7 +24,7 @@ internal class AzureCosmosStorage : IGrainStorage, ILifecycleParticipant<ISiloLi
     private CosmosClient _client = default!;
     private Container _container = default!;
 
-    public AzureCosmosStorage(
+    public AzureCosmosGrainStorage(
         string name,
         AzureCosmosGrainStorageOptions options,
         ILoggerFactory loggerFactory,
@@ -33,7 +33,7 @@ internal class AzureCosmosStorage : IGrainStorage, ILifecycleParticipant<ISiloLi
         IPartitionKeyProvider partitionKeyProvider
     )
     {
-        _logger = loggerFactory.CreateLogger<AzureCosmosStorage>();
+        _logger = loggerFactory.CreateLogger<AzureCosmosGrainStorage>();
         _options = options;
         _name = name;
         _serviceProvider = serviceProvider;
@@ -249,7 +249,7 @@ internal class AzureCosmosStorage : IGrainStorage, ILifecycleParticipant<ISiloLi
 
     public void Participate(ISiloLifecycle lifecycle)
     {
-        lifecycle.Subscribe(OptionFormattingUtilities.Name<AzureCosmosStorage>(_name), _options.InitStage, Init);
+        lifecycle.Subscribe(OptionFormattingUtilities.Name<AzureCosmosGrainStorage>(_name), _options.InitStage, Init);
     }
 
     private string GetKeyString(GrainId grainId) => $"{Sanitize(_serviceId)}{KEY_STRING_SEPARATOR}{Sanitize(grainId.Type.ToString()!)}{SeparatorChar}{Sanitize(grainId.Key.ToString()!)}";
@@ -393,7 +393,7 @@ internal class AzureCosmosStorage : IGrainStorage, ILifecycleParticipant<ISiloLi
         }
     }
 
-    private async Task<TResult> ExecuteWithRetries<TArg1, TResult>(Func<AzureCosmosStorage, TArg1, Task<TResult>> clientFunc, TArg1 arg1)
+    private async Task<TResult> ExecuteWithRetries<TArg1, TResult>(Func<AzureCosmosGrainStorage, TArg1, Task<TResult>> clientFunc, TArg1 arg1)
     {
         // From:  https://blogs.msdn.microsoft.com/bigdatasupport/2015/09/02/dealing-with-requestratetoolarge-errors-in-azure-documentdb-and-testing-performance/
         while (true)
@@ -422,6 +422,6 @@ public static class AzureCosmosStorageFactory
     public static IGrainStorage Create(IServiceProvider services, string name)
     {
         var optionsMonitor = services.GetRequiredService<IOptionsMonitor<AzureCosmosGrainStorageOptions>>();
-        return ActivatorUtilities.CreateInstance<AzureCosmosStorage>(services, name, optionsMonitor.Get(name));
+        return ActivatorUtilities.CreateInstance<AzureCosmosGrainStorage>(services, name, optionsMonitor.Get(name));
     }
 }
