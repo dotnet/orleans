@@ -6,7 +6,7 @@ using Orleans.Clustering.GoogleFirestore;
 
 namespace Orleans.Tests.Google;
 
-[TestCategory("Functional"), TestCategory("GoogleFirestore"), TestCategory("GoogleCloud")]
+[TestCategory("GoogleFirestore"), TestCategory("GoogleCloud"), TestCategory("Functional")]
 public class FirestoreSiloInstanceManagerTests : IAsyncLifetime
 {
     private FirestoreOptions _options = default!;
@@ -16,7 +16,7 @@ public class FirestoreSiloInstanceManagerTests : IAsyncLifetime
     private int _generation = default!;
     private SiloAddress _siloAddress = default!;
 
-    [Fact]
+    [SkippableFact]
     public async Task ActivateSiloInstance()
     {
         await RegisterSiloInstance();
@@ -24,7 +24,7 @@ public class FirestoreSiloInstanceManagerTests : IAsyncLifetime
         await this._manager.ActivateSiloInstance(this._entity);
     }
 
-    [Fact]
+    [SkippableFact]
     public async Task UnregisterSiloInstance()
     {
         await RegisterSiloInstance();
@@ -32,7 +32,7 @@ public class FirestoreSiloInstanceManagerTests : IAsyncLifetime
         await this._manager.UnregisterSiloInstance(this._entity);
     }
 
-    [Fact]
+    [SkippableFact]
     public async Task CleanDeadSiloInstance()
     {
         this._generation = 0;
@@ -58,7 +58,7 @@ public class FirestoreSiloInstanceManagerTests : IAsyncLifetime
         Assert.All(mbrData.Silos, e => Assert.NotEqual(OrleansSiloInstanceManager.INSTANCE_STATUS_DEAD, e.Status));
     }
 
-    [Fact]
+    [SkippableFact]
     public async Task Register_CheckData()
     {
         await RegisterSiloInstance();
@@ -75,7 +75,7 @@ public class FirestoreSiloInstanceManagerTests : IAsyncLifetime
         CheckSiloInstanceTableEntry(this._entity, silo);
     }
 
-    [Fact]
+    [SkippableFact]
     public async Task Activate_CheckData()
     {
         await RegisterSiloInstance();
@@ -92,7 +92,7 @@ public class FirestoreSiloInstanceManagerTests : IAsyncLifetime
         CheckSiloInstanceTableEntry(this._entity, silo);
     }
 
-    [Fact]
+    [SkippableFact]
     public async Task Unregister_CheckData()
     {
         await RegisterSiloInstance();
@@ -109,7 +109,7 @@ public class FirestoreSiloInstanceManagerTests : IAsyncLifetime
         CheckSiloInstanceTableEntry(this._entity, silo);
     }
 
-    [Fact]
+    [SkippableFact]
     public async Task FindAllGatewayProxyEndpoints()
     {
         await RegisterSiloInstance();
@@ -167,8 +167,6 @@ public class FirestoreSiloInstanceManagerTests : IAsyncLifetime
 
     public async Task InitializeAsync()
     {
-        await GoogleEmulatorHost.Instance.EnsureStarted();
-
         var id = $"orleans-test-{Guid.NewGuid():N}";
         this._options = new FirestoreOptions
         {

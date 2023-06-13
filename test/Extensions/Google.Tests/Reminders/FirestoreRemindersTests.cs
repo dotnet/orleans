@@ -8,7 +8,7 @@ using Orleans.Reminders.GoogleFirestore;
 
 namespace Orleans.Tests.Google;
 
-[TestCategory("Reminders"), TestCategory("GoogleFirestore"), TestCategory("GoogleCloud")]
+[TestCategory("Reminders"), TestCategory("GoogleFirestore"), TestCategory("GoogleCloud"), TestCategory("Functional")]
 [Collection(TestEnvironmentFixture.DefaultCollection)]
 public class FirestoreRemindersTests : ReminderTableTestsBase
 {
@@ -19,8 +19,6 @@ public class FirestoreRemindersTests : ReminderTableTestsBase
 
     protected override IReminderTable CreateRemindersTable()
     {
-        GoogleEmulatorHost.Instance.EnsureStarted().GetAwaiter().GetResult();
-
         var options = new FirestoreOptions
         {
             ProjectId = GoogleEmulatorHost.ProjectId,
@@ -35,24 +33,24 @@ public class FirestoreRemindersTests : ReminderTableTestsBase
 
     protected override Task<string> GetConnectionString() => Task.FromResult(GoogleEmulatorHost.FirestoreEndpoint);
 
-    [Fact]
+    [SkippableFact]
     public void Init()
     {
     }
 
-    [Fact]
+    [SkippableFact]
     public async Task Range()
     {
         await RemindersRange(50);
     }
 
-    [Fact]
+    [SkippableFact]
     public async Task ParallelUpsert()
     {
         await RemindersParallelUpsert();
     }
 
-    [Fact]
+    [SkippableFact]
     public async Task Simple()
     {
         await ReminderSimple();

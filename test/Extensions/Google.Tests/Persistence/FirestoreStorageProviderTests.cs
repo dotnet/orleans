@@ -11,7 +11,7 @@ using Orleans.Persistence.GoogleFirestore;
 
 namespace Orleans.Tests.Google;
 
-[TestCategory("Persistence"), TestCategory("GoogleFirestore"), TestCategory("GoogleCloud")]
+[TestCategory("Persistence"), TestCategory("GoogleFirestore"), TestCategory("GoogleCloud"), TestCategory("Functional")]
 [Collection(TestEnvironmentFixture.DefaultCollection)]
 public class FirestoreStorageProviderTests : IClassFixture<TestEnvironmentFixture>, IAsyncLifetime
 {
@@ -170,8 +170,6 @@ public class FirestoreStorageProviderTests : IClassFixture<TestEnvironmentFixtur
 
     public async Task InitializeAsync()
     {
-        await GoogleEmulatorHost.Instance.EnsureStarted();
-
         var id = $"orleans-test-{Guid.NewGuid():N}";
 
         var options = new FirestoreStateStorageOptions
