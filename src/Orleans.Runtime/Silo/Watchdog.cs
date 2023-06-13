@@ -9,7 +9,7 @@ namespace Orleans.Runtime
     internal class Watchdog
     {
         private readonly CancellationTokenSource cancellation = new CancellationTokenSource();
-        private static readonly TimeSpan heartbeatPeriod = TimeSpan.FromMilliseconds(1000);
+        private static readonly TimeSpan gcHeartbeatPeriod = TimeSpan.FromMilliseconds(1000);
         private readonly TimeSpan healthCheckPeriod;
         private DateTime lastHeartbeat;
         private DateTime lastWatchdogCheck;
@@ -19,8 +19,8 @@ namespace Orleans.Runtime
 
         private readonly List<IHealthCheckParticipant> participants;
         private readonly ILogger logger;
-        private Thread selfThread;
-        private Thread participantThread;
+        private Thread gcThread;
+        private Thread participantsThread;
 
         public Watchdog(TimeSpan watchdogPeriod, List<IHealthCheckParticipant> watchables, ILogger<Watchdog> logger)
         {
@@ -33,7 +33,7 @@ namespace Orleans.Runtime
         {
             logger.LogInformation("Starting Silo Watchdog.");
 
-            if (selfThread is not null)
+            if (gcThread is not null)
             {
                 throw new InvalidOperationException("Watchdog.Start may not be called more than once");
             }
@@ -42,21 +42,21 @@ namespace Orleans.Runtime
             lastHeartbeat = now;
             cumulativeGCPauseDuration = GC.GetTotalPauseDuration();
 
-            this.selfThread = new Thread(this.RunSelfCheck)
+            this.gcThread = new Thread(this.RunGCCheck)
             {
                 IsBackground = true,
-                Name = "Orleans.Runtime.Watchdog",
+                Name = "Orleans.Runtime.Watchdog.GCMonitor",
             };
-            this.selfThread.Start();
+            this.gcThread.Start();
 
             lastWatchdogCheck = now;
 
-            this.participantThread = new Thread(this.RunParticipantCheck)
+            this.participantsThread = new Thread(this.RunParticipantsCheck)
             {
                 IsBackground = true,
-                Name = "Orleans.Runtime.Watchdog",
+                Name = "Orleans.Runtime.Watchdog.ParticipantsMonitor",
             };
-            this.participantThread.Start();
+            this.participantsThread.Start();
         }
 
         public void Stop()
@@ -64,14 +64,14 @@ namespace Orleans.Runtime
             cancellation.Cancel();
         }
 
-        protected void RunSelfCheck()
+        protected void RunGCCheck()
         {
             while (!this.cancellation.IsCancellationRequested)
             {
                 try
                 {
-                    SelfWatchdogHeartbeatTick();
-                    Thread.Sleep(heartbeatPeriod);
+                    GCWatchdogHeartbeatTick();
+                    Thread.Sleep(gcHeartbeatPeriod);
                 }
                 catch (ThreadAbortException)
                 {
@@ -84,13 +84,13 @@ namespace Orleans.Runtime
             }
         }
 
-        protected void RunParticipantCheck()
+        protected void RunParticipantsCheck()
         {
             while (!this.cancellation.IsCancellationRequested)
             {
                 try
                 {
-                    ParticipantWatchdogHeartbeatTick();
+                    ParticipantsWatchdogHeartbeatTick();
                     Thread.Sleep(healthCheckPeriod);
                 }
                 catch (ThreadAbortException)
@@ -104,7 +104,7 @@ namespace Orleans.Runtime
             }
         }
 
-        private void SelfWatchdogHeartbeatTick()
+        private void GCWatchdogHeartbeatTick()
         {
             try
             {
@@ -117,7 +117,7 @@ namespace Orleans.Runtime
             }
         }
 
-        private void ParticipantWatchdogHeartbeatTick()
+        private void ParticipantsWatchdogHeartbeatTick()
         {
             var timeSinceLastWatchdogCheck = DateTime.UtcNow - lastWatchdogCheck;
             if (timeSinceLastWatchdogCheck <= healthCheckPeriod)
@@ -168,7 +168,7 @@ namespace Orleans.Runtime
         {
             var timeSinceLastTick = DateTime.UtcNow - lastCheckTime;
             var pauseDurationSinceLastTick = GC.GetTotalPauseDuration() - lastCumulativeGCPauseDuration;
-            if (timeSinceLastTick > heartbeatPeriod.Multiply(2))
+            if (timeSinceLastTick > gcHeartbeatPeriod.Multiply(2))
             {
                 var gc = new[] { GC.CollectionCount(0), GC.CollectionCount(1), GC.CollectionCount(2) };
                 logger.LogWarning(
