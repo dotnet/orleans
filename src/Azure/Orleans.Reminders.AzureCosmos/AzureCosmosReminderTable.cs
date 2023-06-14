@@ -1,6 +1,7 @@
 using System.Net;
 using System.Diagnostics;
 using Orleans.Reminders.AzureCosmos.Models;
+using System.Reflection.Metadata;
 
 namespace Orleans.Reminders.AzureCosmos;
 
@@ -12,6 +13,7 @@ internal class AzureCosmosReminderTable : IReminderTable
     private readonly ClusterOptions _clusterOptions;
     private readonly ILogger _logger;
     private readonly IServiceProvider _serviceProvider;
+    private readonly Func<ReminderEntity, ReminderEntry> _convertEntityToEntry;
     private CosmosClient _client = default!;
     private Container _container = default!;
 
@@ -25,6 +27,7 @@ internal class AzureCosmosReminderTable : IReminderTable
         _serviceProvider = serviceProvider;
         _options = options.Value;
         _clusterOptions = clusterOptions.Value;
+        _convertEntityToEntry = FromEntity;
     }
 
     public async Task Init()
@@ -33,10 +36,13 @@ internal class AzureCosmosReminderTable : IReminderTable
 
         try
         {
-            _logger.LogInformation(
-                "Azure Cosmos DB Reminder Storage AzureCosmosReminderTable is initializing: Name=AzureCosmosReminderTable ServiceId={ServiceId} Collection={Container}",
-                _clusterOptions.ServiceId,
-                _options.ContainerName);
+            if (_logger.IsEnabled(LogLevel.Debug))
+            {
+                _logger.LogDebug(
+                    "Azure Cosmos DB Reminder Storage AzureCosmosReminderTable is initializing: Name=AzureCosmosReminderTable ServiceId={ServiceId} Collection={Container}",
+                    _clusterOptions.ServiceId,
+                    _options.ContainerName);
+            }
 
             await InitializeCosmosClient();
 
@@ -54,8 +60,11 @@ internal class AzureCosmosReminderTable : IReminderTable
 
             stopWatch.Stop();
 
-            _logger.LogInformation(
-                "Initializing AzureCosmosReminderTable took {Elapsed} milliseconds", stopWatch.ElapsedMilliseconds);
+            if (_logger.IsEnabled(LogLevel.Trace))
+            {
+                _logger.LogTrace(
+                    "Initializing AzureCosmosReminderTable took {Elapsed} milliseconds", stopWatch.ElapsedMilliseconds);
+            }
         }
         catch (Exception exc)
         {
@@ -83,7 +92,7 @@ internal class AzureCosmosReminderTable : IReminderTable
                     var queryResponse = await query.ReadNextAsync().ConfigureAwait(false);
                     if (queryResponse != null && queryResponse.Count > 0)
                     {
-                        reminders.AddRange(queryResponse.ToArray());
+                        reminders.AddRange(queryResponse);
                     }
                     else
                     {
@@ -95,12 +104,13 @@ internal class AzureCosmosReminderTable : IReminderTable
             },
             (grainId, requestOptions)).ConfigureAwait(false);
 
-            return new ReminderTableData(response.Select(FromEntity));
+            return new ReminderTableData(response.Select(_convertEntityToEntry));
         }
         catch (Exception exc)
         {
             _logger.LogError(exc, "Failure reading reminders for grain {GrainId} in container {Container}", grainId, _container.Id);
-            throw new OrleansException(exc.Message);
+            WrappedException.CreateAndRethrow(exc);
+            throw;
         }
     }
 
@@ -111,22 +121,21 @@ internal class AzureCosmosReminderTable : IReminderTable
             var response = await ExecuteWithRetries(static async (self, args) =>
             {
                 var (begin, end) = args;
-                var query = self._container.GetItemLinqQueryable<ReminderEntity>().Where(r => r.ServiceId == self._clusterOptions.ServiceId);
+                var query = self._container.GetItemLinqQueryable<ReminderEntity>()
+                    .Where(entity => entity.ServiceId == self._clusterOptions.ServiceId);
 
                 query = begin < end
                     ? query.Where(r => r.GrainHash > begin && r.GrainHash <= end)
                     : query.Where(r => r.GrainHash > begin || r.GrainHash <= end);
 
                 var iterator = query.ToFeedIterator();
-
                 var reminders = new List<ReminderEntity>();
-
                 do
                 {
                     var queryResponse = await iterator.ReadNextAsync().ConfigureAwait(false);
                     if (queryResponse != null && queryResponse.Count > 0)
                     {
-                        reminders.AddRange(queryResponse.ToArray());
+                        reminders.AddRange(queryResponse);
                     }
                     else
                     {
@@ -138,7 +147,7 @@ internal class AzureCosmosReminderTable : IReminderTable
             },
             (begin, end)).ConfigureAwait(false);
 
-            return new ReminderTableData(response.Select(FromEntity));
+            return new ReminderTableData(response.Select(_convertEntityToEntry));
         }
         catch (Exception exc)
         {
@@ -221,7 +230,7 @@ internal class AzureCosmosReminderTable : IReminderTable
 
             return true;
         }
-        catch (CosmosException dce) when (dce.StatusCode == HttpStatusCode.PreconditionFailed)
+        catch (CosmosException dce) when (dce.StatusCode is HttpStatusCode.PreconditionFailed)
         {
             return false;
         }
@@ -244,7 +253,9 @@ internal class AzureCosmosReminderTable : IReminderTable
         {
             var entities = await ExecuteWithRetries(static async self =>
             {
-                var query = self._container.GetItemLinqQueryable<ReminderEntity>().ToFeedIterator();
+                var query = self._container.GetItemLinqQueryable<ReminderEntity>()
+                    .Where(entity => entity.ServiceId == self._clusterOptions.ServiceId)
+                    .ToFeedIterator();
                 var reminders = new List<ReminderEntity>();
                 do
                 {
@@ -301,9 +312,9 @@ internal class AzureCosmosReminderTable : IReminderTable
     {
         try
         {
-            await _client.GetDatabase(_options.DatabaseName).DeleteAsync();
+            await _client.GetDatabase(_options.DatabaseName).DeleteAsync().ConfigureAwait(false);
         }
-        catch (CosmosException dce) when (dce.StatusCode == System.Net.HttpStatusCode.NotFound)
+        catch (CosmosException dce) when (dce.StatusCode == HttpStatusCode.NotFound)
         {
             return;
         }
@@ -317,12 +328,7 @@ internal class AzureCosmosReminderTable : IReminderTable
 
     private async Task TryCreateCosmosDBResources()
     {
-        var offerThroughput =
-            _options.DatabaseThroughput >= 400
-            ? (int?)_options.DatabaseThroughput
-            : null;
-
-        var dbResponse = await _client.CreateDatabaseIfNotExistsAsync(_options.DatabaseName, offerThroughput);
+        var dbResponse = await _client.CreateDatabaseIfNotExistsAsync(_options.DatabaseName, _options.DatabaseThroughput).ConfigureAwait(false);
         var db = dbResponse.Database;
 
         var remindersCollection = new ContainerProperties(_options.ContainerName, PARTITION_KEY_PATH);
@@ -336,7 +342,7 @@ internal class AzureCosmosReminderTable : IReminderTable
         const int maxRetries = 3;
         for (var retry = 0; retry <= maxRetries; ++retry)
         {
-            var collResponse = await db.CreateContainerIfNotExistsAsync(remindersCollection, _options.ContainerThroughputProperties);
+            var collResponse = await db.CreateContainerIfNotExistsAsync(remindersCollection, _options.ContainerThroughputProperties).ConfigureAwait(false);
 
             if (retry == maxRetries || dbResponse.StatusCode != HttpStatusCode.Created || collResponse.StatusCode == HttpStatusCode.Created)
             {

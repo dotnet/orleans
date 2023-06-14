@@ -55,7 +55,8 @@ internal class AzureCosmosGatewayListProvider : IGatewayListProvider
                 .GetItemLinqQueryable<SiloEntity>(requestOptions: _queryRequestOptions)
                 .Where(g => g.EntityType == nameof(SiloEntity) &&
                     g.Status == (int)SiloStatus.Active &&
-                    g.ProxyPort.HasValue && g.ProxyPort.Value != 0).ToFeedIterator();
+                    g.ProxyPort.HasValue && g.ProxyPort.Value != 0)
+                .ToFeedIterator();
 
             var entities = new List<SiloEntity>();
             do

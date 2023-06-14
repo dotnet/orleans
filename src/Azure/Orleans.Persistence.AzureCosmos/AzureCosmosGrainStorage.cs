@@ -330,12 +330,7 @@ internal class AzureCosmosGrainStorage : IGrainStorage, ILifecycleParticipant<IS
 
     private async Task TryCreateResources()
     {
-        var dbThroughput =
-            _options.DatabaseThroughput >= 400
-            ? (int?)_options.DatabaseThroughput
-            : null;
-
-        var dbResponse = await _client.CreateDatabaseIfNotExistsAsync(_options.DatabaseName, dbThroughput);
+        var dbResponse = await _client.CreateDatabaseIfNotExistsAsync(_options.DatabaseName, _options.DatabaseThroughput);
         var db = dbResponse.Database;
 
         var stateContainer = new ContainerProperties(_options.ContainerName, DEFAULT_PARTITION_KEY_PATH);
@@ -355,8 +350,7 @@ internal class AzureCosmosGrainStorage : IGrainStorage, ILifecycleParticipant<IS
         const int maxRetries = 3;
         for (var retry = 0; retry <= maxRetries; ++retry)
         {
-            var containerResponse = await db.CreateContainerIfNotExistsAsync(
-                stateContainer, _options.ContainerThroughputProperties);
+            var containerResponse = await db.CreateContainerIfNotExistsAsync(stateContainer, _options.ContainerThroughputProperties);
 
             if (containerResponse.StatusCode == HttpStatusCode.OK || containerResponse.StatusCode == HttpStatusCode.Created)
             {
@@ -381,7 +375,7 @@ internal class AzureCosmosGrainStorage : IGrainStorage, ILifecycleParticipant<IS
         {
             await _client.GetDatabase(_options.DatabaseName).DeleteAsync().ConfigureAwait(false);
         }
-        catch (CosmosException dce) when (dce.StatusCode == System.Net.HttpStatusCode.NotFound)
+        catch (CosmosException dce) when (dce.StatusCode == HttpStatusCode.NotFound)
         {
             return;
         }

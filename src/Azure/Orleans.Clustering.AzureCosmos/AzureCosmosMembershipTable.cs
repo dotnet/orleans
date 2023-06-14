@@ -312,7 +312,7 @@ internal class AzureCosmosMembershipTable : IMembershipTable
         {
             await _client.GetDatabase(_options.DatabaseName).DeleteAsync().ConfigureAwait(false);
         }
-        catch (CosmosException dce) when (dce.StatusCode == System.Net.HttpStatusCode.NotFound)
+        catch (CosmosException dce) when (dce.StatusCode == HttpStatusCode.NotFound)
         {
             return;
         }
