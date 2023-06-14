@@ -49,7 +49,7 @@ namespace Orleans.Persistence
             _serviceId = clusterOptions.Value.ServiceId;
             _ttl = options.EntryExpiry is { } ts ? ts.TotalSeconds.ToString(CultureInfo.InvariantCulture) : "-1";
             _keyPrefix = Encoding.UTF8.GetBytes($"{_serviceId}/state/");
-            _getKeyFunc = _options.GetRedisKey ?? GetKey;
+            _getKeyFunc = _options.GetStorageKey ?? DefaultGetStorageKey;
         }
 
         /// <inheritdoc />
@@ -192,7 +192,7 @@ namespace Orleans.Persistence
             }
         }
 
-        private RedisKey GetKey(string grainType, GrainId grainId)
+        private RedisKey DefaultGetStorageKey(string grainType, GrainId grainId)
         {
             var grainIdTypeBytes = IdSpan.UnsafeGetArray(grainId.Type.Value);
             var grainIdKeyBytes = IdSpan.UnsafeGetArray(grainId.Key);

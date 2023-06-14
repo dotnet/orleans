@@ -48,7 +48,7 @@ namespace Orleans.Persistence
         /// <summary>
         /// Gets the Redis key for the provided grain type and grain identifier. If not set, the default implementation will be used, which is equivalent to <c>{ServiceId}/state/{grainId}/{grainType}</c>.
         /// </summary>
-        public Func<string, GrainId, RedisKey>? GetRedisKey { get; set; }
+        public Func<string, GrainId, RedisKey>? GetStorageKey { get; set; }
 
         /// <summary>
         /// The default multiplexer creation delegate.
@@ -73,7 +73,7 @@ namespace Orleans.Persistence
             optionsBuilder.Configure((RedisStorageOptions options, IOptions<ClusterOptions> clusterOptions) =>
             {
                 RedisKey keyPrefix = Encoding.UTF8.GetBytes($"{clusterOptions.Value.ServiceId}/state/");
-                options.GetRedisKey = (_, grainId) => keyPrefix.Append(grainId.ToString());
+                options.GetStorageKey = (_, grainId) => keyPrefix.Append(grainId.ToString());
             });
         }
     }
