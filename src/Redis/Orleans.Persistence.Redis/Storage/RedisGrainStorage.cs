@@ -192,6 +192,9 @@ namespace Orleans.Persistence
             }
         }
 
+        /// <summary>
+        /// Default implementation of <see cref="RedisStorageOptions.GetStorageKey"/> which returns a key equivalent to <c>{ServiceId}/state/{grainId}/{grainType}</c>
+        /// </summary>
         private RedisKey DefaultGetStorageKey(string grainType, GrainId grainId)
         {
             var grainIdTypeBytes = IdSpan.UnsafeGetArray(grainId.Type.Value);
@@ -211,9 +214,9 @@ namespace Orleans.Persistence
             suffix[index++] = (byte)'/';
 
             var bytesWritten = Encoding.UTF8.GetBytes(grainType, suffix.AsSpan(index));
+
             Debug.Assert(bytesWritten == grainTypeLength);
             Debug.Assert(index + bytesWritten == suffix.Length);
-            
             return _keyPrefix.Append(suffix);
         }
 
