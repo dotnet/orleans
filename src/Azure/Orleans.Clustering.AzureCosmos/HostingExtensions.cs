@@ -19,7 +19,8 @@ public static class HostingExtensions
         this ISiloBuilder builder,
         Action<AzureCosmosClusteringOptions> configureOptions)
     {
-        return builder.ConfigureServices(services => services.UseAzureCosmosClustering(configureOptions));
+        builder.Services.UseAzureCosmosClustering(configureOptions);
+        return builder;
     }
 
     /// <summary>
@@ -32,7 +33,8 @@ public static class HostingExtensions
         this ISiloBuilder builder,
         Action<OptionsBuilder<AzureCosmosClusteringOptions>> configureOptions)
     {
-        return builder.ConfigureServices(services => services.UseAzureCosmosClustering(configureOptions));
+        builder.Services.UseAzureCosmosClustering(configureOptions);
+        return builder;
     }
 
     /// <summary>
@@ -42,11 +44,9 @@ public static class HostingExtensions
     /// <returns>The provided <paramref name="builder"/>.</returns>
     public static ISiloBuilder UseAzureCosmosClustering(this ISiloBuilder builder)
     {
-        return builder.ConfigureServices(services =>
-        {
-            services.AddOptions<AzureCosmosClusteringOptions>();
-            services.AddSingleton<IMembershipTable, AzureCosmosMembershipTable>();
-        });
+        builder.Services.AddOptions<AzureCosmosClusteringOptions>();
+        builder.Services.AddSingleton<IMembershipTable, AzureCosmosMembershipTable>();
+        return builder;
     }
 
     /// <summary>
@@ -59,7 +59,8 @@ public static class HostingExtensions
         this IClientBuilder builder,
         Action<AzureCosmosClusteringOptions> configureOptions)
     {
-        return builder.ConfigureServices(services => services.UseAzureCosmosGatewayListProvider(configureOptions));
+        builder.Services.UseAzureCosmosGatewayListProvider(configureOptions);
+        return builder;
     }
 
     /// <summary>
@@ -69,11 +70,9 @@ public static class HostingExtensions
     /// <returns>The provided <paramref name="builder"/>.</returns>
     public static IClientBuilder UseAzureCosmosGatewayListProvider(this IClientBuilder builder)
     {
-        return builder.ConfigureServices(services =>
-        {
-            services.AddOptions<AzureCosmosClusteringOptions>();
-            services.AddSingleton<IGatewayListProvider, AzureCosmosGatewayListProvider>();
-        });
+        builder.Services.AddOptions<AzureCosmosClusteringOptions>();
+        builder.Services.AddSingleton<IGatewayListProvider, AzureCosmosGatewayListProvider>();
+        return builder;
     }
 
     /// <summary>
@@ -86,7 +85,8 @@ public static class HostingExtensions
         this IClientBuilder builder,
         Action<OptionsBuilder<AzureCosmosClusteringOptions>> configureOptions)
     {
-        return builder.ConfigureServices(services => services.UseAzureCosmosGatewayListProvider(configureOptions));
+        builder.Services.UseAzureCosmosGatewayListProvider(configureOptions);
+        return builder;
     }
 
 

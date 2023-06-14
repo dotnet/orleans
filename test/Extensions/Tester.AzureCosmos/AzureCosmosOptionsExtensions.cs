@@ -1,62 +1,54 @@
 using Azure.Identity;
 using Microsoft.Azure.Cosmos;
-using Microsoft.Extensions.Options;
-using Orleans.Configuration;
+using Orleans.Clustering.AzureCosmos;
+using Orleans.Persistence.AzureCosmos;
+using Orleans.Reminders.AzureCosmos;
 using TestExtensions;
 
 namespace Tester.AzureCosmos;
 
 public static class AzureCosmosOptionsExtensions
 {
-    public static void ConfigureTestDefaults(this OptionsBuilder<Orleans.Clustering.AzureCosmos.AzureCosmosOptions> optionsBuilder)
+    public static void ConfigureTestDefaults(this AzureCosmosClusteringOptions options)
     {
-        optionsBuilder.Configure((Orleans.Clustering.AzureCosmos.AzureCosmosOptions options, IOptions<ClusterOptions> clusterOptions) =>
+        if (TestDefaultConfiguration.UseAadAuthentication)
         {
-            if (TestDefaultConfiguration.UseAadAuthentication)
-            {
-                options.ConfigureCosmosClient(TestDefaultConfiguration.CosmosDBAccountEndpoint, new DefaultAzureCredential());
-            }
-            else
-            {
-                options.ConfigureCosmosClient(GetCosmosClientUsingAccountKey());
-            }
+            options.ConfigureCosmosClient(TestDefaultConfiguration.CosmosDBAccountEndpoint, new DefaultAzureCredential());
+        }
+        else
+        {
+            options.ConfigureCosmosClient(GetCosmosClientUsingAccountKey());
+        }
 
-            options.IsResourceCreationEnabled = true;
-        });
+        options.IsResourceCreationEnabled = true;
     }
 
-    public static void ConfigureTestDefaults(this OptionsBuilder<Orleans.Persistence.AzureCosmos.AzureCosmosOptions> optionsBuilder)
+    public static void ConfigureTestDefaults(this AzureCosmosGrainStorageOptions options)
     {
-        optionsBuilder.Configure((Orleans.Persistence.AzureCosmos.AzureCosmosOptions options, IOptions<ClusterOptions> clusterOptions) =>
+        if (TestDefaultConfiguration.UseAadAuthentication)
         {
-            if (TestDefaultConfiguration.UseAadAuthentication)
-            {
-                options.ConfigureCosmosClient(TestDefaultConfiguration.CosmosDBAccountEndpoint, new DefaultAzureCredential());
-            }
-            else
-            {
-                options.ConfigureCosmosClient(GetCosmosClientUsingAccountKey());
-            }
+            options.ConfigureCosmosClient(TestDefaultConfiguration.CosmosDBAccountEndpoint, new DefaultAzureCredential());
+        }
+        else
+        {
+            options.ConfigureCosmosClient(GetCosmosClientUsingAccountKey());
+        }
 
-            options.IsResourceCreationEnabled = true;
-        });
+        options.IsResourceCreationEnabled = true;
     }
 
-    public static void ConfigureTestDefaults(this OptionsBuilder<Orleans.Reminders.AzureCosmos.AzureCosmosOptions> optionsBuilder)
+    public static void ConfigureTestDefaults(this AzureCosmosReminderTableOptions options)
     {
-        optionsBuilder.Configure((Orleans.Reminders.AzureCosmos.AzureCosmosOptions options, IOptions<ClusterOptions> clusterOptions) =>
+        if (TestDefaultConfiguration.UseAadAuthentication)
         {
-            if (TestDefaultConfiguration.UseAadAuthentication)
-            {
-                options.ConfigureCosmosClient(TestDefaultConfiguration.CosmosDBAccountEndpoint, new DefaultAzureCredential());
-            }
-            else
-            {
-                options.ConfigureCosmosClient(GetCosmosClientUsingAccountKey());
-            }
+            options.ConfigureCosmosClient(TestDefaultConfiguration.CosmosDBAccountEndpoint, new DefaultAzureCredential());
+        }
+        else
+        {
+            options.ConfigureCosmosClient(GetCosmosClientUsingAccountKey());
+        }
 
-            options.IsResourceCreationEnabled = true;
-        });
+        options.IsResourceCreationEnabled = true;
     }
 
     private static Func<IServiceProvider, ValueTask<CosmosClient>> GetCosmosClientUsingAccountKey()

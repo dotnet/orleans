@@ -1,7 +1,6 @@
 using System.Net;
 using System.Diagnostics;
 using Orleans.Reminders.AzureCosmos.Models;
-using System.Reflection.Metadata;
 
 namespace Orleans.Reminders.AzureCosmos;
 

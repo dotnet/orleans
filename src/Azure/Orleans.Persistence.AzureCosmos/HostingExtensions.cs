@@ -36,11 +36,9 @@ public static class HostingExtensions
         string name,
         Action<AzureCosmosGrainStorageOptions> configureOptions) where TPartitionKeyProvider : class, IPartitionKeyProvider
     {
-        return builder.ConfigureServices(services =>
-        {
-            services.TryAddSingleton<IPartitionKeyProvider, TPartitionKeyProvider>();
-            services.AddAzureCosmosGrainStorage(name, configureOptions);
-        });
+        builder.Services.TryAddSingleton<IPartitionKeyProvider, TPartitionKeyProvider>();
+        builder.Services.AddAzureCosmosGrainStorage(name, configureOptions);
+        return builder;
     }
 
     /// <summary>
@@ -70,14 +68,13 @@ public static class HostingExtensions
         Action<AzureCosmosGrainStorageOptions> configureOptions,
         Type customPartitionKeyProviderType)
     {
-        return builder.ConfigureServices(services =>
+        if (customPartitionKeyProviderType != null)
         {
-            if (customPartitionKeyProviderType != null)
-            {
-                services.TryAddSingleton(typeof(IPartitionKeyProvider), customPartitionKeyProviderType);
-            }
-            services.AddAzureCosmosGrainStorage(name, configureOptions);
-        });
+            builder.Services.TryAddSingleton(typeof(IPartitionKeyProvider), customPartitionKeyProviderType);
+        }
+
+        builder.Services.AddAzureCosmosGrainStorage(name, configureOptions);
+        return builder;
     }
 
     /// <summary>
@@ -103,7 +100,8 @@ public static class HostingExtensions
         string name,
         Action<AzureCosmosGrainStorageOptions> configureOptions)
     {
-        return builder.ConfigureServices(services => services.AddAzureCosmosGrainStorage(name, configureOptions));
+        builder.Services.AddAzureCosmosGrainStorage(name, configureOptions);
+        return builder;
     }
 
     /// <summary>
@@ -131,11 +129,9 @@ public static class HostingExtensions
         string name,
         Action<OptionsBuilder<AzureCosmosGrainStorageOptions>>? configureOptions = null) where TPartitionKeyProvider : class, IPartitionKeyProvider
     {
-        return builder.ConfigureServices(services =>
-        {
-            services.TryAddSingleton<IPartitionKeyProvider, TPartitionKeyProvider>();
-            services.AddAzureCosmosGrainStorage(name, configureOptions);
-        });
+        builder.Services.TryAddSingleton<IPartitionKeyProvider, TPartitionKeyProvider>();
+        builder.Services.AddAzureCosmosGrainStorage(name, configureOptions);
+        return builder;
     }
 
     /// <summary>
@@ -164,14 +160,13 @@ public static class HostingExtensions
         Type customPartitionKeyProviderType,
         Action<OptionsBuilder<AzureCosmosGrainStorageOptions>>? configureOptions = null)
     {
-        return builder.ConfigureServices(services =>
+        if (customPartitionKeyProviderType != null)
         {
-            if (customPartitionKeyProviderType != null)
-            {
-                services.TryAddSingleton(typeof(IPartitionKeyProvider), customPartitionKeyProviderType);
-            }
-            services.AddAzureCosmosGrainStorage(name, configureOptions);
-        });
+            builder.Services.TryAddSingleton(typeof(IPartitionKeyProvider), customPartitionKeyProviderType);
+        }
+
+        builder.Services.AddAzureCosmosGrainStorage(name, configureOptions);
+        return builder;
     }
 
     /// <summary>
@@ -197,7 +192,8 @@ public static class HostingExtensions
         string name,
         Action<OptionsBuilder<AzureCosmosGrainStorageOptions>>? configureOptions = null)
     {
-        return builder.ConfigureServices(services => services.AddAzureCosmosGrainStorage(name, configureOptions));
+        builder.Services.AddAzureCosmosGrainStorage(name, configureOptions);
+        return builder;
     }
 
     /// <summary>
