@@ -374,7 +374,6 @@ namespace Orleans.Hosting
             services.AddSingleton<ISpecializableCodec, GrainReferenceCodecProvider>();
             services.AddSingleton<ISpecializableCopier, GrainReferenceCopierProvider>();
             services.AddSingleton<OnDeserializedCallbacks>();
-            services.AddSingleton<MigrationContext.SerializationHooks>();
             services.AddTransient<IConfigurationValidator, SerializerConfigurationValidator>();
             services.AddSingleton<IPostConfigureOptions<OrleansJsonSerializerOptions>, ConfigureOrleansJsonSerializerOptions>();
             services.AddSingleton<OrleansJsonSerializer>();
@@ -392,6 +391,11 @@ namespace Orleans.Hosting
             services.AddSingleton<ILifecycleParticipant<ISiloLifecycle>, GatewayConnectionListener>();
             services.AddSingleton<SocketSchedulers>();
             services.AddSingleton<SharedMemoryPool>();
+
+            // Activation migration
+            services.AddSingleton<MigrationContext.SerializationHooks>();
+            services.AddSingleton<ActivationMigrationManager>();
+            services.AddFromExisting<IActivationMigrationManager, ActivationMigrationManager>();
         }
 
         private class AllowOrleansTypes : ITypeNameFilter

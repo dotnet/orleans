@@ -27,6 +27,7 @@ namespace Orleans.Runtime
     /// </summary>
     internal sealed class ActivationData : IGrainContext, ICollectibleGrainContext, IGrainExtensionBinder, IActivationWorkingSetMember, IGrainTimerRegistry, IGrainManagementExtension, ICallChainReentrantGrainContext, IAsyncDisposable
     {
+        private const string GrainAddressMigrationContextKey = "sys.addr";
         private readonly GrainTypeSharedContext _shared;
         private readonly IServiceScope _serviceScope;
         private readonly WorkItemGroup _workItemGroup;
@@ -1078,7 +1079,7 @@ namespace Orleans.Runtime
                         throw new InvalidOperationException($"Attempted to rehydrate a grain in the {State} state");
                     }
 
-                    if (context.TryGetValue("sys.addr", out GrainAddress previousRegistration) && previousRegistration is not null)
+                    if (context.TryGetValue(GrainAddressMigrationContextKey, out GrainAddress previousRegistration) && previousRegistration is not null)
                     {
                         // Propagate the previous registration, so that the new activation can atomically replace it with its new address.
                         (_extras ??= new()).PreviousRegistration = previousRegistration;
@@ -1138,7 +1139,7 @@ namespace Orleans.Runtime
 
                 if (IsUsingGrainDirectory)
                 {
-                    context.TryAddValue("sys.addr", Address);
+                    context.TryAddValue(GrainAddressMigrationContextKey, Address);
                 }
             }
 
@@ -1604,7 +1605,7 @@ namespace Orleans.Runtime
                 await WaitForAllTimersToFinish(cancellationToken);
                 await CallGrainDeactivate(cancellationToken);
 
-                if (DehydrationContext is { } context)
+                if (DehydrationContext is { } context && _shared.MigrationManager is { } migrationManager)
                 {
                     Debug.Assert(ForwardingAddress is not null);
 
@@ -1622,10 +1623,8 @@ namespace Orleans.Runtime
 
                         OnDehydrate(context.Value);
 
-                        // Send the dehydration context to the target host
-                        // TODO: Coalesce concurrent requests into fewer calls by delegating to a shared service.
-                        var remoteCatalog = _shared.Runtime.ServiceProvider.GetRequiredService<IInternalGrainFactory>().GetSystemTarget<ICatalog>(Constants.CatalogType, ForwardingAddress);
-                        await remoteCatalog.AcceptMigratingGrains(new List<GrainMigrationPackage>() { new GrainMigrationPackage() { GrainId = GrainId, MigrationContext = context.Value } });
+                        // Send the dehydration context to the target host.
+                        await migrationManager.MigrateAsync(ForwardingAddress, GrainId, context.Value);
                         migrated = true;
                     }
                     catch (Exception exception)
