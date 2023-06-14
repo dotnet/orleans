@@ -52,7 +52,7 @@ internal class CosmosReminderTable : IReminderTable
                     await TryDeleteDatabase();
                 }
 
-                await TryCreateCosmosDBResources();
+                await TryCreateCosmosResources();
             }
 
             _container = _client.GetContainer(_options.DatabaseName, _options.ContainerName);
@@ -325,7 +325,7 @@ internal class CosmosReminderTable : IReminderTable
         }
     }
 
-    private async Task TryCreateCosmosDBResources()
+    private async Task TryCreateCosmosResources()
     {
         var dbResponse = await _client.CreateDatabaseIfNotExistsAsync(_options.DatabaseName, _options.DatabaseThroughput).ConfigureAwait(false);
         var db = dbResponse.Database;
