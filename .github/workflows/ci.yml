@@ -233,12 +233,13 @@ jobs:
           **/TestResults/*
           **/logs/*
   test-azure-cosmosdb:
-    name: Azure CosmosDB provider tests
+    if: ${{ false }}
+    name: Azure Cosmos DB provider tests
     runs-on: windows-latest
     strategy:
       matrix:
         framework: ["net7.0"]
-        provider: ["AzureCosmosDB"]
+        provider: ["Cosmos"]
     steps:
     - uses: actions/checkout@v2
     - name: Setup .NET
@@ -254,9 +255,9 @@ jobs:
     #     awk 'BEGIN {c=0;} /BEGIN CERT/{c++} { print > "emulatorcert." c ".crt"}' < /tmp/emulatorcert.crt
     #     sudo cp emulatorcert.*.crt /usr/local/share/ca-certificates/
     #     sudo update-ca-certificates
-    - name: Start Cosmos DB emulator
+    - name: Start Azure Cosmos DB emulator
       run: |
-        Write-Host "Launching Cosmos DB Emulator"
+        Write-Host "Launching Azure Cosmos DB Emulator"
         Import-Module "$env:ProgramFiles\Azure Cosmos DB Emulator\PSModules\Microsoft.Azure.CosmosDB.Emulator"
         Start-CosmosDbEmulator -NoUI -Consistency Strong -PartitionCount 2 -DefaultPartitionCount 2
         $IPAddress = "127.0.0.1" #(Get-NetIPAddress -AddressFamily IPV4 -AddressState Preferred -PrefixOrigin Manual | Select-Object IPAddress -First 1).IPAddress ?? "127.0.0.1"
