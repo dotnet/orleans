@@ -36,7 +36,7 @@ namespace UnitTests.MembershipTests
                 Invariant = GetAdoInvariant(),
                 ConnectionString = this.connectionString,
             };
-            return new AdoNetClusteringTable(this.Services, this.clusterOptions, Options.Create(options),  this.loggerFactory.CreateLogger<AdoNetClusteringTable>());
+            return new AdoNetClusteringTable(this.Services, this._clusterOptions, Options.Create(options),  this.loggerFactory.CreateLogger<AdoNetClusteringTable>());
         }
 
         protected override IGatewayListProvider CreateGatewayListProvider(ILogger logger)
@@ -46,7 +46,7 @@ namespace UnitTests.MembershipTests
                 ConnectionString = this.connectionString,
                 Invariant = GetAdoInvariant()
             };
-            return new AdoNetGatewayListProvider(this.loggerFactory.CreateLogger<AdoNetGatewayListProvider>(), this.Services, Options.Create(options), gatewayOptions, this.clusterOptions);
+            return new AdoNetGatewayListProvider(this.loggerFactory.CreateLogger<AdoNetGatewayListProvider>(), this.Services, Options.Create(options), _gatewayOptions, this._clusterOptions);
         }
 
         protected override string GetAdoInvariant()

@@ -227,6 +227,52 @@ jobs:
         path: |
           **/TestResults/*
           **/logs/*
+  test-azure-cosmosdb:
+    if: ${{ false }}
+    name: Azure Cosmos DB provider tests
+    runs-on: windows-latest
+    strategy:
+      matrix:
+        framework: ["net7.0"]
+        provider: ["Cosmos"]
+    steps:
+    - uses: actions/checkout@v2
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v1
+      with:
+        include-prerelease: true
+    # - name: Install emulator certificate
+    #   run: |
+    #     sleep 90s
+    #     mkdir /tmp/emulatorcerts
+    #     sudo sh -c "curl -k https://127.0.0.1:${{ job.services.cosmosdb-emulator.ports[8081] }}/_explorer/emulator.pem > /tmp/emulatorcert.crt"
+    #     cat /tmp/emulatorcert.crt
+    #     awk 'BEGIN {c=0;} /BEGIN CERT/{c++} { print > "emulatorcert." c ".crt"}' < /tmp/emulatorcert.crt
+    #     sudo cp emulatorcert.*.crt /usr/local/share/ca-certificates/
+    #     sudo update-ca-certificates
+    - name: Start Azure Cosmos DB emulator
+      run: |
+        Write-Host "Launching Azure Cosmos DB Emulator"
+        Import-Module "$env:ProgramFiles\Azure Cosmos DB Emulator\PSModules\Microsoft.Azure.CosmosDB.Emulator"
+        Start-CosmosDbEmulator -NoUI -Consistency Strong -PartitionCount 2 -DefaultPartitionCount 2
+        $IPAddress = "127.0.0.1" #(Get-NetIPAddress -AddressFamily IPV4 -AddressState Preferred -PrefixOrigin Manual | Select-Object IPAddress -First 1).IPAddress ?? "127.0.0.1"
+        Add-Content -Path $env:GITHUB_ENV -Value "ORLEANSCOSMOSDBACCOUNTENDPOINT=https://$($IPAddress):8081/"
+    - name: Test
+      run: dotnet test --filter "Category=${{ matrix.provider }}&(Category=BVT|Category=SlowBVT|Category=Functional)" --framework ${{ matrix.framework }} --blame-hang-timeout 10m --logger "trx" -- -parallel none -noshadow
+      env:
+# [SuppressMessage("Microsoft.Security", "CS002:SecretInNextLine", Justification="Not a secret")]
+        #ORLEANSCOSMOSDBACCOUNTENDPOINT: "https://127.0.0.1:8081/"
+# [SuppressMessage("Microsoft.Security", "CS002:SecretInNextLine", Justification="Not a secret")]
+        ORLEANSCOSMOSDBACCOUNTKEY: "C2y6yDjf5/R+ob0N8A7Cgv30VRDJIWEHLM+4QDU5DE2nQ9nDuVTqobD4b8mGGyPMbIZnqyMsEcaGQy67XIw/Jw=="
+    - name: Archive Test Results
+      if: always()
+      uses: actions/upload-artifact@v3
+      with:
+        name: test_output
+        retention-days: 1
+        path: |
+          **/TestResults/*
+          **/logs/*
   test-consul:
     name: Consul provider tests
     runs-on: ubuntu-latest

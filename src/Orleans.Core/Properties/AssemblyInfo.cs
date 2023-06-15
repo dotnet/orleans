@@ -15,6 +15,7 @@ using System.Runtime.CompilerServices;
 [assembly: InternalsVisibleTo("Benchmarks")]
 [assembly: InternalsVisibleTo("Tester")]
 [assembly: InternalsVisibleTo("Tester.AzureUtils")]
+[assembly: InternalsVisibleTo("Tester.Cosmos")]
 [assembly: InternalsVisibleTo("Tester.AdoNet")]
 [assembly: InternalsVisibleTo("Tester.Redis")]
 [assembly: InternalsVisibleTo("Tester.ZooKeeperUtils")]
