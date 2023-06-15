@@ -28,7 +28,7 @@ namespace Orleans.Persistence
         private readonly ILogger _logger;
         private readonly RedisStorageOptions _options;
         private readonly IGrainStorageSerializer _grainStorageSerializer;
-
+        private readonly Func<string, GrainId, RedisKey> _getKeyFunc;
         private IConnectionMultiplexer _connection;
         private IDatabase _db;
 
@@ -49,6 +49,7 @@ namespace Orleans.Persistence
             _serviceId = clusterOptions.Value.ServiceId;
             _ttl = options.EntryExpiry is { } ts ? ts.TotalSeconds.ToString(CultureInfo.InvariantCulture) : "-1";
             _keyPrefix = Encoding.UTF8.GetBytes($"{_serviceId}/state/");
+            _getKeyFunc = _options.GetStorageKey ?? DefaultGetStorageKey;
         }
 
         /// <inheritdoc />
@@ -103,7 +104,7 @@ namespace Orleans.Persistence
         /// <inheritdoc />
         public async Task ReadStateAsync<T>(string grainType, GrainId grainId, IGrainState<T> grainState)
         {
-            var key = GetKey(grainId);
+            var key = _getKeyFunc(grainType, grainId);
 
             try
             {
@@ -159,7 +160,7 @@ namespace Orleans.Persistence
                 end
                 """;
 
-            var key = GetKey(grainId);
+            var key = _getKeyFunc(grainType, grainId);
             RedisValue etag = grainState.ETag ?? "";
             RedisValue newEtag = Guid.NewGuid().ToString("N");
 
@@ -191,7 +192,33 @@ namespace Orleans.Persistence
             }
         }
 
-        private RedisKey GetKey(GrainId grainId) => _keyPrefix.Append(grainId.ToString());
+        /// <summary>
+        /// Default implementation of <see cref="RedisStorageOptions.GetStorageKey"/> which returns a key equivalent to <c>{ServiceId}/state/{grainId}/{grainType}</c>
+        /// </summary>
+        private RedisKey DefaultGetStorageKey(string grainType, GrainId grainId)
+        {
+            var grainIdTypeBytes = IdSpan.UnsafeGetArray(grainId.Type.Value);
+            var grainIdKeyBytes = IdSpan.UnsafeGetArray(grainId.Key);
+            var grainTypeLength = Encoding.UTF8.GetByteCount(grainType);
+            var suffix = new byte[grainIdTypeBytes.Length + 1 + grainIdKeyBytes.Length + 1 + grainTypeLength];
+            var index = 0;
+
+            grainIdTypeBytes.CopyTo(suffix, 0);
+            index += grainIdTypeBytes.Length;
+
+            suffix[index++] = (byte)'/';
+
+            grainIdKeyBytes.CopyTo(suffix, index);
+            index += grainIdKeyBytes.Length;
+
+            suffix[index++] = (byte)'/';
+
+            var bytesWritten = Encoding.UTF8.GetBytes(grainType, suffix.AsSpan(index));
+
+            Debug.Assert(bytesWritten == grainTypeLength);
+            Debug.Assert(index + bytesWritten == suffix.Length);
+            return _keyPrefix.Append(suffix);
+        }
 
         /// <inheritdoc />
         public async Task ClearStateAsync<T>(string grainType, GrainId grainId, IGrainState<T> grainState)
@@ -201,6 +228,7 @@ namespace Orleans.Persistence
                 RedisValue etag = grainState.ETag ?? "";
                 RedisResult response;
                 string newETag;
+                var key = _getKeyFunc(grainType, grainId);
                 if (_options.DeleteStateOnClear)
                 {
                     const string DeleteScript =
@@ -213,7 +241,7 @@ namespace Orleans.Persistence
                           return -1
                         end
                         """;
-                    response = await _db.ScriptEvaluateAsync(DeleteScript, keys: new[] { GetKey(grainId) }, values: new[] { etag }).ConfigureAwait(false);
+                    response = await _db.ScriptEvaluateAsync(DeleteScript, keys: new[] { key }, values: new[] { etag }).ConfigureAwait(false);
                     newETag = null;
                 }
                 else
@@ -229,7 +257,7 @@ namespace Orleans.Persistence
                         end
                         """;
                     newETag = Guid.NewGuid().ToString("N");
-                    response = await _db.ScriptEvaluateAsync(ClearScript, keys: new[] { GetKey(grainId) }, values: new RedisValue[] { etag, newETag }).ConfigureAwait(false);
+                    response = await _db.ScriptEvaluateAsync(ClearScript, keys: new[] { key }, values: new RedisValue[] { etag, newETag }).ConfigureAwait(false);
                 }
 
                 if (response is not null && (int)response == -1)
