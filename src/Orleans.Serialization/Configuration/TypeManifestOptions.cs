@@ -86,5 +86,10 @@ namespace Orleans.Serialization.Configuration
         /// Default: <see langword="false"/>.
         /// </summary>
         public bool AllowAllTypes { get; set; }
+
+        /// <summary>
+        /// Gets the set of type manifest providers which have configured this instance.
+        /// </summary>
+        internal HashSet<object> TypeManifestProviders { get; } = new();
     }
 }

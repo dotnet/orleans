@@ -104,13 +104,13 @@ namespace Orleans.CodeGenerator
             AddCompoundTypeAliases(metadataModel, configParam, body);
 
             var configType = libraryTypes.TypeManifestOptions;
-            var configureMethod = MethodDeclaration(PredefinedType(Token(SyntaxKind.VoidKeyword)), "Configure")
-                .AddModifiers(Token(SyntaxKind.PublicKeyword))
+            var configureMethod = MethodDeclaration(PredefinedType(Token(SyntaxKind.VoidKeyword)), "ConfigureInner")
+                .AddModifiers(Token(SyntaxKind.ProtectedKeyword), Token(SyntaxKind.OverrideKeyword))
                 .AddParameterListParameters(
                     Parameter(configParam.Identifier).WithType(configType.ToTypeSyntax()))
                 .AddBodyStatements(body.ToArray());
 
-            var interfaceType = libraryTypes.ITypeManifestProvider;
+            var interfaceType = libraryTypes.TypeManifestProviderBase;
             return ClassDeclaration("Metadata_" + SyntaxGeneration.Identifier.SanitizeIdentifierName(compilation.AssemblyName))
                 .AddBaseListTypes(SimpleBaseType(interfaceType.ToTypeSyntax()))
                 .AddModifiers(Token(SyntaxKind.InternalKeyword), Token(SyntaxKind.SealedKeyword))
