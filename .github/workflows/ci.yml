@@ -12,7 +12,6 @@ env:
   DOTNET_NOLOGO: true
 jobs:
   build:
-    if: ${{ false }}
     name: Build
     runs-on: ${{ matrix.os }}
     strategy:
@@ -35,7 +34,6 @@ jobs:
         path: |
           **/*.binlog
   test-redis:
-    if: ${{ false }}
     name: Redis provider tests
     runs-on: ubuntu-latest
     strategy:
@@ -73,7 +71,6 @@ jobs:
           **/TestResults/*
           **/logs/*
   test-postgres:
-    if: ${{ false }}
     name: PostgreSQL provider tests
     runs-on: ubuntu-latest
     strategy:
@@ -115,7 +112,6 @@ jobs:
           **/TestResults/*
           **/logs/*
   test-mariadb:
-    if: ${{ false }}
     name: MariaDB/MySQL provider tests
     runs-on: ubuntu-latest
     strategy:
@@ -154,7 +150,6 @@ jobs:
           **/TestResults/*
           **/logs/*
   test-sqlserver:
-    if: ${{ false }}
     name: Microsoft SQL Server provider tests
     runs-on: ubuntu-latest
     strategy:
@@ -279,7 +274,6 @@ jobs:
           **/TestResults/*
           **/logs/*
   test-consul:
-    if: ${{ false }}
     name: Consul provider tests
     runs-on: ubuntu-latest
     strategy:
@@ -317,7 +311,6 @@ jobs:
           **/TestResults/*
           **/logs/*
   test-zookeeper:
-    if: ${{ false }}
     name: ZooKeeper provider tests
     runs-on: ubuntu-latest
     strategy:
@@ -352,7 +345,6 @@ jobs:
           **/TestResults/*
           **/logs/*
   test-dynamodb:
-    if: ${{ false }}
     name: AWS DynamoDB provider tests
     runs-on: ubuntu-latest
     strategy:
