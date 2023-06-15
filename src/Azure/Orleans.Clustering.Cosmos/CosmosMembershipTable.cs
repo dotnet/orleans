@@ -27,7 +27,7 @@ internal class CosmosMembershipTable : IMembershipTable
         _serviceProvider = serviceProvider;
         _options = options.Value;
         _clusterId = clusterOptions.Value.ClusterId;
-        _partitionKey = new(CosmosIdSanitizer.Sanitize(_clusterId));
+        _partitionKey = new(_clusterId);
 
         _queryRequestOptions = new() { PartitionKey = _partitionKey };
     }
@@ -67,8 +67,10 @@ internal class CosmosMembershipTable : IMembershipTable
 
                 var response = await _container.CreateItemAsync(versionEntity, _partitionKey).ConfigureAwait(false);
 
-                if (response.StatusCode == HttpStatusCode.Created)
-                    _logger?.LogInformation("Created new Cluster Version entity.");
+                if (response.StatusCode == HttpStatusCode.Created && _logger.IsEnabled(LogLevel.Debug))
+                {
+                    _logger.LogDebug("Created new Cluster Version entity.");
+                }
             }
         }
     }

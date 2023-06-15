@@ -189,9 +189,18 @@ internal class CosmosGrainStorage : IGrainStorage, ILifecycleParticipant<ISiloLi
     {
         var id = GetKeyString(grainId);
         var partitionKey = await BuildPartitionKey(grainType, grainId);
-        if (_logger.IsEnabled(LogLevel.Trace)) _logger.LogTrace(
-            "Clearing: GrainType={GrainType} Key={Id} GrainId={GrainId} ETag={ETag} DeleteStateOnClear={DeleteOnClear} from Container={Container} with PartitionKey {PartitionKey}",
-            grainType, id, grainId, grainState.ETag, _options.DeleteStateOnClear, _options.ContainerName, partitionKey);
+        if (_logger.IsEnabled(LogLevel.Trace))
+        {
+            _logger.LogTrace(
+                "Clearing: GrainType={GrainType} Key={Id} GrainId={GrainId} ETag={ETag} DeleteStateOnClear={DeleteOnClear} from Container={Container} with PartitionKey {PartitionKey}",
+                 grainType,
+                 id,
+                 grainId,
+                 grainState.ETag,
+                 _options.DeleteStateOnClear,
+                 _options.ContainerName,
+                 partitionKey);
+        }
 
         var pk = new PartitionKey(partitionKey);
         var requestOptions = new ItemRequestOptions { IfMatchEtag = grainState.ETag };
@@ -302,7 +311,8 @@ internal class CosmosGrainStorage : IGrainStorage, ILifecycleParticipant<ISiloLi
         catch (Exception ex)
         {
             stopWatch.Stop();
-            _logger.LogError((int)ErrorCode.Provider_ErrorFromInit,
+            _logger.LogError(
+                (int)ErrorCode.Provider_ErrorFromInit,
                 ex,
                 "Initialization failed for provider {ProviderName} of type {ProviderType} in stage {Stage} in {ElapsedMilliseconds} milliseconds",
                 _name,

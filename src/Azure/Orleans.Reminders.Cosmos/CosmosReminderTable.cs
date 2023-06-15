@@ -150,7 +150,12 @@ internal class CosmosReminderTable : IReminderTable
         }
         catch (Exception exc)
         {
-            _logger.LogError(exc, "Failure reading reminders for service {Service} for range {Begin} to {End}", _clusterOptions.ServiceId, begin, end);
+            _logger.LogError(
+                exc,
+                "Failure reading reminders for service {Service} for range {Begin} to {End}",
+                _clusterOptions.ServiceId,
+                begin.ToString("X"),
+                end.ToString("X"));
             WrappedException.CreateAndRethrow(exc);
             throw;
         }
