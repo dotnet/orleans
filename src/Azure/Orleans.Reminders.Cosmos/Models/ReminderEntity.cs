@@ -46,15 +46,5 @@ internal class ReminderEntity : BaseEntity
         return $"{Sanitize(grainType)}{SeparatorChar}{Sanitize(grainKey)}{SeparatorChar}{Sanitize(reminderName)}";
     }
 
-    public static string ConstructPartitionKey(string serviceId, GrainId grainId)
-    {
-        // IMPORTANT NOTE: Other code using this return data is very sensitive to format changes,
-        //       so take great care when making any changes here!!!
-
-        // this format of partition key makes sure that the comparisons in FindReminderEntries(begin, end) work correctly
-        // the idea is that when converting to string, negative numbers start with 0, and positive start with 1. Now,
-        // when comparisons will be done on strings, this will ensure that positive numbers are always greater than negative
-        // string grainHash = number < 0 ? string.Format("0{0}", number.ToString("X")) : string.Format("1{0:d16}", number);
-        return $"{Sanitize(serviceId)}{SeparatorChar}{grainId.GetUniformHashCode():X}";
-    }
+    public static string ConstructPartitionKey(string serviceId, GrainId grainId) => $"{serviceId}_{grainId.GetUniformHashCode():X}";
 }
