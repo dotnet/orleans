@@ -35,7 +35,7 @@ public class FirestoreMembershipTableTests : MembershipTableTestsBase, IClassFix
             EmulatorHost = GoogleEmulatorHost.FirestoreEndpoint
         };
 
-        return new GoogleFirestoreMembershipTable(this.loggerFactory, Options.Create(options), this.clusterOptions);
+        return new GoogleFirestoreMembershipTable(this.loggerFactory, Options.Create(options), this._clusterOptions);
     }
 
     protected override IGatewayListProvider CreateGatewayListProvider(ILogger logger)
@@ -46,7 +46,7 @@ public class FirestoreMembershipTableTests : MembershipTableTestsBase, IClassFix
             EmulatorHost = GoogleEmulatorHost.FirestoreEndpoint
         };
 
-        return new GoogleFirestoreGatewayListProvider(this.loggerFactory, Options.Create(options), this.clusterOptions, this.gatewayOptions);
+        return new GoogleFirestoreGatewayListProvider(this.loggerFactory, Options.Create(options), this._clusterOptions, this._gatewayOptions);
     }
 
     protected override Task<string> GetConnectionString() => Task.FromResult("<dummy>");
