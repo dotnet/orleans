@@ -223,21 +223,15 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Orleans.Serialization.Proto
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Google", "Google", "{10D550AB-A742-40D9-B898-A4BCADEA177D}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Orleans.Clustering.GoogleCloudStorage", "src\Google\Orleans.Clustering.GoogleCloudStorage\Orleans.Clustering.GoogleCloudStorage.csproj", "{3D11CA50-46F8-4814-839A-72293955BFFC}"
-EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Orleans.Clustering.GoogleFirestore", "src\Google\Orleans.Clustering.GoogleFirestore\Orleans.Clustering.GoogleFirestore.csproj", "{3B150F8B-AAD5-4545-A834-644D55F56546}"
-EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Orleans.Persistence.GoogleCloudStorage", "src\Google\Orleans.Persistence.GoogleCloudStorage\Orleans.Persistence.GoogleCloudStorage.csproj", "{5083077F-34A5-44B1-AEBD-2C92903A61E4}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Orleans.Persistence.GoogleFirestore", "src\Google\Orleans.Persistence.GoogleFirestore\Orleans.Persistence.GoogleFirestore.csproj", "{D74DC809-6B1D-45CE-AD83-8BF7037C02B3}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Orleans.Reminders.GoogleCloudStorage", "src\Google\Orleans.Reminders.GoogleCloudStorage\Orleans.Reminders.GoogleCloudStorage.csproj", "{085EBCE1-5B36-436E-8031-ECF6510C4617}"
-EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Orleans.Reminders.GoogleFirestore", "src\Google\Orleans.Reminders.GoogleFirestore\Orleans.Reminders.GoogleFirestore.csproj", "{118FC17E-0335-4F70-88B6-1704A9C3A7F6}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Orleans.Streaming.GooglePubSub", "src\Google\Orleans.Streaming.GooglePubSub\Orleans.Streaming.GooglePubSub.csproj", "{7F35FE06-43A1-4823-9869-5EB6D5DCEBD0}"
-EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Google.Tests", "test\Extensions\Google.Tests\Google.Tests.csproj", "{66C5424B-3E4B-420A-84A9-DD71ACEB7B9C}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Orleans.GrainDirectory.GoogleFirestore", "src\Google\Orleans.GrainDirectory.GoogleFirestore\Orleans.GrainDirectory.GoogleFirestore.csproj", "{BE535F02-933A-4783-9D4C-46AA72705D5E}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -605,38 +599,26 @@ Global
 		{A073C0EE-8732-42F9-A22E-D47034E25076}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{A073C0EE-8732-42F9-A22E-D47034E25076}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{A073C0EE-8732-42F9-A22E-D47034E25076}.Release|Any CPU.Build.0 = Release|Any CPU
-		{3D11CA50-46F8-4814-839A-72293955BFFC}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{3D11CA50-46F8-4814-839A-72293955BFFC}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{3D11CA50-46F8-4814-839A-72293955BFFC}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{3D11CA50-46F8-4814-839A-72293955BFFC}.Release|Any CPU.Build.0 = Release|Any CPU
 		{3B150F8B-AAD5-4545-A834-644D55F56546}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{3B150F8B-AAD5-4545-A834-644D55F56546}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{3B150F8B-AAD5-4545-A834-644D55F56546}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{3B150F8B-AAD5-4545-A834-644D55F56546}.Release|Any CPU.Build.0 = Release|Any CPU
-		{5083077F-34A5-44B1-AEBD-2C92903A61E4}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{5083077F-34A5-44B1-AEBD-2C92903A61E4}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{5083077F-34A5-44B1-AEBD-2C92903A61E4}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{5083077F-34A5-44B1-AEBD-2C92903A61E4}.Release|Any CPU.Build.0 = Release|Any CPU
 		{D74DC809-6B1D-45CE-AD83-8BF7037C02B3}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{D74DC809-6B1D-45CE-AD83-8BF7037C02B3}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{D74DC809-6B1D-45CE-AD83-8BF7037C02B3}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{D74DC809-6B1D-45CE-AD83-8BF7037C02B3}.Release|Any CPU.Build.0 = Release|Any CPU
-		{085EBCE1-5B36-436E-8031-ECF6510C4617}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{085EBCE1-5B36-436E-8031-ECF6510C4617}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{085EBCE1-5B36-436E-8031-ECF6510C4617}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{085EBCE1-5B36-436E-8031-ECF6510C4617}.Release|Any CPU.Build.0 = Release|Any CPU
 		{118FC17E-0335-4F70-88B6-1704A9C3A7F6}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{118FC17E-0335-4F70-88B6-1704A9C3A7F6}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{118FC17E-0335-4F70-88B6-1704A9C3A7F6}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{118FC17E-0335-4F70-88B6-1704A9C3A7F6}.Release|Any CPU.Build.0 = Release|Any CPU
-		{7F35FE06-43A1-4823-9869-5EB6D5DCEBD0}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{7F35FE06-43A1-4823-9869-5EB6D5DCEBD0}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{7F35FE06-43A1-4823-9869-5EB6D5DCEBD0}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{7F35FE06-43A1-4823-9869-5EB6D5DCEBD0}.Release|Any CPU.Build.0 = Release|Any CPU
 		{66C5424B-3E4B-420A-84A9-DD71ACEB7B9C}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{66C5424B-3E4B-420A-84A9-DD71ACEB7B9C}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{66C5424B-3E4B-420A-84A9-DD71ACEB7B9C}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{66C5424B-3E4B-420A-84A9-DD71ACEB7B9C}.Release|Any CPU.Build.0 = Release|Any CPU
+		{BE535F02-933A-4783-9D4C-46AA72705D5E}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{BE535F02-933A-4783-9D4C-46AA72705D5E}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{BE535F02-933A-4783-9D4C-46AA72705D5E}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{BE535F02-933A-4783-9D4C-46AA72705D5E}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -746,14 +728,11 @@ Global
 		{F13247A0-70C9-4200-9CB1-2002CB8105E0} = {082D25DB-70CA-48F4-93E0-EC3455F494B8}
 		{A073C0EE-8732-42F9-A22E-D47034E25076} = {4CD3AA9E-D937-48CA-BB6C-158E12257D23}
 		{10D550AB-A742-40D9-B898-A4BCADEA177D} = {FE2E08C6-9C3B-4AEE-AE07-CCA387580D7A}
-		{3D11CA50-46F8-4814-839A-72293955BFFC} = {10D550AB-A742-40D9-B898-A4BCADEA177D}
 		{3B150F8B-AAD5-4545-A834-644D55F56546} = {10D550AB-A742-40D9-B898-A4BCADEA177D}
-		{5083077F-34A5-44B1-AEBD-2C92903A61E4} = {10D550AB-A742-40D9-B898-A4BCADEA177D}
 		{D74DC809-6B1D-45CE-AD83-8BF7037C02B3} = {10D550AB-A742-40D9-B898-A4BCADEA177D}
-		{085EBCE1-5B36-436E-8031-ECF6510C4617} = {10D550AB-A742-40D9-B898-A4BCADEA177D}
 		{118FC17E-0335-4F70-88B6-1704A9C3A7F6} = {10D550AB-A742-40D9-B898-A4BCADEA177D}
-		{7F35FE06-43A1-4823-9869-5EB6D5DCEBD0} = {10D550AB-A742-40D9-B898-A4BCADEA177D}
 		{66C5424B-3E4B-420A-84A9-DD71ACEB7B9C} = {082D25DB-70CA-48F4-93E0-EC3455F494B8}
+		{BE535F02-933A-4783-9D4C-46AA72705D5E} = {10D550AB-A742-40D9-B898-A4BCADEA177D}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {7BFB3429-B5BB-4DB1-95B4-67D77A864952}
