@@ -117,17 +117,10 @@ public static class GrainReminderExtensions
     }
 
     /// <summary>
-    /// Gets the <see cref="IReminderService"/>.
+    /// Gets the <see cref="IReminderRegistry"/>.
     /// </summary>
     private static IReminderRegistry GetReminderRegistry(IGrainContext grainContext)
     {
-        if (RuntimeContext.Current is null) ThrowInvalidContext();
         return grainContext.ActivationServices.GetRequiredService<IReminderRegistry>();
-    }
-
-    private static void ThrowInvalidContext()
-    {
-        throw new InvalidOperationException("Attempted to access grain from a non-grain context, such as a background thread, which is invalid."
-            + " Ensure that you are only accessing grain functionality from within the context of a grain.");
     }
 }

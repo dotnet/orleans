@@ -37,14 +37,14 @@ namespace Tester.AzureUtils
             TestUtils.CheckForAzureStorage();
             var options = new AzureStorageClusteringOptions();
             options.ConfigureTestDefaults();
-            return new AzureBasedMembershipTable(loggerFactory, Options.Create(options), this.clusterOptions);
+            return new AzureBasedMembershipTable(loggerFactory, Options.Create(options), this._clusterOptions);
         }
 
         protected override IGatewayListProvider CreateGatewayListProvider(ILogger logger)
         {
             var options = new AzureStorageGatewayOptions();
             options.ConfigureTestDefaults();
-            return new AzureGatewayListProvider(loggerFactory, Options.Create(options), this.clusterOptions, this.gatewayOptions);
+            return new AzureGatewayListProvider(loggerFactory, Options.Create(options), this._clusterOptions, this._gatewayOptions);
         }
 
         protected override Task<string> GetConnectionString()

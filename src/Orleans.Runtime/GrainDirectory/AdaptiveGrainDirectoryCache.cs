@@ -74,7 +74,7 @@ namespace Orleans.Runtime.GrainDirectory
             var entry = new GrainDirectoryCacheEntry(value, version, initialExpirationTimer);
 
             // Notice that LRU should know how to throw the oldest entry if the cache is full
-            cache.Add(value.GrainId, entry);
+            cache.AddOrUpdate(value.GrainId, entry);
         }
 
         public bool Remove(GrainId key) => cache.RemoveKey(key);

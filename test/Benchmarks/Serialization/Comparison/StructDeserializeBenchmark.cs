@@ -88,7 +88,7 @@ namespace Benchmarks.Comparison
         [Benchmark(Baseline = true)]
         public int Orleans()
         {
-            Session.FullReset();
+            Session.Reset();
             IntStruct result = default;
             Serializer.Deserialize(Input, ref result, Session);
             return SumResult(in result);

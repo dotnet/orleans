@@ -103,7 +103,7 @@ namespace Benchmarks.Comparison
         [Benchmark(Baseline = true)]
         public int Orleans()
         {
-            Session.FullReset();
+            Session.Reset();
             var instance = Serializer.Deserialize(Input, Session);
             return SumResult(instance);
         }

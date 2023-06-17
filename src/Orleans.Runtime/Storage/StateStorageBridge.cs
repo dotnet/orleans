@@ -1,25 +1,27 @@
+#nullable enable
 using System;
+using System.Diagnostics.CodeAnalysis;
+using System.Runtime.ExceptionServices;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Orleans.Runtime;
 using Orleans.Storage;
 
-#nullable enable
 namespace Orleans.Core
 {
     /// <summary>
     /// Provides functionality for operating on grain state.
-    /// Implements the <see cref="Orleans.Core.IStorage{TState}" />
+    /// Implements the <see cref="IStorage{TState}" />
     /// </summary>
     /// <typeparam name="TState">The underlying state type.</typeparam>
-    /// <seealso cref="Orleans.Core.IStorage{TState}" />
-    public sealed class StateStorageBridge<TState> : IStorage<TState>
+    /// <seealso cref="IStorage{TState}" />
+    public class StateStorageBridge<TState> : IStorage<TState>, IGrainMigrationParticipant
     {
-        private readonly string name;
-        private readonly GrainId grainId;
-        private readonly IGrainStorage store;
-        private readonly GrainState<TState> grainState;
-        private readonly ILogger logger;
+        private readonly string _name;
+        private readonly IGrainContext _grainContext;
+        private readonly IGrainStorage _store;
+        private readonly ILogger _logger;
+        private GrainState<TState>? _grainState;
 
         /// <inheritdoc/>
         public TState State
@@ -27,34 +29,36 @@ namespace Orleans.Core
             get
             {
                 GrainRuntime.CheckRuntimeContext(RuntimeContext.Current);
-                return grainState.State;
+                return GrainState.State;
             }
 
             set
             {
                 GrainRuntime.CheckRuntimeContext(RuntimeContext.Current);
-                grainState.State = value;
+                GrainState.State = value;
             }
         }
 
-        /// <inheritdoc/>
-        public string Etag => grainState.ETag;
+        private GrainState<TState> GrainState => _grainState ??= new GrainState<TState>(Activator.CreateInstance<TState>());
+        internal bool IsStateInitialized => _grainState != null;
 
         /// <inheritdoc/>
-        public bool RecordExists => grainState.RecordExists;
+        public string? Etag { get => GrainState.ETag; set => GrainState.ETag = value; }
 
-        public StateStorageBridge(string name, GrainId grainId, IGrainStorage store, ILoggerFactory loggerFactory)
+        /// <inheritdoc/>
+        public bool RecordExists => GrainState.RecordExists;
+
+        public StateStorageBridge(string name, IGrainContext grainContext, IGrainStorage store, ILoggerFactory loggerFactory)
         {
             ArgumentNullException.ThrowIfNull(name);
-            if (grainId.IsDefault) throw new ArgumentNullException(nameof(grainId));
+            ArgumentNullException.ThrowIfNull(grainContext);
             ArgumentNullException.ThrowIfNull(store);
             ArgumentNullException.ThrowIfNull(loggerFactory);
 
-            this.logger = loggerFactory.CreateLogger(store.GetType());
-            this.name = name;
-            this.grainId = grainId;
-            this.store = store;
-            this.grainState = new GrainState<TState>(Activator.CreateInstance<TState>());
+            _logger = loggerFactory.CreateLogger(store.GetType());
+            _name = name;
+            _grainContext = grainContext;
+            _store = store;
         }
 
         /// <inheritdoc />
@@ -65,20 +69,13 @@ namespace Orleans.Core
                 GrainRuntime.CheckRuntimeContext(RuntimeContext.Current);
 
                 var sw = ValueStopwatch.StartNew();
-                await store.ReadStateAsync(name, grainId, grainState);
+                await _store.ReadStateAsync(_name, _grainContext.GrainId, GrainState);
                 StorageInstruments.OnStorageRead(sw.Elapsed);
             }
             catch (Exception exc)
             {
                 StorageInstruments.OnStorageReadError();
-
-                string errMsg = MakeErrorMsg("ReadState", exc);
-                this.logger.LogError((int)ErrorCode.StorageProvider_ReadFailed, exc, "{Message}", errMsg);
-                if (!(exc is OrleansException))
-                {
-                    throw new OrleansException(errMsg, exc);
-                }
-                throw;
+                OnError(exc, ErrorCode.StorageProvider_ReadFailed, nameof(ReadStateAsync));
             }
         }
 
@@ -90,20 +87,13 @@ namespace Orleans.Core
                 GrainRuntime.CheckRuntimeContext(RuntimeContext.Current);
 
                 var sw = ValueStopwatch.StartNew();
-                await store.WriteStateAsync(name, grainId, grainState);
+                await _store.WriteStateAsync(_name, _grainContext.GrainId, GrainState);
                 StorageInstruments.OnStorageWrite(sw.Elapsed);
             }
             catch (Exception exc)
             {
                 StorageInstruments.OnStorageWriteError();
-                string errMsgToLog = MakeErrorMsg("WriteState", exc);
-                this.logger.LogError((int)ErrorCode.StorageProvider_WriteFailed, exc, "{Message}", errMsgToLog);
-                // If error is not specialization of OrleansException, wrap it
-                if (!(exc is OrleansException))
-                {
-                    throw new OrleansException(errMsgToLog, exc);
-                }
-                throw;
+                OnError(exc, ErrorCode.StorageProvider_WriteFailed, nameof(WriteStateAsync));
             }
         }
 
@@ -116,11 +106,11 @@ namespace Orleans.Core
 
                 var sw = ValueStopwatch.StartNew();
                 // Clear (most likely Delete) state from external storage
-                await store.ClearStateAsync(name, grainId, grainState);
+                await _store.ClearStateAsync(_name, _grainContext.GrainId, GrainState);
                 sw.Stop();
 
                 // Reset the in-memory copy of the state
-                grainState.State = Activator.CreateInstance<TState>();
+                GrainState.State = Activator.CreateInstance<TState>();
 
                 // Update counters
                 StorageInstruments.OnStorageDelete(sw.Elapsed);
@@ -128,23 +118,57 @@ namespace Orleans.Core
             catch (Exception exc)
             {
                 StorageInstruments.OnStorageDeleteError();
+                OnError(exc, ErrorCode.StorageProvider_DeleteFailed, nameof(ClearStateAsync));
+            }
+        }
 
-                string errMsg = MakeErrorMsg("ClearState", exc);
-                this.logger.LogError((int)ErrorCode.StorageProvider_DeleteFailed, exc, "{Message}", errMsg);
-                if (!(exc is OrleansException))
-                {
-                    throw new OrleansException(errMsg, exc);
-                }
+        public void OnDehydrate(IDehydrationContext dehydrationContext)
+        {
+            try
+            {
+                dehydrationContext.TryAddValue($"state.{_name}", _grainState);
+            }
+            catch (Exception exception)
+            {
+                _logger.LogError(exception, "Failed to dehydrate state named {StateName} for grain {GrainId}", _name, _grainContext.GrainId);
+
+                // We must throw here since we do not know that the dehydration context is in a clean state after this.
                 throw;
             }
         }
 
-        private string MakeErrorMsg(string what, Exception exc)
+        public void OnRehydrate(IRehydrationContext rehydrationContext)
+        {
+            try
+            {
+                rehydrationContext.TryGetValue($"state.{_name}", out _grainState);
+            }
+            catch (Exception exception)
+            {
+                // It is ok to swallow this exception, since state rehydration is best-effort.
+                _logger.LogError(exception, "Failed to rehydrate state named {StateName} for grain {GrainId}", _name, _grainContext.GrainId);
+            }
+        }
+
+        [DoesNotReturn]
+        private void OnError(Exception exception, ErrorCode id, string operation)
         {
             string? errorCode = null;
-            (store as IRestExceptionDecoder)?.DecodeException(exc, out _, out errorCode, true);
+            (_store as IRestExceptionDecoder)?.DecodeException(exception, out _, out errorCode, true);
+            var errorString = errorCode is { Length: > 0 } ? $" Error: {errorCode}" : null;
 
-            return $"Error from storage provider {store.GetType().Name}.{name} during {what} for grain Type={grainId.Type} Id={grainId.Key} Error={errorCode}{Environment.NewLine} {LogFormatter.PrintException(exc)}";
+            var grainId = _grainContext.GrainId;
+            var providerName = _store.GetType().Name;
+            _logger.LogError((int)id, exception, "Error from storage provider {ProviderName}.{StateName} during {Operation} for grain {GrainId}{ErrorCode}", providerName, _name, operation, grainId, errorString);
+
+            // If error is not specialization of OrleansException, wrap it
+            if (exception is not OrleansException)
+            {
+                var errMsg = $"Error from storage provider {providerName}.{_name} during {operation} for grain {grainId}{errorString}{Environment.NewLine} {LogFormatter.PrintException(exception)}";
+                throw new OrleansException(errMsg, exception);
+            }
+
+            ExceptionDispatchInfo.Throw(exception);
         }
     }
 }

@@ -60,6 +60,7 @@ namespace Orleans.Hosting
                 services =>
                 {
                     configureOptions?.Invoke(services.AddOptions<AzureStorageClusteringOptions>());
+                    services.AddTransient<IConfigurationValidator>(sp => new AzureStorageClusteringOptionsValidator(sp.GetRequiredService<IOptionsMonitor<AzureStorageClusteringOptions>>().Get(Options.DefaultName), Options.DefaultName));
                     services.AddSingleton<IMembershipTable, AzureBasedMembershipTable>()
                     .ConfigureFormatter<AzureStorageClusteringOptions>();
                 });
@@ -114,6 +115,7 @@ namespace Orleans.Hosting
                 services =>
                 {
                     configureOptions?.Invoke(services.AddOptions<AzureStorageGatewayOptions>());
+                    services.AddTransient<IConfigurationValidator>(sp => new AzureStorageGatewayOptionsValidator(sp.GetRequiredService<IOptionsMonitor<AzureStorageGatewayOptions>>().Get(Options.DefaultName), Options.DefaultName));
                     services.AddSingleton<IGatewayListProvider, AzureGatewayListProvider>()
                     .ConfigureFormatter<AzureStorageGatewayOptions>();
                 });

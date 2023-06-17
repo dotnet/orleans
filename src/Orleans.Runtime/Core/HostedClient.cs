@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Channels;
 using System.Threading.Tasks;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Orleans.GrainReferences;
 using Orleans.Internal;
@@ -27,6 +28,8 @@ namespace Orleans.Runtime
         private readonly MessageCenter siloMessageCenter;
         private readonly MessagingTrace messagingTrace;
         private readonly ConcurrentDictionary<Type, (object Implementation, IAddressable Reference)> _extensions = new ConcurrentDictionary<Type, (object, IAddressable)>();
+        private readonly ConcurrentDictionary<Type, object> _components = new();
+        private readonly IServiceScope _serviceProviderScope;
         private bool disposing;
         private Task messagePump;
 
@@ -64,6 +67,7 @@ namespace Orleans.Runtime
             this.ClientId = CreateHostedClientGrainId(siloDetails.SiloAddress);
             this.Address = Gateway.GetClientActivationAddress(this.ClientId.GrainId, siloDetails.SiloAddress);
             this.GrainReference = referenceActivator.CreateReference(this.ClientId.GrainId, default);
+            _serviceProviderScope = runtimeClient.ServiceProvider.CreateScope();
         }
 
         public static ClientGrainId CreateHostedClientGrainId(SiloAddress siloAddress) => ClientGrainId.Create($"hosted-{siloAddress.ToParsableString()}");
@@ -81,7 +85,7 @@ namespace Orleans.Runtime
 
         public GrainAddress Address { get; }
 
-        public IServiceProvider ActivationServices => this.runtimeClient.ServiceProvider;
+        public IServiceProvider ActivationServices => _serviceProviderScope.ServiceProvider;
 
         public IGrainLifecycle ObservableLifecycle => throw new NotImplementedException();
 
@@ -114,7 +118,7 @@ namespace Orleans.Runtime
         /// <inheritdoc />
         public void DeleteObjectReference(IAddressable obj)
         {
-            if (!(obj is GrainReference reference))
+            if (obj is not GrainReference reference)
             {
                 throw new ArgumentException("Argument reference is not a grain reference.");
             }
@@ -133,12 +137,43 @@ namespace Orleans.Runtime
         public TComponent GetComponent<TComponent>() where TComponent : class
         {
             if (this is TComponent component) return component;
+            if (_components.TryGetValue(typeof(TComponent), out var result))
+            {
+                return (TComponent)result;
+            }
+            else if (typeof(TComponent) == typeof(PlacementStrategy))
+            {
+                return (TComponent)(object)ClientObserversPlacement.Instance;
+            }
+
+            lock (lockObj)
+            {
+                if (ActivationServices.GetService<TComponent>() is { } activatedComponent)
+                {
+                    return (TComponent)_components.GetOrAdd(typeof(TComponent), activatedComponent);
+                }
+            }
+
             return default;
         }
 
         public void SetComponent<TComponent>(TComponent instance) where TComponent : class
         {
-            throw new NotSupportedException($"Cannot set components on shared client instance. Extension contract: {typeof(TComponent)}. Component: {instance} (Type: {instance?.GetType()})");
+            if (this is TComponent)
+            {
+                throw new ArgumentException("Cannot override a component which is implemented by the client context");
+            }
+
+            lock (lockObj)
+            {
+                if (instance == null)
+                {
+                    _components.Remove(typeof(TComponent), out _);
+                    return;
+                }
+
+                _components[typeof(TComponent)] = instance;
+            }
         }
 
         /// <inheritdoc />
@@ -180,6 +215,7 @@ namespace Orleans.Runtime
         {
             if (this.disposing) return;
             this.disposing = true;
+            _serviceProviderScope.Dispose();
             Utils.SafeExecute(() => this.siloMessageCenter.SetHostedClient(null));
             Utils.SafeExecute(() => this.incomingMessages.Writer.TryComplete());
             Utils.SafeExecute(() => this.messagePump?.GetAwaiter().GetResult());
@@ -347,5 +383,16 @@ namespace Orleans.Runtime
         public void Activate(Dictionary<string, object> requestContext, CancellationToken? cancellationToken = null) { }
         public void Deactivate(DeactivationReason deactivationReason, CancellationToken? cancellationToken = null) { }
         public Task Deactivated => Task.CompletedTask;
+
+        public void Rehydrate(IRehydrationContext context)
+        {
+            // Migration is not supported, but we need to dispose of the context if it's provided
+            (context as IDisposable)?.Dispose();
+        }
+
+        public void Migrate(Dictionary<string, object> requestContext, CancellationToken? cancellationToken = null)
+        {
+            // Migration is not supported. Do nothing: the contract is that this method attempts migration, but does not guarantee it will occur.
+        }
     }
 }

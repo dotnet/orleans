@@ -13,7 +13,7 @@ namespace Orleans.Configuration
 
     public class AzureTableGrainDirectoryOptionsValidator : AzureStorageOperationOptionsValidator<AzureTableGrainDirectoryOptions>
     {
-        public AzureTableGrainDirectoryOptionsValidator(AzureTableGrainDirectoryOptions options) : base(options)
+        public AzureTableGrainDirectoryOptionsValidator(AzureTableGrainDirectoryOptions options, string name) : base(options, name)
         {
         }
     }

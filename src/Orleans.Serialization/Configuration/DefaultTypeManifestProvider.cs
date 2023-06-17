@@ -1,12 +1,19 @@
 using System;
 using System.Net;
+using Microsoft.Extensions.Options;
 using Orleans.Serialization.Invocation;
 
 namespace Orleans.Serialization.Configuration
 {
-    internal class DefaultTypeManifestProvider : ITypeManifestProvider
+    internal class DefaultTypeManifestProvider : TypeManifestProviderBase, IPostConfigureOptions<TypeManifestOptions>
     {
-        public void Configure(TypeManifestOptions typeManifest)
+        public void PostConfigure(string name, TypeManifestOptions options)
+        {
+            // Clean up the options bookkeeping.
+            options.TypeManifestProviders.Clear();
+        }
+
+        protected override void ConfigureInner(TypeManifestOptions typeManifest)
         {
             var wellKnownTypes = typeManifest.WellKnownTypeIds;
             wellKnownTypes[0] = typeof(void); // Represents the type of null

@@ -13,17 +13,18 @@ namespace Orleans.Runtime.Placement
     /// </summary>
     internal class PreferLocalPlacementDirector : RandomPlacementDirector, IPlacementDirector
     {
-        private Task<SiloAddress> cachedLocalSilo;
+        private Task<SiloAddress> _cachedLocalSilo;
 
         public override Task<SiloAddress> 
             OnAddActivation(PlacementStrategy strategy, PlacementTarget target, IPlacementContext context)
         {
             // if local silo is not active or does not support this type of grain, revert to random placement
             if (context.LocalSiloStatus != SiloStatus.Active || !context.GetCompatibleSilos(target).Contains(context.LocalSilo))
+            {
                 return base.OnAddActivation(strategy, target, context);
+            }
 
-            cachedLocalSilo = cachedLocalSilo ?? Task.FromResult(context.LocalSilo);
-            return cachedLocalSilo;
+            return _cachedLocalSilo ??= Task.FromResult(context.LocalSilo);
         }
     }
 }

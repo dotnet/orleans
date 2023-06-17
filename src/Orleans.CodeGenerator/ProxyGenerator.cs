@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Linq.Expressions;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -98,10 +99,16 @@ namespace Orleans.CodeGenerator
             MethodDeclarationSyntax CreateProxyMethod(MethodDescription methodDescription)
             {
                 var method = methodDescription.Method;
+                var (isAsync, body) = CreateAsyncProxyMethodBody(libraryTypes, fieldDescriptions, metadataModel, methodDescription);
                 var declaration = MethodDeclaration(method.ReturnType.ToTypeSyntax(methodDescription.TypeParameterSubstitutions), method.Name.EscapeIdentifier())
                     .AddParameterListParameters(method.Parameters.Select((p, i) => GetParameterSyntax(i, p, methodDescription.TypeParameterSubstitutions)).ToArray())
-                    .WithBody(
-                        CreateAsyncProxyMethodBody(libraryTypes, fieldDescriptions, metadataModel, methodDescription));
+                    .WithBody(body);
+
+                if (isAsync)
+                {
+                    declaration = declaration.WithModifiers(TokenList(Token(SyntaxKind.AsyncKeyword)));
+                }
+
                 if (methodDescription.HasCollision)
                 {
                     declaration = declaration.WithModifiers(TokenList(Token(SyntaxKind.PublicKeyword)));
@@ -133,7 +140,7 @@ namespace Orleans.CodeGenerator
             }
         }
 
-        private static BlockSyntax CreateAsyncProxyMethodBody(
+        private static (bool IsAsync, BlockSyntax body) CreateAsyncProxyMethodBody(
             LibraryTypes libraryTypes,
             List<GeneratedFieldDescription> fieldDescriptions,
             MetadataModel metadataModel,
@@ -205,7 +212,7 @@ namespace Orleans.CodeGenerator
                 parameterIndex++;
             }
 
-            var invokeMethodName = "InvokeAsync";
+            string invokeMethodName = default;
             foreach (var attr in methodDescription.Method.GetAttributes())
             {
                 if (attr.AttributeClass.GetAttributes(libraryTypes.InvokeMethodNameAttribute, out var attrs))
@@ -217,7 +224,6 @@ namespace Orleans.CodeGenerator
                 }
             }
 
-            ITypeSymbol resultType;
             var methodReturnType = methodDescription.Method.ReturnType;
             if (methodReturnType is not INamedTypeSymbol namedMethodReturnType)
             {
@@ -225,47 +231,74 @@ namespace Orleans.CodeGenerator
                 throw new OrleansGeneratorDiagnosticAnalysisException(diagnostic);
             }
 
+            ExpressionSyntax baseInvokeExpression;
+            var isVoid = methodReturnType.SpecialType is SpecialType.System_Void;
             if (namedMethodReturnType.TypeArguments.Length == 1)
             {
                 // Task<T> / ValueTask<T>
-                resultType = namedMethodReturnType.TypeArguments[0];
+                var resultType = namedMethodReturnType.TypeArguments[0];
+                baseInvokeExpression = BaseExpression().Member(
+                    invokeMethodName ?? "InvokeAsync",
+                    resultType.ToTypeSyntax(methodDescription.TypeParameterSubstitutions));
+            }
+            else if (isVoid)
+            {
+                // void
+                baseInvokeExpression = BaseExpression().Member(invokeMethodName ?? "Invoke");
             }
             else
             {
-                // void, Task / ValueTask
-                resultType = null;
+                // Task / ValueTask
+                baseInvokeExpression = BaseExpression().Member(invokeMethodName ?? "InvokeAsync");
             }
 
             // C#: base.InvokeAsync<TReturn>(request);
-            var baseInvokeExpression = resultType switch
-            {
-                not null => BaseExpression().Member(invokeMethodName, resultType.ToTypeSyntax(methodDescription.TypeParameterSubstitutions)),
-                _ => BaseExpression().Member(invokeMethodName),
-            };
             var invocationExpression =
                          InvocationExpression(
                              baseInvokeExpression,
                              ArgumentList(SeparatedList(new[] { Argument(requestVar) })));
 
             var rt = namedMethodReturnType.ConstructedFrom;
+            bool isAsync;
             if (SymbolEqualityComparer.Default.Equals(rt, libraryTypes.Task_1) || SymbolEqualityComparer.Default.Equals(methodReturnType, libraryTypes.Task))
             {
                 // C#: return <invocation>.AsTask()
                 statements.Add(ReturnStatement(InvocationExpression(invocationExpression.Member("AsTask"), ArgumentList())));
+                isAsync = false;
             }
             else if (SymbolEqualityComparer.Default.Equals(rt, libraryTypes.ValueTask_1) || SymbolEqualityComparer.Default.Equals(methodReturnType, libraryTypes.ValueTask))
             {
                 // ValueTask<T> / ValueTask
                 // C#: return <invocation>
                 statements.Add(ReturnStatement(invocationExpression));
+                isAsync = false;
+            }
+            else if (requestDescription.ReturnValueInitializerMethod is { } returnValueInitializerMethod)
+            {
+                // C#: return request.<returnValueInitializerMethod>(this);
+                statements.Add(ReturnStatement(InvocationExpression(requestVar.Member(returnValueInitializerMethod), ArgumentList(SingletonSeparatedList(Argument(ThisExpression()))))));
+                isAsync = false;
+            }
+            else if (isVoid)
+            {
+                // C#: <invocation>
+                statements.Add(ExpressionStatement(invocationExpression));
+                isAsync = false;
+            }
+            else if (rt.Arity == 0)
+            {
+                // C#: await <invocation>
+                statements.Add(ExpressionStatement(AwaitExpression(invocationExpression)));
+                isAsync = true;
             }
             else
             {
-                // C#: _ = <invocation>
-                statements.Add(ExpressionStatement(AssignmentExpression(SyntaxKind.SimpleAssignmentExpression, IdentifierName("_"), invocationExpression)));
+                // C#: return await <invocation>
+                statements.Add(ReturnStatement(AwaitExpression(invocationExpression)));
+                isAsync = true;
             }
 
-            return Block(statements);
+            return (isAsync, Block(statements));
         }
 
         private static MemberDeclarationSyntax[] GenerateConstructors(

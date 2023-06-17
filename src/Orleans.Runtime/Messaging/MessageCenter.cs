@@ -10,6 +10,11 @@ using Orleans.Serialization.Invocation;
 
 namespace Orleans.Runtime.Messaging
 {
+    internal interface IMessagingSystemTarget : ISystemTarget
+    {
+        ValueTask OnMessagesForwarded(List<(GrainId TargetGrainId, CorrelationId CorrelationId, SiloAddress From, SiloAddress To)> forwards);
+    }
+
     internal class MessageCenter : IMessageCenter, IAsyncDisposable
     {
         private readonly ISiloStatusOracle siloStatusOracle;
@@ -261,7 +266,7 @@ namespace Orleans.Runtime.Messaging
         internal void ProcessRequestsToInvalidActivation(
             List<Message> messages,
             GrainAddress oldAddress,
-            GrainAddress forwardingAddress,
+            SiloAddress forwardingAddress,
             string failedOperation = null,
             Exception exc = null,
             bool rejectMessages = false)
@@ -291,7 +296,7 @@ namespace Orleans.Runtime.Messaging
         internal void ProcessRequestToInvalidActivation(
             Message message,
             GrainAddress oldAddress,
-            GrainAddress forwardingAddress,
+            SiloAddress forwardingAddress,
             string failedOperation,
             Exception exc = null,
             bool rejectMessages = false)
@@ -313,9 +318,9 @@ namespace Orleans.Runtime.Messaging
             }
         }
 
-        internal void TryForwardRequest(Message message, GrainAddress oldAddress, GrainAddress forwardingAddress, string failedOperation = null, Exception exc = null)
+        internal void TryForwardRequest(Message message, GrainAddress oldAddress, SiloAddress forwardingAddress, string failedOperation = null, Exception exc = null)
         {
-            bool forwardingSucceded = false;
+            bool forwardingSucceeded = false;
             try
             {
                 this.messagingTrace.OnDispatcherForwarding(message, oldAddress, forwardingAddress, failedOperation, exc);
@@ -325,11 +330,11 @@ namespace Orleans.Runtime.Messaging
                     message.AddToCacheInvalidationHeader(oldAddress);
                 }
 
-                forwardingSucceded = this.TryForwardMessage(message, forwardingAddress);
+                forwardingSucceeded = this.TryForwardMessage(message, forwardingAddress);
             }
             catch (Exception exc2)
             {
-                forwardingSucceded = false;
+                forwardingSucceeded = false;
                 exc = exc2;
             }
             finally
@@ -347,7 +352,7 @@ namespace Orleans.Runtime.Messaging
                     sentRejection = true;
                 }
 
-                if (!forwardingSucceded)
+                if (!forwardingSucceeded)
                 {
                     this.messagingTrace.OnDispatcherForwardingFailed(message, oldAddress, forwardingAddress, failedOperation, exc);
                     if (!sentRejection)
@@ -368,7 +373,7 @@ namespace Orleans.Runtime.Messaging
             ResendMessageImpl(message);
         }
 
-        internal bool TryForwardMessage(Message message, GrainAddress forwardingAddress)
+        internal bool TryForwardMessage(Message message, SiloAddress forwardingAddress)
         {
             if (!MayForward(message, this.messagingOptions)) return false;
 
@@ -378,7 +383,7 @@ namespace Orleans.Runtime.Messaging
             return true;
         }
 
-        private void ResendMessageImpl(Message message, GrainAddress forwardingAddress = null)
+        private void ResendMessageImpl(Message message, SiloAddress forwardingAddress = null)
         {
             if (log.IsEnabled(LogLevel.Debug)) log.LogDebug("Resend {Message}", message);
 
@@ -389,7 +394,7 @@ namespace Orleans.Runtime.Messaging
             }
             else if (forwardingAddress != null)
             {
-                message.TargetSilo = forwardingAddress.SiloAddress;
+                message.TargetSilo = forwardingAddress;
                 SendMessage(message);
             }
             else
@@ -485,7 +490,8 @@ namespace Orleans.Runtime.Messaging
                 {
                     var targetActivation = catalog.GetOrCreateActivation(
                         msg.TargetGrain,
-                        msg.RequestContextData);
+                        msg.RequestContextData,
+                        rehydrationContext: null);
 
                     if (targetActivation is null)
                     {

@@ -8,7 +8,6 @@
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
     <RootNamespace>Orleans</RootNamespace>
-    <EmitCompilerGeneratedFiles>true</EmitCompilerGeneratedFiles>
   </PropertyGroup>
 
   <ItemGroup>

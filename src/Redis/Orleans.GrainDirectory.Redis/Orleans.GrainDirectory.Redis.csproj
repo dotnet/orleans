@@ -6,7 +6,6 @@
     <Description>Microsoft Orleans Grain Directory implementation that uses Redis</Description>
     <PackageTags>$(PackageTags) Redis Grain Directory</PackageTags>
     <TargetFrameworks>$(DefaultTargetFrameworks)</TargetFrameworks>
-    <VersionSuffix Condition="$(VersionSuffix) == ''">beta1</VersionSuffix>
     <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
   </PropertyGroup>
 

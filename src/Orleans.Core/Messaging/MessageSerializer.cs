@@ -121,7 +121,7 @@ namespace Orleans.Runtime.Messaging
             finally
             {
                 input = input.Slice(requiredBytes);
-                _deserializationSession.FullReset();
+                _deserializationSession.Reset();
             }
         }
 
@@ -183,7 +183,7 @@ namespace Orleans.Runtime.Messaging
                 if (bodyCodec is not null)
                 {
                     innerWriter = Writer.Create(new MessageBufferWriter(bufferWriter), _serializationSession);
-                    if (rawCodec != null) rawCodec.WriteRaw(ref innerWriter, message.BodyObject);
+                    if (rawCodec != null) rawCodec.WriteRaw(ref innerWriter, message.BodyObject!);
                     else bodyCodec.WriteField(ref innerWriter, 0, null, message.BodyObject);
                     innerWriter.Commit();
                 }
@@ -206,7 +206,7 @@ namespace Orleans.Runtime.Messaging
             finally
             {
                 _bufferWriter.Reset();
-                _serializationSession.FullReset();
+                _serializationSession.Reset();
             }
         }
 

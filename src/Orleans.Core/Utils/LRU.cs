@@ -92,9 +92,42 @@ namespace Orleans.Runtime
             return result;
         }
 
+        public TValue AddOrUpdate<TState>(TKey key, Func<TState, TKey, TValue> addFunc, TState state)
+        {
+            var generation = GetNewGeneration();
+            var storedValue = cache.AddOrUpdate(
+                key,
+                static (key, state) =>
+                {
+                    var (outerState, addFunc, generation) = state;
+                    return new TimestampedValue(addFunc(outerState, key), generation);
+                },
+                static (key, existing, state) =>
+                {
+                    var (outerState, addFunc, generation) = state;
+                    return new TimestampedValue(addFunc(outerState, key), generation);
+                },
+                (State: state, AddFunc: addFunc, Generation: generation));
+
+            var result = storedValue.Value;
+
+            if (storedValue.Generation == generation)
+            {
+                Interlocked.Increment(ref count);
+                AdjustSize();
+            }
+
+            return result;
+        }
+
         public void Add(TKey key, TValue value)
         {
             GetOrAdd(key, static (value, key) => value, value);
+        }
+
+        public void AddOrUpdate(TKey key, TValue value)
+        {
+            AddOrUpdate(key, static (value, key) => value, value);
         }
 
         public bool ContainsKey(TKey key) => cache.ContainsKey(key);

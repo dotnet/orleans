@@ -31,6 +31,14 @@ namespace Orleans.Runtime
         ValueTask InvokeMethodAsync(GrainReference reference, IInvokable request, InvokeMethodOptions options);
 
         /// <summary>
+        /// Invokes the specified void-returning method on the provided grain interface without waiting for a response.
+        /// </summary>
+        /// <param name="reference">The grain reference.</param>
+        /// <param name="request">The method description.</param>
+        /// <param name="options">The invocation options.</param>
+        void InvokeMethod(GrainReference reference, IInvokable request, InvokeMethodOptions options);
+
+        /// <summary>
         /// Converts the provided <paramref name="grain"/> to the provided <paramref name="interfaceType"/>.
         /// </summary>
         /// <param name="grain">The grain.</param>

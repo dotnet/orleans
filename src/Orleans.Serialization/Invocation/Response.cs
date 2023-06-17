@@ -1,3 +1,4 @@
+#nullable enable
 using System;
 using System.Buffers;
 using System.Runtime.CompilerServices;
@@ -44,12 +45,12 @@ namespace Orleans.Serialization.Invocation
         public static Response Completed => CompletedResponse.Instance;
 
         /// <inheritdoc />
-        public abstract object Result { get; set; }
+        public abstract object? Result { get; set; }
 
-        public virtual Type GetSimpleResultType() => null;
+        public virtual Type? GetSimpleResultType() => null;
 
         /// <inheritdoc />
-        public abstract Exception Exception { get; set; }
+        public abstract Exception? Exception { get; set; }
 
         /// <inheritdoc />
         public abstract T GetResult<T>();
@@ -58,7 +59,7 @@ namespace Orleans.Serialization.Invocation
         public abstract void Dispose();
 
         /// <inheritdoc />
-        public override string ToString() => Exception is { } ex ? ex.ToString() : Result is { } r ? r.ToString() : "[null]";
+        public override string ToString() => Exception is { } ex ? ex.ToString() : Result?.ToString() ?? "[null]";
     }
 
     /// <summary>
@@ -73,13 +74,13 @@ namespace Orleans.Serialization.Invocation
         public static CompletedResponse Instance { get; } = new CompletedResponse();
 
         /// <inheritdoc/>
-        public override object Result { get => null; set => throw new InvalidOperationException($"Type {nameof(CompletedResponse)} is read-only"); } 
+        public override object? Result { get => null; set => throw new InvalidOperationException($"Type {nameof(CompletedResponse)} is read-only"); }
 
         /// <inheritdoc/>
-        public override Exception Exception { get => null; set => throw new InvalidOperationException($"Type {nameof(CompletedResponse)} is read-only"); }
+        public override Exception? Exception { get => null; set => throw new InvalidOperationException($"Type {nameof(CompletedResponse)} is read-only"); }
 
         /// <inheritdoc/>
-        public override T GetResult<T>() => default;
+        public override T GetResult<T>() => default!;
 
         /// <inheritdoc/>
         public override void Dispose() { }
@@ -105,11 +106,11 @@ namespace Orleans.Serialization.Invocation
     public sealed class ExceptionResponse : Response
     {
         /// <inheritdoc/>
-        public override object Result
+        public override object? Result
         {
             get
             {
-                ExceptionDispatchInfo.Capture(Exception).Throw();
+                ExceptionDispatchInfo.Capture(Exception!).Throw();
                 return null;
             }
 
@@ -118,12 +119,12 @@ namespace Orleans.Serialization.Invocation
 
         /// <inheritdoc/>
         [Id(0)]
-        public override Exception Exception { get; set; }
+        public override Exception? Exception { get; set; }
 
         /// <inheritdoc/>
         public override T GetResult<T>()
         {
-            ExceptionDispatchInfo.Capture(Exception).Throw();
+            ExceptionDispatchInfo.Capture(Exception!).Throw();
             return default;
         }
 
@@ -142,20 +143,20 @@ namespace Orleans.Serialization.Invocation
     public sealed class Response<TResult> : Response
     {
         [Id(0)]
-        private TResult _result;
+        private TResult? _result;
 
-        public TResult TypedResult { get => _result; set => _result = value; }
+        public TResult? TypedResult { get => _result; set => _result = value; }
 
-        public override Exception Exception
+        public override Exception? Exception
         {
             get => null;
             set => throw new InvalidOperationException($"Cannot set {nameof(Exception)} property for type {nameof(Response<TResult>)}");
         }
 
-        public override object Result
+        public override object? Result
         {
             get => _result;
-            set => _result = (TResult)value;
+            set => _result = (TResult?)value;
         }
 
         public override Type GetSimpleResultType() => typeof(TResult);
@@ -163,9 +164,9 @@ namespace Orleans.Serialization.Invocation
         public override T GetResult<T>()
         {
             if (typeof(TResult).IsValueType && typeof(T).IsValueType && typeof(T) == typeof(TResult))
-                return Unsafe.As<TResult, T>(ref _result);
+                return Unsafe.As<TResult, T>(ref _result!);
 
-            return (T)(object)_result;
+            return (T)(object)_result!;
         }
 
         public override void Dispose()
@@ -174,7 +175,7 @@ namespace Orleans.Serialization.Invocation
             ResponsePool.Return(this);
         }
 
-        public override string ToString() => _result is { } r ? r.ToString() : "[null]";
+        public override string ToString() => _result?.ToString() ?? "[null]";
     }
 
     /// <summary>
@@ -261,13 +262,13 @@ namespace Orleans.Serialization.Invocation
         public PooledResponseCopier(ICodecProvider codecProvider)
             => _copier = OrleansGeneratedCodeHelper.GetService<IDeepCopier<TResult>>(this, codecProvider);
 
-        public Response<TResult> DeepCopy(Response<TResult> input, CopyContext context)
+        public Response<TResult> DeepCopy(Response<TResult>? input, CopyContext context)
         {
             if (input is null)
-                return null;
+                return null!;
 
             var result = ResponsePool.Get<TResult>();
-            result.TypedResult = _copier.DeepCopy(input.TypedResult, context);
+            result.TypedResult = _copier.DeepCopy(input.TypedResult!, context);
             return result;
         }
     }
@@ -276,5 +277,16 @@ namespace Orleans.Serialization.Invocation
     internal sealed class PooledResponseActivator<TResult> : IActivator<Response<TResult>>
     {
         public Response<TResult> Create() => ResponsePool.Get<TResult>();
+    }
+
+    public static class ResponseExtensions
+    {
+        public static void ThrowIfExceptionResponse(this Response response)
+        {
+            if (response.Exception is { } exception)
+            {
+                ExceptionDispatchInfo.Capture(exception).Throw();
+            }
+        }
     }
 }

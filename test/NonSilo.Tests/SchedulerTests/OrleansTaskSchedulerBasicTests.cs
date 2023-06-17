@@ -54,6 +54,8 @@ namespace UnitTests.SchedulerTests
         public void SetComponent<TComponent>(TComponent value) where TComponent : class => throw new NotImplementedException();
 
         bool IEquatable<IGrainContext>.Equals(IGrainContext other) => ReferenceEquals(this, other);
+        void IGrainContext.Rehydrate(IRehydrationContext context) => throw new NotImplementedException();
+        void IGrainContext.Migrate(Dictionary<string, object> requestContext, CancellationToken? cancellationToken) => throw new NotImplementedException();
     }
     
     [TestCategory("BVT"), TestCategory("Scheduler")]

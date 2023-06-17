@@ -1,12 +1,12 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <IsTestProject>true</IsTestProject>
     <TargetFrameworks>$(TestTargetFrameworks);netcoreapp3.1</TargetFrameworks>
     <GenerateBindingRedirectsOutputType>true</GenerateBindingRedirectsOutputType>
     <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
-    <EmitCompilerGeneratedFiles>true</EmitCompilerGeneratedFiles>
     <ImplicitUsings>disable</ImplicitUsings>
+    <SuppressTfmSupportBuildWarnings>true</SuppressTfmSupportBuildWarnings>
   </PropertyGroup>
 
   <ItemGroup>

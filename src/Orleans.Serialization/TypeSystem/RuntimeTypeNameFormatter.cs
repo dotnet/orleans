@@ -1,5 +1,7 @@
+#nullable enable
 using System;
 using System.Collections.Concurrent;
+using System.Diagnostics.CodeAnalysis;
 using System.Reflection;
 using System.Text;
 
@@ -13,7 +15,7 @@ public static class RuntimeTypeNameFormatter
 {
     private static readonly Assembly SystemAssembly = typeof(int).Assembly;
 
-    private static readonly ConcurrentDictionary<Type, string> Cache = new ConcurrentDictionary<Type, string>();
+    private static readonly ConcurrentDictionary<Type, string> Cache = new();
 
     /// <summary>
     /// Returns a <see cref="string"/> form of <paramref name="type"/> which can be parsed by <see cref="Type.GetType(string)"/>.
@@ -22,12 +24,23 @@ public static class RuntimeTypeNameFormatter
     /// <returns>
     /// A <see cref="string"/> form of <paramref name="type"/> which can be parsed by <see cref="Type.GetType(string)"/>.
     /// </returns>
-    public static string Format(Type type) => Cache.GetOrAdd(type, t =>
+    public static string Format(Type type)
     {
-        var builder = new StringBuilder();
-        Format(builder, t, isElementType: false);
-        return builder.ToString();
-    });
+        if (type is null)
+        {
+            ThrowTypeArgumentNull();
+        }
+
+        return Cache.GetOrAdd(type, static t =>
+        {
+            var builder = new StringBuilder();
+            Format(builder, t, isElementType: false);
+            return builder.ToString();
+        });
+    }
+
+    [DoesNotReturn]
+    private static void ThrowTypeArgumentNull() => throw new ArgumentNullException("type");
 
     internal static string FormatInternalNoCache(Type type, bool allowAliases)
     {
@@ -49,7 +62,7 @@ public static class RuntimeTypeNameFormatter
         if (type.HasElementType)
         {
             // Format the element type.
-            Format(builder, type.GetElementType(), isElementType: true);
+            Format(builder, type.GetElementType()!, isElementType: true);
 
             // Format this type's adornments to the element type.
             AddArrayRank(builder, type);
@@ -134,7 +147,7 @@ public static class RuntimeTypeNameFormatter
         // Format the declaring type.
         if (type.IsNested)
         {
-            AddClassName(builder, type.DeclaringType);
+            AddClassName(builder, type.DeclaringType!);
             _ = builder.Append('+');
         }
 
@@ -181,7 +194,7 @@ public static class RuntimeTypeNameFormatter
 
         // The arity is the number of generic parameters minus the number of generic parameters in the declaring types.
         var baseTypeParameterCount =
-            type.IsNested ? type.DeclaringType.GetGenericArguments().Length : 0;
+            type.IsNested ? type.DeclaringType!.GetGenericArguments().Length : 0;
         var arity = type.GetGenericArguments().Length - baseTypeParameterCount;
 
         // If all of the generic parameters are in the declaring types then this type has no parameters of its own.

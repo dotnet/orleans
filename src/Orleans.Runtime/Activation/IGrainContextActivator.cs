@@ -15,6 +15,7 @@ using Orleans.GrainReferences;
 using Orleans.Metadata;
 using Orleans.Runtime.Placement;
 using Orleans.Serialization.Invocation;
+using Orleans.Serialization.Session;
 
 namespace Orleans.Runtime
 {
@@ -180,6 +181,7 @@ namespace Orleans.Runtime
         private readonly IGrainRuntime _grainRuntime;
         private readonly ILogger<Grain> _logger;
         private readonly IServiceProvider _serviceProvider;
+        private readonly SerializerSessionPool _serializerSessionPool;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="GrainTypeSharedContextResolver"/> class.
@@ -196,6 +198,7 @@ namespace Orleans.Runtime
         /// <param name="grainRuntime">The grain runtime.</param>
         /// <param name="logger">The logger.</param>
         /// <param name="serviceProvider">The service provider.</param>
+        /// <param name="serializerSessionPool">The serializer session pool.</param>
         public GrainTypeSharedContextResolver(
             IEnumerable<IConfigureGrainTypeComponents> configurators,
             GrainPropertiesResolver grainPropertiesResolver,
@@ -208,7 +211,8 @@ namespace Orleans.Runtime
             IOptions<SchedulingOptions> schedulingOptions,
             IGrainRuntime grainRuntime,
             ILogger<Grain> logger,
-            IServiceProvider serviceProvider)
+            IServiceProvider serviceProvider,
+            SerializerSessionPool serializerSessionPool)
         {
             _configurators = configurators.ToArray();
             _grainPropertiesResolver = grainPropertiesResolver;
@@ -222,6 +226,7 @@ namespace Orleans.Runtime
             _grainRuntime = grainRuntime;
             _logger = logger;
             _serviceProvider = serviceProvider;
+            _serializerSessionPool = serializerSessionPool;
             _createFunc = Create;
         }
 
@@ -245,7 +250,8 @@ namespace Orleans.Runtime
                 _grainRuntime,
                 _logger,
                 _grainReferenceActivator,
-                _serviceProvider);
+                _serviceProvider,
+                _serializerSessionPool);
             var properties = _grainPropertiesResolver.GetGrainProperties(grainType);
             foreach (var configurator in _configurators)
             {

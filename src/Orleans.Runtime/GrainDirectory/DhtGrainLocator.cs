@@ -29,7 +29,7 @@ namespace Orleans.Runtime.GrainDirectory
 
         public async ValueTask<GrainAddress> Lookup(GrainId grainId) => (await _localGrainDirectory.LookupAsync(grainId)).Address;
 
-        public async Task<GrainAddress> Register(GrainAddress address) => (await _localGrainDirectory.RegisterAsync(address)).Address;
+        public async Task<GrainAddress> Register(GrainAddress address, GrainAddress previousAddress) => (await _localGrainDirectory.RegisterAsync(address, currentRegistration: previousAddress)).Address;
 
         public Task Unregister(GrainAddress address, UnregistrationCause cause)
         {

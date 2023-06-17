@@ -44,6 +44,7 @@ namespace Orleans.Serialization
                 services.Add(context.CreateServiceDescriptor());
                 services.AddOptions();
                 services.AddSingleton<IConfigureOptions<TypeManifestOptions>, DefaultTypeManifestProvider>();
+                services.AddSingleton<IPostConfigureOptions<TypeManifestOptions>, DefaultTypeManifestProvider>();
                 services.AddSingleton<TypeResolver, CachedTypeResolver>();
                 services.AddSingleton<TypeConverter>();
                 services.TryAddSingleton<CodecProvider>();

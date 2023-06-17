@@ -35,6 +35,8 @@ namespace TestExtensions
             }
         }
 
+        public static string CosmosDBAccountEndpoint => defaultConfiguration[nameof(CosmosDBAccountEndpoint)];
+        public static string CosmosDBAccountKey => defaultConfiguration[nameof(CosmosDBAccountKey)];
         public static Uri TableEndpoint => new Uri(defaultConfiguration[nameof(TableEndpoint)]);
         public static Uri DataBlobUri => new Uri(defaultConfiguration[nameof(DataBlobUri)]);
         public static Uri DataQueueUri => new Uri(defaultConfiguration[nameof(DataQueueUri)]);
@@ -88,7 +90,7 @@ namespace TestExtensions
         {
             [NonSerialized]
             private PhysicalFileProvider fileProvider;
-            
+
             public string Root { get; set; }
 
             public IDirectoryContents GetDirectoryContents(string subpath)

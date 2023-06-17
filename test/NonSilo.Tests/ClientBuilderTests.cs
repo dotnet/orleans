@@ -174,7 +174,7 @@ namespace NonSilo.Tests
             Assert.Throws<ArgumentNullException>(() => hostBuilder.ConfigureServices(null));
 
             var registeredFirst = new int[1];
-            
+
             var one = new MyService { Id = 1 };
             hostBuilder.ConfigureServices(
                 services =>
@@ -196,7 +196,7 @@ namespace NonSilo.Tests
             var client = host.Services.GetRequiredService<IClusterClient>();
             var services = client.ServiceProvider.GetServices<MyService>()?.ToList();
             Assert.NotNull(services);
-            
+
             // Both services should be registered.
             Assert.Equal(2, services.Count);
             Assert.NotNull(services.FirstOrDefault(svc => svc.Id == 1));
@@ -220,6 +220,23 @@ namespace NonSilo.Tests
                         siloBuilder.UseLocalhostClustering();
                     })
                     .UseOrleansClient((ctx, clientBuilder) =>
+                    {
+                        clientBuilder.UseLocalhostClustering();
+                    });
+            });
+        }
+
+        [Fact]
+        public void ClientBuilderWithHotApplicationBuilderThrowsDuringStartupIfSiloBuildersAdded()
+        {
+            Assert.Throws<OrleansConfigurationException>(() =>
+            {
+                _ = Host.CreateApplicationBuilder()
+                    .UseOrleans(siloBuilder =>
+                    {
+                        siloBuilder.UseLocalhostClustering();
+                    })
+                    .UseOrleansClient(clientBuilder =>
                     {
                         clientBuilder.UseLocalhostClustering();
                     });

@@ -1,8 +1,10 @@
 using System;
 using System.Buffers;
+using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using Orleans.Serialization.Buffers;
 using Orleans.Serialization.Cloning;
+using Orleans.Serialization.Serializers;
 using Orleans.Serialization.WireProtocol;
 
 namespace Orleans.Serialization.Codecs
@@ -288,5 +290,54 @@ namespace Orleans.Serialization.Codecs
 
             return input.ToArray();
         }
+    }
+
+    /// <summary>
+    /// Serializer for <see cref="PooledBuffer"/> instances.
+    /// </summary>
+    [RegisterSerializer]
+    public sealed class PooledBufferCodec : IValueSerializer<PooledBuffer>
+    {
+        public void Serialize<TBufferWriter>(ref Writer<TBufferWriter> writer, scoped ref PooledBuffer value) where TBufferWriter : IBufferWriter<byte>
+        {
+            writer.WriteVarUInt32((uint)value.Length);
+            foreach (var segment in value)
+            {
+                writer.Write(segment);
+            }
+
+            // Dispose of the value after sending it.
+            // PooledBuffer is special in this sense.
+            // Senders must not use the value after sending.
+            // Receivers must dispose of the value after use.
+            value.Reset();
+            value = default;
+        }
+
+        public void Deserialize<TInput>(ref Reader<TInput> reader, scoped ref PooledBuffer value)
+        {
+            const int MaxSpanLength = 4096;
+            var length = (int)reader.ReadVarUInt32();
+            while (length > 0)
+            {
+                var copied = Math.Min(length, MaxSpanLength);
+                var span = value.GetSpan(copied)[..copied];
+                reader.ReadBytes(span);
+                value.Advance(copied);
+                length -= copied;
+            }
+
+            Debug.Assert(length == 0);
+        }
+    }
+
+    /// <summary>
+    /// Copier for <see cref="PooledBuffer"/> instances, which are assumed to be immutable.
+    /// </summary>
+    [RegisterCopier]
+    public sealed class PooledBufferCopier : IDeepCopier<PooledBuffer>, IOptionalDeepCopier
+    {
+        public PooledBuffer DeepCopy(PooledBuffer input, CopyContext context) => input;
+        public bool IsShallowCopyable() => true;
     }
 }

@@ -1,6 +1,3 @@
-using System;
-using System.Threading.Tasks;
-
 namespace UnitTests.GrainInterfaces
 {
     public interface ISimplePersistentGrain : ISimpleGrain

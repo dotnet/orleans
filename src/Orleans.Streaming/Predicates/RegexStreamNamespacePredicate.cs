@@ -23,7 +23,8 @@ namespace Orleans.Streams
         /// <param name="regex">The stream namespace regular expression.</param>
         public RegexStreamNamespacePredicate(string regex)
         {
-            this.regex = new Regex(regex, RegexOptions.Compiled) ?? throw new ArgumentNullException(nameof(regex));
+            ArgumentNullException.ThrowIfNull(regex);
+            this.regex = new Regex(regex, RegexOptions.Compiled);
         }
 
         /// <inheritdoc />

@@ -51,6 +51,7 @@ namespace Orleans.Hosting
             services.AddSingleton<IReminderTable, AzureBasedReminderTable>();
             configureOptions?.Invoke(services.AddOptions<AzureTableReminderStorageOptions>());
             services.ConfigureFormatter<AzureTableReminderStorageOptions>();
+            services.AddTransient<IConfigurationValidator>(sp => new AzureTableReminderStorageOptionsValidator(sp.GetRequiredService<IOptionsMonitor<AzureTableReminderStorageOptions>>().Get(Options.DefaultName), Options.DefaultName));
             return services;
         }
 

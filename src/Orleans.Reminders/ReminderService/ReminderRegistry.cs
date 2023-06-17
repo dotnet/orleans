@@ -44,13 +44,13 @@ namespace Orleans.Runtime.ReminderService
             if (string.IsNullOrEmpty(reminderName))
                 throw new ArgumentException("Cannot use null or empty name for the reminder", nameof(reminderName));
 
-            EnsureReminderServiceRegistered();
+            EnsureReminderServiceRegisteredAndInGrainContext();
             return GetGrainService(callingGrainId).RegisterOrUpdateReminder(callingGrainId, reminderName, dueTime, period);
         }
 
         public Task UnregisterReminder(GrainId callingGrainId, IGrainReminder reminder)
         {
-            EnsureReminderServiceRegistered();
+            EnsureReminderServiceRegisteredAndInGrainContext();
             return GetGrainService(callingGrainId).UnregisterReminder(reminder);
         }
 
@@ -59,18 +59,19 @@ namespace Orleans.Runtime.ReminderService
             if (string.IsNullOrEmpty(reminderName))
                 throw new ArgumentException("Cannot use null or empty name for the reminder", nameof(reminderName));
 
-            EnsureReminderServiceRegistered();
+            EnsureReminderServiceRegisteredAndInGrainContext();
             return GetGrainService(callingGrainId).GetReminder(callingGrainId, reminderName);
         }
 
         public Task<List<IGrainReminder>> GetReminders(GrainId callingGrainId)
         {
-            EnsureReminderServiceRegistered();
+            EnsureReminderServiceRegisteredAndInGrainContext();
             return GetGrainService(callingGrainId).GetReminders(callingGrainId);
         }
 
-        private void EnsureReminderServiceRegistered()
+        private void EnsureReminderServiceRegisteredAndInGrainContext()
         {
+            if (RuntimeContext.Current is null) ThrowInvalidContext();
             if (serviceProvider != null) ValidateServiceProvider();
         }
 
@@ -88,6 +89,12 @@ namespace Orleans.Runtime.ReminderService
             }
 
             serviceProvider = null;
+        }
+
+        private static void ThrowInvalidContext()
+        {
+            throw new InvalidOperationException("Attempted to access grain from a non-grain context, such as a background thread, which is invalid."
+                + " Ensure that you are only accessing grain functionality from within the context of a grain.");
         }
     }
 }

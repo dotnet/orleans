@@ -4,6 +4,7 @@ using System.Runtime.CompilerServices;
 [assembly: Xunit.CollectionBehavior(MaxParallelThreads = -1)]
 
 [assembly: InternalsVisibleTo("Tester.AzureUtils")]
+[assembly: InternalsVisibleTo("Tester.Cosmos")]
 [assembly: InternalsVisibleTo("Tester.AdoNet")]
 [assembly: InternalsVisibleTo("Tester.Redis")]
 [assembly: InternalsVisibleTo("AWSUtils.Tests")]

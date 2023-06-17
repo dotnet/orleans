@@ -1,11 +1,11 @@
+#nullable enable
 using System;
-using System.Collections.Generic;
-using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Core;
 using Orleans.Runtime;
+using Orleans.Serialization.TypeSystem;
 
 namespace Orleans
 {
@@ -29,18 +29,12 @@ namespace Orleans
         /// <summary>
         /// Gets an object which can be used to access other grains. Null if this grain is not associated with a Runtime, such as when created directly for unit testing.
         /// </summary>
-        protected IGrainFactory GrainFactory
-        {
-            get { return Runtime?.GrainFactory; }
-        }
+        protected IGrainFactory GrainFactory => Runtime.GrainFactory;
 
         /// <summary>
         /// Gets the IServiceProvider managed by the runtime. Null if this grain is not associated with a Runtime, such as when created directly for unit testing.
         /// </summary>
-        protected internal IServiceProvider ServiceProvider
-        {
-            get { return GrainContext?.ActivationServices ?? Runtime?.ServiceProvider; }
-        }
+        protected internal IServiceProvider ServiceProvider => GrainContext?.ActivationServices ?? Runtime?.ServiceProvider!;
 
         internal GrainId GrainId => GrainContext.GrainId;
 
@@ -56,25 +50,22 @@ namespace Orleans
         /// This constructor is particularly useful for unit testing where test code can create a Grain and replace
         /// the IGrainIdentity and IGrainRuntime with test doubles (mocks/stubs).
         /// </summary>
-        protected Grain(IGrainContext grainContext, IGrainRuntime grainRuntime = null)
+        protected Grain(IGrainContext grainContext, IGrainRuntime? grainRuntime = null)
         {
             GrainContext = grainContext;
-            Runtime = grainRuntime ?? grainContext?.ActivationServices.GetRequiredService<IGrainRuntime>();
+            Runtime = grainRuntime ?? grainContext?.ActivationServices.GetService<IGrainRuntime>()!;
         }
 
         /// <summary>
         /// String representation of grain's SiloIdentity including type and primary key.
         /// </summary>
-        public string IdentityString => this.GrainId.ToString();
+        public string IdentityString => GrainId.ToString();
 
         /// <summary>
         /// A unique identifier for the current silo.
         /// There is no semantic content to this string, but it may be useful for logging.
         /// </summary>
-        public string RuntimeIdentity
-        {
-            get { return Runtime?.SiloIdentity ?? string.Empty; }
-        }
+        public string RuntimeIdentity => Runtime?.SiloIdentity ?? string.Empty;
 
         /// <summary>
         /// Registers a timer to send periodic callbacks to this grain.
@@ -125,6 +116,17 @@ namespace Orleans
         }
 
         /// <summary>
+        /// Starts an attempt to migrating this instance to another location.
+        /// Migration captures the current <see cref="RequestContext"/>, making it available to the activation's placement director so that it can consider it when selecting a new location.
+        /// Migration will occur asynchronously, when no requests are executing, and will not occur if the activation's placement director does not select an alternative location.
+        /// </summary>
+        protected void MigrateOnIdle()
+        {
+            EnsureRuntime();
+            ((IGrainBase)this).MigrateOnIdle();
+        }
+
+        /// <summary>
         /// Delay Deactivation of this activation at least for the specified time duration.
         /// A positive <c>timeSpan</c> value means “prevent GC of this activation for that time span”.
         /// A negative <c>timeSpan</c> value means “cancel the previous setting of the DelayDeactivation call and make this activation behave based on the regular Activation Garbage Collection settings”.
@@ -165,12 +167,12 @@ namespace Orleans
     /// Base class for a Grain with declared persistent state.
     /// </summary>
     /// <typeparam name="TGrainState">The class of the persistent state object</typeparam>
-    public class Grain<TGrainState> : Grain, ILifecycleParticipant<IGrainLifecycle>
+    public class Grain<TGrainState> : Grain
     {
         /// <summary>
         /// The underlying state storage.
         /// </summary>
-        private IStorage<TGrainState> storage;
+        private IStorage<TGrainState>? _storage;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="Grain{TGrainState}"/> class.
@@ -181,6 +183,10 @@ namespace Orleans
         /// </remarks>
         protected Grain()
         {
+            var observer = new LifecycleObserver(this);
+            var lifecycle = RuntimeContext.Current.ObservableLifecycle;
+            lifecycle.AddMigrationParticipant(observer);
+            lifecycle.Subscribe(RuntimeTypeNameFormatter.Format(GetType()), GrainLifecycleStage.SetupState, observer);
         }
 
         /// <summary>
@@ -196,7 +202,7 @@ namespace Orleans
         /// </remarks>
         protected Grain(IStorage<TGrainState> storage)
         {
-            this.storage = storage;
+            _storage = storage;
         }
 
         /// <summary>
@@ -204,8 +210,8 @@ namespace Orleans
         /// </summary>
         protected TGrainState State
         {
-            get => storage.State;
-            set => storage.State = value;
+            get => _storage!.State;
+            set => _storage!.State = value;
         }
 
         /// <summary>
@@ -214,10 +220,7 @@ namespace Orleans
         /// <returns>
         /// A <see cref="Task"/> representing the operation.
         /// </returns>
-        protected virtual Task ClearStateAsync()
-        {
-            return storage.ClearStateAsync();
-        }
+        protected virtual Task ClearStateAsync() => _storage!.ClearStateAsync();
 
         /// <summary>
         /// Write the current grain state data into the backing store.
@@ -225,10 +228,7 @@ namespace Orleans
         /// <returns>
         /// A <see cref="Task"/> representing the operation.
         /// </returns>
-        protected virtual Task WriteStateAsync()
-        {
-            return storage.WriteStateAsync();
-        }
+        protected virtual Task WriteStateAsync() => _storage!.WriteStateAsync();
 
         /// <summary>
         /// Reads grain state from backing store, updating <see cref="State"/>.
@@ -239,23 +239,42 @@ namespace Orleans
         /// <returns>
         /// A <see cref="Task"/> representing the operation.
         /// </returns>
-        protected virtual Task ReadStateAsync()
-        {
-            return storage.ReadStateAsync();
-        }
+        protected virtual Task ReadStateAsync() => _storage!.ReadStateAsync();
 
-        /// <inheritdoc />
-        public virtual void Participate(IGrainLifecycle lifecycle)
+        private class LifecycleObserver : ILifecycleObserver, IGrainMigrationParticipant
         {
-            lifecycle.Subscribe(this.GetType().FullName, GrainLifecycleStage.SetupState, OnSetupState);
-        }
+            private readonly Grain<TGrainState> _grain;
 
-        private Task OnSetupState(CancellationToken ct)
-        {
-            if (ct.IsCancellationRequested)
-                return Task.CompletedTask;
-            this.storage = this.Runtime.GetStorage<TGrainState>(GrainContext);
-            return this.ReadStateAsync();
+            public LifecycleObserver(Grain<TGrainState> grain) => _grain = grain;
+
+            private void SetupStorage() => _grain._storage ??= _grain.Runtime.GetStorage<TGrainState>(_grain.GrainContext);
+
+            public void OnDehydrate(IDehydrationContext dehydrationContext) => (_grain._storage as IGrainMigrationParticipant)?.OnDehydrate(dehydrationContext);
+
+            public void OnRehydrate(IRehydrationContext rehydrationContext)
+            {
+                SetupStorage();
+                (_grain._storage as IGrainMigrationParticipant)?.OnRehydrate(rehydrationContext);
+            }
+
+            public Task OnStart(CancellationToken cancellationToken = default)
+            {
+                if (cancellationToken.IsCancellationRequested)
+                {
+                    return Task.CompletedTask;
+                }
+
+                // Avoid reading the state if it is already present because of rehydration
+                if (_grain._storage?.Etag is not null)
+                {
+                    return Task.CompletedTask;
+                }
+
+                SetupStorage();
+                return _grain.ReadStateAsync();
+            }
+
+            public Task OnStop(CancellationToken cancellationToken = default) => Task.CompletedTask;
         }
     }
 }

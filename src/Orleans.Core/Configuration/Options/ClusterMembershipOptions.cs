@@ -81,7 +81,7 @@ namespace Orleans.Configuration
         public int NumMissedProbesLimit { get; set; } = 3;
 
         /// <summary>
-        /// Gets or sets the number of non-expired votes that are needed to declare some silo as down (should be at most <see cref="NumMissedProbesLimit"/>)
+        /// Gets or sets the number of non-expired votes that are needed to declare some silo as down (should be at most <see cref="NumProbedSilos"/>)
         /// </summary>
         /// <value>Two votes are sufficient for a silo to be declared as down, by default.</value>
         public int NumVotesForDeathDeclaration { get; set; } = 2;

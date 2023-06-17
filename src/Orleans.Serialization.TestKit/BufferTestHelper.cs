@@ -20,6 +20,7 @@ namespace Orleans.Serialization.TestKit
             }
 
             result.Add(ActivatorUtilities.CreateInstance<StructBufferWriterTester>(serviceProvider));
+            result.Add(ActivatorUtilities.CreateInstance<PooledBufferWriterTester>(serviceProvider));
             return result.ToArray();
         }
 
@@ -89,6 +90,34 @@ namespace Orleans.Serialization.TestKit
             }
 
             public override string ToString() => $"{nameof(TestBufferWriterStruct)}";
+        }
+
+        private struct PooledOutputBuffer : IBufferWriter<byte>, IOutputBuffer, IDisposable
+        {
+            private PooledBuffer _buffer;
+
+            public PooledOutputBuffer()
+            {
+                _buffer = new();
+            }
+
+            public void Advance(int count) => _buffer.Advance(count);
+            public void Dispose() => _buffer.Dispose();
+            public Memory<byte> GetMemory(int sizeHint = 0) => _buffer.GetMemory(sizeHint);
+            public ReadOnlySequence<byte> GetReadOnlySequence(int maxSegmentSize) => _buffer.AsReadOnlySequence();
+            public Span<byte> GetSpan(int sizeHint = 0) => _buffer.GetSpan(sizeHint);
+        }
+
+        [ExcludeFromCodeCoverage]
+        private class PooledBufferWriterTester : BufferTester<PooledOutputBuffer>
+        {
+            public PooledBufferWriterTester(IServiceProvider serviceProvider) : base(serviceProvider)
+            {
+            }
+
+            protected override PooledOutputBuffer CreateBufferWriter() => new();
+
+            public override string ToString() => $"{nameof(PooledBufferWriterTester)}";
         }
     }
 }

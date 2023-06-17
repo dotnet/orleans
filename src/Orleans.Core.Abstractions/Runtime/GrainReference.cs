@@ -1,6 +1,5 @@
 using System;
 using System.Reflection;
-using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
 using Orleans.Serialization.Cloning;
 using Orleans.Serialization.Codecs;
@@ -10,7 +9,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Orleans.CodeGeneration;
 using System.Text;
 using System.Diagnostics;
-using Orleans.Serialization;
+using System.Collections.Generic;
 
 namespace Orleans.Runtime
 {
@@ -250,6 +249,7 @@ namespace Orleans.Runtime
     [DefaultInvokableBaseType(typeof(Task<>), typeof(TaskRequest<>))]
     [DefaultInvokableBaseType(typeof(Task), typeof(TaskRequest))]
     [DefaultInvokableBaseType(typeof(void), typeof(VoidRequest))]
+    [DefaultInvokableBaseType(typeof(IAsyncEnumerable<>), typeof(AsyncEnumerableRequest<>))]
     public class GrainReference : IAddressable, IEquatable<GrainReference>, ISpanFormattable
     {
         /// <summary>
@@ -407,10 +407,9 @@ namespace Orleans.Runtime
         /// <typeparam name="T">The underlying method return type.</typeparam>
         /// <param name="methodDescription">The method description.</param>
         /// <returns>The result of the invocation.</returns>
-        protected ValueTask<T> InvokeAsync<T>(IInvokable methodDescription)
+        protected ValueTask<T> InvokeAsync<T>(IRequest methodDescription)
         {
-            var request = (RequestBase)methodDescription;
-            return this.Runtime.InvokeMethodAsync<T>(this, methodDescription, request.Options);
+            return this.Runtime.InvokeMethodAsync<T>(this, methodDescription, methodDescription.Options);
         }
 
         /// <summary>
@@ -418,10 +417,98 @@ namespace Orleans.Runtime
         /// </summary>
         /// <param name="methodDescription">The method description.</param>
         /// <returns>A <see cref="ValueTask"/> representing the operation.</returns>
-        protected ValueTask InvokeAsync(IInvokable methodDescription)
+        protected ValueTask InvokeAsync(IRequest methodDescription)
         {
-            var request = (RequestBase)methodDescription;
-            return this.Runtime.InvokeMethodAsync(this, methodDescription, request.Options);
+            return this.Runtime.InvokeMethodAsync(this, methodDescription, methodDescription.Options);
+        }
+
+        /// <summary>
+        /// Invokes the provided method.
+        /// </summary>
+        /// <param name="methodDescription">The method description.</param>
+        protected void Invoke(IRequest methodDescription)
+        {
+            this.Runtime.InvokeMethod(this, methodDescription, methodDescription.Options);
+        }
+    }
+
+    /// <summary>
+    /// Represents a request to invoke a method on a grain.
+    /// </summary>
+    public interface IRequest : IInvokable
+    {
+        /// <summary>
+        /// Gets the invocation options.
+        /// </summary>
+        InvokeMethodOptions Options { get; }
+
+        /// <summary>
+        /// Incorporates the provided invocation options.
+        /// </summary>
+        /// <param name="options">
+        /// The options.
+        /// </param>
+        void AddInvokeMethodOptions(InvokeMethodOptions options);
+
+        /// <summary>
+        /// Returns a string representation of the request.
+        /// </summary>
+        /// <returns>A string representation of the request.</returns>
+        public static string ToString(IRequest request)
+        {
+            var result = new StringBuilder();
+            result.Append(request.GetInterfaceName());
+            if (request.GetTarget() is { } target)
+            {
+                result.Append("[(");
+                result.Append(request.GetInterfaceName());
+                result.Append(')');
+                result.Append(target.ToString());
+                result.Append(']');
+            }
+
+            result.Append('.');
+            result.Append(request.GetMethodName());
+            result.Append('(');
+            var argumentCount = request.GetArgumentCount();
+            for (var n = 0; n < argumentCount; n++)
+            {
+                if (n > 0)
+                {
+                    result.Append(", ");
+                }
+
+                result.Append(request.GetArgument(n));
+            }
+
+            result.Append(')');
+            return result.ToString();
+        }
+
+        /// <summary>
+        /// Returns a string representation of the request.
+        /// </summary>
+        /// <returns>A string representation of the request.</returns>
+        public static string ToMethodCallString(IRequest request)
+        {
+            var result = new StringBuilder();
+            result.Append(request.GetInterfaceName());
+            result.Append('.');
+            result.Append(request.GetMethodName());
+            result.Append('(');
+            var argumentCount = request.GetArgumentCount();
+            for (var n = 0; n < argumentCount; n++)
+            {
+                if (n > 0)
+                {
+                    result.Append(", ");
+                }
+
+                result.Append(request.GetArgument(n));
+            }
+
+            result.Append(')');
+            return result.ToString();
         }
     }
 
@@ -430,13 +517,13 @@ namespace Orleans.Runtime
     /// </summary>
     [SuppressReferenceTracking]
     [SerializerTransparent]
-    public abstract class RequestBase : IInvokable
+    public abstract class RequestBase : IRequest
     {
         /// <summary>
         /// Gets the invocation options.
         /// </summary>
         [field: NonSerialized]
-        public InvokeMethodOptions Options { get; private set; }
+        public InvokeMethodOptions Options { get; protected set; }
 
         /// <inheritdoc/>
         public virtual int GetArgumentCount() => 0;
@@ -487,40 +574,7 @@ namespace Orleans.Runtime
         public abstract MethodInfo GetMethod();
 
         /// <inheritdoc/>
-        public override string ToString()
-        {
-            var result = new StringBuilder();
-            result.Append(GetInterfaceName());
-            if (GetTarget() is { } target)
-            {
-                result.Append("[(");
-                result.Append(GetInterfaceName());
-                result.Append(')');
-                result.Append(target.ToString());
-                result.Append(']');
-            }
-            else
-            {
-                result.Append(GetInterfaceName());
-            }
-
-            result.Append('.');
-            result.Append(GetMethodName());
-            result.Append('(');
-            var argumentCount = GetArgumentCount();
-            for (var n = 0; n < argumentCount; n++)
-            {
-                if (n > 0)
-                {
-                    result.Append(", ");
-                }
-
-                result.Append(GetArgument(n));
-            }
-
-            result.Append(')');
-            return result.ToString();
-        }
+        public override string ToString() => IRequest.ToString(this);
     }
 
     /// <summary>
@@ -727,6 +781,12 @@ namespace Orleans.Runtime
     [SerializerTransparent]
     public abstract class VoidRequest : RequestBase
     {
+        protected VoidRequest()
+        {
+            // All void requests are inherently one-way.
+            Options = InvokeMethodOptions.OneWay;
+        }
+
         /// <inheritdoc/>
         [DebuggerHidden]
         public sealed override ValueTask<Response> Invoke()

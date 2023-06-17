@@ -1,29 +1,25 @@
-#if ORLEANS_CLUSTERING
-namespace Orleans.Clustering.AzureStorage
-#elif ORLEANS_PERSISTENCE
-namespace Orleans.Persistence.AzureStorage
-#elif ORLEANS_REMINDERS
-namespace Orleans.Reminders.AzureStorage
-#elif ORLEANS_STREAMING
-namespace Orleans.Streaming.AzureStorage
-#elif ORLEANS_EVENTHUBS
-namespace Orleans.Streaming.EventHubs
-#elif TESTER_AZUREUTILS
-namespace Orleans.Tests.AzureUtils
-#elif ORLEANS_TRANSACTIONS
-namespace Orleans.Transactions.AzureStorage
-#elif ORLEANS_DIRECTORY
-namespace Orleans.GrainDirectory.AzureStorage
-#else
-// No default namespace intentionally to cause compile errors if something is not defined
-#endif
+namespace Orleans.Clustering.AzureStorage;
+
+/// <summary>
+/// Specify options used for AzureTableBasedMembership
+/// </summary>
+public class AzureStorageClusteringOptions : AzureStorageOperationOptions
+{
+    public override string TableName { get; set; } = DEFAULT_TABLE_NAME;
+    public const string DEFAULT_TABLE_NAME = "OrleansSiloInstances";
+}
+
+/// <summary>
+/// Configuration validator for <see cref="AzureStorageClusteringOptions"/>.
+/// </summary>
+public class AzureStorageClusteringOptionsValidator : AzureStorageOperationOptionsValidator<AzureStorageClusteringOptions>
 {
     /// <summary>
-    /// Specify options used for AzureTableBasedMembership
+    /// Initializes a new instance of the <see cref="AzureStorageClusteringOptionsValidator"/> class.
     /// </summary>
-    public class AzureStorageClusteringOptions : AzureStorageOperationOptions
+    /// <param name="options">The option to be validated.</param>
+    /// <param name="name">The option name to be validated.</param>
+    public AzureStorageClusteringOptionsValidator(AzureStorageClusteringOptions options, string name) : base(options, name)
     {
-        public override string TableName { get; set; } = DEFAULT_TABLE_NAME;
-        public const string DEFAULT_TABLE_NAME = "OrleansSiloInstances";
     }
 }

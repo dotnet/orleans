@@ -3,7 +3,7 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
-using Orleans.Core.Internal;
+using Microsoft.Extensions.DependencyInjection;
 using Orleans.Runtime;
 
 namespace Orleans
@@ -11,7 +11,8 @@ namespace Orleans
     internal class ClientGrainContext : IGrainContext, IGrainExtensionBinder, IGrainContextAccessor
     {
         private readonly object _lockObj = new object();
-        private readonly ConcurrentDictionary<Type, (object Implementation, IAddressable Reference)> _extensions = new ConcurrentDictionary<Type, (object, IAddressable)>();
+        private readonly ConcurrentDictionary<Type, (object Implementation, IAddressable Reference)> _extensions = new();
+        private readonly ConcurrentDictionary<Type, object> _components = new();
         private readonly OutsideRuntimeClient _runtimeClient;
         private GrainReference _grainReference;
 
@@ -47,6 +48,23 @@ namespace Orleans
         public TComponent GetComponent<TComponent>() where TComponent : class
         {
             if (this is TComponent component) return component;
+            if (_components.TryGetValue(typeof(TComponent), out var result))
+            {
+                return (TComponent)result;
+            }
+            else if (typeof(TComponent) == typeof(PlacementStrategy))
+            {
+                return (TComponent)(object)ClientObserversPlacement.Instance;
+            }
+
+            lock (_lockObj)
+            {
+                if (ActivationServices.GetService<TComponent>() is { } activatedComponent)
+                {
+                    return (TComponent)_components.GetOrAdd(typeof(TComponent), activatedComponent);
+                }
+            }
+
             return default;
         }
 
@@ -58,7 +76,21 @@ namespace Orleans
 
         public void SetComponent<TComponent>(TComponent instance) where TComponent : class
         {
-            throw new NotSupportedException($"Cannot set components on shared client instance. Extension contract: {typeof(TComponent)}. Component: {instance} (Type: {instance?.GetType()})");
+            if (this is TComponent)
+            {
+                throw new ArgumentException("Cannot override a component which is implemented by the client context");
+            }
+
+            lock (_lockObj)
+            {
+                if (instance == null)
+                {
+                    _components.Remove(typeof(TComponent), out _);
+                    return;
+                }
+
+                _components[typeof(TComponent)] = instance;
+            }
         }
 
         public (TExtension, TExtensionInterface) GetOrSetExtension<TExtension, TExtensionInterface>(Func<TExtension> newExtensionFunc)
@@ -153,6 +185,18 @@ namespace Orleans
 
         public void Activate(Dictionary<string, object> requestContext, CancellationToken? cancellationToken = null) { }
         public void Deactivate(DeactivationReason deactivationReason, CancellationToken? cancellationToken = null) { }
+
+        public void Rehydrate(IRehydrationContext context)
+        {
+            // Migration is not supported, but we need to dispose of the context if it's provided
+            (context as IDisposable)?.Dispose();
+        }
+
+        public void Migrate(Dictionary<string, object> requestContext, CancellationToken? cancellationToken = null)
+        {
+            // Migration is not supported. Do nothing: the contract is that this method attempts migration, but does not guarantee it will occur.
+        }
+
         public Task Deactivated => Task.CompletedTask;
     }
 }

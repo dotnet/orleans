@@ -62,7 +62,7 @@ namespace Orleans.Serialization.Session
         /// <summary>
         /// Performs a full reset.
         /// </summary>
-        public void FullReset()
+        public void Reset()
         {
             ReferencedObjects.Reset();
             ReferencedTypes.Reset();

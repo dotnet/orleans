@@ -77,8 +77,16 @@ namespace Orleans.CodeGenerator
                 }
             }
 
+            string returnValueInitializerMethod = null;
+            if (baseClassType.GetAttribute(libraryTypes.ReturnValueProxyAttribute) is { ConstructorArguments: { Length: > 0 } attrArgs })
+            {
+                returnValueInitializerMethod = (string)attrArgs[0].Value;
+            }
+
             while (baseClassType.HasAttribute(libraryTypes.SerializerTransparentAttribute))
+            {
                 baseClassType = baseClassType.BaseType;
+            }
 
             var invokerDescription = new GeneratedInvokerDescription(
                 interfaceDescription,
@@ -89,7 +97,8 @@ namespace Orleans.CodeGenerator
                 serializationHooks,
                 baseClassType,
                 ctorArgs,
-                compoundTypeAliasArgs);
+                compoundTypeAliasArgs,
+                returnValueInitializerMethod);
             return (classDeclaration, invokerDescription);
 
             static Accessibility GetAccessibility(InvokableInterfaceDescription interfaceDescription)

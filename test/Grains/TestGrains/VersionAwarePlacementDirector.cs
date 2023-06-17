@@ -1,7 +1,5 @@
 using Orleans.Runtime;
 using Orleans.Runtime.Placement;
-using System;
-using System.Threading.Tasks;
 
 namespace UnitTests.Grains
 {

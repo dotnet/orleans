@@ -138,7 +138,15 @@ namespace Orleans.Serialization.TypeSystem
                     return result;
                 }
 
-                result = Assembly.Load(assemblyName);
+                try
+                {
+                    result = Assembly.Load(assemblyName);
+                }
+                catch(Exception ex)
+                {
+                    throw new TypeLoadException($"Unable to load {fullName} from assembly {fullAssemblyName}", ex);
+                }
+                
                 _assemblyCache[GetName(result)] = result;
                 _assemblyCache[result.FullName] = result;
 

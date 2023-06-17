@@ -14,7 +14,7 @@ namespace Orleans.Runtime.GrainDirectory
         public void AddOrUpdate(GrainAddress activationAddress, int version)
         {
             // ignore the version number
-            cache.Add(activationAddress.GrainId, (activationAddress, version));
+            cache.AddOrUpdate(activationAddress.GrainId, (activationAddress, version));
         }
 
         public bool Remove(GrainId key) => cache.RemoveKey(key);

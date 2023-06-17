@@ -55,7 +55,7 @@ namespace Orleans.Runtime.GrainDirectory
             return null;
         }
 
-        public Task<GrainAddress> Register(GrainAddress address) => throw new InvalidOperationException($"Cannot register client grain explicitly");
+        public Task<GrainAddress> Register(GrainAddress address, GrainAddress previousAddress) => throw new InvalidOperationException($"Cannot register client grain explicitly");
 
         public Task Unregister(GrainAddress address, UnregistrationCause cause) => throw new InvalidOperationException($"Cannot unregister client grain explicitly");
 

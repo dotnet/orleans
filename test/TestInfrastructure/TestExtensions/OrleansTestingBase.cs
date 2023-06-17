@@ -1,6 +1,3 @@
-using System;
-using Orleans.Internal;
-
 namespace TestExtensions
 {
     public abstract class OrleansTestingBase

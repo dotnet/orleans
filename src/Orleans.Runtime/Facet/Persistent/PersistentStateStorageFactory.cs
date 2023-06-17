@@ -4,6 +4,7 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Orleans.Core;
+using Orleans.Serialization.TypeSystem;
 using Orleans.Storage;
 
 #nullable enable
@@ -15,7 +16,6 @@ namespace Orleans.Runtime
     /// <seealso cref="Orleans.Runtime.IPersistentStateFactory" />
     public class PersistentStateFactory : IPersistentStateFactory
     {
-
         /// <inheritdoc/>
         public IPersistentState<TState> Create<TState>(IGrainContext context, IPersistentStateConfiguration cfg)
         {
@@ -26,10 +26,9 @@ namespace Orleans.Runtime
             {
                 ThrowMissingProviderException(context, cfg);
             }
-            string fullStateName = GetFullStateName(context, cfg);
-            var bridge = new PersistentStateBridge<TState>(fullStateName, context, storageProvider);
-            bridge.Participate(context.ObservableLifecycle);
-            return bridge;
+
+            var fullStateName = GetFullStateName(context, cfg);
+            return new PersistentState<TState>(fullStateName, context, storageProvider);
         }
 
         protected virtual string GetFullStateName(IGrainContext context, IPersistentStateConfiguration cfg)
@@ -52,59 +51,33 @@ namespace Orleans.Runtime
 
             throw new BadProviderConfigException(errMsg);
         }
+    }
 
-        private sealed class PersistentStateBridge<TState> : IPersistentState<TState>, ILifecycleParticipant<IGrainLifecycle>
+    internal sealed class PersistentState<TState> : StateStorageBridge<TState>, IPersistentState<TState>, ILifecycleObserver
+    {
+        public PersistentState(string stateName, IGrainContext context, IGrainStorage storageProvider) : base(stateName, context, storageProvider, context.ActivationServices.GetRequiredService<ILoggerFactory>())
         {
-            private readonly string stateName;
-            private readonly IGrainContext context;
-            private readonly IGrainStorage storageProvider;
-            private StateStorageBridge<TState> storage;
-
-            public PersistentStateBridge(string stateName, IGrainContext context, IGrainStorage storageProvider)
-            {
-                this.stateName = stateName;
-                this.context = context;
-                this.storageProvider = storageProvider;
-                storage = null!;
-            }
-
-            public TState State
-            {
-                get { return this.storage.State; }
-                set { this.storage.State = value; }
-            }
-
-            public string Etag => this.storage.Etag;
-
-            public bool RecordExists => this.storage.RecordExists;
-
-            public Task ClearStateAsync()
-            {
-                return this.storage.ClearStateAsync();
-            }
-
-            public Task ReadStateAsync()
-            {
-                return this.storage.ReadStateAsync();
-            }
-
-            public Task WriteStateAsync()
-            {
-                return this.storage.WriteStateAsync();
-            }
-
-            public void Participate(IGrainLifecycle lifecycle)
-            {
-                lifecycle.Subscribe(this.GetType().FullName, GrainLifecycleStage.SetupState, OnSetupState);
-            }
-
-            private Task OnSetupState(CancellationToken ct)
-            {
-                if (ct.IsCancellationRequested)
-                    return Task.CompletedTask;
-                storage = new(stateName, context.GrainId, storageProvider, context.ActivationServices.GetRequiredService<ILoggerFactory>());
-                return this.ReadStateAsync();
-            }
+            var lifecycle = context.ObservableLifecycle;
+            lifecycle.Subscribe(RuntimeTypeNameFormatter.Format(GetType()), GrainLifecycleStage.SetupState, this);
+            lifecycle.AddMigrationParticipant(this);
         }
+
+        public Task OnStart(CancellationToken cancellationToken = default) 
+        {
+            if (cancellationToken.IsCancellationRequested)
+            {
+                return Task.CompletedTask;
+            }
+
+            // No need to load state if it has been loaded already via rehydration.
+            if (IsStateInitialized)
+            {
+                return Task.CompletedTask;
+            }
+
+            return ReadStateAsync();
+        }
+
+        public Task OnStop(CancellationToken cancellationToken = default) => Task.CompletedTask;
     }
 }

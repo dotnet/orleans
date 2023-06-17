@@ -1,4 +1,5 @@
 using k8s;
+using k8s.Autorest;
 using k8s.Models;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -17,6 +18,31 @@ namespace Orleans.Hosting.Kubernetes
     /// </summary>
     public sealed class KubernetesClusterAgent : ILifecycleParticipant<ISiloLifecycle>
     {
+        private const string ExampleRoleBinding =
+            """
+            kind: Role
+            apiVersion: rbac.authorization.k8s.io/v1
+            metadata:
+              name: pod-updater
+            rules:
+            - apiGroups: [ "" ]
+              resources: ["pods"]
+              verbs: ["get", "watch", "list", "patch"]
+            ---
+            kind: RoleBinding
+            apiVersion: rbac.authorization.k8s.io/v1
+            metadata:
+              name: pod-updater-binding
+            subjects:
+            - kind: ServiceAccount
+              name: default
+              apiGroup: ''
+            roleRef:
+              kind: Role
+              name: pod-updater
+              apiGroup: ''
+            """;
+
         private readonly IOptionsMonitor<KubernetesHostingOptions> _options;
         private readonly ClusterOptions _clusterOptions;
         private readonly IClusterMembershipService _clusterMembershipService;
@@ -57,65 +83,119 @@ namespace Orleans.Hosting.Kubernetes
             lifecycle.Subscribe(
                 nameof(KubernetesClusterAgent),
                 ServiceLifecycleStage.AfterRuntimeGrainServices,
-                OnRuntimeInitializeStart,
-                OnRuntimeInitializeStop);
+                OnStart,
+                OnStop);
         }
 
-        private async Task OnRuntimeInitializeStart(CancellationToken cancellation)
+        private async Task OnStart(CancellationToken cancellation)
         {
-            // Find the currently known cluster members first, before interrogating Kubernetes
-            await _clusterMembershipService.Refresh();
-            var snapshot = _clusterMembershipService.CurrentSnapshot.Members;
-
-            // Find the pods which correspond to this cluster
-            var pods = await _client.ListNamespacedPodAsync(
-                namespaceParameter: _podNamespace,
-                labelSelector: _podLabelSelector,
-                cancellationToken: cancellation);
-            var clusterPods = new HashSet<string>();
-            clusterPods.Add(_podName);
-            foreach (var pod in pods.Items)
+            var attempts = 0;
+            while (!cancellation.IsCancellationRequested)
             {
-                clusterPods.Add(pod.Metadata.Name);
-            }
-
-            HashSet<string> known = new HashSet<string>();
-            var knownMap = new Dictionary<string, ClusterMember>();
-            known.Add(_podName);
-            foreach (var member in snapshot.Values)
-            {
-                if (member.Status == SiloStatus.Dead)
+                try
                 {
-                    continue;
+                    await AddClusterOptionsToPodLabels(cancellation);
+
+                    // Find the currently known cluster members first, before interrogating Kubernetes
+                    await _clusterMembershipService.Refresh();
+                    var snapshot = _clusterMembershipService.CurrentSnapshot.Members;
+
+                    // Find the pods which correspond to this cluster
+                    var pods = await _client.ListNamespacedPodAsync(
+                        namespaceParameter: _podNamespace,
+                        labelSelector: _podLabelSelector,
+                        cancellationToken: cancellation);
+                    var clusterPods = new HashSet<string> { _podName };
+                    foreach (var pod in pods.Items)
+                    {
+                        clusterPods.Add(pod.Metadata.Name);
+                    }
+
+                    var known = new HashSet<string>();
+                    var knownMap = new Dictionary<string, ClusterMember>();
+                    known.Add(_podName);
+                    foreach (var member in snapshot.Values)
+                    {
+                        if (member.Status == SiloStatus.Dead)
+                        {
+                            continue;
+                        }
+
+                        known.Add(member.Name);
+                        knownMap[member.Name] = member;
+                    }
+
+                    var unknownPods = new List<string>(clusterPods.Except(known));
+                    unknownPods.Sort();
+                    foreach (var pod in unknownPods)
+                    {
+                        _logger.LogWarning("Pod {PodName} does not correspond to any known silos", pod);
+
+                        // Delete the pod once it has been active long enough?
+                    }
+
+                    var unmatched = new List<string>(known.Except(clusterPods));
+                    unmatched.Sort();
+                    foreach (var pod in unmatched)
+                    {
+                        var siloAddress = knownMap[pod];
+                        if (siloAddress.Status is not SiloStatus.Active)
+                        {
+                            continue;
+                        }
+
+                        _logger.LogWarning("Silo {SiloAddress} does not correspond to any known pod. Marking it as dead.", siloAddress);
+                        await _clusterMembershipService.TryKill(siloAddress.SiloAddress);
+                    }
+
+                    break;
                 }
+                catch (HttpOperationException exception) when (exception.Response.StatusCode is System.Net.HttpStatusCode.Forbidden)
+                {
+                    _logger.LogError(exception, $"Unable to monitor pods due to insufficient permissions. Ensure that this pod has an appropriate Kubernetes role binding. Here is an example role binding:\n{ExampleRoleBinding}");
+                }
+                catch (Exception exception)
+                {
+                    _logger.LogError(exception, "Error while initializing Kubernetes cluster agent");
+                    if (++attempts > _options.CurrentValue.MaxKubernetesApiRetryAttempts)
+                    {
+                        throw;
+                    }
 
-                known.Add(member.Name);
-                knownMap[member.Name] = member;
-            }
-
-            var unknown = new List<string>(clusterPods.Except(known));
-            unknown.Sort();
-            foreach (var pod in unknown)
-            {
-                _logger.LogWarning("Pod {PodName} does not correspond to any known silos", pod);
-
-                // Delete the pod once it has been active long enough?
-            }
-
-            var unmatched = new List<string>(known.Except(clusterPods));
-            unmatched.Sort();
-            foreach (var pod in unmatched)
-            {
-                var siloAddress = knownMap[pod];
-                _logger.LogWarning("Silo {SiloAddress} does not correspond to any known pod. Marking it as dead.", siloAddress);
-                await _clusterMembershipService.TryKill(siloAddress.SiloAddress);
+                    await Task.Delay(1000, cancellation);
+                }
             }
 
             // Start monitoring loop
             ThreadPool.UnsafeQueueUserWorkItem(_ => _runTask = Task.WhenAll(Task.Run(MonitorOrleansClustering), Task.Run(MonitorKubernetesPods)), null);
         }
 
-        public async Task OnRuntimeInitializeStop(CancellationToken cancellationToken)
+        private async Task AddClusterOptionsToPodLabels(CancellationToken cancellation)
+        {
+            // Propagate our configured cluster membership options to our pod
+            var thisPod = await _client.ReadNamespacedPodAsync(_podName, namespaceParameter: _podNamespace, cancellationToken: cancellation);
+
+            var labels = thisPod.Labels();
+            if (labels is null
+                || !labels.TryGetValue(KubernetesHostingOptions.ServiceIdLabel, out var sidVal) || !string.Equals(_clusterOptions.ServiceId, sidVal, StringComparison.Ordinal)
+                || !labels.TryGetValue(KubernetesHostingOptions.ClusterIdLabel, out var cidVal) || !string.Equals(_clusterOptions.ClusterId, cidVal, StringComparison.Ordinal))
+            {
+                var patch =
+                    $$"""
+                    {
+                        "metadata": {
+                            "labels": {
+                                "{{KubernetesHostingOptions.ClusterIdLabel}}": "{{_clusterOptions.ClusterId}}",
+                                "{{KubernetesHostingOptions.ServiceIdLabel}}": "{{_clusterOptions.ServiceId}}"
+                            }
+                        }
+                    }
+                    """;
+                await _client.PatchNamespacedPodAsync(new V1Patch(patch, V1Patch.PatchType.MergePatch), _podName, _podNamespace, cancellationToken: cancellation);
+            }
+        }
+
+        public async Task OnStop(CancellationToken cancellationToken)
         {
             _shutdownToken.Cancel();
             _enableMonitoring = false;
@@ -188,7 +268,11 @@ namespace Orleans.Hosting.Kubernetes
                 }
                 catch (Exception exception) when (!(_shutdownToken.IsCancellationRequested && (exception is TaskCanceledException || exception is OperationCanceledException)))
                 {
-                    _logger.LogError(exception, "Error monitoring cluster changes");
+                    if (_logger.IsEnabled(LogLevel.Debug))
+                    {
+                        _logger.LogDebug(exception, "Error while monitoring cluster changes");
+                    }
+
                     if (!_shutdownToken.IsCancellationRequested)
                     {
                         await Task.Delay(5000);
@@ -205,7 +289,7 @@ namespace Orleans.Hosting.Kubernetes
                 {
                     if (!_enableMonitoring)
                     {
-                        // Pulse the semaphore to avoid spinning in a tight loop.
+                        // Wait on the semaphore to avoid spinning in a tight loop.
                         await _pauseMonitoringSemaphore.WaitAsync();
                         continue;
                     }
@@ -236,7 +320,7 @@ namespace Orleans.Hosting.Kubernetes
 
                         if (eventType == WatchEventType.Modified)
                         {
-                            // TODO: Remember silo addresses for pods are restarting/terminating
+                            // TODO: Remember silo addresses for pods that are restarting/terminating
                         }
 
                         if (eventType == WatchEventType.Deleted)

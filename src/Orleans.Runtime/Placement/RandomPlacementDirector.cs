@@ -1,6 +1,5 @@
 using System;
 using System.Threading.Tasks;
-using Orleans.Internal;
 
 namespace Orleans.Runtime.Placement
 {
@@ -9,8 +8,15 @@ namespace Orleans.Runtime.Placement
         public virtual Task<SiloAddress> OnAddActivation(
             PlacementStrategy strategy, PlacementTarget target, IPlacementContext context)
         {
-            var allSilos = context.GetCompatibleSilos(target);
-            return Task.FromResult(allSilos[Random.Shared.Next(allSilos.Length)]);
+            var compatibleSilos = context.GetCompatibleSilos(target);
+
+            // If a valid placement hint was specified, use it.
+            if (IPlacementDirector.GetPlacementHint(target.RequestContextData, compatibleSilos) is { } placementHint)
+            {
+                return Task.FromResult(placementHint);
+            }
+
+            return Task.FromResult(compatibleSilos[Random.Shared.Next(compatibleSilos.Length)]);
         }
     }
 }

@@ -149,23 +149,17 @@ namespace Orleans.Runtime
                 sharedData = this.sharedCallbackData;
             }
 
-            var oneWay = (options & InvokeMethodOptions.OneWay) != 0;
-            if (context is null && !oneWay)
-            {
-                this.logger.LogWarning(
-                    (int)ErrorCode.IGC_SendRequest_NullContext,
-                    "Null context {Message}: {StackTrace}",
-                    message,
-                    Utils.GetStackTrace());
-            }
-
             if (message.IsExpirableMessage(this.messagingOptions.DropExpiredMessages))
             {
                 message.TimeToLive = sharedData.ResponseTimeout;
             }
 
+            var oneWay = (options & InvokeMethodOptions.OneWay) != 0;
             if (!oneWay)
             {
+                Debug.Assert(context is not null);
+
+                // Register a callback for the request.
                 var callbackData = new CallbackData(sharedData, context, message);
                 callbacks.TryAdd((message.SendingGrain, message.Id), callbackData);
             }

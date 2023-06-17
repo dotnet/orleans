@@ -97,12 +97,12 @@ namespace Orleans.Transactions
             }
 
             await stateStorage.WriteStateAsync();
-            return stateStorage.Etag;
+            return stateStorage.Etag!;
         }
 
         private StateStorageBridge<TransactionalStateRecord<TState>> GetStateStorage()
         {
-            return new(this.stateName, context.GrainId, grainStorage, loggerFactory);
+            return new(this.stateName, context, grainStorage, loggerFactory);
         }
     }
 

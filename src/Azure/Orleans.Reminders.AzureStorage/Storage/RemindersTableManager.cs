@@ -175,7 +175,8 @@ namespace Orleans.Runtime.ReminderService
             {
                 await DeleteTableEntryAsync(reminderEntry, eTag);
                 return true;
-            }catch(Exception exc)
+            }
+            catch(Exception exc)
             {
                 HttpStatusCode httpStatusCode;
                 string restStatus;

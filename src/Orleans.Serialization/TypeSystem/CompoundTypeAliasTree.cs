@@ -91,7 +91,7 @@ public class CompoundTypeAliasTree
 
         if (_children.TryGetValue(key, out var existing))
         {
-            if (value is not null && existing.Value is not null)
+            if (value is not null && existing.Value is { } type && type != value)
             {
                 throw new ArgumentException("A key with this value already exists");
             }

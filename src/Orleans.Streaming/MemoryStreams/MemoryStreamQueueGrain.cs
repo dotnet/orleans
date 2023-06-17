@@ -1,7 +1,8 @@
-﻿
+
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using Orleans.Runtime;
 
 namespace Orleans.Providers
 {
@@ -9,15 +10,15 @@ namespace Orleans.Providers
     /// Memory stream queue grain. This grain works as a storage queue of event data. Enqueue and Dequeue operations are supported.
     /// the max event count sets the max storage limit to the queue.
     /// </summary>
-    public class MemoryStreamQueueGrain : Grain, IMemoryStreamQueueGrain
+    public class MemoryStreamQueueGrain : Grain, IMemoryStreamQueueGrain, IGrainMigrationParticipant
     {
-        private readonly Queue<MemoryMessageData> eventQueue = new Queue<MemoryMessageData>();
+        private Queue<MemoryMessageData> _eventQueue = new Queue<MemoryMessageData>();
         private long sequenceNumber = DateTime.UtcNow.Ticks;
 
         /// <summary>
-        /// max event count. 
+        /// The maximum event count. 
         /// </summary>
-        private int maxEventCount = 16384;
+        private const int MaxEventCount = 16384;
 
         /// <summary>
         /// Enqueues an event data. If the current total count reaches the max limit. throws an exception.
@@ -26,12 +27,12 @@ namespace Orleans.Providers
         /// <returns></returns>
         public Task Enqueue(MemoryMessageData data)
         {
-            if (eventQueue.Count >= maxEventCount)
+            if (_eventQueue.Count >= MaxEventCount)
             {
-                throw new InvalidOperationException($"Can not enqueue since the count has reached its maximum of {maxEventCount}");
+                throw new InvalidOperationException($"Can not enqueue since the count has reached its maximum of {MaxEventCount}");
             }
             data.SequenceNumber = sequenceNumber++;
-            eventQueue.Enqueue(data);
+            _eventQueue.Enqueue(data);
             return Task.CompletedTask;
         }
 
@@ -44,12 +45,25 @@ namespace Orleans.Providers
         {
             List<MemoryMessageData> list = new List<MemoryMessageData>();
 
-            for (int i = 0; i < maxCount && eventQueue.Count > 0; ++i)
+            for (int i = 0; i < maxCount && _eventQueue.Count > 0; ++i)
             {
-                list.Add(eventQueue.Dequeue());
+                list.Add(_eventQueue.Dequeue());
             }
 
             return Task.FromResult(list);
+        }
+
+        void IGrainMigrationParticipant.OnDehydrate(IDehydrationContext dehydrationContext)
+        {
+            dehydrationContext.TryAddValue("queue", _eventQueue);
+        }
+
+        void IGrainMigrationParticipant.OnRehydrate(IRehydrationContext rehydrationContext)
+        {
+            if (rehydrationContext.TryGetValue("queue", out Queue<MemoryMessageData> value))
+            {
+                _eventQueue = value;
+            }
         }
     }
 }

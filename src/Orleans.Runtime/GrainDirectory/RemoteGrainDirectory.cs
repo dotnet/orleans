@@ -22,17 +22,19 @@ namespace Orleans.Runtime.GrainDirectory
             logger = loggerFactory.CreateLogger($"{typeof(RemoteGrainDirectory).FullName}.CacheValidator");
         }
 
-        public Task<AddressAndTag> RegisterAsync(GrainAddress address, int hopCount)
+        public Task<AddressAndTag> RegisterAsync(GrainAddress address, GrainAddress? previousAddress, int hopCount)
         {
             DirectoryInstruments.RegistrationsSingleActRemoteReceived.Add(1);
 
-            return router.RegisterAsync(address, hopCount);
+            return router.RegisterAsync(address, previousAddress, hopCount);
         }
 
         public Task RegisterMany(List<GrainAddress> addresses)
         {
             if (addresses == null || addresses.Count == 0)
-                throw new ArgumentException("addresses cannot be an empty list or null");
+            {
+                throw new ArgumentException("Addresses cannot be an empty list or null");
+            }
 
             // validate that this request arrived correctly
             //logger.Assert(ErrorCode.Runtime_Error_100140, silo.Matches(router.MyAddress), "destination address != my address");
@@ -40,7 +42,7 @@ namespace Orleans.Runtime.GrainDirectory
             if (logger.IsEnabled(LogLevel.Trace)) logger.LogTrace("RegisterMany Count={Count}", addresses.Count);
 
 
-            return Task.WhenAll(addresses.Select(addr => router.RegisterAsync(addr, 1)));
+            return Task.WhenAll(addresses.Select(addr => router.RegisterAsync(addr, previousAddress: null, 1)));
         }
 
         public Task UnregisterAsync(GrainAddress address, UnregistrationCause cause, int hopCount)

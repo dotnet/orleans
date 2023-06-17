@@ -94,7 +94,7 @@ namespace Orleans.Metadata
         /// <summary>
         /// Gets all bindings.
         /// </summary>
-        /// <returns>The colleciton of all grain bindings.</returns>
+        /// <returns>The collection of all grain bindings.</returns>
         public (MajorMinorVersion Version, ImmutableDictionary<GrainType, GrainBindings> Bindings) GetAllBindings()
         {
             var cache = GetCache();

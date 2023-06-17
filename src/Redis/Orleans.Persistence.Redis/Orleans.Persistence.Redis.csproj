@@ -6,7 +6,6 @@
     <Description>Microsoft Orleans Persistence implementation that uses Redis</Description>
     <PackageTags>$(PackageTags) Redis Persistence</PackageTags>
     <TargetFrameworks>$(DefaultTargetFrameworks)</TargetFrameworks>
-    <VersionSuffix Condition="$(VersionSuffix) == ''">beta1</VersionSuffix>
     <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
   </PropertyGroup>
 

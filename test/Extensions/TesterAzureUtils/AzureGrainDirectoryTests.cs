@@ -60,7 +60,7 @@ namespace Tester.AzureUtils
                     MembershipVersion = new MembershipVersion(51)
                 };
                 addresses.Add(addr);
-                await this.grainDirectory.Register(addr);
+                await this.grainDirectory.Register(addr, previousAddress: null);
             }
 
             // Modify the Rth entry locally, to simulate another activation tentative by another silo

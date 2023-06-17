@@ -1,5 +1,7 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
+using System.Net.NetworkInformation;
 using System.Text;
 using System.Text.Json;
 using System.Threading;
@@ -14,45 +16,34 @@ namespace Orleans.GrainDirectory.Redis
 {
     public class RedisGrainDirectory : IGrainDirectory, ILifecycleParticipant<ISiloLifecycle>
     {
-        private const string DeleteScript =
-            """
-            local cur = redis.call('GET', KEYS[1]) 
-            if cur ~= false then
-                local typedCur = cjson.decode(cur)
-                if typedCur.ActivationId == ARGV[1] then
-                    return redis.call('DEL', KEYS[1])
-                end
-            end
-            return 0
-            """;
-
-        private readonly RedisGrainDirectoryOptions directoryOptions;
-        private readonly ClusterOptions clusterOptions;
-        private readonly ILogger<RedisGrainDirectory> logger;
+        private readonly RedisGrainDirectoryOptions _directoryOptions;
+        private readonly ClusterOptions _clusterOptions;
+        private readonly ILogger<RedisGrainDirectory> _logger;
         private readonly RedisKey _keyPrefix;
-
-        private IConnectionMultiplexer redis;
-        private IDatabase database;
+        private readonly string _ttl;
+        private IConnectionMultiplexer _redis;
+        private IDatabase _database;
 
         public RedisGrainDirectory(
             RedisGrainDirectoryOptions directoryOptions,
             IOptions<ClusterOptions> clusterOptions,
             ILogger<RedisGrainDirectory> logger)
         {
-            this.directoryOptions = directoryOptions;
-            this.logger = logger;
-            this.clusterOptions = clusterOptions.Value;
-            _keyPrefix = Encoding.UTF8.GetBytes($"{this.clusterOptions.ClusterId}/directory/");
+            _directoryOptions = directoryOptions;
+            _logger = logger;
+            _clusterOptions = clusterOptions.Value;
+            _keyPrefix = Encoding.UTF8.GetBytes($"{_clusterOptions.ClusterId}/directory/");
+            _ttl = directoryOptions.EntryExpiry is { } ts ? ts.TotalSeconds.ToString(CultureInfo.InvariantCulture) : "-1";
         }
 
         public async Task<GrainAddress> Lookup(GrainId grainId)
         {
             try
             {
-                var result = (string)await this.database.StringGetAsync(GetKey(grainId));
+                var result = (string)await _database.StringGetAsync(GetKey(grainId));
 
-                if (this.logger.IsEnabled(LogLevel.Debug))
-                    this.logger.LogDebug("Lookup {GrainId}: {Result}", grainId, string.IsNullOrWhiteSpace(result) ? "null" : result);
+                if (_logger.IsEnabled(LogLevel.Debug))
+                    _logger.LogDebug("Lookup {GrainId}: {Result}", grainId, string.IsNullOrWhiteSpace(result) ? "null" : result);
 
                 if (string.IsNullOrWhiteSpace(result))
                     return default;
@@ -61,66 +52,118 @@ namespace Orleans.GrainDirectory.Redis
             }
             catch (Exception ex)
             {
-                this.logger.LogError(ex, "Lookup failed for {GrainId}", grainId);
+                _logger.LogError(ex, "Lookup failed for {GrainId}", grainId);
 
                 if (IsRedisException(ex))
-                    throw new OrleansException($"Lookup failed for {grainId} : {ex.ToString()}");
+                    throw new OrleansException($"Lookup failed for {grainId} : {ex}");
                 else
                     throw;
             }
         }
 
-        public async Task<GrainAddress> Register(GrainAddress address)
+        public Task<GrainAddress> Register(GrainAddress address) => Register(address, null);
+        
+        public async Task<GrainAddress> Register(GrainAddress address, GrainAddress previousAddress)
         {
-            var value = JsonSerializer.Serialize(address);
+            const string RegisterScript =
+                """
+                local cur = redis.call('GET', KEYS[1]) 
+                local success = true
+                if cur ~= false then
+                    local typedCur = cjson.decode(cur)
+                    if typedCur.ActivationId ~= ARGV[2] then
+                       success = false
+                    end
+                end
 
+                if (success) then
+                    redis.call('SET', KEYS[1], ARGV[1])
+                    if ARGV[3] ~= '-1' then
+                        redis.call('EXPIRE', KEYS[1], ARGV[3])
+                    end 
+                    return nil
+                end
+
+                return cur
+                """;
+
+            var value = JsonSerializer.Serialize(address);
             try
             {
-                var success = await this.database.StringSetAsync(
-                    this.GetKey(address.GrainId),
-                    value,
-                    this.directoryOptions.EntryExpiry,
-                    When.NotExists);
+                var previousActivationId = previousAddress is { } ? previousAddress.ActivationId.ToString() : "";
+                var key = GetKey(address.GrainId);
+                var entryString = (string)await _database.ScriptEvaluateAsync(
+                    RegisterScript,
+                    keys: new RedisKey[] { key },
+                    values: new RedisValue[] { value, previousActivationId, _ttl });
 
-                if (this.logger.IsEnabled(LogLevel.Debug))
-                    this.logger.LogDebug("Register {GrainId} ({Address}): {Result}", address.GrainId, value, success ? "OK" : "Conflict");
+                if (entryString is null)
+                {
+                    if (_logger.IsEnabled(LogLevel.Debug))
+                    {
+                        _logger.LogDebug("Registered {GrainId} ({Address})", address.GrainId, value);
+                    }
 
-                if (success)
                     return address;
+                }
 
-                return await Lookup(address.GrainId);
+                if (_logger.IsEnabled(LogLevel.Debug))
+                {
+                    _logger.LogDebug("Failed to register {GrainId} ({Address}) in directory: Conflicted with existing value, {Result}", address.GrainId, value, entryString);
+                }
+
+                return JsonSerializer.Deserialize<GrainAddress>(entryString);
             }
             catch (Exception ex)
             {
-                this.logger.LogError(ex, "Register failed for {GrainId} ({Address})", address.GrainId, value);
+                _logger.LogError(ex, "Failed to register {GrainId} ({Address}) in directory", address.GrainId, value);
 
                 if (IsRedisException(ex))
-                    throw new OrleansException($"Register failed for {address.GrainId} ({value}) : {ex.ToString()}");
+                {
+                    throw new OrleansException($"Register failed for {address.GrainId} ({value}) : {ex}");
+                }
                 else
+                {
                     throw;
+                }
             }
         }
 
         public async Task Unregister(GrainAddress address)
         {
+            const string DeleteScript =
+                """
+                local cur = redis.call('GET', KEYS[1]) 
+                if cur ~= false then
+                    local typedCur = cjson.decode(cur)
+                    if typedCur.ActivationId == ARGV[1] then
+                        return redis.call('DEL', KEYS[1])
+                    end
+                end
+                return 0
+                """;
+
             try
             {
-                var result = (int) await this.database.ScriptEvaluateAsync(
+                var value = JsonSerializer.Serialize(address);
+                var result = (int) await _database.ScriptEvaluateAsync(
                     DeleteScript,
                     keys: new RedisKey[] { GetKey(address.GrainId) },
-                    values: new RedisValue[] { address.ActivationId.ToParsableString() });
+                    values: new RedisValue[] { address.ActivationId.ToString() });
 
-                if (this.logger.IsEnabled(LogLevel.Debug))
-                    this.logger.LogDebug("Unregister {GrainId} ({Address}): {Result}", address.GrainId, JsonSerializer.Serialize(address), (result != 0) ? "OK" : "Conflict");
+                if (_logger.IsEnabled(LogLevel.Debug))
+                {
+                    _logger.LogDebug("Unregister {GrainId} ({Address}): {Result}", address.GrainId, JsonSerializer.Serialize(address), (result != 0) ? "OK" : "Conflict");
+                }
             }
             catch (Exception ex)
             {
                 var value = JsonSerializer.Serialize(address);
 
-                this.logger.LogError(ex, "Unregister failed for {GrainId} ({Address})", address.GrainId, value);
+                _logger.LogError(ex, "Unregister failed for {GrainId} ({Address})", address.GrainId, value);
 
                 if (IsRedisException(ex))
-                    throw new OrleansException($"Unregister failed for {address.GrainId} ({value}) : {ex.ToString()}");
+                    throw new OrleansException($"Unregister failed for {address.GrainId} ({value}) : {ex}");
                 else
                     throw;
             }
@@ -138,25 +181,25 @@ namespace Orleans.GrainDirectory.Redis
 
         public async Task Initialize(CancellationToken ct = default)
         {
-            this.redis = await directoryOptions.CreateMultiplexer(directoryOptions);
+            _redis = await _directoryOptions.CreateMultiplexer(_directoryOptions);
 
             // Configure logging
-            this.redis.ConnectionRestored += this.LogConnectionRestored;
-            this.redis.ConnectionFailed += this.LogConnectionFailed;
-            this.redis.ErrorMessage += this.LogErrorMessage;
-            this.redis.InternalError += this.LogInternalError;
+            _redis.ConnectionRestored += LogConnectionRestored;
+            _redis.ConnectionFailed += LogConnectionFailed;
+            _redis.ErrorMessage += LogErrorMessage;
+            _redis.InternalError += LogInternalError;
 
-            this.database = this.redis.GetDatabase();
+            _database = _redis.GetDatabase();
         }
 
         private async Task Uninitialize(CancellationToken arg)
         {
-            if (this.redis != null && this.redis.IsConnected)
+            if (_redis != null && _redis.IsConnected)
             {
-                await this.redis.CloseAsync();
-                this.redis.Dispose();
-                this.redis = null;
-                this.database = null;
+                await _redis.CloseAsync();
+                _redis.Dispose();
+                _redis = null;
+                _database = null;
             }
         }
 
@@ -164,16 +207,16 @@ namespace Orleans.GrainDirectory.Redis
 
         #region Logging
         private void LogConnectionRestored(object sender, ConnectionFailedEventArgs e)
-            => this.logger.LogInformation(e.Exception, "Connection to {EndPoint} failed: {FailureType}", e.EndPoint, e.FailureType);
+            => _logger.LogInformation(e.Exception, "Connection to {EndPoint} failed: {FailureType}", e.EndPoint, e.FailureType);
 
         private void LogConnectionFailed(object sender, ConnectionFailedEventArgs e)
-            => this.logger.LogError(e.Exception, "Connection to {EndPoint} failed: {FailureType}", e.EndPoint, e.FailureType);
+            => _logger.LogError(e.Exception, "Connection to {EndPoint} failed: {FailureType}", e.EndPoint, e.FailureType);
 
         private void LogErrorMessage(object sender, RedisErrorEventArgs e)
-            => this.logger.LogError(e.Message);
+            => _logger.LogError(e.Message);
 
         private void LogInternalError(object sender, InternalErrorEventArgs e)
-            => this.logger.LogError(e.Exception, "Internal error");
+            => _logger.LogError(e.Exception, "Internal error");
         #endregion
 
         // These exceptions are not serializable by the client

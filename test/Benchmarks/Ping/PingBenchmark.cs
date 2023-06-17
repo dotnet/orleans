@@ -1,18 +1,10 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Net;
-using System.Threading;
-using System.Threading.Tasks;
 using BenchmarkDotNet.Attributes;
 using BenchmarkGrainInterfaces.Ping;
 using BenchmarkGrains.Ping;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
-using Orleans;
 using Orleans.Configuration;
-using Orleans.Hosting;
-using Orleans.Runtime;
 
 namespace Benchmarks.Ping
 {
@@ -139,15 +131,28 @@ namespace Benchmarks.Ping
             if (clientHost is { } client)
             {
                 await client.StopAsync();
-                if (client is IAsyncDisposable asyncDisposable) await asyncDisposable.DisposeAsync();
-                else client.Dispose();
+                if (client is IAsyncDisposable asyncDisposable)
+                {
+                    await asyncDisposable.DisposeAsync();
+                }
+                else
+                {
+                    client.Dispose();
+                }
             }
 
             this.hosts.Reverse();
             foreach (var host in this.hosts)
             {
                 await host.StopAsync();
-                host.Dispose();
+                if (host is IAsyncDisposable asyncDisposable)
+                {
+                    await asyncDisposable.DisposeAsync();
+                }
+                else
+                {
+                    host.Dispose();
+                }
             }
         }
 

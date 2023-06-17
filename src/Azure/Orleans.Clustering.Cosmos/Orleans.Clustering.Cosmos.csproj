@@ -1,0 +1,34 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <PackageId>Microsoft.Orleans.Clustering.Cosmos</PackageId>
+    <Title>Microsoft Orleans clustering provider for Azure Cosmos DB</Title>
+    <Description>Microsoft Orleans clustering provider backed by Azure Cosmos DB</Description>
+    <PackageTags>$(PackageTags) Azure Cosmos DB</PackageTags>
+    <TargetFrameworks>$(DefaultTargetFrameworks)</TargetFrameworks>
+    <AssemblyName>Orleans.Clustering.Cosmos</AssemblyName>
+    <RootNamespace>Orleans.Clustering.Cosmos</RootNamespace>
+    <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
+    <DefineConstants>$(DefineConstants);ORLEANS_CLUSTERING</DefineConstants>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="..\Shared\Cosmos\CosmosOptions.cs" Link="Storage\CosmosOptions.cs" />
+    <Compile Include="..\Shared\Cosmos\CosmosOptionsValidator.cs" Link="Storage\CosmosOptionsValidator.cs" />
+    <Compile Include="..\Shared\Cosmos\BaseEntity.cs" Link="Storage\BaseEntity.cs" />
+    <Compile Include="..\Shared\Cosmos\Usings.cs" Link="Storage\Usings.cs" />
+    <Compile Include="..\Shared\Cosmos\CosmosIdSanitizer.cs" Link="Storage\CosmosIdSanitizer.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="$(SourceRoot)src\Orleans.Runtime\Orleans.Runtime.csproj" />
+    <PackageReference Include="Azure.Core" />
+    <PackageReference Include="Microsoft.Azure.Cosmos" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleToAttribute">
+      <_Parameter1>Tester.Cosmos</_Parameter1>
+    </AssemblyAttribute>
+  </ItemGroup>
+</Project>

@@ -26,7 +26,7 @@ namespace Orleans.Runtime
         internal const string CALL_CHAIN_REENTRANCY_HEADER = "#CCR";
         internal const string PING_APPLICATION_HEADER = "Ping";
 
-        internal static readonly AsyncLocal<ContextProperties> CallContextData = new AsyncLocal<ContextProperties>();
+        internal static readonly AsyncLocal<ContextProperties> CallContextData = new();
 
         public static Guid ReentrancyId
         {

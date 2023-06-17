@@ -92,7 +92,7 @@ namespace Orleans.Serialization.Buffers
         /// <param name="session">The session.</param>
         /// <returns>A new <see cref="Writer{TBufferWriter}"/>.</returns>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static Writer<PooledArrayBufferWriter> CreatePooled(SerializerSession session) => new(new PooledArrayBufferWriter(), session);
+        public static Writer<PooledBuffer> CreatePooled(SerializerSession session) => new(new PooledBuffer(), session);
     }
 
     /// <summary>

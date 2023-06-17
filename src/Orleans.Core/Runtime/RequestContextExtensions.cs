@@ -7,7 +7,7 @@ using Orleans.Serialization;
 namespace Orleans.Runtime
 {
     /// <summary>
-    /// Extensions for working wiht <see cref="RequestContext"/>.
+    /// Extensions for working with <see cref="RequestContext"/>.
     /// </summary>
     public static class RequestContextExtensions
     {

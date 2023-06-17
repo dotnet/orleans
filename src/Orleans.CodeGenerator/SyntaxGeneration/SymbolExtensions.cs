@@ -452,6 +452,45 @@ namespace Orleans.CodeGenerator.SyntaxGeneration
             }
         }
 
+        public static bool IsAssignableFrom(this INamedTypeSymbol symbol, INamedTypeSymbol type)
+        {
+            if (symbol.TypeKind == TypeKind.Interface)
+            {
+                return IsInterfaceAssignableFromInternal(symbol, type);
+            }
+
+            return IsBaseAssignableFromInternal(symbol, type);
+        }
+
+        private static bool IsBaseAssignableFromInternal(this INamedTypeSymbol symbol, INamedTypeSymbol? type)
+        {
+            if (type is null) return false;
+            if (SymbolEqualityComparer.Default.Equals(symbol, type))
+            {
+                return true;
+            }
+
+            return IsBaseAssignableFromInternal(symbol, type.BaseType);
+        }
+
+        private static bool IsInterfaceAssignableFromInternal(this INamedTypeSymbol iface, INamedTypeSymbol type)
+        {
+            if (SymbolEqualityComparer.Default.Equals(iface, type))
+            {
+                return true;
+            }
+
+            foreach (var typeInterface in type.AllInterfaces)
+            {
+                if (SymbolEqualityComparer.Default.Equals(iface, typeInterface))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
         public static IEnumerable<INamedTypeSymbol> GetDeclaredTypes(this IAssemblySymbol reference)
         {
             foreach (var module in reference.Modules)
