@@ -131,7 +131,7 @@ namespace Orleans.CodeGenerator
             }
         }
 
-        private MetadataModel GenerateMetadataModel(CancellationToken cancellationToken)
+        internal MetadataModel GenerateMetadataModel(CancellationToken cancellationToken)
         {
             var metadataModel = new MetadataModel();
             var referencedAssemblies = new HashSet<IAssemblySymbol>(SymbolEqualityComparer.Default);
