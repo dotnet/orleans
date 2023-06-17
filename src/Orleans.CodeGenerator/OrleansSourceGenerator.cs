@@ -1,17 +1,15 @@
 using System;
 using System.Diagnostics;
 using System.Linq;
-using System.Text;
 using System.Threading;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.Diagnostics;
-using Microsoft.CodeAnalysis.Text;
 using Orleans.CodeGenerator.Diagnostics;
 
 namespace Orleans.CodeGenerator
 {
     [Generator]
-    public class OrleansSerializationSourceGenerator : IIncrementalGenerator
+    public sealed partial class OrleansSerializationSourceGenerator : IIncrementalGenerator
     {
 
         public void Initialize(IncrementalGeneratorInitializationContext context)
@@ -22,9 +20,26 @@ namespace Orleans.CodeGenerator
                 return;
             }
 
-            var codeGeneratorOptions = context.AnalyzerConfigOptionsProvider.Select(GetCodeGeneratorOptions);
+            var contextGenerationSpecs = context.AnalyzerConfigOptionsProvider
+                .Select(GetCodeGeneratorOptions)
+                .Combine(context.CompilationProvider)
+                .Combine(context.AnalyzerConfigOptionsProvider)
+                .Select(static (tuple, _) =>
+                {
+                    var codeGenerator = new CodeGenerator(tuple.Left.Right, tuple.Left.Left);
+                    return new ContextGenerationSpecs()
+                    {
+                        LibraryTypes = codeGenerator.LibraryTypes,
+                        Compilation = tuple.Left.Right,
+                        AnalyzerConfigOptionsProvider = tuple.Right,
+                        CodeGeneratorOptions = tuple.Left.Left,
+                        MetadataModel = codeGenerator.GenerateMetadataModel(_)
 
-            context.RegisterSourceOutput(codeGeneratorOptions.Combine(context.AnalyzerConfigOptionsProvider).Combine(context.CompilationProvider), RegisterSourceOutput);
+
+                    };
+                });
+
+            context.RegisterSourceOutput(contextGenerationSpecs, RegisterSourceOutput);
         }
 
         private static CodeGeneratorOptions GetCodeGeneratorOptions(AnalyzerConfigOptionsProvider acop, CancellationToken token)
@@ -65,32 +80,30 @@ namespace Orleans.CodeGenerator
             }
         }
 
-        private static void RegisterSourceOutput(SourceProductionContext context, ((CodeGeneratorOptions codeGeneratorOptions, AnalyzerConfigOptionsProvider analyzerConfigOptionsProvider) Left, Compilation compilation) ctx)
+        private static void RegisterSourceOutput(SourceProductionContext context, ContextGenerationSpecs specs)
         {
             try
             {
-                if (ctx.Left.codeGeneratorOptions == null)
+                if (specs.CodeGeneratorOptions == null)
                 {
                     return;
                 }
 
-                if (ctx.Left.analyzerConfigOptionsProvider.GlobalOptions.TryGetValue("build_property.orleans_designtimebuild", out var isDesignTimeBuild)
+                if (specs.AnalyzerConfigOptionsProvider.GlobalOptions.TryGetValue("build_property.orleans_designtimebuild", out var isDesignTimeBuild)
                     && string.Equals("true", isDesignTimeBuild, StringComparison.OrdinalIgnoreCase))
                 {
                     return;
                 }
 
-                if (ctx.Left.analyzerConfigOptionsProvider.GlobalOptions.TryGetValue("build_property.orleans_attachdebugger", out var attachDebuggerOption)
+                if (specs.AnalyzerConfigOptionsProvider.GlobalOptions.TryGetValue("build_property.orleans_attachdebugger", out var attachDebuggerOption)
                     && string.Equals("true", attachDebuggerOption, StringComparison.OrdinalIgnoreCase))
                 {
                     Debugger.Launch();
                 }
 
-                var codeGenerator = new CodeGenerator(ctx.compilation, ctx.Left.codeGeneratorOptions);
-                var syntax = codeGenerator.GenerateCode(context.CancellationToken);
-                var sourceString = syntax.NormalizeWhitespace().ToFullString();
-                var sourceText = SourceText.From(sourceString, Encoding.UTF8);
-                context.AddSource($"{ctx.compilation.AssemblyName ?? "assembly"}.orleans.g.cs", sourceText);
+
+                Emitter emitter = new Emitter(context, specs);
+                emitter.Emit();
             }
             catch (Exception exception) when (HandleException(context, exception))
             {

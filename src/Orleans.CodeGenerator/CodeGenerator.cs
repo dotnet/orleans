@@ -1,17 +1,17 @@
-using Orleans.CodeGenerator.SyntaxGeneration;
+using System;
+using System.Collections.Generic;
+using System.Collections.Immutable;
+using System.Linq;
+using System.Text;
+using System.Threading;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading;
-using static Microsoft.CodeAnalysis.CSharp.SyntaxFactory;
-using System.Collections.Immutable;
-using Orleans.CodeGenerator.Hashing;
-using System.Text;
-using static Orleans.CodeGenerator.SyntaxGeneration.SymbolExtensions;
 using Orleans.CodeGenerator.Diagnostics;
+using Orleans.CodeGenerator.Hashing;
+using Orleans.CodeGenerator.SyntaxGeneration;
+using static Microsoft.CodeAnalysis.CSharp.SyntaxFactory;
+using static Orleans.CodeGenerator.SyntaxGeneration.SymbolExtensions;
 
 namespace Orleans.CodeGenerator
 {
@@ -42,96 +42,8 @@ namespace Orleans.CodeGenerator
 
         internal LibraryTypes LibraryTypes { get; }
 
-        public CompilationUnitSyntax GenerateCode(CancellationToken cancellationToken)
-        {
-            // Collect metadata from the compilation.
-            var metadataModel = GenerateMetadataModel(cancellationToken);
-            var nsMembers = new Dictionary<string, List<MemberDeclarationSyntax>>();
 
-            foreach (var type in metadataModel.InvokableInterfaces)
-            {
-                string ns = type.GeneratedNamespace;
-                foreach (var method in type.Methods)
-                {
-                    var (invokable, generatedInvokerDescription) = InvokableGenerator.Generate(LibraryTypes, type, method);
-                    metadataModel.SerializableTypes.Add(generatedInvokerDescription);
-                    metadataModel.GeneratedInvokables[method] = generatedInvokerDescription;
-                    if (generatedInvokerDescription.CompoundTypeAliasArguments is { Length: > 0 } compoundTypeAliasArguments)
-                    {
-                        metadataModel.CompoundTypeAliases.Add(compoundTypeAliasArguments, generatedInvokerDescription.OpenTypeSyntax);
-                    }
-
-                    AddMember(ns, invokable);
-                }
-
-                var (proxy, generatedProxyDescription) = ProxyGenerator.Generate(LibraryTypes, type, metadataModel);
-                metadataModel.GeneratedProxies.Add(generatedProxyDescription);
-                AddMember(ns, proxy);
-            }
-
-            // Generate code.
-            foreach (var type in metadataModel.SerializableTypes)
-            {
-                string ns = type.GeneratedNamespace;
-
-                // Generate a partial serializer class for each serializable type.
-                var serializer = SerializerGenerator.GenerateSerializer(LibraryTypes, type);
-                AddMember(ns, serializer);
-
-                // Generate a copier for each serializable type.
-                if (CopierGenerator.GenerateCopier(LibraryTypes, type, metadataModel.DefaultCopiers) is { } copier)
-                    AddMember(ns, copier);
-
-                if (!type.IsEnumType && (!type.IsValueType && type.IsEmptyConstructable && !type.UseActivator && type is not GeneratedInvokerDescription || type.HasActivatorConstructor))
-                {
-                    metadataModel.ActivatableTypes.Add(type);
-
-                    // Generate an activator class for types with default constructor or activator constructor.
-                    var activator = ActivatorGenerator.GenerateActivator(LibraryTypes, type);
-                    AddMember(ns, activator);
-                }
-            }
-
-            // Generate metadata.
-            var metadataClassNamespace = CodeGeneratorName + "." + SyntaxGeneration.Identifier.SanitizeIdentifierName(_compilation.AssemblyName);
-            var metadataClass = MetadataGenerator.GenerateMetadata(_compilation, metadataModel, LibraryTypes);
-            AddMember(ns: metadataClassNamespace, member: metadataClass);
-            var metadataAttribute = AttributeList()
-                .WithTarget(AttributeTargetSpecifier(Token(SyntaxKind.AssemblyKeyword)))
-                .WithAttributes(
-                    SingletonSeparatedList(
-                        Attribute(LibraryTypes.TypeManifestProviderAttribute.ToNameSyntax())
-                            .AddArgumentListArguments(AttributeArgument(TypeOfExpression(QualifiedName(IdentifierName(metadataClassNamespace), IdentifierName(metadataClass.Identifier.Text)))))));
-
-            var assemblyAttributes = ApplicationPartAttributeGenerator.GenerateSyntax(LibraryTypes, metadataModel);
-            assemblyAttributes.Add(metadataAttribute);
-
-            var usings = List(new[] { UsingDirective(ParseName("global::Orleans.Serialization.Codecs")), UsingDirective(ParseName("global::Orleans.Serialization.GeneratedCodeHelpers")) });
-            var namespaces = new List<MemberDeclarationSyntax>(nsMembers.Count);
-            foreach (var pair in nsMembers)
-            {
-                var ns = pair.Key;
-                var member = pair.Value;
-
-                namespaces.Add(NamespaceDeclaration(ParseName(ns)).WithMembers(List(member)).WithUsings(usings));
-            }
-
-            return CompilationUnit()
-                .WithAttributeLists(List(assemblyAttributes))
-                .WithMembers(List(namespaces));
-
-            void AddMember(string ns, MemberDeclarationSyntax member)
-            {
-                if (!nsMembers.TryGetValue(ns, out var existing))
-                {
-                    existing = nsMembers[ns] = new List<MemberDeclarationSyntax>();
-                }
-
-                existing.Add(member);
-            }
-        }
-
-        private MetadataModel GenerateMetadataModel(CancellationToken cancellationToken)
+        internal MetadataModel GenerateMetadataModel(CancellationToken cancellationToken)
         {
             var metadataModel = new MetadataModel();
             var referencedAssemblies = new HashSet<IAssemblySymbol>(SymbolEqualityComparer.Default);
@@ -243,7 +155,7 @@ namespace Orleans.CodeGenerator
                             {
                                 (_, GenerateFieldIds.PublicProperties) => GenerateFieldIds.PublicProperties,
                                 (GenerateFieldIds.PublicProperties, _) => GenerateFieldIds.PublicProperties,
-                                _  => GenerateFieldIds.None
+                                _ => GenerateFieldIds.None
                             };
                             var fieldIdAssignmentHelper = new FieldIdAssignmentHelper(symbol, constructorParameters, implicitMemberSelectionStrategy, LibraryTypes);
                             if (!fieldIdAssignmentHelper.IsValidForSerialization)
