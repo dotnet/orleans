@@ -203,6 +203,29 @@ namespace Orleans.Runtime.GrainDirectory
             activationInfo.RegistrationStatus = status;
             return true;
         }
+
+        public Dictionary<ActivationId, IActivationInfo> RemoveWhere<T>(Func<T, IActivationInfo, bool> predicate, T state)
+        {
+            Dictionary<ActivationId, IActivationInfo> removed = null;
+            foreach (var pair in Instances)
+            {
+                if (predicate(state, pair.Value))
+                {
+                    removed ??= new();
+                    removed[pair.Key] = pair.Value;
+                }
+            }
+
+            if (removed != null)
+            {
+                foreach (var pair in removed)
+                {
+                    Instances.Remove(pair.Key);
+                }
+            }
+
+            return removed;
+        }
     }
 
     internal class GrainDirectoryPartition
@@ -490,7 +513,7 @@ namespace Orleans.Runtime.GrainDirectory
                 }
 
                 var first = grainInfo.Instances.FirstOrDefault();
-                if (first.Value != null)
+                if (first.Value != null && IsValidSilo(first.Value.SiloAddress))
                 {
                     address = ActivationAddress.GetAddress(first.Value.SiloAddress, grain, first.Key);
                     version = grainInfo.VersionTag;
@@ -531,18 +554,32 @@ namespace Orleans.Runtime.GrainDirectory
         /// <returns>Activations which must be deactivated.</returns>
         internal Dictionary<SiloAddress, List<ActivationAddress>> Merge(GrainDirectoryPartition other)
         {
+            List<ActivationId> entryCleanupScratchBuffer = new();
             Dictionary<SiloAddress, List<ActivationAddress>> activationsToRemove = null;
             lock (lockable)
             {
                 foreach (var pair in other.partitionData)
                 {
-                    if (partitionData.ContainsKey(pair.Key))
+                    var otherEntry = pair.Value;
+                    var grainId = pair.Key;
+
+                    // Remove defunct activations from the received entry
+                    var defunctOther = otherEntry.RemoveWhere(static (oracle, info) => oracle.IsDeadSilo(info.SiloAddress), siloStatusOracle);
+                    MergeRemovals(grainId, defunctOther, ref activationsToRemove);
+
+                    if (this.partitionData.TryGetValue(grainId, out var existing))
                     {
-                        if (log.IsEnabled(LogLevel.Debug)) log.Debug("While merging two disjoint partitions, same grain " + pair.Key + " was found in both partitions");
-                        var activationsToDrop = partitionData[pair.Key].Merge(pair.Key, pair.Value);
+                        if (log.IsEnabled(LogLevel.Debug)) this.log.Debug("While merging two disjoint partitions, same grain " + grainId + " was found in both partitions");
+
+                        // Remove defunct activations from the existing entry.
+                        var defunct = existing.RemoveWhere(static (oracle, info) => oracle.IsDeadSilo(info.SiloAddress), siloStatusOracle);
+                        MergeRemovals(grainId, defunct, ref activationsToRemove);
+
+                        var activationsToDrop = existing.Merge(grainId, otherEntry);
                         if (activationsToDrop == null) continue;
 
-                        if (activationsToRemove == null) activationsToRemove = new Dictionary<SiloAddress, List<ActivationAddress>>();
+                        // Add the activations dropped by the merge operation to the list of activations to be dropped.
+                        activationsToRemove ??= new Dictionary<SiloAddress, List<ActivationAddress>>();
                         foreach (var siloActivations in activationsToDrop)
                         {
                             if (activationsToRemove.TryGetValue(siloActivations.Key, out var activations))
@@ -557,12 +594,35 @@ namespace Orleans.Runtime.GrainDirectory
                     }
                     else
                     {
-                        partitionData.Add(pair.Key, pair.Value);
+                        this.partitionData.Add(grainId, otherEntry);
                     }
                 }
             }
 
             return activationsToRemove;
+
+            static void MergeRemovals(
+                GrainId grainId,
+                Dictionary<ActivationId, IActivationInfo> droppedActivations,
+                ref Dictionary<SiloAddress, List<ActivationAddress>> activationsToRemove)
+            {
+                if (droppedActivations == null) return;
+                activationsToRemove ??= new();
+                foreach (var value in droppedActivations)
+                {
+                    var silo = value.Value.SiloAddress;
+                    var address = ActivationAddress.GetAddress(silo, grainId, value.Key);
+                    if (activationsToRemove.TryGetValue(silo, out var activations))
+                    {
+                        // Note that it's possible that we will have duplicate entries in the resulting list, which is benign.
+                        activations.Add(address);
+                    }
+                    else
+                    {
+                        activationsToRemove[silo] = new(1) { address };
+                    }
+                }
+            }
         }
 
         /// <summary>
