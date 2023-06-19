@@ -439,6 +439,7 @@ namespace Orleans.Runtime.GrainDirectory
             }
 
             result.Addresses = new List<ActivationAddress>(grainInfoInstancesCount);
+            List<SiloAddress> toRemove = null;
             for (var i = 0; i < grainInfoInstancesCount; i++)
             {
                 var activationInfo = activationInfos[i];
@@ -446,9 +447,27 @@ namespace Orleans.Runtime.GrainDirectory
                 {
                     result.Addresses.Add(ActivationAddress.GetAddress(activationInfo.SiloAddress, grain, activationIds[i]));
                 }
+                else
+                {
+                    toRemove ??= new();
+                    toRemove.Add(activationInfo.SiloAddress);
+                }
 
                 activationInfos[i] = null;
                 activationIds[i] = null;
+            }
+
+            if (toRemove is not null)
+            {
+                lock (lockable)
+                {
+                    if (partitionData.TryGetValue(grain, out var grainInfo))
+                    {
+                        foreach (var instance in grainInfo.Instances)
+                        {
+                        }
+                    }
+                }
             }
 
             return result;
