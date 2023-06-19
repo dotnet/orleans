@@ -16,6 +16,7 @@ namespace Orleans.Runtime.GrainDirectory
         private readonly AdaptiveGrainDirectoryCache cache;
         private readonly LocalGrainDirectory router;
         private readonly IInternalGrainFactory grainFactory;
+        private readonly ISiloStatusOracle siloStatusOracle;
 
         private long lastNumAccesses;       // for stats
         private long lastNumHits;           // for stats
@@ -24,10 +25,12 @@ namespace Orleans.Runtime.GrainDirectory
             LocalGrainDirectory router,
             AdaptiveGrainDirectoryCache cache,
             IInternalGrainFactory grainFactory,
+            ISiloStatusOracle siloStatusOracle,
             ILoggerFactory loggerFactory)
             :base(nameSuffix: null, loggerFactory)
         {
             this.grainFactory = grainFactory;
+            this.siloStatusOracle = siloStatusOracle;
             this.router = router;
             this.cache = cache;
 
@@ -135,6 +138,17 @@ namespace Orleans.Runtime.GrainDirectory
 
                 var silo = kv.Key;
 
+                // Remove entries registered on dead silos
+                if (siloStatusOracle.IsDeadSilo(silo))
+                {
+                    foreach (var entry in kv.Value)
+                    {
+                        cache.Remove(entry);
+                    }
+
+                    return;
+                }
+
                 router.CacheValidationsSent.Increment();
                 // Send all of the items in one large request
                 var validator = this.grainFactory.GetSystemTarget<IRemoteGrainDirectory>(Constants.DirectoryCacheValidatorId, silo);
@@ -207,7 +221,30 @@ namespace Orleans.Runtime.GrainDirectory
 
                 if (entry != null)
                 {
-                    grainAndETagList.Add(new Tuple<GrainId, int>(grain, entry.ETag));
+                    // Remove entries with activations on dead silos
+                    var activationOnDeadSilos = false;
+                    if (entry.Value is not null)
+                    {
+                        foreach (var value in entry.Value)
+                        {
+                            if (siloStatusOracle.IsDeadSilo(value.Item1))
+                            {
+                                activationOnDeadSilos = true;
+                                break;
+                            }
+                        }
+                    }
+
+                    if (activationOnDeadSilos)
+                    {
+                        // Remove the entry and do not refresh it
+                        cache.Remove(grain);
+                    }
+                    else
+                    {
+                        // Refresh the entry
+                        grainAndETagList.Add(new Tuple<GrainId, int>(grain, entry.ETag));
+                    }
                 }
                 else
                 {
