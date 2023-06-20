@@ -113,6 +113,7 @@ namespace Orleans.Runtime.GrainDirectory
                     this,
                     this.DirectoryCache,
                     grainFactory,
+                    siloStatusOracle,
                     loggerFactory);
 
             var primarySiloEndPoint = developmentClusterMembershipOptions.Value.PrimarySiloEndpoint;
@@ -576,15 +577,15 @@ namespace Orleans.Runtime.GrainDirectory
                     if (IsValidSilo(address.Silo))
                     {
                         // Caching optimization:
-                        // cache the result of a successfull RegisterActivation call, only if it is not a duplicate activation.
+                        // cache the result of a successful RegisterActivation call, only if it is not a duplicate activation.
                         // this way next local lookup will find this ActivationAddress in the cache and we will save a full lookup!
                         IReadOnlyList<Tuple<SiloAddress, ActivationId>> cached;
                         if (!DirectoryCache.LookUp(address.Grain, out cached))
                         {
                             cached = new List<Tuple<SiloAddress, ActivationId>>(1)
-                        {
-                            Tuple.Create(address.Silo, address.Activation)
-                        };
+                            {
+                                Tuple.Create(address.Silo, address.Activation)
+                            };
                         }
                         else
                         {

@@ -28,11 +28,12 @@ namespace Orleans.Runtime.GrainDirectory
             LocalGrainDirectory router,
             IGrainDirectoryCache cache,
             IInternalGrainFactory grainFactory,
+            ISiloStatusOracle siloStatusOracle,
             ILoggerFactory loggerFactory)
         {
             var adaptiveCache = cache as AdaptiveGrainDirectoryCache;
             return adaptiveCache != null
-                ? new AdaptiveDirectoryCacheMaintainer(router, adaptiveCache, grainFactory, loggerFactory)
+                ? new AdaptiveDirectoryCacheMaintainer(router, adaptiveCache, grainFactory, siloStatusOracle, loggerFactory)
                 : null;
         }
     }

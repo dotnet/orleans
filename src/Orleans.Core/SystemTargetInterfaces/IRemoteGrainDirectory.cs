@@ -33,6 +33,7 @@ namespace Orleans.Runtime
         Dictionary<SiloAddress, List<ActivationAddress>> Merge(GrainId grain, IGrainInfo other);
         void CacheOrUpdateRemoteClusterRegistration(GrainId grain, ActivationId oldActivation, ActivationId activation, SiloAddress silo);
         bool UpdateClusterRegistrationStatus(ActivationId activationId, GrainDirectoryEntryStatus registrationStatus, GrainDirectoryEntryStatus? compareWith = null);
+        Dictionary<ActivationId, IActivationInfo> RemoveWhere<T>(Func<T, IActivationInfo, bool> predicate, T state);
     }
 
     /// <summary>
