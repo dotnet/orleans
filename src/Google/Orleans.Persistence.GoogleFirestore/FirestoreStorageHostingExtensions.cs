@@ -60,7 +60,7 @@ public static class FirestoreStorageHostingExtensions
     }
 
     /// <summary>
-    /// Configure silo to use AWS DynamoDB storage as the default grain storage.
+    /// Configure silo to use Google Firestore storage as the default grain storage.
     /// </summary>
     public static ISiloBuilder AddGoogleFirestoreGrainStorageAsDefault(this ISiloBuilder builder, Action<FirestoreStateStorageOptions> configureOptions)
     {
@@ -68,7 +68,7 @@ public static class FirestoreStorageHostingExtensions
     }
 
     /// <summary>
-    /// Configure silo to use AWS DynamoDB storage for grain storage.
+    /// Configure silo to use Google Firestore storage for grain storage.
     /// </summary>
     public static ISiloBuilder AddGoogleFirestoreGrainStorage(this ISiloBuilder builder, string name, Action<FirestoreStateStorageOptions> configureOptions)
     {
@@ -76,7 +76,7 @@ public static class FirestoreStorageHostingExtensions
     }
 
     /// <summary>
-    /// Configure silo to use AWS DynamoDB storage as the default grain storage.
+    /// Configure silo to use Google Firestore storage as the default grain storage.
     /// </summary>
     public static ISiloBuilder AddGoogleFirestoreGrainStorageAsDefault(this ISiloBuilder builder, Action<OptionsBuilder<FirestoreStateStorageOptions>>? configureOptions = null)
     {
@@ -84,7 +84,7 @@ public static class FirestoreStorageHostingExtensions
     }
 
     /// <summary>
-    /// Configure silo to use AWS DynamoDB storage for grain storage.
+    /// Configure silo to use Google Firestore storage for grain storage.
     /// </summary>
     public static ISiloBuilder AddGoogleFirestoreGrainStorage(this ISiloBuilder builder, string name, Action<OptionsBuilder<FirestoreStateStorageOptions>>? configureOptions = null)
     {

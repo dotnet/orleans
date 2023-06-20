@@ -18,6 +18,7 @@
     <Compile Include="..\Shared\Storage\FirestoreOptions.cs" Link="Storage\FirestoreOptions.cs" />
     <Compile Include="..\Shared\Storage\GoogleCloudOptions.cs" Link="Storage\GoogleCloudOptions.cs" />
     <Compile Include="..\Shared\Utils\Utils.cs" Link="Utils\Utils.cs" />
+    <Compile Remove="GoogleFirestoreGrainStorageExtensions.cs" />
   </ItemGroup>
 
   <ItemGroup>
