@@ -13,11 +13,21 @@ internal partial class ApplicationPartsGenerator
     private class Emitter : EmitterBase
     {
 
-        private static string _metadataClassName = "Metadata_" + SyntaxGeneration.Identifier.SanitizeIdentifierName(_context.AssemblyName);
-        private static string _metadataClassNamespace = Constants.CodeGeneratorName + "." + SyntaxGeneration.Identifier.SanitizeIdentifierName(_context.AssemblyName);
-        private static string _metaDataClassString =
-            $$"""
-        namespace OrleansCodeGen.HelloWorldGrains
+        private string _metadataClassName;
+        private string _metadataClassNamespace;
+
+        private static MetadataGeneratorContext _context;
+
+        public Emitter(IncrementalGeneratorContext context, SourceProductionContext sourceProductionContext) : base(sourceProductionContext)
+        {
+            _context = (MetadataGeneratorContext)context;
+
+        }
+
+        private string GetMetadataClassContent(string metadataClassName, string _metadataClassNamespace)
+        {
+            return $$"""
+        namespace {{_metadataClassNamespace}}
         {
             using global::Orleans.Serialization.Codecs;
             using global::Orleans.Serialization.GeneratedCodeHelpers;
@@ -38,31 +48,30 @@ internal partial class ApplicationPartsGenerator
 
         """;
 
-        private static MetadataGeneratorContext _context;
-
-        public Emitter(IncrementalGeneratorContext context, SourceProductionContext sourceProductionContext) : base(sourceProductionContext)
-        {
-            _context = (MetadataGeneratorContext)context;
         }
 
         public override void Emit()
         {
-            AddAssemblyAttributes();
+            _metadataClassName = "Metadata_" + SyntaxGeneration.Identifier.SanitizeIdentifierName(_context.AssemblyName);
+            _metadataClassNamespace = Constants.CodeGeneratorName + "." + SyntaxGeneration.Identifier.SanitizeIdentifierName(_context.AssemblyName);
+
             AddMetadataClass();
+            AddAssemblyAttributes();
         }
 
         private void AddMetadataClass()
         {
+            var _metaDataClassContent = GetMetadataClassContent(_metadataClassName, _metadataClassNamespace);
 
-            AddSource("Metadata", _metaDataClassString);
+            AddSource("Metadata", _metaDataClassContent);
 
 
         }
 
+
+
         private void AddAssemblyAttributes()
         {
-
-
             var metadataAttribute = AttributeList()
                .WithTarget(AttributeTargetSpecifier(Token(SyntaxKind.AssemblyKeyword)))
                .WithAttributes(
