@@ -9,4 +9,8 @@ internal class Constants
     public const string TypeManifestProviderAttribute = "Orleans.Serialization.Configuration.TypeManifestProviderAttribute";
 
     public const string CodeGeneratorName = "OrleansCodeGen";
+
+    public const string AliasAttribute = "Orleans.AliasAttribute";
+
+    public const string CompoundTypeAliasAttribute = "Orleans.CompoundTypeAliasAttribute";
 }
