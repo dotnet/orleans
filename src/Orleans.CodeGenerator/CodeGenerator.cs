@@ -93,18 +93,18 @@ namespace Orleans.CodeGenerator
             }
 
             // Generate metadata.
-            var metadataClassNamespace = CodeGeneratorName + "." + SyntaxGeneration.Identifier.SanitizeIdentifierName(_compilation.AssemblyName);
-            var metadataClass = MetadataGenerator.GenerateMetadata(_compilation, metadataModel, LibraryTypes);
-            AddMember(ns: metadataClassNamespace, member: metadataClass);
-            var metadataAttribute = AttributeList()
-                .WithTarget(AttributeTargetSpecifier(Token(SyntaxKind.AssemblyKeyword)))
-                .WithAttributes(
-                    SingletonSeparatedList(
-                        Attribute(LibraryTypes.TypeManifestProviderAttribute.ToNameSyntax())
-                            .AddArgumentListArguments(AttributeArgument(TypeOfExpression(QualifiedName(IdentifierName(metadataClassNamespace), IdentifierName(metadataClass.Identifier.Text)))))));
+            // var metadataClassNamespace = CodeGeneratorName + "." + SyntaxGeneration.Identifier.SanitizeIdentifierName(_compilation.AssemblyName);
+            //var metadataClass = MetadataGenerator.GenerateMetadata(_compilation, metadataModel, LibraryTypes);
+            //AddMember(ns: metadataClassNamespace, member: metadataClass);
+            //var metadataAttribute = AttributeList()
+            //    .WithTarget(AttributeTargetSpecifier(Token(SyntaxKind.AssemblyKeyword)))
+            //    .WithAttributes(
+            //        SingletonSeparatedList(
+            //            Attribute(LibraryTypes.TypeManifestProviderAttribute.ToNameSyntax())
+            //                .AddArgumentListArguments(AttributeArgument(TypeOfExpression(QualifiedName(IdentifierName(metadataClassNamespace), IdentifierName(metadataClass.Identifier.Text)))))));
 
-            var assemblyAttributes = ApplicationPartAttributeGenerator.GenerateSyntax(LibraryTypes, metadataModel);
-            assemblyAttributes.Add(metadataAttribute);
+            //var assemblyAttributes = ApplicationPartAttributeGenerator.GenerateSyntax(LibraryTypes, metadataModel);
+            //assemblyAttributes.Add(metadataAttribute);
 
             var usings = List(new[] { UsingDirective(ParseName("global::Orleans.Serialization.Codecs")), UsingDirective(ParseName("global::Orleans.Serialization.GeneratedCodeHelpers")) });
             var namespaces = new List<MemberDeclarationSyntax>(nsMembers.Count);
@@ -117,7 +117,7 @@ namespace Orleans.CodeGenerator
             }
 
             return CompilationUnit()
-                .WithAttributeLists(List(assemblyAttributes))
+                //.WithAttributeLists(List(assemblyAttributes))
                 .WithMembers(List(namespaces));
 
             void AddMember(string ns, MemberDeclarationSyntax member)
@@ -133,36 +133,37 @@ namespace Orleans.CodeGenerator
 
         internal MetadataModel GenerateMetadataModel(CancellationToken cancellationToken)
         {
+            //Debugger.Launch();
             var metadataModel = new MetadataModel();
-            var referencedAssemblies = new HashSet<IAssemblySymbol>(SymbolEqualityComparer.Default);
+            //var referencedAssemblies = new HashSet<IAssemblySymbol>(SymbolEqualityComparer.Default);
             var assembliesToExamine = new HashSet<IAssemblySymbol>(SymbolEqualityComparer.Default);
             var compilationAsm = LibraryTypes.Compilation.Assembly;
             ComputeAssembliesToExamine(compilationAsm, assembliesToExamine);
 
-            // Expand the set of referenced assemblies
-            referencedAssemblies.Add(compilationAsm);
-            metadataModel.ApplicationParts.Add(compilationAsm.MetadataName);
-            foreach (var reference in LibraryTypes.Compilation.References)
-            {
-                if (LibraryTypes.Compilation.GetAssemblyOrModuleSymbol(reference) is not IAssemblySymbol asm)
-                {
-                    continue;
-                }
+            //// Expand the set of referenced assemblies
+            //referencedAssemblies.Add(compilationAsm);
+            //metadataModel.ApplicationParts.Add(compilationAsm.MetadataName);
+            //foreach (var reference in LibraryTypes.Compilation.References)
+            //{
+            //    if (LibraryTypes.Compilation.GetAssemblyOrModuleSymbol(reference) is not IAssemblySymbol asm)
+            //    {
+            //        continue;
+            //    }
 
-                if (!referencedAssemblies.Add(asm))
-                {
-                    continue;
-                }
+            //    if (!referencedAssemblies.Add(asm))
+            //    {
+            //        continue;
+            //    }
 
-                if (asm.GetAttributes(LibraryTypes.ApplicationPartAttribute, out var attrs))
-                {
-                    metadataModel.ApplicationParts.Add(asm.MetadataName);
-                    foreach (var attr in attrs)
-                    {
-                        metadataModel.ApplicationParts.Add((string)attr.ConstructorArguments.First().Value);
-                    }
-                }
-            }
+            //    if (asm.GetAttributes(LibraryTypes.ApplicationPartAttribute, out var attrs))
+            //    {
+            //        metadataModel.ApplicationParts.Add(asm.MetadataName);
+            //        foreach (var attr in attrs)
+            //        {
+            //            metadataModel.ApplicationParts.Add((string)attr.ConstructorArguments.First().Value);
+            //        }
+            //    }
+            //}
 
             // The mapping of proxy base types to a mapping of return types to invokable base types. Used to set default invokable base types for each proxy base type.
             var proxyBaseTypeInvokableBaseTypes = new Dictionary<INamedTypeSymbol, Dictionary<INamedTypeSymbol, INamedTypeSymbol>>(SymbolEqualityComparer.Default);
