@@ -41,7 +41,7 @@ internal partial class MetadataGenerator
                     //config.AddAssemblyCopierTypes();
                     //config.AddAssemblyInterfaceProxyTypes();
                     //config.AddAssemblyInterfaceTypes();
-                    //config.AddAssemblyTypeAliases();
+                    config.AddAssemblyTypeAliases();
                 }
             }
         }
@@ -83,7 +83,7 @@ internal partial class MetadataGenerator
             assemblyAttributes.Add(metadataAttribute);
 
 
-            var content = ConvertIntoString(CompilationUnit().WithAttributeLists(List(assemblyAttributes)));
+            var content = ConvertCompilationUnitSyntaxIntoString(CompilationUnit().WithAttributeLists(List(assemblyAttributes)));
 
             AddSource("ApplicationPart", content);
         }

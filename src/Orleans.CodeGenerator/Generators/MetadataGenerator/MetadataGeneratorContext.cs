@@ -9,6 +9,4 @@ internal class MetadataGeneratorContext : IncrementalGeneratorContext
     public INamedTypeSymbol ApplicationPartAttribute { get; set; }
 
     public INamedTypeSymbol TypeManifestProviderAttribute { get; set; }
-
-    public string AssemblyName { get; set; }
 }

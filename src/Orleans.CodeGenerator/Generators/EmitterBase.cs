@@ -1,5 +1,6 @@
 namespace Orleans.CodeGenerator.Generators;
 
+using System.Collections.Generic;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 
@@ -14,7 +15,7 @@ internal abstract class EmitterBase
 
     public abstract void Emit();
 
-    protected static string ConvertIntoString(CompilationUnitSyntax compilationUnitSyntax)
+    protected static string ConvertCompilationUnitSyntaxIntoString(CompilationUnitSyntax compilationUnitSyntax)
     {
         return compilationUnitSyntax.NormalizeWhitespace().ToFullString();
 
@@ -25,5 +26,15 @@ internal abstract class EmitterBase
 
         _sourceProductionContext.AddSource(fileName + ".g.cs", content);
 
+    }
+
+    protected static void AddMember(Dictionary<string, List<MemberDeclarationSyntax>> nsMembers, string ns, MemberDeclarationSyntax member)
+    {
+        if (!nsMembers.TryGetValue(ns, out var existing))
+        {
+            existing = nsMembers[ns] = new List<MemberDeclarationSyntax>();
+        }
+
+        existing.Add(member);
     }
 }
