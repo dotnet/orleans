@@ -13,6 +13,8 @@ internal partial class ApplicationPartsGenerator
     private class Emitter : EmitterBase
     {
 
+        private static string _metadataClassName = "Metadata_" + SyntaxGeneration.Identifier.SanitizeIdentifierName(_context.AssemblyName);
+        private static string _metadataClassNamespace = Constants.CodeGeneratorName + "." + SyntaxGeneration.Identifier.SanitizeIdentifierName(_context.AssemblyName);
         private static string _metaDataClassString =
             $$"""
         namespace OrleansCodeGen.HelloWorldGrains
@@ -21,11 +23,10 @@ internal partial class ApplicationPartsGenerator
             using global::Orleans.Serialization.GeneratedCodeHelpers;
 
             [global::System.CodeDom.Compiler.GeneratedCodeAttribute("OrleansCodeGen", {{typeof(ApplicationPartsGenerator).Assembly.GetName().Version.ToString().GetLiteralExpression()}})]
-            internal sealed class Metadata_HelloWorldGrains : global::Orleans.Serialization.Configuration.TypeManifestProviderBase
+            internal sealed class {{_metadataClassName}} : global::Orleans.Serialization.Configuration.TypeManifestProviderBase
             {
                 protected override void ConfigureInner(global::Orleans.Serialization.Configuration.TypeManifestOptions config)
                 {
-
                     //config.AddAssemblySerializerTypes();
                     //config.AddAssemblyCopierTypes();
                     //config.AddAssemblyInterfaceProxyTypes();
@@ -60,8 +61,6 @@ internal partial class ApplicationPartsGenerator
 
         private void AddAssemblyAttributes()
         {
-            var metadataClassNamespace = Constants.CodeGeneratorName + "." + SyntaxGeneration.Identifier.SanitizeIdentifierName(_context.AssemblyName);
-            var metadataClass = "Metadata_" + SyntaxGeneration.Identifier.SanitizeIdentifierName(_context.AssemblyName);
 
 
             var metadataAttribute = AttributeList()
@@ -69,7 +68,7 @@ internal partial class ApplicationPartsGenerator
                .WithAttributes(
                    SingletonSeparatedList(
                        Attribute(_context.TypeManifestProviderAttribute.ToNameSyntax())
-                           .AddArgumentListArguments(AttributeArgument(TypeOfExpression(QualifiedName(IdentifierName(metadataClassNamespace), IdentifierName(metadataClass)))))));
+                           .AddArgumentListArguments(AttributeArgument(TypeOfExpression(QualifiedName(IdentifierName(_metadataClassNamespace), IdentifierName(_metadataClassName)))))));
 
             var assemblyAttributes = GenerateSyntax();
             assemblyAttributes.Add(metadataAttribute);
