@@ -56,5 +56,5 @@ public static partial class Utils
         GrainId.Parse(grainId.Replace(PERCENTAGE_SYMBOL_ENCODED, PERCENTAGE_SYMBOL).Replace(FORWARD_SLASH_SYMBOL_ENCODED, FORWARD_SLASH_SYMBOL));
 
     [GeneratedRegex("__.*__", RegexOptions.CultureInvariant)]
-    private static partial Regex ForbiddenIdRegex();
+    internal static partial Regex ForbiddenIdRegex();
 }
