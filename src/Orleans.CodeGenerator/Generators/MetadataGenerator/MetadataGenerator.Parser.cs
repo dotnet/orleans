@@ -9,7 +9,7 @@ using Microsoft.CodeAnalysis.CSharp;
 using Orleans.CodeGenerator.Diagnostics;
 using Orleans.CodeGenerator.SyntaxGeneration;
 
-internal partial class ApplicationPartsGenerator
+internal partial class MetadataGenerator
 {
 
     internal class Parser : ParserBase

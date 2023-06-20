@@ -7,7 +7,7 @@ using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Orleans.CodeGenerator.SyntaxGeneration;
 using static Microsoft.CodeAnalysis.CSharp.SyntaxFactory;
 
-internal partial class ApplicationPartsGenerator
+internal partial class MetadataGenerator
 {
 
     private class Emitter : EmitterBase
@@ -32,7 +32,7 @@ internal partial class ApplicationPartsGenerator
             using global::Orleans.Serialization.Codecs;
             using global::Orleans.Serialization.GeneratedCodeHelpers;
 
-            [global::System.CodeDom.Compiler.GeneratedCodeAttribute("OrleansCodeGen", {{typeof(ApplicationPartsGenerator).Assembly.GetName().Version.ToString().GetLiteralExpression()}})]
+            [global::System.CodeDom.Compiler.GeneratedCodeAttribute("OrleansCodeGen", {{typeof(MetadataGenerator).Assembly.GetName().Version.ToString().GetLiteralExpression()}})]
             internal sealed class {{_metadataClassName}} : global::Orleans.Serialization.Configuration.TypeManifestProviderBase
             {
                 protected override void ConfigureInner(global::Orleans.Serialization.Configuration.TypeManifestOptions config)

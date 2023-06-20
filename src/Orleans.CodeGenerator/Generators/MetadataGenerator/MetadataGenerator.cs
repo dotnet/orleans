@@ -4,7 +4,7 @@ using Microsoft.CodeAnalysis;
 using Orleans.CodeGenerator.Generators;
 
 [Generator]
-internal partial class ApplicationPartsGenerator : BaseIncrementalGenerator
+internal partial class MetadataGenerator : BaseIncrementalGenerator
 {
 
 
