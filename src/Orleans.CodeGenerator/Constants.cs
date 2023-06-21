@@ -13,4 +13,6 @@ internal class Constants
     public const string AliasAttribute = "Orleans.AliasAttribute";
 
     public const string CompoundTypeAliasAttribute = "Orleans.CompoundTypeAliasAttribute";
+
+    public const string IdAttribute = "Orleans.IdAttribute";
 }

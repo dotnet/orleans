@@ -1,4 +1,4 @@
-namespace Orleans.CodeGenerator.Generators.AliasGenerator;
+namespace Orleans.CodeGenerator.Generators.WellKnownIdGenerators;
 using System.Collections.Generic;
 using System.Linq;
 using Microsoft.CodeAnalysis;
@@ -7,18 +7,18 @@ using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Orleans.CodeGenerator.SyntaxGeneration;
 using static Microsoft.CodeAnalysis.CSharp.SyntaxFactory;
 
-internal partial class AliasGenerator
+internal partial class WellKnownIdGenerator
 {
     private class Emitter : EmitterBase
     {
 
         private static string _metadataClassName;
         private static string _metadataClassNamespace;
-        private static AliasGeneratorContext _context;
+        private static WellKnownIdGeneratorContext _context;
 
-        public Emitter(IncrementalGeneratorContext context, SourceProductionContext sourceProductionContext) : base(sourceProductionContext)
+        public Emitter(WellKnownIdGeneratorContext context, SourceProductionContext sourceProductionContext) : base(sourceProductionContext)
         {
-            _context = (AliasGeneratorContext)context;
+            _context = context;
 
         }
 
@@ -46,8 +46,8 @@ internal partial class AliasGenerator
         {
 
             return ClassDeclaration(_metadataClassName + "_TypeManifestOptionsExtensionMethods")
-                .AddModifiers(Token(SyntaxKind.InternalKeyword), Token(SyntaxKind.StaticKeyword))
-                .AddAttributeLists(AttributeList(SingletonSeparatedList(CodeGenerator.GetGeneratedCodeAttributeSyntax())))
+                .AddModifiers(Token(SyntaxKind.InternalKeyword), Token(SyntaxKind.StaticKeyword), Token(SyntaxKind.PartialKeyword))
+                //.AddAttributeLists(AttributeList(SingletonSeparatedList(CodeGenerator.GetGeneratedCodeAttributeSyntax())))
                 .AddMembers(classMembers);
         }
 
@@ -55,7 +55,7 @@ internal partial class AliasGenerator
         {
             IdentifierNameSyntax configParam = "config".ToIdentifierName();
             List<StatementSyntax> body = GetStatementSyntaxes(configParam);
-            return MethodDeclaration(PredefinedType(Token(SyntaxKind.VoidKeyword)), "AddAssemblyTypeAliases")
+            return MethodDeclaration(PredefinedType(Token(SyntaxKind.VoidKeyword)), "AddAssemblyWellKnownTypeIds")
                 .AddModifiers(Token(SyntaxKind.PublicKeyword), Token(SyntaxKind.StaticKeyword))
                 .AddParameterListParameters(
                     Parameter(configParam.Identifier).WithModifiers(SyntaxTokenList.Create(Token(SyntaxKind.ThisKeyword))).WithType(IdentifierName("global::Orleans.Serialization.Configuration.TypeManifestOptions")))
@@ -80,18 +80,18 @@ internal partial class AliasGenerator
             var nds = GetNamespaceDeclarationSyntax(_metadataClassNamespace, default, cds);
             var compilationUnit = GetCompilationUnit(default, nds);
             var content = ConvertCompilationUnitSyntaxIntoString(compilationUnit);
-            AddSource("Alias", content);
+            AddSource("WellKnownIds", content);
         }
 
         private static List<StatementSyntax> GetStatementSyntaxes(IdentifierNameSyntax configParam)
         {
             var body = new List<StatementSyntax>();
 
-            var addTypeAliasMethod = configParam.Member("WellKnownTypeAliases").Member("Add");
-            foreach (var type in _context.TypeAliases)
+            var addWellKnownTypeIdMethod = configParam.Member("WellKnownTypeIds").Member("Add");
+            foreach (var type in _context.WellKnownTypeIds)
             {
-                body.Add(ExpressionStatement(InvocationExpression(addTypeAliasMethod,
-                    ArgumentList(SeparatedList(new[] { Argument(LiteralExpression(SyntaxKind.StringLiteralExpression, Literal(type.Alias))), Argument(TypeOfExpression(type.Type)) })))));
+                body.Add(ExpressionStatement(InvocationExpression(addWellKnownTypeIdMethod,
+                    ArgumentList(SeparatedList(new[] { Argument(LiteralExpression(SyntaxKind.NumericLiteralExpression, Literal(type.Id))), Argument(TypeOfExpression(type.Type)) })))));
             }
 
             return body;

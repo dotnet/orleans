@@ -1,4 +1,4 @@
-namespace Orleans.CodeGenerator.Generators.ApplicationPartsGenerator;
+namespace Orleans.CodeGenerator.Generators.MetadataGenerators;
 using System.Threading;
 using Microsoft.CodeAnalysis;
 using Orleans.CodeGenerator.Generators;
@@ -30,7 +30,7 @@ internal partial class MetadataGenerator : BaseIncrementalGenerator
 
     protected override void RegisterSourceOutput(SourceProductionContext context, IncrementalGeneratorContext igContext)
     {
-        Emitter emitter = new Emitter(igContext, context);
+        Emitter emitter = new Emitter((MetadataGeneratorContext)igContext, context);
         emitter.Emit();
     }
 }

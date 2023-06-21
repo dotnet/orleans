@@ -1,4 +1,4 @@
-namespace Orleans.CodeGenerator.Generators.AliasGenerator;
+namespace Orleans.CodeGenerator.Generators.AliasGenerators;
 using System.Collections.Generic;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 

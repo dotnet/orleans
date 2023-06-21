@@ -1,4 +1,4 @@
-namespace Orleans.CodeGenerator.Generators.ApplicationPartsGenerator;
+namespace Orleans.CodeGenerator.Generators.MetadataGenerators;
 
 using System.Collections.Generic;
 using Microsoft.CodeAnalysis;
@@ -18,9 +18,9 @@ internal partial class MetadataGenerator
 
         private static MetadataGeneratorContext _context;
 
-        public Emitter(IncrementalGeneratorContext context, SourceProductionContext sourceProductionContext) : base(sourceProductionContext)
+        public Emitter(MetadataGeneratorContext context, SourceProductionContext sourceProductionContext) : base(sourceProductionContext)
         {
-            _context = (MetadataGeneratorContext)context;
+            _context = context;
 
         }
 
@@ -42,6 +42,7 @@ internal partial class MetadataGenerator
                     //config.AddAssemblyInterfaceProxyTypes();
                     //config.AddAssemblyInterfaceTypes();
                     config.AddAssemblyTypeAliases();
+                    config.AddAssemblyTypeCompoundAliases();
                 }
             }
         }
