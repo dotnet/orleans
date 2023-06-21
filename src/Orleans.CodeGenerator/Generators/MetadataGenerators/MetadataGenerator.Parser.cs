@@ -1,4 +1,4 @@
-namespace Orleans.CodeGenerator.Generators.ApplicationPartsGenerator;
+namespace Orleans.CodeGenerator.Generators.MetadataGenerators;
 
 using System.Collections.Generic;
 using System.Linq;

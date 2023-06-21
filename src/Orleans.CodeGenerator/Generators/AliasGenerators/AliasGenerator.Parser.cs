@@ -1,4 +1,4 @@
-namespace Orleans.CodeGenerator.Generators.AliasGenerator;
+namespace Orleans.CodeGenerator.Generators.AliasGenerators;
 
 using System.Collections.Immutable;
 using System.Linq;
@@ -34,14 +34,34 @@ internal partial class AliasGenerator
 
         public override IncrementalGeneratorContext Parse(CancellationToken token)
         {
-            SetAliasInContext(_aliasTypes, token);
+            SetCurrentAssemblyAliasInContext(token);
+            SetDeclaringAssembliesAliasInContext(token);
             return _aliasContext;
         }
 
-
-        static IncrementalGeneratorContext SetAliasInContext(ImmutableArray<(TypeDeclarationSyntax, SemanticModel)> aliasTypes, CancellationToken token)
+        private void SetDeclaringAssembliesAliasInContext(CancellationToken token)
         {
-            foreach (var type in aliasTypes)
+            var declaringAssemblies = GetDeclaringAssemblies();
+
+            if (!declaringAssemblies.Any()) return;
+
+            foreach (var assembly in declaringAssemblies)
+            {
+                foreach (var typeSymbol in assembly.GetDeclaredTypes())
+                {
+                    if (GetAlias(typeSymbol) is string typeAlias)
+                    {
+                        _aliasContext.TypeAliases.Add((typeSymbol.ToOpenTypeSyntax(), typeAlias));
+                    }
+                }
+            }
+
+
+        }
+
+        IncrementalGeneratorContext SetCurrentAssemblyAliasInContext(CancellationToken token)
+        {
+            foreach (var type in _aliasTypes)
             {
                 var symbol = (ITypeSymbol)type.Item2.GetDeclaredSymbol(type.Item1);
                 var aliasConstructorValue = GetAlias(symbol);
@@ -51,7 +71,7 @@ internal partial class AliasGenerator
             return _aliasContext;
         }
 
-        public static string GetAlias(ISymbol symbol)
+        private static string GetAlias(ISymbol symbol)
         {
             return (string)symbol.GetAttribute(_aliasAttribute)?.ConstructorArguments.First().Value;
         }

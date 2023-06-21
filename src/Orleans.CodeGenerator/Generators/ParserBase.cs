@@ -33,18 +33,18 @@ internal abstract class ParserBase
 
     public abstract IncrementalGeneratorContext Parse(CancellationToken token);
 
-    protected HashSet<IAssemblySymbol> GetExamineAssemblies()
+    protected HashSet<IAssemblySymbol> GetDeclaringAssemblies()
     {
         generateCodeForDeclaringAssemblyAttribute = Type(Constants.GenerateCodeForDeclaringAssemblyAttribute);
         var assembliesToExamine = new HashSet<IAssemblySymbol>(SymbolEqualityComparer.Default);
         var compilationAsm = compilation.Assembly;
-        ComputeAssembliesToExamine(compilationAsm, assembliesToExamine);
+        ComputeAssembliesToExamine(compilationAsm, assembliesToExamine, compilationAsm);
         return assembliesToExamine;
     }
 
-    protected static void ComputeAssembliesToExamine(IAssemblySymbol asm, HashSet<IAssemblySymbol> expandedAssemblies)
+    protected static void ComputeAssembliesToExamine(IAssemblySymbol asm, HashSet<IAssemblySymbol> expandedAssemblies, IAssemblySymbol currentAssembly)
     {
-        if (!expandedAssemblies.Add(asm))
+        if (!asm.Equals(currentAssembly, SymbolEqualityComparer.Default) && !expandedAssemblies.Add(asm))
         {
             return;
         }
@@ -70,7 +70,7 @@ internal abstract class ParserBase
             }
             else
             {
-                ComputeAssembliesToExamine(declaringAsm, expandedAssemblies);
+                ComputeAssembliesToExamine(declaringAsm, expandedAssemblies, currentAssembly);
             }
         }
     }

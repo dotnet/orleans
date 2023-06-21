@@ -1,4 +1,4 @@
-namespace Orleans.CodeGenerator.Generators.AliasGenerator;
+namespace Orleans.CodeGenerator.Generators.AliasGenerators;
 
 using System.Collections.Immutable;
 using System.Threading;
@@ -13,7 +13,6 @@ internal partial class AliasGenerator : BaseIncrementalGenerator
     protected override void AddSyntaxProvider(SyntaxValueProvider syntaxProvider)
     {
         _alasTypesIncremetalValues = syntaxProvider.ForAttributeWithMetadataName(Constants.AliasAttribute, TransformPredicate, Transform);
-
 
 
         (TypeDeclarationSyntax, SemanticModel) Transform(GeneratorAttributeSyntaxContext context, CancellationToken token) => ((TypeDeclarationSyntax)context.TargetNode, context.SemanticModel);
@@ -37,7 +36,7 @@ internal partial class AliasGenerator : BaseIncrementalGenerator
 
     protected override void RegisterSourceOutput(SourceProductionContext context, IncrementalGeneratorContext igContext)
     {
-        Emitter emitter = new Emitter(igContext, context);
+        Emitter emitter = new Emitter((AliasGeneratorContext)igContext, context);
         emitter.Emit();
     }
 }

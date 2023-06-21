@@ -175,20 +175,20 @@ namespace Orleans.CodeGenerator
                     var syntaxTree = symbol.DeclaringSyntaxReferences.FirstOrDefault()?.SyntaxTree ?? _compilation.SyntaxTrees.First();
                     var semanticModel = _compilation.GetSemanticModel(syntaxTree);
 
-                    if (GetWellKnownTypeId(symbol) is uint wellKnownTypeId)
-                    {
-                        metadataModel.WellKnownTypeIds.Add((symbol.ToOpenTypeSyntax(), wellKnownTypeId));
-                    }
+                    //if (GetWellKnownTypeId(symbol) is uint wellKnownTypeId)
+                    //{
+                    //    metadataModel.WellKnownTypeIds.Add((symbol.ToOpenTypeSyntax(), wellKnownTypeId));
+                    //}
 
-                    if (GetAlias(symbol) is string typeAlias)
-                    {
-                        metadataModel.TypeAliases.Add((symbol.ToOpenTypeSyntax(), typeAlias));
-                    }
+                    //if (GetAlias(symbol) is string typeAlias)
+                    //{
+                    //    metadataModel.TypeAliases.Add((symbol.ToOpenTypeSyntax(), typeAlias));
+                    //}
 
-                    if (GetCompoundTypeAlias(symbol) is CompoundTypeAliasComponent[] compoundTypeAlias)
-                    {
-                        metadataModel.CompoundTypeAliases.Add(compoundTypeAlias, symbol.ToOpenTypeSyntax());
-                    }
+                    //if (GetCompoundTypeAlias(symbol) is CompoundTypeAliasComponent[] compoundTypeAlias)
+                    //{
+                    //    metadataModel.CompoundTypeAliases.Add(compoundTypeAlias, symbol.ToOpenTypeSyntax());
+                    //}
 
                     if (FSharpUtilities.IsUnionCase(LibraryTypes, symbol, out var sumType) && ShouldGenerateSerializer(sumType))
                     {
