@@ -47,7 +47,7 @@ internal partial class AliasGenerator
 
             return ClassDeclaration(_metadataClassName + "_TypeManifestOptionsExtensionMethods")
                 .AddModifiers(Token(SyntaxKind.InternalKeyword), Token(SyntaxKind.StaticKeyword), Token(SyntaxKind.PartialKeyword))
-                .AddAttributeLists(AttributeList(SingletonSeparatedList(CodeGenerator.GetGeneratedCodeAttributeSyntax())))
+                .AddAttributeLists(AttributeList(SingletonSeparatedList(GeneratorHelper.GetGeneratedCodeAttributeSyntax())))
                 .AddMembers(classMembers);
         }
 

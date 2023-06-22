@@ -1,10 +1,10 @@
+using System;
 using System.Collections.Generic;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Orleans.CodeGenerator.SyntaxGeneration;
 using static Microsoft.CodeAnalysis.CSharp.SyntaxFactory;
-using System;
 
 namespace Orleans.CodeGenerator
 {
@@ -114,7 +114,7 @@ namespace Orleans.CodeGenerator
             return ClassDeclaration("Metadata_" + SyntaxGeneration.Identifier.SanitizeIdentifierName(compilation.AssemblyName))
                 .AddBaseListTypes(SimpleBaseType(interfaceType.ToTypeSyntax()))
                 .AddModifiers(Token(SyntaxKind.InternalKeyword), Token(SyntaxKind.SealedKeyword))
-                .AddAttributeLists(AttributeList(SingletonSeparatedList(CodeGenerator.GetGeneratedCodeAttributeSyntax())))
+                .AddAttributeLists(AttributeList(SingletonSeparatedList(GeneratorHelper.GetGeneratedCodeAttributeSyntax())))
                 .AddMembers(configureMethod);
         }
 

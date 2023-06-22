@@ -21,6 +21,17 @@ internal abstract class ParserBase
 
     protected INamedTypeSymbol Type(string metadataName)
     {
+        return Type(compilation, metadataName);
+    }
+
+    protected INamedTypeSymbol TypeOrDefault(string metadataName)
+    {
+        var result = compilation.GetTypeByMetadataName(metadataName);
+        return result;
+    }
+
+    public static INamedTypeSymbol Type(Compilation compilation, string metadataName)
+    {
         var result = compilation.GetTypeByMetadataName(metadataName);
         if (result is null)
         {
@@ -73,6 +84,29 @@ internal abstract class ParserBase
                 ComputeAssembliesToExamine(declaringAsm, expandedAssemblies, currentAssembly);
             }
         }
-    }
 
+
+    }
+    protected static AttributeData HasAttribute(INamedTypeSymbol symbol, INamedTypeSymbol attributeType, bool inherited)
+    {
+        if (symbol.GetAttribute(attributeType) is { } attribute)
+            return attribute;
+
+        if (inherited)
+        {
+            foreach (var iface in symbol.AllInterfaces)
+            {
+                if (iface.GetAttribute(attributeType) is { } iattr)
+                    return iattr;
+            }
+
+            while ((symbol = symbol.BaseType) != null)
+            {
+                if (symbol.GetAttribute(attributeType) is { } attr)
+                    return attr;
+            }
+        }
+
+        return null;
+    }
 }

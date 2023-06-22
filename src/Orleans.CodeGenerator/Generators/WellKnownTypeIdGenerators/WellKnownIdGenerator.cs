@@ -14,8 +14,8 @@ internal partial class WellKnownIdGenerator : BaseIncrementalGenerator
         _wellKnownIdTypeIncremetalValues = syntaxProvider.ForAttributeWithMetadataName(Constants.IdAttribute, TransformPredicate, Transform);
 
 
-        (TypeDeclarationSyntax, SemanticModel) Transform(GeneratorAttributeSyntaxContext context, CancellationToken token) => ((TypeDeclarationSyntax)context.TargetNode, context.SemanticModel);
-        bool TransformPredicate(SyntaxNode node, CancellationToken token) => node is TypeDeclarationSyntax;
+        static (TypeDeclarationSyntax, SemanticModel) Transform(GeneratorAttributeSyntaxContext context, CancellationToken token) => ((TypeDeclarationSyntax)context.TargetNode, context.SemanticModel);
+        static bool TransformPredicate(SyntaxNode node, CancellationToken token) => node is TypeDeclarationSyntax;
     }
     protected override IncrementalValueProvider<IncrementalGeneratorContext> Execute(IncrementalGeneratorInitializationContext context)
     {

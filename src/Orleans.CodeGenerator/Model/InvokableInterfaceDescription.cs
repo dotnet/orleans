@@ -1,17 +1,18 @@
-using Orleans.CodeGenerator.SyntaxGeneration;
-using Microsoft.CodeAnalysis;
 using System;
 using System.Collections.Generic;
 using System.Globalization;
-using Orleans.CodeGenerator.Diagnostics;
 using System.Linq;
+using Microsoft.CodeAnalysis;
+using Orleans.CodeGenerator.Diagnostics;
+using Orleans.CodeGenerator.SyntaxGeneration;
+using static Orleans.CodeGenerator.Generators.SerializerGenerators.SerializerGenerator;
 
 namespace Orleans.CodeGenerator
 {
     internal class InvokableInterfaceDescription
     {
         public InvokableInterfaceDescription(
-            CodeGenerator generator,
+            LibraryTypes libraryTypes,
             SemanticModel semanticModel,
             INamedTypeSymbol interfaceType,
             string name,
@@ -19,8 +20,8 @@ namespace Orleans.CodeGenerator
             bool isExtension,
             Dictionary<INamedTypeSymbol, INamedTypeSymbol> invokableBaseTypes)
         {
-            ValidateBaseClass(generator.LibraryTypes, proxyBaseType);
-            CodeGenerator = generator;
+            ValidateBaseClass(libraryTypes, proxyBaseType);
+            LibraryTypes = libraryTypes;
             SemanticModel = semanticModel;
             InterfaceType = interfaceType;
             ProxyBaseType = proxyBaseType;
@@ -35,8 +36,8 @@ namespace Orleans.CodeGenerator
 
             GeneratedNamespace = InterfaceType.GetNamespaceAndNesting() switch
             {
-                { Length: > 0 } ns => $"{CodeGenerator.CodeGeneratorName}.{ns}",
-                _ => CodeGenerator.CodeGeneratorName
+                { Length: > 0 } ns => $"{Constants.CodeGeneratorName}.{ns}",
+                _ => Constants.CodeGeneratorName
             };
 
             var names = new HashSet<string>(StringComparer.Ordinal);
@@ -65,9 +66,9 @@ namespace Orleans.CodeGenerator
             }
         }
 
-        public CodeGenerator CodeGenerator { get; }
+        public LibraryTypes LibraryTypes { get; }
 
-        private List<MethodDescription> GetMethods(INamedTypeSymbol symbol)
+        protected virtual List<MethodDescription> GetMethods(INamedTypeSymbol symbol)
         {
 #pragma warning disable RS1024 // Symbols should be compared for equality
             var methods = new Dictionary<IMethodSymbol, bool>(MethodSignatureComparer.Default);
@@ -90,9 +91,10 @@ namespace Orleans.CodeGenerator
             foreach (var pair in methods)
             {
                 var method = pair.Key;
-                var methodId = CodeGenerator.GetId(method)?.ToString(CultureInfo.InvariantCulture)
-                    ?? CodeGenerator.GetAlias(method)
-                    ?? CodeGenerator.CreateHashedMethodId(method);
+                string methodId = Parser.GetId(LibraryTypes, method)?.ToString(CultureInfo.InvariantCulture)
+                ?? Parser.GetAlias(LibraryTypes, method)
+                ?? Parser.CreateHashedMethodId(method);
+
                 res.Add(new(this, method, methodId, hasCollision: pair.Value));
             }
 
@@ -201,7 +203,7 @@ namespace Orleans.CodeGenerator
                     throw new OrleansGeneratorDiagnosticAnalysisException(diagnostic);
                 }
             }
-            
+
             static void ValidateNonGenericInvokeAsync(LibraryTypes l, INamedTypeSymbol baseClass)
             {
                 var found = false;
@@ -276,7 +278,7 @@ namespace Orleans.CodeGenerator
             }
         }
 
-        private sealed class MethodSignatureComparer : IEqualityComparer<IMethodSymbol>, IComparer<IMethodSymbol>
+        protected sealed class MethodSignatureComparer : IEqualityComparer<IMethodSymbol>, IComparer<IMethodSymbol>
         {
             public static MethodSignatureComparer Default { get; } = new();
 

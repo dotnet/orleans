@@ -34,12 +34,12 @@ internal partial class AliasGenerator
 
         public override IncrementalGeneratorContext Parse(CancellationToken token)
         {
-            SetCurrentAssemblyAliasInContext(token);
-            SetDeclaringAssembliesAliasInContext(token);
+            SetContextValuesForCurrentAssembly(token);
+            SetContextValuesForDeclaringAssemblies(token);
             return _aliasContext;
         }
 
-        private void SetDeclaringAssembliesAliasInContext(CancellationToken token)
+        private void SetContextValuesForDeclaringAssemblies(CancellationToken token)
         {
             var declaringAssemblies = GetDeclaringAssemblies();
 
@@ -59,7 +59,7 @@ internal partial class AliasGenerator
 
         }
 
-        IncrementalGeneratorContext SetCurrentAssemblyAliasInContext(CancellationToken token)
+        IncrementalGeneratorContext SetContextValuesForCurrentAssembly(CancellationToken token)
         {
             foreach (var type in _aliasTypes)
             {

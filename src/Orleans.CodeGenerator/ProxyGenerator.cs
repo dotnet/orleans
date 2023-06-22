@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Linq.Expressions;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -41,7 +40,7 @@ namespace Orleans.CodeGenerator
                     SimpleBaseType(interfaceDescription.InterfaceType.ToTypeSyntax()))
                 .AddModifiers(Token(SyntaxKind.InternalKeyword), Token(SyntaxKind.SealedKeyword))
                 .AddAttributeLists(
-                    AttributeList(SingletonSeparatedList(CodeGenerator.GetGeneratedCodeAttributeSyntax())))
+                    AttributeList(SingletonSeparatedList(GeneratorHelper.GetGeneratedCodeAttributeSyntax())))
                 .AddMembers(fieldDeclarations)
                 .AddMembers(ctors)
                 .AddMembers(proxyMethods);

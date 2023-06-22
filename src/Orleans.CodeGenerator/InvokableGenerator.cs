@@ -1,11 +1,11 @@
-using Orleans.CodeGenerator.SyntaxGeneration;
-using Microsoft.CodeAnalysis;
-using Microsoft.CodeAnalysis.CSharp;
-using Microsoft.CodeAnalysis.CSharp.Syntax;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Orleans.CodeGenerator.Diagnostics;
+using Orleans.CodeGenerator.SyntaxGeneration;
 using static Microsoft.CodeAnalysis.CSharp.SyntaxFactory;
 
 namespace Orleans.CodeGenerator
@@ -40,7 +40,7 @@ namespace Orleans.CodeGenerator
                 .AddBaseListTypes(SimpleBaseType(baseClassType.ToTypeSyntax(method.TypeParameterSubstitutions)))
                 .AddModifiers(Token(accessibilityKind), Token(SyntaxKind.SealedKeyword))
                 .AddAttributeLists(
-                    AttributeList(SingletonSeparatedList(CodeGenerator.GetGeneratedCodeAttributeSyntax())),
+                    AttributeList(SingletonSeparatedList(GeneratorHelper.GetGeneratedCodeAttributeSyntax())),
                     AttributeList(SingletonSeparatedList(GetCompoundTypeAliasAttribute(libraryTypes, compoundTypeAliasArgs))))
                 .AddMembers(fields);
 
@@ -629,7 +629,7 @@ namespace Orleans.CodeGenerator
             }
 
             fields.Add(new TargetFieldDescription(interfaceDescription.InterfaceType));
-            fields.Add(new MethodInfoFieldDescription(interfaceDescription.CodeGenerator.LibraryTypes.MethodInfo, "MethodBackingField"));
+            fields.Add(new MethodInfoFieldDescription(interfaceDescription.LibraryTypes.MethodInfo, "MethodBackingField"));
 
             return fields;
         }
