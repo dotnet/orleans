@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
+using Orleans.CodeGenerator.SyntaxGeneration;
 using static Microsoft.CodeAnalysis.CSharp.SyntaxFactory;
 public partial class OrleansSerializationSourceGenerator
 {
@@ -74,19 +75,18 @@ public partial class OrleansSerializationSourceGenerator
                 }
             }
 
-            // Generate metadata.
-            //var metadataClassNamespace = CodeGenerator.CodeGeneratorName + "." + SyntaxGeneration.Identifier.SanitizeIdentifierName(_specs.Compilation.AssemblyName);
-            //var metadataClass = MetadataGenerator.GenerateMetadata(_specs.Compilation, _specs.MetadataModel, _specs.LibraryTypes);
-            //AddMember(ns: metadataClassNamespace, member: metadataClass);
-            //var metadataAttribute = AttributeList()
-            //    .WithTarget(AttributeTargetSpecifier(Token(SyntaxKind.AssemblyKeyword)))
-            //    .WithAttributes(
-            //        SingletonSeparatedList(
-            //            Attribute(_specs.LibraryTypes.TypeManifestProviderAttribute.ToNameSyntax())
-            //                .AddArgumentListArguments(AttributeArgument(TypeOfExpression(QualifiedName(IdentifierName(metadataClassNamespace), IdentifierName(metadataClass.Identifier.Text)))))));
+            var metadataClassNamespace = CodeGenerator.CodeGeneratorName + "." + SyntaxGeneration.Identifier.SanitizeIdentifierName(_specs.Compilation.AssemblyName);
+            var metadataClass = MetadataGenerator.GenerateMetadata(_specs.Compilation, _specs.MetadataModel, _specs.LibraryTypes);
+            AddMember(ns: metadataClassNamespace, member: metadataClass);
+            var metadataAttribute = AttributeList()
+                .WithTarget(AttributeTargetSpecifier(Token(SyntaxKind.AssemblyKeyword)))
+                .WithAttributes(
+                    SingletonSeparatedList(
+                        Attribute(_specs.LibraryTypes.TypeManifestProviderAttribute.ToNameSyntax())
+                            .AddArgumentListArguments(AttributeArgument(TypeOfExpression(QualifiedName(IdentifierName(metadataClassNamespace), IdentifierName(metadataClass.Identifier.Text)))))));
 
-            //var assemblyAttributes = ApplicationPartAttributeGenerator.GenerateSyntax(_specs.LibraryTypes, _specs.MetadataModel);
-            //assemblyAttributes.Add(metadataAttribute);
+            var assemblyAttributes = ApplicationPartAttributeGenerator.GenerateSyntax(_specs.LibraryTypes, _specs.MetadataModel);
+            assemblyAttributes.Add(metadataAttribute);
 
             var usings = List(new[] { UsingDirective(ParseName("global::Orleans.Serialization.Codecs")), UsingDirective(ParseName("global::Orleans.Serialization.GeneratedCodeHelpers")) });
             var namespaces = new List<MemberDeclarationSyntax>(nsMembers.Count);

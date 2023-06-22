@@ -8,7 +8,7 @@ using Orleans.CodeGenerator.Diagnostics;
 
 namespace Orleans.CodeGenerator
 {
-    [Generator]
+    //[Generator]
     public sealed partial class OrleansSerializationSourceGenerator : IIncrementalGenerator
     {
 

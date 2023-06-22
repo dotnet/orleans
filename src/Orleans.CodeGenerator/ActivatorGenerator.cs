@@ -1,8 +1,8 @@
-using Orleans.CodeGenerator.SyntaxGeneration;
+using System.Collections.Generic;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
+using Orleans.CodeGenerator.SyntaxGeneration;
 using static Microsoft.CodeAnalysis.CSharp.SyntaxFactory;
-using System.Collections.Generic;
 
 namespace Orleans.CodeGenerator
 {
@@ -50,7 +50,7 @@ namespace Orleans.CodeGenerator
             var classDeclaration = ClassDeclaration(simpleClassName)
                 .AddBaseListTypes(SimpleBaseType(baseInterface))
                 .AddModifiers(Token(SyntaxKind.InternalKeyword), Token(SyntaxKind.SealedKeyword))
-                .AddAttributeLists(AttributeList(SingletonSeparatedList(CodeGenerator.GetGeneratedCodeAttributeSyntax())))
+                .AddAttributeLists(AttributeList(SingletonSeparatedList(GeneratorHelper.GetGeneratedCodeAttributeSyntax())))
                 .AddMembers(members.ToArray());
 
             if (type.IsGenericType)

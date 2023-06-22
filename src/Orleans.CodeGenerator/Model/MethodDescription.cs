@@ -1,8 +1,8 @@
-using Orleans.CodeGenerator.SyntaxGeneration;
-using Microsoft.CodeAnalysis;
 using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
+using Microsoft.CodeAnalysis;
+using Orleans.CodeGenerator.SyntaxGeneration;
 
 namespace Orleans.CodeGenerator
 {
@@ -69,7 +69,7 @@ namespace Orleans.CodeGenerator
         {
             foreach (var methodAttr in method.GetAttributes())
             {
-                if (methodAttr.AttributeClass.GetAttributes(containingType.CodeGenerator.LibraryTypes.InvokableBaseTypeAttribute, out var attrs))
+                if (methodAttr.AttributeClass.GetAttributes(containingType.LibraryTypes.InvokableBaseTypeAttribute, out var attrs))
                 {
                     foreach (var attr in attrs)
                     {
@@ -87,7 +87,7 @@ namespace Orleans.CodeGenerator
                     }
                 }
 
-                if (methodAttr.AttributeClass.GetAttributes(containingType.CodeGenerator.LibraryTypes.InvokableCustomInitializerAttribute, out attrs))
+                if (methodAttr.AttributeClass.GetAttributes(containingType.LibraryTypes.InvokableCustomInitializerAttribute, out attrs))
                 {
                     foreach (var attr in attrs)
                     {
@@ -151,7 +151,7 @@ namespace Orleans.CodeGenerator
         public List<(string Name, ITypeParameterSymbol Parameter)> AllTypeParameters { get; }
 
         public List<(string Name, ITypeParameterSymbol Parameter)> MethodTypeParameters { get; }
-        
+
         public Dictionary<ITypeParameterSymbol, string> TypeParameterSubstitutions { get; }
 
         public List<(string, TypedConstant)> CustomInitializerMethods { get; } = new();

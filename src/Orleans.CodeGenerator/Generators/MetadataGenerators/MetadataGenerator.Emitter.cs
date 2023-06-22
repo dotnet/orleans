@@ -37,10 +37,7 @@ internal partial class MetadataGenerator
             {
                 protected override void ConfigureInner(global::Orleans.Serialization.Configuration.TypeManifestOptions config)
                 {
-                    //config.AddAssemblySerializerTypes();
-                    //config.AddAssemblyCopierTypes();
-                    //config.AddAssemblyInterfaceProxyTypes();
-                    //config.AddAssemblyInterfaceTypes();
+                    config.AddSerializerTypesFromAssembly();
                     config.AddAssemblyTypeAliases();
                     config.AddAssemblyTypeCompoundAliases();
                 }

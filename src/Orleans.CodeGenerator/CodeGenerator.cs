@@ -12,7 +12,6 @@ using Orleans.CodeGenerator.Hashing;
 using Orleans.CodeGenerator.SyntaxGeneration;
 using static Microsoft.CodeAnalysis.CSharp.SyntaxFactory;
 using static Orleans.CodeGenerator.SyntaxGeneration.SymbolExtensions;
-
 namespace Orleans.CodeGenerator
 {
     public class CodeGeneratorOptions
@@ -93,18 +92,18 @@ namespace Orleans.CodeGenerator
             }
 
             // Generate metadata.
-            // var metadataClassNamespace = CodeGeneratorName + "." + SyntaxGeneration.Identifier.SanitizeIdentifierName(_compilation.AssemblyName);
-            var metadataClass = MetadataGenerator.GenerateMetadata(_compilation, metadataModel, LibraryTypes);
-            //AddMember(ns: metadataClassNamespace, member: metadataClass);
-            //var metadataAttribute = AttributeList()
-            //    .WithTarget(AttributeTargetSpecifier(Token(SyntaxKind.AssemblyKeyword)))
-            //    .WithAttributes(
-            //        SingletonSeparatedList(
-            //            Attribute(LibraryTypes.TypeManifestProviderAttribute.ToNameSyntax())
-            //                .AddArgumentListArguments(AttributeArgument(TypeOfExpression(QualifiedName(IdentifierName(metadataClassNamespace), IdentifierName(metadataClass.Identifier.Text)))))));
+            var metadataClassNamespace = CodeGeneratorName + "." + SyntaxGeneration.Identifier.SanitizeIdentifierName(_compilation.AssemblyName);
+            ClassDeclarationSyntax metadataClass = MetadataGenerator.GenerateMetadata(_compilation, metadataModel, LibraryTypes);
+            AddMember(ns: metadataClassNamespace, member: metadataClass);
+            var metadataAttribute = AttributeList()
+                .WithTarget(AttributeTargetSpecifier(Token(SyntaxKind.AssemblyKeyword)))
+                .WithAttributes(
+                    SingletonSeparatedList(
+                        Attribute(LibraryTypes.TypeManifestProviderAttribute.ToNameSyntax())
+                            .AddArgumentListArguments(AttributeArgument(TypeOfExpression(QualifiedName(IdentifierName(metadataClassNamespace), IdentifierName(metadataClass.Identifier.Text)))))));
 
-            //var assemblyAttributes = ApplicationPartAttributeGenerator.GenerateSyntax(LibraryTypes, metadataModel);
-            //assemblyAttributes.Add(metadataAttribute);
+            var assemblyAttributes = ApplicationPartAttributeGenerator.GenerateSyntax(LibraryTypes, metadataModel);
+            assemblyAttributes.Add(metadataAttribute);
 
             var usings = List(new[] { UsingDirective(ParseName("global::Orleans.Serialization.Codecs")), UsingDirective(ParseName("global::Orleans.Serialization.GeneratedCodeHelpers")) });
             var namespaces = new List<MemberDeclarationSyntax>(nsMembers.Count);
@@ -135,35 +134,35 @@ namespace Orleans.CodeGenerator
         {
             //Debugger.Launch();
             var metadataModel = new MetadataModel();
-            //var referencedAssemblies = new HashSet<IAssemblySymbol>(SymbolEqualityComparer.Default);
+            var referencedAssemblies = new HashSet<IAssemblySymbol>(SymbolEqualityComparer.Default);
             var assembliesToExamine = new HashSet<IAssemblySymbol>(SymbolEqualityComparer.Default);
             var compilationAsm = LibraryTypes.Compilation.Assembly;
             ComputeAssembliesToExamine(compilationAsm, assembliesToExamine);
 
             //// Expand the set of referenced assemblies
-            //referencedAssemblies.Add(compilationAsm);
-            //metadataModel.ApplicationParts.Add(compilationAsm.MetadataName);
-            //foreach (var reference in LibraryTypes.Compilation.References)
-            //{
-            //    if (LibraryTypes.Compilation.GetAssemblyOrModuleSymbol(reference) is not IAssemblySymbol asm)
-            //    {
-            //        continue;
-            //    }
+            referencedAssemblies.Add(compilationAsm);
+            metadataModel.ApplicationParts.Add(compilationAsm.MetadataName);
+            foreach (var reference in LibraryTypes.Compilation.References)
+            {
+                if (LibraryTypes.Compilation.GetAssemblyOrModuleSymbol(reference) is not IAssemblySymbol asm)
+                {
+                    continue;
+                }
 
-            //    if (!referencedAssemblies.Add(asm))
-            //    {
-            //        continue;
-            //    }
+                if (!referencedAssemblies.Add(asm))
+                {
+                    continue;
+                }
 
-            //    if (asm.GetAttributes(LibraryTypes.ApplicationPartAttribute, out var attrs))
-            //    {
-            //        metadataModel.ApplicationParts.Add(asm.MetadataName);
-            //        foreach (var attr in attrs)
-            //        {
-            //            metadataModel.ApplicationParts.Add((string)attr.ConstructorArguments.First().Value);
-            //        }
-            //    }
-            //}
+                if (asm.GetAttributes(LibraryTypes.ApplicationPartAttribute, out var attrs))
+                {
+                    metadataModel.ApplicationParts.Add(asm.MetadataName);
+                    foreach (var attr in attrs)
+                    {
+                        metadataModel.ApplicationParts.Add((string)attr.ConstructorArguments.First().Value);
+                    }
+                }
+            }
 
             // The mapping of proxy base types to a mapping of return types to invokable base types. Used to set default invokable base types for each proxy base type.
             var proxyBaseTypeInvokableBaseTypes = new Dictionary<INamedTypeSymbol, Dictionary<INamedTypeSymbol, INamedTypeSymbol>>(SymbolEqualityComparer.Default);
@@ -175,20 +174,20 @@ namespace Orleans.CodeGenerator
                     var syntaxTree = symbol.DeclaringSyntaxReferences.FirstOrDefault()?.SyntaxTree ?? _compilation.SyntaxTrees.First();
                     var semanticModel = _compilation.GetSemanticModel(syntaxTree);
 
-                    //if (GetWellKnownTypeId(symbol) is uint wellKnownTypeId)
-                    //{
-                    //    metadataModel.WellKnownTypeIds.Add((symbol.ToOpenTypeSyntax(), wellKnownTypeId));
-                    //}
+                    if (GetWellKnownTypeId(symbol) is uint wellKnownTypeId)
+                    {
+                        metadataModel.WellKnownTypeIds.Add((symbol.ToOpenTypeSyntax(), wellKnownTypeId));
+                    }
 
-                    //if (GetAlias(symbol) is string typeAlias)
-                    //{
-                    //    metadataModel.TypeAliases.Add((symbol.ToOpenTypeSyntax(), typeAlias));
-                    //}
+                    if (GetAlias(symbol) is string typeAlias)
+                    {
+                        metadataModel.TypeAliases.Add((symbol.ToOpenTypeSyntax(), typeAlias));
+                    }
 
-                    //if (GetCompoundTypeAlias(symbol) is CompoundTypeAliasComponent[] compoundTypeAlias)
-                    //{
-                    //    metadataModel.CompoundTypeAliases.Add(compoundTypeAlias, symbol.ToOpenTypeSyntax());
-                    //}
+                    if (GetCompoundTypeAlias(symbol) is CompoundTypeAliasComponent[] compoundTypeAlias)
+                    {
+                        metadataModel.CompoundTypeAliases.Add(compoundTypeAlias, symbol.ToOpenTypeSyntax());
+                    }
 
                     if (FSharpUtilities.IsUnionCase(LibraryTypes, symbol, out var sumType) && ShouldGenerateSerializer(sumType))
                     {
@@ -259,7 +258,7 @@ namespace Orleans.CodeGenerator
 
                     if (symbol.TypeKind == TypeKind.Interface)
                     {
-                        var attribute = HasAttribute(
+                        var attribute = GeneratorHelper.HasAttribute(
                             symbol,
                             LibraryTypes.GenerateMethodSerializersAttribute,
                             inherited: true);
@@ -276,7 +275,7 @@ namespace Orleans.CodeGenerator
                             var invokableBaseTypes = GetInvokableBaseTypes(proxyBaseTypeInvokableBaseTypes, baseClass);
 
                             var description = new InvokableInterfaceDescription(
-                                this,
+                                LibraryTypes,
                                 semanticModel,
                                 symbol,
                                 GetAlias(symbol) ?? symbol.Name,
@@ -312,7 +311,7 @@ namespace Orleans.CodeGenerator
                         // Find all implementations of invokable interfaces
                         foreach (var iface in symbol.AllInterfaces)
                         {
-                            var attribute = HasAttribute(
+                            var attribute = GeneratorHelper.HasAttribute(
                                 iface,
                                 LibraryTypes.GenerateMethodSerializersAttribute,
                                 inherited: true);
@@ -350,7 +349,7 @@ namespace Orleans.CodeGenerator
 
                         foreach (var attr in _generateSerializerAttributes)
                         {
-                            if (HasAttribute(t, attr, inherited: true) != null)
+                            if (GeneratorHelper.HasAttribute(t, attr, inherited: true) != null)
                             {
                                 return true;
                             }
@@ -598,40 +597,6 @@ namespace Orleans.CodeGenerator
             return result;
         }
 
-        // Returns true if the type declaration has the specified attribute.
-        private static AttributeData HasAttribute(INamedTypeSymbol symbol, INamedTypeSymbol attributeType, bool inherited)
-        {
-            if (symbol.GetAttribute(attributeType) is { } attribute)
-                return attribute;
 
-            if (inherited)
-            {
-                foreach (var iface in symbol.AllInterfaces)
-                {
-                    if (iface.GetAttribute(attributeType) is { } iattr)
-                        return iattr;
-                }
-
-                while ((symbol = symbol.BaseType) != null)
-                {
-                    if (symbol.GetAttribute(attributeType) is { } attr)
-                        return attr;
-                }
-            }
-
-            return null;
-        }
-
-        internal static AttributeSyntax GetGeneratedCodeAttributeSyntax() => GeneratedCodeAttributeSyntax;
-        private static readonly AttributeSyntax GeneratedCodeAttributeSyntax =
-                Attribute(ParseName("global::System.CodeDom.Compiler.GeneratedCodeAttribute"))
-                    .AddArgumentListArguments(
-                        AttributeArgument(CodeGeneratorName.GetLiteralExpression()),
-                        AttributeArgument(typeof(CodeGenerator).Assembly.GetName().Version.ToString().GetLiteralExpression()));
-
-        internal static AttributeSyntax GetMethodImplAttributeSyntax() => MethodImplAttributeSyntax;
-        private static readonly AttributeSyntax MethodImplAttributeSyntax =
-            Attribute(ParseName("global::System.Runtime.CompilerServices.MethodImplAttribute"))
-                .AddArgumentListArguments(AttributeArgument(ParseName("global::System.Runtime.CompilerServices.MethodImplOptions").Member("AggressiveInlining")));
     }
 }

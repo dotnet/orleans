@@ -1,4 +1,3 @@
-using System;
 using System.Collections.Generic;
 using System.Linq;
 using Microsoft.CodeAnalysis;
@@ -62,7 +61,7 @@ namespace Orleans.CodeGenerator
             var classDeclaration = ClassDeclaration(simpleClassName)
                 .AddBaseListTypes(SimpleBaseType(baseType))
                 .AddModifiers(Token(accessibility), Token(SyntaxKind.SealedKeyword))
-                .AddAttributeLists(AttributeList(SingletonSeparatedList(CodeGenerator.GetGeneratedCodeAttributeSyntax())));
+                .AddAttributeLists(AttributeList(SingletonSeparatedList(GeneratorHelper.GetGeneratedCodeAttributeSyntax())));
 
             if (!isShallowCopyable)
             {
@@ -105,8 +104,8 @@ namespace Orleans.CodeGenerator
 
         public static string GetGeneratedNamespaceName(ITypeSymbol type) => type.GetNamespaceAndNesting() switch
         {
-            { Length: > 0 } ns => $"{CodeGenerator.CodeGeneratorName}.{ns}",
-            _ => CodeGenerator.CodeGeneratorName
+            { Length: > 0 } ns => $"{Constants.CodeGeneratorName}.{ns}",
+            _ => Constants.CodeGeneratorName
         };
 
         private static MemberDeclarationSyntax[] GetFieldDeclarations(List<GeneratedFieldDescription> fieldDescriptions)
@@ -449,7 +448,7 @@ skip:;
             return MethodDeclaration(returnType, DeepCopyMethodName)
                 .AddModifiers(Token(SyntaxKind.PublicKeyword))
                 .AddParameterListParameters(parameters)
-                .AddAttributeLists(AttributeList(SingletonSeparatedList(CodeGenerator.GetMethodImplAttributeSyntax())))
+                .AddAttributeLists(AttributeList(SingletonSeparatedList(GeneratorHelper.GetMethodImplAttributeSyntax())))
                 .AddBodyStatements(body.ToArray());
         }
 
@@ -507,7 +506,7 @@ skip:;
             var method = MethodDeclaration(PredefinedType(Token(SyntaxKind.VoidKeyword)), DeepCopyMethodName)
                 .AddModifiers(Token(SyntaxKind.PublicKeyword))
                 .AddParameterListParameters(parameters)
-                .AddAttributeLists(AttributeList(SingletonSeparatedList(CodeGenerator.GetMethodImplAttributeSyntax())))
+                .AddAttributeLists(AttributeList(SingletonSeparatedList(GeneratorHelper.GetMethodImplAttributeSyntax())))
                 .AddBodyStatements(body.ToArray());
 
             if (isExceptionType)

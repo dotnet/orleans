@@ -1,4 +1,3 @@
-using System;
 using System.Collections.Generic;
 using System.Linq;
 using Microsoft.CodeAnalysis;
@@ -57,7 +56,7 @@ namespace Orleans.CodeGenerator
             var classDeclaration = ClassDeclaration(simpleClassName)
                 .AddBaseListTypes(SimpleBaseType(baseType))
                 .AddModifiers(Token(accessibility), Token(SyntaxKind.SealedKeyword))
-                .AddAttributeLists(AttributeList(SingletonSeparatedList(CodeGenerator.GetGeneratedCodeAttributeSyntax())))
+                .AddAttributeLists(AttributeList(SingletonSeparatedList(GeneratorHelper.GetGeneratedCodeAttributeSyntax())))
                 .AddMembers(fieldDeclarations);
 
             if (ctor != null)
@@ -366,7 +365,7 @@ namespace Orleans.CodeGenerator
                 .AddModifiers(Token(SyntaxKind.PublicKeyword))
                 .AddParameterListParameters(parameters)
                 .AddTypeParameterListParameters(TypeParameter("TBufferWriter"))
-                .AddAttributeLists(AttributeList(SingletonSeparatedList(CodeGenerator.GetMethodImplAttributeSyntax())))
+                .AddAttributeLists(AttributeList(SingletonSeparatedList(GeneratorHelper.GetMethodImplAttributeSyntax())))
                 .AddBodyStatements(body.ToArray());
 
             res = type.IsAbstractType
@@ -410,11 +409,11 @@ namespace Orleans.CodeGenerator
                     codecExpression = IdentifierName(instanceCodec.FieldName);
                 }
 
-               // When a static codec is available, we can call it directly and can skip passing the expected type,
-               // since it is known to be the static codec's field type:
-               //   C#: <staticCodec>.WriteField(ref writer, <fieldIdDelta, <member>)
-               // When no static codec is available:
-               //   C#: <codecField>.WriteField(ref writer, <fieldIdDelta>, <expectedType>, <member>)
+                // When a static codec is available, we can call it directly and can skip passing the expected type,
+                // since it is known to be the static codec's field type:
+                //   C#: <staticCodec>.WriteField(ref writer, <fieldIdDelta, <member>)
+                // When no static codec is available:
+                //   C#: <codecField>.WriteField(ref writer, <fieldIdDelta>, <expectedType>, <member>)
                 var writeFieldArgs = new List<ArgumentSyntax> {
                     Argument(writerParam).WithRefOrOutKeyword(Token(SyntaxKind.RefKeyword)),
                     Argument(fieldIdDeltaExpr)
@@ -544,7 +543,7 @@ namespace Orleans.CodeGenerator
                 .AddTypeParameterListParameters(TypeParameter("TReaderInput"))
                 .AddModifiers(Token(SyntaxKind.PublicKeyword))
                 .AddParameterListParameters(parameters)
-                .AddAttributeLists(AttributeList(SingletonSeparatedList(CodeGenerator.GetMethodImplAttributeSyntax())))
+                .AddAttributeLists(AttributeList(SingletonSeparatedList(GeneratorHelper.GetMethodImplAttributeSyntax())))
                 .AddBodyStatements(body.ToArray());
 
             if (type.IsAbstractType)
@@ -798,7 +797,7 @@ namespace Orleans.CodeGenerator
                 .AddParameterListParameters(parameters)
                 .AddTypeParameterListParameters(TypeParameter("TBufferWriter"))
                 .AddConstraintClauses(TypeParameterConstraintClause("TBufferWriter").AddConstraints(TypeConstraint(libraryTypes.IBufferWriter.ToTypeSyntax(PredefinedType(Token(SyntaxKind.ByteKeyword))))))
-                .AddAttributeLists(AttributeList(SingletonSeparatedList(CodeGenerator.GetMethodImplAttributeSyntax())))
+                .AddAttributeLists(AttributeList(SingletonSeparatedList(GeneratorHelper.GetMethodImplAttributeSyntax())))
                 .AddBodyStatements(body.ToArray());
         }
 
@@ -914,7 +913,7 @@ namespace Orleans.CodeGenerator
                 .AddTypeParameterListParameters(TypeParameter("TReaderInput"))
                 .AddModifiers(Token(SyntaxKind.PublicKeyword))
                 .AddParameterListParameters(parameters)
-                .AddAttributeLists(AttributeList(SingletonSeparatedList(CodeGenerator.GetMethodImplAttributeSyntax())))
+                .AddAttributeLists(AttributeList(SingletonSeparatedList(GeneratorHelper.GetMethodImplAttributeSyntax())))
                 .AddBodyStatements(body.ToArray());
         }
 
@@ -964,7 +963,7 @@ namespace Orleans.CodeGenerator
                 .AddParameterListParameters(parameters)
                 .AddTypeParameterListParameters(TypeParameter("TBufferWriter"))
                 .AddConstraintClauses(TypeParameterConstraintClause("TBufferWriter").AddConstraints(TypeConstraint(libraryTypes.IBufferWriter.ToTypeSyntax(PredefinedType(Token(SyntaxKind.ByteKeyword))))))
-                .AddAttributeLists(AttributeList(SingletonSeparatedList(CodeGenerator.GetMethodImplAttributeSyntax())))
+                .AddAttributeLists(AttributeList(SingletonSeparatedList(GeneratorHelper.GetMethodImplAttributeSyntax())))
                 .AddBodyStatements(body.ToArray());
         }
 
@@ -998,7 +997,7 @@ namespace Orleans.CodeGenerator
                 .AddTypeParameterListParameters(TypeParameter("TReaderInput"))
                 .AddModifiers(Token(SyntaxKind.PublicKeyword))
                 .AddParameterListParameters(parameters)
-                .AddAttributeLists(AttributeList(SingletonSeparatedList(CodeGenerator.GetMethodImplAttributeSyntax())))
+                .AddAttributeLists(AttributeList(SingletonSeparatedList(GeneratorHelper.GetMethodImplAttributeSyntax())))
                 .AddBodyStatements(body.ToArray());
         }
 
@@ -1133,7 +1132,7 @@ namespace Orleans.CodeGenerator
             IMemberDescription ISerializableMember.Member => _member;
             public MethodParameterFieldDescription Member => _member;
 
-            private LibraryTypes LibraryTypes => _member.Method.ContainingInterface.CodeGenerator.LibraryTypes;
+            private LibraryTypes LibraryTypes => _member.Method.ContainingInterface.LibraryTypes;
 
             public bool IsShallowCopyable => LibraryTypes.IsShallowCopyable(_member.Parameter.Type) || _member.Parameter.HasAnyAttribute(LibraryTypes.ImmutableAttributes);
 

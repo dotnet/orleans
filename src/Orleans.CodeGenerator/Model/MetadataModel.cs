@@ -7,21 +7,21 @@ namespace Orleans.CodeGenerator
 {
     internal class MetadataModel
     {
-        public List<ISerializableTypeDescription> SerializableTypes { get; } = new(1024);
-        public List<InvokableInterfaceDescription> InvokableInterfaces { get; } = new(1024);
-        public List<INamedTypeSymbol> InvokableInterfaceImplementations { get; } = new(1024);
-        public Dictionary<MethodDescription, GeneratedInvokerDescription> GeneratedInvokables { get; } = new();
-        public List<GeneratedProxyDescription> GeneratedProxies { get; } = new(1024);
-        public List<ISerializableTypeDescription> ActivatableTypes { get; } = new(1024);
-        public List<INamedTypeSymbol> DetectedSerializers { get; } = new();
-        public List<INamedTypeSymbol> DetectedActivators { get; } = new();
-        public Dictionary<ISerializableTypeDescription, TypeSyntax> DefaultCopiers { get; } = new();
-        public List<INamedTypeSymbol> DetectedCopiers { get; } = new();
-        public List<INamedTypeSymbol> DetectedConverters { get; } = new();
-        public List<(TypeSyntax Type, string Alias)> TypeAliases { get; } = new(1024);
-        public CompoundTypeAliasTree CompoundTypeAliases { get; } = CompoundTypeAliasTree.Create();
-        public List<(TypeSyntax Type, uint Id)> WellKnownTypeIds { get; } = new(1024);
-        public HashSet<string> ApplicationParts { get; } = new();
+        public List<ISerializableTypeDescription> SerializableTypes { get; set; } = new(1024);
+        public List<InvokableInterfaceDescription> InvokableInterfaces { get; set; } = new(1024);
+        public List<INamedTypeSymbol> InvokableInterfaceImplementations { get; set; } = new(1024);
+        public Dictionary<MethodDescription, GeneratedInvokerDescription> GeneratedInvokables { get; set; } = new();
+        public List<GeneratedProxyDescription> GeneratedProxies { get; set; } = new(1024);
+        public List<ISerializableTypeDescription> ActivatableTypes { get; set; } = new(1024);
+        public List<INamedTypeSymbol> DetectedSerializers { get; set; } = new();
+        public List<INamedTypeSymbol> DetectedActivators { get; set; } = new();
+        public Dictionary<ISerializableTypeDescription, TypeSyntax> DefaultCopiers { get; set; } = new();
+        public List<INamedTypeSymbol> DetectedCopiers { get; set; } = new();
+        public List<INamedTypeSymbol> DetectedConverters { get; set; } = new();
+        public List<(TypeSyntax Type, string Alias)> TypeAliases { get; set; } = new(1024);
+        public CompoundTypeAliasTree CompoundTypeAliases { get; set; } = CompoundTypeAliasTree.Create();
+        public List<(TypeSyntax Type, uint Id)> WellKnownTypeIds { get; set; } = new(1024);
+        public HashSet<string> ApplicationParts { get; set; } = new();
     }
 
     /// <summary>
