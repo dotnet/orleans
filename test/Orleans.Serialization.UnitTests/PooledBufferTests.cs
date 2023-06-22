@@ -1,6 +1,8 @@
 using System;
 using System.Buffers;
+using Microsoft.Extensions.DependencyInjection;
 using Orleans.Serialization.Buffers;
+using Orleans.Serialization.Session;
 using Xunit;
 
 namespace Orleans.Serialization.UnitTests
@@ -85,8 +87,63 @@ namespace Orleans.Serialization.UnitTests
             var rosReader = Reader.Create(ros, null);
             var rosArray = rosReader.ReadBytes((uint)randomData.Length);
             Assert.Equal(randomData, rosArray);
-            
+
             buffer.Dispose();
+        }
+
+        /// <summary>
+        /// Regression test for https://github.com/dotnet/orleans/issues/8503
+        /// </summary>
+        [Fact]
+        public void PooledBuffer_WriteTwice()
+        {
+            var serviceProvider = new ServiceCollection()
+                .AddSerializer()
+                .BuildServiceProvider();
+            var pool = serviceProvider.GetRequiredService<SerializerSessionPool>();
+            var serializer = serviceProvider.GetRequiredService<Serializer>();
+            var obj = LargeObject.BuildRandom();
+
+            SerializeObject(pool, serializer, obj);
+            SerializeObject(pool, serializer, obj);
+
+            static void SerializeObject(SerializerSessionPool pool, Serializer serializer, LargeObject obj)
+            {
+                Writer<PooledBuffer> writer = default;
+                var session = pool.GetSession();
+                try
+                {
+                    writer = Writer.CreatePooled(session);
+                    serializer.Serialize(obj, ref writer);
+
+                    var sequence = writer.Output.AsReadOnlySequence();
+                    Assert.Equal(writer.Output.Length, sequence.Length);
+                }
+                finally
+                {
+                    writer.Dispose();
+                    session.Dispose();
+                }
+            }
+        }
+
+        [GenerateSerializer]
+        public readonly record struct LargeObject(
+            [property: Id(0)] Guid Id,
+            [property: Id(1)] (Guid, Guid)[] Values)
+        {
+            public static LargeObject BuildRandom()
+            {
+                var id = Guid.NewGuid();
+                var values = new (Guid, Guid)[256];
+
+                for (var i = 0; i < values.Length; i++)
+                {
+                    values[i] = (Guid.NewGuid(), Guid.NewGuid());
+                }
+
+                return new(id, values);
+            }
         }
     }
 }
