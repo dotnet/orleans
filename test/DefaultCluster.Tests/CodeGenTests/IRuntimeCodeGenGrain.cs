@@ -342,4 +342,17 @@ namespace Tester.CodeGenTests
             return Task.FromResult(value.Payload.Value);
         }
     }
+
+    public interface IGrainWithStaticMembers : IGrainWithGuidKey
+    {
+        public static int StaticMethodWithNonAsyncReturnType(int a) => 0;
+        public static virtual int StaticVirtualMethodWithNonAsyncReturnType(int a) => 0;
+        public static int StaticProperty => 0;
+        public static virtual int StaticVirtualProperty => 0;
+        public static int StaticMethodWithOutAndVarParams(out int a, ref int b) { a = 0; return 0; }
+        public static virtual int StaticVirtualMethodWithOutAndVarParams(out int a, ref int b) { a = 0; return 0; }
+    }
+
+    public class GrainWithStaticMembers : Grain, IGrainWithStaticMembers
+    { }
 }
