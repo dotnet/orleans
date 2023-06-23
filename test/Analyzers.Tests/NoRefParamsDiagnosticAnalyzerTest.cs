@@ -102,5 +102,18 @@ namespace Analyzers.Tests
 
             Assert.Empty(diagnostics);
         }
+
+        [Fact]
+        public async Task OutAndRefParamsAllowedInStaticGrainInterfaceMethods()
+        {
+            var code = @"public interface I : IGrain
+                        {
+                            public static bool SomeStaticMethod(out int o, ref int v) { o = 0; return false; }
+                            public static virtual bool SomeStaticVirtualMethod(out int o, ref int v) { o = 0; return false; }
+                        }";
+
+            var (diagnostics, _) = await this.GetDiagnosticsAsync(code, new string[0]);
+            Assert.Empty(diagnostics);
+        }
     }
 }
