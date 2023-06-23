@@ -188,7 +188,7 @@ namespace Orleans.Serialization.TestKit
                 var writer = Writer.CreatePooled(buffer, _sessionPool.GetSession());
                 serializer.Serialize(original, ref writer);
                 buffer.Flush();
-                writer.Output.Dispose();
+                writer.Dispose();
 
                 buffer.Position = 0;
                 var reader = Reader.Create(buffer, _sessionPool.GetSession());
@@ -486,7 +486,7 @@ namespace Orleans.Serialization.TestKit
                     buffer.SetLength(buffer.Position);
                     buffer.Position = 0;
                     var result = buffer.ToArray();
-                    writer.Output.Dispose();
+                    writer.Dispose();
                     Assert.Equal(expected, result);
                 }
 
