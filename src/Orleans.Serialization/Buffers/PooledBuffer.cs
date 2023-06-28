@@ -87,7 +87,7 @@ public partial struct PooledBuffer : IBufferWriter<byte>, IDisposable
     public void Reset()
     {
         var current = _first;
-        while (current != null)
+        while (current != null && current != _writeHead)
         {
             var previous = current;
             current = previous.Next as SequenceSegment;
@@ -354,16 +354,14 @@ public partial struct PooledBuffer : IBufferWriter<byte>, IDisposable
         if (_first is null)
         {
             _first = _writeHead;
-            _last = _writeHead;
         }
         else
         {
-
             Debug.Assert(_last is not null);
             _last.SetNext(_writeHead);
-            _last = _writeHead;
         }
 
+        _last = _writeHead;
         _writeHead = null;
         _currentPosition = 0;
     }
@@ -509,7 +507,7 @@ public partial struct PooledBuffer : IBufferWriter<byte>, IDisposable
             {
                 if (ReferenceEquals(_segment, InitialSegmentSentinel))
                 {
-                    _segment = _slice._buffer._first;
+                    _segment = Buffer._first;
                 }
 
                 var endPosition = Offset + Length;
@@ -553,6 +551,9 @@ public partial struct PooledBuffer : IBufferWriter<byte>, IDisposable
                     return true;
                 }
 
+                // Account for the uncommitted data at the end of the buffer.
+                // The write head is only linked to the previous buffers when Commit() is called and it is set to null afterwards,
+                // meaning that if the write head is not null, the other buffers are not linked to it and it therefore has not been enumerated.
                 if (_segment != FinalSegmentSentinel && Buffer._currentPosition > 0 && Buffer._writeHead is { } head && _position < endPosition)
                 {
                     var finalOffset = Math.Max(Offset - _position, 0);
