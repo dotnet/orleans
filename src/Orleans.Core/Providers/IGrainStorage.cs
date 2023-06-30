@@ -1,11 +1,28 @@
-﻿using System;
+using System;
 using System.Runtime.Serialization;
 using System.Threading.Tasks;
 using Orleans.Runtime;
 using System.Net;
+using System.Collections.Generic;
+using System.Threading;
+using System.Runtime.CompilerServices;
 
 namespace Orleans.Storage
 {
+    public readonly struct StorageEntry
+    {
+        public string Name { get; }
+        public GrainReference GrainReference { get; }
+        public IGrainState GrainState { get; }
+
+        public StorageEntry(string name, GrainReference grainReference, IGrainState grainState)
+        {
+            this.Name = name;
+            this.GrainReference = grainReference;
+            this.GrainState = grainState;
+        }
+    }
+
     /// <summary>
     /// Interface to be implemented for a storage able to read and write Orleans grain state data.
     /// </summary>
@@ -31,6 +48,12 @@ namespace Orleans.Storage
         /// <param name="grainState">Copy of last-known state data object for this grain.</param>
         /// <returns>Completion promise for the Delete operation on the specified grain.</returns>
         Task ClearStateAsync(string grainType, GrainReference grainReference, IGrainState grainState);
+
+        /// <summary>
+        /// Get all entries in storage
+        /// </summary>
+        /// <returns>The entries in storage</returns>
+        IAsyncEnumerable<StorageEntry> GetAll(CancellationToken cancellationToken);
     }
 
     /// <summary>
