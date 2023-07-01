@@ -1,5 +1,3 @@
-using System;
-using System.Linq;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -62,7 +60,7 @@ namespace NonSilo.Tests.Directory
         [Fact]
         public void ListAllDirectories()
         {
-            
+
             var expected = new[] { this.azureDirectory, this.otherDirectory, this.againAnotherDirectory };
             Assert.Equal(expected, this.target.Directories.ToArray());
         }

@@ -1,7 +1,4 @@
-using System;
-using System.Collections.Generic;
 using System.Globalization;
-using System.Linq;
 using Azure;
 using Azure.Data.Tables;
 using Newtonsoft.Json;
@@ -131,7 +128,7 @@ namespace Orleans.Transactions.AzureStorage
                 {
                     if (properties.TryGetValue(stringDataPropertyName, out var dataProperty))
                     {
-                        if (dataProperty is string { Length: >0 } data)
+                        if (dataProperty is string { Length: > 0 } data)
                         {
                             yield return data;
                         }

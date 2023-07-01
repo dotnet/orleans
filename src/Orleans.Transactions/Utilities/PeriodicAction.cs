@@ -1,5 +1,3 @@
-using System;
-
 namespace Orleans.Internal.Trasactions
 {
     internal class PeriodicAction

@@ -1,8 +1,6 @@
 using AWSUtils.Tests.StorageTests;
 using Microsoft.Extensions.Configuration;
-using Orleans.Hosting;
 using Orleans.TestingHost;
-using System.Threading.Tasks;
 using UnitTests.MembershipTests;
 using Xunit;
 using Xunit.Abstractions;
@@ -36,7 +34,7 @@ namespace AWSUtils.Tests.Liveness
         {
             public void Configure(IConfiguration configuration, IClientBuilder clientBuilder)
             {
-                clientBuilder.UseDynamoDBClustering(ob => ob.Configure(gatewayOptions => 
+                clientBuilder.UseDynamoDBClustering(ob => ob.Configure(gatewayOptions =>
                 {
                     gatewayOptions.Service = AWSTestConstants.DynamoDbService;
                 }));

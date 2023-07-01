@@ -1,8 +1,3 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading;
-using System.Threading.Tasks;
 using Orleans.Configuration;
 using Orleans.GrainDirectory;
 using Orleans.Internal;
@@ -103,7 +98,7 @@ namespace Orleans.Runtime.GrainDirectory
             }
 
             // Cache update
-            this.cache.AddOrUpdate(result, (int) result.MembershipVersion.Value);
+            this.cache.AddOrUpdate(result, (int)result.MembershipVersion.Value);
 
             return result;
         }

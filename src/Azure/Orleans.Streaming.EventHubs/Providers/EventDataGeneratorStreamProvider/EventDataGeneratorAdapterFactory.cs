@@ -1,6 +1,3 @@
-using System;
-using System.Linq;
-using System.Threading.Tasks;
 using Azure.Messaging.EventHubs;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -167,7 +164,7 @@ namespace Orleans.Streaming.EventHubs.Testing
                     this.RandomlyPlaceStreamToQueue(arg as StreamRandomPlacementArg);
                     break;
                 case (int)Commands.Stop_Producing_On_Stream:
-                    this.StopProducingOnStream((StreamId) arg);
+                    this.StopProducingOnStream((StreamId)arg);
                     break;
                 default: break;
 
@@ -177,7 +174,7 @@ namespace Orleans.Streaming.EventHubs.Testing
 
         public new static EventDataGeneratorAdapterFactory Create(IServiceProvider services, string name)
         {
-            var generatorOptions= services.GetOptionsByName<EventDataGeneratorStreamOptions>(name);
+            var generatorOptions = services.GetOptionsByName<EventDataGeneratorStreamOptions>(name);
             var ehOptions = services.GetOptionsByName<EventHubOptions>(name);
             var receiverOptions = services.GetOptionsByName<EventHubReceiverOptions>(name);
             var cacheOptions = services.GetOptionsByName<EventHubStreamCachePressureOptions>(name);
@@ -186,7 +183,7 @@ namespace Orleans.Streaming.EventHubs.Testing
             IEventHubDataAdapter dataAdapter = services.GetServiceByName<IEventHubDataAdapter>(name)
                 ?? services.GetService<IEventHubDataAdapter>()
                 ?? ActivatorUtilities.CreateInstance<EventHubDataAdapter>(services);
-            var factory = ActivatorUtilities.CreateInstance<EventDataGeneratorAdapterFactory>(services, name, generatorOptions, ehOptions, receiverOptions, cacheOptions, 
+            var factory = ActivatorUtilities.CreateInstance<EventDataGeneratorAdapterFactory>(services, name, generatorOptions, ehOptions, receiverOptions, cacheOptions,
                 evictionOptions, statisticOptions, dataAdapter);
             factory.Init();
             return factory;

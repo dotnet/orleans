@@ -1,10 +1,4 @@
-
-using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Text;
-using System.Threading;
-using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
 using Orleans.Transactions.Abstractions;
@@ -36,7 +30,7 @@ namespace Orleans.Transactions.TestKit.Correctnesss
             if (ReferenceEquals(null, obj)) return false;
             if (ReferenceEquals(this, obj)) return true;
             if (obj.GetType() != this.GetType()) return false;
-            return Equals((BitArrayState) obj);
+            return Equals((BitArrayState)obj);
         }
 
         public override int GetHashCode()
@@ -74,13 +68,14 @@ namespace Orleans.Transactions.TestKit.Correctnesss
             int idx = index / BitsInInt;
             if (idx >= this.value.Length)
             {
-                Array.Resize(ref this.value, idx+1);
+                Array.Resize(ref this.value, idx + 1);
             }
             int shift = 1 << (index % BitsInInt);
             if (value)
             {
                 this.value[idx] |= shift;
-            } else
+            }
+            else
                 this.value[idx] &= ~shift;
         }
 
@@ -216,7 +211,7 @@ namespace Orleans.Transactions.TestKit.Correctnesss
             this.dataArray = dataArray;
             this.loggerFactory = loggerFactory;
         }
-        
+
         public override Task OnActivateAsync(CancellationToken cancellationToken)
         {
             this.logger = this.loggerFactory.CreateLogger(this.GetGrainId().ToString());

@@ -1,5 +1,3 @@
-using System;
-
 namespace Orleans.Configuration
 {
     public class TransactionalStateOptions

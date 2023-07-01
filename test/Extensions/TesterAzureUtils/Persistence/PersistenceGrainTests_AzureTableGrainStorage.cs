@@ -1,13 +1,9 @@
-using System.Threading.Tasks;
 using Microsoft.Extensions.Options;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Configuration;
 using Xunit;
 using Xunit.Abstractions;
-using Orleans.Hosting;
 using Orleans.TestingHost;
-using TestExtensions;
-using Orleans.Storage;
 
 namespace Tester.AzureUtils.Persistence
 {
@@ -55,7 +51,7 @@ namespace Tester.AzureUtils.Persistence
             }
         }
 
-        public PersistenceGrainTests_AzureTableGrainStorage(ITestOutputHelper output, Fixture fixture) : 
+        public PersistenceGrainTests_AzureTableGrainStorage(ITestOutputHelper output, Fixture fixture) :
             base(output, fixture)
         {
             fixture.EnsurePreconditionsMet();

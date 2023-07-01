@@ -1,7 +1,3 @@
-using System.Collections.Generic;
-using System.Threading.Tasks;
-using Orleans.CodeGeneration;
-
 namespace UnitTests.GrainInterfaces
 {
     using System;
@@ -40,7 +36,7 @@ namespace UnitTests.GrainInterfaces
     {
         Task<string> SayHello();
     }
-    
+
     public interface ITrickyMethodInterceptionGrain : IGenericMethodInterceptionGrain<string>, IGenericMethodInterceptionGrain<bool>
     {
         Task<int> GetBestNumber();

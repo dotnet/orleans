@@ -1,8 +1,4 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Net;
-using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Orleans.GrainDirectory;
 using Orleans.Runtime;
@@ -41,8 +37,8 @@ namespace UnitTests.Directory
         [Fact]
         public async Task SingleDeactivation()
         {
-            foreach (var cause in (UnregistrationCause[]) Enum.GetValues(typeof(UnregistrationCause)))
-             {
+            foreach (var cause in (UnregistrationCause[])Enum.GetValues(typeof(UnregistrationCause)))
+            {
                 var activationAddress = GenerateActivationAddress();
 
                 await this.target.Unregister(activationAddress, cause);

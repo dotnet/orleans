@@ -1,17 +1,12 @@
-using System;
-using System.Threading.Tasks;
-using Orleans;
 using Orleans.Runtime;
 using TestExtensions;
 using UnitTests.GrainInterfaces;
 using UnitTests.Grains;
 using Xunit;
-using GrainInterfaceUtils = Orleans.CodeGeneration.GrainInterfaceUtils;
 
 namespace DefaultCluster.Tests
 {
     using Microsoft.Extensions.DependencyInjection;
-    using Orleans.Internal;
 
     public class GrainReferenceCastTests : HostedTestClusterEnsureDefaultStarted
     {
@@ -90,10 +85,10 @@ namespace DefaultCluster.Tests
             int newValue = 4;
 
             IMultifacetWriter writer = this.GrainFactory.GetGrain<IMultifacetWriter>(2);
-            
+
             IMultifacetReader reader = writer.AsReference<IMultifacetReader>(); // --> Test case fails here
-            // Error: System.InvalidCastException: Grain reference MultifacetGrain.MultifacetWriterFactory+MultifacetWriterReference service interface mismatch: expected interface id=[1947430462] received interface name=[MultifacetGrain.IMultifacetWriter] id=[62435819] in grainRef=[GrainReference:*std/8408c2bc]
-            
+                                                                                // Error: System.InvalidCastException: Grain reference MultifacetGrain.MultifacetWriterFactory+MultifacetWriterReference service interface mismatch: expected interface id=[1947430462] received interface name=[MultifacetGrain.IMultifacetWriter] id=[62435819] in grainRef=[GrainReference:*std/8408c2bc]
+
             writer.SetValue(newValue).Wait();
 
             int result = reader.GetValue().Result;
@@ -116,7 +111,7 @@ namespace DefaultCluster.Tests
         public void CastInternalCastFromMyType()
         {
             GrainReference grain = (GrainReference)this.GrainFactory.GetGrain<ISimpleGrain>(Random.Shared.Next(), SimpleGrain.SimpleGrainNamePrefix);
-            
+
             // This cast should be a no-op, since the interface matches the initial reference's exactly.
             IAddressable cast = grain.Cast<ISimpleGrain>();
 
@@ -129,7 +124,7 @@ namespace DefaultCluster.Tests
         {
             // GeneratorTestDerivedGrain1Reference extends GeneratorTestGrainReference
             GrainReference grain = (GrainReference)this.GrainFactory.GetGrain<IGeneratorTestDerivedGrain1>(GetRandomGrainId());
-            
+
             // This cast should be a no-op, since the interface is implemented by the initial reference's interface.
             IAddressable cast = grain.Cast<IGeneratorTestGrain>();
 
@@ -141,8 +136,8 @@ namespace DefaultCluster.Tests
         public void CastGrainRefUpCastFromChild()
         {
             // GeneratorTestDerivedGrain1Reference extends GeneratorTestGrainReference
-            GrainReference grain = (GrainReference) this.GrainFactory.GetGrain<IGeneratorTestDerivedGrain1>(GetRandomGrainId());
-            GrainReference cast = (GrainReference) grain.AsReference<IGeneratorTestGrain>();
+            GrainReference grain = (GrainReference)this.GrainFactory.GetGrain<IGeneratorTestDerivedGrain1>(GetRandomGrainId());
+            GrainReference cast = (GrainReference)grain.AsReference<IGeneratorTestGrain>();
             Assert.IsAssignableFrom<IGeneratorTestDerivedGrain1>(cast);
             Assert.IsAssignableFrom<IGeneratorTestGrain>(cast);
         }
@@ -157,7 +152,7 @@ namespace DefaultCluster.Tests
 
             // Fails the next line as grain reference is already resolved
             IGeneratorTestDerivedGrain2 cast = grain.AsReference<IGeneratorTestDerivedGrain2>();
-            
+
             await Assert.ThrowsAsync<InvalidCastException>(() => cast.StringConcat("a", "b", "c"));
         }
 
@@ -213,18 +208,18 @@ namespace DefaultCluster.Tests
 
             GrainReference cast;
             GrainReference grain = (GrainReference)this.GrainFactory.GetGrain<IGeneratorTestDerivedDerivedGrain>(GetRandomGrainId());
-  
+
             // Parent
-            cast = (GrainReference) grain.AsReference<IGeneratorTestDerivedGrain2>();
+            cast = (GrainReference)grain.AsReference<IGeneratorTestDerivedGrain2>();
             Assert.IsAssignableFrom<IGeneratorTestDerivedDerivedGrain>(cast);
             Assert.IsAssignableFrom<IGeneratorTestDerivedGrain2>(cast);
             Assert.IsAssignableFrom<IGeneratorTestGrain>(cast);
-            
+
             // Cross-cast outside the inheritance hierarchy should not work
             Assert.False(cast is IGeneratorTestDerivedGrain1);
 
             // Grandparent
-            cast = (GrainReference) grain.AsReference<IGeneratorTestGrain>();
+            cast = (GrainReference)grain.AsReference<IGeneratorTestGrain>();
             Assert.IsAssignableFrom<IGeneratorTestDerivedDerivedGrain>(cast);
             Assert.IsAssignableFrom<IGeneratorTestGrain>(cast);
 
@@ -237,8 +232,8 @@ namespace DefaultCluster.Tests
         {
             // GeneratorTestDerivedDerivedGrainReference extends GeneratorTestDerivedGrain2Reference
             // GeneratorTestDerivedGrain2Reference extends GeneratorTestGrainReference
-            GrainReference grain = (GrainReference) this.GrainFactory.GetGrain<IGeneratorTestDerivedDerivedGrain>(GetRandomGrainId());
-            GrainReference cast = (GrainReference) grain.AsReference<IGeneratorTestDerivedGrain2>();
+            GrainReference grain = (GrainReference)this.GrainFactory.GetGrain<IGeneratorTestDerivedDerivedGrain>(GetRandomGrainId());
+            GrainReference cast = (GrainReference)grain.AsReference<IGeneratorTestDerivedGrain2>();
             Assert.IsAssignableFrom<IGeneratorTestDerivedDerivedGrain>(cast);
             Assert.IsAssignableFrom<IGeneratorTestDerivedGrain2>(cast);
             Assert.IsAssignableFrom<IGeneratorTestGrain>(cast);

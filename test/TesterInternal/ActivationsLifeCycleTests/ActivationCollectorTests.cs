@@ -1,13 +1,7 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
-using Orleans;
 using Orleans.Configuration;
-using Orleans.Hosting;
 using Orleans.Runtime;
 using Orleans.Serialization.TypeSystem;
 using Orleans.TestingHost;
@@ -146,7 +140,7 @@ namespace UnitTests.ActivationsLifeCycleTests
 
             int activationsNotCollected = await TestUtils.GetActivationCount(this.testCluster.GrainFactory, fullGrainTypeName);
             Assert.Equal(0, activationsNotCollected);
-        }   
+        }
 
         [Fact, TestCategory("ActivationCollector"), TestCategory("Functional")]
         public async Task ActivationCollectorShouldNotCollectBusyActivations()
@@ -168,7 +162,7 @@ namespace UnitTests.ActivationsLifeCycleTests
                 tasks0.Add(g.Nop());
             }
             await Task.WhenAll(tasks0);
-            bool[] quit = new bool[]{ false };
+            bool[] quit = new bool[] { false };
             Func<Task> busyWorker =
                 async () =>
                 {
@@ -208,8 +202,8 @@ namespace UnitTests.ActivationsLifeCycleTests
             Assert.Equal(busyGrainCount, busyActivationsNotCollected);
 
             quit[0] = true;
-        }          
-        
+        }
+
         [Fact, TestCategory("ActivationCollector"), TestCategory("Functional")]
         public async Task ManualCollectionShouldNotCollectBusyActivations()
         {
@@ -231,7 +225,7 @@ namespace UnitTests.ActivationsLifeCycleTests
                 tasks0.Add(g.Nop());
             }
             await Task.WhenAll(tasks0);
-            bool[] quit = new bool[]{ false };
+            bool[] quit = new bool[] { false };
             Func<Task> busyWorker =
                 async () =>
                 {
@@ -265,7 +259,7 @@ namespace UnitTests.ActivationsLifeCycleTests
             await Task.Delay(shortIdleTimeout);
 
             TimeSpan everything = TimeSpan.FromMinutes(10);
-            logger.LogInformation("ManualCollectionShouldNotCollectBusyActivations: triggering manual collection (timespan is {TotalSeconds} sec).",  everything.TotalSeconds);
+            logger.LogInformation("ManualCollectionShouldNotCollectBusyActivations: triggering manual collection (timespan is {TotalSeconds} sec).", everything.TotalSeconds);
             IManagementGrain mgmtGrain = this.testCluster.GrainFactory.GetGrain<IManagementGrain>(0);
             await mgmtGrain.ForceActivationCollection(everything);
 
@@ -283,8 +277,8 @@ namespace UnitTests.ActivationsLifeCycleTests
             Assert.Equal(busyGrainCount, busyActivationsNotCollected);
 
             quit[0] = true;
-        }    
-        
+        }
+
         [Fact, TestCategory("ActivationCollector"), TestCategory("Functional")]
         public async Task ActivationCollectorShouldCollectIdleActivationsSpecifiedInPerTypeConfiguration()
         {
@@ -315,7 +309,7 @@ namespace UnitTests.ActivationsLifeCycleTests
 
             int activationsNotCollected = await TestUtils.GetActivationCount(this.testCluster.GrainFactory, fullGrainTypeName);
             Assert.Equal(0, activationsNotCollected);
-        }   
+        }
 
         [Fact, TestCategory("ActivationCollector"), TestCategory("Functional")]
         public async Task ActivationCollectorShouldNotCollectBusyActivationsSpecifiedInPerTypeConfiguration()
@@ -339,7 +333,7 @@ namespace UnitTests.ActivationsLifeCycleTests
                 tasks0.Add(g.Nop());
             }
             await Task.WhenAll(tasks0);
-            bool[] quit = new bool[]{ false };
+            bool[] quit = new bool[] { false };
             Func<Task> busyWorker =
                 async () =>
                 {
@@ -379,8 +373,8 @@ namespace UnitTests.ActivationsLifeCycleTests
             Assert.Equal(busyGrainCount, busyActivationsNotCollected);
 
             quit[0] = true;
-        } 
-  
+        }
+
         [Fact(Skip = "Flaky test. Needs to be investigated."), TestCategory("ActivationCollector"), TestCategory("Functional")]
         public async Task ActivationCollectorShouldNotCollectBusyStatelessWorkers()
         {
@@ -578,7 +572,7 @@ namespace UnitTests.ActivationsLifeCycleTests
                 "ActivationCollectorShouldCollectByCollectionSpecificAgeLimit: grains activated; waiting {WaitSeconds} sec (activation GC idle timeout is {DefaultIdleTimeout} sec).",
                 WAIT_TIME.TotalSeconds,
                 DEFAULT_IDLE_TIMEOUT.TotalSeconds);
-            
+
             // Some time is required for GC to collect all of the Grains)
             await Task.Delay(waitTime);
 

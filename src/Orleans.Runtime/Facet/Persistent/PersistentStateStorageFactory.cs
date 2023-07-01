@@ -1,6 +1,4 @@
 using System.Diagnostics.CodeAnalysis;
-using System.Threading;
-using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Orleans.Core;
@@ -62,7 +60,7 @@ namespace Orleans.Runtime
             lifecycle.AddMigrationParticipant(this);
         }
 
-        public Task OnStart(CancellationToken cancellationToken = default) 
+        public Task OnStart(CancellationToken cancellationToken = default)
         {
             if (cancellationToken.IsCancellationRequested)
             {

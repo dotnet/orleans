@@ -1,8 +1,5 @@
-using System;
 using System.Collections.Concurrent;
-using System.Collections.Generic;
 using System.Diagnostics;
-using System.Linq;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Orleans.Serialization.Activators;
@@ -401,7 +398,7 @@ namespace Orleans.Serialization.Serializers
             object[] constructorArguments = null;
             if (_baseCopiers.TryGetValue(searchType, out var copierType))
             {
-               // Use the detected copier type. 
+                // Use the detected copier type. 
                 if (copierType.IsGenericTypeDefinition)
                 {
                     copierType = copierType.MakeGenericType(concreteType.GetGenericArguments());

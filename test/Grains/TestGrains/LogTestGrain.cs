@@ -1,8 +1,3 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading;
-using System.Threading.Tasks;
 using Orleans.EventSourcing;
 using UnitTests.GrainInterfaces;
 
@@ -43,23 +38,23 @@ namespace TestGrains
         public void Apply(AddReservation x) { Reservations[x.Val.ToString()] = x.Val; }
         public void Apply(RemoveReservation x) { Reservations.Remove(x.Val.ToString()); }
     }
- 
+
 
     [Serializable]
     [Orleans.GenerateSerializer]
-    public class UpdateA {[Orleans.Id(0)] public int Val; }
+    public class UpdateA { [Orleans.Id(0)] public int Val; }
     [Serializable]
     [Orleans.GenerateSerializer]
-    public class UpdateB  {[Orleans.Id(0)] public int Val; }
+    public class UpdateB { [Orleans.Id(0)] public int Val; }
     [Serializable]
     [Orleans.GenerateSerializer]
-    public class IncrementA  {[Orleans.Id(0)] public int Val; }
+    public class IncrementA { [Orleans.Id(0)] public int Val; }
     [Serializable]
     [Orleans.GenerateSerializer]
-    public class AddReservation {[Orleans.Id(0)] public int Val; }
+    public class AddReservation { [Orleans.Id(0)] public int Val; }
     [Serializable]
     [Orleans.GenerateSerializer]
-    public class RemoveReservation {[Orleans.Id(0)] public int Val; }
+    public class RemoveReservation { [Orleans.Id(0)] public int Val; }
 
 
 
@@ -69,7 +64,7 @@ namespace TestGrains
     /// and a dictionary of reservations that can be added and removed
     /// We subclass this to create variations for all storage providers
     /// </summary>
-    public abstract class LogTestGrain : JournaledGrain<MyGrainState,object>, UnitTests.GrainInterfaces.ILogTestGrain
+    public abstract class LogTestGrain : JournaledGrain<MyGrainState, object>, UnitTests.GrainInterfaces.ILogTestGrain
     {
 
         public override Task OnActivateAsync(CancellationToken cancellationToken)
@@ -190,7 +185,8 @@ namespace TestGrains
             return Task.CompletedTask;
         }
 
-        public Task<IReadOnlyList<object>> GetEventLog() {
+        public Task<IReadOnlyList<object>> GetEventLog()
+        {
             return this.RetrieveConfirmedEvents(0, Version);
         }
 

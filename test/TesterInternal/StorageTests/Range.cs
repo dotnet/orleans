@@ -1,6 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Diagnostics;
+﻿using System.Diagnostics;
 
 
 namespace UnitTests.StorageTests.Relational
@@ -11,7 +9,7 @@ namespace UnitTests.StorageTests.Relational
     /// <typeparam name="T">The type of the range.</typeparam>
     /// <remarks>A rudimentary implementation.</remarks>
     [DebuggerDisplay("Start = {Start}, End = {End}")]
-    public sealed class Range<T>: IEquatable<Range<T>>
+    public sealed class Range<T> : IEquatable<Range<T>>
     {
         /// <summary>
         /// The start of a contiguous range.
@@ -33,7 +31,7 @@ namespace UnitTests.StorageTests.Relational
         public Range(T start, T end, IComparer<T> comparer = null)
         {
             var comp = comparer == null ? Comparer<T>.Default : comparer;
-            if(comp.Compare(end, start) < 0)
+            if (comp.Compare(end, start) < 0)
             {
                 throw new ArgumentOutOfRangeException(nameof(end), end, $"The relation min ({start}) <= max ({end}) must hold.");
             }
@@ -45,7 +43,7 @@ namespace UnitTests.StorageTests.Relational
 
         public override bool Equals(object obj)
         {
-            if(!(obj is Range<T>)) return false;
+            if (!(obj is Range<T>)) return false;
             Range<T> other = (Range<T>)obj;
 
             return Equals(other);

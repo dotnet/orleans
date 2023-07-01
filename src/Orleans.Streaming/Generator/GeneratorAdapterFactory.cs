@@ -1,12 +1,8 @@
-using System;
 using System.Collections.Concurrent;
-using System.Collections.Generic;
 using System.Diagnostics;
-using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Orleans.Configuration;
-using Orleans.Internal;
 using Orleans.Providers.Streams.Common;
 using Orleans.Runtime;
 using Orleans.Streams;
@@ -73,7 +69,7 @@ namespace Orleans.Providers.Streams.Generator
         /// Return a IQueueAdapterReceiverMonitor
         /// </summary>
         protected Func<ReceiverMonitorDimensions, IQueueAdapterReceiverMonitor> ReceiverMonitorFactory;
-        
+
         public GeneratorAdapterFactory(
             string providerName,
             HashRingStreamQueueMapperOptions queueMapperOptions,
@@ -104,7 +100,7 @@ namespace Orleans.Providers.Streams.Generator
             if (this.ReceiverMonitorFactory == null)
                 this.ReceiverMonitorFactory = (dimensions) => new DefaultQueueAdapterReceiverMonitor(dimensions);
             generatorConfig = this.serviceProvider.GetServiceByName<IStreamGeneratorConfig>(this.Name);
-            if(generatorConfig == null)
+            if (generatorConfig == null)
             {
                 this.logger.LogInformation("No generator configuration found for stream provider {StreamProvider}.  Inactive until provided with configuration by command.", this.Name);
             }
@@ -208,7 +204,7 @@ namespace Orleans.Providers.Streams.Generator
             public async Task<IList<IBatchContainer>> GetQueueMessagesAsync(int maxCount)
             {
                 var watch = Stopwatch.StartNew();
-                await Task.Delay(Random.Shared.Next(1,MaxDelayMs));
+                await Task.Delay(Random.Shared.Next(1, MaxDelayMs));
                 List<IBatchContainer> batches;
                 if (QueueGenerator == null || !QueueGenerator.TryReadEvents(DateTime.UtcNow, maxCount, out batches))
                 {

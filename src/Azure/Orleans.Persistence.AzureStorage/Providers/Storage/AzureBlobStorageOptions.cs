@@ -1,12 +1,8 @@
-using System;
-using System.Threading.Tasks;
 using Azure;
 using Azure.Core;
 using Azure.Storage;
 using Azure.Storage.Blobs;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Options;
-using Newtonsoft.Json;
 using Orleans.Persistence.AzureStorage;
 using Orleans.Runtime;
 using Orleans.Storage;
@@ -134,7 +130,7 @@ namespace Orleans.Configuration
                 AzureBlobUtils.ValidateContainerName(options.ContainerName);
                 AzureBlobUtils.ValidateBlobName(this.name);
             }
-            catch(ArgumentException e)
+            catch (ArgumentException e)
             {
                 throw new OrleansConfigurationException(
                     $"Configuration for AzureBlobStorageOptions {name} is invalid. {nameof(this.options.ContainerName)} is not valid", e);

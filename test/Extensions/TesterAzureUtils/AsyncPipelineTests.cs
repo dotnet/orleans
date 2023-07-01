@@ -1,8 +1,4 @@
-using System;
 using System.Diagnostics;
-using System.Threading;
-using System.Threading.Tasks;
-using Orleans;
 using Tester.AzureUtils.Utilities;
 using UnitTests.TestHelper;
 using Xunit;
@@ -54,7 +50,7 @@ namespace UnitTests.AsyncPrimitivesTests
             int finished1 = 0;
             int finished2 = 0;
             int numActions = 1000;
-            Action action1 = (() => 
+            Action action1 = (() =>
                 {
                     lock (this) started++;
                     Thread.Sleep((int)(rand.NextDouble() * 100));
@@ -91,7 +87,7 @@ namespace UnitTests.AsyncPrimitivesTests
             }
             return result;
         }
-        
+
         [Fact, TestCategory("Functional")]
         public async Task AsyncPipelineSingleThreadedBlackBoxConsistencyTest()
         {
@@ -169,10 +165,10 @@ namespace UnitTests.AsyncPrimitivesTests
 
             Assert.True(capacityReached.IsSet, "Pipeline capacity not reached; the delay length probably is too short to be useful.");
             Assert.True(
-                actualSec >= minTimeSec, 
+                actualSec >= minTimeSec,
                 string.Format("The unit test completed too early ({0} sec < {1} sec).", actualSec, minTimeSec));
             Assert.True(
-                actualSec <= maxTimeSec, 
+                actualSec <= maxTimeSec,
                 string.Format("The unit test completed too late ({0} sec > {1} sec).", actualSec, maxTimeSec));
         }
 

@@ -12,12 +12,12 @@ namespace Tester.Redis.Persistence
     {
         private readonly CommonFixture fixture;
         private readonly CommonStorageTests commonStorageTests;
-    
-        public RedisStorageTests(ITestOutputHelper output, CommonFixture commonFixture) 
+
+        public RedisStorageTests(ITestOutputHelper output, CommonFixture commonFixture)
         {
             TestUtils.CheckForRedis();
             this.fixture = commonFixture;
-            this.commonStorageTests = new CommonStorageTests(commonFixture.CreateRedisGrainStorage(false).GetAwaiter().GetResult());      
+            this.commonStorageTests = new CommonStorageTests(commonFixture.CreateRedisGrainStorage(false).GetAwaiter().GetResult());
         }
 
         [SkippableFact]

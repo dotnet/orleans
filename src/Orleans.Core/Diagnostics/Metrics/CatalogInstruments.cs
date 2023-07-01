@@ -1,5 +1,3 @@
-using System;
-using System.Collections.Generic;
 using System.Diagnostics.Metrics;
 
 namespace Orleans.Runtime;
@@ -25,7 +23,7 @@ internal static class CatalogInstruments
     internal static readonly Counter<int> ActivationsDestroyed = Instruments.Meter.CreateCounter<int>(InstrumentNames.CATALOG_ACTIVATION_DESTROYED);
 
     internal static ObservableGauge<int> ActivationCount;
-    
+
     internal static void RegisterActivationCountObserve(Func<int> observeValue)
     {
         ActivationCount = Instruments.Meter.CreateObservableGauge(InstrumentNames.CATALOG_ACTIVATION_COUNT, observeValue);

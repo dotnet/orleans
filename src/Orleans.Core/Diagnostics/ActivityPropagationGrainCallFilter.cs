@@ -1,7 +1,4 @@
-using System;
-using System.Collections.Generic;
 using System.Diagnostics;
-using System.Threading.Tasks;
 
 namespace Orleans.Runtime
 {
@@ -65,7 +62,7 @@ namespace Orleans.Runtime
                     activity.SetTag("exception.escaped", true);
                     activity.SetTag("status", "Error");
                 }
-                
+
                 throw;
             }
             finally

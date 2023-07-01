@@ -1,4 +1,3 @@
-using System;
 using System.Runtime.CompilerServices;
 using Orleans.Serialization.Buffers;
 using Orleans.Serialization.TypeSystem;
@@ -194,7 +193,7 @@ namespace Orleans.Serialization.Codecs
             switch (schemaType)
             {
                 case SchemaType.WellKnown:
-                    { 
+                    {
                         var typeId = reader.ReadVarUInt32();
                         var found = reader.Session.WellKnownTypes.TryGetWellKnownType(typeId, out var type);
                         return (type, $"WellKnown {typeId} ({(found ? type is null ? "null" : RuntimeTypeNameFormatter.Format(type) : "unknown")})");

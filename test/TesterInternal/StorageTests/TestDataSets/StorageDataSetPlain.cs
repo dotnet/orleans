@@ -1,9 +1,5 @@
-using System;
-using Orleans;
 using System.Collections;
-using System.Collections.Generic;
 using Orleans.Runtime;
-using System.Linq;
 
 namespace UnitTests.StorageTests.Relational.TestDataSets
 {
@@ -11,7 +7,7 @@ namespace UnitTests.StorageTests.Relational.TestDataSets
     /// A set of simple test data set wit and without extension keys.
     /// </summary>
     /// <typeparam name="TGrainKey">The grain type (integer, guid or string)</typeparam>.
-    internal sealed class StorageDataSetPlain<TGrainKey>: IEnumerable<object[]>
+    internal sealed class StorageDataSetPlain<TGrainKey> : IEnumerable<object[]>
     {
         private const int NumCases = 3;
 

@@ -98,13 +98,13 @@ namespace Benchmarks
         [Fact]
         public void CopyComplex()
         {
-            _copier.Copy(_value); 
+            _copier.Copy(_value);
         }
 
         [Fact]
         public void CopyComplexStruct()
         {
-            _structCopier.Copy(_structValue); 
+            _structCopier.Copy(_structValue);
         }
 
         [Fact]
@@ -122,20 +122,20 @@ namespace Benchmarks
             return result;
         }
 
-/*
-        [Fact]
-        [Benchmark]
-        public void OrleansMessageSerializerStructRoundTrip()
-        {
-            var buffer = new PooledBuffer();
-            var (headerLength, bodyLength) = _messageSerializer.Write(ref buffer, _structMessage);
+        /*
+                [Fact]
+                [Benchmark]
+                public void OrleansMessageSerializerStructRoundTrip()
+                {
+                    var buffer = new PooledBuffer();
+                    var (headerLength, bodyLength) = _messageSerializer.Write(ref buffer, _structMessage);
 
-            var readBuffer = buffer.Slice();
-            _messageSerializer.Read(in readBuffer, headerLength, bodyLength, out var result);
+                    var readBuffer = buffer.Slice();
+                    _messageSerializer.Read(in readBuffer, headerLength, bodyLength, out var result);
 
-            ((Response<SimpleStruct>)result.BodyObject).Dispose();
-        }
-        */
+                    ((Response<SimpleStruct>)result.BodyObject).Dispose();
+                }
+                */
 
         [Fact]
         //[Benchmark]

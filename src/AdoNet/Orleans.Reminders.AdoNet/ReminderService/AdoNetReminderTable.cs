@@ -1,5 +1,3 @@
-using System;
-using System.Threading.Tasks;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 using Orleans.Reminders.AdoNet.Storage;
@@ -13,7 +11,7 @@ namespace Orleans.Runtime.ReminderService
         private RelationalOrleansQueries orleansQueries;
 
         public AdoNetReminderTable(
-            IOptions<ClusterOptions> clusterOptions, 
+            IOptions<ClusterOptions> clusterOptions,
             IOptions<AdoNetReminderTableOptions> storageOptions)
         {
             this.serviceId = clusterOptions.Value.ServiceId;
@@ -38,8 +36,8 @@ namespace Orleans.Runtime.ReminderService
         public Task<ReminderEntry> ReadRow(GrainId grainId, string reminderName)
         {
             return this.orleansQueries.ReadReminderRowAsync(this.serviceId, grainId, reminderName);
-        }   
-        
+        }
+
         public Task<string> UpsertRow(ReminderEntry entry)
         {
             if (entry.StartAt.Kind is DateTimeKind.Unspecified)
@@ -47,12 +45,12 @@ namespace Orleans.Runtime.ReminderService
                 entry.StartAt = new DateTime(entry.StartAt.Ticks, DateTimeKind.Utc);
             }
 
-            return this.orleansQueries.UpsertReminderRowAsync(this.serviceId, entry.GrainId, entry.ReminderName, entry.StartAt, entry.Period);            
+            return this.orleansQueries.UpsertReminderRowAsync(this.serviceId, entry.GrainId, entry.ReminderName, entry.StartAt, entry.Period);
         }
 
         public Task<bool> RemoveRow(GrainId grainId, string reminderName, string eTag)
         {
-            return this.orleansQueries.DeleteReminderRowAsync(this.serviceId, grainId, reminderName, eTag);            
+            return this.orleansQueries.DeleteReminderRowAsync(this.serviceId, grainId, reminderName, eTag);
         }
 
         public Task TestOnlyClearTable()

@@ -1,7 +1,3 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
 using Newtonsoft.Json;
 using Orleans.Runtime;
 
@@ -9,7 +5,7 @@ namespace Orleans.Streams
 {
     [Serializable]
     [GenerateSerializer]
-    internal class StreamSubscriptionHandleImpl<T> : StreamSubscriptionHandle<T>, IStreamSubscriptionHandle 
+    internal class StreamSubscriptionHandleImpl<T> : StreamSubscriptionHandle<T>, IStreamSubscriptionHandle
     {
         [Id(0)]
         [JsonProperty]
@@ -122,7 +118,8 @@ namespace Orleans.Streams
                     {
                         await NextItem(itemTuple.Item1, itemTuple.Item2);
                     }
-                } else
+                }
+                else
                 {
                     await NextItems(batch.GetEvents<T>());
                 }

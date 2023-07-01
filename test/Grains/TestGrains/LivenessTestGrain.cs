@@ -1,9 +1,4 @@
-using System;
-using System.Threading;
-using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
-using Orleans;
-using Orleans.Runtime;
 using UnitTests.GrainInterfaces;
 
 namespace UnitTests.Grains
@@ -53,7 +48,7 @@ namespace UnitTests.Grains
         {
             logger.LogInformation("StartTimer.");
             base.RegisterTimer(TimerTick, null, TimeSpan.Zero, TimeSpan.FromSeconds(10));
-            
+
             return Task.CompletedTask;
         }
 

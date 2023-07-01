@@ -1,6 +1,3 @@
-using System;
-using System.Threading.Tasks;
-using Orleans;
 using TestExtensions;
 using UnitTests.GrainInterfaces;
 using Xunit;
@@ -25,7 +22,7 @@ namespace DefaultCluster.Tests.General
         {
             writer = this.GrainFactory.GetGrain<IMultifacetWriter>(GetRandomGrainId());
             reader = writer.AsReference<IMultifacetReader>();
-            
+
             int x = 1234;
             bool ok = writer.SetValue(x).Wait(timeout);
             if (!ok) throw new TimeoutException();
@@ -53,7 +50,7 @@ namespace DefaultCluster.Tests.General
             writer.SetValue(5).Wait();
             int v = reader.GetValue().Result;
             Assert.Equal(5, v);
-            
+
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Cast")]

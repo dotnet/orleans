@@ -1,5 +1,3 @@
-using System;
-using System.Collections.Generic;
 using Orleans.Serialization.TypeSystem;
 
 namespace Orleans.Serialization.Configuration

@@ -219,7 +219,7 @@ namespace Orleans.Serialization.UnitTests
 
         private delegate T ReadValue<T>(ref Reader<TInput> reader);
         private delegate void WriteValue<T>(ref Writer<TOutput> writer, T value);
-        
+
         public ReaderWriterTestBase(ITestOutputHelper testOutputHelper)
         {
             var services = new ServiceCollection();
@@ -307,7 +307,7 @@ namespace Orleans.Serialization.UnitTests
             static void Write(ref Writer<TOutput> writer, long expected) => writer.WriteInt64(expected);
 
             Gen.Long.Sample(CreateTestPredicate(Write, Read));
-                
+
         }
 
         protected void Int32RoundTripTest()
@@ -323,7 +323,7 @@ namespace Orleans.Serialization.UnitTests
             static ulong Read(ref Reader<TInput> reader) => reader.ReadUInt64();
             static void Write(ref Writer<TOutput> writer, ulong expected) => writer.WriteUInt64(expected);
 
-            Gen.ULong.Sample(CreateTestPredicate(Write, Read)); 
+            Gen.ULong.Sample(CreateTestPredicate(Write, Read));
         }
 
         protected void UInt32RoundTripTest()

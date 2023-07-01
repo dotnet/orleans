@@ -1,7 +1,3 @@
-using System;
-using System.Collections.Generic;
-using System.Threading.Tasks;
-using Orleans;
 using Orleans.Streams;
 using Orleans.Streams.Core;
 using UnitTests.GrainInterfaces;
@@ -13,7 +9,7 @@ namespace UnitTests.Grains.Batching
     public class BatchingStreamBatchingTestConsumerGrain : Grain, IStreamBatchingTestConsumerGrain, IStreamSubscriptionObserver
     {
         private readonly ConsumptionReport report = new ConsumptionReport();
-        
+
         public Task<ConsumptionReport> GetConsumptionReport() => Task.FromResult(this.report);
 
         public Task OnSubscribed(IStreamSubscriptionHandleFactory handleFactory)

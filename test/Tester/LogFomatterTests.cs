@@ -1,11 +1,7 @@
-using System;
 using System.Collections.Concurrent;
-using System.Collections.Generic;
-using System.Linq;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using Orleans;
 using Orleans.Configuration;
 using Xunit;
 
@@ -79,7 +75,8 @@ namespace Tester
             services.AddSingleton(typeof(ILogger<>), typeof(TestLogger<>));
             services.AddSingleton(typeof(IOptionFormatter<>), typeof(DefaultOptionsFormatter<>));
             services.AddSingleton<OptionsLogger, TestOptionsLogger>();
-            services.Configure<TestOptionsWithSecrets>(options => {
+            services.Configure<TestOptionsWithSecrets>(options =>
+            {
                 options.Data = "Hello";
                 options.Password = "v3ryS3cur3!!!";
                 options.SomeConnectionString = "DefaultEndpointsProtocol=https;AccountName=someAccount;AccountKey=someKey;EndpointSuffix=core.windows.net";
@@ -109,7 +106,8 @@ namespace Tester
             services.AddSingleton(typeof(ILogger<>), typeof(TestLogger<>));
             services.AddSingleton(typeof(IOptionFormatter<>), typeof(DefaultOptionsFormatter<>));
             services.AddSingleton<OptionsLogger, TestOptionsLogger>();
-            services.Configure<TestOptionsWithListAndDictionary>(options => {
+            services.Configure<TestOptionsWithListAndDictionary>(options =>
+            {
                 options.SomeDictionary.Add("Account1", "Key1");
                 options.SomeDictionary.Add("Account2", "Key2");
                 options.SomeDictionary.Add("Account3", "Key3");
@@ -404,7 +402,7 @@ namespace Tester
             var services = new ServiceCollection();
             IOptionFormatter[] formatters = Enumerable
                 .Range(1, 3)
-                .Select(i =>  TestOptionsFormatter.CreateNamed(i.ToString(), Options.Create(new TestOptions { IntField = i })))
+                .Select(i => TestOptionsFormatter.CreateNamed(i.ToString(), Options.Create(new TestOptions { IntField = i })))
                 .ToArray<IOptionFormatter>();
             var expected = new TestLoggerFactory();
             var optionsLogger = new TestOptionsLogger(expected.CreateLogger<TestOptionsLogger>(), services.BuildServiceProvider());

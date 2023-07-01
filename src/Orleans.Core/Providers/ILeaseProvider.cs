@@ -1,6 +1,3 @@
-using System;
-using System.Threading.Tasks;
-
 namespace Orleans.LeaseProviders
 {
     /// <summary>
@@ -110,7 +107,7 @@ namespace Orleans.LeaseProviders
         /// </summary>
         TransientFailure
     }
-    
+
     /// <summary>
     /// Lease request where you can specify ResourceKey and duration of your lease. 
     /// </summary>

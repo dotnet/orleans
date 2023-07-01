@@ -1,4 +1,3 @@
-using System;
 using System.Runtime.Serialization;
 
 namespace Orleans.Storage.Internal
@@ -55,7 +54,7 @@ namespace Orleans.Storage.Internal
         /// <returns>A new <see cref="InconsistentStateException"/>.</returns>
         public InconsistentStateException AsInconsistentStateException()
         {
-            var message = $"e-Tag mismatch in Memory Storage. Stored = { StoredEtag ?? "null"} Received = {ReceivedEtag}";
+            var message = $"e-Tag mismatch in Memory Storage. Stored = {StoredEtag ?? "null"} Received = {ReceivedEtag}";
             return new InconsistentStateException(message, StoredEtag, ReceivedEtag, this);
         }
     }

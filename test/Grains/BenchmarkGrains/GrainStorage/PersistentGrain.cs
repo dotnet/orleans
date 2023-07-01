@@ -1,11 +1,7 @@
-using System;
-using System.Threading.Tasks;
 using System.Diagnostics;
-using Orleans;
 using BenchmarkGrainInterfaces.GrainStorage;
 using Microsoft.Extensions.Logging;
 using Orleans.Runtime;
-using System.Linq;
 
 namespace BenchmarkGrains.GrainStorage
 {
@@ -47,10 +43,11 @@ namespace BenchmarkGrains.GrainStorage
                 sw.Stop();
                 logger.LogInformation("Grain {GrainId} took {WriteTimeMs}ms to set state.", this.GetPrimaryKey(), sw.ElapsedMilliseconds);
                 success = true;
-            } catch(Exception ex)
+            }
+            catch (Exception ex)
             {
                 sw.Stop();
-                this.logger.LogError(ex, "Grain {GrainId} failed to set state in {WriteTimeMs}ms to set state.",  this.GetPrimaryKey(), sw.ElapsedMilliseconds );
+                this.logger.LogError(ex, "Grain {GrainId} failed to set state in {WriteTimeMs}ms to set state.", this.GetPrimaryKey(), sw.ElapsedMilliseconds);
                 success = false;
             }
 

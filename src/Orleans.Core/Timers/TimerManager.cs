@@ -1,7 +1,4 @@
-using System;
 using System.Runtime.CompilerServices;
-using System.Threading;
-using System.Threading.Tasks;
 using Orleans.Runtime;
 using Orleans.Threading;
 
@@ -134,7 +131,7 @@ namespace Orleans.Timers.Internal
                 expired?.FireTimers();
             }
         }
-        
+
         private static void CheckQueues()
         {
             var expired = new ExpiredTimers();

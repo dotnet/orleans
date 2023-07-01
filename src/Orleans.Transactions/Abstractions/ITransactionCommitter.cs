@@ -1,8 +1,4 @@
-﻿
-using System;
-using System.Threading.Tasks;
-
-namespace Orleans.Transactions.Abstractions
+﻿namespace Orleans.Transactions.Abstractions
 {
     public interface ITransactionCommitOperation<TService>
         where TService : class

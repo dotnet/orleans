@@ -1,5 +1,4 @@
-﻿using System;
-using System.Xml.Linq;
+﻿using System.Xml.Linq;
 
 namespace TestGrains
 {
@@ -76,4 +75,3 @@ namespace TestGrains
         }
     }
 }
-   

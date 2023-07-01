@@ -1,7 +1,4 @@
-using System;
 using Microsoft.Extensions.Configuration;
-using Orleans;
-using Orleans.Hosting;
 using Orleans.TestingHost;
 using Tester.StreamingTests;
 using TestExtensions;
@@ -29,7 +26,7 @@ namespace ServiceBus.Tests.Streaming
                 public void Configure(ISiloBuilder hostBuilder)
                 {
                     hostBuilder
-                        .AddEventHubStreams(StreamProviderName, b=>
+                        .AddEventHubStreams(StreamProviderName, b =>
                         {
                             b.ConfigureEventHub(ob => ob.Configure(options =>
                             {
@@ -43,7 +40,7 @@ namespace ServiceBus.Tests.Streaming
                         });
 
                     hostBuilder
-                        .AddEventHubStreams(StreamProviderName2, b=>
+                        .AddEventHubStreams(StreamProviderName2, b =>
                         {
                             b.ConfigureEventHub(ob => ob.Configure(options =>
                             {

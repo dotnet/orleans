@@ -1,7 +1,3 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Orleans.Runtime;
@@ -245,8 +241,8 @@ namespace UnitTests.StreamingTests
             actualSubscriptions = await consumer.GetAllSubscriptions(streamGuid, streamNamespace, streamProviderName);
 
             // validate
-            Assert.Equal(subscriptionCount-1, actualSubscriptions.Count);
-            Assert.Equal(subscriptionCount-1, expectedSubscriptions.Count);
+            Assert.Equal(subscriptionCount - 1, actualSubscriptions.Count);
+            Assert.Equal(subscriptionCount - 1, expectedSubscriptions.Count);
             foreach (StreamSubscriptionHandle<int> subscription in actualSubscriptions)
             {
                 Assert.True(expectedSubscriptions.Contains(subscription), "Subscription Match");
@@ -314,7 +310,7 @@ namespace UnitTests.StreamingTests
 
             var provider = this.testCluster.Client.ServiceProvider.GetServiceByName<IStreamProvider>(streamProviderName);
             var stream = provider.GetStream<int>(streamNamespace, streamGuid);
-            var handle = await stream.SubscribeAsync((e,t) =>
+            var handle = await stream.SubscribeAsync((e, t) =>
             {
                 eventCount++;
                 return Task.CompletedTask;
@@ -370,7 +366,7 @@ namespace UnitTests.StreamingTests
                     {
                         logger.LogInformation("numProduced != consumed: Produced and consumed counts do not match. numProduced = {ProducedCount}, consumed = {ConsumedCount}",
                             numProduced, consumed.Key.HandleId + " -> " + consumed.Value);
-                            //numProduced, Utils.DictionaryToString(numConsumed));
+                        //numProduced, Utils.DictionaryToString(numConsumed));
                     }
                 }
                 return false;

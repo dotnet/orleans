@@ -1,5 +1,3 @@
-using System.Threading.Tasks;
-
 namespace Orleans.Storage
 {
     /// <summary>
@@ -17,7 +15,7 @@ namespace Orleans.Storage
         /// <param name="grainState">New state data to be stored for this grain.</param>
         /// <returns>Completion promise with new eTag for the update operation for stored grain state for the specified grain.</returns>
         Task<string> WriteStateAsync<T>(string grainStoreKey, IGrainState<T> grainState);
-        
+
         /// <param name="grainStoreKey">Store key for this grain.</param>
         /// <param name="eTag">The previous etag that was read.</param>
         /// <returns>Completion promise for the update operation for stored grain state for the specified grain.</returns>

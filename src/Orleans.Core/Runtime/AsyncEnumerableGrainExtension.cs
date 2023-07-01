@@ -1,11 +1,7 @@
-using System;
-using System.Collections.Generic;
 using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using System.Runtime.ExceptionServices;
 using System.Runtime.InteropServices;
-using System.Threading;
-using System.Threading.Tasks;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 using Orleans.Internal;
@@ -18,7 +14,7 @@ namespace Orleans.Runtime;
 /// </summary>
 internal sealed class AsyncEnumerableGrainExtension : IAsyncEnumerableGrainExtension, IAsyncDisposable, IDisposable
 {
-    private const long EnumeratorExpirationMilliseconds = 10_000; 
+    private const long EnumeratorExpirationMilliseconds = 10_000;
     private readonly Dictionary<Guid, EnumeratorState> _enumerators = new();
     private readonly IGrainContext _grainContext;
     private readonly MessagingOptions _messagingOptions;
@@ -255,7 +251,7 @@ internal sealed class AsyncEnumerableGrainExtension : IAsyncEnumerableGrainExten
         await enumerator.DisposeAsync();
         return (EnumerationResult.Completed, default);
     }
-    
+
     private async ValueTask<(EnumerationResult Status, object Value)> OnError<T>(Guid requestId, IAsyncEnumerator<T> enumerator, Exception exception)
     {
         _enumerators.Remove(requestId, out var state);

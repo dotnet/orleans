@@ -1,7 +1,4 @@
-﻿using System;
-using System.Threading.Tasks;
-using Orleans;
-using Orleans.Providers;
+﻿using Orleans.Providers;
 using UnitTests.GrainInterfaces;
 
 namespace UnitTests.Grains
@@ -17,7 +14,7 @@ namespace UnitTests.Grains
     [StorageProvider(ProviderName = "MemoryStore")]
     public class MultifacetTestGrain : Grain<MultifacetTestGrainState>, IMultifacetTestGrain
     {
-        
+
         public string GetRuntimeInstanceId()
         {
             return RuntimeIdentity;

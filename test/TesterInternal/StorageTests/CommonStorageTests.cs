@@ -1,8 +1,4 @@
-using System;
 using System.Globalization;
-using System.Linq;
-using System.Threading.Tasks;
-using Orleans;
 using Orleans.Runtime;
 using Orleans.Storage;
 using UnitTests.StorageTests.Relational.TestDataSets;
@@ -34,7 +30,7 @@ namespace UnitTests.StorageTests.Relational
         /// <param name="version">The initial version of the state.</param>
         /// <returns>A grain reference and a state pair.</returns>
         [System.Diagnostics.CodeAnalysis.SuppressMessage("Style", "IDE0022")]
-        internal (GrainId GrainId, GrainState<TestState1> GrainState)  GetTestReferenceAndState(long grainId, string version)
+        internal (GrainId GrainId, GrainState<TestState1> GrainState) GetTestReferenceAndState(long grainId, string version)
         {
             var id = GrainId.Create(GrainType.Create("my-grain-type"), GrainIdKeyExtensions.CreateIntegerKey(grainId));
             var grainState = new GrainState<TestState1> { State = new TestState1(), ETag = version };

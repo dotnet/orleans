@@ -1,17 +1,8 @@
-using System;
-using System.Threading.Tasks;
-using System.Linq;
-using Orleans.Hosting;
 using Orleans.TestingHost;
 using BenchmarkGrainInterfaces.Transaction;
 using TestExtensions;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Transactions;
-using Orleans.Configuration;
-using Orleans.Runtime;
-using System.Collections.Generic;
-using Microsoft.Extensions.Logging;
-using System.Text;
 
 namespace Benchmarks.Transactions
 {
@@ -102,16 +93,16 @@ namespace Benchmarks.Transactions
         {
             Console.WriteLine($"Cold Run.");
             await FullRunAsync();
-            for(int i=0; i<runs; i++)
+            for (int i = 0; i < runs; i++)
             {
-                Console.WriteLine($"Warm Run {i+1}.");
+                Console.WriteLine($"Warm Run {i + 1}.");
                 await FullRunAsync();
             }
         }
 
         private async Task FullRunAsync()
         {
-            int runners = Math.Max(1,(int)Math.Sqrt(concurrent));
+            int runners = Math.Max(1, (int)Math.Sqrt(concurrent));
             int transactionsPerRunner = Math.Max(1, this.transactionsPerRun / runners);
             Report[] reports = await Task.WhenAll(Enumerable.Range(0, runners).Select(i => RunAsync(i, transactionsPerRunner, runners)));
             Report finalReport = new Report();

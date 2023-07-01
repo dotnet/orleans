@@ -1,6 +1,3 @@
-using System;
-using System.Collections.Generic;
-using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
@@ -529,7 +526,7 @@ namespace Orleans.Runtime.Messaging
             {
                 MessagingInstruments.OnRejectedMessage(msg);
                 this.log.LogWarning(
-                    (int) ErrorCode.MessagingMessageFromUnknownActivation,
+                    (int)ErrorCode.MessagingMessageFromUnknownActivation,
                     "Received a message {Message} for an unknown SystemTarget: {Target}",
                      msg,
                      msg.TargetGrain);

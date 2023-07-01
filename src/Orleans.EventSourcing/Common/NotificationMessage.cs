@@ -1,7 +1,3 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
-
 namespace Orleans.EventSourcing.Common
 {
     /// <summary>
@@ -24,7 +20,7 @@ namespace Orleans.EventSourcing.Common
     {
         /// <inheritdoc/>
         [Id(0)]
-        public int Version { get; set;  }
+        public int Version { get; set; }
     }
 
 
@@ -38,7 +34,8 @@ namespace Orleans.EventSourcing.Common
         public List<INotificationMessage> Notifications { get; set; }
 
         /// <summary>The version number - for a batch, this is the maximum version contained.</summary>
-        public int Version {
+        public int Version
+        {
             get
             {
                 return Notifications.Aggregate(0, (v, m) => Math.Max(v, m.Version));

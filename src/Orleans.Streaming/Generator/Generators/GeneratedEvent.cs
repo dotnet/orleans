@@ -1,5 +1,3 @@
-using System;
-
 namespace Orleans.Providers.Streams.Generator
 {
     /// <summary>

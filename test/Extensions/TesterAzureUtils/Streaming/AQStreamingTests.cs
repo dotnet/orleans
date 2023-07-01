@@ -1,11 +1,8 @@
-using System.Threading.Tasks;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
-using Orleans;
 using Orleans.Configuration;
-using Orleans.Hosting;
 using Orleans.Providers.Streams.AzureQueue;
 using Orleans.TestingHost;
 using TestExtensions;
@@ -34,8 +31,8 @@ namespace Tester.AzureUtils.Streaming
             public void Configure(IConfiguration configuration, IClientBuilder clientBuilder)
             {
                 clientBuilder
-                    .AddAzureQueueStreams(AzureQueueStreamProviderName, b=>
-                    b.ConfigureAzureQueue(ob=>ob.Configure<IOptions<ClusterOptions>>(
+                    .AddAzureQueueStreams(AzureQueueStreamProviderName, b =>
+                    b.ConfigureAzureQueue(ob => ob.Configure<IOptions<ClusterOptions>>(
                         (options, dep) =>
                         {
                             options.ConfigureTestDefaults();
@@ -60,13 +57,13 @@ namespace Tester.AzureUtils.Streaming
                             options.DeleteStateOnClear = true;
                         }))
                     .AddMemoryGrainStorage("MemoryStore")
-                    .AddAzureQueueStreams(AzureQueueStreamProviderName, c=>
+                    .AddAzureQueueStreams(AzureQueueStreamProviderName, c =>
                         c.ConfigureAzureQueue(ob => ob.Configure<IOptions<ClusterOptions>>(
                             (options, dep) =>
                             {
                                 options.ConfigureTestDefaults();
                                 options.QueueNames = AzureQueueUtilities.GenerateQueueNames(dep.Value.ClusterId, queueCount);
-                        })));
+                            })));
             }
         }
 
@@ -127,7 +124,7 @@ namespace Tester.AzureUtils.Streaming
             await runner.StreamTest_06_ManyDifferent_ManyProducerGrainManyConsumerClients();
         }
 
-        [SkippableFact(Skip="https://github.com/dotnet/orleans/issues/5648"), TestCategory("Functional")]
+        [SkippableFact(Skip = "https://github.com/dotnet/orleans/issues/5648"), TestCategory("Functional")]
         public async Task AQ_07_ManyDifferent_ManyProducerClientsManyConsumerGrains()
         {
             await runner.StreamTest_07_ManyDifferent_ManyProducerClientsManyConsumerGrains();

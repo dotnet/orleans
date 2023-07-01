@@ -1,9 +1,7 @@
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.Text;
 using Orleans.CodeGenerator.Diagnostics;
-using System;
 using System.Diagnostics;
-using System.Linq;
 using System.Text;
 
 namespace Orleans.CodeGenerator

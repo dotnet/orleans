@@ -1,7 +1,3 @@
-using System;
-using System.Threading;
-using System.Threading.Tasks;
-using System.Collections.Generic;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -22,7 +18,7 @@ namespace Orleans.Transactions
         private readonly TransactionalStateConfiguration config;
         private readonly IGrainContext context;
         private readonly ITransactionDataCopier<TState> copier;
-        private readonly Dictionary<Type,object> copiers;
+        private readonly Dictionary<Type, object> copiers;
         private readonly IGrainRuntime grainRuntime;
         private readonly ILogger logger;
         private readonly ActivationLifetime activationLifetime;
@@ -34,8 +30,8 @@ namespace Orleans.Transactions
         private bool detectReentrancy;
 
         public TransactionalState(
-            TransactionalStateConfiguration transactionalStateConfiguration, 
-            IGrainContextAccessor contextAccessor, 
+            TransactionalStateConfiguration transactionalStateConfiguration,
+            IGrainContextAccessor contextAccessor,
             ITransactionDataCopier<TState> copier,
             IGrainRuntime grainRuntime,
             ILogger<TransactionalState<TState>> logger)

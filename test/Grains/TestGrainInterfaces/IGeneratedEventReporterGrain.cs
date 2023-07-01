@@ -1,7 +1,3 @@
-using System;
-using System.Collections.Generic;
-using System.Threading.Tasks;
-using Orleans;
 using Orleans.Runtime;
 
 namespace TestGrainInterfaces
@@ -10,7 +6,7 @@ namespace TestGrainInterfaces
     {
         Task ReportResult(Guid streamGuid, string streamProvider, string streamNamespace, int count);
 
-        Task<IDictionary<Guid,int>> GetReport(string streamProvider, string streamNamespace);
+        Task<IDictionary<Guid, int>> GetReport(string streamProvider, string streamNamespace);
 
         Task Reset();
 

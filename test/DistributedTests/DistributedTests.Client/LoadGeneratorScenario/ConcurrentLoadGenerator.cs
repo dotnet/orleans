@@ -1,10 +1,6 @@
-using System;
-using System.Threading.Tasks;
 using System.Threading.Channels;
-using System.Collections.Generic;
 using System.Diagnostics;
 using Microsoft.Extensions.Logging;
-using System.Threading;
 
 namespace DistributedTests.Client
 {
@@ -90,7 +86,7 @@ namespace DistributedTests.Client
             await Task.WhenAll(this.tasks);
 
             // Ignore warmup blocks.
-            while (completedBlockReader.TryRead(out _));
+            while (completedBlockReader.TryRead(out _)) ;
             GC.Collect();
             GC.Collect();
             GC.Collect();

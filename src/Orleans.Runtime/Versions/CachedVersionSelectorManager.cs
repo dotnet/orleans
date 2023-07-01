@@ -1,7 +1,4 @@
-using System;
 using System.Collections.Concurrent;
-using System.Collections.Generic;
-using System.Linq;
 using Orleans.Metadata;
 using Orleans.Runtime.Versions.Compatibility;
 using Orleans.Runtime.Versions.Selector;
@@ -51,8 +48,8 @@ namespace Orleans.Runtime.Versions
             var compatibilityDirector = this.CompatibilityDirectorManager.GetDirector(interfaceType);
             (var version, var available) = this.grainInterfaceVersions.GetAvailableVersions(interfaceType);
             var versions = versionSelector.GetSuitableVersion(
-                requestedVersion, 
-                available, 
+                requestedVersion,
+                available,
                 compatibilityDirector);
 
             (_, var result) = this.grainInterfaceVersions.GetSupportedSilos(grainType, interfaceType, versions);

@@ -1,4 +1,3 @@
-using System;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
@@ -26,7 +25,7 @@ namespace Orleans.Hosting
         /// <param name="configurator">The configuration builder.</param>
         /// <param name="siloMaturityPeriod">The silo maturity period.</param>
         public static void UseStaticClusterConfigDeploymentBalancer(
-            this ISiloPersistentStreamConfigurator configurator, 
+            this ISiloPersistentStreamConfigurator configurator,
             TimeSpan? siloMaturityPeriod = null)
         {
             configurator.ConfigurePartitionBalancing<DeploymentBasedQueueBalancerOptions>(
@@ -63,7 +62,7 @@ namespace Orleans.Hosting
         /// </summary>
         /// <param name="configurator">The configuration builder.</param>
         /// <param name="configureOptions">The configure options.</param>
-        public static void UseLeaseBasedQueueBalancer(this ISiloPersistentStreamConfigurator configurator, 
+        public static void UseLeaseBasedQueueBalancer(this ISiloPersistentStreamConfigurator configurator,
             Action<OptionsBuilder<LeaseBasedQueueBalancerOptions>> configureOptions = null)
         {
             configurator.ConfigurePartitionBalancing((s, n) => LeaseBasedQueueBalancer.Create(s, n),

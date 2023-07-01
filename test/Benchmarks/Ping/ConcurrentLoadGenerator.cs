@@ -1,7 +1,4 @@
-using System;
-using System.Threading.Tasks;
 using System.Threading.Channels;
-using System.Collections.Generic;
 using System.Diagnostics;
 
 namespace Benchmarks.Ping
@@ -63,7 +60,7 @@ namespace Benchmarks.Ping
             await Task.WhenAll(this.tasks);
 
             // Ignore warmup blocks.
-            while (completedBlockReader.TryRead(out _));
+            while (completedBlockReader.TryRead(out _)) ;
             GC.Collect();
             GC.Collect();
             GC.Collect();

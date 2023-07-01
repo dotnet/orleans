@@ -1,6 +1,4 @@
-using System;
 using Orleans.Serialization.TypeSystem;
-using Orleans.Utilities;
 
 namespace Orleans.Streams
 {
@@ -8,7 +6,7 @@ namespace Orleans.Streams
     /// Default implementation of <see cref="IStreamNamespacePredicateProvider"/> for internally supported stream predicates.
     /// </summary>
     public class DefaultStreamNamespacePredicateProvider : IStreamNamespacePredicateProvider
-    {  
+    {
         /// <inheritdoc/>
         public bool TryGetPredicate(string predicatePattern, out IStreamNamespacePredicate predicate)
         {

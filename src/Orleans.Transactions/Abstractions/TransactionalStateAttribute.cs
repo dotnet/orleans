@@ -1,6 +1,4 @@
-﻿using System;
-
-namespace Orleans.Transactions.Abstractions
+﻿namespace Orleans.Transactions.Abstractions
 {
     [AttributeUsage(AttributeTargets.Parameter)]
     public class TransactionalStateAttribute : Attribute, IFacetMetadata, ITransactionalStateConfiguration

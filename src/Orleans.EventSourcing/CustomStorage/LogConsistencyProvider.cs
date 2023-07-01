@@ -1,6 +1,5 @@
 using Orleans.Storage;
 using Orleans.Configuration;
-using System;
 using Microsoft.Extensions.Options;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -26,7 +25,7 @@ namespace Orleans.EventSourcing.CustomStorage
 
         /// <inheritdoc/>
         public bool UsesStorageProvider => false;
-        
+
         public LogConsistencyProvider(CustomStorageLogConsistencyOptions options)
         {
             this.options = options;

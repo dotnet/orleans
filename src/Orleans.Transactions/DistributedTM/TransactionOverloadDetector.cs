@@ -1,4 +1,3 @@
-using System;
 using Microsoft.Extensions.Options;
 using Orleans.Internal.Trasactions;
 using Orleans.Transactions.Abstractions;
@@ -68,7 +67,7 @@ namespace Orleans.Transactions
             double txPerSecondCurrently = CalculateTps(this.lastStatistics.TransactionsStarted, this.lastCheckTime, this.statistics.TransactionsStarted, now);
             //decaying utilization for tx per second
             var aggregratedTxPerSecond = (this.transactionStartedPerSecond + (2.0 * txPerSecondCurrently)) / 3.0;
-            
+
             return aggregratedTxPerSecond > this.options.Limit;
         }
 

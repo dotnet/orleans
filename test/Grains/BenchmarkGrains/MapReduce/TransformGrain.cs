@@ -1,17 +1,12 @@
-using System;
 using System.Collections.Concurrent;
-using System.Collections.Generic;
-using System.Threading;
-using System.Threading.Tasks;
 using BenchmarkGrainInterfaces.MapReduce;
-using Orleans;
 
 namespace BenchmarkGrains.MapReduce
 {
     public class TransformGrain<TInput, TOutput> : DataflowGrain, ITransformGrain<TInput, TOutput>
     {
         private ITransformProcessor<TInput, TOutput> _processor;
-        private bool _processingStarted ;
+        private bool _processingStarted;
         private bool _proccessingStopped;
 
         private const bool ProcessOnThreadPool = true;

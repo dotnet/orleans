@@ -1,11 +1,5 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading;
-using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
-using Orleans;
 using Orleans.Runtime;
 using Orleans.Runtime.GrainDirectory;
 using UnitTests.GrainInterfaces;
@@ -85,14 +79,14 @@ namespace UnitTests.Grains
 
             var task = Task.Factory.StartNew(() =>
             {
-                bar1 = (string) RequestContext.Get("jarjar");
+                bar1 = (string)RequestContext.Get("jarjar");
                 logger.LogInformation("bar = {Bar}.", bar1);
             });
 
             string bar2 = null;
             var ac = Task.Factory.StartNew(() =>
             {
-                bar2 = (string) RequestContext.Get("jarjar");
+                bar2 = (string)RequestContext.Get("jarjar");
                 logger.LogInformation("bar = {Bar}.", bar2);
             });
 

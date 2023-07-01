@@ -1,5 +1,4 @@
 using Microsoft.Extensions.DependencyInjection;
-using Orleans.Hosting;
 using Orleans.LeaseProviders;
 
 namespace Orleans.Runtime.Development
@@ -17,7 +16,7 @@ namespace Orleans.Runtime.Development
         /// </remarks>
         /// <param name="builder">The builder.</param>
         /// <returns>The builder.</returns>
-         public static ISiloBuilder UseInMemoryLeaseProvider(this ISiloBuilder builder)
+        public static ISiloBuilder UseInMemoryLeaseProvider(this ISiloBuilder builder)
         {
             return builder.ConfigureServices(UseInMemoryLeaseProvider);
         }

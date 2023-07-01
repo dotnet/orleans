@@ -1,12 +1,6 @@
-using System;
-using System.Collections.Generic;
 using System.Diagnostics;
-using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
-using Orleans.Configuration;
-using Orleans.Hosting;
 using Orleans.Internal;
-using Orleans.Runtime;
 using Orleans.TestingHost;
 using TestExtensions;
 using UnitTests.GrainInterfaces;
@@ -68,7 +62,7 @@ namespace UnitTests
             }
             this.fixture.Logger.LogInformation("Reentrancy ReentrantGrain Test finished OK.");
         }
-        
+
         [Fact, TestCategory("Functional"), TestCategory("Tasks"), TestCategory("Reentrancy")]
         public void NonReentrantGrain_WithMayInterleavePredicate_WhenPredicateReturnsTrue()
         {
@@ -102,7 +96,7 @@ namespace UnitTests
             }
             this.fixture.Logger.LogInformation("Reentrancy NonReentrantGrain_WithMayInterleavePredicate_WhenPredicateThrows Test finished OK.");
         }
-        
+
         [Fact, TestCategory("Functional"), TestCategory("Tasks"), TestCategory("Reentrancy")]
         public void Reentrancy_Deadlock_1()
         {
@@ -168,7 +162,7 @@ namespace UnitTests
         }
 
         // TODO: [Fact, TestCategory("BVT"), TestCategory("Tasks"), TestCategory("Reentrancy")]
-        [Fact(Skip ="Ignore"), TestCategory("Failures"), TestCategory("Tasks"), TestCategory("Reentrancy")]
+        [Fact(Skip = "Ignore"), TestCategory("Failures"), TestCategory("Tasks"), TestCategory("Reentrancy")]
         public async Task FanOut_Task_NonReentrant_Chain()
         {
             await Do_FanOut_Task_Join(0, true, true);
@@ -194,7 +188,7 @@ namespace UnitTests
 
         [TestCategory("MultithreadingFailures")]
         // TODO: [TestCategory("Functional")]
-        [Fact(Skip ="Ignore"), TestCategory("Tasks"), TestCategory("Reentrancy")]
+        [Fact(Skip = "Ignore"), TestCategory("Tasks"), TestCategory("Reentrancy")]
         public async Task FanOut_AC_NonReentrant_Chain()
         {
             await Do_FanOut_AC_Join(0, true, true);
@@ -247,7 +241,7 @@ namespace UnitTests
                 IFanOutGrain grain = this.fixture.GrainFactory.GetGrain<IFanOutGrain>(id);
                 if (doCallChain)
                 {
-                    await grain.FanOutNonReentrant_Chain(offset*num, num);
+                    await grain.FanOutNonReentrant_Chain(offset * num, num);
                 }
                 else
                 {
@@ -259,7 +253,7 @@ namespace UnitTests
                 IFanOutGrain grain = this.fixture.GrainFactory.GetGrain<IFanOutGrain>(id);
                 if (doCallChain)
                 {
-                    await grain.FanOutReentrant_Chain(offset*num, num);
+                    await grain.FanOutReentrant_Chain(offset * num, num);
                 }
                 else
                 {

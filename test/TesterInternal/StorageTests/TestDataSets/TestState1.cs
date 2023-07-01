@@ -1,15 +1,11 @@
-﻿using System;
-using System.Collections.Generic;
-
-
-namespace UnitTests.StorageTests.Relational.TestDataSets
+﻿namespace UnitTests.StorageTests.Relational.TestDataSets
 {
     /// <summary>
     /// A state used to test if saving, reading and clearing of the storage functions as expected.
     /// </summary>
     [Serializable]
     [Orleans.GenerateSerializer]
-    public class TestState1: IEquatable<TestState1>
+    public class TestState1 : IEquatable<TestState1>
     {
         [Orleans.Id(0)]
         public string A { get; set; }
@@ -28,7 +24,7 @@ namespace UnitTests.StorageTests.Relational.TestDataSets
 
         public bool Equals(TestState1 other)
         {
-            if(ReferenceEquals(other, null))
+            if (ReferenceEquals(other, null))
             {
                 return false;
             }

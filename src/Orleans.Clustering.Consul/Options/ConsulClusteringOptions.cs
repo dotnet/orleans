@@ -1,4 +1,3 @@
-using System;
 using Consul;
 using Orleans.Runtime;
 
@@ -8,11 +7,11 @@ namespace Orleans.Configuration
     /// Base class for consul-cluster-options.
     /// </summary>
     public class ConsulClusteringOptions
-    {        
+    {
         /// <summary>
         /// Consul KV root folder name.
         /// </summary>
-        public string KvRootFolder { get; set; }       
+        public string KvRootFolder { get; set; }
 
         /// <summary>
         /// Factory for the used Consul-Client.
@@ -26,14 +25,14 @@ namespace Orleans.Configuration
         {
             CreateClient = createClientCallback ?? throw new ArgumentNullException(nameof(createClientCallback));
         }
-       
+
         /// <summary>
         /// Configures the <see cref="CreateClient"/> using the consul-address and a acl-token.
         /// </summary>
         public void ConfigureConsulClient(Uri address, string aclClientToken = null)
         {
-            if (address is null) throw new ArgumentNullException(nameof(address));            
-            
+            if (address is null) throw new ArgumentNullException(nameof(address));
+
             CreateClient = () => new ConsulClient(config =>
             {
                 config.Address = address;
@@ -51,7 +50,7 @@ namespace Orleans.Configuration
             if (CreateClient is null)
             {
                 throw new OrleansConfigurationException($"No callback specified. Use the {GetType().Name}.{nameof(ConsulClusteringOptions.ConfigureConsulClient)} method to configure the consul client.");
-            }                       
+            }
         }
     }
 

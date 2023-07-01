@@ -1,6 +1,4 @@
-using System;
 using System.Buffers;
-using System.Collections.Generic;
 using System.Reflection;
 using Orleans.Serialization.Buffers;
 using Orleans.Serialization.Cloning;
@@ -271,7 +269,7 @@ namespace Orleans.Serialization.Codecs
                 {
                     break;
                 }
-                
+
                 fieldId += header.FieldIdDelta;
                 switch (fieldId)
                 {

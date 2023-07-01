@@ -1,10 +1,6 @@
 using Microsoft.Extensions.Logging;
 using Orleans.Concurrency;
 using Orleans.Transactions.Abstractions;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
 
 namespace Orleans.Transactions.TestKit.Consistency
 {
@@ -43,14 +39,14 @@ namespace Orleans.Transactions.TestKit.Consistency
         public async Task<Observation[]> Run(ConsistencyTestOptions options, int depth, string stack, int maxgrain, DateTime stopAfter)
         {
             if (random == null)
-                random = new Random(options.RandomSeed* options.NumGrains + MyNumber);
+                random = new Random(options.RandomSeed * options.NumGrains + MyNumber);
 
             if (depth < options.MaxDepth && random.NextDouble() < recursionProbability)
             {
                 switch (random.Next(2))
                 {
                     case 0:
-                        return await Recurse(options, depth, stack, random, 10, ! options.AvoidDeadlocks, maxgrain, stopAfter);
+                        return await Recurse(options, depth, stack, random, 10, !options.AvoidDeadlocks, maxgrain, stopAfter);
                     case 1:
                         return await Recurse(options, depth, stack, random, 10, false, maxgrain, stopAfter);
                     case 2:
@@ -86,7 +82,8 @@ namespace Orleans.Transactions.TestKit.Consistency
                             stack);
                         return await Read();
                 }
-            } catch(Exception e)
+            }
+            catch (Exception e)
             {
                 logger.LogTrace("g{MyNumber} {CurrentTransactionId} {Stack} --> {ExceptionType}", MyNumber, TransactionContext.CurrentTransactionId, stack, e.GetType().Name);
                 throw;
@@ -111,7 +108,7 @@ namespace Orleans.Transactions.TestKit.Consistency
         }
 
         private Task<Observation[]> Write()
-        { 
+        {
             var txid = TransactionContext.CurrentTransactionId;
             return data.PerformUpdate((state) =>
             {
@@ -180,5 +177,5 @@ namespace Orleans.Transactions.TestKit.Consistency
                 throw;
             }
         }
-    } 
+    }
 }

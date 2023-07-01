@@ -1,7 +1,3 @@
-using System;
-using System.Collections.Generic;
-using System.Threading;
-using System.Threading.Tasks;
 using Orleans.Providers;
 using Orleans.SqlUtils.StorageProvider.GrainInterfaces;
 
@@ -51,7 +47,7 @@ namespace Orleans.SqlUtils.StorageProvider.GrainClasses
         public async Task SetRandomState()
         {
             int customerId = (int)this.GetPrimaryKeyLong();
-            
+
             var dt = DateTime.UtcNow;
             var now = new DateTime(dt.Year, dt.Month, dt.Day, dt.Hour, dt.Minute, dt.Second, DateTimeKind.Utc);
 
@@ -59,7 +55,7 @@ namespace Orleans.SqlUtils.StorageProvider.GrainClasses
             State.FirstName = "FirstName_" + customerId;
             State.LastName = "LastName_" + customerId;
             State.NickName = "NickName_" + customerId;
-            State.BirthDate = new DateTime(_random.Next(40) + 1970, _random.Next(12) + 1,  _random.Next(28) + 1, 0, 0, 0, DateTimeKind.Utc);
+            State.BirthDate = new DateTime(_random.Next(40) + 1970, _random.Next(12) + 1, _random.Next(28) + 1, 0, 0, 0, DateTimeKind.Utc);
             State.Gender = _random.Next(2);
             State.Country = "Country_" + _random.Next();
             State.AvatarUrl = "AvatarUrl_" + _random.Next();

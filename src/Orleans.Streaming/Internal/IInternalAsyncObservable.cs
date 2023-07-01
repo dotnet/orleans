@@ -1,6 +1,3 @@
-using System.Collections.Generic;
-using System.Threading.Tasks;
-
 namespace Orleans.Streams
 {
     internal interface IInternalAsyncObservable<T> : IAsyncObservable<T>, IAsyncBatchObservable<T>
@@ -22,7 +19,7 @@ namespace Orleans.Streams
         Task Cleanup();
     }
 
-        
+
     internal interface IInternalAsyncBatchObserver<T> : IAsyncBatchProducer<T>
     {
         Task Cleanup();

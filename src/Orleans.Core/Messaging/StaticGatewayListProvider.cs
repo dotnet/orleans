@@ -1,6 +1,3 @@
-using System;
-using System.Collections.Generic;
-using System.Threading.Tasks;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 
@@ -27,7 +24,7 @@ namespace Orleans.Messaging
 
         /// <inheritdoc />
         public Task InitializeGatewayListProvider() => Task.CompletedTask;
-        
+
         /// <inheritdoc />
         public Task<IList<Uri>> GetGateways() => Task.FromResult<IList<Uri>>(this.options.Gateways);
 

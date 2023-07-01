@@ -1,8 +1,4 @@
-using System;
-using System.Collections.Generic;
 using System.Collections.Immutable;
-using System.Threading;
-using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
@@ -484,7 +480,7 @@ namespace Orleans.Runtime.GrainDirectory
                     {
                         // The target has already seen the latest version for this silo.
                         builder.Remove(silo);
-                    } 
+                    }
                 }
             }
 

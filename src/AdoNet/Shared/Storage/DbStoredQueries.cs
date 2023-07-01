@@ -1,7 +1,4 @@
-using System;
-using System.Collections.Generic;
 using System.Data;
-using System.Linq;
 using System.Net;
 using System.Reflection;
 using Orleans.Runtime;
@@ -144,7 +141,7 @@ namespace Orleans.Tests.SqlUtils
                     record.GetValue<string>("QueryText"));
             }
 
-    
+
             internal static Tuple<MembershipEntry, int> GetMembershipEntry(IDataRecord record)
             {
                 //TODO: This is a bit of hack way to check in the current version if there's membership data or not, but if there's a start time, there's member.            
@@ -241,7 +238,7 @@ namespace Orleans.Tests.SqlUtils
             {
                 command.AddParameter(paramName, paramValue, dbType: dbType);
             }
-            
+
             private void AddAddress(string name, IPAddress address)
             {
                 Add(name, address.ToString(), dbType: DbType.AnsiString);
@@ -373,7 +370,8 @@ namespace Orleans.Tests.SqlUtils
 
             internal TimeSpan Period
             {
-                set {
+                set
+                {
                     if (value.TotalMilliseconds <= int.MaxValue)
                     {
                         // Original casting when old schema is used.  Here to maintain backwards compatibility

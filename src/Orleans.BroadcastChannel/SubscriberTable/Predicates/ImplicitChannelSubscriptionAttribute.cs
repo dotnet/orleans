@@ -1,5 +1,3 @@
-using System;
-using System.Collections.Generic;
 using Orleans.BroadcastChannel;
 using Orleans.Metadata;
 using Orleans.Runtime;
@@ -50,7 +48,7 @@ namespace Orleans
         /// <param name="channelIdMapper">The name of the stream identity mapper.</param>
         public ImplicitChannelSubscriptionAttribute(Type predicateType, string channelIdMapper = null)
         {
-            Predicate = (IChannelNamespacePredicate) Activator.CreateInstance(predicateType);
+            Predicate = (IChannelNamespacePredicate)Activator.CreateInstance(predicateType);
             ChannelIdMapper = channelIdMapper;
         }
 

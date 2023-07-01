@@ -1,7 +1,4 @@
-using System.Collections.Generic;
 using Orleans.Providers.Streams.Common;
-using Orleans.Runtime;
-using Orleans.Streaming.EventHubs;
 
 namespace Orleans.Streaming.EventHubs.StatisticMonitors
 {

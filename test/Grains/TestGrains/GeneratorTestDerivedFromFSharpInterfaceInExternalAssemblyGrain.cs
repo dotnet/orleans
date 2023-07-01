@@ -1,6 +1,3 @@
-using System;
-using System.Threading.Tasks;
-using Orleans;
 using UnitTests.GrainInterfaces;
 
 namespace UnitTests.Grains
@@ -18,7 +15,7 @@ namespace UnitTests.Grains
 
         public Task<Tuple<string, int>> MultipleParameterEcho(string s, int x)
         {
-            return Task.FromResult(new Tuple<string,int>(s,x));
+            return Task.FromResult(new Tuple<string, int>(s, x));
         }
     }
 }

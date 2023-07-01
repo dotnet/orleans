@@ -1,6 +1,3 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 
@@ -32,7 +29,7 @@ namespace Orleans.Runtime
         }
 
         /// <inheritdoc/>
-        public TService GetService(IServiceProvider services) => factory(services,Key);
+        public TService GetService(IServiceProvider services) => factory(services, Key);
 
         /// <inheritdoc/>
         public bool Equals(TKey other)

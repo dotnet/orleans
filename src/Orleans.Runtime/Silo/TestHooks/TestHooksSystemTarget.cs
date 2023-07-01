@@ -1,14 +1,9 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 using Orleans.Runtime.ConsistentRing;
 using Orleans.Storage;
-using Orleans.Hosting;
 using Orleans.Statistics;
 
 namespace Orleans.Runtime.TestHooks
@@ -65,9 +60,9 @@ namespace Orleans.Runtime.TestHooks
 
         public Task<string> GetConsistentRingProviderDiagnosticInfo()
         {
-            return Task.FromResult(consistentRingProvider.ToString()); 
+            return Task.FromResult(consistentRingProvider.ToString());
         }
-        
+
         public Task<string> GetServiceId() => Task.FromResult(this.serviceProvider.GetRequiredService<IOptions<ClusterOptions>>().Value.ServiceId);
 
         public Task<bool> HasStorageProvider(string providerName)
@@ -87,7 +82,7 @@ namespace Orleans.Runtime.TestHooks
         }
 
         public Task<int> UnregisterGrainForTesting(GrainId grain) => Task.FromResult(this.serviceProvider.GetRequiredService<Catalog>().UnregisterGrainForTesting(grain));
-        
+
         public Task LatchIsOverloaded(bool overloaded, TimeSpan latchPeriod)
         {
             if (overloaded)

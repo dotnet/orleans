@@ -1,6 +1,3 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
 using Orleans.Tests.SqlUtils;
 using TestExtensions;
 
@@ -55,7 +52,7 @@ namespace UnitTests.General
 
         protected override IEnumerable<string> ConvertToExecutableBatches(string setupScript, string dataBaseName)
         {
-            var batches = setupScript.Split(new[] {"GO"}, StringSplitOptions.RemoveEmptyEntries).ToList();
+            var batches = setupScript.Split(new[] { "GO" }, StringSplitOptions.RemoveEmptyEntries).ToList();
 
             //This removes the use of recovery log in case of database crashes, which
             //improves performance to some degree, depending on usage. For non-performance testing only.

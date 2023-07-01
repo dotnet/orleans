@@ -1,9 +1,4 @@
-using System;
-using System.Collections.Generic;
-using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
-using Orleans;
-using Orleans.Runtime;
 using Orleans.TestingHost;
 using Orleans.TestingHost.Utils;
 using UnitTests.StreamingTests;
@@ -36,7 +31,7 @@ namespace UnitTests.Streaming
             logger.LogInformation("\n\n************************ {StreamProviderName}_{TestNumber}_{TestName} ********************************* \n\n", streamProviderName, testNumber, testName);
         }
 
-        public async Task StreamTest_MultipleStreams_ManyDifferent_ManyProducerGrainsManyConsumerGrains(Func<bool,SiloHandle> startSiloFunc = null, Action<SiloHandle> stopSiloFunc = null)
+        public async Task StreamTest_MultipleStreams_ManyDifferent_ManyProducerGrainsManyConsumerGrains(Func<bool, SiloHandle> startSiloFunc = null, Action<SiloHandle> stopSiloFunc = null)
         {
             Heading("MultipleStreams_ManyDifferent_ManyProducerGrainsManyConsumerGrains");
             List<SingleStreamTestRunner> runners = new List<SingleStreamTestRunner>();

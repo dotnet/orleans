@@ -1,11 +1,6 @@
-using System;
 using System.Collections.Concurrent;
-using System.Collections.Generic;
-using System.Threading;
-using System.Threading.Tasks;
 using Orleans.Internal;
 using Orleans.Serialization.Codecs;
-using Orleans.Serialization.Cloning;
 using Orleans.Serialization.Serializers;
 
 namespace Orleans.Runtime
@@ -53,11 +48,11 @@ namespace Orleans.Runtime
             return tasks is null ? localTask ?? Task.CompletedTask : Task.WhenAll(tasks);
         }
 
-         private async Task CancelTokenWithRetries(
-             Guid id,
-             ConcurrentDictionary<GrainId, GrainReference> grainReferences,
-             GrainId key,
-             ICancellationSourcesExtension tokenExtension)
+        private async Task CancelTokenWithRetries(
+            Guid id,
+            ConcurrentDictionary<GrainId, GrainReference> grainReferences,
+            GrainId key,
+            ICancellationSourcesExtension tokenExtension)
         {
             await AsyncExecutorWithRetries.ExecuteWithRetries(
                 i => tokenExtension.CancelRemoteToken(id),

@@ -31,7 +31,7 @@ namespace TestGrains
     public class CountersGrain_StateStore_Reentrant : CountersGrain
     {
     }
-    
+
     [LogConsistencyProvider(ProviderName = "LogStorage")]
     [StorageProvider(ProviderName = "SlowMemoryStore")]
     public class CountersGrain_LogStore_NonReentrant : CountersGrain
@@ -45,7 +45,7 @@ namespace TestGrains
     {
     }
 
- 
+
 
 
 }

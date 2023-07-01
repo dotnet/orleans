@@ -1,8 +1,4 @@
-using System;
-using System.Collections.Generic;
 using System.Diagnostics;
-using System.Linq;
-using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Orleans.Storage;
 using Orleans.EventSourcing.Common;
@@ -221,7 +217,7 @@ namespace Orleans.EventSourcing.StateStorage
         /// </summary>
         [Serializable]
         [GenerateSerializer]
-        protected internal sealed class UpdateNotificationMessage : INotificationMessage 
+        protected internal sealed class UpdateNotificationMessage : INotificationMessage
         {
             /// <inheritdoc/>
             [Id(0)]
@@ -244,7 +240,7 @@ namespace Orleans.EventSourcing.StateStorage
             {
                 return string.Format("v{0} ({1} updates by {2}) etag={3}", Version, Updates.Count, Origin, ETag);
             }
-         }
+        }
 
         /// <inheritdoc/>
         protected override INotificationMessage Merge(INotificationMessage earlierMessage, INotificationMessage laterMessage)
@@ -270,7 +266,7 @@ namespace Orleans.EventSourcing.StateStorage
                 return base.Merge(earlierMessage, laterMessage); // keep only the version number
         }
 
-        private SortedList<long, UpdateNotificationMessage> notifications = new SortedList<long,UpdateNotificationMessage>();
+        private SortedList<long, UpdateNotificationMessage> notifications = new SortedList<long, UpdateNotificationMessage>();
 
         /// <inheritdoc/>
         protected override void OnNotificationReceived(INotificationMessage payload)
@@ -313,7 +309,7 @@ namespace Orleans.EventSourcing.StateStorage
 
                 GlobalStateCache.StateAndMetaData.FlipBit(updateNotification.Origin);
 
-                GlobalStateCache.ETag = updateNotification.ETag;         
+                GlobalStateCache.ETag = updateNotification.ETag;
 
                 Services.Log(LogLevel.Debug, "notification success ({0} updates) {1}", updateNotification.Updates.Count, GlobalStateCache);
             }
@@ -321,7 +317,7 @@ namespace Orleans.EventSourcing.StateStorage
             Services.Log(LogLevel.Trace, "unprocessed notifications in queue: {0}", notifications.Count);
 
             base.ProcessNotifications();
-         
+
         }
 
 

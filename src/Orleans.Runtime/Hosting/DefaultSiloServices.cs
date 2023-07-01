@@ -10,7 +10,6 @@ using Orleans.Metadata;
 using Orleans.Runtime.Messaging;
 using Orleans.Runtime.Placement;
 using Orleans.Runtime.Providers;
-using Orleans.Runtime.Scheduler;
 using Orleans.Runtime.Versions;
 using Orleans.Runtime.Versions.Compatibility;
 using Orleans.Runtime.Versions.Selector;
@@ -24,9 +23,7 @@ using Orleans.Providers;
 using Orleans.Runtime;
 using Microsoft.Extensions.Logging;
 using Orleans.Runtime.Utilities;
-using System;
 using System.Reflection;
-using System.Linq;
 using Microsoft.Extensions.Options;
 using Orleans.Timers.Internal;
 using Microsoft.AspNetCore.Connections;
@@ -87,7 +84,7 @@ namespace Orleans.Hosting
 
             services.AddLogging();
             services.TryAddSingleton<ITimerRegistry, TimerRegistry>();
-            
+
             services.TryAddSingleton<GrainRuntime>();
             services.TryAddSingleton<IGrainRuntime, GrainRuntime>();
             services.TryAddSingleton<IGrainCancellationTokenRuntime, GrainCancellationTokenRuntime>();
@@ -402,7 +399,7 @@ namespace Orleans.Hosting
         {
             public bool? IsTypeNameAllowed(string typeName, string assemblyName)
             {
-                if (assemblyName is { Length: > 0} && assemblyName.Contains("Orleans"))
+                if (assemblyName is { Length: > 0 } && assemblyName.Contains("Orleans"))
                 {
                     return true;
                 }

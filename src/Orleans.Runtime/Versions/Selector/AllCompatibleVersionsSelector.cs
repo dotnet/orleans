@@ -1,4 +1,3 @@
-using System.Linq;
 using Orleans.Versions.Compatibility;
 using Orleans.Versions.Selector;
 

@@ -1,4 +1,3 @@
-using System;
 using Orleans.Runtime;
 
 namespace Orleans.Configuration
@@ -42,7 +41,7 @@ namespace Orleans.Configuration
         /// <inheritdoc />
         public void ValidateConfiguration()
         {
-            if(options.CacheSize <= 0)
+            if (options.CacheSize <= 0)
                 throw new OrleansConfigurationException($"{nameof(SimpleQueueCacheOptions)} on stream provider {this.name} is invalid. {nameof(SimpleQueueCacheOptions.CacheSize)} must be larger than zero");
         }
 

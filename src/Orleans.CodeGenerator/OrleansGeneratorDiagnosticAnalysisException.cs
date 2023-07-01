@@ -1,5 +1,4 @@
 using Microsoft.CodeAnalysis;
-using System;
 
 namespace Orleans.CodeGenerator
 {

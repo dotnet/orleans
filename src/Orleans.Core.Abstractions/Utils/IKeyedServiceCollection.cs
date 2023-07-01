@@ -1,5 +1,3 @@
-using System;
-using System.Collections.Generic;
 namespace Orleans.Runtime
 {
     /// <summary>
@@ -74,7 +72,7 @@ namespace Orleans.Runtime
         public static TService GetServiceByKey<TKey, TService>(this IServiceProvider services, TKey key)
             where TService : class
         {
-            IKeyedServiceCollection<TKey, TService> collection = (IKeyedServiceCollection<TKey, TService>) services.GetService(typeof(IKeyedServiceCollection<TKey, TService>));
+            IKeyedServiceCollection<TKey, TService> collection = (IKeyedServiceCollection<TKey, TService>)services.GetService(typeof(IKeyedServiceCollection<TKey, TService>));
             return collection?.GetService(services, key);
         }
 

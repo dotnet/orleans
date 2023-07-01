@@ -1,11 +1,10 @@
-using System.Linq;
 using Microsoft.CodeAnalysis;
 
 namespace Orleans.CodeGenerator.Diagnostics;
 
 public static class InvalidRpcMethodReturnTypeDiagnostic
 {
-    public const string RuleId = "ORLEANS0102"; 
+    public const string RuleId = "ORLEANS0102";
     private const string Category = "Usage";
     private static readonly LocalizableString Title = new LocalizableResourceString(nameof(Resources.InvalidRpcMethodReturnTypeTitle), Resources.ResourceManager, typeof(Resources));
     private static readonly LocalizableString MessageFormat = new LocalizableResourceString(nameof(Resources.InvalidRpcMethodReturnTypeMessageFormat), Resources.ResourceManager, typeof(Resources));

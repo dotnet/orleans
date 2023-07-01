@@ -1,5 +1,3 @@
-using System;
-using Newtonsoft.Json;
 using Orleans.Persistence.AdoNet.Storage;
 using Orleans.Runtime;
 using Orleans.Storage;
@@ -53,7 +51,7 @@ namespace Orleans.Configuration
         /// <param name="name">The name of the option to be validated.</param>
         public AdoNetGrainStorageOptionsValidator(AdoNetGrainStorageOptions configurationOptions, string name)
         {
-            if(configurationOptions == null)
+            if (configurationOptions == null)
                 throw new OrleansConfigurationException($"Invalid AdoNetGrainStorageOptions for AdoNetGrainStorage {name}. Options is required.");
             this.options = configurationOptions;
             this.name = name;

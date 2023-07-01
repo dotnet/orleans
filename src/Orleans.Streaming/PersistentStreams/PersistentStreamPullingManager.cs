@@ -1,14 +1,9 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Orleans.Providers.Streams.Common;
 using Orleans.Runtime;
 using Orleans.Configuration;
 using RunState = Orleans.Configuration.StreamLifecycleOptions.RunState;
 using Orleans.Internal;
-using System.Threading;
 using Orleans.Streams.Filtering;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Runtime.Scheduler;
@@ -141,7 +136,7 @@ namespace Orleans.Streams
         {
             managerState = RunState.AgentsStopped;
             List<QueueId> queuesToRemove = queuesToAgentsMap.Keys.ToList();
-            logger.LogInformation((int)ErrorCode.PersistentStreamPullingManager_Stopping, "Stopping agents for {RemovedCount} queues: {RemovedQueues}",  queuesToRemove.Count, PrintQueues(queuesToRemove) );
+            logger.LogInformation((int)ErrorCode.PersistentStreamPullingManager_Stopping, "Stopping agents for {RemovedCount} queues: {RemovedQueues}", queuesToRemove.Count, PrintQueues(queuesToRemove));
             await RemoveQueues(queuesToRemove);
             logger.LogInformation((int)ErrorCode.PersistentStreamPullingManager_Stopped, "Stopped agents.");
         }

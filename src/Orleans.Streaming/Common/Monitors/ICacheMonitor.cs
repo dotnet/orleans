@@ -1,5 +1,3 @@
-using System;
-
 namespace Orleans.Providers.Streams.Common
 {
     /// <summary>
@@ -15,7 +13,7 @@ namespace Orleans.Providers.Streams.Common
         /// <param name="cachePressureContributionCount">The cache pressure contribution count.</param>
         /// <param name="currentPressure">The current pressure.</param>
         /// <param name="flowControlThreshold">The flow control threshold.</param>
-        void TrackCachePressureMonitorStatusChange(string pressureMonitorType, bool underPressure, double? cachePressureContributionCount, double? currentPressure, 
+        void TrackCachePressureMonitorStatusChange(string pressureMonitorType, bool underPressure, double? cachePressureContributionCount, double? currentPressure,
             double? flowControlThreshold);
 
         /// <summary>
@@ -49,7 +47,7 @@ namespace Orleans.Providers.Streams.Common
         /// <param name="oldestMessageDequeueTimeUtc">The time in UTC when the oldest message was read from the queue and put in the cache.</param>
         /// <param name="newestMessageEnqueueTimeUtc">The time in UTC when the newest message was enqueued to the queue.</param>
         /// <param name="totalMessageCount">The total message count.</param>
-        void ReportMessageStatistics(DateTime? oldestMessageEnqueueTimeUtc, DateTime? oldestMessageDequeueTimeUtc, DateTime? newestMessageEnqueueTimeUtc, 
+        void ReportMessageStatistics(DateTime? oldestMessageEnqueueTimeUtc, DateTime? oldestMessageDequeueTimeUtc, DateTime? newestMessageEnqueueTimeUtc,
             long totalMessageCount);
 
         /// <summary>

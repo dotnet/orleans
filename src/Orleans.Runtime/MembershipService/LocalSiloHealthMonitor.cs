@@ -1,11 +1,6 @@
 #nullable enable
 
-using System;
-using System.Collections.Generic;
 using System.Collections.Immutable;
-using System.Linq;
-using System.Threading;
-using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
@@ -60,7 +55,7 @@ namespace Orleans.Runtime.MembershipService
         private readonly ClusterMembershipOptions _clusterMembershipOptions;
         private readonly IAsyncTimer _degradationCheckTimer;
         private readonly ThreadPoolMonitor _threadPoolMonitor;
-        private readonly ProbeRequestMonitor _probeRequestMonitor; 
+        private readonly ProbeRequestMonitor _probeRequestMonitor;
         private ValueStopwatch _clusteredDuration;
         private Task? _runTask;
         private bool _isActive;
@@ -103,7 +98,7 @@ namespace Orleans.Runtime.MembershipService
         /// <param name="checkTime">The time which the check is taking place.</param>
         /// <param name="complaints">If not null, will be populated with the current set of detected health issues.</param>
         /// <returns>The local health degradation score, which is a value between 0 (healthy) and <see cref="MaxScore"/> (unhealthy).</returns>
-        public int GetLocalHealthDegradationScore(DateTime checkTime, List<string>? complaints) 
+        public int GetLocalHealthDegradationScore(DateTime checkTime, List<string>? complaints)
         {
             var score = 0;
             score += CheckSuspectingNodes(checkTime, complaints);
@@ -151,7 +146,7 @@ namespace Orleans.Runtime.MembershipService
 
                 complaints?.Add(
                     $".NET Thread Pool is exhibiting delays of {threadPoolDelaySeconds}s. This can indicate .NET Thread Pool starvation, very long .NET GC pauses, or other runtime or machine pauses.");
-            } 
+            }
 
             // Each second of delay contributes to the score.
             return (int)threadPoolDelaySeconds;

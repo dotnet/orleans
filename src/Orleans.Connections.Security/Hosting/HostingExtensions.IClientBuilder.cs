@@ -1,4 +1,3 @@
-using System;
 using System.Security.Cryptography.X509Certificates;
 using Orleans.Configuration;
 using Orleans.Connections.Security;

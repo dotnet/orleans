@@ -1,4 +1,3 @@
-using System;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 using Orleans.Statistics;
@@ -92,9 +91,7 @@ namespace Orleans.Runtime
             DateTime = dateTime;
         }
 
-        public override string ToString() => @$"SiloRuntimeStatistics: ActivationCount={ActivationCount} RecentlyUsedActivationCount={RecentlyUsedActivationCount
-            } CpuUsage={CpuUsage?.ToString() ?? "<unset>"} AvailableMemory={AvailableMemory} MemoryUsage={MemoryUsage} IsOverloaded={IsOverloaded
-            } ClientCount={ClientCount} TotalPhysicalMemory={TotalPhysicalMemory} DateTime={DateTime}";
+        public override string ToString() => @$"SiloRuntimeStatistics: ActivationCount={ActivationCount} RecentlyUsedActivationCount={RecentlyUsedActivationCount} CpuUsage={CpuUsage?.ToString() ?? "<unset>"} AvailableMemory={AvailableMemory} MemoryUsage={MemoryUsage} IsOverloaded={IsOverloaded} ClientCount={ClientCount} TotalPhysicalMemory={TotalPhysicalMemory} DateTime={DateTime}";
     }
 
     /// <summary>
@@ -183,13 +180,6 @@ namespace Orleans.Runtime
         [Id(7)]
         public string LocalActivation { get; init; }
 
-        public override string ToString() => @$"{Environment.NewLine
-            }**DetailedGrainReport for grain {Grain} from silo {SiloName} SiloAddress={SiloAddress}{Environment.NewLine
-            }   LocalCacheActivationAddresses={LocalCacheActivationAddress}{Environment.NewLine
-            }   LocalDirectoryActivationAddresses={LocalDirectoryActivationAddress}{Environment.NewLine
-            }   PrimaryForGrain={PrimaryForGrain}{Environment.NewLine
-            }   GrainClassTypeName={GrainClassTypeName}{Environment.NewLine
-            }   LocalActivation:{Environment.NewLine
-            }{LocalActivation}.{Environment.NewLine}";
+        public override string ToString() => @$"{Environment.NewLine}**DetailedGrainReport for grain {Grain} from silo {SiloName} SiloAddress={SiloAddress}{Environment.NewLine}   LocalCacheActivationAddresses={LocalCacheActivationAddress}{Environment.NewLine}   LocalDirectoryActivationAddresses={LocalDirectoryActivationAddress}{Environment.NewLine}   PrimaryForGrain={PrimaryForGrain}{Environment.NewLine}   GrainClassTypeName={GrainClassTypeName}{Environment.NewLine}   LocalActivation:{Environment.NewLine}{LocalActivation}.{Environment.NewLine}";
     }
 }

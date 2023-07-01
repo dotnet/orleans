@@ -1,4 +1,3 @@
-using System;
 using System.Globalization;
 using System.Text;
 
@@ -60,16 +59,16 @@ namespace Orleans.Storage
         public byte[] GetHashBytes()
         {
             byte[] bytes = null;
-            if(IsLongKey)
+            if (IsLongKey)
             {
                 bytes = BitConverter.GetBytes(N1Key);
             }
-            else if(IsGuidKey)
+            else if (IsGuidKey)
             {
                 bytes = ToGuidKey(N0Key, N1Key).ToByteArray();
             }
 
-            if(bytes != null && StringKey != null)
+            if (bytes != null && StringKey != null)
             {
                 int oldLen = bytes.Length;
                 var stringBytes = Encoding.UTF8.GetBytes(StringKey);
@@ -77,12 +76,12 @@ namespace Orleans.Storage
                 Array.Copy(stringBytes, 0, bytes, oldLen, stringBytes.Length);
             }
 
-            if(bytes == null)
+            if (bytes == null)
             {
                 bytes = Encoding.UTF8.GetBytes(StringKey);
             }
 
-            if(BitConverter.IsLittleEndian)
+            if (BitConverter.IsLittleEndian)
             {
                 Array.Reverse(bytes);
             }
@@ -94,12 +93,12 @@ namespace Orleans.Storage
         {
             string primaryKey;
             string keyExtension = null;
-            if(IsLongKey)
+            if (IsLongKey)
             {
                 primaryKey = N1Key.ToString(CultureInfo.InvariantCulture);
                 keyExtension = StringKey;
             }
-            else if(IsGuidKey)
+            else if (IsGuidKey)
             {
                 primaryKey = ToGuidKey(N0Key, N1Key).ToString();
                 keyExtension = StringKey;

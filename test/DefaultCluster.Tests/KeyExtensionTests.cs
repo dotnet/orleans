@@ -1,7 +1,3 @@
-using System;
-using System.Threading.Tasks;
-using Microsoft.Extensions.DependencyInjection;
-using Orleans;
 using Orleans.Runtime;
 using TestExtensions;
 using UnitTests.GrainInterfaces;
@@ -107,7 +103,7 @@ namespace DefaultCluster.Tests.General
             const string key = "foo";
 
             var grain = this.GrainFactory.GetGrain<IStringGrain>(key);
-            var key2 = ((GrainReference) grain).GetPrimaryKeyString();
+            var key2 = ((GrainReference)grain).GetPrimaryKeyString();
 
             Assert.Equal(key, key2); // Unexpected key was returned.
         }

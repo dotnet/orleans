@@ -1,5 +1,3 @@
-using System;
-using System.Collections.Generic;
 using Orleans.Metadata;
 using Orleans.Runtime;
 
@@ -19,17 +17,17 @@ namespace Orleans
         /// <summary>
         /// Gets or sets the number of days to delay collecting an idle activation for.
         /// </summary>
-        public double Days { get; set; } 
+        public double Days { get; set; }
 
         /// <summary>
         /// Gets or sets the number of hours to delay collecting an idle activation for.
         /// </summary>
-        public double Hours { get; set; } 
+        public double Hours { get; set; }
 
         /// <summary>
         /// Gets or sets the number of minutes to delay collecting an idle activation for.
         /// </summary>
-        public double Minutes { get; set; } 
+        public double Minutes { get; set; }
 
         /// <summary>
         /// Gets or sets a value indicating whether this grain should never be collected by the idle activation collector.

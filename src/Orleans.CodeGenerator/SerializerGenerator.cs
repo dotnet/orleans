@@ -1,6 +1,3 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -410,11 +407,11 @@ namespace Orleans.CodeGenerator
                     codecExpression = IdentifierName(instanceCodec.FieldName);
                 }
 
-               // When a static codec is available, we can call it directly and can skip passing the expected type,
-               // since it is known to be the static codec's field type:
-               //   C#: <staticCodec>.WriteField(ref writer, <fieldIdDelta, <member>)
-               // When no static codec is available:
-               //   C#: <codecField>.WriteField(ref writer, <fieldIdDelta>, <expectedType>, <member>)
+                // When a static codec is available, we can call it directly and can skip passing the expected type,
+                // since it is known to be the static codec's field type:
+                //   C#: <staticCodec>.WriteField(ref writer, <fieldIdDelta, <member>)
+                // When no static codec is available:
+                //   C#: <codecField>.WriteField(ref writer, <fieldIdDelta>, <expectedType>, <member>)
                 var writeFieldArgs = new List<ArgumentSyntax> {
                     Argument(writerParam).WithRefOrOutKeyword(Token(SyntaxKind.RefKeyword)),
                     Argument(fieldIdDeltaExpr)

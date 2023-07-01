@@ -1,9 +1,5 @@
-using System;
-using System.Collections.Generic;
 using System.Collections.Specialized;
-using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
-using Orleans;
 using UnitTests.GrainInterfaces;
 
 namespace UnitTests.Grains
@@ -25,7 +21,7 @@ namespace UnitTests.Grains
 
         public Task<EnumClass> GetEnumModel()
         {
-            return Task.FromResult( new EnumClass() { EnumsList = new List<DateTimeKind>() { DateTimeKind.Local } });
+            return Task.FromResult(new EnumClass() { EnumsList = new List<DateTimeKind>() { DateTimeKind.Local } });
         }
     }
 }

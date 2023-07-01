@@ -1,8 +1,4 @@
-using System;
-using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
-using Orleans;
-using Orleans.Internal;
 using Orleans.Runtime;
 using Orleans.Streams;
 using Orleans.TestingHost.Utils;
@@ -445,7 +441,7 @@ namespace UnitTests.StreamingTests
                 await producer.ProduceParallelSeries(ItemCount);
                 await TestingUtils.WaitUntilAsync(lastTry => CheckCounters(producer, consumer, false), _timeout);
                 await CheckCounters(producer, consumer);
-           
+
                 await producer.ProducePeriodicSeries(ItemCount);
                 await TestingUtils.WaitUntilAsync(lastTry => CheckCounters(producer, consumer, false), _timeout);
                 await CheckCounters(producer, consumer);
@@ -463,7 +459,7 @@ namespace UnitTests.StreamingTests
         private async Task<bool> CheckCounters(ProducerProxy producer, ConsumerProxy consumer, bool assertAreEqual = true)
         {
             var consumerCount = await consumer.ConsumerCount;
-            Assert.NotEqual(0,  consumerCount);  // "no consumers were detected."
+            Assert.NotEqual(0, consumerCount);  // "no consumers were detected."
             _ = await producer.ProducerCount;
             var numProduced = await producer.ExpectedItemsProduced;
             var expectConsumed = numProduced * consumerCount;
@@ -476,7 +472,7 @@ namespace UnitTests.StreamingTests
                 numConsumed);
             if (assertAreEqual)
             {
-                Assert.Equal(expectConsumed,  numConsumed); // String.Format("expectConsumed = {0}, numConsumed = {1}", expectConsumed, numConsumed));
+                Assert.Equal(expectConsumed, numConsumed); // String.Format("expectConsumed = {0}, numConsumed = {1}", expectConsumed, numConsumed));
                 return true;
             }
             else
@@ -524,15 +520,15 @@ namespace UnitTests.StreamingTests
             }
             var expectActivationCount = 0;
             logger.LogInformation(
-                "Test {TestNumber} CheckGrainsDeactivated: {Type}ActivationCount = {ActivationCount}, Expected{Type}ActivationCount = {ExpectActivationCount}", 
-                testNumber, 
-                str, 
-                activationCount, 
+                "Test {TestNumber} CheckGrainsDeactivated: {Type}ActivationCount = {ActivationCount}, Expected{Type}ActivationCount = {ExpectActivationCount}",
+                testNumber,
+                str,
+                activationCount,
                 str,
                 expectActivationCount);
             if (assertAreEqual)
             {
-                Assert.Equal(expectActivationCount,  activationCount); // String.Format("Expected{0}ActivationCount = {1}, {0}ActivationCount = {2}", str, expectActivationCount, activationCount));
+                Assert.Equal(expectActivationCount, activationCount); // String.Format("Expected{0}ActivationCount = {1}, {0}ActivationCount = {2}", str, expectActivationCount, activationCount));
             }
             return expectActivationCount == activationCount;
         }

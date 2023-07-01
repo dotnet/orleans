@@ -1,6 +1,4 @@
-﻿using System.Collections.Generic;
-using System.Threading.Tasks;
-using Orleans.Transactions.Abstractions;
+﻿using Orleans.Transactions.Abstractions;
 using Orleans.Transactions.TestKit.Correctnesss;
 
 namespace Orleans.Transactions.TestKit

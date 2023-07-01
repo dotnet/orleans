@@ -1,10 +1,5 @@
-using System;
 using System.Collections.Concurrent;
-using System.Collections.Generic;
-using System.Threading;
-using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
-using Orleans;
 using Orleans.Runtime;
 using UnitTests.GrainInterfaces;
 
@@ -79,7 +74,7 @@ namespace UnitTests.Grains
 
             lock (tcss)
             {
-                if(tcss.ContainsKey(key))
+                if (tcss.ContainsKey(key))
                     throw new InvalidOperationException("Duplicate call for the same grain ID.");
 
                 var tcs = new TaskCompletionSource<bool>();

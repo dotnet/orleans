@@ -1,6 +1,3 @@
-using System;
-using System.Collections.Generic;
-using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Orleans.Storage.Internal;
 
@@ -13,7 +10,7 @@ namespace Orleans.Storage
     [KeepAlive]
     internal class MemoryStorageGrain : Grain, IMemoryStorageGrain
     {
-        private readonly Dictionary<string, object> _store = new(); 
+        private readonly Dictionary<string, object> _store = new();
         private readonly ILogger _logger;
 
         public MemoryStorageGrain(ILogger<MemoryStorageGrain> logger)
@@ -47,7 +44,7 @@ namespace Orleans.Storage
             ValidateEtag(currentETag, etag, grainStoreKey, "Delete");
             // Do not remove it from the dictionary, just set the value to null to remember that this item
             // was once in the store, and now is deleted
-            _store[grainStoreKey] = null; 
+            _store[grainStoreKey] = null;
             return Task.CompletedTask;
         }
 

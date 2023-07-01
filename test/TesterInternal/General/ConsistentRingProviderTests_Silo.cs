@@ -1,15 +1,7 @@
-using System;
-using System.Collections.Generic;
 using System.Diagnostics;
-using System.Linq;
-using System.Threading;
-using System.Threading.Tasks;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
-using Orleans;
 using Orleans.Configuration;
-using Orleans.Hosting;
-using Orleans.Internal;
 using Orleans.Runtime;
 using Orleans.Runtime.ReminderService;
 using Orleans.TestingHost;
@@ -27,7 +19,7 @@ namespace UnitTests.General
         private readonly TimeSpan endWait = TimeSpan.FromMinutes(5);
 
         enum Fail { First, Random, Last }
-        
+
         protected override void ConfigureTestCluster(TestClusterBuilder builder)
         {
             builder.AddSiloBuilderConfigurator<Configurator>();
@@ -165,7 +157,7 @@ namespace UnitTests.General
 
             // kill a silo and join a new one in parallel
             logger.LogInformation("Killing silo {SiloAddress} and joining a silo", failures[0].SiloAddress);
-            
+
             var tasks = new Task[2]
             {
                 Task.Factory.StartNew(() => this.HostedCluster.StopSiloAsync(failures[0])),

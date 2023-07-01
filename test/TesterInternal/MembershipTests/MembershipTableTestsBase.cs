@@ -1,11 +1,4 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Net;
-using System.Threading;
-using System.Threading.Tasks;
-using Microsoft.Extensions.DependencyInjection;
-using Orleans;
 using Orleans.Messaging;
 using Orleans.Runtime;
 using Orleans.TestingHost.Utils;
@@ -457,7 +450,7 @@ namespace UnitTests.MembershipTests
             Assert.True(ok, "InsertRow Joining failed");
 
             newTableVersion = table.Version.Next();
-            var  newEntry = CreateMembershipEntryForTest();
+            var newEntry = CreateMembershipEntryForTest();
             ok = await membershipTable.InsertRow(newEntry, newTableVersion);
 
             Assert.True(ok, "InsertRow failed");

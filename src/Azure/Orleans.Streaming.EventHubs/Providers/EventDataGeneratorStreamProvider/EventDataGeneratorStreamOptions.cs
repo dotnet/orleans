@@ -4,7 +4,7 @@ namespace Orleans.Configuration
     /// <summary>
     /// Setting class for EHGeneratorStreamProvider
     /// </summary>
-    public class EventDataGeneratorStreamOptions 
+    public class EventDataGeneratorStreamOptions
     {
         /// <summary>
         /// Configure eventhub partition count wanted. EventDataGeneratorStreamProvider would generate the same set of partitions based on the count, when initializing.

@@ -1,7 +1,3 @@
-
-using System;
-using System.Collections.Generic;
-using System.Linq;
 using Microsoft.Extensions.Logging;
 using Orleans.Runtime;
 using Orleans.Streams;
@@ -22,7 +18,7 @@ namespace Orleans.Providers.Streams.Common
     ///   in part, why, unlike the SimpleQueueCache, this cache does not implement IQueueCache.  It is intended
     ///   to be used in queue specific implementations of IQueueCache.
     /// </summary>
-    public class PooledQueueCache: IPurgeObservable
+    public class PooledQueueCache : IPurgeObservable
     {
         // linked list of message bocks.  First is newest.
         private readonly LinkedList<CachedMessageBlock> messageBlocks;
@@ -188,7 +184,7 @@ namespace Orleans.Providers.Streams.Common
 
             // If sequenceToken is too new to be in cache, unset token, and wait for more data.
             CachedMessage newestMessage = newestBlock.Value.NewestMessage;
-            if (newestMessage.Compare(sequenceToken) < 0) 
+            if (newestMessage.Compare(sequenceToken) < 0)
             {
                 cursor.State = CursorStates.Unset;
                 cursor.SequenceToken = sequenceToken;
@@ -234,7 +230,7 @@ namespace Orleans.Providers.Streams.Common
             cursor.CurrentBlock = node;
             cursor.Index = node.Value.GetIndexOfFirstMessageLessThanOrEqualTo(sequenceToken);
             // if cursor has been idle, move to next message after message specified by sequenceToken  
-            if(cursor.State == CursorStates.Idle)
+            if (cursor.State == CursorStates.Idle)
             {
                 // if there are more messages in this block, move to next message
                 if (!cursor.IsNewestInBlock)

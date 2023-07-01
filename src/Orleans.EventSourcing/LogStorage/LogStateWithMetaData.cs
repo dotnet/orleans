@@ -1,6 +1,4 @@
 using Orleans.EventSourcing.Common;
-using System;
-using System.Collections.Generic;
 
 namespace Orleans.EventSourcing.LogStorage
 {
@@ -95,7 +93,8 @@ namespace Orleans.EventSourcing.LogStorage
         /// </summary>
         /// <param name="Replica">The replica for which we want to look up the bit</param>
         /// <returns></returns>
-        public bool GetBit(string Replica) {
+        public bool GetBit(string Replica)
+        {
             return StringEncodedWriteVector.GetBit(WriteVector, Replica);
         }
 
@@ -104,7 +103,8 @@ namespace Orleans.EventSourcing.LogStorage
         /// </summary>
         /// <param name="Replica">The replica for which we want to flip the bit</param>
         /// <returns>the state of the bit after flipping it</returns>
-        public bool FlipBit(string Replica) {
+        public bool FlipBit(string Replica)
+        {
             var str = WriteVector;
             var rval = StringEncodedWriteVector.FlipBit(ref str, Replica);
             WriteVector = str;

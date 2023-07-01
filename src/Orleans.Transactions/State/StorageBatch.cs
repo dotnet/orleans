@@ -1,8 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
-using Orleans.Transactions.Abstractions;
+﻿using Orleans.Transactions.Abstractions;
 
 namespace Orleans.Transactions
 {
@@ -42,7 +38,7 @@ namespace Orleans.Transactions
         // follow-up actions, to be executed after storing this batch
         private List<Action> followUpActions;
         private List<Func<Task<bool>>> storeConditions;
-        
+
         // counters for each type of event
         private int total = 0;
         private int prepare = 0;

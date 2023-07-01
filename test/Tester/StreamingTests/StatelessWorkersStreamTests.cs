@@ -1,13 +1,6 @@
-using System;
-using System.Linq;
-using System.Threading.Tasks;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
-using Orleans;
-using Orleans.Hosting;
 using Orleans.Providers;
-using Orleans.Runtime;
-using Orleans.Streams;
 using Orleans.TestingHost;
 using TestExtensions;
 using UnitTests.GrainInterfaces;
@@ -59,9 +52,9 @@ namespace UnitTests.StreamingTests
         [Fact, TestCategory("Functional")]
         public async Task SubscribeToStream_FromStatelessWorker_Fail()
         {
-            this.logger.LogInformation($"************************ { nameof(SubscribeToStream_FromStatelessWorker_Fail) } *********************************");
+            this.logger.LogInformation($"************************ {nameof(SubscribeToStream_FromStatelessWorker_Fail)} *********************************");
             var runner = new StatelessWorkersStreamTestsRunner(StreamProvider, this.logger, this.fixture.HostedCluster);
-            await Assert.ThrowsAsync<InvalidOperationException>( () => runner.BecomeConsumer(Guid.NewGuid()));
+            await Assert.ThrowsAsync<InvalidOperationException>(() => runner.BecomeConsumer(Guid.NewGuid()));
         }
     }
 

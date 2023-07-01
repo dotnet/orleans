@@ -1,10 +1,7 @@
-﻿using System.Threading.Tasks;
-using Orleans;
-
-namespace UnitTests.GrainInterfaces
+﻿namespace UnitTests.GrainInterfaces
 {
     public interface ISimpleGrainAsync : IGrainWithIntegerKey
-    { 
+    {
         Task SetA_Async(int a);
         Task SetB_Async(int b);
         Task<int> GetAxB_Async();

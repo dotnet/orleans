@@ -1,13 +1,9 @@
-using System;
 using System.Net;
-using Microsoft.Extensions.DependencyInjection;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using Orleans.Runtime;
 using Orleans.GrainReferences;
-using Orleans.Serialization.TypeSystem;
 using Microsoft.Extensions.Options;
-using System.Globalization;
 
 namespace Orleans.Serialization
 {
@@ -292,7 +288,7 @@ namespace Orleans.Serialization
         /// <inheritdoc/>
         public override void WriteJson(JsonWriter writer, object value, JsonSerializer serializer)
         {
-            var val = ((IAddressable)value).AsReference();  
+            var val = ((IAddressable)value).AsReference();
             writer.WriteStartObject();
             writer.WritePropertyName("Id");
             writer.WriteStartObject();

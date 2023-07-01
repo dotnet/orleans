@@ -1,8 +1,5 @@
 using Orleans.Runtime;
-using System;
-using System.Collections.Generic;
 using System.Diagnostics.Metrics;
-using System.Threading;
 
 namespace Orleans.Providers.Streams.Common
 {
@@ -28,7 +25,7 @@ namespace Orleans.Providers.Streams.Common
         private ValueStopwatch _newestMessageReadEnqueueAge;
         private long _messagesReceived;
 
-        protected DefaultQueueAdapterReceiverMonitor(KeyValuePair<string,object>[] dimensions)
+        protected DefaultQueueAdapterReceiverMonitor(KeyValuePair<string, object>[] dimensions)
         {
             _dimensions = dimensions;
             _initializationFailureCounter = Instruments.Meter.CreateCounter<long>(InstrumentNames.STREAMS_QUEUE_INITIALIZATION_FAILURES);
@@ -52,7 +49,7 @@ namespace Orleans.Providers.Streams.Common
         /// Initializes a new instance of the <see cref="DefaultQueueAdapterReceiverMonitor"/> class.
         /// </summary>
         /// <param name="dimensions">The dimensions.</param>
-        public DefaultQueueAdapterReceiverMonitor(ReceiverMonitorDimensions dimensions) : this(new KeyValuePair<string,object>[] { new("QueueId", dimensions.QueueId) })
+        public DefaultQueueAdapterReceiverMonitor(ReceiverMonitorDimensions dimensions) : this(new KeyValuePair<string, object>[] { new("QueueId", dimensions.QueueId) })
         {
         }
 

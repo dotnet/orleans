@@ -1,6 +1,4 @@
 using Orleans.Configuration;
-using System;
-using System.Linq;
 
 namespace Orleans.Clustering.DynamoDB
 {
@@ -13,7 +11,7 @@ namespace Orleans.Clustering.DynamoDB
         private const string TableNamePropertyName = "TableName";
         private const string ReadCapacityUnitsPropertyName = "ReadCapacityUnits";
         private const string WriteCapacityUnitsPropertyName = "WriteCapacityUnits";
-        
+
         /// <summary>
         /// Parse data connection string to fill in fields in <paramref name="options"/>
         /// </summary>

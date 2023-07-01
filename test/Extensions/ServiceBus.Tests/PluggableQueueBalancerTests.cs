@@ -1,6 +1,4 @@
-using System.Threading.Tasks;
 using Orleans.Configuration;
-using Orleans.Hosting;
 using Orleans.Hosting.Developer;
 using Orleans.TestingHost;
 using Tester.StreamingTests;
@@ -35,7 +33,7 @@ namespace ServiceBus.Tests
                         .AddMemoryGrainStorage("PubSubStore")
                         .AddEventDataGeneratorStreams(
                             StreamProviderName,
-                            b=>
+                            b =>
                             {
                                 b.Configure<EventDataGeneratorStreamOptions>(ob => ob.Configure(
                                 options =>

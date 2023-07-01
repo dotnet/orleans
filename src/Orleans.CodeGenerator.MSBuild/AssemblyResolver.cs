@@ -1,7 +1,3 @@
-using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Linq;
 using System.Reflection;
 using System.Runtime.Loader;
 using Microsoft.Extensions.DependencyModel;
@@ -15,7 +11,7 @@ namespace Orleans.CodeGenerator.MSBuild
     internal class AssemblyResolver : IDisposable
     {
         private readonly ICompilationAssemblyResolver _assemblyResolver;
-        
+
         private readonly DependencyContext _resolverRependencyContext;
         private readonly AssemblyLoadContext _loadContext;
 

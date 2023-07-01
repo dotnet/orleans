@@ -1,6 +1,4 @@
-using System;
 using System.Runtime.CompilerServices;
-using System.Threading;
 
 namespace Orleans.Threading
 {
@@ -29,7 +27,7 @@ namespace Orleans.Threading
             var previousValue = Interlocked.CompareExchange(ref this.lockState, ThreadId, UNLOCKED);
             return previousValue == UNLOCKED || previousValue == ThreadId;
         }
-        
+
         /// <summary>
         /// Acquire the lock, blocking the thread if necessary.
         /// </summary>

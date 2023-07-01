@@ -1,5 +1,3 @@
-using System;
-using System.Collections.Generic;
 using Microsoft.Extensions.Logging;
 using Orleans.Runtime;
 using Orleans.Streams;
@@ -88,7 +86,7 @@ namespace Orleans.Providers.Streams.Common
             IBatchContainer next;
             while (cache.TryGetNextMessage(this, out next))
             {
-                if(IsInStream(next))
+                if (IsInStream(next))
                     break;
             }
             current = next;

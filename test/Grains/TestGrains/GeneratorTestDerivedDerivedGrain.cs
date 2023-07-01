@@ -1,6 +1,4 @@
-﻿using System;
-using System.Threading.Tasks;
-using UnitTests.GrainInterfaces;
+﻿using UnitTests.GrainInterfaces;
 
 namespace UnitTests.Grains
 {
@@ -9,7 +7,7 @@ namespace UnitTests.Grains
         public Task<string> StringNConcat(string[] strArray)
         {
             string strAll = string.Empty;
-            foreach(string str in strArray)
+            foreach (string str in strArray)
                 strAll = String.Concat(strAll, str);
 
             return Task.FromResult(strAll);

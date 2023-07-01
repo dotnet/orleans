@@ -1,7 +1,4 @@
-using System;
 using System.Diagnostics;
-using System.Threading;
-using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Orleans;
 using Orleans.Internal;
@@ -33,7 +30,7 @@ namespace UnitTests.SchedulerTests
             this.context = new UnitTestSchedulingContext();
             this.performanceMetrics = new TestHooksHostEnvironmentStatistics();
         }
-        
+
         public void Dispose()
         {
             this.loggerFactory.Dispose();
@@ -629,7 +626,7 @@ namespace UnitTests.SchedulerTests
                 }
 
                 bool ok = resultHandles[i].Task.Result;
-                
+
                 try
                 {
                     // since resultHandle being complete doesn't directly imply that the final chain was completed (there's a chance for a race condition), give a small chance for it to complete.
@@ -702,7 +699,7 @@ namespace UnitTests.SchedulerTests
             {
                 this.output.WriteLine("#0 - new Task - SynchronizationContext.Current={0} TaskScheduler.Current={1}",
                     SynchronizationContext.Current, TaskScheduler.Current);
-                
+
                 Task t1 = grain.Test1();
 
                 Action wrappedDoneAction = () => { wrappedDone.SetResult(true); };
@@ -723,7 +720,7 @@ namespace UnitTests.SchedulerTests
             });
             wrapper.Start(scheduler);
             await wrapper;
-            
+
             var timeoutLimit = TimeSpan.FromSeconds(1);
             try
             {

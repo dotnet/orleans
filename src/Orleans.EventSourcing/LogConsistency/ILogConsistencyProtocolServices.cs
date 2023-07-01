@@ -1,4 +1,3 @@
-using System;
 using System.Runtime.Serialization;
 using Microsoft.Extensions.Logging;
 using Orleans.Runtime;
@@ -14,7 +13,7 @@ namespace Orleans.EventSourcing
         /// <summary>
         /// The ID for this grain.
         /// </summary>
-        GrainId GrainId { get;  }
+        GrainId GrainId { get; }
 
         /// <summary>
         /// Copies the provided argument.

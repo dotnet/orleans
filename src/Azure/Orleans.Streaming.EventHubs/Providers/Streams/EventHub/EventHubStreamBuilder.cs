@@ -1,15 +1,12 @@
-using System;
 using Microsoft.Extensions.Options;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Configuration;
 using Orleans.Streaming.EventHubs;
-using Orleans.Providers.Streams.Common;
 using Orleans.Streams;
-using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace Orleans.Hosting
 {
-    public interface IEventHubStreamConfigurator : INamedServiceConfigurator {}
+    public interface IEventHubStreamConfigurator : INamedServiceConfigurator { }
 
     public static class EventHubStreamConfiguratorExtensions
     {

@@ -1,4 +1,3 @@
-using System;
 using Microsoft.AspNetCore.Connections;
 
 namespace Orleans.Configuration

@@ -1,11 +1,5 @@
-using System;
-using System.Collections.Generic;
 using System.Collections.Specialized;
-using System.Reflection;
-using Castle.DynamicProxy.Internal;
-using Orleans.Runtime;
 using Orleans.Serialization.TypeSystem;
-using Orleans.Utilities;
 using Xunit;
 using Xunit.Abstractions;
 
@@ -18,7 +12,7 @@ namespace NonSilo.Tests
     public class RuntimeTypeNameFormatterTests
     {
         public interface IMyBaseType<T> { }
-        public interface IMyArrayType<T> : IMyBaseType <T[]> { }
+        public interface IMyArrayType<T> : IMyBaseType<T[]> { }
         private readonly ITestOutputHelper _output;
         private readonly List<Type> _types = new()
             {
@@ -91,8 +85,8 @@ namespace NonSilo.Tests
                 _output.WriteLine($"Reparsed     : {reparsed}");
                 Assert.Equal(formatted, reparsed.Format());
             }
-        } 
-        
+        }
+
         public class Inner<T>
         {
             public class Middle { }

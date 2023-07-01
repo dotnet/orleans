@@ -1,8 +1,4 @@
-using System.Threading;
-using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
-using Orleans;
-using Orleans.Runtime;
 using UnitTests.GrainInterfaces;
 
 
@@ -11,7 +7,7 @@ namespace UnitTests.Grains
     /// <summary>
     /// A simple grain that allows to set two arguments and then multiply them.
     /// </summary>
-    public class SimpleGrain : Grain, ISimpleGrain 
+    public class SimpleGrain : Grain, ISimpleGrain
     {
         public const string SimpleGrainNamePrefix = "UnitTests.Grains.SimpleG";
 

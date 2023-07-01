@@ -1,8 +1,5 @@
-using System;
 using System.Collections.Concurrent;
-using System.Collections.Generic;
 using System.Collections.Immutable;
-using System.Linq;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Orleans.CodeGenerator.SyntaxGeneration;
@@ -122,7 +119,7 @@ namespace Orleans.CodeGenerator
                     new(TypeOrDefault("System.Int128"), TypeOrDefault("Orleans.Serialization.Codecs.Int128Codec")),
                     new(TypeOrDefault("System.Half"), TypeOrDefault("Orleans.Serialization.Codecs.HalfCodec")),
                     new(Type("System.Uri"), Type("Orleans.Serialization.Codecs.UriCodec")),
-                }.Where(desc => desc.UnderlyingType is {} && desc.CodecType is {}).ToArray(),
+                }.Where(desc => desc.UnderlyingType is { } && desc.CodecType is { }).ToArray(),
                 WellKnownCodecs = new WellKnownCodecDescription[]
                 {
                     new(Type("System.Exception"), Type("Orleans.Serialization.ExceptionCodec")),
@@ -290,7 +287,7 @@ namespace Orleans.CodeGenerator
             UInt128,
             Int128,
             Half
-        }.Where(t => t is {}).ToArray();
+        }.Where(t => t is { }).ToArray();
 
         public INamedTypeSymbol[] ImmutableAttributes { get; private set; }
         public INamedTypeSymbol Exception { get; private set; }

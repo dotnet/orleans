@@ -1,9 +1,4 @@
-using System;
-using System.Collections.Generic;
-using System.Threading;
-using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
-using Orleans;
 using Orleans.Runtime;
 using Orleans.Runtime.Scheduler;
 using UnitTests.GrainInterfaces;
@@ -54,7 +49,7 @@ namespace UnitTestGrains
                 RuntimeContext.Current);
 
             // make sure we run in the right activation context.
-            if(!Equals(context, RuntimeContext.Current))
+            if (!Equals(context, RuntimeContext.Current))
                 logger.LogError((int)ErrorCode.Runtime_Error_100146, "Grain not running in the right activation context");
 
             string name = (string)data;
@@ -67,7 +62,7 @@ namespace UnitTestGrains
             {
                 timer = allTimers[(string)data];
             }
-            if(timer == null)
+            if (timer == null)
                 logger.LogError((int)ErrorCode.Runtime_Error_100146, "Timer is null");
             if (timer != null && counter > 10000)
             {
@@ -235,7 +230,7 @@ namespace UnitTestGrains
 
         private void CheckRuntimeContext(string what)
         {
-            if (RuntimeContext.Current == null 
+            if (RuntimeContext.Current == null
                 || !RuntimeContext.Current.Equals(context))
             {
                 throw new InvalidOperationException(

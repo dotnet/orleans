@@ -1,12 +1,7 @@
-using System;
-using System.Threading.Tasks;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Logging;
-using Orleans;
 using Orleans.Configuration;
-using Orleans.Hosting;
-using Orleans.Runtime;
 using Orleans.Streaming.EventHubs;
 using Orleans.Streams;
 using Orleans.TestingHost;
@@ -52,7 +47,7 @@ namespace ServiceBus.Tests.StreamingTests
             public void Configure(ISiloBuilder hostBuilder)
             {
                 hostBuilder
-                    .AddPersistentStreams(StreamProviderName, TestEventHubStreamAdapterFactory.Create, b=>
+                    .AddPersistentStreams(StreamProviderName, TestEventHubStreamAdapterFactory.Create, b =>
                     {
                         b.Configure<SiloMessagingOptions>(ob => ob.Configure(options => options.ClientDropTimeout = TimeSpan.FromSeconds(5)));
                         b.Configure<EventHubOptions>(ob => ob.Configure(options =>
@@ -77,8 +72,8 @@ namespace ServiceBus.Tests.StreamingTests
             public void Configure(IConfiguration configuration, IClientBuilder clientBuilder)
             {
                 clientBuilder
-                    .AddPersistentStreams(StreamProviderName, TestEventHubStreamAdapterFactory.Create, b=>b
-                        .Configure<EventHubOptions>(ob=>ob.Configure(options =>
+                    .AddPersistentStreams(StreamProviderName, TestEventHubStreamAdapterFactory.Create, b => b
+                        .Configure<EventHubOptions>(ob => ob.Configure(options =>
                         {
                             options.ConfigureTestDefaults(EHPath, EHConsumerGroup);
                         })))
@@ -86,14 +81,14 @@ namespace ServiceBus.Tests.StreamingTests
             }
         }
 
-        [SkippableFact(Skip="https://github.com/dotnet/orleans/issues/5657")]
+        [SkippableFact(Skip = "https://github.com/dotnet/orleans/issues/5657")]
         public async Task EHStreamProducerOnDroppedClientTest()
         {
             logger.LogInformation("************************ EHStreamProducerOnDroppedClientTest *********************************");
             await runner.StreamProducerOnDroppedClientTest(StreamProviderName, StreamNamespace);
         }
 
-        [SkippableFact(Skip="https://github.com/dotnet/orleans/issues/5634")]
+        [SkippableFact(Skip = "https://github.com/dotnet/orleans/issues/5634")]
         public async Task EHStreamConsumerOnDroppedClientTest()
         {
             logger.LogInformation("************************ EHStreamConsumerOnDroppedClientTest *********************************");

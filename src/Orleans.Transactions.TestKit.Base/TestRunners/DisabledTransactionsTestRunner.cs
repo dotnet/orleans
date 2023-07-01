@@ -1,7 +1,3 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
 using FluentAssertions;
 
 namespace Orleans.Transactions.TestKit
@@ -15,7 +11,7 @@ namespace Orleans.Transactions.TestKit
         {
             const int delta = 5;
             ITransactionTestGrain grain = RandomTestGrain(transactionTestGrainClassName);
-            Func<Task> task = ()=>grain.Set(delta);
+            Func<Task> task = () => grain.Set(delta);
             var response = task.Should().ThrowAsync<OrleansTransactionsDisabledException>();
         }
 

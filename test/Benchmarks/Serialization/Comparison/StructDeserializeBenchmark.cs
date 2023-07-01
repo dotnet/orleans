@@ -6,7 +6,6 @@ using Orleans.Serialization.Buffers;
 using Orleans.Serialization.Session;
 using Microsoft.Extensions.DependencyInjection;
 using Newtonsoft.Json;
-using System.IO;
 using Xunit;
 using SerializerSession = Orleans.Serialization.Session.SerializerSession;
 using Utf8JsonNS = Utf8Json;
@@ -125,5 +124,5 @@ namespace Benchmarks.Comparison
 
         [Benchmark(Description = "SpanJson")]
         public int SpanJsonUtf8() => SumResult(SpanJson.JsonSerializer.Generic.Utf8.Deserialize<IntStruct>(SpanJsonInput));
-    } 
+    }
 }

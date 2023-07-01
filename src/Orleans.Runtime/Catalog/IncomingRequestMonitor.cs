@@ -1,7 +1,5 @@
-using System;
 using System.Collections.Concurrent;
 using System.Runtime.CompilerServices;
-using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
@@ -44,7 +42,7 @@ namespace Orleans.Runtime
             {
                 return;
             }
-            
+
             _recentlyUsedActivations.TryAdd(activation, true);
         }
 

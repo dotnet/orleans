@@ -1,10 +1,5 @@
-using System;
 using System.Diagnostics;
-using System.Linq;
-using System.Threading;
-using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
-using Orleans;
 using Orleans.Concurrency;
 using Orleans.Providers;
 using Orleans.Runtime;
@@ -268,7 +263,7 @@ namespace UnitTests.Grains
             return result;
         }
 
-        #pragma warning disable 1998
+#pragma warning disable 1998
         public async Task<string> CallMethodTask_Block(string data)
         {
             string name = GetType().Name + ".CallMethodTask_Block";
@@ -282,9 +277,9 @@ namespace UnitTests.Grains
             logger.LogInformation("{Name} Result={Result}", name, result);
             return result;
         }
-        #pragma warning restore 1998
+#pragma warning restore 1998
 
-        #pragma warning disable 1998
+#pragma warning disable 1998
         public async Task<string> CallMethodAV_Block(string data)
         {
             string name = GetType().Name + ".CallMethodAV_Block";
@@ -298,7 +293,7 @@ namespace UnitTests.Grains
             logger.LogInformation("{Name} Result={Result}", name, result);
             return result;
         }
-        #pragma warning restore 1998
+#pragma warning restore 1998
     }
 
     [Reentrant]

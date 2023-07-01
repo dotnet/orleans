@@ -1,5 +1,3 @@
-using System;
-using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Orleans.Runtime;
 using Orleans.Transactions.Abstractions;
@@ -45,7 +43,7 @@ namespace Orleans.Transactions.TestKit
 
     public enum FaultInjectionType
     {
-        None, 
+        None,
         Deactivation,
         ExceptionBeforeStore,
         ExceptionAfterStore
@@ -83,7 +81,7 @@ namespace Orleans.Transactions.TestKit
         internal void SetupResourceFactory(IGrainContext context, string stateName, TransactionQueue<TState> queue)
         {
             // Add resources factory to the grain context
-            context.RegisterResourceFactory<ITransactionalResource>(stateName, () => new FaultInjectionTransactionalResource<TState>(this.faultInjector, FaultInjectionControl, new TransactionalResource<TState>(queue), context, logger,  grainRuntime));
+            context.RegisterResourceFactory<ITransactionalResource>(stateName, () => new FaultInjectionTransactionalResource<TState>(this.faultInjector, FaultInjectionControl, new TransactionalResource<TState>(queue), context, logger, grainRuntime));
 
             // Add tm factory to the grain context
             context.RegisterResourceFactory<ITransactionManager>(stateName, () => new FaultInjectionTransactionManager<TState>(this.faultInjector, FaultInjectionControl, new TransactionManager<TState>(queue), context, logger, grainRuntime));

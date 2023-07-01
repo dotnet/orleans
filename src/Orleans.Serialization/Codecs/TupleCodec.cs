@@ -1,4 +1,3 @@
-using System;
 using System.Buffers;
 using Orleans.Serialization.Buffers;
 using Orleans.Serialization.Cloning;
@@ -510,8 +509,19 @@ namespace Orleans.Serialization.Codecs
             ReferenceCodec.RecordObject(reader.Session, result, placeholderReferenceId);
             return result;
         }
+
+        /* Unmerged change from project 'Orleans.Serialization (net7.0)'
+        Before:
+            }
+
+            /// <summary>
+        After:
+            }
+
+            /// <summary>
+        */
     }
-    
+
     /// <summary>
     /// Copier for <see cref="Tuple{T1, T2, T3, T4}"/>.
     /// </summary>
@@ -762,7 +772,7 @@ namespace Orleans.Serialization.Codecs
             context.RecordCopy(input, result);
             return result;
         }
-    } 
+    }
 
     /// <summary>
     /// Serializer for <see cref="Tuple{T1, T2, T3, T4, T5, T6}"/>.
@@ -896,7 +906,7 @@ namespace Orleans.Serialization.Codecs
             return result;
         }
     }
-    
+
     /// <summary>
     /// Copier for <see cref="Tuple{T1, T2, T3, T4, T5, T6}"/>.
     /// </summary>
@@ -969,7 +979,7 @@ namespace Orleans.Serialization.Codecs
             context.RecordCopy(input, result);
             return result;
         }
-    } 
+    }
 
     /// <summary>
     /// Serializer for <see cref="Tuple{T1, T2, T3, T4, T5, T6, T7}"/>.
@@ -1114,8 +1124,19 @@ namespace Orleans.Serialization.Codecs
             ReferenceCodec.RecordObject(reader.Session, result, placeholderReferenceId);
             return result;
         }
+
+        /* Unmerged change from project 'Orleans.Serialization (net7.0)'
+        Before:
+            }
+
+            /// <summary>
+        After:
+            }
+
+            /// <summary>
+        */
     }
-    
+
     /// <summary>
     /// Copier for <see cref="Tuple{T1, T2, T3, T4, T5, T6, T7}"/>.
     /// </summary>
@@ -1194,7 +1215,7 @@ namespace Orleans.Serialization.Codecs
             context.RecordCopy(input, result);
             return result;
         }
-    } 
+    }
 
     /// <summary>
     /// Serializer for <see cref="Tuple{T1, T2, T3, T4, T5, T6, T7, T8}"/>.
@@ -1350,7 +1371,7 @@ namespace Orleans.Serialization.Codecs
             return result;
         }
     }
-    
+
     /// <summary>
     /// Copier for <see cref="Tuple{T1, T2, T3, T4, T5, T6, T7, T8}"/>.
     /// </summary>
@@ -1435,5 +1456,5 @@ namespace Orleans.Serialization.Codecs
             context.RecordCopy(input, result);
             return result;
         }
-    } 
+    }
 }

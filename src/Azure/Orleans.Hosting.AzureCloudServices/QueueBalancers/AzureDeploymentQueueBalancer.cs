@@ -1,4 +1,3 @@
-using System;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Runtime.Host;
@@ -15,7 +14,7 @@ namespace Orleans.Hosting
         /// This Balancer uses both the information about the full set of silos as reported by Azure role code and 
         /// the information from Membership oracle about currently active (alive) silos and rebalances queues from non active silos.
         /// </summary>
-        public static void UseDynamicAzureDeploymentBalancer(this ISiloPersistentStreamConfigurator configurator, 
+        public static void UseDynamicAzureDeploymentBalancer(this ISiloPersistentStreamConfigurator configurator,
             TimeSpan? siloMaturityPeriod = null)
         {
             configurator.ConfigurePartitionBalancing<DeploymentBasedQueueBalancerOptions>(

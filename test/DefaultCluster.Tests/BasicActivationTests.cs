@@ -1,12 +1,6 @@
-using System;
-using System.Collections.Generic;
 using System.Globalization;
-using System.Threading;
-using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
-using Orleans;
-using Orleans.Runtime;
 using TestExtensions;
 using UnitTests.GrainInterfaces;
 using Xunit;
@@ -249,7 +243,7 @@ namespace DefaultCluster.Tests.General
 
                 // set the regular response time back, expect msgs ot succeed.
                 this.SetResponseTimeout(prevTimeout);
-                
+
                 this.Logger.LogInformation("About to send a next legit request that should succeed.");
                 grain.DoLongAction(TimeSpan.FromMilliseconds(1), "B_" + 0).Wait();
                 this.Logger.LogInformation("The request succeeded.");

@@ -1,9 +1,5 @@
-using System;
 using System.Collections.Concurrent;
-using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
-using System.Threading;
-using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 
 namespace Orleans.Runtime
@@ -27,7 +23,7 @@ namespace Orleans.Runtime
 #pragma warning disable IDE0052 // Remove unread private members
         private readonly Task _messageLoopTask;
 #pragma warning restore IDE0052 // Remove unread private members
-        
+
         private GrainReference _grainReference;
 
         public StatelessWorkerGrainContext(

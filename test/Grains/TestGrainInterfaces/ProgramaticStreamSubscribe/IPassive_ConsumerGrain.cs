@@ -1,14 +1,10 @@
-﻿using System;
-using System.Threading.Tasks;
-using Orleans;
-
-namespace UnitTests.GrainInterfaces
+﻿namespace UnitTests.GrainInterfaces
 {
     /// <summary>
     /// Consumer grain which passively reacts to subscriptions which was made on behalf of
     /// it using Programmatic Subscribing 
     /// </summary>
-    public interface IPassive_ConsumerGrain: IGrainWithGuidKey
+    public interface IPassive_ConsumerGrain : IGrainWithGuidKey
     {
         Task StopConsuming();
         Task<int> GetCountOfOnAddFuncCalled();
@@ -20,11 +16,11 @@ namespace UnitTests.GrainInterfaces
     {
     }
 
-    public interface IImplicitSubscribeGrain: IPassive_ConsumerGrain
+    public interface IImplicitSubscribeGrain : IPassive_ConsumerGrain
     {
     }
 
-    public interface ITypedProducerGrain: IGrainWithGuidKey
+    public interface ITypedProducerGrain : IGrainWithGuidKey
     {
         Task BecomeProducer(Guid streamId, string streamNamespace, string providerToUse);
 

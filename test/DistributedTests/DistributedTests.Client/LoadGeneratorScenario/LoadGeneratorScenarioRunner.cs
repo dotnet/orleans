@@ -1,13 +1,8 @@
-using System;
-using System.Threading;
-using System.Threading.Tasks;
 using Microsoft.Crank.EventSources;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
-using Orleans;
 using Orleans.Configuration;
-using Orleans.Hosting;
 
 namespace DistributedTests.Client.LoadGeneratorScenario
 {
@@ -16,14 +11,14 @@ namespace DistributedTests.Client.LoadGeneratorScenario
         public string ServiceId { get; set; }
         public string ClusterId { get; set; }
         public int ConnectionsPerEndpoint { get; set; }
-        public SecretConfiguration.SecretSource SecretSource { get;set; }
+        public SecretConfiguration.SecretSource SecretSource { get; set; }
     }
 
     public class LoadGeneratorParameters
     {
         public int NumWorkers { get; set; }
         public int BlocksPerWorker { get; set; }
-        public int RequestsPerBlock { get; set; } 
+        public int RequestsPerBlock { get; set; }
         public int Duration { get; set; }
     }
 

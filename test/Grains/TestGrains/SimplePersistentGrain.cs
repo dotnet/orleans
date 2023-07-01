@@ -1,8 +1,4 @@
-using System;
-using System.Threading;
-using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
-using Orleans;
 using Orleans.Runtime;
 using UnitTests.GrainInterfaces;
 
@@ -26,7 +22,7 @@ namespace UnitTests.Grains
     {
         private ILogger logger;
         private Guid version;
-        
+
         public SimplePersistentGrain(ILoggerFactory loggerFactory)
         {
             this.logger = loggerFactory.CreateLogger($"{this.GetType().Name}-{this.IdentityString}");
@@ -46,7 +42,7 @@ namespace UnitTests.Grains
 
         public Task SetA(int a, bool deactivate)
         {
-            if(deactivate)
+            if (deactivate)
                 DeactivateOnIdle();
             return SetA(a);
         }
@@ -65,7 +61,7 @@ namespace UnitTests.Grains
 
         public Task<int> GetAxB()
         {
-            return Task.FromResult(State.A*State.B);
+            return Task.FromResult(State.A * State.B);
         }
 
         public Task<int> GetAxB(int a, int b)

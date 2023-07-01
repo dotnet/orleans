@@ -5,8 +5,6 @@ using Orleans.Providers.Streams.Common;
 using Orleans.Runtime;
 using Orleans.Serialization;
 using Orleans.Streams;
-using System.Collections.Generic;
-using System.Linq;
 
 namespace Orleans.Providers.GCP.Streams.PubSub
 {

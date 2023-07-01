@@ -1,5 +1,3 @@
-using System;
-using System.Threading;
 using Orleans.Runtime.Internal;
 
 namespace Orleans.Runtime

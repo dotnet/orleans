@@ -1,8 +1,4 @@
-using System;
-using System.Collections.Generic;
 using System.Diagnostics;
-using System.Linq;
-using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Orleans.Storage;
 using Orleans.EventSourcing.Common;
@@ -36,7 +32,7 @@ namespace Orleans.EventSourcing.LogStorage
 
 
         IGrainStorage globalGrainStorage;
-        string grainTypeName;   
+        string grainTypeName;
 
         // the object containing the entire log, as retrieved from / sent to storage
         LogStateWithMetaDataAndETag<TLogEntry> GlobalLog;
@@ -251,7 +247,7 @@ namespace Orleans.EventSourcing.LogStorage
         /// </summary>
         [Serializable]
         [GenerateSerializer]
-        protected internal sealed class UpdateNotificationMessage : INotificationMessage 
+        protected internal sealed class UpdateNotificationMessage : INotificationMessage
         {
             /// <inheritdoc/>
             [Id(0)]
@@ -274,7 +270,7 @@ namespace Orleans.EventSourcing.LogStorage
             {
                 return string.Format("v{0} ({1} updates by {2}) etag={3}", Version, Updates.Count, Origin, ETag);
             }
-         }
+        }
 
         /// <inheritdoc/>
         protected override INotificationMessage Merge(INotificationMessage earlierMessage, INotificationMessage laterMessage)
@@ -300,7 +296,7 @@ namespace Orleans.EventSourcing.LogStorage
                 return base.Merge(earlierMessage, laterMessage); // keep only the version number
         }
 
-        private SortedList<long, UpdateNotificationMessage> notifications = new SortedList<long,UpdateNotificationMessage>();
+        private SortedList<long, UpdateNotificationMessage> notifications = new SortedList<long, UpdateNotificationMessage>();
 
         /// <inheritdoc/>
         protected override void OnNotificationReceived(INotificationMessage payload)
@@ -331,7 +327,7 @@ namespace Orleans.EventSourcing.LogStorage
                 // append all operations in pending 
                 foreach (var u in updateNotification.Updates)
                     GlobalLog.StateAndMetaData.Log.Add(u);
-                  
+
                 GlobalLog.StateAndMetaData.FlipBit(updateNotification.Origin);
 
                 GlobalLog.ETag = updateNotification.ETag;
@@ -344,7 +340,7 @@ namespace Orleans.EventSourcing.LogStorage
             Services.Log(LogLevel.Trace, "unprocessed notifications in queue: {0}", notifications.Count);
 
             base.ProcessNotifications();
-         
+
         }
 
 

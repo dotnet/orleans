@@ -1,5 +1,3 @@
-using System;
-
 namespace Orleans.Runtime
 {
     [Id(102), GenerateSerializer, Immutable]

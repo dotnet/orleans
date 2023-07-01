@@ -1,6 +1,3 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
 using Orleans.Streams;
 using Xunit;
 
@@ -13,7 +10,7 @@ namespace UnitTests.OrleansRuntime.Streams
         {
             const int resourceCount = 99;
             const int bucketCount = 10;
-            var idealBalance = (int)Math.Floor((double) (resourceCount)/bucketCount);
+            var idealBalance = (int)Math.Floor((double)(resourceCount) / bucketCount);
             List<int> resources = Enumerable.Range(0, resourceCount).ToList();
             List<int> buckets = Enumerable.Range(0, bucketCount).ToList();
             var resourceBalancer = new BestFitBalancer<int, int>(buckets, resources);
@@ -111,7 +108,7 @@ namespace UnitTests.OrleansRuntime.Streams
         {
             const int resourceCount = 99;
             const int bucketCount = 10;
-            const int activeBucketCount = bucketCount/2;
+            const int activeBucketCount = bucketCount / 2;
             var idealBalance = (int)Math.Floor((double)(resourceCount) / activeBucketCount);
             List<int> resources = Enumerable.Range(0, resourceCount).ToList();
             List<int> buckets = Enumerable.Range(0, bucketCount).ToList();

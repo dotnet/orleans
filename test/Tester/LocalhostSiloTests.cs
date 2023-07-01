@@ -1,11 +1,6 @@
-using System;
 using System.Net;
-using System.Threading;
-using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
-using Orleans;
-using Orleans.Hosting;
 using Orleans.Internal;
 using Orleans.Runtime;
 using Orleans.TestingHost;
@@ -78,7 +73,7 @@ namespace Tester
 
             var clientHost = new HostBuilder().UseOrleansClient((ctx, clientBuilder) =>
             {
-                clientBuilder.UseLocalhostClustering(new[] {baseGatewayPort, baseGatewayPort + 1});
+                clientBuilder.UseLocalhostClustering(new[] { baseGatewayPort, baseGatewayPort + 1 });
             }).Build();
 
             var client = clientHost.Services.GetRequiredService<IClusterClient>();

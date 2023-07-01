@@ -5,16 +5,14 @@ using Orleans.Serialization.Codecs;
 using Orleans.Serialization.GeneratedCodeHelpers;
 using Orleans.Serialization.Serializers;
 using Orleans.Serialization.Session;
-using System;
 using System.Buffers;
-using System.IO;
 
 namespace Orleans.Serialization
 {
     /// <summary>
     /// Serializes and deserializes values.
     /// </summary>
-    public sealed class Serializer 
+    public sealed class Serializer
     {
         private readonly SerializerSessionPool _sessionPool;
 
@@ -487,8 +485,19 @@ namespace Orleans.Serialization
         /// <param name="source">The source buffer.</param>
         /// <param name="session">The serializer session.</param>
         /// <returns>The deserialized value.</returns>
+
+        /* Unmerged change from project 'Orleans.Serialization (net7.0)'
+        Before:
+                public T Deserialize<T>(ArraySegment<byte> source, SerializerSession session) => Deserialize<T>(source.AsSpan(), session);
+
+                /// <summary>
+        After:
+                public T Deserialize<T>(ArraySegment<byte> source, SerializerSession session) => Deserialize<T>(source.AsSpan(), session);
+
+                /// <summary>
+        */
         public T Deserialize<T>(ArraySegment<byte> source, SerializerSession session) => Deserialize<T>(source.AsSpan(), session);
-        
+
         /// <summary>
         /// Deserialize a value of type <typeparamref name="T"/> from <paramref name="source"/>.
         /// </summary>
@@ -1326,7 +1335,7 @@ namespace Orleans.Serialization
     /// <summary>
     /// Provides methods for serializing and deserializing values which have types which are not statically known.
     /// </summary>
-    public sealed class ObjectSerializer 
+    public sealed class ObjectSerializer
     {
         private readonly SerializerSessionPool _sessionPool;
 
@@ -1720,7 +1729,7 @@ namespace Orleans.Serialization
         /// <param name="type">The expected type of the value.</param>
         /// <returns>The deserialized value.</returns>
         public object Deserialize(ArraySegment<byte> source, SerializerSession session, Type type) => Deserialize(source.AsSpan(), session, type);
-        
+
         /// <summary>
         /// Deserialize a value of type <paramref name="type"/> from <paramref name="source"/>.
         /// </summary>

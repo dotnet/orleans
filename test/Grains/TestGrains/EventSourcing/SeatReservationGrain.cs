@@ -1,6 +1,3 @@
-using System;
-using System.Collections.Generic;
-using System.Threading.Tasks;
 using TestGrainInterfaces;
 using Orleans.Providers;
 using Orleans.EventSourcing;
@@ -21,9 +18,9 @@ namespace TestGrains
 
     [StorageProvider(ProviderName = "Default")]
     [LogConsistencyProvider(ProviderName = "StateStorage")]
-    public class SeatReservationGrain : JournaledGrain<ReservationState,SeatReservation>, ISeatReservationGrain
+    public class SeatReservationGrain : JournaledGrain<ReservationState, SeatReservation>, ISeatReservationGrain
     {
-      
+
         public async Task<bool> Reserve(int seatnumber, string userid)
         {
             // first, enqueue the request

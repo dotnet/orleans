@@ -1,8 +1,4 @@
 using Orleans.Providers.Streams.Common;
-using Orleans.Runtime;
-using System;
-using System.Collections.Generic;
-using System.Linq;
 using Microsoft.Extensions.Logging;
 
 namespace Orleans.Streaming.EventHubs

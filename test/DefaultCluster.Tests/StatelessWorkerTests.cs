@@ -1,8 +1,4 @@
-using System;
-using System.Collections.Generic;
 using System.Diagnostics;
-using System.Linq;
-using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
@@ -30,7 +26,7 @@ namespace DefaultCluster.Tests.General
         {
             var grain = this.GrainFactory.GetGrain<IStatelessWorkerExceptionGrain>(0);
 
-            for (int i=0; i<100; i++)
+            for (int i = 0; i < 100; i++)
             {
                 var ex = await Assert.ThrowsAsync<Exception>(() => grain.Ping());
                 Assert.Equal("oops", ex.Message);
@@ -43,14 +39,14 @@ namespace DefaultCluster.Tests.General
             var gatewayOptions = this.Fixture.Client.ServiceProvider.GetRequiredService<IOptions<StaticGatewayListProviderOptions>>();
             var gatewaysCount = gatewayOptions.Value.Gateways.Count;
             // do extra calls to trigger activation of ExpectedMaxLocalActivations local activations
-            int numberOfCalls = ExpectedMaxLocalActivations * 3 * gatewaysCount; 
+            int numberOfCalls = ExpectedMaxLocalActivations * 3 * gatewaysCount;
 
             IStatelessWorkerGrain grain = this.GrainFactory.GetGrain<IStatelessWorkerGrain>(GetRandomGrainId());
             List<Task> promises = new List<Task>();
 
             // warmup
             for (int i = 0; i < gatewaysCount; i++)
-                promises.Add(grain.LongCall()); 
+                promises.Add(grain.LongCall());
             await Task.WhenAll(promises);
 
             await Task.Delay(2000);
@@ -102,7 +98,7 @@ namespace DefaultCluster.Tests.General
             // message forwards. When the issue occurs, this test will throw an exception.
 
             // We are trying to trigger a race condition and need more than 1 attempt to reliably reproduce the issue.
-            for (var attempt = 0; attempt < 100; attempt ++)
+            for (var attempt = 0; attempt < 100; attempt++)
             {
                 var grain = this.GrainFactory.GetGrain<IStatelessWorkerGrain>(attempt);
                 await Task.WhenAll(Enumerable.Range(0, 10).Select(_ => grain.DummyCall()));
@@ -125,7 +121,7 @@ namespace DefaultCluster.Tests.General
 
             IStatelessWorkerGrain grain = this.GrainFactory.GetGrain<IStatelessWorkerGrain>(GetRandomGrainId());
             List<Task> promises = new List<Task>();
-            
+
             for (int i = 0; i < numberOfCalls; i++)
                 promises.Add(grain.LongCall());
             await Task.WhenAll(promises);

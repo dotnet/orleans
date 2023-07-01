@@ -1,10 +1,5 @@
-using System;
-using System.Collections.Generic;
 using System.Diagnostics;
-using System.Linq;
 using System.Runtime;
-using System.Threading;
-using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -14,9 +9,7 @@ using Orleans.Runtime.Messaging;
 using Orleans.Runtime.Scheduler;
 using Orleans.Services;
 using Orleans.Configuration;
-using Orleans.Serialization;
 using Orleans.Internal;
-using Orleans.Hosting;
 
 namespace Orleans.Runtime
 {
@@ -171,13 +164,13 @@ namespace Orleans.Runtime
             this.siloLifecycle = this.Services.GetRequiredService<ISiloLifecycleSubject>();
             // register all lifecycle participants
             IEnumerable<ILifecycleParticipant<ISiloLifecycle>> lifecycleParticipants = this.Services.GetServices<ILifecycleParticipant<ISiloLifecycle>>();
-            foreach(ILifecycleParticipant<ISiloLifecycle> participant in lifecycleParticipants)
+            foreach (ILifecycleParticipant<ISiloLifecycle> participant in lifecycleParticipants)
             {
                 participant?.Participate(this.siloLifecycle);
             }
 
             // register all named lifecycle participants
-            var namedLifecycleParticipantCollection = this.Services.GetService<IKeyedServiceCollection<string,ILifecycleParticipant<ISiloLifecycle>>>();
+            var namedLifecycleParticipantCollection = this.Services.GetService<IKeyedServiceCollection<string, ILifecycleParticipant<ISiloLifecycle>>>();
             if (namedLifecycleParticipantCollection?.GetServices(Services)?.Select(s => s.GetService(Services)) is { } namedParticipants)
             {
                 foreach (ILifecycleParticipant<ISiloLifecycle> participant in namedParticipants)
@@ -386,7 +379,7 @@ namespace Orleans.Runtime
             var grainService = (GrainService)service;
 
             await grainService.QueueTask(grainService.Start).WithTimeout(this.initTimeout, $"Starting GrainService failed due to timeout {initTimeout}");
-            logger.LogInformation("Grain Service {GrainServiceType} started successfully.",service.GetType().FullName);
+            logger.LogInformation("Grain Service {GrainServiceType} started successfully.", service.GetType().FullName);
         }
 
         /// <summary>
@@ -467,10 +460,10 @@ namespace Orleans.Runtime
                 {
                     logger.LogDebug((int)ErrorCode.SiloStopInProgress, "Silo shutdown in progress. Waiting for shutdown to be completed.");
                 }
-                var pause = TimeSpan.FromSeconds(1);                
+                var pause = TimeSpan.FromSeconds(1);
 
                 while (!this.SystemStatus.Equals(SystemStatus.Terminated))
-                {                    
+                {
                     if (logger.IsEnabled(LogLevel.Debug))
                     {
                         logger.LogDebug((int)ErrorCode.WaitingForSiloStop, "Silo shutdown still in progress...");

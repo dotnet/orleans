@@ -1,7 +1,5 @@
-﻿using System;
-using Microsoft.Extensions.Logging;
+﻿using Microsoft.Extensions.Logging;
 using Orleans.Providers.Streams.Common;
-using Orleans.Runtime;
 using Orleans.Configuration;
 
 namespace Orleans.Streaming.EventHubs
@@ -30,8 +28,8 @@ namespace Orleans.Streaming.EventHubs
         /// </summary>
         /// <param name="logger"></param>
         /// <param name="monitor"></param>
-        public AveragingCachePressureMonitor(ILogger logger, ICacheMonitor monitor=null)
-            :this(EventHubStreamCachePressureOptions.DEFAULT_AVERAGING_CACHE_PRESSURE_MONITORING_THRESHOLD, logger, monitor)
+        public AveragingCachePressureMonitor(ILogger logger, ICacheMonitor monitor = null)
+            : this(EventHubStreamCachePressureOptions.DEFAULT_AVERAGING_CACHE_PRESSURE_MONITORING_THRESHOLD, logger, monitor)
         { }
 
         /// <summary>
@@ -40,7 +38,7 @@ namespace Orleans.Streaming.EventHubs
         /// <param name="flowControlThreshold"></param>
         /// <param name="logger"></param>
         /// <param name="monitor"></param>
-        public AveragingCachePressureMonitor(double flowControlThreshold, ILogger logger, ICacheMonitor monitor=null)
+        public AveragingCachePressureMonitor(double flowControlThreshold, ILogger logger, ICacheMonitor monitor = null)
         {
             this.flowControlThreshold = flowControlThreshold;
             this.logger = logger;
@@ -87,7 +85,7 @@ namespace Orleans.Streaming.EventHubs
             if (isUnderPressure != wasUnderPressure)
             {
                 this.CacheMonitor?.TrackCachePressureMonitorStatusChange(this.GetType().Name, isUnderPressure, cachePressureContributionCount, pressure, this.flowControlThreshold);
-                if(this.logger.IsEnabled(LogLevel.Debug))
+                if (this.logger.IsEnabled(LogLevel.Debug))
                     logger.LogDebug(isUnderPressure
                     ? $"Ingesting messages too fast. Throttling message reading. AccumulatedCachePressure: {accumulatedCachePressure}, Contributions: {cachePressureContributionCount}, AverageCachePressure: {pressure}, Threshold: {flowControlThreshold}"
                     : $"Message ingestion is healthy. AccumulatedCachePressure: {accumulatedCachePressure}, Contributions: {cachePressureContributionCount}, AverageCachePressure: {pressure}, Threshold: {flowControlThreshold}");

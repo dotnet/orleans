@@ -1,8 +1,3 @@
-using System;
-using System.Collections.Generic;
-using System.Threading.Tasks;
-using Orleans;
-
 // ReSharper disable InconsistentNaming
 
 namespace UnitTests.GrainInterfaces
@@ -42,7 +37,7 @@ namespace UnitTests.GrainInterfaces
         Task<int> DoRead();
         Task DoDelete();
     }
-    
+
 
     public interface IGrainStorageTestGrain : IGrainWithGuidKey
     {

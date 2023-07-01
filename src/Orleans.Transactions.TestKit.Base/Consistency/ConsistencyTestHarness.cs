@@ -1,9 +1,5 @@
 using Orleans.Runtime;
 using Orleans.TestingHost;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
 using FluentAssertions;
 
 namespace Orleans.Transactions.TestKit.Consistency
@@ -87,7 +83,7 @@ namespace Orleans.Transactions.TestKit.Consistency
                         var id = result[0].ExecutingTx;
 
                         lock (succeeded)
-                            succeeded.Add(id);                           
+                            succeeded.Add(id);
 
                         output($"{partition}.{i} g{target} -> {result.Length} tuples");
 
@@ -156,7 +152,7 @@ namespace Orleans.Transactions.TestKit.Consistency
                 };
 
                 HashSet<string> readersOfPreviousVersion = new HashSet<string>();
-                
+
                 foreach (var seqnoKvp in grainKvp.Value)
                 {
                     var seqno = seqnoKvp.Key;
@@ -170,7 +166,7 @@ namespace Orleans.Transactions.TestKit.Consistency
 
                     var writer = writers.First().Key;
                     var readers = writers.First().Value;
- 
+
                     if (seqno == 0)
                     {
                         if (writer != InitialTx)
@@ -211,13 +207,13 @@ namespace Orleans.Transactions.TestKit.Consistency
             }
 
             // due a DFS to find cycles in the ordered-before graph (= violation of serializability)
-            DFS();             
+            DFS();
 
             // report unknown exceptions
             if (!tolerateUnknownExceptions)
-            foreach (var kvp in indoubt)
-                if (kvp.Value.Contains("failure during transaction commit"))
-                    true.Should().BeFalse($"exception during commit {kvp.Key} {kvp.Value}");
+                foreach (var kvp in indoubt)
+                    if (kvp.Value.Contains("failure during transaction commit"))
+                        true.Should().BeFalse($"exception during commit {kvp.Key} {kvp.Value}");
 
             // report timeout exceptions          
             if (!tolerateGenericTimeouts && timeoutsOccurred)

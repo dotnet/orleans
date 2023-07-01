@@ -1,7 +1,4 @@
-using System;
-using System.Threading.Tasks;
 using System.Collections.Concurrent;
-using System.Linq;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Orleans.Providers.Streams.Common;
@@ -10,7 +7,6 @@ using Orleans.Streaming.EventHubs;
 using Orleans.Streams;
 using Orleans.Streaming.EventHubs.Testing;
 using Orleans.Configuration;
-using Orleans;
 using Orleans.Statistics;
 
 namespace ServiceBus.Tests.TestStreamProviders
@@ -48,12 +44,12 @@ namespace ServiceBus.Tests.TestStreamProviders
         {
             var eventHubPath = this.ehOptions.EventHubName;
             var sharedDimensions = new EventHubMonitorAggregationDimensions(eventHubPath);
-            return new CacheFactoryForTesting(this.Name, this.cacheOptions, this.evictionOptions,this.staticticOptions, base.dataAdapter, this.createdCaches, sharedDimensions, this.serviceProvider.GetRequiredService<ILoggerFactory>());
+            return new CacheFactoryForTesting(this.Name, this.cacheOptions, this.evictionOptions, this.staticticOptions, base.dataAdapter, this.createdCaches, sharedDimensions, this.serviceProvider.GetRequiredService<ILoggerFactory>());
         }
 
         private class CacheFactoryForTesting : EventHubQueueCacheFactory
         {
-            private readonly ConcurrentBag<QueueCacheForTesting> caches; 
+            private readonly ConcurrentBag<QueueCacheForTesting> caches;
             private readonly string name;
 
             public CacheFactoryForTesting(string name, EventHubStreamCachePressureOptions cacheOptions, StreamCacheEvictionOptions evictionOptions, StreamStatisticOptions statisticOptions,
@@ -139,7 +135,7 @@ namespace ServiceBus.Tests.TestStreamProviders
             IEventHubDataAdapter dataAdapter = services.GetServiceByName<IEventHubDataAdapter>(name)
                 ?? services.GetService<IEventHubDataAdapter>()
                 ?? ActivatorUtilities.CreateInstance<EventHubDataAdapter>(services);
-            var factory = ActivatorUtilities.CreateInstance<EHStreamProviderWithCreatedCacheListAdapterFactory>(services, name, generatorOptions, ehOptions, receiverOptions, 
+            var factory = ActivatorUtilities.CreateInstance<EHStreamProviderWithCreatedCacheListAdapterFactory>(services, name, generatorOptions, ehOptions, receiverOptions,
                 cacheOptions, evictionOptions, statisticOptions, dataAdapter);
             factory.Init();
             return factory;

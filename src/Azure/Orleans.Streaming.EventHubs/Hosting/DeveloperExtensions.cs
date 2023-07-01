@@ -1,5 +1,3 @@
-using System;
-
 namespace Orleans.Hosting.Developer
 {
     public static class SiloBuilderExtensions

@@ -1,6 +1,4 @@
 using Orleans.Streams.Core;
-using System;
-using System.Threading.Tasks;
 using Orleans.Runtime;
 
 namespace Orleans.Streams.PubSub

@@ -1,4 +1,3 @@
-using System;
 using Azure.Messaging.EventHubs;
 using Orleans.Providers.Streams.Common;
 using Orleans.Runtime;

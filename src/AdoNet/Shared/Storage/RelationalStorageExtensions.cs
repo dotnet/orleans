@@ -1,11 +1,5 @@
-using System;
-using System.Collections.Generic;
 using System.Data;
 using System.Data.Common;
-using System.IO;
-using System.Linq;
-using System.Threading;
-using System.Threading.Tasks;
 
 #if CLUSTERING_ADONET
 namespace Orleans.Clustering.AdoNet.Storage
@@ -33,7 +27,7 @@ namespace Orleans.Tests.SqlUtils
         /// This is a template to produce query parameters that are indexed.
         /// </summary>
         private const string indexedParameterTemplate = "@p{0}";
-                    
+
         /// <summary>
         /// Executes a multi-record insert query clause with <em>SELECT UNION ALL</em>.
         /// </summary>
@@ -48,12 +42,12 @@ namespace Orleans.Tests.SqlUtils
         /// <returns>The rows affected.</returns>
         public static Task<int> ExecuteMultipleInsertIntoAsync<T>(this IRelationalStorage storage, string tableName, IEnumerable<T> parameters, CancellationToken cancellationToken = default(CancellationToken), IReadOnlyDictionary<string, string> nameMap = null, IEnumerable<string> onlyOnceColumns = null, bool useSqlParams = true)
         {
-            if(string.IsNullOrWhiteSpace(tableName))
+            if (string.IsNullOrWhiteSpace(tableName))
             {
                 throw new ArgumentException("The name must be a legal SQL table name", "tableName");
             }
 
-            if(parameters == null)
+            if (parameters == null)
             {
                 throw new ArgumentNullException("parameters");
             }
@@ -70,7 +64,7 @@ namespace Orleans.Tests.SqlUtils
             const string insertIntoValuesTemplate = "INSERT INTO {0} ({1}) SELECT {2};";
             var columns = string.Empty;
             var values = new List<string>();
-            if(parameters.Any())
+            if (parameters.Any())
             {
                 //Type and property information are the same for all of the objects.
                 //The following assumes the property names will be retrieved in the same
@@ -82,11 +76,11 @@ namespace Orleans.Tests.SqlUtils
                 {
                     var onlyOnceProperties = properties.Where(pn => onlyOnceColumns.Contains(pn.Name)).Select(pn => pn).ToArray();
                     var onlyOnceData = parameters.First();
-                    for(int i = 0; i < onlyOnceProperties.Length; ++i)
+                    for (int i = 0; i < onlyOnceProperties.Length; ++i)
                     {
                         var currentProperty = onlyOnceProperties[i];
                         var parameterValue = currentProperty.GetValue(onlyOnceData, null);
-                        if(useSqlParams)
+                        if (useSqlParams)
                         {
                             var parameterName = string.Format("@{0}", (nameMap.TryGetValue(onlyOnceProperties[i].Name, out var parameter) ? parameter : onlyOnceProperties[i].Name));
                             onlyOnceRow.Add(parameterName);
@@ -102,13 +96,13 @@ namespace Orleans.Tests.SqlUtils
                 var dataRows = new List<string>();
                 var multiProperties = onlyOnceColumns == null ? properties : properties.Where(pn => !onlyOnceColumns.Contains(pn.Name)).Select(pn => pn).ToArray();
                 int parameterCount = 0;
-                foreach(var row in parameters)
+                foreach (var row in parameters)
                 {
-                    for(int i = 0; i < multiProperties.Length; ++i)
+                    for (int i = 0; i < multiProperties.Length; ++i)
                     {
                         var currentProperty = multiProperties[i];
                         var parameterValue = currentProperty.GetValue(row, null);
-                        if(useSqlParams)
+                        if (useSqlParams)
                         {
                             var parameterName = string.Format(indexedParameterTemplate, parameterCount);
                             dataRows.Add(parameterName);
@@ -129,9 +123,9 @@ namespace Orleans.Tests.SqlUtils
             var query = string.Format(insertIntoValuesTemplate, tableName, columns, string.Join(storageConsts.UnionAllSelectTemplate, values));
             return storage.ExecuteAsync(query, command =>
             {
-                if(useSqlParams)
+                if (useSqlParams)
                 {
-                    foreach(var sp in sqlParameters)
+                    foreach (var sp in sqlParameters)
                     {
                         var p = command.CreateParameter();
                         p.ParameterName = sp.Key;
@@ -186,7 +180,7 @@ namespace Orleans.Tests.SqlUtils
         {
             return storage.ReadAsync(query, command =>
             {
-                if(parameters != null)
+                if (parameters != null)
                 {
                     command.ReflectionParameterProvider(parameters);
                 }
@@ -229,7 +223,7 @@ namespace Orleans.Tests.SqlUtils
         {
             return storage.ExecuteAsync(query, command =>
             {
-                if(parameters != null)
+                if (parameters != null)
                 {
                     command.ReflectionParameterProvider(parameters);
                 }
@@ -260,7 +254,7 @@ namespace Orleans.Tests.SqlUtils
         /// <returns></returns>
         public static Stream GetStream(this DbDataReader reader, int ordinal, IRelationalStorage storage)
         {
-            if(storage.SupportsStreamNatively())
+            if (storage.SupportsStreamNatively())
             {
                 return reader.GetStream(ordinal);
             }

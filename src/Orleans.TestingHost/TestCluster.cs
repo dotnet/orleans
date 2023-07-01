@@ -1,11 +1,6 @@
-using System;
-using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Diagnostics;
-using System.Linq;
 using System.Text;
-using System.Threading;
-using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Runtime;
 using Orleans.TestingHost.Utils;
@@ -126,7 +121,7 @@ namespace Orleans.TestingHost
         /// The port allocator.
         /// </summary>
         public ITestClusterPortAllocator PortAllocator { get; }
-        
+
         /// <summary>
         /// Configures the test cluster plus client in-process.
         /// </summary>
@@ -256,12 +251,12 @@ namespace Orleans.TestingHost
                 Primary, additional.Count, Runtime.Utils.EnumerableToString(additional));
 
             if (Primary?.IsActive == true) yield return Primary;
-            
+
 
             if (additional.Count > 0)
-            foreach (var s in additional)
-                if (s?.IsActive == true)
-                    yield return s;
+                foreach (var s in additional)
+                    if (s?.IsActive == true)
+                        yield return s;
         }
 
         /// <summary>
@@ -401,7 +396,7 @@ namespace Orleans.TestingHost
                 if (client is not null)
                 {
                     await client.StopAsync().ConfigureAwait(false);
-                }                
+                }
             }
             catch (Exception exc)
             {
@@ -655,7 +650,7 @@ namespace Orleans.TestingHost
                 });
             });
         }
-        
+
         /// <summary>
         /// Start a new silo in the target cluster
         /// </summary>

@@ -1,6 +1,3 @@
-using System;
-using System.Threading;
-using System.Threading.Tasks;
 using Orleans.Runtime;
 using Xunit;
 
@@ -23,7 +20,7 @@ namespace UnitTests
 
             target.Add("1", "one");
             Assert.Equal(1, target.Count);  // "Count wrong after adding one item"
-            
+
             target.Add("2", "two");
             Assert.Equal(2, target.Count);  // "Count wrong after adding two items"
         }
@@ -39,7 +36,7 @@ namespace UnitTests
             {
                 var s = i.ToString();
                 target.Add(s, "item " + s);
-                Thread.Sleep(10);                
+                Thread.Sleep(10);
             }
 
             Assert.Equal(maxSize, target.Count);  // "LRU grew larger than maximum size"
@@ -72,7 +69,7 @@ namespace UnitTests
                 var s = i.ToString();
                 target.TryGetValue(s, out _);
             }
-            
+
             // Add a new item to push the least recently used out -- which should be item "10"
             var s1 = (maxSize + 1).ToString();
             target.Add(s1, "item " + s1);
@@ -91,7 +88,7 @@ namespace UnitTests
         public async Task LruRemoveExpired()
         {
             const int n = 10;
-            const int maxSize = n*2;
+            const int maxSize = n * 2;
             var maxAge = TimeSpan.FromMilliseconds(500);
             var flushCounter = 0;
 

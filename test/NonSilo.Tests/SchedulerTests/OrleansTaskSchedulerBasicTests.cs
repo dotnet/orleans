@@ -1,6 +1,3 @@
-using System;
-using System.Threading;
-using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Orleans.Runtime;
 using Orleans.Runtime.Scheduler;
@@ -9,9 +6,7 @@ using Xunit;
 using Xunit.Abstractions;
 using Orleans.TestingHost.Utils;
 using Orleans.Internal;
-using System.Collections.Generic;
 using Orleans;
-using Orleans.Core;
 
 // ReSharper disable ConvertToConstant.Local
 
@@ -57,7 +52,7 @@ namespace UnitTests.SchedulerTests
         void IGrainContext.Rehydrate(IRehydrationContext context) => throw new NotImplementedException();
         void IGrainContext.Migrate(Dictionary<string, object> requestContext, CancellationToken? cancellationToken) => throw new NotImplementedException();
     }
-    
+
     [TestCategory("BVT"), TestCategory("Scheduler")]
     public class OrleansTaskSchedulerBasicTests : IDisposable
     {
@@ -73,7 +68,7 @@ namespace UnitTests.SchedulerTests
             this.rootContext = new UnitTestSchedulingContext();
             rootContext.Scheduler = SchedulingHelper.CreateWorkItemGroupForTesting(this.rootContext, this.loggerFactory);
         }
-        
+
         public void Dispose()
         {
             SynchronizationContext.SetSynchronizationContext(null);
@@ -234,7 +229,7 @@ namespace UnitTests.SchedulerTests
             Assert.False(t1.IsFaulted, "Task-1 faulted: " + t1.Exception);
             Assert.True(result1.Task.Result, "Task-1 completed");
         }
-                
+
         [Fact]
         public async Task Sched_Task_SubTaskExecutionSequencing()
         {
@@ -245,7 +240,7 @@ namespace UnitTests.SchedulerTests
 
             int n = 0;
             TaskCompletionSource<int> finished = new TaskCompletionSource<int>();
-            var numCompleted = new[] {0};
+            var numCompleted = new[] { 0 };
             Action closure = () =>
             {
                 LogContext("ClosureWorkItem-task " + Task.CurrentId);
@@ -291,7 +286,7 @@ namespace UnitTests.SchedulerTests
             Assert.True(n != 0, "Work items did not get executed");
             Assert.Equal(10, n);  // "Work items executed concurrently"
         }
-        
+
         [Fact]
         public void Sched_AC_RequestContext_StartNew_ContinueWith()
         {

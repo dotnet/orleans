@@ -1,13 +1,8 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
 using Azure.Storage.Queues.Models;
 using Microsoft.Extensions.Logging;
 using Orleans.AzureUtils;
 using Orleans.AzureUtils.Utilities;
 using Orleans.Configuration;
-using Orleans.Runtime;
 using Orleans.Streams;
 
 namespace Orleans.Providers.Streams.AzureQueue
@@ -39,8 +34,8 @@ namespace Orleans.Providers.Streams.AzureQueue
         private AzureQueueAdapterReceiver(string azureQueueName, ILoggerFactory loggerFactory, AzureQueueDataManager queue, IQueueDataAdapter<string, IBatchContainer> dataAdapter)
         {
             this.azureQueueName = azureQueueName ?? throw new ArgumentNullException(nameof(azureQueueName));
-            this.queue = queue?? throw new ArgumentNullException(nameof(queue));
-            this.dataAdapter = dataAdapter?? throw new ArgumentNullException(nameof(dataAdapter));
+            this.queue = queue ?? throw new ArgumentNullException(nameof(queue));
+            this.dataAdapter = dataAdapter ?? throw new ArgumentNullException(nameof(dataAdapter));
             this.logger = loggerFactory.CreateLogger<AzureQueueAdapterReceiver>();
             this.pending = new List<PendingDelivery>();
         }
@@ -79,7 +74,7 @@ namespace Orleans.Providers.Streams.AzureQueue
                 if (queueRef == null) return new List<IBatchContainer>();
 
                 int count = maxCount < 0 || maxCount == QueueAdapterConstants.UNLIMITED_GET_QUEUE_MSG ?
-                    MaxNumberOfMessagesToPeek : Math.Min(maxCount, MaxNumberOfMessagesToPeek) ;
+                    MaxNumberOfMessagesToPeek : Math.Min(maxCount, MaxNumberOfMessagesToPeek);
 
                 var task = queueRef.GetQueueMessages(count);
                 outstandingTask = task;
@@ -106,7 +101,7 @@ namespace Orleans.Providers.Streams.AzureQueue
             try
             {
                 var queueRef = queue; // store direct ref, in case we are somehow asked to shutdown while we are receiving.
-                if (messages.Count == 0 || queueRef==null) return;
+                if (messages.Count == 0 || queueRef == null) return;
                 // get sequence tokens of delivered messages
                 List<StreamSequenceToken> deliveredTokens = messages.Select(message => message.SequenceToken).ToList();
                 // find oldest delivered message

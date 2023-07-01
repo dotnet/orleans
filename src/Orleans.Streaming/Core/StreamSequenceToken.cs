@@ -1,5 +1,3 @@
-using System;
-
 namespace Orleans.Streams
 {
     /// <summary>
@@ -14,7 +12,7 @@ namespace Orleans.Streams
         /// <summary>
         /// Gets the number of event batches in stream prior to this event batch
         /// </summary>
-        public abstract long SequenceNumber { get; protected set;  }
+        public abstract long SequenceNumber { get; protected set; }
 
         /// <summary>
         /// Gets the number of events in batch prior to this event

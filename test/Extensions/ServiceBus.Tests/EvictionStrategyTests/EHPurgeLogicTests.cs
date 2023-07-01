@@ -1,17 +1,10 @@
 using Orleans.Providers.Streams.Common;
-using Orleans.Runtime;
 using Orleans.Streaming.EventHubs;
 using Orleans.Streams;
-using Orleans.TestingHost.Utils;
-using System;
 using System.Collections.Concurrent;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Orleans.Configuration;
-using TestExtensions;
 using Xunit;
 using Orleans.Streaming.EventHubs.Testing;
 using Azure.Messaging.EventHubs;
@@ -68,7 +61,7 @@ namespace ServiceBus.Tests.EvictionStrategyTests
             var tasks = new List<Task>();
             //add items into cache, make sure will allocate multiple buffers from the pool
             int itemAddToCache = 100;
-            foreach(var cache in this.cacheList)
+            foreach (var cache in this.cacheList)
                 tasks.Add(AddDataIntoCache(cache, itemAddToCache));
             await Task.WhenAll(tasks);
 
@@ -172,10 +165,11 @@ namespace ServiceBus.Tests.EvictionStrategyTests
             //Each cache should have all buffers purged, except for current buffer
             this.evictionStrategyList.ForEach(strategy => Assert.Single(strategy.InUseBuffers));
             var oldBuffersInCaches = new List<FixedSizeBuffer>();
-            this.evictionStrategyList.ForEach(strategy => {
+            this.evictionStrategyList.ForEach(strategy =>
+            {
                 foreach (var inUseBuffer in strategy.InUseBuffers)
                     oldBuffersInCaches.Add(inUseBuffer);
-                });
+            });
             //add items into cache again
             itemAddToCache = 100;
             foreach (var cache in this.cacheList)
@@ -183,7 +177,8 @@ namespace ServiceBus.Tests.EvictionStrategyTests
             await Task.WhenAll(tasks);
             //block pool should have purged buffers returned by now, and used those to allocate buffer for new item
             var newBufferAllocated = new List<FixedSizeBuffer>();
-            this.evictionStrategyList.ForEach(strategy => {
+            this.evictionStrategyList.ForEach(strategy =>
+            {
                 foreach (var inUseBuffer in strategy.InUseBuffers)
                     newBufferAllocated.Add(inUseBuffer);
             });
@@ -204,7 +199,7 @@ namespace ServiceBus.Tests.EvictionStrategyTests
                 EventHubPath = this.ehSettings.Hub.EventHubName,
             };
 
-            this.receiver1 = new EventHubAdapterReceiver(this.ehSettings, this.CacheFactory, this.CheckPointerFactory, NullLoggerFactory.Instance, 
+            this.receiver1 = new EventHubAdapterReceiver(this.ehSettings, this.CacheFactory, this.CheckPointerFactory, NullLoggerFactory.Instance,
                 new DefaultEventHubReceiverMonitor(monitorDimensions), new LoadSheddingOptions(), _hostEnvironmentStatistics);
             this.receiver2 = new EventHubAdapterReceiver(this.ehSettings, this.CacheFactory, this.CheckPointerFactory, NullLoggerFactory.Instance,
                 new DefaultEventHubReceiverMonitor(monitorDimensions), new LoadSheddingOptions(), _hostEnvironmentStatistics);

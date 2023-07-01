@@ -1,5 +1,3 @@
-using System;
-
 namespace Orleans.Runtime
 {
     /// <summary>
@@ -26,7 +24,7 @@ namespace Orleans.Runtime
         /// </summary>
         /// <returns>A new stopwatch.</returns>
         public static CoarseStopwatch FromTimestamp(long timestamp) => new(timestamp);
-        
+
         private CoarseStopwatch(long timestamp)
         {
             _value = timestamp;
@@ -41,7 +39,7 @@ namespace Orleans.Runtime
         /// Returns true if this instance is running or false otherwise.
         /// </summary>
         public bool IsRunning => _value > 0;
-        
+
         /// <summary>
         /// Returns the elapsed time.
         /// </summary>
@@ -62,7 +60,7 @@ namespace Orleans.Runtime
                 // A positive timestamp value indicates the start time of a running stopwatch,
                 // a negative value indicates the negative total duration of a stopped stopwatch.
                 var timestamp = _value;
-                
+
                 long delta;
                 if (IsRunning)
                 {
@@ -111,7 +109,7 @@ namespace Orleans.Runtime
         public void Start()
         {
             var timestamp = _value;
-            
+
             // If already started, do nothing.
             if (IsRunning) return;
 
@@ -151,7 +149,7 @@ namespace Orleans.Runtime
         public override bool Equals(object obj) => obj is CoarseStopwatch stopwatch && _value == stopwatch._value;
         public bool Equals(CoarseStopwatch other) => _value == other._value;
         public override int GetHashCode() => HashCode.Combine(_value);
-        public static bool operator== (CoarseStopwatch left, CoarseStopwatch right) => left.Equals(right);
-        public static bool operator!= (CoarseStopwatch left, CoarseStopwatch right) => !left.Equals(right);
+        public static bool operator ==(CoarseStopwatch left, CoarseStopwatch right) => left.Equals(right);
+        public static bool operator !=(CoarseStopwatch left, CoarseStopwatch right) => !left.Equals(right);
     }
 }

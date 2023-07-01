@@ -1,7 +1,4 @@
 #nullable enable
-using System;
-using System.Threading;
-using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Core;
 using Orleans.Runtime;
@@ -43,7 +40,7 @@ namespace Orleans
         /// Client code should use the GrainFactory property to get a reference to a Grain.
         /// </summary>
         protected Grain() : this(RuntimeContext.Current, grainRuntime: null)
-        {}
+        { }
 
         /// <summary>
         /// Grain implementers do NOT have to expose this constructor but can choose to do so.

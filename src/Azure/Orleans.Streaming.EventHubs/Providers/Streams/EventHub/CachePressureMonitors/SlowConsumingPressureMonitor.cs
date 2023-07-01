@@ -1,6 +1,4 @@
 using Orleans.Providers.Streams.Common;
-using Orleans.Runtime;
-using System;
 using Microsoft.Extensions.Logging;
 
 namespace Orleans.Streaming.EventHubs
@@ -106,7 +104,7 @@ namespace Orleans.Streaming.EventHubs
                 this.wasUnderPressure = underPressure;
                 this.nextCheckedTime = utcNow + this.PressureWindowSize;
                 this.CacheMonitor?.TrackCachePressureMonitorStatusChange(this.GetType().Name, underPressure, null, biggestPressureInCurrentWindow, this.FlowControlThreshold);
-                if(logger.IsEnabled(LogLevel.Debug))
+                if (logger.IsEnabled(LogLevel.Debug))
                     logger.LogDebug(
                         "Ingesting messages too fast. Throttling message reading. BiggestPressureInCurrentPeriod: {BiggestPressureInCurrentWindow}, Threshold: {FlowControlThreshold}",
                         biggestPressureInCurrentWindow,

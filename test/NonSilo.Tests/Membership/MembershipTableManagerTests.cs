@@ -1,4 +1,3 @@
-using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
@@ -6,13 +5,9 @@ using Orleans.Runtime.MembershipService;
 using Xunit;
 using NSubstitute;
 using Orleans.Runtime;
-using System;
 using Orleans;
 using Xunit.Abstractions;
-using System.Linq;
 using TestExtensions;
-using System.Collections.Generic;
-using System.Threading;
 using System.Collections.Concurrent;
 using NonSilo.Tests.Utilities;
 
@@ -251,7 +246,7 @@ namespace NonSilo.Tests.Membership
             Assert.True(calls.Count >= 2);
             Assert.Equal(nameof(IMembershipTable.InitializeMembershipTable), calls[0].Method);
             Assert.Contains(calls, call => call.Method.Equals(nameof(IMembershipTable.ReadAll)));
-            
+
             // During initialization, a first read from the table will be performed, transitioning
             // membership to a valid version.Assert.True(membershipUpdates.MoveNextAsync().Result);
             Assert.True(membershipUpdates.MoveNextAsync().Result);
@@ -712,7 +707,7 @@ namespace NonSilo.Tests.Membership
                 siloLifecycle: this.lifecycle);
             ((ILifecycleParticipant<ISiloLifecycle>)manager).Participate(this.lifecycle);
             await this.lifecycle.OnStart();
-            
+
             // Test that retries occur after an exception.
             (TimeSpan? DelayOverride, TaskCompletionSource<bool> Completion) timer = (default, default);
             while (!timerCalls.TryDequeue(out timer)) await Task.Delay(1);

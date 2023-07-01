@@ -1,22 +1,11 @@
-using System;
-using System.Collections.Concurrent;
-using System.Collections.Generic;
 using System.Collections.ObjectModel;
-using System.Linq;
-using System.Runtime.Serialization;
-using System.Threading.Tasks;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.DependencyInjection.Extensions;
-using Orleans;
 using Orleans.Concurrency;
-using Orleans.Configuration;
 using Orleans.GrainDirectory;
 using Orleans.Runtime;
 using Orleans.Serialization;
 using Orleans.Serialization.TypeSystem;
 using Orleans.Streaming.EventHubs;
 using Orleans.Streams;
-using Orleans.Utilities;
 using TestExtensions;
 using TestGrainInterfaces;
 using UnitTests.GrainInterfaces;
@@ -471,7 +460,7 @@ namespace UnitTests.Serialization
             source["three"] = val2;
             Assert.Same(source["one"], source["two"]); //Object identity lost before round trip of string/list dict!!!
 
-            var deserialized = OrleansSerializationLoop(environment.Serializer, environment.DeepCopier,  source);
+            var deserialized = OrleansSerializationLoop(environment.Serializer, environment.DeepCopier, source);
             var result = Assert.IsAssignableFrom<Dictionary<string, List<string>>>(deserialized); //Type is wrong after round-trip of string/list dict
             Assert.Equal(source.Count, result.Count); //Count is wrong after round-trip of string/list dict
 
@@ -558,7 +547,7 @@ namespace UnitTests.Serialization
             GrainId grainId = LegacyGrainId.NewId();
             GrainReference input = (GrainReference)environment.InternalGrainFactory.GetGrain(grainId);
 
-            object deserialized = OrleansSerializationLoop(environment.Serializer, environment.DeepCopier,  input);
+            object deserialized = OrleansSerializationLoop(environment.Serializer, environment.DeepCopier, input);
 
             var grainRef = Assert.IsAssignableFrom<GrainReference>(deserialized); //GrainReference copied as wrong type
             Assert.Equal(grainId, grainRef.GrainId); //GrainId different after copy
@@ -702,34 +691,34 @@ namespace UnitTests.Serialization
             c2.CircularTest1List.Add(c1);
             c1.CircularTest2 = c2;
 
-            var deserialized = (CircularTest1)OrleansSerializationLoop(environment.Serializer, environment.DeepCopier,  c1);
+            var deserialized = (CircularTest1)OrleansSerializationLoop(environment.Serializer, environment.DeepCopier, c1);
             Assert.Equal(c1.CircularTest2.CircularTest1List.Count, deserialized.CircularTest2.CircularTest1List.Count);
             Assert.Same(deserialized, deserialized.CircularTest2.CircularTest1List[0]);
 
-            deserialized = (CircularTest1)OrleansSerializationLoop(environment.Serializer, environment.DeepCopier,  c1, true);
+            deserialized = (CircularTest1)OrleansSerializationLoop(environment.Serializer, environment.DeepCopier, c1, true);
             Assert.Equal(c1.CircularTest2.CircularTest1List.Count, deserialized.CircularTest2.CircularTest1List.Count);
             Assert.Same(deserialized, deserialized.CircularTest2.CircularTest1List[0]);
         }
-        
+
         [Fact, TestCategory("Functional")]
         public void Serialize_Enums()
         {
-            var result = OrleansSerializationLoop(environment.Serializer, environment.DeepCopier,  IntEnum.Value2);
+            var result = OrleansSerializationLoop(environment.Serializer, environment.DeepCopier, IntEnum.Value2);
             var typedResult = Assert.IsType<IntEnum>(result);
             Assert.Equal(IntEnum.Value2, typedResult);
 
-            var result2 = OrleansSerializationLoop(environment.Serializer, environment.DeepCopier,  UShortEnum.Value3);
+            var result2 = OrleansSerializationLoop(environment.Serializer, environment.DeepCopier, UShortEnum.Value3);
             var typedResult2 = Assert.IsType<UShortEnum>(result2);
             Assert.Equal(UShortEnum.Value3, typedResult2);
 
             var test = new ClassWithEnumTestData { EnumValue = TestEnum.Third, Enemy = CampaignEnemyTestType.Enemy3 };
-            var result3 = OrleansSerializationLoop(environment.Serializer, environment.DeepCopier,  test);
+            var result3 = OrleansSerializationLoop(environment.Serializer, environment.DeepCopier, test);
             var typedResult3 = Assert.IsType<ClassWithEnumTestData>(result3);
 
             Assert.Equal(TestEnum.Third, typedResult3.EnumValue);
             Assert.Equal(CampaignEnemyTestType.Enemy3, typedResult3.Enemy);
 
-            var result4 = OrleansSerializationLoop(environment.Serializer, environment.DeepCopier,  CampaignEnemyType.Enemy3);
+            var result4 = OrleansSerializationLoop(environment.Serializer, environment.DeepCopier, CampaignEnemyType.Enemy3);
             var typedResult4 = Assert.IsType<CampaignEnemyType>(result4);
             Assert.Equal(CampaignEnemyType.Enemy3, typedResult4);
         }

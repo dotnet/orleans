@@ -1,5 +1,3 @@
-
-using System;
 using Orleans.Runtime.GrainDirectory;
 
 namespace Orleans.Configuration

@@ -1,6 +1,3 @@
-using System;
-using System.Threading;
-
 namespace Orleans.Transactions.State
 {
     internal interface IActivationLifetime

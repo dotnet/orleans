@@ -1,7 +1,5 @@
-using System;
 using System.Diagnostics;
 using System.Runtime.ExceptionServices;
-using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.CodeGeneration;
 using Orleans.Runtime;
@@ -50,11 +48,11 @@ namespace Orleans
 
     public enum TransactionOptionAlias
     {
-        Suppress     = TransactionOption.Supported,
-        Required     = TransactionOption.CreateOrJoin,
-        RequiresNew  = TransactionOption.Create,
-        Mandatory    = TransactionOption.Join,
-        Never        = TransactionOption.NotAllowed,
+        Suppress = TransactionOption.Supported,
+        Required = TransactionOption.CreateOrJoin,
+        RequiresNew = TransactionOption.Create,
+        Mandatory = TransactionOption.Join,
+        Never = TransactionOption.NotAllowed,
     }
 
     [GenerateSerializer]
@@ -132,7 +130,7 @@ namespace Orleans
         }
 
         private TransactionInfo SetTransactionInfo()
-        { 
+        {
             // Clear transaction info if transaction operation requires new transaction.
             var transactionInfo = TransactionContext.GetTransactionInfo();
 
@@ -242,7 +240,7 @@ namespace Orleans
 
         public override void Dispose()
         {
-           TransactionInfo = null;
+            TransactionInfo = null;
         }
 
         void IOnDeserialized.OnDeserialized(DeserializationContext context)
@@ -312,7 +310,7 @@ namespace Orleans
     }
 
     [SerializerTransparent]
-    public abstract class TransactionRequest : TransactionRequestBase 
+    public abstract class TransactionRequest : TransactionRequestBase
     {
         protected TransactionRequest(Serializer<OrleansTransactionAbortedException> exceptionSerializer, IServiceProvider serviceProvider) : base(exceptionSerializer, serviceProvider)
         {

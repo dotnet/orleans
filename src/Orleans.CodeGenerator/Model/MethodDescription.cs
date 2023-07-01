@@ -1,7 +1,5 @@
 using Orleans.CodeGenerator.SyntaxGeneration;
 using Microsoft.CodeAnalysis;
-using System;
-using System.Collections.Generic;
 using System.Collections.Immutable;
 
 namespace Orleans.CodeGenerator
@@ -151,7 +149,7 @@ namespace Orleans.CodeGenerator
         public List<(string Name, ITypeParameterSymbol Parameter)> AllTypeParameters { get; }
 
         public List<(string Name, ITypeParameterSymbol Parameter)> MethodTypeParameters { get; }
-        
+
         public Dictionary<ITypeParameterSymbol, string> TypeParameterSubstitutions { get; }
 
         public List<(string, TypedConstant)> CustomInitializerMethods { get; } = new();

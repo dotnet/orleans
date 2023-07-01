@@ -1,4 +1,3 @@
-using System;
 using Microsoft.Extensions.Logging;
 
 namespace Orleans.Streaming.EventHubs
@@ -11,10 +10,10 @@ namespace Orleans.Streaming.EventHubs
         /// <summary>
         /// Start of orlean servicebus error codes
         /// </summary>
-        ServiceBus = 1<<16,
+        ServiceBus = 1 << 16,
 
         FailedPartitionRead = ServiceBus + 1,
-        RetryReceiverInit   = ServiceBus + 2,
+        RetryReceiverInit = ServiceBus + 2,
     }
 
     internal static class LoggerExtensions

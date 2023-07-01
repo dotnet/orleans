@@ -1,10 +1,7 @@
 using Orleans.CodeGenerator.SyntaxGeneration;
 using Microsoft.CodeAnalysis;
-using System;
-using System.Collections.Generic;
 using System.Globalization;
 using Orleans.CodeGenerator.Diagnostics;
-using System.Linq;
 
 namespace Orleans.CodeGenerator
 {
@@ -201,7 +198,7 @@ namespace Orleans.CodeGenerator
                     throw new OrleansGeneratorDiagnosticAnalysisException(diagnostic);
                 }
             }
-            
+
             static void ValidateNonGenericInvokeAsync(LibraryTypes l, INamedTypeSymbol baseClass)
             {
                 var found = false;

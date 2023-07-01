@@ -1,15 +1,10 @@
-using System;
-using System.Threading.Tasks;
-using Orleans;
 using Orleans.EventSourcing;
 using TestGrainInterfaces;
-using System.Collections.Generic;
 using Orleans.Runtime;
-using System.Linq;
 
 namespace TestGrains
 {
-    public class PersonGrain : JournaledGrain<PersonState,IPersonEvent>, IPersonGrain
+    public class PersonGrain : JournaledGrain<PersonState, IPersonEvent>, IPersonGrain
     {
 
         public Task RegisterBirth(PersonAttributes props)

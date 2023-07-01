@@ -1,4 +1,3 @@
-using System.Collections.Generic;
 using Orleans.Metadata;
 
 namespace Orleans.Runtime

@@ -1,7 +1,6 @@
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Runtime;
 using Orleans.Configuration.Internal;
-using System.Linq;
 using Orleans.Runtime.ReminderService;
 using Orleans.Timers;
 

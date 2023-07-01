@@ -1,8 +1,4 @@
-using System;
-using System.Threading.Tasks;
-using System.Collections.Generic;
 using System.Diagnostics;
-using Orleans;
 using BenchmarkGrainInterfaces.Transaction;
 using Orleans.Transactions;
 
@@ -51,7 +47,7 @@ namespace BenchmarkGrains.Transaction
         {
             try
             {
-                if(all)
+                if (all)
                 {
                     await Task.WhenAll(pending);
                 }
@@ -59,17 +55,19 @@ namespace BenchmarkGrains.Transaction
                 {
                     await Task.WhenAny(pending);
                 }
-            } catch (Exception) {}
+            }
+            catch (Exception) { }
             List<Task> remaining = new List<Task>();
             foreach (Task t in pending)
             {
                 if (t.IsFaulted || t.IsCanceled)
                 {
-                    if(t.Exception.Flatten().GetBaseException() is OrleansStartTransactionFailedException)
+                    if (t.Exception.Flatten().GetBaseException() is OrleansStartTransactionFailedException)
                     {
                         report.Throttled++;
 
-                    } else
+                    }
+                    else
                     {
                         report.Failed++;
                     }
@@ -91,7 +89,8 @@ namespace BenchmarkGrains.Transaction
             try
             {
                 await GrainFactory.GetGrain<ITransactionRootGrain>(Guid.Empty).Run(new List<int>() { index * 2, index * 2 + 1 });
-            } catch(OrleansStartTransactionFailedException)
+            }
+            catch (OrleansStartTransactionFailedException)
             {
                 // Depay before retry
                 await Task.Delay(TimeSpan.FromSeconds(1));

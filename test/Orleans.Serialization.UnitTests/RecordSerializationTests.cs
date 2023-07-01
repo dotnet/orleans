@@ -71,140 +71,140 @@ public class RecordSerializationTests
         Assert.Equal(expected[1], result[1]);
     }
 
-        [Fact]
-        public void Can_Roundtrip_WithListOfObject_Fruit()
+    [Fact]
+    public void Can_Roundtrip_WithListOfObject_Fruit()
+    {
+        var original = new FooWithListOfObject
         {
-            var original = new FooWithListOfObject
-            {
-                Items = new List<object> { new FruitRecord("Banana"), new FruitRecord("Mango") },
-                Bar = new FooRecord(Guid.NewGuid())
-            };
+            Items = new List<object> { new FruitRecord("Banana"), new FruitRecord("Mango") },
+            Bar = new FooRecord(Guid.NewGuid())
+        };
 
-            var bytes = _serializer.SerializeToArray(original);
+        var bytes = _serializer.SerializeToArray(original);
 
-            var deserialized = _serializer.Deserialize<FooWithListOfObject>(bytes);
+        var deserialized = _serializer.Deserialize<FooWithListOfObject>(bytes);
 
-            Assert.NotNull(deserialized.Bar);
-            Assert.Equal(original.Bar, deserialized.Bar);
-        }
+        Assert.NotNull(deserialized.Bar);
+        Assert.Equal(original.Bar, deserialized.Bar);
+    }
 
-        [Fact]
-        public void Can_Roundtrip_With_Them_Apples()
+    [Fact]
+    public void Can_Roundtrip_With_Them_Apples()
+    {
+        var original = new TwoObjects
         {
-            var original = new TwoObjects
-            {
-                One = new AppleRecord("Golden Delicious"),
-                Two = new AppleRecord("Granny Smith")
-            };
+            One = new AppleRecord("Golden Delicious"),
+            Two = new AppleRecord("Granny Smith")
+        };
 
-            var bytes = _serializer.SerializeToArray(original);
+        var bytes = _serializer.SerializeToArray(original);
 
-            var deserialized = _serializer.Deserialize<TwoObjects>(bytes);
+        var deserialized = _serializer.Deserialize<TwoObjects>(bytes);
 
-            Assert.NotNull(deserialized.One);
-            Assert.NotNull(deserialized.Two);
-            Assert.Equal(original.One, deserialized.One);
-            Assert.Equal(original.Two, deserialized.Two);
-        }
+        Assert.NotNull(deserialized.One);
+        Assert.NotNull(deserialized.Two);
+        Assert.Equal(original.One, deserialized.One);
+        Assert.Equal(original.Two, deserialized.Two);
+    }
 
-        [Fact]
-        public void Can_Roundtrip_WithListOfObject_Apple()
+    [Fact]
+    public void Can_Roundtrip_WithListOfObject_Apple()
+    {
+        var original = new FooWithListOfObject
         {
-            var original = new FooWithListOfObject
-            {
-                Items = new List<object> { new AppleRecord("Golden Delicious"), new AppleRecord("Granny Smith") },
-                Bar = new FooRecord(Guid.NewGuid())
-            };
+            Items = new List<object> { new AppleRecord("Golden Delicious"), new AppleRecord("Granny Smith") },
+            Bar = new FooRecord(Guid.NewGuid())
+        };
 
-            var bytes = _serializer.SerializeToArray(original);
+        var bytes = _serializer.SerializeToArray(original);
 
-            var deserialized = _serializer.Deserialize<FooWithListOfObject>(bytes);
+        var deserialized = _serializer.Deserialize<FooWithListOfObject>(bytes);
 
-            Assert.NotNull(deserialized.Items);
-            Assert.Equal(original.Items.Count, deserialized.Items.Count);
-            Assert.Equal(original.Items[0], deserialized.Items[0]);
-            Assert.Equal(original.Items[1], deserialized.Items[1]);
+        Assert.NotNull(deserialized.Items);
+        Assert.Equal(original.Items.Count, deserialized.Items.Count);
+        Assert.Equal(original.Items[0], deserialized.Items[0]);
+        Assert.Equal(original.Items[1], deserialized.Items[1]);
 
-            Assert.NotNull(deserialized.Bar);
-            Assert.Equal(original.Bar, deserialized.Bar);
-        }
+        Assert.NotNull(deserialized.Bar);
+        Assert.Equal(original.Bar, deserialized.Bar);
+    }
 
-        [Fact]
-        public void Can_Roundtrip_WithListOfFruit_Fruit()
+    [Fact]
+    public void Can_Roundtrip_WithListOfFruit_Fruit()
+    {
+        var original = new FooWithListOfFruit()
         {
-            var original = new FooWithListOfFruit()
-            {
-                Items = new List<FruitRecord> { new FruitRecord("Banana"), new FruitRecord("Mango") },
-                Bar = new FooRecord(Guid.NewGuid())
-            };
+            Items = new List<FruitRecord> { new FruitRecord("Banana"), new FruitRecord("Mango") },
+            Bar = new FooRecord(Guid.NewGuid())
+        };
 
-            var bytes = _serializer.SerializeToArray(original);
+        var bytes = _serializer.SerializeToArray(original);
 
-            var deserialized = _serializer.Deserialize<FooWithListOfFruit>(bytes);
+        var deserialized = _serializer.Deserialize<FooWithListOfFruit>(bytes);
 
-            Assert.NotNull(deserialized.Bar);
-            Assert.Equal(original.Bar, deserialized.Bar);
-        }
+        Assert.NotNull(deserialized.Bar);
+        Assert.Equal(original.Bar, deserialized.Bar);
+    }
 
-        [Fact]
-        public void Can_Roundtrip_WithListOfFruit_Apple()
+    [Fact]
+    public void Can_Roundtrip_WithListOfFruit_Apple()
+    {
+        var original = new FooWithListOfFruit()
         {
-            var original = new FooWithListOfFruit()
-            {
-                Items = new List<FruitRecord> { new AppleRecord("Golden Delicious"), new AppleRecord("Granny Smith") },
-                Bar = new FooRecord(Guid.NewGuid())
-            };
+            Items = new List<FruitRecord> { new AppleRecord("Golden Delicious"), new AppleRecord("Granny Smith") },
+            Bar = new FooRecord(Guid.NewGuid())
+        };
 
-            var bytes = _serializer.SerializeToArray(original);
+        var bytes = _serializer.SerializeToArray(original);
 
-            var deserialized = _serializer.Deserialize<FooWithListOfFruit>(bytes);
+        var deserialized = _serializer.Deserialize<FooWithListOfFruit>(bytes);
 
-            Assert.NotNull(deserialized.Bar);
-            Assert.Equal(original.Bar, deserialized.Bar);
-        }
+        Assert.NotNull(deserialized.Bar);
+        Assert.Equal(original.Bar, deserialized.Bar);
+    }
 
-        [Fact]
-        public void Can_Roundtrip_WithListOfApple_Apple()
+    [Fact]
+    public void Can_Roundtrip_WithListOfApple_Apple()
+    {
+        var original = new FooWithListOfApple()
         {
-            var original = new FooWithListOfApple()
-            {
-                Items = new List<AppleRecord> { new AppleRecord("Golden Delicious"), new AppleRecord("Granny Smith") },
-                Bar = new FooRecord(Guid.NewGuid())
-            };
+            Items = new List<AppleRecord> { new AppleRecord("Golden Delicious"), new AppleRecord("Granny Smith") },
+            Bar = new FooRecord(Guid.NewGuid())
+        };
 
-            var bytes = _serializer.SerializeToArray(original);
+        var bytes = _serializer.SerializeToArray(original);
 
-            var deserialized = _serializer.Deserialize<FooWithListOfApple>(bytes);
+        var deserialized = _serializer.Deserialize<FooWithListOfApple>(bytes);
 
-            Assert.NotNull(deserialized.Bar);
-            Assert.Equal(original.Bar, deserialized.Bar);
-        }
+        Assert.NotNull(deserialized.Bar);
+        Assert.Equal(original.Bar, deserialized.Bar);
+    }
 
-        [Fact]
-        public void Can_Roundtrip_Fruit_Apple()
-        {
-            FruitRecord original = new AppleRecord("Golden Delicious");
+    [Fact]
+    public void Can_Roundtrip_Fruit_Apple()
+    {
+        FruitRecord original = new AppleRecord("Golden Delicious");
 
-            var bytes = _serializer.SerializeToArray(original);
+        var bytes = _serializer.SerializeToArray(original);
 
-            var deserialized = _serializer.Deserialize<FruitRecord>(bytes);
+        var deserialized = _serializer.Deserialize<FruitRecord>(bytes);
 
-            Assert.NotNull(deserialized);
-            Assert.Equal(original, deserialized);
-        }
+        Assert.NotNull(deserialized);
+        Assert.Equal(original, deserialized);
+    }
 
-        [Fact]
-        public void Can_Roundtrip_Foo()
-        {
-            var original = new FooRecord(Guid.NewGuid());
+    [Fact]
+    public void Can_Roundtrip_Foo()
+    {
+        var original = new FooRecord(Guid.NewGuid());
 
-            var bytes = _serializer.SerializeToArray(original);
+        var bytes = _serializer.SerializeToArray(original);
 
-            var deserialized = _serializer.Deserialize<FooRecord>(bytes);
+        var deserialized = _serializer.Deserialize<FooRecord>(bytes);
 
-            Assert.NotNull(deserialized);
-            Assert.Equal(original, deserialized);
-        }
+        Assert.NotNull(deserialized);
+        Assert.Equal(original, deserialized);
+    }
 
     // TODO: This type should cause a build error because "Bar" is an init-only non-auto property but has an [Id(...)] attribute.
     // It is suited for an diagnostic analyzer test, but the current implementation

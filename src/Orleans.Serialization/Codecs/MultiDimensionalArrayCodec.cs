@@ -1,4 +1,3 @@
-using System;
 using System.Buffers;
 using Orleans.Serialization.Buffers;
 using Orleans.Serialization.Cloning;
@@ -190,7 +189,7 @@ namespace Orleans.Serialization.Codecs
             }
 
             result = Array.CreateInstance(elementType, lengths);
-            context.RecordCopy(original, result); 
+            context.RecordCopy(original, result);
 
             if (rank == 1)
             {

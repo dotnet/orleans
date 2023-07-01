@@ -10,7 +10,7 @@ namespace Orleans.Configuration
     public class AdoNetReminderTableOptionsValidator : IConfigurationValidator
     {
         private readonly AdoNetReminderTableOptions options;
-        
+
         public AdoNetReminderTableOptionsValidator(IOptions<AdoNetReminderTableOptions> options)
         {
             this.options = options.Value;

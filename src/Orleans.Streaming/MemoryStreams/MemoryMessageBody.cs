@@ -1,7 +1,3 @@
-
-using System;
-using System.Collections.Generic;
-using System.Linq;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Serialization;
 
@@ -71,7 +67,7 @@ namespace Orleans.Providers
     [Serializable]
     [GenerateSerializer]
     public sealed class MemoryMessageBody
-    {        
+    {
         /// <summary>
         /// Initializes a new instance of the <see cref="MemoryMessageBody"/> class.
         /// </summary>

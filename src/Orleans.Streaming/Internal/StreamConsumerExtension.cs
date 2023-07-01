@@ -1,8 +1,4 @@
-using System;
 using System.Collections.Concurrent;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Orleans.Runtime;
@@ -101,10 +97,10 @@ namespace Orleans.Streams
             {
                 return await observer.DeliverItem(item, currentToken, handshakeToken);
             }
-            else if(this.streamSubscriptionObserver != null)
+            else if (this.streamSubscriptionObserver != null)
             {
                 var streamProvider = this.providerRuntime.ServiceProvider.GetServiceByName<IStreamProvider>(streamId.ProviderName);
-                if(streamProvider != null)
+                if (streamProvider != null)
                 {
                     var subscriptionHandlerFactory = new StreamSubscriptionHandlerFactory(streamProvider, streamId, streamId.ProviderName, subscriptionId);
                     await this.streamSubscriptionObserver.OnSubscribed(subscriptionHandlerFactory);
@@ -136,7 +132,7 @@ namespace Orleans.Streams
             {
                 return await observer.DeliverBatch(batch, handshakeToken);
             }
-            else if(this.streamSubscriptionObserver != null)
+            else if (this.streamSubscriptionObserver != null)
             {
                 var streamProvider = this.providerRuntime.ServiceProvider.GetServiceByName<IStreamProvider>(streamId.ProviderName);
                 if (streamProvider != null)

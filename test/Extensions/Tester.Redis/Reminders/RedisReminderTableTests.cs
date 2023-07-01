@@ -14,7 +14,7 @@ namespace Tester.Redis.Reminders
     [Collection(TestEnvironmentFixture.DefaultCollection)]
     public class RedisRemindersTableTests : ReminderTableTestsBase
     {
-        public RedisRemindersTableTests(ConnectionStringFixture fixture, CommonFixture clusterFixture) : base (fixture, clusterFixture, CreateFilters())
+        public RedisRemindersTableTests(ConnectionStringFixture fixture, CommonFixture clusterFixture) : base(fixture, clusterFixture, CreateFilters())
         {
             TestUtils.CheckForRedis();
         }
@@ -37,7 +37,7 @@ namespace Tester.Redis.Reminders
                 {
                     ConfigurationOptions = ConfigurationOptions.Parse(GetConnectionString().Result),
                     EntryExpiry = TimeSpan.FromHours(1)
-                })); 
+                }));
 
             if (reminderTable == null)
             {

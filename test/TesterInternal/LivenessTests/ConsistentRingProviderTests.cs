@@ -1,6 +1,3 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
 using Microsoft.Extensions.Logging.Abstractions;
 using Orleans.Configuration;
 using Orleans.Runtime;
@@ -68,12 +65,12 @@ namespace UnitTests.LivenessTests
             SiloAddress silo1 = SiloAddressUtils.NewLocalSiloAddress(random.Next(100000));
             VirtualBucketsRingProvider ring = new VirtualBucketsRingProvider(silo1, NullLoggerFactory.Instance, 50);
             //ring.logger.SetSeverityLevel(Severity.Warning);
-            
+
             for (int i = 1; i <= NUM_SILOS - 1; i++)
             {
                 ring.SiloStatusChangeNotification(SiloAddressUtils.NewLocalSiloAddress(random.Next(100000)), SiloStatus.Active);
             }
-  
+
             var siloRanges = ring.GetRanges();
             var sortedSiloRanges = siloRanges.ToList();
             sortedSiloRanges.Sort((t1, t2) => t1.Item2.RangePercentage().CompareTo(t2.Item2.RangePercentage()));
@@ -82,7 +79,7 @@ namespace UnitTests.LivenessTests
             foreach (var siloRange in siloRanges)
             {
                 List<IRingRangeInternal> agentRanges = new List<IRingRangeInternal>();
-                for(int i=0; i < NUM_AGENTS; i++)
+                for (int i = 0; i < NUM_AGENTS; i++)
                 {
                     IRingRangeInternal agentRange = (IRingRangeInternal)RangeFactory.GetEquallyDividedSubRange(siloRange.Value, NUM_AGENTS, i);
                     agentRanges.Add(agentRange);
@@ -92,7 +89,7 @@ namespace UnitTests.LivenessTests
 
             Dictionary<SiloAddress, List<int>> queueHistogram = GetQueueHistogram(allAgentRanges, (int)NUM_QUEUES);
             string str = Utils.EnumerableToString(sortedSiloRanges,
-                tuple => String.Format("Silo {0} -> Range {1:0.000}%, {2} queues: {3}", 
+                tuple => String.Format("Silo {0} -> Range {1:0.000}%, {2} queues: {3}",
                     tuple.Item1,
                     tuple.Item2.RangePercentage(),
                     queueHistogram[tuple.Item1].Sum(),

@@ -1,12 +1,8 @@
-using System;
-using System.Collections.Generic;
-using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Clustering.AdoNet.Storage;
 using Orleans.Messaging;
 using Orleans.Configuration;
-using Microsoft.Extensions.DependencyInjection;
 
 namespace Orleans.Runtime.Membership
 {
@@ -19,7 +15,7 @@ namespace Orleans.Runtime.Membership
         private readonly IServiceProvider serviceProvider;
         private readonly TimeSpan maxStaleness;
         public AdoNetGatewayListProvider(
-            ILogger<AdoNetGatewayListProvider> logger, 
+            ILogger<AdoNetGatewayListProvider> logger,
             IServiceProvider serviceProvider,
             IOptions<AdoNetClusteringClientOptions> options,
             IOptions<GatewayOptions> gatewayOptions,

@@ -1,7 +1,4 @@
-﻿using System;
-using System.Threading.Tasks;
-
-namespace Orleans.Runtime
+﻿namespace Orleans.Runtime
 {
     internal interface IAsyncTimer : IDisposable, IHealthCheckable
     {

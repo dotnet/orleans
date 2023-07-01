@@ -1,9 +1,4 @@
-using System;
-using System.Threading;
-using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
-using Orleans.Internal;
-using Orleans.Runtime;
 using TestExtensions;
 using UnitTests.GrainInterfaces;
 using Xunit;
@@ -267,13 +262,13 @@ namespace DefaultCluster.Tests.ActivationsLifeCycleTests
                 string activation = await grain.DoSomething();
                 Assert.True(false, "Should have thrown.");
             }
-            catch(InvalidOperationException exc)
+            catch (InvalidOperationException exc)
             {
                 this.Logger.LogInformation(exc, "Thrown as expected");
                 Assert.True(
                     exc.Message.Contains("DeactivateOnIdle from within OnActivateAsync"),
                     "Did not get expected exception message returned: " + exc.Message);
-            }  
+            }
         }
 
         private async Task CheckNumActivateDeactivateCalls(
@@ -286,12 +281,12 @@ namespace DefaultCluster.Tests.ActivationsLifeCycleTests
                 expectedActivateCalls,
                 expectedDeactivateCalls,
                 new string[] { forActivation },
-                when )
+                when)
             ;
         }
 
         private async Task CheckNumActivateDeactivateCalls(
-            int expectedActivateCalls, 
+            int expectedActivateCalls,
             int expectedDeactivateCalls,
             string[] forActivations,
             string when = null)

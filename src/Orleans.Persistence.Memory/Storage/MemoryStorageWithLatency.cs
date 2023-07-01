@@ -1,6 +1,4 @@
-using System;
 using System.Diagnostics;
-using System.Threading.Tasks;
 using Orleans.Runtime;
 using Microsoft.Extensions.Logging;
 using Orleans.Configuration;
@@ -28,7 +26,7 @@ namespace Orleans.Storage
         /// Gets or sets a value indicating whether to mock calls instead of issuing real storage calls.
         /// </summary>
         /// <value><see langword="true" /> if the provider should mock calls; otherwise, <see langword="false" />.</value>
-        public bool MockCallsOnly { get;set; }
+        public bool MockCallsOnly { get; set; }
     }
 
     /// <summary>
@@ -42,7 +40,7 @@ namespace Orleans.Storage
     ///  or long-term persistence capabilities.
     /// </remarks>
     [DebuggerDisplay("MemoryStore:{Name},WithLatency:{latency}")]
-    public class MemoryGrainStorageWithLatency :IGrainStorage
+    public class MemoryGrainStorageWithLatency : IGrainStorage
     {
         private MemoryGrainStorage baseGranStorage;
         private MemoryStorageWithLatencyOptions options;
@@ -69,7 +67,7 @@ namespace Orleans.Storage
         /// <see cref="IGrainStorage.WriteStateAsync{T}"/>
         public Task WriteStateAsync<T>(string grainType, GrainId grainId, IGrainState<T> grainState)
         {
-           return MakeFixedLatencyCall(() => baseGranStorage.WriteStateAsync(grainType, grainId, grainState));
+            return MakeFixedLatencyCall(() => baseGranStorage.WriteStateAsync(grainType, grainId, grainState));
         }
 
         /// <summary> Delete / Clear state data function for this storage provider. </summary>

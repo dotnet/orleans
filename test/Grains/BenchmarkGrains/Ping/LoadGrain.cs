@@ -1,9 +1,4 @@
-using System;
-using System.Threading.Tasks;
-using System.Collections.Generic;
-using System.Linq;
 using System.Diagnostics;
-using Orleans;
 using BenchmarkGrainInterfaces.Ping;
 
 namespace BenchmarkGrains.Ping
@@ -32,7 +27,7 @@ namespace BenchmarkGrains.Ping
             Stopwatch sw = Stopwatch.StartNew();
             while (!this.end)
             {
-                foreach(Pending pending in pendingWork.Where(t => t.PendingCall == default))
+                foreach (Pending pending in pendingWork.Where(t => t.PendingCall == default))
                 {
                     pending.PendingCall = pending.Grain.Run();
                 }
@@ -48,7 +43,7 @@ namespace BenchmarkGrains.Ping
         {
             try
             {
-                if(all)
+                if (all)
                 {
                     await Task.WhenAll(pendingWork.Where(t => !t.PendingCall.IsCompletedSuccessfully).Select(p => p.PendingCall.AsTask()));
                 }
@@ -56,7 +51,8 @@ namespace BenchmarkGrains.Ping
                 {
                     await Task.WhenAny(pendingWork.Where(t => !t.PendingCall.IsCompletedSuccessfully).Select(p => p.PendingCall.AsTask()));
                 }
-            } catch (Exception) {}
+            }
+            catch (Exception) { }
             foreach (Pending pending in pendingWork.Where(p => p.PendingCall != default))
             {
                 if (pending.PendingCall.IsFaulted || pending.PendingCall.IsCanceled)
@@ -71,7 +67,7 @@ namespace BenchmarkGrains.Ping
                 }
             }
         }
-        
+
         private class Pending
         {
             public IPingGrain Grain { get; set; }

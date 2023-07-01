@@ -1,7 +1,4 @@
-﻿using System.Collections.Generic;
-using System.Threading.Tasks;
-
-namespace Orleans.EventSourcing.CustomStorage
+﻿namespace Orleans.EventSourcing.CustomStorage
 {
     /// <summary>
     /// The storage interface exposed by grains that want to use the CustomStorage log-consistency provider
@@ -15,7 +12,7 @@ namespace Orleans.EventSourcing.CustomStorage
         /// (note that the state object may be mutated by the provider, so it must not be shared).
         /// </summary>
         /// <returns>the version number and a  state object.</returns>
-        Task<KeyValuePair<int,TState>> ReadStateFromStorage();
+        Task<KeyValuePair<int, TState>> ReadStateFromStorage();
 
         /// <summary>
         /// Applies the given array of deltas to storage, and returns true, if the version in storage matches the expected version. 

@@ -1,5 +1,3 @@
-using System;
-using System.Threading.Tasks;
 using Azure;
 using Azure.Core;
 using Azure.Storage;
@@ -125,7 +123,7 @@ namespace Orleans.Configuration
         public void ValidateConfiguration()
         {
             // name can be null, but not empty or white space.
-            if(this.name != null && string.IsNullOrWhiteSpace(this.name))
+            if (this.name != null && string.IsNullOrWhiteSpace(this.name))
             {
                 throw new OrleansConfigurationException($"Named option {nameof(AzureBlobLeaseProviderOptions)} of name {this.name} is invalid.  Name cannot be empty or whitespace.");
             }
@@ -144,7 +142,7 @@ namespace Orleans.Configuration
                 var errorStr = string.IsNullOrEmpty(this.name)
                     ? $"Configuration for {nameof(AzureBlobLeaseProviderOptions)} {this.name} is invalid. {nameof(this.options.BlobContainerName)} is not valid"
                     : $"Configuration for {nameof(AzureBlobLeaseProviderOptions)} is invalid. {nameof(this.options.BlobContainerName)} is not valid";
-                throw new OrleansConfigurationException(errorStr , e);
+                throw new OrleansConfigurationException(errorStr, e);
             }
         }
     }

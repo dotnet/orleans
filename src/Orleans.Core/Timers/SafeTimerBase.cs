@@ -1,6 +1,3 @@
-using System;
-using System.Threading;
-using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 
 namespace Orleans.Runtime
@@ -10,19 +7,19 @@ namespace Orleans.Runtime
     /// </summary>
     internal class SafeTimerBase : IDisposable
     {
-        private const string asyncTimerName ="Orleans.Runtime.AsyncTaskSafeTimer";
+        private const string asyncTimerName = "Orleans.Runtime.AsyncTaskSafeTimer";
         private const string syncTimerName = "Orleans.Runtime.SafeTimerBase";
         private const uint MaxSupportedTimeout = 0xfffffffe;
 
-        private Timer               timer;
-        private Func<object, Task>  asyncTaskCallback;
-        private TimerCallback       syncCallbackFunc;
-        private TimeSpan            dueTime;
-        private TimeSpan            timerFrequency;
-        private bool                timerStarted;
-        private DateTime            previousTickTime;
-        private int                 totalNumTicks;
-        private ILogger      logger;
+        private Timer timer;
+        private Func<object, Task> asyncTaskCallback;
+        private TimerCallback syncCallbackFunc;
+        private TimeSpan dueTime;
+        private TimeSpan timerFrequency;
+        private bool timerStarted;
+        private DateTime previousTickTime;
+        private int totalNumTicks;
+        private ILogger logger;
 
         internal SafeTimerBase(ILogger logger, Func<object, Task> asyncTaskCallback, object state)
         {
@@ -149,7 +146,7 @@ namespace Orleans.Runtime
                         dueTime, timerFrequency, logger, () => String.Format("{0}.{1}", GetFullName(), callerName()), ErrorCode.Timer_SafeTimerIsNotTicking, true);
         }
 
-        public static bool CheckTimerDelay(DateTime previousTickTime, int totalNumTicks, 
+        public static bool CheckTimerDelay(DateTime previousTickTime, int totalNumTicks,
                         TimeSpan dueTime, TimeSpan timerFrequency, ILogger logger, Func<string> getName, ErrorCode errorCode, bool freezeCheck)
         {
             TimeSpan timeSinceLastTick = DateTime.UtcNow - previousTickTime;

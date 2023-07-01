@@ -1,7 +1,4 @@
-﻿
-using System;
-using System.Linq;
-using Orleans.Providers.Streams.Common;
+﻿using Orleans.Providers.Streams.Common;
 using Xunit;
 
 namespace UnitTests.OrleansRuntime.Streams
@@ -56,7 +53,7 @@ namespace UnitTests.OrleansRuntime.Streams
             IObjectPool<TestPooledResource> pool = new ObjectPool<TestPooledResource>(() => new TestPooledResource(accumulator));
 
             // Allocate 10 items
-            var resources = Enumerable.Range(0, 10).Select(i => pool.Allocate()) .ToList();
+            var resources = Enumerable.Range(0, 10).Select(i => pool.Allocate()).ToList();
 
             // free 10
             resources.ForEach(r => r.Dispose());
@@ -99,7 +96,7 @@ namespace UnitTests.OrleansRuntime.Streams
                 for (int j = 0; j < 5; j++)
                 {
                     TestPooledResource resource = pool.Allocate();
-                    int expectedAllocationCount = (i*(5 + 1)) // allocations accumulated in previous loops
+                    int expectedAllocationCount = (i * (5 + 1)) // allocations accumulated in previous loops
                                                   + (j + 1); // allocations accumulated in this loop
                     Assert.Equal(expectedAllocationCount, resource.AllocationCount);
                     resource.Dispose();

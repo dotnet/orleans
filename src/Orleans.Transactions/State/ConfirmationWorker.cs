@@ -1,7 +1,3 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
@@ -138,7 +134,7 @@ namespace Orleans.Transactions.State
                 // wait for storage call, so we don't free spin
                 return await storeComplete.Task;
             }
-            catch(Exception ex)
+            catch (Exception ex)
             {
                 this.logger.LogWarning(ex, "Error occured while cleaning up transaction {TransactionId} from commit log.  Will retry.", transactionId);
             }

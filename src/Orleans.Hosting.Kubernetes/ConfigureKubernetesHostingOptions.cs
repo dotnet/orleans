@@ -2,11 +2,7 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
-using System;
-using System.Collections.Generic;
 using System.Diagnostics;
-using System.IO;
-using System.Linq;
 using System.Net;
 using System.Net.Sockets;
 
@@ -109,7 +105,7 @@ namespace Orleans.Hosting.Kubernetes
         private static class IPAddressSelector
         {
             // IANA private IPv4 addresses
-            private static readonly (IPAddress Address, IPAddress SubnetMask)[] PreferredRanges = new []
+            private static readonly (IPAddress Address, IPAddress SubnetMask)[] PreferredRanges = new[]
             {
                 (IPAddress.Parse("192.168.0.0"), IPAddress.Parse("255.255.0.0")),
                 (IPAddress.Parse("10.0.0.0"), IPAddress.Parse("255.0.0.0")),

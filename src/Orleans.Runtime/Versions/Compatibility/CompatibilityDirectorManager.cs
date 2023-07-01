@@ -1,5 +1,3 @@
-using System;
-using System.Collections.Generic;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 using Orleans.Versions.Compatibility;
@@ -26,8 +24,8 @@ namespace Orleans.Runtime.Versions.Compatibility
         public ICompatibilityDirector GetDirector(GrainInterfaceType interfaceType)
         {
             ICompatibilityDirector director;
-            return compatibilityDirectors.TryGetValue(interfaceType, out director) 
-                ? director 
+            return compatibilityDirectors.TryGetValue(interfaceType, out director)
+                ? director
                 : Default;
         }
         public void SetStrategy(CompatibilityStrategy strategy)
@@ -53,7 +51,7 @@ namespace Orleans.Runtime.Versions.Compatibility
             CompatibilityStrategy compatibilityStrategy)
         {
             var strategyType = compatibilityStrategy.GetType();
-            return serviceProvider.GetRequiredServiceByKey<Type,ICompatibilityDirector>(strategyType);
+            return serviceProvider.GetRequiredServiceByKey<Type, ICompatibilityDirector>(strategyType);
         }
     }
 }

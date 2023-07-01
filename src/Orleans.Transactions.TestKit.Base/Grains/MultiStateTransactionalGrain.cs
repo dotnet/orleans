@@ -1,10 +1,6 @@
 using Microsoft.Extensions.Logging;
 using Orleans.Transactions.Abstractions;
-using System;
-using System.Linq;
 using System.Runtime.Serialization;
-using System.Threading;
-using System.Threading.Tasks;
 
 namespace Orleans.Transactions.TestKit
 {
@@ -83,7 +79,7 @@ namespace Orleans.Transactions.TestKit
 
         public async Task Set(int newValue)
         {
-            foreach(var data in this.dataArray)
+            foreach (var data in this.dataArray)
             {
                 await data.PerformUpdate(state =>
                 {
@@ -97,7 +93,7 @@ namespace Orleans.Transactions.TestKit
         public async Task<int[]> Add(int numberToAdd)
         {
             var result = new int[dataArray.Length];
-            for(int i = 0; i < dataArray.Length; i++)
+            for (int i = 0; i < dataArray.Length; i++)
             {
                 result[i] = await dataArray[i].PerformUpdate(state =>
                 {

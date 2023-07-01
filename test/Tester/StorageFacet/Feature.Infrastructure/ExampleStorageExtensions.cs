@@ -1,5 +1,4 @@
 using Microsoft.Extensions.DependencyInjection;
-using Orleans.Hosting;
 using Orleans.Runtime;
 using Tester.StorageFacet.Abstractions;
 

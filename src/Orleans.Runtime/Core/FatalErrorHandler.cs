@@ -1,9 +1,7 @@
-using System;
 using Microsoft.Extensions.Logging;
 using System.Diagnostics;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
-using System.Threading;
 
 namespace Orleans.Runtime
 {
@@ -34,8 +32,7 @@ namespace Orleans.Runtime
                 sender,
                 context);
 
-            var msg = @$"FATAL EXCEPTION from {sender?.ToString() ?? "null"}. Context: {context ?? "null"
-                }. Exception: {(exception != null ? LogFormatter.PrintException(exception) : "null")}.\nCurrent stack: {Environment.StackTrace}";
+            var msg = @$"FATAL EXCEPTION from {sender?.ToString() ?? "null"}. Context: {context ?? "null"}. Exception: {(exception != null ? LogFormatter.PrintException(exception) : "null")}.\nCurrent stack: {Environment.StackTrace}";
             Console.Error.WriteLine(msg);
 
             // Allow some time for loggers to flush.

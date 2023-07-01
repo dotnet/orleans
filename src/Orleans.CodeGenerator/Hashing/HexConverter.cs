@@ -2,7 +2,6 @@
 // Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 
-using System;
 using System.Runtime.CompilerServices;
 
 namespace Orleans.CodeGenerator.Hashing
@@ -12,7 +11,7 @@ namespace Orleans.CodeGenerator.Hashing
         public static unsafe string ToString(ReadOnlySpan<byte> bytes)
         {
             // Adapted from: https://github.com/dotnet/runtime/blob/f156fb9dcf121e536b93ae90bcc5e8e6d5336062/src/libraries/Common/src/System/HexConverter.cs#L196
-            
+
             Span<char> result = bytes.Length > 16 ?
                 new char[bytes.Length * 2].AsSpan() :
                 stackalloc char[bytes.Length * 2];

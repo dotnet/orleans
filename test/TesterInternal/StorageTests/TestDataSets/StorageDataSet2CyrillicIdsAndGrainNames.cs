@@ -1,9 +1,5 @@
-using System;
-using Orleans;
 using System.Collections;
-using System.Collections.Generic;
 using Orleans.Runtime;
-using System.Linq;
 
 namespace UnitTests.StorageTests.Relational.TestDataSets
 {
@@ -11,7 +7,7 @@ namespace UnitTests.StorageTests.Relational.TestDataSets
     /// A data set for grains with Cyrillic letters and IDs.
     /// </summary>
     /// <typeparam name="TStateData">The type of <see cref="TestStateGeneric1{T}"/>.</typeparam>
-    internal class StorageDataSet2CyrillicIdsAndGrainNames<TStateData>: IEnumerable<object[]>
+    internal class StorageDataSet2CyrillicIdsAndGrainNames<TStateData> : IEnumerable<object[]>
     {
         private const int NumCases = 3;
 
@@ -24,7 +20,7 @@ namespace UnitTests.StorageTests.Relational.TestDataSets
         /// The length of random string drawn form <see cref="Symbols"/>.
         /// </summary>
         private const long StringLength = 15L;
-        
+
         public static (string, GrainId, GrainState<TestStateGeneric1<TStateData>>) GetTestData(int testNum) => testNum switch
         {
             0 => (

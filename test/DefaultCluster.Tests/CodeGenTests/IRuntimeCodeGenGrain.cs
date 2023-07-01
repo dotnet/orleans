@@ -33,7 +33,7 @@ namespace Tester.CodeGenTests
 
         public Task<Type[]> GetTypesExplicit<T, U, V>()
         {
-            return Task.FromResult(new[] {typeof(T), typeof(U), typeof(V)});
+            return Task.FromResult(new[] { typeof(T), typeof(U), typeof(V) });
         }
 
         public Task<Type[]> GetTypesInferred<T, U, V>(T t, U u, V v)
@@ -76,7 +76,7 @@ namespace Tester.CodeGenTests
             this.state = value;
         }
 
-        public Task<T> GetValue<T>() => Task.FromResult((T) this.state);
+        public Task<T> GetValue<T>() => Task.FromResult((T)this.state);
 
         public Task SetValueOnObserver<T>(IGrainObserverWithGenericMethods observer, T value)
         {
@@ -330,7 +330,7 @@ namespace Tester.CodeGenTests
     /// <summary>
     /// Tests that nested classes do not fail code generation.
     /// </summary>
-    public class NestedGenericGrain : Grain,  INestedGenericGrain
+    public class NestedGenericGrain : Grain, INestedGenericGrain
     {
         public Task<int> Do(NestedGeneric<int> value)
         {

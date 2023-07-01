@@ -1,8 +1,4 @@
-using Orleans;
 using Orleans.Streams;
-using System;
-using System.Collections.Generic;
-using System.Threading.Tasks;
 
 namespace Tester.StreamingTests
 {
@@ -39,14 +35,14 @@ namespace Tester.StreamingTests
         {
             var responsibilty = await this.leaseManagerGrain.GetLeaseResposibility();
             this.ownedQueues = new List<QueueId>(responsibilty);
-            for(int i = 0; i < responsibilty; i++)
+            for (int i = 0; i < responsibilty; i++)
             {
                 try
                 {
                     this.ownedQueues.Add(await this.leaseManagerGrain.Acquire());
                 }
                 catch (KeyNotFoundException)
-                { }   
+                { }
             }
             await this.leaseManagerGrain.RecordBalancerResponsibility(id.ToString(), this.ownedQueues.Count);
         }

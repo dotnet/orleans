@@ -1,9 +1,4 @@
-
-using System;
-using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
-using Orleans;
-using Orleans.Hosting;
 using Orleans.Runtime;
 using Orleans.Streams;
 using Orleans.TestingHost;
@@ -20,7 +15,7 @@ namespace UnitTests.StreamingTests
         {
             protected override void ConfigureTestCluster(TestClusterBuilder builder)
             {
-               builder.AddSiloBuilderConfigurator<SiloHostConfigurator>();
+                builder.AddSiloBuilderConfigurator<SiloHostConfigurator>();
             }
 
             public class SiloHostConfigurator : ISiloConfigurator

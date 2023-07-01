@@ -1,6 +1,3 @@
-using System.Linq;
-using System.Threading.Tasks;
-
 namespace Orleans.Runtime.Placement
 {
     /// <summary>
@@ -15,7 +12,7 @@ namespace Orleans.Runtime.Placement
     {
         private Task<SiloAddress> _cachedLocalSilo;
 
-        public override Task<SiloAddress> 
+        public override Task<SiloAddress>
             OnAddActivation(PlacementStrategy strategy, PlacementTarget target, IPlacementContext context)
         {
             // if local silo is not active or does not support this type of grain, revert to random placement

@@ -1,13 +1,10 @@
-using System;
-using System.Threading.Tasks;
-using Orleans;
 using Orleans.Concurrency;
 using Orleans.Runtime;
 using UnitTests.GrainInterfaces;
 
 namespace UnitTests.Grains
 {
-    public class IdleActivationGcTestGrain1: Grain, IIdleActivationGcTestGrain1
+    public class IdleActivationGcTestGrain1 : Grain, IIdleActivationGcTestGrain1
     {
         public Task Nop()
         {
@@ -15,7 +12,7 @@ namespace UnitTests.Grains
         }
     }
 
-    public class IdleActivationGcTestGrain2: Grain, IIdleActivationGcTestGrain2
+    public class IdleActivationGcTestGrain2 : Grain, IIdleActivationGcTestGrain2
     {
         public Task Nop()
         {
@@ -23,7 +20,7 @@ namespace UnitTests.Grains
         }
     }
 
-    internal class BusyActivationGcTestGrain1: Grain, IBusyActivationGcTestGrain1
+    internal class BusyActivationGcTestGrain1 : Grain, IBusyActivationGcTestGrain1
     {
         private readonly string _id = Guid.NewGuid().ToString();
         private readonly ActivationCollector activationCollector;
@@ -79,7 +76,7 @@ namespace UnitTests.Grains
         }
     }
 
-    public class BusyActivationGcTestGrain2: Grain, IBusyActivationGcTestGrain2
+    public class BusyActivationGcTestGrain2 : Grain, IBusyActivationGcTestGrain2
     {
         public Task Nop()
         {

@@ -2,10 +2,7 @@
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
-using System;
 using System.Collections.Concurrent;
-using System.Collections.Generic;
-using System.Linq;
 using System.Text;
 using static Microsoft.CodeAnalysis.CSharp.SyntaxFactory;
 
@@ -70,7 +67,7 @@ namespace Orleans.CodeGenerator.SyntaxGeneration
             return ToDisplayName(typeSymbol, new DisplayNameOptions { Substitutions = substitutions, IncludeGlobalSpecifier = includeGlobalSpecifier, IncludeNamespace = includeNamespace });
         }
 
-        public static string ToDisplayName(this ITypeSymbol typeSymbol, DisplayNameOptions options) 
+        public static string ToDisplayName(this ITypeSymbol typeSymbol, DisplayNameOptions options)
         {
             if (typeSymbol.SpecialType == SpecialType.System_Void)
             {
@@ -393,7 +390,7 @@ namespace Orleans.CodeGenerator.SyntaxGeneration
                 yield return member;
             }
         }
-        
+
         public static IEnumerable<TSymbol> GetDeclaredInstanceMembers<TSymbol>(this ITypeSymbol type) where TSymbol : ISymbol
         {
             foreach (var candidate in type.GetMembers())

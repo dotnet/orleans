@@ -1,8 +1,4 @@
-using System;
-using System.Collections.Generic;
 using System.Data;
-using System.Linq;
-using System.Threading.Tasks;
 
 using Orleans.Runtime;
 
@@ -40,10 +36,10 @@ namespace Orleans.Tests.SqlUtils
             DbStoredQueries.Columns.Statistic
         };
 
-    /// <summary>
-    /// the orleans functional queries
-    /// </summary>
-    private readonly DbStoredQueries dbStoredQueries;
+        /// <summary>
+        /// the orleans functional queries
+        /// </summary>
+        private readonly DbStoredQueries dbStoredQueries;
 
         /// <summary>
         /// Constructor

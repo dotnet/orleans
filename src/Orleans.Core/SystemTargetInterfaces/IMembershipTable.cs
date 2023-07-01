@@ -1,9 +1,5 @@
-using System;
-using System.Collections.Generic;
 using System.Collections.Immutable;
-using System.Linq;
 using System.Net;
-using System.Threading.Tasks;
 using Orleans.Concurrency;
 using Orleans.Runtime;
 
@@ -195,12 +191,7 @@ namespace Orleans
             int shuttingDown = Members.Count(e => e.Item1.Status == SiloStatus.ShuttingDown);
             int stopping = Members.Count(e => e.Item1.Status == SiloStatus.Stopping);
 
-            return @$"{Members.Count} silos, {active} are Active, {dead} are Dead{
-                (created > 0 ? $", {created} are Created" : null)}{
-                (joining > 0 ? $", {joining} are Joining" : null)}{
-                (shuttingDown > 0 ? $", {shuttingDown} are ShuttingDown" : null)}{
-                (stopping > 0 ? $", {stopping} are Stopping" : null)
-                }, Version={Version}. All silos: {Utils.EnumerableToString(Members.Select(t => t.Item1))}";
+            return @$"{Members.Count} silos, {active} are Active, {dead} are Dead{(created > 0 ? $", {created} are Created" : null)}{(joining > 0 ? $", {joining} are Joining" : null)}{(shuttingDown > 0 ? $", {shuttingDown} are ShuttingDown" : null)}{(stopping > 0 ? $", {stopping} are Stopping" : null)}, Version={Version}. All silos: {Utils.EnumerableToString(Members.Select(t => t.Item1))}";
         }
 
         // return a copy of the table removing all dead appereances of dead nodes, except for the last one.
@@ -399,9 +390,7 @@ namespace Orleans
             var suspecters = SuspectTimes == null ? null : Utils.EnumerableToString(SuspectTimes.Select(tuple => tuple.Item1));
             var suspectTimes = SuspectTimes == null ? null : Utils.EnumerableToString(SuspectTimes.Select(tuple => LogFormatter.PrintDate(tuple.Item2)));
 
-            return @$"[SiloAddress={SiloAddress} SiloName={SiloName} Status={Status} HostName={HostName} ProxyPort={ProxyPort} RoleName={RoleName
-                } UpdateZone={UpdateZone} FaultZone={FaultZone} StartTime={LogFormatter.PrintDate(StartTime)} IAmAliveTime={LogFormatter.PrintDate(IAmAliveTime)
-                }{(suspecters == null ? null : " Suspecters=")}{suspecters}{(suspectTimes == null ? null : " SuspectTimes=")}{suspectTimes}]";
+            return @$"[SiloAddress={SiloAddress} SiloName={SiloName} Status={Status} HostName={HostName} ProxyPort={ProxyPort} RoleName={RoleName} UpdateZone={UpdateZone} FaultZone={FaultZone} StartTime={LogFormatter.PrintDate(StartTime)} IAmAliveTime={LogFormatter.PrintDate(IAmAliveTime)}{(suspecters == null ? null : " Suspecters=")}{suspecters}{(suspectTimes == null ? null : " SuspectTimes=")}{suspectTimes}]";
         }
     }
 }

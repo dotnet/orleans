@@ -1,8 +1,3 @@
-
-using System.Collections.Generic;
-using System.Threading;
-using Orleans.Runtime;
-
 namespace Orleans.Transactions
 {
     public static class TransactionContext

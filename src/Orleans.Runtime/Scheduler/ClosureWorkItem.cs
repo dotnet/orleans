@@ -1,6 +1,3 @@
-using System;
-using System.Threading.Tasks;
-
 namespace Orleans.Runtime.Scheduler
 {
     internal sealed class AsyncClosureWorkItem : WorkItemBase

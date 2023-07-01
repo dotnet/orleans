@@ -1,5 +1,3 @@
-using System;
-using System.Threading.Tasks;
 using Orleans.Runtime.ConsistentRing;
 using Orleans.Streams;
 using Microsoft.Extensions.DependencyInjection;
@@ -97,7 +95,7 @@ namespace Orleans.Runtime.Providers
         {
             try
             {
-                var balancer = this.ServiceProvider.GetServiceByName<IStreamQueueBalancer>(streamProviderName) ??this.ServiceProvider.GetService<IStreamQueueBalancer>();
+                var balancer = this.ServiceProvider.GetServiceByName<IStreamQueueBalancer>(streamProviderName) ?? this.ServiceProvider.GetService<IStreamQueueBalancer>();
                 if (balancer == null)
                     throw new ArgumentOutOfRangeException("balancerType", $"Cannot create stream queue balancer for StreamProvider: {streamProviderName}.Please configure your stream provider with a queue balancer.");
                 this.logger.LogInformation(
@@ -140,7 +138,7 @@ namespace Orleans.Runtime.Providers
         {
             if (this.grainContextAccessor.GrainContext is ActivationData activationData && activationData.IsStatelessWorker)
             {
-                throw new InvalidOperationException($"The extension { typeof(TExtension) } cannot be bound to a Stateless Worker.");
+                throw new InvalidOperationException($"The extension {typeof(TExtension)} cannot be bound to a Stateless Worker.");
             }
 
             return this.grainContextAccessor.GrainContext.GetComponent<IGrainExtensionBinder>().GetOrSetExtension<TExtension, TExtensionInterface>(newExtensionFunc);

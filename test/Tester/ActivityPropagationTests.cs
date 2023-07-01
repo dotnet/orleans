@@ -1,12 +1,5 @@
-using System;
-using System.Collections.Generic;
 using System.Diagnostics;
-using System.Text;
-using System.Threading.Tasks;
 using Microsoft.Extensions.Configuration;
-using Orleans;
-using Orleans.Hosting;
-using Orleans.Internal;
 using Orleans.Runtime;
 using Orleans.TestingHost;
 using TestExtensions;
@@ -31,7 +24,7 @@ namespace UnitTests.General
             static ActivitySamplingResult Sample(ref ActivityCreationOptions<ActivityContext> options)
             {
                 //Trace id has to be accessed in sample to reproduce the scenario when SetParentId does not work
-                var _ = options.TraceId; 
+                var _ = options.TraceId;
                 return ActivitySamplingResult.PropagationData;
             };
 

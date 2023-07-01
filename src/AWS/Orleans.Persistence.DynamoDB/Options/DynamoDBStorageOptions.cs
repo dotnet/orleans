@@ -1,5 +1,3 @@
-using System;
-using Newtonsoft.Json;
 using Orleans.Persistence.DynamoDB;
 using Orleans.Runtime;
 using Orleans.Storage;

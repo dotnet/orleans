@@ -1,7 +1,6 @@
 using Orleans.Serialization.Cloning;
 using Orleans.Serialization.Serializers;
 using System.Collections.Concurrent;
-using System.Collections.Generic;
 
 namespace Orleans.Serialization.Codecs
 {
@@ -19,7 +18,7 @@ namespace Orleans.Serialization.Codecs
         public ConcurrentQueueCodec(IValueSerializer<ConcurrentQueueSurrogate<T>> surrogateSerializer) : base(surrogateSerializer)
         {
         }
-        
+
         /// <inheritdoc/>
         public override ConcurrentQueue<T> ConvertFromSurrogate(ref ConcurrentQueueSurrogate<T> surrogate) => new(surrogate.Values);
 

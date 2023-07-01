@@ -1,10 +1,6 @@
 //#define USE_SQL_SERVER
 
-using System;
-using System.Collections.Generic;
-using System.Threading.Tasks;
 using Microsoft.Extensions.Configuration;
-using Orleans.Hosting;
 using Orleans.TestingHost;
 using TestExtensions;
 using UnitTests.General;
@@ -63,7 +59,7 @@ namespace Tester.AdoNet.Reminders
             var controlProxy = fixture.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
             controlProxy.EraseReminderTable().WaitWithThrow(TestConstants.InitTimeout);
         }
-        
+
         // Basic tests
 
         [SkippableFact]

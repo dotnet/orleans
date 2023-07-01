@@ -1,6 +1,3 @@
-using System;
-using System.Threading.Tasks;
-using Orleans;
 using Orleans.Runtime;
 using Orleans.Streams;
 
@@ -53,7 +50,7 @@ namespace UnitTests.GrainInterfaces
             return grain.TestBecomeConsumerSlim(streamId, providerName);
         }
 
-        public static  Task RemoveConsumer(this IStreamLifecycleConsumerGrain grain, Guid streamIdGuid, string streamNamespace, string providerName, StreamSubscriptionHandle<int> consumerHandle)
+        public static Task RemoveConsumer(this IStreamLifecycleConsumerGrain grain, Guid streamIdGuid, string streamNamespace, string providerName, StreamSubscriptionHandle<int> consumerHandle)
         {
             var streamId = StreamId.Create(streamNamespace, streamIdGuid);
             return grain.RemoveConsumer(streamId, providerName, consumerHandle);

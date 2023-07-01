@@ -1,4 +1,3 @@
-using System.Threading.Tasks;
 using Azure.Storage.Blobs;
 using Orleans.Configuration;
 using Orleans.Runtime;

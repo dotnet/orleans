@@ -1,4 +1,3 @@
-using System;
 using System.Net;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans;
@@ -19,7 +18,7 @@ namespace UnitTests.General
 
         class A { }
         class B : A { }
-        
+
         public IdentifierTests(ITestOutputHelper output, TestEnvironmentFixture fixture)
         {
             this.output = output;

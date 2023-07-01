@@ -1,6 +1,4 @@
-using System;
 using System.Collections;
-using System.Collections.Generic;
 using System.Reflection;
 using Microsoft.Extensions.Options;
 
@@ -130,7 +128,7 @@ namespace Orleans
         }
     }
 
-    internal class DefaultOptionsFormatterResolver<T> : IOptionFormatterResolver<T> where T: class
+    internal class DefaultOptionsFormatterResolver<T> : IOptionFormatterResolver<T> where T : class
     {
         private readonly IOptionsMonitor<T> _optionsMonitor;
 

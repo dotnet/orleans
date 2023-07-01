@@ -1,5 +1,3 @@
-using System;
-using System.Collections.Generic;
 using Orleans.Tests.SqlUtils;
 using TestExtensions;
 using UnitTests.General;
@@ -39,7 +37,7 @@ WHERE pg_stat_activity.datname = '{0}'
 DROP DATABASE ""{0}"";";
             }
         }
-        
+
 
         protected override string ExistsDatabaseTemplate
         {
@@ -57,8 +55,8 @@ DROP DATABASE ""{0}"";";
             {
                 setupScript,
                 CreateStreamTestTable
-            }; 
-            
+            };
+
 
             return batches;
         }

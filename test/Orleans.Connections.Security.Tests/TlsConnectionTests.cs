@@ -1,9 +1,5 @@
-using System;
-using System.Threading.Tasks;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
-using Orleans;
-using Orleans.Hosting;
 using Orleans.TestingHost;
 using Xunit;
 
@@ -26,7 +22,7 @@ namespace Orleans.Connections.Security.Tests
             var decoded = TestCertificateHelper.ConvertFromBase64(encoded);
             Assert.Equal(original, decoded);
         }
-        
+
         private class TlsClientConfigurator : IClientBuilderConfigurator
         {
             public void Configure(IConfiguration configuration, IClientBuilder clientBuilder)
@@ -99,7 +95,7 @@ namespace Orleans.Connections.Security.Tests
 
                 var certificate = TestCertificateHelper.CreateSelfSignedCertificate(
                     CertificateSubjectName, oids);
-                
+
                 var encodedCertificate = TestCertificateHelper.ConvertToBase64(certificate);
                 builder.Properties[CertificateConfigKey] = encodedCertificate;
                 builder.Properties[ClientCertificateModeKey] = certificateMode.ToString();

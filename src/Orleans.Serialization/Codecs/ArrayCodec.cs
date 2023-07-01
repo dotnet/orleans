@@ -1,4 +1,3 @@
-using System;
 using System.Buffers;
 using System.Runtime.InteropServices;
 using Orleans.Serialization.Buffers;
@@ -322,8 +321,19 @@ namespace Orleans.Serialization.Codecs
 
             return result;
         }
+
+        /* Unmerged change from project 'Orleans.Serialization (net7.0)'
+        Before:
+            }
+
+            /// <summary>
+        After:
+            }
+
+            /// <summary>
+        */
     }
-    
+
     /// <summary>
     /// Serializer for <see cref="Memory{T}"/>.
     /// </summary>
@@ -485,7 +495,7 @@ namespace Orleans.Serialization.Codecs
             return result;
         }
     }
-    
+
     /// <summary>
     /// Serializer for <see cref="ArraySegment{T}"/>.
     /// </summary>

@@ -1,5 +1,3 @@
-using System;
-
 namespace Orleans.Versions.Compatibility
 {
     /// <summary>

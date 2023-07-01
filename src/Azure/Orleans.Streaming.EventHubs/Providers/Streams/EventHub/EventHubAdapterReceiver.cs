@@ -1,9 +1,4 @@
-using System;
-using System.Collections.Generic;
 using System.Diagnostics;
-using System.Linq;
-using System.Threading;
-using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Orleans.Configuration;
 using Orleans.Providers.Streams.Common;
@@ -107,7 +102,7 @@ namespace Orleans.Streaming.EventHubs
             try
             {
                 this.checkpointer = await this.checkpointerFactory(this.settings.Partition);
-                if(this.cache != null)
+                if (this.cache != null)
                 {
                     this.cache.Dispose();
                     this.cache = null;

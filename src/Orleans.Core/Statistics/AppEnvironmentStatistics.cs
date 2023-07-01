@@ -1,5 +1,3 @@
-using System;
-
 namespace Orleans.Statistics
 {
     internal class AppEnvironmentStatistics : IAppEnvironmentStatistics

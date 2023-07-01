@@ -1,11 +1,6 @@
-using System;
-using System.Collections.Generic;
 using System.Data;
 using System.Data.Common;
 using System.Diagnostics;
-using System.Linq;
-using System.Threading;
-using System.Threading.Tasks;
 
 #if CLUSTERING_ADONET
 namespace Orleans.Clustering.AdoNet.Storage
@@ -23,7 +18,7 @@ namespace Orleans.Tests.SqlUtils
     /// A general purpose class to work with a given relational database and ADO.NET provider.
     /// </summary>    
     [DebuggerDisplay("InvariantName = {InvariantName}, ConnectionString = {ConnectionString}")]
-    internal class RelationalStorage: IRelationalStorage
+    internal class RelationalStorage : IRelationalStorage
     {
         /// <summary>
         /// The connection string to use.
@@ -85,12 +80,12 @@ namespace Orleans.Tests.SqlUtils
         /// <returns></returns>
         public static IRelationalStorage CreateInstance(string invariantName, string connectionString)
         {
-            if(string.IsNullOrWhiteSpace(invariantName))
+            if (string.IsNullOrWhiteSpace(invariantName))
             {
                 throw new ArgumentException("The name of invariant must contain characters", "invariantName");
             }
 
-            if(string.IsNullOrWhiteSpace(connectionString))
+            if (string.IsNullOrWhiteSpace(connectionString))
             {
                 throw new ArgumentException("Connection string must contain characters", "connectionString");
             }
@@ -151,12 +146,12 @@ namespace Orleans.Tests.SqlUtils
         public async Task<IEnumerable<TResult>> ReadAsync<TResult>(string query, Action<IDbCommand> parameterProvider, Func<IDataRecord, int, CancellationToken, Task<TResult>> selector, CancellationToken cancellationToken = default(CancellationToken), CommandBehavior commandBehavior = CommandBehavior.Default)
         {
             //If the query is something else that is not acceptable (e.g. an empty string), there will an appropriate database exception.
-            if(query == null)
+            if (query == null)
             {
                 throw new ArgumentNullException("query");
             }
 
-            if(selector == null)
+            if (selector == null)
             {
                 throw new ArgumentNullException("selector");
             }
@@ -189,7 +184,7 @@ namespace Orleans.Tests.SqlUtils
         public async Task<int> ExecuteAsync(string query, Action<IDbCommand> parameterProvider, CancellationToken cancellationToken = default(CancellationToken), CommandBehavior commandBehavior = CommandBehavior.Default)
         {
             //If the query is something else that is not acceptable (e.g. an empty string), there will an appropriate database exception.
-            if(query == null)
+            if (query == null)
             {
                 throw new ArgumentNullException("query");
             }
@@ -215,9 +210,9 @@ namespace Orleans.Tests.SqlUtils
         {
             var results = new List<TResult>();
             int resultSetCount = 0;
-            while(reader.HasRows)
+            while (reader.HasRows)
             {
-                while(await reader.ReadAsync(cancellationToken).ConfigureAwait(continueOnCapturedContext: false))
+                while (await reader.ReadAsync(cancellationToken).ConfigureAwait(continueOnCapturedContext: false))
                 {
                     var obj = await selector(reader, resultSetCount, cancellationToken).ConfigureAwait(false);
                     results.Add(obj);
@@ -233,12 +228,12 @@ namespace Orleans.Tests.SqlUtils
 
         private async Task<Tuple<IEnumerable<TResult>, int>> ExecuteReaderAsync<TResult>(DbCommand command, Func<IDataRecord, int, CancellationToken, Task<TResult>> selector, CancellationToken cancellationToken, CommandBehavior commandBehavior)
         {
-            using(var reader = await command.ExecuteReaderAsync(commandBehavior, cancellationToken).ConfigureAwait(continueOnCapturedContext: false))
+            using (var reader = await command.ExecuteReaderAsync(commandBehavior, cancellationToken).ConfigureAwait(continueOnCapturedContext: false))
             {
                 CancellationTokenRegistration cancellationRegistration = default(CancellationTokenRegistration);
                 try
                 {
-                    if(cancellationToken.CanBeCanceled && supportsCommandCancellation)
+                    if (cancellationToken.CanBeCanceled && supportsCommandCancellation)
                     {
                         cancellationRegistration = cancellationToken.Register(CommandCancellation, Tuple.Create(reader, command), useSynchronizationContext: false);
                     }
@@ -250,7 +245,7 @@ namespace Orleans.Tests.SqlUtils
                 }
             }
         }
-           
+
 
         private async Task<Tuple<IEnumerable<TResult>, int>> ExecuteAsync<TResult>(
             string query,
@@ -263,7 +258,7 @@ namespace Orleans.Tests.SqlUtils
             using (var connection = DbConnectionFactory.CreateConnection(invariantName, connectionString))
             {
                 await connection.OpenAsync(cancellationToken).ConfigureAwait(continueOnCapturedContext: false);
-                using(var command = connection.CreateCommand())
+                using (var command = connection.CreateCommand())
                 {
                     parameterProvider?.Invoke(command);
                     command.CommandText = query;
@@ -271,7 +266,7 @@ namespace Orleans.Tests.SqlUtils
                     databaseCommandInterceptor.Intercept(command);
 
                     Task<Tuple<IEnumerable<TResult>, int>> ret;
-                    if(isSynchronousAdoNetImplementation)
+                    if (isSynchronousAdoNetImplementation)
                     {
                         ret = Task.Run(() => executor(command, selector, cancellationToken, commandBehavior), cancellationToken);
                     }
@@ -293,7 +288,7 @@ namespace Orleans.Tests.SqlUtils
             //despite the connection already closed. Source: https://msdn.microsoft.com/en-us/library/system.data.sqlclient.sqlcommand.cancel(v=vs.110).aspx.
             //Enforcing this behavior across all providers does not seem to hurt.
             var stateTuple = (Tuple<DbDataReader, DbCommand>)state;
-            if(!stateTuple.Item1.IsClosed)
+            if (!stateTuple.Item1.IsClosed)
             {
                 stateTuple.Item2.Cancel();
             }

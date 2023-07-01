@@ -1,4 +1,3 @@
-using System;
 using System.Net;
 using Orleans.Persistence.AzureStorage;
 using Xunit;
@@ -12,16 +11,16 @@ namespace Tester.AzureUtils
         [Fact, TestCategory("Functional")]
         public void AzureTableErrorCode_IsRetriableHttpError()
         {
-            Assert.True(AzureTableUtils.IsRetriableHttpError((HttpStatusCode) 503, null));
-            Assert.True(AzureTableUtils.IsRetriableHttpError((HttpStatusCode) 504, null));
-            Assert.True(AzureTableUtils.IsRetriableHttpError((HttpStatusCode) 408, null));
+            Assert.True(AzureTableUtils.IsRetriableHttpError((HttpStatusCode)503, null));
+            Assert.True(AzureTableUtils.IsRetriableHttpError((HttpStatusCode)504, null));
+            Assert.True(AzureTableUtils.IsRetriableHttpError((HttpStatusCode)408, null));
 
-            Assert.True(AzureTableUtils.IsRetriableHttpError((HttpStatusCode) 500, "OperationTimedOut"));
-            Assert.False(AzureTableUtils.IsRetriableHttpError((HttpStatusCode) 500, null));
-            Assert.False(AzureTableUtils.IsRetriableHttpError((HttpStatusCode) 500, "SomeOtherStatusValue"));
+            Assert.True(AzureTableUtils.IsRetriableHttpError((HttpStatusCode)500, "OperationTimedOut"));
+            Assert.False(AzureTableUtils.IsRetriableHttpError((HttpStatusCode)500, null));
+            Assert.False(AzureTableUtils.IsRetriableHttpError((HttpStatusCode)500, "SomeOtherStatusValue"));
 
             // Current behaviour is to ignore successes as not retriable:
-            Assert.False(AzureTableUtils.IsRetriableHttpError((HttpStatusCode) 200, null));
+            Assert.False(AzureTableUtils.IsRetriableHttpError((HttpStatusCode)200, null));
         }
 
         [Fact, TestCategory("Functional")]
@@ -32,19 +31,19 @@ namespace Tester.AzureUtils
             Assert.True(AzureTableUtils.IsContentionError(HttpStatusCode.NotFound));
             Assert.True(AzureTableUtils.IsContentionError(HttpStatusCode.NotImplemented));
 
-            Assert.False(AzureTableUtils.IsContentionError((HttpStatusCode) 503));
-            Assert.False(AzureTableUtils.IsContentionError((HttpStatusCode) 504));
-            Assert.False(AzureTableUtils.IsContentionError((HttpStatusCode) 408));
-            Assert.False(AzureTableUtils.IsContentionError((HttpStatusCode) 500));
-            Assert.False(AzureTableUtils.IsContentionError((HttpStatusCode) 500));
-            Assert.False(AzureTableUtils.IsContentionError((HttpStatusCode) 500));
-            Assert.False(AzureTableUtils.IsContentionError((HttpStatusCode) 200));
+            Assert.False(AzureTableUtils.IsContentionError((HttpStatusCode)503));
+            Assert.False(AzureTableUtils.IsContentionError((HttpStatusCode)504));
+            Assert.False(AzureTableUtils.IsContentionError((HttpStatusCode)408));
+            Assert.False(AzureTableUtils.IsContentionError((HttpStatusCode)500));
+            Assert.False(AzureTableUtils.IsContentionError((HttpStatusCode)500));
+            Assert.False(AzureTableUtils.IsContentionError((HttpStatusCode)500));
+            Assert.False(AzureTableUtils.IsContentionError((HttpStatusCode)200));
         }
 
         [Fact, TestCategory("Functional")]
         public void AzureTableErrorCode_BadTableName()
         {
-            
+
             string tableName = "abc-123";
             Assert.Throws<ArgumentException>(() =>
             AzureTableUtils.ValidateTableName(tableName));

@@ -1,5 +1,3 @@
-using System;
-using System.Threading.Tasks;
 using Orleans.GrainDirectory.Redis;
 using Orleans.Runtime;
 using StackExchange.Redis;
@@ -9,7 +7,7 @@ namespace Orleans.Configuration
     /// <summary>
     /// Configuration options for the <see cref="RedisGrainDirectory"/>
     /// </summary>
-    public class RedisGrainDirectoryOptions 
+    public class RedisGrainDirectoryOptions
     {
         /// <summary>
         /// Gets or sets the Redis client configuration.

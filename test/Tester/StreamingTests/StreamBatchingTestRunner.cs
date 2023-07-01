@@ -1,7 +1,3 @@
-using System;
-using System.Linq;
-using System.Threading.Tasks;
-using Orleans;
 using Orleans.Streams;
 using Orleans.TestingHost.Utils;
 using TestExtensions;
@@ -23,7 +19,7 @@ namespace UnitTests.StreamingTests
             this.output = output;
         }
 
-        [SkippableFact(Skip="https://github.com/dotnet/orleans/issues/5649"), TestCategory("Functional"), TestCategory("Streaming")]
+        [SkippableFact(Skip = "https://github.com/dotnet/orleans/issues/5649"), TestCategory("Functional"), TestCategory("Streaming")]
         public async Task SingleSendBatchConsume()
         {
             const int ExpectedConsumed = 30;
@@ -31,7 +27,7 @@ namespace UnitTests.StreamingTests
 
             IStreamProvider provider = this.fixture.Client.GetStreamProvider(StreamBatchingTestConst.ProviderName);
             IAsyncStream<string> stream = provider.GetStream<string>(StreamBatchingTestConst.BatchingNameSpace, streamGuid);
-            for(int i = 0; i< ExpectedConsumed; i++)
+            for (int i = 0; i < ExpectedConsumed; i++)
             {
                 await stream.OnNextAsync(i.ToString());
             }

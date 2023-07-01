@@ -1,5 +1,4 @@
-﻿using System;
-using System.Data;
+﻿using System.Data;
 using System.Linq.Expressions;
 
 #if CLUSTERING_ADONET
@@ -92,14 +91,14 @@ namespace Orleans.Tests.SqlUtils
                 //String parameters are mapped to NVarChar2 OracleDbType which is limited to 4000 bytes
                 //This sets the OracleType explicitly to CLOB
                 if (commandParameter.ParameterName == "PayloadJson")
-                { 
+                {
                     setClobOracleDbTypeAction.Value(commandParameter);
                     continue;
                 }
 
                 //Same like above
                 if (commandParameter.ParameterName == "PayloadXml")
-                { 
+                {
                     setClobOracleDbTypeAction.Value(commandParameter);
                     continue;
                 }

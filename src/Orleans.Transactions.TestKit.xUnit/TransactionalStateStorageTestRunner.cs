@@ -1,6 +1,4 @@
-﻿using System;
-using System.Threading.Tasks;
-using FluentAssertions.Equivalency;
+﻿using FluentAssertions.Equivalency;
 using Orleans.Transactions.Abstractions;
 using Xunit;
 using Xunit.Abstractions;
@@ -8,7 +6,7 @@ using Xunit.Abstractions;
 namespace Orleans.Transactions.TestKit.xUnit
 {
     public abstract class TransactionalStateStorageTestRunnerxUnit<TState> : TransactionalStateStorageTestRunner<TState>
-        where TState: class, new()
+        where TState : class, new()
     {
         /// <summary>
         /// Constructor

@@ -6,7 +6,7 @@ using static Microsoft.CodeAnalysis.CSharp.SyntaxFactory;
 
 namespace Orleans.CodeGenerator
 {
-    internal interface IPropertyDescription : IMemberDescription 
+    internal interface IPropertyDescription : IMemberDescription
     {
     }
 

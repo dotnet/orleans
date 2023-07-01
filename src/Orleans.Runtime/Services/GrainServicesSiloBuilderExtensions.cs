@@ -2,8 +2,6 @@ using Microsoft.Extensions.DependencyInjection;
 using Orleans.CodeGeneration;
 using Orleans.Runtime;
 using Orleans.Services;
-using System;
-using System.Linq;
 
 namespace Orleans.Hosting
 {

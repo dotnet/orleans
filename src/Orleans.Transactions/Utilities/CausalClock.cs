@@ -1,6 +1,3 @@
-
-using System;
-
 namespace Orleans.Transactions
 {
     public class CausalClock

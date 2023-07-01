@@ -1,7 +1,4 @@
-﻿using System;
-using System.Threading.Tasks;
-
-namespace Orleans.Transactions.Abstractions
+﻿namespace Orleans.Transactions.Abstractions
 {
     public static class TransactionalStateExtensions
     {

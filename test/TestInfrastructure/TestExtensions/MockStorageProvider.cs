@@ -1,17 +1,10 @@
-using System;
-using System.Collections.Generic;
 using System.Diagnostics;
-using System.Linq;
-using System.Threading;
-using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
-using Orleans;
 using Orleans.Providers;
 using Orleans.Runtime;
 using Orleans.Serialization;
 using Orleans.Storage;
 using Microsoft.Extensions.Logging;
-using Orleans.Hosting;
 
 namespace UnitTests.StorageTests
 {
@@ -55,7 +48,7 @@ namespace UnitTests.StorageTests
         }
         [Serializable]
         [GenerateSerializer]
-        public class StateForTest 
+        public class StateForTest
         {
             [Id(0)]
             public int InitCount { get; set; }
@@ -151,7 +144,7 @@ namespace UnitTests.StorageTests
                 if (!storedDict.ContainsKey(stateStoreKey))
                 {
                     storedDict[stateStoreKey] = Activator.CreateInstance(stateType);
-                } 
+                }
 
                 var storedState = storedDict[stateStoreKey];
                 var field = storedState.GetType().GetProperty(name).GetSetMethod(true);
@@ -168,7 +161,7 @@ namespace UnitTests.StorageTests
 
         public T GetLastState<T>()
         {
-            return (T) LastState;
+            return (T)LastState;
         }
 
         private object GetLastState<T>(string grainType, GrainId grainId, IGrainState<T> grainState)
@@ -217,7 +210,7 @@ namespace UnitTests.StorageTests
             lock (StateStore)
             {
                 var storedState = this.copier.Copy(grainState.State); // Store current state data
-                var stateStore = new Dictionary<string, object> {{ stateStoreKey, storedState }};
+                var stateStore = new Dictionary<string, object> { { stateStoreKey, storedState } };
                 StateStore.WriteRow(MakeGrainStateKeys(grainType, grainId), stateStore, grainState.ETag);
 
                 LastId = GetId(grainId);
@@ -273,8 +266,8 @@ namespace UnitTests.StorageTests
                 case Commands.InitCount:
                     return Task.FromResult<object>(initCount);
                 case Commands.SetValue:
-                    SetValue((SetValueArgs) arg);
-                    return Task.FromResult<object>(true); 
+                    SetValue((SetValueArgs)arg);
+                    return Task.FromResult<object>(true);
                 case Commands.GetProvideState:
                     return Task.FromResult<object>(GetProviderState());
                 case Commands.GetLastState:
@@ -283,7 +276,7 @@ namespace UnitTests.StorageTests
                     ResetHistory();
                     return Task.FromResult<object>(true);
                 default:
-                    return Task.FromResult<object>(true); 
+                    return Task.FromResult<object>(true);
             }
         }
     }

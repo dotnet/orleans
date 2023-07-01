@@ -1,13 +1,11 @@
-﻿using System.Threading.Tasks;
-using Orleans;
-using UnitTests.GrainInterfaces;
+﻿using UnitTests.GrainInterfaces;
 
 namespace UnitTests.Grains
 {
     public class ClientAddressableTestConsumerGrain : Grain, IClientAddressableTestConsumer
     {
         private IClientAddressableTestProducer producer;
-        
+
         public async Task<int> PollProducer()
         {
             return await producer.Poll();

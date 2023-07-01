@@ -1,15 +1,9 @@
 using Amazon.Runtime;
 using Amazon.SQS;
-using Orleans.Runtime;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
 using Amazon.SQS.Model;
 using Microsoft.Extensions.Logging;
 using Orleans.Streaming.SQS;
 using SQSMessage = Amazon.SQS.Model.Message;
-using Orleans;
 
 namespace OrleansAWSUtils.Storage
 {

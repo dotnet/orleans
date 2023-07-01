@@ -1,7 +1,3 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -38,13 +34,13 @@ namespace Orleans.Runtime
 
         private readonly IOptions<LoadSheddingOptions> loadSheddingOptions;
         private readonly GrainCountStatistics _grainCountStatistics;
-        private readonly Dictionary<Tuple<string,string>, IControllable> controllables;
+        private readonly Dictionary<Tuple<string, string>, IControllable> controllables;
 
         public SiloControl(
             ILocalSiloDetails localSiloDetails,
             DeploymentLoadPublisher deploymentLoadPublisher,
             Catalog catalog,
-            CachedVersionSelectorManager cachedVersionSelectorManager, 
+            CachedVersionSelectorManager cachedVersionSelectorManager,
             CompatibilityDirectorManager compatibilityDirectorManager,
             VersionSelectorManager selectorManager,
             IServiceProvider services,
@@ -79,7 +75,7 @@ namespace Orleans.Runtime
             foreach (IKeyedService<string, IControllable> keyedService in namedIControllableCollections.SelectMany(c => c.GetServices(services)))
             {
                 IControllable controllable = keyedService.GetService(services);
-                if(controllable != null)
+                if (controllable != null)
                 {
                     this.controllables.Add(Tuple.Create(controllable.GetType().FullName, keyedService.Key), controllable);
                 }
@@ -133,7 +129,7 @@ namespace Orleans.Runtime
             return Task.FromResult(this.catalog.GetGrainStatistics());
         }
 
-        public Task<List<DetailedGrainStatistic>> GetDetailedGrainStatistics(string[] types=null)
+        public Task<List<DetailedGrainStatistic>> GetDetailedGrainStatistics(string[] types = null)
         {
             if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug("GetDetailedGrainStatistics");
             return Task.FromResult(this.catalog.GetDetailedGrainStatistics(types));
@@ -142,14 +138,14 @@ namespace Orleans.Runtime
         public Task<SimpleGrainStatistic[]> GetSimpleGrainStatistics()
         {
             logger.LogInformation("GetSimpleGrainStatistics");
-            return Task.FromResult( _grainCountStatistics.GetSimpleGrainStatistics().Select(p =>
+            return Task.FromResult(_grainCountStatistics.GetSimpleGrainStatistics().Select(p =>
                 new SimpleGrainStatistic { SiloAddress = this.localSiloDetails.SiloAddress, GrainType = p.Key, ActivationCount = (int)p.Value }).ToArray());
         }
 
         public Task<DetailedGrainReport> GetDetailedGrainReport(GrainId grainId)
         {
             logger.LogInformation("DetailedGrainReport for grain id {GrainId}", grainId);
-            return Task.FromResult( this.catalog.GetDetailedGrainReport(grainId));
+            return Task.FromResult(this.catalog.GetDetailedGrainReport(grainId));
         }
 
         public Task<int> GetActivationCount()
@@ -160,7 +156,7 @@ namespace Orleans.Runtime
         public Task<object> SendControlCommandToProvider(string providerTypeFullName, string providerName, int command, object arg)
         {
             IControllable controllable;
-            if(!this.controllables.TryGetValue(Tuple.Create(providerTypeFullName, providerName), out controllable))
+            if (!this.controllables.TryGetValue(Tuple.Create(providerTypeFullName, providerName), out controllable))
             {
                 logger.LogError(
                     (int)ErrorCode.Provider_ProviderNotFound,

@@ -1,7 +1,5 @@
-using System;
 using Microsoft.Extensions.Logging;
 using Orleans.EventSourcing.CustomStorage;
-using Orleans.Hosting;
 using Orleans.Storage;
 using Orleans.TestingHost;
 using TestExtensions;
@@ -35,7 +33,7 @@ namespace Tester.EventSourcingTests
                     })
                     .AddMemoryGrainStorageAsDefault()
                     .AddMemoryGrainStorage("MemoryStore")
-                    .AddFaultInjectionMemoryStorage("SlowMemoryStore", options=>options.NumStorageGrains = 10, faultyOptions => faultyOptions.Latency = TimeSpan.FromMilliseconds(15));
+                    .AddFaultInjectionMemoryStorage("SlowMemoryStore", options => options.NumStorageGrains = 10, faultyOptions => faultyOptions.Latency = TimeSpan.FromMilliseconds(15));
             }
         }
     }

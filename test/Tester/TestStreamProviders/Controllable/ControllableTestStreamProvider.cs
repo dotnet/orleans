@@ -1,8 +1,4 @@
-using System;
-using System.Collections.Generic;
-using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
-using Orleans;
 using Orleans.Configuration;
 using Orleans.Providers;
 using Orleans.Providers.Streams.Common;
@@ -65,7 +61,7 @@ namespace Tester.TestStreamProviders.Controllable
 
         public Task<object> ExecuteCommand(int command, object arg)
         {
-            switch ((ControllableTestStreamProviderCommands) command)
+            switch ((ControllableTestStreamProviderCommands)command)
             {
                 case ControllableTestStreamProviderCommands.AdapterEcho:
                     return Task.FromResult<object>(Tuple.Create(ControllableTestStreamProviderCommands.AdapterEcho, arg));

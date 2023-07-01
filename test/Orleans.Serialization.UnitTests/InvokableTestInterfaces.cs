@@ -7,7 +7,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 
-public interface IHasNoNamespace : IMyInvokableBaseType 
+public interface IHasNoNamespace : IMyInvokableBaseType
 {
 }
 
@@ -28,7 +28,7 @@ namespace Orleans.Serialization.UnitTests
             CopyContextPool = copyContextPool;
             CodecProvider = codecProvider;
         }
-        
+
         protected TInvokable GetInvokable<TInvokable>() where TInvokable : class, IInvokable, new() => InvokablePool.Get<TInvokable>();
 
         protected ValueTask<T> InvokeAsync<T>(IInvokable body)
@@ -97,7 +97,7 @@ namespace Orleans.Serialization.UnitTests
         ValueTask Method<W, X, Y>();
     }
 
-    public interface IG2<T1, T2> : IMyInvokableBaseType 
+    public interface IG2<T1, T2> : IMyInvokableBaseType
     { }
 
     public class HalfOpenGrain1<T> : IG2<T, int>
@@ -118,7 +118,7 @@ namespace Orleans.Serialization.UnitTests
 
     public class Dummy2 { }
 
-    public interface IG<T> : IMyInvokableBaseType 
+    public interface IG<T> : IMyInvokableBaseType
     {
     }
 
@@ -128,7 +128,7 @@ namespace Orleans.Serialization.UnitTests
 
     public class Root<TRoot>
     {
-        public interface IA<T1, T2, T3> : IMyInvokableBaseType 
+        public interface IA<T1, T2, T3> : IMyInvokableBaseType
         {
 
         }
@@ -138,7 +138,7 @@ namespace Orleans.Serialization.UnitTests
         }
     }
 
-    public interface IGrainWithGenericMethods : IMyInvokableBaseType 
+    public interface IGrainWithGenericMethods : IMyInvokableBaseType
     {
         Task<Type[]> GetTypesExplicit<T, U, V>();
         Task<Type[]> GetTypesInferred<T, U, V>(T t, U u, V v);
@@ -157,7 +157,7 @@ namespace Orleans.Serialization.UnitTests
 
         public Task<Type[]> GetTypesExplicit<T, U, V>()
         {
-            return Task.FromResult(new[] {typeof(T), typeof(U), typeof(V)});
+            return Task.FromResult(new[] { typeof(T), typeof(U), typeof(V) });
         }
 
         public Task<Type[]> GetTypesInferred<T, U, V>(T t, U u, V v)
@@ -190,7 +190,7 @@ namespace Orleans.Serialization.UnitTests
             return Task.FromResult("default string");
         }
 
-        public Task<TGrain> Constraints<TGrain>(TGrain grain) where TGrain : IMyInvokableBaseType 
+        public Task<TGrain> Constraints<TGrain>(TGrain grain) where TGrain : IMyInvokableBaseType
         {
             return Task.FromResult(grain);
         }
@@ -200,7 +200,7 @@ namespace Orleans.Serialization.UnitTests
             this.state = value;
         }
 
-        public Task<T> GetValue<T>() => Task.FromResult((T) this.state);
+        public Task<T> GetValue<T>() => Task.FromResult((T)this.state);
 
         public ValueTask<int> ValueTaskMethod(bool useCache)
         {
@@ -213,7 +213,7 @@ namespace Orleans.Serialization.UnitTests
         }
     }
 
-    public interface IGenericGrainWithGenericMethods<T> : IMyInvokableBaseType 
+    public interface IGenericGrainWithGenericMethods<T> : IMyInvokableBaseType
     {
         Task<T> Method(T value);
 #pragma warning disable 693
@@ -415,7 +415,7 @@ namespace Orleans.Serialization.UnitTests
         }
     }
 
-    public interface INestedGenericGrain : IMyInvokableBaseType 
+    public interface INestedGenericGrain : IMyInvokableBaseType
     {
         Task<int> Do(NestedGeneric<int> value);
         Task<int> Do(NestedConstructedGeneric value);

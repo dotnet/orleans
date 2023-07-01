@@ -1,16 +1,11 @@
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using Orleans;
 using Orleans.Configuration;
-using Orleans.Hosting;
 using Orleans.Providers;
 using Orleans.Providers.Streams.Common;
 using Orleans.Runtime;
 using Orleans.TestingHost;
 using Orleans.TestingHost.Utils;
-using System;
-using System.Linq;
-using System.Threading.Tasks;
 using TestExtensions;
 using Xunit;
 
@@ -44,7 +39,7 @@ namespace Tester.AzureUtils.Lease
                         options.BlobContainerName = "cluster-" + cluster.Value.ClusterId + "-leases";
                     }))
                     .UseAzureStorageClustering(options => options.ConfigureTestDefaults())
-                    .AddMemoryStreams<DefaultMemoryMessageBodySerializer>(StreamProviderName, b=>
+                    .AddMemoryStreams<DefaultMemoryMessageBodySerializer>(StreamProviderName, b =>
                     {
                         b.ConfigurePartitioning(totalQueueCount);
                         b.UseLeaseBasedQueueBalancer(ob => ob.Configure(options =>
@@ -104,7 +99,7 @@ namespace Tester.AzureUtils.Lease
                 int sum = counts.Sum();
                 pass = totalQueueCount == sum &&
                     counts.All(startedAgentInEachSilo => startedAgentInEachSilo <= expectedAgentCountMax && startedAgentInEachSilo >= expectedAgentCountMin);
-                if(!pass && assertIsTrue)
+                if (!pass && assertIsTrue)
                     throw new OrleansException($"AgentManager doesn't own correct amount of agents: {string.Join(",", counts.Select(startedAgentInEachSilo => startedAgentInEachSilo.ToString()))}");
             }
             catch

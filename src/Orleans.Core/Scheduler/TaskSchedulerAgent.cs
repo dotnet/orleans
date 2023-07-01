@@ -1,6 +1,3 @@
-using System;
-using System.Threading;
-using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 
 namespace Orleans.Runtime
@@ -19,7 +16,7 @@ namespace Orleans.Runtime
             Running,
             StopRequested
         }
-               
+
         protected CancellationTokenSource Cts { get; private set; }
         private readonly object lockable;
         protected ILogger Log { get; }
@@ -158,7 +155,7 @@ namespace Orleans.Runtime
         {
             return Name;
         }
-        
+
         /// <summary>
         /// Handles fault
         /// </summary>
@@ -197,7 +194,7 @@ namespace Orleans.Runtime
 
             return State != AgentState.Stopped;
         }
-        
+
         private void LogExecutorError(Exception exc)
         {
             switch (OnFault)

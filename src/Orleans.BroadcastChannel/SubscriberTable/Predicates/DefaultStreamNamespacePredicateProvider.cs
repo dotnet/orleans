@@ -1,7 +1,4 @@
-using System;
-using Orleans.BroadcastChannel;
 using Orleans.Serialization.TypeSystem;
-using Orleans.Utilities;
 
 namespace Orleans.BroadcastChannel
 {
@@ -9,7 +6,7 @@ namespace Orleans.BroadcastChannel
     /// Default implementation of <see cref="IChannelNamespacePredicateProvider"/> for internally supported stream predicates.
     /// </summary>
     public class DefaultChannelNamespacePredicateProvider : IChannelNamespacePredicateProvider
-    {  
+    {
         /// <inheritdoc/>
         public bool TryGetPredicate(string predicatePattern, out IChannelNamespacePredicate predicate)
         {

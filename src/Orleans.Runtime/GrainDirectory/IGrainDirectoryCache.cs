@@ -1,5 +1,3 @@
-using System.Collections.Generic;
-
 namespace Orleans.Runtime.GrainDirectory
 {
     /// <summary>
@@ -29,7 +27,7 @@ namespace Orleans.Runtime.GrainDirectory
         /// <param name="key">key to remove</param>
         /// <returns>True if the entry was in the cache and the removal was successful</returns>
         bool Remove(GrainAddress key);
-        
+
         /// <summary>
         /// Clear the cache, deleting all entries.
         /// </summary>

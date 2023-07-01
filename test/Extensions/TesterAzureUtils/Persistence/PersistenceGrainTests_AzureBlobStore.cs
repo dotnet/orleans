@@ -1,10 +1,8 @@
 //#define REREAD_STATE_AFTER_WRITE_FAILED
 
-using System.Threading.Tasks;
 using Xunit;
 using Xunit.Abstractions;
 using Orleans.TestingHost;
-using Orleans.Hosting;
 using Orleans.Configuration;
 
 // ReSharper disable RedundantAssignment
@@ -64,7 +62,7 @@ namespace Tester.AzureUtils.Persistence
         {
             fixture.EnsurePreconditionsMet();
         }
-        
+
         [SkippableFact, TestCategory("Functional")]
         public async Task Grain_AzureBlobStore_Delete()
         {
@@ -117,7 +115,7 @@ namespace Tester.AzureUtils.Persistence
             await base.Grain_Generic_AzureStore_DiffTypes();
         }
 
-        [SkippableFact(Skip="https://github.com/dotnet/orleans/issues/5651"), TestCategory("Functional")]
+        [SkippableFact(Skip = "https://github.com/dotnet/orleans/issues/5651"), TestCategory("Functional")]
         public async Task Grain_AzureBlobStore_SiloRestart()
         {
             await base.Grain_AzureStore_SiloRestart();
@@ -141,7 +139,7 @@ namespace Tester.AzureUtils.Persistence
             base.Persistence_Perf_Write_Reread();
         }
 
-      
+
         [SkippableTheory, TestCategory("Functional")]
         [InlineData("AzureStore")]
         [InlineData("AzureStore1")]

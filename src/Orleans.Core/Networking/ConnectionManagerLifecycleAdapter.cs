@@ -1,6 +1,3 @@
-using System.Threading;
-using System.Threading.Tasks;
-
 namespace Orleans.Runtime.Messaging
 {
     internal class ConnectionManagerLifecycleAdapter<TLifecycle>
@@ -24,7 +21,7 @@ namespace Orleans.Runtime.Messaging
         {
             lifecycle.Subscribe(
                 nameof(ConnectionManager),
-                ServiceLifecycleStage.RuntimeInitialize-1, // Components from RuntimeInitialize need network
+                ServiceLifecycleStage.RuntimeInitialize - 1, // Components from RuntimeInitialize need network
                 this);
         }
     }

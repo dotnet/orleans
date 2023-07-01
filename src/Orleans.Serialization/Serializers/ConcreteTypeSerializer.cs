@@ -3,7 +3,6 @@ using Orleans.Serialization.Buffers;
 using Orleans.Serialization.Codecs;
 using Orleans.Serialization.GeneratedCodeHelpers;
 using Orleans.Serialization.WireProtocol;
-using System;
 using System.Buffers;
 
 namespace Orleans.Serialization.Serializers

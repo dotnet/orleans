@@ -1,8 +1,4 @@
-using Orleans;
-using Orleans.Runtime;
 using Orleans.Tests.SqlUtils;
-using System;
-using System.Threading.Tasks;
 using UnitTests.StorageTests.Relational.TestDataSets;
 using Xunit;
 
@@ -21,7 +17,7 @@ namespace UnitTests.StorageTests.Relational
         /// The storage invariant, storage ID, or ADO.NET invariant for this test set.
         /// </summary>
         private const string AdoNetInvariant = AdoNetInvariants.InvariantNamePostgreSql;
-        
+
         public PostgreSqlStorageTests(CommonFixture commonFixture) : base(AdoNetInvariant, commonFixture)
         {
             //XUnit.NET will automatically call this constructor before every test method run.

@@ -1,7 +1,3 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
 using Orleans.Runtime;
 using Orleans.Streams.Core;
 
@@ -92,7 +88,7 @@ namespace Orleans.Streams
                     return new StreamSubscription(subId, streamId.ProviderName, streamId, grainId);
                 }).ToList();
                 return Task.FromResult(subscriptions);
-            }   
+            }
         }
 
         internal bool IsImplicitSubscriber(GrainId grainId, QualifiedStreamId streamId)

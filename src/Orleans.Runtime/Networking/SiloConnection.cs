@@ -1,10 +1,8 @@
 #nullable enable
 
-using System;
 using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using System.Text;
-using System.Threading.Tasks;
 using Microsoft.AspNetCore.Connections;
 using Microsoft.Extensions.Logging;
 using Orleans.Configuration;
@@ -243,7 +241,7 @@ namespace Orleans.Runtime.Messaging
             // Don't send messages that have already timed out
             if (msg.IsExpired)
             {
-                this.MessagingTrace.OnDropExpiredMessage(msg,  MessagingInstruments.Phase.Send);
+                this.MessagingTrace.OnDropExpiredMessage(msg, MessagingInstruments.Phase.Send);
 
                 if (msg.IsPing())
                 {

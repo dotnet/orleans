@@ -1,8 +1,3 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using Orleans.Internal;
-
 namespace Orleans.Streams
 {
     /// <summary>

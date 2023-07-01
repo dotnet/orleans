@@ -1,9 +1,5 @@
-using System;
-using System.Collections.Generic;
 using System.Diagnostics;
-using System.Linq;
 using System.Net;
-using System.Threading.Tasks;
 using Azure;
 using Azure.Data.Tables;
 using Microsoft.Extensions.Logging;
@@ -14,12 +10,12 @@ namespace Orleans.Runtime.ReminderService
 {
     internal sealed class ReminderTableEntry : ITableEntity
     {
-        public string GrainReference        { get; set; }    // Part of RowKey
-        public string ReminderName          { get; set; }    // Part of RowKey
-        public string ServiceId             { get; set; }    // Part of PartitionKey
-        public string DeploymentId          { get; set; }
-        public string StartAt               { get; set; }
-        public string Period                { get; set; }
+        public string GrainReference { get; set; }    // Part of RowKey
+        public string ReminderName { get; set; }    // Part of RowKey
+        public string ServiceId { get; set; }    // Part of PartitionKey
+        public string DeploymentId { get; set; }
+        public string StartAt { get; set; }
+        public string Period { get; set; }
         public string GrainRefConsistentHash { get; set; }    // Part of PartitionKey
 
         public string PartitionKey { get; set; }
@@ -81,7 +77,7 @@ namespace Orleans.Runtime.ReminderService
             }
             return singleton;
         }
-        
+
         private RemindersTableManager(
             string serviceId,
             string clusterId,
@@ -155,7 +151,7 @@ namespace Orleans.Runtime.ReminderService
             {
                 return await UpsertTableEntryAsync(reminderEntry);
             }
-            catch(Exception exc)
+            catch (Exception exc)
             {
                 HttpStatusCode httpStatusCode;
                 string restStatus;
@@ -176,7 +172,7 @@ namespace Orleans.Runtime.ReminderService
                 await DeleteTableEntryAsync(reminderEntry, eTag);
                 return true;
             }
-            catch(Exception exc)
+            catch (Exception exc)
             {
                 HttpStatusCode httpStatusCode;
                 string restStatus;
@@ -206,7 +202,7 @@ namespace Orleans.Runtime.ReminderService
 
             foreach (var entriesPerPartition in groupedByHash.Values)
             {
-                    foreach (var batch in entriesPerPartition.BatchIEnumerable(this.StoragePolicyOptions.MaxBulkUpdateRows))
+                foreach (var batch in entriesPerPartition.BatchIEnumerable(this.StoragePolicyOptions.MaxBulkUpdateRows))
                 {
                     tasks.Add(DeleteTableEntriesAsync(batch));
                 }

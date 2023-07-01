@@ -1,16 +1,10 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Net;
-using System.Threading.Tasks;
 using Azure;
-using Azure.Core;
 using Azure.Storage.Queues;
 using Azure.Storage.Queues.Models;
 using Microsoft.Extensions.Logging;
 using Orleans.AzureUtils.Utilities;
 using Orleans.Configuration;
-using Orleans.Runtime;
 
 namespace Orleans.AzureUtils
 {
@@ -65,7 +59,7 @@ namespace Orleans.AzureUtils
         /// <param name="storageConnectionString">Connection string for the Azure storage account used to host this table.</param>
         /// <param name="visibilityTimeout">A TimeSpan specifying the visibility timeout interval</param>
         public AzureQueueDataManager(ILoggerFactory loggerFactory, string queueName, string storageConnectionString, TimeSpan? visibilityTimeout = null)
-            : this (loggerFactory, queueName, ConfigureOptions(storageConnectionString, visibilityTimeout))
+            : this(loggerFactory, queueName, ConfigureOptions(storageConnectionString, visibilityTimeout))
         {
         }
 
@@ -242,7 +236,7 @@ namespace Orleans.AzureUtils
         /// </summary>
         public async Task<QueueMessage> GetQueueMessage()
         {
-               var startTime = DateTime.UtcNow;
+            var startTime = DateTime.UtcNow;
             if (logger.IsEnabled(LogLevel.Trace)) logger.LogTrace("Getting a message from queue: {QueueName}", QueueName);
             try
             {

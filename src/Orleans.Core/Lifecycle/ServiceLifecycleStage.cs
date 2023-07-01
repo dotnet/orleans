@@ -47,7 +47,7 @@ namespace Orleans
         /// and the gateway, no other component should run
         /// at this stage
         /// </summary>
-        public const int BecomeActive = Active-1;
+        public const int BecomeActive = Active - 1;
 
         /// <summary>
         /// Service is active.

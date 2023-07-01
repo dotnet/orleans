@@ -1,8 +1,3 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
@@ -17,8 +12,8 @@ public class GrainDirectoryPartitionTests
 {
     private readonly GrainDirectoryPartition _target;
     private readonly MockSiloStatusOracle _siloStatusOracle;
-    private static readonly SiloAddress LocalSiloAddress =  SiloAddress.FromParsableString("127.0.0.1:11111@123");
-    private static readonly SiloAddress OtherSiloAddress =  SiloAddress.FromParsableString("127.0.0.2:11111@456");
+    private static readonly SiloAddress LocalSiloAddress = SiloAddress.FromParsableString("127.0.0.1:11111@123");
+    private static readonly SiloAddress OtherSiloAddress = SiloAddress.FromParsableString("127.0.0.2:11111@456");
 
     public GrainDirectoryPartitionTests()
     {
@@ -58,7 +53,7 @@ public class GrainDirectoryPartitionTests
         var grainAddress = GrainAddress.NewActivationAddress(OtherSiloAddress, grainId);
 
         // Insert invalid entry, pointing to dead silo
-       Assert.Throws<OrleansException>(() => _target.AddSingleActivation(grainAddress, previousAddress: null));
+        Assert.Throws<OrleansException>(() => _target.AddSingleActivation(grainAddress, previousAddress: null));
     }
 
     [Fact]

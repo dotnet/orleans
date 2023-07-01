@@ -1,6 +1,4 @@
-using System;
 using System.Diagnostics;
-using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Runtime;
 using TestExtensions;
@@ -34,7 +32,7 @@ namespace UnitTests
         public void Timeout_LongMethod()
         {
             bool finished = false;
-            var grainName = typeof (ErrorGrain).FullName;
+            var grainName = typeof(ErrorGrain).FullName;
             IErrorGrain grain = this.GrainFactory.GetGrain<IErrorGrain>(GetRandomGrainId(), grainName);
             TimeSpan timeout = TimeSpan.FromMilliseconds(1000);
             this.runtimeClient.SetResponseTimeout(timeout);
@@ -85,7 +83,7 @@ namespace UnitTests
             Assert.True(promise.Status == TaskStatus.Faulted);
         }
 
-        [SkippableFact(Skip= "https://github.com/dotnet/orleans/issues/3995"), TestCategory("SlowBVT")]
+        [SkippableFact(Skip = "https://github.com/dotnet/orleans/issues/3995"), TestCategory("SlowBVT")]
         public async Task CallThatShouldHaveBeenDroppedNotExecutedTest()
         {
             var responseTimeout = TimeSpan.FromSeconds(2);

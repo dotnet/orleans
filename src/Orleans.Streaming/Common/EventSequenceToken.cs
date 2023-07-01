@@ -1,4 +1,3 @@
-using System;
 using System.Globalization;
 using Orleans.Streams;
 using Newtonsoft.Json;
@@ -86,11 +85,11 @@ namespace Orleans.Providers.Streams.Common
         {
             if (other == null)
                 return 1;
-            
+
             var token = other as EventSequenceToken;
             if (token == null)
                 throw new ArgumentOutOfRangeException("other");
-            
+
             int difference = SequenceNumber.CompareTo(token.SequenceNumber);
             return difference != 0 ? difference : EventIndex.CompareTo(token.EventIndex);
         }

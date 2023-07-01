@@ -1,10 +1,6 @@
-using System;
-using System.Threading;
-using System.Threading.Tasks;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
-using Orleans.Hosting;
 using Orleans.Runtime;
 
 namespace Orleans.TestingHost
@@ -15,7 +11,7 @@ namespace Orleans.TestingHost
     public class InProcessSiloHandle : SiloHandle
     {
         private bool isActive = true;
-        
+
         /// <summary>Gets a reference to the silo host.</summary>
         public IHost SiloHost { get; private set; }
 

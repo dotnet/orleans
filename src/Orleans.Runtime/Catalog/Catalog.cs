@@ -1,10 +1,4 @@
-using System;
-using System.Collections.Generic;
-using System.Diagnostics.Metrics;
-using System.Linq;
 using System.Runtime.CompilerServices;
-using System.Threading;
-using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -12,10 +6,8 @@ using Orleans.Configuration;
 using Orleans.GrainDirectory;
 using Orleans.Metadata;
 using Orleans.Runtime.GrainDirectory;
-using Orleans.Runtime.Placement;
 using Orleans.Runtime.Scheduler;
 using Orleans.Serialization.TypeSystem;
-using Orleans.Statistics;
 
 namespace Orleans.Runtime
 {
@@ -113,7 +105,7 @@ namespace Orleans.Runtime
                 .ToList();
         }
 
-        public List<DetailedGrainStatistic> GetDetailedGrainStatistics(string[] types=null)
+        public List<DetailedGrainStatistic> GetDetailedGrainStatistics(string[] types = null)
         {
             var stats = new List<DetailedGrainStatistic>();
             lock (activations)
@@ -124,7 +116,7 @@ namespace Orleans.Runtime
                     if (data == null || data.GrainInstance == null) continue;
 
                     var grainType = RuntimeTypeNameFormatter.Format(data.GrainInstance.GetType());
-                    if (types==null || types.Contains(grainType))
+                    if (types == null || types.Contains(grainType))
                     {
                         stats.Add(new DetailedGrainStatistic()
                         {

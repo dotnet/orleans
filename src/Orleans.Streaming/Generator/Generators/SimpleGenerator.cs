@@ -1,7 +1,3 @@
-
-using System;
-using System.Collections.Generic;
-using Orleans.Hosting;
 using Orleans.Providers.Streams.Common;
 using Orleans.Runtime;
 using Orleans.Streams;
@@ -42,7 +38,7 @@ namespace Orleans.Providers.Streams.Generator
                 return false;
             }
 
-            for(int i=0; i< maxCount; i++)
+            for (int i = 0; i < maxCount; i++)
             {
                 if (!TryGenerateBatch(out GeneratedBatchContainer batch))
                     break;
@@ -51,7 +47,7 @@ namespace Orleans.Providers.Streams.Generator
 
             return true;
         }
-        
+
         private bool TryGenerateBatch(out GeneratedBatchContainer batch)
         {
             batch = null;

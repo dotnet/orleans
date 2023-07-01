@@ -1,8 +1,4 @@
-﻿using System.Collections.Generic;
-using System.Threading.Tasks;
-using Orleans;
-
-namespace BenchmarkGrainInterfaces.MapReduce
+﻿namespace BenchmarkGrainInterfaces.MapReduce
 {
     public interface IDataflowGrain : IGrain
     {
@@ -48,7 +44,7 @@ namespace BenchmarkGrainInterfaces.MapReduce
     {
         Task<List<TOutput>> ReceiveAll();
     }
-    
+
     public interface ITransformGrain<TInput, TOutput> : IPropagatorGrain<TInput, TOutput>, IProcessor<ITransformProcessor<TInput, TOutput>>
     {
     }

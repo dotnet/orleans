@@ -1,11 +1,9 @@
-using System;
 using System.Collections.Concurrent;
 using System.IO.Pipelines;
-using System.Threading;
 
 namespace Orleans.Networking.Shared
 {
-    internal sealed class IOQueue : PipeScheduler,  IThreadPoolWorkItem
+    internal sealed class IOQueue : PipeScheduler, IThreadPoolWorkItem
     {
         private readonly ConcurrentQueue<(Action<object> Callback, object State)> _workItems = new();
         private int _doingWork;

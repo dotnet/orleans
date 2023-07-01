@@ -1,7 +1,3 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
 using FluentAssertions;
 
 namespace Orleans.Transactions.TestKit
@@ -104,7 +100,7 @@ namespace Orleans.Transactions.TestKit
             {
                 await coordinator.MultiGrainDouble(grains);
 
-                int expected = delta * (int)Math.Pow(2,i+1);
+                int expected = delta * (int)Math.Pow(2, i + 1);
                 foreach (var grain in grains)
                 {
                     int[] actualValues = await grain.Get();

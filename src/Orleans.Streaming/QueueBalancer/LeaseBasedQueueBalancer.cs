@@ -1,7 +1,3 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Orleans.Configuration;
@@ -17,7 +13,7 @@ namespace Orleans.Streams
     /// </summary>
     public class LeaseBasedQueueBalancer : QueueBalancerBase, IStreamQueueBalancer
     {
-        private class AcquiredQueue 
+        private class AcquiredQueue
         {
             public int LeaseOrder { get; set; }
             public QueueId QueueId { get; set; }
@@ -209,9 +205,9 @@ namespace Orleans.Streams
                 .ToArray();
             // Remove queues from list even if release fails, since we can let the lease expire
             // TODO: mark for removal instead so we don't renew, and only remove leases that have not expired. - jbragg
-            for(int index = this.myQueues.Count-1; index >= 0; index--)
+            for (int index = this.myQueues.Count - 1; index >= 0; index--)
             {
-                if(queuesToGiveUp.Contains(this.myQueues[index].AcquiredLease))
+                if (queuesToGiveUp.Contains(this.myQueues[index].AcquiredLease))
                 {
                     this.myQueues.RemoveAt(index);
                 }
@@ -245,7 +241,7 @@ namespace Orleans.Streams
             while (!base.Cancellation.IsCancellationRequested && leasesToAquire > 0 && possibleLeaseCount > 0)
             {
                 //select new queues to acquire
-                List<QueueId> expectedQueues = this.queueSelector.NextSelection(leasesToAquire, this.myQueues.Select(queue=>queue.QueueId).ToList());
+                List<QueueId> expectedQueues = this.queueSelector.NextSelection(leasesToAquire, this.myQueues.Select(queue => queue.QueueId).ToList());
                 // build lease request from each queue
                 LeaseRequest[] leaseRequests = expectedQueues
                     .Select(queue => new LeaseRequest(queue.ToString(), options.LeaseLength))
@@ -416,7 +412,7 @@ namespace Orleans.Streams
             var activeSiloCount = Math.Max(1, activeSilos.Count);
             this.responsibility = this.allQueuesCount / activeSiloCount;
             var overflow = this.allQueuesCount % activeSiloCount;
-            if(overflow != 0 && this.AmGreedy(overflow, activeSilos))
+            if (overflow != 0 && this.AmGreedy(overflow, activeSilos))
             {
                 this.responsibility++;
             }

@@ -1,13 +1,9 @@
-using System;
-using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
-using Orleans.Hosting;
 using Orleans.Providers.Streams.AzureQueue;
-using Orleans.Runtime;
 using Orleans.TestingHost;
 using Orleans.TestingHost.Utils;
 using Tester;
@@ -51,21 +47,21 @@ namespace UnitTests.HaloTests.Streaming
                             options.DeleteStateOnClear = true;
                             options.ConfigureTestDefaults();
                         }))
-                        .AddAzureQueueStreams(AzureQueueStreamProviderName, b=>b
+                        .AddAzureQueueStreams(AzureQueueStreamProviderName, b => b
                         .ConfigureAzureQueue(ob => ob.Configure<IOptions<ClusterOptions>>(
                                 (options, dep) =>
                                 {
                                     options.ConfigureTestDefaults();
                                     options.QueueNames = AzureQueueUtilities.GenerateQueueNames(dep.Value.ClusterId, queueCount);
-                            })));
+                                })));
                     hostBuilder
-                        .AddAzureQueueStreams("AzureQueueProvider2", b=>b
+                        .AddAzureQueueStreams("AzureQueueProvider2", b => b
                         .ConfigureAzureQueue(ob => ob.Configure<IOptions<ClusterOptions>>(
                                 (options, dep) =>
                                 {
                                     options.ConfigureTestDefaults();
                                     options.QueueNames = AzureQueueUtilities.GenerateQueueNames($"{dep.Value.ClusterId}2", queueCount);
-                            })));
+                                })));
                 }
             }
 

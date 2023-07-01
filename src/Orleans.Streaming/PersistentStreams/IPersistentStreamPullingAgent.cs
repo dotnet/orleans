@@ -1,4 +1,3 @@
-using System.Threading.Tasks;
 using Orleans.Providers.Streams.Common;
 
 namespace Orleans.Streams

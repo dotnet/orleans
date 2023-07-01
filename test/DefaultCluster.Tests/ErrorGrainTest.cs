@@ -1,9 +1,5 @@
-using System;
-using System.Collections.Generic;
 using System.Diagnostics;
-using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
-using Orleans;
 using Orleans.Runtime;
 using Orleans.Internal;
 using TestExtensions;
@@ -39,7 +35,7 @@ namespace DefaultCluster.Tests
         public async Task ErrorHandlingLocalError()
         {
             LocalErrorGrain localGrain = new LocalErrorGrain();
-            
+
             Task<int> intPromise = localGrain.GetAxBError();
             try
             {
@@ -51,7 +47,7 @@ namespace DefaultCluster.Tests
                 Assert.Equal(exc2.GetBaseException().Message, (new Exception("GetAxBError-Exception")).Message);
             }
 
-            Assert.True(intPromise.Status == TaskStatus.Faulted);                
+            Assert.True(intPromise.Status == TaskStatus.Faulted);
         }
 
         [Fact, TestCategory("BVT"), TestCategory("ErrorHandling")]
@@ -105,7 +101,7 @@ namespace DefaultCluster.Tests
             Assert.True(stopwatch.ElapsedMilliseconds <= 1300, $"Waited longer than 1300ms: ({stopwatch.ElapsedMilliseconds}ms)");
 
             promise.Wait(); // just wait for the server side grain invocation to finish
-            
+
             Assert.True(promise.Status == TaskStatus.RanToCompletion);
         }
 

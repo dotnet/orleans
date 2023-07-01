@@ -1,10 +1,7 @@
-using System;
-using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Microsoft.Extensions.Logging;
 using Orleans.Providers.Streams.Common;
-using Orleans.Serialization;
 using Orleans.Streams;
 using Orleans.Configuration;
 using Orleans.Configuration.Overrides;
@@ -28,12 +25,12 @@ namespace Orleans.Providers.GCP.Streams.PubSub
         protected Func<QueueId, Task<IStreamFailureHandler>> StreamFailureHandlerFactory { private get; set; }
 
         public PubSubAdapterFactory(
-            string name, 
-            PubSubOptions options, 
+            string name,
+            PubSubOptions options,
             HashRingStreamQueueMapperOptions queueMapperOptions,
             SimpleQueueCacheOptions cacheOptions,
-            IServiceProvider serviceProvider, 
-            IOptions<ClusterOptions> clusterOptions, 
+            IServiceProvider serviceProvider,
+            IOptions<ClusterOptions> clusterOptions,
             ILoggerFactory loggerFactory)
         {
             this._providerName = name;

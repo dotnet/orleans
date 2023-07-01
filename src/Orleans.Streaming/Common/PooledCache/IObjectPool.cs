@@ -1,7 +1,3 @@
-
-using System;
-using System.Threading;
-
 namespace Orleans.Providers.Streams.Common
 {
     /// <summary>

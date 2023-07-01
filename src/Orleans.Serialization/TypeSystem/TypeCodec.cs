@@ -1,10 +1,8 @@
-using System;
 using System.Buffers;
 using System.Buffers.Binary;
 using System.Collections.Concurrent;
 using System.Diagnostics.CodeAnalysis;
 using System.IO.Hashing;
-using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Text;
@@ -176,7 +174,7 @@ namespace Orleans.Serialization.TypeSystem
             _ = _typeConverter.TryParse(typeNameString, out type);
             var key = new TypeKey(hashCode, typeName.ToArray());
             typeString = key.ToString();
-            return type is not null; 
+            return type is not null;
         }
 
         [DoesNotReturn]

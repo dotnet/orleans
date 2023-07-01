@@ -1,6 +1,5 @@
 #nullable enable
 
-using System;
 
 namespace Orleans.Serialization.TypeSystem;
 
@@ -237,7 +236,7 @@ internal static class RuntimeTypeNameRewriter
                 }
 
                 // Give the rewriter a chance to rewrite the resolved name.
-                return ApplyInner(resolved, assemblyName); 
+                return ApplyInner(resolved, assemblyName);
             }
 
             return (replacementTypeSpec, assemblyName);

@@ -1,10 +1,5 @@
-using Orleans;
 using Orleans.Runtime;
 using Orleans.TestingHost;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Orleans.Streams.Core;
@@ -16,7 +11,7 @@ using UnitTests.Grains.ProgrammaticSubscribe;
 
 namespace Tester.StreamingTests
 {
-    public abstract class ProgrammaticSubcribeTestsRunner 
+    public abstract class ProgrammaticSubcribeTestsRunner
     {
         private readonly BaseTestClusterFixture fixture;
         public const string StreamProviderName = "StreamProvider1";
@@ -32,7 +27,7 @@ namespace Tester.StreamingTests
             var subGrain = this.fixture.HostedCluster.GrainFactory.GetGrain<ISubscribeGrain>(Guid.NewGuid());
             Assert.True(await subGrain.CanGetSubscriptionManager(StreamProviderName));
         }
-        
+
         [SkippableFact]
         public async Task Programmatic_Subscribe_CanUseNullNamespace()
         {
@@ -61,11 +56,11 @@ namespace Tester.StreamingTests
             int numProduced = 0;
             await TestingUtils.WaitUntilAsync(lastTry => ProducerHasProducedSinceLastCheck(numProduced, producer, lastTry), _timeout);
             await producer.StopPeriodicProducing();
-            
+
             var tasks = new List<Task>();
             foreach (var consumer in consumers)
             {
-                tasks.Add(TestingUtils.WaitUntilAsync(lastTry => CheckCounters(new List<ITypedProducerGrain> { producer }, 
+                tasks.Add(TestingUtils.WaitUntilAsync(lastTry => CheckCounters(new List<ITypedProducerGrain> { producer },
                     consumer, lastTry, this.fixture.Logger), _timeout));
             }
             await Task.WhenAll(tasks);
@@ -76,7 +71,7 @@ namespace Tester.StreamingTests
             await Task.WhenAll(tasks);
         }
 
-        [SkippableFact(Skip= "https://github.com/dotnet/orleans/issues/5635")]
+        [SkippableFact(Skip = "https://github.com/dotnet/orleans/issues/5635")]
         public async Task StreamingTests_Consumer_Producer_UnSubscribe()
         {
             var subscriptionManager = new SubscriptionManager(this.fixture.HostedCluster);
@@ -108,7 +103,7 @@ namespace Tester.StreamingTests
 
             //assert normal consumer consumed equal to produced
             await TestingUtils.WaitUntilAsync(
-            lastTry =>CheckCounters(new List<ITypedProducerGrain> { producer }, consumerNormal, lastTry, this.fixture.Logger), _timeout);
+            lastTry => CheckCounters(new List<ITypedProducerGrain> { producer }, consumerNormal, lastTry, this.fixture.Logger), _timeout);
 
             //asert unsubscribed consumer consumed less than produced
             numProduced = await producer.GetNumberProduced();
@@ -133,7 +128,7 @@ namespace Tester.StreamingTests
             var subscriptionIds = subscriptions.Select(sub => sub.SubscriptionId).ToSet();
             Assert.True(expectedSubscriptionIds.SetEquals(subscriptionIds));
 
-             //remove one subscription
+            //remove one subscription
             await subscriptionManager.RemoveSubscription(streamId, expectedSubscriptions[0].SubscriptionId);
             expectedSubscriptions = expectedSubscriptions.GetRange(1, 1);
             subscriptions = await subscriptionManager.GetSubscriptions(streamId);
@@ -165,12 +160,12 @@ namespace Tester.StreamingTests
 
             //get subscription count now, should be all removed/unsubscribed 
             var subscriptions = await subscriptionManager.GetSubscriptions(streamId);
-            Assert.True( subscriptions.Count<Orleans.Streams.Core.StreamSubscription>()== 0);
+            Assert.True(subscriptions.Count<Orleans.Streams.Core.StreamSubscription>() == 0);
             // clean up tests
         }
 
 
-        [SkippableFact(Skip="https://github.com/dotnet/orleans/issues/5650")]
+        [SkippableFact(Skip = "https://github.com/dotnet/orleans/issues/5650")]
         public async Task StreamingTests_Consumer_Producer_SubscribeToTwoStream_MessageWithPolymorphism()
         {
             var subscriptionManager = new SubscriptionManager(this.fixture.HostedCluster);
@@ -260,7 +255,7 @@ namespace Tester.StreamingTests
 
         //test utilities and statics
         private static readonly TimeSpan _timeout = TimeSpan.FromSeconds(30);
-       
+
         public static async Task<bool> ProducerHasProducedSinceLastCheck(int numProducedLastTime, ITypedProducerGrain producer, bool assertIsTrue)
         {
             var numProduced = await producer.GetNumberProduced();

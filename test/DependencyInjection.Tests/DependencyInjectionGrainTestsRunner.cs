@@ -1,13 +1,9 @@
-using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.TestingHost;
 using TestExtensions;
 using UnitTests.GrainInterfaces;
 using UnitTests.Grains;
 using Xunit;
-using System.Linq;
-using Orleans.Hosting;
-using System;
 
 namespace DependencyInjection.Tests
 {
@@ -68,7 +64,7 @@ namespace DependencyInjection.Tests
 
             // the injected service will return the same value only if it's the same instance
             Assert.Equal(
-                await grain1.GetInjectedSingletonServiceValue(), 
+                await grain1.GetInjectedSingletonServiceValue(),
                 await grain2.GetInjectedSingletonServiceValue());
 
             await grain1.DoDeactivate();

@@ -1,5 +1,4 @@
 using System.Diagnostics.Metrics;
-using System.Threading;
 using Orleans.Transactions.Abstractions;
 
 namespace Orleans.Transactions

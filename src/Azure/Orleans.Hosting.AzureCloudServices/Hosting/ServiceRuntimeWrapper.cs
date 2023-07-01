@@ -1,6 +1,3 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Net;
 using System.Reflection;
 using Microsoft.Extensions.Logging;
@@ -33,7 +30,7 @@ namespace Orleans.Runtime.Host
         /// Update domain of the role instance
         /// </summary>
         int UpdateDomain { get; }
-        
+
         /// <summary>
         /// Fault domain of the role instance
         /// </summary>
@@ -128,9 +125,9 @@ namespace Orleans.Runtime.Host
         {
             dynamic instances = role.Instances;
             var list = new List<string>();
-            foreach(dynamic instance in instances)
-                list.Add(ExtractInstanceName(instance.Id,DeploymentId));
-            
+            foreach (dynamic instance in instances)
+                list.Add(ExtractInstanceName(instance.Id, DeploymentId));
+
             return list;
         }
 
@@ -140,7 +137,7 @@ namespace Orleans.Runtime.Host
             {
                 dynamic ep = instanceEndpoints.GetType()
                     .GetProperty("Item")
-                    .GetMethod.Invoke(instanceEndpoints, new object[] {endpointName});
+                    .GetMethod.Invoke(instanceEndpoints, new object[] { endpointName });
                 return ep.IPEndpoint;
             }
             catch (Exception exc)
@@ -162,14 +159,14 @@ namespace Orleans.Runtime.Host
 
         public string GetConfigurationSettingValue(string configurationSettingName)
         {
-            return (string) roleEnvironmentType.GetMethod("GetConfigurationSettingValue").Invoke(null, new object[] {configurationSettingName});
+            return (string)roleEnvironmentType.GetMethod("GetConfigurationSettingValue").Invoke(null, new object[] { configurationSettingName });
         }
 
         public void SubscribeForStoppingNotification(object handlerObject, EventHandler<object> handler)
         {
             var handlerDelegate = handler.GetMethodInfo().CreateDelegate(stoppingEvent.EventHandlerType, handlerObject);
             stoppingEventAdd.Invoke(null, new object[] { handlerDelegate });
-            
+
         }
 
         public void UnsubscribeFromStoppingNotification(object handlerObject, EventHandler<object> handler)
@@ -209,7 +206,7 @@ namespace Orleans.Runtime.Host
 
             roleInstanceType = assembly.GetType("Microsoft.WindowsAzure.ServiceRuntime.RoleInstance");
 
-            DeploymentId = (string) roleEnvironmentType.GetProperty("DeploymentId").GetValue(null);
+            DeploymentId = (string)roleEnvironmentType.GetProperty("DeploymentId").GetValue(null);
             if (string.IsNullOrWhiteSpace(DeploymentId))
                 throw new OrleansException("DeploymentId is null or whitespace.");
 

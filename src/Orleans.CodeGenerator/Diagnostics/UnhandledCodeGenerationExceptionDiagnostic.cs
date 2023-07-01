@@ -1,11 +1,10 @@
-using System;
 using Microsoft.CodeAnalysis;
 
 namespace Orleans.CodeGenerator.Diagnostics;
 
 public static class UnhandledCodeGenerationExceptionDiagnostic
 {
-    public const string RuleId = "ORLEANS0103"; 
+    public const string RuleId = "ORLEANS0103";
     private const string Category = "Usage";
     private static readonly LocalizableString Title = "An unhandled source generation exception occurred";
     private static readonly LocalizableString MessageFormat = "An unhandled exception occurred while generating source for your project: {0}";

@@ -1,10 +1,5 @@
 using Microsoft.Extensions.Logging;
-using System;
-using System.Collections.Generic;
 using System.Collections.Immutable;
-using System.Linq;
-using System.Threading;
-using System.Threading.Tasks;
 
 namespace Orleans.Runtime
 {
@@ -38,7 +33,7 @@ namespace Orleans.Runtime
         /// <inheritdoc />
         public override Task OnStart(CancellationToken cancellationToken = default)
         {
-            foreach(var stage in this.observers.GroupBy(o => o.Stage).OrderBy(s => s.Key))
+            foreach (var stage in this.observers.GroupBy(o => o.Stage).OrderBy(s => s.Key))
             {
                 if (this.logger.IsEnabled(LogLevel.Debug))
                 {
@@ -47,7 +42,7 @@ namespace Orleans.Runtime
                         "Stage {Stage}: {Observers}",
                         this.GetStageName(stage.Key),
                         string.Join(", ", stage.Select(o => o.Name)));
-                }                
+                }
             }
 
             return base.OnStart(cancellationToken);
@@ -97,7 +92,7 @@ namespace Orleans.Runtime
                     "Starting lifecycle stage {Stage} took {Elapsed} Milliseconds",
                     this.GetStageName(stage),
                     elapsed.TotalMilliseconds);
-            }                
+            }
         }
 
         /// <inheritdoc />
@@ -141,7 +136,7 @@ namespace Orleans.Runtime
                             this.Name,
                             this.StageName,
                             stopwatch.Elapsed.TotalMilliseconds);
-                    }                    
+                    }
                 }
                 catch (Exception exception)
                 {
@@ -170,7 +165,7 @@ namespace Orleans.Runtime
                             this.Name,
                             this.StageName,
                             stopwatch.Elapsed.TotalMilliseconds);
-                    }                    
+                    }
                 }
                 catch (Exception exception)
                 {

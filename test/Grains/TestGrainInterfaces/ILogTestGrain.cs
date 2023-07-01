@@ -1,8 +1,3 @@
-using System;
-using System.Threading.Tasks;
-using Orleans;
-using System.Collections.Generic;
-
 namespace UnitTests.GrainInterfaces
 {
     /// <summary>
@@ -11,7 +6,7 @@ namespace UnitTests.GrainInterfaces
     /// (don't use this as an introduction on how to use JournaledGrain)
     /// it started from SimpleGrain, but a lot of stuff got added over time 
     /// </summary>
-    public interface ILogTestGrain: IGrainWithIntegerKey
+    public interface ILogTestGrain : IGrainWithIntegerKey
     {
         // read A
 
@@ -66,7 +61,7 @@ namespace UnitTests.GrainInterfaces
 
         // other operations
 
-            Task SynchronizeGlobalState();
+        Task SynchronizeGlobalState();
         Task Deactivate();
     }
 

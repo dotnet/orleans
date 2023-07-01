@@ -1,11 +1,9 @@
 using Microsoft.Extensions.DependencyInjection;
-using Orleans;
 using Orleans.Configuration;
 using System.Reflection;
 using Orleans.Hosting;
 using TestExtensions;
 using Xunit;
-using System;
 using System.Text;
 using Microsoft.Extensions.Hosting;
 using Newtonsoft.Json;
@@ -76,7 +74,7 @@ namespace UnitTests.Serialization
 
         private static void TestSerializationRoundTrip(Serializer serializer)
         {
-            var data = new JsonPoco {Prop = "some data"};
+            var data = new JsonPoco { Prop = "some data" };
             var serialized = serializer.SerializeToArray(data);
             var subSequence = Encoding.UTF8.GetBytes("crazy_name");
 

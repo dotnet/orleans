@@ -1,9 +1,5 @@
 //#define USE_SQL_SERVER
-using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Net;
-using System.Threading.Tasks;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
@@ -12,7 +8,6 @@ using Orleans.Runtime;
 using Orleans.Internal;
 using Xunit;
 using Xunit.Abstractions;
-using System.Threading;
 
 namespace UnitTests.MessageCenterTests
 {
@@ -27,7 +22,7 @@ namespace UnitTests.MessageCenterTests
             new Uri("gwy.tcp://127.0.0.1:3/0"),
             new Uri("gwy.tcp://127.0.0.1:4/0")
         }.ToList();
-        
+
         public GatewaySelectionTest(ITestOutputHelper output)
         {
             this.output = output;

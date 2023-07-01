@@ -12,12 +12,12 @@ namespace Tester.Redis.Persistence
     {
         private readonly CommonFixture fixture;
         private readonly CommonStorageTests commonStorageTests;
-    
-        public RedisStorageTests_DeleteStateOnClear(ITestOutputHelper output, CommonFixture commonFixture) 
+
+        public RedisStorageTests_DeleteStateOnClear(ITestOutputHelper output, CommonFixture commonFixture)
         {
             TestUtils.CheckForRedis();
             this.fixture = commonFixture;
-            this.commonStorageTests = new CommonStorageTests(commonFixture.CreateRedisGrainStorage(useOrleansSerializer: false, deleteStateOnClear: true).GetAwaiter().GetResult());      
+            this.commonStorageTests = new CommonStorageTests(commonFixture.CreateRedisGrainStorage(useOrleansSerializer: false, deleteStateOnClear: true).GetAwaiter().GetResult());
         }
 
         [SkippableTheory, ClassData(typeof(StorageDataSet2CyrillicIdsAndGrainNames<string>))]

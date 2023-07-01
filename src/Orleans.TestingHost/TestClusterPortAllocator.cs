@@ -1,12 +1,7 @@
-using System;
 using System.Collections.Concurrent;
-using System.Collections.Generic;
 using System.Globalization;
-using System.Linq;
 using System.Net;
 using System.Net.NetworkInformation;
-using System.Threading;
-using Orleans.Internal;
 
 namespace Orleans.TestingHost
 {
@@ -165,7 +160,7 @@ namespace Orleans.TestingHost
 
             public bool Acquire(string name)
             {
-                var result = new [] { 0 };
+                var result = new[] { 0 };
                 var signal = new ManualResetEventSlim(initialState: false);
                 _workItems.Add(() =>
                 {

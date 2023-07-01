@@ -1,4 +1,3 @@
-using System.Threading.Tasks;
 using TestExtensions;
 using UnitTests.GrainInterfaces;
 using UnitTests.Grains;
@@ -31,7 +30,7 @@ namespace DefaultCluster.Tests.General
         public async Task SimpleGrainControlFlow()
         {
             ISimpleGrain grain = GetSimpleGrain();
-            
+
             Task setPromise = grain.SetA(2);
             await setPromise;
 

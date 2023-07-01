@@ -1,10 +1,8 @@
-using k8s;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 using Orleans.Hosting.Kubernetes;
 using Orleans.Runtime;
-using System;
 
 namespace Orleans.Hosting
 {

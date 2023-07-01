@@ -1,8 +1,4 @@
-using Orleans;
-using Orleans.Runtime;
 using Orleans.Tests.SqlUtils;
-using System;
-using System.Threading.Tasks;
 using UnitTests.StorageTests.Relational.TestDataSets;
 using Xunit;
 
@@ -17,7 +13,7 @@ namespace UnitTests.StorageTests.Relational
     /// optionally remove <see cref="RelationalStorageTests"/> inheritance and implement a provider and environment
     /// setup as done in <see cref="CommonFixture"/> and how it delegates it.</remarks>
     [TestCategory("AdoNet"), TestCategory("SqlServer"), TestCategory("Persistence")]
-    public class SqlServerStorageTests: RelationalStorageTests, IClassFixture<CommonFixture>
+    public class SqlServerStorageTests : RelationalStorageTests, IClassFixture<CommonFixture>
     {
         /// <summary>
         /// The storage invariant, storage ID, or ADO.NET invariant for this test set.

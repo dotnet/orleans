@@ -1,15 +1,9 @@
-using System;
-using System.Collections.Generic;
-using System.Threading;
-using System.Threading.Tasks;
 using Orleans.Runtime;
 using Orleans.TestingHost;
 using UnitTests.GrainInterfaces;
 using Xunit;
-using System.Linq;
 using Microsoft.Extensions.Logging;
 using UnitTests.TimerTests;
-using Orleans.Hosting;
 using Orleans.Internal;
 
 // ReSharper disable InconsistentNaming
@@ -200,7 +194,7 @@ namespace Tester.AzureUtils.TimerTests
         [SkippableFact, TestCategory("Functional")]
         public async Task Rem_Azure_2F_MultiGrain()
         {
-            List<SiloHandle> silos = await this.HostedCluster.StartAdditionalSilosAsync(2,true);
+            List<SiloHandle> silos = await this.HostedCluster.StartAdditionalSilosAsync(2, true);
 
             IReminderTestGrain2 g1 = this.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
             IReminderTestGrain2 g2 = this.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());

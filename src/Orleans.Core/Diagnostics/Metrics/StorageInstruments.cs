@@ -1,4 +1,3 @@
-using System;
 using System.Diagnostics.Metrics;
 
 namespace Orleans.Runtime;

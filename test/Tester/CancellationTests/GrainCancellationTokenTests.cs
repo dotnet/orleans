@@ -1,9 +1,4 @@
-using System;
-using System.Linq;
-using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
-using Orleans;
-using Orleans.Hosting;
 using Orleans.TestingHost;
 using TestExtensions;
 using UnitTests.GrainInterfaces;
@@ -179,7 +174,7 @@ namespace UnitTests.CancellationTests
             await GrainGrainCancellation(true, delay);
         }
 
-        [SkippableTheory(Skip="https://github.com/dotnet/orleans/issues/5654"), TestCategory("BVT"), TestCategory("Cancellation")]
+        [SkippableTheory(Skip = "https://github.com/dotnet/orleans/issues/5654"), TestCategory("BVT"), TestCategory("Cancellation")]
         [InlineData(0)]
         [InlineData(10)]
         [InlineData(300)]
@@ -227,7 +222,7 @@ namespace UnitTests.CancellationTests
             var targetInstanceId = await target.GetRuntimeInstanceId();
             var retriesCount = 0;
             var retriesLimit = 10;
-            
+
             while ((placeOnDifferentSilos && instanceId.Equals(targetInstanceId))
                 || (!placeOnDifferentSilos && !instanceId.Equals(targetInstanceId)))
             {

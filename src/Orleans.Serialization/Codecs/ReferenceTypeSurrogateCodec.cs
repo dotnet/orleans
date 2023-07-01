@@ -1,4 +1,3 @@
-using System;
 using System.Buffers;
 using Orleans.Serialization.Buffers;
 using Orleans.Serialization.GeneratedCodeHelpers;
@@ -86,6 +85,6 @@ namespace Orleans.Serialization.Codecs
         /// </summary>
         /// <param name="value">The value.</param>
         /// <param name="surrogate">The surrogate.</param>
-        public abstract void ConvertToSurrogate(TField value, ref TSurrogate surrogate); 
+        public abstract void ConvertToSurrogate(TField value, ref TSurrogate surrogate);
     }
 }

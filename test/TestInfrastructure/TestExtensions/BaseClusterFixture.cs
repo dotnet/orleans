@@ -1,10 +1,7 @@
-using System;
 using System.Runtime.ExceptionServices;
-using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using Orleans;
 using Orleans.Configuration;
 using Orleans.TestingHost;
 
@@ -50,7 +47,7 @@ namespace TestExtensions
         public IClusterClient Client => this.HostedCluster?.Client;
 
         public ILogger Logger { get; private set; }
-        
+
         public string GetClientServiceId() => Client.ServiceProvider.GetRequiredService<IOptions<ClusterOptions>>().Value.ServiceId;
 
         public virtual async Task InitializeAsync()

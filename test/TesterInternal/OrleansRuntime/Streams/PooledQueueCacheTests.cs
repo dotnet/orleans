@@ -1,11 +1,5 @@
-
-using System;
-using System.Collections.Generic;
 using System.Globalization;
-using System.Linq;
-using System.Threading.Tasks;
 using Microsoft.Extensions.Logging.Abstractions;
-using Orleans;
 using Orleans.Providers.Streams.Common;
 using Orleans.Runtime;
 using Orleans.Streams;
@@ -20,7 +14,7 @@ namespace UnitTests.OrleansRuntime.Streams
         private const int MessageSize = 1 << 7; // 128
         private const int MessagesPerBuffer = 8;
         private const string TestStreamNamespace = "blarg";
-        
+
         private class TestQueueMessage
         {
             private static readonly byte[] FixedMessage = new byte[MessageSize];
@@ -64,7 +58,7 @@ namespace UnitTests.OrleansRuntime.Streams
 
                 return new TestBatchContainer
                 {
-                    StreamId =  cachedMessage.StreamId,
+                    StreamId = cachedMessage.StreamId,
                     SequenceToken = GetSequenceToken(ref cachedMessage),
                     Data = payload.ToArray()
                 };
@@ -405,7 +399,7 @@ namespace UnitTests.OrleansRuntime.Streams
             Assert.Equal((sequenceNumber - startOfCache) / 2, stream2EventCount);
 
             // Add a blocks worth of events to the cache, then walk each cursor.  Do this enough times to fill the cache twice.
-            for (int j = 0; j < PooledBufferCount*2; j++)
+            for (int j = 0; j < PooledBufferCount * 2; j++)
             {
                 List<TestQueueMessage> moreMessages = Enumerable.Range(0, MessagesPerBuffer)
                 .Select(i => new TestQueueMessage

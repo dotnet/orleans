@@ -1,6 +1,4 @@
-﻿using System;
-
-namespace Orleans.Configuration
+﻿namespace Orleans.Configuration
 {
     public class PubSubOptions
     {

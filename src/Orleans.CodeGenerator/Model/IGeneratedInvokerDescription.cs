@@ -1,5 +1,3 @@
-using System.Collections.Generic;
-using System.Linq;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Orleans.CodeGenerator.SyntaxGeneration;
@@ -69,7 +67,7 @@ namespace Orleans.CodeGenerator
         public bool IsExceptionType => false;
         public List<TypeSyntax> ActivatorConstructorParameters { get; }
         public bool HasActivatorConstructor => UseActivator;
-        public CompoundTypeAliasComponent[] CompoundTypeAliasArguments {get;}
+        public CompoundTypeAliasComponent[] CompoundTypeAliasArguments { get; }
         public string ReturnValueInitializerMethod { get; }
 
         public ExpressionSyntax GetObjectCreationExpression(LibraryTypes libraryTypes) => ObjectCreationExpression(TypeSyntax, ArgumentList(), null);

@@ -1,7 +1,3 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
 using System.Diagnostics;
 using Microsoft.Extensions.Logging;
 
@@ -68,7 +64,7 @@ namespace Orleans.EventSourcing.Common
         /// <summary>
         /// Whether this cluster supports submitting updates
         /// </summary>
-        protected virtual bool SupportSubmissions {  get { return true;  } }
+        protected virtual bool SupportSubmissions { get { return true; } }
 
         /// <summary>
         /// Handle protocol messages.
@@ -88,8 +84,8 @@ namespace Orleans.EventSourcing.Common
         /// Handle notification messages. Override this to handle notification subtypes.
         /// </summary>
         protected virtual void OnNotificationReceived(INotificationMessage payload)
-        {        
-            var msg = payload as VersionNotificationMessage; 
+        {
+            var msg = payload as VersionNotificationMessage;
             if (msg != null)
             {
                 if (msg.Version > lastVersionNotified)
@@ -150,7 +146,7 @@ namespace Orleans.EventSourcing.Common
         /// <summary>
         /// Construct an instance, for the given parameters.
         /// </summary>
-        protected PrimaryBasedLogViewAdaptor(ILogViewAdaptorHost<TLogView, TLogEntry> host, 
+        protected PrimaryBasedLogViewAdaptor(ILogViewAdaptorHost<TLogView, TLogEntry> host,
             TLogView initialstate, ILogConsistencyProtocolServices services)
         {
             Debug.Assert(host != null && services != null && initialstate != null);
@@ -630,7 +626,7 @@ namespace Orleans.EventSourcing.Common
                 }
             }
         }
-        
+
 
         private void NotifyViewChanges(ref int version, int numWritten = 0)
         {
@@ -658,7 +654,7 @@ namespace Orleans.EventSourcing.Common
         /// </summary>
         protected RecordedConnectionIssue LastPrimaryIssue;
 
-     
+
 
         /// <inheritdoc />
         public async Task Synchronize()

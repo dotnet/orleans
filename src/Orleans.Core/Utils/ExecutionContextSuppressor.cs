@@ -1,5 +1,3 @@
-using System.Threading;
-
 namespace Orleans.Runtime.Internal;
 
 /// <summary>

@@ -1,7 +1,3 @@
-using Orleans;
-using System;
-using System.Collections.Generic;
-
 namespace UnitTests.StorageTests.Relational.TestDataSets
 {
     public static class GrainTypeGenerator
@@ -11,35 +7,35 @@ namespace UnitTests.StorageTests.Relational.TestDataSets
         /// </summary>
         private class NotApplicable { };
 
-        public interface ITestGrainWithIntegerKey: IGrainWithIntegerKey { }
+        public interface ITestGrainWithIntegerKey : IGrainWithIntegerKey { }
 
-        public interface ITestGrainGenericWithIntegerKey<T>: IGrainWithIntegerKey { }
+        public interface ITestGrainGenericWithIntegerKey<T> : IGrainWithIntegerKey { }
 
-        public class TestGrainWithIntegerKey: Grain, ITestGrainWithIntegerKey { }
+        public class TestGrainWithIntegerKey : Grain, ITestGrainWithIntegerKey { }
 
-        public class TestGrainGenericWithIntegerKey<T>: Grain, ITestGrainGenericWithIntegerKey<T> { }
+        public class TestGrainGenericWithIntegerKey<T> : Grain, ITestGrainGenericWithIntegerKey<T> { }
 
-        public interface ITestGrainWithGuidKey: IGrainWithGuidKey { }
+        public interface ITestGrainWithGuidKey : IGrainWithGuidKey { }
 
-        public interface ITestGrainGenericWithGuidKey<T>: IGrainWithGuidKey { }
+        public interface ITestGrainGenericWithGuidKey<T> : IGrainWithGuidKey { }
 
-        public class TestGrainWithGuidKey: Grain, ITestGrainWithGuidKey { }
+        public class TestGrainWithGuidKey : Grain, ITestGrainWithGuidKey { }
 
-        public class TestGrainGenericWithGuidKey<T>: Grain, ITestGrainGenericWithGuidKey<T> { }
+        public class TestGrainGenericWithGuidKey<T> : Grain, ITestGrainGenericWithGuidKey<T> { }
 
-        public interface ITestGrainWithStringKey: IGrainWithStringKey { }
+        public interface ITestGrainWithStringKey : IGrainWithStringKey { }
 
-        public interface ITestGrainGenericWithStringKey<T>: IGrainWithStringKey { }
+        public interface ITestGrainGenericWithStringKey<T> : IGrainWithStringKey { }
 
-        public class TestGrainWithStringKey: Grain, ITestGrainWithStringKey { }
+        public class TestGrainWithStringKey : Grain, ITestGrainWithStringKey { }
 
-        public class TestGrainGenericWithStringKey<T>: Grain, ITestGrainGenericWithStringKey<T> { }
+        public class TestGrainGenericWithStringKey<T> : Grain, ITestGrainGenericWithStringKey<T> { }
 
         private static Dictionary<Type, Func<Type, Type, Type>> GrainTypeSwitch { get; } = new Dictionary<Type, Func<Type, Type, Type>>
         {
             [typeof(Guid)] = (grainType, stateType) =>
             {
-                if(grainType == typeof(NotApplicable))
+                if (grainType == typeof(NotApplicable))
                 {
                     return typeof(TestGrainWithGuidKey);
                 }
@@ -47,7 +43,7 @@ namespace UnitTests.StorageTests.Relational.TestDataSets
             },
             [typeof(long)] = (grainType, stateType) =>
             {
-                if(grainType == typeof(NotApplicable))
+                if (grainType == typeof(NotApplicable))
                 {
                     return typeof(TestGrainWithIntegerKey);
                 }
@@ -55,7 +51,7 @@ namespace UnitTests.StorageTests.Relational.TestDataSets
             },
             [typeof(string)] = (grainType, stateType) =>
             {
-                if(grainType == typeof(NotApplicable))
+                if (grainType == typeof(NotApplicable))
                 {
                     return typeof(TestGrainWithStringKey);
                 }
@@ -69,7 +65,7 @@ namespace UnitTests.StorageTests.Relational.TestDataSets
             return GetGrainType<TGrainKey, NotApplicable>();
         }
 
-// Orleans.Storage.AdoNetStorageProvider cannot be resolved, because the containing assembly is not referenced since not needed.
+        // Orleans.Storage.AdoNetStorageProvider cannot be resolved, because the containing assembly is not referenced since not needed.
 #pragma warning disable 1574
         /// <summary>
         /// Returns a grain type name.
@@ -85,7 +81,7 @@ namespace UnitTests.StorageTests.Relational.TestDataSets
         public static string GetGrainType<TGrainKey, TGrain>()
         {
             Func<Type, Type, Type> func;
-            if(GrainTypeSwitch.TryGetValue(typeof(TGrainKey), out func))
+            if (GrainTypeSwitch.TryGetValue(typeof(TGrainKey), out func))
             {
                 return (func(typeof(TGrainKey), typeof(TGrain))).AssemblyQualifiedName;
             }

@@ -1,6 +1,4 @@
-﻿using System;
-
-namespace Orleans.Transactions.TestKit.Consistency
+﻿namespace Orleans.Transactions.TestKit.Consistency
 {
     [Serializable]
     [GenerateSerializer]

@@ -5,13 +5,9 @@ using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 using Orleans.Runtime;
 using Orleans.Runtime.MembershipService;
-using System;
-using System.Collections.Generic;
 using System.Globalization;
-using System.Linq;
 using System.Net;
 using System.Text;
-using System.Threading.Tasks;
 
 namespace Orleans.Clustering.DynamoDB
 {
@@ -72,7 +68,7 @@ namespace Orleans.Clustering.DynamoDB
             {
                 // ignore return value, since we don't care if I inserted it or not, as long as it is in there.
                 bool created = await TryCreateTableVersionEntryAsync();
-                if(created) logger.LogInformation("Created new table version row.");
+                if (created) logger.LogInformation("Created new table version row.");
             }
         }
 
@@ -185,7 +181,7 @@ namespace Orleans.Clustering.DynamoDB
                 };
 
                 var entries = await storage.GetEntriesTxAsync(this.options.TableName,
-                    new[] {siloEntryKeys, versionEntryKeys}, fields => new SiloInstanceRecord(fields));
+                    new[] { siloEntryKeys, versionEntryKeys }, fields => new SiloInstanceRecord(fields));
 
                 MembershipTableData data = Convert(entries.ToList());
                 if (this.logger.IsEnabled(LogLevel.Trace)) this.logger.LogTrace("Read my entry {SiloAddress} Table: {TableData}", siloAddress.ToString(), data.ToString());
@@ -289,7 +285,7 @@ namespace Orleans.Clustering.DynamoDB
                     (versionEntryUpdate.UpdateExpression, versionEntryUpdate.ExpressionAttributeValues) =
                         this.storage.ConvertUpdate(versionEntry.GetFields(), conditionalValues);
 
-                    await this.storage.WriteTxAsync(new[] {tableEntryInsert}, new[] {versionEntryUpdate});
+                    await this.storage.WriteTxAsync(new[] { tableEntryInsert }, new[] { versionEntryUpdate });
 
                     result = true;
                 }
@@ -380,7 +376,7 @@ namespace Orleans.Clustering.DynamoDB
                     (versionEntryUpdate.UpdateExpression, versionEntryUpdate.ExpressionAttributeValues) =
                         this.storage.ConvertUpdate(versionEntry.GetFields(), versionConditionalValues);
 
-                    await this.storage.WriteTxAsync(updates: new[] {siloEntryUpdate, versionEntryUpdate});
+                    await this.storage.WriteTxAsync(updates: new[] { siloEntryUpdate, versionEntryUpdate });
                     result = true;
                 }
                 catch (TransactionCanceledException canceledException)
@@ -423,7 +419,7 @@ namespace Orleans.Clustering.DynamoDB
                 var siloEntry = ConvertPartial(entry);
                 var fields = new Dictionary<string, AttributeValue> { { SiloInstanceRecord.I_AM_ALIVE_TIME_PROPERTY_NAME, new AttributeValue(siloEntry.IAmAliveTime) } };
                 var expression = $"attribute_exists({SiloInstanceRecord.DEPLOYMENT_ID_PROPERTY_NAME}) AND attribute_exists({SiloInstanceRecord.SILO_IDENTITY_PROPERTY_NAME})";
-                await this.storage.UpsertEntryAsync(this.options.TableName, siloEntry.GetKeys(),fields, expression);
+                await this.storage.UpsertEntryAsync(this.options.TableName, siloEntry.GetKeys(), fields, expression);
             }
             catch (Exception exc)
             {

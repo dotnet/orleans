@@ -1,5 +1,4 @@
 using k8s;
-using System;
 
 namespace Orleans.Hosting.Kubernetes
 {

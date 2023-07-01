@@ -1,11 +1,5 @@
-using System;
-using System.Collections.Generic;
 using System.Globalization;
-using System.Linq;
-using System.Threading;
-using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
-using Orleans;
 using Orleans.Concurrency;
 using Orleans.Providers;
 using Orleans.Runtime;
@@ -720,7 +714,7 @@ namespace UnitTests.Grains
         }
     }
 
-    public class GenericGrainWithContraints<A, B, C>: Grain, IGenericGrainWithConstraints<A, B, C>
+    public class GenericGrainWithContraints<A, B, C> : Grain, IGenericGrainWithConstraints<A, B, C>
         where A : ICollection<B>, new()
         where B : struct
         where C : class
@@ -751,11 +745,13 @@ namespace UnitTests.Grains
 
     public class NonGenericCastableGrain : Grain, INonGenericCastableGrain, ISomeGenericGrain<string>, IIndependentlyConcretizedGenericGrain<string>, IIndependentlyConcretizedGrain
     {
-        public Task DoSomething() {
+        public Task DoSomething()
+        {
             return Task.CompletedTask;
         }
 
-        public Task<string> Hello() {
+        public Task<string> Hello()
+        {
             return Task.FromResult("Hello!");
         }
     }
@@ -763,7 +759,8 @@ namespace UnitTests.Grains
 
     public class GenericCastableGrain<T> : Grain, IGenericCastableGrain<T>, INonGenericCastGrain
     {
-        public Task<string> Hello() {
+        public Task<string> Hello()
+        {
             return Task.FromResult("Hello!");
         }
     }
@@ -781,7 +778,8 @@ namespace UnitTests.Grains
 
     public class IndepedentlyConcretizedGenericGrain : Grain, IIndependentlyConcretizedGenericGrain<string>, IIndependentlyConcretizedGrain
     {
-        public Task<string> Hello() {
+        public Task<string> Hello()
+        {
             return Task.FromResult("I have been independently concretized!");
         }
     }
@@ -821,7 +819,7 @@ namespace UnitTests.Grains
     public class UnmanagedArgGrain<T> : IUnmanagedArgGrain<T> where T : unmanaged
     {
         public ValueTask<T> Echo(T value) => new(value);
-        public ValueTask<U> EchoNonNullable<U>(U value)  where U : notnull => new(value);
+        public ValueTask<U> EchoNonNullable<U>(U value) where U : notnull => new(value);
         public ValueTask<U> EchoReference<U>(U value) where U : class => new(value);
         public ValueTask<U> EchoValue<U>(U value) where U : struct => new(value);
     }
@@ -851,11 +849,13 @@ namespace UnitTests.Grains
 
         public abstract class BasicGrain : Grain
         {
-            public Task<string> Hello() {
+            public Task<string> Hello()
+            {
                 return Task.FromResult("Hello!");
             }
 
-            public Task<string[]> ConcreteGenArgTypeNames() {
+            public Task<string[]> ConcreteGenArgTypeNames()
+            {
                 var grainType = GetImmediateSubclass(this.GetType());
 
                 return Task.FromResult(
@@ -866,8 +866,10 @@ namespace UnitTests.Grains
             }
 
 
-            Type GetImmediateSubclass(Type subject) {
-                if(subject.BaseType == typeof(BasicGrain)) {
+            Type GetImmediateSubclass(Type subject)
+            {
+                if (subject.BaseType == typeof(BasicGrain))
+                {
                     return subject;
                 }
 

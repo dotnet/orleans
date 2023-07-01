@@ -3,7 +3,6 @@ using Microsoft.Extensions.DependencyInjection;
 using Orleans.Serialization.Cloning;
 using Orleans.Serialization.Serializers;
 using Orleans.Serialization.Utilities.Internal;
-using System;
 
 namespace Orleans.Serialization;
 
@@ -12,7 +11,7 @@ namespace Orleans.Serialization;
 /// </summary>
 public static class SerializationHostingExtensions
 {
-    private static readonly ServiceDescriptor ServiceDescriptor = new (typeof(ProtobufCodec), typeof(ProtobufCodec));
+    private static readonly ServiceDescriptor ServiceDescriptor = new(typeof(ProtobufCodec), typeof(ProtobufCodec));
 
     /// <summary>
     /// Adds support for serializing and deserializing Protobuf IMessage types using <see cref="MessageParser"/>.

@@ -1,6 +1,3 @@
-using System;
-using System.Threading;
-using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -72,8 +69,8 @@ namespace Orleans.Providers.Streams.Common
         private readonly DeepCopier deepCopier;
         private readonly IRuntimeClient runtimeClient;
         private readonly ProviderStateManager stateManager = new ProviderStateManager();
-        private IQueueAdapterFactory    adapterFactory;
-        private IQueueAdapter           queueAdapter;
+        private IQueueAdapterFactory adapterFactory;
+        private IQueueAdapter queueAdapter;
         private IPersistentStreamPullingManager pullingAgentManager;
         private IStreamSubscriptionManager streamSubscriptionManager;
         private readonly StreamPubSubOptions pubsubOptions;
@@ -100,13 +97,13 @@ namespace Orleans.Providers.Streams.Common
             this.logger = logger ?? throw new ArgumentNullException(nameof(logger));
         }
 
-        private async Task Init(CancellationToken token) 
+        private async Task Init(CancellationToken token)
         {
-            if(!this.stateManager.PresetState(ProviderState.Initialized)) return;
+            if (!this.stateManager.PresetState(ProviderState.Initialized)) return;
             this.adapterFactory = this.runtime.ServiceProvider.GetRequiredServiceByName<IQueueAdapterFactory>(this.Name);
             this.queueAdapter = await adapterFactory.CreateAdapter();
 
-            if (this.pubsubOptions.PubSubType == StreamPubSubType.ExplicitGrainBasedAndImplicit 
+            if (this.pubsubOptions.PubSubType == StreamPubSubType.ExplicitGrainBasedAndImplicit
                 || this.pubsubOptions.PubSubType == StreamPubSubType.ExplicitGrainBasedOnly)
             {
                 this.streamSubscriptionManager = this.runtime.ServiceProvider
@@ -142,7 +139,7 @@ namespace Orleans.Providers.Streams.Common
         private async Task Close(CancellationToken token)
         {
             if (!stateManager.PresetState(ProviderState.Closed)) return;
-            
+
             var manager = this.pullingAgentManager;
             if (manager != null)
             {
@@ -193,7 +190,7 @@ namespace Orleans.Providers.Streams.Common
             {
                 return ((IControllable)adapterFactory).ExecuteCommand(command, arg);
             }
-            
+
             if (pullingAgentManager != null)
             {
                 return pullingAgentManager.ExecuteCommand((PersistentStreamProviderCommand)command, arg);

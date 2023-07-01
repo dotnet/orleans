@@ -1,11 +1,6 @@
-using System;
-using System.Collections.Generic;
 using System.Globalization;
-using System.Net.NetworkInformation;
 using System.Text;
 using System.Text.Json;
-using System.Threading;
-using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
@@ -62,7 +57,7 @@ namespace Orleans.GrainDirectory.Redis
         }
 
         public Task<GrainAddress> Register(GrainAddress address) => Register(address, null);
-        
+
         public async Task<GrainAddress> Register(GrainAddress address, GrainAddress previousAddress)
         {
             const string RegisterScript =
@@ -146,7 +141,7 @@ namespace Orleans.GrainDirectory.Redis
             try
             {
                 var value = JsonSerializer.Serialize(address);
-                var result = (int) await _database.ScriptEvaluateAsync(
+                var result = (int)await _database.ScriptEvaluateAsync(
                     DeleteScript,
                     keys: new RedisKey[] { GetKey(address.GrainId) },
                     values: new RedisValue[] { address.ActivationId.ToString() });

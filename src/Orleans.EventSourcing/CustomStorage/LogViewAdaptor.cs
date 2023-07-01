@@ -1,8 +1,4 @@
-using System;
-using System.Collections.Generic;
 using System.Diagnostics;
-using System.Linq;
-using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Orleans.Storage;
 using Orleans.EventSourcing.Common;
@@ -67,8 +63,8 @@ namespace Orleans.EventSourcing.CustomStorage
         /// <inheritdoc/>
         protected override SubmissionEntry<TLogEntry> MakeSubmissionEntry(TLogEntry entry)
         {
-           // no special tagging is required, thus we create a plain submission entry
-           return new SubmissionEntry<TLogEntry>() { Entry = entry };
+            // no special tagging is required, thus we create a plain submission entry
+            return new SubmissionEntry<TLogEntry>() { Entry = entry };
         }
 
         [Serializable]
@@ -93,7 +89,7 @@ namespace Orleans.EventSourcing.CustomStorage
         /// <inheritdoc/>
         protected override Task<ILogConsistencyProtocolMessage> OnMessageReceived(ILogConsistencyProtocolMessage payload)
         {
-            var request = (ReadRequest) payload;
+            var request = (ReadRequest)payload;
 
             var response = new ReadResponse<TLogView>() { Version = version };
 
@@ -152,7 +148,7 @@ namespace Orleans.EventSourcing.CustomStorage
 
             try
             {
-                writesuccessful = await ((ICustomStorageInterface<TLogView,TLogEntry>) Host).ApplyUpdatesToStorage(updates, version);
+                writesuccessful = await ((ICustomStorageInterface<TLogView, TLogEntry>)Host).ApplyUpdatesToStorage(updates, version);
 
                 LastPrimaryIssue.Resolve(Host, Services);
             }
@@ -279,13 +275,13 @@ namespace Orleans.EventSourcing.CustomStorage
                 return string.Format("v{0} ({1} updates)", Version, Updates.Count);
             }
         }
-   
-        private SortedList<long, UpdateNotificationMessage> notifications = new SortedList<long,UpdateNotificationMessage>();
+
+        private SortedList<long, UpdateNotificationMessage> notifications = new SortedList<long, UpdateNotificationMessage>();
 
         /// <inheritdoc/>
         protected override void OnNotificationReceived(INotificationMessage payload)
         {
-           var um = payload as UpdateNotificationMessage;
+            var um = payload as UpdateNotificationMessage;
             if (um != null)
                 notifications.Add(um.Version - um.Updates.Count, um);
             else
@@ -328,7 +324,7 @@ namespace Orleans.EventSourcing.CustomStorage
             Services.Log(LogLevel.Trace, "unprocessed notifications in queue: {0}", notifications.Count);
 
             base.ProcessNotifications();
-        
+
         }
 
         [Conditional("DEBUG")]

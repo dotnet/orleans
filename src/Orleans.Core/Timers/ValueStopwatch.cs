@@ -1,4 +1,3 @@
-using System;
 using System.Diagnostics;
 
 namespace Orleans.Runtime
@@ -8,7 +7,7 @@ namespace Orleans.Runtime
     /// </summary>
     internal struct ValueStopwatch
     {
-        private static readonly double TimestampToTicks = TimeSpan.TicksPerSecond / (double) Stopwatch.Frequency;
+        private static readonly double TimestampToTicks = TimeSpan.TicksPerSecond / (double)Stopwatch.Frequency;
         private long value;
 
         /// <summary>
@@ -25,17 +24,17 @@ namespace Orleans.Runtime
         /// </param>
         /// <returns>A new, running stopwatch.</returns>
         public static ValueStopwatch StartNew(TimeSpan elapsed) => new(GetTimestamp() - (long)(elapsed.TotalSeconds * Stopwatch.Frequency));
-        
+
         private ValueStopwatch(long timestamp)
         {
             this.value = timestamp;
         }
-        
+
         /// <summary>
         /// Returns true if this instance is running or false otherwise.
         /// </summary>
         public bool IsRunning => this.value > 0;
-        
+
         /// <summary>
         /// Returns the elapsed time.
         /// </summary>
@@ -51,7 +50,7 @@ namespace Orleans.Runtime
                 // A positive timestamp value indicates the start time of a running stopwatch,
                 // a negative value indicates the negative total duration of a stopped stopwatch.
                 var timestamp = this.value;
-                
+
                 long delta;
                 if (this.IsRunning)
                 {
@@ -66,7 +65,7 @@ namespace Orleans.Runtime
                     delta = -timestamp;
                 }
 
-                return (long) (delta * TimestampToTicks);
+                return (long)(delta * TimestampToTicks);
             }
         }
 
@@ -100,7 +99,7 @@ namespace Orleans.Runtime
         public void Start()
         {
             var timestamp = this.value;
-            
+
             // If already started, do nothing.
             if (this.IsRunning) return;
 

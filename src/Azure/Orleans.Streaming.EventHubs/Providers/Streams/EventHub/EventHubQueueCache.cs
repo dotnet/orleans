@@ -1,8 +1,6 @@
-using System;
 using Orleans.Providers.Streams.Common;
 using Orleans.Runtime;
 using Orleans.Streams;
-using System.Collections.Generic;
 using Microsoft.Extensions.Logging;
 using Azure.Messaging.EventHubs;
 

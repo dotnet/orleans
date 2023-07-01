@@ -1,5 +1,3 @@
-using System;
-using System.Collections.Generic;
 using System.Text;
 using Orleans.Runtime;
 
@@ -32,13 +30,13 @@ namespace UnitTests.StorageTests.Relational
         {
             [typeof(Guid)] = new Func<object, Guid>(_ => Guid.NewGuid()),
             [typeof(int)] = new Func<object, int>(_ => Random.Shared.Next()),
-            [typeof(long)] = new Func<object, long>(_=> Random.Shared.NextInt64()),
+            [typeof(long)] = new Func<object, long>(_ => Random.Shared.NextInt64()),
             [typeof(string)] = new Func<object, string>(symbolSet =>
             {
                 var count = ((Tuple<Range<long>, SymbolSet>)symbolSet).Item1.Start;
                 var symbols = ((Tuple<Range<long>, SymbolSet>)symbolSet).Item2;
                 var builder = new StringBuilder();
-                for(long i = 0; i < count; ++i)
+                for (long i = 0; i < count; ++i)
                 {
                     var symbolRange = symbols.SetRanges[Random.Shared.Next(symbols.SetRanges.Count)];
                     builder.Append((char)Random.Shared.Next(symbolRange.Start, symbolRange.End));
@@ -57,11 +55,11 @@ namespace UnitTests.StorageTests.Relational
         public static T GetRandom<T>(Range<long> range = null)
         {
             object randomGenerator;
-            if(RandomGenerators.TryGetValue(typeof(T), out randomGenerator))
+            if (RandomGenerators.TryGetValue(typeof(T), out randomGenerator))
             {
                 //If this a string type, some symbol set from which to draw the symbols needs to given
                 //and a special kind of a parameter constructed.
-                if((typeof(T) == typeof(string)))
+                if ((typeof(T) == typeof(string)))
                 {
                     const long SymbolsDefaultCount = 15;
                     var symbols = new SymbolSet(SymbolSet.Latin1);
@@ -84,12 +82,12 @@ namespace UnitTests.StorageTests.Relational
         /// <exception cref="ArgumentOutOfRangeException"/>.
         public static string GetRandomCharacters(SymbolSet symbolSet, long count)
         {
-            if(symbolSet == null)
+            if (symbolSet == null)
             {
                 throw new ArgumentNullException(nameof(symbolSet));
             }
 
-            if(count < 1)
+            if (count < 1)
             {
                 throw new ArgumentOutOfRangeException(nameof(count), "The count news to be more than zero.");
             }
@@ -138,7 +136,7 @@ namespace UnitTests.StorageTests.Relational
             const long SymbolsDefaultCount = 15;
             var symbolSet = new SymbolSet(SymbolSet.Latin1);
 
-            if (typeof(T)== typeof(Guid))
+            if (typeof(T) == typeof(Guid))
             {
                 var extension = keyExtension ? GetRandomCharacters(symbolSet, SymbolsDefaultCount) : null;
                 return LegacyGrainId.GetGrainId(UniqueKey.NewKey(Guid.NewGuid(), keyExtension ? UniqueKey.Category.KeyExtGrain : UniqueKey.Category.Grain, keyExtension ? KeyExtensionGrainTypeCode : NormalGrainTypeCode, extension));

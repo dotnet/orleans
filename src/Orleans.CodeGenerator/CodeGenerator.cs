@@ -2,10 +2,6 @@ using Orleans.CodeGenerator.SyntaxGeneration;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading;
 using static Microsoft.CodeAnalysis.CSharp.SyntaxFactory;
 using System.Collections.Immutable;
 using Orleans.CodeGenerator.Hashing;
@@ -243,7 +239,7 @@ namespace Orleans.CodeGenerator
                             {
                                 (_, GenerateFieldIds.PublicProperties) => GenerateFieldIds.PublicProperties,
                                 (GenerateFieldIds.PublicProperties, _) => GenerateFieldIds.PublicProperties,
-                                _  => GenerateFieldIds.None
+                                _ => GenerateFieldIds.None
                             };
                             var fieldIdAssignmentHelper = new FieldIdAssignmentHelper(symbol, constructorParameters, implicitMemberSelectionStrategy, LibraryTypes);
                             if (!fieldIdAssignmentHelper.IsValidForSerialization)

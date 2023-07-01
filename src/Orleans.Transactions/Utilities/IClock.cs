@@ -1,6 +1,4 @@
-﻿using System;
-
-namespace Orleans.Transactions
+﻿namespace Orleans.Transactions
 {
     /// <summary>
     /// System clock abstraction

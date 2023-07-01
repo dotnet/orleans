@@ -50,14 +50,14 @@ namespace Orleans.Configuration
             this.options = options;
             this.name = name;
         }
-        
+
         /// <inheritdoc/>
         public void ValidateConfiguration()
         {
             if (this.options.NumStorageGrains <= 0)
                 throw new OrleansConfigurationException(
                     $"Configuration for {nameof(MemoryGrainStorage)} {name} is invalid. {nameof(this.options.NumStorageGrains)} must be larger than 0.");
-            if(this.options.InitStage < ServiceLifecycleStage.RuntimeGrainServices)
+            if (this.options.InitStage < ServiceLifecycleStage.RuntimeGrainServices)
                 throw new OrleansConfigurationException(
                    $"Configuration for {nameof(MemoryGrainStorage)} {name} is invalid. {nameof(this.options.InitStage)} must be larger than {ServiceLifecycleStage.RuntimeGrainServices} since " +
                    $"{nameof(MemoryGrainStorage)} depends on {nameof(MemoryStorageGrain)} to have grain environment to finish set up.");

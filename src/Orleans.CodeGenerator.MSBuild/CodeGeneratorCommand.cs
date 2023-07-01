@@ -1,11 +1,5 @@
-using System;
-using System.Collections.Generic;
 using System.Diagnostics;
-using System.IO;
-using System.Linq;
 using System.Reflection;
-using System.Threading;
-using System.Threading.Tasks;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.Text;
@@ -30,7 +24,7 @@ namespace Orleans.CodeGenerator.MSBuild
         };
 
         public ILogger Log { get; set; }
-        
+
         /// <summary>
         /// The MS Build project path.
         /// </summary>
@@ -90,7 +84,7 @@ namespace Orleans.CodeGenerator.MSBuild
                 var languageName = GetLanguageName(ProjectPath);
                 var documents = GetDocuments(Compile, projectId).ToList();
                 var metadataReferences = GetMetadataReferences(Reference).ToList();
-                
+
                 foreach (var doc in documents)
                 {
                     Log.LogDebug("Document: {FilePath}", doc.FilePath);
@@ -143,7 +137,7 @@ namespace Orleans.CodeGenerator.MSBuild
                     "GenerateCode completed in {ElapsedMilliseconds}ms.",
                     stopwatch.ElapsedMilliseconds);
                 stopwatch.Restart();
-                
+
                 var normalized = syntax.NormalizeWhitespace();
                 Log.LogInformation("NormalizeWhitespace completed in {ElapsedMilliseconds}ms.",
                     stopwatch.ElapsedMilliseconds);

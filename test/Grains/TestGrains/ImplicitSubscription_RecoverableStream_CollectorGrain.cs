@@ -1,12 +1,6 @@
-
-using System;
-using System.Threading;
-using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
-using Orleans;
 using Orleans.Providers;
 using Orleans.Providers.Streams.Generator;
-using Orleans.Runtime;
 using Orleans.Streams;
 using TestGrainInterfaces;
 using UnitTests.Grains;
@@ -19,7 +13,7 @@ namespace TestGrains
     {
         public const string StreamNamespace = "RecoverableStream";
         public const string StorageProviderName = "AzureStorage";
-        
+
         // grain instance state
         private ILogger logger;
         private IAsyncStream<GeneratedEvent> stream;

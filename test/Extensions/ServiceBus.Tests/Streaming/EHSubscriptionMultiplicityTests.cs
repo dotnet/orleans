@@ -1,12 +1,8 @@
-using System;
-using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
-using Orleans.Runtime;
 using Orleans.TestingHost;
 using TestExtensions;
 using UnitTests.StreamingTests;
 using Xunit;
-using Orleans.Hosting;
 
 namespace ServiceBus.Tests.StreamingTests
 {
@@ -34,7 +30,7 @@ namespace ServiceBus.Tests.StreamingTests
                 {
                     hostBuilder
                         .AddMemoryGrainStorage("PubSubStore")
-                        .AddEventHubStreams(StreamProviderName, b=>
+                        .AddEventHubStreams(StreamProviderName, b =>
                         {
                             b.ConfigureEventHub(ob => ob.Configure(options =>
                             {
@@ -56,7 +52,7 @@ namespace ServiceBus.Tests.StreamingTests
         {
             this.fixture = fixture;
             fixture.EnsurePreconditionsMet();
-            runner = new SubscriptionMultiplicityTestRunner(StreamProviderName, fixture.HostedCluster);            
+            runner = new SubscriptionMultiplicityTestRunner(StreamProviderName, fixture.HostedCluster);
         }
 
         [SkippableFact, TestCategory("EventHub"), TestCategory("Streaming")]
@@ -73,7 +69,7 @@ namespace ServiceBus.Tests.StreamingTests
             await runner.MultipleLinearSubscriptionTest(Guid.NewGuid(), StreamNamespace);
         }
 
-        [SkippableFact(Skip="https://github.com/dotnet/orleans/issues/5647"), TestCategory("EventHub"), TestCategory("Streaming")]
+        [SkippableFact(Skip = "https://github.com/dotnet/orleans/issues/5647"), TestCategory("EventHub"), TestCategory("Streaming")]
         public async Task EHMultipleSubscriptionTest_AddRemove()
         {
             this.fixture.Logger.LogInformation("************************ EHMultipleSubscriptionTest_AddRemove *********************************");
@@ -101,7 +97,7 @@ namespace ServiceBus.Tests.StreamingTests
             await runner.ActiveSubscriptionTest(Guid.NewGuid(), StreamNamespace);
         }
 
-        [SkippableFact(Skip="https://github.com/dotnet/orleans/issues/5653"), TestCategory("EventHub"), TestCategory("Streaming")]
+        [SkippableFact(Skip = "https://github.com/dotnet/orleans/issues/5653"), TestCategory("EventHub"), TestCategory("Streaming")]
         public async Task EHTwoIntermitentStreamTest()
         {
             this.fixture.Logger.LogInformation("************************ EHTwoIntermitentStreamTest *********************************");

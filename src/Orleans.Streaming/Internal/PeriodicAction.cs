@@ -1,5 +1,3 @@
-using System;
-
 namespace Orleans
 {
     internal class PeriodicAction

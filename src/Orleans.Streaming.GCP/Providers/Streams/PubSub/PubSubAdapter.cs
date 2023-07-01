@@ -1,10 +1,6 @@
 using Orleans.Runtime;
-using Orleans.Serialization;
 using Orleans.Streams;
-using System;
 using System.Collections.Concurrent;
-using System.Collections.Generic;
-using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 
 namespace Orleans.Providers.GCP.Streams.PubSub
@@ -34,7 +30,7 @@ namespace Orleans.Providers.GCP.Streams.PubSub
             string topicId,
             string serviceId,
             string providerName,
-            TimeSpan? deadline = null, 
+            TimeSpan? deadline = null,
             string customEndpoint = "")
         {
             if (string.IsNullOrEmpty(projectId)) throw new ArgumentNullException(nameof(projectId));

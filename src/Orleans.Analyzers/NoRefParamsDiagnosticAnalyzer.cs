@@ -1,5 +1,4 @@
 using System.Collections.Immutable;
-using System.Linq;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -40,7 +39,7 @@ namespace Orleans.Analyzers
                                               .Select(interfaceDef => interfaceDef.Name);
             if (!implementedInterfaces.Contains(BaseInterfaceName)) return;
 
-            foreach(var param in symbol.Parameters)
+            foreach (var param in symbol.Parameters)
             {
                 if (param.RefKind == RefKind.None) continue;
 

@@ -1,6 +1,5 @@
 ﻿using System.Reflection;
 using Microsoft.Extensions.DependencyInjection;
-using Orleans;
 using Orleans.Runtime;
 using Tester.StorageFacet.Abstractions;
 
@@ -20,7 +19,7 @@ namespace Tester.StorageFacet.Infrastructure
             }
             // use generic type args to define collection type.
             MethodInfo genericCreate = create.MakeGenericMethod(parameter.ParameterType.GetGenericArguments());
-            object[] args = new object[] {attribute.StorageProviderName, config};
+            object[] args = new object[] { attribute.StorageProviderName, config };
             return context => Create(context, genericCreate, args);
         }
 

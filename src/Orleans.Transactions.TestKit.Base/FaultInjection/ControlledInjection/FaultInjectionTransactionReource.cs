@@ -1,6 +1,3 @@
-using System;
-using System.Collections.Generic;
-using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Orleans.Runtime;
 using Orleans.Transactions.Abstractions;
@@ -105,7 +102,7 @@ namespace Orleans.Transactions.TestKit
         private readonly TransactionalResource<TState> tResource;
         private readonly IControlledTransactionFaultInjector faultInjector;
         private readonly ILogger logger;
-        public FaultInjectionTransactionalResource(IControlledTransactionFaultInjector faultInjector, FaultInjectionControl faultInjectionControl, 
+        public FaultInjectionTransactionalResource(IControlledTransactionFaultInjector faultInjector, FaultInjectionControl faultInjectionControl,
             TransactionalResource<TState> tResource, IGrainContext activationContext, ILogger logger, IGrainRuntime grainRuntime)
         {
             this.grainRuntime = grainRuntime;

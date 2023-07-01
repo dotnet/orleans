@@ -1,9 +1,4 @@
-using System;
-using System.Collections.Generic;
-using System.Threading;
-using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
-using Orleans;
 using Orleans.Runtime;
 using UnitTests.GrainInterfaces;
 
@@ -29,7 +24,7 @@ namespace UnitTests.Grains
         public Task LogMessage(string msg)
         {
             logger.LogInformation("{Message}", msg);
-           return Task.CompletedTask;
+            return Task.CompletedTask;
         }
 
         public Task SetAError(int a)

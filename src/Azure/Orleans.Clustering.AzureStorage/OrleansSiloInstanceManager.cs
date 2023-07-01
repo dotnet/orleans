@@ -1,10 +1,6 @@
-using System;
-using System.Collections.Generic;
 using System.Globalization;
-using System.Linq;
 using System.Net;
 using System.Text;
-using System.Threading.Tasks;
 using Azure.Data.Tables;
 using Microsoft.Extensions.Logging;
 using Orleans.Clustering.AzureStorage;
@@ -124,7 +120,8 @@ namespace Orleans.AzureUtils
 
                 logger.LogInformation((int)ErrorCode.Runtime_Error_100278, "Found {GatewaySiloCount} active Gateway Silos for deployment {DeploymentId}.", gatewaySiloInstances.Count, this.DeploymentId);
                 return gatewaySiloInstances;
-            }catch(Exception exc)
+            }
+            catch (Exception exc)
             {
                 logger.LogError((int)ErrorCode.Runtime_Error_100331, exc, "Error searching for active gateway silos for deployment {DeploymentId} ", this.DeploymentId);
                 throw;

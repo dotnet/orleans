@@ -1,6 +1,4 @@
-﻿using System.Threading.Tasks;
-using Orleans;
-using Orleans.Placement;
+﻿using Orleans.Placement;
 
 namespace UnitTests.Stats
 {
@@ -14,7 +12,7 @@ namespace UnitTests.Stats
             numStatsCalls++;
             return Task.CompletedTask;
         }
-        
+
         public Task<long> GetReportStatsCallCount()
         {
             return Task.FromResult(numStatsCalls);

@@ -1,9 +1,5 @@
-using System;
-using System.Threading.Tasks;
 using Newtonsoft.Json;
-using Orleans;
 using Orleans.Concurrency;
-using Orleans.Internal;
 using Orleans.Runtime;
 using Orleans.Serialization;
 using Orleans.Storage;
@@ -179,9 +175,9 @@ namespace DefaultCluster.Tests.General
 
             Assert.IsAssignableFrom(grain.GetType(), other);
             Assert.NotNull(other);
-            Assert.Equal(grain,  other);  // "Deserialized grain reference equality is preserved"
+            Assert.Equal(grain, other);  // "Deserialized grain reference equality is preserved"
             int res = other.GetA().Result;
-            Assert.Equal(id,  res);  // "Returned values from call to deserialized grain reference"
+            Assert.Equal(id, res);  // "Returned values from call to deserialized grain reference"
         }
 
         private T NewtonsoftJsonSerializeRoundtrip<T>(T obj)

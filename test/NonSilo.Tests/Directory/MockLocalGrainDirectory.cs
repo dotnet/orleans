@@ -1,6 +1,3 @@
-using System;
-using System.Collections.Generic;
-using System.Threading.Tasks;
 using Orleans.GrainDirectory;
 using Orleans.Runtime;
 using Orleans.Runtime.GrainDirectory;
@@ -40,7 +37,7 @@ namespace UnitTests.Directory
         {
             this.UnregistrationCounter++;
             await Task.Delay(batchOperationDelay);
-            foreach(var addr in addresses)
+            foreach (var addr in addresses)
             {
                 this.UnregistrationReceived.Add((addr, cause));
             }

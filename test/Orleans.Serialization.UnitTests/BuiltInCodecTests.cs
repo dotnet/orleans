@@ -42,7 +42,7 @@ namespace Orleans.Serialization.UnitTests
 
         protected override IFieldCodec<MyEnum> CreateCodec() => ServiceProvider.GetRequiredService<ICodecProvider>().GetCodec<MyEnum>();
         protected override MyEnum CreateValue() => (MyEnum)Random.Next((int)MyEnum.None, (int)MyEnum.Two);
-        protected override MyEnum[] TestValues => new[] { MyEnum.None, MyEnum.One, MyEnum.Two, (MyEnum)(-1), (MyEnum)10_000};
+        protected override MyEnum[] TestValues => new[] { MyEnum.None, MyEnum.One, MyEnum.Two, (MyEnum)(-1), (MyEnum)10_000 };
         protected override void Configure(ISerializerBuilder builder)
         {
             builder.Services.RemoveAll(typeof(IFieldCodec<MyEnum>));
@@ -59,7 +59,7 @@ namespace Orleans.Serialization.UnitTests
 
         protected override IDeepCopier<MyEnum> CreateCopier() => ServiceProvider.GetRequiredService<ICodecProvider>().GetDeepCopier<MyEnum>();
         protected override MyEnum CreateValue() => (MyEnum)Random.Next((int)MyEnum.None, (int)MyEnum.Two);
-        protected override MyEnum[] TestValues => new[] { MyEnum.None, MyEnum.One, MyEnum.Two, (MyEnum)(-1), (MyEnum)10_000};
+        protected override MyEnum[] TestValues => new[] { MyEnum.None, MyEnum.One, MyEnum.Two, (MyEnum)(-1), (MyEnum)10_000 };
         protected override void Configure(ISerializerBuilder builder)
         {
             builder.Services.RemoveAll(typeof(IFieldCodec<MyEnum>));
@@ -76,7 +76,7 @@ namespace Orleans.Serialization.UnitTests
 
         protected override IFieldCodec<DayOfWeek> CreateCodec() => ServiceProvider.GetRequiredService<ICodecProvider>().GetCodec<DayOfWeek>();
         protected override DayOfWeek CreateValue() => (DayOfWeek)Random.Next((int)DayOfWeek.Sunday, (int)DayOfWeek.Saturday);
-        protected override DayOfWeek[] TestValues => new[] { DayOfWeek.Monday, DayOfWeek.Sunday, (DayOfWeek)(-1), (DayOfWeek)10_000};
+        protected override DayOfWeek[] TestValues => new[] { DayOfWeek.Monday, DayOfWeek.Sunday, (DayOfWeek)(-1), (DayOfWeek)10_000 };
 
         protected override Action<Action<DayOfWeek>> ValueProvider => Gen.Int.Select(v => (DayOfWeek)v).ToValueProvider();
     }
@@ -89,7 +89,7 @@ namespace Orleans.Serialization.UnitTests
 
         protected override IDeepCopier<DayOfWeek> CreateCopier() => ServiceProvider.GetRequiredService<ICodecProvider>().GetDeepCopier<DayOfWeek>();
         protected override DayOfWeek CreateValue() => (DayOfWeek)Random.Next((int)DayOfWeek.Sunday, (int)DayOfWeek.Saturday);
-        protected override DayOfWeek[] TestValues => new[] { DayOfWeek.Monday, DayOfWeek.Sunday, (DayOfWeek)(-1), (DayOfWeek)10_000};
+        protected override DayOfWeek[] TestValues => new[] { DayOfWeek.Monday, DayOfWeek.Sunday, (DayOfWeek)(-1), (DayOfWeek)10_000 };
 
         protected override Action<Action<DayOfWeek>> ValueProvider => Gen.Int.Select(v => (DayOfWeek)v).ToValueProvider();
     }
@@ -286,7 +286,7 @@ namespace Orleans.Serialization.UnitTests
         protected override bool IsImmutable => true;
     }
 
-    public class BitVector32Tests: FieldCodecTester<BitVector32, BitVector32Codec>
+    public class BitVector32Tests : FieldCodecTester<BitVector32, BitVector32Codec>
     {
         public BitVector32Tests(ITestOutputHelper output) : base(output)
         {
@@ -307,7 +307,7 @@ namespace Orleans.Serialization.UnitTests
         protected override bool Equals(BitVector32 left, BitVector32 right) => left.Equals(right) && left.GetHashCode() == right.GetHashCode();
     }
 
-    public class BitVector32CopierTests: CopierTester<BitVector32, IDeepCopier<BitVector32>>
+    public class BitVector32CopierTests : CopierTester<BitVector32, IDeepCopier<BitVector32>>
     {
         public BitVector32CopierTests(ITestOutputHelper output) : base(output)
         {
@@ -540,7 +540,7 @@ namespace Orleans.Serialization.UnitTests
         protected override bool IsImmutable => true;
     }
 
-    public class Tuple6Tests : FieldCodecTester<Tuple<string, string,string, string, string, string>, TupleCodec<string, string, string, string, string, string>>
+    public class Tuple6Tests : FieldCodecTester<Tuple<string, string, string, string, string, string>, TupleCodec<string, string, string, string, string, string>>
     {
         public Tuple6Tests(ITestOutputHelper output) : base(output)
         {
@@ -564,7 +564,7 @@ namespace Orleans.Serialization.UnitTests
         };
     }
 
-    public class Tuple6CopierTests : CopierTester<Tuple<string, string,string, string, string, string>, TupleCopier<string, string, string, string, string, string>>
+    public class Tuple6CopierTests : CopierTester<Tuple<string, string, string, string, string, string>, TupleCopier<string, string, string, string, string, string>>
     {
         public Tuple6CopierTests(ITestOutputHelper output) : base(output)
         {
@@ -898,7 +898,7 @@ namespace Orleans.Serialization.UnitTests
         };
     }
 
-    public class ValueTuple6Tests : FieldCodecTester<ValueTuple<string, string,string, string, string, string>, ValueTupleCodec<string, string, string, string, string, string>>
+    public class ValueTuple6Tests : FieldCodecTester<ValueTuple<string, string, string, string, string, string>, ValueTupleCodec<string, string, string, string, string, string>>
     {
         public ValueTuple6Tests(ITestOutputHelper output) : base(output)
         {
@@ -922,7 +922,7 @@ namespace Orleans.Serialization.UnitTests
         };
     }
 
-    public class ValueTuple6CopierTests : CopierTester<ValueTuple<string, string,string, string, string, string>, ValueTupleCopier<string, string, string, string, string, string>>
+    public class ValueTuple6CopierTests : CopierTester<ValueTuple<string, string, string, string, string, string>, ValueTupleCopier<string, string, string, string, string, string>>
     {
         public ValueTuple6CopierTests(ITestOutputHelper output) : base(output)
         {
@@ -1182,7 +1182,7 @@ namespace Orleans.Serialization.UnitTests
         {
         }
 
-        protected override UInt128 CreateValue() => new (unchecked((ulong)Random.NextInt64()), unchecked((ulong)Random.NextInt64()));
+        protected override UInt128 CreateValue() => new(unchecked((ulong)Random.NextInt64()), unchecked((ulong)Random.NextInt64()));
 
         protected override UInt128[] TestValues => new UInt128[]
         {
@@ -1200,7 +1200,7 @@ namespace Orleans.Serialization.UnitTests
             UInt128.MaxValue,
         };
 
-        protected override Action<Action<UInt128>> ValueProvider => assert => Gen.ULong.Select(Gen.ULong).Sample(value => assert(new (value.V0, value.V1)));
+        protected override Action<Action<UInt128>> ValueProvider => assert => Gen.ULong.Select(Gen.ULong).Sample(value => assert(new(value.V0, value.V1)));
     }
 
     public class UInt128CopierTests : CopierTester<UInt128, IDeepCopier<UInt128>>
@@ -1209,7 +1209,7 @@ namespace Orleans.Serialization.UnitTests
         {
         }
 
-        protected override UInt128 CreateValue() => new (unchecked((ulong)Random.NextInt64()), unchecked((ulong)Random.NextInt64()));
+        protected override UInt128 CreateValue() => new(unchecked((ulong)Random.NextInt64()), unchecked((ulong)Random.NextInt64()));
 
         protected override UInt128[] TestValues => new UInt128[]
         {
@@ -1227,7 +1227,7 @@ namespace Orleans.Serialization.UnitTests
             UInt128.MaxValue,
         };
 
-        protected override Action<Action<UInt128>> ValueProvider => assert => Gen.ULong.Select(Gen.ULong).Sample(value => assert(new (value.V0, value.V1)));
+        protected override Action<Action<UInt128>> ValueProvider => assert => Gen.ULong.Select(Gen.ULong).Sample(value => assert(new(value.V0, value.V1)));
     }
 #endif
 
@@ -1421,7 +1421,7 @@ namespace Orleans.Serialization.UnitTests
         {
         }
 
-        protected override Int128 CreateValue() => new (unchecked((ulong)Random.NextInt64()), unchecked((ulong)Random.NextInt64()));
+        protected override Int128 CreateValue() => new(unchecked((ulong)Random.NextInt64()), unchecked((ulong)Random.NextInt64()));
 
         protected override Int128[] TestValues => new Int128[]
         {
@@ -1439,7 +1439,7 @@ namespace Orleans.Serialization.UnitTests
             Int128.MaxValue,
         };
 
-        protected override Action<Action<Int128>> ValueProvider => assert => Gen.ULong.Select(Gen.ULong).Sample(value => assert(new (value.V0, value.V1)));
+        protected override Action<Action<Int128>> ValueProvider => assert => Gen.ULong.Select(Gen.ULong).Sample(value => assert(new(value.V0, value.V1)));
     }
 
     public class Int128CopierTests : CopierTester<Int128, IDeepCopier<Int128>>
@@ -1466,7 +1466,7 @@ namespace Orleans.Serialization.UnitTests
             Int128.MaxValue,
         };
 
-        protected override Action<Action<Int128>> ValueProvider => assert => Gen.ULong.Select(Gen.ULong).Sample(value => assert(new (value.V0, value.V1)));
+        protected override Action<Action<Int128>> ValueProvider => assert => Gen.ULong.Select(Gen.ULong).Sample(value => assert(new(value.V0, value.V1)));
     }
 #endif
 

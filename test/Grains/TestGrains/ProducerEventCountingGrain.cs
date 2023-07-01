@@ -1,9 +1,4 @@
-using System;
-using System.Threading;
-using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
-using Orleans;
-using Orleans.Runtime;
 using Orleans.Streams;
 using UnitTests.GrainInterfaces;
 
@@ -59,7 +54,7 @@ namespace UnitTests.Grains
             {
                 throw new ApplicationException("Not yet a producer on a stream.  Must call BecomeProducer first.");
             }
-            
+
             await _producer.OnNextAsync(_numProducedItems + 1);
 
             // update after send in case of error

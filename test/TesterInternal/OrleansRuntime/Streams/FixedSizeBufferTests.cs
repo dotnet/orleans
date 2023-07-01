@@ -1,6 +1,4 @@
-﻿
-using System;
-using Orleans.Providers.Streams.Common;
+﻿using Orleans.Providers.Streams.Common;
 using Xunit;
 
 namespace UnitTests.OrleansRuntime.Streams
@@ -17,7 +15,7 @@ namespace UnitTests.OrleansRuntime.Streams
             public FixedSizeBuffer Allocate()
             {
                 Allocated++;
-                return new FixedSizeBuffer(TestBlockSize) {Pool = this};
+                return new FixedSizeBuffer(TestBlockSize) { Pool = this };
             }
 
             public void Free(FixedSizeBuffer resource)

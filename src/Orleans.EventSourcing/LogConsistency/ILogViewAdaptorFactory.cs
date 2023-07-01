@@ -6,7 +6,7 @@ namespace Orleans.EventSourcing
     /// <summary>
     /// Interface to be implemented for a log-view adaptor factory
     /// </summary>
-    public interface ILogViewAdaptorFactory  
+    public interface ILogViewAdaptorFactory
     {
         /// <summary> Returns true if a storage provider is required for constructing adaptors. </summary>
         bool UsesStorageProvider { get; }

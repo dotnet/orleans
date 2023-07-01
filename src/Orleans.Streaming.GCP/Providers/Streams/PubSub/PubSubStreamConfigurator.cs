@@ -1,6 +1,5 @@
 using Orleans.Configuration;
 using Orleans.Providers.GCP.Streams.PubSub;
-using System;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 

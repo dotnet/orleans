@@ -1,7 +1,5 @@
-using System;
 using System.Buffers;
 using System.Collections;
-using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Runtime.CompilerServices;
 using System.Runtime.ExceptionServices;
@@ -279,7 +277,7 @@ namespace Orleans.Serialization
             writer.WriteStartObject(fieldIdDelta, expectedType, typeof(ExceptionCodec));
             SerializeException(ref writer, (Exception)value);
             writer.WriteEndObject();
-       }
+        }
 
         /// <inheritdoc />
         public Exception ReadValue<TInput>(ref Reader<TInput> reader, Field field)
@@ -313,7 +311,7 @@ namespace Orleans.Serialization
 
             return DeserializeException(ref reader, field);
         }
-                                
+
         public Exception DeserializeException<TInput>(ref Reader<TInput> reader, Field field)
         {
             field.EnsureWireTypeTagDelimited();

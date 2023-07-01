@@ -1,5 +1,3 @@
-using System;
-using System.Collections.Generic;
 using Azure.Messaging.EventHubs;
 using Orleans.Providers.Streams.Common;
 using Orleans.Runtime;
@@ -63,7 +61,7 @@ namespace Orleans.Streaming.EventHubs
         {
             return new CachedMessage()
             {
-                StreamId = streamPosition.StreamId, 
+                StreamId = streamPosition.StreamId,
                 SequenceNumber = queueMessage.SequenceNumber,
                 EventIndex = streamPosition.SequenceToken.EventIndex,
                 EnqueueTimeUtc = queueMessage.EnqueuedTime.UtcDateTime,

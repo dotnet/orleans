@@ -1,8 +1,5 @@
-using System;
 using System.Globalization;
-using System.Linq;
 using System.Net;
-using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Orleans.AzureUtils;
 using Orleans.Runtime;
@@ -61,7 +58,7 @@ namespace Tester.AzureUtils
         // Use TestCleanup to run code after each test has run
         public void Dispose()
         {
-            if(manager != null && SiloInstanceTableTestConstants.DeleteEntriesAfterTest)
+            if (manager != null && SiloInstanceTableTestConstants.DeleteEntriesAfterTest)
             {
                 TimeSpan timeout = SiloInstanceTableTestConstants.Timeout;
 
@@ -201,16 +198,16 @@ namespace Tester.AzureUtils
             RegisterSiloInstance();
 
             var gateways = await manager.FindAllGatewayProxyEndpoints();
-            Assert.Equal(0,  gateways.Count);  // "Number of gateways before Silo.Activate"
+            Assert.Equal(0, gateways.Count);  // "Number of gateways before Silo.Activate"
 
             await manager.ActivateSiloInstance(myEntry);
 
             gateways = await manager.FindAllGatewayProxyEndpoints();
-            Assert.Equal(1,  gateways.Count);  // "Number of gateways after Silo.Activate"
+            Assert.Equal(1, gateways.Count);  // "Number of gateways after Silo.Activate"
 
             Uri myGateway = gateways.First();
-            Assert.Equal(myEntry.Address,  myGateway.Host.ToString());  // "Gateway address"
-            Assert.Equal(myEntry.ProxyPort,  myGateway.Port.ToString(CultureInfo.InvariantCulture));  // "Gateway port"
+            Assert.Equal(myEntry.Address, myGateway.Host.ToString());  // "Gateway address"
+            Assert.Equal(myEntry.ProxyPort, myGateway.Port.ToString(CultureInfo.InvariantCulture));  // "Gateway port"
         }
 
         [SkippableFact, TestCategory("Functional")]
@@ -232,7 +229,7 @@ namespace Tester.AzureUtils
 
             output.WriteLine("SiloAddress result = {0} From Row Key string = {1}", fromRowKey, MembershipRowKey);
 
-            Assert.Equal(siloAddress,  fromRowKey);
+            Assert.Equal(siloAddress, fromRowKey);
             Assert.Equal(SiloInstanceTableEntry.ConstructRowKey(siloAddress), SiloInstanceTableEntry.ConstructRowKey(fromRowKey));
         }
 
@@ -287,7 +284,7 @@ namespace Tester.AzureUtils
             Assert.Equal(referenceEntry.DeploymentId, entry.DeploymentId);
             Assert.Equal(referenceEntry.Address, entry.Address);
             Assert.Equal(referenceEntry.Port, entry.Port);
-            Assert.Equal(referenceEntry.Generation,  entry.Generation);
+            Assert.Equal(referenceEntry.Generation, entry.Generation);
             Assert.Equal(referenceEntry.HostName, entry.HostName);
             //Assert.Equal(referenceEntry.Status, entry.Status);
             Assert.Equal(referenceEntry.ProxyPort, entry.ProxyPort);

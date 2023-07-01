@@ -1,7 +1,3 @@
-using System;
-using System.Linq;
-using System.Threading;
-using System.Threading.Tasks;
 using Orleans.Tests.SqlUtils;
 using UnitTests.General;
 using Xunit;
@@ -40,8 +36,8 @@ namespace UnitTests.StorageTests.AdoNet
         [SkippableFact, TestCategory("Functional")]
         public async Task Streaming_SqlServer_Test()
         {
-            using(var tokenSource = new CancellationTokenSource(StreamCancellationTimeoutLimit))
-            {                
+            using (var tokenSource = new CancellationTokenSource(StreamCancellationTimeoutLimit))
+            {
                 var isMatch = await Task.WhenAll(InsertAndReadStreamsAndCheckMatch(_storage, StreamSizeToBeInsertedInBytes, NumberOfParallelStreams, tokenSource.Token));
                 Assert.True(isMatch.All(i => i), "All inserted streams should be equal to read streams.");
             }

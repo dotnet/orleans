@@ -1,9 +1,4 @@
-﻿
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
-using Orleans.Transactions.TestKit;
+﻿using Orleans.Transactions.TestKit;
 using Xunit;
 using Xunit.Abstractions;
 
@@ -34,7 +29,7 @@ namespace Orleans.Transactions.Tests
         public async Task AllSupportedAttributesFromOutsideTransactionTest()
         {
             ITransactionAttributionGrain top = this.grainFactory.GetTransactionAttributionGrain(Guid.NewGuid());
-            List<ITransactionAttributionGrain>[] tiers = 
+            List<ITransactionAttributionGrain>[] tiers =
             {
                 new List<ITransactionAttributionGrain>(new[] {
                     this.grainFactory.GetTransactionAttributionGrain(Guid.NewGuid()),
@@ -47,7 +42,7 @@ namespace Orleans.Transactions.Tests
             };
 
             List<string>[] results = await top.GetNestedTransactionIds(0, tiers);
-            for(int i=0; i<results.Length; i++)
+            for (int i = 0; i < results.Length; i++)
             {
                 this.output.WriteLine($"{i} => {string.Join(",", results[i])}");
             }

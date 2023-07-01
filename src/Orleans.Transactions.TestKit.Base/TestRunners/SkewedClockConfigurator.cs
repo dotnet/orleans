@@ -1,6 +1,4 @@
-﻿using System;
-using Microsoft.Extensions.DependencyInjection;
-using Orleans.Hosting;
+﻿using Microsoft.Extensions.DependencyInjection;
 using Orleans.TestingHost;
 
 namespace Orleans.Transactions.TestKit

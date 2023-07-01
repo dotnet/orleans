@@ -1,7 +1,3 @@
-
-using System;
-using System.Collections.Generic;
-using Microsoft.Extensions.Options;
 using Orleans.Providers.Streams.Generator;
 
 namespace Orleans.Hosting
@@ -25,7 +21,7 @@ namespace Orleans.Hosting
         /// Gets the stream generator type
         /// </summary>
         /// <value>The type of the stream generator.</value>
-        public Type StreamGeneratorType => typeof (SimpleGenerator);
+        public Type StreamGeneratorType => typeof(SimpleGenerator);
 
         /// <summary>
         /// Gets or sets the number of events to generate.

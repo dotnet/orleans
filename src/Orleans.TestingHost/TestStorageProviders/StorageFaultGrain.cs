@@ -1,12 +1,6 @@
-
-using System;
-using System.Collections.Generic;
-using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Orleans.Runtime;
 using Microsoft.Extensions.DependencyInjection;
-using System.Threading;
-using Orleans.Timers.Internal;
 
 namespace Orleans.TestingHost
 {
@@ -24,7 +18,7 @@ namespace Orleans.TestingHost
         public override async Task OnActivateAsync(CancellationToken cancellationToken)
         {
             await base.OnActivateAsync(cancellationToken);
-            logger = this.ServiceProvider.GetService<ILoggerFactory>().CreateLogger($"{typeof (StorageFaultGrain).FullName}-{IdentityString}-{RuntimeIdentity}");
+            logger = this.ServiceProvider.GetService<ILoggerFactory>().CreateLogger($"{typeof(StorageFaultGrain).FullName}-{IdentityString}-{RuntimeIdentity}");
             readFaults = new();
             writeFaults = new();
             clearfaults = new();

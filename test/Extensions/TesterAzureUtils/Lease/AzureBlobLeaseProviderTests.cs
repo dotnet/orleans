@@ -10,7 +10,7 @@ namespace Tester.AzureUtils.Lease
     public class AzureBlobLeaseProviderTests : GoldenPathLeaseProviderTestRunner
     {
         public AzureBlobLeaseProviderTests(ITestOutputHelper output)
-            :base(CreateLeaseProvider(), output)
+            : base(CreateLeaseProvider(), output)
         {
         }
 

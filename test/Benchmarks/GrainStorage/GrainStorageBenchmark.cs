@@ -1,12 +1,7 @@
-using System;
-using System.Threading.Tasks;
 using System.Diagnostics;
-using Orleans.Hosting;
 using Orleans.TestingHost;
 using TestExtensions;
 using BenchmarkGrainInterfaces.GrainStorage;
-using System.Collections.Generic;
-using System.Linq;
 
 namespace Benchmarks.GrainStorage
 {
@@ -107,7 +102,7 @@ namespace Benchmarks.GrainStorage
             await Task.WhenAny(waitTasks);
             running = false;
             var runResults = await runTask;
-            sw.Stop(); 
+            sw.Stop();
             var reports = runResults.SelectMany(r => r).ToList();
 
             var stored = reports.Count(r => r.Success);

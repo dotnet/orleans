@@ -1,10 +1,5 @@
-using System;
 using System.Diagnostics;
-using System.Threading;
-using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
-using Orleans;
-using Orleans.Runtime;
 using Orleans.Streams;
 using UnitTests.GrainInterfaces;
 
@@ -102,7 +97,7 @@ namespace UnitTests.Grains
             {
                 eventsConsumedCount++;
             }
-            else if(failPeriodTimer.Elapsed >= failPeriod)
+            else if (failPeriodTimer.Elapsed >= failPeriod)
             {
                 failPeriodTimer = null;
                 eventsConsumedCount++;

@@ -1,15 +1,10 @@
-using System;
-using System.Collections.Generic;
 using System.Diagnostics;
 using System.Globalization;
 using System.Text;
-using System.Threading;
-using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
-using Orleans;
 using Orleans.Concurrency;
 using Orleans.Configuration;
 using Orleans.Runtime;
@@ -780,7 +775,7 @@ namespace UnitTests.Grains
         {
             logger.LogInformation(" ==================================== Test1 Started");
             CheckRuntimeEnvironment();
-            for (var i = 1*Multiple; i < 2*Multiple; i++)
+            for (var i = 1 * Multiple; i < 2 * Multiple; i++)
             {
                 var t1 = SetOne(i);
                 await t1;
@@ -806,7 +801,7 @@ namespace UnitTests.Grains
         {
             logger.LogInformation("==================================== Test2 Started");
             CheckRuntimeEnvironment();
-            for (var i = 2*Multiple; i < 3*Multiple; i++)
+            for (var i = 2 * Multiple; i < 3 * Multiple; i++)
             {
                 var t1 = _other.SetOne(i);
                 await t1;
@@ -961,10 +956,10 @@ namespace UnitTests.Grains
             await Task.WhenAll(tasks);
             logger.LogInformation("Test1.Finish");
             CheckRuntimeEnvironment("Test1.Finish-CheckRuntimeEnvironment");
-//#if DEBUG
-//            // HACK for testing
-//            Logger.SetTraceLevelOverrides(overridesOff.ToList());
-//#endif
+            //#if DEBUG
+            //            // HACK for testing
+            //            Logger.SetTraceLevelOverrides(overridesOff.ToList());
+            //#endif
         }
 
         public async Task Task_Delay(bool doStart)

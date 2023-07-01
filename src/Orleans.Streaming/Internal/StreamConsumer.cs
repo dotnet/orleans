@@ -1,7 +1,3 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Orleans.Runtime;
 using Orleans.Streams.Core;
@@ -10,18 +6,18 @@ namespace Orleans.Streams
 {
     internal class StreamConsumer<T> : IInternalAsyncObservable<T>
     {
-        internal bool                               IsRewindable { get; private set; }
+        internal bool IsRewindable { get; private set; }
 
-        private readonly StreamImpl<T>              stream;
-        private readonly string                     streamProviderName;
+        private readonly StreamImpl<T> stream;
+        private readonly string streamProviderName;
         [NonSerialized]
-        private readonly IStreamProviderRuntime     providerRuntime;
+        private readonly IStreamProviderRuntime providerRuntime;
         [NonSerialized]
-        private readonly IStreamPubSub              pubSub;
-        private StreamConsumerExtension             myExtension;
-        private IStreamConsumerExtension            myGrainReference;
+        private readonly IStreamPubSub pubSub;
+        private StreamConsumerExtension myExtension;
+        private IStreamConsumerExtension myGrainReference;
         [NonSerialized]
-        private readonly AsyncLock                  bindExtLock;
+        private readonly AsyncLock bindExtLock;
         [NonSerialized]
         private readonly ILogger logger;
 
@@ -191,7 +187,7 @@ namespace Orleans.Streams
 
             await BindExtensionLazy();
 
-            List<StreamSubscription> subscriptions= await pubSub.GetAllSubscriptions(stream.InternalStreamId, myGrainReference.GetGrainId());
+            List<StreamSubscription> subscriptions = await pubSub.GetAllSubscriptions(stream.InternalStreamId, myGrainReference.GetGrainId());
             return subscriptions.Select(sub => new StreamSubscriptionHandleImpl<T>(GuidId.GetGuidId(sub.SubscriptionId), stream))
                                   .ToList<StreamSubscriptionHandle<T>>();
         }
@@ -215,7 +211,8 @@ namespace Orleans.Streams
             {
                 await Task.WhenAll(tasks);
 
-            } catch (Exception exc)
+            }
+            catch (Exception exc)
             {
                 logger.LogWarning(
                     (int)ErrorCode.StreamProvider_ConsumerFailedToUnregister,
@@ -246,7 +243,7 @@ namespace Orleans.Streams
                     {
                         if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug("BindExtensionLazy - Binding local extension to stream runtime={ProviderRuntime}", providerRuntime);
                         (myExtension, myGrainReference) = providerRuntime.BindExtension<StreamConsumerExtension, IStreamConsumerExtension>(() => new StreamConsumerExtension(providerRuntime));
-                        if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug("BindExtensionLazy - Connected Extension={Extension} GrainRef={GrainReference}", myExtension, myGrainReference);                        
+                        if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug("BindExtensionLazy - Connected Extension={Extension} GrainRef={GrainReference}", myExtension, myGrainReference);
                     }
                 }
             }

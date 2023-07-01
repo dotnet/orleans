@@ -1,4 +1,3 @@
-using System;
 using System.Collections.Immutable;
 using System.Text;
 
@@ -72,7 +71,7 @@ namespace Orleans.Runtime
 
         [Id(0)]
         public MembershipVersion Version { get; }
-        
+
         [Id(1)]
         public ImmutableDictionary<SiloAddress, MembershipEntry> Entries { get; }
 

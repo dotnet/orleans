@@ -1,5 +1,4 @@
 using MessagePack;
-using Orleans;
 using ProtoBuf;
 
 namespace Benchmarks.Serialization.Models;

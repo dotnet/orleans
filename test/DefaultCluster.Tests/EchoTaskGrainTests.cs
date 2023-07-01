@@ -1,13 +1,10 @@
-using System;
 using System.Diagnostics;
-using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Orleans.Internal;
 using Orleans.Runtime;
 using TestExtensions;
 using UnitTests.GrainInterfaces;
 using Xunit;
-using Xunit.Sdk;
 
 namespace DefaultCluster.Tests.General
 {
@@ -57,7 +54,7 @@ namespace DefaultCluster.Tests.General
         public async Task EchoGrain_EchoError()
         {
             grain = this.GrainFactory.GetGrain<IEchoTaskGrain>(Guid.NewGuid());
-        
+
             Task<string> promise = grain.EchoErrorAsync(expectedEchoError);
             await promise.ContinueWith(t =>
             {
@@ -74,7 +71,7 @@ namespace DefaultCluster.Tests.General
         public async Task EchoGrain_Timeout_Wait()
         {
             grain = this.GrainFactory.GetGrain<IEchoTaskGrain>(Guid.NewGuid());
-        
+
             TimeSpan delay30 = TimeSpan.FromSeconds(30); // grain call timeout (set in config)
             TimeSpan delay45 = TimeSpan.FromSeconds(45);
             TimeSpan delay60 = TimeSpan.FromSeconds(60);
@@ -99,7 +96,7 @@ namespace DefaultCluster.Tests.General
         public async Task EchoGrain_Timeout_Await()
         {
             grain = this.GrainFactory.GetGrain<IEchoTaskGrain>(Guid.NewGuid());
-            
+
             TimeSpan delay30 = TimeSpan.FromSeconds(30);
             TimeSpan delay60 = TimeSpan.FromSeconds(60);
             Stopwatch sw = new Stopwatch();
@@ -123,7 +120,7 @@ namespace DefaultCluster.Tests.General
         public async Task EchoGrain_Timeout_Result()
         {
             grain = this.GrainFactory.GetGrain<IEchoTaskGrain>(Guid.NewGuid());
-            
+
             TimeSpan delay30 = TimeSpan.FromSeconds(30);
             TimeSpan delay60 = TimeSpan.FromSeconds(60);
             Stopwatch sw = new Stopwatch();
@@ -177,7 +174,7 @@ namespace DefaultCluster.Tests.General
 
             what = "EchoGrain.Ping";
             clock.Restart();
-            
+
             await grain.PingAsync().WithTimeout(timeout);
             this.Logger.LogInformation("{What} took {Elapsed}", what, clock.Elapsed);
         }

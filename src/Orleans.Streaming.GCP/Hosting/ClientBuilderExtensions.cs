@@ -1,4 +1,3 @@
-using System;
 using Orleans.Configuration;
 using Orleans.Providers.GCP.Streams.PubSub;
 
@@ -14,7 +13,7 @@ namespace Orleans.Hosting
             string name, Action<PubSubOptions> configurePubSub)
             where TDataAdapter : IPubSubDataAdapter
         {
-            builder.AddPubSubStreams<TDataAdapter>(name, b=>b.ConfigurePubSub(ob => ob.Configure(configurePubSub)));
+            builder.AddPubSubStreams<TDataAdapter>(name, b => b.ConfigurePubSub(ob => ob.Configure(configurePubSub)));
             return builder;
         }
 

@@ -1,11 +1,4 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading;
-using System.Threading.Tasks;
-using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
-using Orleans;
 using Xunit;
 
 namespace Tester
@@ -24,7 +17,7 @@ namespace Tester
             Dictionary<TestStages, List<Observer>> observersByStage = await RunLifecycle(observerCountByStage, null, null);
 
             Assert.Equal(observerCountByStage.Count, observersByStage.Count);
-            foreach (KeyValuePair<TestStages,List<Observer>> kvp in observersByStage)
+            foreach (KeyValuePair<TestStages, List<Observer>> kvp in observersByStage)
             {
                 Assert.Equal(observerCountByStage[kvp.Key], kvp.Value.Count);
                 Assert.True(kvp.Value.All(o => o.Started));
@@ -58,13 +51,15 @@ namespace Tester
                         Assert.True(kvp.Value.All(o => o.Stopped));
                         Assert.True(kvp.Value.All(o => !o.FailedOnStart));
                         Assert.True(kvp.Value.All(o => !o.FailedOnStop));
-                    } else if (kvp.Key == stage)
+                    }
+                    else if (kvp.Key == stage)
                     {
                         Assert.True(kvp.Value.All(o => o.Started));
                         Assert.True(kvp.Value.All(o => o.Stopped));
                         Assert.True(kvp.Value.All(o => o.FailedOnStart));
                         Assert.True(kvp.Value.All(o => !o.FailedOnStop));
-                    } else if (kvp.Key > stage)
+                    }
+                    else if (kvp.Key > stage)
                     {
                         Assert.True(kvp.Value.All(o => !o.Started));
                         Assert.True(kvp.Value.All(o => !o.Stopped));
@@ -132,7 +127,7 @@ namespace Tester
             Assert.True(multiStageObserver.Stopped.Values.All(o => o));
         }
 
-        private async Task<Dictionary<TestStages,List<Observer>>> RunLifecycle(Dictionary<TestStages,int> observerCountByStage, TestStages? failOnStart, TestStages? failOnStop)
+        private async Task<Dictionary<TestStages, List<Observer>>> RunLifecycle(Dictionary<TestStages, int> observerCountByStage, TestStages? failOnStart, TestStages? failOnStop)
         {
             // setup lifecycle observers
             var observersByStage = new Dictionary<TestStages, List<Observer>>();
@@ -208,7 +203,7 @@ namespace Tester
         /// </summary>
         private class MultiStageObserver : ILifecycleParticipant<ILifecycleObservable>
         {
-            public Dictionary<TestStages,bool> Started { get; } = new Dictionary<TestStages, bool>(); 
+            public Dictionary<TestStages, bool> Started { get; } = new Dictionary<TestStages, bool>();
             public Dictionary<TestStages, bool> Stopped { get; } = new Dictionary<TestStages, bool>();
 
 

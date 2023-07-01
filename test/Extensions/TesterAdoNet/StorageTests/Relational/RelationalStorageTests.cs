@@ -1,11 +1,8 @@
 using Microsoft.Extensions.DependencyInjection;
-using Orleans;
 using Orleans.Runtime;
 using Orleans.Serialization;
 using Orleans.Storage;
-using System.Threading.Tasks;
 using UnitTests.StorageTests.Relational.TestDataSets;
-using Xunit;
 
 
 namespace UnitTests.StorageTests.Relational
@@ -39,7 +36,7 @@ namespace UnitTests.StorageTests.Relational
         {
             Fixture = fixture;
             var persistenceStorage = fixture.GetStorageProvider(adoNetInvariant).GetAwaiter().GetResult();
-            if(persistenceStorage != null)
+            if (persistenceStorage != null)
             {
                 PersistenceStorageTests = new CommonStorageTests(persistenceStorage);
             }

@@ -1,5 +1,3 @@
-using System;
-using System.Collections.Generic;
 using Microsoft.Extensions.Options;
 using Orleans.Runtime;
 using Orleans.Serialization.Configuration;
@@ -14,12 +12,12 @@ namespace Orleans.Configuration
         /// <summary>
         /// Gets a collection of metadata about grain classes.
         /// </summary>
-        public HashSet<Type> Classes { get; } = new ();
+        public HashSet<Type> Classes { get; } = new();
 
         /// <summary>
         /// Gets a collection of metadata about grain interfaces.
         /// </summary>
-        public HashSet<Type> Interfaces { get; } = new ();
+        public HashSet<Type> Interfaces { get; } = new();
     }
 
     /// <summary>

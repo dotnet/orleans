@@ -1,5 +1,3 @@
-using Orleans.Hosting;
-
 namespace Orleans.TestingHost
 {
     /// <summary>

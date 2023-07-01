@@ -1,8 +1,3 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading;
-using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Orleans.Runtime;
@@ -99,7 +94,7 @@ namespace Orleans.Streams
             }
             return Task.WhenAll(queueBalanceListenersCopy.Select(listener => listener.QueueDistributionChangeNotification()));
         }
-#endregion
+        #endregion
 
         private async Task ListenForClusterChanges()
         {
@@ -112,7 +107,7 @@ namespace Orleans.Streams
                     .Select(member => member.SiloAddress));
 
                 // if active list has changed, track new list and notify
-                if(!current.SetEquals(update))
+                if (!current.SetEquals(update))
                 {
                     current = update;
                     OnClusterMembershipChange(current);

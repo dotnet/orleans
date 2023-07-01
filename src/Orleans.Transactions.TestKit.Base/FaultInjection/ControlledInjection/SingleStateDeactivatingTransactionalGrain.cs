@@ -1,5 +1,3 @@
-using System.Threading;
-using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Orleans.Transactions.Abstractions;
 
@@ -63,7 +61,7 @@ namespace Orleans.Transactions.TestKit
                 this.data.FaultInjectionControl.FaultInjectionPhase = faultInjectionControl.FaultInjectionPhase;
                 this.data.FaultInjectionControl.FaultInjectionType = faultInjectionControl.FaultInjectionType;
             }
-           
+
             return this.data.PerformUpdate(d =>
             {
                 this.logger.LogInformation("Adding {NumberToAdd} to value {Value}.", numberToAdd, d.Value);

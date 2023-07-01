@@ -1,5 +1,3 @@
-using System;
-using System.Collections.Generic;
 using Microsoft.Extensions.Logging;
 using Orleans.Runtime;
 using Orleans.Streams;
@@ -67,7 +65,7 @@ namespace Orleans.Providers.Streams.Common
         {
             cachedMessages = new LinkedList<SimpleQueueCacheItem>();
             maxCacheSize = cacheSize;
-            
+
             this.logger = logger;
             cacheCursorHistogram = new List<CacheBucket>();
             CACHE_HISTOGRAM_MAX_BUCKET_SIZE = Math.Max(cacheSize / NUM_CACHE_HISTOGRAM_BUCKETS, 1); // we have 10 buckets

@@ -1,9 +1,3 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
-using Orleans;
-
 namespace Tester.AzureUtils.Utilities
 {
     /// <summary>
@@ -22,7 +16,7 @@ namespace Tester.AzureUtils.Utilities
 
         private readonly HashSet<Task> running;
         private readonly int capacity;
-        private readonly LinkedList<Tuple<Task,TaskCompletionSource<bool>>> waiting;
+        private readonly LinkedList<Tuple<Task, TaskCompletionSource<bool>>> waiting;
         private readonly object lockable;
 
         /// <summary>
@@ -40,7 +34,7 @@ namespace Tester.AzureUtils.Utilities
         /// </summary>
         public AsyncPipeline() :
             this(DEFAULT_CAPACITY)
-        {}
+        { }
 
         /// <summary>
         /// Constructs an empty AsyncPipeline with a given capacity.
@@ -177,13 +171,13 @@ namespace Tester.AzureUtils.Utilities
         {
             while (!IsFull && waiting.Count > 0)
             {
-                Tuple<Task,TaskCompletionSource<bool>> next = waiting.First();
+                Tuple<Task, TaskCompletionSource<bool>> next = waiting.First();
                 waiting.RemoveFirst();
                 Task task = next.Item1;
-                if(!task.IsCompleted)
+                if (!task.IsCompleted)
                 {
                     task.ContinueWith(OnTaskCompletion).Ignore();
-                   running.Add(task);
+                    running.Add(task);
                 }
                 next.Item2.SetResult(true);
             }

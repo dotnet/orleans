@@ -1,8 +1,4 @@
-﻿using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
-
-namespace Orleans.Transactions.TestKit
+﻿namespace Orleans.Transactions.TestKit
 {
     public interface IFaultInjectionTransactionCoordinatorGrain : IGrainWithGuidKey
     {
@@ -10,7 +6,7 @@ namespace Orleans.Transactions.TestKit
         Task MultiGrainSet(List<IFaultInjectionTransactionTestGrain> grains, int numberToAdd);
 
         [Transaction(TransactionOption.Create)]
-        Task MultiGrainAddAndFaultInjection(List<IFaultInjectionTransactionTestGrain> grains, int numberToAdd, 
+        Task MultiGrainAddAndFaultInjection(List<IFaultInjectionTransactionTestGrain> grains, int numberToAdd,
             FaultInjectionControl faultInjection = null);
     }
     public class FaultInjectionTransactionCoordinatorGrain : Grain, IFaultInjectionTransactionCoordinatorGrain

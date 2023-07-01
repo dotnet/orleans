@@ -1,6 +1,3 @@
-using System.Threading.Tasks;
-using Orleans;
-
 namespace UnitTests.GrainInterfaces
 {
     public interface IChainedGrain : IGrainWithIntegerKey
@@ -19,7 +16,7 @@ namespace UnitTests.GrainInterfaces
         Task PassThisNested(ChainGrainHolder next);
         Task PassNullNested(ChainGrainHolder next);
     }
-    
+
     [GenerateSerializer]
     public class ChainGrainHolder
     {

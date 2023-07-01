@@ -1,6 +1,4 @@
-﻿using System;
-
-namespace Orleans.Runtime.Messaging
+﻿namespace Orleans.Runtime.Messaging
 {
     internal sealed class ConnectionCommon
     {

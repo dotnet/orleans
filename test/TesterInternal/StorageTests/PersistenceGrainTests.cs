@@ -1,11 +1,6 @@
 //#define REREAD_STATE_AFTER_WRITE_FAILED
 
-using System;
-using System.Collections.Generic;
 using System.Diagnostics;
-using System.Linq;
-using System.Threading.Tasks;
-using Orleans;
 using Orleans.Runtime;
 using Orleans.Storage;
 using Orleans.TestingHost;
@@ -15,7 +10,6 @@ using Xunit;
 using Xunit.Abstractions;
 using TesterInternal;
 using TestExtensions;
-using Orleans.Hosting;
 using Orleans.Internal;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -164,7 +158,7 @@ namespace UnitTests.StorageTests
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Persistence"), TestCategory("Generics")]
-        public async Task Persistence_Grain_Activate_StoredValue_Generic() 
+        public async Task Persistence_Grain_Activate_StoredValue_Generic()
         {
             const string providerName = MockStorageProviderName1;
             Guid guid = Guid.NewGuid();
@@ -254,7 +248,7 @@ namespace UnitTests.StorageTests
             Assert.Equal(1, providerState.ProviderStateForTest.ReadCount); // StorageProvider #Reads
             Assert.Equal(0, providerState.ProviderStateForTest.WriteCount); // StorageProvider #Writes
             SetStoredValue(providerName, typeof(MockStorageProvider).FullName, DefaultGrainStateName, grain, "Field1", 42);
-            
+
             await grain.DoRead();
             providerState = GetStateForStorageProviderInUse(providerName, typeof(MockStorageProvider).FullName);
             Assert.Equal(2, providerState.ProviderStateForTest.ReadCount); // StorageProvider #Reads-2
@@ -262,7 +256,7 @@ namespace UnitTests.StorageTests
 
             Assert.Equal(42, providerState.LastStoredGrainState.Field1); // Store-Field1
         }
-        
+
         [Fact, TestCategory("Functional"), TestCategory("Persistence"), TestCategory("MemoryStore")]
         public async Task MemoryStore_Read_Write()
         {
@@ -325,12 +319,12 @@ namespace UnitTests.StorageTests
 
             TimeSpan elapsed = sw.Elapsed;
             double tps = (numIterations * 2) / elapsed.TotalSeconds; // One Read and one Write per iteration
-            output.WriteLine("{0} Completed Read-Write operations in {1} at {2} TPS",  numIterations, elapsed, tps);
+            output.WriteLine("{0} Completed Read-Write operations in {1} at {2} TPS", numIterations, elapsed, tps);
 
             for (int i = 0; i < numIterations; i++)
             {
                 int expectedVal = i;
-                Assert.Equal(expectedVal,  promises[i].Result);  //  "Returned value - Read @ #" + i
+                Assert.Equal(expectedVal, promises[i].Result);  //  "Returned value - Read @ #" + i
             }
         }
 
@@ -627,7 +621,7 @@ namespace UnitTests.StorageTests
 
             Assert.Equal(expectedVal, val); // Returned value
             await SetErrorInjection(providerName, ErrorInjectionPoint.BeforeRead);
-            
+
             await CheckStorageProviderErrors(grain.DoRead);
 
             await SetErrorInjection(providerName, ErrorInjectionPoint.None);
@@ -756,7 +750,7 @@ namespace UnitTests.StorageTests
         {
             var target = this.HostedCluster.GrainFactory.GetGrain<IPersistenceProviderErrorGrain>(Guid.NewGuid());
             var proxy = this.HostedCluster.GrainFactory.GetGrain<IPersistenceProviderErrorProxyGrain>(Guid.NewGuid());
-            
+
             // Record the original activation ids.
             var targetActivationId = await target.GetActivationId();
             var proxyActivationId = await proxy.GetActivationId();
@@ -981,7 +975,7 @@ namespace UnitTests.StorageTests
             for (int i = 0; i < numIterations; i++)
             {
                 int expectedVal = i;
-                Assert.Equal(expectedVal,  promises[i].Result);  //  "Returned value - Read @ #" + i
+                Assert.Equal(expectedVal, promises[i].Result);  //  "Returned value - Read @ #" + i
             }
         }
 
@@ -1013,9 +1007,9 @@ namespace UnitTests.StorageTests
             Assert.NotNull(exc.InnerException); // BaseException.InnerException should not be null
             Assert.IsAssignableFrom<BadProviderConfigException>(exc.InnerException);
 
-            Assert.StartsWith(msg3,  ae.Message);  //  "AggregateException.Message should be '{0}'", msg3
-            Assert.Equal(msg2,  exc.Message);  //  "OrleansException.Message should be '{0}'", msg2
-            Assert.Equal(msg1,  exc.InnerException.Message);  //  "InnerException.Message should be '{0}'", msg1
+            Assert.StartsWith(msg3, ae.Message);  //  "AggregateException.Message should be '{0}'", msg3
+            Assert.Equal(msg2, exc.Message);  //  "OrleansException.Message should be '{0}'", msg2
+            Assert.Equal(msg1, exc.InnerException.Message);  //  "InnerException.Message should be '{0}'", msg1
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Persistence"), TestCategory("MemoryStore")]
@@ -1269,7 +1263,7 @@ namespace UnitTests.StorageTests
                providerName, (int)MockStorageProvider.Commands.GetProvideState, null).Result;
             object[] replies2 = mgmtGrain.SendControlCommandToProvider(providerTypeFullName,
                               providerName, (int)MockStorageProvider.Commands.GetLastState, null).Result;
-            for(int i = 0; i < replies.Length; i++)
+            for (int i = 0; i < replies.Length; i++)
             {
                 MockStorageProvider.StateForTest state = (MockStorageProvider.StateForTest)replies[i];
                 PersistenceTestGrainState grainState = (PersistenceTestGrainState)replies2[i];
@@ -1280,7 +1274,7 @@ namespace UnitTests.StorageTests
                     return providerState;
                 }
             }
-            
+
             return providerState;
         }
 

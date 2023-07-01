@@ -1,5 +1,3 @@
-using System.Collections.Generic;
-
 #if CLUSTERING_ADONET
 namespace Orleans.Clustering.AdoNet.Storage
 #elif PERSISTENCE_ADONET

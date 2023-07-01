@@ -1,8 +1,4 @@
-using System;
-using System.Threading.Tasks;
 using Xunit;
-using Orleans;
-using Orleans.Hosting;
 using Orleans.Runtime;
 using Orleans.TestingHost;
 using TestExtensions;
@@ -120,15 +116,18 @@ namespace DefaultCluster.Tests
         }
 
         [Fact, TestCategory("Providers"), TestCategory("BVT"), TestCategory("Cast"), TestCategory("Generics")]
-        public async Task Providers_ReferenceNonGenericExtensionOfGenericInterface() {
+        public async Task Providers_ReferenceNonGenericExtensionOfGenericInterface()
+        {
             var grain = this.fixture.GrainFactory.GetGrain<IGenericGrainWithNonGenericExtension<int>>(GetRandomGrainId());
             await grain.DoSomething(); //original generic grain activates here
 
             var extension = grain.AsReference<ISimpleExtension>();
-            try {
+            try
+            {
                 var res = await extension.CheckExtension_1();
             }
-            catch(Exception ex) {
+            catch (Exception ex)
+            {
                 Assert.True(false, "No exception should have been thrown. Ex: " + ex.Message);
             }
 

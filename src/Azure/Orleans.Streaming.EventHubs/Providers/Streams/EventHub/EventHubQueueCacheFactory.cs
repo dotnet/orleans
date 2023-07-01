@@ -1,9 +1,6 @@
-using System;
 using Microsoft.Extensions.Logging;
 using Orleans.Configuration;
 using Orleans.Providers.Streams.Common;
-using Orleans.Runtime;
-using Orleans.Serialization;
 using Orleans.Streams;
 using Orleans.Streaming.EventHubs.StatisticMonitors;
 
@@ -40,7 +37,7 @@ namespace Orleans.Streaming.EventHubs
         /// </summary>
         public EventHubQueueCacheFactory(
             EventHubStreamCachePressureOptions cacheOptions,
-            StreamCacheEvictionOptions evictionOptions, 
+            StreamCacheEvictionOptions evictionOptions,
             StreamStatisticOptions statisticOptions,
             IEventHubDataAdapter dataAdater,
             EventHubMonitorAggregationDimensions sharedDimensions,
@@ -145,7 +142,7 @@ namespace Orleans.Streaming.EventHubs
             var cacheMonitor = this.CacheMonitorFactory(cacheMonitorDimensions, loggerFactory);
             var logger = loggerFactory.CreateLogger($"{typeof(EventHubQueueCache).FullName}.{sharedDimensions.EventHubPath}.{partition}");
             var evictionStrategy = new ChronologicalEvictionStrategy(logger, timePurge, cacheMonitor, statisticOptions.StatisticMonitorWriteInterval);
-            return new EventHubQueueCache(partition, EventHubAdapterReceiver.MaxMessagesPerRead, bufferPool, dataAdatper, evictionStrategy, checkpointer, logger,  
+            return new EventHubQueueCache(partition, EventHubAdapterReceiver.MaxMessagesPerRead, bufferPool, dataAdatper, evictionStrategy, checkpointer, logger,
                 cacheMonitor, statisticOptions.StatisticMonitorWriteInterval, streamCacheEvictionOptions.MetadataMinTimeInCache);
         }
     }

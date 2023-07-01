@@ -1,5 +1,4 @@
 using Microsoft.Extensions.Logging;
-using System;
 using Xunit.Abstractions;
 
 namespace TestExtensions
@@ -29,7 +28,7 @@ namespace TestExtensions
                 this.output = output;
                 this.category = category;
             }
-            
+
             public IDisposable BeginScope<TState>(TState state) => this;
 
             public void Dispose() { }

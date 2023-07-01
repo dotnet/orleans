@@ -1,4 +1,3 @@
-using System;
 using Orleans.Core;
 using Orleans.Timers;
 
@@ -30,7 +29,7 @@ namespace Orleans.Runtime
         /// </summary>
         ITimerRegistry TimerRegistry { get; }
 
-        
+
         /// <summary>
         /// Gets the service provider.
         /// </summary>

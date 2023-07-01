@@ -1,10 +1,5 @@
-using System;
-using System.Collections.Generic;
 using System.CommandLine;
 using System.CommandLine.Invocation;
-using System.Linq;
-using System.Threading;
-using System.Threading.Tasks;
 using DistributedTests.Common.MessageChannel;
 using Microsoft.Extensions.Logging;
 
@@ -52,7 +47,7 @@ namespace DistributedTests.Client.Commands
             _logger.LogInformation("Waiting {WaitSeconds} seconds before starting...", parameters.Wait);
             await Task.Delay(TimeSpan.FromSeconds(parameters.Wait));
 
-            for (var i=0; i<parameters.Rounds; i++)
+            for (var i = 0; i < parameters.Rounds; i++)
             {
                 _logger.LogInformation(
                     "Round #{Round}: sending {ServersPerRound} orders [Restart: {Restart}, Graceful: {Graceful}]",

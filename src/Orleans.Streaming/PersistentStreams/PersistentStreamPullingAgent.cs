@@ -1,14 +1,8 @@
-using System;
-using System.Collections.Generic;
 using System.Diagnostics.Metrics;
-using System.Linq;
-using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
-using Orleans.Concurrency;
 using Orleans.Configuration;
 using Orleans.Internal;
 using Orleans.Runtime;
-using Orleans.Statistics;
 using Orleans.Streams.Filtering;
 
 namespace Orleans.Streams
@@ -509,7 +503,7 @@ namespace Orleans.Streams
                     }
                     else
                     {
-                        if(this.logger.IsEnabled(LogLevel.Debug))
+                        if (this.logger.IsEnabled(LogLevel.Debug))
                             this.logger.LogDebug(
                                 $"Pulled new messages in stream {streamId} from the queue, but pulling agent haven't succeeded in" +
                                                               $"RegisterStream yet, will start deliver on this stream after RegisterStream succeeded");
@@ -834,8 +828,11 @@ namespace Orleans.Streams
 
                 ISet<PubSubSubscriptionState> streamData = null;
                 await AsyncExecutorWithRetries.ExecuteWithRetries(
-                                async i => { streamData =
-                                    await PubsubRegisterProducer(pubSub, streamId, GrainId, logger); },
+                                async i =>
+                                {
+                                    streamData =
+                                    await PubsubRegisterProducer(pubSub, streamId, GrainId, logger);
+                                },
                                 AsyncExecutorWithRetries.INFINITE_RETRIES,
                                 (exception, i) => !IsShutdown,
                                 Constants.INFINITE_TIMESPAN,

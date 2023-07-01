@@ -1,4 +1,3 @@
-using System;
 using System.Net;
 using System.Net.Sockets;
 using Microsoft.Extensions.Logging;
@@ -36,7 +35,7 @@ namespace Orleans.Configuration
                         }
                     }
                     else
-                    { 
+                    {
                         advertisedIPAddress = resolvedIP;
                     }
                 }
@@ -49,7 +48,7 @@ namespace Orleans.Configuration
                             $"Unable to find a suitable candidate for {nameof(EndpointOptions)}.{nameof(options.AdvertisedIPAddress)}. Falling back to {nameof(IPAddress.Loopback)} ({{AdvertisedIPAddress}})",
                             advertisedIPAddress);
                     }
-                }                
+                }
 
                 options.AdvertisedIPAddress = advertisedIPAddress;
             }

@@ -1,8 +1,6 @@
 using Microsoft.Extensions.Options;
 using Orleans.Runtime;
 using StackExchange.Redis;
-using System;
-using System.Threading.Tasks;
 
 namespace Orleans.Clustering.Redis
 {

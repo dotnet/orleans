@@ -1,7 +1,5 @@
 using Orleans.Runtime;
-using System.Collections.Generic;
 using System.Diagnostics.Metrics;
-using System.Threading;
 
 namespace Orleans.Providers.Streams.Common
 {
@@ -39,7 +37,7 @@ namespace Orleans.Providers.Streams.Common
         /// Initializes a new instance of the <see cref="DefaultBlockPoolMonitor"/> class.
         /// </summary>
         /// <param name="dimensions">The dimensions.</param>
-        public DefaultBlockPoolMonitor(BlockPoolMonitorDimensions dimensions) : this(new KeyValuePair<string, object>[] { new ("BlockPoolId", dimensions.BlockPoolId) })
+        public DefaultBlockPoolMonitor(BlockPoolMonitorDimensions dimensions) : this(new KeyValuePair<string, object>[] { new("BlockPoolId", dimensions.BlockPoolId) })
         {
         }
 

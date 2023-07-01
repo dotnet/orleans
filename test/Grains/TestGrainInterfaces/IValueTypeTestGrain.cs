@@ -1,8 +1,3 @@
-using System;
-using System.Collections.Generic;
-using System.Text.Json.Serialization;
-using System.Threading.Tasks;
-using Orleans;
 using Orleans.Concurrency;
 using ProtoBuf;
 
@@ -24,7 +19,7 @@ namespace UnitTests.GrainInterfaces
 
     [Serializable]
     [GenerateSerializer]
-    public enum TestEnum : byte 
+    public enum TestEnum : byte
     {
         First,
         Second,
@@ -42,15 +37,15 @@ namespace UnitTests.GrainInterfaces
         Enemy3
     }
 
-[GenerateSerializer]
-public class ClassWithEnumTestData
-{
-    [Id(0)]
-    public TestEnum EnumValue { get; set; }
+    [GenerateSerializer]
+    public class ClassWithEnumTestData
+    {
+        [Id(0)]
+        public TestEnum EnumValue { get; set; }
 
-    [Id(1)]
-    public CampaignEnemyTestType Enemy { get; set; }
-}
+        [Id(1)]
+        public CampaignEnemyTestType Enemy { get; set; }
+    }
 
     [ProtoContract]
     [Serializable]

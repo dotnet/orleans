@@ -1,10 +1,5 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
-using Orleans;
 using Orleans.Providers.Streams.Common;
 using Orleans.Providers.Streams.Generator;
 using Orleans.Runtime;
@@ -16,7 +11,6 @@ using TestGrainInterfaces;
 using TestGrains;
 using UnitTests.Grains;
 using Xunit;
-using Orleans.Hosting;
 using Orleans.Configuration;
 using Tester;
 
@@ -48,7 +42,7 @@ namespace ServiceBus.Tests.StreamingTests
                         {
                             options.ConfigureBlobServiceClient(TestDefaultConfiguration.DataConnectionString);
                         })
-                    .AddEventHubStreams(StreamProviderName, b=>
+                    .AddEventHubStreams(StreamProviderName, b =>
                     {
                         b.UseDynamicClusterConfigDeploymentBalancer();
                         b.ConfigureStreamPubSub(StreamPubSubType.ImplicitOnly);
@@ -73,7 +67,7 @@ namespace ServiceBus.Tests.StreamingTests
             public void Configure(IConfiguration configuration, IClientBuilder clientBuilder)
             {
                 clientBuilder
-                    .AddEventHubStreams(StreamProviderName, b=>
+                    .AddEventHubStreams(StreamProviderName, b =>
                     {
                         b.ConfigureEventHub(ob => ob.Configure(options =>
                         {
@@ -84,14 +78,14 @@ namespace ServiceBus.Tests.StreamingTests
             }
         }
 
-        [SkippableFact(Skip="https://github.com/dotnet/orleans/issues/5356")]
+        [SkippableFact(Skip = "https://github.com/dotnet/orleans/issues/5356")]
         public async Task ReloadFromCheckpointTest()
         {
             logger.LogInformation("************************ EHReloadFromCheckpointTest *********************************");
             await this.ReloadFromCheckpointTestRunner(ImplicitSubscription_RecoverableStream_CollectorGrain.StreamNamespace, 1, 256);
         }
 
-        [SkippableFact(Skip="https://github.com/dotnet/orleans/issues/5356")]
+        [SkippableFact(Skip = "https://github.com/dotnet/orleans/issues/5356")]
         public async Task RestartSiloAfterCheckpointTest()
         {
             logger.LogInformation("************************ EHRestartSiloAfterCheckpointTest *********************************");

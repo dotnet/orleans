@@ -14,10 +14,6 @@
 //
 //*********************************************************
 
-using System;
-using System.IO;
-using System.Threading.Tasks;
-
 namespace Samples.StorageProviders
 {
     /// <summary>
@@ -56,7 +52,7 @@ namespace Samples.StorageProviders
     /// <summary>
     /// Interfaces with the file system.
     /// </summary>
-    internal class GrainStateFileDataManager : IJSONStateDataManager 
+    internal class GrainStateFileDataManager : IJSONStateDataManager
     {
         /// <summary>
         /// Constructor

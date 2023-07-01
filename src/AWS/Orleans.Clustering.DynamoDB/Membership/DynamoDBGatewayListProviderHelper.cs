@@ -1,5 +1,3 @@
-using System;
-using System.Linq;
 using Orleans.Configuration;
 
 namespace Orleans.Clustering.DynamoDB

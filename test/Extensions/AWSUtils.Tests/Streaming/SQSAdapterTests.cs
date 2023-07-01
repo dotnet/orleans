@@ -1,10 +1,5 @@
-using System;
 using System.Collections.Concurrent;
-using System.Collections.Generic;
 using System.Globalization;
-using System.Linq;
-using System.Threading;
-using System.Threading.Tasks;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Orleans.Providers.Streams.Common;
@@ -17,7 +12,6 @@ using Xunit;
 using Xunit.Abstractions;
 using OrleansAWSUtils.Storage;
 using Orleans.Configuration;
-using Orleans.Internal;
 
 namespace AWSUtils.Tests.Streaming
 {

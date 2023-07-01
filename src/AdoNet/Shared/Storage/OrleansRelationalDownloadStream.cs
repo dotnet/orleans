@@ -1,8 +1,4 @@
-using System;
 using System.Data.Common;
-using System.IO;
-using System.Threading;
-using System.Threading.Tasks;
 
 #if CLUSTERING_ADONET
 namespace Orleans.Clustering.AdoNet.Storage
@@ -62,10 +58,10 @@ namespace Orleans.Tests.SqlUtils
         /// <param name="reader">The reader to use to read from the database.</param>
         /// <param name="ordinal">The column ordinal to read from.</param>
         public OrleansRelationalDownloadStream(DbDataReader reader, int ordinal)
-        {            
+        {
             this.reader = reader;
             this.ordinal = ordinal;
-                        
+
             //This return the total length of the column pointed by the ordinal.
             totalBytes = reader.GetBytes(ordinal, 0, null, 0, 0);
         }
@@ -126,9 +122,48 @@ namespace Orleans.Tests.SqlUtils
         {
             get { return position; }
             set { throw new NotSupportedException(); }
+
+            /* Unmerged change from project 'Orleans.Persistence.AdoNet (net7.0)'
+            Before:
+                    }
+
+
+                    /// <summary>
+            After:
+                    }
+
+
+                    /// <summary>
+            */
+
+            /* Unmerged change from project 'Orleans.Reminders.AdoNet (net7.0)'
+            Before:
+                    }
+
+
+                    /// <summary>
+            After:
+                    }
+
+
+                    /// <summary>
+            */
+
+            /* Unmerged change from project 'Orleans.Clustering.AdoNet (net7.0)'
+            Before:
+                    }
+
+
+                    /// <summary>
+            After:
+                    }
+
+
+                    /// <summary>
+            */
         }
 
-        
+
         /// <summary>
         /// Throws <exception cref="NotSupportedException"/>.
         /// </summary>        
@@ -152,10 +187,10 @@ namespace Orleans.Tests.SqlUtils
             ValidateReadParameters(buffer, offset, count);
 
             try
-            {                                                               
+            {
                 int length = Math.Min(count, (int)(totalBytes - position));
                 long bytesRead = 0;
-                if(length > 0)
+                if (length > 0)
                 {
                     bytesRead = reader.GetBytes(ordinal, position, buffer, offset, length);
                     position += bytesRead;
@@ -163,7 +198,7 @@ namespace Orleans.Tests.SqlUtils
 
                 return (int)bytesRead;
             }
-            catch(DbException dex)
+            catch (DbException dex)
             {
                 //It's not OK to throw non-IOExceptions from a Stream.
                 throw new IOException(dex.Message, dex);
@@ -184,7 +219,7 @@ namespace Orleans.Tests.SqlUtils
             //This will throw with the same parameter names if the parameters are not valid.
             ValidateReadParameters(buffer, offset, count);
 
-            if(cancellationToken.IsCancellationRequested)
+            if (cancellationToken.IsCancellationRequested)
             {
                 var tcs = new TaskCompletionSource<int>(TaskCreationOptions.RunContinuationsAsynchronously);
                 tcs.SetCanceled();
@@ -200,7 +235,7 @@ namespace Orleans.Tests.SqlUtils
 
                 return ret;
             }
-            catch(Exception e)
+            catch (Exception e)
             {
                 //Due to call to Read, this is for sure a IOException and can be thrown out.
                 var tcs = new TaskCompletionSource<int>(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -220,13 +255,13 @@ namespace Orleans.Tests.SqlUtils
         /// <remarks>Reading from the underlying ADO.NET provider is currently synchro</remarks>
         public override async Task CopyToAsync(Stream destination, int bufferSize, CancellationToken cancellationToken)
         {
-            if(!cancellationToken.IsCancellationRequested)
+            if (!cancellationToken.IsCancellationRequested)
             {
                 byte[] buffer = new byte[InternalReadBufferLength];
                 int bytesRead;
-                while((bytesRead = Read(buffer, 0, buffer.Length)) > 0)
+                while ((bytesRead = Read(buffer, 0, buffer.Length)) > 0)
                 {
-                    if(cancellationToken.IsCancellationRequested)
+                    if (cancellationToken.IsCancellationRequested)
                     {
                         break;
                     }
@@ -236,7 +271,7 @@ namespace Orleans.Tests.SqlUtils
             }
         }
 
-       
+
         /// <summary>
         /// Throws <exception cref="NotSupportedException"/>.
         /// </summary>
@@ -279,7 +314,7 @@ namespace Orleans.Tests.SqlUtils
         /// <param name="disposing">Whether is disposing or not.</param>
         protected override void Dispose(bool disposing)
         {
-            if(disposing)
+            if (disposing)
             {
                 reader = null;
             }
@@ -295,28 +330,28 @@ namespace Orleans.Tests.SqlUtils
         /// <param name="offset"></param>
         /// <param name="count"></param>
         private static void ValidateReadParameters(byte[] buffer, int offset, int count)
-        {            
-            if(buffer == null)
+        {
+            if (buffer == null)
             {
-                throw new ArgumentNullException("buffer");                    
+                throw new ArgumentNullException("buffer");
             }
-            if(offset < 0)
+            if (offset < 0)
             {
                 throw new ArgumentOutOfRangeException("offset");
             }
-            if(count < 0)
+            if (count < 0)
             {
                 throw new ArgumentOutOfRangeException("count");
             }
             try
             {
-                if(checked(offset + count) > buffer.Length)
+                if (checked(offset + count) > buffer.Length)
                 {
                     throw new ArgumentException("Invalid offset length");
                 }
             }
-            catch(OverflowException)
-            {                
+            catch (OverflowException)
+            {
                 throw new ArgumentException("Invalid offset length");
             }
         }

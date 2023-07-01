@@ -24,7 +24,8 @@ namespace Tester.Redis.Persistence
             var siloAddress = IPAddress.Loopback;
 
             var host = Host.CreateDefaultBuilder()
-                .UseOrleans((ctx, builder) => {
+                .UseOrleans((ctx, builder) =>
+                {
                     builder.Configure<ClusterOptions>(options => options.ClusterId = "TESTCLUSTER")
                         .UseDevelopmentClustering(options => options.PrimarySiloEndpoint = new IPEndPoint(siloAddress, siloPort))
                         .ConfigureEndpoints(siloAddress, siloPort, gatewayPort)

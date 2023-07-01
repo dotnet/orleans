@@ -1,17 +1,10 @@
 //#define USE_GENERICS
 //#define DELETE_AFTER_TEST
 
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading;
-using System.Threading.Tasks;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
-using Orleans;
 using Orleans.Configuration;
-using Orleans.Hosting;
 using Orleans.Providers.Streams.AzureQueue;
 using Orleans.Runtime;
 using Orleans.TestingHost;
@@ -27,7 +20,6 @@ using Tester.AzureUtils;
 using Orleans.Serialization.TypeSystem;
 using Microsoft.Extensions.Logging;
 using Orleans.Providers;
-using Orleans.Internal;
 
 // ReSharper disable ConvertToConstant.Local
 // ReSharper disable CheckNamespace
@@ -54,7 +46,7 @@ namespace UnitTests.Streaming.Reliability
 
             this.numExpectedSilos = 2;
             builder.CreateSiloAsync = StandaloneSiloHandle.CreateForAssembly(this.GetType().Assembly);
-            builder.Options.InitialSilosCount = (short) this.numExpectedSilos;
+            builder.Options.InitialSilosCount = (short)this.numExpectedSilos;
             builder.Options.UseTestClusterMembership = false;
 
             builder.AddSiloBuilderConfigurator<SiloBuilderConfigurator>();
@@ -218,7 +210,7 @@ namespace UnitTests.Streaming.Reliability
             StreamTestUtils.LogEndTest(testName, logger);
         }
 
-        [SkippableFact(Skip ="Ignore"), TestCategory("Failures"), TestCategory("Streaming"), TestCategory("Reliability")]
+        [SkippableFact(Skip = "Ignore"), TestCategory("Failures"), TestCategory("Streaming"), TestCategory("Reliability")]
         public async Task SMS_AddMany_Consumers()
         {
             const string testName = "SMS_AddMany_Consumers";
@@ -466,7 +458,7 @@ namespace UnitTests.Streaming.Reliability
             }
             ////Thread.Sleep(TimeSpan.FromSeconds(2));
             // Messages received by original consumer grain
-            await CheckReceivedCounts(when2, consumerGrain, numLoops*2 + 1, 0);
+            await CheckReceivedCounts(when2, consumerGrain, numLoops * 2 + 1, 0);
             // Messages received by new consumer grains
             await Task.WhenAll(grains2.Select(g => CheckReceivedCounts(when2, g, numLoops, 0)));
 
@@ -945,9 +937,9 @@ namespace UnitTests.Streaming.Reliability
             }
             expectedReceived += numLoops;
             // Old consumer received the newly published messages
-            await CheckReceivedCounts(when+"-Old", consumerGrain, expectedReceived, 0);
+            await CheckReceivedCounts(when + "-Old", consumerGrain, expectedReceived, 0);
             // New consumer received the newly published messages
-            await CheckReceivedCounts(when+"-New", newConsumer, numLoops, 0);
+            await CheckReceivedCounts(when + "-New", newConsumer, numLoops, 0);
 
             StreamTestUtils.LogEndTest(testName, logger);
         }
@@ -1001,13 +993,13 @@ namespace UnitTests.Streaming.Reliability
             }
             else if (kill)
             {
-               await this.HostedCluster.KillSiloAsync(silo);
-               Assert.False(silo.IsActive);
+                await this.HostedCluster.KillSiloAsync(silo);
+                Assert.False(silo.IsActive);
             }
             else
             {
-               await this.HostedCluster.StopSiloAsync(silo);
-               Assert.False(silo.IsActive);
+                await this.HostedCluster.StopSiloAsync(silo);
+                Assert.False(silo.IsActive);
             }
 
             // WaitForLivenessToStabilize(!kill);

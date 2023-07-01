@@ -1,6 +1,3 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
 using Azure.Messaging.EventHubs;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -56,13 +53,13 @@ namespace Orleans.Streaming.EventHubs.Testing
                     this.GenerateEvent(this.SequenceNumberCounter.Value),
                     RequestContextExtensions.Export(this.deepCopier));
 
-               var wrapper = new WrappedEventData(
-                    eventData.Body,
-                    eventData.Properties,
-                    eventData.SystemProperties,
-                    partitionKey: StreamId.GetKeyAsString(),
-                    offset: DateTime.UtcNow.Ticks,
-                    sequenceNumber: this.SequenceNumberCounter.Value);
+                var wrapper = new WrappedEventData(
+                     eventData.Body,
+                     eventData.Properties,
+                     eventData.SystemProperties,
+                     partitionKey: StreamId.GetKeyAsString(),
+                     offset: DateTime.UtcNow.Ticks,
+                     sequenceNumber: this.SequenceNumberCounter.Value);
 
                 eventDataList.Add(wrapper);
 
@@ -79,7 +76,7 @@ namespace Orleans.Streaming.EventHubs.Testing
             events.Add(sequenceNumber);
             return events;
         }
-        
+
         public static Func<StreamId, IStreamDataGenerator<EventData>> CreateFactory(IServiceProvider services)
         {
             return (streamId) => ActivatorUtilities.CreateInstance<SimpleStreamEventDataGenerator>(services, streamId);
@@ -122,7 +119,7 @@ namespace Orleans.Streaming.EventHubs.Testing
         /// <inheritdoc />
         public void AddDataGeneratorForStream(StreamId streamId)
         {
-            var generator =  this.generatorFactory(streamId);
+            var generator = this.generatorFactory(streamId);
             generator.SequenceNumberCounter = sequenceNumberCounter;
             this.logger.LogInformation("Data generator set up on stream {StreamId}.", streamId);
             this.generators.Add(generator);
@@ -130,7 +127,8 @@ namespace Orleans.Streaming.EventHubs.Testing
         /// <inheritdoc />
         public void StopProducingOnStream(StreamId streamId)
         {
-            this.generators.ForEach(generator => {
+            this.generators.ForEach(generator =>
+            {
                 if (generator.StreamId.Equals(streamId))
                 {
                     generator.ShouldProduce = false;

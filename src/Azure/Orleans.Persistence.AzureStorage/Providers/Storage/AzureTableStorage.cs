@@ -1,24 +1,16 @@
-using System;
-using System.Collections.Generic;
 using System.Diagnostics;
-using System.Linq;
 using System.Net;
 using System.Text;
-using System.Threading;
-using System.Threading.Tasks;
 using Azure;
 using Azure.Data.Tables;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using Newtonsoft.Json;
 using Orleans.Configuration;
 using Orleans.Configuration.Overrides;
 using Orleans.Persistence.AzureStorage;
 using Orleans.Providers.Azure;
 using Orleans.Runtime;
-using Orleans.Runtime.Configuration;
-using Orleans.Serialization;
 using LogLevel = Microsoft.Extensions.Logging.LogLevel;
 
 namespace Orleans.Storage
@@ -318,7 +310,7 @@ namespace Orleans.Storage
             {
                 if (entity.TryGetValue(stringDataPropertyName, out var dataProperty))
                 {
-                    if (dataProperty is string {Length: > 0 } data)
+                    if (dataProperty is string { Length: > 0 } data)
                     {
                         yield return data;
                     }

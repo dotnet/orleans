@@ -1,7 +1,4 @@
-using System;
 using System.Collections.Concurrent;
-using System.Collections.Generic;
-using System.Linq;
 using Orleans.Metadata;
 
 namespace Orleans.Runtime.Versions
@@ -321,7 +318,7 @@ namespace Orleans.Runtime.Versions
             }
 
             public MajorMinorVersion Version { get; }
-            public Dictionary<GrainInterfaceType, ushort[]> AvailableVersions { get; } 
+            public Dictionary<GrainInterfaceType, ushort[]> AvailableVersions { get; }
             public Dictionary<(GrainInterfaceType, ushort), SiloAddress[]> SupportedSilosByInterface { get; } = new Dictionary<(GrainInterfaceType, ushort), SiloAddress[]>();
             public Dictionary<GrainType, SiloAddress[]> SupportedSilosByGrainType { get; } = new Dictionary<GrainType, SiloAddress[]>();
         }

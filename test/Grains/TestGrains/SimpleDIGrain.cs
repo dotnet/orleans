@@ -1,12 +1,8 @@
-using System;
 using System.Runtime.Serialization;
-using System.Threading.Tasks;
-using Orleans;
 using UnitTests.GrainInterfaces;
 using Orleans.Runtime;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
-using System.Threading;
 
 namespace UnitTests.Grains
 {
@@ -20,7 +16,7 @@ namespace UnitTests.Grains
         private readonly IGrainContextAccessor grainContextAccessor;
         private IGrainContext originalGrainContext;
 
-        public DIGrainWithInjectedServices(IInjectedService injectedService, IInjectedScopedService injectedScopedService,  IGrainFactory injectedGrainFactory, IGrainContextAccessor grainContextAccessor)
+        public DIGrainWithInjectedServices(IInjectedService injectedService, IInjectedScopedService injectedScopedService, IGrainFactory injectedGrainFactory, IGrainContextAccessor grainContextAccessor)
         {
             this.injectedService = injectedService;
             this.injectedGrainFactory = injectedGrainFactory;
@@ -157,6 +153,6 @@ namespace UnitTests.Grains
             logger.LogInformation("Disposed instance {Value}", this.instanceValue);
         }
 
-        public string GetInstanceValue() =>  this.instanceValue;
+        public string GetInstanceValue() => this.instanceValue;
     }
 }

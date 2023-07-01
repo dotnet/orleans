@@ -1,7 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-
-namespace Orleans.Serialization
+﻿namespace Orleans.Serialization
 {
     /// <summary>
     /// Options for exception serialization.

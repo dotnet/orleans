@@ -1,11 +1,5 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Net;
-using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
-using Orleans;
-using Orleans.Hosting;
 using Orleans.Runtime;
 using Orleans.TestingHost;
 using TestExtensions;
@@ -58,7 +52,7 @@ namespace UnitTests.General
             TestSilosStarted(2);
 
             logger.LogInformation("********************** TestSilosStarted passed OK. ******************************");
-            
+
             var grains =
                 Enumerable.Range(0, 20).
                 Select(
@@ -118,7 +112,7 @@ namespace UnitTests.General
             var preferLocalGrainPlaces = preferLocalGrainKeys.Select(key => this.GrainFactory.GetGrain<IPreferLocalPlacementTestGrain>(key).GetRuntimeInstanceId().Result).ToList();
 
             // check that every "prefer local grain" was placed on the same silo with its requesting random grain
-            foreach(int key in Enumerable.Range(0, numGrains))
+            foreach (int key in Enumerable.Range(0, numGrains))
             {
                 string random = randomGrainPlaces.ElementAt(key);
                 string preferLocal = preferLocalGrainPlaces.ElementAt(key);

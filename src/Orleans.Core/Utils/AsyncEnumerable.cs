@@ -1,7 +1,3 @@
-using System;
-using System.Collections.Generic;
-using System.Threading;
-using System.Threading.Tasks;
 using Orleans.Internal;
 
 namespace Orleans.Runtime.Utilities
@@ -24,7 +20,7 @@ namespace Orleans.Runtime.Utilities
         private readonly object updateLock = new object();
         private readonly Func<T, T, bool> updateValidator;
         private Element current;
-        
+
         public AsyncEnumerable(Func<T, T, bool> updateValidator, T initial)
         {
             this.updateValidator = updateValidator;
@@ -34,7 +30,7 @@ namespace Orleans.Runtime.Utilities
         public Action<T> OnPublished { get; set; }
 
         public bool TryPublish(T value) => this.TryPublish(new Element(value)) == PublishResult.Success;
-        
+
         public void Publish(T value)
         {
             switch (this.TryPublish(new Element(value)))

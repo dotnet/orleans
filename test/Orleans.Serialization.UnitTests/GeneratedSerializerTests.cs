@@ -147,7 +147,7 @@ namespace Orleans.Serialization.UnitTests
             // Note that this only works because we are serializing each object using the "expected type" optimization and
             // therefore omitting the concrete type names.
             var originalAsArray = _serializer.SerializeToArray(original);
-            var classVersion = new Person5_Class { Age = 2,  Name = "harry", FavouriteColor = "redborine", StarSign = "Aquaricorn" };
+            var classVersion = new Person5_Class { Age = 2, Name = "harry", FavouriteColor = "redborine", StarSign = "Aquaricorn" };
             var classAsArray = _serializer.SerializeToArray(classVersion);
             Assert.Equal(originalAsArray, classAsArray);
         }
@@ -178,7 +178,7 @@ namespace Orleans.Serialization.UnitTests
         public void GeneratedSerializersRoundTripThroughSerializer_ImmutableStruct()
         {
             var original = new ImmutableStruct(30, 2);
-             var result = (ImmutableStruct)RoundTripThroughUntypedSerializer(original, out _);
+            var result = (ImmutableStruct)RoundTripThroughUntypedSerializer(original, out _);
 
             Assert.Equal(original.GetIntField(), result.GetIntField());
             Assert.Equal(original.IntProperty, result.IntProperty);
@@ -351,7 +351,7 @@ namespace Orleans.Serialization.UnitTests
 
             original.StringProperty = "bananas";
             result = RoundTripThroughCodec(original);
- 
+
             Assert.Equal(default(Guid), result.GuidProperty);
             Assert.Equal(original.GuidProperty, result.GuidProperty);
             Assert.Equal("bananas", result.StringProperty);

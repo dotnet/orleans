@@ -7,7 +7,7 @@ namespace UnitTests.StorageTests.Relational
     /// Returns a constant hash value to all input. This is used to induce hash collisions
     /// one scenarios that involve more than one case.
     /// </summary>
-    public class ConstantHasher: IHasher
+    public class ConstantHasher : IHasher
     {
         /// <summary>
         /// The hash value to which every input will be hashed to.

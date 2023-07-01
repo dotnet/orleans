@@ -1,6 +1,4 @@
-﻿using System;
-
-namespace Orleans.Runtime
+﻿namespace Orleans.Runtime
 {
     internal interface IAsyncTimerFactory
     {

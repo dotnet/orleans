@@ -46,7 +46,7 @@ namespace DefaultCluster.Tests.General
             Assert.Equal("E1", IERef.E1Method().Result);
             Assert.Equal("E2", IERef.E2Method().Result);
             Assert.Equal("E3", IERef.E3Method().Result);
-            
+
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Cast")]

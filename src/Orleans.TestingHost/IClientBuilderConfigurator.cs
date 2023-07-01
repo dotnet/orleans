@@ -1,5 +1,4 @@
 using Microsoft.Extensions.Configuration;
-using Orleans.Hosting;
 
 namespace Orleans.TestingHost
 {

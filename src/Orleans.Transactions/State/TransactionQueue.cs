@@ -1,7 +1,3 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Runtime;
@@ -9,7 +5,6 @@ using Orleans.Transactions.Abstractions;
 using Orleans.Storage;
 using Orleans.Configuration;
 using Orleans.Timers.Internal;
-using System.Runtime.CompilerServices;
 
 namespace Orleans.Transactions.State
 {
@@ -116,12 +111,12 @@ namespace Orleans.Transactions.State
 
                             // optimization: can immediately proceed if dependency is implied
                             bool behindRemoteEntryBySameTM = false;
-                                /* disabled - jbragg - TODO - revisit
-                                commitQueue.Count >= 2
-                                && commitQueue[commitQueue.Count - 2] is TransactionRecord<TState> rce
-                                && rce.Role == CommitRole.RemoteCommit
-                                && rce.TransactionManager.Equals(record.TransactionManager);
-                                */
+                            /* disabled - jbragg - TODO - revisit
+                            commitQueue.Count >= 2
+                            && commitQueue[commitQueue.Count - 2] is TransactionRecord<TState> rce
+                            && rce.Role == CommitRole.RemoteCommit
+                            && rce.TransactionManager.Equals(record.TransactionManager);
+                            */
 
                             if (record.NumberWrites > 0)
                             {
@@ -286,7 +281,7 @@ namespace Orleans.Transactions.State
                                 .Select(p => p.Reference.AsReference<ITransactionalResourceExtension>()
                                      .Cancel(p.Name, entry.TransactionId, entry.Timestamp, status)));
                         }
-                        catch(Exception ex)
+                        catch (Exception ex)
                         {
                             this.logger.LogWarning(ex, "Failed to notify all transaction participants of cancellation.  TransactionId: {TransactionId}, Timestamp: {Timestamp}, Status: {Status}", entry.TransactionId, entry.Timestamp, status);
                         }
@@ -702,8 +697,8 @@ namespace Orleans.Transactions.State
                                 // send PreparedMessage to remote TM
                                 bottom.TransactionManager.Reference.AsReference<ITransactionManagerExtension>()
                                       .Prepared(bottom.TransactionManager.Name, bottom.TransactionId, bottom.Timestamp, resource, TransactionalStatus.Ok)
-                                      .Ignore();                                
-                                    
+                                      .Ignore();
+
                                 bottom.LastSent = now;
 
                                 if (logger.IsEnabled(LogLevel.Trace))

@@ -4,7 +4,7 @@ namespace Orleans.Serialization.WireProtocol
     /// Represents an extended wire type
     /// </summary>
     public enum ExtendedWireType : uint
-    {        
+    {
         /// <summary>
         /// Marks the end of a tag-delimited field.
         /// </summary>

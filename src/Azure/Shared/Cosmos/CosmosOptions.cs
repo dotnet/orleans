@@ -1,7 +1,5 @@
-using System.Text.Json;
 using Azure;
 using Azure.Core;
-using Microsoft.Extensions.DependencyInjection;
 
 #if ORLEANS_CLUSTERING
 namespace Orleans.Clustering.Cosmos;

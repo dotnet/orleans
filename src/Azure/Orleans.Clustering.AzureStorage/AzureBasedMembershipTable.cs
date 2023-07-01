@@ -1,9 +1,6 @@
-using System;
-using System.Collections.Generic;
 using System.Globalization;
 using System.Net;
 using System.Text;
-using System.Threading.Tasks;
 using Azure;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -50,7 +47,7 @@ namespace Orleans.Runtime.MembershipService
             {
                 // ignore return value, since we don't care if I inserted it or not, as long as it is in there.
                 bool created = await tableManager.TryCreateTableVersionEntryAsync();
-                if(created) logger.LogInformation("Created new table version row.");
+                if (created) logger.LogInformation("Created new table version row.");
             }
         }
 
@@ -187,7 +184,7 @@ namespace Orleans.Runtime.MembershipService
                     {
                         try
                         {
-                            
+
                             MembershipEntry membershipEntry = Parse(tableEntry);
                             memEntries.Add(new Tuple<MembershipEntry, string>(membershipEntry, tuple.ETag));
                         }
@@ -216,7 +213,7 @@ namespace Orleans.Runtime.MembershipService
             var parse = new MembershipEntry
             {
                 HostName = tableEntry.HostName,
-                Status = (SiloStatus) Enum.Parse(typeof (SiloStatus), tableEntry.Status)
+                Status = (SiloStatus)Enum.Parse(typeof(SiloStatus), tableEntry.Status)
             };
 
             if (!string.IsNullOrEmpty(tableEntry.ProxyPort))
@@ -236,7 +233,8 @@ namespace Orleans.Runtime.MembershipService
             if (!string.IsNullOrEmpty(tableEntry.SiloName))
             {
                 parse.SiloName = tableEntry.SiloName;
-            }else if (!string.IsNullOrEmpty(tableEntry.InstanceName))
+            }
+            else if (!string.IsNullOrEmpty(tableEntry.InstanceName))
             {
                 // this is for backward compatability: in a mixed cluster of old and new version,
                 // some entries will have the old InstanceName column.

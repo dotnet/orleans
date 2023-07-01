@@ -1,5 +1,3 @@
-using System;
-using System.Threading.Tasks;
 using Orleans.Metadata;
 using Orleans.Versions.Compatibility;
 using Orleans.Versions.Selector;
@@ -48,7 +46,7 @@ namespace Tester.HeterogeneousSilosTests.UpgradeTests
                 var grain = Client.GetGrain<IVersionUpgradeTestGrain>(i);
                 Assert.Equal(1, await grain.GetVersion());
             }
-            
+
             // Fallback to AllVersionsCompatible
             await ManagementGrain.SetCompatibilityStrategy(ifaceId, null);
 

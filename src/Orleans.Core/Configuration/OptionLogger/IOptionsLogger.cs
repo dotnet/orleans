@@ -1,14 +1,9 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Text;
-using System.Threading;
-using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
 namespace Orleans
-{ 
+{
     /// <summary>
     /// Logger for options on the client.
     /// </summary>
@@ -50,7 +45,7 @@ namespace Orleans
     /// <summary>
     /// Base class for client and silo default options loggers.
     /// </summary>
-    public abstract class OptionsLogger 
+    public abstract class OptionsLogger
     {
         private readonly ILogger logger;
         private readonly IServiceProvider services;
@@ -105,7 +100,8 @@ namespace Orleans
                     stringBuiler.AppendLine($"{setting}");
                 }
                 this.logger.LogInformation(stringBuiler.ToString());
-            } catch(Exception ex)
+            }
+            catch (Exception ex)
             {
                 this.logger.LogError(ex, $"An error occurred while logging options {formatter.Name}", formatter.Name);
                 throw;

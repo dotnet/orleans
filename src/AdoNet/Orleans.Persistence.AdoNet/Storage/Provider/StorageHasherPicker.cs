@@ -1,8 +1,5 @@
 using Orleans.Runtime;
-using System;
-using System.Collections.Generic;
 using System.Collections.ObjectModel;
-using System.Linq;
 
 
 namespace Orleans.Storage
@@ -10,7 +7,7 @@ namespace Orleans.Storage
     /// <summary>
     /// <see cref="IStorageHasherPicker"/>.
     /// </summary>
-    public class StorageHasherPicker: IStorageHasherPicker
+    public class StorageHasherPicker : IStorageHasherPicker
     {
         /// <summary>
         /// <see cref="IStorageHasherPicker.HashProviders"/>.
@@ -24,7 +21,7 @@ namespace Orleans.Storage
         /// <param name="hashProviders">The hash providers this picker uses.</param>
         public StorageHasherPicker(IEnumerable<IHasher> hashProviders)
         {
-            if(hashProviders == null)
+            if (hashProviders == null)
             {
                 throw new ArgumentNullException(nameof(hashProviders));
             }

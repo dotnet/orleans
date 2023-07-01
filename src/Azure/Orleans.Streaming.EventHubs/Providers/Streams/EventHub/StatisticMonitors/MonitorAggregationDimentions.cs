@@ -54,7 +54,7 @@ namespace Orleans.Streaming.EventHubs
         /// <param name="dimensions"></param>
         /// <param name="ehPartition"></param>
         public EventHubReceiverMonitorDimensions(EventHubMonitorAggregationDimensions dimensions, string ehPartition)
-            :base(dimensions)
+            : base(dimensions)
         {
             this.EventHubPartition = ehPartition;
         }
@@ -84,7 +84,7 @@ namespace Orleans.Streaming.EventHubs
         /// <param name="ehPartition"></param>
         /// <param name="blockPoolId"></param>
         public EventHubCacheMonitorDimensions(EventHubMonitorAggregationDimensions dimensions, string ehPartition, string blockPoolId)
-            :base(dimensions, ehPartition)
+            : base(dimensions, ehPartition)
         {
             this.BlockPoolId = blockPoolId;
         }
@@ -113,7 +113,7 @@ namespace Orleans.Streaming.EventHubs
         /// <param name="dimensions"></param>
         /// <param name="blockPoolId"></param>
         public EventHubBlockPoolMonitorDimensions(EventHubMonitorAggregationDimensions dimensions, string blockPoolId)
-            :base(dimensions)
+            : base(dimensions)
         {
             this.BlockPoolId = blockPoolId;
         }

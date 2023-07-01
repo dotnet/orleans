@@ -1,7 +1,4 @@
-using System;
 using System.Diagnostics;
-using System.IO;
-using System.Linq;
 
 namespace Orleans.TestingHost.Utils
 {
@@ -65,11 +62,11 @@ namespace Orleans.TestingHost.Utils
             try
             {
                 //This process handle returns immediately.
-                using(var process = Process.Start(CreateProcessArguments("help")))
+                using (var process = Process.Start(CreateProcessArguments("help")))
                 {
                     process.WaitForExit();
                     var help = string.Empty;
-                    while(!process.StandardOutput.EndOfStream)
+                    while (!process.StandardOutput.EndOfStream)
                     {
                         help += process.StandardOutput.ReadLine();
                     }
@@ -106,7 +103,7 @@ namespace Orleans.TestingHost.Utils
             try
             {
                 //This process handle returns immediately.
-                using(var process = Process.Start(CreateProcessArguments("start")))
+                using (var process = Process.Start(CreateProcessArguments("start")))
                 {
                     if (process == null) return false;
                     process.WaitForExit();
@@ -130,7 +127,7 @@ namespace Orleans.TestingHost.Utils
             try
             {
                 //This process handle returns immediately.
-                using(var process = Process.Start(CreateProcessArguments("stop")))
+                using (var process = Process.Start(CreateProcessArguments("stop")))
                 {
                     process.WaitForExit();
                     return process.ExitCode == 0;

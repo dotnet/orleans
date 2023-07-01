@@ -1,13 +1,7 @@
-using System;
-using System.Collections.Generic;
 using Microsoft.Extensions.Logging;
 using Orleans.Configuration;
-using System.Threading.Tasks;
-using System.Threading;
 using Microsoft.Extensions.Options;
-using System.Linq;
 using Orleans.Internal;
-using System.Reflection.Metadata;
 
 namespace Orleans.Runtime.MembershipService
 {
@@ -289,7 +283,7 @@ namespace Orleans.Runtime.MembershipService
             {
                 this.log.LogDebug((int)ErrorCode.MembershipShutDown, "-Shutdown");
             }
-            
+
             try
             {
                 await this.UpdateStatus(SiloStatus.ShuttingDown);

@@ -1,7 +1,5 @@
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
-using System;
-using System.Collections.Generic;
 
 namespace Orleans.CodeGenerator
 {
@@ -16,7 +14,7 @@ namespace Orleans.CodeGenerator
         TypeSyntax TypeSyntax { get; }
         string TypeNameIdentifier { get; }
         TypeSyntax GetTypeSyntax(ITypeSymbol typeSymbol);
-        bool IsPrimaryConstructorParameter { get; } 
+        bool IsPrimaryConstructorParameter { get; }
     }
 
     internal sealed class MemberDescriptionTypeComparer : IEqualityComparer<IMemberDescription>
@@ -35,7 +33,7 @@ namespace Orleans.CodeGenerator
                 return false;
             }
 
-           return string.Equals(x.TypeName, y.TypeName) && string.Equals(x.AssemblyName, y.AssemblyName);
+            return string.Equals(x.TypeName, y.TypeName) && string.Equals(x.AssemblyName, y.AssemblyName);
         }
 
         public int GetHashCode(IMemberDescription obj)

@@ -1,6 +1,4 @@
-using System.Collections.Generic;
 using Microsoft.Extensions.Logging;
-using System.Threading;
 
 namespace Orleans.Runtime.MembershipService
 {
@@ -30,7 +28,7 @@ namespace Orleans.Runtime.MembershipService
         public SiloStatus CurrentStatus => this.membershipTableManager.CurrentStatus;
         public string SiloName => this.localSiloDetails.Name;
         public SiloAddress SiloAddress => this.localSiloDetails.SiloAddress;
-        
+
         public SiloStatus GetApproximateSiloStatus(SiloAddress silo)
         {
             var status = this.membershipTableManager.MembershipTableSnapshot.GetSiloStatus(silo);
@@ -86,7 +84,7 @@ namespace Orleans.Runtime.MembershipService
             if (silo.Equals(this.SiloAddress)) return false;
 
             var status = this.GetApproximateSiloStatus(silo);
-            
+
             return status == SiloStatus.Dead;
         }
 
@@ -114,6 +112,6 @@ namespace Orleans.Runtime.MembershipService
         public bool SubscribeToSiloStatusEvents(ISiloStatusListener listener) => this.listenerManager.Subscribe(listener);
 
         public bool UnSubscribeFromSiloStatusEvents(ISiloStatusListener listener) => this.listenerManager.Unsubscribe(listener);
-    
+
     }
 }
