@@ -1,4 +1,3 @@
-using System;
 using Microsoft.AspNetCore.Connections;
 
 namespace Orleans.Configuration
@@ -10,9 +9,9 @@ namespace Orleans.Configuration
     /// <seealso cref="Orleans.Configuration.SiloConnectionOptions.ISiloConnectionBuilderOptions" />
     public class SiloConnectionOptions : SiloConnectionOptions.ISiloConnectionBuilderOptions
     {
-        private readonly ConnectionBuilderDelegates siloOutboundDelegates = new ConnectionBuilderDelegates();
-        private readonly ConnectionBuilderDelegates siloInboundDelegates = new ConnectionBuilderDelegates();
-        private readonly ConnectionBuilderDelegates gatewayInboundDelegates = new ConnectionBuilderDelegates();
+        private readonly ConnectionBuilderDelegates siloOutboundDelegates = new();
+        private readonly ConnectionBuilderDelegates siloInboundDelegates = new();
+        private readonly ConnectionBuilderDelegates gatewayInboundDelegates = new();
 
         /// <summary>
         /// Configures silo outbound connections.

@@ -114,14 +114,9 @@ namespace Orleans.Persistence
                     string eTag = hashEntries.Single(static e => e.Name == "etag").Value;
                     ReadOnlyMemory<byte> data = hashEntries.Single(static e => e.Name == "data").Value;
 
-                    if (data.Length > 0)
-                    {
-                        grainState.State = _grainStorageSerializer.Deserialize<T>(data);
-                    }
-                    else
-                    {
-                        grainState.State = Activator.CreateInstance<T>();
-                    }
+                    grainState.State = data.Length > 0
+                        ? _grainStorageSerializer.Deserialize<T>(data)
+                        : Activator.CreateInstance<T>();
 
                     grainState.ETag = eTag;
                     grainState.RecordExists = true;

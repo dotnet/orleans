@@ -1,12 +1,6 @@
 using Microsoft.Extensions.Logging;
-using Orleans;
-using Orleans.Runtime;
 using Orleans.Streams;
-using System;
-using System.Collections.Generic;
 using System.Runtime.CompilerServices;
-using System.Threading;
-using System.Threading.Tasks;
 using UnitTests.GrainInterfaces;
 
 namespace UnitTests.Grains.ProgrammaticSubscribe
@@ -43,7 +37,7 @@ namespace UnitTests.Grains.ProgrammaticSubscribe
         public Task StartPeriodicProducing(TimeSpan? firePeriod = null)
         {
             logger.LogInformation("StartPeriodicProducing");
-            var period = (firePeriod == null)? defaultFirePeriod : firePeriod;
+            var period = (firePeriod == null) ? defaultFirePeriod : firePeriod;
             producerTimer = base.RegisterTimer(TimerCallback, null, TimeSpan.Zero, period.Value);
             return Task.CompletedTask;
         }
@@ -137,7 +131,7 @@ namespace UnitTests.Grains.ProgrammaticSubscribe
     public class Apple : IFruit
     {
         [Id(0)]
-        int number;
+        readonly int number;
 
         public Apple(int number)
         {

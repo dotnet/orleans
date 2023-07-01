@@ -50,10 +50,7 @@ namespace Orleans.Transactions.State
             }
         }
 
-        public bool IsConfirmed(Guid transactionId)
-        {
-            return this.pending.Contains(transactionId);
-        }
+        public bool IsConfirmed(Guid transactionId) => this.pending.Contains(transactionId);
 
         private async Task SendConfirmation(Guid transactionId, DateTime timestamp, List<ParticipantId> participants)
         {

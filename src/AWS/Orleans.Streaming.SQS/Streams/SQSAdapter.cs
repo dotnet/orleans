@@ -16,7 +16,7 @@ namespace OrleansAWSUtils.Streams
         private readonly Serializer<SQSBatchContainer> serializer;
         protected readonly string DataConnectionString;
         private readonly IConsistentRingStreamQueueMapper streamQueueMapper;
-        protected readonly ConcurrentDictionary<QueueId, SQSStorage> Queues = new ConcurrentDictionary<QueueId, SQSStorage>();
+        protected readonly ConcurrentDictionary<QueueId, SQSStorage> Queues = new();
         private readonly ILoggerFactory loggerFactory;
         public string Name { get; private set; }
         public bool IsRewindable { get { return false; } }
@@ -25,7 +25,7 @@ namespace OrleansAWSUtils.Streams
 
         public SQSAdapter(Serializer<SQSBatchContainer> serializer, IConsistentRingStreamQueueMapper streamQueueMapper, ILoggerFactory loggerFactory, string dataConnectionString, string serviceId, string providerName)
         {
-            if (string.IsNullOrEmpty(dataConnectionString)) throw new ArgumentNullException("dataConnectionString");
+            if (string.IsNullOrEmpty(dataConnectionString)) throw new ArgumentNullException(nameof(dataConnectionString));
             if (string.IsNullOrEmpty(serviceId)) throw new ArgumentNullException(nameof(serviceId));
             this.loggerFactory = loggerFactory;
             this.serializer = serializer;
@@ -44,7 +44,7 @@ namespace OrleansAWSUtils.Streams
         {
             if (token != null)
             {
-                throw new ArgumentException("SQSStream stream provider currently does not support non-null StreamSequenceToken.", "token");
+                throw new ArgumentException("SQSStream stream provider currently does not support non-null StreamSequenceToken.", nameof(token));
             }
             var queueId = streamQueueMapper.GetQueueForStream(streamId);
             SQSStorage queue;

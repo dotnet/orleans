@@ -30,9 +30,9 @@ namespace Orleans.TestingHost
     /// </remarks>
     public class TestCluster : IDisposable, IAsyncDisposable
     {
-        private readonly List<SiloHandle> additionalSilos = new List<SiloHandle>();
+        private readonly List<SiloHandle> additionalSilos = new();
         private readonly TestClusterOptions options;
-        private readonly StringBuilder log = new StringBuilder();
+        private readonly StringBuilder log = new();
         private readonly InMemoryTransportConnectionHub _transportHub = new();
         private bool _disposed;
         private int startedInstances;

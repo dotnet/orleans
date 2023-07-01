@@ -17,7 +17,7 @@ namespace Orleans.Clustering.DynamoDB
 {
     internal class DynamoDBMembershipTable : IMembershipTable
     {
-        private static readonly TableVersion NotFoundTableVersion = new TableVersion(0, "0");
+        private static readonly TableVersion NotFoundTableVersion = new(0, "0");
 
         private const string CURRENT_ETAG_ALIAS = ":currentETag";
         private const int MAX_BATCH_SIZE = 25;

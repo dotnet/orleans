@@ -30,24 +30,24 @@ namespace Orleans.Transactions.DynamoDB
     /// </summary>
     internal class DynamoDBStorage
     {
-        private string accessKey;
-        private string token;
-        private string profileName;
+        private readonly string accessKey;
+        private readonly string token;
+        private readonly string profileName;
         /// <summary> Secret key for this dynamoDB table </summary>
         protected string secretKey;
-        private string service;
+        private readonly string service;
         public const int DefaultReadCapacityUnits = 10;
         public const int DefaultWriteCapacityUnits = 5;
         private readonly ProvisionedThroughput provisionedThroughput;
         private readonly bool createIfNotExists;
         private readonly bool updateIfExists;
         private readonly bool useProvisionedThroughput;
-        private readonly ReadOnlyCollection<TableStatus> updateTableValidTableStatuses = new ReadOnlyCollection<TableStatus>(new List<TableStatus>()
+        private readonly ReadOnlyCollection<TableStatus> updateTableValidTableStatuses = new(new List<TableStatus>()
             {
                 TableStatus.CREATING, TableStatus.UPDATING, TableStatus.ACTIVE
             });
         private AmazonDynamoDBClient ddbClient;
-        private ILogger Logger;
+        private readonly ILogger Logger;
 
         /// <summary>
         /// Create a DynamoDBStorage instance

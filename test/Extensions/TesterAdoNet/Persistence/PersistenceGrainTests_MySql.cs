@@ -1,8 +1,5 @@
-using System;
-using System.Collections.Generic;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
-using Orleans.Hosting;
 using Orleans.TestingHost;
 using Orleans.Tests.SqlUtils;
 using TestExtensions;
@@ -62,7 +59,7 @@ namespace Tester.AdoNet.Persistence
             }
         }
 
-        private Fixture fixture;
+        private readonly Fixture fixture;
 
         public PersistenceGrainTests_MySql(ITestOutputHelper output, Fixture fixture) : base(output, fixture)
         {

@@ -10,7 +10,7 @@ namespace Consul.Tests
     public static class ConsulTestUtils
     {
         public static readonly string ConsulConnectionString = TestDefaultConfiguration.ConsulConnectionString;
-        private static readonly Lazy<bool> EnsureConsulLazy = new Lazy<bool>(() => EnsureConsulAsync().Result);
+        private static readonly Lazy<bool> EnsureConsulLazy = new(() => EnsureConsulAsync().Result);
 
         public static void EnsureConsul()
         {

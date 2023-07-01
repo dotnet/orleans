@@ -1,9 +1,5 @@
-using System;
-using System.Threading.Tasks;
-using System.Collections.Generic;
 using Microsoft.Extensions.Options;
 using Xunit;
-using Orleans.Hosting;
 using Orleans.TestingHost;
 using UnitTests.GrainInterfaces;
 using TestExtensions;
@@ -17,7 +13,7 @@ namespace Tests.GeoClusterTests
     public class BasicLogTestGrainTests : IClassFixture<BasicLogTestGrainTests.Fixture>
     {
         private readonly Fixture fixture;
-        private Random random;
+        private readonly Random random;
 
         public class Fixture : BaseAzureTestClusterFixture
         {
@@ -45,11 +41,11 @@ namespace Tests.GeoClusterTests
                         {
                             options.ConfigureTableServiceClient(TestDefaultConfiguration.DataConnectionString);
                         }))
-                        .AddMemoryGrainStorage("MemoryStore"); 
+                        .AddMemoryGrainStorage("MemoryStore");
                 }
             }
         }
-        
+
         public BasicLogTestGrainTests(Fixture fixture)
         {
             this.fixture = fixture;

@@ -1448,7 +1448,7 @@ namespace Orleans.Serialization.UnitTests
         {
         }
 
-        protected override Int128 CreateValue() => new Int128(unchecked((ulong)Random.NextInt64()), unchecked((ulong)Random.NextInt64()));
+        protected override Int128 CreateValue() => new(unchecked((ulong)Random.NextInt64()), unchecked((ulong)Random.NextInt64()));
 
         protected override Int128[] TestValues => new Int128[]
         {
@@ -2158,7 +2158,7 @@ namespace Orleans.Serialization.UnitTests
     {
         protected override int[] MaxSegmentSizes => new[] { 1024 };
         private int _nextComparer;
-        private IEqualityComparer<string>[] _comparers = new IEqualityComparer<string>[]
+        private readonly IEqualityComparer<string>[] _comparers = new IEqualityComparer<string>[]
         {
             new CaseInsensitiveEqualityComparer(),
 #if NETCOREAPP3_1_OR_GREATER
@@ -2439,15 +2439,9 @@ namespace Orleans.Serialization.UnitTests
 
         protected override IPAddress CreateValue()
         {
-            byte[] bytes;
-            if (Random.Next(1) == 0)
-            {
-                bytes = new byte[4];
-            }
-            else
-            {
-                bytes = new byte[16];
-            }
+            var bytes = Random.Next(1) == 0
+                ? (new byte[4])
+                : (new byte[16]);
             Random.NextBytes(bytes);
             return new IPAddress(bytes);
         }
@@ -2463,15 +2457,9 @@ namespace Orleans.Serialization.UnitTests
 
         protected override IPAddress CreateValue()
         {
-            byte[] bytes;
-            if (Random.Next(1) == 0)
-            {
-                bytes = new byte[4];
-            }
-            else
-            {
-                bytes = new byte[16];
-            }
+            var bytes = Random.Next(1) == 0
+                ? (new byte[4])
+                : (new byte[16]);
             Random.NextBytes(bytes);
             return new IPAddress(bytes);
         }
@@ -2600,7 +2588,7 @@ namespace Orleans.Serialization.UnitTests
         }
 
         protected override int[] MaxSegmentSizes => new[] { 128 };
-        protected override Uri CreateValue() => new Uri($"http://www.{Guid.NewGuid()}.com/");
+        protected override Uri CreateValue() => new($"http://www.{Guid.NewGuid()}.com/");
 
         protected override Uri[] TestValues => new[] { null, CreateValue(), CreateValue(), CreateValue(), CreateValue() };
 
@@ -2613,7 +2601,7 @@ namespace Orleans.Serialization.UnitTests
         {
         }
 
-        protected override Uri CreateValue() => new Uri($"http://www.{Guid.NewGuid()}.com/");
+        protected override Uri CreateValue() => new($"http://www.{Guid.NewGuid()}.com/");
 
         protected override Uri[] TestValues => new[] { null, CreateValue(), CreateValue(), CreateValue(), CreateValue() };
 

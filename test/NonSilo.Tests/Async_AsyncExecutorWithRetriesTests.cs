@@ -26,7 +26,7 @@ namespace NonSilo.Tests
         public void Async_AsyncExecutorWithRetriesTest_1()
         {
             int counter = 0;
-            Func<int, Task<int>> myFunc = ((int funcCounter) =>
+            Func<int, Task<int>> myFunc = (int funcCounter) =>
             {
                 // ReSharper disable AccessToModifiedClosure
                 Assert.Equal(counter, funcCounter);
@@ -37,11 +37,11 @@ namespace NonSilo.Tests
                 else
                     throw new ArgumentException("Wrong arg!");
                 // ReSharper restore AccessToModifiedClosure
-            });
-            Func<Exception, int, bool> errorFilter = ((Exception exc, int i) =>
+            };
+            Func<Exception, int, bool> errorFilter = (Exception exc, int i) =>
             {
                 return true;
-            });
+            };
 
             Task<int> promise = AsyncExecutorWithRetries.ExecuteWithRetries(myFunc, 10, 10, null, errorFilter);
             int value = promise.Result;
@@ -98,19 +98,19 @@ namespace NonSilo.Tests
         {
             int counter = 0;
             int lastIteration = 0;
-            Func<int, Task<int>> myFunc = ((int funcCounter) =>
+            Task<int> myFunc(int funcCounter)
             {
                 lastIteration = funcCounter;
                 Assert.Equal(counter, funcCounter);
                 this.output.WriteLine("Running for {0} time.", counter);
                 return Task.FromResult(++counter);
-            });
-            Func<Exception, int, bool> errorFilter = ((Exception exc, int i) =>
+            }
+            bool errorFilter(Exception exc, int i)
             {
                 Assert.Equal(lastIteration, i);
                 Assert.True(false, "Should not be called");
                 return true;
-            });
+            }
 
             int maxRetries = 5;
             Task<int> promise = AsyncExecutorWithRetries.ExecuteWithRetries(

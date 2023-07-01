@@ -129,7 +129,7 @@ namespace DefaultCluster.Tests.TimerTests
                 $"Assert: last <= maximalNumTicks. Actual: last = {last}, maximalNumTicks = {maximalNumTicks}");
 
             output.WriteLine(
-                "Total Elapsed time = " + (stopwatch.Elapsed.TotalSeconds) + " sec. Expected Ticks = " + maximalNumTicks +
+                "Total Elapsed time = " + stopwatch.Elapsed.TotalSeconds + " sec. Expected Ticks = " + maximalNumTicks +
                 ". Actual ticks = " + last);
         }
 

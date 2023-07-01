@@ -7,8 +7,8 @@ namespace Orleans.Runtime
     {
         private readonly SiloAddress _localSilo;
         private readonly IClusterMembershipService _clusterMembershipService;
-        private readonly object _lockObj = new object();
-        private VersionedSuccessor _successor = new VersionedSuccessor(MembershipVersion.MinValue, null);
+        private readonly object _lockObj = new();
+        private VersionedSuccessor _successor = new(MembershipVersion.MinValue, null);
 
         public SimpleConsistentRingProvider(ILocalSiloDetails localSiloDetails, IClusterMembershipService clusterMembershipService)
         {

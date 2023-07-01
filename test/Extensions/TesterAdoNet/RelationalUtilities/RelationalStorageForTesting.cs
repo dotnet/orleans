@@ -1,19 +1,13 @@
-using System;
-using System.Collections.Generic;
 using System.Data.Common;
-using System.IO;
-using System.Linq;
-using System.Threading.Tasks;
 using Orleans.Tests.SqlUtils;
 using Tester.RelationalUtilities;
-using Xunit.Sdk;
 
 namespace UnitTests.General
 {
     public abstract class RelationalStorageForTesting
     {
         private static readonly Dictionary<string, Func<string, RelationalStorageForTesting>> instanceFactory =
-            new Dictionary<string, Func<string, RelationalStorageForTesting>>
+            new()
             {
                 {AdoNetInvariants.InvariantNameSqlServer, cs => new SqlServerStorageForTesting(cs)},
                 {AdoNetInvariants.InvariantNameMySql, cs => new MySqlStorageForTesting(cs)},

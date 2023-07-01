@@ -1,17 +1,11 @@
 //#define REREAD_STATE_AFTER_WRITE_FAILED
 
 
-using System;
-using System.Collections.Generic;
 using System.Diagnostics;
-using System.Linq;
-using System.Threading.Tasks;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Xunit;
 using Xunit.Abstractions;
-using Orleans;
-using Orleans.Hosting;
 using Orleans.TestingHost;
 using TestExtensions;
 using TestExtensions.Runners;
@@ -35,7 +29,7 @@ namespace Tester.AzureUtils.Persistence
         protected readonly ILogger logger;
         private const int LoopIterations_Grain = 1000;
         private const int BatchSize = 100;
-        private GrainPersistenceTestsRunner basicPersistenceTestsRunner;
+        private readonly GrainPersistenceTestsRunner basicPersistenceTestsRunner;
         private const int MaxReadTime = 200;
         private const int MaxWriteTime = 2000;
         public class SiloBuilderConfigurator : ISiloConfigurator
@@ -163,7 +157,7 @@ namespace Tester.AzureUtils.Persistence
                 grainAzureStore => grainAzureStore.DoRead());
         }
 
-       
+
         protected async Task Persistence_Silo_StorageProvider_Azure(string providerName)
         {
             List<SiloHandle> silos = this.HostedCluster.GetActiveSilos().ToList();

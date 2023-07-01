@@ -1,7 +1,3 @@
-using System;
-using System.Diagnostics.CodeAnalysis;
-using System.Reflection;
-using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Orleans.Runtime.Scheduler;
 
@@ -17,7 +13,7 @@ namespace Orleans.Runtime
         private int totalNumTicks;
         private readonly ILogger logger;
         private volatile Task currentlyExecutingTickTask;
-        private object currentlyExecutingTickTaskLock = new();
+        private readonly object currentlyExecutingTickTaskLock = new();
         private readonly IGrainContext grainContext;
 
         public string Name { get; }

@@ -28,7 +28,7 @@ namespace Orleans.Reminders.Redis
         private IConnectionMultiplexer _muxer;
         private IDatabase _db;
 
-        private readonly JsonSerializerSettings _jsonSettings = new JsonSerializerSettings()
+        private readonly JsonSerializerSettings _jsonSettings = new()
         {
             DateFormatHandling = DateFormatHandling.IsoDateFormat,
             DefaultValueHandling = DefaultValueHandling.Ignore,

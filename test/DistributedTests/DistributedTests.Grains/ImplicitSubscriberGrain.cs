@@ -1,8 +1,5 @@
-using System;
-using System.Threading.Tasks;
 using DistributedTests.GrainInterfaces;
 using Microsoft.Extensions.Logging;
-using Orleans;
 using Orleans.Streams;
 using Orleans.Streams.Core;
 
@@ -11,7 +8,7 @@ namespace DistributedTests.Grains
     [ImplicitStreamSubscription(StreamingConstants.StreamingNamespace)]
     public class ImplicitSubscriberGrain : Grain, IImplicitSubscriberGrain, IStreamSubscriptionObserver, IAsyncObserver<object>
     {
-        private ILogger _logger;
+        private readonly ILogger _logger;
         private int _requestCounter;
         private int _errorCounter;
 

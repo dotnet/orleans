@@ -17,7 +17,7 @@ namespace Orleans
         /// <summary>
         /// The cache of typed system target references.
         /// </summary>
-        private readonly Dictionary<(GrainId, Type), ISystemTarget> typedSystemTargetReferenceCache = new Dictionary<(GrainId, Type), ISystemTarget>();
+        private readonly Dictionary<(GrainId, Type), ISystemTarget> typedSystemTargetReferenceCache = new();
 
         private readonly GrainReferenceActivator referenceActivator;
         private readonly GrainInterfaceTypeResolver interfaceTypeResolver;

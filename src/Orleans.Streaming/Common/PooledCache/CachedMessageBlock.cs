@@ -122,7 +122,7 @@ namespace Orleans.Providers.Streams.Common
             {
                 if (index >= writeIndex || index < readIndex)
                 {
-                    throw new ArgumentOutOfRangeException("index");
+                    throw new ArgumentOutOfRangeException(nameof(index));
                 }
                 return cachedMessages[index];
             }
@@ -177,7 +177,7 @@ namespace Orleans.Providers.Streams.Common
                     return i;
                 }
             }
-            throw new ArgumentOutOfRangeException("token");
+            throw new ArgumentOutOfRangeException(nameof(token));
         }
 
         /// <summary>
@@ -194,7 +194,7 @@ namespace Orleans.Providers.Streams.Common
 
         /// <summary>
         /// Tries to get the next message from the provided stream, starting at the start index.
-        /// </summary>        
+        /// </summary>
         /// <param name="start">The start index.</param>
         /// <param name="streamId">The stream identifier.</param>
         /// <param name="dataAdapter">The data adapter.</param>
@@ -204,7 +204,7 @@ namespace Orleans.Providers.Streams.Common
         {
             if (start < readIndex)
             {
-                throw new ArgumentOutOfRangeException("start");
+                throw new ArgumentOutOfRangeException(nameof(start));
             }
 
             for (int i = start; i < writeIndex; i++)

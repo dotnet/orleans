@@ -1,10 +1,6 @@
-using System;
 using System.Buffers.Binary;
 using System.Collections.Concurrent;
-using System.Collections.Generic;
 using System.Net;
-using System.Threading;
-using System.Threading.Tasks;
 using Microsoft.AspNetCore.Connections;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -302,8 +298,8 @@ namespace Orleans.Runtime.Messaging
                 RunContinuationsAsynchronously = true
             };
 
-            private GatewayInboundConnection _connection;
-            private int _dropped;
+            private readonly GatewayInboundConnection _connection;
+            private readonly int _dropped;
             private CoarseStopwatch _disconnectedSince;
 
             internal ClientState(Gateway gateway, ClientGrainId id)

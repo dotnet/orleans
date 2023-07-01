@@ -21,13 +21,13 @@ namespace Orleans.Networking.Shared
         private readonly ISocketsTrace _trace;
         private readonly SocketReceiver _receiver;
         private readonly SocketSender _sender;
-        private readonly CancellationTokenSource _connectionClosedTokenSource = new CancellationTokenSource();
+        private readonly CancellationTokenSource _connectionClosedTokenSource = new();
 
-        private readonly object _shutdownLock = new object();
+        private readonly object _shutdownLock = new();
         private volatile bool _socketDisposed;
         private volatile Exception _shutdownReason;
         private Task _processingTask;
-        private readonly TaskCompletionSource<object> _waitForConnectionClosedTcs = new TaskCompletionSource<object>(TaskCreationOptions.RunContinuationsAsynchronously);
+        private readonly TaskCompletionSource<object> _waitForConnectionClosedTcs = new(TaskCreationOptions.RunContinuationsAsynchronously);
         private bool _connectionClosed;
 
         internal SocketConnection(Socket socket,

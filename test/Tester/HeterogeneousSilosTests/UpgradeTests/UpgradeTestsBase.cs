@@ -1,13 +1,6 @@
-using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Linq;
-using System.Threading.Tasks;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Configuration.Memory;
-using Orleans;
 using Orleans.Configuration;
-using Orleans.Hosting;
 using Orleans.Runtime;
 using Orleans.TestingHost;
 using TestExtensions;
@@ -39,7 +32,7 @@ namespace Tester.HeterogeneousSilosTests.UpgradeTests
         private readonly FileInfo assemblyGrainsV1;
         private readonly FileInfo assemblyGrainsV2;
 
-        private readonly List<SiloHandle> deployedSilos = new List<SiloHandle>();
+        private readonly List<SiloHandle> deployedSilos = new();
         private int siloIdx = 0;
         private TestClusterBuilder builder;
         private TestCluster cluster;

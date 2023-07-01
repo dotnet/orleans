@@ -1,16 +1,10 @@
-
-using System;
 using System.Collections.Concurrent;
-using System.Threading;
-using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
-using Orleans;
 using Orleans.Placement;
 using Orleans.Providers.Streams.Generator;
 using Orleans.Runtime;
 using Orleans.Streams;
 using TestGrainInterfaces;
-using UnitTests.GrainInterfaces;
 using UnitTests.Grains;
 
 namespace TestGrains
@@ -67,13 +61,13 @@ namespace TestGrains
             }
         }
 
-        private static readonly ConcurrentDictionary<Guid, FaultsState> FaultInjectionTracker = new ConcurrentDictionary<Guid, FaultsState>();
+        private static readonly ConcurrentDictionary<Guid, FaultsState> FaultInjectionTracker = new();
 
         private FaultsState myFaults;
         private FaultsState Faults { get { return myFaults ?? (myFaults = FaultInjectionTracker.GetOrAdd(this.GetPrimaryKey(), key => new FaultsState())); } }
-     
+
         // grain instance state
-        private ILogger logger;
+        private readonly ILogger logger;
         private IAsyncStream<GeneratedEvent> stream;
 
         public ImplicitSubscription_TransientError_RecoverableStream_CollectorGrain(ILoggerFactory loggerFactory)
@@ -133,7 +127,7 @@ namespace TestGrains
                 Faults.onFirstMessageProcessedFault.TryFire(InjectFault);
                 Faults.on33rdMessageFault.TryFire(InjectFault);
                 // every 10 events, checkpoint our grain state
-                if (State.Accumulator%10 != 0) return;
+                if (State.Accumulator % 10 != 0) return;
                 logger.LogInformation(
                     "Checkpointing: StreamGuid: {StreamGuid}, StreamNamespace: {StreamNamespace}, SequenceToken: {SequenceToken}, Accumulator: {Accumulator}.",
                     State.StreamGuid,

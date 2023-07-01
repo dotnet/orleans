@@ -5,7 +5,7 @@ namespace UnitTests.Grains
 {
     public class VersionAwarePlacementDirector : IPlacementDirector
     {
-        private readonly Random random = new Random();
+        private readonly Random random = new();
 
         public Task<SiloAddress> OnAddActivation(PlacementStrategy strategy, PlacementTarget target, IPlacementContext context)
         {

@@ -1,15 +1,11 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
-using Orleans;
 using Orleans.Configuration;
-using Orleans.Hosting;
 using Orleans.Runtime;
 using Orleans.TestingHost;
-using System;
 using System.Diagnostics;
 using System.Net.Sockets;
-using System.Threading.Tasks;
 using TestExtensions;
 using Xunit;
 
@@ -17,7 +13,7 @@ namespace Tester.ClientConnectionTests
 {
     public class StallConnectionTests : TestClusterPerTest
     {
-        private static TimeSpan Timeout = TimeSpan.FromSeconds(10);
+        private static readonly TimeSpan Timeout = TimeSpan.FromSeconds(10);
 
         protected override void ConfigureTestCluster(TestClusterBuilder builder)
         {

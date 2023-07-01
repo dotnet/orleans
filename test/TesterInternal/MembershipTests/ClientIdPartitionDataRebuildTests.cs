@@ -1,11 +1,6 @@
-using System;
-using System.Threading;
-using System.Threading.Tasks;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using Orleans;
 using Orleans.Configuration;
-using Orleans.Hosting;
 using Orleans.Runtime;
 using Orleans.TestingHost;
 using UnitTests.GrainInterfaces;
@@ -19,7 +14,7 @@ namespace UnitTests.MembershipTests
     {
         internal class Observer : ISimpleGrainObserver
         {
-            private readonly SemaphoreSlim semaphore = new SemaphoreSlim(0);
+            private readonly SemaphoreSlim semaphore = new(0);
             private int lastA;
             private int lastB;
 

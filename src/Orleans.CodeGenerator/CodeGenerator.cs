@@ -460,7 +460,7 @@ namespace Orleans.CodeGenerator
         }
 
         // Returns descriptions of all data members (fields and properties)
-        private IEnumerable<IMemberDescription> GetDataMembers(FieldIdAssignmentHelper fieldIdAssignmentHelper)
+        private static IEnumerable<IMemberDescription> GetDataMembers(FieldIdAssignmentHelper fieldIdAssignmentHelper)
         {
             var members = new Dictionary<(uint, bool), IMemberDescription>();
 
@@ -557,10 +557,7 @@ namespace Orleans.CodeGenerator
 
         private uint? GetWellKnownTypeId(ISymbol symbol) => GetId(symbol);
 
-        public string GetAlias(ISymbol symbol)
-        {
-            return (string)symbol.GetAttribute(LibraryTypes.AliasAttribute)?.ConstructorArguments.First().Value;
-        }
+        public string GetAlias(ISymbol symbol) => (string)symbol.GetAttribute(LibraryTypes.AliasAttribute)?.ConstructorArguments.First().Value;
 
         private CompoundTypeAliasComponent[] GetCompoundTypeAlias(ISymbol symbol)
         {

@@ -66,7 +66,7 @@ namespace Orleans.Runtime
         /// <returns>
         /// The newly created <see cref="GrainType"/> instance.
         /// </returns>
-        public static GrainType Create(string value) => new GrainType(Encoding.UTF8.GetBytes(value));
+        public static GrainType Create(string value) => new(Encoding.UTF8.GetBytes(value));
 
         /// <summary>
         /// Converts a <see cref="GrainType"/> to a <see cref="IdSpan"/>.
@@ -80,7 +80,7 @@ namespace Orleans.Runtime
         /// </summary>
         /// <param name="id">The id span to convert.</param>
         /// <returns>The corresponding <see cref="GrainType"/>.</returns>
-        public static explicit operator GrainType(IdSpan id) => new GrainType(id);
+        public static explicit operator GrainType(IdSpan id) => new(id);
 
         /// <summary>
         /// Gets a value indicating whether this instance is the default value.

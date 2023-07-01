@@ -1,13 +1,11 @@
 using System.Collections;
 using System.Collections.Concurrent;
-using System.Collections.Generic;
-using System.Threading;
 
 namespace Orleans.Runtime;
 
 internal sealed class ActivationDirectory : IEnumerable<KeyValuePair<GrainId, IGrainContext>>
 {
-    private int _activationsCount;
+    private readonly int _activationsCount;
 
     private readonly ConcurrentDictionary<GrainId, IGrainContext> _activations = new();
 

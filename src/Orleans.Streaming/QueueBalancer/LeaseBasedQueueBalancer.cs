@@ -33,9 +33,9 @@ namespace Orleans.Streams
         private readonly LeaseBasedQueueBalancerOptions options;
         private readonly ILeaseProvider leaseProvider;
         private readonly ITimerRegistry timerRegistry;
-        private readonly AsyncSerialExecutor executor = new AsyncSerialExecutor();
+        private readonly AsyncSerialExecutor executor = new();
         private int allQueuesCount;
-        private readonly List<AcquiredQueue> myQueues = new List<AcquiredQueue>();
+        private readonly List<AcquiredQueue> myQueues = new();
         private IDisposable leaseMaintenanceTimer;
         private IDisposable leaseAquisitionTimer;
         private RoundRobinSelector<QueueId> queueSelector;

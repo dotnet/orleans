@@ -1,14 +1,8 @@
-using System;
 using System.Collections.Concurrent;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading;
-using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 using Orleans.Internal;
-using Orleans.Statistics;
 
 namespace Orleans.Runtime
 {
@@ -24,10 +18,10 @@ namespace Orleans.Runtime
         private DateTime nextTicket;
         private static readonly List<ICollectibleGrainContext> nothing = new(0);
         private readonly ILogger logger;
-        private IAsyncTimer _collectionTimer;
+        private readonly IAsyncTimer _collectionTimer;
         private Task _collectionLoopTask;
-        private int collectionNumber;
-        private int _activationCount;
+        private readonly int collectionNumber;
+        private readonly int _activationCount;
         private readonly IOptions<GrainCollectionOptions> _options;
 
         /// <summary>

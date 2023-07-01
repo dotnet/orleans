@@ -2,7 +2,7 @@ namespace Orleans.Runtime
 {
     internal class GrainContextAccessor : IGrainContextAccessor
     {
-        private HostedClient _hostedClient;
+        private readonly HostedClient _hostedClient;
 
         public GrainContextAccessor(HostedClient hostedClient)
         {

@@ -20,7 +20,7 @@ namespace Orleans.Runtime
         private readonly SystemTargetGrainId id;
         private GrainReference selfReference;
         private Message running;
-        private Dictionary<Type, object> _components = new Dictionary<Type, object>();
+        private Dictionary<Type, object> _components = new();
 
         /// <summary>Silo address of the system target.</summary>
         public SiloAddress Silo { get; }

@@ -1,8 +1,4 @@
-using System;
-using System.Diagnostics;
-using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
-using Orleans;
 using Orleans.Runtime;
 using UnitTests.GrainInterfaces;
 
@@ -40,7 +36,7 @@ namespace UnitTests.Grains
 
     public class RequestContextTaskGrain : Grain, IRequestContextTaskGrain
     {
-        private ILogger logger;
+        private readonly ILogger logger;
 
         public RequestContextTaskGrain(ILoggerFactory loggerFactory)
         {

@@ -29,7 +29,7 @@ namespace Orleans.Runtime
         /// <summary>
         /// Gets the minimum possible version.
         /// </summary>
-        public static MembershipVersion MinValue => new MembershipVersion(long.MinValue);
+        public static MembershipVersion MinValue => new(long.MinValue);
 
         /// <inheritdoc/>
         public int CompareTo(MembershipVersion other) => this.Value.CompareTo(other.Value);

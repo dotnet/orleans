@@ -14,7 +14,7 @@ namespace Orleans.Runtime
         public const int MAX_LOG_MESSAGE_SIZE = 20000;
         private const string TIME_FORMAT = "HH:mm:ss.fff 'GMT'"; // Example: 09:50:43.341 GMT
         private const string DATE_FORMAT = "yyyy-MM-dd " + TIME_FORMAT; // Example: 2010-09-02 09:50:43.341 GMT - Variant of UniversalSorta­bleDateTimePat­tern
-        private static readonly ConcurrentDictionary<Type, Func<Exception, string>> exceptionDecoders = new ConcurrentDictionary<Type, Func<Exception, string>>();
+        private static readonly ConcurrentDictionary<Type, Func<Exception, string>> exceptionDecoders = new();
 
         /// <summary>
         /// Utility function to convert a <c>DateTime</c> object into printable data format used by the Logger subsystem.

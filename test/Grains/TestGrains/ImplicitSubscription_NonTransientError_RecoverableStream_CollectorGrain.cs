@@ -1,10 +1,5 @@
-
-using System;
 using System.Collections.Concurrent;
-using System.Threading;
-using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
-using Orleans;
 using Orleans.Placement;
 using Orleans.Providers.Streams.Generator;
 using Orleans.Runtime;
@@ -19,16 +14,16 @@ namespace TestGrains
     public class ImplicitSubscription_NonTransientError_RecoverableStream_CollectorGrain : Grain<StreamCheckpoint<int>>, IGeneratedEventCollectorGrain
     {
         public const string StreamNamespace = "NonTransientError_RecoverableStream";
-     
+
         // grain instance state
-        private ILogger logger;
+        private readonly ILogger logger;
         private IAsyncStream<GeneratedEvent> stream;
 
         private class FaultsState
         {
             public bool FaultCleared { get; set; }
         }
-        private static readonly ConcurrentDictionary<Guid, FaultsState> FaultInjectionTracker = new ConcurrentDictionary<Guid, FaultsState>();
+        private static readonly ConcurrentDictionary<Guid, FaultsState> FaultInjectionTracker = new();
         private FaultsState myFaults;
         private FaultsState Faults { get { return myFaults ?? (myFaults = FaultInjectionTracker.GetOrAdd(this.GetPrimaryKey(), key => new FaultsState())); } }
 
@@ -86,7 +81,7 @@ namespace TestGrains
             if (evt.EventType != GeneratedEvent.GeneratedEventType.Report)
             {
                 // every 10 events, checkpoint our grain state
-                if (State.Accumulator%10 != 0) return;
+                if (State.Accumulator % 10 != 0) return;
                 logger.LogInformation(
                     "Checkpointing: StreamGuid: {StreamGuid}, StreamNamespace: {StreamNamespace}, SequenceToken: {SequenceToken}, Accumulator: {Accumulator}",
                     State.StreamGuid,

@@ -1,8 +1,4 @@
-using System;
-using System.Collections.Generic;
 using System.Collections.Immutable;
-using System.Threading;
-using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Orleans.Internal;
@@ -20,7 +16,7 @@ namespace Orleans.Runtime.Metadata
         private readonly IFatalErrorHandler _fatalErrorHandler;
         private readonly CancellationTokenSource _cancellation = new CancellationTokenSource();
         private readonly AsyncEnumerable<ClusterManifest> _updates;
-        private ClusterManifest _current;
+        private readonly ClusterManifest _current;
         private Task _runTask;
 
         public ClusterManifestProvider(

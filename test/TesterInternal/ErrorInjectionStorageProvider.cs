@@ -1,7 +1,4 @@
-using System;
 using System.Runtime.Serialization;
-using System.Threading.Tasks;
-using Orleans;
 using Orleans.Providers;
 using Orleans.Runtime;
 using Microsoft.Extensions.Logging;
@@ -24,7 +21,7 @@ namespace UnitTests.StorageTests
     [GenerateSerializer]
     public struct ErrorInjectionBehavior
     {
-        public static readonly ErrorInjectionBehavior None = new ErrorInjectionBehavior { ErrorInjectionPoint = ErrorInjectionPoint.None };
+        public static readonly ErrorInjectionBehavior None = new() { ErrorInjectionPoint = ErrorInjectionPoint.None };
 
         [Id(0)]
         public Type ExceptionType { get; set; }
@@ -73,7 +70,7 @@ namespace UnitTests.StorageTests
 
     public class ErrorInjectionStorageProvider : MockStorageProvider, IControllable
     {
-        private ILogger logger;
+        private readonly ILogger logger;
 
         public ErrorInjectionStorageProvider(
             ILogger<ErrorInjectionStorageProvider> logger,
@@ -89,7 +86,7 @@ namespace UnitTests.StorageTests
             IManagementGrain mgmtGrain = grainFactory.GetGrain<IManagementGrain>(0);
             await mgmtGrain.SendControlCommandToProvider(
                 typeof(ErrorInjectionStorageProvider).FullName,
-                providerName, 
+                providerName,
                 (int)Commands.SetErrorInjection,
                 errorInjectionBehavior);
         }
@@ -103,7 +100,7 @@ namespace UnitTests.StorageTests
             ErrorInjection = errorInject;
             logger.LogInformation("Set ErrorInjection to {ErrorInjection}", ErrorInjection);
         }
-        
+
         public async override Task Close()
         {
             logger.LogInformation("Close ErrorInjection={ErrorInjection}", ErrorInjection);
@@ -121,7 +118,7 @@ namespace UnitTests.StorageTests
 
         public async override Task ReadStateAsync<T>(string grainType, GrainId grainId, IGrainState<T> grainState)
         {
-            logger.LogInformation( "ReadStateAsync for {GrainType} {GrainId} ErrorInjection={ErrorInjection}", grainType, grainId, ErrorInjection);
+            logger.LogInformation("ReadStateAsync for {GrainType} {GrainId} ErrorInjection={ErrorInjection}", grainType, grainId, ErrorInjection);
             try
             {
                 ThrowIfMatches(ErrorInjectionPoint.BeforeRead);
@@ -172,7 +169,7 @@ namespace UnitTests.StorageTests
         /// <param name="command">A serial number of the command.</param>
         /// <param name="arg">An opaque command argument</param>
         public override Task<object> ExecuteCommand(int command, object arg)
-        { 
+        {
             switch ((Commands)command)
             {
                 case Commands.SetErrorInjection:

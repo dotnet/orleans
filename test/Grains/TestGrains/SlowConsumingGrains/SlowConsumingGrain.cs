@@ -14,7 +14,7 @@ namespace UnitTests.Grains
     /// </summary>
     public class SlowConsumingGrain : Grain, ISlowConsumingGrain
     {
-        private ILogger logger;
+        private readonly ILogger logger;
         public SlowObserver<int> ConsumerObserver { get; private set; }
         public StreamSubscriptionHandle<int> ConsumerHandle { get; set; }
 
@@ -62,8 +62,8 @@ namespace UnitTests.Grains
     public class SlowObserver<T> : IAsyncObserver<T>
     {
         public int NumConsumed { get; private set; }
-        private ILogger logger;
-        private SlowConsumingGrain slowConsumingGrain;
+        private readonly ILogger logger;
+        private readonly SlowConsumingGrain slowConsumingGrain;
         private StreamSequenceToken firstToken;
 
         internal SlowObserver(SlowConsumingGrain grain, ILogger logger)

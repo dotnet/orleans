@@ -27,7 +27,7 @@ namespace Orleans.Tests.SqlUtils
         /// <summary>
         /// Used to format .NET objects suitable to relational database format.
         /// </summary>
-        private static readonly AdoNetFormatProvider adoNetFormatProvider = new AdoNetFormatProvider();
+        private static readonly AdoNetFormatProvider adoNetFormatProvider = new();
 
         /// <summary>
         /// This is a template to produce query parameters that are indexed.
@@ -50,12 +50,12 @@ namespace Orleans.Tests.SqlUtils
         {
             if(string.IsNullOrWhiteSpace(tableName))
             {
-                throw new ArgumentException("The name must be a legal SQL table name", "tableName");
+                throw new ArgumentException("The name must be a legal SQL table name", nameof(tableName));
             }
 
             if(parameters == null)
             {
-                throw new ArgumentNullException("parameters");
+                throw new ArgumentNullException(nameof(parameters));
             }
 
             var storageConsts = DbConstantsStore.GetDbConstants(storage.InvariantName);

@@ -23,11 +23,11 @@ namespace Orleans.Transactions.TestKit.Consistency
         private readonly HashSet<string> aborted;
         private readonly Dictionary<string, string> indoubt;
         private bool timeoutsOccurred;
-        private bool tolerateUnknownExceptions;
+        private readonly bool tolerateUnknownExceptions;
         private readonly IGrainFactory grainFactory;
 
-        private readonly Dictionary<string, HashSet<string>> orderEdges = new Dictionary<string, HashSet<string>>();
-        private readonly Dictionary<string, bool> marks = new Dictionary<string, bool>();
+        private readonly Dictionary<string, HashSet<string>> orderEdges = new();
+        private readonly Dictionary<string, bool> marks = new();
 
 
         public ConsistencyTestHarness(

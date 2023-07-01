@@ -1,6 +1,3 @@
-using System;
-using System.Collections.Generic;
-using System.Threading.Tasks;
 using Orleans.TestingHost.Utils;
 using TestExtensions;
 using UnitTests.GrainInterfaces;
@@ -16,7 +13,7 @@ namespace Tester.StreamingTests.ProgrammaticSubscribeTests
         //test utilities and statics
         public static string StreamProviderName = "StreamProvider1";
         public static string StreamProviderName2 = "StreamProvider2";
-        private BaseTestClusterFixture fixture;
+        private readonly BaseTestClusterFixture fixture;
         public SubscriptionObserverWithImplicitSubscribingTestRunner(BaseTestClusterFixture fixture)
         {
             this.fixture = fixture;
@@ -44,8 +41,8 @@ namespace Tester.StreamingTests.ProgrammaticSubscribeTests
 
             var implicitConsumer =
                 this.fixture.HostedCluster.GrainFactory.GetGrain<IImplicitSubscribeGrain>(streamId.Guid);
-             await TestingUtils.WaitUntilAsync(lastTry => ProgrammaticSubcribeTestsRunner.CheckCounters(new List<ITypedProducerGrain> { producer },
-                    implicitConsumer, lastTry, this.fixture.Logger), _timeout);
+            await TestingUtils.WaitUntilAsync(lastTry => ProgrammaticSubcribeTestsRunner.CheckCounters(new List<ITypedProducerGrain> { producer },
+                   implicitConsumer, lastTry, this.fixture.Logger), _timeout);
 
             //clean up test
             await implicitConsumer.StopConsuming();
@@ -100,7 +97,7 @@ namespace Tester.StreamingTests.ProgrammaticSubscribeTests
             await TestingUtils.WaitUntilAsync(lastTry => ProgrammaticSubcribeTestsRunner.ProducerHasProducedSinceLastCheck(numProduced, producer2, lastTry), _timeout);
             await producer.StopPeriodicProducing();
             await producer2.StopPeriodicProducing();
-            
+
             var implicitConsumer =
                 this.fixture.HostedCluster.GrainFactory.GetGrain<IImplicitSubscribeGrain>(streamId.Guid);
             await TestingUtils.WaitUntilAsync(lastTry => ProgrammaticSubcribeTestsRunner.CheckCounters(new List<ITypedProducerGrain> { producer, producer2 },

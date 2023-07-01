@@ -17,7 +17,7 @@ namespace UnitTests.Grains
     {
         private string label;
 
-        private ILogger logger;
+        private readonly ILogger logger;
 
         public StressTestGrain(ILoggerFactory loggerFactory)
         {
@@ -114,7 +114,7 @@ namespace UnitTests.Grains
     internal class ReentrantStressTestGrain : Grain, IReentrantStressTestGrain
     {
         private string label;
-        private ILogger logger;
+        private readonly ILogger logger;
 
         public ReentrantStressTestGrain(ILoggerFactory loggerFactory)
         {
@@ -271,7 +271,7 @@ namespace UnitTests.Grains
     public class ReentrantLocalStressTestGrain : Grain, IReentrantLocalStressTestGrain
     {
         private string label;
-        private ILogger logger;
+        private readonly ILogger logger;
 
         public ReentrantLocalStressTestGrain(ILoggerFactory loggerFactory)
         {

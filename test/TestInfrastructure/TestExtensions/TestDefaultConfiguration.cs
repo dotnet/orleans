@@ -1,6 +1,3 @@
-using System;
-using System.Collections.Generic;
-using System.IO;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.FileProviders;
 using Microsoft.Extensions.Primitives;
@@ -10,7 +7,7 @@ namespace TestExtensions
 {
     public class TestDefaultConfiguration
     {
-        private static readonly object LockObject = new object();
+        private static readonly object LockObject = new();
         private static IConfiguration defaultConfiguration;
 
         static TestDefaultConfiguration()
@@ -37,9 +34,9 @@ namespace TestExtensions
 
         public static string CosmosDBAccountEndpoint => defaultConfiguration[nameof(CosmosDBAccountEndpoint)];
         public static string CosmosDBAccountKey => defaultConfiguration[nameof(CosmosDBAccountKey)];
-        public static Uri TableEndpoint => new Uri(defaultConfiguration[nameof(TableEndpoint)]);
-        public static Uri DataBlobUri => new Uri(defaultConfiguration[nameof(DataBlobUri)]);
-        public static Uri DataQueueUri => new Uri(defaultConfiguration[nameof(DataQueueUri)]);
+        public static Uri TableEndpoint => new(defaultConfiguration[nameof(TableEndpoint)]);
+        public static Uri DataBlobUri => new(defaultConfiguration[nameof(DataBlobUri)]);
+        public static Uri DataQueueUri => new(defaultConfiguration[nameof(DataQueueUri)]);
         public static string DataConnectionString => defaultConfiguration[nameof(DataConnectionString)];
         public static string EventHubConnectionString => defaultConfiguration[nameof(EventHubConnectionString)];
         public static string EventHubFullyQualifiedNamespace => defaultConfiguration[nameof(EventHubFullyQualifiedNamespace)];

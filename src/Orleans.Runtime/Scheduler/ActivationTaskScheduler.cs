@@ -1,7 +1,4 @@
-using System.Collections.Generic;
 using System.Diagnostics;
-using System.Threading;
-using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 
 namespace Orleans.Runtime.Scheduler
@@ -14,7 +11,7 @@ namespace Orleans.Runtime.Scheduler
     {
         private readonly ILogger logger;
 
-        private static long idCounter;
+        private static readonly long idCounter;
         private readonly long myId;
         private readonly WorkItemGroup workerGroup;
 #if EXTRA_STATS
@@ -46,7 +43,7 @@ namespace Orleans.Runtime.Scheduler
                     "RunTask: Incomplete base.TryExecuteTask for Task Id={TaskId} with Status={TaskStatus}",
                     task.Id,
                     task.Status);
-            
+
             //  Consider adding ResetExecutionContext() or even better:
             //  Consider getting rid of ResetExecutionContext completely and just making sure we always call SetExecutionContext before TryExecuteTask.
         }
@@ -92,7 +89,7 @@ namespace Orleans.Runtime.Scheduler
             // If the task was previously queued, remove it from the queue
             if (taskWasPreviouslyQueued)
                 canExecuteInline = TryDequeue(task);
-            
+
 
             if (!canExecuteInline)
             {

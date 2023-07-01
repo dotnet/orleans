@@ -1,6 +1,3 @@
-using System;
-using System.Threading.Tasks;
-using Orleans;
 using Orleans.Streams;
 using Orleans.Internal;
 using UnitTests.GrainInterfaces;
@@ -14,7 +11,7 @@ namespace UnitTests.StreamingTests
     {
         private static readonly TimeSpan Timeout = TimeSpan.FromSeconds(10);
         private readonly string streamProviderName;
-        private IClusterClient client;
+        private readonly IClusterClient client;
 
         private class Counter
         {

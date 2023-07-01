@@ -1,10 +1,5 @@
-using System;
-using System.Collections.Generic;
 using System.Collections.Immutable;
-using System.Linq;
-using System.Threading;
 using System.Threading.Channels;
-using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using NonSilo.Tests.Utilities;
@@ -34,7 +29,7 @@ namespace NonSilo.Tests.Membership
         private readonly ILocalSiloHealthMonitor _localSiloHealthMonitor;
         private readonly IRemoteSiloProber _prober;
         private readonly IClusterMembershipService _membershipService;
-        private ClusterMembershipOptions _clusterMembershipOptions;
+        private readonly ClusterMembershipOptions _clusterMembershipOptions;
         private readonly IOptionsMonitor<ClusterMembershipOptions> _optionsMonitor;
         private readonly Channel<ProbeResult> _probeResults;
         private readonly SiloHealthMonitor _monitor;
@@ -280,13 +275,13 @@ namespace NonSilo.Tests.Membership
         }
 
         private static ClusterMembershipSnapshot Snapshot(long version, params ClusterMember[] members)
-            => new ClusterMembershipSnapshot(
+            => new(
                 ImmutableDictionary.CreateRange(
                     members.Select(m => new KeyValuePair<SiloAddress, ClusterMember>(m.SiloAddress, m))),
                 new MembershipVersion(version));
 
         private static SiloAddress Silo(string value) => SiloAddress.FromParsableString(value);
 
-        private static ClusterMember Member(SiloAddress address, SiloStatus status) => new ClusterMember(address, status, address.ToString());
+        private static ClusterMember Member(SiloAddress address, SiloStatus status) => new(address, status, address.ToString());
     }
 }

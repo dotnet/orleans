@@ -1,7 +1,4 @@
-using System;
-using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
-using Orleans;
 using Orleans.Runtime;
 using Orleans.Streams.Filtering;
 using TestExtensions;
@@ -13,7 +10,7 @@ namespace Tester.StreamingTests.Filtering
 {
     public class CustomStreamFilter : IStreamFilter
     {
-        private ILogger<CustomStreamFilter> logger;
+        private readonly ILogger<CustomStreamFilter> logger;
 
         public CustomStreamFilter(ILogger<CustomStreamFilter> logger)
         {

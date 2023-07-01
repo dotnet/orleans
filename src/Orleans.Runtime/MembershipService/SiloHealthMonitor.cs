@@ -1,8 +1,4 @@
-using System;
-using System.Linq;
 using System.Runtime.InteropServices;
-using System.Threading;
-using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
@@ -24,7 +20,7 @@ namespace Orleans.Runtime.MembershipService
         private readonly IClusterMembershipService _membershipService;
         private readonly ILocalSiloDetails _localSiloDetails;
         private readonly CancellationTokenSource _stoppingCancellation = new CancellationTokenSource();
-        private readonly object _lockObj = new object();
+        private readonly object _lockObj = new();
         private readonly IAsyncTimer _pingTimer;
         private ValueStopwatch _elapsedSinceLastSuccessfulResponse;
         private Func<SiloHealthMonitor, ProbeResult, Task> _onProbeResult;
@@ -412,10 +408,10 @@ namespace Orleans.Runtime.MembershipService
             }
 
             public static ProbeResult CreateDirect(int failedProbeCount, ProbeResultStatus status)
-                => new ProbeResult(failedProbeCount, status, isDirectProbe: true, 0);
+                => new(failedProbeCount, status, isDirectProbe: true, 0);
 
             public static ProbeResult CreateIndirect(int failedProbeCount, ProbeResultStatus status, IndirectProbeResponse indirectProbeResponse)
-                => new ProbeResult(failedProbeCount, status, isDirectProbe: false, indirectProbeResponse.IntermediaryHealthScore);
+                => new(failedProbeCount, status, isDirectProbe: false, indirectProbeResponse.IntermediaryHealthScore);
 
             public int FailedProbeCount { get; }
 

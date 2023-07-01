@@ -210,7 +210,7 @@ namespace Orleans.TestingHost
         /// Converts these options into a dictionary.
         /// </summary>
         /// <returns>The options dictionary.</returns>
-        public Dictionary<string, string> ToDictionary() => new Dictionary<string, string>
+        public Dictionary<string, string> ToDictionary() => new()
         {
             [nameof(SiloPort)] = this.SiloPort.ToString(),
             [nameof(GatewayPort)] = this.GatewayPort.ToString(),

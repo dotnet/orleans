@@ -1,6 +1,4 @@
-﻿using System.Threading.Tasks;
-using Orleans;
-using UnitTests.GrainInterfaces;
+﻿using UnitTests.GrainInterfaces;
 
 namespace UnitTests.Grains
 {
@@ -30,7 +28,7 @@ namespace UnitTests.Grains
 
     public class SimpleExtension : ISimpleExtension
     {
-        private string someString;
+        private readonly string someString;
 
         public SimpleExtension(string someString)
         {
@@ -42,7 +40,7 @@ namespace UnitTests.Grains
             return Task.FromResult(someString);
         }
     }
-    
+
     public class AutoExtension : IAutoExtension
     {
         public Task<string> CheckExtension()

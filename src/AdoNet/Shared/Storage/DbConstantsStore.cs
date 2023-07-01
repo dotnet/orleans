@@ -15,7 +15,7 @@ namespace Orleans.Tests.SqlUtils
     internal static class DbConstantsStore
     {
         private static readonly Dictionary<string, DbConstants> invariantNameToConsts =
-            new Dictionary<string, DbConstants>
+            new()
             {
                 {
                     AdoNetInvariants.InvariantNameSqlServer,

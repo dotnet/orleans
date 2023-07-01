@@ -1,8 +1,5 @@
-using System;
 using System.Diagnostics;
 using System.Runtime.CompilerServices;
-using System.Threading;
-using System.Threading.Tasks;
 using System.Threading.Tasks.Sources;
 
 namespace Orleans.Runtime
@@ -23,7 +20,7 @@ namespace Orleans.Runtime
         private const uint ResetMask = ~SignaledFlag & ~WaitingFlag;
 
         private ManualResetValueTaskSourceCore<bool> _waitSource;
-        private volatile uint _status;
+        private readonly uint _status;
 
         public bool RunContinuationsAsynchronously
         {

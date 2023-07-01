@@ -36,7 +36,7 @@ namespace NonSilo.Tests.Directory
         private readonly ClientDirectory _directory;
         private readonly ClientDirectory.TestAccessor _testAccessor;
         private readonly IConnectedClientCollection _connectedClientCollection;
-        private readonly ConcurrentDictionary<SiloAddress, IRemoteClientDirectory> _remoteDirectories = new ConcurrentDictionary<SiloAddress, IRemoteClientDirectory>();
+        private readonly ConcurrentDictionary<SiloAddress, IRemoteClientDirectory> _remoteDirectories = new();
         private long _expectedConnectedClientsVersion;
 
         public ClientDirectoryTests()

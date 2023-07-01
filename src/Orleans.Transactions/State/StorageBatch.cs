@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -34,14 +34,14 @@ namespace Orleans.Transactions
         // watermarks for commit, prepare, abort
         private long confirmUpTo;
         private long cancelAbove;
-        private long cancelAboveStart;
+        private readonly long cancelAboveStart;
 
         // prepare records
-        private SortedDictionary<long, PendingTransactionState<TState>> prepares;
+        private readonly SortedDictionary<long, PendingTransactionState<TState>> prepares;
 
         // follow-up actions, to be executed after storing this batch
-        private List<Action> followUpActions;
-        private List<Func<Task<bool>>> storeConditions;
+        private readonly List<Action> followUpActions;
+        private readonly List<Func<Task<bool>>> storeConditions;
         
         // counters for each type of event
         private int total = 0;
@@ -57,10 +57,7 @@ namespace Orleans.Transactions
         public string ETag { get; set; }
 
         public int BatchSize => total;
-        public override string ToString()
-        {
-            return $"batchsize={total} [{read}r {prepare}p {commit}c {confirm}cf {collect}cl {cancel}cc]";
-        }
+        public override string ToString() => $"batchsize={total} [{read}r {prepare}p {commit}c {confirm}cf {collect}cl {cancel}cc]";
 
         public StorageBatch(TransactionalStateMetaData metaData, string etag, long confirmUpTo, long cancelAbove)
         {
@@ -191,15 +188,9 @@ namespace Orleans.Transactions
             MetaData.CommitRecords.Remove(transactionId);
         }
 
-        public void FollowUpAction(Action action)
-        {
-            followUpActions.Add(action);
-        }
+        public void FollowUpAction(Action action) => followUpActions.Add(action);
 
-        public void AddStorePreCondition(Func<Task<bool>> action)
-        {
-            this.storeConditions.Add(action);
-        }
+        public void AddStorePreCondition(Func<Task<bool>> action) => this.storeConditions.Add(action);
 
         public async Task<bool> CheckStorePreConditions()
         {

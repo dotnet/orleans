@@ -1,9 +1,4 @@
-using System;
 using System.Collections.Concurrent;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading;
-using System.Threading.Tasks;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 
@@ -13,7 +8,7 @@ namespace Orleans.Runtime.Placement
     {
         private class CachedLocalStat
         {
-            private int _activationCount;
+            private readonly int _activationCount;
 
             internal CachedLocalStat(SiloRuntimeStatistics siloStats) => SiloStats = siloStats;
 
@@ -21,7 +16,7 @@ namespace Orleans.Runtime.Placement
             public int ActivationCount => _activationCount;
             public void IncrementActivationCount(int delta) => Interlocked.Add(ref _activationCount, delta);
         }
-        
+
         // Track created activations on this silo between statistic intervals.
         private readonly ConcurrentDictionary<SiloAddress, CachedLocalStat> _localCache = new();
         private readonly SiloAddress _localAddress;
@@ -29,7 +24,7 @@ namespace Orleans.Runtime.Placement
 
         public ActivationCountPlacementDirector(
             ILocalSiloDetails localSiloDetails,
-            DeploymentLoadPublisher deploymentLoadPublisher, 
+            DeploymentLoadPublisher deploymentLoadPublisher,
             IOptions<ActivationCountBasedPlacementOptions> options)
         {
             _localAddress = localSiloDetails.SiloAddress;

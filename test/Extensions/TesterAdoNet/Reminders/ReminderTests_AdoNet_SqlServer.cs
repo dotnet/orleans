@@ -1,10 +1,6 @@
 //#define USE_SQL_SERVER
 
-using System;
-using System.Collections.Generic;
-using System.Threading.Tasks;
 using Microsoft.Extensions.Configuration;
-using Orleans.Hosting;
 using Orleans.TestingHost;
 using TestExtensions;
 using UnitTests.General;
@@ -24,7 +20,7 @@ namespace Tester.AdoNet.Reminders
     public class ReminderTests_AdoNet_SqlServer : ReminderTests_Base, IClassFixture<ReminderTests_AdoNet_SqlServer.Fixture>
     {
         private const string TestDatabaseName = "OrleansTest_SqlServer_Reminders";
-        private static string AdoInvariant = AdoNetInvariants.InvariantNameSqlServer;
+        private static readonly string AdoInvariant = AdoNetInvariants.InvariantNameSqlServer;
         private const string ConnectionStringKey = "ReminderConnectionString";
 
         public class Fixture : BaseTestClusterFixture
@@ -63,7 +59,7 @@ namespace Tester.AdoNet.Reminders
             var controlProxy = fixture.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
             controlProxy.EraseReminderTable().WaitWithThrow(TestConstants.InitTimeout);
         }
-        
+
         // Basic tests
 
         [SkippableFact]

@@ -10,13 +10,13 @@ using Orleans.Runtime;
 namespace Orleans.TestingHost.Logging
 {
     /// <summary>
-    /// The log output which all <see cref="FileLogger"/> share to log messages to 
+    /// The log output which all <see cref="FileLogger"/> share to log messages to
     /// </summary>
     public class FileLoggingOutput : IDisposable
     {
         private static readonly ConcurrentDictionary<FileLoggingOutput, object> Instances = new();
         private readonly TimeSpan flushInterval = Debugger.IsAttached ? TimeSpan.FromMilliseconds(10) : TimeSpan.FromSeconds(1);
-        private readonly object lockObj = new object();
+        private readonly object lockObj = new();
         private readonly string logFileName;
         private DateTime lastFlush = DateTime.UtcNow;
         private StreamWriter logOutput;
@@ -137,7 +137,7 @@ namespace Orleans.TestingHost.Logging
     public class FileLogger : ILogger
     {
         private readonly FileLoggingOutput output;
-        private string category;
+        private readonly string category;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="FileLogger"/> class.

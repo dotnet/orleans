@@ -14,7 +14,7 @@ namespace Orleans.Clustering.Redis
     internal class RedisMembershipTable : IMembershipTable, IDisposable
     {
         private const string TableVersionKey = "Version";
-        private static readonly TableVersion DefaultTableVersion = new TableVersion(0, "0");
+        private static readonly TableVersion DefaultTableVersion = new(0, "0");
         private readonly RedisClusteringOptions _redisOptions;
         private readonly ClusterOptions _clusterOptions;
         private readonly JsonSerializerSettings _jsonSerializerSettings;
@@ -216,7 +216,7 @@ namespace Orleans.Clustering.Redis
             return new TableVersion(version, versionString);
         }
 
-        private static TableVersion Predeccessor(TableVersion tableVersion) => new TableVersion(tableVersion.Version - 1, (tableVersion.Version - 1).ToString(CultureInfo.InvariantCulture));
+        private static TableVersion Predeccessor(TableVersion tableVersion) => new(tableVersion.Version - 1, (tableVersion.Version - 1).ToString(CultureInfo.InvariantCulture));
 
 
         private string Serialize(MembershipEntry value)

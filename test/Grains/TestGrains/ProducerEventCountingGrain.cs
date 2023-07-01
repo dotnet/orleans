@@ -1,9 +1,4 @@
-using System;
-using System.Threading;
-using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
-using Orleans;
-using Orleans.Runtime;
 using Orleans.Streams;
 using UnitTests.GrainInterfaces;
 
@@ -13,7 +8,7 @@ namespace UnitTests.Grains
     {
         private IAsyncObserver<int> _producer;
         private int _numProducedItems;
-        private ILogger _logger;
+        private readonly ILogger _logger;
 
         public ProducerEventCountingGrain(ILoggerFactory loggerFactory)
         {
@@ -39,7 +34,7 @@ namespace UnitTests.Grains
             _logger.LogInformation("Producer.BecomeProducer");
             if (String.IsNullOrEmpty(providerToUse))
             {
-                throw new ArgumentNullException("providerToUse");
+                throw new ArgumentNullException(nameof(providerToUse));
             }
             IStreamProvider streamProvider = this.GetStreamProvider(providerToUse);
             IAsyncStream<int> stream = streamProvider.GetStream<int>(ConsumerEventCountingGrain.StreamNamespace, streamId);
@@ -59,7 +54,7 @@ namespace UnitTests.Grains
             {
                 throw new ApplicationException("Not yet a producer on a stream.  Must call BecomeProducer first.");
             }
-            
+
             await _producer.OnNextAsync(_numProducedItems + 1);
 
             // update after send in case of error

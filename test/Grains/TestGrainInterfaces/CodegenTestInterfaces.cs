@@ -1,8 +1,4 @@
-using System;
 using System.Collections;
-using System.Collections.Generic;
-using System.Threading.Tasks;
-using Orleans;
 
 namespace UnitTests.GrainInterfaces
 {
@@ -226,7 +222,7 @@ namespace UnitTests.GrainInterfaces
 
         [Id(5)]
         public IEchoGrain SomeGrainReference { get; set; }
-        
+
 #pragma warning disable 618
         public int GetObsoleteInt() => this.ObsoleteInt;
         public void SetObsoleteInt(int value)
@@ -318,7 +314,7 @@ namespace UnitTests.GrainInterfaces
     [Serializable]
     public class ClassWithNestedPrivateClassInListField
     {
-        private readonly List<NestedPrivateClass> coolBeans = new List<NestedPrivateClass>
+        private readonly List<NestedPrivateClass> coolBeans = new()
         {
             new NestedPrivateClass()
         };

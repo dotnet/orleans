@@ -28,11 +28,11 @@ namespace UnitTests.Grains
         Dictionary<string, long> sequence;
         private TimeSpan period;
 
-        private static long aCCURACY = 50 * TimeSpan.TicksPerMillisecond; // when we use ticks to compute sequence numbers, we might get wrong results as timeouts don't happen with precision of ticks  ... we keep this as a leeway
+        private static readonly long aCCURACY = 50 * TimeSpan.TicksPerMillisecond; // when we use ticks to compute sequence numbers, we might get wrong results as timeouts don't happen with precision of ticks  ... we keep this as a leeway
 
-        private IOptions<ReminderOptions> reminderOptions;
+        private readonly IOptions<ReminderOptions> reminderOptions;
 
-        private ILogger logger;
+        private readonly ILogger logger;
         private string _id; // used to distinguish during debugging between multiple activations of the same grain
 
         private string filePrefix;
@@ -68,17 +68,12 @@ namespace UnitTests.Grains
         {
             TimeSpan usePeriod = p ?? this.period;
             this.logger.LogInformation("Starting reminder {ReminderName}.", reminderName);
-            TimeSpan dueTime;
-            if (reminderOptions.Value.MinimumReminderPeriod < TimeSpan.FromSeconds(2))
-                dueTime = TimeSpan.FromSeconds(2) - reminderOptions.Value.MinimumReminderPeriod;
-            else dueTime = usePeriod - TimeSpan.FromSeconds(2);
-
-            IGrainReminder r;
-            if (validate)
-                r = await this.RegisterOrUpdateReminder(reminderName, dueTime, usePeriod);
-            else
-                r = await this.unvalidatedReminderRegistry.RegisterOrUpdateReminder(GrainId, reminderName, dueTime, usePeriod);
-
+            var dueTime = reminderOptions.Value.MinimumReminderPeriod < TimeSpan.FromSeconds(2)
+                ? TimeSpan.FromSeconds(2) - reminderOptions.Value.MinimumReminderPeriod
+                : usePeriod - TimeSpan.FromSeconds(2);
+            IGrainReminder r = validate
+                ? await this.RegisterOrUpdateReminder(reminderName, dueTime, usePeriod)
+                : await this.unvalidatedReminderRegistry.RegisterOrUpdateReminder(GrainId, reminderName, dueTime, usePeriod);
             this.allReminders[reminderName] = new(r);
             this.sequence[reminderName] = 0;
 
@@ -243,9 +238,9 @@ namespace UnitTests.Grains
         Dictionary<string, long> sequence;
         private TimeSpan period;
 
-        private static long aCCURACY = 50 * TimeSpan.TicksPerMillisecond; // when we use ticks to compute sequence numbers, we might get wrong results as timeouts don't happen with precision of ticks  ... we keep this as a leeway
+        private static readonly long aCCURACY = 50 * TimeSpan.TicksPerMillisecond; // when we use ticks to compute sequence numbers, we might get wrong results as timeouts don't happen with precision of ticks  ... we keep this as a leeway
 
-        private ILogger logger;
+        private readonly ILogger logger;
         private long myId; // used to distinguish during debugging between multiple activations of the same grain
 
         private string filePrefix;
@@ -277,11 +272,9 @@ namespace UnitTests.Grains
         {
             TimeSpan usePeriod = p ?? this.period;
             this.logger.LogInformation("Starting reminder {ReminderName} for {GrainId}", reminderName, this.GrainId);
-            IGrainReminder r;
-            if (validate)
-                r = await this.RegisterOrUpdateReminder(reminderName, usePeriod - TimeSpan.FromSeconds(2), usePeriod);
-            else
-                r = await this.unvalidatedReminderRegistry.RegisterOrUpdateReminder(
+            IGrainReminder r = validate
+                ? await this.RegisterOrUpdateReminder(reminderName, usePeriod - TimeSpan.FromSeconds(2), usePeriod)
+                : await this.unvalidatedReminderRegistry.RegisterOrUpdateReminder(
                     this.GrainId,
                     reminderName,
                     usePeriod - TimeSpan.FromSeconds(2),
@@ -408,7 +401,7 @@ namespace UnitTests.Grains
 
     public class WrongReminderGrain : Grain, IReminderGrainWrong
     {
-        private ILogger logger;
+        private readonly ILogger logger;
 
         public WrongReminderGrain(ILoggerFactory loggerFactory)
         {

@@ -1,6 +1,3 @@
-using System;
-using System.Threading;
-using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Orleans.Runtime.ConsistentRing;
 using Orleans.Runtime.Scheduler;
@@ -15,7 +12,7 @@ namespace Orleans.Runtime
         private readonly string typeName;
         private GrainServiceStatus status;
 
-        private ILogger Logger;
+        private readonly ILogger Logger;
 
         /// <summary>Gets the token for signaling cancellation upon stopping of grain service</summary>
         protected CancellationTokenSource StoppedCancellationTokenSource { get; }

@@ -455,11 +455,11 @@ namespace Orleans.GrainDirectory.AzureStorage
             var startTime = DateTime.UtcNow;
             if (Logger.IsEnabled(LogLevel.Trace)) Logger.LogTrace("{Operation} entries: {Data} table {TableName}", operation, Utils.EnumerableToString(collection), TableName);
 
-            if (collection == null) throw new ArgumentNullException("collection");
+            if (collection == null) throw new ArgumentNullException(nameof(collection));
 
             if (collection.Count > this.StoragePolicyOptions.MaxBulkUpdateRows)
             {
-                throw new ArgumentOutOfRangeException("collection", collection.Count,
+                throw new ArgumentOutOfRangeException(nameof(collection), collection.Count,
                         "Too many rows for bulk delete - max " + this.StoragePolicyOptions.MaxBulkUpdateRows);
             }
 
@@ -564,10 +564,10 @@ namespace Orleans.GrainDirectory.AzureStorage
         public async Task BulkInsertTableEntries(IReadOnlyCollection<T> collection)
         {
             const string operation = "BulkInsertTableEntries";
-            if (collection == null) throw new ArgumentNullException("collection");
+            if (collection == null) throw new ArgumentNullException(nameof(collection));
             if (collection.Count > this.StoragePolicyOptions.MaxBulkUpdateRows)
             {
-                throw new ArgumentOutOfRangeException("collection", collection.Count,
+                throw new ArgumentOutOfRangeException(nameof(collection), collection.Count,
                         "Too many rows for bulk update - max " + this.StoragePolicyOptions.MaxBulkUpdateRows);
             }
 

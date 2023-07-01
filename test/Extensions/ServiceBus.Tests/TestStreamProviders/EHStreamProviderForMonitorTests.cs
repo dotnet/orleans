@@ -20,9 +20,9 @@ namespace ServiceBus.Tests.TestStreamProviders
         private readonly StreamCacheEvictionOptions evictionOptions;
         private readonly StreamStatisticOptions staticticOptions;
         private readonly EventHubOptions ehOptions;
-        private readonly CacheMonitorForTesting cacheMonitorForTesting = new CacheMonitorForTesting();
-        private readonly EventHubReceiverMonitorForTesting eventHubReceiverMonitorForTesting = new EventHubReceiverMonitorForTesting();
-        private readonly BlockPoolMonitorForTesting blockPoolMonitorForTesting = new BlockPoolMonitorForTesting();
+        private readonly CacheMonitorForTesting cacheMonitorForTesting = new();
+        private readonly EventHubReceiverMonitorForTesting eventHubReceiverMonitorForTesting = new();
+        private readonly BlockPoolMonitorForTesting blockPoolMonitorForTesting = new();
 
 
         public EHStreamProviderForMonitorTestsAdapterFactory(
@@ -95,7 +95,7 @@ namespace ServiceBus.Tests.TestStreamProviders
 
         private class CacheFactoryForMonitorTesting : EventHubQueueCacheFactory
         {
-            private CachePressureInjectionMonitor cachePressureInjectionMonitor;
+            private readonly CachePressureInjectionMonitor cachePressureInjectionMonitor;
             public CacheFactoryForMonitorTesting(
                 CachePressureInjectionMonitor cachePressureInjectionMonitor,
                 EventHubStreamCachePressureOptions cacheOptions,

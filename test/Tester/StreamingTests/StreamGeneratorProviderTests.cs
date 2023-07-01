@@ -1,9 +1,5 @@
-using System;
-using System.Linq;
-using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Orleans.Configuration;
-using Orleans.Hosting;
 using Orleans.Providers.Streams.Generator;
 using Orleans.Runtime;
 using Orleans.Streams;
@@ -27,7 +23,7 @@ namespace UnitTests.StreamingTests
             public const string StreamProviderName = GeneratedStreamTestConstants.StreamProviderName;
             public const string StreamNamespace = GeneratedEventCollectorGrain.StreamNamespace;
 
-            public readonly static SimpleGeneratorOptions GeneratorConfig = new SimpleGeneratorOptions
+            public readonly static SimpleGeneratorOptions GeneratorConfig = new()
             {
                 StreamNamespace = StreamNamespace,
                 EventsInStream = 100

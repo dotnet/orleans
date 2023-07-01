@@ -1,5 +1,3 @@
-﻿using System.Collections.Generic;
-using System.Linq;
 using Microsoft.Extensions.Logging.Abstractions;
 using Orleans.Runtime;
 using Orleans.Runtime.ConsistentRing;
@@ -71,8 +69,8 @@ namespace UnitTests.General
 
         private void TestChurn(int[] indexesFails, int[] indexesJoins)
         {
-            Dictionary<SiloAddress, ConsistentRingProvider> rings, holder = new Dictionary<SiloAddress, ConsistentRingProvider>();
-            List<SiloAddress> sortedServers, fail = new List<SiloAddress>();
+            Dictionary<SiloAddress, ConsistentRingProvider> rings, holder = new();
+            List<SiloAddress> sortedServers, fail = new();
 
             rings = CreateServers(count);
 
@@ -208,12 +206,14 @@ namespace UnitTests.General
     internal class RangeBreakable
     {
         private List<SingleRange> ranges { get; set; }
-        internal int NumRanges { get { return ranges.Count(); } }
+        internal int NumRanges => ranges.Count;
 
         public RangeBreakable()
         {
-            ranges = new List<SingleRange>(1);
-            ranges.Add(RangeFactory.CreateFullRange() as SingleRange);
+            ranges = new List<SingleRange>(1)
+            {
+                RangeFactory.CreateFullRange() as SingleRange
+            };
         }
 
         public bool Remove(IRingRange range)

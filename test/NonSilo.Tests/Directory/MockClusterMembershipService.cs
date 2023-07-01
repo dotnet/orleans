@@ -1,8 +1,4 @@
-using System;
-using System.Collections.Generic;
 using System.Collections.Immutable;
-using System.Threading;
-using System.Threading.Tasks;
 using Orleans.Runtime;
 using Orleans.Runtime.Utilities;
 
@@ -11,7 +7,7 @@ namespace UnitTests.Directory
     internal class MockClusterMembershipService : IClusterMembershipService
     {
         private long version = 0;
-        private Dictionary<SiloAddress, (SiloStatus Status, string Name)> statuses;
+        private readonly Dictionary<SiloAddress, (SiloStatus Status, string Name)> statuses;
         private ClusterMembershipSnapshot snapshot;
         private readonly AsyncEnumerable<ClusterMembershipSnapshot> updates;
 
@@ -50,7 +46,7 @@ namespace UnitTests.Directory
             return new ClusterMembershipSnapshot(dictBuilder.ToImmutable(), new MembershipVersion(version));
         }
 
-        public ValueTask Refresh(MembershipVersion minimumVersion = default) => new ValueTask();
+        public ValueTask Refresh(MembershipVersion minimumVersion = default) => new();
 
         public Task<bool> TryKill(SiloAddress siloAddress) => throw new NotImplementedException();
     }

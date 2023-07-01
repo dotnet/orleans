@@ -21,7 +21,7 @@ namespace Orleans.Serialization.UnitTests
             builder.AddNewtonsoftJsonSerializer(isSupported: type => type.GetCustomAttribute<MyJsonSerializableAttribute>(inherit: false) is not null);
         }
 
-        protected override MyJsonClass CreateValue() => new MyJsonClass { IntProperty = 30, SubTypeProperty = "hello" };
+        protected override MyJsonClass CreateValue() => new() { IntProperty = 30, SubTypeProperty = "hello" };
 
         protected override int[] MaxSegmentSizes => new[] { 840 };
 
@@ -91,7 +91,7 @@ namespace Orleans.Serialization.UnitTests
 
         protected override IDeepCopier<MyJsonClass> CreateCopier() => ServiceProvider.GetRequiredService<ICodecProvider>().GetDeepCopier<MyJsonClass>();
 
-        protected override MyJsonClass CreateValue() => new MyJsonClass { IntProperty = 30, SubTypeProperty = "hello" };
+        protected override MyJsonClass CreateValue() => new() { IntProperty = 30, SubTypeProperty = "hello" };
 
         protected override MyJsonClass[] TestValues => new MyJsonClass[]
         {

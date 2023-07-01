@@ -1,17 +1,12 @@
-using System;
 using System.Collections.Concurrent;
-using System.Collections.Generic;
-using System.Threading;
-using System.Threading.Tasks;
 using BenchmarkGrainInterfaces.MapReduce;
-using Orleans;
 
 namespace BenchmarkGrains.MapReduce
 {
     public class TransformGrain<TInput, TOutput> : DataflowGrain, ITransformGrain<TInput, TOutput>
     {
         private ITransformProcessor<TInput, TOutput> _processor;
-        private bool _processingStarted ;
+        private bool _processingStarted;
         private bool _proccessingStopped;
 
         private const bool ProcessOnThreadPool = true;
@@ -20,9 +15,9 @@ namespace BenchmarkGrains.MapReduce
         private ITargetGrain<TOutput> _target;
 
         // BlockingCollection has shown worse perf results for this workload types
-        private readonly ConcurrentQueue<TInput> _input = new ConcurrentQueue<TInput>();
+        private readonly ConcurrentQueue<TInput> _input = new();
 
-        private readonly ConcurrentQueue<TOutput> _output = new ConcurrentQueue<TOutput>();
+        private readonly ConcurrentQueue<TOutput> _output = new();
 
         public Task Initialize(ITransformProcessor<TInput, TOutput> processor)
         {

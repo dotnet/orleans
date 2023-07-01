@@ -85,16 +85,9 @@ namespace Orleans.Serialization
         [SecurityCritical]
         private static DynamicMethod GetSerializationMethod(Type type, MethodInfo callbackMethod, Type owner)
         {
-            Type[] callbackParameterTypes;
-            if (owner.IsValueType)
-            {
-                callbackParameterTypes = new[] { typeof(object), owner.MakeByRefType(), typeof(StreamingContext) };
-            }
-            else
-            {
-                callbackParameterTypes = new[] { typeof(object), typeof(object), typeof(StreamingContext) };
-            }
-
+            var callbackParameterTypes = owner.IsValueType
+                ? (new[] { typeof(object), owner.MakeByRefType(), typeof(StreamingContext) })
+                : (new[] { typeof(object), typeof(object), typeof(StreamingContext) });
             var method = new DynamicMethod($"{callbackMethod.Name}_Trampoline", null, callbackParameterTypes, type, skipVisibility: true);
             var il = method.GetILGenerator();
 

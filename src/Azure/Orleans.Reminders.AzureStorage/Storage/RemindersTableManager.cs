@@ -144,10 +144,7 @@ namespace Orleans.Runtime.ReminderService
             return await ReadSingleTableEntryAsync(partitionKey, rowKey);
         }
 
-        private Task<List<(ReminderTableEntry Entity, string ETag)>> FindAllReminderEntries()
-        {
-            return FindReminderEntries(0, 0);
-        }
+        private Task<List<(ReminderTableEntry Entity, string ETag)>> FindAllReminderEntries() => FindReminderEntries(0, 0);
 
         internal async Task<string> UpsertRow(ReminderTableEntry reminderEntry)
         {
@@ -157,9 +154,7 @@ namespace Orleans.Runtime.ReminderService
             }
             catch(Exception exc)
             {
-                HttpStatusCode httpStatusCode;
-                string restStatus;
-                if (AzureTableUtils.EvaluateException(exc, out httpStatusCode, out restStatus))
+                if (AzureTableUtils.EvaluateException(exc, out var httpStatusCode, out var restStatus))
                 {
                     if (Logger.IsEnabled(LogLevel.Trace)) Logger.LogTrace("UpsertRow failed with HTTP status code: {HttpStatusCode}, REST status: {RestStatus}", httpStatusCode, restStatus);
                     if (AzureTableUtils.IsContentionError(httpStatusCode)) return null; // false;

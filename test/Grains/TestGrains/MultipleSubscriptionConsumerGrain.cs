@@ -1,10 +1,4 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading;
-using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
-using Orleans;
 using Orleans.Runtime;
 using Orleans.Streams;
 using UnitTests.GrainInterfaces;
@@ -13,8 +7,8 @@ namespace UnitTests.Grains
 {
     public class MultipleSubscriptionConsumerGrain : Grain, IMultipleSubscriptionConsumerGrain
     {
-        private readonly Dictionary<StreamSubscriptionHandle<int>, Tuple<Counter,Counter>> consumedMessageCounts;
-        private ILogger logger;
+        private readonly Dictionary<StreamSubscriptionHandle<int>, Tuple<Counter, Counter>> consumedMessageCounts;
+        private readonly ILogger logger;
         private int consumerCount = 0;
 
         public MultipleSubscriptionConsumerGrain(ILoggerFactory loggerFactory)
@@ -64,7 +58,7 @@ namespace UnitTests.Grains
                 e => OnError(e, countCapture, error));
 
             // track counter
-            consumedMessageCounts.Add(handle, Tuple.Create(count,error));
+            consumedMessageCounts.Add(handle, Tuple.Create(count, error));
 
             // return handle
             return handle;
@@ -73,11 +67,11 @@ namespace UnitTests.Grains
         public async Task<StreamSubscriptionHandle<int>> Resume(StreamSubscriptionHandle<int> handle)
         {
             logger.LogInformation("Resume");
-            if(handle == null)
-                throw new ArgumentNullException("handle");
+            if (handle == null)
+                throw new ArgumentNullException(nameof(handle));
 
             // new counter for this subscription
-            Tuple<Counter,Counter> counters;
+            Tuple<Counter, Counter> counters;
             if (!consumedMessageCounts.TryGetValue(handle, out counters))
             {
                 counters = Tuple.Create(new Counter(), new Counter());
@@ -120,7 +114,7 @@ namespace UnitTests.Grains
             return stream.GetAllSubscriptionHandles();
         }
 
-        public Task<Dictionary<StreamSubscriptionHandle<int>, Tuple<int,int>>> GetNumberConsumed()
+        public Task<Dictionary<StreamSubscriptionHandle<int>, Tuple<int, int>>> GetNumberConsumed()
         {
             logger.LogInformation(
                 "ConsumedMessageCounts = {Counts}",
@@ -156,7 +150,7 @@ namespace UnitTests.Grains
 
         private Task OnNext(IList<SequentialItem<int>> items, int countCapture, Counter count)
         {
-            foreach(SequentialItem<int> item in items)
+            foreach (SequentialItem<int> item in items)
             {
                 logger.LogInformation("Got next event {Item} on handle {Handle}", item.Item, countCapture);
                 var contextValue = RequestContext.Get(SampleStreaming_ProducerGrain.RequestContextKey) as string;

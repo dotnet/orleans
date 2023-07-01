@@ -1,6 +1,4 @@
-using System.Threading.Tasks;
 using Microsoft.Extensions.Configuration;
-using Orleans.Hosting;
 using Orleans.TestingHost;
 using Orleans.Transactions.TestKit;
 using Orleans.Transactions.TestKit.xUnit;
@@ -15,7 +13,7 @@ namespace Orleans.Transactions.AzureStorage.Tests
     public class TransactionRecoveryTests : TestClusterPerTest
     {
         private TransactionRecoveryTestsRunnerxUnit testRunner;
-        private ITestOutputHelper helper;
+        private readonly ITestOutputHelper helper;
 
         public TransactionRecoveryTests(ITestOutputHelper helper)
         {

@@ -8,12 +8,12 @@ namespace Orleans.Runtime.Messaging
 {
     internal sealed class ClientOutboundConnectionFactory : ConnectionFactory
     {
-        internal static readonly object ServicesKey = new object();
+        internal static readonly object ServicesKey = new();
         private readonly ConnectionCommon connectionShared;
         private readonly ClientConnectionOptions clientConnectionOptions;
         private readonly ClusterOptions clusterOptions;
         private readonly ConnectionPreambleHelper connectionPreambleHelper;
-        private readonly object initializationLock = new object();
+        private readonly object initializationLock = new();
         private volatile bool isInitialized;
         private ClientMessageCenter messageCenter;
         private ConnectionManager connectionManager;

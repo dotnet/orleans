@@ -113,20 +113,22 @@ namespace Orleans.CodeGenerator
         {
             return fieldDescriptions.Select(GetFieldDeclaration).ToArray();
 
-            static MemberDeclarationSyntax GetFieldDeclaration(GeneratedFieldDescription description)
+            static MemberDeclarationSyntax GetFieldDeclaration(GeneratedFieldDescription description) => description switch
             {
-                switch (description)
-                {
-                    case FieldAccessorDescription accessor:
-                        return
-                            FieldDeclaration(VariableDeclaration(accessor.FieldType,
-                                SingletonSeparatedList(VariableDeclarator(accessor.FieldName).WithInitializer(EqualsValueClause(accessor.InitializationSyntax)))))
-                                .AddModifiers(Token(SyntaxKind.PrivateKeyword), Token(SyntaxKind.StaticKeyword), Token(SyntaxKind.ReadOnlyKeyword));
-                    default:
-                        return FieldDeclaration(VariableDeclaration(description.FieldType, SingletonSeparatedList(VariableDeclarator(description.FieldName))))
-                            .AddModifiers(Token(SyntaxKind.PrivateKeyword), Token(SyntaxKind.ReadOnlyKeyword));
-                }
-            }
+                FieldAccessorDescription accessor =>
+                    FieldDeclaration(
+                        VariableDeclaration(
+                            accessor.FieldType,
+                            SingletonSeparatedList(
+                                VariableDeclarator(accessor.FieldName).WithInitializer(EqualsValueClause(accessor.InitializationSyntax)))))
+                                            .AddModifiers(Token(SyntaxKind.PrivateKeyword), Token(SyntaxKind.StaticKeyword), Token(SyntaxKind.ReadOnlyKeyword)),
+                _ => FieldDeclaration(
+                        VariableDeclaration(
+                            description.FieldType,
+                            SingletonSeparatedList(
+                                VariableDeclarator(description.FieldName))))
+                                            .AddModifiers(Token(SyntaxKind.PrivateKeyword), Token(SyntaxKind.ReadOnlyKeyword)),
+            };
         }
 
         private static ConstructorDeclarationSyntax GenerateConstructor(LibraryTypes libraryTypes, string simpleClassName, List<GeneratedFieldDescription> fieldDescriptions, bool isExceptionType)

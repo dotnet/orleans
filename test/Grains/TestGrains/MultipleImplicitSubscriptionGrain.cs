@@ -1,9 +1,4 @@
-using System;
-using System.Threading;
-using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
-using Orleans;
-using Orleans.Runtime;
 using Orleans.Streams;
 using UnitTests.GrainInterfaces;
 
@@ -14,7 +9,7 @@ namespace UnitTests.Grains
     [ImplicitStreamSubscription("blue")]
     public class MultipleImplicitSubscriptionGrain : Grain, IMultipleImplicitSubscriptionGrain
     {
-        private ILogger logger;
+        private readonly ILogger logger;
         private IAsyncStream<int> redStream, blueStream;
         private int redCounter, blueCounter;
 

@@ -8,8 +8,8 @@ namespace Orleans.Runtime.Utilities
 {
     internal static class AsyncEnumerable
     {
-        internal static readonly object InitialValue = new object();
-        internal static readonly object DisposedValue = new object();
+        internal static readonly object InitialValue = new();
+        internal static readonly object DisposedValue = new();
     }
 
     internal sealed class AsyncEnumerable<T> : IAsyncEnumerable<T>
@@ -21,7 +21,7 @@ namespace Orleans.Runtime.Utilities
             Disposed
         }
 
-        private readonly object updateLock = new object();
+        private readonly object updateLock = new();
         private readonly Func<T, T, bool> updateValidator;
         private Element current;
         
@@ -148,7 +148,7 @@ namespace Orleans.Runtime.Utilities
                 this.next = new TaskCompletionSource<Element>(TaskCreationOptions.RunContinuationsAsynchronously);
             }
 
-            public static Element CreateInitial() => new Element(
+            public static Element CreateInitial() => new(
                 AsyncEnumerable.InitialValue,
                 new TaskCompletionSource<Element>(TaskCreationOptions.RunContinuationsAsynchronously));
 

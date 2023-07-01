@@ -78,14 +78,9 @@ namespace Orleans.Streams
             }
 
             var type = Type.GetType(typeName, throwOnError: true);
-            if (string.IsNullOrEmpty(arg))
-            {
-                predicate = (IStreamNamespacePredicate)Activator.CreateInstance(type);
-            }
-            else
-            {
-                predicate = (IStreamNamespacePredicate)Activator.CreateInstance(type, arg);
-            }
+            predicate = string.IsNullOrEmpty(arg)
+                ? (IStreamNamespacePredicate)Activator.CreateInstance(type)
+                : (IStreamNamespacePredicate)Activator.CreateInstance(type, arg);
 
             return true;
         }

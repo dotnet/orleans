@@ -1,6 +1,3 @@
-using System;
-using System.Threading.Tasks;
-using Orleans;
 using Orleans.Transactions.Abstractions;
 using BenchmarkGrainInterfaces.Transaction;
 
@@ -16,7 +13,7 @@ namespace BenchmarkGrains.Transaction
 
     public class TransactionGrain : Grain, ITransactionGrain
     {
-        private ITransactionalState<Info> info;
+        private readonly ITransactionalState<Info> info;
 
         public TransactionGrain(
             [TransactionalState("Info")] ITransactionalState<Info> info)

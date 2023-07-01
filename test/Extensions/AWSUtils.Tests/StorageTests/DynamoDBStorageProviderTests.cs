@@ -23,7 +23,7 @@ namespace AWSUtils.Tests.StorageTests
     {
         private readonly IProviderRuntime providerRuntime;
         private readonly ITestOutputHelper output;
-        private readonly Dictionary<string, string> providerCfgProps = new Dictionary<string, string>();
+        private readonly Dictionary<string, string> providerCfgProps = new();
         private readonly TestEnvironmentFixture fixture;
 
         public DynamoDBStorageProviderTests(ITestOutputHelper output, TestEnvironmentFixture fixture)

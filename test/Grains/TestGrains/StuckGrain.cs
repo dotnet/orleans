@@ -13,15 +13,15 @@ namespace UnitTests.Grains
 {
     public class StuckGrain : Grain, IStuckGrain
     {
-        private static ConcurrentDictionary<GrainId, bool> ActivationCalls = new();
-        private static Dictionary<Guid, TaskCompletionSource<bool>> tcss = new Dictionary<Guid, TaskCompletionSource<bool>>();
-        private static Dictionary<Guid, int> counters = new Dictionary<Guid, int>();
-        private static HashSet<Guid> grains = new HashSet<Guid>();
+        private static readonly ConcurrentDictionary<GrainId, bool> ActivationCalls = new();
+        private static readonly Dictionary<Guid, TaskCompletionSource<bool>> tcss = new();
+        private static readonly Dictionary<Guid, int> counters = new();
+        private static readonly HashSet<Guid> grains = new();
         private readonly ILogger<StuckGrain> _log;
         private bool isDeactivatingBlocking = false;
 
-        private static ConcurrentDictionary<GrainId, ManualResetEventSlim> blockingMREMap =
-            new ConcurrentDictionary<GrainId, ManualResetEventSlim>();
+        private static readonly ConcurrentDictionary<GrainId, ManualResetEventSlim> blockingMREMap =
+            new();
 
         public StuckGrain(ILogger<StuckGrain> log)
         {

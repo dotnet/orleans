@@ -24,7 +24,7 @@ namespace Orleans.Runtime
     /// </summary>
     public sealed class GrainContextActivator
     {
-        private readonly object _lockObj = new object();
+        private readonly object _lockObj = new();
         private readonly IGrainContextActivatorProvider[] _activatorProviders;
         private readonly IConfigureGrainContextProvider[] _configuratorProviders;
         private readonly GrainPropertiesResolver _resolver;

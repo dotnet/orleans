@@ -1,4 +1,4 @@
-﻿using Amazon.DynamoDBv2.Model;
+using Amazon.DynamoDBv2.Model;
 using Orleans.TestingHost.Utils;
 using System;
 using System.Collections.Generic;
@@ -16,8 +16,8 @@ namespace AWSUtils.Tests.StorageTests
     public class DynamoDBStorageStressTests : IClassFixture<DynamoDBStorageTestsFixture>
     {
         private readonly ITestOutputHelper output;
-        private string PartitionKey;
-        private UnitTestDynamoDBStorage manager;
+        private readonly string PartitionKey;
+        private readonly UnitTestDynamoDBStorage manager;
 
         public DynamoDBStorageStressTests(DynamoDBStorageTestsFixture fixture, ITestOutputHelper output)
         {
@@ -70,7 +70,7 @@ namespace AWSUtils.Tests.StorageTests
             var data = manager.QueryAsync(UnitTestDynamoDBStorage.INSTANCE_TABLE_NAME, keys, $"PartitionKey = :PK", item => new UnitTestDynamoDBTableData(item)).Result;
 
             sw.Stop();
-            int count = data.results.Count();
+            int count = data.results.Count;
             output.WriteLine("DynamoDBDataManagerStressTests_ReadAll completed. ReadAll {0} entries in {1} at {2} RPS", count, sw.Elapsed, count / sw.Elapsed.TotalSeconds);
 
             //Assert.True(count >= iterations, $"ReadAllshould return some data: Found={count}");

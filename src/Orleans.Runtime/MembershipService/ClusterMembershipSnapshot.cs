@@ -1,4 +1,3 @@
-using System;
 using System.Collections.Immutable;
 using System.Text;
 
@@ -62,8 +61,8 @@ namespace Orleans.Runtime
         /// Returns a <see cref="ClusterMembershipUpdate"/> which represents this instance.
         /// </summary>
         /// <returns>A <see cref="ClusterMembershipUpdate"/> which represents this instance.</returns>
-        public ClusterMembershipUpdate AsUpdate() => new ClusterMembershipUpdate(this, this.Members.Values.ToImmutableArray());
-        
+        public ClusterMembershipUpdate AsUpdate() => new(this, this.Members.Values.ToImmutableArray());
+
         /// <summary>
         /// Returns a <see cref="ClusterMembershipUpdate"/> which represents the change in cluster membership from the provided snapshot to this instance.
         /// </summary>

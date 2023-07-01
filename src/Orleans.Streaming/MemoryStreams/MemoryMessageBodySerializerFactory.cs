@@ -6,7 +6,7 @@ namespace Orleans.Providers
     internal static class MemoryMessageBodySerializerFactory<TSerializer>
         where TSerializer : class, IMemoryMessageBodySerializer
     {
-        private static readonly Lazy<ObjectFactory> ObjectFactory = new Lazy<ObjectFactory>(
+        private static readonly Lazy<ObjectFactory> ObjectFactory = new(
             () => ActivatorUtilities.CreateFactory(
                 typeof(TSerializer),
                 Type.EmptyTypes));

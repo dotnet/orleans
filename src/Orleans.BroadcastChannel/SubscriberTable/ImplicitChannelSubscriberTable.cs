@@ -12,7 +12,7 @@ namespace Orleans.BroadcastChannel.SubscriberTable
 {
     internal class ImplicitChannelSubscriberTable
     {
-        private readonly object _lockObj = new object();
+        private readonly object _lockObj = new();
         private readonly GrainBindingsResolver _bindings;
         private readonly IChannelNamespacePredicateProvider[] _providers;
         private readonly IServiceProvider _serviceProvider;

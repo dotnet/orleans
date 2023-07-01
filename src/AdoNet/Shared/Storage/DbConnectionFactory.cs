@@ -21,10 +21,10 @@ namespace Orleans.Tests.SqlUtils
     internal static class DbConnectionFactory
     {
         private static readonly ConcurrentDictionary<string, CachedFactory> factoryCache =
-            new ConcurrentDictionary<string, CachedFactory>();
+            new();
 
         private static readonly Dictionary<string, List<Tuple<string, string>>> providerFactoryTypeMap =
-            new Dictionary<string, List<Tuple<string, string>>>
+            new()
             {
                 { AdoNetInvariants.InvariantNameSqlServer, new List<Tuple<string, string>>{ new Tuple<string, string>("System.Data.SqlClient", "System.Data.SqlClient.SqlClientFactory") } },
                 { AdoNetInvariants.InvariantNameMySql, new List<Tuple<string, string>>{ new Tuple<string, string>("MySql.Data", "MySql.Data.MySqlClient.MySqlClientFactory") } },

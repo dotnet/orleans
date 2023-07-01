@@ -1,8 +1,6 @@
 using Orleans.Providers.Streams.Common;
 using Orleans.Streaming.EventHubs;
 using Orleans.Streams;
-using System;
-using System.Collections.Generic;
 using Microsoft.Extensions.Logging;
 using Orleans.Runtime;
 using Azure.Messaging.EventHubs;
@@ -13,15 +11,15 @@ namespace ServiceBus.Tests.EvictionStrategyTests
     {
         public EventHubQueueCacheForTesting(IObjectPool<FixedSizeBuffer> bufferPool, IEventHubDataAdapter dataAdapter, IEvictionStrategy evictionStrategy, IStreamQueueCheckpointer<string> checkpointer,
             ILogger logger)
-            :base("test", EventHubAdapterReceiver.MaxMessagesPerRead, bufferPool, dataAdapter, evictionStrategy, checkpointer, logger, null, null, null)
-            { }
+            : base("test", EventHubAdapterReceiver.MaxMessagesPerRead, bufferPool, dataAdapter, evictionStrategy, checkpointer, logger, null, null, null)
+        { }
 
         public int ItemCount => this.cache.ItemCount;
     }
     public class EHEvictionStrategyForTesting : ChronologicalEvictionStrategy
     {
         public EHEvictionStrategyForTesting(ILogger logger, ICacheMonitor cacheMonitor = null, TimeSpan? monitorWriteInterval = null, TimePurgePredicate timePurage = null)
-            :base(logger, timePurage, cacheMonitor, monitorWriteInterval)
+            : base(logger, timePurage, cacheMonitor, monitorWriteInterval)
         { }
 
         public Queue<FixedSizeBuffer> InUseBuffers => this.inUseBuffers;
@@ -30,8 +28,8 @@ namespace ServiceBus.Tests.EvictionStrategyTests
     public class MockEventHubCacheAdaptor : EventHubDataAdapter
     {
         private long sequenceNumberCounter = 0;
-        private int eventIndex = 1;
-        private string eventHubOffset = "OffSet";
+        private readonly int eventIndex = 1;
+        private readonly string eventHubOffset = "OffSet";
         public MockEventHubCacheAdaptor(Orleans.Serialization.Serializer serializer) : base(serializer)
         { }
 

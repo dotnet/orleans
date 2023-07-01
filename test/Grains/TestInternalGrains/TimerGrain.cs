@@ -19,10 +19,10 @@ namespace UnitTestGrains
         Dictionary<string, IDisposable> allTimers;
         IDisposable defaultTimer;
         private static readonly TimeSpan period = TimeSpan.FromMilliseconds(100);
-        string DefaultTimerName = "DEFAULT TIMER";
+        readonly string DefaultTimerName = "DEFAULT TIMER";
         IGrainContext context;
 
-        private ILogger logger;
+        private readonly ILogger logger;
 
         public TimerGrain(ILoggerFactory loggerFactory)
         {
@@ -58,16 +58,10 @@ namespace UnitTestGrains
                 logger.LogError((int)ErrorCode.Runtime_Error_100146, "Grain not running in the right activation context");
 
             string name = (string)data;
-            IDisposable timer;
-            if (name == DefaultTimerName)
-            {
-                timer = defaultTimer;
-            }
-            else
-            {
-                timer = allTimers[(string)data];
-            }
-            if(timer == null)
+            var timer = name == DefaultTimerName
+                ? defaultTimer
+                : allTimers[(string)data];
+            if (timer == null)
                 logger.LogError((int)ErrorCode.Runtime_Error_100146, "Timer is null");
             if (timer != null && counter > 10000)
             {
@@ -142,7 +136,7 @@ namespace UnitTestGrains
         private IGrainContext context;
         private TaskScheduler activationTaskScheduler;
 
-        private ILogger logger;
+        private readonly ILogger logger;
 
         public TimerCallGrain(ILoggerFactory loggerFactory)
         {

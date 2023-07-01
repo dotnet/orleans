@@ -290,23 +290,23 @@ namespace Orleans.Tests.SqlUtils
 
         /// <summary>
         /// Checks the parameters passed into a ReadAsync() or Read() are valid.
-        /// </summary>        
+        /// </summary>
         /// <param name="buffer"></param>
         /// <param name="offset"></param>
         /// <param name="count"></param>
         private static void ValidateReadParameters(byte[] buffer, int offset, int count)
-        {            
+        {
             if(buffer == null)
             {
-                throw new ArgumentNullException("buffer");                    
+                throw new ArgumentNullException(nameof(buffer));
             }
             if(offset < 0)
             {
-                throw new ArgumentOutOfRangeException("offset");
+                throw new ArgumentOutOfRangeException(nameof(offset));
             }
             if(count < 0)
             {
-                throw new ArgumentOutOfRangeException("count");
+                throw new ArgumentOutOfRangeException(nameof(count));
             }
             try
             {

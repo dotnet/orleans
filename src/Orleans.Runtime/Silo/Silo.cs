@@ -31,7 +31,7 @@ namespace Orleans.Runtime
         private readonly MessageCenter messageCenter;
         private readonly LocalGrainDirectory localGrainDirectory;
         private readonly ILogger logger;
-        private readonly TaskCompletionSource<int> siloTerminatedTask = new TaskCompletionSource<int>(TaskCreationOptions.RunContinuationsAsynchronously);
+        private readonly TaskCompletionSource<int> siloTerminatedTask = new(TaskCreationOptions.RunContinuationsAsynchronously);
         private readonly InsideRuntimeClient runtimeClient;
         private SystemTarget fallbackScheduler;
         private readonly ISiloStatusOracle siloStatusOracle;
@@ -40,11 +40,11 @@ namespace Orleans.Runtime
         private readonly TimeSpan initTimeout;
         private readonly TimeSpan stopTimeout = TimeSpan.FromMinutes(1);
         private readonly Catalog catalog;
-        private readonly object lockable = new object();
+        private readonly object lockable = new();
         private readonly GrainFactory grainFactory;
         private readonly ISiloLifecycleSubject siloLifecycle;
         private readonly IMembershipService membershipService;
-        internal List<GrainService> grainServices = new List<GrainService>();
+        internal List<GrainService> grainServices = new();
 
         private readonly ILoggerFactory loggerFactory;
         /// <summary>

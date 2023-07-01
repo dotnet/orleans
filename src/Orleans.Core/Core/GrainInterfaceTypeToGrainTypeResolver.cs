@@ -16,8 +16,8 @@ namespace Orleans
     /// </remarks>
     public class GrainInterfaceTypeToGrainTypeResolver
     {
-        private readonly object _lockObj = new object();
-        private readonly ConcurrentDictionary<GrainInterfaceType, GrainType> _genericMapping = new ConcurrentDictionary<GrainInterfaceType, GrainType>();
+        private readonly object _lockObj = new();
+        private readonly ConcurrentDictionary<GrainInterfaceType, GrainType> _genericMapping = new();
         private readonly IClusterManifestProvider _clusterManifestProvider;
         private Cache _cache;
 

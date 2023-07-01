@@ -1,12 +1,6 @@
 using Microsoft.Extensions.Logging;
-using Orleans;
-using Orleans.Runtime;
 using Orleans.Streams;
 using Orleans.Streams.Core;
-using System;
-using System.Collections.Generic;
-using System.Threading;
-using System.Threading.Tasks;
 using UnitTests.GrainInterfaces;
 
 namespace UnitTests.Grains
@@ -108,7 +102,7 @@ namespace UnitTests.Grains
     public class CounterObserver<T> : IAsyncObserver<T>, ICounterObserver
     {
         public int NumConsumed { get; private set; }
-        private ILogger logger;
+        private readonly ILogger logger;
         internal CounterObserver(ILogger logger)
         {
             this.NumConsumed = 0;

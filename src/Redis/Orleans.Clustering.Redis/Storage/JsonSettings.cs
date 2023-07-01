@@ -9,7 +9,7 @@ namespace Orleans.Clustering.Redis
 {
     internal static class JsonSettings
     {
-        public static JsonSerializerSettings JsonSerializerSettings => new JsonSerializerSettings
+        public static JsonSerializerSettings JsonSerializerSettings => new()
         {
             Formatting = Formatting.None,
             TypeNameHandling = TypeNameHandling.None,

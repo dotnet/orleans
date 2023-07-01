@@ -16,8 +16,8 @@ namespace Orleans.TestingHost
     public class TestClusterPortAllocator : ITestClusterPortAllocator
     {
         private bool disposed;
-        private readonly object lockObj = new object();
-        private readonly Dictionary<int, string> allocatedPorts = new Dictionary<int, string>();
+        private readonly object lockObj = new();
+        private readonly Dictionary<int, string> allocatedPorts = new();
 
         /// <inheritdoc />
         public (int, int) AllocateConsecutivePortPairs(int numPorts = 5)
@@ -135,8 +135,8 @@ namespace Orleans.TestingHost
 
         private class MutexManager
         {
-            private readonly Dictionary<string, Mutex> _mutexes = new Dictionary<string, Mutex>();
-            private readonly BlockingCollection<Action> _workItems = new BlockingCollection<Action>();
+            private readonly Dictionary<string, Mutex> _mutexes = new();
+            private readonly BlockingCollection<Action> _workItems = new();
             private readonly Thread _thread;
 
             public static MutexManager Instance { get; } = new MutexManager();

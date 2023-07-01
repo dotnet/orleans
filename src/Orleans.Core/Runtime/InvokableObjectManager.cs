@@ -13,8 +13,8 @@ namespace Orleans
 {
     internal class InvokableObjectManager : IDisposable
     {
-        private readonly CancellationTokenSource disposed = new CancellationTokenSource();
-        private readonly ConcurrentDictionary<ObserverGrainId, LocalObjectData> localObjects = new ConcurrentDictionary<ObserverGrainId, LocalObjectData>();
+        private readonly CancellationTokenSource disposed = new();
+        private readonly ConcurrentDictionary<ObserverGrainId, LocalObjectData> localObjects = new();
         private readonly IGrainContext rootGrainContext;
         private readonly IRuntimeClient runtimeClient;
         private readonly ILogger logger;

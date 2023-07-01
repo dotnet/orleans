@@ -348,7 +348,7 @@ namespace Orleans.Runtime.MembershipService
         private class ThreadPoolMonitor
         {
             private static readonly WaitCallback Callback = state => ((ThreadPoolMonitor)state!).Execute();
-            private readonly object _lockObj = new object();
+            private readonly object _lockObj = new();
             private readonly ILogger<ThreadPoolMonitor> _log;
             private bool _scheduled;
             private TimeSpan _lastQueueDelay;

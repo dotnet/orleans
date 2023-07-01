@@ -202,7 +202,7 @@ namespace Orleans.EventSourcing.Common
 
 
         // the currently submitted, unconfirmed entries. 
-        private readonly List<TSubmissionEntry> pending = new List<TSubmissionEntry>();
+        private readonly List<TSubmissionEntry> pending = new();
 
 
         /// called at beginning of WriteAsync to the current tentative state
@@ -242,7 +242,7 @@ namespace Orleans.EventSourcing.Common
         /// <summary>
         /// Background worker which asynchronously sends operations to the leader
         /// </summary>
-        private BatchWorker worker;
+        private readonly BatchWorker worker;
 
 
 

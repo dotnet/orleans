@@ -1,7 +1,3 @@
-using System;
-using System.Collections.Generic;
-using System.Threading;
-using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Orleans.Configuration;
 using Orleans.Internal;
@@ -16,7 +12,7 @@ namespace Orleans.Runtime
         private readonly MembershipTableManager membershipTableManager;
         private readonly ILogger<ClusterMembershipService> log;
         private readonly IFatalErrorHandler fatalErrorHandler;
-        private ClusterMembershipSnapshot snapshot;
+        private readonly ClusterMembershipSnapshot snapshot;
 
         public ClusterMembershipService(
             MembershipTableManager membershipTableManager,

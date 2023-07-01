@@ -220,15 +220,9 @@ namespace DefaultCluster.Tests
 
         private void CreateGR(int n, int type)
         {
-            Guid guid;
-            if (type == 1)
-            {
-                guid = Guid.Parse(string.Format("00000000-0000-0000-0000-{0:X12}", n));
-            }
-            else
-            {
-                guid = Guid.Parse(string.Format("{0:X8}-0000-0000-0000-000000000000", n));
-            }
+            var guid = type == 1
+                ? Guid.Parse(string.Format("00000000-0000-0000-0000-{0:X12}", n))
+                : Guid.Parse(string.Format("{0:X8}-0000-0000-0000-000000000000", n));
             IEchoGrain grain = this.GrainFactory.GetGrain<IEchoGrain>(guid);
             GrainId grainId = ((GrainReference)grain.AsReference<IEchoGrain>()).GrainId;
             output.WriteLine("Guid = {0}, Guid.HashCode = x{1:X8}, GrainId.HashCode = x{2:X8}, GrainId.UniformHashCode = x{3:X8}", guid, guid.GetHashCode(), grainId.GetHashCode(), grainId.GetUniformHashCode());

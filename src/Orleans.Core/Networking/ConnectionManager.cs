@@ -22,7 +22,7 @@ namespace Orleans.Runtime.Messaging
         private readonly ConnectionFactory connectionFactory;
         private readonly NetworkingTrace trace;
         private readonly CancellationTokenSource shutdownCancellation = new();
-        private readonly object lockObj = new object();
+        private readonly object lockObj = new();
         private readonly TaskCompletionSource<int> closedTaskCompletionSource = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
         public ConnectionManager(
@@ -30,10 +30,9 @@ namespace Orleans.Runtime.Messaging
             ConnectionFactory connectionFactory,
             NetworkingTrace trace)
         {
-            if (trace == null) throw new ArgumentNullException(nameof(trace));
             this.connectionOptions = connectionOptions.Value;
             this.connectionFactory = connectionFactory;
-            this.trace = trace;
+            this.trace = trace ?? throw new ArgumentNullException(nameof(trace));
         }
 
         public int ConnectionCount => connections.Sum(e => e.Value.Connections.Length);

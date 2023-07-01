@@ -1,8 +1,4 @@
-using System;
-using System.Collections.Generic;
 using Microsoft.Extensions.Logging;
-using System.Threading.Tasks;
-using System.Threading;
 using System.Collections.Immutable;
 using Orleans.Internal;
 
@@ -13,7 +9,7 @@ namespace Orleans.Runtime.MembershipService
     /// </summary>
     internal class SiloStatusListenerManager : ILifecycleParticipant<ISiloLifecycle>
     {
-        private readonly object listenersLock = new object();
+        private readonly object listenersLock = new();
         private readonly CancellationTokenSource cancellation = new CancellationTokenSource();
         private readonly MembershipTableManager membershipTableManager;
         private readonly ILogger<SiloStatusListenerManager> log;

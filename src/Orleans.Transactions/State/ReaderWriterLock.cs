@@ -15,8 +15,8 @@ namespace Orleans.Transactions.State
     {
         private readonly TransactionalStateOptions options;
         private readonly TransactionQueue<TState> queue;
-        private BatchWorker lockWorker;
-        private BatchWorker storageWorker;
+        private readonly BatchWorker lockWorker;
+        private readonly BatchWorker storageWorker;
         private readonly ILogger logger;
         private readonly IActivationLifetime activationLifetime;
 
@@ -205,15 +205,9 @@ namespace Orleans.Transactions.State
             }
         }
 
-        public void Notify()
-        {
-            this.lockWorker.Notify();
-        }
+        public void Notify() => this.lockWorker.Notify();
 
-        public bool TryGetRecord(Guid transactionId, out TransactionRecord<TState> record)
-        {
-            return this.currentGroup.TryGetValue(transactionId, out record);
-        }
+        public bool TryGetRecord(Guid transactionId, out TransactionRecord<TState> record) => this.currentGroup.TryGetValue(transactionId, out record);
 
         public Task AbortExecutingTransactions(Exception exception)
         {
@@ -558,9 +552,6 @@ namespace Orleans.Transactions.State
             }
         }
 
-        private static int Comparer(TransactionRecord<TState> a, TransactionRecord<TState> b)
-        {
-            return a.Timestamp.CompareTo(b.Timestamp);
-        }
+        private static int Comparer(TransactionRecord<TState> a, TransactionRecord<TState> b) => a.Timestamp.CompareTo(b.Timestamp);
     }
 }

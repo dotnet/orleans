@@ -1,12 +1,11 @@
-﻿using System;
-using Microsoft.Extensions.Options;
+﻿using Microsoft.Extensions.Options;
 using Orleans.Runtime;
 
 namespace Orleans.Configuration
 {
     internal class GrainCollectionOptionsValidator : IConfigurationValidator
     {
-        private IOptions<GrainCollectionOptions> options;
+        private readonly IOptions<GrainCollectionOptions> options;
 
         public GrainCollectionOptionsValidator(IOptions<GrainCollectionOptions> options)
         {
@@ -29,7 +28,7 @@ namespace Orleans.Configuration
                     $"{nameof(GrainCollectionOptions.CollectionAge)} must be greater than {nameof(GrainCollectionOptions.CollectionQuantum)}, " +
                     $"which is set to {this.options.Value.CollectionQuantum}");
             }
-            foreach(var classSpecificCollectionAge in this.options.Value.ClassSpecificCollectionAge)
+            foreach (var classSpecificCollectionAge in this.options.Value.ClassSpecificCollectionAge)
             {
                 if (classSpecificCollectionAge.Value <= this.options.Value.CollectionQuantum)
                 {

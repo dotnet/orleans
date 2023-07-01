@@ -7,7 +7,7 @@ namespace Orleans.Runtime.Messaging
     /// </summary>
     internal sealed class ProbeRequestMonitor
     {
-        private readonly object _lock = new object();
+        private readonly object _lock = new();
         private ValueStopwatch _probeRequestStopwatch;
 
         /// <summary>

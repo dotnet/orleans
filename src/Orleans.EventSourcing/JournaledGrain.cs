@@ -42,10 +42,10 @@ namespace Orleans.EventSourcing
         /// Raises an event.
         /// </summary>
         /// <param name="event">Event to raise.</param>
-        protected virtual void RaiseEvent<TEvent>(TEvent @event) 
+        protected virtual void RaiseEvent<TEvent>(TEvent @event)
             where TEvent : TEventBase
         {
-            if (@event == null) throw new ArgumentNullException("event");
+            if (@event == null) throw new ArgumentNullException(nameof(@event));
 
             LogViewAdaptor.Submit(@event);
         }
@@ -54,16 +54,16 @@ namespace Orleans.EventSourcing
         /// Raise multiple events, as an atomic sequence.
         /// </summary>
         /// <param name="events">Events to raise.</param>
-        protected virtual void RaiseEvents<TEvent>(IEnumerable<TEvent> events) 
+        protected virtual void RaiseEvents<TEvent>(IEnumerable<TEvent> events)
             where TEvent : TEventBase
         {
-            if (events == null) throw new ArgumentNullException("events");
+            if (events == null) throw new ArgumentNullException(nameof(events));
 
             LogViewAdaptor.SubmitRange((IEnumerable<TEventBase>) events);
         }
 
         /// <summary>
-        /// Raise an event conditionally. 
+        /// Raise an event conditionally.
         /// Succeeds only if there are no conflicts, that is, no other events were raised in the meantime.
         /// </summary>
         /// <param name="event">Event to raise.</param>
@@ -71,13 +71,13 @@ namespace Orleans.EventSourcing
         protected virtual Task<bool> RaiseConditionalEvent<TEvent>(TEvent @event)
             where TEvent : TEventBase
         {
-            if (@event == null) throw new ArgumentNullException("event");
+            if (@event == null) throw new ArgumentNullException(nameof(@event));
 
             return LogViewAdaptor.TryAppend(@event);
         }
 
         /// <summary>
-        /// Raise multiple events, as an atomic sequence, conditionally. 
+        /// Raise multiple events, as an atomic sequence, conditionally.
         /// Succeeds only if there are no conflicts, that is, no other events were raised in the meantime.
         /// </summary>
         /// <param name="events">Events to raise</param>
@@ -85,12 +85,12 @@ namespace Orleans.EventSourcing
         protected virtual Task<bool> RaiseConditionalEvents<TEvent>(IEnumerable<TEvent> events)
             where TEvent : TEventBase
         {
-            if (events == null) throw new ArgumentNullException("events");
+            if (events == null) throw new ArgumentNullException(nameof(events));
             return LogViewAdaptor.TryAppendRange((IEnumerable<TEventBase>) events);
         }
 
         /// <summary>
-        /// Gets the current confirmed state. 
+        /// Gets the current confirmed state.
         /// Includes only confirmed events.
         /// </summary>
         protected TGrainState State
@@ -99,7 +99,7 @@ namespace Orleans.EventSourcing
         }
 
         /// <summary>
-        /// Gets the version of the current confirmed state. 
+        /// Gets the version of the current confirmed state.
         /// Equals the total number of confirmed events.
         /// </summary>
         protected int Version
@@ -134,7 +134,7 @@ namespace Orleans.EventSourcing
         }
 
         /// <summary>
-        /// Waits until all previously raised events have been confirmed. 
+        /// Waits until all previously raised events have been confirmed.
         /// <para>await this after raising one or more events, to ensure events are persisted before proceeding, or to guarantee strong consistency (linearizability) even if there are multiple instances of this grain</para>
         /// </summary>
         /// <returns>a task that completes once the events have been confirmed.</returns>
@@ -144,7 +144,7 @@ namespace Orleans.EventSourcing
         }
 
         /// <summary>
-        /// Retrieves the latest state now, and confirms all previously raised events. 
+        /// Retrieves the latest state now, and confirms all previously raised events.
         /// Effectively, this enforces synchronization with the global state.
         /// <para>Await this before reading the state to ensure strong consistency (linearizability) even if there are multiple instances of this grain</para>
         /// </summary>
@@ -173,7 +173,7 @@ namespace Orleans.EventSourcing
         }
 
         /// <summary>
-        /// Retrieves a segment of the confirmed event sequence, possibly from storage. 
+        /// Retrieves a segment of the confirmed event sequence, possibly from storage.
         /// Throws <see cref="NotSupportedException"/> if the events are not available to read.
         /// Whether events are available, and for how long, depends on the providers used and how they are configured.
         /// </summary>
@@ -203,7 +203,7 @@ namespace Orleans.EventSourcing
 
         /// <summary>
         /// Called when a previously reported connection issue has been resolved.
-        /// <para>Override this to monitor the health of the log-consistency protocol. 
+        /// <para>Override this to monitor the health of the log-consistency protocol.
         /// Any exceptions thrown are caught and logged by the <see cref="ILogViewAdaptorFactory"/>.</para>
         /// </summary>
         protected virtual void OnConnectionIssueResolved(ConnectionIssue issue)
@@ -304,7 +304,7 @@ namespace Orleans.EventSourcing
         }
 
         /// <summary>
-        /// Called by adaptor on state change. 
+        /// Called by adaptor on state change.
         /// </summary>
         void ILogViewAdaptorHost<TGrainState, TEventBase>.OnViewChanged(bool tentative, bool confirmed)
         {
@@ -315,7 +315,7 @@ namespace Orleans.EventSourcing
         }
 
         /// <summary>
-        /// called by adaptor on connection issues. 
+        /// called by adaptor on connection issues.
         /// </summary>
         void IConnectionIssueListener.OnConnectionIssue(ConnectionIssue connectionIssue)
         {
@@ -323,7 +323,7 @@ namespace Orleans.EventSourcing
         }
 
         /// <summary>
-        /// Called by adaptor when a connection issue is resolved. 
+        /// Called by adaptor when a connection issue is resolved.
         /// </summary>
         void IConnectionIssueListener.OnConnectionIssueResolved(ConnectionIssue connectionIssue)
         {

@@ -23,7 +23,7 @@ namespace Orleans.Streaming.EventHubs
         private double cachePressureContributionCount;
         private DateTime nextCheckedTime;
         private bool isUnderPressure;
-        private double flowControlThreshold;
+        private readonly double flowControlThreshold;
 
         /// <summary>
         /// Constructor

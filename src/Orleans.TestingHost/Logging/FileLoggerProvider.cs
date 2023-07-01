@@ -8,7 +8,7 @@ namespace Orleans.TestingHost.Logging
     /// </summary>
     public class FileLoggerProvider : ILoggerProvider
     {
-        private FileLoggingOutput output;
+        private readonly FileLoggingOutput output;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="FileLoggerProvider"/> class.

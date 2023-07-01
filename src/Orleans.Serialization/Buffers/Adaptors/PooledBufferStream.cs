@@ -135,7 +135,7 @@ namespace Orleans.Serialization.Buffers.Adaptors
         /// <summary>
         /// Returns a <see cref="ReadOnlySequence{T}"/> previously rented by <see cref="RentReadOnlySequence"/>;
         /// </summary>
-        public void ReturnReadOnlySequence(in ReadOnlySequence<byte> sequence)
+        public static void ReturnReadOnlySequence(in ReadOnlySequence<byte> sequence)
         {
             if (sequence.Start.GetObject() is not BufferSegment segment)
             {

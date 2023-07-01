@@ -94,10 +94,7 @@ namespace Orleans.CodeGenerator.MSBuild
 
             return null;
 
-            bool NamesMatch(RuntimeLibrary runtime)
-            {
-                return string.Equals(runtime.Name, name.Name, StringComparison.OrdinalIgnoreCase);
-            }
+            bool NamesMatch(RuntimeLibrary runtime) => string.Equals(runtime.Name, name.Name, StringComparison.OrdinalIgnoreCase);
         }
 
         private Assembly TryLoadAssemblyFromPath(string path)

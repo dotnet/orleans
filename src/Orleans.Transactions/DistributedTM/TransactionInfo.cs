@@ -130,14 +130,9 @@ namespace Orleans.Transactions
             // Take sum of write counts
             foreach (KeyValuePair<ParticipantId, AccessCounter> participant in other.Participants)
             {
-                if (!this.Participants.TryGetValue(participant.Key, out var existing))
-                {
-                    this.Participants[participant.Key] = participant.Value;
-                }
-                else
-                {
-                    this.Participants[participant.Key] = existing + participant.Value;
-                }
+                this.Participants[participant.Key] = !this.Participants.TryGetValue(participant.Key, out var existing)
+                    ? participant.Value
+                    : existing + participant.Value;
             }
 
             // take max of timestamp

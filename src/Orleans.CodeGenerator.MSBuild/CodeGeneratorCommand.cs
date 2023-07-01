@@ -211,7 +211,7 @@ namespace Orleans.CodeGenerator.MSBuild
             ?? (IEnumerable<MetadataReference>)Array.Empty<MetadataReference>();
 
 
-        private static string GetLanguageName(string projectPath) => (Path.GetExtension(projectPath)) switch
+        private static string GetLanguageName(string projectPath) => Path.GetExtension(projectPath) switch
         {
             ".csproj" => LanguageNames.CSharp,
             string ext when !string.IsNullOrWhiteSpace(ext) => throw new NotSupportedException($"Projects of type {ext} are not supported."),

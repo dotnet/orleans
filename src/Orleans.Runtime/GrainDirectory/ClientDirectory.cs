@@ -1,8 +1,4 @@
-using System;
-using System.Collections.Generic;
 using System.Collections.Immutable;
-using System.Threading;
-using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
@@ -37,7 +33,7 @@ namespace Orleans.Runtime.GrainDirectory
         private readonly IClusterMembershipService _clusterMembershipService;
         private readonly SiloMessagingOptions _messagingOptions;
         private readonly CancellationTokenSource _shutdownCancellation = new CancellationTokenSource();
-        private readonly object _lockObj = new object();
+        private readonly object _lockObj = new();
         private readonly GrainId _localHostedClientId;
         private readonly IConnectedClientCollection _connectedClients;
         private Action _schedulePublishUpdate;
@@ -484,7 +480,7 @@ namespace Orleans.Runtime.GrainDirectory
                     {
                         // The target has already seen the latest version for this silo.
                         builder.Remove(silo);
-                    } 
+                    }
                 }
             }
 

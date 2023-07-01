@@ -10,7 +10,7 @@ namespace Orleans
 {
     internal class ClientGrainContext : IGrainContext, IGrainExtensionBinder, IGrainContextAccessor
     {
-        private readonly object _lockObj = new object();
+        private readonly object _lockObj = new();
         private readonly ConcurrentDictionary<Type, (object Implementation, IAddressable Reference)> _extensions = new();
         private readonly ConcurrentDictionary<Type, object> _components = new();
         private readonly OutsideRuntimeClient _runtimeClient;

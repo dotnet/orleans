@@ -7,7 +7,7 @@ namespace Orleans.Transactions.State
 {
     internal class ActivationLifetime : IActivationLifetime, ILifecycleObserver
     {
-        private readonly CancellationTokenSource onDeactivating = new CancellationTokenSource();
+        private readonly CancellationTokenSource onDeactivating = new();
 
         private int pendingDeactivationLocks;
 

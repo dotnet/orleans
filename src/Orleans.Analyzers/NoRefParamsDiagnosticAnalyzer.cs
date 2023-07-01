@@ -16,7 +16,7 @@ namespace Orleans.Analyzers
         public const string MessageFormat = Title;
         public const string Category = "Usage";
 
-        private static readonly DiagnosticDescriptor Rule = new DiagnosticDescriptor(DiagnosticId, Title, MessageFormat, Category, DiagnosticSeverity.Error, isEnabledByDefault: true);
+        private static readonly DiagnosticDescriptor Rule = new(DiagnosticId, Title, MessageFormat, Category, DiagnosticSeverity.Error, isEnabledByDefault: true);
 
         public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics => ImmutableArray.Create(Rule);
 
@@ -29,7 +29,7 @@ namespace Orleans.Analyzers
 
         private static void AnalyzeSyntax(SyntaxNodeAnalysisContext context)
         {
-            if (!(context.Node is MethodDeclarationSyntax syntax)) return;
+            if (context.Node is not MethodDeclarationSyntax syntax) return;
 
             var symbol = context.SemanticModel.GetDeclaredSymbol(syntax, context.CancellationToken);
 

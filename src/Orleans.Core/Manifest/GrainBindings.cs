@@ -43,8 +43,8 @@ namespace Orleans.Metadata
     {
         private const string BindingPrefix = WellKnownGrainTypeProperties.BindingPrefix + ".";
         private const char BindingIndexEnd = '.';
-        private readonly object _lockObj = new object();
-        private readonly ConcurrentDictionary<GenericGrainType, GrainType> _genericMapping = new ConcurrentDictionary<GenericGrainType, GrainType>();
+        private readonly object _lockObj = new();
+        private readonly ConcurrentDictionary<GenericGrainType, GrainType> _genericMapping = new();
         private readonly IClusterManifestProvider _clusterManifestProvider;
         private Cache _cache;
 

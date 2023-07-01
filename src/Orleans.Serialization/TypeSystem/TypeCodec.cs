@@ -18,8 +18,8 @@ namespace Orleans.Serialization.TypeSystem
     public sealed class TypeCodec
     {
         private const byte Version1 = 1;
-        private readonly ConcurrentDictionary<Type, TypeKey> _typeCache = new ConcurrentDictionary<Type, TypeKey>();
-        private readonly ConcurrentDictionary<int, (TypeKey Key, Type Type)> _typeKeyCache = new ConcurrentDictionary<int, (TypeKey, Type)>();
+        private readonly ConcurrentDictionary<Type, TypeKey> _typeCache = new();
+        private readonly ConcurrentDictionary<int, (TypeKey Key, Type Type)> _typeKeyCache = new();
         private readonly TypeConverter _typeConverter;
         private readonly Func<Type, TypeKey> _getTypeKey;
 

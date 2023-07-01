@@ -6,7 +6,7 @@ namespace Orleans.Streaming.EventHubs.Testing
 {
     public class NoOpCheckpointerFactory : IStreamQueueCheckpointerFactory
     {
-        public static NoOpCheckpointerFactory Instance = new NoOpCheckpointerFactory();
+        public static NoOpCheckpointerFactory Instance = new();
         public Task<IStreamQueueCheckpointer<string>> Create(string partition)
         {
             return Task.FromResult<IStreamQueueCheckpointer<string>>(NoOpCheckpointer.Instance);
@@ -19,7 +19,7 @@ namespace Orleans.Streaming.EventHubs.Testing
     /// </summary>
     public class NoOpCheckpointer : IStreamQueueCheckpointer<string>
     {
-        public static NoOpCheckpointer Instance = new NoOpCheckpointer();
+        public static NoOpCheckpointer Instance = new();
 
         public bool CheckpointExists => true;
         public Task<string> Load()

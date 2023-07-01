@@ -16,7 +16,7 @@ namespace UnitTests.Grains
         private readonly IInjectedScopedService injectedScopedService;
         private readonly IGrainFactory injectedGrainFactory;
         private readonly long grainFactoryId;
-        public static readonly ObjectIDGenerator ObjectIdGenerator = new ObjectIDGenerator();
+        public static readonly ObjectIDGenerator ObjectIdGenerator = new();
         private readonly IGrainContextAccessor grainContextAccessor;
         private IGrainContext originalGrainContext;
 

@@ -1,15 +1,10 @@
-using System;
-using System.Threading.Tasks;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Configuration;
 using AWSUtils.Tests.StorageTests;
 using Microsoft.Extensions.Logging;
 using Xunit;
-using Orleans;
-using Orleans.Runtime;
 using Orleans.TestingHost;
 using OrleansAWSUtils.Streams;
-using Orleans.Hosting;
 using TestExtensions;
 using UnitTests.StreamingTests;
 
@@ -19,7 +14,7 @@ namespace AWSUtils.Tests.Streaming
     {
         private const string SQSStreamProviderName = "SQSProvider";
         private const string StreamNamespace = "SQSSubscriptionMultiplicityTestsNamespace";
-        private string StreamConnectionString = AWSTestConstants.SqsConnectionString;
+        private readonly string StreamConnectionString = AWSTestConstants.SqsConnectionString;
         private SubscriptionMultiplicityTestRunner runner;
 
         protected override void ConfigureTestCluster(TestClusterBuilder builder)

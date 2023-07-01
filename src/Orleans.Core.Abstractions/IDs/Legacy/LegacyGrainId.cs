@@ -10,9 +10,9 @@ namespace Orleans.Runtime
     [Serializable, GenerateSerializer, Immutable]
     public sealed class LegacyGrainId : IEquatable<LegacyGrainId>, IComparable<LegacyGrainId>
     {
-        private static readonly Interner<UniqueKey, LegacyGrainId> grainIdInternCache = new Interner<UniqueKey, LegacyGrainId>(InternerConstants.SIZE_LARGE);
-        private static readonly Interner<UniqueKey, byte[]> grainTypeInternCache = new Interner<UniqueKey, byte[]>();
-        private static readonly Interner<UniqueKey, byte[]> grainKeyInternCache = new Interner<UniqueKey, byte[]>();
+        private static readonly Interner<UniqueKey, LegacyGrainId> grainIdInternCache = new(InternerConstants.SIZE_LARGE);
+        private static readonly Interner<UniqueKey, byte[]> grainTypeInternCache = new();
+        private static readonly Interner<UniqueKey, byte[]> grainKeyInternCache = new();
         private static readonly ReadOnlyMemory<byte> ClientPrefixBytes = Encoding.UTF8.GetBytes(GrainTypePrefix.ClientPrefix + ".");
 
         [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Security", "CA2104:DoNotDeclareReadOnlyMutableReferenceTypes")]

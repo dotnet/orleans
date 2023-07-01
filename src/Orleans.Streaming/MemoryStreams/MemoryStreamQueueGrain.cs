@@ -12,7 +12,7 @@ namespace Orleans.Providers
     /// </summary>
     public class MemoryStreamQueueGrain : Grain, IMemoryStreamQueueGrain, IGrainMigrationParticipant
     {
-        private Queue<MemoryMessageData> _eventQueue = new Queue<MemoryMessageData>();
+        private Queue<MemoryMessageData> _eventQueue = new();
         private long sequenceNumber = DateTime.UtcNow.Ticks;
 
         /// <summary>

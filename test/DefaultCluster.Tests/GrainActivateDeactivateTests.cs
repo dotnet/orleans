@@ -12,7 +12,7 @@ namespace DefaultCluster.Tests.ActivationsLifeCycleTests
 {
     public class GrainActivateDeactivateTests : HostedTestClusterEnsureDefaultStarted, IDisposable
     {
-        private IActivateDeactivateWatcherGrain watcher;
+        private readonly IActivateDeactivateWatcherGrain watcher;
 
         public GrainActivateDeactivateTests(DefaultClusterFixture fixture) : base(fixture)
         {

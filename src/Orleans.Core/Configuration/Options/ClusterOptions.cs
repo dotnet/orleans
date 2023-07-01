@@ -44,7 +44,7 @@ namespace Orleans.Configuration
     /// </summary>
     public class ClusterOptionsValidator : IConfigurationValidator
     {
-        private ClusterOptions options;
+        private readonly ClusterOptions options;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="ClusterOptionsValidator"/> class.

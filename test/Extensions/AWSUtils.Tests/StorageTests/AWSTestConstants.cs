@@ -12,7 +12,7 @@ namespace AWSUtils.Tests.StorageTests
 {
     public class AWSTestConstants
     {
-        private static readonly Lazy<bool> _isDynamoDbAvailable = new Lazy<bool>(() =>
+        private static readonly Lazy<bool> _isDynamoDbAvailable = new(() =>
         {
             if (string.IsNullOrEmpty(DynamoDbService))
             {

@@ -1,6 +1,4 @@
-using System;
 using System.Buffers;
-using System.IO;
 
 namespace Orleans.Serialization.Buffers.Adaptors
 {
@@ -11,7 +9,7 @@ namespace Orleans.Serialization.Buffers.Adaptors
     {
         public const int DefaultInitialBufferSize = 256;
         private readonly Stream _stream;
-        private byte[] _buffer;
+        private readonly byte[] _buffer;
         private int _index;
 
         /// <summary>

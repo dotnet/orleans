@@ -1,9 +1,4 @@
-using System;
 using System.Collections.Concurrent;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading;
-using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Orleans.Internal;
 using Orleans.Runtime.Internal;
@@ -25,7 +20,7 @@ namespace Orleans.Runtime
         private readonly IAsyncTimer _scanPeriodTimer;
         private readonly List<IActivationWorkingSetObserver> _observers;
 
-        private int _activeCount;
+        private readonly int _activeCount;
         private Task _runTask;
 
         public ActivationWorkingSet(

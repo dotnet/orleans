@@ -1,6 +1,3 @@
-using System;
-using System.Threading.Tasks;
-
 namespace Orleans.UnitTest.GrainInterfaces
 {
     [Serializable]
@@ -8,7 +5,7 @@ namespace Orleans.UnitTest.GrainInterfaces
     public class MyTypeWithAnInternalTypeField
     {
         [Id(0)]
-        private MyInternalDependency _dependency;
+        private readonly MyInternalDependency _dependency;
 
         public MyTypeWithAnInternalTypeField()
         {

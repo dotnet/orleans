@@ -1,10 +1,6 @@
-using System;
-using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using Orleans;
-using Orleans.Hosting;
 using Orleans.Runtime;
 using Orleans.Runtime.Services;
 using UnitTests.GrainInterfaces;
@@ -50,7 +46,7 @@ namespace Tester
 
     public class TestGrainService : GrainService, ITestGrainService
     {
-        private TestGrainServiceOptions config;
+        private readonly TestGrainServiceOptions config;
 
         public TestGrainService(GrainId id, Silo silo, ILoggerFactory loggerFactory, IOptions<TestGrainServiceOptions> options) : base(id, silo, loggerFactory)
         {

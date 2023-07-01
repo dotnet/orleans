@@ -13,7 +13,7 @@ namespace Orleans.Runtime.Membership
     public class AdoNetGatewayListProvider : IGatewayListProvider
     {
         private readonly ILogger logger;
-        private string clusterId;
+        private readonly string clusterId;
         private readonly AdoNetClusteringClientOptions options;
         private RelationalOrleansQueries orleansQueries;
         private readonly IServiceProvider serviceProvider;

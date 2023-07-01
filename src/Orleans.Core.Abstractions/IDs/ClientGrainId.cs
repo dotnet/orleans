@@ -31,7 +31,7 @@ namespace Orleans.Runtime
         /// <summary>
         /// Creates a new <see cref="ClientGrainId"/> instance.
         /// </summary>
-        public static ClientGrainId Create(IdSpan id) => new ClientGrainId(new GrainId(GrainTypePrefix.ClientGrainType, id));
+        public static ClientGrainId Create(IdSpan id) => new(new GrainId(GrainTypePrefix.ClientGrainType, id));
 
         /// <summary>
         /// Converts the provided <see cref="GrainId"/> to a <see cref="ClientGrainId"/>. A return value indicates whether the operation succeeded.
