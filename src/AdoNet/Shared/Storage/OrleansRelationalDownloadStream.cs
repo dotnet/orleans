@@ -62,10 +62,10 @@ namespace Orleans.Tests.SqlUtils
         /// <param name="reader">The reader to use to read from the database.</param>
         /// <param name="ordinal">The column ordinal to read from.</param>
         public OrleansRelationalDownloadStream(DbDataReader reader, int ordinal)
-        {            
+        {
             this.reader = reader;
             this.ordinal = ordinal;
-                        
+
             //This return the total length of the column pointed by the ordinal.
             totalBytes = reader.GetBytes(ordinal, 0, null, 0, 0);
         }
@@ -112,7 +112,7 @@ namespace Orleans.Tests.SqlUtils
 
         /// <summary>
         /// The length of the stream.
-        /// </summary>        
+        /// </summary>
         public override long Length
         {
             get { return totalBytes; }
@@ -128,10 +128,10 @@ namespace Orleans.Tests.SqlUtils
             set { throw new NotSupportedException(); }
         }
 
-        
+
         /// <summary>
         /// Throws <exception cref="NotSupportedException"/>.
-        /// </summary>        
+        /// </summary>
         /// <exception cref="NotSupportedException" />.
         public override void Flush()
         {
@@ -152,7 +152,7 @@ namespace Orleans.Tests.SqlUtils
             ValidateReadParameters(buffer, offset, count);
 
             try
-            {                                                               
+            {
                 int length = Math.Min(count, (int)(totalBytes - position));
                 long bytesRead = 0;
                 if(length > 0)
@@ -176,7 +176,7 @@ namespace Orleans.Tests.SqlUtils
         /// </summary>
         /// <param name="buffer">The buffer to read to.</param>
         /// <param name="offset">The offset to the buffer to stat reading.</param>
-        /// <param name="count">The count of bytes to read to.</param>        
+        /// <param name="count">The count of bytes to read to.</param>
         /// <param name="cancellationToken">The cancellation token.</param>
         /// <returns>The number of actual bytes read from the stream.</returns>
         public override Task<int> ReadAsync(byte[] buffer, int offset, int count, CancellationToken cancellationToken)
@@ -236,7 +236,7 @@ namespace Orleans.Tests.SqlUtils
             }
         }
 
-       
+
         /// <summary>
         /// Throws <exception cref="NotSupportedException"/>.
         /// </summary>
@@ -251,7 +251,7 @@ namespace Orleans.Tests.SqlUtils
 
 
         /// <summary>
-        /// Throws <exception cref="NotSupportedException"/>. 
+        /// Throws <exception cref="NotSupportedException"/>.
         /// </summary>
         /// <returns>Throws <exception cref="NotSupportedException"/>.</returns>
         /// <exception cref="NotSupportedException" />.
@@ -262,7 +262,7 @@ namespace Orleans.Tests.SqlUtils
 
 
         /// <summary>
-        /// Throws <exception cref="NotSupportedException"/>. 
+        /// Throws <exception cref="NotSupportedException"/>.
         /// </summary>
         /// <param name="buffer">The buffer.</param>
         /// <param name="offset">The offset to the buffer.</param>
@@ -290,23 +290,23 @@ namespace Orleans.Tests.SqlUtils
 
         /// <summary>
         /// Checks the parameters passed into a ReadAsync() or Read() are valid.
-        /// </summary>        
+        /// </summary>
         /// <param name="buffer"></param>
         /// <param name="offset"></param>
         /// <param name="count"></param>
         private static void ValidateReadParameters(byte[] buffer, int offset, int count)
-        {            
+        {
             if(buffer == null)
             {
-                throw new ArgumentNullException("buffer");                    
+                throw new ArgumentNullException(nameof(buffer));
             }
             if(offset < 0)
             {
-                throw new ArgumentOutOfRangeException("offset");
+                throw new ArgumentOutOfRangeException(nameof(offset));
             }
             if(count < 0)
             {
-                throw new ArgumentOutOfRangeException("count");
+                throw new ArgumentOutOfRangeException(nameof(count));
             }
             try
             {
@@ -316,7 +316,7 @@ namespace Orleans.Tests.SqlUtils
                 }
             }
             catch(OverflowException)
-            {                
+            {
                 throw new ArgumentException("Invalid offset length");
             }
         }

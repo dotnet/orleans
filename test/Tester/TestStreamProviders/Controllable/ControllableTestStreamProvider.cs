@@ -72,7 +72,7 @@ namespace Tester.TestStreamProviders.Controllable
                 case ControllableTestStreamProviderCommands.AdapterFactoryEcho:
                     return Task.FromResult<object>(Tuple.Create(ControllableTestStreamProviderCommands.AdapterFactoryEcho, arg));
             }
-            throw new ArgumentOutOfRangeException("command");
+            throw new ArgumentOutOfRangeException(nameof(command));
         }
 
         public static ControllableTestAdapterFactory Create(IServiceProvider services, string name)

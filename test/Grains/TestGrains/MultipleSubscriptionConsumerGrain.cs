@@ -74,7 +74,7 @@ namespace UnitTests.Grains
         {
             logger.LogInformation("Resume");
             if(handle == null)
-                throw new ArgumentNullException("handle");
+                throw new ArgumentNullException(nameof(handle));
 
             // new counter for this subscription
             Tuple<Counter,Counter> counters;

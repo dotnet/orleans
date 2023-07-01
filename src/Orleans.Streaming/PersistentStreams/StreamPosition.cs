@@ -19,7 +19,7 @@ namespace Orleans.Streams
         {
             if (sequenceToken == null)
             {
-                throw new ArgumentNullException("sequenceToken");
+                throw new ArgumentNullException(nameof(sequenceToken));
             }
             StreamId = streamId;
             SequenceToken = sequenceToken;

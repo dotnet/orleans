@@ -57,7 +57,7 @@ namespace Orleans.Streams
             StreamSequenceToken token,
             string filterData)
         {
-            if (null == stream) throw new ArgumentNullException("stream");
+            if (null == stream) throw new ArgumentNullException(nameof(stream));
 
             try
             {

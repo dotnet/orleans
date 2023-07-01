@@ -5,7 +5,7 @@ using System.Linq;
 namespace Orleans.Streams
 {
     /// <summary>
-    /// Best fit balancer keeps each active bucket responsible for its ideal set of resources, and redistributes 
+    /// Best fit balancer keeps each active bucket responsible for its ideal set of resources, and redistributes
     /// resources from inactive buckets evenly over active buckets.  If there are large numbers of inactive buckets,
     /// this can lead to quite a bit of shuffling of resources from inactive buckets as buckets come back online.
     /// Requirements:
@@ -21,7 +21,7 @@ namespace Orleans.Streams
     ///        these resources from ever being assigned to another bucket unless a bucket becomes inactive.
     ///     2) Build a list of inactive buckets.
     ///     3) For each inactive bucket, add its ideal resource allocation to the list of resources to be reallocated.
-    ///     4) Order the active buckets by the number of resources allocated to each and begin assigning them more resources 
+    ///     4) Order the active buckets by the number of resources allocated to each and begin assigning them more resources
     ///        from the list of resources to be reallocated.
     ///         i) Continue iterating over the active buckets assigning resources until there are no more resources that need
     ///            reallocated.
@@ -46,19 +46,19 @@ namespace Orleans.Streams
         {
             if (buckets == null)
             {
-                throw new ArgumentNullException("buckets");
+                throw new ArgumentNullException(nameof(buckets));
             }
 
             if (resources == null)
             {
-                throw new ArgumentNullException("resources");
+                throw new ArgumentNullException(nameof(resources));
             }
 
             idealDistribution = BuildIdealDistribution(buckets, resources);
         }
 
         /// <summary>
-        /// Gets a distribution for the active buckets. 
+        /// Gets a distribution for the active buckets.
         /// Any active buckets keep their ideal distribution.  Resources from inactive buckets are redistributed evenly
         /// among the active buckets, starting with those with the fewest allocated resources.
         /// </summary>
@@ -68,7 +68,7 @@ namespace Orleans.Streams
         {
             if (activeBuckets == null)
             {
-                throw new ArgumentNullException("activeBuckets");
+                throw new ArgumentNullException(nameof(activeBuckets));
             }
 
             // sanitize active buckets.  Remove duplicates, ensure all buckets are valid
@@ -77,7 +77,7 @@ namespace Orleans.Streams
             {
                 if (!idealDistribution.ContainsKey(bucket))
                 {
-                    throw new ArgumentOutOfRangeException("activeBuckets", String.Format("Active buckets contain a bucket {0} not in the master list.", bucket));
+                    throw new ArgumentOutOfRangeException(nameof(activeBuckets), String.Format("Active buckets contain a bucket {0} not in the master list.", bucket));
                 }
             }
 

@@ -87,12 +87,12 @@ namespace Orleans.Tests.SqlUtils
         {
             if(string.IsNullOrWhiteSpace(invariantName))
             {
-                throw new ArgumentException("The name of invariant must contain characters", "invariantName");
+                throw new ArgumentException("The name of invariant must contain characters", nameof(invariantName));
             }
 
             if(string.IsNullOrWhiteSpace(connectionString))
             {
-                throw new ArgumentException("Connection string must contain characters", "connectionString");
+                throw new ArgumentException("Connection string must contain characters", nameof(connectionString));
             }
 
             return new RelationalStorage(invariantName, connectionString);
@@ -153,12 +153,12 @@ namespace Orleans.Tests.SqlUtils
             //If the query is something else that is not acceptable (e.g. an empty string), there will an appropriate database exception.
             if(query == null)
             {
-                throw new ArgumentNullException("query");
+                throw new ArgumentNullException(nameof(query));
             }
 
             if(selector == null)
             {
-                throw new ArgumentNullException("selector");
+                throw new ArgumentNullException(nameof(selector));
             }
 
             return (await ExecuteAsync(query, parameterProvider, ExecuteReaderAsync, selector, cancellationToken, commandBehavior).ConfigureAwait(false)).Item1;
@@ -191,7 +191,7 @@ namespace Orleans.Tests.SqlUtils
             //If the query is something else that is not acceptable (e.g. an empty string), there will an appropriate database exception.
             if(query == null)
             {
-                throw new ArgumentNullException("query");
+                throw new ArgumentNullException(nameof(query));
             }
 
             return (await ExecuteAsync(query, parameterProvider, ExecuteReaderAsync, (unit, id, c) => Task.FromResult(unit), cancellationToken, commandBehavior).ConfigureAwait(false)).Item2;
