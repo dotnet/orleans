@@ -35,6 +35,9 @@ namespace Orleans.Analyzers
 
             if (symbol.ContainingType.TypeKind != TypeKind.Interface) return;
 
+            // ignore static members
+            if (symbol.IsStatic) return;
+
             var implementedInterfaces = symbol.ContainingType
                                               .AllInterfaces
                                               .Select(interfaceDef => interfaceDef.Name);

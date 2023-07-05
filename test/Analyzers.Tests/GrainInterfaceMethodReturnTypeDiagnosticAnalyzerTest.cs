@@ -74,6 +74,7 @@ public class GrainInterfaceMethodReturnTypeDiagnosticAnalyzerTest : DiagnosticAn
                     public interface I : Orleans.IGrain
                     {
                         public static int GetSomeOtherThing(int a) => 0;
+                        public static virtual int GetSomeOtherThingVirtual(int a) => 0;
                     }
                     """;
 

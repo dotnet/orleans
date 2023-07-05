@@ -86,4 +86,34 @@ public class GrainInterfacePropertyDiagnosticAnalyzerTest : DiagnosticAnalyzerTe
         Assert.Equal(DiagnosticSeverity.Error, diagnostic.Severity);
         Assert.Equal(MessageFormat, diagnostic.GetMessage());
     }
+
+    [Fact]
+    public async Task StaticInterfacePropertiesAllowedInGrainInterface()
+    {
+        var code = """
+                    public interface I : Orleans.IGrain
+                    {
+                        public static int MyProperty => 0;
+                        public static virtual int MyVirtualProperty => 0;
+                    }
+                    """;
+
+        var (diagnostics, _) = await this.GetDiagnosticsAsync(code, new string[0]);
+        Assert.Empty(diagnostics);
+    }
+
+    [Fact]
+    public async Task StaticInterfacePropertiesAllowedInAddressableInterface()
+    {
+        var code = """
+                    public interface I : Orleans.Runtime.IAddressable
+                    {
+                        public static int MyProperty => 0;
+                        public static virtual int MyVirtualProperty => 0;
+                    }
+                    """;
+
+        var (diagnostics, _) = await this.GetDiagnosticsAsync(code, new string[0]);
+        Assert.Empty(diagnostics);
+    }
 }
