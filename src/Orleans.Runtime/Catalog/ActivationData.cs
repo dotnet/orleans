@@ -1397,10 +1397,10 @@ namespace Orleans.Runtime
                 try
                 {
                     RequestContextExtensions.Import(requestContextData);
-                    await Lifecycle.OnStart(cancellationToken).WithCancellation(cancellationToken, "Timed out waiting for grain lifecycle to complete activation");
+                    await Lifecycle.OnStart(cancellationToken).WithCancellation("Timed out waiting for grain lifecycle to complete activation", cancellationToken);
                     if (GrainInstance is IGrainBase grainBase)
                     {
-                        await grainBase.OnActivateAsync(cancellationToken).WithCancellation(cancellationToken, $"Timed out waiting for {nameof(IGrainBase.OnActivateAsync)} to complete");
+                        await grainBase.OnActivateAsync(cancellationToken).WithCancellation($"Timed out waiting for {nameof(IGrainBase.OnActivateAsync)} to complete", cancellationToken);
                     }
 
                     lock (this)
@@ -1717,10 +1717,10 @@ namespace Orleans.Runtime
                             RequestContext.Clear(); // Clear any previous RC, so it does not leak into this call by mistake.
                             if (GrainInstance is IGrainBase grainBase)
                             {
-                                await grainBase.OnDeactivateAsync(DeactivationReason, ct).WithCancellation(ct, $"Timed out waiting for {nameof(IGrainBase.OnDeactivateAsync)} to complete");
+                                await grainBase.OnDeactivateAsync(DeactivationReason, ct).WithCancellation($"Timed out waiting for {nameof(IGrainBase.OnDeactivateAsync)} to complete", ct);
                             }
 
-                            await Lifecycle.OnStop(ct).WithCancellation(ct, "Timed out waiting for grain lifecycle to complete deactivation");
+                            await Lifecycle.OnStop(ct).WithCancellation("Timed out waiting for grain lifecycle to complete deactivation", ct);
                         }
 
                         if (_shared.Logger.IsEnabled(LogLevel.Debug))

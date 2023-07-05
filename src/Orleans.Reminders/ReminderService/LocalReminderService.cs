@@ -75,12 +75,12 @@ namespace Orleans.Runtime.ReminderService
                     using var timeoutCancellation = new CancellationTokenSource(initTimeout);
                     var cts = CancellationTokenSource.CreateLinkedTokenSource(ct, timeoutCancellation.Token);
                     await this.QueueTask(Start)
-                        .WithCancellation(ct, $"Starting ReminderService failed due to timeout {initTimeout}");
+                        .WithCancellation($"Starting ReminderService failed due to timeout {initTimeout}", ct);
                 },
                 ct =>
                 {
                     return this.QueueTask(Stop)
-                        .WithCancellation(ct, "Stopping ReminderService failed because the task was cancelled");
+                        .WithCancellation("Stopping ReminderService failed because the task was cancelled", ct);
                 });
         }
 

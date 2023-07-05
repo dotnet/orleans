@@ -33,7 +33,7 @@ namespace Orleans.Tests.SqlUtils
         /// This is a template to produce query parameters that are indexed.
         /// </summary>
         private const string indexedParameterTemplate = "@p{0}";
-                    
+
         /// <summary>
         /// Executes a multi-record insert query clause with <em>SELECT UNION ALL</em>.
         /// </summary>
@@ -41,12 +41,12 @@ namespace Orleans.Tests.SqlUtils
         /// <param name="storage">The storage to use.</param>
         /// <param name="tableName">The table name to against which to execute the query.</param>
         /// <param name="parameters">The parameters to insert.</param>
-        /// <param name="cancellationToken">The cancellation token. Defaults to <see cref="CancellationToken.None"/>.</param>
         /// <param name="nameMap">If provided, maps property names from <typeparamref name="T"/> to ones provided in the map.</param>
         /// <param name="onlyOnceColumns">If given, SQL parameter values for the given <typeparamref name="T"/> property types are generated only once. Effective only when <paramref name="useSqlParams"/> is <em>TRUE</em>.</param>
         /// <param name="useSqlParams"><em>TRUE</em> if the query should be in parameterized form. <em>FALSE</em> otherwise.</param>
+        /// <param name="cancellationToken">The cancellation token. Defaults to <see cref="CancellationToken.None"/>.</param>
         /// <returns>The rows affected.</returns>
-        public static Task<int> ExecuteMultipleInsertIntoAsync<T>(this IRelationalStorage storage, string tableName, IEnumerable<T> parameters, CancellationToken cancellationToken = default(CancellationToken), IReadOnlyDictionary<string, string> nameMap = null, IEnumerable<string> onlyOnceColumns = null, bool useSqlParams = true)
+        public static Task<int> ExecuteMultipleInsertIntoAsync<T>(this IRelationalStorage storage, string tableName, IEnumerable<T> parameters, IReadOnlyDictionary<string, string> nameMap = null, IEnumerable<string> onlyOnceColumns = null, bool useSqlParams = true, CancellationToken cancellationToken = default(CancellationToken))
         {
             if(string.IsNullOrWhiteSpace(tableName))
             {
@@ -55,7 +55,7 @@ namespace Orleans.Tests.SqlUtils
 
             if(parameters == null)
             {
-                throw new ArgumentNullException("parameters");
+                throw new ArgumentNullException(nameof(parameters));
             }
 
             var storageConsts = DbConstantsStore.GetDbConstants(storage.InvariantName);
@@ -74,7 +74,7 @@ namespace Orleans.Tests.SqlUtils
             {
                 //Type and property information are the same for all of the objects.
                 //The following assumes the property names will be retrieved in the same
-                //order as is the index iteration done.                                
+                //order as is the index iteration done.
                 var onlyOnceRow = new List<string>();
                 var properties = parameters.First().GetType().GetProperties();
                 columns = string.Join(",", nameMap == null ? properties.Select(pn => string.Format("{0}{1}{2}", startEscapeIndicator, pn.Name, endEscapeIndicator)) : properties.Select(pn => string.Format("{0}{1}{2}", startEscapeIndicator, (nameMap.TryGetValue(pn.Name, out var pnName) ? pnName : pn.Name), endEscapeIndicator)));
@@ -129,9 +129,9 @@ namespace Orleans.Tests.SqlUtils
             var query = string.Format(insertIntoValuesTemplate, tableName, columns, string.Join(storageConsts.UnionAllSelectTemplate, values));
             return storage.ExecuteAsync(query, command =>
             {
-                if(useSqlParams)
+                if (useSqlParams)
                 {
-                    foreach(var sp in sqlParameters)
+                    foreach (var sp in sqlParameters)
                     {
                         var p = command.CreateParameter();
                         p.ParameterName = sp.Key;
@@ -140,7 +140,7 @@ namespace Orleans.Tests.SqlUtils
                         command.Parameters.Add(p);
                     }
                 }
-            }, cancellationToken);
+            }, cancellationToken: cancellationToken);
         }
 
 
@@ -169,13 +169,13 @@ namespace Orleans.Tests.SqlUtils
         /// <returns>A list of objects as a result of the <see paramref="query"/>.</returns>
         /// <example>This uses reflection to read results and match the parameters.
         /// <code>
-        /// //This struct holds the return value in this example.        
+        /// //This struct holds the return value in this example.
         /// public struct Information
         /// {
         ///     public string TABLE_CATALOG { get; set; }
         ///     public string TABLE_NAME { get; set; }
         /// }
-        /// 
+        ///
         /// //Here reflection (<seealso cref="DbExtensions.ReflectionParameterProvider{T}(IDbCommand, T, IReadOnlyDictionary{string, string})"/>)
         /// is used to match parameter names as well as to read back the results (<seealso cref="DbExtensions.ReflectionSelector{TResult}(IDataRecord)"/>).
         /// var query = "SELECT * FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = @tname;";
@@ -186,11 +186,11 @@ namespace Orleans.Tests.SqlUtils
         {
             return storage.ReadAsync(query, command =>
             {
-                if(parameters != null)
+                if (parameters != null)
                 {
                     command.ReflectionParameterProvider(parameters);
                 }
-            }, (selector, resultSetCount, token) => Task.FromResult(selector.ReflectionSelector<TResult>()), cancellationToken);
+            }, (selector, resultSetCount, token) => Task.FromResult(selector.ReflectionSelector<TResult>()), cancellationToken: cancellationToken);
         }
 
 
@@ -218,7 +218,7 @@ namespace Orleans.Tests.SqlUtils
         /// <returns>Affected rows count.</returns>
         /// <example>This uses reflection to provide parameters to an execute
         /// query that reads only affected rows count if available.
-        /// <code>        
+        /// <code>
         /// //Here reflection (<seealso cref="DbExtensions.ReflectionParameterProvider{T}(IDbCommand, T, IReadOnlyDictionary{string, string})"/>)
         /// is used to match parameter names as well as to read back the results (<seealso cref="DbExtensions.ReflectionSelector{TResult}(IDataRecord)"/>).
         /// var query = "IF NOT EXISTS(SELECT * FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = @tname) CREATE TABLE Test(Id INT PRIMARY KEY IDENTITY(1, 1) NOT NULL);"
@@ -229,11 +229,11 @@ namespace Orleans.Tests.SqlUtils
         {
             return storage.ExecuteAsync(query, command =>
             {
-                if(parameters != null)
+                if (parameters != null)
                 {
                     command.ReflectionParameterProvider(parameters);
                 }
-            }, cancellationToken);
+            }, cancellationToken: cancellationToken);
         }
 
 
@@ -241,7 +241,7 @@ namespace Orleans.Tests.SqlUtils
         /// Uses <see cref="IRelationalStorage"/> with <see cref="DbExtensions.ReflectionSelector{TResult}(System.Data.IDataRecord)"/>.
         /// </summary>
         /// <param name="storage">The storage to use.</param>
-        /// <param name="query">Executes a given statement. Especially intended to use with <em>INSERT</em>, <em>UPDATE</em>, <em>DELETE</em> or <em>DDL</em> queries.</param>        
+        /// <param name="query">Executes a given statement. Especially intended to use with <em>INSERT</em>, <em>UPDATE</em>, <em>DELETE</em> or <em>DDL</em> queries.</param>
         /// <param name="cancellationToken">The cancellation token. Defaults to <see cref="CancellationToken.None"/>.</param>
         /// <returns>Affected rows count.</returns>
         public static Task<int> ExecuteAsync(this IRelationalStorage storage, string query, CancellationToken cancellationToken = default(CancellationToken))

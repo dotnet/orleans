@@ -600,14 +600,14 @@ namespace Orleans.Runtime
             {
                 await lifecycleSchedulingSystemTarget
                     .QueueTask(() => this.messageCenter.Gateway.SendStopSendMessages(this.grainFactory))
-                    .WithCancellation(ct, "Sending gateway disconnection requests failed because the task was cancelled");
+                    .WithCancellation("Sending gateway disconnection requests failed because the task was cancelled", ct);
             }
 
             foreach (var grainService in grainServices)
             {
                 await grainService
                     .QueueTask(grainService.Stop)
-                    .WithCancellation(ct, "Stopping GrainService failed because the task was cancelled");
+                    .WithCancellation("Stopping GrainService failed because the task was cancelled", ct);
 
                 if (this.logger.IsEnabled(LogLevel.Debug))
                 {
