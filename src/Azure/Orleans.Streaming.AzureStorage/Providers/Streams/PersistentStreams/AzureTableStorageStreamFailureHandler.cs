@@ -96,11 +96,11 @@ namespace Orleans.Providers.Streams.PersistentStreams
         {
             if (subscriptionId == null)
             {
-                throw new ArgumentNullException("subscriptionId");
+                throw new ArgumentNullException(nameof(subscriptionId));
             }
             if (string.IsNullOrWhiteSpace(streamProviderName))
             {
-                throw new ArgumentNullException("streamProviderName");
+                throw new ArgumentNullException(nameof(streamProviderName));
             }
 
             var failureEntity = createEntity();

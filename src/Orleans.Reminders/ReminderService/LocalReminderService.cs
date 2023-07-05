@@ -728,7 +728,7 @@ namespace Orleans.Runtime.ReminderService
                     throw new ArgumentNullException(nameof(grainId));
 
                 if (string.IsNullOrWhiteSpace(reminderName))
-                    throw new ArgumentException("The reminder name is either null or whitespace.", "reminderName");
+                    throw new ArgumentException("The reminder name is either null or whitespace.", nameof(reminderName));
 
                 this.GrainId = grainId;
                 this.ReminderName = reminderName;

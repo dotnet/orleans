@@ -171,12 +171,12 @@ namespace Orleans.Providers.Streams.Generator
         {
             if (arg == null)
             {
-                throw new ArgumentNullException("arg");
+                throw new ArgumentNullException(nameof(arg));
             }
             generatorConfig = arg as IStreamGeneratorConfig;
             if (generatorConfig == null)
             {
-                throw new ArgumentOutOfRangeException("arg", "Arg must by of type IStreamGeneratorConfig");
+                throw new ArgumentOutOfRangeException(nameof(arg), "Arg must by of type IStreamGeneratorConfig");
             }
 
             // update generator on receivers
