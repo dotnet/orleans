@@ -45,8 +45,8 @@
     <PackageVersion Include="Microsoft.Extensions.Http" Version="7.0.0" />
     <PackageVersion Include="Microsoft.Extensions.Hosting.Abstractions" Version="7.0.0" />
     <PackageVersion Include="Microsoft.Extensions.Hosting" Version="7.0.0" />
-    <PackageVersion Include="Azure.Data.Tables" Version="12.6.1" />
-    <PackageVersion Include="Azure.Core" Version="1.25.0" />
+    <PackageVersion Include="Azure.Data.Tables" Version="12.8.0" />
+    <PackageVersion Include="Azure.Core" Version="1.33.0" />
     <PackageVersion Include="Azure.Messaging.EventHubs" Version="5.7.3" />
     <PackageVersion Include="Azure.Storage.Blobs" Version="12.14.0" />
     <PackageVersion Include="Azure.Storage.Queues" Version="12.12.0" />
@@ -83,7 +83,7 @@
     <PackageVersion Include="NSubstitute" Version="4.4.0" />
     <PackageVersion Include="NSubstitute.Analyzers.CSharp" Version="1.0.15" />
     <PackageVersion Include="CsCheck" Version="2.10.0" />
-    <PackageVersion Include="System.Data.SqlClient" Version="4.8.4" />
+    <PackageVersion Include="System.Data.SqlClient" Version="4.8.5" />
     <PackageVersion Include="Npgsql" Version="6.0.7" />
     <PackageVersion Include="MySql.Data" Version="8.0.31" />
     <PackageVersion Include="Microsoft.Extensions.Configuration.AzureKeyVault" Version="3.1.24" />
