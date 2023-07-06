@@ -62,7 +62,12 @@ namespace DefaultCluster.Tests.General
                 RequestContext.Set(IPlacementDirector.PlacementHintKey, targetHost);
                 await grain.Cast<IGrainManagementExtension>().MigrateOnIdle();
 
-                var newAddress = await grain.GetGrainAddress();
+                GrainAddress newAddress;
+                do
+                {
+                    newAddress = await grain.GetGrainAddress();
+                } while (newAddress.ActivationId == originalAddress.ActivationId);
+
                 var newHost = newAddress.SiloAddress;
                 Assert.Equal(targetHost, newHost);
 
@@ -91,7 +96,12 @@ namespace DefaultCluster.Tests.General
                 RequestContext.Set(IPlacementDirector.PlacementHintKey, targetHost);
                 await grain.Cast<IGrainManagementExtension>().MigrateOnIdle();
 
-                var newAddress = await grain.GetGrainAddress();
+                GrainAddress newAddress;
+                do
+                {
+                    newAddress = await grain.GetGrainAddress();
+                } while (newAddress.ActivationId == originalAddress.ActivationId);
+
                 var newHost = newAddress.SiloAddress;
                 Assert.Equal(targetHost, newHost);
 
@@ -121,7 +131,12 @@ namespace DefaultCluster.Tests.General
                 RequestContext.Set(IPlacementDirector.PlacementHintKey, targetHost);
                 await grain.Cast<IGrainManagementExtension>().MigrateOnIdle();
 
-                var newAddress = await grain.GetGrainAddress();
+                GrainAddress newAddress;
+                do
+                {
+                    newAddress = await grain.GetGrainAddress();
+                } while (newAddress.ActivationId == originalAddress.ActivationId);
+
                 var newHost = newAddress.SiloAddress;
                 Assert.Equal(targetHost, newHost);
 
