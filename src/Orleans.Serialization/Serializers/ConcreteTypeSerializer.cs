@@ -33,7 +33,7 @@ namespace Orleans.Serialization.Serializers
         /// <inheritdoc/>
         public void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, TField value) where TBufferWriter : IBufferWriter<byte>
         {
-            if (value is null || value.GetType() == typeof(TField))
+            if (value is null || value.GetType() as object == CodecFieldType as object)
             {
                 if (ReferenceCodec.TryWriteReferenceField(ref writer, fieldIdDelta, expectedType, value))
                 {

@@ -154,7 +154,7 @@ namespace Orleans.Serialization.Codecs
         public bool IsSupportedType(Type type) => type.IsArray && !type.IsSZArray;
 
         private void ThrowIndexOutOfRangeException(int[] lengths) => throw new IndexOutOfRangeException(
-            $"Encountered too many elements in array of type {typeof(T)} with declared lengths {string.Join(", ", lengths)}.");
+            $"Encountered too many elements in array of type {CodecElementType} with declared lengths {string.Join(", ", lengths)}.");
 
         private void ThrowLengthsFieldMissing() => throw new RequiredFieldMissingException("Serialized array is missing its lengths field.");
     }

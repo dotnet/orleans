@@ -1,5 +1,6 @@
 using Orleans.Serialization.Cloning;
 using Orleans.Serialization.Serializers;
+using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 
@@ -49,6 +50,7 @@ namespace Orleans.Serialization.Codecs
     [RegisterCopier]
     public sealed class ConcurrentQueueCopier<T> : IDeepCopier<ConcurrentQueue<T>>, IBaseCopier<ConcurrentQueue<T>>
     {
+        private readonly Type _fieldType = typeof(ConcurrentQueue<T>);
         private readonly IDeepCopier<T> _copier;
 
         /// <summary>
@@ -68,7 +70,7 @@ namespace Orleans.Serialization.Codecs
                 return result;
             }
 
-            if (input.GetType() != typeof(ConcurrentQueue<T>))
+            if (input.GetType() as object != _fieldType as object)
             {
                 return context.DeepCopy(input);
             }
