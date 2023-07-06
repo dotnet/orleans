@@ -27,8 +27,8 @@ namespace OrleansAWSUtils.Streams
 
         public static IQueueAdapterReceiver Create(Serializer<SQSBatchContainer> serializer, ILoggerFactory loggerFactory, QueueId queueId, string dataConnectionString, string serviceId)
         {
-            if (queueId.IsDefault) throw new ArgumentNullException("queueId");
-            if (string.IsNullOrEmpty(dataConnectionString)) throw new ArgumentNullException("dataConnectionString");
+            if (queueId.IsDefault) throw new ArgumentNullException(nameof(queueId));
+            if (string.IsNullOrEmpty(dataConnectionString)) throw new ArgumentNullException(nameof(dataConnectionString));
             if (string.IsNullOrEmpty(serviceId)) throw new ArgumentNullException(nameof(serviceId));
 
             var queue = new SQSStorage(loggerFactory, queueId.ToString(), dataConnectionString, serviceId);
@@ -37,8 +37,8 @@ namespace OrleansAWSUtils.Streams
 
         private SQSAdapterReceiver(Serializer<SQSBatchContainer> serializer, ILoggerFactory loggerFactory, QueueId queueId, SQSStorage queue)
         {
-            if (queueId.IsDefault) throw new ArgumentNullException("queueId");
-            if (queue == null) throw new ArgumentNullException("queue");
+            if (queueId.IsDefault) throw new ArgumentNullException(nameof(queueId));
+            if (queue == null) throw new ArgumentNullException(nameof(queue));
 
             Id = queueId;
             this.queue = queue;

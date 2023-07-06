@@ -44,8 +44,8 @@ namespace Orleans.Analyzers
 
             if (symbol.ContainingType.TypeKind != TypeKind.Interface) return;
 
-            // allow static interface methods to return any type (excluding abstract / virtual)
-            if (symbol.IsStatic && !symbol.IsAbstract && !symbol.IsVirtual)
+            // allow static interface methods to return any type
+            if (symbol.IsStatic)
                 return;
 
             var isIAddressableInterface = false;

@@ -50,7 +50,7 @@ namespace Orleans.Tests.SqlUtils
         {
             if(string.IsNullOrWhiteSpace(tableName))
             {
-                throw new ArgumentException("The name must be a legal SQL table name", "tableName");
+                throw new ArgumentException("The name must be a legal SQL table name", nameof(tableName));
             }
 
             if(parameters == null)

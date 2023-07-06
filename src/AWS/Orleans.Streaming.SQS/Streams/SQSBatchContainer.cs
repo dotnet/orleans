@@ -54,7 +54,7 @@ namespace OrleansAWSUtils.Streams
 
         private SQSBatchContainer(StreamId streamId, List<object> events, Dictionary<string, object> requestContext)
         {
-            if (events == null) throw new ArgumentNullException("events", "Message contains no events");
+            if (events == null) throw new ArgumentNullException(nameof(events), "Message contains no events");
 
             StreamId = streamId;
             this.events = events;

@@ -61,34 +61,33 @@ namespace Orleans.Serialization.UnitTests
             var writer = Writer.Create(new PooledBuffer(), null);
             writer.Write(randomData);
             writer.Commit();
-            var buffer = writer.Output;
 
-            var slice = buffer.Slice();
+            var slice = writer.Output.Slice();
             var sliceReader = Reader.Create(slice, null);
             var sliceArray = sliceReader.ReadBytes((uint)randomData.Length);
             Assert.Equal(randomData, sliceArray);
 
-            var slice3 = buffer.Slice(100, 1024);
+            var slice3 = writer.Output.Slice(100, 1024);
             var reader3 = Reader.Create(slice3, null);
             var result3 = reader3.ReadBytes((uint)slice3.Length);
             Assert.Equal(randomData.AsSpan(100, 1024).ToArray(), result3);
 
-            var slice2 = buffer.Slice(100);
+            var slice2 = writer.Output.Slice(100);
             var reader2 = Reader.Create(slice2, null);
             var result2 = reader2.ReadBytes((uint)slice2.Length);
             Assert.Equal(randomData.AsSpan(100).ToArray(), result2);
 
-            var slice4 = buffer.Slice(3000, 1500);
+            var slice4 = writer.Output.Slice(3000, 1500);
             var reader4 = Reader.Create(slice4, null);
             var result4 = reader4.ReadBytes((uint)slice4.Length);
             Assert.Equal(randomData.AsSpan(3000, 1500).ToArray(), result4);
 
-            var ros = buffer.AsReadOnlySequence();
+            var ros = writer.Output.AsReadOnlySequence();
             var rosReader = Reader.Create(ros, null);
             var rosArray = rosReader.ReadBytes((uint)randomData.Length);
             Assert.Equal(randomData, rosArray);
 
-            buffer.Dispose();
+            writer.Dispose();
         }
 
         /// <summary>

@@ -39,7 +39,7 @@ namespace UnitTests.Grains
             _logger.LogInformation("Producer.BecomeProducer");
             if (String.IsNullOrEmpty(providerToUse))
             {
-                throw new ArgumentNullException("providerToUse");
+                throw new ArgumentNullException(nameof(providerToUse));
             }
             IStreamProvider streamProvider = this.GetStreamProvider(providerToUse);
             IAsyncStream<int> stream = streamProvider.GetStream<int>(ConsumerEventCountingGrain.StreamNamespace, streamId);

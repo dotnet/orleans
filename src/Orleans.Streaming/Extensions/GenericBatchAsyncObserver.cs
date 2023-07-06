@@ -16,9 +16,9 @@ namespace Orleans.Streams
 
         public GenericAsyncBatchObserver(Func<IList<SequentialItem<T>>, Task> onNextAsync, Func<Exception, Task> onErrorAsync, Func<Task> onCompletedAsync)
         {
-            this.onNextAsync = onNextAsync ?? throw new ArgumentNullException("onNextAsync");
-            this.onErrorAsync = onErrorAsync ?? throw new ArgumentNullException("onErrorAsync");
-            this.onCompletedAsync = onCompletedAsync ?? throw new ArgumentNullException("onCompletedAsync");
+            this.onNextAsync = onNextAsync ?? throw new ArgumentNullException(nameof(onNextAsync));
+            this.onErrorAsync = onErrorAsync ?? throw new ArgumentNullException(nameof(onErrorAsync));
+            this.onCompletedAsync = onCompletedAsync ?? throw new ArgumentNullException(nameof(onCompletedAsync));
         }
 
         public Task OnNextAsync(IList<SequentialItem<T>> items)

@@ -49,7 +49,7 @@ namespace Tester.AzureUtils.Utilities
         public AsyncPipeline(int capacity)
         {
             if (capacity < 1)
-                throw new ArgumentOutOfRangeException("capacity", "The pipeline size must be larger than 0.");
+                throw new ArgumentOutOfRangeException(nameof(capacity), "The pipeline size must be larger than 0.");
             running = new HashSet<Task>();
             waiting = new LinkedList<Tuple<Task, TaskCompletionSource<bool>>>();
             this.capacity = capacity;
@@ -124,7 +124,7 @@ namespace Tester.AzureUtils.Utilities
         internal void Add(Task task, WhiteBox whiteBox)
         {
             if (null == task)
-                throw new ArgumentNullException("task");
+                throw new ArgumentNullException(nameof(task));
 
             // whitebox testing results-- we initialize pipeSz with an inconsistent copy of Count because it's better than nothing and will reflect that the pipeline size was in a valid state during some portion of this method, even if it isn't at a properly synchronized moment.
             int pipeSz = Count;
