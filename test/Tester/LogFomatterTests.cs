@@ -525,7 +525,7 @@ namespace Tester
 
         private class TestLoggerFactory : ILoggerFactory
         {
-            private readonly ConcurrentDictionary<string, Logger> loggers = new ConcurrentDictionary<string, Logger>();
+            private readonly ConcurrentDictionary<string, Logger> loggers = new();
 
             public void AddProvider(ILoggerProvider provider)
             {
@@ -548,7 +548,7 @@ namespace Tester
 
             private class Logger : ILogger
             {
-                private readonly List<string> entries = new List<string>();
+                private readonly List<string> entries = new();
 
                 public IDisposable BeginScope<TState>(TState state)
                 {

@@ -17,7 +17,7 @@ namespace Orleans.Runtime.GrainDirectory
         private readonly GrainDirectoryResolver grainDirectoryResolver;
         private readonly IGrainDirectoryCache cache;
 
-        private readonly CancellationTokenSource shutdownToken = new CancellationTokenSource();
+        private readonly CancellationTokenSource shutdownToken = new();
         private readonly IClusterMembershipService clusterMembershipService;
 
         private Task listenToClusterChangeTask;

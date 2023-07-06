@@ -42,7 +42,7 @@ namespace Orleans.Messaging
     // </summary>
     internal class ClientMessageCenter : IMessageCenter, IDisposable
     {
-        private readonly object grainBucketUpdateLock = new object();
+        private readonly object grainBucketUpdateLock = new();
 
         internal static readonly TimeSpan MINIMUM_INTERCONNECT_DELAY = TimeSpan.FromMilliseconds(100);   // wait one tenth of a second between connect attempts
         internal const int CONNECT_RETRY_COUNT = 2;                                                      // Retry twice before giving up on a gateway server

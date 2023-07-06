@@ -350,7 +350,7 @@ namespace NonSilo.Tests.Membership
 
         private static SiloAddress Silo(string value) => SiloAddress.FromParsableString(value);
 
-        private static MembershipEntry Entry(SiloAddress address, SiloStatus status) => new MembershipEntry { SiloAddress = address, Status = status, StartTime = DateTime.UtcNow, IAmAliveTime = DateTime.UtcNow };
+        private static MembershipEntry Entry(SiloAddress address, SiloStatus status) => new() { SiloAddress = address, Status = status, StartTime = DateTime.UtcNow, IAmAliveTime = DateTime.UtcNow };
 
         private static async Task Until(Func<bool> condition)
         {

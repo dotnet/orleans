@@ -24,7 +24,7 @@ namespace UnitTests.StorageTests
     [GenerateSerializer]
     public struct ErrorInjectionBehavior
     {
-        public static readonly ErrorInjectionBehavior None = new ErrorInjectionBehavior { ErrorInjectionPoint = ErrorInjectionPoint.None };
+        public static readonly ErrorInjectionBehavior None = new() { ErrorInjectionPoint = ErrorInjectionPoint.None };
 
         [Id(0)]
         public Type ExceptionType { get; set; }

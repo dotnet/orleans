@@ -12,7 +12,7 @@ namespace Orleans.Runtime
         /// </summary>
         private static readonly TimeSpan TimerDelaySlack = TimeSpan.FromSeconds(3);
 
-        private readonly CancellationTokenSource cancellation = new CancellationTokenSource();
+        private readonly CancellationTokenSource cancellation = new();
         private readonly TimeSpan period;
         private readonly string name;
         private readonly ILogger log;

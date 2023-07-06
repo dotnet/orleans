@@ -56,7 +56,7 @@ namespace Orleans.Serialization.WireProtocol
         /// </summary>
         /// <param name="tag">The tag.</param>
         /// <returns>The result of the conversion.</returns>
-        public static implicit operator Tag(byte tag) => new Tag(tag);
+        public static implicit operator Tag(byte tag) => new(tag);
 
         /// <summary>
         /// Performs an implicit conversion from <see cref="Tag"/> to <see cref="System.Byte"/>.

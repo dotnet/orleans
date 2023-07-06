@@ -6,7 +6,7 @@ namespace Orleans.Configuration
 {
     internal class ConnectionBuilderDelegates
     {
-        private readonly List<Action<IConnectionBuilder>> configurationDelegates = new List<Action<IConnectionBuilder>>();
+        private readonly List<Action<IConnectionBuilder>> configurationDelegates = new();
 
         public void Add(Action<IConnectionBuilder> configure)
             => this.configurationDelegates.Add(configure ?? throw new ArgumentNullException(nameof(configure)));

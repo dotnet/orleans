@@ -11,7 +11,7 @@ namespace Orleans.Runtime.Messaging
 {
     internal sealed class SiloConnectionListener : ConnectionListener, ILifecycleParticipant<ISiloLifecycle>, ILifecycleObserver
     {
-        internal static readonly object ServicesKey = new object();
+        internal static readonly object ServicesKey = new();
         private readonly ILocalSiloDetails localSiloDetails;
         private readonly SiloConnectionOptions siloConnectionOptions;
         private readonly MessageCenter messageCenter;

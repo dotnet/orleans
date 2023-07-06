@@ -43,13 +43,13 @@ namespace Orleans.Networking.Shared
         /// Thread-safe collection of blocks which are currently in the pool. A slab will pre-allocate all of the block tracking objects
         /// and add them to this collection. When memory is requested it is taken from here first, and when it is returned it is re-added.
         /// </summary>
-        private readonly ConcurrentQueue<MemoryPoolBlock> _blocks = new ConcurrentQueue<MemoryPoolBlock>();
+        private readonly ConcurrentQueue<MemoryPoolBlock> _blocks = new();
 
         /// <summary>
         /// Thread-safe collection of slabs which have been allocated by this pool. As long as a slab is in this collection and slab.IsActive,
         /// the blocks will be added to _blocks when returned.
         /// </summary>
-        private readonly ConcurrentStack<MemoryPoolSlab> _slabs = new ConcurrentStack<MemoryPoolSlab>();
+        private readonly ConcurrentStack<MemoryPoolSlab> _slabs = new();
 
         /// <summary>
         /// This is part of implementing the IDisposable pattern.
@@ -58,7 +58,7 @@ namespace Orleans.Networking.Shared
 
         private int _totalAllocatedBlocks;
 
-        private readonly object _disposeSync = new object();
+        private readonly object _disposeSync = new();
 
         /// <summary>
         /// This default value passed in to Rent to use the default value for the pool.

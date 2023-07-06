@@ -42,7 +42,7 @@ namespace Orleans.Transactions.DynamoDB
         private readonly bool createIfNotExists;
         private readonly bool updateIfExists;
         private readonly bool useProvisionedThroughput;
-        private readonly ReadOnlyCollection<TableStatus> updateTableValidTableStatuses = new ReadOnlyCollection<TableStatus>(new List<TableStatus>()
+        private readonly ReadOnlyCollection<TableStatus> updateTableValidTableStatuses = new(new List<TableStatus>()
             {
                 TableStatus.CREATING, TableStatus.UPDATING, TableStatus.ACTIVE
             });

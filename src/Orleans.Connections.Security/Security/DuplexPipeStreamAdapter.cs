@@ -12,7 +12,7 @@ namespace Orleans.Connections.Security
     internal class DuplexPipeStreamAdapter<TStream> : DuplexPipeStream, IDuplexPipe where TStream : Stream
     {
         private bool _disposed;
-        private readonly object _disposeLock = new object();
+        private readonly object _disposeLock = new();
 
         public DuplexPipeStreamAdapter(IDuplexPipe duplexPipe, Func<Stream, TStream> createStream) :
             this(duplexPipe, new StreamPipeReaderOptions(leaveOpen: true), new StreamPipeWriterOptions(leaveOpen: true), createStream)

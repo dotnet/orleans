@@ -13,7 +13,7 @@ namespace Orleans.Runtime
     internal class Watchdog
     {
         private static readonly TimeSpan PlatformWatchdogHeartbeatPeriod = TimeSpan.FromMilliseconds(1000);
-        private readonly CancellationTokenSource _cancellation = new CancellationTokenSource();
+        private readonly CancellationTokenSource _cancellation = new();
         private readonly TimeSpan _componentHealthCheckPeriod;
         private readonly List<IHealthCheckParticipant> _participants;
         private readonly ILogger _logger;

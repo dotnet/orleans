@@ -82,7 +82,7 @@ namespace Orleans.Runtime
         /// <param name="start">The start timestamp.</param>
         /// <param name="end">The end timestamp.</param>
         /// <returns>A new, stopped <see cref="ValueStopwatch"/> with the provided start and end timestamps.</returns>
-        public static ValueStopwatch FromTimestamp(long start, long end) => new ValueStopwatch(-(end - start));
+        public static ValueStopwatch FromTimestamp(long start, long end) => new(-(end - start));
 
         /// <summary>
         /// Gets the raw counter value for this instance.

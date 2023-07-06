@@ -5,7 +5,7 @@ namespace Orleans.Transactions
 {
     public class CausalClock
     {
-        private readonly object lockable = new object();
+        private readonly object lockable = new();
         private readonly IClock clock;
         private long previous;
 

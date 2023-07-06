@@ -23,7 +23,7 @@ namespace Orleans.GrainReferences
     /// </summary>
     public sealed class GrainReferenceActivator
     {
-        private readonly object _lockObj = new object();
+        private readonly object _lockObj = new();
         private readonly IServiceProvider _serviceProvider;
         private readonly IGrainReferenceActivatorProvider[] _providers;
         private Dictionary<(GrainType, GrainInterfaceType), IGrainReferenceActivator> _activators = new();

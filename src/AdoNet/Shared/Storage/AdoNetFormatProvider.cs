@@ -18,7 +18,7 @@ namespace Orleans.Tests.SqlUtils
     /// </summary>
     internal class AdoNetFormatProvider: IFormatProvider
     {
-        private readonly AdoNetFormatter formatter = new AdoNetFormatter();
+        private readonly AdoNetFormatter formatter = new();
 
         /// <summary>
         /// Returns an instance of the formatter

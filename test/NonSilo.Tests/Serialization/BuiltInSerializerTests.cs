@@ -418,7 +418,7 @@ namespace UnitTests.Serialization
 
         private class BanningTypeResolver : TypeResolver
         {
-            private readonly CachedTypeResolver _resolver = new CachedTypeResolver();
+            private readonly CachedTypeResolver _resolver = new();
             private readonly HashSet<Type> _blockedTypes;
 
             public BanningTypeResolver(params Type[] blockedTypes)

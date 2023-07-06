@@ -8,7 +8,7 @@ namespace Tester.ZooKeeperUtils
 {
     public static class ZookeeperTestUtils
     {
-        private static readonly Lazy<bool> EnsureZooKeeperLazy = new Lazy<bool>(() => EnsureZooKeeperAsync().Result);
+        private static readonly Lazy<bool> EnsureZooKeeperLazy = new(() => EnsureZooKeeperAsync().Result);
 
         public static void EnsureZooKeeper()
         {

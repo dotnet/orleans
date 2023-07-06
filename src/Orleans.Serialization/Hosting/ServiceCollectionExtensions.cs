@@ -107,7 +107,7 @@ namespace Orleans.Serialization
         {
             public ConfigurationContext(IServiceCollection services) => Builder = new SerializerBuilder(services);
 
-            public ServiceDescriptor CreateServiceDescriptor() => new ServiceDescriptor(typeof(ConfigurationContext), this);
+            public ServiceDescriptor CreateServiceDescriptor() => new(typeof(ConfigurationContext), this);
 
             public ISerializerBuilder Builder { get; }
         }

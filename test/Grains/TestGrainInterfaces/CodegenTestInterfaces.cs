@@ -318,7 +318,7 @@ namespace UnitTests.GrainInterfaces
     [Serializable]
     public class ClassWithNestedPrivateClassInListField
     {
-        private readonly List<NestedPrivateClass> coolBeans = new List<NestedPrivateClass>
+        private readonly List<NestedPrivateClass> coolBeans = new()
         {
             new NestedPrivateClass()
         };

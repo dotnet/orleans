@@ -270,7 +270,7 @@ namespace Orleans.EventSourcing.StateStorage
                 return base.Merge(earlierMessage, laterMessage); // keep only the version number
         }
 
-        private SortedList<long, UpdateNotificationMessage> notifications = new SortedList<long,UpdateNotificationMessage>();
+        private SortedList<long, UpdateNotificationMessage> notifications = new();
 
         /// <inheritdoc/>
         protected override void OnNotificationReceived(INotificationMessage payload)

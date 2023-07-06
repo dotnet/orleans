@@ -19,7 +19,7 @@ namespace Orleans.Runtime.MembershipService
     /// </summary>
     internal class ClusterHealthMonitor : IHealthCheckParticipant, ILifecycleParticipant<ISiloLifecycle>, ClusterHealthMonitor.ITestAccessor
     {
-        private readonly CancellationTokenSource shutdownCancellation = new CancellationTokenSource();
+        private readonly CancellationTokenSource shutdownCancellation = new();
         private readonly ILocalSiloDetails localSiloDetails;
         private readonly IServiceProvider serviceProvider;
         private readonly MembershipTableManager membershipService;

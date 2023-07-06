@@ -17,7 +17,7 @@ namespace ServiceBus.Tests.TestStreamProviders
 {
     public class EHStreamProviderWithCreatedCacheListAdapterFactory : EventDataGeneratorAdapterFactory
     {
-        private readonly ConcurrentBag<QueueCacheForTesting> createdCaches = new ConcurrentBag<QueueCacheForTesting>();
+        private readonly ConcurrentBag<QueueCacheForTesting> createdCaches = new();
         private readonly EventHubStreamCachePressureOptions cacheOptions;
         private readonly StreamStatisticOptions staticticOptions;
         private readonly EventHubOptions ehOptions;

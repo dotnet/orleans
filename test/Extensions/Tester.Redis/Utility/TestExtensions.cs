@@ -30,7 +30,7 @@ namespace Tester.Redis.Utility
 
     public static class SiloAddressUtils
     {
-        private static readonly IPEndPoint localEndpoint = new IPEndPoint(IPAddress.Loopback, 0);
+        private static readonly IPEndPoint localEndpoint = new(IPAddress.Loopback, 0);
 
         public static SiloAddress NewLocalSiloAddress(int gen)
         {

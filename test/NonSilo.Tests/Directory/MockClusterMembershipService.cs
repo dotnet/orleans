@@ -50,7 +50,7 @@ namespace UnitTests.Directory
             return new ClusterMembershipSnapshot(dictBuilder.ToImmutable(), new MembershipVersion(version));
         }
 
-        public ValueTask Refresh(MembershipVersion minimumVersion = default) => new ValueTask();
+        public ValueTask Refresh(MembershipVersion minimumVersion = default) => new();
 
         public Task<bool> TryKill(SiloAddress siloAddress) => throw new NotImplementedException();
     }

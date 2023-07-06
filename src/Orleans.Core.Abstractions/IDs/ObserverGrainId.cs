@@ -49,7 +49,7 @@ namespace Orleans.Runtime
         /// <returns>
         /// A new <see cref="ObserverGrainId"/> instance for the provided client id.
         /// </returns>
-        public static ObserverGrainId Create(ClientGrainId clientId, IdSpan scopedId) => new ObserverGrainId(ConstructGrainId(clientId, scopedId));
+        public static ObserverGrainId Create(ClientGrainId clientId, IdSpan scopedId) => new(ConstructGrainId(clientId, scopedId));
 
         /// <summary>
         /// Returns <see langword="true"/> if the provided instance represents an observer, <see langword="false"/> if otherwise.

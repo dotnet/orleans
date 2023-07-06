@@ -25,7 +25,7 @@ namespace Orleans.Analyzers
         public const string MessageFormat = $"Grain interfaces methods must return a compatible type, such as Task, Task<T>, ValueTask, ValueTask<T>, or void";
         public const string Category = "Usage";
 
-        private static readonly DiagnosticDescriptor Rule = new DiagnosticDescriptor(DiagnosticId, Title, MessageFormat, Category, DiagnosticSeverity.Error, isEnabledByDefault: true);
+        private static readonly DiagnosticDescriptor Rule = new(DiagnosticId, Title, MessageFormat, Category, DiagnosticSeverity.Error, isEnabledByDefault: true);
 
         public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics => ImmutableArray.Create(Rule);
 
@@ -44,8 +44,8 @@ namespace Orleans.Analyzers
 
             if (symbol.ContainingType.TypeKind != TypeKind.Interface) return;
 
-            // allow static interface methods to return any type
-            if (symbol.IsStatic)
+            // allow static interface methods to return any type (excluding abstract / virtual)
+            if (symbol.IsStatic && !symbol.IsAbstract && !symbol.IsVirtual)
                 return;
 
             var isIAddressableInterface = false;

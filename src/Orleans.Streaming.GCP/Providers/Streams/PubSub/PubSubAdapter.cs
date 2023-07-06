@@ -17,7 +17,7 @@ namespace Orleans.Providers.GCP.Streams.PubSub
         protected readonly string TopicId;
         protected readonly TimeSpan? Deadline;
         private readonly HashRingBasedStreamQueueMapper _streamQueueMapper;
-        protected readonly ConcurrentDictionary<QueueId, PubSubDataManager> Subscriptions = new ConcurrentDictionary<QueueId, PubSubDataManager>();
+        protected readonly ConcurrentDictionary<QueueId, PubSubDataManager> Subscriptions = new();
         protected readonly IPubSubDataAdapter _dataAdapter;
         private readonly ILogger _logger;
         private readonly ILoggerFactory loggerFactory;

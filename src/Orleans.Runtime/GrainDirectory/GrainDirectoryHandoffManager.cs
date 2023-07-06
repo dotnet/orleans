@@ -24,7 +24,7 @@ namespace Orleans.Runtime.GrainDirectory
         private readonly ILogger logger;
         private readonly Factory<GrainDirectoryPartition> createPartion;
         private readonly Queue<(string name, object state, Func<GrainDirectoryHandoffManager, object, Task> action)> pendingOperations = new();
-        private readonly AsyncLock executorLock = new AsyncLock();
+        private readonly AsyncLock executorLock = new();
 
         internal GrainDirectoryHandoffManager(
             LocalGrainDirectory localDirectory,

@@ -19,7 +19,7 @@ namespace UnitTests.General
         private readonly ITestOutputHelper output;
         private readonly Fixture fixture;
         private readonly IMessageSerializationGrain exceptionGrain;
-        private readonly MessageSerializationClientObject clientObject = new MessageSerializationClientObject();
+        private readonly MessageSerializationClientObject clientObject = new();
         private readonly IMessageSerializationClientObject clientObjectRef;
 
         public ExceptionPropagationTests(ITestOutputHelper output, Fixture fixture)

@@ -71,7 +71,7 @@ namespace Orleans.Providers.Streams.Common
         private readonly IStreamProviderRuntime runtime;
         private readonly DeepCopier deepCopier;
         private readonly IRuntimeClient runtimeClient;
-        private readonly ProviderStateManager stateManager = new ProviderStateManager();
+        private readonly ProviderStateManager stateManager = new();
         private IQueueAdapterFactory    adapterFactory;
         private IQueueAdapter           queueAdapter;
         private IPersistentStreamPullingManager pullingAgentManager;

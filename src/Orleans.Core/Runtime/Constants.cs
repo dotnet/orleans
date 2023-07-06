@@ -55,7 +55,7 @@ namespace Orleans.Runtime
 
         public static readonly TimeSpan DEFAULT_CLIENT_DROP_TIMEOUT = TimeSpan.FromMinutes(1);
 
-        private static readonly Dictionary<GrainType, string> singletonSystemTargetNames = new Dictionary<GrainType, string>
+        private static readonly Dictionary<GrainType, string> singletonSystemTargetNames = new()
         {
             {DirectoryServiceType, "DirectoryService"},
             {DirectoryCacheValidatorType, "DirectoryCacheValidator"},

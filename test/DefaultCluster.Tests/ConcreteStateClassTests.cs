@@ -11,7 +11,7 @@ namespace DefaultCluster.Tests.General
     /// </summary>
     public class StateClassTests : HostedTestClusterEnsureDefaultStarted
     {
-        private readonly Random rand = new Random();
+        private readonly Random rand = new();
 
         public StateClassTests(DefaultClusterFixture fixture) : base(fixture)
         {

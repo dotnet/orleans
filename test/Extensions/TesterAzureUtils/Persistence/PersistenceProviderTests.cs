@@ -30,7 +30,7 @@ namespace Tester.AzureUtils.Persistence
     public class PersistenceProviderTests_Local
     {
         private readonly IProviderRuntime providerRuntime;
-        private readonly Dictionary<string, string> providerCfgProps = new Dictionary<string, string>();
+        private readonly Dictionary<string, string> providerCfgProps = new();
         private readonly ITestOutputHelper output;
         private readonly TestEnvironmentFixture fixture;
 

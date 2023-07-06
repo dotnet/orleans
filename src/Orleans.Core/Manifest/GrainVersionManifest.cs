@@ -11,9 +11,9 @@ namespace Orleans.Runtime.Versions
     /// </summary>
     internal class GrainVersionManifest
     {
-        private readonly object _lockObj = new object();
-        private readonly ConcurrentDictionary<GrainInterfaceType, GrainInterfaceType> _genericInterfaceMapping = new ConcurrentDictionary<GrainInterfaceType, GrainInterfaceType>();
-        private readonly ConcurrentDictionary<GrainType, GrainType> _genericGrainTypeMapping = new ConcurrentDictionary<GrainType, GrainType>();
+        private readonly object _lockObj = new();
+        private readonly ConcurrentDictionary<GrainInterfaceType, GrainInterfaceType> _genericInterfaceMapping = new();
+        private readonly ConcurrentDictionary<GrainType, GrainType> _genericGrainTypeMapping = new();
         private readonly IClusterManifestProvider _clusterManifestProvider;
         private readonly Dictionary<GrainInterfaceType, ushort> _localVersions;
         private Cache _cache;

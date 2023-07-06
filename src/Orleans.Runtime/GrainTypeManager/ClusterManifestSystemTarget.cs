@@ -19,8 +19,8 @@ namespace Orleans.Runtime
             _clusterManifestProvider = clusterManifestProvider;
         }
 
-        public ValueTask<ClusterManifest> GetClusterManifest() => new ValueTask<ClusterManifest>(_clusterManifestProvider.Current);
+        public ValueTask<ClusterManifest> GetClusterManifest() => new(_clusterManifestProvider.Current);
 
-        public ValueTask<GrainManifest> GetSiloManifest() => new ValueTask<GrainManifest>(_siloManifest);
+        public ValueTask<GrainManifest> GetSiloManifest() => new(_siloManifest);
     }
 }

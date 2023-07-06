@@ -22,6 +22,6 @@ namespace Orleans.Runtime
     {
         public long Version => 0;
 
-        public List<GrainId> GetConnectedClientIds() => new List<GrainId>(0);
+        public List<GrainId> GetConnectedClientIds() => new(0);
     }
 }

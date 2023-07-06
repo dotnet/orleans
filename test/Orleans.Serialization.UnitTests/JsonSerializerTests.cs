@@ -28,7 +28,7 @@ namespace Orleans.Serialization.UnitTests
             builder.AddJsonSerializer(isSupported: type => type.GetCustomAttribute<MyJsonSerializableAttribute>(inherit: false) is not null);
         }
 
-        protected override MyJsonClass? CreateValue() => new MyJsonClass { IntProperty = 30, SubTypeProperty = "hello", Id = new(Guid.NewGuid()) };
+        protected override MyJsonClass? CreateValue() => new() { IntProperty = 30, SubTypeProperty = "hello", Id = new(Guid.NewGuid()) };
 
         protected override MyJsonClass?[] TestValues => new MyJsonClass?[]
         {
@@ -96,7 +96,7 @@ namespace Orleans.Serialization.UnitTests
         protected override IDeepCopier<MyJsonClass?> CreateCopier() => ServiceProvider.GetRequiredService<ICodecProvider>().GetDeepCopier<MyJsonClass?>();
 
 
-        protected override MyJsonClass? CreateValue() => new MyJsonClass { IntProperty = 30, SubTypeProperty = "hello", Id = new(Guid.NewGuid()) };
+        protected override MyJsonClass? CreateValue() => new() { IntProperty = 30, SubTypeProperty = "hello", Id = new(Guid.NewGuid()) };
 
         protected override MyJsonClass?[] TestValues => new MyJsonClass?[]
         {

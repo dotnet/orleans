@@ -78,7 +78,7 @@ namespace DefaultCluster.Tests.General
 
         private class SimpleGrainObserver : ISimpleGrainObserver
         {
-            private readonly TaskCompletionSource<int> completion = new TaskCompletionSource<int>();
+            private readonly TaskCompletionSource<int> completion = new();
             public Task ReceivedValue => this.completion.Task;
             public void StateChanged(int a, int b)
             {

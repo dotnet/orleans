@@ -12,7 +12,7 @@ namespace Orleans.Streams
     /// </summary>
     internal class StreamDirectory : IAsyncDisposable
     {
-        private readonly ConcurrentDictionary<QualifiedStreamId, object> allStreams = new ConcurrentDictionary<QualifiedStreamId, object>();
+        private readonly ConcurrentDictionary<QualifiedStreamId, object> allStreams = new();
 
         internal IAsyncStream<T> GetOrAddStream<T>(QualifiedStreamId streamId, Func<IAsyncStream<T>> streamCreator)
         {

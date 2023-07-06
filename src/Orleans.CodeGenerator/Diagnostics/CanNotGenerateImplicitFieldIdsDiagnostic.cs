@@ -10,7 +10,7 @@ public static class CanNotGenerateImplicitFieldIdsDiagnostic
     public const string MessageFormat = "Could not generate implicit field identifiers for the type {0}: {reason}";
     public const string Category = "Usage";
 
-    private static readonly DiagnosticDescriptor Rule = new DiagnosticDescriptor(DiagnosticId, Title, MessageFormat, Category, DiagnosticSeverity.Error, isEnabledByDefault: true);
+    private static readonly DiagnosticDescriptor Rule = new(DiagnosticId, Title, MessageFormat, Category, DiagnosticSeverity.Error, isEnabledByDefault: true);
 
     internal static Diagnostic CreateDiagnostic(ISymbol symbol, string reason) => Diagnostic.Create(Rule, symbol.Locations.First(), symbol.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat), reason);
 }

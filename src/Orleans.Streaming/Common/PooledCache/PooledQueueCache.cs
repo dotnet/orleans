@@ -34,7 +34,7 @@ namespace Orleans.Providers.Streams.Common
         private readonly PeriodicAction periodicMonitoring;
         private readonly PeriodicAction periodicMetadaPurging;
 
-        private readonly Dictionary<StreamId, (DateTime TimeStamp, StreamSequenceToken Token)> lastPurgedToken = new Dictionary<StreamId, (DateTime TimeStamp, StreamSequenceToken Token)>();
+        private readonly Dictionary<StreamId, (DateTime TimeStamp, StreamSequenceToken Token)> lastPurgedToken = new();
 
         /// <summary>
         /// Gets the cached message most recently added.
@@ -82,8 +82,8 @@ namespace Orleans.Providers.Streams.Common
             TimeSpan? cacheMonitorWriteInterval,
             TimeSpan? purgeMetadataInterval = null)
         {
-            this.cacheDataAdapter = cacheDataAdapter ?? throw new ArgumentNullException(nameof(cacheDataAdapter));
-            this.logger = logger ?? throw new ArgumentNullException(nameof(logger));
+            this.cacheDataAdapter = cacheDataAdapter ?? throw new ArgumentNullException("cacheDataAdapter");
+            this.logger = logger ?? throw new ArgumentNullException("logger");
             this.ItemCount = 0;
             pool = new CachedMessagePool(cacheDataAdapter);
             messageBlocks = new LinkedList<CachedMessageBlock>();
@@ -269,13 +269,13 @@ namespace Orleans.Providers.Streams.Common
 
             if (cursorObj == null)
             {
-                throw new ArgumentNullException(nameof(cursorObj));
+                throw new ArgumentNullException("cursorObj");
             }
 
             var cursor = cursorObj as Cursor;
             if (cursor == null)
             {
-                throw new ArgumentOutOfRangeException(nameof(cursorObj), "Cursor is bad");
+                throw new ArgumentOutOfRangeException("cursorObj", "Cursor is bad");
             }
 
             if (cursor.State != CursorStates.Set)

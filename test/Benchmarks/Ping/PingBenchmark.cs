@@ -12,7 +12,7 @@ namespace Benchmarks.Ping
     public class PingBenchmark : IDisposable
     {
         private readonly ConsoleCancelEventHandler _onCancelEvent;
-        private readonly List<IHost> hosts = new List<IHost>();
+        private readonly List<IHost> hosts = new();
         private readonly IPingGrain grain;
         private readonly IClusterClient client;
         private readonly IHost clientHost;

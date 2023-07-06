@@ -19,7 +19,7 @@ namespace UnitTests.MembershipTests
     {
         internal class Observer : ISimpleGrainObserver
         {
-            private readonly SemaphoreSlim semaphore = new SemaphoreSlim(0);
+            private readonly SemaphoreSlim semaphore = new(0);
             private int lastA;
             private int lastB;
 

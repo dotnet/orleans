@@ -12,7 +12,7 @@ namespace UnitTests.Grains.Batching
     [ImplicitStreamSubscription(StreamBatchingTestConst.NonBatchingNameSpace)]
     public class BatchingStreamBatchingTestConsumerGrain : Grain, IStreamBatchingTestConsumerGrain, IStreamSubscriptionObserver
     {
-        private readonly ConsumptionReport report = new ConsumptionReport();
+        private readonly ConsumptionReport report = new();
         
         public Task<ConsumptionReport> GetConsumptionReport() => Task.FromResult(this.report);
 

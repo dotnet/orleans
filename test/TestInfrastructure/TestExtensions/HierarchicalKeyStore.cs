@@ -17,7 +17,7 @@ namespace Orleans.Storage
         [NonSerialized]
         private readonly Dictionary<string, Dictionary<string, object>> dataTable = new();
         private readonly int numKeyLayers;
-        private readonly object lockable = new object();
+        private readonly object lockable = new();
 
         public HierarchicalKeyStore(int keyLayers)
         {
@@ -30,7 +30,7 @@ namespace Orleans.Storage
             {
                 var error = string.Format("Wrong number of keys supplied -- Expected count = {0} Received = {1}", numKeyLayers, keys.Count);
                 Trace.TraceError(error);
-                throw new ArgumentOutOfRangeException(nameof(keys), keys.Count, error);
+                throw new ArgumentOutOfRangeException("keys", keys.Count, error);
             }
 
             lock (lockable)
@@ -51,7 +51,7 @@ namespace Orleans.Storage
             {
                 var error = string.Format("Not enough keys supplied -- Expected count = {0} Received = {1}", numKeyLayers, keys.Count);
                 Trace.TraceError(error);
-                throw new ArgumentOutOfRangeException(nameof(keys), keys.Count, error);
+                throw new ArgumentOutOfRangeException("keys", keys.Count, error);
             }
 
             lock (lockable)
@@ -64,7 +64,7 @@ namespace Orleans.Storage
         {
             if (keys.Count > numKeyLayers)
             {
-                throw new ArgumentOutOfRangeException(nameof(keys), keys.Count,
+                throw new ArgumentOutOfRangeException("keys", keys.Count,
                     string.Format("Too many key supplied -- Expected count = {0} Received = {1}", numKeyLayers, keys.Count));
             }
 
@@ -78,7 +78,7 @@ namespace Orleans.Storage
         {
             if (keys.Count > numKeyLayers)
             {
-                throw new ArgumentOutOfRangeException(nameof(keys), keys.Count,
+                throw new ArgumentOutOfRangeException("keys", keys.Count,
                     string.Format("Not enough keys supplied -- Expected count = {0} Received = {1}", numKeyLayers, keys.Count));
             }
 

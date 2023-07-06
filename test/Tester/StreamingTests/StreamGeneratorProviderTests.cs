@@ -27,7 +27,7 @@ namespace UnitTests.StreamingTests
             public const string StreamProviderName = GeneratedStreamTestConstants.StreamProviderName;
             public const string StreamNamespace = GeneratedEventCollectorGrain.StreamNamespace;
 
-            public readonly static SimpleGeneratorOptions GeneratorConfig = new SimpleGeneratorOptions
+            public readonly static SimpleGeneratorOptions GeneratorConfig = new()
             {
                 StreamNamespace = StreamNamespace,
                 EventsInStream = 100

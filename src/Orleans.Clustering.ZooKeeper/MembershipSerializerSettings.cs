@@ -8,7 +8,7 @@ namespace Orleans.Runtime.Host
 {
     internal class MembershipSerializerSettings : JsonSerializerSettings
     {
-        public static readonly MembershipSerializerSettings Instance = new MembershipSerializerSettings();
+        public static readonly MembershipSerializerSettings Instance = new();
 
         private MembershipSerializerSettings()
         {

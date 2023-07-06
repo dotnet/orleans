@@ -27,7 +27,7 @@ namespace Orleans.Tests.SqlUtils
         /// <summary>
         /// Used to format .NET objects suitable to relational database format.
         /// </summary>
-        private static readonly AdoNetFormatProvider adoNetFormatProvider = new AdoNetFormatProvider();
+        private static readonly AdoNetFormatProvider adoNetFormatProvider = new();
 
         /// <summary>
         /// This is a template to produce query parameters that are indexed.

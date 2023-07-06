@@ -19,13 +19,13 @@ namespace Orleans.Runtime
     /// </summary>
     internal class ClientClusterManifestProvider : IClusterManifestProvider, IAsyncDisposable, IDisposable
     {
-        private readonly TaskCompletionSource<bool> _initialized = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        private readonly TaskCompletionSource<bool> _initialized = new(TaskCreationOptions.RunContinuationsAsynchronously);
         private readonly ILogger<ClientClusterManifestProvider> _logger;
         private readonly TypeManagementOptions _typeManagementOptions;
         private readonly IServiceProvider _services;
         private readonly GatewayManager _gatewayManager;
         private readonly AsyncEnumerable<ClusterManifest> _updates;
-        private readonly CancellationTokenSource _cancellation = new CancellationTokenSource();
+        private readonly CancellationTokenSource _cancellation = new();
         private ClusterManifest _current;
         private Task _runTask;
 

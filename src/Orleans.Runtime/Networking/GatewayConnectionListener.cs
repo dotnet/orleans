@@ -12,7 +12,7 @@ namespace Orleans.Runtime.Messaging
 {
     internal sealed class GatewayConnectionListener : ConnectionListener, ILifecycleParticipant<ISiloLifecycle>, ILifecycleObserver
     {
-        internal static readonly object ServicesKey = new object();
+        internal static readonly object ServicesKey = new();
         private readonly ILocalSiloDetails localSiloDetails;
         private readonly MessageCenter messageCenter;
         private readonly ConnectionCommon connectionShared;

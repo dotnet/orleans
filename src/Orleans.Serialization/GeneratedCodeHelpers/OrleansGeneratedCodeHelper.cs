@@ -19,7 +19,7 @@ namespace Orleans.Serialization.GeneratedCodeHelpers
     /// </summary>
     public static class OrleansGeneratedCodeHelper
     {
-        private static readonly ThreadLocal<RecursiveServiceResolutionState> ResolutionState = new ThreadLocal<RecursiveServiceResolutionState>(() => new RecursiveServiceResolutionState());
+        private static readonly ThreadLocal<RecursiveServiceResolutionState> ResolutionState = new(() => new RecursiveServiceResolutionState());
 
         private sealed class RecursiveServiceResolutionState
         {

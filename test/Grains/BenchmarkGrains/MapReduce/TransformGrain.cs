@@ -20,9 +20,9 @@ namespace BenchmarkGrains.MapReduce
         private ITargetGrain<TOutput> _target;
 
         // BlockingCollection has shown worse perf results for this workload types
-        private readonly ConcurrentQueue<TInput> _input = new ConcurrentQueue<TInput>();
+        private readonly ConcurrentQueue<TInput> _input = new();
 
-        private readonly ConcurrentQueue<TOutput> _output = new ConcurrentQueue<TOutput>();
+        private readonly ConcurrentQueue<TOutput> _output = new();
 
         public Task Initialize(ITransformProcessor<TInput, TOutput> processor)
         {

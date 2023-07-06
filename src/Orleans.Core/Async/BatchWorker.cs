@@ -16,7 +16,7 @@ namespace Orleans
     /// </summary>
     public abstract class BatchWorker
     {
-        private readonly object lockable = new object();
+        private readonly object lockable = new();
 
         private DateTime? scheduledNotify;
 

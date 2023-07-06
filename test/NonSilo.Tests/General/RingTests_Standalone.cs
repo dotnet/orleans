@@ -71,8 +71,8 @@ namespace UnitTests.General
 
         private void TestChurn(int[] indexesFails, int[] indexesJoins)
         {
-            Dictionary<SiloAddress, ConsistentRingProvider> rings, holder = new Dictionary<SiloAddress, ConsistentRingProvider>();
-            List<SiloAddress> sortedServers, fail = new List<SiloAddress>();
+            Dictionary<SiloAddress, ConsistentRingProvider> rings, holder = new();
+            List<SiloAddress> sortedServers, fail = new();
 
             rings = CreateServers(count);
 

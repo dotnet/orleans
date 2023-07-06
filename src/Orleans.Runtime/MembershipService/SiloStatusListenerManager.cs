@@ -13,8 +13,8 @@ namespace Orleans.Runtime.MembershipService
     /// </summary>
     internal class SiloStatusListenerManager : ILifecycleParticipant<ISiloLifecycle>
     {
-        private readonly object listenersLock = new object();
-        private readonly CancellationTokenSource cancellation = new CancellationTokenSource();
+        private readonly object listenersLock = new();
+        private readonly CancellationTokenSource cancellation = new();
         private readonly MembershipTableManager membershipTableManager;
         private readonly ILogger<SiloStatusListenerManager> log;
         private readonly IFatalErrorHandler fatalErrorHandler;

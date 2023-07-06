@@ -8,7 +8,7 @@ namespace Orleans.Configuration
     /// </summary>
     public class ClientConnectionOptions
     {
-        private readonly ConnectionBuilderDelegates delegates = new ConnectionBuilderDelegates();
+        private readonly ConnectionBuilderDelegates delegates = new();
 
         /// <summary>
         /// Adds a connection configuration delegate.

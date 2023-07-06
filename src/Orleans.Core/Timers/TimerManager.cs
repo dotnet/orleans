@@ -40,7 +40,7 @@ namespace Orleans.Timers.Internal
         private sealed class DelayTimer : ITimerCallback, ILinkedListElement<DelayTimer>
         {
             private readonly TaskCompletionSource<bool> completion =
-                new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+                new(TaskCreationOptions.RunContinuationsAsynchronously);
 
             public DelayTimer(DateTime dueTime, CancellationToken cancellationToken)
             {
@@ -82,7 +82,7 @@ namespace Orleans.Timers.Internal
         /// Lock protecting <see cref="allQueues"/>.
         /// </summary>
         // ReSharper disable once StaticMemberInGenericType
-        private static readonly object AllQueuesLock = new object();
+        private static readonly object AllQueuesLock = new();
 
 #pragma warning disable IDE0052 // Remove unread private members
         private static readonly Timer QueueChecker;
@@ -245,7 +245,7 @@ namespace Orleans.Timers.Internal
         /// </summary>
         private sealed class ThreadLocalQueue : ILinkedList<T>
         {
-            public readonly RecursiveInterlockedExchangeLock Lock = new RecursiveInterlockedExchangeLock();
+            public readonly RecursiveInterlockedExchangeLock Lock = new();
 
             /// <summary>
             /// The number of times that this queue has been starved since it was last serviced.

@@ -18,7 +18,7 @@ namespace UnitTests.General
     [TestCategory("Elasticity"), TestCategory("Placement")]
     public class ElasticPlacementTests : TestClusterPerTest
     {
-        private readonly List<IActivationCountBasedPlacementTestGrain> grains = new List<IActivationCountBasedPlacementTestGrain>();
+        private readonly List<IActivationCountBasedPlacementTestGrain> grains = new();
         private const int leavy = 300;
         private const int perSilo = 1000;
 

@@ -16,7 +16,7 @@ namespace Orleans.Analyzers
         public const string MessageFormat = Title;
         public const string Category = "Usage";
 
-        private static readonly DiagnosticDescriptor Rule = new DiagnosticDescriptor(DiagnosticId, Title, MessageFormat, Category, DiagnosticSeverity.Error, isEnabledByDefault: true);
+        private static readonly DiagnosticDescriptor Rule = new(DiagnosticId, Title, MessageFormat, Category, DiagnosticSeverity.Error, isEnabledByDefault: true);
 
         public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics => ImmutableArray.Create(Rule);
 
@@ -34,9 +34,6 @@ namespace Orleans.Analyzers
             var symbol = context.SemanticModel.GetDeclaredSymbol(syntax, context.CancellationToken);
 
             if (symbol.ContainingType.TypeKind != TypeKind.Interface) return;
-
-            // ignore static members
-            if (symbol.IsStatic) return;
 
             var implementedInterfaces = symbol.ContainingType
                                               .AllInterfaces

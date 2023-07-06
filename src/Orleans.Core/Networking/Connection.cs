@@ -20,7 +20,7 @@ namespace Orleans.Runtime.Messaging
     {
         private static readonly Func<ConnectionContext, Task> OnConnectedDelegate = context => OnConnectedAsync(context);
         private static readonly Action<object> OnConnectionClosedDelegate = state => ((Connection)state).OnTransportConnectionClosed();
-        private static readonly UnboundedChannelOptions OutgoingMessageChannelOptions = new UnboundedChannelOptions
+        private static readonly UnboundedChannelOptions OutgoingMessageChannelOptions = new()
         {
             SingleReader = true,
             SingleWriter = false,
@@ -32,7 +32,7 @@ namespace Orleans.Runtime.Messaging
         private readonly ConnectionDelegate middleware;
         private readonly Channel<Message> outgoingMessages;
         private readonly ChannelWriter<Message> outgoingMessageWriter;
-        private readonly List<Message> inflight = new List<Message>(4);
+        private readonly List<Message> inflight = new(4);
         private readonly TaskCompletionSource<int> _transportConnectionClosed = new(TaskCreationOptions.RunContinuationsAsynchronously);
         private readonly TaskCompletionSource<int> _initializationTcs = new(TaskCreationOptions.RunContinuationsAsynchronously);
         private IDuplexPipe _transport;
@@ -531,7 +531,7 @@ namespace Orleans.Runtime.Messaging
 
         private sealed class MessageHandlerPoolPolicy : PooledObjectPolicy<MessageHandler>
         {
-            public override MessageHandler Create() => new MessageHandler();
+            public override MessageHandler Create() => new();
 
             public override bool Return(MessageHandler obj)
             {

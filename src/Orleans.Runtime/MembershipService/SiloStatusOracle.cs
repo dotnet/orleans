@@ -10,10 +10,10 @@ namespace Orleans.Runtime.MembershipService
         private readonly MembershipTableManager membershipTableManager;
         private readonly SiloStatusListenerManager listenerManager;
         private readonly ILogger log;
-        private readonly object cacheUpdateLock = new object();
+        private readonly object cacheUpdateLock = new();
         private MembershipTableSnapshot cachedSnapshot;
-        private Dictionary<SiloAddress, SiloStatus> siloStatusCache = new Dictionary<SiloAddress, SiloStatus>();
-        private Dictionary<SiloAddress, SiloStatus> siloStatusCacheOnlyActive = new Dictionary<SiloAddress, SiloStatus>();
+        private Dictionary<SiloAddress, SiloStatus> siloStatusCache = new();
+        private Dictionary<SiloAddress, SiloStatus> siloStatusCacheOnlyActive = new();
 
         public SiloStatusOracle(
             ILocalSiloDetails localSiloDetails,

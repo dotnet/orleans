@@ -14,8 +14,8 @@ namespace Orleans
     /// </typeparam>
     public class AsyncSerialExecutor<TResult>
     {
-        private readonly ConcurrentQueue<Tuple<TaskCompletionSource<TResult>, Func<Task<TResult>>>> actions = new ConcurrentQueue<Tuple<TaskCompletionSource<TResult>, Func<Task<TResult>>>>();
-        private readonly InterlockedExchangeLock locker = new InterlockedExchangeLock();
+        private readonly ConcurrentQueue<Tuple<TaskCompletionSource<TResult>, Func<Task<TResult>>>> actions = new();
+        private readonly InterlockedExchangeLock locker = new();
 
         /// <summary>
         /// A lock which relies on <see cref="Interlocked.Exchange(ref long, long)"/>
@@ -110,7 +110,7 @@ namespace Orleans
     /// </summary>
     public class AsyncSerialExecutor
     {
-        private AsyncSerialExecutor<bool> executor = new AsyncSerialExecutor<bool>();
+        private AsyncSerialExecutor<bool> executor = new();
 
         /// <summary>
         /// Submits the next function for execution. It will execute after all previously submitted functions have finished, without interleaving their executions.

@@ -63,7 +63,7 @@ namespace UnitTests.Grains
             return Task.FromResult(1);
         }
 
-        private readonly List<int> m_list = new List<int>();
+        private readonly List<int> m_list = new();
 
         public Task<List<int>> ModifyReturnList_Test()
         {

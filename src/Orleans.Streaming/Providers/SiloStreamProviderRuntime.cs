@@ -20,7 +20,7 @@ namespace Orleans.Runtime.Providers
         private readonly ILocalSiloDetails siloDetails;
         private readonly IGrainContextAccessor grainContextAccessor;
         private readonly ILogger logger;
-        private readonly StreamDirectory hostedClientStreamDirectory = new StreamDirectory();
+        private readonly StreamDirectory hostedClientStreamDirectory = new();
 
         public IGrainFactory GrainFactory => this.runtimeClient.InternalGrainFactory;
         public IServiceProvider ServiceProvider => this.runtimeClient.ServiceProvider;

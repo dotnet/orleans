@@ -1448,7 +1448,7 @@ namespace Orleans.Serialization.UnitTests
         {
         }
 
-        protected override Int128 CreateValue() => new Int128(unchecked((ulong)Random.NextInt64()), unchecked((ulong)Random.NextInt64()));
+        protected override Int128 CreateValue() => new(unchecked((ulong)Random.NextInt64()), unchecked((ulong)Random.NextInt64()));
 
         protected override Int128[] TestValues => new Int128[]
         {
@@ -2600,7 +2600,7 @@ namespace Orleans.Serialization.UnitTests
         }
 
         protected override int[] MaxSegmentSizes => new[] { 128 };
-        protected override Uri CreateValue() => new Uri($"http://www.{Guid.NewGuid()}.com/");
+        protected override Uri CreateValue() => new($"http://www.{Guid.NewGuid()}.com/");
 
         protected override Uri[] TestValues => new[] { null, CreateValue(), CreateValue(), CreateValue(), CreateValue() };
 
@@ -2613,7 +2613,7 @@ namespace Orleans.Serialization.UnitTests
         {
         }
 
-        protected override Uri CreateValue() => new Uri($"http://www.{Guid.NewGuid()}.com/");
+        protected override Uri CreateValue() => new($"http://www.{Guid.NewGuid()}.com/");
 
         protected override Uri[] TestValues => new[] { null, CreateValue(), CreateValue(), CreateValue(), CreateValue() };
 

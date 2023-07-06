@@ -19,7 +19,7 @@ namespace UnitTests.SchedulerTests
 {
     public class OrleansTaskSchedulerAdvancedTests_Set2 : IDisposable
     {
-        private static readonly object Lockable = new object();
+        private static readonly object Lockable = new();
         private static readonly int WaitFactor = Debugger.IsAttached ? 100 : 1;
         private readonly ITestOutputHelper output;
         private readonly UnitTestSchedulingContext context;

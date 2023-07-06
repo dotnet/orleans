@@ -18,7 +18,7 @@ namespace Orleans.Runtime.Metadata
         private readonly IServiceProvider _services;
         private readonly IClusterMembershipService _clusterMembershipService;
         private readonly IFatalErrorHandler _fatalErrorHandler;
-        private readonly CancellationTokenSource _cancellation = new CancellationTokenSource();
+        private readonly CancellationTokenSource _cancellation = new();
         private readonly AsyncEnumerable<ClusterManifest> _updates;
         private ClusterManifest _current;
         private Task _runTask;

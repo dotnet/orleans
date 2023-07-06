@@ -10,7 +10,7 @@ namespace Orleans.SqlUtils.StorageProvider.GrainClasses
     [StorageProvider(ProviderName = "SqlStore")]
     public class CustomerGrain : Grain<CustomerState>, ICustomerGrain
     {
-        private readonly Random _random = new Random();
+        private readonly Random _random = new();
 
         public override async Task OnActivateAsync(CancellationToken cancellationToken)
         {
@@ -34,7 +34,7 @@ namespace Orleans.SqlUtils.StorageProvider.GrainClasses
         public async Task AddDevice(IDeviceGrain device)
         {
             if (device == null)
-                throw new ArgumentNullException(nameof(device));
+                throw new ArgumentNullException("device");
 
             if (null == State.Devices)
                 State.Devices = new List<IDeviceGrain>();

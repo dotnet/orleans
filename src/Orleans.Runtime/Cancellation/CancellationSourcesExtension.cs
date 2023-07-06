@@ -15,7 +15,7 @@ namespace Orleans.Runtime
     /// </summary>
     internal class CancellationSourcesExtension : ICancellationSourcesExtension, IDisposable
     {
-        private readonly ConcurrentDictionary<Guid, Entry> _cancellationTokens = new ConcurrentDictionary<Guid, Entry>();
+        private readonly ConcurrentDictionary<Guid, Entry> _cancellationTokens = new();
         private readonly ILogger _logger;
         private readonly IGrainCancellationTokenRuntime _cancellationTokenRuntime;
         private readonly Timer _cleanupTimer;

@@ -36,8 +36,8 @@ namespace Orleans.Runtime.GrainDirectory
         private readonly SiloAddress _localSilo;
         private readonly IClusterMembershipService _clusterMembershipService;
         private readonly SiloMessagingOptions _messagingOptions;
-        private readonly CancellationTokenSource _shutdownCancellation = new CancellationTokenSource();
-        private readonly object _lockObj = new object();
+        private readonly CancellationTokenSource _shutdownCancellation = new();
+        private readonly object _lockObj = new();
         private readonly GrainId _localHostedClientId;
         private readonly IConnectedClientCollection _connectedClients;
         private Action _schedulePublishUpdate;

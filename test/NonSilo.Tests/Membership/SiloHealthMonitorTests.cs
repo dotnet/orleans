@@ -280,13 +280,13 @@ namespace NonSilo.Tests.Membership
         }
 
         private static ClusterMembershipSnapshot Snapshot(long version, params ClusterMember[] members)
-            => new ClusterMembershipSnapshot(
+            => new(
                 ImmutableDictionary.CreateRange(
                     members.Select(m => new KeyValuePair<SiloAddress, ClusterMember>(m.SiloAddress, m))),
                 new MembershipVersion(version));
 
         private static SiloAddress Silo(string value) => SiloAddress.FromParsableString(value);
 
-        private static ClusterMember Member(SiloAddress address, SiloStatus status) => new ClusterMember(address, status, address.ToString());
+        private static ClusterMember Member(SiloAddress address, SiloStatus status) => new(address, status, address.ToString());
     }
 }

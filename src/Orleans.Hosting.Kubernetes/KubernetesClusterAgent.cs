@@ -54,7 +54,7 @@ namespace Orleans.Hosting.Kubernetes
         private readonly ILocalSiloDetails _localSiloDetails;
         private readonly ILogger<KubernetesClusterAgent> _logger;
         private readonly CancellationTokenSource _shutdownToken;
-        private readonly SemaphoreSlim _pauseMonitoringSemaphore = new SemaphoreSlim(0);
+        private readonly SemaphoreSlim _pauseMonitoringSemaphore = new(0);
         private volatile bool _enableMonitoring;
         private Task _runTask;
 

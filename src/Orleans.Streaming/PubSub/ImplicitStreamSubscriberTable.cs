@@ -12,7 +12,7 @@ namespace Orleans.Streams
 {
     internal class ImplicitStreamSubscriberTable
     {
-        private readonly object _lockObj = new object();
+        private readonly object _lockObj = new();
         private readonly GrainBindingsResolver _bindings;
         private readonly IStreamNamespacePredicateProvider[] _providers;
         private readonly IServiceProvider _serviceProvider;

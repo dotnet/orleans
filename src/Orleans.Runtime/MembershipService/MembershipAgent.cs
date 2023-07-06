@@ -16,7 +16,7 @@ namespace Orleans.Runtime.MembershipService
     /// </summary>
     internal class MembershipAgent : IHealthCheckParticipant, ILifecycleParticipant<ISiloLifecycle>, IDisposable, MembershipAgent.ITestAccessor
     {
-        private readonly CancellationTokenSource cancellation = new CancellationTokenSource();
+        private readonly CancellationTokenSource cancellation = new();
         private readonly MembershipTableManager tableManager;
         private readonly ILocalSiloDetails localSilo;
         private readonly IFatalErrorHandler fatalErrorHandler;

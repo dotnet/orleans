@@ -26,8 +26,8 @@ namespace Orleans.Transactions.TestKit.Consistency
         private bool tolerateUnknownExceptions;
         private readonly IGrainFactory grainFactory;
 
-        private readonly Dictionary<string, HashSet<string>> orderEdges = new Dictionary<string, HashSet<string>>();
-        private readonly Dictionary<string, bool> marks = new Dictionary<string, bool>();
+        private readonly Dictionary<string, HashSet<string>> orderEdges = new();
+        private readonly Dictionary<string, bool> marks = new();
 
 
         public ConsistencyTestHarness(

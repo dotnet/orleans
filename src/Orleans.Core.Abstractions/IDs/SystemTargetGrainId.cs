@@ -41,7 +41,7 @@ namespace Orleans.Runtime
         /// <returns>
         /// A <see cref="SystemTargetGrainId"/>.
         /// </returns>
-        public static SystemTargetGrainId Create(GrainType kind, SiloAddress address) => new SystemTargetGrainId(new GrainId(kind, new IdSpan(address.ToUtf8String())));
+        public static SystemTargetGrainId Create(GrainType kind, SiloAddress address) => new(new GrainId(kind, new IdSpan(address.ToUtf8String())));
 
         /// <summary>
         /// Creates a new <see cref="SystemTargetGrainId"/> instance.
@@ -201,7 +201,7 @@ namespace Orleans.Runtime
         /// </param>
         /// <returns>A grain id for a grain service instance.</returns>
         internal static GrainId CreateGrainServiceGrainId(GrainType grainType, SiloAddress address)
-            => new GrainId(grainType, new IdSpan(address.ToUtf8String()));
+            => new(grainType, new IdSpan(address.ToUtf8String()));
 
         /// <summary>
         /// Creates a system target <see cref="GrainType"/> with the provided name.

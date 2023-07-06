@@ -62,7 +62,7 @@ namespace UnitTests.SchedulerTests
     public class OrleansTaskSchedulerBasicTests : IDisposable
     {
         private readonly ITestOutputHelper output;
-        private static readonly object Lockable = new object();
+        private static readonly object Lockable = new();
         private readonly UnitTestSchedulingContext rootContext;
         private readonly ILoggerFactory loggerFactory;
         public OrleansTaskSchedulerBasicTests(ITestOutputHelper output)

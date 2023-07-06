@@ -30,7 +30,7 @@ namespace Orleans.Streams
         private volatile IInternalAsyncObservable<T>?            consumerInterface;
 
         [NonSerialized]
-        private readonly object initLock = new object();
+        private readonly object initLock = new();
 
         [NonSerialized]
         private IRuntimeClient?                                  runtimeClient;

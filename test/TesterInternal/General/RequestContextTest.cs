@@ -384,7 +384,7 @@ namespace UnitTests.General
     {
         private readonly ITestOutputHelper output;
 
-        private AsyncLocal<int> threadId = new AsyncLocal<int>();
+        private AsyncLocal<int> threadId = new();
 
         public Halo_CallContextTests(ITestOutputHelper output)
         {

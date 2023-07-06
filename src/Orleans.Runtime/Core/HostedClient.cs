@@ -18,7 +18,7 @@ namespace Orleans.Runtime
     /// </summary>
     internal sealed class HostedClient : IGrainContext, IGrainExtensionBinder, IDisposable, ILifecycleParticipant<ISiloLifecycle>
     {
-        private readonly object lockObj = new object();
+        private readonly object lockObj = new();
         private readonly Channel<Message> incomingMessages;
         private readonly IGrainReferenceRuntime grainReferenceRuntime;
         private readonly InvokableObjectManager invokableObjects;
@@ -27,7 +27,7 @@ namespace Orleans.Runtime
         private readonly IInternalGrainFactory grainFactory;
         private readonly MessageCenter siloMessageCenter;
         private readonly MessagingTrace messagingTrace;
-        private readonly ConcurrentDictionary<Type, (object Implementation, IAddressable Reference)> _extensions = new ConcurrentDictionary<Type, (object, IAddressable)>();
+        private readonly ConcurrentDictionary<Type, (object Implementation, IAddressable Reference)> _extensions = new();
         private readonly ConcurrentDictionary<Type, object> _components = new();
         private readonly IServiceScope _serviceProviderScope;
         private bool disposing;

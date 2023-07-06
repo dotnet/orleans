@@ -18,7 +18,7 @@ namespace Orleans.Runtime.GrainDirectory
         private readonly SiloAddress? seed;
         private readonly ISiloStatusOracle siloStatusOracle;
         private readonly IInternalGrainFactory grainFactory;
-        private readonly object writeLock = new object();
+        private readonly object writeLock = new();
         private Action<SiloAddress, SiloStatus>? catalogOnSiloRemoved;
         private DirectoryMembership directoryMembership = DirectoryMembership.Default;
 

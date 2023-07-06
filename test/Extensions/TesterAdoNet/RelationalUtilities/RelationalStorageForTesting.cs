@@ -13,7 +13,7 @@ namespace UnitTests.General
     public abstract class RelationalStorageForTesting
     {
         private static readonly Dictionary<string, Func<string, RelationalStorageForTesting>> instanceFactory =
-            new Dictionary<string, Func<string, RelationalStorageForTesting>>
+            new()
             {
                 {AdoNetInvariants.InvariantNameSqlServer, cs => new SqlServerStorageForTesting(cs)},
                 {AdoNetInvariants.InvariantNameMySql, cs => new MySqlStorageForTesting(cs)},
@@ -84,12 +84,12 @@ namespace UnitTests.General
         {
             if (string.IsNullOrWhiteSpace(invariantName))
             {
-                throw new ArgumentException("The name of invariant must contain characters", nameof(invariantName));
+                throw new ArgumentException("The name of invariant must contain characters", "invariantName");
             }
 
             if (string.IsNullOrWhiteSpace(testDatabaseName))
             {
-                throw new ArgumentException("database string must contain characters", nameof(testDatabaseName));
+                throw new ArgumentException("database string must contain characters", "testDatabaseName");
             }
 
             Console.WriteLine("Initializing relational databases...");

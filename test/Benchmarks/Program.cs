@@ -13,7 +13,7 @@ namespace Benchmarks
 {
     class Program
     {
-        private static readonly Dictionary<string, Action<string[]>> _benchmarks = new Dictionary<string, Action<string[]>>
+        private static readonly Dictionary<string, Action<string[]>> _benchmarks = new()
         {
             ["MapReduce"] = _ =>
             {
