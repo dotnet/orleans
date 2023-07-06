@@ -13,7 +13,7 @@ namespace Orleans.Serialization.Serializers
     /// <typeparam name="TValueSerializer">The value-type serializer implementation type.</typeparam>
     public sealed class ValueSerializer<TField, TValueSerializer> : IFieldCodec<TField> where TField : struct where TValueSerializer : IValueSerializer<TField>
     {
-        private static readonly Type CodecFieldType = typeof(TField);
+        private readonly Type CodecFieldType = typeof(TField);
         private readonly TValueSerializer _serializer;
 
         /// <summary>

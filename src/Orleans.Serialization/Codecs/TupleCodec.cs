@@ -128,8 +128,8 @@ namespace Orleans.Serialization.Codecs
     [RegisterSerializer]
     public sealed class TupleCodec<T1, T2> : IFieldCodec<Tuple<T1, T2>>
     {
-        private static readonly Type ElementType1 = typeof(T1);
-        private static readonly Type ElementType2 = typeof(T2);
+        private readonly Type ElementType1 = typeof(T1);
+        private readonly Type ElementType2 = typeof(T2);
 
         private readonly IFieldCodec<T1> _item1Codec;
         private readonly IFieldCodec<T2> _item2Codec;
@@ -260,9 +260,9 @@ namespace Orleans.Serialization.Codecs
     [RegisterSerializer]
     public sealed class TupleCodec<T1, T2, T3> : IFieldCodec<Tuple<T1, T2, T3>>
     {
-        private static readonly Type ElementType1 = typeof(T1);
-        private static readonly Type ElementType2 = typeof(T2);
-        private static readonly Type ElementType3 = typeof(T3);
+        private readonly Type ElementType1 = typeof(T1);
+        private readonly Type ElementType2 = typeof(T2);
+        private readonly Type ElementType3 = typeof(T3);
 
         private readonly IFieldCodec<T1> _item1Codec;
         private readonly IFieldCodec<T2> _item2Codec;
@@ -414,10 +414,10 @@ namespace Orleans.Serialization.Codecs
     [RegisterSerializer]
     public sealed class TupleCodec<T1, T2, T3, T4> : IFieldCodec<Tuple<T1, T2, T3, T4>>
     {
-        private static readonly Type ElementType1 = typeof(T1);
-        private static readonly Type ElementType2 = typeof(T2);
-        private static readonly Type ElementType3 = typeof(T3);
-        private static readonly Type ElementType4 = typeof(T4);
+        private readonly Type ElementType1 = typeof(T1);
+        private readonly Type ElementType2 = typeof(T2);
+        private readonly Type ElementType3 = typeof(T3);
+        private readonly Type ElementType4 = typeof(T4);
 
         private readonly IFieldCodec<T1> _item1Codec;
         private readonly IFieldCodec<T2> _item2Codec;
@@ -585,11 +585,11 @@ namespace Orleans.Serialization.Codecs
     [RegisterSerializer]
     public sealed class TupleCodec<T1, T2, T3, T4, T5> : IFieldCodec<Tuple<T1, T2, T3, T4, T5>>
     {
-        private static readonly Type ElementType1 = typeof(T1);
-        private static readonly Type ElementType2 = typeof(T2);
-        private static readonly Type ElementType3 = typeof(T3);
-        private static readonly Type ElementType4 = typeof(T4);
-        private static readonly Type ElementType5 = typeof(T5);
+        private readonly Type ElementType1 = typeof(T1);
+        private readonly Type ElementType2 = typeof(T2);
+        private readonly Type ElementType3 = typeof(T3);
+        private readonly Type ElementType4 = typeof(T4);
+        private readonly Type ElementType5 = typeof(T5);
 
         private readonly IFieldCodec<T1> _item1Codec;
         private readonly IFieldCodec<T2> _item2Codec;
@@ -776,12 +776,12 @@ namespace Orleans.Serialization.Codecs
     [RegisterSerializer]
     public sealed class TupleCodec<T1, T2, T3, T4, T5, T6> : IFieldCodec<Tuple<T1, T2, T3, T4, T5, T6>>
     {
-        private static readonly Type ElementType1 = typeof(T1);
-        private static readonly Type ElementType2 = typeof(T2);
-        private static readonly Type ElementType3 = typeof(T3);
-        private static readonly Type ElementType4 = typeof(T4);
-        private static readonly Type ElementType5 = typeof(T5);
-        private static readonly Type ElementType6 = typeof(T6);
+        private readonly Type ElementType1 = typeof(T1);
+        private readonly Type ElementType2 = typeof(T2);
+        private readonly Type ElementType3 = typeof(T3);
+        private readonly Type ElementType4 = typeof(T4);
+        private readonly Type ElementType5 = typeof(T5);
+        private readonly Type ElementType6 = typeof(T6);
 
         private readonly IFieldCodec<T1> _item1Codec;
         private readonly IFieldCodec<T2> _item2Codec;
@@ -984,13 +984,13 @@ namespace Orleans.Serialization.Codecs
     [RegisterSerializer]
     public sealed class TupleCodec<T1, T2, T3, T4, T5, T6, T7> : IFieldCodec<Tuple<T1, T2, T3, T4, T5, T6, T7>>
     {
-        private static readonly Type ElementType1 = typeof(T1);
-        private static readonly Type ElementType2 = typeof(T2);
-        private static readonly Type ElementType3 = typeof(T3);
-        private static readonly Type ElementType4 = typeof(T4);
-        private static readonly Type ElementType5 = typeof(T5);
-        private static readonly Type ElementType6 = typeof(T6);
-        private static readonly Type ElementType7 = typeof(T7);
+        private readonly Type ElementType1 = typeof(T1);
+        private readonly Type ElementType2 = typeof(T2);
+        private readonly Type ElementType3 = typeof(T3);
+        private readonly Type ElementType4 = typeof(T4);
+        private readonly Type ElementType5 = typeof(T5);
+        private readonly Type ElementType6 = typeof(T6);
+        private readonly Type ElementType7 = typeof(T7);
 
         private readonly IFieldCodec<T1> _item1Codec;
         private readonly IFieldCodec<T2> _item2Codec;
@@ -1210,14 +1210,14 @@ namespace Orleans.Serialization.Codecs
     [RegisterSerializer]
     public sealed class TupleCodec<T1, T2, T3, T4, T5, T6, T7, T8> : IFieldCodec<Tuple<T1, T2, T3, T4, T5, T6, T7, T8>>
     {
-        private static readonly Type ElementType1 = typeof(T1);
-        private static readonly Type ElementType2 = typeof(T2);
-        private static readonly Type ElementType3 = typeof(T3);
-        private static readonly Type ElementType4 = typeof(T4);
-        private static readonly Type ElementType5 = typeof(T5);
-        private static readonly Type ElementType6 = typeof(T6);
-        private static readonly Type ElementType7 = typeof(T7);
-        private static readonly Type ElementType8 = typeof(T8);
+        private readonly Type ElementType1 = typeof(T1);
+        private readonly Type ElementType2 = typeof(T2);
+        private readonly Type ElementType3 = typeof(T3);
+        private readonly Type ElementType4 = typeof(T4);
+        private readonly Type ElementType5 = typeof(T5);
+        private readonly Type ElementType6 = typeof(T6);
+        private readonly Type ElementType7 = typeof(T7);
+        private readonly Type ElementType8 = typeof(T8);
 
         private readonly IFieldCodec<T1> _item1Codec;
         private readonly IFieldCodec<T2> _item2Codec;

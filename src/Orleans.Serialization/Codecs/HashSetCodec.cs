@@ -121,10 +121,10 @@ namespace Orleans.Serialization.Codecs
             return result;
         }
 
-        private static void ThrowInvalidSizeException(int length) => throw new IndexOutOfRangeException(
+        private void ThrowInvalidSizeException(int length) => throw new IndexOutOfRangeException(
             $"Declared length of {typeof(HashSet<T>)}, {length}, is greater than total length of input.");
 
-        private static void ThrowLengthFieldMissing() => throw new RequiredFieldMissingException("Serialized set is missing its length field.");
+        private void ThrowLengthFieldMissing() => throw new RequiredFieldMissingException("Serialized set is missing its length field.");
     }
 
     /// <summary>
