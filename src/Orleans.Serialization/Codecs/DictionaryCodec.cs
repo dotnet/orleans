@@ -143,10 +143,10 @@ namespace Orleans.Serialization.Codecs
             return result;
         }
 
-        private static void ThrowInvalidSizeException(int length) => throw new IndexOutOfRangeException(
+        private void ThrowInvalidSizeException(int length) => throw new IndexOutOfRangeException(
             $"Declared length of {typeof(Dictionary<TKey, TValue>)}, {length}, is greater than total length of input.");
 
-        private static void ThrowLengthFieldMissing() => throw new RequiredFieldMissingException("Serialized dictionary is missing its length field.");
+        private void ThrowLengthFieldMissing() => throw new RequiredFieldMissingException("Serialized dictionary is missing its length field.");
     }
 
     /// <summary>
@@ -312,10 +312,10 @@ namespace Orleans.Serialization.Codecs
             }
         }
 
-        private static void ThrowInvalidSizeException(int length) => throw new IndexOutOfRangeException(
+        private void ThrowInvalidSizeException(int length) => throw new IndexOutOfRangeException(
             $"Declared length of {typeof(Dictionary<TKey, TValue>)}, {length}, is greater than total length of input.");
 
-        private static void ThrowLengthFieldMissing() => throw new RequiredFieldMissingException("Serialized dictionary is missing its length field.");
+        private void ThrowLengthFieldMissing() => throw new RequiredFieldMissingException("Serialized dictionary is missing its length field.");
 
     }
 }

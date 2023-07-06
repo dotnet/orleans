@@ -84,9 +84,9 @@ namespace Orleans.Runtime.Utilities
             }
         }
 
-        private static void ThrowInvalidUpdate() => throw new ArgumentException("The value was not valid");
+        private void ThrowInvalidUpdate() => throw new ArgumentException("The value was not valid");
 
-        private static void ThrowDisposed() => throw new ObjectDisposedException("This instance has been disposed");
+        private void ThrowDisposed() => throw new ObjectDisposedException("This instance has been disposed");
 
         public IAsyncEnumerator<T> GetAsyncEnumerator(CancellationToken cancellationToken = default)
         {
@@ -172,7 +172,7 @@ namespace Orleans.Runtime.Utilities
                 get
                 {
                     if (this.IsInitial) ThrowInvalidInstance();
-                    if (this.IsDisposed) ThrowDisposed();
+                    ObjectDisposedException.ThrowIf(IsDisposed, this);
                     if (this.value is T typedValue) return typedValue;
                     return default;
                 }
@@ -185,7 +185,7 @@ namespace Orleans.Runtime.Utilities
 
             public void SetNext(Element next) => this.next.SetResult(next);
 
-            private static T ThrowInvalidInstance() => throw new InvalidOperationException("This instance does not have a value set.");
+            private void ThrowInvalidInstance() => throw new InvalidOperationException("This instance does not have a value set.");
         }
     }
 }
