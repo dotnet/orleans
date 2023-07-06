@@ -87,12 +87,12 @@ namespace Orleans.Tests.SqlUtils
         {
             if(string.IsNullOrWhiteSpace(invariantName))
             {
-                throw new ArgumentException("The name of invariant must contain characters", "invariantName");
+                throw new ArgumentException("The name of invariant must contain characters", nameof(invariantName));
             }
 
             if(string.IsNullOrWhiteSpace(connectionString))
             {
-                throw new ArgumentException("Connection string must contain characters", "connectionString");
+                throw new ArgumentException("Connection string must contain characters", nameof(connectionString));
             }
 
             return new RelationalStorage(invariantName, connectionString);
@@ -153,15 +153,15 @@ namespace Orleans.Tests.SqlUtils
             //If the query is something else that is not acceptable (e.g. an empty string), there will an appropriate database exception.
             if(query == null)
             {
-                throw new ArgumentNullException("query");
+                throw new ArgumentNullException(nameof(query));
             }
 
             if(selector == null)
             {
-                throw new ArgumentNullException("selector");
+                throw new ArgumentNullException(nameof(selector));
             }
 
-            return (await ExecuteAsync(query, parameterProvider, selector, ExecuteReaderAsync, commandBehavior, cancellationToken).ConfigureAwait(false)).Item1;
+            return (await ExecuteAsync(query, parameterProvider, ExecuteReaderAsync, selector, commandBehavior, cancellationToken).ConfigureAwait(false)).Item1;
         }
 
 
@@ -191,10 +191,10 @@ namespace Orleans.Tests.SqlUtils
             //If the query is something else that is not acceptable (e.g. an empty string), there will an appropriate database exception.
             if(query == null)
             {
-                throw new ArgumentNullException("query");
+                throw new ArgumentNullException(nameof(query));
             }
 
-            return (await ExecuteAsync(query, parameterProvider, (unit, id, c) => Task.FromResult(unit), ExecuteReaderAsync, commandBehavior, cancellationToken).ConfigureAwait(false)).Item2;
+            return (await ExecuteAsync(query, parameterProvider, ExecuteReaderAsync, (unit, id, c) => Task.FromResult(unit), commandBehavior, cancellationToken).ConfigureAwait(false)).Item2;
         }
 
         /// <summary>
@@ -255,7 +255,7 @@ namespace Orleans.Tests.SqlUtils
         private async Task<Tuple<IEnumerable<TResult>, int>> ExecuteAsync<TResult>(
             string query,
             Action<DbCommand> parameterProvider,
-            Func<DbCommand, Func<IDataRecord, int, CancellationToken, Task<TResult>>, CancellationToken, CommandBehavior, Task<Tuple<IEnumerable<TResult>, int>>> executor,
+            Func<DbCommand, Func<IDataRecord, int, CancellationToken, Task<TResult>>, CommandBehavior, CancellationToken, Task<Tuple<IEnumerable<TResult>, int>>> executor,
             Func<IDataRecord, int, CancellationToken, Task<TResult>> selector,
             CommandBehavior commandBehavior,
             CancellationToken cancellationToken)
@@ -273,11 +273,11 @@ namespace Orleans.Tests.SqlUtils
                     Task<Tuple<IEnumerable<TResult>, int>> ret;
                     if(isSynchronousAdoNetImplementation)
                     {
-                        ret = Task.Run(() => executor(command, selector, cancellationToken, commandBehavior), cancellationToken);
+                        ret = Task.Run(() => executor(command, selector, commandBehavior, cancellationToken), cancellationToken);
                     }
                     else
                     {
-                        ret = executor(command, selector, cancellationToken, commandBehavior);
+                        ret = executor(command, selector, commandBehavior, cancellationToken);
                     }
 
                     return await ret.ConfigureAwait(continueOnCapturedContext: false);
