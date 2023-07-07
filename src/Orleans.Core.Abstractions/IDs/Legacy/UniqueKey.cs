@@ -137,7 +137,7 @@ namespace Orleans.Runtime
             if (IsKeyExt(GetCategory(typeCodeData)))
             {
                 if (string.IsNullOrWhiteSpace(keyExt))
-                    throw keyExt is null ? new ArgumentNullException("keyExt") : throw new ArgumentException("Extended key is empty or white space.", "keyExt");
+                    throw keyExt is null ? new ArgumentNullException(nameof(keyExt)) : throw new ArgumentException("Extended key is empty or white space.", nameof(keyExt));
             }
             else if (keyExt != null) throw new ArgumentException("Only key extended grains can specify a non-null key extension.");
             return new UniqueKey { TypeCodeData = typeCodeData, KeyExt = keyExt };
