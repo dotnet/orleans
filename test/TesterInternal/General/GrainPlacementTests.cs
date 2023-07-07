@@ -132,13 +132,13 @@ namespace UnitTests.General
                 yield return grain.GetEndpoint().Result;
         }
 
-        private IEnumerable<string> CollectActivationIds(IPlacementTestGrain grain, int sampleSize)
+        private static IEnumerable<string> CollectActivationIds(IPlacementTestGrain grain, int sampleSize)
         {
             for (var i = 0; i < sampleSize; ++i)
                 yield return grain.GetActivationId().Result;
         }
 
-        private int ActivationCount(IEnumerable<string> ids)
+        private static int ActivationCount(IEnumerable<string> ids)
         {
             return ids.GroupBy(id => id).Count();
         }

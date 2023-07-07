@@ -184,7 +184,7 @@ namespace AWSUtils.Tests.Streaming
             }
         }
 
-        private List<object> CreateEvents(int count)
+        private static List<object> CreateEvents(int count)
         {
             return Enumerable.Range(0, count).Select(i =>
             {

@@ -147,7 +147,7 @@ namespace Orleans.Configuration
             CreateConnection = createConnection ?? throw new ArgumentNullException(nameof(createConnection));
         }
 
-        private void ValidateValues(string eventHubName, string consumerGroup)
+        private static void ValidateValues(string eventHubName, string consumerGroup)
         {
             if (string.IsNullOrWhiteSpace(eventHubName))
             {

@@ -44,7 +44,7 @@ namespace BenchmarkGrains.Ping
             return report;
         }
 
-        private async Task ResolvePending(List<Pending> pendingWork, Report report, bool all = false)
+        private static async Task ResolvePending(List<Pending> pendingWork, Report report, bool all = false)
         {
             try
             {
@@ -71,7 +71,7 @@ namespace BenchmarkGrains.Ping
                 }
             }
         }
-        
+
         private class Pending
         {
             public IPingGrain Grain { get; set; }

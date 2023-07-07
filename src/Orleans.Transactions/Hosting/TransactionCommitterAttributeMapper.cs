@@ -1,4 +1,4 @@
-﻿using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection;
 using Orleans.Runtime;
 using Orleans.Transactions.Abstractions;
 using System.Reflection;
@@ -18,7 +18,7 @@ namespace Orleans.Transactions
             return context => Create(context, genericCreate, args);
         }
 
-        private object Create(IGrainContext context, MethodInfo genericCreate, object[] args)
+        private static object Create(IGrainContext context, MethodInfo genericCreate, object[] args)
         {
             ITransactionCommitterFactory factory = context.ActivationServices.GetRequiredService<ITransactionCommitterFactory>();
             return genericCreate.Invoke(factory, args);

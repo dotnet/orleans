@@ -146,7 +146,7 @@ namespace Orleans.Transactions.AzureStorage
             return result;
         }
 
-        private void CheckMaxDataSize(int dataSize, int maxDataSize)
+        private static void CheckMaxDataSize(int dataSize, int maxDataSize)
         {
             if (dataSize > maxDataSize)
             {
