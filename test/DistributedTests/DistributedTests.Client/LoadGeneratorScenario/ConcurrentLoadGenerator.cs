@@ -119,14 +119,14 @@ namespace DistributedTests.Client
             }
 
             var completion = Task.WhenAll(this.tasks);
-            _ = Task.Run(async () => { try { await completion; } catch { } finally { this.completedBlocks.Writer.Complete(); } });
+            _ = Task.Run(async () => { try { await completion; } catch { } finally { this.completedBlocks.Writer.Complete(); } }, ct);
             // Do not allocated a list with a too high capacity
             var blocks = new List<WorkBlock>(this.numWorkers * Math.Min(100, this.blocksPerWorker));
             var blocksPerReport = this.numWorkers * Math.Min(100, this.blocksPerWorker) / 5;
             var nextReportBlockCount = blocksPerReport;
             while (!completion.IsCompleted)
             {
-                var more = await completedBlockReader.WaitToReadAsync();
+                var more = await completedBlockReader.WaitToReadAsync(ct);
                 if (!more) break;
                 while (completedBlockReader.TryRead(out var block))
                 {
@@ -201,7 +201,7 @@ namespace DistributedTests.Client
                 }
 
                 workBlock.EndTimestamp = Stopwatch.GetTimestamp();
-                await completedBlockWriter.WriteAsync(workBlock);
+                await completedBlockWriter.WriteAsync(workBlock, ct);
                 --numBlocks;
             }
         }

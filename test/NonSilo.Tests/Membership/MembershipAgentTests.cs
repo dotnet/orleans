@@ -366,7 +366,7 @@ namespace NonSilo.Tests.Membership
             while (!stopped.IsCompleted)
             {
                 foreach (var pair in this.timerCalls) while (pair.Value.TryDequeue(out var call)) call.Completion.TrySetResult(false);
-                await Task.Delay(15);
+                await Task.Delay(15, cancellation);
             }
 
             await stopped;

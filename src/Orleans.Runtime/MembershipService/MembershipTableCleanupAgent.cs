@@ -97,7 +97,7 @@ namespace Orleans.Runtime.MembershipService
 
             Task OnStart(CancellationToken ct)
             {
-                tasks.Add(Task.Run(() => this.CleanupDefunctSilos()));
+                tasks.Add(Task.Run(CleanupDefunctSilos, ct));
                 return Task.CompletedTask;
             }
 

@@ -357,8 +357,8 @@ namespace Orleans.Runtime.MembershipService
                     this.iAmAliveTimer.Dispose();
                     this.cancellation.Cancel();
                     await Task.WhenAny(
-                        Task.Run(() => this.BecomeDead()),
-                        Task.Delay(TimeSpan.FromMinutes(1)));
+                        Task.Run(BecomeDead, ct),
+                        Task.Delay(TimeSpan.FromMinutes(1), ct));
                 }
 
                 lifecycle.Subscribe(
@@ -371,7 +371,7 @@ namespace Orleans.Runtime.MembershipService
             {
                 async Task AfterRuntimeGrainServicesStart(CancellationToken ct)
                 {
-                    await Task.Run(() => this.BecomeJoining());
+                    await Task.Run(BecomeJoining, ct);
                 }
 
                 Task AfterRuntimeGrainServicesStop(CancellationToken ct) => Task.CompletedTask;
@@ -388,8 +388,8 @@ namespace Orleans.Runtime.MembershipService
 
                 async Task OnBecomeActiveStart(CancellationToken ct)
                 {
-                    await Task.Run(() => this.BecomeActive());
-                    tasks.Add(Task.Run(() => this.UpdateIAmAlive()));
+                    await Task.Run(BecomeActive, ct);
+                    tasks.Add(Task.Run(UpdateIAmAlive, ct));
                 }
 
                 async Task OnBecomeActiveStop(CancellationToken ct)
@@ -400,17 +400,17 @@ namespace Orleans.Runtime.MembershipService
 
                     if (ct.IsCancellationRequested)
                     {
-                        await Task.Run(() => this.BecomeStopping());
+                        await Task.Run(BecomeStopping, ct);
                     }
                     else
                     {
                         // Allow some minimum time for graceful shutdown.
-                        var gracePeriod = Task.WhenAll(Task.Delay(ClusterMembershipOptions.ClusteringShutdownGracePeriod), cancellationTask);
+                        var gracePeriod = Task.WhenAll(Task.Delay(ClusterMembershipOptions.ClusteringShutdownGracePeriod, ct), cancellationTask);
                         var task = await Task.WhenAny(gracePeriod, this.BecomeShuttingDown());
                         if (ReferenceEquals(task, gracePeriod))
                         {
                             this.log.LogWarning("Graceful shutdown aborted: starting ungraceful shutdown");
-                            await Task.Run(() => this.BecomeStopping());
+                            await Task.Run(BecomeStopping, ct);
                         }
                         else
                         {

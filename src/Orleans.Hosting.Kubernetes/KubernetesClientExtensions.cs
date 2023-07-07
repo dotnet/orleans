@@ -59,7 +59,7 @@ namespace Orleans.Hosting.Kubernetes
                     watcher[0].Dispose();
                     cancellationRegistration.Dispose();
                 }
-            });
+            }, cancellation);
 
 
             while (await channel.Reader.WaitToReadAsync(cancellation))

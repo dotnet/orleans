@@ -467,15 +467,15 @@ namespace Orleans.Runtime
                 {
                     logger.LogDebug((int)ErrorCode.SiloStopInProgress, "Silo shutdown in progress. Waiting for shutdown to be completed.");
                 }
-                var pause = TimeSpan.FromSeconds(1);                
+                var pause = TimeSpan.FromSeconds(1);
 
                 while (!this.SystemStatus.Equals(SystemStatus.Terminated))
-                {                    
+                {
                     if (logger.IsEnabled(LogLevel.Debug))
                     {
                         logger.LogDebug((int)ErrorCode.WaitingForSiloStop, "Silo shutdown still in progress...");
                     }
-                    await Task.Delay(pause).ConfigureAwait(false);
+                    await Task.Delay(pause, cancellationToken).ConfigureAwait(false);
                 }
 
                 await this.SiloTerminated.ConfigureAwait(false);
@@ -488,7 +488,7 @@ namespace Orleans.Runtime
             }
             finally
             {
-                // log final status                
+                // log final status
                 if (gracefully)
                 {
                     if (logger.IsEnabled(LogLevel.Debug))
@@ -575,7 +575,7 @@ namespace Orleans.Runtime
                     }
 
                     // Wait for all queued message sent to OutboundMessageQueue before MessageCenter stop and OutboundMessageQueue stop.
-                    await Task.WhenAny(Task.Delay(waitForMessageToBeQueuedForOutbound), ct.WhenCancelled());
+                    await Task.WhenAny(Task.Delay(waitForMessageToBeQueuedForOutbound, ct), ct.WhenCancelled());
                 }
             }
             catch (Exception exc)
@@ -634,11 +634,11 @@ namespace Orleans.Runtime
 
         private void Participate(ISiloLifecycle lifecycle)
         {
-            lifecycle.Subscribe<Silo>(ServiceLifecycleStage.RuntimeInitialize, (ct) => Task.Run(() => OnRuntimeInitializeStart(ct)), (ct) => Task.Run(() => OnRuntimeInitializeStop(ct)));
-            lifecycle.Subscribe<Silo>(ServiceLifecycleStage.RuntimeServices, (ct) => Task.Run(() => OnRuntimeServicesStart(ct)), (ct) => Task.Run(() => OnRuntimeServicesStop(ct)));
-            lifecycle.Subscribe<Silo>(ServiceLifecycleStage.RuntimeGrainServices, (ct) => Task.Run(() => OnRuntimeGrainServicesStart(ct)));
-            lifecycle.Subscribe<Silo>(ServiceLifecycleStage.BecomeActive, (ct) => Task.Run(() => OnBecomeActiveStart(ct)), (ct) => Task.Run(() => OnBecomeActiveStop(ct)));
-            lifecycle.Subscribe<Silo>(ServiceLifecycleStage.Active, (ct) => Task.Run(() => OnActiveStart(ct)), (ct) => Task.Run(() => OnActiveStop(ct)));
+            lifecycle.Subscribe<Silo>(ServiceLifecycleStage.RuntimeInitialize, (ct) => Task.Run(() => OnRuntimeInitializeStart(ct), ct), (ct) => Task.Run(() => OnRuntimeInitializeStop(ct), ct));
+            lifecycle.Subscribe<Silo>(ServiceLifecycleStage.RuntimeServices, (ct) => Task.Run(() => OnRuntimeServicesStart(ct), ct), (ct) => Task.Run(() => OnRuntimeServicesStop(ct), ct));
+            lifecycle.Subscribe<Silo>(ServiceLifecycleStage.RuntimeGrainServices, (ct) => Task.Run(() => OnRuntimeGrainServicesStart(ct), ct));
+            lifecycle.Subscribe<Silo>(ServiceLifecycleStage.BecomeActive, (ct) => Task.Run(() => OnBecomeActiveStart(ct), ct), (ct) => Task.Run(() => OnBecomeActiveStop(ct), ct));
+            lifecycle.Subscribe<Silo>(ServiceLifecycleStage.Active, (ct) => Task.Run(() => OnActiveStart(ct), ct), (ct) => Task.Run(() => OnActiveStop(ct), ct));
         }
     }
 

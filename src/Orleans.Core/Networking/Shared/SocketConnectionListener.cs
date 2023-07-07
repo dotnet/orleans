@@ -80,7 +80,7 @@ namespace Orleans.Networking.Shared
             {
                 try
                 {
-                    var acceptSocket = await _listenSocket.AcceptAsync();
+                    var acceptSocket = await _listenSocket.AcceptAsync(cancellationToken);
                     acceptSocket.NoDelay = _options.NoDelay;
 
                     var connection = new SocketConnection(acceptSocket, _memoryPool, _schedulers.GetScheduler(), _trace);

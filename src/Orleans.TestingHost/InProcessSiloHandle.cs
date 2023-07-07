@@ -71,7 +71,7 @@ namespace Orleans.TestingHost
 
             try
             {
-                await Task.Run(() => this.SiloHost.StopAsync(ct));
+                await Task.Run(() => SiloHost.StopAsync(ct), ct);
             }
             catch (Exception exc)
             {

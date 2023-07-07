@@ -187,7 +187,7 @@ namespace Orleans.Tests.SqlUtils
             if(cancellationToken.IsCancellationRequested)
             {
                 var tcs = new TaskCompletionSource<int>(TaskCreationOptions.RunContinuationsAsynchronously);
-                tcs.SetCanceled();
+                tcs.SetCanceled(cancellationToken);
                 return tcs.Task;
             }
 

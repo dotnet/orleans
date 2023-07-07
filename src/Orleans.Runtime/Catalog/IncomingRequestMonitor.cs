@@ -73,7 +73,7 @@ namespace Orleans.Runtime
                 ServiceLifecycleStage.BecomeActive,
                 ct =>
                 {
-                    _runTask = Task.Run(this.Run);
+                    _runTask = Task.Run(Run, ct);
                     return Task.CompletedTask;
                 },
                 async ct =>

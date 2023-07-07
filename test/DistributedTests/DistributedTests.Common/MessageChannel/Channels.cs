@@ -105,7 +105,7 @@ namespace DistributedTests.Common.MessageChannel
 
                 if (msg != null)
                 {
-                    await queueClient.DeleteMessageAsync(msg.MessageId, msg.PopReceipt);
+                    await queueClient.DeleteMessageAsync(msg.MessageId, msg.PopReceipt, ct);
                     return JsonSerializer.Deserialize<T>(msg.MessageText);
                 }
 

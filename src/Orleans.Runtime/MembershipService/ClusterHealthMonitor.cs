@@ -208,7 +208,7 @@ namespace Orleans.Runtime.MembershipService
 
             Task OnActiveStart(CancellationToken ct)
             {
-                tasks.Add(Task.Run(() => this.ProcessMembershipUpdates()));
+                tasks.Add(Task.Run(ProcessMembershipUpdates, ct));
                 return Task.CompletedTask;
             }
 
@@ -224,7 +224,7 @@ namespace Orleans.Runtime.MembershipService
                 this.monitoredSilos = ImmutableDictionary<SiloAddress, SiloHealthMonitor>.Empty;
 
                 // Allow some minimum time for graceful shutdown.
-                var shutdownGracePeriod = Task.WhenAll(Task.Delay(ClusterMembershipOptions.ClusteringShutdownGracePeriod), ct.WhenCancelled());
+                var shutdownGracePeriod = Task.WhenAll(Task.Delay(ClusterMembershipOptions.ClusteringShutdownGracePeriod, ct), ct.WhenCancelled());
                 await Task.WhenAny(shutdownGracePeriod, Task.WhenAll(tasks));
             }
         }

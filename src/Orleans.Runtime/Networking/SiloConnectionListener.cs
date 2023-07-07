@@ -80,8 +80,8 @@ namespace Orleans.Runtime.Messaging
             await BindAsync();
             // Start accepting connections immediately.
             Start();
-        });
+        }, ct);
 
-        Task ILifecycleObserver.OnStop(CancellationToken ct) => Task.Run(() => StopAsync(ct));
+        Task ILifecycleObserver.OnStop(CancellationToken ct) => Task.Run(() => StopAsync(ct), ct);
     }
 }

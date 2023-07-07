@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
@@ -11,7 +11,7 @@ namespace UnitTests.Grains
     {
         public override Task OnActivateAsync(CancellationToken cancellationToken)
         {
-            return Task.Delay(TimeSpan.FromMilliseconds(50));
+            return Task.Delay(TimeSpan.FromMilliseconds(50), cancellationToken);
         }
 
         public Task Initialize()

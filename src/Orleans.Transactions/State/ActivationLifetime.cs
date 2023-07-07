@@ -39,7 +39,7 @@ namespace Orleans.Transactions.State
             var maxTime = TimeSpan.FromSeconds(5);
             while (!ct.IsCancellationRequested && pendingDeactivationLocks > 0 && DateTime.UtcNow - startTime < maxTime)
             {
-                await Task.Delay(TimeSpan.FromMilliseconds(10));
+                await Task.Delay(TimeSpan.FromMilliseconds(10), ct);
             }
         }
 

@@ -190,9 +190,9 @@ namespace Orleans.Runtime.Metadata
             return fetchSuccess;
         }
 
-        private Task StartAsync(CancellationToken _)
+        private Task StartAsync(CancellationToken ct)
         {
-            _runTask = Task.Run(ProcessMembershipUpdates);
+            _runTask = Task.Run(ProcessMembershipUpdates, ct);
             return Task.CompletedTask;
         }
 

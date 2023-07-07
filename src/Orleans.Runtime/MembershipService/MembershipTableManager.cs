@@ -874,8 +874,8 @@ namespace Orleans.Runtime.MembershipService
 
             async Task OnRuntimeGrainServicesStart(CancellationToken ct)
             {
-                await Task.Run(() => this.Start());
-                tasks.Add(Task.Run(() => this.PeriodicallyRefreshMembershipTable()));
+                await Task.Run(Start, ct);
+                tasks.Add(Task.Run(PeriodicallyRefreshMembershipTable, ct));
             }
 
             async Task OnRuntimeGrainServicesStop(CancellationToken ct)
@@ -883,7 +883,7 @@ namespace Orleans.Runtime.MembershipService
                 this.membershipUpdateTimer.Dispose();
 
                 // Allow some minimum time for graceful shutdown.
-                var gracePeriod = Task.WhenAll(Task.Delay(ClusterMembershipOptions.ClusteringShutdownGracePeriod), ct.WhenCancelled());
+                var gracePeriod = Task.WhenAll(Task.Delay(ClusterMembershipOptions.ClusteringShutdownGracePeriod, ct), ct.WhenCancelled());
                 await Task.WhenAny(gracePeriod, Task.WhenAll(tasks));
             }
         }

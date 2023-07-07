@@ -76,10 +76,10 @@ namespace Orleans.Runtime.Messaging
             if (this.Endpoint is null) return;
 
             lifecycle.Subscribe(nameof(GatewayConnectionListener), ServiceLifecycleStage.RuntimeInitialize - 1, this);
-            lifecycle.Subscribe(nameof(GatewayConnectionListener), ServiceLifecycleStage.Active, _ => Task.Run(Start));
+            lifecycle.Subscribe(nameof(GatewayConnectionListener), ServiceLifecycleStage.Active, ct => Task.Run(Start, ct));
         }
 
-        Task ILifecycleObserver.OnStart(CancellationToken ct) => Task.Run(BindAsync);
-        Task ILifecycleObserver.OnStop(CancellationToken ct) => Task.Run(() => StopAsync(ct));
+        Task ILifecycleObserver.OnStart(CancellationToken ct) => Task.Run(BindAsync, ct);
+        Task ILifecycleObserver.OnStop(CancellationToken ct) => Task.Run(() => StopAsync(ct), ct);
     }
 }

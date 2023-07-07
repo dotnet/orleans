@@ -148,7 +148,7 @@ namespace Orleans.Runtime.MembershipService
 
             Task OnStart(CancellationToken ct)
             {
-                tasks.Add(Task.Run(() => this.ProcessMembershipUpdates()));
+                tasks.Add(Task.Run(ProcessMembershipUpdates, ct));
                 return Task.CompletedTask;
             }
 

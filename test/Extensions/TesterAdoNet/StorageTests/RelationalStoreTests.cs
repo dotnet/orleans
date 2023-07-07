@@ -90,16 +90,16 @@ namespace UnitTests.StorageTests.AdoNet
             }, async (selector, resultSetCount, canellationToken) =>
             {
                 var streamSelector = (DbDataReader)selector;
-                var id = await streamSelector.GetValueAsync<int>("Id");
+                var id = await streamSelector.GetValueAsync<int>("Id", cancellationToken: canellationToken);
                 using(var ms = new MemoryStream())
-                {                    
+                {
                     using(var downloadStream = streamSelector.GetStream(1, sut.Storage))
                     {
-                        await downloadStream.CopyToAsync(ms);
+                        await downloadStream.CopyToAsync(ms, canellationToken);
 
                         return new StreamingTest { Id = id, StreamData = ms.ToArray() };
                     }
-                }                
+                }
             }, cancellationToken, CommandBehavior.SequentialAccess).ConfigureAwait(false)).Single();
         }
 

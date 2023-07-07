@@ -158,7 +158,7 @@ namespace Orleans.Runtime
                 ct =>
                 {
                     using var _ = new ExecutionContextSuppressor();
-                    _runTask = Task.Run(MonitorWorkingSet);
+                    _runTask = Task.Run(MonitorWorkingSet, ct);
                     return Task.CompletedTask;
                 },
                 async ct =>
