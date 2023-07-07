@@ -195,7 +195,7 @@ namespace Orleans.Runtime
                 null);
         }
 
-        internal static void OnSendRequest(Message message)
+        internal void OnSendRequest(Message message)
         {
             OrleansInsideRuntimeClientEvent.Log.SendRequest(message);
         }
