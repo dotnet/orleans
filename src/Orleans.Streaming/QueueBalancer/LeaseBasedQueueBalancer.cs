@@ -13,11 +13,11 @@ namespace Orleans.Streams
 {
     /// <summary>
     /// LeaseBasedQueueBalancer. This balancer supports queue balancing in cluster auto-scale scenarios,
-    /// unexpected server failure scenarios, and tries to support ideal distribution as much as possible. 
+    /// unexpected server failure scenarios, and tries to support ideal distribution as much as possible.
     /// </summary>
     public class LeaseBasedQueueBalancer : QueueBalancerBase, IStreamQueueBalancer
     {
-        private class AcquiredQueue 
+        private class AcquiredQueue
         {
             public int LeaseOrder { get; set; }
             public QueueId QueueId { get; set; }
@@ -85,12 +85,12 @@ namespace Orleans.Streams
             if (base.Cancellation.IsCancellationRequested) throw new InvalidOperationException("Cannot initialize a terminated balancer.");
             if (queueMapper == null)
             {
-                throw new ArgumentNullException("queueMapper");
+                throw new ArgumentNullException(nameof(queueMapper));
             }
             var allQueues = queueMapper.GetAllQueues().ToList();
             this.allQueuesCount = allQueues.Count;
 
-            //Selector default to round robin selector now, but we can make a further change to make selector configurable if needed.  Selector algorithm could 
+            //Selector default to round robin selector now, but we can make a further change to make selector configurable if needed.  Selector algorithm could
             //be affecting queue balancing stablization time in cluster initializing and auto-scaling
             this.queueSelector = new RoundRobinSelector<QueueId>(allQueues);
             return base.Initialize(queueMapper);

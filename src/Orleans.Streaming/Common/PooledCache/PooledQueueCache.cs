@@ -12,7 +12,7 @@ namespace Orleans.Providers.Streams.Common
     /// The PooledQueueCache is a cache that is intended to serve as a message cache in an IQueueCache.
     /// It is capable of storing large numbers of messages (gigs worth of messages) for extended periods
     ///   of time (minutes to indefinite), while incurring a minimal performance hit due to garbage collection.
-    /// This pooled cache allocates memory and never releases it. It keeps freed resources available in pools 
+    /// This pooled cache allocates memory and never releases it. It keeps freed resources available in pools
     ///   that remain in application use through the life of the service. This means these objects go to gen2,
     ///   are compacted, and then stay there. This is relatively cheap, as the only cost they now incur is
     ///   the cost of checking to see if they should be freed in each collection cycle. Since this cache uses
@@ -82,8 +82,8 @@ namespace Orleans.Providers.Streams.Common
             TimeSpan? cacheMonitorWriteInterval,
             TimeSpan? purgeMetadataInterval = null)
         {
-            this.cacheDataAdapter = cacheDataAdapter ?? throw new ArgumentNullException("cacheDataAdapter");
-            this.logger = logger ?? throw new ArgumentNullException("logger");
+            this.cacheDataAdapter = cacheDataAdapter ?? throw new ArgumentNullException(nameof(cacheDataAdapter));
+            this.logger = logger ?? throw new ArgumentNullException(nameof(logger));
             this.ItemCount = 0;
             pool = new CachedMessagePool(cacheDataAdapter);
             messageBlocks = new LinkedList<CachedMessageBlock>();
@@ -106,7 +106,7 @@ namespace Orleans.Providers.Streams.Common
         public bool IsEmpty => messageBlocks.Count == 0 || (messageBlocks.Count == 1 && messageBlocks.First.Value.IsEmpty);
 
         /// <summary>
-        /// Acquires a cursor to enumerate through the messages in the cache at the provided sequenceToken, 
+        /// Acquires a cursor to enumerate through the messages in the cache at the provided sequenceToken,
         ///   filtered on the specified stream.
         /// </summary>
         /// <param name="streamId">stream identity</param>
@@ -188,7 +188,7 @@ namespace Orleans.Providers.Streams.Common
 
             // If sequenceToken is too new to be in cache, unset token, and wait for more data.
             CachedMessage newestMessage = newestBlock.Value.NewestMessage;
-            if (newestMessage.Compare(sequenceToken) < 0) 
+            if (newestMessage.Compare(sequenceToken) < 0)
             {
                 cursor.State = CursorStates.Unset;
                 cursor.SequenceToken = sequenceToken;
@@ -233,7 +233,7 @@ namespace Orleans.Providers.Streams.Common
             // return cursor from start.
             cursor.CurrentBlock = node;
             cursor.Index = node.Value.GetIndexOfFirstMessageLessThanOrEqualTo(sequenceToken);
-            // if cursor has been idle, move to next message after message specified by sequenceToken  
+            // if cursor has been idle, move to next message after message specified by sequenceToken
             if(cursor.State == CursorStates.Idle)
             {
                 // if there are more messages in this block, move to next message
@@ -269,13 +269,13 @@ namespace Orleans.Providers.Streams.Common
 
             if (cursorObj == null)
             {
-                throw new ArgumentNullException("cursorObj");
+                throw new ArgumentNullException(nameof(cursorObj));
             }
 
             var cursor = cursorObj as Cursor;
             if (cursor == null)
             {
-                throw new ArgumentOutOfRangeException("cursorObj", "Cursor is bad");
+                throw new ArgumentOutOfRangeException(nameof(cursorObj), "Cursor is bad");
             }
 
             if (cursor.State != CursorStates.Set)
@@ -337,7 +337,7 @@ namespace Orleans.Providers.Streams.Common
         }
 
         /// <summary>
-        /// Add a list of queue message to the cache 
+        /// Add a list of queue message to the cache
         /// </summary>
         /// <param name="messages"></param>
         /// <param name="dequeueTime"></param>

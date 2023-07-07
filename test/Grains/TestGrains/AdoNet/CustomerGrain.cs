@@ -34,7 +34,7 @@ namespace Orleans.SqlUtils.StorageProvider.GrainClasses
         public async Task AddDevice(IDeviceGrain device)
         {
             if (device == null)
-                throw new ArgumentNullException("device");
+                throw new ArgumentNullException(nameof(device));
 
             if (null == State.Devices)
                 State.Devices = new List<IDeviceGrain>();
@@ -51,7 +51,7 @@ namespace Orleans.SqlUtils.StorageProvider.GrainClasses
         public async Task SetRandomState()
         {
             int customerId = (int)this.GetPrimaryKeyLong();
-            
+
             var dt = DateTime.UtcNow;
             var now = new DateTime(dt.Year, dt.Month, dt.Day, dt.Hour, dt.Minute, dt.Second, DateTimeKind.Utc);
 
