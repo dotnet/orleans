@@ -50,7 +50,7 @@ namespace Tester.StreamingTests
         private readonly ITestOutputHelper output = null;
         private readonly ClientStreamTestRunner runner;
 
-        private Fixture fixture;
+        private readonly Fixture fixture;
 
         public MemoryStreamProviderBatchedClientTests(Fixture fixture)
         {

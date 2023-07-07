@@ -34,14 +34,14 @@ namespace Orleans.Transactions
         // watermarks for commit, prepare, abort
         private long confirmUpTo;
         private long cancelAbove;
-        private long cancelAboveStart;
+        private readonly long cancelAboveStart;
 
         // prepare records
-        private SortedDictionary<long, PendingTransactionState<TState>> prepares;
+        private readonly SortedDictionary<long, PendingTransactionState<TState>> prepares;
 
         // follow-up actions, to be executed after storing this batch
-        private List<Action> followUpActions;
-        private List<Func<Task<bool>>> storeConditions;
+        private readonly List<Action> followUpActions;
+        private readonly List<Func<Task<bool>>> storeConditions;
         
         // counters for each type of event
         private int total = 0;

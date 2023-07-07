@@ -30,7 +30,7 @@ namespace UnitTests.Grains
 
     public class SimpleExtension : ISimpleExtension
     {
-        private string someString;
+        private readonly string someString;
 
         public SimpleExtension(string someString)
         {

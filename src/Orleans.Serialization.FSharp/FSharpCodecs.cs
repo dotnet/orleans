@@ -89,7 +89,7 @@ namespace Orleans.Serialization
     [RegisterCopier]
     public sealed class FSharpOptionCopier<T> : IDeepCopier<FSharpOption<T>>
     {
-        private IDeepCopier<T> _valueCopier;
+        private readonly IDeepCopier<T> _valueCopier;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="FSharpOptionCopier{T}"/> class.
@@ -189,7 +189,7 @@ namespace Orleans.Serialization
     [RegisterCopier]
     public sealed class FSharpValueOptionCopier<T> : IDeepCopier<FSharpValueOption<T>>
     {
-        private IDeepCopier<T> _valueCopier;
+        private readonly IDeepCopier<T> _valueCopier;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="FSharpValueOptionCopier{T}"/> class.

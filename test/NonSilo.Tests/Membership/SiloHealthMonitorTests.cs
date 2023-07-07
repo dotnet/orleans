@@ -34,7 +34,7 @@ namespace NonSilo.Tests.Membership
         private readonly ILocalSiloHealthMonitor _localSiloHealthMonitor;
         private readonly IRemoteSiloProber _prober;
         private readonly IClusterMembershipService _membershipService;
-        private ClusterMembershipOptions _clusterMembershipOptions;
+        private readonly ClusterMembershipOptions _clusterMembershipOptions;
         private readonly IOptionsMonitor<ClusterMembershipOptions> _optionsMonitor;
         private readonly Channel<ProbeResult> _probeResults;
         private readonly SiloHealthMonitor _monitor;

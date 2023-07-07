@@ -39,7 +39,7 @@ namespace UnitTests.Grains
     {
         private INonReentrantGrain Self { get; set; }
 
-        private ILogger logger;
+        private readonly ILogger logger;
 
         public NonRentrantGrain(ILoggerFactory loggerFactory)
         {
@@ -185,7 +185,7 @@ namespace UnitTests.Grains
     public class ReentrantSelfManagedGrain1 : Grain, IReentrantSelfManagedGrain
     {
         private long destination;
-        private ILogger logger;
+        private readonly ILogger logger;
 
         public ReentrantSelfManagedGrain1(ILoggerFactory loggerFactory)
         {
@@ -232,7 +232,7 @@ namespace UnitTests.Grains
     public class NonReentrantSelfManagedGrain1 : Grain, INonReentrantSelfManagedGrain
     {
         private long destination;
-        private ILogger logger;
+        private readonly ILogger logger;
 
         public NonReentrantSelfManagedGrain1(ILoggerFactory loggerFactory)
         {
@@ -279,7 +279,7 @@ namespace UnitTests.Grains
     [Reentrant]
     public class FanOutGrain : Grain, IFanOutGrain
     {
-        private ILogger logger;
+        private readonly ILogger logger;
         private static readonly TimeSpan OneSecond = TimeSpan.FromSeconds(1);
 
         public FanOutGrain(ILoggerFactory loggerFactory)
@@ -399,7 +399,7 @@ namespace UnitTests.Grains
     [Reentrant]
     public class FanOutACGrain : Grain, IFanOutACGrain
     {
-        private ILogger logger;
+        private readonly ILogger logger;
         private static readonly TimeSpan OneSecond = TimeSpan.FromSeconds(1);
 
         public FanOutACGrain(ILoggerFactory loggerFactory)
@@ -516,7 +516,7 @@ namespace UnitTests.Grains
     [Reentrant]
     public class ReentrantTaskGrain : Grain, IReentrantTaskGrain
     {
-        private ILogger logger;
+        private readonly ILogger logger;
         private long otherId;
         private int count;
 
@@ -554,7 +554,7 @@ namespace UnitTests.Grains
 
     public class NonReentrantTaskGrain : Grain, INonReentrantTaskGrain
     {
-        private ILogger logger;
+        private readonly ILogger logger;
         private long otherId;
         private int count;
 

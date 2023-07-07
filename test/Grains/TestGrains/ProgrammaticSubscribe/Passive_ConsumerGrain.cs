@@ -108,7 +108,7 @@ namespace UnitTests.Grains
     public class CounterObserver<T> : IAsyncObserver<T>, ICounterObserver
     {
         public int NumConsumed { get; private set; }
-        private ILogger logger;
+        private readonly ILogger logger;
         internal CounterObserver(ILogger logger)
         {
             this.NumConsumed = 0;

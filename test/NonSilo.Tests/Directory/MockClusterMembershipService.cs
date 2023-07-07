@@ -11,7 +11,7 @@ namespace UnitTests.Directory
     internal class MockClusterMembershipService : IClusterMembershipService
     {
         private long version = 0;
-        private Dictionary<SiloAddress, (SiloStatus Status, string Name)> statuses;
+        private readonly Dictionary<SiloAddress, (SiloStatus Status, string Name)> statuses;
         private ClusterMembershipSnapshot snapshot;
         private readonly AsyncEnumerable<ClusterMembershipSnapshot> updates;
 

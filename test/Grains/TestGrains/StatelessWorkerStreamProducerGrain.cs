@@ -14,7 +14,7 @@ namespace UnitTests.Grains
         internal const int MaxLocalWorkers = 1;
         internal const string StreamNamespace = "StatelessWorkerStreamingNamespace";
 
-        private ILogger logger;
+        private readonly ILogger logger;
 
         public StatelessWorkerStreamProducerGrain(ILoggerFactory loggerFactory)
         {

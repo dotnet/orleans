@@ -21,7 +21,7 @@ namespace TestGrains
         public const string StreamNamespace = "NonTransientError_RecoverableStream";
      
         // grain instance state
-        private ILogger logger;
+        private readonly ILogger logger;
         private IAsyncStream<GeneratedEvent> stream;
 
         private class FaultsState
