@@ -481,7 +481,7 @@ namespace Orleans.Clustering.DynamoDB
             }
         }
 
-        private MembershipEntry Parse(SiloInstanceRecord tableEntry)
+        private static MembershipEntry Parse(SiloInstanceRecord tableEntry)
         {
             var parse = new MembershipEntry
             {

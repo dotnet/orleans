@@ -457,7 +457,7 @@ namespace Orleans.CodeGenerator
         }
 
         // Returns descriptions of all data members (fields and properties)
-        private IEnumerable<IMemberDescription> GetDataMembers(FieldIdAssignmentHelper fieldIdAssignmentHelper)
+        private static IEnumerable<IMemberDescription> GetDataMembers(FieldIdAssignmentHelper fieldIdAssignmentHelper)
         {
             var members = new Dictionary<(uint, bool), IMemberDescription>();
 
