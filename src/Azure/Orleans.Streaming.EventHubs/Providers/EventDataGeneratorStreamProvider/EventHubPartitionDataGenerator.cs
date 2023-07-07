@@ -53,7 +53,7 @@ namespace Orleans.Streaming.EventHubs.Testing
                 var eventData = EventHubBatchContainer.ToEventData(
                     this.serializer,
                     this.StreamId,
-                    this.GenerateEvent(this.SequenceNumberCounter.Value),
+                    GenerateEvent(this.SequenceNumberCounter.Value),
                     RequestContextExtensions.Export(this.deepCopier));
 
                var wrapper = new WrappedEventData(
