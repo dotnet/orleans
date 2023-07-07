@@ -24,7 +24,7 @@ namespace Orleans.Runtime
         private DateTime nextTicket;
         private static readonly List<ICollectibleGrainContext> nothing = new(0);
         private readonly ILogger logger;
-        private IAsyncTimer _collectionTimer;
+        private readonly IAsyncTimer _collectionTimer;
         private Task _collectionLoopTask;
         private int collectionNumber;
         private int _activationCount;

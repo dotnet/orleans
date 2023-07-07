@@ -443,7 +443,7 @@ namespace Tester
         {
             public string Name { get; private set; }
 
-            private TestOptions options;
+            private readonly TestOptions options;
             public TestOptionsFormatter2(IOptions<TestOptions> options)
             {
                 this.options = options.Value;
@@ -486,7 +486,7 @@ namespace Tester
         {
             public string Name { get; private set; }
 
-            private TestOptions options;
+            private readonly TestOptions options;
             public TestOptionsFormatter(IOptions<TestOptions> options)
             {
                 this.options = options.Value;

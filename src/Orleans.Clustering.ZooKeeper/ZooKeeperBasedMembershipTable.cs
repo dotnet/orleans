@@ -36,7 +36,7 @@ namespace Orleans.Runtime.Membership
     /// </remarks>
     public class ZooKeeperBasedMembershipTable : IMembershipTable
     {
-        private ILogger logger;
+        private readonly ILogger logger;
 
         private const int ZOOKEEPER_CONNECTION_TIMEOUT = 2000;
 

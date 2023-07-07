@@ -14,7 +14,7 @@ namespace UnitTests.Grains
     [ImplicitStreamSubscription("blue")]
     public class MultipleImplicitSubscriptionGrain : Grain, IMultipleImplicitSubscriptionGrain
     {
-        private ILogger logger;
+        private readonly ILogger logger;
         private IAsyncStream<int> redStream, blueStream;
         private int redCounter, blueCounter;
 

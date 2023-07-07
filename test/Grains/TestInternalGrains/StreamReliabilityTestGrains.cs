@@ -61,7 +61,7 @@ namespace UnitTests.Grains
 #endif
     {
         [NonSerialized]
-        private ILogger logger;
+        private readonly ILogger logger;
 
         private readonly IGrainContext _grainContext;
 
@@ -360,7 +360,7 @@ namespace UnitTests.Grains
     public class StreamUnsubscribeTestGrain : Grain<StreamReliabilityTestGrainState>, IStreamUnsubscribeTestGrain
     {
         [NonSerialized]
-        private ILogger logger;
+        private readonly ILogger logger;
 
         private const string StreamNamespace = StreamTestsConstants.StreamReliabilityNamespace;
 

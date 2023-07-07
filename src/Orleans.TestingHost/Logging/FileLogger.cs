@@ -137,7 +137,7 @@ namespace Orleans.TestingHost.Logging
     public class FileLogger : ILogger
     {
         private readonly FileLoggingOutput output;
-        private string category;
+        private readonly string category;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="FileLogger"/> class.

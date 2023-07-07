@@ -24,14 +24,14 @@ namespace ServiceBus.Tests.EvictionStrategyTests
     [TestCategory("EventHub"), TestCategory("Streaming")]
     public class EHPurgeLogicTests
     {
-        private CachePressureInjectionMonitor cachePressureInjectionMonitor;
-        private PurgeDecisionInjectionPredicate purgePredicate;
-        private Serializer serializer;
+        private readonly CachePressureInjectionMonitor cachePressureInjectionMonitor;
+        private readonly PurgeDecisionInjectionPredicate purgePredicate;
+        private readonly Serializer serializer;
         private EventHubAdapterReceiver receiver1;
         private EventHubAdapterReceiver receiver2;
-        private ObjectPool<FixedSizeBuffer> bufferPool;
-        private TimeSpan timeOut = TimeSpan.FromSeconds(30);
-        private EventHubPartitionSettings ehSettings;
+        private readonly ObjectPool<FixedSizeBuffer> bufferPool;
+        private readonly TimeSpan timeOut = TimeSpan.FromSeconds(30);
+        private readonly EventHubPartitionSettings ehSettings;
         private NoOpHostEnvironmentStatistics _hostEnvironmentStatistics;
         private ConcurrentBag<EventHubQueueCacheForTesting> cacheList;
         private List<EHEvictionStrategyForTesting> evictionStrategyList;

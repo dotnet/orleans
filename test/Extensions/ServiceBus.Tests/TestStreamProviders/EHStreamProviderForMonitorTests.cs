@@ -95,7 +95,7 @@ namespace ServiceBus.Tests.TestStreamProviders
 
         private class CacheFactoryForMonitorTesting : EventHubQueueCacheFactory
         {
-            private CachePressureInjectionMonitor cachePressureInjectionMonitor;
+            private readonly CachePressureInjectionMonitor cachePressureInjectionMonitor;
             public CacheFactoryForMonitorTesting(
                 CachePressureInjectionMonitor cachePressureInjectionMonitor,
                 EventHubStreamCachePressureOptions cacheOptions,

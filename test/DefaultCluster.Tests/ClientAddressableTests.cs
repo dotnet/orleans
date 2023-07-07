@@ -13,12 +13,12 @@ namespace DefaultCluster.Tests
     public class ClientAddressableTests : HostedTestClusterEnsureDefaultStarted
     {
         private object anchor;
-        private IRuntimeClient runtimeClient;
+        private readonly IRuntimeClient runtimeClient;
 
         private class MyPseudoGrain : IClientAddressableTestClientObject
         {
             private int counter = 0;
-            private List<int> numbers = new List<int>();
+            private readonly List<int> numbers = new List<int>();
 
             public Task<string> OnHappyPath(string message)
             {

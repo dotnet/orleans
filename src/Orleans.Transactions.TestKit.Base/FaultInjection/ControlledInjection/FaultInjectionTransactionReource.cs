@@ -11,7 +11,7 @@ namespace Orleans.Transactions.TestKit
     internal class FaultInjectionTransactionManager<TState> : ITransactionManager
         where TState : class, new()
     {
-        private TransactionManager<TState> tm;
+        private readonly TransactionManager<TState> tm;
         private readonly IGrainRuntime grainRuntime;
         private readonly IGrainContext context;
         private readonly FaultInjectionControl faultInjectionControl;

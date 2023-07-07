@@ -35,8 +35,8 @@ namespace Orleans.EventSourcing.LogStorage
         private const int maxEntriesInNotifications = 200;
 
 
-        IGrainStorage globalGrainStorage;
-        string grainTypeName;   
+        readonly IGrainStorage globalGrainStorage;
+        readonly string grainTypeName;   
 
         // the object containing the entire log, as retrieved from / sent to storage
         LogStateWithMetaDataAndETag<TLogEntry> GlobalLog;
@@ -300,7 +300,7 @@ namespace Orleans.EventSourcing.LogStorage
                 return base.Merge(earlierMessage, laterMessage); // keep only the version number
         }
 
-        private SortedList<long, UpdateNotificationMessage> notifications = new SortedList<long,UpdateNotificationMessage>();
+        private readonly SortedList<long, UpdateNotificationMessage> notifications = new SortedList<long,UpdateNotificationMessage>();
 
         /// <inheritdoc/>
         protected override void OnNotificationReceived(INotificationMessage payload)

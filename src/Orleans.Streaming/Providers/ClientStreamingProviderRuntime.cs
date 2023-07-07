@@ -9,9 +9,9 @@ namespace Orleans.Providers
 {
     internal class ClientStreamingProviderRuntime : IStreamProviderRuntime, ILifecycleParticipant<IClusterClientLifecycle>
     {
-        private IStreamPubSub grainBasedPubSub;
-        private IStreamPubSub implicitPubSub;
-        private IStreamPubSub combinedGrainBasedAndImplicitPubSub;
+        private readonly IStreamPubSub grainBasedPubSub;
+        private readonly IStreamPubSub implicitPubSub;
+        private readonly IStreamPubSub combinedGrainBasedAndImplicitPubSub;
         private StreamDirectory streamDirectory;
         private readonly IInternalGrainFactory grainFactory;
         private readonly ImplicitStreamSubscriberTable implicitSubscriberTable;

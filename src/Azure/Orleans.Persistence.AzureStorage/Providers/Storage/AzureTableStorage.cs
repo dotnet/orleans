@@ -43,7 +43,7 @@ namespace Orleans.Storage
 
         private const string BINARY_DATA_PROPERTY_NAME = "Data";
         private const string STRING_DATA_PROPERTY_NAME = "StringData";
-        private string name;
+        private readonly string name;
 
         /// <summary> Default constructor </summary>
         public AzureTableGrainStorage(
