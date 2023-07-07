@@ -113,6 +113,7 @@ namespace Orleans.Serialization.Codecs
     [RegisterCopier]
     public sealed class QueueCopier<T> : IDeepCopier<Queue<T>>, IBaseCopier<Queue<T>>
     {
+        private readonly Type _fieldType = typeof(Queue<T>);
         private readonly IDeepCopier<T> _copier;
 
         /// <summary>
@@ -132,7 +133,7 @@ namespace Orleans.Serialization.Codecs
                 return result;
             }
 
-            if (input.GetType() != typeof(Queue<T>))
+            if (input.GetType() as object != _fieldType as object)
             {
                 return context.DeepCopy(input);
             }

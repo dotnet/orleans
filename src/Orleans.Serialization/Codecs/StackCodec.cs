@@ -124,6 +124,7 @@ namespace Orleans.Serialization.Codecs
     [RegisterCopier]
     public sealed class StackCopier<T> : IDeepCopier<Stack<T>>, IBaseCopier<Stack<T>>
     {
+        private readonly Type _fieldType = typeof(Stack<T>);
         private readonly IDeepCopier<T> _copier;
 
         /// <summary>
@@ -143,7 +144,7 @@ namespace Orleans.Serialization.Codecs
                 return result;
             }
 
-            if (input.GetType() != typeof(Stack<T>))
+            if (input.GetType() as object != _fieldType as object)
             {
                 return context.DeepCopy(input);
             }

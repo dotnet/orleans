@@ -88,6 +88,7 @@ namespace Orleans.Serialization.Codecs
     [RegisterCopier]
     public sealed class TupleCopier<T> : IDeepCopier<Tuple<T>>, IOptionalDeepCopier
     {
+        private readonly Type _fieldType = typeof(Tuple<T>);
         private readonly IDeepCopier<T> _copier;
 
         /// <summary>
@@ -104,7 +105,7 @@ namespace Orleans.Serialization.Codecs
             if (context.TryGetCopy(input, out Tuple<T> existing))
                 return existing;
 
-            if (input.GetType() != typeof(Tuple<T>))
+            if (input.GetType() as object != _fieldType as object)
                 return context.DeepCopy(input);
 
             if (IsShallowCopyable())
@@ -212,6 +213,7 @@ namespace Orleans.Serialization.Codecs
     [RegisterCopier]
     public sealed class TupleCopier<T1, T2> : IDeepCopier<Tuple<T1, T2>>, IOptionalDeepCopier
     {
+        private readonly Type _fieldType = typeof(Tuple<T1, T2>);
         private readonly IDeepCopier<T1> _copier1;
         private readonly IDeepCopier<T2> _copier2;
 
@@ -233,7 +235,7 @@ namespace Orleans.Serialization.Codecs
             if (context.TryGetCopy(input, out Tuple<T1, T2> existing))
                 return existing;
 
-            if (input.GetType() != typeof(Tuple<T1, T2>))
+            if (input.GetType() as object != _fieldType as object)
                 return context.DeepCopy(input);
 
             if (IsShallowCopyable())
@@ -357,6 +359,7 @@ namespace Orleans.Serialization.Codecs
     [RegisterCopier]
     public sealed class TupleCopier<T1, T2, T3> : IDeepCopier<Tuple<T1, T2, T3>>, IOptionalDeepCopier
     {
+        private readonly Type _fieldType = typeof(Tuple<T1, T2, T3>);
         private readonly IDeepCopier<T1> _copier1;
         private readonly IDeepCopier<T2> _copier2;
         private readonly IDeepCopier<T3> _copier3;
@@ -385,7 +388,7 @@ namespace Orleans.Serialization.Codecs
             if (context.TryGetCopy(input, out Tuple<T1, T2, T3> existing))
                 return existing;
 
-            if (input.GetType() != typeof(Tuple<T1, T2, T3>))
+            if (input.GetType() as object != _fieldType as object)
                 return context.DeepCopy(input);
 
             if (IsShallowCopyable())
@@ -522,6 +525,7 @@ namespace Orleans.Serialization.Codecs
     [RegisterCopier]
     public sealed class TupleCopier<T1, T2, T3, T4> : IDeepCopier<Tuple<T1, T2, T3, T4>>, IOptionalDeepCopier
     {
+        private readonly Type _fieldType = typeof(Tuple<T1, T2, T3, T4>);
         private readonly IDeepCopier<T1> _copier1;
         private readonly IDeepCopier<T2> _copier2;
         private readonly IDeepCopier<T3> _copier3;
@@ -554,7 +558,7 @@ namespace Orleans.Serialization.Codecs
             if (context.TryGetCopy(input, out Tuple<T1, T2, T3, T4> existing))
                 return existing;
 
-            if (input.GetType() != typeof(Tuple<T1, T2, T3, T4>))
+            if (input.GetType() as object != _fieldType as object)
                 return context.DeepCopy(input);
 
             if (IsShallowCopyable())
@@ -707,6 +711,7 @@ namespace Orleans.Serialization.Codecs
     [RegisterCopier]
     public sealed class TupleCopier<T1, T2, T3, T4, T5> : IDeepCopier<Tuple<T1, T2, T3, T4, T5>>, IOptionalDeepCopier
     {
+        private readonly Type _fieldType = typeof(Tuple<T1, T2, T3, T4, T5>);
         private readonly IDeepCopier<T1> _copier1;
         private readonly IDeepCopier<T2> _copier2;
         private readonly IDeepCopier<T3> _copier3;
@@ -743,7 +748,7 @@ namespace Orleans.Serialization.Codecs
             if (context.TryGetCopy(input, out Tuple<T1, T2, T3, T4, T5> existing))
                 return existing;
 
-            if (input.GetType() != typeof(Tuple<T1, T2, T3, T4, T5>))
+            if (input.GetType() as object != _fieldType as object)
                 return context.DeepCopy(input);
 
             if (IsShallowCopyable())
@@ -909,6 +914,7 @@ namespace Orleans.Serialization.Codecs
     [RegisterCopier]
     public sealed class TupleCopier<T1, T2, T3, T4, T5, T6> : IDeepCopier<Tuple<T1, T2, T3, T4, T5, T6>>, IOptionalDeepCopier
     {
+        private readonly Type _fieldType = typeof(Tuple<T1, T2, T3, T4, T5, T6>);
         private readonly IDeepCopier<T1> _copier1;
         private readonly IDeepCopier<T2> _copier2;
         private readonly IDeepCopier<T3> _copier3;
@@ -949,7 +955,7 @@ namespace Orleans.Serialization.Codecs
             if (context.TryGetCopy(input, out Tuple<T1, T2, T3, T4, T5, T6> existing))
                 return existing;
 
-            if (input.GetType() != typeof(Tuple<T1, T2, T3, T4, T5, T6>))
+            if (input.GetType() as object != _fieldType as object)
                 return context.DeepCopy(input);
 
             if (IsShallowCopyable())
@@ -1129,6 +1135,7 @@ namespace Orleans.Serialization.Codecs
     [RegisterCopier]
     public sealed class TupleCopier<T1, T2, T3, T4, T5, T6, T7> : IDeepCopier<Tuple<T1, T2, T3, T4, T5, T6, T7>>, IOptionalDeepCopier
     {
+        private readonly Type _fieldType = typeof(Tuple<T1, T2, T3, T4, T5, T6, T7>);
         private readonly IDeepCopier<T1> _copier1;
         private readonly IDeepCopier<T2> _copier2;
         private readonly IDeepCopier<T3> _copier3;
@@ -1173,7 +1180,7 @@ namespace Orleans.Serialization.Codecs
             if (context.TryGetCopy(input, out Tuple<T1, T2, T3, T4, T5, T6, T7> existing))
                 return existing;
 
-            if (input.GetType() != typeof(Tuple<T1, T2, T3, T4, T5, T6, T7>))
+            if (input.GetType() as object != _fieldType as object)
                 return context.DeepCopy(input);
 
             if (IsShallowCopyable())
@@ -1365,6 +1372,7 @@ namespace Orleans.Serialization.Codecs
     [RegisterCopier]
     public sealed class TupleCopier<T1, T2, T3, T4, T5, T6, T7, T8> : IDeepCopier<Tuple<T1, T2, T3, T4, T5, T6, T7, T8>>, IOptionalDeepCopier
     {
+        private readonly Type _fieldType = typeof(Tuple<T1, T2, T3, T4, T5, T6, T7, T8>);
         private readonly IDeepCopier<T1> _copier1;
         private readonly IDeepCopier<T2> _copier2;
         private readonly IDeepCopier<T3> _copier3;
@@ -1413,7 +1421,7 @@ namespace Orleans.Serialization.Codecs
             if (context.TryGetCopy(input, out Tuple<T1, T2, T3, T4, T5, T6, T7, T8> existing))
                 return existing;
 
-            if (input.GetType() != typeof(Tuple<T1, T2, T3, T4, T5, T6, T7, T8>))
+            if (input.GetType() as object != _fieldType as object)
                 return context.DeepCopy(input);
 
             if (IsShallowCopyable())

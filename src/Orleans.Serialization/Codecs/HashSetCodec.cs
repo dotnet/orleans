@@ -17,6 +17,7 @@ namespace Orleans.Serialization.Codecs
     public sealed class HashSetCodec<T> : IFieldCodec<HashSet<T>>
     {
         private readonly Type CodecElementType = typeof(T);
+        private readonly Type _comparerType = typeof(IEqualityComparer<T>);
 
         private readonly IFieldCodec<T> _fieldCodec;
         private readonly IFieldCodec<IEqualityComparer<T>> _comparerCodec;
@@ -44,7 +45,7 @@ namespace Orleans.Serialization.Codecs
 
             if (value.Comparer != EqualityComparer<T>.Default)
             {
-                _comparerCodec.WriteField(ref writer, 0, typeof(IEqualityComparer<T>), value.Comparer);
+                _comparerCodec.WriteField(ref writer, 0, _comparerType, value.Comparer);
             }
 
             if (value.Count > 0)
@@ -134,6 +135,7 @@ namespace Orleans.Serialization.Codecs
     [RegisterCopier]
     public sealed class HashSetCopier<T> : IDeepCopier<HashSet<T>>, IBaseCopier<HashSet<T>>
     {
+        private readonly Type _fieldType = typeof(HashSet<T>);
         private readonly IDeepCopier<T> _copier;
 
         /// <summary>
@@ -153,7 +155,7 @@ namespace Orleans.Serialization.Codecs
                 return result;
             }
 
-            if (input.GetType() != typeof(HashSet<T>))
+            if (input.GetType() as object != _fieldType as object)
             {
                 return context.DeepCopy(input);
             }
