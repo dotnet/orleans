@@ -195,5 +195,5 @@ VALUES
         AND ((@GrainIdExtensionString IS NOT NULL AND GrainIdExtensionString IS NOT NULL AND GrainIdExtensionString = @GrainIdExtensionString) OR @GrainIdExtensionString IS NULL AND GrainIdExtensionString IS NULL)
         AND ServiceId = @ServiceId AND @ServiceId IS NOT NULL
         AND Version IS NOT NULL AND Version = @GrainStateVersion AND @GrainStateVersion IS NOT NULL
-    Returning NULL as NewGrainStateVersion
+    Returning Version + 1 as NewGrainStateVersion
 ');
