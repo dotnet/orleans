@@ -37,6 +37,12 @@ public class PersistenceGrainTests_CosmosGrainStorage : OrleansTestingBase, ICla
                     .AddMemoryGrainStorage("MemoryStore");
             }
         }
+
+        protected override void CheckPreconditionsOrThrow()
+        {
+            base.CheckPreconditionsOrThrow();
+            CosmosTestUtils.CheckCosmosStorage();
+        }
     }
 
     public PersistenceGrainTests_CosmosGrainStorage(ITestOutputHelper output, Fixture fixture, string grainNamespace = "UnitTests.Grains")
