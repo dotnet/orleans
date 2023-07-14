@@ -47,7 +47,7 @@
     <PackageVersion Include="Microsoft.Extensions.Hosting" Version="7.0.0" />
     <PackageVersion Include="Azure.Data.Tables" Version="12.8.0" />
     <PackageVersion Include="Azure.Core" Version="1.33.0" />
-    <PackageVersion Include="Azure.Messaging.EventHubs" Version="5.7.3" />
+    <PackageVersion Include="Azure.Messaging.EventHubs" Version="5.9.2" />
     <PackageVersion Include="Azure.Storage.Blobs" Version="12.14.0" />
     <PackageVersion Include="Azure.Storage.Queues" Version="12.12.0" />
     <!-- 3rd party packages -->
