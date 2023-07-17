@@ -13,6 +13,7 @@ using Xunit.Abstractions;
 
 namespace Orleans.Serialization.UnitTests;
 
+
 [Trait("Category", "BVT")]
 public class ProtobufSerializerTests : FieldCodecTester<MyProtobufClass?, IFieldCodec<MyProtobufClass?>>
 {
