@@ -19,6 +19,9 @@ namespace Orleans.Serialization;
 /// <summary>
 /// A serialization codec which uses <see cref="MessagePackSerializer"/>.
 /// </summary>
+/// <remarks>
+/// MessagePack codec performs slightly worse than default Orleans serializer, if performance is critical for your application, consider using default serialization.
+/// </remarks>
 [Alias(WellKnownAlias)]
 public class MessagePackCodec : IGeneralizedCodec, IGeneralizedCopier, ITypeFilter
 {
@@ -38,8 +41,9 @@ public class MessagePackCodec : IGeneralizedCodec, IGeneralizedCopier, ITypeFilt
     /// <summary>
     /// Initializes a new instance of the <see cref="MessagePackCodec"/> class.
     /// </summary>
+    /// /// <param name="serializableTypeSelectors">Filters used to indicate which types should be serialized by this codec.</param>
     /// <param name="copyableTypeSelectors">Filters used to indicate which types should be copied by this codec.</param>
-    /// <param name="options">The JSON codec options.</param>
+    /// <param name="options">The MessagePack codec options.</param>
     public MessagePackCodec(
         IEnumerable<ICodecSelector> serializableTypeSelectors,
         IEnumerable<ICopierSelector> copyableTypeSelectors,
