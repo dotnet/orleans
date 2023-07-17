@@ -10,6 +10,7 @@ using Orleans.Providers;
 using Orleans.Configuration;
 using Orleans.Persistence.Cosmos;
 using UnitTests.Persistence;
+using Microsoft.Extensions.Options;
 
 namespace Tester.Cosmos.Persistence;
 
@@ -46,7 +47,7 @@ public class PersistenceProviderTests_Cosmos
         options.ConfigureTestDefaults();
 
         var pkProvider = new DefaultPartitionKeyProvider();
-        var clusterOptions = new ClusterOptions { ClusterId = _clusterId, ServiceId = _serviceId };
+        var clusterOptions = Options.Create(new ClusterOptions { ClusterId = _clusterId, ServiceId = _serviceId });
 
         var store = ActivatorUtilities.CreateInstance<CosmosGrainStorage>(providerRuntime.ServiceProvider, options, clusterOptions, "TestStorage", pkProvider);
         var lifecycle = ActivatorUtilities.CreateInstance<SiloLifecycleSubject>(providerRuntime.ServiceProvider);
