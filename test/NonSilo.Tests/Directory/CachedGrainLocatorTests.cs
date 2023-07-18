@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using NSubstitute;
+using NSubstitute.ReceivedExtensions;
 using Orleans;
 using Orleans.GrainDirectory;
 using Orleans.Metadata;
@@ -360,6 +361,31 @@ namespace UnitTests.Directory
 
             // Unregister and check if cache was cleaned
             await this.grainLocator.Unregister(expectedAddr, UnregistrationCause.Force);
+            Assert.False(this.grainLocator.TryLookupInCache(expectedAddr.GrainId, out _));
+        }
+
+        [Fact]
+        public async Task UnregisterRemovesFromCacheFirst()
+        {            
+            var expectedSilo = GenerateSiloAddress();
+
+            // Setup membership service
+            this.mockMembershipService.UpdateSiloStatus(expectedSilo, SiloStatus.Active, "exp");
+            await this.lifecycle.OnStart();
+            await WaitUntilClusterChangePropagated();
+
+            var expectedAddr = GenerateGrainAddress(expectedSilo);
+
+            // Give up control then Run forever
+            this.grainDirectory.When(v => v.Unregister(expectedAddr)).Do(async (t) => { await Task.Yield();  while (true) { } });
+
+            this.grainDirectory.Register(expectedAddr, previousAddress: null).Returns(expectedAddr);
+
+            // Register to populate cache
+            await this.grainLocator.Register(expectedAddr, previousAddress: null);
+
+            // Unregister and check if cache was cleaned
+            _ = this.grainLocator.Unregister(expectedAddr, UnregistrationCause.Force);
             Assert.False(this.grainLocator.TryLookupInCache(expectedAddr.GrainId, out _));
         }
 

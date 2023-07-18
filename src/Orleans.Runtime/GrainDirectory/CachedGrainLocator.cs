@@ -110,14 +110,11 @@ namespace Orleans.Runtime.GrainDirectory
 
         public async Task Unregister(GrainAddress address, UnregistrationCause cause)
         {
-            try
-            {
-                await GetGrainDirectory(address.GrainId.Type).Unregister(address);
-            }
-            finally
-            {
-                this.cache.Remove(address);
-            }
+            // Remove from local cache first so we don't return it anymore
+            this.cache.Remove(address);
+            
+            // Remove from grain directory which may take significantly longer
+            await GetGrainDirectory(address.GrainId.Type).Unregister(address);
         }
 
         public void Participate(ISiloLifecycle lifecycle)
