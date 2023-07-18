@@ -357,7 +357,7 @@ namespace Orleans.Runtime
 
             var functionType = Expression.GetFuncType(grainType, typeof(IInvokable), typeof(bool));
             var functionDelegate = method.CreateDelegate(functionType);
-            var predicateType = typeof(MayInterleaveInstancePredicate<>).MakeGenericType(grainType);
+            var predicateType = typeof(MayInterleaveInstancedPredicate<>).MakeGenericType(grainType);
 
             return Activator.CreateInstance(predicateType, functionDelegate) as IMayInterleavePredicate;
         }
@@ -385,11 +385,11 @@ namespace Orleans.Runtime
         public bool Invoke(object _, IInvokable message) => _mayInterleavePredicate(message);
     }
 
-    internal class MayInterleaveInstancePredicate<T> : IMayInterleavePredicate where T : class
+    internal class MayInterleaveInstancedPredicate<T> : IMayInterleavePredicate where T : class
     {
         private readonly Func<T, IInvokable, bool> _mayInterleavePredicate;
 
-        public MayInterleaveInstancePredicate(Delegate mayInterleavePredicate)
+        public MayInterleaveInstancedPredicate(Delegate mayInterleavePredicate)
         {
             _mayInterleavePredicate = mayInterleavePredicate as Func<T, IInvokable, bool>;
         }
