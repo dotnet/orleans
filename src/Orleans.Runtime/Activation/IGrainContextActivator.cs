@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Diagnostics.CodeAnalysis;
 using System.Linq;
+using System.Linq.Expressions;
 using System.Reflection;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
@@ -121,7 +122,7 @@ namespace Orleans.Runtime
         /// <returns><see langword="true"/> if an appropriate activator was found, otherwise <see langword="false"/>.</returns>
         bool TryGet(GrainType grainType, [NotNullWhen(true)] out IGrainContextActivator activator);
     }
-   
+
     /// <summary>
     /// Creates a grain context for the given grain address.
     /// </summary>
@@ -289,7 +290,7 @@ namespace Orleans.Runtime
                     shared.SetComponent<GrainCanInterleave>(component);
                 }
 
-                component.MayInterleavePredicates.Add(_ => true);
+                component.MayInterleavePredicates.Add(new ReentrantPredicate());
             }
         }
     }
@@ -305,11 +306,11 @@ namespace Orleans.Runtime
 
         public bool TryGetConfigurator(GrainType grainType, GrainProperties properties, out IConfigureGrainContext configurator)
         {
-            if (properties.Properties.TryGetValue(WellKnownGrainTypeProperties.MayInterleavePredicate, out var value)
+            if (properties.Properties.TryGetValue(WellKnownGrainTypeProperties.MayInterleavePredicate, out _)
                 && _grainClassMap.TryGetGrainClass(grainType, out var grainClass))
             {
                 var predicate = GetMayInterleavePredicate(grainClass);
-                configurator = new MayInterleaveConfigurator(message => predicate(message.BodyObject as IInvokable));
+                configurator = new MayInterleaveConfigurator(predicate);
                 return true;
             }
 
@@ -321,7 +322,7 @@ namespace Orleans.Runtime
         /// Returns interleave predicate depending on whether class is marked with <see cref="MayInterleaveAttribute"/> or not.
         /// </summary>
         /// <param name="grainType">Grain class.</param>
-        private static Func<IInvokable, bool> GetMayInterleavePredicate(Type grainType)
+        private static IMayInterleavePredicate GetMayInterleavePredicate(Type grainType)
         {
             var attribute = grainType.GetCustomAttribute<MayInterleaveAttribute>();
             if (attribute is null)
@@ -329,12 +330,13 @@ namespace Orleans.Runtime
                 return null;
             }
 
+            // here
             var callbackMethodName = attribute.CallbackMethodName;
-            var method = grainType.GetMethod(callbackMethodName, BindingFlags.Public | BindingFlags.Static | BindingFlags.FlattenHierarchy);
+            var method = grainType.GetMethod(callbackMethodName, BindingFlags.Public | BindingFlags.Static | BindingFlags.Instance | BindingFlags.FlattenHierarchy);
             if (method == null)
             {
                 throw new InvalidOperationException(
-                    $"Class {grainType.FullName} doesn't declare public static method " +
+                    $"Class {grainType.FullName} doesn't declare public method " +
                     $"with name {callbackMethodName} specified in MayInterleave attribute");
             }
 
@@ -348,15 +350,58 @@ namespace Orleans.Runtime
                     $"Expected: public static bool {callbackMethodName}(IInvokable req)");
             }
 
-            return method.CreateDelegate<Func<IInvokable, bool>>();
+            if (method.IsStatic)
+            {
+                return new MayInterleaveStaticPredicate(method.CreateDelegate<Func<IInvokable, bool>>());
+            }
+
+            var functionType = Expression.GetFuncType(grainType, typeof(IInvokable), typeof(bool));
+            var functionDelegate = method.CreateDelegate(functionType);
+            var predicateType = typeof(MayInterleaveInstancePredicate<>).MakeGenericType(grainType);
+
+            return Activator.CreateInstance(predicateType, functionDelegate) as IMayInterleavePredicate;
         }
+    }
+
+    internal interface IMayInterleavePredicate
+    {
+        bool Invoke(object instance, IInvokable message);
+    }
+
+    internal class ReentrantPredicate : IMayInterleavePredicate
+    {
+        public bool Invoke(object instance, IInvokable message) => true;
+    }
+
+    internal class MayInterleaveStaticPredicate : IMayInterleavePredicate
+    {
+        private readonly Func<IInvokable, bool> _mayInterleavePredicate;
+
+        public MayInterleaveStaticPredicate(Func<IInvokable, bool> mayInterleavePredicate)
+        {
+            _mayInterleavePredicate = mayInterleavePredicate;
+        }
+
+        public bool Invoke(object _, IInvokable message) => _mayInterleavePredicate(message);
+    }
+
+    internal class MayInterleaveInstancePredicate<T> : IMayInterleavePredicate where T : class
+    {
+        private readonly Func<T, IInvokable, bool> _mayInterleavePredicate;
+
+        public MayInterleaveInstancePredicate(Delegate mayInterleavePredicate)
+        {
+            _mayInterleavePredicate = mayInterleavePredicate as Func<T, IInvokable, bool>;
+        }
+
+        public bool Invoke(object instance, IInvokable message) => _mayInterleavePredicate(instance as T, message);
     }
 
     internal class MayInterleaveConfigurator : IConfigureGrainContext
     {
-        private readonly Func<Message, bool> _mayInterleavePredicate;
+        private readonly IMayInterleavePredicate _mayInterleavePredicate;
 
-        public MayInterleaveConfigurator(Func<Message, bool> mayInterleavePredicate)
+        public MayInterleaveConfigurator(IMayInterleavePredicate mayInterleavePredicate)
         {
             _mayInterleavePredicate = mayInterleavePredicate;
         }
@@ -376,12 +421,12 @@ namespace Orleans.Runtime
 
     internal class GrainCanInterleave
     {
-        public List<Func<Message, bool>> MayInterleavePredicates { get; } = new List<Func<Message, bool>>();
-        public bool MayInterleave(Message message)
+        public List<IMayInterleavePredicate> MayInterleavePredicates { get; } = new List<IMayInterleavePredicate>();
+        public bool MayInterleave(object instance, Message message)
         {
             foreach (var predicate in this.MayInterleavePredicates)
             {
-                if (predicate(message)) return true;
+                if (predicate.Invoke(instance, message.BodyObject as IInvokable)) return true;
             }
 
             return false;

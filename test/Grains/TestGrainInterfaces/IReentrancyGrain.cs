@@ -38,6 +38,11 @@ namespace UnitTests.GrainInterfaces
         Task SetSelf(IMayInterleavePredicateGrain self);
     }
 
+    public interface IMeyInterleaveInstancedPredicateGrain : IGrainWithStringKey
+    {
+        Task<string> One(int seconds);
+    }
+
     [Unordered]
     public interface IUnorderedNonReentrantGrain : IGrainWithIntegerKey
     {

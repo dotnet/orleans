@@ -87,7 +87,7 @@ namespace UnitTests.Grains
             this.logger = loggerFactory.CreateLogger($"{this.GetType().Name}-{this.IdentityString}");
         }
 
-        public static bool MayInterleave(IInvokable req)
+        public bool MayInterleave(IInvokable req)
         {
             // not interested
             if (req.GetArgumentCount() == 0)
@@ -113,7 +113,7 @@ namespace UnitTests.Grains
 
         private IMayInterleavePredicateGrain Self { get; set; }
 
-        // this interleaves only when arg == "reentrant" 
+        // this interleaves only when arg == "reentrant"
         // and test predicate will throw when arg = "err"
         public Task<string> One(string arg)
         {
@@ -151,7 +151,7 @@ namespace UnitTests.Grains
             return GetStream().OnNextAsync(item);
         }
 
-        IAsyncStream<string> GetStream() => 
+        IAsyncStream<string> GetStream() =>
             this.GetStreamProvider("sms").GetStream<string>("test-stream-interleave", Guid.Empty);
 
         public Task SetSelf(IMayInterleavePredicateGrain self)
