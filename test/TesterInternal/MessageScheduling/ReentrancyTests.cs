@@ -68,11 +68,11 @@ namespace UnitTests
             }
             this.fixture.Logger.LogInformation("Reentrancy ReentrantGrain Test finished OK.");
         }
-        
+
         [Fact, TestCategory("Functional"), TestCategory("Tasks"), TestCategory("Reentrancy")]
-        public void NonReentrantGrain_WithMayInterleavePredicate_WhenPredicateReturnsTrue()
+        public void NonReentrantGrain_WithMayInterleaveStaticPredicate_WhenPredicateReturnsTrue()
         {
-            var grain = this.fixture.GrainFactory.GetGrain<IMayInterleavePredicateGrain>(GetRandomGrainId());
+            var grain = this.fixture.GrainFactory.GetGrain<IMayInterleaveStaticPredicateGrain>(GetRandomGrainId());
             grain.SetSelf(grain).Wait();
             try
             {
@@ -86,9 +86,9 @@ namespace UnitTests
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Tasks"), TestCategory("Reentrancy")]
-        public async Task NonReentrantGrain_WithMayInterleavePredicate_WhenPredicateThrows()
+        public async Task NonReentrantGrain_WithMayInterleaveStaticPredicate_WhenPredicateThrows()
         {
-            var grain = this.fixture.GrainFactory.GetGrain<IMayInterleavePredicateGrain>(GetRandomGrainId());
+            var grain = this.fixture.GrainFactory.GetGrain<IMayInterleaveStaticPredicateGrain>(GetRandomGrainId());
             grain.SetSelf(grain).Wait();
             try
             {
@@ -102,7 +102,7 @@ namespace UnitTests
             }
             this.fixture.Logger.LogInformation("Reentrancy NonReentrantGrain_WithMayInterleavePredicate_WhenPredicateThrows Test finished OK.");
         }
-        
+
         [Fact, TestCategory("Functional"), TestCategory("Tasks"), TestCategory("Reentrancy")]
         public void Reentrancy_Deadlock_1()
         {

@@ -44,9 +44,9 @@ namespace UnitTests
             this.logger.LogInformation("Reentrancy NonReentrantGrain Test finished OK.");
         }
 
-        public void NonReentrantGrain_WithMayInterleavePredicate_WhenPredicateReturnsFalse(bool performDeadlockDetection)
+        public void NonReentrantGrain_WithMayInterleaveStaticPredicate_WhenPredicateReturnsFalse(bool performDeadlockDetection)
         {
-            var grain = this.grainFactory.GetGrain<IMayInterleavePredicateGrain>(OrleansTestingBase.GetRandomGrainId());
+            var grain = this.grainFactory.GetGrain<IMayInterleaveStaticPredicateGrain>(OrleansTestingBase.GetRandomGrainId());
             grain.SetSelf(grain).Wait();
             bool timeout = false;
             bool deadlock = false;

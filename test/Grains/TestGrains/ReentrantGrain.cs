@@ -78,16 +78,16 @@ namespace UnitTests.Grains
     }
 
     [MayInterleave(nameof(MayInterleave))]
-    public class MayInterleavePredicateGrain : Grain, IMayInterleavePredicateGrain
+    public class MayInterleaveStaticPredicateGrain : Grain, IMayInterleaveStaticPredicateGrain
     {
         private readonly ILogger logger;
 
-        public MayInterleavePredicateGrain(ILoggerFactory loggerFactory)
+        public MayInterleaveStaticPredicateGrain(ILoggerFactory loggerFactory)
         {
             this.logger = loggerFactory.CreateLogger($"{this.GetType().Name}-{this.IdentityString}");
         }
 
-        public bool MayInterleave(IInvokable req)
+        public static bool MayInterleave(IInvokable req)
         {
             // not interested
             if (req.GetArgumentCount() == 0)
@@ -111,7 +111,7 @@ namespace UnitTests.Grains
 
         static object UnwrapImmutable(object item) => item is Immutable<object> ? ((Immutable<object>)item).Value : item;
 
-        private IMayInterleavePredicateGrain Self { get; set; }
+        private IMayInterleaveStaticPredicateGrain Self { get; set; }
 
         // this interleaves only when arg == "reentrant"
         // and test predicate will throw when arg = "err"
@@ -154,7 +154,7 @@ namespace UnitTests.Grains
         IAsyncStream<string> GetStream() =>
             this.GetStreamProvider("sms").GetStream<string>("test-stream-interleave", Guid.Empty);
 
-        public Task SetSelf(IMayInterleavePredicateGrain self)
+        public Task SetSelf(IMayInterleaveStaticPredicateGrain self)
         {
             Self = self;
             return Task.CompletedTask;
