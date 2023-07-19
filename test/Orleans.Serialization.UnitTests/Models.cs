@@ -487,6 +487,17 @@ namespace Orleans.Serialization.UnitTests
     }
 
     [GenerateSerializer]
+    public sealed class DerivedFromDictionary<TKey, TValue> : Dictionary<TKey, TValue>
+    {
+        public DerivedFromDictionary(IEqualityComparer<TKey> comparer) : base(comparer)
+        {
+        }
+
+        [Id(0)]
+        public int IntProperty { get; set; }
+    }
+
+    [GenerateSerializer]
     [Alias("gpoco`1")]
     public class GenericPoco<T>
     {
