@@ -5,8 +5,6 @@ using System.Collections.Immutable;
 using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using System.Reflection;
-using System.Threading.Tasks;
-using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Concurrency;
@@ -385,64 +383,6 @@ namespace Orleans.Runtime
             }
 
             return false;
-        }
-    }
-
-    internal class ConfigureDefaultGrainActivator : IConfigureGrainTypeComponents
-    {
-        private readonly GrainClassMap _grainClassMap;
-        private readonly ConstructorArgumentFactory _constructorArgumentFactory;
-
-        public ConfigureDefaultGrainActivator(GrainClassMap grainClassMap, IServiceProvider serviceProvider)
-        {
-            _constructorArgumentFactory = new ConstructorArgumentFactory(serviceProvider);
-            _grainClassMap = grainClassMap;
-        }
-
-        public void Configure(GrainType grainType, GrainProperties properties, GrainTypeSharedContext shared)
-        {
-            if (shared.GetComponent<IGrainActivator>() is object) return;
-
-            if (!_grainClassMap.TryGetGrainClass(grainType, out var grainClass))
-            {
-                return;
-            }
-
-            var argumentFactory = _constructorArgumentFactory.CreateFactory(grainClass);
-            var createGrainInstance = ActivatorUtilities.CreateFactory(grainClass, argumentFactory.ArgumentTypes);
-            var instanceActivator = new DefaultGrainActivator(createGrainInstance, argumentFactory);
-            shared.SetComponent<IGrainActivator>(instanceActivator);
-        }
-
-        internal class DefaultGrainActivator : IGrainActivator
-        {
-            private readonly ObjectFactory _factory;
-            private readonly ConstructorArgumentFactory.ArgumentFactory _argumentFactory;
-
-            public DefaultGrainActivator(ObjectFactory factory, ConstructorArgumentFactory.ArgumentFactory argumentFactory)
-            {
-                _factory = factory;
-                _argumentFactory = argumentFactory;
-            }
-
-            public object CreateInstance(IGrainContext context)
-            {
-                var args = _argumentFactory.CreateArguments(context);
-                return _factory(context.ActivationServices, args);
-            }
-
-            public async ValueTask DisposeInstance(IGrainContext context, object instance)
-            {
-                switch (instance)
-                {
-                    case IAsyncDisposable asyncDisposable:
-                        await asyncDisposable.DisposeAsync();
-                        break;
-                    case IDisposable disposable:
-                        disposable.Dispose();
-                        break;
-                }
-            }
         }
     }
 }
