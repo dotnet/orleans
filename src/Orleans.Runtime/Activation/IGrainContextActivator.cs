@@ -355,8 +355,11 @@ namespace Orleans.Runtime
                 return new MayInterleaveStaticPredicate(method.CreateDelegate<Func<IInvokable, bool>>());
             }
 
-            var functionDelegate = (Func<object, IInvokable, bool>)method.CreateDelegate(typeof(Func<object, IInvokable, bool>));
-            return new MayInterleaveInstancedPredicate(functionDelegate);
+            var functionType = Expression.GetFuncType(grainType, typeof(IInvokable), typeof(bool));
+            var functionDelegate = method.CreateDelegate(functionType);
+            var predicateType = typeof(MayInterleaveInstancedPredicate<>).MakeGenericType(grainType);
+
+            return Activator.CreateInstance(predicateType, functionDelegate) as IMayInterleavePredicate;
         }
     }
 
@@ -388,16 +391,16 @@ namespace Orleans.Runtime
         public bool Invoke(object _, IInvokable bodyObject) => _mayInterleavePredicate(bodyObject);
     }
 
-    internal class MayInterleaveInstancedPredicate : IMayInterleavePredicate
+    internal class MayInterleaveInstancedPredicate<T> : IMayInterleavePredicate where T : class
     {
-        private readonly Func<object, IInvokable, bool> _mayInterleavePredicate;
+        private readonly Func<T, IInvokable, bool> _mayInterleavePredicate;
 
-        public MayInterleaveInstancedPredicate(Func<object, IInvokable, bool> mayInterleavePredicate)
+        public MayInterleaveInstancedPredicate(Delegate mayInterleavePredicate)
         {
-            _mayInterleavePredicate = mayInterleavePredicate;
+            _mayInterleavePredicate = mayInterleavePredicate as Func<T, IInvokable, bool>;
         }
 
-        public bool Invoke(object instance, IInvokable bodyObject) => _mayInterleavePredicate(instance, bodyObject);
+        public bool Invoke(object instance, IInvokable bodyObject) => _mayInterleavePredicate(instance as T, bodyObject);
     }
 
     internal class MayInterleaveConfigurator : IConfigureGrainContext
