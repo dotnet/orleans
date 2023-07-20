@@ -4,7 +4,6 @@ using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Diagnostics.CodeAnalysis;
 using System.Linq;
-using System.Linq.Expressions;
 using System.Reflection;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
@@ -355,7 +354,7 @@ namespace Orleans.Runtime
                 return new MayInterleaveStaticPredicate(method.CreateDelegate<Func<IInvokable, bool>>());
             }
 
-            var functionType = Expression.GetFuncType(grainType, typeof(IInvokable), typeof(bool));
+            var functionType = typeof(Func<,,>).MakeGenericType(grainType, typeof(IInvokable), typeof(bool));
             var functionDelegate = method.CreateDelegate(functionType);
             var predicateType = typeof(MayInterleaveInstancedPredicate<>).MakeGenericType(grainType);
 
