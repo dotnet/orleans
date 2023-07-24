@@ -23,7 +23,7 @@ namespace UnitTests.GrainInterfaces
         Task SetSelf(INonReentrantGrain self);
     }
 
-    public interface IMayInterleavePredicateGrain : IGrainWithIntegerKey
+    public interface IMayInterleaveStaticPredicateGrain : IGrainWithIntegerKey
     {
         Task<string> One(string arg); // this interleaves only when arg == "reentrant"
 
@@ -35,7 +35,22 @@ namespace UnitTests.GrainInterfaces
         Task SubscribeToStream();
         Task PushToStream(string item);
 
-        Task SetSelf(IMayInterleavePredicateGrain self);
+        Task SetSelf(IMayInterleaveStaticPredicateGrain self);
+    }
+
+    public interface IMayInterleaveInstancedPredicateGrain : IGrainWithIntegerKey
+    {
+        Task<string> One(string arg); // this interleaves only when arg == "reentrant"
+
+        Task<string> Two();
+        Task<string> TwoReentrant();
+
+        Task Exceptional();
+
+        Task SubscribeToStream();
+        Task PushToStream(string item);
+
+        Task SetSelf(IMayInterleaveInstancedPredicateGrain self);
     }
 
     [Unordered]

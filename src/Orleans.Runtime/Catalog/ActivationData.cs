@@ -1016,7 +1016,7 @@ namespace Orleans.Runtime
                 {
                     try
                     {
-                        return canInterleave.MayInterleave(incoming);
+                        return canInterleave.MayInterleave(GrainInstance, incoming);
                     }
                     catch (Exception exception)
                     {
