@@ -208,7 +208,9 @@ namespace Orleans.Runtime
                 ? checked((int)reader.ValueSequence.Length)
                 : reader.ValueSpan.Length;
 
-            Span<char> buf = stackalloc char[valueLength];
+            Span<char> buf = valueLength <= 128
+                ? (stackalloc char[128])[..valueLength]
+                : new char[valueLength];
 
             var written = reader.CopyString(buf);
             buf = buf[..written];
