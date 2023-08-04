@@ -103,7 +103,7 @@ namespace Orleans.Runtime.GrainDirectory
             }
 
             // Cache update
-            this.cache.AddOrUpdate(result, (int) result.MembershipVersion.Value);
+            this.cache.AddOrUpdate(result, (int)result.MembershipVersion.Value);
 
             return result;
         }
@@ -112,9 +112,14 @@ namespace Orleans.Runtime.GrainDirectory
         {
             // Remove from local cache first so we don't return it anymore
             this.cache.Remove(address);
-            
+
             // Remove from grain directory which may take significantly longer
             await GetGrainDirectory(address.GrainId.Type).Unregister(address);
+
+            if (this.cache.LookUp(address.GrainId, out var entry, out _) && entry == address)
+            {
+                this.cache.Remove(address);
+            }
         }
 
         public void Participate(ISiloLifecycle lifecycle)
