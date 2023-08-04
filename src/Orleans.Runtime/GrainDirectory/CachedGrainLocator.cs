@@ -116,6 +116,7 @@ namespace Orleans.Runtime.GrainDirectory
             // Remove from grain directory which may take significantly longer
             await GetGrainDirectory(address.GrainId.Type).Unregister(address);
 
+            // There is the potential for a lookup to race with the Unregister and add the bad entry back to the cache.
             if (this.cache.LookUp(address.GrainId, out var entry, out _) && entry == address)
             {
                 this.cache.Remove(address);
