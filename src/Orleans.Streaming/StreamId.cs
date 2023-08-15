@@ -109,6 +109,13 @@ namespace Orleans.Runtime
                 return new StreamId(buf, (ushort)nsLen);
             }
         }
+        
+        /// <summary>
+        /// Initializes a new instance of the <see cref="StreamId"/> struct.
+        /// </summary>
+        /// <param name="ns">The namespace.</param>
+        /// <param name="key">The key.</param>
+        public static StreamId Create(string ns, long key) => Create(ns, key.ToString());
 
         /// <summary>
         /// Initializes a new instance of the <see cref="StreamId"/> struct.
