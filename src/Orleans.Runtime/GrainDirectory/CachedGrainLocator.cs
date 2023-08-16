@@ -103,18 +103,21 @@ namespace Orleans.Runtime.GrainDirectory
             }
 
             // Cache update
-            this.cache.AddOrUpdate(result, (int) result.MembershipVersion.Value);
+            this.cache.AddOrUpdate(result, (int)result.MembershipVersion.Value);
 
             return result;
         }
 
         public async Task Unregister(GrainAddress address, UnregistrationCause cause)
         {
-            try
-            {
-                await GetGrainDirectory(address.GrainId.Type).Unregister(address);
-            }
-            finally
+            // Remove from local cache first so we don't return it anymore
+            this.cache.Remove(address);
+
+            // Remove from grain directory which may take significantly longer
+            await GetGrainDirectory(address.GrainId.Type).Unregister(address);
+
+            // There is the potential for a lookup to race with the Unregister and add the bad entry back to the cache.
+            if (this.cache.LookUp(address.GrainId, out var entry, out _) && entry == address)
             {
                 this.cache.Remove(address);
             }
