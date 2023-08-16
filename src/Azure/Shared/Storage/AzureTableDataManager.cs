@@ -38,7 +38,7 @@ namespace Orleans.GrainDirectory.AzureStorage
     /// Utility class to encapsulate row-based access to Azure table storage.
     /// </summary>
     /// <typeparam name="T">Table data entry used by this table / manager.</typeparam>
-    internal class AzureTableDataManager<T> where T : class, ITableEntity, new()
+    internal class AzureTableDataManager<T> where T : class, ITableEntity
     {
         private readonly AzureStorageOperationOptions options;
 
