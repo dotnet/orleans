@@ -85,7 +85,7 @@ namespace Orleans.Streams
             if (base.Cancellation.IsCancellationRequested) throw new InvalidOperationException("Cannot initialize a terminated balancer.");
             if (queueMapper == null)
             {
-                throw new ArgumentNullException("queueMapper");
+                throw new ArgumentNullException(nameof(queueMapper));
             }
             var allQueues = queueMapper.GetAllQueues().ToList();
             this.allQueuesCount = allQueues.Count;

@@ -10,7 +10,7 @@ namespace Orleans.Transactions.Tests
     [TestCategory("BVT"), TestCategory("Transactions")]
     public class TransactionOverloadDetectorTests
     {
-        private ITestOutputHelper output;
+        private readonly ITestOutputHelper output;
 
         public TransactionOverloadDetectorTests(ITestOutputHelper output)
         {

@@ -15,7 +15,7 @@ namespace Orleans.BroadcastChannel
     {
         private readonly ConcurrentDictionary<InternalChannelId, ICallback> _handlers = new();
         private readonly IOnBroadcastChannelSubscribed _subscriptionObserver;
-        private AsyncLock _lock = new AsyncLock();
+        private readonly AsyncLock _lock = new AsyncLock();
 
         private interface ICallback
         {

@@ -44,8 +44,8 @@ namespace Orleans.Storage
     [DebuggerDisplay("MemoryStore:{Name},WithLatency:{latency}")]
     public class MemoryGrainStorageWithLatency :IGrainStorage
     {
-        private MemoryGrainStorage baseGranStorage;
-        private MemoryStorageWithLatencyOptions options;
+        private readonly MemoryGrainStorage baseGranStorage;
+        private readonly MemoryStorageWithLatencyOptions options;
         /// <summary> Default constructor. </summary>
         public MemoryGrainStorageWithLatency(
             string name,

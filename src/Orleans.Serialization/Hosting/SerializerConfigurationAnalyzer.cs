@@ -1,4 +1,4 @@
-﻿using Orleans.Serialization.Configuration;
+using Orleans.Serialization.Configuration;
 using Orleans.Serialization.Serializers;
 using System;
 using System.Collections.Generic;
@@ -29,7 +29,7 @@ namespace Orleans.Serialization
             var allComplaints = new Dictionary<Type, SerializerConfigurationComplaint>();
             foreach (var @interface in options.Interfaces)
             {
-                foreach (var method in @interface.GetMethods())
+                foreach (var method in @interface.GetMethods(BindingFlags.Instance | BindingFlags.Public))
                 {
                     if (typeof(Task).IsAssignableFrom(method.ReturnType))
                     {

@@ -192,7 +192,7 @@ namespace Orleans.Configuration
     public class StreamCheckpointerConfigurationValidator : IConfigurationValidator
     {
         private readonly IServiceProvider services;
-        private string name;
+        private readonly string name;
         public StreamCheckpointerConfigurationValidator(IServiceProvider services, string name)
         {
             this.services = services;

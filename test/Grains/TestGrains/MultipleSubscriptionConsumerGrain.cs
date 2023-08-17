@@ -14,7 +14,7 @@ namespace UnitTests.Grains
     public class MultipleSubscriptionConsumerGrain : Grain, IMultipleSubscriptionConsumerGrain
     {
         private readonly Dictionary<StreamSubscriptionHandle<int>, Tuple<Counter,Counter>> consumedMessageCounts;
-        private ILogger logger;
+        private readonly ILogger logger;
         private int consumerCount = 0;
 
         public MultipleSubscriptionConsumerGrain(ILoggerFactory loggerFactory)
@@ -74,7 +74,7 @@ namespace UnitTests.Grains
         {
             logger.LogInformation("Resume");
             if(handle == null)
-                throw new ArgumentNullException("handle");
+                throw new ArgumentNullException(nameof(handle));
 
             // new counter for this subscription
             Tuple<Counter,Counter> counters;

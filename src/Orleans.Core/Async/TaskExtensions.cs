@@ -132,13 +132,13 @@ namespace Orleans.Internal
         /// For making an uncancellable task cancellable, by ignoring its result.
         /// </summary>
         /// <param name="taskToComplete">The task to wait for unless cancelled</param>
-        /// <param name="cancellationToken">A cancellation token for cancelling the wait</param>
         /// <param name="message">Message to set in the exception</param>
+        /// <param name="cancellationToken">A cancellation token for cancelling the wait</param>
         /// <returns></returns>
         internal static async Task WithCancellation(
             this Task taskToComplete,
-            CancellationToken cancellationToken,
-            string message)
+            string message,
+            CancellationToken cancellationToken)
         {
             try
             {
@@ -203,7 +203,7 @@ namespace Orleans.Internal
         }
 
         //The rationale for GetAwaiter().GetResult() instead of .Result
-        //is presented at https://github.com/aspnet/Security/issues/59.      
+        //is presented at https://github.com/aspnet/Security/issues/59.
         internal static T GetResult<T>(this Task<T> task)
         {
             return task.GetAwaiter().GetResult();

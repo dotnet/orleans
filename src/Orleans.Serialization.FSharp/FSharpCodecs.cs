@@ -89,7 +89,7 @@ namespace Orleans.Serialization
     [RegisterCopier]
     public sealed class FSharpOptionCopier<T> : IDeepCopier<FSharpOption<T>>
     {
-        private IDeepCopier<T> _valueCopier;
+        private readonly IDeepCopier<T> _valueCopier;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="FSharpOptionCopier{T}"/> class.
@@ -189,7 +189,7 @@ namespace Orleans.Serialization
     [RegisterCopier]
     public sealed class FSharpValueOptionCopier<T> : IDeepCopier<FSharpValueOption<T>>
     {
-        private IDeepCopier<T> _valueCopier;
+        private readonly IDeepCopier<T> _valueCopier;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="FSharpValueOptionCopier{T}"/> class.
@@ -220,8 +220,8 @@ namespace Orleans.Serialization
     [RegisterSerializer]
     public class FSharpChoiceCodec<T1, T2> : IFieldCodec<FSharpChoice<T1, T2>>, IDerivedTypeCodec
     {
-        private static readonly Type ElementType1 = typeof(T1);
-        private static readonly Type ElementType2 = typeof(T2);
+        private readonly Type ElementType1 = typeof(T1);
+        private readonly Type ElementType2 = typeof(T2);
 
         private readonly IFieldCodec<T1> _item1Codec;
         private readonly IFieldCodec<T2> _item2Codec;
@@ -325,9 +325,9 @@ namespace Orleans.Serialization
     [RegisterSerializer]
     public class FSharpChoiceCodec<T1, T2, T3> : IFieldCodec<FSharpChoice<T1, T2, T3>>, IDerivedTypeCodec
     {
-        private static readonly Type ElementType1 = typeof(T1);
-        private static readonly Type ElementType2 = typeof(T2);
-        private static readonly Type ElementType3 = typeof(T3);
+        private readonly Type ElementType1 = typeof(T1);
+        private readonly Type ElementType2 = typeof(T2);
+        private readonly Type ElementType3 = typeof(T3);
 
         private readonly IFieldCodec<T1> _item1Codec;
         private readonly IFieldCodec<T2> _item2Codec;
@@ -438,10 +438,10 @@ namespace Orleans.Serialization
     [RegisterSerializer]
     public class FSharpChoiceCodec<T1, T2, T3, T4> : IFieldCodec<FSharpChoice<T1, T2, T3, T4>>, IDerivedTypeCodec
     {
-        private static readonly Type ElementType1 = typeof(T1);
-        private static readonly Type ElementType2 = typeof(T2);
-        private static readonly Type ElementType3 = typeof(T3);
-        private static readonly Type ElementType4 = typeof(T4);
+        private readonly Type ElementType1 = typeof(T1);
+        private readonly Type ElementType2 = typeof(T2);
+        private readonly Type ElementType3 = typeof(T3);
+        private readonly Type ElementType4 = typeof(T4);
 
         private readonly IFieldCodec<T1> _item1Codec;
         private readonly IFieldCodec<T2> _item2Codec;
@@ -561,11 +561,11 @@ namespace Orleans.Serialization
     [RegisterSerializer]
     public class FSharpChoiceCodec<T1, T2, T3, T4, T5> : IFieldCodec<FSharpChoice<T1, T2, T3, T4, T5>>, IDerivedTypeCodec
     {
-        private static readonly Type ElementType1 = typeof(T1);
-        private static readonly Type ElementType2 = typeof(T2);
-        private static readonly Type ElementType3 = typeof(T3);
-        private static readonly Type ElementType4 = typeof(T4);
-        private static readonly Type ElementType5 = typeof(T5);
+        private readonly Type ElementType1 = typeof(T1);
+        private readonly Type ElementType2 = typeof(T2);
+        private readonly Type ElementType3 = typeof(T3);
+        private readonly Type ElementType4 = typeof(T4);
+        private readonly Type ElementType5 = typeof(T5);
 
         private readonly IFieldCodec<T1> _item1Codec;
         private readonly IFieldCodec<T2> _item2Codec;
@@ -694,12 +694,12 @@ namespace Orleans.Serialization
     [RegisterSerializer]
     public class FSharpChoiceCodec<T1, T2, T3, T4, T5, T6> : IFieldCodec<FSharpChoice<T1, T2, T3, T4, T5, T6>>, IDerivedTypeCodec
     {
-        private static readonly Type ElementType1 = typeof(T1);
-        private static readonly Type ElementType2 = typeof(T2);
-        private static readonly Type ElementType3 = typeof(T3);
-        private static readonly Type ElementType4 = typeof(T4);
-        private static readonly Type ElementType5 = typeof(T5);
-        private static readonly Type ElementType6 = typeof(T6);
+        private readonly Type ElementType1 = typeof(T1);
+        private readonly Type ElementType2 = typeof(T2);
+        private readonly Type ElementType3 = typeof(T3);
+        private readonly Type ElementType4 = typeof(T4);
+        private readonly Type ElementType5 = typeof(T5);
+        private readonly Type ElementType6 = typeof(T6);
 
         private readonly IFieldCodec<T1> _item1Codec;
         private readonly IFieldCodec<T2> _item2Codec;

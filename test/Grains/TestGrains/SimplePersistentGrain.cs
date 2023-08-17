@@ -24,7 +24,7 @@ namespace UnitTests.Grains
     /// </summary>
     public class SimplePersistentGrain : Grain<SimplePersistentGrain_State>, ISimplePersistentGrain
     {
-        private ILogger logger;
+        private readonly ILogger logger;
         private Guid version;
         
         public SimplePersistentGrain(ILoggerFactory loggerFactory)

@@ -73,7 +73,7 @@ namespace UnitTests.StorageTests
 
     public class ErrorInjectionStorageProvider : MockStorageProvider, IControllable
     {
-        private ILogger logger;
+        private readonly ILogger logger;
 
         public ErrorInjectionStorageProvider(
             ILogger<ErrorInjectionStorageProvider> logger,

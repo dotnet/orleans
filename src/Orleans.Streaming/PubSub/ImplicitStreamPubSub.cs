@@ -16,7 +16,7 @@ namespace Orleans.Streams
         {
             if (implicitPubSubTable == null)
             {
-                throw new ArgumentNullException("implicitPubSubTable");
+                throw new ArgumentNullException(nameof(implicitPubSubTable));
             }
 
             this.grainFactory = grainFactory;

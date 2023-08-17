@@ -87,11 +87,12 @@ public partial struct PooledBuffer : IBufferWriter<byte>, IDisposable
     public void Reset()
     {
         var current = _first;
-        while (current != null && current != _writeHead)
+        while (current != null)
         {
             var previous = current;
             current = previous.Next as SequenceSegment;
             previous.Return();
+            Debug.Assert(current == null || current != _writeHead);
         }
 
         _writeHead?.Return();

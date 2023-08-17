@@ -5,8 +5,8 @@ using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Editing;
 using Microsoft.CodeAnalysis.Simplification;
+using System;
 using System.Collections.Immutable;
-using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using static Microsoft.CodeAnalysis.CSharp.SyntaxFactory;
@@ -79,33 +79,6 @@ namespace Orleans.Analyzers
             var editor = await DocumentEditor.CreateAsync(context.Document, cancellationToken).ConfigureAwait(false);
             var analysis = SerializationAttributesHelper.AnalyzeTypeDeclaration(declaration);
 
-            var insertUsingDirective = true;
-            var ns = root.DescendantNodesAndSelf()
-                .OfType<UsingDirectiveSyntax>()
-                .FirstOrDefault(directive => string.Equals(directive.Name.ToString(), Constants.SystemNamespace));
-            if (ns is not null)
-            {
-                insertUsingDirective = false;
-            }
-
-            if (insertUsingDirective)
-            {
-                var usingDirective = UsingDirective(IdentifierName(Constants.SystemNamespace)).WithTrailingTrivia(EndOfLine("\r\n"));
-                var lastUsing = root.DescendantNodesAndSelf().OfType<UsingDirectiveSyntax>().LastOrDefault();
-                if (lastUsing is not null)
-                {
-                    editor.InsertAfter(lastUsing, usingDirective);
-                }
-                else if (root.DescendantNodesAndSelf().OfType<NamespaceDeclarationSyntax>().FirstOrDefault() is NamespaceDeclarationSyntax firstNamespace)
-                {
-                    editor.InsertBefore(lastUsing, usingDirective);
-                }
-                else if (root.DescendantNodesAndSelf().FirstOrDefault() is SyntaxNode firstNode)
-                {
-                    editor.InsertBefore(firstNode, usingDirective);
-                }
-            }
-
             foreach (var member in analysis.UnannotatedMembers)
             {
                 // Add the [NonSerialized] attribute
@@ -120,7 +93,32 @@ namespace Orleans.Analyzers
                 editor.AddAttribute(member, attribute);
             }
 
-            return editor.GetChangedDocument();
+            var document = editor.GetChangedDocument();
+            root = await document.GetSyntaxRootAsync(cancellationToken).ConfigureAwait(false);
+
+            var insertUsingDirective = true;
+            if (root is CompilationUnitSyntax rootCompilationUnit)
+            {
+                foreach (var directive in rootCompilationUnit.Usings)
+                {
+                    if (string.Equals(directive.Name.ToString(), Constants.SystemNamespace, StringComparison.Ordinal))
+                    {
+                        insertUsingDirective = false;
+                        break;
+                    }
+                }
+
+                if (insertUsingDirective)
+                {
+                    var usingDirective = UsingDirective(IdentifierName(Constants.SystemNamespace)).WithTrailingTrivia(EndOfLine("\r\n"));
+                    if (root is CompilationUnitSyntax compilationUnit)
+                    {
+                        root = compilationUnit.AddUsings(usingDirective);
+                    }
+                }
+            }
+
+            return document.WithSyntaxRoot(root);
         }
     }
 }

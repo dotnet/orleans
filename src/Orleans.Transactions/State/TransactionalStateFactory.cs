@@ -9,7 +9,7 @@ namespace Orleans.Transactions
 {
     public class TransactionalStateFactory : ITransactionalStateFactory
     {
-        private IGrainContextAccessor contextAccessor;
+        private readonly IGrainContextAccessor contextAccessor;
         public TransactionalStateFactory(IGrainContextAccessor contextAccessor)
         {
             this.contextAccessor = contextAccessor;

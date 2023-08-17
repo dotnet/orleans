@@ -13,7 +13,7 @@ namespace Orleans.Serialization.Codecs
     /// <typeparam name="TSurrogate">The surrogate type serialized in place of <typeparamref name="TField"/>.</typeparam>
     public abstract class GeneralizedValueTypeSurrogateCodec<TField, TSurrogate> : IFieldCodec<TField> where TField : struct where TSurrogate : struct
     {
-        private static readonly Type CodecFieldType = typeof(TField);
+        private readonly Type CodecFieldType = typeof(TField);
         private readonly IValueSerializer<TSurrogate> _surrogateSerializer;
 
         /// <summary>

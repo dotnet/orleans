@@ -79,7 +79,7 @@ namespace Orleans.Streams
             string filterData = null)
         {
             if (token != null && !IsRewindable)
-                throw new ArgumentNullException("token", "Passing a non-null token to a non-rewindable IAsyncObservable.");
+                throw new ArgumentNullException(nameof(token), "Passing a non-null token to a non-rewindable IAsyncObservable.");
             if (observer is GrainReference)
                 throw new ArgumentException("On-behalf subscription via grain references is not supported. Only passing of object references is allowed.", nameof(observer));
             if (batchObserver is GrainReference)
@@ -148,7 +148,7 @@ namespace Orleans.Streams
             StreamSubscriptionHandleImpl<T> oldHandleImpl = CheckHandleValidity(handle);
 
             if (token != null && !IsRewindable)
-                throw new ArgumentNullException("token", "Passing a non-null token to a non-rewindable IAsyncObservable.");
+                throw new ArgumentNullException(nameof(token), "Passing a non-null token to a non-rewindable IAsyncObservable.");
 
             if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug("Resume Token={Token}", token);
             await BindExtensionLazy();
@@ -255,14 +255,14 @@ namespace Orleans.Streams
         private StreamSubscriptionHandleImpl<T> CheckHandleValidity(StreamSubscriptionHandle<T> handle)
         {
             if (handle == null)
-                throw new ArgumentNullException("handle");
+                throw new ArgumentNullException(nameof(handle));
             if (!handle.StreamId.Equals(stream.StreamId))
-                throw new ArgumentException("Handle is not for this stream.", "handle");
+                throw new ArgumentException("Handle is not for this stream.", nameof(handle));
             var handleImpl = handle as StreamSubscriptionHandleImpl<T>;
             if (handleImpl == null)
-                throw new ArgumentException("Handle type not supported.", "handle");
+                throw new ArgumentException("Handle type not supported.", nameof(handle));
             if (!handleImpl.IsValid)
-                throw new ArgumentException("Handle is no longer valid.  It has been used to unsubscribe or resume.", "handle");
+                throw new ArgumentException("Handle is no longer valid.  It has been used to unsubscribe or resume.", nameof(handle));
             return handleImpl;
         }
     }

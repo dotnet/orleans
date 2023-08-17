@@ -17,7 +17,7 @@ namespace Tester.ClientConnectionTests
 {
     public class StallConnectionTests : TestClusterPerTest
     {
-        private static TimeSpan Timeout = TimeSpan.FromSeconds(10);
+        private static readonly TimeSpan Timeout = TimeSpan.FromSeconds(10);
 
         protected override void ConfigureTestCluster(TestClusterBuilder builder)
         {

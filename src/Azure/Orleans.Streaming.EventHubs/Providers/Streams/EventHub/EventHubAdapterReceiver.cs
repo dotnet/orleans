@@ -50,7 +50,7 @@ namespace Orleans.Streaming.EventHubs
 
         private IEventHubReceiver receiver;
 
-        private Func<EventHubPartitionSettings, string, ILogger, IEventHubReceiver> eventHubReceiverFactory;
+        private readonly Func<EventHubPartitionSettings, string, ILogger, IEventHubReceiver> eventHubReceiverFactory;
 
         private IStreamQueueCheckpointer<string> checkpointer;
         private AggregatedQueueFlowController flowController;

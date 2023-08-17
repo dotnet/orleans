@@ -103,8 +103,8 @@ namespace Orleans.Streaming.EventHubs.Testing
         private readonly EventDataGeneratorStreamOptions options;
         private readonly IntCounter sequenceNumberCounter = new IntCounter();
         private readonly ILogger logger;
-        private Func<StreamId, IStreamDataGenerator<EventData>> generatorFactory;
-        private List<IStreamDataGenerator<EventData>> generators;
+        private readonly Func<StreamId, IStreamDataGenerator<EventData>> generatorFactory;
+        private readonly List<IStreamDataGenerator<EventData>> generators;
 
         /// <summary>
         /// Constructor

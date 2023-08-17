@@ -9,15 +9,15 @@ namespace Orleans.Streams
     /// <typeparam name="T">The type of object produced by the observable.</typeparam>
     internal class GenericAsyncObserver<T> : IAsyncObserver<T>
     {
-        private Func<T, StreamSequenceToken, Task> onNextAsync;
-        private Func<Exception, Task> onErrorAsync;
-        private Func<Task> onCompletedAsync;
+        private readonly Func<T, StreamSequenceToken, Task> onNextAsync;
+        private readonly Func<Exception, Task> onErrorAsync;
+        private readonly Func<Task> onCompletedAsync;
 
         public GenericAsyncObserver(Func<T, StreamSequenceToken, Task> onNextAsync, Func<Exception, Task> onErrorAsync, Func<Task> onCompletedAsync)
         {
-            if (onNextAsync == null) throw new ArgumentNullException("onNextAsync");
-            if (onErrorAsync == null) throw new ArgumentNullException("onErrorAsync");
-            if (onCompletedAsync == null) throw new ArgumentNullException("onCompletedAsync");
+            if (onNextAsync == null) throw new ArgumentNullException(nameof(onNextAsync));
+            if (onErrorAsync == null) throw new ArgumentNullException(nameof(onErrorAsync));
+            if (onCompletedAsync == null) throw new ArgumentNullException(nameof(onCompletedAsync));
 
             this.onNextAsync = onNextAsync;
             this.onErrorAsync = onErrorAsync;

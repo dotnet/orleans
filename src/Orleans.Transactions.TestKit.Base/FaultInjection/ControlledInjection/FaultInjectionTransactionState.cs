@@ -63,7 +63,7 @@ namespace Orleans.Transactions.TestKit
         private readonly TransactionalState<TState> txState;
         private readonly ILogger logger;
         public FaultInjectionControl FaultInjectionControl { get; set; }
-        private IControlledTransactionFaultInjector faultInjector;
+        private readonly IControlledTransactionFaultInjector faultInjector;
         public string CurrentTransactionId => this.txState.CurrentTransactionId;
         public FaultInjectionTransactionalState(TransactionalState<TState> txState, IControlledTransactionFaultInjector faultInjector, IGrainRuntime grainRuntime, ILogger<FaultInjectionTransactionalState<TState>> logger)
         {
@@ -77,7 +77,7 @@ namespace Orleans.Transactions.TestKit
         public void Participate(IGrainLifecycle lifecycle)
         {
             lifecycle.Subscribe<FaultInjectionTransactionalState<TState>>(GrainLifecycleStage.SetupState,
-                (ct) => this.txState.OnSetupState(ct, this.SetupResourceFactory));
+                (ct) => this.txState.OnSetupState(this.SetupResourceFactory, ct));
         }
 
         internal void SetupResourceFactory(IGrainContext context, string stateName, TransactionQueue<TState> queue)

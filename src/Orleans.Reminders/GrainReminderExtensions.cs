@@ -80,7 +80,7 @@ public static class GrainReminderExtensions
     /// <param name="grain">The grain instance.</param>
     /// <param name="reminderName">Reminder to return</param>
     /// <returns>Promise for Reminder handle.</returns>
-    public static Task<IGrainReminder> GetReminder(this Grain grain, string reminderName) => GetReminder(grain?.GrainContext, reminderName);
+    public static Task<IGrainReminder?> GetReminder(this Grain grain, string reminderName) => GetReminder(grain?.GrainContext, reminderName);
 
     /// <summary>
     /// Returns a previously registered reminder.
@@ -88,9 +88,9 @@ public static class GrainReminderExtensions
     /// <param name="grain">A grain.</param>
     /// <param name="reminderName">Reminder to return</param>
     /// <returns>Promise for Reminder handle.</returns>
-    public static Task<IGrainReminder> GetReminder(this IGrainBase grain, string reminderName) => GetReminder(grain?.GrainContext, reminderName);
+    public static Task<IGrainReminder?> GetReminder(this IGrainBase grain, string reminderName) => GetReminder(grain?.GrainContext, reminderName);
 
-    private static Task<IGrainReminder> GetReminder(IGrainContext? grainContext, string reminderName)
+    private static Task<IGrainReminder?> GetReminder(IGrainContext? grainContext, string reminderName)
     {
         ArgumentNullException.ThrowIfNull(grainContext, "grain");
         if (string.IsNullOrWhiteSpace(reminderName)) throw new ArgumentNullException(nameof(reminderName));

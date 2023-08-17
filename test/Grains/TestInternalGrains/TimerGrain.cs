@@ -19,10 +19,10 @@ namespace UnitTestGrains
         Dictionary<string, IDisposable> allTimers;
         IDisposable defaultTimer;
         private static readonly TimeSpan period = TimeSpan.FromMilliseconds(100);
-        string DefaultTimerName = "DEFAULT TIMER";
+        readonly string DefaultTimerName = "DEFAULT TIMER";
         IGrainContext context;
 
-        private ILogger logger;
+        private readonly ILogger logger;
 
         public TimerGrain(ILoggerFactory loggerFactory)
         {
@@ -142,7 +142,7 @@ namespace UnitTestGrains
         private IGrainContext context;
         private TaskScheduler activationTaskScheduler;
 
-        private ILogger logger;
+        private readonly ILogger logger;
 
         public TimerCallGrain(ILoggerFactory loggerFactory)
         {

@@ -138,10 +138,11 @@ namespace Orleans.Serialization.Serializers
         /// <inheritdoc/>
         public IFieldCodec<TField> TryGetCodec<TField>()
         {
-            if (_typedCodecs.TryGetValue(typeof(TField), out var existing))
+            var fieldType = typeof(TField);
+            if (_typedCodecs.TryGetValue(fieldType, out var existing))
                 return (IFieldCodec<TField>)existing;
 
-            if (TryGetCodec(typeof(TField)) is not { } untypedResult)
+            if (TryGetCodec(fieldType) is not { } untypedResult)
                 return null;
 
             var typedResult = untypedResult switch
@@ -151,7 +152,7 @@ namespace Orleans.Serialization.Serializers
                 _ => new UntypedCodecWrapper<TField>(untypedResult)
             };
 
-            return (IFieldCodec<TField>)_typedCodecs.GetOrAdd(typeof(TField), typedResult);
+            return (IFieldCodec<TField>)_typedCodecs.GetOrAdd(fieldType, typedResult);
         }
 
         /// <inheritdoc/>
@@ -303,10 +304,11 @@ namespace Orleans.Serialization.Serializers
         /// <inheritdoc/>
         public IDeepCopier<T> TryGetDeepCopier<T>()
         {
-            if (_typedCopiers.TryGetValue(typeof(T), out var existing))
+            var type = typeof(T);
+            if (_typedCopiers.TryGetValue(type, out var existing))
                 return (IDeepCopier<T>)existing;
 
-            if (TryGetDeepCopier(typeof(T)) is not { } untypedResult)
+            if (TryGetDeepCopier(type) is not { } untypedResult)
                 return null;
 
             var typedResult = untypedResult switch
@@ -316,7 +318,7 @@ namespace Orleans.Serialization.Serializers
                 _ => new UntypedCopierWrapper<T>(untypedResult)
             };
 
-            return (IDeepCopier<T>)_typedCopiers.GetOrAdd(typeof(T), typedResult);
+            return (IDeepCopier<T>)_typedCopiers.GetOrAdd(type, typedResult);
         }
 
         /// <inheritdoc/>

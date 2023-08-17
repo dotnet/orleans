@@ -23,7 +23,7 @@ namespace UnitTests.General
     {
         private readonly ITestOutputHelper output;
         private readonly Fixture fixture;
-        private OutsideRuntimeClient runtimeClient;
+        private readonly OutsideRuntimeClient runtimeClient;
 
         public class Fixture : BaseTestClusterFixture
         {
@@ -384,7 +384,7 @@ namespace UnitTests.General
     {
         private readonly ITestOutputHelper output;
 
-        private AsyncLocal<int> threadId = new AsyncLocal<int>();
+        private readonly AsyncLocal<int> threadId = new AsyncLocal<int>();
 
         public Halo_CallContextTests(ITestOutputHelper output)
         {

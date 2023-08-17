@@ -14,7 +14,7 @@ namespace Orleans.Serialization.Codecs
     /// <typeparam name="T">The array element type.</typeparam>
     internal sealed class MultiDimensionalArrayCodec<T> : IGeneralizedCodec
     {
-        private static readonly Type DimensionFieldType = typeof(int[]);
+        private readonly Type DimensionFieldType = typeof(int[]);
         private readonly Type CodecElementType = typeof(T);
 
         private readonly IFieldCodec<int[]> _intArrayCodec;
@@ -73,7 +73,7 @@ namespace Orleans.Serialization.Codecs
                         --idx;
                         if (idx < 0)
                         {
-                            _ = ThrowIndexOutOfRangeException(lengths);
+                            ThrowIndexOutOfRangeException(lengths);
                         }
                     }
                 }
@@ -125,7 +125,7 @@ namespace Orleans.Serialization.Codecs
                         {
                             if (result is null || indices is null || lengths is null)
                             {
-                                return ThrowLengthsFieldMissing();
+                                ThrowLengthsFieldMissing();
                             }
 
                             var element = _elementCodec.ReadValue(ref reader, header);
@@ -153,10 +153,10 @@ namespace Orleans.Serialization.Codecs
         /// <inheritdoc/>
         public bool IsSupportedType(Type type) => type.IsArray && !type.IsSZArray;
 
-        private static object ThrowIndexOutOfRangeException(int[] lengths) => throw new IndexOutOfRangeException(
-            $"Encountered too many elements in array of type {typeof(T)} with declared lengths {string.Join(", ", lengths)}.");
+        private void ThrowIndexOutOfRangeException(int[] lengths) => throw new IndexOutOfRangeException(
+            $"Encountered too many elements in array of type {CodecElementType} with declared lengths {string.Join(", ", lengths)}.");
 
-        private static T ThrowLengthsFieldMissing() => throw new RequiredFieldMissingException("Serialized array is missing its lengths field.");
+        private void ThrowLengthsFieldMissing() => throw new RequiredFieldMissingException("Serialized array is missing its lengths field.");
     }
 
     /// <summary>

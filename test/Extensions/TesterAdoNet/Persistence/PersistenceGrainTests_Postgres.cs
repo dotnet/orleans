@@ -62,7 +62,7 @@ namespace Tester.AdoNet.Persistence
             }
         }
 
-        private Fixture fixture;
+        private readonly Fixture fixture;
 
         public PersistenceGrainTests_Postgres(ITestOutputHelper output, Fixture fixture) : base(output, fixture)
         {

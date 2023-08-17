@@ -180,7 +180,7 @@ namespace Orleans.Storage
                     command.AddParameter("GrainIdExtensionString", grainId.StringKey);
                     command.AddParameter("ServiceId", serviceId);
                     command.AddParameter("GrainStateVersion", !string.IsNullOrWhiteSpace(grainState.ETag) ? int.Parse(grainState.ETag, CultureInfo.InvariantCulture) : default(int?));
-                }, (selector, resultSetCount, token) => Task.FromResult(selector.GetValue(0).ToString()), CancellationToken.None).ConfigureAwait(false));
+                }, (selector, resultSetCount, token) => Task.FromResult(selector.GetValue(0).ToString()), cancellationToken: CancellationToken.None).ConfigureAwait(false));
                 storageVersion = clearRecord.SingleOrDefault();
             }
             catch(Exception ex)
@@ -272,7 +272,7 @@ namespace Orleans.Storage
                         var result = Tuple.Create(storageState, version?.ToString(CultureInfo.InvariantCulture));
                         return Task.FromResult(result);
                     },
-                    CancellationToken.None, commandBehavior).ConfigureAwait(false)).SingleOrDefault();
+                    commandBehavior, CancellationToken.None).ConfigureAwait(false)).SingleOrDefault();
 
                 T state = readRecords != null ? (T) readRecords.Item1 : default;
                 string etag = readRecords != null ? readRecords.Item2 : null;
@@ -361,7 +361,7 @@ namespace Orleans.Storage
                     command.AddParameter("GrainStateVersion", !string.IsNullOrWhiteSpace(grainState.ETag) ? int.Parse(grainState.ETag, CultureInfo.InvariantCulture) : default(int?));
                     command.AddParameter("PayloadBinary", serialized.ToArray());
                 }, (selector, resultSetCount, token) =>
-                { return Task.FromResult(selector.GetNullableInt32("NewGrainStateVersion").ToString()); }, CancellationToken.None).ConfigureAwait(false);
+                { return Task.FromResult(selector.GetNullableInt32("NewGrainStateVersion").ToString()); }, cancellationToken: CancellationToken.None).ConfigureAwait(false);
                 storageVersion = writeRecord.SingleOrDefault();
             }
             catch(Exception ex)

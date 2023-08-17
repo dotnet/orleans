@@ -44,9 +44,9 @@ namespace UnitTests
             this.logger.LogInformation("Reentrancy NonReentrantGrain Test finished OK.");
         }
 
-        public void NonReentrantGrain_WithMayInterleavePredicate_WhenPredicateReturnsFalse(bool performDeadlockDetection)
+        public void NonReentrantGrain_WithMayInterleaveStaticPredicate_WhenPredicateReturnsFalse(bool performDeadlockDetection)
         {
-            var grain = this.grainFactory.GetGrain<IMayInterleavePredicateGrain>(OrleansTestingBase.GetRandomGrainId());
+            var grain = this.grainFactory.GetGrain<IMayInterleaveStaticPredicateGrain>(OrleansTestingBase.GetRandomGrainId());
             grain.SetSelf(grain).Wait();
             bool timeout = false;
             bool deadlock = false;
@@ -67,6 +67,31 @@ namespace UnitTests
                 Assert.True(timeout, "Non-reentrant grain should timeout when MayInterleave predicate returns false");
             }
             this.logger.LogInformation("Reentrancy NonReentrantGrain_WithMayInterleavePredicate_WhenPredicateReturnsFalse Test finished OK.");
+        }
+
+        public void NonReentrantGrain_WithMayInterleaveInstancedPredicate_WhenPredicateReturnsFalse(bool performDeadlockDetection)
+        {
+            var grain = this.grainFactory.GetGrain<IMayInterleaveInstancedPredicateGrain>(OrleansTestingBase.GetRandomGrainId());
+            grain.SetSelf(grain).Wait();
+            bool timeout = false;
+            bool deadlock = false;
+            try
+            {
+                timeout = !grain.Two().Wait(2000);
+            }
+            catch (Exception exc)
+            {
+                Assert.True(false, string.Format("Unexpected exception {0}: {1}", exc.Message, exc.StackTrace));
+            }
+            if (performDeadlockDetection)
+            {
+                Assert.True(deadlock, "Non-reentrant grain should deadlock when MayInterleave predicate returns false");
+            }
+            else
+            {
+                Assert.True(timeout, "Non-reentrant grain should timeout when MayInterleave predicate returns false");
+            }
+            this.logger.LogInformation("Reentrancy NonReentrantGrain_WithMayInterleaveInstancedPredicate_WhenPredicateReturnsFalse Test finished OK.");
         }
 
         public void UnorderedNonReentrantGrain(bool performDeadlockDetection)

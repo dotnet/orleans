@@ -17,7 +17,7 @@ namespace Orleans.GrainDirectory
         /// </summary>
         /// <param name="address">The <see cref="GrainAddress"/> to register</param>
         /// <returns>The <see cref="GrainAddress"/> that is effectively registered in the directory.</returns>
-        Task<GrainAddress> Register(GrainAddress address);
+        Task<GrainAddress?> Register(GrainAddress address);
 
         /// <summary>
         /// Register a <see cref="GrainAddress"/> entry in the directory.
@@ -26,7 +26,7 @@ namespace Orleans.GrainDirectory
         /// </summary>
         /// <param name="address">The <see cref="GrainAddress"/> to register</param>
         /// <returns>The <see cref="GrainAddress"/> that is effectively registered in the directory.</returns>
-        Task<GrainAddress> Register(GrainAddress address, GrainAddress? previousAddress) => GrainDirectoryExtension.Register(this, address, previousAddress);
+        Task<GrainAddress?> Register(GrainAddress address, GrainAddress? previousAddress) => GrainDirectoryExtension.Register(this, address, previousAddress);
 
         /// <summary>
         /// Unregisters the specified <see cref="GrainAddress"/> entry from the directory.
@@ -44,7 +44,7 @@ namespace Orleans.GrainDirectory
         /// </summary>
         /// <param name="grainId">The Grain ID to lookup</param>
         /// <returns>The <see cref="GrainAddress"/> entry found in the directory, if any</returns>
-        Task<GrainAddress> Lookup(GrainId grainId);
+        Task<GrainAddress?> Lookup(GrainId grainId);
 
         /// <summary>
         /// Unregisters all grain directory entries which point to any of the specified silos.
@@ -61,7 +61,7 @@ namespace Orleans.GrainDirectory
 
     internal static class GrainDirectoryExtension
     {
-        internal static async Task<GrainAddress> Register(IGrainDirectory directory, GrainAddress address, GrainAddress? previousAddress)
+        internal static async Task<GrainAddress?> Register(IGrainDirectory directory, GrainAddress address, GrainAddress? previousAddress)
         {
             if (previousAddress is not null)
             {

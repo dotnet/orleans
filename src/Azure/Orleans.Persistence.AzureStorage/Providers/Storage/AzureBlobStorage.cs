@@ -20,11 +20,11 @@ namespace Orleans.Storage
     /// </summary>
     public class AzureBlobGrainStorage : IGrainStorage, ILifecycleParticipant<ISiloLifecycle>
     {
-        private ILogger logger;
+        private readonly ILogger logger;
         private readonly string name;
         private readonly IBlobContainerFactory blobContainerFactory;
         private readonly AzureBlobStorageOptions options;
-        private IGrainStorageSerializer grainStorageSerializer;
+        private readonly IGrainStorageSerializer grainStorageSerializer;
 
         /// <summary> Default constructor </summary>
         public AzureBlobGrainStorage(

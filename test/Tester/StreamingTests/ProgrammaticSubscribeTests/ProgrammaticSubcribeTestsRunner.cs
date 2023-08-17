@@ -297,9 +297,9 @@ namespace Tester.StreamingTests
 
     public class SubscriptionManager
     {
-        private IGrainFactory grainFactory;
-        private IServiceProvider serviceProvider;
-        private IStreamSubscriptionManager subManager;
+        private readonly IGrainFactory grainFactory;
+        private readonly IServiceProvider serviceProvider;
+        private readonly IStreamSubscriptionManager subManager;
         public SubscriptionManager(TestCluster cluster)
         {
             this.grainFactory = cluster.GrainFactory;

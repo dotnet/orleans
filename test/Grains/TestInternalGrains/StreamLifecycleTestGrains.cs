@@ -127,7 +127,7 @@ namespace UnitTests.Grains
 
         protected void InitStream(StreamId streamId, string providerToUse)
         {
-            if (providerToUse == null) throw new ArgumentNullException("providerToUse", "Can't have null stream provider name");
+            if (providerToUse == null) throw new ArgumentNullException(nameof(providerToUse), "Can't have null stream provider name");
 
             if (State.Stream != null && !State.Stream.StreamId.Equals(streamId))
             {

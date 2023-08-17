@@ -12,7 +12,7 @@ namespace Orleans.Streaming.EventHubs.Testing
     /// </summary>
     public class EventHubPartitionGeneratorReceiver : IEventHubReceiver
     {
-        private IDataGenerator<EventData> generator;
+        private readonly IDataGenerator<EventData> generator;
         /// <summary>
         /// Constructor
         /// </summary>

@@ -16,12 +16,12 @@ namespace Orleans.Streams
         {
             if (explicitPubSub == null)
             {
-                throw new ArgumentNullException("explicitPubSub");
+                throw new ArgumentNullException(nameof(explicitPubSub));
             }
 
             if (implicitPubSub == null)
             {
-                throw new ArgumentNullException("implicitPubSub");
+                throw new ArgumentNullException(nameof(implicitPubSub));
             }
 
             this.explicitPubSub = explicitPubSub;

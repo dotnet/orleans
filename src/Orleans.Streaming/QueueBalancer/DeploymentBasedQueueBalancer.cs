@@ -59,7 +59,7 @@ namespace Orleans.Streams
         {
             if (queueMapper == null)
             {
-                throw new ArgumentNullException("queueMapper");
+                throw new ArgumentNullException(nameof(queueMapper));
             }
             this.allQueues = queueMapper.GetAllQueues().ToList();
             NotifyAfterStart().Ignore();

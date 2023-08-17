@@ -16,9 +16,9 @@ namespace Orleans
     /// </summary>
     public class SerializerConfigurationValidator : IConfigurationValidator
     {
-        private ICodecProvider _codecProvider;
-        private TypeManifestOptions _options;
-        private bool _enabled;
+        private readonly ICodecProvider _codecProvider;
+        private readonly TypeManifestOptions _options;
+        private readonly bool _enabled;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="SerializerConfigurationValidator"/> class.

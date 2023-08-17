@@ -12,7 +12,7 @@ namespace UnitTests.Grains
     public class ConsumerEventCountingGrain : Grain, IConsumerEventCountingGrain
     {
         private int _numConsumedItems;
-        private ILogger _logger;
+        private readonly ILogger _logger;
         private IAsyncObservable<int> _consumer;
         private StreamSubscriptionHandle<int> _subscriptionHandle;
         internal const string StreamNamespace = "HaloStreamingNamespace";
@@ -68,7 +68,7 @@ namespace UnitTests.Grains
             _logger.LogInformation("Consumer.BecomeConsumer");
             if (String.IsNullOrEmpty(providerToUse))
             {
-                throw new ArgumentNullException("providerToUse");
+                throw new ArgumentNullException(nameof(providerToUse));
             }
             IStreamProvider streamProvider = this.GetStreamProvider(providerToUse);
             IAsyncStream<int> stream = streamProvider.GetStream<int>(StreamNamespace, streamId);
@@ -96,7 +96,7 @@ namespace UnitTests.Grains
 
         public Task<int> GetNumberConsumed()
         {
-            return Task.FromResult(_numConsumedItems); 
+            return Task.FromResult(_numConsumedItems);
         }
     }
 }

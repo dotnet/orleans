@@ -29,7 +29,7 @@ internal class CosmosGrainStorage : IGrainStorage, ILifecycleParticipant<ISiloLi
         CosmosGrainStorageOptions options,
         ILoggerFactory loggerFactory,
         IServiceProvider serviceProvider,
-        ClusterOptions clusterOptions,
+        IOptions<ClusterOptions> clusterOptions,
         IPartitionKeyProvider partitionKeyProvider
     )
     {
@@ -37,7 +37,7 @@ internal class CosmosGrainStorage : IGrainStorage, ILifecycleParticipant<ISiloLi
         _options = options;
         _name = name;
         _serviceProvider = serviceProvider;
-        _serviceId = clusterOptions.ServiceId;
+        _serviceId = clusterOptions.Value.ServiceId;
         _partitionKeyProvider = partitionKeyProvider;
     }
 

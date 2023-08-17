@@ -56,7 +56,7 @@ namespace UnitTests.Grains
         {
             if (0 == count)
             {
-                throw new ArgumentOutOfRangeException("count");
+                throw new ArgumentOutOfRangeException(nameof(count));
             }
 
             burstCount = count;

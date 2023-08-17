@@ -45,7 +45,7 @@ namespace Orleans.EventSourcing
         protected virtual void RaiseEvent<TEvent>(TEvent @event) 
             where TEvent : TEventBase
         {
-            if (@event == null) throw new ArgumentNullException("event");
+            if (@event == null) throw new ArgumentNullException(nameof(@event));
 
             LogViewAdaptor.Submit(@event);
         }
@@ -57,7 +57,7 @@ namespace Orleans.EventSourcing
         protected virtual void RaiseEvents<TEvent>(IEnumerable<TEvent> events) 
             where TEvent : TEventBase
         {
-            if (events == null) throw new ArgumentNullException("events");
+            if (events == null) throw new ArgumentNullException(nameof(events));
 
             LogViewAdaptor.SubmitRange((IEnumerable<TEventBase>) events);
         }
@@ -71,7 +71,7 @@ namespace Orleans.EventSourcing
         protected virtual Task<bool> RaiseConditionalEvent<TEvent>(TEvent @event)
             where TEvent : TEventBase
         {
-            if (@event == null) throw new ArgumentNullException("event");
+            if (@event == null) throw new ArgumentNullException(nameof(@event));
 
             return LogViewAdaptor.TryAppend(@event);
         }
@@ -85,7 +85,7 @@ namespace Orleans.EventSourcing
         protected virtual Task<bool> RaiseConditionalEvents<TEvent>(IEnumerable<TEvent> events)
             where TEvent : TEventBase
         {
-            if (events == null) throw new ArgumentNullException("events");
+            if (events == null) throw new ArgumentNullException(nameof(events));
             return LogViewAdaptor.TryAppendRange((IEnumerable<TEventBase>) events);
         }
 

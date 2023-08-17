@@ -31,7 +31,7 @@ namespace Orleans.Streams
         private readonly ILoggerFactory loggerFactory;
         private int latestRingNotificationSequenceNumber;
         private int latestCommandNumber;
-        private IQueueAdapter queueAdapter;
+        private readonly IQueueAdapter queueAdapter;
         private readonly IQueueAdapterCache queueAdapterCache;
         private IStreamQueueBalancer queueBalancer;
         private readonly IStreamFilter streamFilter;
@@ -56,17 +56,17 @@ namespace Orleans.Streams
         {
             if (string.IsNullOrWhiteSpace(strProviderName))
             {
-                throw new ArgumentNullException("strProviderName");
+                throw new ArgumentNullException(nameof(strProviderName));
             }
 
             if (streamPubSub == null)
             {
-                throw new ArgumentNullException("streamPubSub", "StreamPubSub reference should not be null");
+                throw new ArgumentNullException(nameof(streamPubSub), "StreamPubSub reference should not be null");
             }
 
             if (streamQueueBalancer == null)
             {
-                throw new ArgumentNullException("streamQueueBalancer", "IStreamQueueBalancer streamQueueBalancer reference should not be null");
+                throw new ArgumentNullException(nameof(streamQueueBalancer), "IStreamQueueBalancer streamQueueBalancer reference should not be null");
             }
 
             queuesToAgentsMap = new Dictionary<QueueId, PersistentStreamPullingAgent>();

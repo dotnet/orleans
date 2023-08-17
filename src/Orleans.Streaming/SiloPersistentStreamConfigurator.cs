@@ -14,8 +14,8 @@ namespace Orleans.Hosting
     /// </summary>
     public class PersistentStreamStorageConfigurationValidator : IConfigurationValidator
     {
-        private IServiceProvider services;
-        private string streamProviderName;
+        private readonly IServiceProvider services;
+        private readonly string streamProviderName;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="PersistentStreamStorageConfigurationValidator"/> class.

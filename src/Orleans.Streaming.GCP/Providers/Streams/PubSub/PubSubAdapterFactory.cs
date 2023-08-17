@@ -19,8 +19,8 @@ namespace Orleans.Providers.GCP.Streams.PubSub
         private readonly ClusterOptions clusterOptions;
         private readonly ILoggerFactory loggerFactory;
         private readonly Func<TDataAdapter> _adaptorFactory;
-        private HashRingBasedStreamQueueMapper _streamQueueMapper;
-        private IQueueAdapterCache _adapterCache;
+        private readonly HashRingBasedStreamQueueMapper _streamQueueMapper;
+        private readonly IQueueAdapterCache _adapterCache;
 
         /// <summary>
         /// Application level failure handler override.

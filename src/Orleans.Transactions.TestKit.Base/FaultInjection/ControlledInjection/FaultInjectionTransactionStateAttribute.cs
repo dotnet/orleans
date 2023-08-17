@@ -30,7 +30,7 @@ namespace Orleans.Transactions.TestKit
 
     public class FaultInjectionTransactionalStateFactory : IFaultInjectionTransactionalStateFactory
     {
-        private IGrainContextAccessor contextAccessor;
+        private readonly IGrainContextAccessor contextAccessor;
         public FaultInjectionTransactionalStateFactory(IGrainContextAccessor contextAccessor)
         {
             this.contextAccessor = contextAccessor;

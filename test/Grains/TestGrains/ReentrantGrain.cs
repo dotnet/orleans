@@ -39,7 +39,7 @@ namespace UnitTests.Grains
     {
         private INonReentrantGrain Self { get; set; }
 
-        private ILogger logger;
+        private readonly ILogger logger;
 
         public NonRentrantGrain(ILoggerFactory loggerFactory)
         {
@@ -78,11 +78,11 @@ namespace UnitTests.Grains
     }
 
     [MayInterleave(nameof(MayInterleave))]
-    public class MayInterleavePredicateGrain : Grain, IMayInterleavePredicateGrain
+    public class MayInterleaveStaticPredicateGrain : Grain, IMayInterleaveStaticPredicateGrain
     {
         private readonly ILogger logger;
 
-        public MayInterleavePredicateGrain(ILoggerFactory loggerFactory)
+        public MayInterleaveStaticPredicateGrain(ILoggerFactory loggerFactory)
         {
             this.logger = loggerFactory.CreateLogger($"{this.GetType().Name}-{this.IdentityString}");
         }
@@ -111,9 +111,9 @@ namespace UnitTests.Grains
 
         static object UnwrapImmutable(object item) => item is Immutable<object> ? ((Immutable<object>)item).Value : item;
 
-        private IMayInterleavePredicateGrain Self { get; set; }
+        private IMayInterleaveStaticPredicateGrain Self { get; set; }
 
-        // this interleaves only when arg == "reentrant" 
+        // this interleaves only when arg == "reentrant"
         // and test predicate will throw when arg = "err"
         public Task<string> One(string arg)
         {
@@ -151,10 +151,94 @@ namespace UnitTests.Grains
             return GetStream().OnNextAsync(item);
         }
 
-        IAsyncStream<string> GetStream() => 
+        IAsyncStream<string> GetStream() =>
             this.GetStreamProvider("sms").GetStream<string>("test-stream-interleave", Guid.Empty);
 
-        public Task SetSelf(IMayInterleavePredicateGrain self)
+        public Task SetSelf(IMayInterleaveStaticPredicateGrain self)
+        {
+            Self = self;
+            return Task.CompletedTask;
+        }
+    }
+
+    [MayInterleave(nameof(MayInterleave))]
+    public class MayInterleaveInstancedPredicateGrain : Grain, IMayInterleaveInstancedPredicateGrain
+    {
+        private readonly ILogger logger;
+
+        public MayInterleaveInstancedPredicateGrain(ILoggerFactory loggerFactory)
+        {
+            this.logger = loggerFactory.CreateLogger($"{this.GetType().Name}-{this.IdentityString}");
+        }
+
+        public bool MayInterleave(IInvokable req)
+        {
+            // not interested
+            if (req.GetArgumentCount() == 0)
+                return false;
+
+            string arg = null;
+
+            // assume single argument message
+            if (req.GetArgumentCount() == 1)
+                arg = (string)UnwrapImmutable(req.GetArgument(0));
+
+            // assume stream message
+            if (req.GetArgumentCount() == 2)
+                arg = (string)UnwrapImmutable(req.GetArgument(1));
+
+            if (arg == "err")
+                throw new ApplicationException("boom");
+
+            return arg == "reentrant";
+        }
+
+        static object UnwrapImmutable(object item) => item is Immutable<object> ? ((Immutable<object>)item).Value : item;
+
+        private IMayInterleaveInstancedPredicateGrain Self { get; set; }
+
+        // this interleaves only when arg == "reentrant"
+        // and test predicate will throw when arg = "err"
+        public Task<string> One(string arg)
+        {
+            return Task.FromResult("one");
+        }
+
+        public async Task<string> Two()
+        {
+            return await Self.One("") + " two";
+        }
+
+        public async Task<string> TwoReentrant()
+        {
+            return await Self.One("reentrant") + " two";
+        }
+
+        public Task Exceptional()
+        {
+            return Self.One("err");
+        }
+
+        public async Task SubscribeToStream()
+        {
+            var stream = GetStream();
+
+            await stream.SubscribeAsync((item, _) =>
+            {
+                logger.LogInformation("Received stream item: {Item}", item);
+                return Task.CompletedTask;
+            });
+        }
+
+        public Task PushToStream(string item)
+        {
+            return GetStream().OnNextAsync(item);
+        }
+
+        IAsyncStream<string> GetStream() =>
+            this.GetStreamProvider("sms").GetStream<string>("test-stream-interleave", Guid.Empty);
+
+        public Task SetSelf(IMayInterleaveInstancedPredicateGrain self)
         {
             Self = self;
             return Task.CompletedTask;
@@ -185,7 +269,7 @@ namespace UnitTests.Grains
     public class ReentrantSelfManagedGrain1 : Grain, IReentrantSelfManagedGrain
     {
         private long destination;
-        private ILogger logger;
+        private readonly ILogger logger;
 
         public ReentrantSelfManagedGrain1(ILoggerFactory loggerFactory)
         {
@@ -232,7 +316,7 @@ namespace UnitTests.Grains
     public class NonReentrantSelfManagedGrain1 : Grain, INonReentrantSelfManagedGrain
     {
         private long destination;
-        private ILogger logger;
+        private readonly ILogger logger;
 
         public NonReentrantSelfManagedGrain1(ILoggerFactory loggerFactory)
         {
@@ -279,7 +363,7 @@ namespace UnitTests.Grains
     [Reentrant]
     public class FanOutGrain : Grain, IFanOutGrain
     {
-        private ILogger logger;
+        private readonly ILogger logger;
         private static readonly TimeSpan OneSecond = TimeSpan.FromSeconds(1);
 
         public FanOutGrain(ILoggerFactory loggerFactory)
@@ -399,7 +483,7 @@ namespace UnitTests.Grains
     [Reentrant]
     public class FanOutACGrain : Grain, IFanOutACGrain
     {
-        private ILogger logger;
+        private readonly ILogger logger;
         private static readonly TimeSpan OneSecond = TimeSpan.FromSeconds(1);
 
         public FanOutACGrain(ILoggerFactory loggerFactory)
@@ -516,7 +600,7 @@ namespace UnitTests.Grains
     [Reentrant]
     public class ReentrantTaskGrain : Grain, IReentrantTaskGrain
     {
-        private ILogger logger;
+        private readonly ILogger logger;
         private long otherId;
         private int count;
 
@@ -554,7 +638,7 @@ namespace UnitTests.Grains
 
     public class NonReentrantTaskGrain : Grain, INonReentrantTaskGrain
     {
-        private ILogger logger;
+        private readonly ILogger logger;
         private long otherId;
         private int count;
 

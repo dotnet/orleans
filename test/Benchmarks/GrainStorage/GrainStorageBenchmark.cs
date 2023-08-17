@@ -13,9 +13,9 @@ namespace Benchmarks.GrainStorage
     public class GrainStorageBenchmark : IDisposable
     {
         private TestCluster host;
-        private int concurrent;
-        private int payloadSize;
-        private TimeSpan duration;
+        private readonly int concurrent;
+        private readonly int payloadSize;
+        private readonly TimeSpan duration;
 
         public GrainStorageBenchmark(int concurrent, int payloadSize, TimeSpan duration)
         {

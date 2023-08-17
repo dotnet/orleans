@@ -111,10 +111,10 @@ namespace Orleans.Serialization.Codecs
             return result;
         }
 
-        private static void ThrowInvalidSizeException(int length) => throw new IndexOutOfRangeException(
+        private void ThrowInvalidSizeException(int length) => throw new IndexOutOfRangeException(
             $"Declared length of {typeof(Stack<T>)}, {length}, is greater than total length of input.");
 
-        private static void ThrowLengthFieldMissing() => throw new RequiredFieldMissingException("Serialized stack is missing its length field.");
+        private void ThrowLengthFieldMissing() => throw new RequiredFieldMissingException("Serialized stack is missing its length field.");
     }
 
     /// <summary>
@@ -124,6 +124,7 @@ namespace Orleans.Serialization.Codecs
     [RegisterCopier]
     public sealed class StackCopier<T> : IDeepCopier<Stack<T>>, IBaseCopier<Stack<T>>
     {
+        private readonly Type _fieldType = typeof(Stack<T>);
         private readonly IDeepCopier<T> _copier;
 
         /// <summary>
@@ -143,7 +144,7 @@ namespace Orleans.Serialization.Codecs
                 return result;
             }
 
-            if (input.GetType() != typeof(Stack<T>))
+            if (input.GetType() as object != _fieldType as object)
             {
                 return context.DeepCopy(input);
             }

@@ -33,7 +33,7 @@ namespace Orleans.Providers.Streams.Common
         {
             if (factoryFunc == null)
             {
-                throw new ArgumentNullException("factoryFunc");
+                throw new ArgumentNullException(nameof(factoryFunc));
             }
 
             this.factoryFunc = factoryFunc;

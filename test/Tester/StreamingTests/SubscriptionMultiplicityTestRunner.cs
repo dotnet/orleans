@@ -24,7 +24,7 @@ namespace UnitTests.StreamingTests
         {
             if (string.IsNullOrWhiteSpace(streamProviderName))
             {
-                throw new ArgumentNullException("streamProviderName");
+                throw new ArgumentNullException(nameof(streamProviderName));
             }
             this.streamProviderName = streamProviderName;
             this.logger = testCluster.Client.ServiceProvider.GetRequiredService<ILogger<SubscriptionMultiplicityTestRunner>>();

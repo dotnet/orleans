@@ -12,7 +12,7 @@ namespace Orleans.Runtime
     /// </summary>
     [Serializable, GenerateSerializer, Immutable]
     [JsonConverter(typeof(GrainIdJsonConverter))]
-    public readonly struct GrainId : IEquatable<GrainId>, IComparable<GrainId>, ISerializable, ISpanFormattable
+    public readonly struct GrainId : IEquatable<GrainId>, IComparable<GrainId>, ISerializable, ISpanFormattable, ISpanParsable<GrainId>
     {
         [Id(0)]
         private readonly GrainType _type;
@@ -64,35 +64,70 @@ namespace Orleans.Runtime
         public static GrainId Create(GrainType type, IdSpan key) => new GrainId(type, key);
 
         /// <summary>
-        /// Creates a new <see cref="GrainType"/> instance.
+        /// Parses a <see cref="GrainId"/> from the span.
         /// </summary>
-        public static GrainId Parse(string value)
+        public static GrainId Parse(ReadOnlySpan<char> value, IFormatProvider? provider = null)
         {
-            if (!TryParse(value, out var result))
+            if (!TryParse(value, provider, out var result))
             {
                 ThrowInvalidGrainId(value);
 
-                static void ThrowInvalidGrainId(string value) => throw new ArgumentException($"Unable to parse \"{value}\" as a grain id");
+                static void ThrowInvalidGrainId(ReadOnlySpan<char> value) => throw new ArgumentException($"Unable to parse \"{value}\" as a grain id");
             }
 
             return result;
         }
 
         /// <summary>
-        /// Creates a new <see cref="GrainType"/> instance.
+        /// Tries to parse a <see cref="GrainId"/> from the span.
         /// </summary>
-        public static bool TryParse(string? value, out GrainId grainId)
+        /// <returns><see langword="true"/> if a valid <see cref="GrainId"/> was parsed. <see langword="false"/> otherwise</returns>
+        public static bool TryParse(ReadOnlySpan<char> value, IFormatProvider? provider, out GrainId result)
         {
             int i;
-            if (value is null || (i = value.IndexOf('/')) < 0)
+            if ((i = value.IndexOf('/')) < 0)
             {
-                grainId = default;
+                result = default;
                 return false;
             }
 
-            grainId = new(new GrainType(Encoding.UTF8.GetBytes(value, 0, i)), new IdSpan(Encoding.UTF8.GetBytes(value, i + 1, value.Length - i - 1)));
+            var typeSpan = value[0..i];
+            var type = new byte[Encoding.UTF8.GetByteCount(typeSpan)];
+            Encoding.UTF8.GetBytes(typeSpan, type);
+
+            var idSpan = value[(i + 1)..];
+            var id = new byte[Encoding.UTF8.GetByteCount(idSpan)];
+            Encoding.UTF8.GetBytes(idSpan, id);
+
+            result = new(new GrainType(type), new IdSpan(id));
             return true;
         }
+
+        /// <summary>
+        /// Parses a <see cref="GrainId"/> from the string.
+        /// </summary>
+        public static GrainId Parse(string value)
+            => Parse(value.AsSpan(), null);
+
+        /// <summary>
+        /// Parses a <see cref="GrainId"/> from the string.
+        /// </summary>
+        public static GrainId Parse(string value, IFormatProvider? provider = null)
+            => Parse(value.AsSpan(), provider);
+
+        /// <summary>
+        /// Tries to parse a <see cref="GrainId"/> from the string.
+        /// </summary>
+        /// <returns><see langword="true"/> if a valid <see cref="GrainId"/> was parsed. <see langword="false"/> otherwise</returns>
+        public static bool TryParse(string? value, out GrainId result)
+            => TryParse(value.AsSpan(), null, out result);
+
+        /// <summary>
+        /// Tries to parse a <see cref="GrainId"/> from the string.
+        /// </summary>
+        /// <returns><see langword="true"/> if a valid <see cref="GrainId"/> was parsed. <see langword="false"/> otherwise</returns>
+        public static bool TryParse(string? value, IFormatProvider? provider, out GrainId result)
+            => TryParse(value.AsSpan(), provider, out result);
 
         /// <summary>
         /// <see langword="true"/> if this instance is the default value, <see langword="false"/> if it is not.
@@ -167,7 +202,21 @@ namespace Orleans.Runtime
     public sealed class GrainIdJsonConverter : JsonConverter<GrainId>
     {
         /// <inheritdoc />
-        public override GrainId Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options) => GrainId.Parse(reader.GetString()!);
+        public override GrainId Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+        {
+            var valueLength = reader.HasValueSequence
+                ? checked((int)reader.ValueSequence.Length)
+                : reader.ValueSpan.Length;
+
+            Span<char> buf = valueLength <= 128
+                ? (stackalloc char[128])[..valueLength]
+                : new char[valueLength];
+
+            var written = reader.CopyString(buf);
+            buf = buf[..written];
+
+            return GrainId.Parse(buf);
+        }
 
         /// <inheritdoc />
         public override void Write(Utf8JsonWriter writer, GrainId value, JsonSerializerOptions options)

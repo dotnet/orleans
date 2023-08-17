@@ -68,11 +68,11 @@ namespace UnitTests
             }
             this.fixture.Logger.LogInformation("Reentrancy ReentrantGrain Test finished OK.");
         }
-        
+
         [Fact, TestCategory("Functional"), TestCategory("Tasks"), TestCategory("Reentrancy")]
-        public void NonReentrantGrain_WithMayInterleavePredicate_WhenPredicateReturnsTrue()
+        public void NonReentrantGrain_WithMayInterleaveStaticPredicate_WhenPredicateReturnsTrue()
         {
-            var grain = this.fixture.GrainFactory.GetGrain<IMayInterleavePredicateGrain>(GetRandomGrainId());
+            var grain = this.fixture.GrainFactory.GetGrain<IMayInterleaveStaticPredicateGrain>(GetRandomGrainId());
             grain.SetSelf(grain).Wait();
             try
             {
@@ -82,13 +82,13 @@ namespace UnitTests
             {
                 Assert.True(false, string.Format("Unexpected exception {0}: {1}", ex.Message, ex.StackTrace));
             }
-            this.fixture.Logger.LogInformation("Reentrancy NonReentrantGrain_WithMayInterleavePredicate_WhenPredicateReturnsTrue Test finished OK.");
+            this.fixture.Logger.LogInformation("Reentrancy NonReentrantGrain_WithMayInterleaveStaticPredicate_WhenPredicateReturnsTrue Test finished OK.");
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Tasks"), TestCategory("Reentrancy")]
-        public async Task NonReentrantGrain_WithMayInterleavePredicate_WhenPredicateThrows()
+        public async Task NonReentrantGrain_WithMayInterleaveStaticPredicate_WhenPredicateThrows()
         {
-            var grain = this.fixture.GrainFactory.GetGrain<IMayInterleavePredicateGrain>(GetRandomGrainId());
+            var grain = this.fixture.GrainFactory.GetGrain<IMayInterleaveStaticPredicateGrain>(GetRandomGrainId());
             grain.SetSelf(grain).Wait();
             try
             {
@@ -100,9 +100,43 @@ namespace UnitTests
                 Assert.True(ex.Message == "boom",
                     "Should fail with Orleans runtime exception having all of necessary details");
             }
-            this.fixture.Logger.LogInformation("Reentrancy NonReentrantGrain_WithMayInterleavePredicate_WhenPredicateThrows Test finished OK.");
+            this.fixture.Logger.LogInformation("Reentrancy NonReentrantGrain_WithMayInterleaveStaticPredicate_WhenPredicateThrows Test finished OK.");
         }
-        
+
+        [Fact, TestCategory("Functional"), TestCategory("Tasks"), TestCategory("Reentrancy")]
+        public void NonReentrantGrain_WithMayInterleaveInstancedPredicate_WhenPredicateReturnsTrue()
+        {
+            var grain = this.fixture.GrainFactory.GetGrain<IMayInterleaveInstancedPredicateGrain>(GetRandomGrainId());
+            grain.SetSelf(grain).Wait();
+            try
+            {
+                Assert.True(grain.TwoReentrant().Wait(2000), "Grain should reenter when MayInterleave predicate returns true");
+            }
+            catch (Exception ex)
+            {
+                Assert.True(false, string.Format("Unexpected exception {0}: {1}", ex.Message, ex.StackTrace));
+            }
+            this.fixture.Logger.LogInformation("Reentrancy NonReentrantGrain_WithMayInterleaveInstancedPredicate_WhenPredicateReturnsTrue Test finished OK.");
+        }
+
+        [Fact, TestCategory("Functional"), TestCategory("Tasks"), TestCategory("Reentrancy")]
+        public async Task NonReentrantGrain_WithMayInterleaveInstancedPredicate_WhenPredicateThrows()
+        {
+            var grain = this.fixture.GrainFactory.GetGrain<IMayInterleaveInstancedPredicateGrain>(GetRandomGrainId());
+            grain.SetSelf(grain).Wait();
+            try
+            {
+                await grain.Exceptional().WithTimeout(TimeSpan.FromSeconds(2));
+            }
+            catch (Exception ex)
+            {
+                Assert.IsType<ApplicationException>(ex);
+                Assert.True(ex.Message == "boom",
+                    "Should fail with Orleans runtime exception having all of necessary details");
+            }
+            this.fixture.Logger.LogInformation("Reentrancy NonReentrantGrain_WithMayInterleaveInstancedPredicate_WhenPredicateThrows Test finished OK.");
+        }
+
         [Fact, TestCategory("Functional"), TestCategory("Tasks"), TestCategory("Reentrancy")]
         public void Reentrancy_Deadlock_1()
         {

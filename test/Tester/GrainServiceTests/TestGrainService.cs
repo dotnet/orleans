@@ -50,7 +50,7 @@ namespace Tester
 
     public class TestGrainService : GrainService, ITestGrainService
     {
-        private TestGrainServiceOptions config;
+        private readonly TestGrainServiceOptions config;
 
         public TestGrainService(GrainId id, Silo silo, ILoggerFactory loggerFactory, IOptions<TestGrainServiceOptions> options) : base(id, silo, loggerFactory)
         {

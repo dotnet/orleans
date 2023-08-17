@@ -14,7 +14,7 @@ namespace Tester.StreamingTests
     public class PluggableQueueBalancerTestBase : OrleansTestingBase
     {
         private readonly TimeSpan Timeout = TimeSpan.FromSeconds(30);
-        private static Type QueueBalancerType = typeof(LeaseBasedQueueBalancerForTest);
+        private static readonly Type QueueBalancerType = typeof(LeaseBasedQueueBalancerForTest);
 
         public virtual async Task ShouldUseInjectedQueueBalancerAndBalanceCorrectly(BaseTestClusterFixture fixture, string streamProviderName, int siloCount, int totalQueueCount)
         {

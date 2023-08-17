@@ -116,13 +116,13 @@ namespace Orleans.Serialization.Codecs
             return result;
         }
 
-        private static void ThrowIndexOutOfRangeException(int length) => throw new IndexOutOfRangeException(
+        private void ThrowIndexOutOfRangeException(int length) => throw new IndexOutOfRangeException(
             $"Encountered too many elements in array of type {typeof(T[])} with declared length {length}.");
 
-        private static void ThrowInvalidSizeException(int length) => throw new IndexOutOfRangeException(
+        private void ThrowInvalidSizeException(int length) => throw new IndexOutOfRangeException(
             $"Declared length of {typeof(T[])}, {length}, is greater than total length of input.");
 
-        private static void ThrowLengthFieldMissing() => throw new RequiredFieldMissingException("Serialized array is missing its length field.");
+        private void ThrowLengthFieldMissing() => throw new RequiredFieldMissingException("Serialized array is missing its length field.");
     }
 
     /// <summary>
@@ -266,12 +266,12 @@ namespace Orleans.Serialization.Codecs
             return result;
         }
 
-        private static void ThrowIndexOutOfRangeException(int length) => throw new IndexOutOfRangeException(
+        private void ThrowIndexOutOfRangeException(int length) => throw new IndexOutOfRangeException(
             $"Encountered too many elements in array of type {typeof(T[])} with declared length {length}.");
 
-        private static void ThrowLengthFieldMissing() => throw new RequiredFieldMissingException("Serialized array is missing its length field.");
+        private void ThrowLengthFieldMissing() => throw new RequiredFieldMissingException("Serialized array is missing its length field.");
 
-        private static void ThrowInvalidSizeException(int length) => throw new IndexOutOfRangeException(
+        private void ThrowInvalidSizeException(int length) => throw new IndexOutOfRangeException(
             $"Declared length of {typeof(ReadOnlyMemory<T>)}, {length}, is greater than total length of input.");
     }
 
@@ -428,12 +428,12 @@ namespace Orleans.Serialization.Codecs
             return result;
         }
 
-        private static void ThrowIndexOutOfRangeException(int length) => throw new IndexOutOfRangeException(
+        private void ThrowIndexOutOfRangeException(int length) => throw new IndexOutOfRangeException(
             $"Encountered too many elements in array of type {typeof(T[])} with declared length {length}.");
 
-        private static void ThrowLengthFieldMissing() => throw new RequiredFieldMissingException("Serialized array is missing its length field.");
+        private void ThrowLengthFieldMissing() => throw new RequiredFieldMissingException("Serialized array is missing its length field.");
 
-        private static void ThrowInvalidSizeException(int length) => throw new IndexOutOfRangeException(
+        private void ThrowInvalidSizeException(int length) => throw new IndexOutOfRangeException(
             $"Declared length of {typeof(Memory<T>)}, {length}, is greater than total length of input.");
     }
 
@@ -593,12 +593,12 @@ namespace Orleans.Serialization.Codecs
             return result;
         }
 
-        private static void ThrowIndexOutOfRangeException(int length) => throw new IndexOutOfRangeException(
+        private void ThrowIndexOutOfRangeException(int length) => throw new IndexOutOfRangeException(
             $"Encountered too many elements in array of type {typeof(T[])} with declared length {length}.");
 
-        private static void ThrowLengthFieldMissing() => throw new RequiredFieldMissingException("Serialized array is missing its length field.");
+        private void ThrowLengthFieldMissing() => throw new RequiredFieldMissingException("Serialized array is missing its length field.");
 
-        private static void ThrowInvalidSizeException(int length) => throw new IndexOutOfRangeException(
+        private void ThrowInvalidSizeException(int length) => throw new IndexOutOfRangeException(
             $"Declared length of {typeof(ArraySegment<T>)}, {length}, is greater than total length of input.");
     }
 

@@ -84,12 +84,12 @@ namespace UnitTests.General
         {
             if (string.IsNullOrWhiteSpace(invariantName))
             {
-                throw new ArgumentException("The name of invariant must contain characters", "invariantName");
+                throw new ArgumentException("The name of invariant must contain characters", nameof(invariantName));
             }
 
             if (string.IsNullOrWhiteSpace(testDatabaseName))
             {
-                throw new ArgumentException("database string must contain characters", "testDatabaseName");
+                throw new ArgumentException("database string must contain characters", nameof(testDatabaseName));
             }
 
             Console.WriteLine("Initializing relational databases...");

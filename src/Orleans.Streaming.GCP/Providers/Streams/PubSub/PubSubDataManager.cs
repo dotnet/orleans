@@ -24,8 +24,8 @@ namespace Orleans.Providers.GCP.Streams.PubSub
         private Topic _topic;
         private PublisherClient _publisher;
         private SubscriberClient _subscriber;
-        private TimeSpan? _deadline;
-        private ServiceEndpoint _customEndpoint;
+        private readonly TimeSpan? _deadline;
+        private readonly ServiceEndpoint _customEndpoint;
 
         [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Security", "CA2104:DoNotDeclareReadOnlyMutableReferenceTypes")]
         private readonly ILogger _logger;

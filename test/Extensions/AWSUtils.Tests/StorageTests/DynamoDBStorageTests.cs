@@ -10,8 +10,8 @@ namespace AWSUtils.Tests.StorageTests.AWSUtils
     [TestCategory("Storage"), TestCategory("AWS"), TestCategory("DynamoDb")]
     public class DynamoDBStorageTests : IClassFixture<DynamoDBStorageTestsFixture>
     {
-        private string PartitionKey;
-        private UnitTestDynamoDBStorage manager;
+        private readonly string PartitionKey;
+        private readonly UnitTestDynamoDBStorage manager;
 
         public DynamoDBStorageTests(DynamoDBStorageTestsFixture fixture)
         {

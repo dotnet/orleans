@@ -24,7 +24,7 @@ namespace Orleans.Runtime
         private DateTime nextTicket;
         private static readonly List<ICollectibleGrainContext> nothing = new(0);
         private readonly ILogger logger;
-        private IAsyncTimer _collectionTimer;
+        private readonly IAsyncTimer _collectionTimer;
         private Task _collectionLoopTask;
         private int collectionNumber;
         private int _activationCount;
@@ -359,7 +359,7 @@ namespace Orleans.Runtime
         {
             if (timeout < quantum)
             {
-                throw new ArgumentException(String.Format("timeout must be at least {0}, but it is {1}", quantum, timeout), "timeout");
+                throw new ArgumentException(String.Format("timeout must be at least {0}, but it is {1}", quantum, timeout), nameof(timeout));
             }
 
             return MakeTicketFromDateTime(DateTime.UtcNow + timeout);

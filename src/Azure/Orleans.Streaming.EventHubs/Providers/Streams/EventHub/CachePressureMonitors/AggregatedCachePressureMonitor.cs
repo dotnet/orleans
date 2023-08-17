@@ -13,7 +13,7 @@ namespace Orleans.Streaming.EventHubs
     public class AggregatedCachePressureMonitor : List<ICachePressureMonitor>, ICachePressureMonitor
     {
         private bool isUnderPressure;
-        private ILogger logger;
+        private readonly ILogger logger;
         /// <summary>
         /// Cache monitor which is used to report cache related metrics
         /// </summary>

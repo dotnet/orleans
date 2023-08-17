@@ -49,7 +49,7 @@ namespace Orleans.Runtime
         public void Start(TimeSpan due, TimeSpan period)
         {
             if (timerStarted) throw new InvalidOperationException(String.Format("Calling start on timer {0} is not allowed, since it was already created in a started mode with specified due.", GetFullName()));
-            if (period == TimeSpan.Zero) throw new ArgumentOutOfRangeException("period", period, "Cannot use TimeSpan.Zero for timer period");
+            if (period == TimeSpan.Zero) throw new ArgumentOutOfRangeException(nameof(period), period, "Cannot use TimeSpan.Zero for timer period");
 
             long dueTm = (long)dueTime.TotalMilliseconds;
             if (dueTm < -1) throw new ArgumentOutOfRangeException(nameof(dueTime), "The due time must not be less than -1.");
@@ -68,10 +68,10 @@ namespace Orleans.Runtime
 
         private void Init(ILogger logger, Func<object, Task> asynCallback, TimerCallback synCallback, object state, TimeSpan due, TimeSpan period)
         {
-            if (synCallback == null && asynCallback == null) throw new ArgumentNullException("synCallback", "Cannot use null for both sync and asyncTask timer callbacks.");
+            if (synCallback == null && asynCallback == null) throw new ArgumentNullException(nameof(synCallback), "Cannot use null for both sync and asyncTask timer callbacks.");
             int numNonNulls = (asynCallback != null ? 1 : 0) + (synCallback != null ? 1 : 0);
-            if (numNonNulls > 1) throw new ArgumentNullException("synCallback", "Cannot define more than one timer callbacks. Pick one.");
-            if (period == TimeSpan.Zero) throw new ArgumentOutOfRangeException("period", period, "Cannot use TimeSpan.Zero for timer period");
+            if (numNonNulls > 1) throw new ArgumentNullException(nameof(synCallback), "Cannot define more than one timer callbacks. Pick one.");
+            if (period == TimeSpan.Zero) throw new ArgumentOutOfRangeException(nameof(period), period, "Cannot use TimeSpan.Zero for timer period");
 
             long dueTm = (long)dueTime.TotalMilliseconds;
             if (dueTm < -1) throw new ArgumentOutOfRangeException(nameof(dueTime), "The due time must not be less than -1.");
@@ -192,7 +192,7 @@ namespace Orleans.Runtime
         [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Design", "CA1031:DoNotCatchGeneralExceptionTypes")]
         private bool Change(TimeSpan newDueTime, TimeSpan period)
         {
-            if (period == TimeSpan.Zero) throw new ArgumentOutOfRangeException("period", period, $"Cannot use TimeSpan.Zero for timer {GetFullName()} period");
+            if (period == TimeSpan.Zero) throw new ArgumentOutOfRangeException(nameof(period), period, $"Cannot use TimeSpan.Zero for timer {GetFullName()} period");
 
             if (timer == null) return false;
 

@@ -166,7 +166,7 @@ namespace Orleans.Persistence
 
             try
             {
-                var payload = new RedisValue(_grainStorageSerializer.Serialize<T>(grainState.State).ToString());
+                RedisValue payload = _grainStorageSerializer.Serialize<T>(grainState.State).ToMemory();
                 var keys = new RedisKey[] { key };
                 var args = new RedisValue[] { etag, newEtag, payload, _ttl };
                 var response = await _db.ScriptEvaluateAsync(WriteScript, keys, args).ConfigureAwait(false);

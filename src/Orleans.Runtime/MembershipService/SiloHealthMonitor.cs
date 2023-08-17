@@ -27,7 +27,7 @@ namespace Orleans.Runtime.MembershipService
         private readonly object _lockObj = new object();
         private readonly IAsyncTimer _pingTimer;
         private ValueStopwatch _elapsedSinceLastSuccessfulResponse;
-        private Func<SiloHealthMonitor, ProbeResult, Task> _onProbeResult;
+        private readonly Func<SiloHealthMonitor, ProbeResult, Task> _onProbeResult;
         private Task _runTask;
 
         /// <summary>

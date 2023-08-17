@@ -12,8 +12,8 @@ namespace Tester.AzureUtils
     [TestCategory("AzureStorage"), TestCategory("Storage")]
     public class AzureTableDataManagerTests : AzureStorageBasicTests
     {
-        private string PartitionKey;
-        private UnitTestAzureTableDataManager manager;
+        private readonly string PartitionKey;
+        private readonly UnitTestAzureTableDataManager manager;
 
         private UnitTestAzureTableData GenerateNewData()
         {

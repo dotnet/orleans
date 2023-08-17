@@ -7,7 +7,7 @@ namespace UnitTests.Grains
 {
     internal class KeyExtensionTestGrain : Grain, IKeyExtensionTestGrain
     {
-        private Guid uniqueId = Guid.NewGuid();
+        private readonly Guid uniqueId = Guid.NewGuid();
 
         public Task<IKeyExtensionTestGrain> GetGrainReference()
         {

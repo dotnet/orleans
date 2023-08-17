@@ -18,7 +18,7 @@ namespace Orleans.Runtime.Membership
     public class ConsulBasedMembershipTable : IMembershipTable
     {
         private static readonly TableVersion NotFoundTableVersion = new TableVersion(0, "0");
-        private ILogger _logger;
+        private readonly ILogger _logger;
         private readonly IConsulClient _consulClient;
         private readonly ConsulClusteringOptions clusteringSiloTableOptions;
         private readonly string clusterId;

@@ -75,12 +75,12 @@ namespace Orleans.Runtime.ReminderService
                     using var timeoutCancellation = new CancellationTokenSource(initTimeout);
                     var cts = CancellationTokenSource.CreateLinkedTokenSource(ct, timeoutCancellation.Token);
                     await this.QueueTask(Start)
-                        .WithCancellation(ct, $"Starting ReminderService failed due to timeout {initTimeout}");
+                        .WithCancellation($"Starting ReminderService failed due to timeout {initTimeout}", ct);
                 },
                 ct =>
                 {
                     return this.QueueTask(Stop)
-                        .WithCancellation(ct, "Stopping ReminderService failed because the task was cancelled");
+                        .WithCancellation("Stopping ReminderService failed because the task was cancelled", ct);
                 });
         }
 
@@ -728,7 +728,7 @@ namespace Orleans.Runtime.ReminderService
                     throw new ArgumentNullException(nameof(grainId));
 
                 if (string.IsNullOrWhiteSpace(reminderName))
-                    throw new ArgumentException("The reminder name is either null or whitespace.", "reminderName");
+                    throw new ArgumentException("The reminder name is either null or whitespace.", nameof(reminderName));
 
                 this.GrainId = grainId;
                 this.ReminderName = reminderName;

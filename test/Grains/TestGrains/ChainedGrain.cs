@@ -28,7 +28,7 @@ namespace UnitTests.Grains
     [StorageProvider(ProviderName = "MemoryStore")]
     public class ChainedGrain : Grain<ChainedGrainState>, IChainedGrain
     {
-        private ILogger logger;
+        private readonly ILogger logger;
 
         public ChainedGrain(ILoggerFactory loggerFactory)
         {

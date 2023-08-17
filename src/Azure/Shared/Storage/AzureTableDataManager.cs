@@ -38,7 +38,7 @@ namespace Orleans.GrainDirectory.AzureStorage
     /// Utility class to encapsulate row-based access to Azure table storage.
     /// </summary>
     /// <typeparam name="T">Table data entry used by this table / manager.</typeparam>
-    internal class AzureTableDataManager<T> where T : class, ITableEntity, new()
+    internal class AzureTableDataManager<T> where T : class, ITableEntity
     {
         private readonly AzureStorageOperationOptions options;
 
@@ -455,11 +455,11 @@ namespace Orleans.GrainDirectory.AzureStorage
             var startTime = DateTime.UtcNow;
             if (Logger.IsEnabled(LogLevel.Trace)) Logger.LogTrace("{Operation} entries: {Data} table {TableName}", operation, Utils.EnumerableToString(collection), TableName);
 
-            if (collection == null) throw new ArgumentNullException("collection");
+            if (collection == null) throw new ArgumentNullException(nameof(collection));
 
             if (collection.Count > this.StoragePolicyOptions.MaxBulkUpdateRows)
             {
-                throw new ArgumentOutOfRangeException("collection", collection.Count,
+                throw new ArgumentOutOfRangeException(nameof(collection), collection.Count,
                         "Too many rows for bulk delete - max " + this.StoragePolicyOptions.MaxBulkUpdateRows);
             }
 
@@ -564,10 +564,10 @@ namespace Orleans.GrainDirectory.AzureStorage
         public async Task BulkInsertTableEntries(IReadOnlyCollection<T> collection)
         {
             const string operation = "BulkInsertTableEntries";
-            if (collection == null) throw new ArgumentNullException("collection");
+            if (collection == null) throw new ArgumentNullException(nameof(collection));
             if (collection.Count > this.StoragePolicyOptions.MaxBulkUpdateRows)
             {
-                throw new ArgumentOutOfRangeException("collection", collection.Count,
+                throw new ArgumentOutOfRangeException(nameof(collection), collection.Count,
                         "Too many rows for bulk update - max " + this.StoragePolicyOptions.MaxBulkUpdateRows);
             }
 

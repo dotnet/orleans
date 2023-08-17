@@ -16,8 +16,8 @@ namespace AWSUtils.Tests.StorageTests
     public class DynamoDBStorageStressTests : IClassFixture<DynamoDBStorageTestsFixture>
     {
         private readonly ITestOutputHelper output;
-        private string PartitionKey;
-        private UnitTestDynamoDBStorage manager;
+        private readonly string PartitionKey;
+        private readonly UnitTestDynamoDBStorage manager;
 
         public DynamoDBStorageStressTests(DynamoDBStorageTestsFixture fixture, ITestOutputHelper output)
         {

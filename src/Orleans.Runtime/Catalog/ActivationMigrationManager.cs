@@ -92,16 +92,43 @@ internal class ActivationMigrationManager : SystemTarget, IActivationMigrationMa
         }
     }
 
-    public ValueTask AcceptMigratingGrains(List<GrainMigrationPackage> migratingGrains)
+    public async ValueTask AcceptMigratingGrains(List<GrainMigrationPackage> migratingGrains)
     {
+        var activations = new List<ActivationData>();
         foreach (var package in migratingGrains)
         {
             // If the activation does not exist, create it and provide it with the migration context while doing so.
             // If the activation already exists or cannot be created, it is too late to perform migration, so ignore the request.
-            _catalog.GetOrCreateActivation(package.GrainId, requestContextData: null, package.MigrationContext);
+            var context = _catalog.GetOrCreateActivation(package.GrainId, requestContextData: null, package.MigrationContext);
+            if (context is ActivationData activation)
+            {
+                activations.Add(activation);
+            }
         }
 
-        return default;
+        while (true)
+        {
+            var allActiveOrTerminal = true;
+            foreach (var activation in activations)
+            {
+                lock (activation)
+                {
+                    if (activation.State is not ActivationState.Valid or ActivationState.Invalid or ActivationState.FailedToActivate)
+                    {
+                        allActiveOrTerminal = false;
+                        break;
+                    }
+                }
+            }
+
+            if (allActiveOrTerminal)
+            {
+                break;
+            }
+
+            // Wait a short amount of time and poll the activations again.
+            await Task.Delay(5);
+        }
     }
 
     public ValueTask MigrateAsync(SiloAddress targetSilo, GrainId grainId, MigrationContext migrationContext)

@@ -1,5 +1,6 @@
 using Orleans.Serialization.Cloning;
 using Orleans.Serialization.Serializers;
+using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 
@@ -27,6 +28,7 @@ namespace Orleans.Serialization.Codecs
     [RegisterCopier]
     public sealed class ReadOnlyDictionaryCopier<TKey, TValue> : IDeepCopier<ReadOnlyDictionary<TKey, TValue>>
     {
+        private readonly Type _fieldType = typeof(ReadOnlyDictionary<TKey, TValue>);
         private readonly IDeepCopier<TKey> _keyCopier;
         private readonly IDeepCopier<TValue> _valueCopier;
 
@@ -43,7 +45,7 @@ namespace Orleans.Serialization.Codecs
                 return result;
             }
 
-            if (input.GetType() != typeof(ReadOnlyDictionary<TKey, TValue>))
+            if (input.GetType() as object != _fieldType as object)
             {
                 return context.DeepCopy(input);
             }

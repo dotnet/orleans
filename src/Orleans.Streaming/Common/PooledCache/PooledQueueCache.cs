@@ -82,8 +82,8 @@ namespace Orleans.Providers.Streams.Common
             TimeSpan? cacheMonitorWriteInterval,
             TimeSpan? purgeMetadataInterval = null)
         {
-            this.cacheDataAdapter = cacheDataAdapter ?? throw new ArgumentNullException("cacheDataAdapter");
-            this.logger = logger ?? throw new ArgumentNullException("logger");
+            this.cacheDataAdapter = cacheDataAdapter ?? throw new ArgumentNullException(nameof(cacheDataAdapter));
+            this.logger = logger ?? throw new ArgumentNullException(nameof(logger));
             this.ItemCount = 0;
             pool = new CachedMessagePool(cacheDataAdapter);
             messageBlocks = new LinkedList<CachedMessageBlock>();
@@ -269,13 +269,13 @@ namespace Orleans.Providers.Streams.Common
 
             if (cursorObj == null)
             {
-                throw new ArgumentNullException("cursorObj");
+                throw new ArgumentNullException(nameof(cursorObj));
             }
 
             var cursor = cursorObj as Cursor;
             if (cursor == null)
             {
-                throw new ArgumentOutOfRangeException("cursorObj", "Cursor is bad");
+                throw new ArgumentOutOfRangeException(nameof(cursorObj), "Cursor is bad");
             }
 
             if (cursor.State != CursorStates.Set)

@@ -25,7 +25,7 @@ namespace Orleans
         {
             if (count <= 0)
             {
-                throw new ArgumentOutOfRangeException("count", "count has to be positive.");
+                throw new ArgumentOutOfRangeException(nameof(count), "count has to be positive.");
             }
             tcs = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
             this.count = count;

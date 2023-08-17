@@ -62,7 +62,7 @@ namespace Benchmarks
             Session.Reset();
             var writer = Writer.CreatePooled(Session);
             Serializer.Serialize(Value, ref writer);
-            writer.Output.Dispose();
+            writer.Dispose();
             return writer.Position;
         }
     }

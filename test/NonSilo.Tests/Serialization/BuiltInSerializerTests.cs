@@ -63,7 +63,7 @@ namespace UnitTests.Serialization
                 $"Should be able to serialize internal type {nameof(EventHubSequenceTokenV2)}.");
         }
 
-        [Fact(Skip = "See https://github.com/dotnet/orleans/issues/3531"), TestCategory("BVT"), TestCategory("CodeGen")]
+        [Fact, TestCategory("BVT"), TestCategory("CodeGen")]
         public void ValueTupleTypesHasSerializer()
         {
             Assert.True(

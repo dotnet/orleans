@@ -1,3 +1,4 @@
+#nullable enable
 using System;
 using System.Collections.Generic;
 using System.Globalization;
@@ -21,8 +22,10 @@ namespace Orleans.GrainDirectory.Redis
         private readonly ILogger<RedisGrainDirectory> _logger;
         private readonly RedisKey _keyPrefix;
         private readonly string _ttl;
-        private IConnectionMultiplexer _redis;
-        private IDatabase _database;
+
+        // Both are initialized in the Initialize method.
+        private IConnectionMultiplexer _redis = null!;
+        private IDatabase _database = null!;
 
         public RedisGrainDirectory(
             RedisGrainDirectoryOptions directoryOptions,
@@ -36,11 +39,11 @@ namespace Orleans.GrainDirectory.Redis
             _ttl = directoryOptions.EntryExpiry is { } ts ? ts.TotalSeconds.ToString(CultureInfo.InvariantCulture) : "-1";
         }
 
-        public async Task<GrainAddress> Lookup(GrainId grainId)
+        public async Task<GrainAddress?> Lookup(GrainId grainId)
         {
             try
             {
-                var result = (string)await _database.StringGetAsync(GetKey(grainId));
+                var result = (string?)await _database.StringGetAsync(GetKey(grainId));
 
                 if (_logger.IsEnabled(LogLevel.Debug))
                     _logger.LogDebug("Lookup {GrainId}: {Result}", grainId, string.IsNullOrWhiteSpace(result) ? "null" : result);
@@ -61,9 +64,9 @@ namespace Orleans.GrainDirectory.Redis
             }
         }
 
-        public Task<GrainAddress> Register(GrainAddress address) => Register(address, null);
+        public Task<GrainAddress?> Register(GrainAddress address) => Register(address, null);
         
-        public async Task<GrainAddress> Register(GrainAddress address, GrainAddress previousAddress)
+        public async Task<GrainAddress?> Register(GrainAddress address, GrainAddress? previousAddress)
         {
             const string RegisterScript =
                 """
@@ -92,10 +95,10 @@ namespace Orleans.GrainDirectory.Redis
             {
                 var previousActivationId = previousAddress is { } ? previousAddress.ActivationId.ToString() : "";
                 var key = GetKey(address.GrainId);
-                var entryString = (string)await _database.ScriptEvaluateAsync(
+                var entryString = (string?)await _database.ScriptEvaluateAsync(
                     RegisterScript,
                     keys: new RedisKey[] { key },
-                    values: new RedisValue[] { value, previousActivationId, _ttl });
+                    values: new RedisValue[] { value, previousActivationId, _ttl })!;
 
                 if (entryString is null)
                 {
@@ -198,24 +201,24 @@ namespace Orleans.GrainDirectory.Redis
             {
                 await _redis.CloseAsync();
                 _redis.Dispose();
-                _redis = null;
-                _database = null;
+                _redis = null!;
+                _database = null!;
             }
         }
 
         private RedisKey GetKey(GrainId grainId) => _keyPrefix.Append(grainId.ToString());
 
         #region Logging
-        private void LogConnectionRestored(object sender, ConnectionFailedEventArgs e)
+        private void LogConnectionRestored(object? sender, ConnectionFailedEventArgs e)
             => _logger.LogInformation(e.Exception, "Connection to {EndPoint} failed: {FailureType}", e.EndPoint, e.FailureType);
 
-        private void LogConnectionFailed(object sender, ConnectionFailedEventArgs e)
+        private void LogConnectionFailed(object? sender, ConnectionFailedEventArgs e)
             => _logger.LogError(e.Exception, "Connection to {EndPoint} failed: {FailureType}", e.EndPoint, e.FailureType);
 
-        private void LogErrorMessage(object sender, RedisErrorEventArgs e)
+        private void LogErrorMessage(object? sender, RedisErrorEventArgs e)
             => _logger.LogError(e.Message);
 
-        private void LogInternalError(object sender, InternalErrorEventArgs e)
+        private void LogInternalError(object? sender, InternalErrorEventArgs e)
             => _logger.LogError(e.Exception, "Internal error");
         #endregion
 

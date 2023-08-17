@@ -49,7 +49,7 @@ namespace Orleans.Transactions.TestKit
             response.PendingStates.Should().BeEmpty();
         }
 
-        private static List<PendingTransactionState<TState>> emptyPendingStates = new List<PendingTransactionState<TState>>();
+        private static readonly List<PendingTransactionState<TState>> emptyPendingStates = new List<PendingTransactionState<TState>>();
   
         public virtual async Task StoreWithoutChanges()
         {

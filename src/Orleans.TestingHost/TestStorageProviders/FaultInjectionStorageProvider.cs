@@ -31,8 +31,8 @@ namespace Orleans.TestingHost
     public class FaultInjectionGrainStorage : IGrainStorage, ILifecycleParticipant<ISiloLifecycle>
     {
         private readonly IGrainStorage realStorageProvider;
-        private IGrainFactory grainFactory;
-        private ILogger logger;
+        private readonly IGrainFactory grainFactory;
+        private readonly ILogger logger;
         private readonly FaultInjectionGrainStorageOptions options;
 
         /// <summary>

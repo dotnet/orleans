@@ -28,7 +28,7 @@ namespace Orleans.Runtime
         private readonly GrainDirectoryResolver grainDirectoryResolver;
         private readonly ILocalGrainDirectory directory;
         private readonly ActivationDirectory activations;
-        private IServiceProvider serviceProvider;
+        private readonly IServiceProvider serviceProvider;
         private readonly ILogger logger;
         private readonly string localSiloName;
         private readonly IOptions<GrainCollectionOptions> collectionOptions;

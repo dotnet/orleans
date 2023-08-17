@@ -17,7 +17,7 @@ namespace Tests.GeoClusterTests
     public class BasicLogTestGrainTests : IClassFixture<BasicLogTestGrainTests.Fixture>
     {
         private readonly Fixture fixture;
-        private Random random;
+        private readonly Random random;
 
         public class Fixture : BaseAzureTestClusterFixture
         {

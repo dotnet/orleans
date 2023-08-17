@@ -19,8 +19,8 @@ namespace UnitTests.Grains
 
         private Guid activationGuid;
         private readonly List<Tuple<DateTime, DateTime>> calls = new List<Tuple<DateTime, DateTime>>();
-        private ILogger logger;
-        private static HashSet<Guid> allActivationIds = new HashSet<Guid>();
+        private readonly ILogger logger;
+        private static readonly HashSet<Guid> allActivationIds = new HashSet<Guid>();
 
         public StatelessWorkerGrain(ILoggerFactory loggerFactory)
         {

@@ -57,10 +57,10 @@ namespace Orleans.Streams
             StreamSequenceToken token,
             string filterData)
         {
-            this.subscriptionId = subscriptionId ?? throw new ArgumentNullException("subscriptionId");
+            this.subscriptionId = subscriptionId ?? throw new ArgumentNullException(nameof(subscriptionId));
             this.observer = observer;
             this.batchObserver = batchObserver;
-            this.streamImpl = streamImpl ?? throw new ArgumentNullException("streamImpl");
+            this.streamImpl = streamImpl ?? throw new ArgumentNullException(nameof(streamImpl));
             this.filterData = filterData;
             this.isRewindable = streamImpl.IsRewindable;
             if (IsRewindable)

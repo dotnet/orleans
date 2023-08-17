@@ -40,7 +40,7 @@ namespace UnitTests.Grains
 
     public class RequestContextTaskGrain : Grain, IRequestContextTaskGrain
     {
-        private ILogger logger;
+        private readonly ILogger logger;
 
         public RequestContextTaskGrain(ILoggerFactory loggerFactory)
         {

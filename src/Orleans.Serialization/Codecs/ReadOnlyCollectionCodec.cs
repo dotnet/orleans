@@ -1,5 +1,6 @@
 using Orleans.Serialization.Cloning;
 using Orleans.Serialization.Serializers;
+using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 
@@ -49,6 +50,7 @@ namespace Orleans.Serialization.Codecs
     [RegisterCopier]
     public sealed class ReadOnlyCollectionCopier<T> : IDeepCopier<ReadOnlyCollection<T>>
     {
+        private readonly Type _fieldType = typeof(ReadOnlyCollection<T>);
         private readonly IDeepCopier<T> _elementCopier;
 
         /// <summary>
@@ -68,7 +70,7 @@ namespace Orleans.Serialization.Codecs
                 return result;
             }
 
-            if (input.GetType() != typeof(ReadOnlyCollection<T>))
+            if (input.GetType() as object != _fieldType as object)
             {
                 return context.DeepCopy(input);
             }

@@ -11,7 +11,7 @@ namespace Orleans.Transactions.TOC
     internal class TocTransactionQueue<TService> : TransactionQueue<TransactionCommitter<TService>.OperationState>
                 where TService : class
     {
-        private TService service;
+        private readonly TService service;
 
         public TocTransactionQueue(
             TService service,

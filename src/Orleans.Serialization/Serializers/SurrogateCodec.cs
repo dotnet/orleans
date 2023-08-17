@@ -21,7 +21,7 @@ public sealed class SurrogateCodec<TField, TSurrogate, TConverter>
     where TSurrogate : struct
     where TConverter : IConverter<TField, TSurrogate>
 {
-    private readonly Type _fieldType;
+    private readonly Type _fieldType = typeof(TField);
     private readonly IValueSerializer<TSurrogate> _surrogateSerializer;
     private readonly IDeepCopier<TSurrogate> _surrogateCopier;
     private readonly IPopulator<TField, TSurrogate> _populator;
@@ -42,7 +42,6 @@ public sealed class SurrogateCodec<TField, TSurrogate, TConverter>
         _surrogateCopier = surrogateCopier;
         _converter = converter;
         _populator = converter as IPopulator<TField, TSurrogate>;
-        _fieldType = typeof(TField);
     }
 
     /// <inheritdoc/>
@@ -91,7 +90,7 @@ public sealed class SurrogateCodec<TField, TSurrogate, TConverter>
             return;
         }
 
-        if (value.GetType() == typeof(TField))
+        if (value.GetType() as object == _fieldType as object)
         {
             writer.WriteStartObject(fieldIdDelta, expectedType, _fieldType);
             var surrogate = _converter.ConvertToSurrogate(in value);
@@ -134,5 +133,5 @@ public sealed class SurrogateCodec<TField, TSurrogate, TConverter>
     }
 
     [DoesNotReturn]
-    private static void ThrowNoPopulatorException() => throw new NotSupportedException($"Surrogate type {typeof(TConverter)} does not implement {typeof(IPopulator<TField, TSurrogate>)} and therefore cannot be used in an inheritance hierarchy.");
+    private void ThrowNoPopulatorException() => throw new NotSupportedException($"Surrogate type {typeof(TConverter)} does not implement {typeof(IPopulator<TField, TSurrogate>)} and therefore cannot be used in an inheritance hierarchy.");
 }
