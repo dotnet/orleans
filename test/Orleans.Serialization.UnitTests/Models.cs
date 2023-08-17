@@ -68,12 +68,12 @@ public sealed class MyJsonSerializableAttribute : Attribute
 {
 }
 
-interface IMyBase
+internal interface IMyBase
 {
     MyValue BaseValue { get; set; }
 }
 
-interface IMySub : IMyBase
+internal interface IMySub : IMyBase
 {
     MyValue SubValue { get; set; }
 }

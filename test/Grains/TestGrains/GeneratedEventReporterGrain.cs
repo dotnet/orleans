@@ -9,7 +9,7 @@ using TestGrainInterfaces;
 
 namespace TestGrains
 {
-    class GeneratedEventReporterGrain : Grain, IGeneratedEventReporterGrain
+    internal class GeneratedEventReporterGrain : Grain, IGeneratedEventReporterGrain
     {
         private readonly ILogger logger;
 

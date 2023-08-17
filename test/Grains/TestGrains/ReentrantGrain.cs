@@ -109,7 +109,7 @@ namespace UnitTests.Grains
             return arg == "reentrant";
         }
 
-        static object UnwrapImmutable(object item) => item is Immutable<object> ? ((Immutable<object>)item).Value : item;
+        private static object UnwrapImmutable(object item) => item is Immutable<object> ? ((Immutable<object>)item).Value : item;
 
         private IMayInterleaveStaticPredicateGrain Self { get; set; }
 
@@ -151,7 +151,7 @@ namespace UnitTests.Grains
             return GetStream().OnNextAsync(item);
         }
 
-        IAsyncStream<string> GetStream() =>
+        private IAsyncStream<string> GetStream() =>
             this.GetStreamProvider("sms").GetStream<string>("test-stream-interleave", Guid.Empty);
 
         public Task SetSelf(IMayInterleaveStaticPredicateGrain self)

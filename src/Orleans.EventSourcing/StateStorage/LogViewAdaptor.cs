@@ -13,8 +13,8 @@ namespace Orleans.EventSourcing.StateStorage
     /// A log view adaptor that wraps around a traditional storage adaptor, and uses batching and e-tags
     /// to append entries.
     ///<para>
-    /// The log itself is transient, i.e. not actually saved to storage - only the latest view and some 
-    /// metadata (the log position, and write flags) are stored. 
+    /// The log itself is transient, i.e. not actually saved to storage - only the latest view and some
+    /// metadata (the log position, and write flags) are stored.
     /// </para>
     /// </summary>
     /// <typeparam name="TLogView">Type of log view</typeparam>
@@ -35,9 +35,9 @@ namespace Orleans.EventSourcing.StateStorage
         private const int maxEntriesInNotifications = 200;
 
 
-        readonly IGrainStorage globalGrainStorage;
-        readonly string grainTypeName;        // stores the confirmed state including metadata
-        GrainStateWithMetaDataAndETag<TLogView> GlobalStateCache;
+        private readonly IGrainStorage globalGrainStorage;
+        private readonly string grainTypeName;        // stores the confirmed state including metadata
+        private GrainStateWithMetaDataAndETag<TLogView> GlobalStateCache;
 
         /// <inheritdoc/>
         protected override TLogView LastConfirmedView()
@@ -221,7 +221,7 @@ namespace Orleans.EventSourcing.StateStorage
         /// </summary>
         [Serializable]
         [GenerateSerializer]
-        protected internal sealed class UpdateNotificationMessage : INotificationMessage 
+        protected internal sealed class UpdateNotificationMessage : INotificationMessage
         {
             /// <inheritdoc/>
             [Id(0)]
@@ -298,7 +298,7 @@ namespace Orleans.EventSourcing.StateStorage
                 var updateNotification = notifications.ElementAt(0).Value;
                 notifications.RemoveAt(0);
 
-                // Apply all operations in pending 
+                // Apply all operations in pending
                 foreach (var u in updateNotification.Updates)
                     try
                     {
@@ -313,7 +313,7 @@ namespace Orleans.EventSourcing.StateStorage
 
                 GlobalStateCache.StateAndMetaData.FlipBit(updateNotification.Origin);
 
-                GlobalStateCache.ETag = updateNotification.ETag;         
+                GlobalStateCache.ETag = updateNotification.ETag;
 
                 Services.Log(LogLevel.Debug, "notification success ({0} updates) {1}", updateNotification.Updates.Count, GlobalStateCache);
             }
@@ -321,12 +321,12 @@ namespace Orleans.EventSourcing.StateStorage
             Services.Log(LogLevel.Trace, "unprocessed notifications in queue: {0}", notifications.Count);
 
             base.ProcessNotifications();
-         
+
         }
 
 
 #if DEBUG
-        bool operation_in_progress;
+        private bool operation_in_progress;
 #endif
 
         [Conditional("DEBUG")]

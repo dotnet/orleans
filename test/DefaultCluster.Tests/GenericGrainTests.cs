@@ -57,7 +57,7 @@ namespace DefaultCluster.Tests.General
             Assert.Equal("789", stringResult);
         }
 
-        /// Multiple GetGrain requests with the same id return the same concrete grain 
+        /// Multiple GetGrain requests with the same id return the same concrete grain
         [Fact, TestCategory("BVT"), TestCategory("Generics")]
         public async Task GenericGrainTests_ConcreteGrainWithGenericInterfaceMultiplicity()
         {
@@ -86,10 +86,10 @@ namespace DefaultCluster.Tests.General
 
             // generic grain implementation does not change the set value:
             await grain.Transform();
-            
+
             T result = await grain.Get();
-            
-            Assert.Equal(setValue, result);            
+
+            Assert.Equal(setValue, result);
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Generics")]
@@ -102,10 +102,10 @@ namespace DefaultCluster.Tests.General
 
             // generic grain implementation does not change the set value:
             await grain.Transform();
-            
+
             var result = await grain.Get();
-            
-            Assert.Equal(expected, result);            
+
+            Assert.Equal(expected, result);
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Generics")]
@@ -117,8 +117,8 @@ namespace DefaultCluster.Tests.General
             await grain.Set(expected);
 
             var result = await grain.Get();
-            
-            Assert.Equal(expected, result);            
+
+            Assert.Equal(expected, result);
         }
 
         /// Can instantiate grains that implement generic interfaces with generic type parameters
@@ -154,7 +154,7 @@ namespace DefaultCluster.Tests.General
             Assert.Equal(1.2f, floatResult);
         }
 
-        /// If both a concrete implementation and a generic implementation of a 
+        /// If both a concrete implementation and a generic implementation of a
         /// generic interface exist, prefer the concrete implementation.
         [Fact, TestCategory("BVT"), TestCategory("Generics")]
         public async Task GenericGrainTests_PreferConcreteGrainImplementationOfGenericInterface()
@@ -245,7 +245,7 @@ namespace DefaultCluster.Tests.General
             await grainRef1.Set(1);
             await grainRef1.Transform();  // ConcreteGrainWith2GenericInterfaces multiplies the set value by 10:
 
-            // A second reference to a different interface implemented by ConcreteGrainWith2GenericInterfaces 
+            // A second reference to a different interface implemented by ConcreteGrainWith2GenericInterfaces
             // will reference the same grain:
             var grainRef2 = GetGrain<IGenericGrain<int, string>>(grainId);
             // ConcreteGrainWith2GenericInterfaces returns a string representation of the current value multiplied by 10:
@@ -692,7 +692,7 @@ namespace DefaultCluster.Tests.General
             var grain =  this.GrainFactory.GetGrain<ICircularStateTestGrain>(primaryKey: grainId, keyExtension: grainId.ToString("N"));
             _ = await grain.GetState();
         }
-                
+
         [Fact, TestCategory("BVT"), TestCategory("Generics")]
         public async Task Generic_GrainWithTypeConstraints()
         {
@@ -738,7 +738,7 @@ namespace DefaultCluster.Tests.General
         }
 
         [Fact(Skip = "https://github.com/dotnet/orleans/issues/1655 Casting from non-generic to generic interface fails with an obscure error message"), TestCategory("Functional"), TestCategory("Cast"), TestCategory("Generics")]
-        public async Task Generic_CastToGenericInterfaceAfterActivation() 
+        public async Task Generic_CastToGenericInterfaceAfterActivation()
         {
             var grain =  this.GrainFactory.GetGrain<INonGenericCastableGrain>(Guid.NewGuid());
             await grain.DoSomething(); //activates original grain type here
@@ -760,7 +760,7 @@ namespace DefaultCluster.Tests.General
 
             Assert.Equal("Hello!", result);
         }
-        
+
         [Fact, TestCategory("BVT"), TestCategory("Cast")]
         public async Task Generic_CastToDifferentlyConcretizedInterfaceBeforeActivation() {
             var grain =  this.GrainFactory.GetGrain<INonGenericCastableGrain>(Guid.NewGuid());
@@ -771,7 +771,7 @@ namespace DefaultCluster.Tests.General
 
             Assert.Equal("Hello!", result);
         }
-        
+
         [Fact, TestCategory("BVT"), TestCategory("Cast"), TestCategory("Generics")]
         public async Task Generic_CastGenericInterfaceToNonGenericInterfaceBeforeActivation() {
             var grain =  this.GrainFactory.GetGrain<IGenericCastableGrain<string>>(Guid.NewGuid());
@@ -782,7 +782,7 @@ namespace DefaultCluster.Tests.General
 
             Assert.Equal("Hello!", result);
         }
-        
+
         /// <summary>
         /// Tests that generic grains can have generic state and that the parameters to the Grain{TState}
         /// class do not have to match the parameters to the grain class itself.
@@ -808,13 +808,13 @@ namespace DefaultCluster.Tests.General
             {
             }
 
-            static async Task<Type[]> GetConcreteGenArgs(IBasicGrain @this) {
+            private static async Task<Type[]> GetConcreteGenArgs(IBasicGrain @this) {
                 var genArgTypeNames = await @this.ConcreteGenArgTypeNames();
 
                 return genArgTypeNames.Select(n => Type.GetType(n))
                                         .ToArray();
             }
-                        
+
 
             [Fact(Skip = "Currently unsupported"), TestCategory("Generics")]
             public async Task Generic_PartiallySpecifyingGenericGrainFulfilsInterface() {
@@ -826,7 +826,7 @@ namespace DefaultCluster.Tests.General
                         concreteGenArgs.SequenceEqual(new[] { typeof(int) })
                         );
             }
-            
+
 
             [Fact(Skip = "Currently unsupported"), TestCategory("Generics")]
             public async Task Generic_GenericGrainCanReuseOwnGenArgRepeatedly() {
@@ -866,7 +866,7 @@ namespace DefaultCluster.Tests.General
 
                 Assert.Equal("Hello!", response);
             }
-            
+
 
             [Fact(Skip = "Currently unsupported"), TestCategory("Generics")]
             public async Task Generic_RepeatedRearrangedGenArgsResolved() {
@@ -881,7 +881,7 @@ namespace DefaultCluster.Tests.General
                         concreteGenArgs.SequenceEqual(new[] { typeof(string), typeof(int) })
                         );
             }
-            
+
 
             [Fact(Skip = "Currently unsupported"), TestCategory("Generics")]
             public async Task Generic_RepeatedGenArgsWorkAmongstInterfacesInTypeResolution() {
@@ -921,7 +921,7 @@ namespace DefaultCluster.Tests.General
 
                 Assert.Equal("Hello!", response);
             }
-            
+
 
             [Fact(Skip = "Currently unsupported"), TestCategory("Generics")]
             public async Task Generic_RearrangedGenArgsOfCorrectArityAreResolved() {
@@ -933,7 +933,7 @@ namespace DefaultCluster.Tests.General
                         concreteGenArgs.SequenceEqual(new[] { typeof(long), typeof(int) })
                         );
             }
-            
+
 
             [Fact(Skip = "Currently unsupported"), TestCategory("Generics")]
             public async Task Generic_RearrangedGenArgsOfCorrectNumberAreCastable() {
@@ -968,7 +968,7 @@ namespace DefaultCluster.Tests.General
             //Below must be commented out, as supplying multiple fully-specified generic interfaces
             //to a class causes the codegen to fall over, stopping all other tests from working.
 
-            //See new test here of the bit causing the issue - type info conflation:  
+            //See new test here of the bit causing the issue - type info conflation:
             //UnitTests.CodeGeneration.CodeGeneratorTests.CodeGen_EncounteredFullySpecifiedInterfacesAreEncodedDistinctly()
 
 
@@ -983,7 +983,7 @@ namespace DefaultCluster.Tests.General
 
 
             //[Fact, TestCategory("Generics")]
-            //public async Task CastingBetweenFullySpecifiedGenericInterfaces() 
+            //public async Task CastingBetweenFullySpecifiedGenericInterfaces()
             //{
             //    //Is this legitimate? Solely in the realm of virtual grain interfaces - no special knowledge of implementation implicated, only of interface hierarchy
 
@@ -1003,7 +1003,7 @@ namespace DefaultCluster.Tests.General
             //}
 
             //*******************************************************************************************************
-            
+
 
             [Fact(Skip = "Currently unsupported"), TestCategory("Generics")]
             public async Task Generic_CanCastToFullySpecifiedInterfaceUnrelatedToConcreteGenArgs() {
@@ -1029,7 +1029,7 @@ namespace DefaultCluster.Tests.General
 
                 Assert.Equal("Hello!", response);
             }
-            
+
 
             [Fact(Skip = "Currently unsupported"), TestCategory("Generics")]
             public async Task Generic_GenArgsCanBeFurtherSpecialized() {
@@ -1053,7 +1053,7 @@ namespace DefaultCluster.Tests.General
                         concreteGenArgs.SequenceEqual(new[] { typeof(long) })
                         );
             }
-            
+
 
             [Fact(Skip = "Currently unsupported"), TestCategory("Generics")]
             public async Task Generic_CanCastBetweenInterfacesWithFurtherSpecializedGenArgs() {

@@ -190,7 +190,7 @@ namespace Orleans.Providers.Streams.Generator
 
         private class Receiver : IQueueAdapterReceiver
         {
-            const int MaxDelayMs = 20;
+            private const int MaxDelayMs = 20;
             private readonly IQueueAdapterReceiverMonitor receiverMonitor;
             public IStreamGenerator QueueGenerator { private get; set; }
 

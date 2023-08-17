@@ -26,8 +26,8 @@ namespace UnitTests.General
         private readonly TimeSpan failureTimeout = TimeSpan.FromSeconds(30);
         private readonly TimeSpan endWait = TimeSpan.FromMinutes(5);
 
-        enum Fail { First, Random, Last }
-        
+        private enum Fail { First, Random, Last }
+
         protected override void ConfigureTestCluster(TestClusterBuilder builder)
         {
             builder.AddSiloBuilderConfigurator<Configurator>();

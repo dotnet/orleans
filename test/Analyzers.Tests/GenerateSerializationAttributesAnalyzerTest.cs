@@ -12,7 +12,7 @@ namespace Analyzers.Tests;
 [TestCategory("BVT"), TestCategory("Analyzer")]
 public class GenerateSerializationAttributesAnalyzerTest : DiagnosticAnalyzerTestBase<GenerateSerializationAttributesAnalyzer>
 {
-    async Task VerifyGeneratedDiagnostic(string code)
+    private async Task VerifyGeneratedDiagnostic(string code)
     {
         var (diagnostics, _) = await GetDiagnosticsAsync(code, new string[0]);
 

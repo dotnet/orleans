@@ -80,7 +80,7 @@ namespace DefaultCluster.Tests.General
             this.GrainFactory.DeleteObjectReference<ISimpleGrainObserver>(reference);
         }
 
-        void ObserverTest_SimpleNotification_Callback(int a, int b, AsyncResultHandle result)
+        private void ObserverTest_SimpleNotification_Callback(int a, int b, AsyncResultHandle result)
         {
             callbackCounter++;
             this.Logger.LogInformation("Invoking ObserverTest_SimpleNotification_Callback for {CallbackCounter} time with a = {A} and b = {B}", this.callbackCounter, a, b);
@@ -145,7 +145,7 @@ namespace DefaultCluster.Tests.General
             this.GrainFactory.DeleteObjectReference<ISimpleGrainObserver>(reference);
         }
 
-        void ObserverTest_DoubleSubscriptionSameReference_Callback(int a, int b, AsyncResultHandle result)
+        private void ObserverTest_DoubleSubscriptionSameReference_Callback(int a, int b, AsyncResultHandle result)
         {
             callbackCounter++;
             this.Logger.LogInformation("Invoking ObserverTest_DoubleSubscriptionSameReference_Callback for {CallbackCounter} time with a={A} and b={B}", this.callbackCounter, a, b);
@@ -177,7 +177,7 @@ namespace DefaultCluster.Tests.General
             this.GrainFactory.DeleteObjectReference<ISimpleGrainObserver>(reference);
         }
 
-        void ObserverTest_SubscribeUnsubscribe_Callback(int a, int b, AsyncResultHandle result)
+        private void ObserverTest_SubscribeUnsubscribe_Callback(int a, int b, AsyncResultHandle result)
         {
             callbackCounter++;
             this.Logger.LogInformation("Invoking ObserverTest_SubscribeUnsubscribe_Callback for {CallbackCounter} time with a = {A} and b = {B}", this.callbackCounter, a, b);
@@ -236,7 +236,7 @@ namespace DefaultCluster.Tests.General
             this.GrainFactory.DeleteObjectReference<ISimpleGrainObserver>(reference2);
         }
 
-        void ObserverTest_DoubleSubscriptionDifferentReferences_Callback(int a, int b, AsyncResultHandle result)
+        private void ObserverTest_DoubleSubscriptionDifferentReferences_Callback(int a, int b, AsyncResultHandle result)
         {
             callbackCounter++;
             this.Logger.LogInformation("Invoking ObserverTest_DoubleSubscriptionDifferentReferences_Callback for {CallbackCounter} time with a = {A} and b = {B}", this.callbackCounter, a, b);
@@ -267,7 +267,7 @@ namespace DefaultCluster.Tests.General
             Assert.False(await result.WaitForFinished(timeout), $"Should timeout waiting {timeout} for SetB");
         }
 
-        void ObserverTest_DeleteObject_Callback(int a, int b, AsyncResultHandle result)
+        private void ObserverTest_DeleteObject_Callback(int a, int b, AsyncResultHandle result)
         {
             callbackCounter++;
             this.Logger.LogInformation("Invoking ObserverTest_DeleteObject_Callback for {CallbackCounter} time with a = {A} and b = {B}", this.callbackCounter, a, b);
@@ -322,8 +322,8 @@ namespace DefaultCluster.Tests.General
 
         internal class SimpleGrainObserver : ISimpleGrainObserver
         {
-            readonly Action<int, int, AsyncResultHandle> action;
-            readonly AsyncResultHandle result;
+            private readonly Action<int, int, AsyncResultHandle> action;
+            private readonly AsyncResultHandle result;
 
             private readonly ILogger logger;
 

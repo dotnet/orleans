@@ -9,7 +9,7 @@ using UnitTests.GrainInterfaces;
 
 namespace UnitTests.Grains
 {
-    class ProducerEventCountingGrain : BaseGrain, IProducerEventCountingGrain
+    internal class ProducerEventCountingGrain : BaseGrain, IProducerEventCountingGrain
     {
         private IAsyncObserver<int> _producer;
         private int _numProducedItems;
@@ -59,7 +59,7 @@ namespace UnitTests.Grains
             {
                 throw new ApplicationException("Not yet a producer on a stream.  Must call BecomeProducer first.");
             }
-            
+
             await _producer.OnNextAsync(_numProducedItems + 1);
 
             // update after send in case of error

@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Threading.Tasks;
 using System.Linq;
 using TestGrainInterfaces;
@@ -28,7 +28,7 @@ namespace Tester.EventSourcingTests
         // - confirming at end only, instead of after each update, is fast.
         // - allowing reentrancy, while still confirming after each update, is also fast. 
 
-        private readonly int iterations = 800;
+        private const int iterations = 800;
 
         [Fact, RunThisFirst, TestCategory("EventSourcing")]
         public Task Perf_Warmup()
@@ -94,7 +94,7 @@ namespace Tester.EventSourcingTests
 
     }
 
-    class RunThisFirstAttribute : Attribute
+    internal class RunThisFirstAttribute : Attribute
     {
     }
 

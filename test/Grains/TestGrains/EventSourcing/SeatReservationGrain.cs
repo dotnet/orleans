@@ -56,7 +56,7 @@ namespace TestGrains
             Reservations = new Dictionary<int, SeatReservation>();
         }
 
-        void Apply(SeatReservation reservation)
+        private void Apply(SeatReservation reservation)
         {
             // see if this reservation targets an available seat
             // otherwise, treat it as a no-op

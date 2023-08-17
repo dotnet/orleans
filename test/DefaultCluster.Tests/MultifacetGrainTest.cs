@@ -10,10 +10,11 @@ namespace DefaultCluster.Tests.General
     //using ValueUpdateEventArgs = MultifacetGrainClient.ValueUpdateEventArgs;
     public class MultifacetGrainTest : HostedTestClusterEnsureDefaultStarted
     {
-        IMultifacetWriter writer;
-        IMultifacetReader reader;
+        private IMultifacetWriter writer;
+        private IMultifacetReader reader;
+
         //int eventCounter;
-        const int EXPECTED_NUMBER_OF_EVENTS = 4;
+        private const int EXPECTED_NUMBER_OF_EVENTS = 4;
         private readonly TimeSpan timeout = TimeSpan.FromSeconds(5);
 
         public MultifacetGrainTest(DefaultClusterFixture fixture) : base(fixture)
@@ -25,7 +26,7 @@ namespace DefaultCluster.Tests.General
         {
             writer = this.GrainFactory.GetGrain<IMultifacetWriter>(GetRandomGrainId());
             reader = writer.AsReference<IMultifacetReader>();
-            
+
             int x = 1234;
             bool ok = writer.SetValue(x).Wait(timeout);
             if (!ok) throw new TimeoutException();
@@ -53,7 +54,7 @@ namespace DefaultCluster.Tests.General
             writer.SetValue(5).Wait();
             int v = reader.GetValue().Result;
             Assert.Equal(5, v);
-            
+
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Cast")]
