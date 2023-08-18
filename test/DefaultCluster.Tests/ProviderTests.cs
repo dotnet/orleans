@@ -58,17 +58,17 @@ namespace DefaultCluster.Tests
                 }
                 else
                 {
-                    Assert.True(false, "Incorrect exception thrown when an unimplemented method is invoked: " + baseEx);
+                    Assert.Fail("Incorrect exception thrown when an unimplemented method is invoked: " + baseEx);
                 }
             }
             catch (Exception ex1)
             {
-                Assert.True(false, "Incorrect exception thrown when an unimplemented method is invoked: " + ex1);
+                Assert.Fail("Incorrect exception thrown when an unimplemented method is invoked: " + ex1);
             }
 
             if (!exceptionThrown)
             {
-                Assert.True(false, "Expected exception not thrown when no extension configured");
+                Assert.Fail("Expected exception not thrown when no extension configured");
             }
 
             var p2 = grain.InstallExtension("test");
@@ -82,7 +82,7 @@ namespace DefaultCluster.Tests
             }
             catch (Exception exc)
             {
-                Assert.True(false, "Unexpected exception thrown when extension is configured. Exc = " + exc);
+                Assert.Fail("Unexpected exception thrown when extension is configured. Exc = " + exc);
             }
 
             try
@@ -93,7 +93,7 @@ namespace DefaultCluster.Tests
             }
             catch (Exception exc)
             {
-                Assert.True(false, "Unexpected exception thrown when extension is configured. Exc = " + exc);
+                Assert.Fail("Unexpected exception thrown when extension is configured. Exc = " + exc);
             }
         }
 
@@ -109,7 +109,7 @@ namespace DefaultCluster.Tests
             }
             catch (Exception ex)
             {
-                Assert.True(false, "No exception should have been thrown. Ex: " + ex.Message);
+                Assert.Fail("No exception should have been thrown. Ex: " + ex.Message);
             }
 
             Assert.True(true);
@@ -125,7 +125,7 @@ namespace DefaultCluster.Tests
                 var res = await extension.CheckExtension_1();
             }
             catch(Exception ex) {
-                Assert.True(false, "No exception should have been thrown. Ex: " + ex.Message);
+                Assert.Fail("No exception should have been thrown. Ex: " + ex.Message);
             }
 
             Assert.True(true);

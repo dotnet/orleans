@@ -1251,7 +1251,7 @@ namespace UnitTests.StorageTests
                 {
                     string msg = "StorageProviderInjectedError exception should have been thrown " + at;
                     output.WriteLine("Assertion failed: {0}", msg);
-                    Assert.True(false, msg);
+                    Assert.Fail(msg);
                 }
             }
             catch (Exception e)

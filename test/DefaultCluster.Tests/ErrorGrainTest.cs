@@ -40,7 +40,7 @@ namespace DefaultCluster.Tests
             try
             {
                 await intPromise;
-                Assert.True(false, "Should not have executed");
+                Assert.Fail("Should not have executed");
             }
             catch (Exception exc2)
             {
@@ -61,7 +61,7 @@ namespace DefaultCluster.Tests
             try
             {
                 intPromise.Wait();
-                Assert.True(false, "Should have thrown");
+                Assert.Fail("Should have thrown");
             }
             catch (Exception)
             {
@@ -71,7 +71,7 @@ namespace DefaultCluster.Tests
             try
             {
                 intPromise.Wait();
-                Assert.True(false, "Should have thrown");
+                Assert.Fail("Should have thrown");
             }
             catch (Exception exc2)
             {

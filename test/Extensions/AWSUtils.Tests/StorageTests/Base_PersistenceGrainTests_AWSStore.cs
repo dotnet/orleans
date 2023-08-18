@@ -400,7 +400,7 @@ namespace AWSUtils.Tests.StorageTests
 
                 if (elapsed > target.Multiply(2.0 * timingFactor))
                 {
-                    Assert.True(false, msg);
+                    Assert.Fail(msg);
                 }
                 else
                 {

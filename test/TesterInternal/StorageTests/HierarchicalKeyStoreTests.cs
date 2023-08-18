@@ -193,7 +193,7 @@ namespace UnitTests.StorageTests
             var result = store.ReadRow(keys1);
 
             Assert.NotNull(result); // Should not be Null result after DeleteRow
-            Assert.Equal(0, result.Count); // No data after DeleteRow
+            Assert.Empty(result); // No data after DeleteRow
 
             result = store.ReadRow(keys2);
 
@@ -228,7 +228,7 @@ namespace UnitTests.StorageTests
             var results = store.ReadMultiRow(readKeys);
 
             Assert.NotNull(results); // Null results
-            Assert.Equal(1, results.Count); // Number of results
+            Assert.Single(results); // Number of results
 
             var result = results.First();
 
@@ -254,7 +254,7 @@ namespace UnitTests.StorageTests
             var result = store.ReadRow(keys);
 
             Assert.NotNull(result); // Null result
-            Assert.Equal(0, result.Count); // No data
+            Assert.Empty(result); // No data
         }
 
         // Utility methods

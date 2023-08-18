@@ -50,7 +50,7 @@ namespace DependencyInjection.Tests
         [Fact]
         public async Task CanGetGrainWithInjectedGrainFactory()
         {
-            // please don't inject your implemetation of IGrainFactory to DI container in Startup Class, 
+            // please don't inject your implementation of IGrainFactory to DI container in Startup Class, 
             // since we are currently not supporting replacing IGrainFactory 
             IDIGrainWithInjectedServices grain = this.fixture.GrainFactory.GetGrain<IDIGrainWithInjectedServices>(GetRandomGrainId());
             _ = await grain.GetGrainFactoryId();

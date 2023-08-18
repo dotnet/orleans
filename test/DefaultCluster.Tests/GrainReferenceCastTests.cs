@@ -195,7 +195,7 @@ namespace DefaultCluster.Tests
                     while (ex is AggregateException) ex = ex.InnerException;
                     throw ex;
                 }
-                Assert.True(false, "Exception should have been raised");
+                Assert.Fail("Exception should have been raised");
             });
         }
 

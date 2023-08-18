@@ -43,10 +43,12 @@ namespace Orleans.Serialization.UnitTests
         {
             byte[] bytes;
             object deserialized;
+#pragma warning disable SYSLIB0050 // Type or member is obsolete
             var formatter = new BinaryFormatter
             {
                 Context = new StreamingContext(StreamingContextStates.All, null)
             };
+#pragma warning restore SYSLIB0050 // Type or member is obsolete
             using (var str = new MemoryStream())
             {
                 formatter.Serialize(str, input);
@@ -182,7 +184,9 @@ namespace Orleans.Serialization.UnitTests
             public BaseException() { }
 
             public BaseException(string message, Exception innerException) : base(message, innerException) { }
-
+#if NET8_0_OR_GREATER
+            [Obsolete]
+#endif
             protected BaseException(SerializationInfo info, StreamingContext context) : base(info, context)
             {
                 BaseField = (SimpleISerializableObject)info.GetValue("BaseField", typeof(SimpleISerializableObject));
@@ -190,6 +194,9 @@ namespace Orleans.Serialization.UnitTests
 
             public SimpleISerializableObject BaseField { get; set; }
 
+#if NET8_0_OR_GREATER
+            [Obsolete]
+#endif
             public override void GetObjectData(SerializationInfo info, StreamingContext context)
             {
                 base.GetObjectData(info, context);
@@ -205,12 +212,18 @@ namespace Orleans.Serialization.UnitTests
 
             public UnserializableConformingException(string message, Exception innerException) : base(message, innerException) { }
 
+#if NET8_0_OR_GREATER
+            [Obsolete]
+#endif
             protected UnserializableConformingException(SerializationInfo info, StreamingContext context) : base(info, context)
             {
                 SubClassField = info.GetString("SubClassField");
                 SomeObject = info.GetValue("SomeObject", typeof(object));
             }
 
+#if NET8_0_OR_GREATER
+            [Obsolete]
+#endif
             public override void GetObjectData(SerializationInfo info, StreamingContext context)
             {
                 base.GetObjectData(info, context);

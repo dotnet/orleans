@@ -194,7 +194,7 @@ jobs:
     strategy:
       matrix:
         suite: ["BVT", "SlowBVT", "Functional"]
-        framework: ["net7.0"]
+        framework: ["net8.0"]
         provider: ["AzureStorage"]
     services:
       azurite:
@@ -233,7 +233,7 @@ jobs:
     runs-on: windows-latest
     strategy:
       matrix:
-        framework: ["net7.0"]
+        framework: ["net8.0"]
         provider: ["Cosmos"]
     steps:
     - uses: actions/checkout@v2

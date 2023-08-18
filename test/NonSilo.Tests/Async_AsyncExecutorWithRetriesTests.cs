@@ -55,7 +55,7 @@ namespace NonSilo.Tests
             {
                 return;
             }
-            Assert.True(false,"Should have thrown");
+            Assert.Fail("Should have thrown");
         }
 
         [Fact, TestCategory("Functional"), TestCategory("AsynchronyPrimitives")]
@@ -106,7 +106,7 @@ namespace NonSilo.Tests
             Func<Exception, int, bool> errorFilter = ((Exception exc, int i) =>
             {
                 Assert.Equal(lastIteration, i);
-                Assert.True(false, "Should not be called");
+                Assert.Fail("Should not be called");
                 return true;
             });
 
@@ -159,7 +159,7 @@ namespace NonSilo.Tests
             try
             {
                 int value = promise.Result;
-                Assert.True(false,"Should have thrown");
+                Assert.Fail("Should have thrown");
             }
             catch (Exception exc)
             {

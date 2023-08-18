@@ -50,6 +50,7 @@ namespace Orleans.Runtime
         /// <exception cref="ArgumentNullException">
         /// <paramref name="info"/> is <see langword="null"/>.
         /// </exception>
+        [Obsolete]
         protected OrleansMessageRejectionException(SerializationInfo info, StreamingContext context)
             : base(info, context)
         {

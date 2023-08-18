@@ -58,7 +58,7 @@ namespace UnitTests
             }
             catch (Exception ex)
             {
-                Assert.True(false, string.Format("Unexpected exception {0}: {1}", ex.Message, ex.StackTrace));
+                Assert.Fail(string.Format("Unexpected exception {0}: {1}", ex.Message, ex.StackTrace));
             }
             this.fixture.Logger.LogInformation("Reentrancy ReentrantGrain Test finished OK.");
         }
@@ -74,7 +74,7 @@ namespace UnitTests
             }
             catch (Exception ex)
             {
-                Assert.True(false, string.Format("Unexpected exception {0}: {1}", ex.Message, ex.StackTrace));
+                Assert.Fail(string.Format("Unexpected exception {0}: {1}", ex.Message, ex.StackTrace));
             }
             this.fixture.Logger.LogInformation("Reentrancy NonReentrantGrain_WithMayInterleaveStaticPredicate_WhenPredicateReturnsTrue Test finished OK.");
         }
@@ -108,7 +108,7 @@ namespace UnitTests
             }
             catch (Exception ex)
             {
-                Assert.True(false, string.Format("Unexpected exception {0}: {1}", ex.Message, ex.StackTrace));
+                Assert.Fail(string.Format("Unexpected exception {0}: {1}", ex.Message, ex.StackTrace));
             }
             this.fixture.Logger.LogInformation("Reentrancy NonReentrantGrain_WithMayInterleaveInstancedPredicate_WhenPredicateReturnsTrue Test finished OK.");
         }

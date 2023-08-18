@@ -2,7 +2,7 @@
 
   <PropertyGroup>
     <PackageId>Microsoft.Orleans.CodeGenerator.MSBuild</PackageId>
-    <TargetFramework>net7.0</TargetFramework>
+    <TargetFramework>net8.0</TargetFramework>
     <RuntimeIdentifiers>win-x64;linux-x64</RuntimeIdentifiers>
     <PackageDescription>Code generator for projects using Orleans.Serialization with MSBuild</PackageDescription>
     <IsPackable>false</IsPackable>

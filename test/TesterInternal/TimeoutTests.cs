@@ -46,7 +46,7 @@ namespace UnitTests
             try
             {
                 finished = promise.Wait(timeout.Multiply(3));
-                Assert.True(false, "Should have thrown");
+                Assert.Fail("Should have thrown");
             }
             catch (Exception exc)
             {
@@ -54,7 +54,7 @@ namespace UnitTests
                 Exception baseExc = exc.GetBaseException();
                 if (!(baseExc is TimeoutException))
                 {
-                    Assert.True(false, "Should not have got here " + exc);
+                    Assert.Fail("Should not have got here " + exc);
                 }
             }
             output.WriteLine("Waited for " + stopwatch.Elapsed);
@@ -68,7 +68,7 @@ namespace UnitTests
             {
                 stopwatch = new Stopwatch();
                 promise.Wait();
-                Assert.True(false, "Should have thrown");
+                Assert.Fail("Should have thrown");
             }
             catch (Exception exc)
             {
@@ -76,7 +76,7 @@ namespace UnitTests
                 Exception baseExc = exc.GetBaseException();
                 if (!(baseExc is TimeoutException))
                 {
-                    Assert.True(false, "Should not have got here " + exc);
+                    Assert.Fail("Should not have got here " + exc);
                 }
             }
             Assert.True(stopwatch.Elapsed <= timeout.Multiply(0.1), "Waited longer than " + timeout.Multiply(0.1) + ". Waited " + stopwatch.Elapsed);

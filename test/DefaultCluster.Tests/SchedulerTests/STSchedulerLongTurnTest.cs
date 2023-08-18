@@ -43,7 +43,7 @@ namespace DefaultCluster.Tests.SchedulerTests
             {
                 if (ex.GetBaseException() is TimeoutException)
                 {
-                    Assert.True(false, "Long turns queued up and caused a timeout");
+                    Assert.Fail("Long turns queued up and caused a timeout");
                 }
                 else
                 {

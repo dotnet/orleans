@@ -61,6 +61,15 @@ namespace Orleans.Analyzers {
         }
         
         /// <summary>
+        ///   Looks up a localized string similar to Members which are static or abstract cannot be serialized. Remove the [Id(...)] attribute from this member..
+        /// </summary>
+        internal static string AbstractOrStaticMembersCannotBeSerializedDescription {
+            get {
+                return ResourceManager.GetString("AbstractOrStaticMembersCannotBeSerializedDescription", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Looks up a localized string similar to The member &quot;{0}&quot; is marked as {1} and therefore cannot be serialized.
         /// </summary>
         internal static string AbstractOrStaticMembersCannotBeSerializedMessageFormat {
@@ -79,7 +88,7 @@ namespace Orleans.Analyzers {
         }
         
         /// <summary>
-        ///   Looks up a localized string similar to Add the [GenerateSerializer] attribute to serializable types in your application.
+        ///   Looks up a localized string similar to Add the [GenerateSerializer] attribute to serializable types in your application..
         /// </summary>
         internal static string AddGenerateSerializerAttributeDescription {
             get {
@@ -106,7 +115,7 @@ namespace Orleans.Analyzers {
         }
         
         /// <summary>
-        ///   Looks up a localized string similar to Add attributes to properties and fields to direct serializer generation.
+        ///   Looks up a localized string similar to Add attributes to properties and fields to direct serializer generation..
         /// </summary>
         internal static string AddSerializationAttributesDescription {
             get {

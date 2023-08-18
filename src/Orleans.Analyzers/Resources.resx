@@ -124,7 +124,7 @@
     <value>Members which are static or abstract cannot be serialized</value>
   </data>
   <data name="AddGenerateSerializerAttributeDescription" xml:space="preserve">
-    <value>Add the [GenerateSerializer] attribute to serializable types in your application</value>
+    <value>Add the [GenerateSerializer] attribute to serializable types in your application.</value>
   </data>
   <data name="AddGenerateSerializerAttributeMessageFormat" xml:space="preserve">
     <value>The type "{0}" has the [Serializable] attribute but not the [GenerateSerializer] attribute</value>
@@ -133,7 +133,7 @@
     <value>Add the [GenerateSerializer] attribute</value>
   </data>
   <data name="AddSerializationAttributesDescription" xml:space="preserve">
-    <value>Add attributes to properties and fields to direct serializer generation</value>
+    <value>Add attributes to properties and fields to direct serializer generation.</value>
   </data>
   <data name="AddSerializationAttributesMessageFormat" xml:space="preserve">
     <value>Add missing serialization attributes</value>
@@ -146,5 +146,8 @@
   </data>
   <data name="AtMostOneOrleansConstructorMessageFormat" xml:space="preserve">
     <value>A single type is not allowed to have multiple constructors annotated with the [OrleansConstructor] attribute</value>
+  </data>
+  <data name="AbstractOrStaticMembersCannotBeSerializedDescription" xml:space="preserve">
+    <value>Members which are static or abstract cannot be serialized. Remove the [Id(...)] attribute from this member.</value>
   </data>
 </root>

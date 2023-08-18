@@ -119,7 +119,7 @@ namespace UnitTests.SchedulerTests
             }
             catch (TimeoutException)
             {
-                Assert.True(false, "Result did not arrive before timeout " + timeoutLimit);
+                Assert.Fail("Result did not arrive before timeout " + timeoutLimit);
             }
 
             Assert.True(n != 0, "Work items did not get executed");
@@ -176,9 +176,9 @@ namespace UnitTests.SchedulerTests
             });
 
             try { await result1.Task.WithTimeout(TimeSpan.FromSeconds(3)); }
-            catch (TimeoutException) { Assert.True(false, "Timeout-1"); }
+            catch (TimeoutException) { Assert.Fail("Timeout-1"); }
             try { await result2.Task.WithTimeout(TimeSpan.FromSeconds(3)); }
-            catch (TimeoutException) { Assert.True(false, "Timeout-2"); }
+            catch (TimeoutException) { Assert.Fail("Timeout-2"); }
 
             Assert.NotEqual(0, this.stageNum1); // "Work items did not get executed-1"
             Assert.NotEqual(0, this.stageNum2);  // "Work items did not get executed-2"

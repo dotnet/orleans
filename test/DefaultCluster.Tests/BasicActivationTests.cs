@@ -74,7 +74,7 @@ namespace DefaultCluster.Tests.General
                 failed = true;
             }
 
-            if (!failed) Assert.True(false, "Should have failed, but instead returned " + key);
+            if (!failed) Assert.Fail("Should have failed, but instead returned " + key);
         }
 
         [Fact, TestCategory("BVT"), TestCategory("ActivateDeactivate"), TestCategory("ErrorHandling"), TestCategory("GetGrain")]
@@ -103,7 +103,7 @@ namespace DefaultCluster.Tests.General
                 }
             }
 
-            if (!failed) Assert.True(false, "Should have failed, but instead returned " + key);
+            if (!failed) Assert.Fail("Should have failed, but instead returned " + key);
         }
 
         [Fact, TestCategory("BVT"), TestCategory("ActivateDeactivate"), TestCategory("GetGrain")]

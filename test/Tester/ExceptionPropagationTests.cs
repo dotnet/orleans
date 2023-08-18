@@ -80,7 +80,7 @@ namespace UnitTests.General
             {
                 // Use await to force the exception to be rethrown and validate that the remote stack trace is still present
                 await grain.ThrowsInvalidOperationException();
-                Assert.True(false, "should have thrown");
+                Assert.Fail("should have thrown");
             }
             catch (InvalidOperationException exception)
             {
@@ -173,7 +173,7 @@ namespace UnitTests.General
                 // use Wait() so that we get the entire AggregateException ('await' would just catch the first inner exception)
                 // Do not use Assert.Throws to avoid any tampering of the AggregateException itself from the test framework
                 grainCall.Wait();
-                Assert.True(false, "Expected AggregateException");
+                Assert.Fail("Expected AggregateException");
             }
             catch (AggregateException exception)
             {

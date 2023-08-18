@@ -179,7 +179,7 @@ namespace UnitTests.SchedulerTests
             }
             catch (TimeoutException)
             {
-                Assert.True(false, "Result did not arrive before timeout " + timeoutLimit);
+                Assert.Fail("Result did not arrive before timeout " + timeoutLimit);
             }
 
             Assert.True(n != 0, "Work items did not get executed");
@@ -230,7 +230,7 @@ namespace UnitTests.SchedulerTests
             }
             catch (TimeoutException)
             {
-                Assert.True(false, "Result did not arrive before timeout " + timeoutLimit);
+                Assert.Fail("Result did not arrive before timeout " + timeoutLimit);
             }
 
             pause1.Set();
@@ -287,7 +287,7 @@ namespace UnitTests.SchedulerTests
             }
             catch (TimeoutException)
             {
-                Assert.True(false, "Result did not arrive before timeout " + timeoutLimit);
+                Assert.Fail("Result did not arrive before timeout " + timeoutLimit);
             }
 
             Assert.NotNull(join);
@@ -355,7 +355,7 @@ namespace UnitTests.SchedulerTests
             }
             catch (TimeoutException)
             {
-                Assert.True(false, "Result did not arrive before timeout " + timeoutLimit);
+                Assert.Fail("Result did not arrive before timeout " + timeoutLimit);
             }
 
             Assert.NotNull(join); // Joined promise assigned
@@ -418,7 +418,7 @@ namespace UnitTests.SchedulerTests
             }
             catch (TimeoutException)
             {
-                Assert.True(false, "Result did not arrive before timeout " + timeoutLimit);
+                Assert.Fail("Result did not arrive before timeout " + timeoutLimit);
             }
 
             pause1.Set();
@@ -484,7 +484,7 @@ namespace UnitTests.SchedulerTests
             }
             catch (TimeoutException)
             {
-                Assert.True(false, "Result did not arrive before timeout " + timeoutLimit);
+                Assert.Fail("Result did not arrive before timeout " + timeoutLimit);
             }
 
             pause1.Set();
@@ -622,7 +622,7 @@ namespace UnitTests.SchedulerTests
                 }
                 catch (TimeoutException)
                 {
-                    Assert.True(false, "Result did not arrive before timeout " + waitCheckTime);
+                    Assert.Fail("Result did not arrive before timeout " + waitCheckTime);
                 }
 
                 bool ok = resultHandles[i].Task.Result;
@@ -634,7 +634,7 @@ namespace UnitTests.SchedulerTests
                 }
                 catch (TimeoutException)
                 {
-                    Assert.True(false, $"Task chain end {i} should complete very shortly after after its resultHandle");
+                    Assert.Fail($"Task chain end {i} should complete very shortly after after its resultHandle");
                 }
 
                 Assert.True(taskChainEnds[i].IsCompleted, "Task chain " + i + " should be completed");
@@ -728,7 +728,7 @@ namespace UnitTests.SchedulerTests
             }
             catch (TimeoutException)
             {
-                Assert.True(false, "Result did not arrive before timeout " + timeoutLimit);
+                Assert.Fail("Result did not arrive before timeout " + timeoutLimit);
             }
             bool done = wrapperDone.Task.Result;
 
@@ -744,7 +744,7 @@ namespace UnitTests.SchedulerTests
             }
             catch (TimeoutException)
             {
-                Assert.True(false, "Result did not arrive before timeout " + timeoutLimit);
+                Assert.Fail("Result did not arrive before timeout " + timeoutLimit);
             }
             done = wrappedDone.Task.Result;
             Assert.True(done, "Wrapped Task should be finished");
