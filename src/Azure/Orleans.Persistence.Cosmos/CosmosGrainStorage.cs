@@ -41,10 +41,10 @@ internal class CosmosGrainStorage : IGrainStorage, ILifecycleParticipant<ISiloLi
         _partitionKeyProvider = partitionKeyProvider;
     }
 
-    public async Task ReadStateAsync<T>(string grainType, GrainId grainId, IGrainState<T> grainState)
+    public async Task ReadStateAsync<T>(string grainType, GrainId grainId, IGrainState<T> grainState, CancellationToken cancellationToken)
     {
         var id = GetKeyString(grainId);
-        var partitionKey = await BuildPartitionKey(grainType, grainId);
+        var partitionKey = await BuildPartitionKey(grainType, grainId, cancellationToken);
 
         if (_logger.IsEnabled(LogLevel.Trace))
         {
@@ -60,12 +60,13 @@ internal class CosmosGrainStorage : IGrainStorage, ILifecycleParticipant<ISiloLi
         try
         {
             var pk = new PartitionKey(partitionKey);
-            var entity = await ExecuteWithRetries(static (self, args) =>
+            var entity = await ExecuteWithRetries(static (self, args, cancellationToken) =>
             {
                 var (id, pk) = args;
-                return self._container.ReadItemAsync<GrainStateEntity<T>>(id, pk);
+                return self._container.ReadItemAsync<GrainStateEntity<T>>(id, pk, cancellationToken: cancellationToken);
             },
-            (id, pk)).ConfigureAwait(false);
+            (id, pk),
+            cancellationToken).ConfigureAwait(false);
 
             if (entity.Resource.State != null)
             {
@@ -102,11 +103,11 @@ internal class CosmosGrainStorage : IGrainStorage, ILifecycleParticipant<ISiloLi
         }
     }
 
-    public async Task WriteStateAsync<T>(string grainType, GrainId grainId, IGrainState<T> grainState)
+    public async Task WriteStateAsync<T>(string grainType, GrainId grainId, IGrainState<T> grainState, CancellationToken cancellationToken)
     {
         var id = GetKeyString(grainId);
 
-        var partitionKey = await BuildPartitionKey(grainType, grainId);
+        var partitionKey = await BuildPartitionKey(grainType, grainId, cancellationToken);
 
         if (_logger.IsEnabled(LogLevel.Trace))
         {
@@ -137,12 +138,13 @@ internal class CosmosGrainStorage : IGrainStorage, ILifecycleParticipant<ISiloLi
             if (string.IsNullOrWhiteSpace(grainState.ETag))
             {
                 response = await ExecuteWithRetries(
-                    static (self, args) =>
+                    static (self, args, cancellationToken) =>
                     {
                         var (entity, pk) = args;
-                        return self._container.CreateItemAsync(entity, pk);
+                        return self._container.CreateItemAsync(entity, pk, cancellationToken: cancellationToken);
                     },
-                    (entity, pk)).ConfigureAwait(false);
+                    (entity, pk),
+                    cancellationToken).ConfigureAwait(false);
 
                 grainState.ETag = response.Resource.ETag;
             }
@@ -150,24 +152,26 @@ internal class CosmosGrainStorage : IGrainStorage, ILifecycleParticipant<ISiloLi
             {
                 var requestOptions = new ItemRequestOptions { IfMatchEtag = grainState.ETag };
                 response = await ExecuteWithRetries(
-                    static (self, args) =>
+                    static (self, args, cancellationToken) =>
                     {
                         var (entity, pk, requestOptions) = args;
-                        return self._container.UpsertItemAsync(entity, pk, requestOptions);
+                        return self._container.UpsertItemAsync(entity, pk, requestOptions, cancellationToken);
                     },
-                    (entity, pk, requestOptions)).ConfigureAwait(false);
+                    (entity, pk, requestOptions),
+                    cancellationToken).ConfigureAwait(false);
                 grainState.ETag = response.Resource.ETag;
             }
             else
             {
                 var requestOptions = new ItemRequestOptions { IfMatchEtag = grainState.ETag };
                 response = await ExecuteWithRetries(
-                    static (self, args) =>
+                    static (self, args, cancellationToken) =>
                     {
                         var (entity, pk, requestOptions) = args;
-                        return self._container.ReplaceItemAsync(entity, entity.Id, pk, requestOptions);
+                        return self._container.ReplaceItemAsync(entity, entity.Id, pk, requestOptions, cancellationToken);
                     },
-                    (entity, pk, requestOptions)).ConfigureAwait(false);
+                    (entity, pk, requestOptions),
+                    cancellationToken).ConfigureAwait(false);
                 grainState.ETag = response.Resource.ETag;
             }
 
@@ -185,10 +189,10 @@ internal class CosmosGrainStorage : IGrainStorage, ILifecycleParticipant<ISiloLi
         }
     }
 
-    public async Task ClearStateAsync<T>(string grainType, GrainId grainId, IGrainState<T> grainState)
+    public async Task ClearStateAsync<T>(string grainType, GrainId grainId, IGrainState<T> grainState, CancellationToken cancellationToken)
     {
         var id = GetKeyString(grainId);
-        var partitionKey = await BuildPartitionKey(grainType, grainId);
+        var partitionKey = await BuildPartitionKey(grainType, grainId, cancellationToken);
         if (_logger.IsEnabled(LogLevel.Trace))
         {
             _logger.LogTrace(
@@ -211,12 +215,13 @@ internal class CosmosGrainStorage : IGrainStorage, ILifecycleParticipant<ISiloLi
                 if (string.IsNullOrWhiteSpace(grainState.ETag))
                     return;  //state not written
 
-                await ExecuteWithRetries(static (self, args) =>
+                await ExecuteWithRetries(static (self, args, cancellationToken) =>
                 {
                     var (id, pk, requestOptions) = args;
-                    return self._container.DeleteItemAsync<GrainStateEntity<T>>(id, pk, requestOptions);
+                    return self._container.DeleteItemAsync<GrainStateEntity<T>>(id, pk, requestOptions, cancellationToken);
                 },
-                (id, pk, requestOptions));
+                (id, pk, requestOptions),
+                cancellationToken);
 
                 grainState.ETag = null;
                 grainState.RecordExists = false;
@@ -232,17 +237,18 @@ internal class CosmosGrainStorage : IGrainStorage, ILifecycleParticipant<ISiloLi
                     PartitionKey = partitionKey
                 };
 
-                var response = await ExecuteWithRetries(static (self, args) =>
+                var response = await ExecuteWithRetries(static (self, args, cancellationToken) =>
                 {
                     var (grainState, entity, pk, requestOptions) = args;
                     return grainState.ETag switch
                     {
-                        null or { Length: 0 } => self._container.CreateItemAsync(entity, pk),
-                        ANY_ETAG => self._container.ReplaceItemAsync(entity, entity.Id, pk, requestOptions),
-                        _ => self._container.ReplaceItemAsync(entity, entity.Id, pk, requestOptions),
+                        null or { Length: 0 } => self._container.CreateItemAsync(entity, pk, cancellationToken: cancellationToken),
+                        ANY_ETAG => self._container.ReplaceItemAsync(entity, entity.Id, pk, requestOptions, cancellationToken),
+                        _ => self._container.ReplaceItemAsync(entity, entity.Id, pk, requestOptions, cancellationToken),
                     };
                 },
-                (grainState, entity, pk, requestOptions)).ConfigureAwait(false);
+                (grainState, entity, pk, requestOptions),
+                cancellationToken).ConfigureAwait(false);
 
                 grainState.ETag = response.Resource.ETag;
                 grainState.RecordExists = true;
@@ -263,8 +269,8 @@ internal class CosmosGrainStorage : IGrainStorage, ILifecycleParticipant<ISiloLi
 
     private string GetKeyString(GrainId grainId) => $"{Sanitize(_serviceId)}{KEY_STRING_SEPARATOR}{Sanitize(grainId.Type.ToString()!)}{SeparatorChar}{Sanitize(grainId.Key.ToString()!)}";
 
-    private ValueTask<string> BuildPartitionKey(string grainType, GrainId grainId) =>
-        _partitionKeyProvider.GetPartitionKey(grainType, grainId);
+    private ValueTask<string> BuildPartitionKey(string grainType, GrainId grainId, CancellationToken cancellationToken) =>
+        _partitionKeyProvider.GetPartitionKey(grainType, grainId, cancellationToken);
 
     private async Task Init(CancellationToken ct)
     {
@@ -283,16 +289,16 @@ internal class CosmosGrainStorage : IGrainStorage, ILifecycleParticipant<ISiloLi
                     _options.DeleteStateOnClear);
             }
 
-            await InitializeCosmosClient().ConfigureAwait(false);
+            await InitializeCosmosClient(ct).ConfigureAwait(false);
 
             if (_options.IsResourceCreationEnabled)
             {
                 if (_options.CleanResourcesOnInitialization)
                 {
-                    await TryDeleteDatabase().ConfigureAwait(false);
+                    await TryDeleteDatabase(ct).ConfigureAwait(false);
                 }
 
-                await TryCreateResources().ConfigureAwait(false);
+                await TryCreateResources(ct).ConfigureAwait(false);
             }
 
             _container = _client.GetContainer(_options.DatabaseName, _options.ContainerName);
@@ -324,7 +330,7 @@ internal class CosmosGrainStorage : IGrainStorage, ILifecycleParticipant<ISiloLi
         }
     }
 
-    private async Task InitializeCosmosClient()
+    private async Task InitializeCosmosClient(CancellationToken cancellationToken)
     {
         try
         {
@@ -338,9 +344,9 @@ internal class CosmosGrainStorage : IGrainStorage, ILifecycleParticipant<ISiloLi
         }
     }
 
-    private async Task TryCreateResources()
+    private async Task TryCreateResources(CancellationToken cancellationToken)
     {
-        var dbResponse = await _client.CreateDatabaseIfNotExistsAsync(_options.DatabaseName, _options.DatabaseThroughput);
+        var dbResponse = await _client.CreateDatabaseIfNotExistsAsync(_options.DatabaseName, _options.DatabaseThroughput, cancellationToken: cancellationToken);
         var db = dbResponse.Database;
 
         var stateContainer = new ContainerProperties(_options.ContainerName, DEFAULT_PARTITION_KEY_PATH);
@@ -360,7 +366,7 @@ internal class CosmosGrainStorage : IGrainStorage, ILifecycleParticipant<ISiloLi
         const int maxRetries = 3;
         for (var retry = 0; retry <= maxRetries; ++retry)
         {
-            var containerResponse = await db.CreateContainerIfNotExistsAsync(stateContainer, _options.ContainerThroughputProperties);
+            var containerResponse = await db.CreateContainerIfNotExistsAsync(stateContainer, _options.ContainerThroughputProperties, cancellationToken: cancellationToken);
 
             if (containerResponse.StatusCode == HttpStatusCode.OK || containerResponse.StatusCode == HttpStatusCode.Created)
             {
@@ -375,15 +381,16 @@ internal class CosmosGrainStorage : IGrainStorage, ILifecycleParticipant<ISiloLi
             {
                 break;  // Apparently some throttling logic returns HttpStatusCode.OK (not 429) when the collection wasn't created in a new DB.
             }
-            await Task.Delay(1000);
+
+            await Task.Delay(1000, cancellationToken);
         }
     }
 
-    private async Task TryDeleteDatabase()
+    private async Task TryDeleteDatabase(CancellationToken cancellationToken)
     {
         try
         {
-            await _client.GetDatabase(_options.DatabaseName).DeleteAsync().ConfigureAwait(false);
+            await _client.GetDatabase(_options.DatabaseName).DeleteAsync(cancellationToken: cancellationToken).ConfigureAwait(false);
         }
         catch (CosmosException dce) when (dce.StatusCode == HttpStatusCode.NotFound)
         {
@@ -397,15 +404,17 @@ internal class CosmosGrainStorage : IGrainStorage, ILifecycleParticipant<ISiloLi
         }
     }
 
-    private async Task<TResult> ExecuteWithRetries<TArg1, TResult>(Func<CosmosGrainStorage, TArg1, Task<TResult>> clientFunc, TArg1 arg1)
+    private async Task<TResult> ExecuteWithRetries<TArg1, TResult>(Func<CosmosGrainStorage, TArg1, CancellationToken, Task<TResult>> clientFunc, TArg1 arg1, CancellationToken cancellationToken)
     {
         // From:  https://blogs.msdn.microsoft.com/bigdatasupport/2015/09/02/dealing-with-requestratetoolarge-errors-in-azure-documentdb-and-testing-performance/
         while (true)
         {
+            cancellationToken.ThrowIfCancellationRequested();
+
             TimeSpan sleepTime;
             try
             {
-                return await clientFunc(this, arg1).ConfigureAwait(false);
+                return await clientFunc(this, arg1, cancellationToken).ConfigureAwait(false);
             }
             catch (CosmosException dce) when (dce.StatusCode == TOO_MANY_REQUESTS)
             {
@@ -416,9 +425,13 @@ internal class CosmosGrainStorage : IGrainStorage, ILifecycleParticipant<ISiloLi
                 sleepTime = dce.RetryAfter ?? TimeSpan.Zero;
             }
 
-            await Task.Delay(sleepTime);
+            await Task.Delay(sleepTime, cancellationToken);
         }
     }
+
+    public Task ReadStateAsync<T>(string stateName, GrainId grainId, IGrainState<T> grainState) => ReadStateAsync(stateName, grainId, grainState, CancellationToken.None);
+    public Task WriteStateAsync<T>(string stateName, GrainId grainId, IGrainState<T> grainState) => WriteStateAsync(stateName, grainId, grainState, CancellationToken.None);
+    public Task ClearStateAsync<T>(string stateName, GrainId grainId, IGrainState<T> grainState) => ClearStateAsync(stateName, grainId, grainState, CancellationToken.None);
 }
 
 public static class CosmosStorageFactory

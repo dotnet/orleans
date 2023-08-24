@@ -7,6 +7,7 @@ using Orleans.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration.Overrides;
+using System.Threading;
 
 namespace Orleans.Streaming.EventHubs
 {
@@ -101,7 +102,7 @@ namespace Orleans.Streaming.EventHubs
 
         private Task Initialize()
         {
-            return dataManager.InitTableAsync();
+            return dataManager.InitTableAsync(CancellationToken.None);
         }
 
         /// <summary>
@@ -110,7 +111,7 @@ namespace Orleans.Streaming.EventHubs
         /// <returns></returns>
         public async Task<string> Load()
         {
-            var results = await dataManager.ReadSingleTableEntryAsync(entity.PartitionKey, entity.RowKey);
+            var results = await dataManager.ReadSingleTableEntryAsync(entity.PartitionKey, entity.RowKey, CancellationToken.None);
             if (results.Entity != null)
             {
                 entity = results.Entity;
@@ -140,7 +141,7 @@ namespace Orleans.Streaming.EventHubs
 
             entity.Offset = offset;
             throttleSavesUntilUtc = utcNow + persistInterval;
-            inProgressSave = dataManager.UpsertTableEntryAsync(entity);
+            inProgressSave = dataManager.UpsertTableEntryAsync(entity, CancellationToken.None);
             inProgressSave.Ignore();
         }
     }

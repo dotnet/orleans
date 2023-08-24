@@ -32,12 +32,12 @@ namespace Tester.AzureUtils
         public async Task AzureTableDataManager_CreateTableEntryAsync()
         {
             var data = GenerateNewData();
-            await manager.CreateTableEntryAsync(data);
+            await manager.CreateTableEntryAsync(data, CancellationToken.None);
             try
             {
                 var data2 = data.Clone();
                 data2.StringData = "NewData";
-                await manager.CreateTableEntryAsync(data2);
+                await manager.CreateTableEntryAsync(data2, CancellationToken.None);
                 Assert.True(false, "Should have thrown RequestFailedException.");
             }
             catch (RequestFailedException exc)
@@ -49,7 +49,7 @@ namespace Tester.AzureUtils
                 Assert.Equal(HttpStatusCode.Conflict, httpStatusCode);
                 Assert.Equal("EntityAlreadyExists", restStatus);
             }
-            var tuple = await manager.ReadSingleTableEntryAsync(data.PartitionKey, data.RowKey);
+            var tuple = await manager.ReadSingleTableEntryAsync(data.PartitionKey, data.RowKey, CancellationToken.None);
             Assert.Equal(data.StringData, tuple.Entity.StringData);
         }
 
@@ -57,14 +57,14 @@ namespace Tester.AzureUtils
         public async Task AzureTableDataManager_UpsertTableEntryAsync()
         {
             var data = GenerateNewData();
-            await manager.UpsertTableEntryAsync(data);
-            var tuple = await manager.ReadSingleTableEntryAsync(data.PartitionKey, data.RowKey);
+            await manager.UpsertTableEntryAsync(data, CancellationToken.None);
+            var tuple = await manager.ReadSingleTableEntryAsync(data.PartitionKey, data.RowKey, CancellationToken.None);
             Assert.Equal(data.StringData, tuple.Entity.StringData);
 
             var data2 = data.Clone();
             data2.StringData = "NewData";
-            await manager.UpsertTableEntryAsync(data2);
-            tuple = await manager.ReadSingleTableEntryAsync(data2.PartitionKey, data2.RowKey);
+            await manager.UpsertTableEntryAsync(data2, CancellationToken.None);
+            tuple = await manager.ReadSingleTableEntryAsync(data2.PartitionKey, data2.RowKey, CancellationToken.None);
             Assert.Equal(data2.StringData, tuple.Entity.StringData);
         }
 
@@ -75,7 +75,7 @@ namespace Tester.AzureUtils
             var data = GenerateNewData();
             try
             {
-                await manager.UpdateTableEntryAsync(data, AzureTableUtils.ANY_ETAG);
+                await manager.UpdateTableEntryAsync(data, AzureTableUtils.ANY_ETAG, CancellationToken.None);
                 Assert.True(false, "Should have thrown RequestFailedException.");
             }
             catch (RequestFailedException exc)
@@ -88,25 +88,25 @@ namespace Tester.AzureUtils
                 Assert.Equal(TableErrorCode.ResourceNotFound.ToString(), restStatus);
             }
 
-            await manager.UpsertTableEntryAsync(data);
-            var tuple = await manager.ReadSingleTableEntryAsync(data.PartitionKey, data.RowKey);
+            await manager.UpsertTableEntryAsync(data, CancellationToken.None);
+            var tuple = await manager.ReadSingleTableEntryAsync(data.PartitionKey, data.RowKey, CancellationToken.None);
             Assert.Equal(data.StringData, tuple.Entity.StringData);
 
             var data2 = data.Clone();
             data2.StringData = "NewData";
-            string eTag1 = await manager.UpdateTableEntryAsync(data2, AzureTableUtils.ANY_ETAG);
-            tuple = await manager.ReadSingleTableEntryAsync(data2.PartitionKey, data2.RowKey);
+            string eTag1 = await manager.UpdateTableEntryAsync(data2, AzureTableUtils.ANY_ETAG, CancellationToken.None);
+            tuple = await manager.ReadSingleTableEntryAsync(data2.PartitionKey, data2.RowKey, CancellationToken.None);
             Assert.Equal(data2.StringData, tuple.Entity.StringData);
 
             var data3 = data.Clone();
             data3.StringData = "EvenNewerData";
-            _ = await manager.UpdateTableEntryAsync(data3, eTag1);
-            tuple = await manager.ReadSingleTableEntryAsync(data3.PartitionKey, data3.RowKey);
+            _ = await manager.UpdateTableEntryAsync(data3, eTag1, CancellationToken.None);
+            tuple = await manager.ReadSingleTableEntryAsync(data3.PartitionKey, data3.RowKey, CancellationToken.None);
             Assert.Equal(data3.StringData, tuple.Entity.StringData);
 
             try
             {
-                string eTag3 = await manager.UpdateTableEntryAsync(data3.Clone(), eTag1);
+                string eTag3 = await manager.UpdateTableEntryAsync(data3.Clone(), eTag1, CancellationToken.None);
                 Assert.True(false, "Should have thrown RequestFailedException.");
             }
             catch (RequestFailedException exc)
@@ -126,7 +126,7 @@ namespace Tester.AzureUtils
             var data = GenerateNewData();
             try
             {
-                await manager.DeleteTableEntryAsync(data, AzureTableUtils.ANY_ETAG);
+                await manager.DeleteTableEntryAsync(data, AzureTableUtils.ANY_ETAG, CancellationToken.None);
                 Assert.True(false, "Should have thrown RequestFailedException.");
             }
             catch (RequestFailedException exc)
@@ -137,12 +137,12 @@ namespace Tester.AzureUtils
                 Assert.Equal(HttpStatusCode.NotFound, httpStatusCode);
             }
 
-            string eTag1 = await manager.UpsertTableEntryAsync(data);
-            await manager.DeleteTableEntryAsync(data, eTag1);
+            string eTag1 = await manager.UpsertTableEntryAsync(data, CancellationToken.None);
+            await manager.DeleteTableEntryAsync(data, eTag1, CancellationToken.None);
 
             try
             {
-                await manager.DeleteTableEntryAsync(data, eTag1);
+                await manager.DeleteTableEntryAsync(data, eTag1, CancellationToken.None);
                 Assert.True(false, "Should have thrown RequestFailedException.");
             }
             catch (RequestFailedException exc)
@@ -153,7 +153,7 @@ namespace Tester.AzureUtils
                 Assert.Equal(HttpStatusCode.NotFound, httpStatusCode);
             }
 
-            var tuple = await manager.ReadSingleTableEntryAsync(data.PartitionKey, data.RowKey);
+            var tuple = await manager.ReadSingleTableEntryAsync(data.PartitionKey, data.RowKey, CancellationToken.None);
             Assert.Null(tuple.Entity);
         }
 
@@ -164,7 +164,7 @@ namespace Tester.AzureUtils
             var data = GenerateNewData();
             try
             {
-                await manager.MergeTableEntryAsync(data, AzureTableUtils.ANY_ETAG);
+                await manager.MergeTableEntryAsync(data, AzureTableUtils.ANY_ETAG, CancellationToken.None);
                 Assert.True(false, "Should have thrown RequestFailedException.");
             }
             catch (RequestFailedException exc)
@@ -177,14 +177,14 @@ namespace Tester.AzureUtils
                 Assert.Equal(TableErrorCode.ResourceNotFound.ToString(), restStatus);
             }
 
-            string eTag1 = await manager.UpsertTableEntryAsync(data);
+            string eTag1 = await manager.UpsertTableEntryAsync(data, CancellationToken.None);
             var data2 = data.Clone();
             data2.StringData = "NewData";
-            await manager.MergeTableEntryAsync(data2, eTag1);
+            await manager.MergeTableEntryAsync(data2, eTag1, CancellationToken.None);
 
             try
             {
-                await manager.MergeTableEntryAsync(data, eTag1);
+                await manager.MergeTableEntryAsync(data, eTag1, CancellationToken.None);
                 Assert.True(false, "Should have thrown RequestFailedException.");
             }
             catch (RequestFailedException exc)
@@ -197,7 +197,7 @@ namespace Tester.AzureUtils
                 Assert.True(restStatus == TableErrorCode.UpdateConditionNotSatisfied.ToString());
             }
 
-            var tuple = await manager.ReadSingleTableEntryAsync(data.PartitionKey, data.RowKey);
+            var tuple = await manager.ReadSingleTableEntryAsync(data.PartitionKey, data.RowKey, CancellationToken.None);
             Assert.Equal("NewData", tuple.Entity.StringData);
         }
 
@@ -205,7 +205,7 @@ namespace Tester.AzureUtils
         public async Task AzureTableDataManager_ReadSingleTableEntryAsync()
         {
             var data = GenerateNewData();
-            var tuple = await manager.ReadSingleTableEntryAsync(data.PartitionKey, data.RowKey);
+            var tuple = await manager.ReadSingleTableEntryAsync(data.PartitionKey, data.RowKey, CancellationToken.None);
             Assert.Null(tuple.Entity);
         }
 
@@ -218,7 +218,7 @@ namespace Tester.AzureUtils
             var data2 = GenerateNewData();
             try
             {
-                await manager.InsertTwoTableEntriesConditionallyAsync(data1, data2, AzureTableUtils.ANY_ETAG);
+                await manager.InsertTwoTableEntriesConditionallyAsync(data1, data2, AzureTableUtils.ANY_ETAG, CancellationToken.None);
             }
             catch (RequestFailedException exc)
             {
@@ -230,11 +230,11 @@ namespace Tester.AzureUtils
                 Assert.Equal(TableErrorCode.ResourceNotFound.ToString(), restStatus);
             }
 
-            string etag = await manager.CreateTableEntryAsync(data2.Clone());
-            var tuple = await manager.InsertTwoTableEntriesConditionallyAsync(data1, data2, etag);
+            string etag = await manager.CreateTableEntryAsync(data2.Clone(), CancellationToken.None);
+            var tuple = await manager.InsertTwoTableEntriesConditionallyAsync(data1, data2, etag, CancellationToken.None);
             try
             {
-                await manager.InsertTwoTableEntriesConditionallyAsync(data1.Clone(), data2.Clone(), tuple.Item2);
+                await manager.InsertTwoTableEntriesConditionallyAsync(data1.Clone(), data2.Clone(), tuple.Item2, CancellationToken.None);
                 Assert.True(false, "Should have thrown RequestFailedException.");
             }
             catch (RequestFailedException exc)
@@ -249,7 +249,7 @@ namespace Tester.AzureUtils
 
             try
             {
-                await manager.InsertTwoTableEntriesConditionallyAsync(data1.Clone(), data2.Clone(), AzureTableUtils.ANY_ETAG);
+                await manager.InsertTwoTableEntriesConditionallyAsync(data1.Clone(), data2.Clone(), AzureTableUtils.ANY_ETAG, CancellationToken.None);
                 Assert.True(false, "Should have thrown RequestFailedException.");
             }
             catch (RequestFailedException exc)
@@ -272,7 +272,7 @@ namespace Tester.AzureUtils
             var data2 = GenerateNewData();
             try
             {
-                await manager.UpdateTwoTableEntriesConditionallyAsync(data1, AzureTableUtils.ANY_ETAG, data2, AzureTableUtils.ANY_ETAG);
+                await manager.UpdateTwoTableEntriesConditionallyAsync(data1, AzureTableUtils.ANY_ETAG, data2, AzureTableUtils.ANY_ETAG, CancellationToken.None);
                 Assert.True(false, "Update should have failed since the data has not been created yet");
             }
             catch (RequestFailedException exc)
@@ -285,13 +285,13 @@ namespace Tester.AzureUtils
                 Assert.Equal(TableErrorCode.ResourceNotFound.ToString(), restStatus);
             }
 
-            string etag = await manager.CreateTableEntryAsync(data2.Clone());
-            var tuple1 = await manager.InsertTwoTableEntriesConditionallyAsync(data1, data2, etag);
-            _ = await manager.UpdateTwoTableEntriesConditionallyAsync(data1, tuple1.Item1, data2, tuple1.Item2);
+            string etag = await manager.CreateTableEntryAsync(data2.Clone(), CancellationToken.None);
+            var tuple1 = await manager.InsertTwoTableEntriesConditionallyAsync(data1, data2, etag, CancellationToken.None);
+            _ = await manager.UpdateTwoTableEntriesConditionallyAsync(data1, tuple1.Item1, data2, tuple1.Item2, CancellationToken.None);
 
             try
             {
-                await manager.UpdateTwoTableEntriesConditionallyAsync(data1, tuple1.Item1, data2, tuple1.Item2);
+                await manager.UpdateTwoTableEntriesConditionallyAsync(data1, tuple1.Item1, data2, tuple1.Item2, CancellationToken.None);
                 Assert.True(false, "Should have thrown RequestFailedException.");
             }
             catch (RequestFailedException exc)

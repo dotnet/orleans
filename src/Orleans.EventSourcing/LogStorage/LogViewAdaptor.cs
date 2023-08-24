@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Orleans.Storage;
 using Orleans.EventSourcing.Common;
+using System.Threading;
 
 namespace Orleans.EventSourcing.LogStorage
 {
@@ -112,7 +113,7 @@ namespace Orleans.EventSourcing.LogStorage
                     // for manual testing
                     //await Task.Delay(5000);
 
-                    await globalGrainStorage.ReadStateAsync(grainTypeName, Services.GrainId, GlobalLog);
+                    await globalGrainStorage.ReadStateAsync(grainTypeName, Services.GrainId, GlobalLog, CancellationToken.None);
 
                     Services.Log(LogLevel.Debug, "read success {0}", GlobalLog);
 
@@ -153,7 +154,7 @@ namespace Orleans.EventSourcing.LogStorage
                 // for manual testing
                 //await Task.Delay(5000);
 
-                await globalGrainStorage.WriteStateAsync(grainTypeName, Services.GrainId, GlobalLog);
+                await globalGrainStorage.WriteStateAsync(grainTypeName, Services.GrainId, GlobalLog, CancellationToken.None);
 
                 batchsuccessfullywritten = true;
 
@@ -179,7 +180,7 @@ namespace Orleans.EventSourcing.LogStorage
 
                     try
                     {
-                        await globalGrainStorage.ReadStateAsync(grainTypeName, Services.GrainId, GlobalLog);
+                        await globalGrainStorage.ReadStateAsync(grainTypeName, Services.GrainId, GlobalLog, CancellationToken.None);
 
                         Services.Log(LogLevel.Debug, "read success {0}", GlobalLog);
 

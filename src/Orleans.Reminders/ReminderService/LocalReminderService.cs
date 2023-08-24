@@ -91,7 +91,8 @@ namespace Orleans.Runtime.ReminderService
         public override async Task Start()
         {
             // confirm that it can access the underlying store, as after this the ReminderService will load in the background, without the opportunity to prevent the Silo from starting
-            await reminderTable.Init().WithTimeout(initTimeout, $"ReminderTable Initialization failed due to timeout {initTimeout}");
+            using var cancellation = new CancellationTokenSource(initTimeout);
+            await reminderTable.Init(cancellation.Token).WithTimeout(initTimeout, $"ReminderTable Initialization failed due to timeout {initTimeout}");
 
             _ = base.Start();
         }
@@ -130,7 +131,7 @@ namespace Orleans.Runtime.ReminderService
 
             if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug((int)ErrorCode.RS_RegisterOrUpdate, "RegisterOrUpdateReminder: {Entry}", entry.ToString());
             await DoResponsibilitySanityCheck(grainId, "RegisterReminder");
-            var newEtag = await reminderTable.UpsertRow(entry);
+            var newEtag = await reminderTable.UpsertRow(entry, CancellationToken.None);
 
             if (newEtag != null)
             {
@@ -165,7 +166,7 @@ namespace Orleans.Runtime.ReminderService
             // table ... the periodic mechanism will stop this reminder at any silo's LocalReminderService that might have this reminder locally
 
             // remove from persistent/memory store
-            var success = await reminderTable.RemoveRow(grainId, reminderName, eTag);
+            var success = await reminderTable.RemoveRow(grainId, reminderName, eTag, CancellationToken.None);
             if (success)
             {
                 bool removed = TryStopPreviousTimer(grainId, reminderName);
@@ -190,21 +191,21 @@ namespace Orleans.Runtime.ReminderService
         public async Task<IGrainReminder> GetReminder(GrainId grainId, string reminderName)
         {
             if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug((int)ErrorCode.RS_GetReminder, "GetReminder: GrainId={GrainId} ReminderName={ReminderName}", grainId.ToString(), reminderName);
-            var entry = await reminderTable.ReadRow(grainId, reminderName);
+            var entry = await reminderTable.ReadRow(grainId, reminderName, CancellationToken.None);
             return entry == null ? null : entry.ToIGrainReminder();
         }
 
         public async Task<List<IGrainReminder>> GetReminders(GrainId grainId)
         {
             if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug((int)ErrorCode.RS_GetReminders, "GetReminders: GrainId={GrainId}", grainId.ToString());
-            var tableData = await reminderTable.ReadRows(grainId);
+            var tableData = await reminderTable.ReadRows(grainId, CancellationToken.None);
             return tableData.Reminders.Select(entry => entry.ToIGrainReminder()).ToList();
         }
 
         /// <summary>
         /// Attempt to retrieve reminders from the global reminder table
         /// </summary>
-        private Task ReadAndUpdateReminders()
+        private Task ReadAndUpdateReminders(CancellationToken cancellationToken)
         {
             if (StoppedCancellationTokenSource.IsCancellationRequested) return Task.CompletedTask;
 
@@ -216,7 +217,7 @@ namespace Orleans.Runtime.ReminderService
             var acks = new List<Task>();
             foreach (var range in RangeFactory.GetSubRanges(RingRange))
             {
-                acks.Add(ReadTableAndStartTimers(range, rangeSerialNumberCopy));
+                acks.Add(ReadTableAndStartTimers(range, rangeSerialNumberCopy, cancellationToken));
             }
             var task = Task.WhenAll(acks);
             if (logger.IsEnabled(LogLevel.Trace)) task.ContinueWith(_ => PrintReminders(), TaskContinuationOptions.OnlyOnRanToCompletion | TaskContinuationOptions.ExecuteSynchronously);
@@ -249,7 +250,7 @@ namespace Orleans.Runtime.ReminderService
         {
             _ = base.OnRangeChange(oldRange, newRange, increased);
             if (Status == GrainServiceStatus.Started)
-                return ReadAndUpdateReminders();
+                return ReadAndUpdateReminders(CancellationToken.None);
             if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug("Ignoring range change until ReminderService is Started -- Current status = {Status}", Status);
             return Task.CompletedTask;
         }
@@ -269,7 +270,7 @@ namespace Orleans.Runtime.ReminderService
                             await DoInitialReadAndUpdateReminders();
                             break;
                         case GrainServiceStatus.Started:
-                            await ReadAndUpdateReminders();
+                            await ReadAndUpdateReminders(StoppedCancellationTokenSource.Token);
                             break;
                         default:
                             listRefreshTimer.Dispose();
@@ -297,7 +298,7 @@ namespace Orleans.Runtime.ReminderService
                 if (StoppedCancellationTokenSource.IsCancellationRequested) return;
 
                 initialReadCallCount++;
-                await this.ReadAndUpdateReminders();
+                await this.ReadAndUpdateReminders(StoppedCancellationTokenSource.Token);
                 Status = GrainServiceStatus.Started;
                 startedTask.TrySetResult(true);
             }
@@ -324,7 +325,7 @@ namespace Orleans.Runtime.ReminderService
             }
         }
 
-        private async Task ReadTableAndStartTimers(ISingleRange range, int rangeSerialNumberCopy)
+        private async Task ReadTableAndStartTimers(ISingleRange range, int rangeSerialNumberCopy, CancellationToken cancellationToken)
         {
             if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug("Reading rows from {Range}", range.ToString());
             localTableSequence++;
@@ -332,7 +333,7 @@ namespace Orleans.Runtime.ReminderService
 
             try
             {
-                var table = await reminderTable.ReadRows(range.Begin, range.End); // get all reminders, even the ones we already have
+                var table = await reminderTable.ReadRows(range.Begin, range.End, cancellationToken); // get all reminders, even the ones we already have
 
                 if (rangeSerialNumberCopy < RangeSerialNumber)
                 {

@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Net;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 using Azure;
 using Microsoft.Extensions.Logging;
@@ -34,14 +35,24 @@ namespace Orleans.Runtime.MembershipService
             this.clusterId = clusterOptions.Value.ClusterId;
         }
 
-        public async Task InitializeMembershipTable(bool tryInitTableVersion)
+        public Task InitializeMembershipTable(bool tryInitTableVersion) => InitializeMembershipTable(tryInitTableVersion, CancellationToken.None);
+        public Task DeleteMembershipTableEntries(string clusterId) => DeleteMembershipTableEntries(clusterId, CancellationToken.None);
+        public Task CleanupDefunctSiloEntries(DateTimeOffset beforeDate) => CleanupDefunctSiloEntries(beforeDate, CancellationToken.None);
+        public Task<MembershipTableData> ReadRow(SiloAddress key) => ReadRow(key, CancellationToken.None);
+        public Task<MembershipTableData> ReadAll() => ReadAll(CancellationToken.None);  
+        public Task<bool> InsertRow(MembershipEntry entry, TableVersion tableVersion) => InsertRow(entry, tableVersion, CancellationToken.None);
+        public Task<bool> UpdateRow(MembershipEntry entry, string etag, TableVersion tableVersion) => UpdateRow(entry, etag, tableVersion, CancellationToken.None);
+        public Task UpdateIAmAlive(MembershipEntry entry) => UpdateIAmAlive(entry, CancellationToken.None);
+
+        public async Task InitializeMembershipTable(bool tryInitTableVersion, CancellationToken cancellationToken)
         {
             LogFormatter.SetExceptionDecoder(typeof(RequestFailedException), AzureTableUtils.PrintStorageException);
 
             this.tableManager = await OrleansSiloInstanceManager.GetManager(
                 this.clusterId,
                 this.loggerFactory,
-                this.options);
+                this.options,
+                cancellationToken);
 
             // even if I am not the one who created the table,
             // try to insert an initial table version if it is not already there,
@@ -49,26 +60,26 @@ namespace Orleans.Runtime.MembershipService
             if (tryInitTableVersion)
             {
                 // ignore return value, since we don't care if I inserted it or not, as long as it is in there.
-                bool created = await tableManager.TryCreateTableVersionEntryAsync();
+                bool created = await tableManager.TryCreateTableVersionEntryAsync(cancellationToken);
                 if(created) logger.LogInformation("Created new table version row.");
             }
         }
 
-        public Task DeleteMembershipTableEntries(string clusterId)
+        public Task DeleteMembershipTableEntries(string clusterId, CancellationToken cancellationToken)
         {
-            return tableManager.DeleteTableEntries(clusterId);
+            return tableManager.DeleteTableEntries(clusterId, cancellationToken);
         }
 
-        public Task CleanupDefunctSiloEntries(DateTimeOffset beforeDate)
+        public Task CleanupDefunctSiloEntries(DateTimeOffset beforeDate, CancellationToken cancellationToken)
         {
-            return tableManager.CleanupDefunctSiloEntries(beforeDate);
+            return tableManager.CleanupDefunctSiloEntries(beforeDate, cancellationToken);
         }
 
-        public async Task<MembershipTableData> ReadRow(SiloAddress key)
+        public async Task<MembershipTableData> ReadRow(SiloAddress key, CancellationToken cancellationToken)
         {
             try
             {
-                var entries = await tableManager.FindSiloEntryAndTableVersionRow(key);
+                var entries = await tableManager.FindSiloEntryAndTableVersionRow(key, cancellationToken);
                 MembershipTableData data = Convert(entries);
                 if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug($"Read my entry {{SiloAddress}} Table={Environment.NewLine}{{Data}}", key.ToString(), data.ToString());
                 return data;
@@ -82,11 +93,11 @@ namespace Orleans.Runtime.MembershipService
             }
         }
 
-        public async Task<MembershipTableData> ReadAll()
+        public async Task<MembershipTableData> ReadAll(CancellationToken cancellationToken)
         {
             try
             {
-                var entries = await tableManager.FindAllSiloEntries();
+                var entries = await tableManager.FindAllSiloEntries(cancellationToken);
                 MembershipTableData data = Convert(entries);
                 if (logger.IsEnabled(LogLevel.Trace)) logger.LogTrace($"ReadAll Table={Environment.NewLine}{{Data}}", data.ToString());
 
@@ -101,7 +112,7 @@ namespace Orleans.Runtime.MembershipService
             }
         }
 
-        public async Task<bool> InsertRow(MembershipEntry entry, TableVersion tableVersion)
+        public async Task<bool> InsertRow(MembershipEntry entry, TableVersion tableVersion, CancellationToken cancellationToken)
         {
             try
             {
@@ -110,7 +121,7 @@ namespace Orleans.Runtime.MembershipService
                 var versionEntry = tableManager.CreateTableVersionEntry(tableVersion.Version);
 
                 bool result = await tableManager.InsertSiloEntryConditionally(
-                    tableEntry, versionEntry, tableVersion.VersionEtag);
+                    tableEntry, versionEntry, tableVersion.VersionEtag, cancellationToken);
 
                 if (result == false)
                     logger.LogWarning((int)TableStorageErrorCode.AzureTable_22,
@@ -126,7 +137,7 @@ namespace Orleans.Runtime.MembershipService
             }
         }
 
-        public async Task<bool> UpdateRow(MembershipEntry entry, string etag, TableVersion tableVersion)
+        public async Task<bool> UpdateRow(MembershipEntry entry, string etag, TableVersion tableVersion, CancellationToken cancellationToken)
         {
             try
             {
@@ -134,7 +145,7 @@ namespace Orleans.Runtime.MembershipService
                 var siloEntry = Convert(entry, tableManager.DeploymentId);
                 var versionEntry = tableManager.CreateTableVersionEntry(tableVersion.Version);
 
-                bool result = await tableManager.UpdateSiloEntryConditionally(siloEntry, etag, versionEntry, tableVersion.VersionEtag);
+                bool result = await tableManager.UpdateSiloEntryConditionally(siloEntry, etag, versionEntry, tableVersion.VersionEtag, cancellationToken);
                 if (result == false)
                     logger.LogWarning(
                         (int)TableStorageErrorCode.AzureTable_24,
@@ -153,13 +164,13 @@ namespace Orleans.Runtime.MembershipService
             }
         }
 
-        public async Task UpdateIAmAlive(MembershipEntry entry)
+        public async Task UpdateIAmAlive(MembershipEntry entry, CancellationToken cancellationToken)
         {
             try
             {
                 if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug("Merge entry = {Data}", entry.ToString());
                 var siloEntry = ConvertPartial(entry, tableManager.DeploymentId);
-                await tableManager.MergeTableEntryAsync(siloEntry);
+                await tableManager.MergeTableEntryAsync(siloEntry, cancellationToken);
             }
             catch (Exception exc)
             {

@@ -37,7 +37,8 @@ namespace AWSUtils.Tests.StorageTests
                     },
                     new List<AttributeDefinition> {
                         new AttributeDefinition { AttributeName = "PartitionKey", AttributeType = ScalarAttributeType.S }
-                    })
+                    },
+                    cancellationToken: CancellationToken.None)
                 .WithTimeout(TimeSpan.FromSeconds(2)).Wait();
                 return true;
             }

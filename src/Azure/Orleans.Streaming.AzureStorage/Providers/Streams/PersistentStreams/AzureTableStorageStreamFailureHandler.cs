@@ -1,4 +1,5 @@
 using System;
+using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Orleans.Runtime;
@@ -60,7 +61,7 @@ namespace Orleans.Providers.Streams.PersistentStreams
         /// <returns></returns>
         public Task InitAsync()
         {
-            return dataManager.InitTableAsync();
+            return dataManager.InitTableAsync(CancellationToken.None);
         }
 
         /// <summary>
@@ -111,7 +112,7 @@ namespace Orleans.Providers.Streams.PersistentStreams
             failureEntity.SetSequenceToken(this.serializer, sequenceToken);
             failureEntity.SetPartitionKey(this.clusterId);
             failureEntity.SetRowkey();
-            await dataManager.CreateTableEntryAsync(failureEntity);
+            await dataManager.CreateTableEntryAsync(failureEntity, CancellationToken.None);
         }
     }
 }

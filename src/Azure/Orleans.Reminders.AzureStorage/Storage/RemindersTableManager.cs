@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Net;
+using System.Threading;
 using System.Threading.Tasks;
 using Azure;
 using Azure.Data.Tables;
@@ -66,13 +67,13 @@ namespace Orleans.Runtime.ReminderService
         public string ServiceId { get; private set; }
         public string ClusterId { get; private set; }
 
-        public static async Task<RemindersTableManager> GetManager(string serviceId, string clusterId, ILoggerFactory loggerFactory, AzureStorageOperationOptions options)
+        public static async Task<RemindersTableManager> GetManager(string serviceId, string clusterId, ILoggerFactory loggerFactory, AzureStorageOperationOptions options, CancellationToken cancellationToken)
         {
             var singleton = new RemindersTableManager(serviceId, clusterId, options, loggerFactory);
             try
             {
                 singleton.Logger.LogInformation("Creating RemindersTableManager for service id {ServiceId} and clusterId {ClusterId}.", serviceId, clusterId);
-                await singleton.InitTableAsync();
+                await singleton.InitTableAsync(cancellationToken);
             }
             catch (Exception ex)
             {
@@ -93,7 +94,7 @@ namespace Orleans.Runtime.ReminderService
             ServiceId = serviceId;
         }
 
-        internal async Task<List<(ReminderTableEntry Entity, string ETag)>> FindReminderEntries(uint begin, uint end)
+        internal async Task<List<(ReminderTableEntry Entity, string ETag)>> FindReminderEntries(uint begin, uint end, CancellationToken cancellationToken)
         {
             string sBegin = ReminderTableEntry.ConstructPartitionKey(ServiceId, begin);
             string sEnd = ReminderTableEntry.ConstructPartitionKey(ServiceId, end);
@@ -123,37 +124,37 @@ namespace Orleans.Runtime.ReminderService
                 }
             }
 
-            var queryResults = await ReadTableEntriesAndEtagsAsync(query);
+            var queryResults = await ReadTableEntriesAndEtagsAsync(query, cancellationToken);
             return queryResults.ToList();
         }
 
-        internal async Task<List<(ReminderTableEntry Entity, string ETag)>> FindReminderEntries(GrainId grainId)
+        internal async Task<List<(ReminderTableEntry Entity, string ETag)>> FindReminderEntries(GrainId grainId, CancellationToken cancellationToken)
         {
             var partitionKey = ReminderTableEntry.ConstructPartitionKey(ServiceId, grainId);
             var (rowKeyLowerBound, rowKeyUpperBound) = ReminderTableEntry.ConstructRowKeyBounds(grainId);
             var query = TableClient.CreateQueryFilter($"(PartitionKey eq {partitionKey}) and ((RowKey gt {rowKeyLowerBound}) and (RowKey le {rowKeyUpperBound}))");
-            var queryResults = await ReadTableEntriesAndEtagsAsync(query);
+            var queryResults = await ReadTableEntriesAndEtagsAsync(query, cancellationToken);
             return queryResults.ToList();
         }
 
-        internal async Task<(ReminderTableEntry Entity, string ETag)> FindReminderEntry(GrainId grainId, string reminderName)
+        internal async Task<(ReminderTableEntry Entity, string ETag)> FindReminderEntry(GrainId grainId, string reminderName, CancellationToken cancellationToken)
         {
             string partitionKey = ReminderTableEntry.ConstructPartitionKey(ServiceId, grainId);
             string rowKey = ReminderTableEntry.ConstructRowKey(grainId, reminderName);
 
-            return await ReadSingleTableEntryAsync(partitionKey, rowKey);
+            return await ReadSingleTableEntryAsync(partitionKey, rowKey, cancellationToken);
         }
 
-        private Task<List<(ReminderTableEntry Entity, string ETag)>> FindAllReminderEntries()
+        private Task<List<(ReminderTableEntry Entity, string ETag)>> FindAllReminderEntries(CancellationToken cancellationToken)
         {
-            return FindReminderEntries(0, 0);
+            return FindReminderEntries(0, 0, cancellationToken);
         }
 
-        internal async Task<string> UpsertRow(ReminderTableEntry reminderEntry)
+        internal async Task<string> UpsertRow(ReminderTableEntry reminderEntry, CancellationToken cancellationToken)
         {
             try
             {
-                return await UpsertTableEntryAsync(reminderEntry);
+                return await UpsertTableEntryAsync(reminderEntry, cancellationToken);
             }
             catch(Exception exc)
             {
@@ -169,11 +170,11 @@ namespace Orleans.Runtime.ReminderService
         }
 
 
-        internal async Task<bool> DeleteReminderEntryConditionally(ReminderTableEntry reminderEntry, string eTag)
+        internal async Task<bool> DeleteReminderEntryConditionally(ReminderTableEntry reminderEntry, string eTag, CancellationToken cancellationToken)
         {
             try
             {
-                await DeleteTableEntryAsync(reminderEntry, eTag);
+                await DeleteTableEntryAsync(reminderEntry, eTag, cancellationToken);
                 return true;
             }
             catch(Exception exc)
@@ -193,9 +194,9 @@ namespace Orleans.Runtime.ReminderService
             }
         }
 
-        internal async Task DeleteTableEntries()
+        internal async Task DeleteTableEntries(CancellationToken cancellationToken)
         {
-            List<(ReminderTableEntry Entity, string ETag)> entries = await FindAllReminderEntries();
+            List<(ReminderTableEntry Entity, string ETag)> entries = await FindAllReminderEntries(cancellationToken);
             // return manager.DeleteTableEntries(entries); // this doesnt work as entries can be across partitions, which is not allowed
             // group by grain hashcode so each query goes to different partition
             var tasks = new List<Task>();
@@ -206,9 +207,9 @@ namespace Orleans.Runtime.ReminderService
 
             foreach (var entriesPerPartition in groupedByHash.Values)
             {
-                    foreach (var batch in entriesPerPartition.BatchIEnumerable(this.StoragePolicyOptions.MaxBulkUpdateRows))
+                foreach (var batch in entriesPerPartition.BatchIEnumerable(this.StoragePolicyOptions.MaxBulkUpdateRows))
                 {
-                    tasks.Add(DeleteTableEntriesAsync(batch));
+                    tasks.Add(DeleteTableEntriesAsync(batch, cancellationToken));
                 }
             }
 

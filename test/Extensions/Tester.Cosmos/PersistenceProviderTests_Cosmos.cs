@@ -154,7 +154,7 @@ public class PersistenceProviderTests_Cosmos
         Stopwatch sw = new Stopwatch();
         sw.Start();
 
-        await store.ReadStateAsync(grainTypeName, grainId, storedGrainState);
+        await store.ReadStateAsync(grainTypeName, grainId, storedGrainState, CancellationToken.None);
 
         TimeSpan readTime = sw.Elapsed;
         output.WriteLine("{0} - Read time = {1}", store.GetType().FullName, readTime);
@@ -173,7 +173,7 @@ public class PersistenceProviderTests_Cosmos
         Stopwatch sw = new Stopwatch();
         sw.Start();
 
-        await store.WriteStateAsync(grainTypeName, grainId, grainState);
+        await store.WriteStateAsync(grainTypeName, grainId, grainState, CancellationToken.None);
 
         TimeSpan writeTime = sw.Elapsed;
         sw.Restart();
@@ -182,7 +182,7 @@ public class PersistenceProviderTests_Cosmos
         {
             State = new TestStoreGrainState()
         };
-        await store.ReadStateAsync(grainTypeName, grainId, storedGrainState);
+        await store.ReadStateAsync(grainTypeName, grainId, storedGrainState, CancellationToken.None);
         TimeSpan readTime = sw.Elapsed;
         output.WriteLine("{0} - Write time = {1} Read time = {2}", store.GetType().FullName, writeTime, readTime);
         Assert.Equal(grainState.State.A, storedGrainState.State.A);
@@ -205,18 +205,18 @@ public class PersistenceProviderTests_Cosmos
         Stopwatch sw = new Stopwatch();
         sw.Start();
 
-        await store.WriteStateAsync(grainTypeName, grainId, grainState);
+        await store.WriteStateAsync(grainTypeName, grainId, grainState, CancellationToken.None);
 
         TimeSpan writeTime = sw.Elapsed;
         sw.Restart();
 
-        await store.ClearStateAsync(grainTypeName, grainId, grainState);
+        await store.ClearStateAsync(grainTypeName, grainId, grainState, CancellationToken.None);
 
         var storedGrainState = new GrainState<TestStoreGrainState>
         {
             State = new TestStoreGrainState()
         };
-        await store.ReadStateAsync(grainTypeName, grainId, storedGrainState);
+        await store.ReadStateAsync(grainTypeName, grainId, storedGrainState, CancellationToken.None);
         TimeSpan readTime = sw.Elapsed;
         output.WriteLine("{0} - Write time = {1} Read time = {2}", store.GetType().FullName, writeTime, readTime);
         Assert.NotNull(storedGrainState.State);

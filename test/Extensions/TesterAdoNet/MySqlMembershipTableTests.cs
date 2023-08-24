@@ -39,7 +39,7 @@ namespace UnitTests.MembershipTests
                 Invariant = GetAdoInvariant(),
                 ConnectionString = this.connectionString,
             };
-            return new AdoNetClusteringTable(this.Services, this._clusterOptions, Options.Create(options), loggerFactory.CreateLogger<AdoNetClusteringTable>());
+            return new AdoNetClusteringTable(this._clusterOptions, Options.Create(options), loggerFactory.CreateLogger<AdoNetClusteringTable>());
         }
 
         protected override IGatewayListProvider CreateGatewayListProvider(ILogger logger)

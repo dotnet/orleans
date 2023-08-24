@@ -220,7 +220,7 @@ namespace Orleans
         /// <returns>
         /// A <see cref="Task"/> representing the operation.
         /// </returns>
-        protected virtual Task ClearStateAsync() => _storage!.ClearStateAsync();
+        protected virtual Task ClearStateAsync(CancellationToken cancellationToken = default) => _storage!.ClearStateAsync(cancellationToken);
 
         /// <summary>
         /// Write the current grain state data into the backing store.
@@ -228,7 +228,7 @@ namespace Orleans
         /// <returns>
         /// A <see cref="Task"/> representing the operation.
         /// </returns>
-        protected virtual Task WriteStateAsync() => _storage!.WriteStateAsync();
+        protected virtual Task WriteStateAsync(CancellationToken cancellationToken = default) => _storage!.WriteStateAsync(cancellationToken);
 
         /// <summary>
         /// Reads grain state from backing store, updating <see cref="State"/>.
@@ -239,7 +239,7 @@ namespace Orleans
         /// <returns>
         /// A <see cref="Task"/> representing the operation.
         /// </returns>
-        protected virtual Task ReadStateAsync() => _storage!.ReadStateAsync();
+        protected virtual Task ReadStateAsync(CancellationToken cancellationToken = default) => _storage!.ReadStateAsync(cancellationToken);
 
         private class LifecycleObserver : ILifecycleObserver, IGrainMigrationParticipant
         {

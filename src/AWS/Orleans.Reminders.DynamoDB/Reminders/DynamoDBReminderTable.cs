@@ -6,6 +6,7 @@ using Orleans.Configuration;
 using Orleans.Runtime;
 using System;
 using System.Collections.Generic;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace Orleans.Reminders.DynamoDB
@@ -47,8 +48,16 @@ namespace Orleans.Reminders.DynamoDB
             this.options = storageOptions.Value;
         }
 
+        public Task Init() => Init(CancellationToken.None);
+        public Task<ReminderTableData> ReadRows(GrainId grainId) => ReadRows(grainId, CancellationToken.None);
+        public Task<ReminderTableData> ReadRows(uint begin, uint end) => ReadRows(begin, end, CancellationToken.None);
+        public Task<ReminderEntry> ReadRow(GrainId grainId, string reminderName) => ReadRow(grainId, reminderName, CancellationToken.None); 
+        public Task<string> UpsertRow(ReminderEntry entry) => UpsertRow(entry, CancellationToken.None); 
+        public Task<bool> RemoveRow(GrainId grainId, string reminderName, string eTag) => RemoveRow(grainId, reminderName, eTag, CancellationToken.None);
+        public Task TestOnlyClearTable() => TestOnlyClearTable(CancellationToken.None);
+
         /// <summary>Initialize current instance with specific global configuration and logger</summary>
-        public Task Init()
+        public Task Init(CancellationToken cancellationToken)
         {
             this.storage = new DynamoDBStorage(
                 this.logger,
@@ -100,7 +109,8 @@ namespace Orleans.Reminders.DynamoDB
                     new AttributeDefinition { AttributeName = SERVICE_ID_PROPERTY_NAME, AttributeType = ScalarAttributeType.S },
                     new AttributeDefinition { AttributeName = GRAIN_REFERENCE_PROPERTY_NAME, AttributeType = ScalarAttributeType.S }
                 },
-                new List<GlobalSecondaryIndex> { serviceIdGrainHashGlobalSecondaryIndex, serviceIdGrainReferenceGlobalSecondaryIndex });
+                new List<GlobalSecondaryIndex> { serviceIdGrainHashGlobalSecondaryIndex, serviceIdGrainReferenceGlobalSecondaryIndex },
+                cancellationToken: cancellationToken);
         }
 
         /// <summary>
@@ -110,7 +120,7 @@ namespace Orleans.Reminders.DynamoDB
         /// <param name="grainId"> grain ref to locate the row </param>
         /// <param name="reminderName"> reminder name to locate the row </param>
         /// <returns> Return the ReminderTableData if the rows were read successfully </returns>
-        public async Task<ReminderEntry> ReadRow(GrainId grainId, string reminderName)
+        public async Task<ReminderEntry> ReadRow(GrainId grainId, string reminderName, CancellationToken cancellationToken)
         {
             var reminderId = ConstructReminderId(this.serviceId, grainId, reminderName);
 
@@ -122,7 +132,7 @@ namespace Orleans.Reminders.DynamoDB
 
             try
             {
-                return await this.storage.ReadSingleEntryAsync(this.options.TableName, keys, this.Resolve).ConfigureAwait(false);
+                return await this.storage.ReadSingleEntryAsync(this.options.TableName, keys, this.Resolve, cancellationToken: cancellationToken).ConfigureAwait(false);
             }
             catch (Exception exc)
             {
@@ -141,7 +151,7 @@ namespace Orleans.Reminders.DynamoDB
         /// </summary>
         /// <param name="grainId">grain ref to locate the row </param>
         /// <returns> Return the ReminderTableData if the rows were read successfully </returns>
-        public async Task<ReminderTableData> ReadRows(GrainId grainId)
+        public async Task<ReminderTableData> ReadRows(GrainId grainId, CancellationToken cancellationToken)
         {
             var expressionValues = new Dictionary<string, AttributeValue>
                 {
@@ -152,7 +162,14 @@ namespace Orleans.Reminders.DynamoDB
             try
             {
                 var expression = $"{SERVICE_ID_PROPERTY_NAME} = :{SERVICE_ID_PROPERTY_NAME} AND {GRAIN_REFERENCE_PROPERTY_NAME} = :{GRAIN_REFERENCE_PROPERTY_NAME}";
-                var records = await this.storage.QueryAllAsync(this.options.TableName, expressionValues, expression, this.Resolve, SERVICE_ID_GRAIN_REFERENCE_INDEX, consistentRead: false).ConfigureAwait(false);
+                var records = await this.storage.QueryAllAsync(
+                    this.options.TableName,
+                    expressionValues,
+                    expression,
+                    this.Resolve,
+                    SERVICE_ID_GRAIN_REFERENCE_INDEX,
+                    consistentRead: false,
+                    cancellationToken: cancellationToken).ConfigureAwait(false);
 
                 return new ReminderTableData(records);
             }
@@ -174,7 +191,7 @@ namespace Orleans.Reminders.DynamoDB
         /// <param name="begin"></param>
         /// <param name="end"></param>
         /// <returns> Return the RemiderTableData if the rows were read successfully </returns>
-        public async Task<ReminderTableData> ReadRows(uint begin, uint end)
+        public async Task<ReminderTableData> ReadRows(uint begin, uint end, CancellationToken cancellationToken)
         {
             Dictionary<string, AttributeValue> expressionValues = null;
 
@@ -192,7 +209,14 @@ namespace Orleans.Reminders.DynamoDB
                         { $":End{GRAIN_HASH_PROPERTY_NAME}", new AttributeValue { N = end.ToString() } }
                     };
                     expression = $"{SERVICE_ID_PROPERTY_NAME} = :{SERVICE_ID_PROPERTY_NAME} AND {GRAIN_HASH_PROPERTY_NAME} BETWEEN :Begin{GRAIN_HASH_PROPERTY_NAME} AND :End{GRAIN_HASH_PROPERTY_NAME}";
-                    records = await this.storage.QueryAllAsync(this.options.TableName, expressionValues, expression, this.Resolve, SERVICE_ID_GRAIN_HASH_INDEX, consistentRead: false).ConfigureAwait(false);
+                    records = await this.storage.QueryAllAsync(
+                        this.options.TableName,
+                        expressionValues,
+                        expression,
+                        this.Resolve,
+                        SERVICE_ID_GRAIN_HASH_INDEX,
+                        consistentRead: false,
+                        cancellationToken: cancellationToken).ConfigureAwait(false);
                 }
                 else
                 {
@@ -202,7 +226,14 @@ namespace Orleans.Reminders.DynamoDB
                         { $":End{GRAIN_HASH_PROPERTY_NAME}", new AttributeValue { N = end.ToString() } }
                     };
                     expression = $"{SERVICE_ID_PROPERTY_NAME} = :{SERVICE_ID_PROPERTY_NAME} AND {GRAIN_HASH_PROPERTY_NAME} <= :End{GRAIN_HASH_PROPERTY_NAME}";
-                    records = await this.storage.QueryAllAsync(this.options.TableName, expressionValues, expression, this.Resolve, SERVICE_ID_GRAIN_HASH_INDEX, consistentRead: false).ConfigureAwait(false);
+                    records = await this.storage.QueryAllAsync(
+                        this.options.TableName,
+                        expressionValues,
+                        expression,
+                        this.Resolve,
+                        SERVICE_ID_GRAIN_HASH_INDEX,
+                        consistentRead: false,
+                        cancellationToken: cancellationToken).ConfigureAwait(false);
 
                     expressionValues = new Dictionary<string, AttributeValue>
                     {
@@ -210,7 +241,14 @@ namespace Orleans.Reminders.DynamoDB
                         { $":Begin{GRAIN_HASH_PROPERTY_NAME}", new AttributeValue { N = begin.ToString() } }
                     };
                     expression = $"{SERVICE_ID_PROPERTY_NAME} = :{SERVICE_ID_PROPERTY_NAME} AND {GRAIN_HASH_PROPERTY_NAME} > :Begin{GRAIN_HASH_PROPERTY_NAME}";
-                    records.AddRange(await this.storage.QueryAllAsync(this.options.TableName, expressionValues, expression, this.Resolve, SERVICE_ID_GRAIN_HASH_INDEX, consistentRead: false).ConfigureAwait(false));
+                    records.AddRange(await this.storage.QueryAllAsync(
+                        this.options.TableName,
+                        expressionValues,
+                        expression,
+                        this.Resolve,
+                        SERVICE_ID_GRAIN_HASH_INDEX,
+                        consistentRead: false,
+                        cancellationToken: cancellationToken).ConfigureAwait(false));
 
                 }
 
@@ -247,7 +285,7 @@ namespace Orleans.Reminders.DynamoDB
         /// <param name="reminderName"> reminder name to locate the row </param>
         /// <param name="eTag"> e tag </param>
         /// <returns> Return true if the row was removed </returns>
-        public async Task<bool> RemoveRow(GrainId grainId, string reminderName, string eTag)
+        public async Task<bool> RemoveRow(GrainId grainId, string reminderName, string eTag, CancellationToken cancellationToken)
         {
             var reminderId = ConstructReminderId(this.serviceId, grainId, reminderName);
 
@@ -262,7 +300,7 @@ namespace Orleans.Reminders.DynamoDB
                 var conditionalValues = new Dictionary<string, AttributeValue> { { CURRENT_ETAG_ALIAS, new AttributeValue { N = eTag } } };
                 var expression = $"{ETAG_PROPERTY_NAME} = {CURRENT_ETAG_ALIAS}";
 
-                await this.storage.DeleteEntryAsync(this.options.TableName, keys, expression, conditionalValues).ConfigureAwait(false);
+                await this.storage.DeleteEntryAsync(this.options.TableName, keys, expression, conditionalValues, cancellationToken).ConfigureAwait(false);
                 return true;
             }
             catch (ConditionalCheckFailedException)
@@ -275,7 +313,7 @@ namespace Orleans.Reminders.DynamoDB
         /// Test hook to clear reminder table data.
         /// </summary>
         /// <returns></returns>
-        public async Task TestOnlyClearTable()
+        public async Task TestOnlyClearTable(CancellationToken cancellationToken)
         {
             var expressionValues = new Dictionary<string, AttributeValue>
                 {
@@ -290,18 +328,19 @@ namespace Orleans.Reminders.DynamoDB
                     {
                         { REMINDER_ID_PROPERTY_NAME, item[REMINDER_ID_PROPERTY_NAME] },
                         { GRAIN_HASH_PROPERTY_NAME, item[GRAIN_HASH_PROPERTY_NAME] }
-                    }).ConfigureAwait(false);
+                    },
+                    cancellationToken: cancellationToken).ConfigureAwait(false);
 
                 if (records.Count <= 25)
                 {
-                    await this.storage.DeleteEntriesAsync(this.options.TableName, records);
+                    await this.storage.DeleteEntriesAsync(this.options.TableName, records, cancellationToken);
                 }
                 else
                 {
                     List<Task> tasks = new List<Task>();
                     foreach (var batch in records.BatchIEnumerable(25))
                     {
-                        tasks.Add(this.storage.DeleteEntriesAsync(this.options.TableName, batch));
+                        tasks.Add(this.storage.DeleteEntriesAsync(this.options.TableName, batch, cancellationToken));
                     }
                     await Task.WhenAll(tasks);
                 }
@@ -323,7 +362,7 @@ namespace Orleans.Reminders.DynamoDB
         /// </summary>
         /// <param name="entry"> The entry to put </param>
         /// <returns> Return the entry ETag if entry was upsert successfully </returns>
-        public async Task<string> UpsertRow(ReminderEntry entry)
+        public async Task<string> UpsertRow(ReminderEntry entry, CancellationToken cancellationToken)
         {
             var reminderId = ConstructReminderId(this.serviceId, entry.GrainId, entry.ReminderName);
 
@@ -343,7 +382,7 @@ namespace Orleans.Reminders.DynamoDB
             {
                 if (this.logger.IsEnabled(LogLevel.Debug)) this.logger.LogDebug("UpsertRow entry = {Entry}, etag = {ETag}", entry.ToString(), entry.ETag);
 
-                await this.storage.PutEntryAsync(this.options.TableName, fields);
+                await this.storage.PutEntryAsync(this.options.TableName, fields, cancellationToken: cancellationToken);
 
                 entry.ETag = fields[ETAG_PROPERTY_NAME].N;
                 return entry.ETag;
@@ -363,3 +402,4 @@ namespace Orleans.Reminders.DynamoDB
         private static string ConstructReminderId(string serviceId, GrainId grainId, string reminderName) => $"{serviceId}_{grainId}_{reminderName}";
     }
 }
+

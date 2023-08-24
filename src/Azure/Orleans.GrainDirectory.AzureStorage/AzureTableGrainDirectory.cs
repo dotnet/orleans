@@ -73,7 +73,7 @@ namespace Orleans.GrainDirectory.AzureStorage
 
         public async Task<GrainAddress?> Lookup(GrainId grainId)
         {
-            var result = await this.tableDataManager.ReadSingleTableEntryAsync(this.clusterId, GrainDirectoryEntity.GrainIdToRowKey(grainId));
+            var result = await this.tableDataManager.ReadSingleTableEntryAsync(this.clusterId, GrainDirectoryEntity.GrainIdToRowKey(grainId), CancellationToken.None);
 
             if (result.Entity is null)
             {
@@ -92,10 +92,10 @@ namespace Orleans.GrainDirectory.AzureStorage
             {
                 var entry = GrainDirectoryEntity.FromGrainAddress(this.clusterId, address);
                 var previousEntry = GrainDirectoryEntity.FromGrainAddress(this.clusterId, previousAddress);
-                var (storedEntry, eTag) = await tableDataManager.ReadSingleTableEntryAsync(entry.PartitionKey, entry.RowKey);
+                var (storedEntry, eTag) = await tableDataManager.ReadSingleTableEntryAsync(entry.PartitionKey, entry.RowKey, CancellationToken.None);
                 if (storedEntry is null)
                 {
-                    result = await this.tableDataManager.InsertTableEntryAsync(entry);
+                    result = await this.tableDataManager.InsertTableEntryAsync(entry, CancellationToken.None);
                 }
                 else if (storedEntry.ActivationId != previousEntry.ActivationId || storedEntry.SiloAddress != previousEntry.SiloAddress)
                 {
@@ -103,14 +103,14 @@ namespace Orleans.GrainDirectory.AzureStorage
                 }
                 else
                 {
-                    _ = await tableDataManager.UpdateTableEntryAsync(entry, eTag);
+                    _ = await tableDataManager.UpdateTableEntryAsync(entry, eTag, CancellationToken.None);
                     return address;
                 }
             }
             else
             {
                 var entry = GrainDirectoryEntity.FromGrainAddress(this.clusterId, address);
-                result = await this.tableDataManager.InsertTableEntryAsync(entry);
+                result = await this.tableDataManager.InsertTableEntryAsync(entry, CancellationToken.None);
             }
 
             // Possible race condition?
@@ -119,7 +119,7 @@ namespace Orleans.GrainDirectory.AzureStorage
 
         public async Task Unregister(GrainAddress address)
         {
-            var result = await this.tableDataManager.ReadSingleTableEntryAsync(this.clusterId, GrainDirectoryEntity.GrainIdToRowKey(address.GrainId));
+            var result = await this.tableDataManager.ReadSingleTableEntryAsync(this.clusterId, GrainDirectoryEntity.GrainIdToRowKey(address.GrainId), CancellationToken.None);
 
             // No entry found
             if (result.Entity is null)
@@ -130,7 +130,7 @@ namespace Orleans.GrainDirectory.AzureStorage
             // Check if the entry in storage match the one we were asked to delete
             var entity = result.Item1;
             if (entity.ActivationId == address.ActivationId.ToParsableString())
-                await this.tableDataManager.DeleteTableEntryAsync(GrainDirectoryEntity.FromGrainAddress(this.clusterId, address), entity.ETag.ToString());
+                await this.tableDataManager.DeleteTableEntryAsync(GrainDirectoryEntity.FromGrainAddress(this.clusterId, address), entity.ETag.ToString(), CancellationToken.None);
         }
 
         public async Task UnregisterMany(List<GrainAddress> addresses)
@@ -178,14 +178,14 @@ namespace Orleans.GrainDirectory.AzureStorage
             }
 
             queryBuilder.Append(')');
-            var entities = await this.tableDataManager.ReadTableEntriesAndEtagsAsync(queryBuilder.ToString());
-            await this.tableDataManager.DeleteTableEntriesAsync(entities);
+            var entities = await this.tableDataManager.ReadTableEntriesAndEtagsAsync(queryBuilder.ToString(), CancellationToken.None);
+            await this.tableDataManager.DeleteTableEntriesAsync(entities, CancellationToken.None);
         }
 
         // Called by lifecycle, should not be called explicitely, except for tests
         public async Task InitializeIfNeeded(CancellationToken ct = default)
         {
-            await this.tableDataManager.InitTableAsync();
+            await this.tableDataManager.InitTableAsync(ct);
         }
 
         public void Participate(ISiloLifecycle lifecycle)

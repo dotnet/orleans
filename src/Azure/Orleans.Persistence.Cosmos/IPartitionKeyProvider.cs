@@ -1,3 +1,5 @@
+using System.Threading;
+
 namespace Orleans.Persistence.Cosmos;
 
 /// <summary>
@@ -5,6 +7,14 @@ namespace Orleans.Persistence.Cosmos;
 /// </summary>
 public interface IPartitionKeyProvider
 {
+    /// <summary>
+    /// Creates a partition key for the provided grain.
+    /// </summary>
+    /// <param name="grainType">The grain type.</param>
+    /// <param name="grainId">The grain identifier.</param>
+    /// <returns>The partition key.</returns>
+    ValueTask<string> GetPartitionKey(string grainType, GrainId grainId, CancellationToken cancellationToken) => GetPartitionKey(grainType, grainId); 
+
     /// <summary>
     /// Creates a partition key for the provided grain.
     /// </summary>

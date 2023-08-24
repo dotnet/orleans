@@ -98,17 +98,19 @@ namespace AWSUtils.Tests.StorageTests
         {
             if (AWSTestConstants.IsDynamoDbAvailable)
             {
-                InitializeTable(INSTANCE_TABLE_NAME,
-                               new List<KeySchemaElement>
-                               {
-                    new KeySchemaElement { AttributeName = "PartitionKey", KeyType = KeyType.HASH },
-                    new KeySchemaElement { AttributeName = "RowKey", KeyType = KeyType.RANGE }
-                               },
-                               new List<AttributeDefinition>
-                               {
-                    new AttributeDefinition { AttributeName = "PartitionKey", AttributeType = ScalarAttributeType.S },
-                    new AttributeDefinition { AttributeName = "RowKey", AttributeType = ScalarAttributeType.S }
-                               }).Wait();
+                InitializeTable(
+                    INSTANCE_TABLE_NAME,
+                    new List<KeySchemaElement>
+                    {
+                        new KeySchemaElement { AttributeName = "PartitionKey", KeyType = KeyType.HASH },
+                        new KeySchemaElement { AttributeName = "RowKey", KeyType = KeyType.RANGE }
+                    },
+                    new List<AttributeDefinition>
+                    {
+                        new AttributeDefinition { AttributeName = "PartitionKey", AttributeType = ScalarAttributeType.S },
+                        new AttributeDefinition { AttributeName = "RowKey", AttributeType = ScalarAttributeType.S }
+                    },
+                    cancellationToken: CancellationToken.None).Wait();
             }
         }
     }

@@ -32,10 +32,11 @@ namespace ServiceBus.Tests.TestStreamProviders.EventHub
         public static async Task<int> GetDeliveryFailureCount(string streamProviderName)
         {
             var dataManager = GetDataManager();
-            await dataManager.InitTableAsync();
+            await dataManager.InitTableAsync(CancellationToken.None);
             var deliveryErrors =
                 await dataManager.ReadAllTableEntriesForPartitionAsync(
-                        StreamDeliveryFailureEntity.MakeDefaultPartitionKey(streamProviderName, DeploymentId));
+                        StreamDeliveryFailureEntity.MakeDefaultPartitionKey(streamProviderName, DeploymentId),
+                        CancellationToken.None);
             return deliveryErrors.Count;
         }
 

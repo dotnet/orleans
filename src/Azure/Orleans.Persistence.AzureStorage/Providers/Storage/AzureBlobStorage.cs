@@ -40,9 +40,17 @@ namespace Orleans.Storage
             this.logger = logger;
         }
 
-        /// <summary> Read state data function for this storage provider. </summary>
-        /// <see cref="IGrainStorage.ReadStateAsync{T}"/>
-        public async Task ReadStateAsync<T>(string grainType, GrainId grainId, IGrainState<T> grainState)
+        /// <inheritdoc/>
+        public Task ReadStateAsync<T>(string grainType, GrainId grainId, IGrainState<T> grainState) => ReadStateAsync(grainType, grainId, grainState, CancellationToken.None);
+
+        /// <inheritdoc/>
+        public Task WriteStateAsync<T>(string grainType, GrainId grainId, IGrainState<T> grainState) => WriteStateAsync(grainType, grainId, grainState, CancellationToken.None);
+
+        /// <inheritdoc/>
+        public Task ClearStateAsync<T>(string grainType, GrainId grainId, IGrainState<T> grainState) => ClearStateAsync(grainType, grainId, grainState, CancellationToken.None);
+
+        /// <inheritdoc/>
+        public async Task ReadStateAsync<T>(string grainType, GrainId grainId, IGrainState<T> grainState, CancellationToken cancellationToken)
         {
             var blobName = GetBlobName(grainType, grainId);
             var container = this.blobContainerFactory.GetBlobContainerClient(grainId);
@@ -62,7 +70,7 @@ namespace Orleans.Storage
                 BinaryData contents;
                 try
                 {
-                    var response = await blob.DownloadContentAsync();
+                    var response = await blob.DownloadContentAsync(cancellationToken);
                     grainState.ETag = response.Value.Details.ETag.ToString();
                     contents = response.Value.Content;
                 }
@@ -134,9 +142,8 @@ namespace Orleans.Storage
 
         private static string GetBlobName(string grainType, GrainId grainId) => $"{grainType}-{grainId}.json";
 
-        /// <summary> Write state data function for this storage provider. </summary>
-        /// <see cref="IGrainStorage.WriteStateAsync{T}"/>
-        public async Task WriteStateAsync<T>(string grainType, GrainId grainId, IGrainState<T> grainState)
+        /// <inheritdoc/>
+        public async Task WriteStateAsync<T>(string grainType, GrainId grainId, IGrainState<T> grainState, CancellationToken cancellationToken)
         {
             var blobName = GetBlobName(grainType, grainId);
             var container = this.blobContainerFactory.GetBlobContainerClient(grainId);
@@ -155,7 +162,7 @@ namespace Orleans.Storage
 
                 var blob = container.GetBlobClient(blobName);
 
-                await WriteStateAndCreateContainerIfNotExists(grainType, grainId, grainState, contents, "application/octet-stream", blob);
+                await WriteStateAndCreateContainerIfNotExists(grainType, grainId, grainState, contents, "application/octet-stream", blob, cancellationToken);
 
                 if (this.logger.IsEnabled(LogLevel.Trace)) this.logger.LogTrace((int)AzureProviderErrorCode.AzureBlobProvider_Storage_DataRead,
                     "Written: GrainType={GrainType} GrainId={GrainId} ETag={ETag} to BlobName={BlobName} in Container={ContainerName}",
@@ -180,9 +187,8 @@ namespace Orleans.Storage
             }
         }
 
-        /// <summary> Clear / Delete state data function for this storage provider. </summary>
-        /// <see cref="IGrainStorage.ClearStateAsync{T}"/>
-        public async Task ClearStateAsync<T>(string grainType, GrainId grainId, IGrainState<T> grainState)
+        /// <inheritdoc/>
+        public async Task ClearStateAsync<T>(string grainType, GrainId grainId, IGrainState<T> grainState, CancellationToken cancellationToken)
         {
             var blobName = GetBlobName(grainType, grainId);
             var container = this.blobContainerFactory.GetBlobContainerClient(grainId);
@@ -236,7 +242,7 @@ namespace Orleans.Storage
             }
         }
 
-        private async Task WriteStateAndCreateContainerIfNotExists<T>(string grainType, GrainId grainId, IGrainState<T> grainState, BinaryData contents, string mimeType, BlobClient blob)
+        private async Task WriteStateAndCreateContainerIfNotExists<T>(string grainType, GrainId grainId, IGrainState<T> grainState, BinaryData contents, string mimeType, BlobClient blob, CancellationToken cancellationToken)
         {
             var container = this.blobContainerFactory.GetBlobContainerClient(grainId);
 
@@ -253,7 +259,7 @@ namespace Orleans.Storage
                 };
 
                 var result = await DoOptimisticUpdate(
-                    () => blob.UploadAsync(contents, options),
+                    () => blob.UploadAsync(contents, options, cancellationToken),
                     blob,
                     grainState.ETag)
                         .ConfigureAwait(false);
@@ -271,9 +277,9 @@ namespace Orleans.Storage
                     grainState.ETag,
                     blob.Name,
                     container.Name);
-                await container.CreateIfNotExistsAsync().ConfigureAwait(false);
+                await container.CreateIfNotExistsAsync(cancellationToken: cancellationToken).ConfigureAwait(false);
 
-                await WriteStateAndCreateContainerIfNotExists(grainType, grainId, grainState, contents, mimeType, blob).ConfigureAwait(false);
+                await WriteStateAndCreateContainerIfNotExists(grainType, grainId, grainState, contents, mimeType, blob, cancellationToken).ConfigureAwait(false);
             }
         }
 
@@ -295,7 +301,7 @@ namespace Orleans.Storage
         }
 
         /// <summary> Initialization function for this storage provider. </summary>
-        private async Task Init(CancellationToken ct)
+        private async Task Init(CancellationToken cancellationToken)
         {
             var stopWatch = Stopwatch.StartNew();
 
@@ -309,7 +315,7 @@ namespace Orleans.Storage
                 }
 
                 var client = await createClient();
-                await this.blobContainerFactory.InitializeAsync(client);
+                await this.blobContainerFactory.InitializeAsync(client, cancellationToken);
                 stopWatch.Stop();
                 this.logger.LogInformation((int)AzureProviderErrorCode.AzureBlobProvider_InitProvider,
                     "Initializing provider {ProviderName} of type {ProviderType} in stage {Stage} took {ElapsedMilliseconds} Milliseconds.",

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace Orleans.Messaging
@@ -9,6 +10,19 @@ namespace Orleans.Messaging
     /// </summary>
     public interface IGatewayListProvider
     {
+        /// <summary>
+        /// Initializes the provider, will be called before all other methods.
+        /// </summary>
+        /// <returns>A <see cref="Task"/> representing the work performed.</returns>
+        Task InitializeGatewayListProvider(CancellationToken cancellationToken) => InitializeGatewayListProvider().WaitAsync(cancellationToken);
+
+        /// <summary>
+        /// Returns the list of gateways (silos) that can be used by a client to connect to Orleans cluster.
+        /// The Uri is in the form of: "gwy.tcp://IP:port/Generation". See Utils.ToGatewayUri and Utils.ToSiloAddress for more details about Uri format.
+        /// </summary>
+        /// <returns>The list of gateway endpoints.</returns>
+        Task<IList<Uri>> GetGateways(CancellationToken cancellationToken) => GetGateways().WaitAsync(cancellationToken);
+
         /// <summary>
         /// Initializes the provider, will be called before all other methods.
         /// </summary>

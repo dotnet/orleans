@@ -8,6 +8,7 @@ using Orleans.Messaging;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
+using System.Threading;
 
 namespace Orleans.Runtime.Membership
 {
@@ -33,6 +34,9 @@ namespace Orleans.Runtime.Membership
             this.kvRootFolder = options.Value.KvRootFolder;
         }
 
+        public Task InitializeGatewayListProvider() => InitializeGatewayListProvider(CancellationToken.None);
+        public Task<IList<Uri>> GetGateways() => GetGateways(CancellationToken.None);
+
         public TimeSpan MaxStaleness
         {
             get { return this.maxStaleness; }
@@ -42,15 +46,16 @@ namespace Orleans.Runtime.Membership
         {
             get { return true; }
         }
-        public Task InitializeGatewayListProvider()
+
+        public Task InitializeGatewayListProvider(CancellationToken cancellationToken)
         {
             consulClient = options.CreateClient();
             return Task.CompletedTask;
         }
 
-        public async Task<IList<Uri>> GetGateways()
+        public async Task<IList<Uri>> GetGateways(CancellationToken cancellationToken)
         {
-            var membershipTableData = await ConsulBasedMembershipTable.ReadAll(this.consulClient, this.clusterId, this.kvRootFolder, this.logger, null);
+            var membershipTableData = await ConsulBasedMembershipTable.ReadAll(this.consulClient, this.clusterId, this.kvRootFolder, this.logger, null, cancellationToken);
             if (membershipTableData == null) return new List<Uri>();
 
             return membershipTableData.Members.Select(e => e.Item1).

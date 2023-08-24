@@ -1,3 +1,5 @@
+using System;
+using System.Threading;
 using System.Threading.Tasks;
 using Azure.Storage.Blobs;
 using Orleans.Configuration;
@@ -22,6 +24,16 @@ public interface IBlobContainerFactory
     /// </summary>
     /// <param name="client">The connected blob client</param>
     /// <returns>A <see cref="Task"/> representing the asynchronous operation.</returns>
+#pragma warning disable CS0618 // Type or member is obsolete
+    public Task InitializeAsync(BlobServiceClient client, CancellationToken cancellationToken) => InitializeAsync(client);
+#pragma warning restore CS0618 // Type or member is obsolete
+
+    /// <summary>
+    /// Initialize any required dependencies using the provided client and options.
+    /// </summary>
+    /// <param name="client">The connected blob client</param>
+    /// <returns>A <see cref="Task"/> representing the asynchronous operation.</returns>
+    [Obsolete($"Use the overload which accepts a {nameof(CancellationToken)}")]
     public Task InitializeAsync(BlobServiceClient client);
 }
 

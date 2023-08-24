@@ -1,6 +1,7 @@
 using System.Net;
 using System.Diagnostics;
 using Orleans.Reminders.Cosmos.Models;
+using System.Threading;
 
 namespace Orleans.Reminders.Cosmos;
 
@@ -29,7 +30,15 @@ internal class CosmosReminderTable : IReminderTable
         _convertEntityToEntry = FromEntity;
     }
 
-    public async Task Init()
+    public Task Init() => Init(CancellationToken.None);
+    public Task<ReminderTableData> ReadRows(GrainId grainId) => ReadRows(grainId, CancellationToken.None);
+    public Task<ReminderTableData> ReadRows(uint begin, uint end) => ReadRows(begin, end, CancellationToken.None);
+    public Task<ReminderEntry> ReadRow(GrainId grainId, string reminderName) => ReadRow(grainId, reminderName, CancellationToken.None); 
+    public Task<string> UpsertRow(ReminderEntry entry) => UpsertRow(entry, CancellationToken.None); 
+    public Task<bool> RemoveRow(GrainId grainId, string reminderName, string eTag) => RemoveRow(grainId, reminderName, eTag, CancellationToken.None);
+    public Task TestOnlyClearTable() => TestOnlyClearTable(CancellationToken.None);
+
+    public async Task Init(CancellationToken cancellationToken)
     {
         var stopWatch = Stopwatch.StartNew();
 
@@ -43,16 +52,16 @@ internal class CosmosReminderTable : IReminderTable
                     _options.ContainerName);
             }
 
-            await InitializeCosmosClient();
+            await InitializeCosmosClient(cancellationToken);
 
             if (_options.IsResourceCreationEnabled)
             {
                 if (_options.CleanResourcesOnInitialization)
                 {
-                    await TryDeleteDatabase();
+                    await TryDeleteDatabase(cancellationToken);
                 }
 
-                await TryCreateCosmosResources();
+                await TryCreateCosmosResources(cancellationToken);
             }
 
             _container = _client.GetContainer(_options.DatabaseName, _options.ContainerName);
@@ -74,13 +83,13 @@ internal class CosmosReminderTable : IReminderTable
         }
     }
 
-    public async Task<ReminderTableData> ReadRows(GrainId grainId)
+    public async Task<ReminderTableData> ReadRows(GrainId grainId, CancellationToken cancellationToken)
     {
         try
         {
             var pk = new PartitionKey(ReminderEntity.ConstructPartitionKey(_clusterOptions.ServiceId, grainId));
             var requestOptions = new QueryRequestOptions { PartitionKey = pk };
-            var response = await ExecuteWithRetries(static async (self, args) =>
+            var response = await ExecuteWithRetries(static async (self, args, cancellationToken) =>
             {
                 var (grainId, requestOptions) = args;
                 var query = self._container.GetItemLinqQueryable<ReminderEntity>(requestOptions: requestOptions).ToFeedIterator();
@@ -88,7 +97,8 @@ internal class CosmosReminderTable : IReminderTable
                 var reminders = new List<ReminderEntity>();
                 do
                 {
-                    var queryResponse = await query.ReadNextAsync().ConfigureAwait(false);
+                    cancellationToken.ThrowIfCancellationRequested();
+                    var queryResponse = await query.ReadNextAsync(cancellationToken).ConfigureAwait(false);
                     if (queryResponse != null && queryResponse.Count > 0)
                     {
                         reminders.AddRange(queryResponse);
@@ -101,7 +111,8 @@ internal class CosmosReminderTable : IReminderTable
 
                 return reminders;
             },
-            (grainId, requestOptions)).ConfigureAwait(false);
+            (grainId, requestOptions),
+            cancellationToken).ConfigureAwait(false);
 
             return new ReminderTableData(response.Select(_convertEntityToEntry));
         }
@@ -113,11 +124,11 @@ internal class CosmosReminderTable : IReminderTable
         }
     }
 
-    public async Task<ReminderTableData> ReadRows(uint begin, uint end)
+    public async Task<ReminderTableData> ReadRows(uint begin, uint end, CancellationToken cancellationToken)
     {
         try
         {
-            var response = await ExecuteWithRetries(static async (self, args) =>
+            var response = await ExecuteWithRetries(static async (self, args, cancellationToken) =>
             {
                 var (begin, end) = args;
                 var query = self._container.GetItemLinqQueryable<ReminderEntity>()
@@ -131,7 +142,7 @@ internal class CosmosReminderTable : IReminderTable
                 var reminders = new List<ReminderEntity>();
                 do
                 {
-                    var queryResponse = await iterator.ReadNextAsync().ConfigureAwait(false);
+                    var queryResponse = await iterator.ReadNextAsync(cancellationToken).ConfigureAwait(false);
                     if (queryResponse != null && queryResponse.Count > 0)
                     {
                         reminders.AddRange(queryResponse);
@@ -144,7 +155,8 @@ internal class CosmosReminderTable : IReminderTable
 
                 return reminders;
             },
-            (begin, end)).ConfigureAwait(false);
+            (begin, end),
+            cancellationToken).ConfigureAwait(false);
 
             return new ReminderTableData(response.Select(_convertEntityToEntry));
         }
@@ -161,18 +173,18 @@ internal class CosmosReminderTable : IReminderTable
         }
     }
 
-    public async Task<ReminderEntry> ReadRow(GrainId grainId, string reminderName)
+    public async Task<ReminderEntry> ReadRow(GrainId grainId, string reminderName, CancellationToken cancellationToken)
     {
         try
         {
             var pk = new PartitionKey(ReminderEntity.ConstructPartitionKey(_clusterOptions.ServiceId, grainId));
             var id = ReminderEntity.ConstructId(grainId, reminderName);
-            var response = await ExecuteWithRetries(async (self, args) =>
+            var response = await ExecuteWithRetries(async (self, args, cancellationToken) =>
             {
                 try
                 {
                     var (id, pk) = args;
-                    var result = await self._container.ReadItemAsync<ReminderEntity>(id, pk).ConfigureAwait(false);
+                    var result = await self._container.ReadItemAsync<ReminderEntity>(id, pk, cancellationToken: cancellationToken).ConfigureAwait(false);
                     return result.Resource;
                 }
                 catch (CosmosException ce) when (ce.StatusCode == HttpStatusCode.NotFound)
@@ -180,7 +192,8 @@ internal class CosmosReminderTable : IReminderTable
                     return null;
                 }
             },
-            (id, pk)).ConfigureAwait(false);
+            (id, pk),
+            cancellationToken).ConfigureAwait(false);
 
             return response != null ? FromEntity(response)! : default!;
         }
@@ -192,7 +205,7 @@ internal class CosmosReminderTable : IReminderTable
         }
     }
 
-    public async Task<string> UpsertRow(ReminderEntry entry)
+    public async Task<string> UpsertRow(ReminderEntry entry, CancellationToken cancellationToken)
     {
         try
         {
@@ -200,13 +213,14 @@ internal class CosmosReminderTable : IReminderTable
             var pk = new PartitionKey(ReminderEntity.ConstructPartitionKey(_clusterOptions.ServiceId, entry.GrainId));
             var options = new ItemRequestOptions { IfMatchEtag = entity.ETag };
 
-            var response = await ExecuteWithRetries(static async (self, args) =>
+            var response = await ExecuteWithRetries(static async (self, args, cancellationToken) =>
             {
                 var (pk, entity, options) = args;
-                var result = await self._container.UpsertItemAsync(entity, pk, options).ConfigureAwait(false);
+                var result = await self._container.UpsertItemAsync(entity, pk, options, cancellationToken).ConfigureAwait(false);
                 return result.Resource;
             },
-            (pk, entity, options)).ConfigureAwait(false);
+            (pk, entity, options),
+            cancellationToken).ConfigureAwait(false);
 
             return response.ETag;
         }
@@ -218,19 +232,20 @@ internal class CosmosReminderTable : IReminderTable
         }
     }
 
-    public async Task<bool> RemoveRow(GrainId grainId, string reminderName, string eTag)
+    public async Task<bool> RemoveRow(GrainId grainId, string reminderName, string eTag, CancellationToken cancellationToken)
     {
         try
         {
             var id = ReminderEntity.ConstructId(grainId, reminderName);
             var options = new ItemRequestOptions { IfMatchEtag = eTag, };
             var pk = new PartitionKey(ReminderEntity.ConstructPartitionKey(_clusterOptions.ServiceId, grainId));
-            await ExecuteWithRetries(static (self, args) =>
+            await ExecuteWithRetries(static (self, args, cancellationToken) =>
             {
                 var (id, pk, options) = args;
-                return self._container.DeleteItemAsync<ReminderEntity>(id, pk, options);
+                return self._container.DeleteItemAsync<ReminderEntity>(id, pk, options, cancellationToken);
             },
-            (id, pk, options)).ConfigureAwait(false);
+            (id, pk, options),
+            cancellationToken).ConfigureAwait(false);
 
             return true;
         }
@@ -251,11 +266,11 @@ internal class CosmosReminderTable : IReminderTable
         }
     }
 
-    public async Task TestOnlyClearTable()
+    public async Task TestOnlyClearTable(CancellationToken cancellationToken)
     {
         try
         {
-            var entities = await ExecuteWithRetries(static async self =>
+            var entities = await ExecuteWithRetries(static async (self, cancellationToken) =>
             {
                 var query = self._container.GetItemLinqQueryable<ReminderEntity>()
                     .Where(entity => entity.ServiceId == self._clusterOptions.ServiceId)
@@ -263,7 +278,7 @@ internal class CosmosReminderTable : IReminderTable
                 var reminders = new List<ReminderEntity>();
                 do
                 {
-                    var queryResponse = await query.ReadNextAsync().ConfigureAwait(false);
+                    var queryResponse = await query.ReadNextAsync(cancellationToken).ConfigureAwait(false);
                     if (queryResponse != null && queryResponse.Count > 0)
                     {
                         reminders.AddRange(queryResponse);
@@ -275,18 +290,20 @@ internal class CosmosReminderTable : IReminderTable
                 } while (query.HasMoreResults);
 
                 return reminders;
-            }).ConfigureAwait(false);
+            },
+            cancellationToken).ConfigureAwait(false);
 
             var deleteTasks = new List<Task>();
             foreach (var entity in entities)
             {
                 deleteTasks.Add(ExecuteWithRetries(
-                    static (self, args) =>
+                    static (self, args, cancellationToken) =>
                     {
                         var (id, pk) = args;
-                        return self._container.DeleteItemAsync<ReminderEntity>(id, pk);
+                        return self._container.DeleteItemAsync<ReminderEntity>(id, pk, cancellationToken: cancellationToken);
                     },
-                    (entity.Id, new PartitionKey(entity.PartitionKey))));
+                    (entity.Id, new PartitionKey(entity.PartitionKey)),
+                    cancellationToken));
             }
             await Task.WhenAll(deleteTasks).ConfigureAwait(false);
         }
@@ -298,7 +315,7 @@ internal class CosmosReminderTable : IReminderTable
         }
     }
 
-    private async Task InitializeCosmosClient()
+    private async Task InitializeCosmosClient(CancellationToken cancellationToken)
     {
         try
         {
@@ -312,11 +329,11 @@ internal class CosmosReminderTable : IReminderTable
         }
     }
 
-    private async Task TryDeleteDatabase()
+    private async Task TryDeleteDatabase(CancellationToken cancellationToken)
     {
         try
         {
-            await _client.GetDatabase(_options.DatabaseName).DeleteAsync().ConfigureAwait(false);
+            await _client.GetDatabase(_options.DatabaseName).DeleteAsync(cancellationToken: cancellationToken).ConfigureAwait(false);
         }
         catch (CosmosException dce) when (dce.StatusCode == HttpStatusCode.NotFound)
         {
@@ -330,9 +347,9 @@ internal class CosmosReminderTable : IReminderTable
         }
     }
 
-    private async Task TryCreateCosmosResources()
+    private async Task TryCreateCosmosResources(CancellationToken cancellationToken)
     {
-        var dbResponse = await _client.CreateDatabaseIfNotExistsAsync(_options.DatabaseName, _options.DatabaseThroughput).ConfigureAwait(false);
+        var dbResponse = await _client.CreateDatabaseIfNotExistsAsync(_options.DatabaseName, _options.DatabaseThroughput, cancellationToken: cancellationToken).ConfigureAwait(false);
         var db = dbResponse.Database;
 
         var remindersCollection = new ContainerProperties(_options.ContainerName, PARTITION_KEY_PATH);
@@ -346,26 +363,27 @@ internal class CosmosReminderTable : IReminderTable
         const int maxRetries = 3;
         for (var retry = 0; retry <= maxRetries; ++retry)
         {
-            var collResponse = await db.CreateContainerIfNotExistsAsync(remindersCollection, _options.ContainerThroughputProperties).ConfigureAwait(false);
+            var collResponse = await db.CreateContainerIfNotExistsAsync(remindersCollection, _options.ContainerThroughputProperties, cancellationToken: cancellationToken).ConfigureAwait(false);
 
             if (retry == maxRetries || dbResponse.StatusCode != HttpStatusCode.Created || collResponse.StatusCode == HttpStatusCode.Created)
             {
                 break;  // Apparently some throttling logic returns HttpStatusCode.OK (not 429) when the collection wasn't created in a new DB.
             }
 
-            await Task.Delay(1000);
+            await Task.Delay(1000, cancellationToken);
         }
     }
 
-    private async Task<TResult> ExecuteWithRetries<TResult>(Func<CosmosReminderTable, Task<TResult>> clientFunc)
+    private async Task<TResult> ExecuteWithRetries<TResult>(Func<CosmosReminderTable, CancellationToken, Task<TResult>> clientFunc, CancellationToken cancellationToken)
     {
         // From:  https://blogs.msdn.microsoft.com/bigdatasupport/2015/09/02/dealing-with-requestratetoolarge-errors-in-azure-documentdb-and-testing-performance/
         while (true)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             TimeSpan sleepTime;
             try
             {
-                return await clientFunc(this).ConfigureAwait(false);
+                return await clientFunc(this, cancellationToken).ConfigureAwait(false);
             }
             catch (CosmosException dce) when (dce.StatusCode == TooManyRequests)
             {
@@ -375,19 +393,20 @@ internal class CosmosReminderTable : IReminderTable
             {
                 sleepTime = dce.RetryAfter ?? dce.RetryAfter!.Value;
             }
-            await Task.Delay(sleepTime).ConfigureAwait(false);
+            await Task.Delay(sleepTime, cancellationToken).ConfigureAwait(false);
         }
     }
 
-    private async Task<TResult> ExecuteWithRetries<TArg1, TResult>(Func<CosmosReminderTable, TArg1, Task<TResult>> clientFunc, TArg1 arg1)
+    private async Task<TResult> ExecuteWithRetries<TArg1, TResult>(Func<CosmosReminderTable, TArg1, CancellationToken, Task<TResult>> clientFunc, TArg1 arg1, CancellationToken cancellationToken)
     {
         // From:  https://blogs.msdn.microsoft.com/bigdatasupport/2015/09/02/dealing-with-requestratetoolarge-errors-in-azure-documentdb-and-testing-performance/
         while (true)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             TimeSpan sleepTime;
             try
             {
-                return await clientFunc(this, arg1).ConfigureAwait(false);
+                return await clientFunc(this, arg1, cancellationToken).ConfigureAwait(false);
             }
             catch (CosmosException dce) when (dce.StatusCode == TooManyRequests)
             {
@@ -397,7 +416,7 @@ internal class CosmosReminderTable : IReminderTable
             {
                 sleepTime = dce.RetryAfter ?? dce.RetryAfter!.Value;
             }
-            await Task.Delay(sleepTime);
+            await Task.Delay(sleepTime, cancellationToken);
         }
     }
 

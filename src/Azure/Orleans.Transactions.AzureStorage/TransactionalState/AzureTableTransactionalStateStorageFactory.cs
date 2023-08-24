@@ -59,7 +59,7 @@ namespace Orleans.Transactions.AzureStorage
             var tableManager = new AzureTableDataManager<TableEntity>(
                 this.options,
                 this.loggerFactory.CreateLogger<AzureTableDataManager<TableEntity>>());
-            await tableManager.InitTableAsync();
+            await tableManager.InitTableAsync(CancellationToken.None);
             this.table = tableManager.Table;
         }
 
