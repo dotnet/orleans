@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.CompilerServices;
+using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -354,7 +355,7 @@ namespace Orleans.Runtime.Placement
                     firstMessage.InterfaceVersion);
 
                 var targetGrain = target.GrainIdentity;
-                var result = await _placementService._grainLocator.Lookup(targetGrain);
+                var result = await _placementService._grainLocator.Lookup(targetGrain, CancellationToken.None);
                 if (result is not null)
                 {
                     return result.SiloAddress;

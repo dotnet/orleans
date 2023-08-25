@@ -513,14 +513,15 @@ namespace Orleans.Runtime
             var reason = new DeactivationReason(DeactivationReasonCode.ActivationUnresponsive, msg);
 
             // Mark the grain as deactivating so that messages are forwarded instead of being invoked
-            Deactivate(reason, token: default);
+            var token = new CancellationTokenSource(_shared.InternalRuntime.CollectionOptions.Value.DeactivationTimeout);
+            Deactivate(reason, token: token.Token);
 
             // Try to remove this activation from the catalog and directory
             // This leaves this activation dangling, stuck processing the current request until it eventually completes
             // (which likely will never happen at this point, since if the grain was deemed stuck then there is probably some kind of
             // application bug, perhaps a deadlock)
             UnregisterMessageTarget();
-            _shared.InternalRuntime.GrainLocator.Unregister(Address, UnregistrationCause.Force).Ignore();
+            _shared.InternalRuntime.GrainLocator.Unregister(Address, UnregistrationCause.Force, token.Token).Ignore();
         }
 
         void IGrainTimerRegistry.OnTimerCreated(IGrainTimer timer)
@@ -1352,7 +1353,7 @@ namespace Orleans.Runtime
             // Register with the grain directory, register with the store if necessary and call the Activate method on the new activation.
             try
             {
-                var success = await RegisterActivationInGrainDirectoryAndValidate();
+                var success = await RegisterActivationInGrainDirectoryAndValidate(cancellationToken);
                 if (!success)
                 {
                     // If registration failed, bail out.
@@ -1439,7 +1440,7 @@ namespace Orleans.Runtime
                     {
                         try
                         {
-                            await _shared.InternalRuntime.GrainLocator.Unregister(Address, UnregistrationCause.Force);
+                            await _shared.InternalRuntime.GrainLocator.Unregister(Address, UnregistrationCause.Force, cancellationToken);
                         }
                         catch (Exception ex)
                         {
@@ -1473,7 +1474,7 @@ namespace Orleans.Runtime
             }
         }
 
-        private async ValueTask<bool> RegisterActivationInGrainDirectoryAndValidate()
+        private async ValueTask<bool> RegisterActivationInGrainDirectoryAndValidate(CancellationToken cancellationToken)
         {
             bool success;
 
@@ -1489,7 +1490,7 @@ namespace Orleans.Runtime
                 Exception registrationException;
                 try
                 {
-                    var result = await _shared.InternalRuntime.GrainLocator.Register(Address, _extras?.PreviousRegistration);
+                    var result = await _shared.InternalRuntime.GrainLocator.Register(Address, _extras?.PreviousRegistration, cancellationToken);
                     if (Address.Matches(result))
                     {
                         success = true;
@@ -1640,7 +1641,7 @@ namespace Orleans.Runtime
                 if (!migrated)
                 {
                     // Unregister from directory
-                    await _shared.InternalRuntime.GrainLocator.Unregister(Address, UnregistrationCause.Force);
+                    await _shared.InternalRuntime.GrainLocator.Unregister(Address, UnregistrationCause.Force, cancellationToken);
                 }
 
                 if (_shared.Logger.IsEnabled(LogLevel.Trace))

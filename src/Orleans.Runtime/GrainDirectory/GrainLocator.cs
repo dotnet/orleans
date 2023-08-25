@@ -1,5 +1,6 @@
 #nullable enable
 using System.Diagnostics.CodeAnalysis;
+using System.Threading;
 using System.Threading.Tasks;
 using Orleans.GrainDirectory;
 
@@ -17,11 +18,11 @@ namespace Orleans.Runtime.GrainDirectory
             _grainLocatorResolver = grainLocatorResolver;
         }
 
-        public ValueTask<GrainAddress?> Lookup(GrainId grainId) => GetGrainLocator(grainId.Type).Lookup(grainId);
+        public ValueTask<GrainAddress?> Lookup(GrainId grainId, CancellationToken cancellationToken) => GetGrainLocator(grainId.Type).Lookup(grainId, cancellationToken);
 
-        public Task<GrainAddress> Register(GrainAddress address, GrainAddress? previousRegistration) => GetGrainLocator(address.GrainId.Type).Register(address, previousRegistration);
+        public Task<GrainAddress> Register(GrainAddress address, GrainAddress? previousRegistration, CancellationToken cancellationToken) => GetGrainLocator(address.GrainId.Type).Register(address, previousRegistration, cancellationToken);
 
-        public Task Unregister(GrainAddress address, UnregistrationCause cause) => GetGrainLocator(address.GrainId.Type).Unregister(address, cause);
+        public Task Unregister(GrainAddress address, UnregistrationCause cause, CancellationToken cancellationToken) => GetGrainLocator(address.GrainId.Type).Unregister(address, cause, cancellationToken);
 
         public bool TryLookupInCache(GrainId grainId, [NotNullWhen(true)] out GrainAddress? address) => GetGrainLocator(grainId.Type).TryLookupInCache(grainId, out address);
 

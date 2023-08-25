@@ -19,17 +19,23 @@ namespace Orleans
         /// Initializes the membership table, will be called before all other methods
         /// </summary>
         /// <param name="tryInitTableVersion">whether an attempt will be made to init the underlying table</param>
+#pragma warning disable CS0618 // Type or member is obsolete
         Task InitializeMembershipTable(bool tryInitTableVersion, CancellationToken cancellationToken) => InitializeMembershipTable(tryInitTableVersion).WaitAsync(cancellationToken);
+#pragma warning restore CS0618 // Type or member is obsolete
 
         /// <summary>
         /// Deletes all table entries of the given clusterId
         /// </summary>
+#pragma warning disable CS0618 // Type or member is obsolete
         Task DeleteMembershipTableEntries(string clusterId, CancellationToken cancellationToken) => DeleteMembershipTableEntries(clusterId).WaitAsync(cancellationToken);
+#pragma warning restore CS0618 // Type or member is obsolete
 
         /// <summary>
         /// Delete all dead silo entries older than <paramref name="beforeDate"/>
         /// </summary>
+#pragma warning disable CS0618 // Type or member is obsolete
         Task CleanupDefunctSiloEntries(DateTimeOffset beforeDate, CancellationToken cancellationToken) => CleanupDefunctSiloEntries(beforeDate).WaitAsync(cancellationToken);
+#pragma warning restore CS0618 // Type or member is obsolete
 
         /// <summary>
         /// Atomically reads the Membership Table information about a given silo.
@@ -39,7 +45,9 @@ namespace Orleans
         /// <param name="key">The address of the silo whose membership information needs to be read.</param>
         /// <returns>The membership information for a given silo: MembershipTableData consisting one MembershipEntry entry and
         /// TableVersion, read atomically.</returns>
+#pragma warning disable CS0618 // Type or member is obsolete
         Task<MembershipTableData> ReadRow(SiloAddress key, CancellationToken cancellationToken) => ReadRow(key).WaitAsync(cancellationToken);
+#pragma warning restore CS0618 // Type or member is obsolete
 
         /// <summary>
         /// Atomically reads the full content of the Membership Table.
@@ -48,7 +56,9 @@ namespace Orleans
         /// </summary>
         /// <returns>The membership information for a given table: MembershipTableData consisting multiple MembershipEntry entries and
         /// TableVersion, all read atomically.</returns>
+#pragma warning disable CS0618 // Type or member is obsolete
         Task<MembershipTableData> ReadAll(CancellationToken cancellationToken) => ReadAll().WaitAsync(cancellationToken);
+#pragma warning restore CS0618 // Type or member is obsolete
 
         /// <summary>
         /// Atomically tries to insert (add) a new MembershipEntry for one silo and also update the TableVersion.
@@ -65,7 +75,9 @@ namespace Orleans
         /// <param name="entry">MembershipEntry to be inserted.</param>
         /// <param name="tableVersion">The new TableVersion for this table, along with its etag.</param>
         /// <returns>True if the insert operation succeeded and false otherwise.</returns>
+#pragma warning disable CS0618 // Type or member is obsolete
         Task<bool> InsertRow(MembershipEntry entry, TableVersion tableVersion, CancellationToken cancellationToken) => InsertRow(entry, tableVersion).WaitAsync(cancellationToken);
+#pragma warning restore CS0618 // Type or member is obsolete
 
         /// <summary>
         /// Atomically tries to update the MembershipEntry for one silo and also update the TableVersion.
@@ -84,7 +96,9 @@ namespace Orleans
         /// <param name="etag">The etag  for the given MembershipEntry.</param>
         /// <param name="tableVersion">The new TableVersion for this table, along with its etag.</param>
         /// <returns>True if the update operation succeeded and false otherwise.</returns>
+#pragma warning disable CS0618 // Type or member is obsolete
         Task<bool> UpdateRow(MembershipEntry entry, string etag, TableVersion tableVersion, CancellationToken cancellationToken) => UpdateRow(entry, etag, tableVersion).WaitAsync(cancellationToken);
+#pragma warning restore CS0618 // Type or member is obsolete
 
         /// <summary>
         /// Updates the IAmAlive part (column) of the MembershipEntry for this silo.
@@ -98,22 +112,27 @@ namespace Orleans
         /// </summary>
         /// <param name="entry"></param>
         /// <returns>Task representing the successful execution of this operation. </returns>
+#pragma warning disable CS0618 // Type or member is obsolete
         Task UpdateIAmAlive(MembershipEntry entry, CancellationToken cancellationToken) => UpdateIAmAlive(entry).WaitAsync(cancellationToken);
+#pragma warning restore CS0618 // Type or member is obsolete
 
         /// <summary>
         /// Initializes the membership table, will be called before all other methods
         /// </summary>
         /// <param name="tryInitTableVersion">whether an attempt will be made to init the underlying table</param>
+        [Obsolete($"Use the overload which accepts a {nameof(CancellationToken)}")]
         Task InitializeMembershipTable(bool tryInitTableVersion);
 
         /// <summary>
         /// Deletes all table entries of the given clusterId
         /// </summary>
+        [Obsolete($"Use the overload which accepts a {nameof(CancellationToken)}")]
         Task DeleteMembershipTableEntries(string clusterId);
 
         /// <summary>
         /// Delete all dead silo entries older than <paramref name="beforeDate"/>
         /// </summary>
+        [Obsolete($"Use the overload which accepts a {nameof(CancellationToken)}")]
         Task CleanupDefunctSiloEntries(DateTimeOffset beforeDate);
 
         /// <summary>
@@ -124,6 +143,7 @@ namespace Orleans
         /// <param name="key">The address of the silo whose membership information needs to be read.</param>
         /// <returns>The membership information for a given silo: MembershipTableData consisting one MembershipEntry entry and
         /// TableVersion, read atomically.</returns>
+        [Obsolete($"Use the overload which accepts a {nameof(CancellationToken)}")]
         Task<MembershipTableData> ReadRow(SiloAddress key);
 
         /// <summary>
@@ -133,6 +153,7 @@ namespace Orleans
         /// </summary>
         /// <returns>The membership information for a given table: MembershipTableData consisting multiple MembershipEntry entries and
         /// TableVersion, all read atomically.</returns>
+        [Obsolete($"Use the overload which accepts a {nameof(CancellationToken)}")]
         Task<MembershipTableData> ReadAll();
 
         /// <summary>
@@ -150,6 +171,7 @@ namespace Orleans
         /// <param name="entry">MembershipEntry to be inserted.</param>
         /// <param name="tableVersion">The new TableVersion for this table, along with its etag.</param>
         /// <returns>True if the insert operation succeeded and false otherwise.</returns>
+        [Obsolete($"Use the overload which accepts a {nameof(CancellationToken)}")]
         Task<bool> InsertRow(MembershipEntry entry, TableVersion tableVersion);
 
         /// <summary>
@@ -169,6 +191,7 @@ namespace Orleans
         /// <param name="etag">The etag  for the given MembershipEntry.</param>
         /// <param name="tableVersion">The new TableVersion for this table, along with its etag.</param>
         /// <returns>True if the update operation succeeded and false otherwise.</returns>
+        [Obsolete($"Use the overload which accepts a {nameof(CancellationToken)}")]
         Task<bool> UpdateRow(MembershipEntry entry, string etag, TableVersion tableVersion);
 
         /// <summary>
@@ -183,6 +206,7 @@ namespace Orleans
         /// </summary>
         /// <param name="entry"></param>
         /// <returns>Task representing the successful execution of this operation. </returns>
+        [Obsolete($"Use the overload which accepts a {nameof(CancellationToken)}")]
         Task UpdateIAmAlive(MembershipEntry entry);
     }
 

@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Net.NetworkInformation;
 using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
@@ -17,16 +18,17 @@ namespace Orleans.CodeGenerator.MSBuild
     {
         private const string OrleansSerializationAssemblyShortName = "Orleans.Serialization";
 
-        private static readonly int[] SuppressCompilerWarnings =
+        private static readonly string[] SuppressCompilerWarnings =
         {
-            162, // CS0162 - Unreachable code detected.
-            219, // CS0219 - The variable 'V' is assigned but its value is never used.
-            414, // CS0414 - The private field 'F' is assigned but its value is never used.
-            618, // CS0616 - Member is obsolete.
-            649, // CS0649 - Field 'F' is never assigned to, and will always have its default value.
-            693, // CS0693 - Type parameter 'type parameter' has the same name as the type parameter from outer type 'T'
-            1591, // CS1591 - Missing XML comment for publicly visible type or member 'Type_or_Member'
-            1998 // CS1998 - This async method lacks 'await' operators and will run synchronously
+            "CS0162", // CS0162 - Unreachable code detected.
+            "CS0219", // CS0219 - The variable 'V' is assigned but its value is never used.
+            "CS0414", // CS0414 - The private field 'F' is assigned but its value is never used.
+            "CS0618", // CS0616 - Member is obsolete.
+            "CS0649", // CS0649 - Field 'F' is never assigned to, and will always have its default value.
+            "CS0693", // CS0693 - Type parameter 'type parameter' has the same name as the type parameter from outer type 'T'
+            "CS1591", // CS1591 - Missing XML comment for publicly visible type or member 'Type_or_Member'
+            "CS1998", // CS1998 - This async method lacks 'await' operators and will run synchronously
+            "CS9035", // CS9035	- Required member 'M' must be set in the object initializer or attribute constructor.
         };
 
         public ILogger Log { get; set; }
@@ -157,9 +159,14 @@ namespace Orleans.CodeGenerator.MSBuild
                 using (var sourceWriter = new StreamWriter(CodeGenOutputFile))
                 {
                     sourceWriter.WriteLine("#if !EXCLUDE_GENERATED_CODE");
-                    foreach (var warningNum in SuppressCompilerWarnings)
+                    foreach (var suppression in SuppressCompilerWarnings)
                     {
-                        await sourceWriter.WriteLineAsync($"#pragma warning disable {warningNum}");
+                        await sourceWriter.WriteLineAsync($"#pragma warning disable {suppression}");
+                    }
+
+                    foreach (var suppression in SuppressCompilerWarnings)
+                    {
+                        await sourceWriter.WriteLineAsync($"#pragma warning disable {suppression}");
                     }
 
                     if (!string.IsNullOrWhiteSpace(source))
@@ -167,9 +174,9 @@ namespace Orleans.CodeGenerator.MSBuild
                         await sourceWriter.WriteLineAsync(source);
                     }
 
-                    foreach (var warningNum in SuppressCompilerWarnings)
+                    foreach (var suppression in SuppressCompilerWarnings)
                     {
-                        await sourceWriter.WriteLineAsync($"#pragma warning restore {warningNum}");
+                        await sourceWriter.WriteLineAsync($"#pragma warning restore {suppression}");
                     }
 
                     sourceWriter.WriteLine("#endif");

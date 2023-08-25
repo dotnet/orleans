@@ -1,5 +1,7 @@
 #nullable enable
+using System;
 using System.Diagnostics.CodeAnalysis;
+using System.Threading;
 using System.Threading.Tasks;
 using Orleans.Runtime;
 
@@ -15,6 +17,35 @@ namespace Orleans.GrainDirectory
         /// </summary>
         /// <param name="address">The address to register.</param>
         /// <returns>The grain address which is registered in the directory immediately following this call.</returns>
+#pragma warning disable CS0618 // Type or member is obsolete
+        Task<GrainAddress> Register(GrainAddress address, GrainAddress? previousRegistration, CancellationToken cancellationToken) => Register(address, previousRegistration).WaitAsync(cancellationToken);
+#pragma warning restore CS0618 // Type or member is obsolete
+
+        /// <summary>
+        /// Deregisters a grain address from the directory.
+        /// </summary>
+        /// <param name="address">The address to deregister.</param>
+        /// <param name="cause">The cause for deregistration.</param>
+        /// <returns>A <see cref="Task"/> representing the work performed.</returns>
+#pragma warning disable CS0618 // Type or member is obsolete
+        Task Unregister(GrainAddress address, UnregistrationCause cause, CancellationToken cancellationToken) => Unregister(address, cause).WaitAsync(cancellationToken);
+#pragma warning restore CS0618 // Type or member is obsolete
+
+        /// <summary>
+        /// Finds the corresponding address for a grain.
+        /// </summary>
+        /// <param name="grainId">The grain id.</param>
+        /// <returns>The address corresponding to the specified grain id, or <see langword="null"/> if the grain is not currently registered.</returns>
+#pragma warning disable CS0618 // Type or member is obsolete
+        ValueTask<GrainAddress?> Lookup(GrainId grainId, CancellationToken cancellationToken) => Lookup(grainId);
+#pragma warning restore CS0618 // Type or member is obsolete
+
+        /// <summary>
+        /// Registers the provided address in the appropriate grain directory.
+        /// </summary>
+        /// <param name="address">The address to register.</param>
+        /// <returns>The grain address which is registered in the directory immediately following this call.</returns>
+        [Obsolete($"Use the overload which accepts a {nameof(CancellationToken)}")]
         Task<GrainAddress> Register(GrainAddress address, GrainAddress? previousRegistration);
 
         /// <summary>
@@ -23,6 +54,7 @@ namespace Orleans.GrainDirectory
         /// <param name="address">The address to deregister.</param>
         /// <param name="cause">The cause for deregistration.</param>
         /// <returns>A <see cref="Task"/> representing the work performed.</returns>
+        [Obsolete($"Use the overload which accepts a {nameof(CancellationToken)}")]
         Task Unregister(GrainAddress address, UnregistrationCause cause);
 
         /// <summary>
@@ -30,6 +62,7 @@ namespace Orleans.GrainDirectory
         /// </summary>
         /// <param name="grainId">The grain id.</param>
         /// <returns>The address corresponding to the specified grain id, or <see langword="null"/> if the grain is not currently registered.</returns>
+        [Obsolete($"Use the overload which accepts a {nameof(CancellationToken)}")]
         ValueTask<GrainAddress?> Lookup(GrainId grainId);
 
         /// <summary>
