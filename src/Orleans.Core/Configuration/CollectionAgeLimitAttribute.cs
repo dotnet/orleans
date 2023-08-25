@@ -71,7 +71,7 @@ namespace Orleans
     }
 
     /// <summary>
-    /// When applied to a grain implementation type this attribute specifies that activations of the grain should should not be collected by the idle activation collector.
+    /// When applied to a grain implementation type this attribute specifies that activations of the grain shouldn't be collected by the idle activation collector.
     /// </summary>
     [AttributeUsage(AttributeTargets.Class, AllowMultiple = false)]
     public class KeepAliveAttribute : Attribute, IGrainPropertiesProviderAttribute
