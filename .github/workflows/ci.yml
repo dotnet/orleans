@@ -33,6 +33,43 @@ jobs:
         retention-days: 1
         path: |
           **/*.binlog
+  test-gcp:
+    name: Google Cloud PubSub tests
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        provider: ["GCP"]
+    services:
+      emulator:
+        image: thekevjames/gcloud-pubsub-emulator:latest
+        ports:
+        - 8681:8681
+        options: >-
+          --health-cmd "wget 127.0.0.1:8681"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+    - uses: actions/checkout@v2
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v2
+      with:
+        dotnet-version: |
+          3.1.x
+          7.0.x
+    - name: Test
+      run: dotnet test --filter "Category=${{ matrix.provider }}&(Category=BVT|Category=SlowBVT|Category=Functional)" --blame-hang-timeout 10m --logger "trx" -- -parallel none -noshadow
+      env:
+        PUBSUB_EMULATOR_HOST: localhost:8681
+    - name: Archive Test Results
+      if: always()
+      uses: actions/upload-artifact@v3
+      with:
+        name: test_output
+        retention-days: 1
+        path: |
+          **/TestResults/*
+          **/logs/*
   test-redis:
     name: Redis provider tests
     runs-on: ubuntu-latest
