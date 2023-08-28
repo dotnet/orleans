@@ -105,5 +105,7 @@ namespace Orleans.Runtime.GrainDirectory
             router.HandoffManager.AcceptExistingRegistrations(singleActivations);
             return Task.CompletedTask;
         }
+
+        public Task<AddressAndTag> RegisterAsync(GrainAddress address, int hopCount = 0) => router.RegisterAsync(address, hopCount);
     }
 }
