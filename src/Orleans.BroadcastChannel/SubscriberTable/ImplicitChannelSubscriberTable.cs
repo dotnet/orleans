@@ -181,7 +181,7 @@ namespace Orleans.BroadcastChannel.SubscriberTable
         /// <param name="channelId">The channel ID to use for the grain ID construction.</param>
         /// <param name="channelSubscriber">The GrainBindings for the grain to create</param>
         /// <returns></returns>
-        private IBroadcastChannelConsumerExtension MakeConsumerReference(
+        private static IBroadcastChannelConsumerExtension MakeConsumerReference(
             IGrainFactory grainFactory,
             InternalChannelId channelId,
             BroadcastChannelSubscriber channelSubscriber)

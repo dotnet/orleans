@@ -67,7 +67,7 @@ namespace Orleans.Runtime
         /// </summary>
         public string? GrainTypeName { get; }
 
-        private TimeSpan GetCollectionAgeLimit(GrainType grainType, Type grainClass, GrainManifest siloManifest, GrainCollectionOptions collectionOptions)
+        private static TimeSpan GetCollectionAgeLimit(GrainType grainType, Type grainClass, GrainManifest siloManifest, GrainCollectionOptions collectionOptions)
         {
             if (siloManifest.Grains.TryGetValue(grainType, out var properties)
                 && properties.Properties.TryGetValue(WellKnownGrainTypeProperties.IdleDeactivationPeriod, out var idleTimeoutString))

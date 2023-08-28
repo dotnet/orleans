@@ -124,7 +124,7 @@ namespace Orleans
             return this.executor.AddNext(() => Wrap(func));
         }
 
-        private async Task<bool> Wrap(Func<Task> func)
+        private static async Task<bool> Wrap(Func<Task> func)
         {
             await func();
             return true;

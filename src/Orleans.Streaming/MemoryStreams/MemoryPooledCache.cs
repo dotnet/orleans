@@ -88,7 +88,7 @@ namespace Orleans.Providers
             return segment;
         }
 
-        private StreamPosition GetStreamPosition(MemoryMessageData queueMessage)
+        private static StreamPosition GetStreamPosition(MemoryMessageData queueMessage)
         {
             return new StreamPosition(queueMessage.StreamId,
                 new EventSequenceTokenV2(queueMessage.SequenceNumber));

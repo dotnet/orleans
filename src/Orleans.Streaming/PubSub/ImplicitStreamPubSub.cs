@@ -92,7 +92,7 @@ namespace Orleans.Streams
                     return new StreamSubscription(subId, streamId.ProviderName, streamId, grainId);
                 }).ToList();
                 return Task.FromResult(subscriptions);
-            }   
+            }
         }
 
         internal bool IsImplicitSubscriber(GrainId grainId, QualifiedStreamId streamId)
