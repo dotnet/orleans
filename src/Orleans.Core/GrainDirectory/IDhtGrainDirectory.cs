@@ -20,6 +20,15 @@ namespace Orleans.GrainDirectory
         /// <para>This method must be called from a scheduler thread.</para>
         /// </summary>
         /// <param name="address">The address of the new activation.</param>
+        /// <param name="hopCount">Counts recursion depth across silos</param>
+        /// <returns>The registered address and the version associated with this directory mapping.</returns>
+        Task<AddressAndTag> RegisterAsync(GrainAddress address, int hopCount = 0);
+
+        /// <summary>
+        /// Record a new grain activation by adding it to the directory.
+        /// <para>This method must be called from a scheduler thread.</para>
+        /// </summary>
+        /// <param name="address">The address of the new activation.</param>
         /// <param name="currentRegistration">The existing registration, which may be null.</param>
         /// <param name="hopCount">Counts recursion depth across silos</param>
         /// <returns>The registered address and the version associated with this directory mapping.</returns>
