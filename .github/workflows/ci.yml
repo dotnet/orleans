@@ -60,7 +60,7 @@ jobs:
     - name: Test
       run: dotnet test --filter "Category=${{ matrix.provider }}&(Category=BVT|Category=SlowBVT|Category=Functional)" --blame-hang-timeout 10m --logger "trx" -- -parallel none -noshadow
       env:
-        PUBSUB_EMULATOR_HOST: localhost:8681
+        PUBSUB_EMULATOR_HOST: http://localhost:8681
     - name: Archive Test Results
       if: always()
       uses: actions/upload-artifact@v3
