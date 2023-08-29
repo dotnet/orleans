@@ -1,4 +1,4 @@
-﻿
+
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
 VisualStudioVersion = 17.0.31410.414
@@ -73,11 +73,9 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Tester.AdoNet", "test\Exten
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Tester.ZooKeeperUtils", "test\Extensions\TesterZooKeeperUtils\Tester.ZooKeeperUtils.csproj", "{6BA81672-10EA-4DA7-A620-3D60619FD39E}"
 EndProject
-Project("{6EC3EE1D-3C4E-46DD-8F32-0CC8E7565705}") = "TestFSharp", "test\Grains\TestFSharp\TestFSharp.fsproj", "{8A652779-85EF-48E2-A639-1EED3CE2C39C}"
+Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "TestFSharp", "test\Grains\TestFSharp\TestFSharp.fsproj", "{8A652779-85EF-48E2-A639-1EED3CE2C39C}"
 EndProject
-Project("{6EC3EE1D-3C4E-46DD-8F32-0CC8E7565705}") = "TestFSharpInterfaces", "test\Misc\TestFSharpInterfaces\TestFSharpInterfaces.fsproj", "{A4F61392-36A3-457C-80D0-9CDC48F5922F}"
-EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Orleans.Streaming.GCP", "src\Orleans.Streaming.GCP\Orleans.Streaming.GCP.csproj", "{6E5860C5-44E7-415C-80D6-3ECF15A80796}"
+Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "TestFSharpInterfaces", "test\Misc\TestFSharpInterfaces\TestFSharpInterfaces.fsproj", "{A4F61392-36A3-457C-80D0-9CDC48F5922F}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "TestInternalGrainInterfaces", "test\Grains\TestInternalGrainInterfaces\TestInternalGrainInterfaces.csproj", "{EBD697E3-91BE-4844-B3F0-6997300A8C12}"
 EndProject
@@ -223,6 +221,18 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Tester.Redis", "test\Extens
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Orleans.Serialization.Protobuf", "src\Serializers\Orleans.Serialization.Protobuf\Orleans.Serialization.Protobuf.csproj", "{A073C0EE-8732-42F9-A22E-D47034E25076}"
 EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Google", "Google", "{10D550AB-A742-40D9-B898-A4BCADEA177D}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Orleans.Clustering.GoogleFirestore", "src\Google\Orleans.Clustering.GoogleFirestore\Orleans.Clustering.GoogleFirestore.csproj", "{3B150F8B-AAD5-4545-A834-644D55F56546}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Orleans.Persistence.GoogleFirestore", "src\Google\Orleans.Persistence.GoogleFirestore\Orleans.Persistence.GoogleFirestore.csproj", "{D74DC809-6B1D-45CE-AD83-8BF7037C02B3}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Orleans.Reminders.GoogleFirestore", "src\Google\Orleans.Reminders.GoogleFirestore\Orleans.Reminders.GoogleFirestore.csproj", "{118FC17E-0335-4F70-88B6-1704A9C3A7F6}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Google.Tests", "test\Extensions\Google.Tests\Google.Tests.csproj", "{66C5424B-3E4B-420A-84A9-DD71ACEB7B9C}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Orleans.GrainDirectory.GoogleFirestore", "src\Google\Orleans.GrainDirectory.GoogleFirestore\Orleans.GrainDirectory.GoogleFirestore.csproj", "{BE535F02-933A-4783-9D4C-46AA72705D5E}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -361,10 +371,6 @@ Global
 		{A4F61392-36A3-457C-80D0-9CDC48F5922F}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{A4F61392-36A3-457C-80D0-9CDC48F5922F}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{A4F61392-36A3-457C-80D0-9CDC48F5922F}.Release|Any CPU.Build.0 = Release|Any CPU
-		{6E5860C5-44E7-415C-80D6-3ECF15A80796}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{6E5860C5-44E7-415C-80D6-3ECF15A80796}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{6E5860C5-44E7-415C-80D6-3ECF15A80796}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{6E5860C5-44E7-415C-80D6-3ECF15A80796}.Release|Any CPU.Build.0 = Release|Any CPU
 		{EBD697E3-91BE-4844-B3F0-6997300A8C12}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{EBD697E3-91BE-4844-B3F0-6997300A8C12}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{EBD697E3-91BE-4844-B3F0-6997300A8C12}.Release|Any CPU.ActiveCfg = Release|Any CPU
@@ -593,6 +599,26 @@ Global
 		{A073C0EE-8732-42F9-A22E-D47034E25076}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{A073C0EE-8732-42F9-A22E-D47034E25076}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{A073C0EE-8732-42F9-A22E-D47034E25076}.Release|Any CPU.Build.0 = Release|Any CPU
+		{3B150F8B-AAD5-4545-A834-644D55F56546}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{3B150F8B-AAD5-4545-A834-644D55F56546}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{3B150F8B-AAD5-4545-A834-644D55F56546}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{3B150F8B-AAD5-4545-A834-644D55F56546}.Release|Any CPU.Build.0 = Release|Any CPU
+		{D74DC809-6B1D-45CE-AD83-8BF7037C02B3}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{D74DC809-6B1D-45CE-AD83-8BF7037C02B3}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{D74DC809-6B1D-45CE-AD83-8BF7037C02B3}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{D74DC809-6B1D-45CE-AD83-8BF7037C02B3}.Release|Any CPU.Build.0 = Release|Any CPU
+		{118FC17E-0335-4F70-88B6-1704A9C3A7F6}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{118FC17E-0335-4F70-88B6-1704A9C3A7F6}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{118FC17E-0335-4F70-88B6-1704A9C3A7F6}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{118FC17E-0335-4F70-88B6-1704A9C3A7F6}.Release|Any CPU.Build.0 = Release|Any CPU
+		{66C5424B-3E4B-420A-84A9-DD71ACEB7B9C}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{66C5424B-3E4B-420A-84A9-DD71ACEB7B9C}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{66C5424B-3E4B-420A-84A9-DD71ACEB7B9C}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{66C5424B-3E4B-420A-84A9-DD71ACEB7B9C}.Release|Any CPU.Build.0 = Release|Any CPU
+		{BE535F02-933A-4783-9D4C-46AA72705D5E}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{BE535F02-933A-4783-9D4C-46AA72705D5E}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{BE535F02-933A-4783-9D4C-46AA72705D5E}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{BE535F02-933A-4783-9D4C-46AA72705D5E}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -633,7 +659,6 @@ Global
 		{6BA81672-10EA-4DA7-A620-3D60619FD39E} = {082D25DB-70CA-48F4-93E0-EC3455F494B8}
 		{8A652779-85EF-48E2-A639-1EED3CE2C39C} = {2A128E88-B281-4BFB-ADEB-E515437F2385}
 		{A4F61392-36A3-457C-80D0-9CDC48F5922F} = {70BCC54E-1618-4742-A079-07588065E361}
-		{6E5860C5-44E7-415C-80D6-3ECF15A80796} = {FE2E08C6-9C3B-4AEE-AE07-CCA387580D7A}
 		{EBD697E3-91BE-4844-B3F0-6997300A8C12} = {2A128E88-B281-4BFB-ADEB-E515437F2385}
 		{73514686-D25D-478B-9943-A86F6B0F3A37} = {4CD3AA9E-D937-48CA-BB6C-158E12257D23}
 		{072B1B88-FE98-4354-86FA-AB6EF80EB9C4} = {3189037B-208D-40A1-A561-169D77D9BB5A}
@@ -702,6 +727,12 @@ Global
 		{8FC6457C-6273-4338-AD2A-ECAA8FE2C5D7} = {082D25DB-70CA-48F4-93E0-EC3455F494B8}
 		{F13247A0-70C9-4200-9CB1-2002CB8105E0} = {082D25DB-70CA-48F4-93E0-EC3455F494B8}
 		{A073C0EE-8732-42F9-A22E-D47034E25076} = {4CD3AA9E-D937-48CA-BB6C-158E12257D23}
+		{10D550AB-A742-40D9-B898-A4BCADEA177D} = {FE2E08C6-9C3B-4AEE-AE07-CCA387580D7A}
+		{3B150F8B-AAD5-4545-A834-644D55F56546} = {10D550AB-A742-40D9-B898-A4BCADEA177D}
+		{D74DC809-6B1D-45CE-AD83-8BF7037C02B3} = {10D550AB-A742-40D9-B898-A4BCADEA177D}
+		{118FC17E-0335-4F70-88B6-1704A9C3A7F6} = {10D550AB-A742-40D9-B898-A4BCADEA177D}
+		{66C5424B-3E4B-420A-84A9-DD71ACEB7B9C} = {082D25DB-70CA-48F4-93E0-EC3455F494B8}
+		{BE535F02-933A-4783-9D4C-46AA72705D5E} = {10D550AB-A742-40D9-B898-A4BCADEA177D}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {7BFB3429-B5BB-4DB1-95B4-67D77A864952}

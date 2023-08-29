@@ -1,0 +1,34 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <PackageId>Microsoft.Orleans.Clustering.GoogleFirestore</PackageId>
+    <Title>Microsoft Orleans Google Firestore Clustering Provider</Title>
+    <Description>Microsoft Orleans clustering provider backed by Google Firestore</Description>
+    <PackageTags>$(PackageTags) Google Firestore</PackageTags>
+    <TargetFrameworks>$(DefaultTargetFrameworks)</TargetFrameworks>
+    <AssemblyName>Orleans.Clustering.GoogleFirestore</AssemblyName>
+    <RootNamespace>Orleans.Clustering.GoogleFirestore</RootNamespace>
+    <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
+    <DefineConstants>$(DefineConstants);ORLEANS_CLUSTERING</DefineConstants>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="..\Shared\Storage\FirestoreDataManager.cs" Link="Storage\FirestoreDataManager.cs" />
+    <Compile Include="..\Shared\Storage\FirestoreEntity.cs" Link="Storage\FirestoreEntity.cs" />
+    <Compile Include="..\Shared\Storage\FirestoreOptions.cs" Link="Storage\FirestoreOptions.cs" />
+    <Compile Include="..\Shared\Storage\GoogleCloudOptions.cs" Link="Storage\GoogleCloudOptions.cs" />
+    <Compile Include="..\Shared\Utils\Utils.cs" Link="Utils\Utils.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="$(SourceRoot)src\Orleans.Runtime\Orleans.Runtime.csproj" />
+    <PackageReference Include="Google.Cloud.Firestore" />
+    <PackageReference Include="System.Net.NameResolution" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleToAttribute">
+      <_Parameter1>Orleans.Tests.Google</_Parameter1>
+    </AssemblyAttribute>
+  </ItemGroup>
+</Project>

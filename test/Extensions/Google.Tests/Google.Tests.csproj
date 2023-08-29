@@ -1,0 +1,36 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFrameworks>$(TestTargetFrameworks)</TargetFrameworks>
+    <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
+    <DefineConstants>$(DefineConstants);GOOGLE_TESTS</DefineConstants>
+    <Nullable>enable</Nullable>
+    <RootNamespace>Orleans.Tests.Google</RootNamespace>
+    <AssemblyName>Orleans.Tests.Google</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="$(MicrosoftTestSdkVersion)" />
+    <PackageReference Include="Google.Cloud.Firestore" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="$(SourceRoot)src\Google\Orleans.Clustering.GoogleFirestore\Orleans.Clustering.GoogleFirestore.csproj" />
+    <ProjectReference Include="$(SourceRoot)src\Google\Orleans.Persistence.GoogleFirestore\Orleans.Persistence.GoogleFirestore.csproj" />
+    <ProjectReference Include="$(SourceRoot)src\Google\Orleans.Reminders.GoogleFirestore\Orleans.Reminders.GoogleFirestore.csproj" />
+    <ProjectReference Include="$(SourceRoot)src\Google\Orleans.GrainDirectory.GoogleFirestore\Orleans.GrainDirectory.GoogleFirestore.csproj" />
+    <ProjectReference Include="$(SourceRoot)test\TesterInternal\TesterInternal.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Include="$(SourceRoot)src\Google\Shared\Storage\FirestoreDataManager.cs" Link="Shared\Storage\FirestoreDataManager.cs" />
+    <Compile Include="$(SourceRoot)src\Google\Shared\Storage\FirestoreEntity.cs" Link="Shared\Storage\FirestoreEntity.cs" />
+    <Compile Include="$(SourceRoot)src\Google\Shared\Storage\FirestoreOptions.cs" Link="Shared\Storage\FirestoreOptions.cs" />
+    <Compile Include="$(SourceRoot)src\Google\Shared\Storage\GoogleCloudOptions.cs" Link="Shared\Storage\GoogleCloudOptions.cs" />
+    <Compile Include="$(SourceRoot)src\Google\Shared\Utils\Utils.cs" Link="Shared\Utils\Utils.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Folder Include="Emulators/" />
+  </ItemGroup>
+  
+</Project>
