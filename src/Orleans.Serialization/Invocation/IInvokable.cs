@@ -70,5 +70,10 @@ namespace Orleans.Serialization.Invocation
         /// Gets the interface type.
         /// </summary>
         Type GetInterfaceType();
+
+        /// <summary>
+        /// Gets the default response timeout.
+        /// </summary>
+        TimeSpan? GetDefaultResponseTimeout();
     }
 }
