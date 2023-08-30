@@ -22,7 +22,10 @@ namespace Orleans
         /// Gets the name of the stream identifier mapper.
         /// </summary>
         /// <value>The name of the stream identifier mapper.</value>
-        public string StreamIdMapper { get; }
+        /// <remarks>
+        /// This value is the name used to resolve the <see cref="IStreamIdMapper"/> registered in the dependency injection container.
+        /// </remarks>
+        public string StreamIdMapper { get; init; }
 
         /// <summary>
         /// Used to subscribe to all stream namespaces.
