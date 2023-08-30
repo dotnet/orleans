@@ -105,6 +105,34 @@ public class GeneratedSerializerTests : IDisposable
         Assert.Equal(original.StarSign, result.StarSign);
     }
 
+#if NET6_0_OR_GREATER
+    [Fact]
+    public void RequiredMembersAreSupported()
+    {
+        var original = new ClassWithRequiredMembers
+        {
+            IntProperty = 1,
+            StringField = "foo",
+        };
+
+        var result = RoundTripThroughCodec(original);
+
+        Assert.Equal(original.IntProperty, result.IntProperty);
+        Assert.Equal(original.StringField, result.StringField);
+
+        var subOriginal = new SubClassWithRequiredMembersInBase
+        {
+            IntProperty = 1,
+            StringField = "foo",
+        };
+
+        var subResult = RoundTripThroughCodec(subOriginal);
+
+        Assert.Equal(subOriginal.IntProperty, subResult.IntProperty);
+        Assert.Equal(subOriginal.StringField, subResult.StringField);
+    }
+#endif
+
     [Fact]
     public void GeneratedRecordWithExcludedPCtorSerializersRoundTripThroughCodec()
     {
