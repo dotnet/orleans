@@ -329,7 +329,7 @@ namespace Orleans.Hosting
                         if (attr != null)
                         {
                             var className = RuntimeTypeNameFormatter.Format(grainClass);
-                            options.ClassSpecificCollectionAge[className] = attr.Amount;
+                            options.ClassSpecificCollectionAge[className] = attr.AgeLimit;
                         }
                     }
                 });

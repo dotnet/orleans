@@ -10,6 +10,7 @@ using UnitTests.GrainInterfaces;
 
 namespace UnitTests.Grains
 {
+    [CollectionAgeLimit("00:05:00")]
     public class CollectionTestGrain : Grain, ICollectionTestGrain
     {
         protected readonly IGrainContext _grainContext;

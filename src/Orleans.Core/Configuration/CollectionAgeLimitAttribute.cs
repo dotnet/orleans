@@ -11,46 +11,51 @@ namespace Orleans
     [AttributeUsage(AttributeTargets.Class, AllowMultiple = false)]
     public class CollectionAgeLimitAttribute : Attribute, IGrainPropertiesProviderAttribute
     {
+        private TimeSpan? _value;
+
+        /// <summary>
+        /// Specifies the period of inactivity before a grain is available for collection and deactivation.
+        /// </summary>
+        /// <remarks>
+        /// Use the <see cref="Minutes"/>, <see cref="Days"/>, and <see cref="Hours"/> properties or the <see cref="AlwaysActive"/> to set the limit.
+        /// </remarks>
+        public CollectionAgeLimitAttribute() { }
+
+        /// <summary>
+        /// Specifies the period of inactivity before a grain is available for collection and deactivation.
+        /// </summary>
+        /// <param name="inactivityPeriod">The period of inactivity before a grain is available for collection and deactivation, expressed as a string using <see cref="TimeSpan.Parse(string)"/> syntax.</param>
+        public CollectionAgeLimitAttribute(string inactivityPeriod) => _value = TimeSpan.Parse(inactivityPeriod);
+
         /// <summary>
         /// Gets the minimum activation age.
         /// </summary>
-        public readonly TimeSpan MinAgeLimit = TimeSpan.FromMinutes(1);
+        public static readonly TimeSpan MinAgeLimit = TimeSpan.FromMinutes(1);
 
         /// <summary>
         /// Gets or sets the number of days to delay collecting an idle activation for.
         /// </summary>
-        public double Days { get; set; } 
+        public double Days { private get; init; } 
 
         /// <summary>
         /// Gets or sets the number of hours to delay collecting an idle activation for.
         /// </summary>
-        public double Hours { get; set; } 
+        public double Hours { private get; init; } 
 
         /// <summary>
         /// Gets or sets the number of minutes to delay collecting an idle activation for.
         /// </summary>
-        public double Minutes { get; set; } 
+        public double Minutes { private get; init; } 
 
         /// <summary>
         /// Gets or sets a value indicating whether this grain should never be collected by the idle activation collector.
         /// </summary>
-        public bool AlwaysActive { get; set; }
+        public bool AlwaysActive { private get; init; }
 
         /// <summary>
         /// Gets the idle activation collection age.
         /// </summary>
-        public TimeSpan Amount
-        {
-            get
-            {
-                var span = AlwaysActive
-                ? TimeSpan.FromDays(short.MaxValue)
-                : TimeSpan.FromDays(Days) + TimeSpan.FromHours(Hours) + TimeSpan.FromMinutes(Minutes);
-                return span <= TimeSpan.Zero
-                    ? MinAgeLimit
-                    : span;
-            }
-        }
+        public TimeSpan AgeLimit => _value ??= CalculateValue();
 
         /// <inheritdoc />
         public void Populate(IServiceProvider services, Type grainClass, GrainType grainType, Dictionary<string, string> properties)
@@ -63,10 +68,20 @@ namespace Orleans
             }
             else
             {
-                idleDeactivationPeriod = this.Amount.ToString("c");
+                idleDeactivationPeriod = AgeLimit.ToString("c");
             }
 
             properties[WellKnownGrainTypeProperties.IdleDeactivationPeriod] = idleDeactivationPeriod;
+        }
+
+        private TimeSpan CalculateValue()
+        {
+            var span = AlwaysActive
+            ? TimeSpan.FromDays(short.MaxValue)
+            : TimeSpan.FromDays(Days) + TimeSpan.FromHours(Hours) + TimeSpan.FromMinutes(Minutes);
+            return span <= TimeSpan.Zero
+                ? MinAgeLimit
+                : span;
         }
     }
 
