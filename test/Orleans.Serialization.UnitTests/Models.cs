@@ -486,6 +486,23 @@ namespace Orleans.Serialization.UnitTests
         public int IntProperty { get; set; }
     }
 
+#if NET6_0_OR_GREATER
+    [GenerateSerializer]
+    public class ClassWithRequiredMembers
+    {
+        [Id(0)]
+        public required int IntProperty { get; set; }
+
+        [Id(1)]
+        public required string StringField;
+    }
+
+    [GenerateSerializer]
+    public class SubClassWithRequiredMembersInBase : ClassWithRequiredMembers
+    {
+    }
+#endif
+
     [GenerateSerializer]
     public sealed class DerivedFromDictionary<TKey, TValue> : Dictionary<TKey, TValue>
     {
