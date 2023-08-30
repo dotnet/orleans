@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using Orleans.Metadata;
 using Orleans.Runtime;
 using Orleans.Streams;
@@ -110,7 +111,7 @@ namespace Orleans
         /// Allows to pass a regular expression to filter stream namespaces to subscribe to.
         /// </summary>
         /// <param name="pattern">The stream namespace regular expression filter.</param>
-        public RegexImplicitStreamSubscriptionAttribute(string pattern)
+        public RegexImplicitStreamSubscriptionAttribute([StringSyntax(StringSyntaxAttribute.Regex)] string pattern)
             : base(new RegexStreamNamespacePredicate(pattern))
         {
         }
