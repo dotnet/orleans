@@ -184,7 +184,7 @@ namespace UnitTests.StreamingTests
                 throw new ArgumentNullException(nameof(targets));
             if (targets.Length == 0)
                 throw new ArgumentException("caller must specify at least one target");
-            if (String.IsNullOrWhiteSpace(streamProvider))
+            if (string.IsNullOrWhiteSpace(streamProvider))
                 throw new ArgumentException("Stream provider name is either null or whitespace", nameof(streamProvider));
             if (logger == null)
                 throw new ArgumentNullException(nameof(logger));
@@ -380,7 +380,7 @@ namespace UnitTests.StreamingTests
         {
             if (targets == null)
                 throw new ArgumentNullException(nameof(targets));
-            if (String.IsNullOrWhiteSpace(streamProvider))
+            if (string.IsNullOrWhiteSpace(streamProvider))
                 throw new ArgumentException("Stream provider name is either null or whitespace", nameof(streamProvider));
             if (logger == null)
                 throw new ArgumentNullException(nameof(logger));

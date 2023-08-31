@@ -367,7 +367,7 @@ namespace Orleans.AzureUtils
 
         private void ReportErrorAndRethrow(Exception exc, string operation, AzureQueueErrorCode errorCode)
         {
-            var errMsg = String.Format(
+            var errMsg = string.Format(
                 "Error doing {0} for Azure storage queue {1} " + Environment.NewLine
                 + "Exception = {2}", operation, QueueName, exc);
             logger.LogError((int)errorCode, exc, "{Message}", errMsg);
@@ -412,37 +412,37 @@ namespace Orleans.AzureUtils
             if (!(queueName.Length >= 3 && queueName.Length <= 63))
             {
                 // A queue name must be from 3 through 63 characters long.
-                throw new ArgumentException(String.Format("A queue name must be from 3 through 63 characters long, while your queueName length is {0}, queueName is {1}.", queueName.Length, queueName), queueName);
+                throw new ArgumentException(string.Format("A queue name must be from 3 through 63 characters long, while your queueName length is {0}, queueName is {1}.", queueName.Length, queueName), queueName);
             }
 
-            if (!Char.IsLetterOrDigit(queueName.First()))
+            if (!char.IsLetterOrDigit(queueName.First()))
             {
                 // A queue name must start with a letter or number
-                throw new ArgumentException(String.Format("A queue name must start with a letter or number, while your queueName is {0}.", queueName), queueName);
+                throw new ArgumentException(string.Format("A queue name must start with a letter or number, while your queueName is {0}.", queueName), queueName);
             }
 
-            if (!Char.IsLetterOrDigit(queueName.Last()))
+            if (!char.IsLetterOrDigit(queueName.Last()))
             {
                 // The first and last letters in the queue name must be alphanumeric. The dash (-) character cannot be the first or last character.
-                throw new ArgumentException(String.Format("The last letter in the queue name must be alphanumeric, while your queueName is {0}.", queueName), queueName);
+                throw new ArgumentException(string.Format("The last letter in the queue name must be alphanumeric, while your queueName is {0}.", queueName), queueName);
             }
 
-            if (!queueName.All(c => Char.IsLetterOrDigit(c) || c.Equals('-')))
+            if (!queueName.All(c => char.IsLetterOrDigit(c) || c.Equals('-')))
             {
                 // A queue name can only contain letters, numbers, and the dash (-) character.
-                throw new ArgumentException(String.Format("A queue name can only contain letters, numbers, and the dash (-) character, while your queueName is {0}.", queueName), queueName);
+                throw new ArgumentException(string.Format("A queue name can only contain letters, numbers, and the dash (-) character, while your queueName is {0}.", queueName), queueName);
             }
 
             if (queueName.Contains("--"))
             {
                 // Consecutive dash characters are not permitted in the queue name.
-                throw new ArgumentException(String.Format("Consecutive dash characters are not permitted in the queue name, while your queueName is {0}.", queueName), queueName);
+                throw new ArgumentException(string.Format("Consecutive dash characters are not permitted in the queue name, while your queueName is {0}.", queueName), queueName);
             }
 
-            if (queueName.Where(Char.IsLetter).Any(c => !Char.IsLower(c)))
+            if (queueName.Where(char.IsLetter).Any(c => !char.IsLower(c)))
             {
                 // All letters in a queue name must be lowercase.
-                throw new ArgumentException(String.Format("All letters in a queue name must be lowercase, while your queueName is {0}.", queueName), queueName);
+                throw new ArgumentException(string.Format("All letters in a queue name must be lowercase, while your queueName is {0}.", queueName), queueName);
             }
         }
     }

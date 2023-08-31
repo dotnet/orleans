@@ -26,11 +26,11 @@ namespace Orleans.Runtime
         }
 
         [Id(0)]
-        public UInt64 N0 { get; private set; }
+        public ulong N0 { get; private set; }
         [Id(1)]
-        public UInt64 N1 { get; private set; }
+        public ulong N1 { get; private set; }
         [Id(2)]
-        public UInt64 TypeCodeData { get; private set; }
+        public ulong TypeCodeData { get; private set; }
         [Id(3)]
         public string KeyExt { get; private set; }
 
@@ -332,7 +332,7 @@ namespace Orleans.Runtime
             return keyString;
         }
 
-        internal static Category GetCategory(UInt64 typeCodeData)
+        internal static Category GetCategory(ulong typeCodeData)
         {
             return (Category)((typeCodeData >> 56) & 0xFF);
         }

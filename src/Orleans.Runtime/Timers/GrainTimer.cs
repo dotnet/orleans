@@ -63,7 +63,7 @@ namespace Orleans.Runtime
         public void Start()
         {
             if (TimerAlreadyStopped)
-                throw new ObjectDisposedException(String.Format("The timer {0} was already disposed.", GetFullName()));
+                throw new ObjectDisposedException(string.Format("The timer {0} was already disposed.", GetFullName()));
 
             timer.Start(dueTime, timerFrequency);
         }

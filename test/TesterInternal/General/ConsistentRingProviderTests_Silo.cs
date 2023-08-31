@@ -223,7 +223,7 @@ namespace UnitTests.General
                 if (responsibleSilo.Equals(s))
                     return randomKey;
             }
-            throw new Exception(String.Format("Could not pick a key that silo {0} will be responsible for. Primary.Ring = \n{1}",
+            throw new Exception(string.Format("Could not pick a key that silo {0} will be responsible for. Primary.Ring = \n{1}",
                 responsibleSilo, testHooks.GetConsistentRingProviderDiagnosticInfo().Result));
         }
 

@@ -149,7 +149,7 @@ namespace Orleans.GrainDirectory.AzureStorage
                 || httpStatusCode == HttpStatusCode.ServiceUnavailable  /* 503 */
                 || httpStatusCode == HttpStatusCode.GatewayTimeout      /* 504 */
                 || (httpStatusCode == HttpStatusCode.InternalServerError /* 500 */
-                    && !String.IsNullOrEmpty(restStatusCode)
+                    && !string.IsNullOrEmpty(restStatusCode)
                     && TableErrorCode.OperationTimedOut.ToString().Equals(restStatusCode, StringComparison.OrdinalIgnoreCase))
             );
         }
@@ -248,7 +248,7 @@ namespace Orleans.GrainDirectory.AzureStorage
                             exc,
                             "DataNotFound reading Azure storage table {TableName}:{Retry} HTTP status code={StatusCode} REST status code={RESTStatusCode}",
                             tableName,
-                            iteration == 0 ? String.Empty : (" Repeat=" + iteration),
+                            iteration == 0 ? string.Empty : (" Repeat=" + iteration),
                             httpStatusCode,
                             restStatus);
 

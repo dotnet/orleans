@@ -274,7 +274,7 @@ namespace Orleans.Runtime.MembershipService
             }
 
             if (suspectingSilos.Count != suspectingTimes.Count)
-                throw new OrleansException(String.Format("SuspectingSilos.Length of {0} as read from Azure table is not equal to SuspectingTimes.Length of {1}", suspectingSilos.Count, suspectingTimes.Count));
+                throw new OrleansException(string.Format("SuspectingSilos.Length of {0} as read from Azure table is not equal to SuspectingTimes.Length of {1}", suspectingSilos.Count, suspectingTimes.Count));
 
             for (int i = 0; i < suspectingSilos.Count; i++)
                 parse.AddSuspector(suspectingSilos[i], suspectingTimes[i]);
@@ -326,8 +326,8 @@ namespace Orleans.Runtime.MembershipService
             }
             else
             {
-                tableEntry.SuspectingSilos = String.Empty;
-                tableEntry.SuspectingTimes = String.Empty;
+                tableEntry.SuspectingSilos = string.Empty;
+                tableEntry.SuspectingTimes = string.Empty;
             }
             tableEntry.PartitionKey = deploymentId;
             tableEntry.RowKey = SiloInstanceTableEntry.ConstructRowKey(memEntry.SiloAddress);

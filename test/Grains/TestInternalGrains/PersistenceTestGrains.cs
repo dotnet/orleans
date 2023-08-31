@@ -25,7 +25,7 @@ namespace UnitTests.Grains
         public static string CaptureRuntimeEnvironment()
         {
             var callStack = Utils.GetStackTrace(1); // Don't include this method in stack trace
-            return String.Format(
+            return string.Format(
                 "   TaskScheduler={0}" + Environment.NewLine
                 + "   RuntimeContext={1}" + Environment.NewLine
                 + "   WorkerPoolThread={2}" + Environment.NewLine

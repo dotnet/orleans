@@ -23,7 +23,7 @@ namespace TestGrains
         [Orleans.Id(1)]
         public int B;
         [Orleans.Id(2)]
-        public Dictionary<String, int> Reservations;
+        public Dictionary<string, int> Reservations;
 
         public MyGrainState()
         {
