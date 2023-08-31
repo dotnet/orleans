@@ -10,7 +10,7 @@ using Orleans.Core.Internal;
 
 namespace UnitTests.StreamingTests
 {
-    class DeactivationTestRunner
+    internal class DeactivationTestRunner
     {
         private static readonly TimeSpan Timeout = TimeSpan.FromSeconds(10);
         private readonly string streamProviderName;

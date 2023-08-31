@@ -24,8 +24,8 @@ namespace UnitTests.Grains
         private readonly IReminderTable reminderTable;
 
         private readonly IReminderRegistry unvalidatedReminderRegistry;
-        Dictionary<string, ReminderState> allReminders;
-        Dictionary<string, long> sequence;
+        private Dictionary<string, ReminderState> allReminders;
+        private Dictionary<string, long> sequence;
         private TimeSpan period;
 
         private static readonly long aCCURACY = 50 * TimeSpan.TicksPerMillisecond; // when we use ticks to compute sequence numbers, we might get wrong results as timeouts don't happen with precision of ticks  ... we keep this as a leeway
@@ -239,8 +239,8 @@ namespace UnitTests.Grains
     public class ReminderTestCopyGrain : Grain, IReminderTestCopyGrain, IRemindable
     {
         private readonly IReminderRegistry unvalidatedReminderRegistry;
-        Dictionary<string, IGrainReminder> allReminders;
-        Dictionary<string, long> sequence;
+        private Dictionary<string, IGrainReminder> allReminders;
+        private Dictionary<string, long> sequence;
         private TimeSpan period;
 
         private static readonly long aCCURACY = 50 * TimeSpan.TicksPerMillisecond; // when we use ticks to compute sequence numbers, we might get wrong results as timeouts don't happen with precision of ticks  ... we keep this as a leeway

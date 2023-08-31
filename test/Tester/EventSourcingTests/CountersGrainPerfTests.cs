@@ -94,7 +94,7 @@ namespace Tester.EventSourcingTests
 
     }
 
-    class RunThisFirstAttribute : Attribute
+    internal class RunThisFirstAttribute : Attribute
     {
     }
 

@@ -3,7 +3,7 @@ using Orleans;
 
 namespace UnitTests.GrainInterfaces
 {
-    interface ISerializerPresenceTest : IGrainWithGuidKey
+    internal interface ISerializerPresenceTest : IGrainWithGuidKey
     {
         Task<bool> SerializerExistsForType(System.Type param);
 

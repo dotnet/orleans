@@ -318,8 +318,8 @@ namespace UnitTests.General
     internal class RequestContextGrainObserver : ISimpleGrainObserver
     {
         private readonly ITestOutputHelper output;
-        readonly Action<int, int, object> action;
-        readonly object result;
+        private readonly Action<int, int, object> action;
+        private readonly object result;
 
         public RequestContextGrainObserver(ITestOutputHelper output, Action<int, int, object> action, object result)
         {

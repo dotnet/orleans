@@ -97,7 +97,7 @@ namespace Tester.StreamingTests
             await TestingUtils.WaitUntilAsync(lastTry => CheckCounters(counts.Sum(), lastTry), Timeout);
         }
 
-        Task OnNextAsync(int e, StreamSequenceToken token)
+        private Task OnNextAsync(int e, StreamSequenceToken token)
         {
             Interlocked.Increment(ref this.eventsConsumed);
             return Task.CompletedTask;

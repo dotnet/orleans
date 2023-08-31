@@ -15,7 +15,7 @@ namespace UnitTests.Serialization
             this.fixture = fixture;
         }
 
-        void RoundTripCollectionSerializationTest<T>(IEnumerable<T> input)
+        private void RoundTripCollectionSerializationTest<T>(IEnumerable<T> input)
         {
             var output = this.fixture.Serializer.RoundTripSerializationForTesting(input);
             Assert.Equal(input,output);

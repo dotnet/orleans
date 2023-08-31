@@ -865,8 +865,7 @@ namespace UnitTests.Grains
                                 );
             }
 
-
-            Type GetImmediateSubclass(Type subject) {
+            private Type GetImmediateSubclass(Type subject) {
                 if(subject.BaseType == typeof(BasicGrain)) {
                     return subject;
                 }

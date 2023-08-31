@@ -11,7 +11,7 @@ using System.Threading;
 
 namespace Benchmarks
 {
-    class Program
+    internal class Program
     {
         private static readonly Dictionary<string, Action<string[]>> _benchmarks = new Dictionary<string, Action<string[]>>
         {

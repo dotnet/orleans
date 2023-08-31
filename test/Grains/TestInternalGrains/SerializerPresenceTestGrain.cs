@@ -7,7 +7,7 @@ using UnitTests.GrainInterfaces;
 
 namespace UnitTests.Grains
 {
-    class SerializerPresenceTestGrain : Grain, ISerializerPresenceTest
+    internal class SerializerPresenceTestGrain : Grain, ISerializerPresenceTest
     {
         public Task<bool> SerializerExistsForType(Type t)
         {
