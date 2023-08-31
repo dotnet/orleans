@@ -59,8 +59,8 @@ namespace UnitTests.OrleansRuntime.Streams
             public IBatchContainer GetBatchContainer(ref CachedMessage cachedMessage)
             {
                 //Deserialize payload
-                int readOffset = 0;
-                ArraySegment<byte> payload = SegmentBuilder.ReadNextBytes(cachedMessage.Segment, ref readOffset);
+                var readOffset = 0;
+                var payload = SegmentBuilder.ReadNextBytes(cachedMessage.Segment, ref readOffset);
 
                 return new TestBatchContainer
                 {
@@ -92,7 +92,7 @@ namespace UnitTests.OrleansRuntime.Streams
 
             public CachedMessage ToCachedMessage(TestQueueMessage queueMessage, DateTime dequeueTimeUtc)
             {
-                StreamPosition streamPosition = GetStreamPosition(queueMessage);
+                var streamPosition = GetStreamPosition(queueMessage);
                 return new CachedMessage
                 {
                     StreamId = streamPosition.StreamId,
@@ -112,7 +112,7 @@ namespace UnitTests.OrleansRuntime.Streams
             private ArraySegment<byte> SerializeMessageIntoPooledSegment(TestQueueMessage queueMessage)
             {
                 // serialize payload
-                int size = SegmentBuilder.CalculateAppendSize(queueMessage.Data);
+                var size = SegmentBuilder.CalculateAppendSize(queueMessage.Data);
 
                 // get segment from current block
                 ArraySegment<byte> segment;
@@ -125,13 +125,13 @@ namespace UnitTests.OrleansRuntime.Streams
                     // if this fails with clean block, then requested size is too big
                     if (!currentBuffer.TryGetSegment(size, out segment))
                     {
-                        string errmsg = String.Format(CultureInfo.InvariantCulture,
+                        var errmsg = String.Format(CultureInfo.InvariantCulture,
                             "Message size is too big. MessageSize: {0}", size);
                         throw new ArgumentOutOfRangeException(nameof(queueMessage), errmsg);
                     }
                 }
                 // encode namespace, offset, partitionkey, properties and payload into segment
-                int writeOffset = 0;
+                var writeOffset = 0;
                 SegmentBuilder.Append(segment, ref writeOffset, queueMessage.Data);
                 return segment;
             }
@@ -170,7 +170,7 @@ namespace UnitTests.OrleansRuntime.Streams
             evictionStrategy.PurgeObservable = cache;
             var converter = new CachedMessageConverter(bufferPool, evictionStrategy);
 
-            int startSequenceNuber = 222;
+            var startSequenceNuber = 222;
             startSequenceNuber = RunGoldenPath(cache, converter, startSequenceNuber);
             RunGoldenPath(cache, converter, startSequenceNuber);
         }
@@ -356,7 +356,7 @@ namespace UnitTests.OrleansRuntime.Streams
 
         private int RunGoldenPath(PooledQueueCache cache, CachedMessageConverter converter, int startOfCache)
         {
-            int sequenceNumber = startOfCache;
+            var sequenceNumber = startOfCache;
             IBatchContainer batch;
 
             var stream1 = StreamId.Create(TestStreamNamespace, Guid.NewGuid());
@@ -364,23 +364,23 @@ namespace UnitTests.OrleansRuntime.Streams
 
             // now add messages into cache newer than cursor
             // Adding enough to fill the pool
-            List<TestQueueMessage> messages = Enumerable.Range(0, MessagesPerBuffer * PooledBufferCount)
+            var messages = Enumerable.Range(0, MessagesPerBuffer * PooledBufferCount)
                 .Select(i => new TestQueueMessage
                 {
                     StreamId = i % 2 == 0 ? stream1 : stream2,
                     SequenceNumber = sequenceNumber + i
                 })
                 .ToList();
-            DateTime utcNow = DateTime.UtcNow;
-            List<CachedMessage> cachedMessages = messages
+            var utcNow = DateTime.UtcNow;
+            var cachedMessages = messages
                 .Select(m => converter.ToCachedMessage(m, utcNow))
                 .ToList();
             cache.Add(cachedMessages, utcNow);
             sequenceNumber += MessagesPerBuffer * PooledBufferCount;
 
             // get cursor for stream1, walk all the events in the stream using the cursor
-            object stream1Cursor = cache.GetCursor(stream1, new EventSequenceTokenV2(startOfCache));
-            int stream1EventCount = 0;
+            var stream1Cursor = cache.GetCursor(stream1, new EventSequenceTokenV2(startOfCache));
+            var stream1EventCount = 0;
             while (cache.TryGetNextMessage(stream1Cursor, out batch))
             {
                 Assert.NotNull(stream1Cursor);
@@ -392,8 +392,8 @@ namespace UnitTests.OrleansRuntime.Streams
             Assert.Equal((sequenceNumber - startOfCache) / 2, stream1EventCount);
 
             // get cursor for stream2, walk all the events in the stream using the cursor
-            object stream2Cursor = cache.GetCursor(stream2, new EventSequenceTokenV2(startOfCache));
-            int stream2EventCount = 0;
+            var stream2Cursor = cache.GetCursor(stream2, new EventSequenceTokenV2(startOfCache));
+            var stream2EventCount = 0;
             while (cache.TryGetNextMessage(stream2Cursor, out batch))
             {
                 Assert.NotNull(stream2Cursor);
@@ -405,9 +405,9 @@ namespace UnitTests.OrleansRuntime.Streams
             Assert.Equal((sequenceNumber - startOfCache) / 2, stream2EventCount);
 
             // Add a blocks worth of events to the cache, then walk each cursor.  Do this enough times to fill the cache twice.
-            for (int j = 0; j < PooledBufferCount*2; j++)
+            for (var j = 0; j < PooledBufferCount*2; j++)
             {
-                List<TestQueueMessage> moreMessages = Enumerable.Range(0, MessagesPerBuffer)
+                var moreMessages = Enumerable.Range(0, MessagesPerBuffer)
                 .Select(i => new TestQueueMessage
                 {
                     StreamId = i % 2 == 0 ? stream1 : stream2,
@@ -415,7 +415,7 @@ namespace UnitTests.OrleansRuntime.Streams
                 })
                 .ToList();
                 utcNow = DateTime.UtcNow;
-                List<CachedMessage> moreCachedMessages = moreMessages
+                var moreCachedMessages = moreMessages
                     .Select(m => converter.ToCachedMessage(m, utcNow))
                     .ToList();
                 cache.Add(moreCachedMessages, utcNow);

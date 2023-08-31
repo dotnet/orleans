@@ -309,9 +309,9 @@ namespace Orleans.Runtime
         /// <returns>Returns LimitExceededException if overloaded, otherwise <c>null</c>c></returns>
         public LimitExceededException CheckOverloaded()
         {
-            string limitName = nameof(SiloMessagingOptions.MaxEnqueuedRequestsHardLimit);
-            int maxRequestsHardLimit = _shared.MessagingOptions.MaxEnqueuedRequestsHardLimit;
-            int maxRequestsSoftLimit = _shared.MessagingOptions.MaxEnqueuedRequestsSoftLimit;
+            var limitName = nameof(SiloMessagingOptions.MaxEnqueuedRequestsHardLimit);
+            var maxRequestsHardLimit = _shared.MessagingOptions.MaxEnqueuedRequestsHardLimit;
+            var maxRequestsSoftLimit = _shared.MessagingOptions.MaxEnqueuedRequestsSoftLimit;
             if (IsStatelessWorker)
             {
                 limitName = nameof(SiloMessagingOptions.MaxEnqueuedRequestsHardLimit_StatelessWorker);
@@ -321,7 +321,7 @@ namespace Orleans.Runtime
 
             if (maxRequestsHardLimit <= 0 && maxRequestsSoftLimit <= 0) return null; // No limits are set
 
-            int count = GetRequestCount();
+            var count = GetRequestCount();
 
             if (maxRequestsHardLimit > 0 && count > maxRequestsHardLimit) // Hard limit
             {
@@ -1293,7 +1293,7 @@ namespace Orleans.Runtime
         {
             lock (this)
             {
-                List<Message> msgs = DequeueAllWaitingRequests();
+                var msgs = DequeueAllWaitingRequests();
                 if (msgs == null || msgs.Count <= 0) return;
 
                 if (_shared.Logger.IsEnabled(LogLevel.Debug))
@@ -1317,7 +1317,7 @@ namespace Orleans.Runtime
         {
             lock (this)
             {
-                List<Message> msgs = DequeueAllWaitingRequests();
+                var msgs = DequeueAllWaitingRequests();
                 if (msgs is not { Count: > 0 })
                 {
                     return;

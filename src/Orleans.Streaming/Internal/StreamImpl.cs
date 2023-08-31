@@ -105,13 +105,13 @@ namespace Orleans.Streams
 
         public Task OnCompletedAsync()
         {
-            IInternalAsyncBatchObserver<T> producerInterface = GetProducerInterface();
+            var producerInterface = GetProducerInterface();
             return producerInterface.OnCompletedAsync();
         }
 
         public Task OnErrorAsync(Exception ex)
         {
-            IInternalAsyncBatchObserver<T> producerInterface = GetProducerInterface();
+            var producerInterface = GetProducerInterface();
             return producerInterface.OnErrorAsync(ex);
         }
 

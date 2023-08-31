@@ -35,14 +35,14 @@ namespace TestGrains
             var streamProvider = this.GetStreamProvider(GeneratedStreamTestConstants.StreamProviderName);
             stream = streamProvider.GetStream<GeneratedEvent>(StreamNamespace, this.GetPrimaryKey());
 
-            IList<StreamSubscriptionHandle<GeneratedEvent>> handles = await stream.GetAllSubscriptionHandles();
+            var handles = await stream.GetAllSubscriptionHandles();
             if (handles.Count == 0)
             {
                 await stream.SubscribeAsync(OnNextAsync);
             }
             else
             {
-                foreach (StreamSubscriptionHandle<GeneratedEvent> handle in handles)
+                foreach (var handle in handles)
                 {
                     await handle.ResumeAsync(OnNextAsync);
                 }

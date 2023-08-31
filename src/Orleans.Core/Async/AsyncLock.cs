@@ -63,7 +63,7 @@ namespace Orleans
         /// <returns>An <see cref="IDisposable"/> which must be used to release the lock.</returns>
         public ValueTask<IDisposable> LockAsync()
         {
-            Task wait = semaphore.WaitAsync();
+            var wait = semaphore.WaitAsync();
             if (wait.IsCompletedSuccessfully)
             {
                 return new(new LockReleaser(this));
@@ -95,7 +95,7 @@ namespace Orleans
                     return;
 
                 // first null it, next Release, so even if Release throws, we don't hold the reference any more.
-                AsyncLock tmp = target;
+                var tmp = target;
                 target = null;
                 try
                 {

@@ -119,7 +119,7 @@ namespace UnitTests.Grains
             _streamId = streamId;
             ProviderName = streamProvider.Name;
             _streamNamespace = string.IsNullOrWhiteSpace(streamNamespace) ? null : streamNamespace.Trim();
-            IAsyncStream<StreamItem> stream = streamProvider.GetStream<StreamItem>(streamNamespace, streamId);
+            var stream = streamProvider.GetStream<StreamItem>(streamNamespace, streamId);
 
             _subscription = await stream.SubscribeAsync(this);
         }
@@ -128,7 +128,7 @@ namespace UnitTests.Grains
         {
             _logger = logger;
             _logger.LogInformation("RenewConsumer");
-            IAsyncStream<StreamItem> stream = streamProvider.GetStream<StreamItem>(_streamNamespace, _streamId);
+            var stream = streamProvider.GetStream<StreamItem>(_streamNamespace, _streamId);
             _subscription = await stream.SubscribeAsync(this);
         }
 
@@ -208,7 +208,7 @@ namespace UnitTests.Grains
             _cleanedUpFlag.ThrowNotInitializedIfSet();
 
             _logger.LogInformation("BecomeProducer");
-            IAsyncStream<StreamItem> stream = streamProvider.GetStream<StreamItem>(streamNamespace, streamId);
+            var stream = streamProvider.GetStream<StreamItem>(streamNamespace, streamId);
             _observer = stream;
             _logger.LogInformation("ProducerObserver.BecomeProducer: producer requires no disposal; test short-circuited.");
             _observerDisposedYet = true; // TODO BPETIT remove that
@@ -223,7 +223,7 @@ namespace UnitTests.Grains
 
             _logger = logger;
             _logger.LogInformation("RenewProducer");
-            IAsyncStream<StreamItem> stream = streamProvider.GetStream<StreamItem>(_streamNamespace, _streamId);
+            var stream = streamProvider.GetStream<StreamItem>(_streamNamespace, _streamId);
             _observer = stream;
             _observerDisposedYet = true; // TODO BPETIT remove that
         }
@@ -233,7 +233,7 @@ namespace UnitTests.Grains
             if (_cleanedUpFlag.IsSet)
                 return false;
 
-            StreamItem item = new StreamItem(data, _streamId);
+            var item = new StreamItem(data, _streamId);
             await _observer.OnNextAsync(item);
             _itemsProduced++;
             var logLevel = DEBUG_STREAMING_GRAINS ? LogLevel.Information : LogLevel.Debug;
@@ -264,7 +264,7 @@ namespace UnitTests.Grains
             var tasks = new Task<bool>[count];
             for (var i = 1; i <= count; ++i)
             {
-                int capture = i;
+                var capture = i;
                 Func<Task<bool>> func = async () =>
                     {
                         return await ProduceItem($"parallel#{capture}");
@@ -430,7 +430,7 @@ namespace UnitTests.Grains
                 if (_started && !_disposedFlag.IsSet)
                 {
                     --_counter;
-                    bool shouldContinue = await _produceItemFunc(String.Format("periodic#{0}", _counter));
+                    var shouldContinue = await _produceItemFunc(String.Format("periodic#{0}", _counter));
                     if (!shouldContinue || 0 == _counter)
                         Dispose();
                 }
@@ -486,7 +486,7 @@ namespace UnitTests.Grains
         {
             _cleanedUpFlag.ThrowNotInitializedIfSet();
 
-            ProducerObserver producer = ProducerObserver.NewObserver(_logger, GrainFactory);
+            var producer = ProducerObserver.NewObserver(_logger, GrainFactory);
             producer.BecomeProducer(streamId, this.GetStreamProvider(providerToUse), streamNamespace);
             _producers.Add(producer);
             return Task.CompletedTask;
@@ -522,14 +522,14 @@ namespace UnitTests.Grains
         public virtual async Task<int> GetExpectedItemsProduced()
         {
             var tasks = _producers.Select(p => p.ExpectedItemsProduced).ToArray();
-            int[] expectedItemsProduced = await Task.WhenAll(tasks);
+            var expectedItemsProduced = await Task.WhenAll(tasks);
             return expectedItemsProduced.Sum();
         }
 
         public virtual async Task<int> GetItemsProduced()
         {
             var tasks = _producers.Select(p => p.ItemsProduced).ToArray();
-            int[] itemsProduced = await Task.WhenAll(tasks);
+            var itemsProduced = await Task.WhenAll(tasks);
             return itemsProduced.Sum();
         }
 
@@ -545,7 +545,7 @@ namespace UnitTests.Grains
         {
             _cleanedUpFlag.ThrowNotInitializedIfSet();
             var tasks = _producers.Select(p => p.ProducerCount).ToArray();
-            int[] producerCount = await Task.WhenAll(tasks);
+            var producerCount = await Task.WhenAll(tasks);
             return producerCount.Sum();
         }
 
@@ -675,7 +675,7 @@ namespace UnitTests.Grains
         public async virtual Task BecomeConsumer(Guid streamId, string providerToUse, string streamNamespace)
         {
             _providerToUse = providerToUse;
-            ConsumerObserver consumerObserver = ConsumerObserver.NewObserver(_logger);
+            var consumerObserver = ConsumerObserver.NewObserver(_logger);
             await consumerObserver.BecomeConsumer(streamId, this.GetStreamProvider(providerToUse), streamNamespace);
             _observers.Add(consumerObserver);
         }
@@ -683,14 +683,14 @@ namespace UnitTests.Grains
         public virtual async Task<int> GetItemsConsumed()
         {
             var tasks = _observers.Select(p => p.ItemsConsumed).ToArray();
-            int[] itemsConsumed = await Task.WhenAll(tasks);
+            var itemsConsumed = await Task.WhenAll(tasks);
             return itemsConsumed.Sum();
         }
 
         public virtual async Task<int> GetConsumerCount()
         {
             var tasks = _observers.Select(p => p.ConsumerCount).ToArray();
-            int[] consumerCount = await Task.WhenAll(tasks);
+            var consumerCount = await Task.WhenAll(tasks);
             return consumerCount.Sum();
         }
 
@@ -929,14 +929,14 @@ namespace UnitTests.Grains
                 throw new ArgumentException("namespace is required (must not be null or whitespace)", nameof(streamNamespace));
             }
 
-            ConsumerObserver consumerObserver = ConsumerObserver.NewObserver(_logger);
+            var consumerObserver = ConsumerObserver.NewObserver(_logger);
             await consumerObserver.BecomeConsumer(streamGuid, this.GetStreamProvider(providerToUse), streamNamespace);
             _observers[providerToUse] = consumerObserver;
         }
 
         public virtual async Task<int> GetItemsConsumed()
         {
-            int result = 0;
+            var result = 0;
             foreach (var o in _observers.Values)
             {
                 result += await o.ItemsConsumed;

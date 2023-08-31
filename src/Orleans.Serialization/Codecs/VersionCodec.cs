@@ -21,8 +21,8 @@ namespace Orleans.Serialization.Codecs
         /// <inheritdoc />
         public override Version ConvertFromSurrogate(ref VersionSurrogate surrogate)
         {
-            int revision = surrogate.Revision;
-            int build = surrogate.Build;
+            var revision = surrogate.Revision;
+            var build = surrogate.Build;
 
             // ArgumentOutOfRangeException is thrown if any argument is less than zero
             // Build and Revision are -1 if they are not defined during construction

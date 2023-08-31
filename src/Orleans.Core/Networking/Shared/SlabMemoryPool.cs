@@ -87,7 +87,7 @@ namespace Orleans.Networking.Shared
                 ThrowObjectDisposedException();
             }
 
-            if (_blocks.TryDequeue(out MemoryPoolBlock block))
+            if (_blocks.TryDequeue(out var block))
             {
                 // block successfully taken from the stack - return it
 
@@ -120,7 +120,7 @@ namespace Orleans.Networking.Shared
 
             MemoryPoolBlock block = null;
 
-            for (int i = 0; i < blockCount; i++)
+            for (var i = 0; i < blockCount; i++)
             {
                 block = new MemoryPoolBlock(this, slab, offset, _blockSize);
 
@@ -192,7 +192,7 @@ namespace Orleans.Networking.Shared
 
                 if (disposing)
                 {
-                    while (_slabs.TryPop(out MemoryPoolSlab slab))
+                    while (_slabs.TryPop(out var slab))
                     {
                         // dispose managed state (managed objects).
                         slab.Dispose();
@@ -200,7 +200,7 @@ namespace Orleans.Networking.Shared
                 }
 
                 // Discard blocks in pool
-                while (_blocks.TryDequeue(out MemoryPoolBlock block))
+                while (_blocks.TryDequeue(out var block))
                 {
                     GC.SuppressFinalize(block);
                 }

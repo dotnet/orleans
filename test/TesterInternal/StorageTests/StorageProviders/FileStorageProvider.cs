@@ -77,7 +77,7 @@ namespace Samples.StorageProviders
         /// <returns>Completion promise for this operation.</returns>
         public Task Delete(string collectionName, string key)
         {
-            FileInfo fileInfo = GetStorageFilePath(collectionName, key);
+            var fileInfo = GetStorageFilePath(collectionName, key);
 
             if (fileInfo.Exists)
                 fileInfo.Delete();
@@ -93,7 +93,7 @@ namespace Samples.StorageProviders
         /// <returns>Completion promise for this operation.</returns>
         public async Task<string> Read(string collectionName, string key)
         {
-            FileInfo fileInfo = GetStorageFilePath(collectionName, key);
+            var fileInfo = GetStorageFilePath(collectionName, key);
 
             if (!fileInfo.Exists)
                 return null;
@@ -113,7 +113,7 @@ namespace Samples.StorageProviders
         /// <returns>Completion promise for this operation.</returns>
         public async Task Write(string collectionName, string key, string entityData)
         {
-            FileInfo fileInfo = GetStorageFilePath(collectionName, key);
+            var fileInfo = GetStorageFilePath(collectionName, key);
 
             using (var stream = new StreamWriter(fileInfo.Open(FileMode.Create, FileAccess.Write)))
             {
@@ -133,8 +133,8 @@ namespace Samples.StorageProviders
         /// <returns>File info for this storage data file.</returns>
         private FileInfo GetStorageFilePath(string collectionName, string key)
         {
-            string fileName = (key + "." + collectionName).Replace('/', '_');
-            string path = Path.Combine(directory.FullName, fileName);
+            var fileName = (key + "." + collectionName).Replace('/', '_');
+            var path = Path.Combine(directory.FullName, fileName);
             return new FileInfo(path);
         }
 

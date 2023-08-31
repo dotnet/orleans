@@ -70,7 +70,7 @@ namespace Orleans.Transactions.AzureStorage
                     }
 
                     var PrepareRecordsToRecover = new List<PendingTransactionState<TState>>();
-                    for (int i = 0; i < states.Count; i++)
+                    for (var i = 0; i < states.Count; i++)
                     {
                         var kvp = states[i];
 
@@ -82,7 +82,7 @@ namespace Orleans.Transactions.AzureStorage
                         if (kvp.Value.TransactionManager == null)
                             break;
 
-                        ParticipantId tm = JsonConvert.DeserializeObject<ParticipantId>(kvp.Value.TransactionManager, this.jsonSettings);
+                        var tm = JsonConvert.DeserializeObject<ParticipantId>(kvp.Value.TransactionManager, this.jsonSettings);
 
                         PrepareRecordsToRecover.Add(new PendingTransactionState<TState>()
                         {
@@ -95,7 +95,7 @@ namespace Orleans.Transactions.AzureStorage
                     }
 
                     // clear the state strings... no longer needed, ok to GC now
-                    for (int i = 0; i < states.Count; i++)
+                    for (var i = 0; i < states.Count; i++)
                     {
                         var entity = states[i].Value;
                         entity.StateJson = null;
@@ -104,7 +104,7 @@ namespace Orleans.Transactions.AzureStorage
                     if (logger.IsEnabled(LogLevel.Debug))
                         logger.LogDebug("{PartitionKey} Loaded v{CommittedSequenceId} rows={Data}", partition, this.key.CommittedSequenceId, string.Join(",", states.Select(s => s.Key.ToString("x16"))));
 
-                    TransactionalStateMetaData metadata = JsonConvert.DeserializeObject<TransactionalStateMetaData>(this.key.Metadata, this.jsonSettings);
+                    var metadata = JsonConvert.DeserializeObject<TransactionalStateMetaData>(this.key.Metadata, this.jsonSettings);
                     return new TransactionalStorageLoadResponse<TState>(this.key.ETag.ToString(), committedState, this.key.CommittedSequenceId, metadata, PrepareRecordsToRecover);
                 }
             }
@@ -153,7 +153,7 @@ namespace Orleans.Transactions.AzureStorage
                         if (FindState(s.SequenceId, out var pos))
                         {
                             // overwrite with new pending state
-                            StateEntity existing = states[pos].Value;
+                            var existing = states[pos].Value;
                             existing.TransactionId = s.TransactionId;
                             existing.TransactionTimestamp = s.TimeStamp;
                             existing.TransactionManager = JsonConvert.SerializeObject(s.TransactionManager, this.jsonSettings);
@@ -203,7 +203,7 @@ namespace Orleans.Transactions.AzureStorage
             if (states.Count > 0 && states[0].Key < obsoleteBefore)
             {
                 FindState(obsoleteBefore, out var pos);
-                for (int i = 0; i < pos; i++)
+                for (var i = 0; i < pos; i++)
                 {
                     await batchOperation.Add(new TableTransactionAction(TableTransactionActionType.Delete, states[i].Value.Entity, states[i].Value.ETag)).ConfigureAwait(false);
                     key.ETag = batchOperation.KeyETag;
@@ -339,7 +339,7 @@ namespace Orleans.Transactions.AzureStorage
 
                         if (logger.IsEnabled(LogLevel.Trace))
                         {
-                            for (int i = 0; i < batchOperation.Count; i++)
+                            for (var i = 0; i < batchOperation.Count; i++)
                             {
                                 logger.LogTrace("{PartitionKey}.{RowKey} batch-op ok {BatchCount}", batchOperation[i].Entity.PartitionKey, batchOperation[i].Entity.RowKey, i);
                             }
@@ -352,7 +352,7 @@ namespace Orleans.Transactions.AzureStorage
                     {
                         if (logger.IsEnabled(LogLevel.Trace))
                         {
-                            for (int i = 0; i < batchOperation.Count; i++)
+                            for (var i = 0; i < batchOperation.Count; i++)
                             {
                                 logger.LogTrace("{PartitionKey}.{RowKey} batch-op failed {BatchCount}", batchOperation[i].Entity.PartitionKey, batchOperation[i].Entity.RowKey, i);
                             }

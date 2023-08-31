@@ -74,13 +74,13 @@ namespace Orleans.CodeGenerator.Hashing
 
             internal readonly uint Complete(int length, ReadOnlySpan<byte> remaining)
             {
-                uint acc = _hadFullStripe ? Converge() : _smallAcc;
+                var acc = _hadFullStripe ? Converge() : _smallAcc;
 
                 acc += (uint)length;
 
                 while (remaining.Length >= sizeof(uint))
                 {
-                    uint lane = BinaryPrimitives.ReadUInt32LittleEndian(remaining);
+                    var lane = BinaryPrimitives.ReadUInt32LittleEndian(remaining);
                     acc += lane * Prime32_3;
                     acc = BitOperations.RotateLeft(acc, 17);
                     acc *= Prime32_4;
@@ -88,7 +88,7 @@ namespace Orleans.CodeGenerator.Hashing
                     remaining = remaining.Slice(sizeof(uint));
                 }
 
-                for (int i = 0; i < remaining.Length; i++)
+                for (var i = 0; i < remaining.Length; i++)
                 {
                     uint lane = remaining[i];
                     acc += lane * Prime32_5;

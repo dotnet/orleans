@@ -66,7 +66,7 @@ namespace UnitTests.OrleansRuntime.Streams
 
         private CachedMessage QueueMessageToCachedMessage(TestQueueMessage queueMessage, DateTime dequeueTimeUtc)
         {
-            StreamPosition streamPosition = GetStreamPosition(queueMessage);
+            var streamPosition = GetStreamPosition(queueMessage);
             return new CachedMessage
             {
                 StreamId = streamPosition.StreamId,
@@ -92,7 +92,7 @@ namespace UnitTests.OrleansRuntime.Streams
         {
             IObjectPool<CachedMessageBlock> pool = new MyTestPooled();
             ICacheDataAdapter dataAdapter = new TestCacheDataAdapter();
-            CachedMessageBlock block = pool.Allocate();
+            var block = pool.Allocate();
 
             AddAndCheck(block, dataAdapter, 0, -1);
             RemoveAndCheck(block, 0, 0);
@@ -103,9 +103,9 @@ namespace UnitTests.OrleansRuntime.Streams
         {
             IObjectPool<CachedMessageBlock> pool = new MyTestPooled();
             ICacheDataAdapter dataAdapter = new TestCacheDataAdapter();
-            CachedMessageBlock block = pool.Allocate();
-            int first = 0;
-            int last = -1;
+            var block = pool.Allocate();
+            var first = 0;
+            var last = -1;
 
             while (block.HasCapacity)
             {
@@ -134,9 +134,9 @@ namespace UnitTests.OrleansRuntime.Streams
         {
             IObjectPool<CachedMessageBlock> pool = new MyTestPooled();
             ICacheDataAdapter dataAdapter = new TestCacheDataAdapter();
-            CachedMessageBlock block = pool.Allocate();
-            int last = -1;
-            int sequenceNumber = 0;
+            var block = pool.Allocate();
+            var last = -1;
+            var sequenceNumber = 0;
 
             while (block.HasCapacity)
             {
@@ -158,9 +158,9 @@ namespace UnitTests.OrleansRuntime.Streams
         {
             IObjectPool<CachedMessageBlock> pool = new MyTestPooled();
             ICacheDataAdapter dataAdapter = new TestCacheDataAdapter();
-            CachedMessageBlock block = pool.Allocate();
-            int last = 0;
-            int sequenceNumber = 0;
+            var block = pool.Allocate();
+            var last = 0;
+            var sequenceNumber = 0;
             // define 2 streams
             var streams = new[] { new StreamIdentity(Guid.NewGuid(), null), new StreamIdentity(Guid.NewGuid(), null) };
 
@@ -187,7 +187,7 @@ namespace UnitTests.OrleansRuntime.Streams
             Assert.Equal(0, block.GetSequenceToken(streamIndex, dataAdapter).SequenceNumber);
 
             // find stream1 messages
-            int iteration = 1;
+            var iteration = 1;
             while (block.TryFindNextMessage(streamIndex + 1, StreamId.Create(streams[0]), dataAdapter, out streamIndex))
             {
                 Assert.Equal(iteration * 2, streamIndex);

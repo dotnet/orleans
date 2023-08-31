@@ -274,9 +274,9 @@ namespace Orleans.Storage
                     },
                     commandBehavior, CancellationToken.None).ConfigureAwait(false)).SingleOrDefault();
 
-                T state = readRecords != null ? (T) readRecords.Item1 : default;
-                string etag = readRecords != null ? readRecords.Item2 : null;
-                bool recordExists = readRecords != null;
+                var state = readRecords != null ? (T) readRecords.Item1 : default;
+                var etag = readRecords != null ? readRecords.Item2 : null;
+                var recordExists = readRecords != null;
                 if(state == null)
                 {
                     logger.LogInformation(

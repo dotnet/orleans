@@ -121,7 +121,7 @@ namespace Orleans.TestingHost
             
             if (this.SiloBuilderConfiguratorTypes != null)
             {
-                for (int i = 0; i < this.SiloBuilderConfiguratorTypes.Count; i++)
+                for (var i = 0; i < this.SiloBuilderConfiguratorTypes.Count; i++)
                 {
                     result[$"{nameof(SiloBuilderConfiguratorTypes)}:{i}"] = this.SiloBuilderConfiguratorTypes[i];
                 }
@@ -129,7 +129,7 @@ namespace Orleans.TestingHost
 
             if (this.ClientBuilderConfiguratorTypes != null)
             {
-                for (int i = 0; i < this.ClientBuilderConfiguratorTypes.Count; i++)
+                for (var i = 0; i < this.ClientBuilderConfiguratorTypes.Count; i++)
                 {
                     result[$"{nameof(ClientBuilderConfiguratorTypes)}:{i}"] = this.ClientBuilderConfiguratorTypes[i];
                 }
@@ -183,7 +183,7 @@ namespace Orleans.TestingHost
                 : $"Secondary_{instanceNumber}";
             if (assignNewPort)
             {
-                (int siloPort, int gatewayPort) = testCluster.PortAllocator.AllocateConsecutivePortPairs(1);
+                (var siloPort, var gatewayPort) = testCluster.PortAllocator.AllocateConsecutivePortPairs(1);
                 var result = new TestSiloSpecificOptions
                 {
                     SiloPort = siloPort,

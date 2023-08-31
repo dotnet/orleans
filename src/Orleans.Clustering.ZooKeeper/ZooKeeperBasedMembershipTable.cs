@@ -112,7 +112,7 @@ namespace Orleans.Runtime.Membership
                 var getRowTask = GetRow(zk, siloAddress);
                 var getTableNodeTask = zk.getDataAsync("/");//get the current table version
 
-                List<Tuple<MembershipEntry, string>> rows = new List<Tuple<MembershipEntry, string>>(1);
+                var rows = new List<Tuple<MembershipEntry, string>>(1);
                 try
                 {
                     await Task.WhenAll(getRowTask, getTableNodeTask);
@@ -174,12 +174,12 @@ namespace Orleans.Runtime.Membership
         /// <returns>True if the insert operation succeeded and false otherwise.</returns>
         public Task<bool> InsertRow(MembershipEntry entry, TableVersion tableVersion)
         {
-            string rowPath = ConvertToRowPath(entry.SiloAddress);
-            string rowIAmAlivePath = ConvertToRowIAmAlivePath(entry.SiloAddress);
-            byte[] newRowData = Serialize(entry);
-            byte[] newRowIAmAliveData = Serialize(entry.IAmAliveTime);
+            var rowPath = ConvertToRowPath(entry.SiloAddress);
+            var rowIAmAlivePath = ConvertToRowIAmAlivePath(entry.SiloAddress);
+            var newRowData = Serialize(entry);
+            var newRowIAmAliveData = Serialize(entry.IAmAliveTime);
 
-            int expectedTableVersion = int.Parse(tableVersion.VersionEtag, CultureInfo.InvariantCulture);
+            var expectedTableVersion = int.Parse(tableVersion.VersionEtag, CultureInfo.InvariantCulture);
 
             return TryTransaction(t => t
                 .setData("/", null, expectedTableVersion)//increments the version of node "/"
@@ -206,13 +206,13 @@ namespace Orleans.Runtime.Membership
         /// <returns>True if the update operation succeeded and false otherwise.</returns>
         public Task<bool> UpdateRow(MembershipEntry entry, string etag, TableVersion tableVersion)
         {
-            string rowPath = ConvertToRowPath(entry.SiloAddress);
-            string rowIAmAlivePath = ConvertToRowIAmAlivePath(entry.SiloAddress);
+            var rowPath = ConvertToRowPath(entry.SiloAddress);
+            var rowIAmAlivePath = ConvertToRowIAmAlivePath(entry.SiloAddress);
             var newRowData = Serialize(entry);
             var newRowIAmAliveData = Serialize(entry.IAmAliveTime);
 
-            int expectedTableVersion = int.Parse(tableVersion.VersionEtag, CultureInfo.InvariantCulture);
-            int expectedRowVersion = int.Parse(etag, CultureInfo.InvariantCulture);
+            var expectedTableVersion = int.Parse(tableVersion.VersionEtag, CultureInfo.InvariantCulture);
+            var expectedRowVersion = int.Parse(etag, CultureInfo.InvariantCulture);
 
             return TryTransaction(t => t
                 .setData("/", null, expectedTableVersion)//increments the version of node "/"
@@ -234,8 +234,8 @@ namespace Orleans.Runtime.Membership
         /// <returns>Task representing the successful execution of this operation. </returns>
         public Task UpdateIAmAlive(MembershipEntry entry)
         {
-            string rowIAmAlivePath = ConvertToRowIAmAlivePath(entry.SiloAddress);
-            byte[] newRowIAmAliveData = Serialize(entry.IAmAliveTime);
+            var rowIAmAlivePath = ConvertToRowIAmAlivePath(entry.SiloAddress);
+            var newRowIAmAliveData = Serialize(entry.IAmAliveTime);
             //update the data for IAmAlive unconditionally
             return UsingZookeeper(zk => zk.setDataAsync(rowIAmAlivePath, newRowIAmAliveData), this.deploymentConnectionString, this.watcher);
         }
@@ -245,7 +245,7 @@ namespace Orleans.Runtime.Membership
         /// </summary>
         public Task DeleteMembershipTableEntries(string clusterId)
         {
-            string pathToDelete = "/" + clusterId;
+            var pathToDelete = "/" + clusterId;
             return UsingZookeeper(rootConnectionString, async zk =>
             {
                 await ZKUtil.deleteRecursiveAsync(zk, pathToDelete);
@@ -279,18 +279,18 @@ namespace Orleans.Runtime.Membership
         /// <param name="siloAddress">The silo address.</param>
         private static async Task<Tuple<MembershipEntry, string>> GetRow(ZooKeeper zk, SiloAddress siloAddress)
         {
-            string rowPath = ConvertToRowPath(siloAddress);
-            string rowIAmAlivePath = ConvertToRowIAmAlivePath(siloAddress);
+            var rowPath = ConvertToRowPath(siloAddress);
+            var rowIAmAlivePath = ConvertToRowIAmAlivePath(siloAddress);
 
             var rowDataTask = zk.getDataAsync(rowPath);
             var rowIAmAliveDataTask = zk.getDataAsync(rowIAmAlivePath);
 
             await Task.WhenAll(rowDataTask, rowIAmAliveDataTask);
 
-            MembershipEntry me = Deserialize<MembershipEntry>((await rowDataTask).Data);
+            var me = Deserialize<MembershipEntry>((await rowDataTask).Data);
             me.IAmAliveTime = Deserialize<DateTime>((await rowIAmAliveDataTask).Data);
 
-            int rowVersion = (await rowDataTask).Stat.getVersion();
+            var rowVersion = (await rowDataTask).Stat.getVersion();
 
             return new Tuple<MembershipEntry, string>(me, rowVersion.ToString(CultureInfo.InvariantCulture));
         }
@@ -317,7 +317,7 @@ namespace Orleans.Runtime.Membership
 
         private static TableVersion ConvertToTableVersion(Stat stat)
         {
-            int version = stat.getVersion();
+            var version = stat.getVersion();
             return new TableVersion(version, version.ToString(CultureInfo.InvariantCulture));
         }
 

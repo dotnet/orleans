@@ -34,7 +34,7 @@ namespace Orleans.Transactions
             }
 
             var guid = Guid.NewGuid();
-            DateTime ts = this.clock.UtcNow();
+            var ts = this.clock.UtcNow();
 
             if (logger.IsEnabled(LogLevel.Trace))
                 logger.LogTrace("{TotalMilliseconds} start transaction {TransactionId} at {TimeStamp}", stopwatch.Elapsed.TotalMilliseconds.ToString("f2"), guid, ts.ToString("o"));
@@ -80,20 +80,20 @@ namespace Orleans.Transactions
 
         private async Task<(TransactionalStatus, Exception)> CommitReadOnlyTransaction(TransactionInfo transactionInfo, List<KeyValuePair<ParticipantId, AccessCounter>> resources)
         {
-            TransactionalStatus status = TransactionalStatus.Ok;
+            var status = TransactionalStatus.Ok;
             Exception exception;
 
             var tasks = new List<Task<TransactionalStatus>>();
             try
             {
-                foreach (KeyValuePair<ParticipantId, AccessCounter> resource in resources)
+                foreach (var resource in resources)
                 {
                     tasks.Add(resource.Key.Reference.AsReference<ITransactionalResourceExtension>()
                                    .CommitReadOnly(resource.Key.Name, transactionInfo.TransactionId, resource.Value, transactionInfo.TimeStamp));
                 }
 
                 // wait for all responses
-                TransactionalStatus[] results = await Task.WhenAll(tasks);
+                var results = await Task.WhenAll(tasks);
 
                 // examine the return status
                 foreach (var s in results)
@@ -158,7 +158,7 @@ namespace Orleans.Transactions
 
         private async Task<(TransactionalStatus, Exception)> CommitReadWriteTransaction(TransactionInfo transactionInfo, List<ParticipantId> writeResources, List<KeyValuePair<ParticipantId, AccessCounter>> resources, KeyValuePair<ParticipantId, AccessCounter> manager)
         {
-            TransactionalStatus status = TransactionalStatus.Ok;
+            var status = TransactionalStatus.Ok;
             Exception exception;
 
             try
@@ -228,7 +228,7 @@ namespace Orleans.Transactions
         {
             this.statistics.TrackTransactionFailed();
 
-            List<ParticipantId> participants = transactionInfo.Participants.Keys.ToList();
+            var participants = transactionInfo.Participants.Keys.ToList();
 
             if (logger.IsEnabled(LogLevel.Trace))
                 logger.LogTrace("Abort {TransactionInfo} {Participants}", transactionInfo, string.Join(",", participants.Select(p => p.ToString())));
@@ -244,9 +244,9 @@ namespace Orleans.Transactions
             resources = null;
             manager = null;
             KeyValuePair<ParticipantId, AccessCounter>? priorityManager = null;
-            foreach (KeyValuePair<ParticipantId, AccessCounter> participant in participants)
+            foreach (var participant in participants)
             {
-                ParticipantId id = participant.Key;
+                var id = participant.Key;
                 // priority manager
                 if (id.IsPriorityManager())
                 {

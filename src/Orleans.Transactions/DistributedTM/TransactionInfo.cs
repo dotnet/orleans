@@ -128,7 +128,7 @@ namespace Orleans.Transactions
             }
 
             // Take sum of write counts
-            foreach (KeyValuePair<ParticipantId, AccessCounter> participant in other.Participants)
+            foreach (var participant in other.Participants)
             {
                 if (!this.Participants.TryGetValue(participant.Key, out var existing))
                 {
@@ -151,7 +151,7 @@ namespace Orleans.Transactions
 
         public void RecordRead(ParticipantId id, DateTime minTime)
         {
-            this.Participants.TryGetValue(id, out AccessCounter count);
+            this.Participants.TryGetValue(id, out var count);
 
             count.Reads++;
 
@@ -165,7 +165,7 @@ namespace Orleans.Transactions
 
         public void RecordWrite(ParticipantId id, DateTime minTime)
         {
-            this.Participants.TryGetValue(id, out AccessCounter count);
+            this.Participants.TryGetValue(id, out var count);
 
             count.Writes++;
 

@@ -221,10 +221,10 @@ namespace Orleans.Serialization.Codecs
 
                 for (var i = 0; i < originalArray.Length; i++)
                 {
-                    int k = i;
-                    for (int n = 0; n < rank; n++)
+                    var k = i;
+                    for (var n = 0; n < rank; n++)
                     {
-                        int offset = k / sizes[n];
+                        var offset = k / sizes[n];
                         k -= offset * sizes[n];
                         index[n] = offset;
                     }

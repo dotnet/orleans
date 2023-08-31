@@ -20,19 +20,19 @@ namespace Orleans.Transactions.TestKit
         {
             const int expected = 5;
 
-            ITransactionTestGrain grain1 = RandomTestGrain(grainStates);
-            ITransactionTestGrain grain2 = RandomTestGrain(grainStates);
-            ITransactionTestGrain sharedGrain = RandomTestGrain(grainStates);
-            List<ITransactionTestGrain> transaction1Members = new List<ITransactionTestGrain>(new[] { grain1, sharedGrain });
-            List<ITransactionTestGrain> transaction2Members = new List<ITransactionTestGrain>(new[] { grain2, sharedGrain });
+            var grain1 = RandomTestGrain(grainStates);
+            var grain2 = RandomTestGrain(grainStates);
+            var sharedGrain = RandomTestGrain(grainStates);
+            var transaction1Members = new List<ITransactionTestGrain>(new[] { grain1, sharedGrain });
+            var transaction2Members = new List<ITransactionTestGrain>(new[] { grain2, sharedGrain });
             
-            ITransactionCoordinatorGrain coordinator1 = this.grainFactory.GetGrain<ITransactionCoordinatorGrain>(Guid.NewGuid());
-            ITransactionCoordinatorGrain coordinator2 = this.grainFactory.GetGrain<ITransactionCoordinatorGrain>(Guid.NewGuid());
+            var coordinator1 = this.grainFactory.GetGrain<ITransactionCoordinatorGrain>(Guid.NewGuid());
+            var coordinator2 = this.grainFactory.GetGrain<ITransactionCoordinatorGrain>(Guid.NewGuid());
             await Task.WhenAll(
                 coordinator1.MultiGrainAdd(transaction1Members, expected),
                 coordinator2.MultiGrainAdd(transaction2Members, expected));
 
-            int[] actual = await grain1.Get();
+            var actual = await grain1.Get();
             expected.Should().Be(actual.FirstOrDefault());
             actual = await grain2.Get();
             expected.Should().Be(actual.FirstOrDefault());
@@ -49,27 +49,27 @@ namespace Orleans.Transactions.TestKit
         {
             const int expected = 5;
 
-            ITransactionTestGrain grain1 = RandomTestGrain(grainStates);
-            ITransactionTestGrain grain2 = RandomTestGrain(grainStates);
-            ITransactionTestGrain grain3 = RandomTestGrain(grainStates);
-            ITransactionTestGrain grain4 = RandomTestGrain(grainStates);
-            ITransactionTestGrain grain5 = RandomTestGrain(grainStates);
-            List<ITransactionTestGrain> transaction1Members = new List<ITransactionTestGrain>(new[] { grain1, grain2 });
-            List<ITransactionTestGrain> transaction2Members = new List<ITransactionTestGrain>(new[] { grain2, grain3 });
-            List<ITransactionTestGrain> transaction3Members = new List<ITransactionTestGrain>(new[] { grain3, grain4 });
-            List<ITransactionTestGrain> transaction4Members = new List<ITransactionTestGrain>(new[] { grain4, grain5 });
+            var grain1 = RandomTestGrain(grainStates);
+            var grain2 = RandomTestGrain(grainStates);
+            var grain3 = RandomTestGrain(grainStates);
+            var grain4 = RandomTestGrain(grainStates);
+            var grain5 = RandomTestGrain(grainStates);
+            var transaction1Members = new List<ITransactionTestGrain>(new[] { grain1, grain2 });
+            var transaction2Members = new List<ITransactionTestGrain>(new[] { grain2, grain3 });
+            var transaction3Members = new List<ITransactionTestGrain>(new[] { grain3, grain4 });
+            var transaction4Members = new List<ITransactionTestGrain>(new[] { grain4, grain5 });
 
-            ITransactionCoordinatorGrain coordinator1 = this.grainFactory.GetGrain<ITransactionCoordinatorGrain>(Guid.NewGuid());
-            ITransactionCoordinatorGrain coordinator2 = this.grainFactory.GetGrain<ITransactionCoordinatorGrain>(Guid.NewGuid());
-            ITransactionCoordinatorGrain coordinator3 = this.grainFactory.GetGrain<ITransactionCoordinatorGrain>(Guid.NewGuid());
-            ITransactionCoordinatorGrain coordinator4 = this.grainFactory.GetGrain<ITransactionCoordinatorGrain>(Guid.NewGuid());
+            var coordinator1 = this.grainFactory.GetGrain<ITransactionCoordinatorGrain>(Guid.NewGuid());
+            var coordinator2 = this.grainFactory.GetGrain<ITransactionCoordinatorGrain>(Guid.NewGuid());
+            var coordinator3 = this.grainFactory.GetGrain<ITransactionCoordinatorGrain>(Guid.NewGuid());
+            var coordinator4 = this.grainFactory.GetGrain<ITransactionCoordinatorGrain>(Guid.NewGuid());
             await Task.WhenAll(
                 coordinator1.MultiGrainAdd(transaction1Members, expected),
                 coordinator2.MultiGrainAdd(transaction2Members, expected),
                 coordinator3.MultiGrainAdd(transaction3Members, expected),
                 coordinator4.MultiGrainAdd(transaction4Members, expected));
 
-            int[] actual = await grain1.Get();
+            var actual = await grain1.Get();
             actual.FirstOrDefault().Should().Be(expected);
             actual = await grain2.Get();
             actual.FirstOrDefault().Should().Be(expected*2);
@@ -90,23 +90,23 @@ namespace Orleans.Transactions.TestKit
         {
             const int expected = 5;
 
-            ITransactionTestGrain grain1 = RandomTestGrain(grainStates);
-            ITransactionTestGrain grain2 = RandomTestGrain(grainStates);
-            ITransactionTestGrain grain3 = RandomTestGrain(grainStates);
-            ITransactionTestGrain grain4 = RandomTestGrain(grainStates);
-            List<ITransactionTestGrain> transaction1Members = new List<ITransactionTestGrain>(new[] { grain1, grain2 });
-            List<ITransactionTestGrain> transaction2Members = new List<ITransactionTestGrain>(new[] { grain3, grain4 });
-            List<ITransactionTestGrain> transaction3Members = new List<ITransactionTestGrain>(new[] { grain2, grain3 });
+            var grain1 = RandomTestGrain(grainStates);
+            var grain2 = RandomTestGrain(grainStates);
+            var grain3 = RandomTestGrain(grainStates);
+            var grain4 = RandomTestGrain(grainStates);
+            var transaction1Members = new List<ITransactionTestGrain>(new[] { grain1, grain2 });
+            var transaction2Members = new List<ITransactionTestGrain>(new[] { grain3, grain4 });
+            var transaction3Members = new List<ITransactionTestGrain>(new[] { grain2, grain3 });
 
-            ITransactionCoordinatorGrain coordinator1 = this.grainFactory.GetGrain<ITransactionCoordinatorGrain>(Guid.NewGuid());
-            ITransactionCoordinatorGrain coordinator2 = this.grainFactory.GetGrain<ITransactionCoordinatorGrain>(Guid.NewGuid());
-            ITransactionCoordinatorGrain coordinator3 = this.grainFactory.GetGrain<ITransactionCoordinatorGrain>(Guid.NewGuid());
+            var coordinator1 = this.grainFactory.GetGrain<ITransactionCoordinatorGrain>(Guid.NewGuid());
+            var coordinator2 = this.grainFactory.GetGrain<ITransactionCoordinatorGrain>(Guid.NewGuid());
+            var coordinator3 = this.grainFactory.GetGrain<ITransactionCoordinatorGrain>(Guid.NewGuid());
             await Task.WhenAll(
                 coordinator1.MultiGrainAdd(transaction1Members, expected),
                 coordinator2.MultiGrainAdd(transaction2Members, expected),
                 coordinator3.MultiGrainAdd(transaction3Members, expected));
 
-            int[] actual = await grain1.Get();
+            var actual = await grain1.Get();
             actual.FirstOrDefault().Should().Be(expected);
             actual = await grain2.Get();
             actual.FirstOrDefault().Should().Be(expected*2);

@@ -23,9 +23,9 @@ namespace Tester.CodeGenTests
         public async Task GeneratorGrainControlFlow()
         {
             var grainName = typeof(GeneratorTestGrain).FullName;
-            IGeneratorTestGrain grain = this.GrainFactory.GetGrain<IGeneratorTestGrain>(GetRandomGrainId(), grainName);
+            var grain = this.GrainFactory.GetGrain<IGeneratorTestGrain>(GetRandomGrainId(), grainName);
 
-            bool isNull = await grain.StringIsNullOrEmpty();
+            var isNull = await grain.StringIsNullOrEmpty();
             Assert.True(isNull);
 
             await grain.StringSet("Begin");
@@ -33,18 +33,18 @@ namespace Tester.CodeGenTests
             isNull = await grain.StringIsNullOrEmpty();
             Assert.False(isNull);
 
-            MemberVariables members = await grain.GetMemberVariables();
+            var members = await grain.GetMemberVariables();
             Assert.Equal("Begin", members.stringVar);
 
-            ASCIIEncoding encoding = new ASCIIEncoding();
-            byte[] bytes = encoding.GetBytes("ByteBegin");
-            string str = "StringBegin";
-            MemberVariables memberVariables = new MemberVariables(bytes, str, ReturnCode.Fail);
+            var encoding = new ASCIIEncoding();
+            var bytes = encoding.GetBytes("ByteBegin");
+            var str = "StringBegin";
+            var memberVariables = new MemberVariables(bytes, str, ReturnCode.Fail);
 
             await grain.SetMemberVariables(memberVariables);
 
             members = await grain.GetMemberVariables();
-            ASCIIEncoding enc = new ASCIIEncoding();
+            var enc = new ASCIIEncoding();
 
             Assert.Equal("ByteBegin", enc.GetString(members.byteArray));
             Assert.Equal("StringBegin", members.stringVar);
@@ -54,9 +54,9 @@ namespace Tester.CodeGenTests
         [Fact]
         public async Task GeneratorDerivedGrain1ControlFlow()
         {
-            IGeneratorTestDerivedGrain1 grain = this.GrainFactory.GetGrain<IGeneratorTestDerivedGrain1>(GetRandomGrainId());
+            var grain = this.GrainFactory.GetGrain<IGeneratorTestDerivedGrain1>(GetRandomGrainId());
 
-            bool isNull = await grain.StringIsNullOrEmpty();
+            var isNull = await grain.StringIsNullOrEmpty();
             Assert.True(isNull);
 
             await grain.StringSet("Begin");
@@ -64,18 +64,18 @@ namespace Tester.CodeGenTests
             isNull = await grain.StringIsNullOrEmpty();
             Assert.False(isNull);
 
-            MemberVariables members = await grain.GetMemberVariables();
+            var members = await grain.GetMemberVariables();
             Assert.Equal("Begin", members.stringVar);
 
-            ASCIIEncoding encoding = new ASCIIEncoding();
-            byte[] bytes = encoding.GetBytes("ByteBegin");
-            string str = "StringBegin";
-            MemberVariables memberVariables = new MemberVariables(bytes, str, ReturnCode.Fail);
+            var encoding = new ASCIIEncoding();
+            var bytes = encoding.GetBytes("ByteBegin");
+            var str = "StringBegin";
+            var memberVariables = new MemberVariables(bytes, str, ReturnCode.Fail);
 
             await grain.SetMemberVariables(memberVariables);
 
             members = await grain.GetMemberVariables();
-            ASCIIEncoding enc = new ASCIIEncoding();
+            var enc = new ASCIIEncoding();
 
             Assert.Equal("ByteBegin", enc.GetString(members.byteArray));
             Assert.Equal("StringBegin", members.stringVar);
@@ -86,9 +86,9 @@ namespace Tester.CodeGenTests
         public async Task GeneratorDerivedGrain2ControlFlow()
         {
             var grainName = typeof(GeneratorTestDerivedGrain2).FullName;
-            IGeneratorTestDerivedGrain2 grain = this.GrainFactory.GetGrain<IGeneratorTestDerivedGrain2>(GetRandomGrainId(), grainName);
+            var grain = this.GrainFactory.GetGrain<IGeneratorTestDerivedGrain2>(GetRandomGrainId(), grainName);
 
-            bool boolPromise = await grain.StringIsNullOrEmpty();
+            var boolPromise = await grain.StringIsNullOrEmpty();
             Assert.True(boolPromise);
 
             await grain.StringSet("Begin");
@@ -96,33 +96,33 @@ namespace Tester.CodeGenTests
             boolPromise = await grain.StringIsNullOrEmpty();
             Assert.False(boolPromise);
 
-            MemberVariables members = await grain.GetMemberVariables();
+            var members = await grain.GetMemberVariables();
             Assert.Equal("Begin", members.stringVar);
 
-            ASCIIEncoding encoding = new ASCIIEncoding();
-            byte[] bytes = encoding.GetBytes("ByteBegin");
-            string str = "StringBegin";
-            MemberVariables memberVariables = new MemberVariables(bytes, str, ReturnCode.Fail);
+            var encoding = new ASCIIEncoding();
+            var bytes = encoding.GetBytes("ByteBegin");
+            var str = "StringBegin";
+            var memberVariables = new MemberVariables(bytes, str, ReturnCode.Fail);
 
             await grain.SetMemberVariables(memberVariables);
 
             members = await grain.GetMemberVariables();
-            ASCIIEncoding enc = new ASCIIEncoding();
+            var enc = new ASCIIEncoding();
 
             Assert.Equal("ByteBegin", enc.GetString(members.byteArray));
             Assert.Equal("StringBegin", members.stringVar);
             Assert.Equal(ReturnCode.Fail, members.code);
 
-            string strPromise = await grain.StringConcat("Begin", "Cont", "End");
+            var strPromise = await grain.StringConcat("Begin", "Cont", "End");
             Assert.Equal("BeginContEnd", strPromise);
         }
 
         [Fact]
         public async Task GeneratorDerivedDerivedGrainControlFlow()
         {
-            IGeneratorTestDerivedDerivedGrain grain = this.GrainFactory.GetGrain<IGeneratorTestDerivedDerivedGrain>(GetRandomGrainId());
+            var grain = this.GrainFactory.GetGrain<IGeneratorTestDerivedDerivedGrain>(GetRandomGrainId());
 
-            bool isNull = await grain.StringIsNullOrEmpty();
+            var isNull = await grain.StringIsNullOrEmpty();
             Assert.True(isNull);
 
             await grain.StringSet("Begin");
@@ -130,11 +130,11 @@ namespace Tester.CodeGenTests
             isNull = await grain.StringIsNullOrEmpty();
             Assert.False(isNull);
 
-            MemberVariables members = await grain.GetMemberVariables();
+            var members = await grain.GetMemberVariables();
             Assert.Equal("Begin", members.stringVar);
 
-            ReplaceArguments arguments = new ReplaceArguments("Begin", "End");
-            string strPromise = await grain.StringReplace(arguments);
+            var arguments = new ReplaceArguments("Begin", "End");
+            var strPromise = await grain.StringReplace(arguments);
             Assert.Equal("End", strPromise);
 
             strPromise = await grain.StringConcat("Begin", "Cont", "End");
@@ -144,16 +144,16 @@ namespace Tester.CodeGenTests
             strPromise = await grain.StringNConcat(strArray);
             Assert.Equal("BeginContContEnd", strPromise);
 
-            ASCIIEncoding encoding = new ASCIIEncoding();
-            byte[] bytes = encoding.GetBytes("ByteBegin");
-            string str = "StringBegin";
-            MemberVariables memberVariables = new MemberVariables(bytes, str, ReturnCode.Fail);
+            var encoding = new ASCIIEncoding();
+            var bytes = encoding.GetBytes("ByteBegin");
+            var str = "StringBegin";
+            var memberVariables = new MemberVariables(bytes, str, ReturnCode.Fail);
 
             await grain.SetMemberVariables(memberVariables);
 
             members = await grain.GetMemberVariables();
 
-            ASCIIEncoding enc = new ASCIIEncoding();
+            var enc = new ASCIIEncoding();
 
             Assert.Equal("ByteBegin", enc.GetString(members.byteArray));
             Assert.Equal("StringBegin", members.stringVar);

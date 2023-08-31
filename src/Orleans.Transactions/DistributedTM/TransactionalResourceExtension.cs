@@ -45,7 +45,7 @@ namespace Orleans.Transactions
 
         private ITransactionalResource GetResource(string resourceId)
         {
-            if (!this.resources.TryGetValue(resourceId, out ITransactionalResource resource))
+            if (!this.resources.TryGetValue(resourceId, out var resource))
             {
                 this.resources[resourceId] = resource = this.factories[resourceId].Invoke();
             }

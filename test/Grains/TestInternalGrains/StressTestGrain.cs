@@ -55,10 +55,10 @@ namespace UnitTests.Grains
 
         public Task PingOthers(long[] others)
         {
-            List<Task> promises = new List<Task>();
-            foreach (long key in others)
+            var promises = new List<Task>();
+            foreach (var key in others)
             {
-                IStressTestGrain g1 = this.GrainFactory.GetGrain<IStressTestGrain>(key);
+                var g1 = this.GrainFactory.GetGrain<IStressTestGrain>(key);
                 Task promise = g1.GetLabel();
                 promises.Add(promise);
             }
@@ -69,11 +69,11 @@ namespace UnitTests.Grains
             SiloAddress destination, List<Tuple<GrainId, int>> grainAndETagList, int retries = 0)
         {
             var list = new List<Tuple<GrainId, int, List<Tuple<SiloAddress, ActivationId>>>>();
-            foreach (Tuple<GrainId, int> tuple in grainAndETagList)
+            foreach (var tuple in grainAndETagList)
             {
-                GrainId id = tuple.Item1;
+                var id = tuple.Item1;
                 var reply = new List<Tuple<SiloAddress, ActivationId>>();
-                for (int i = 0; i < 10; i++)
+                for (var i = 0; i < 10; i++)
                 {
                     var siloAddress = SiloAddress.New(new IPEndPoint(ConfigUtilities.GetLocalIPAddress(),0), 0);
                     reply.Add(new Tuple<SiloAddress, ActivationId>(siloAddress, ActivationId.NewId()));
@@ -210,18 +210,18 @@ namespace UnitTests.Grains
 
         public async Task InterleavingConsistencyTest(int numItems)
         {
-            TimeSpan delay = TimeSpan.FromMilliseconds(1);
-            List<Task> getFileMetadataPromises = new List<Task>(numItems*2);
-            Dictionary<int, string> fileMetadatas = new Dictionary<int, string>(numItems*2);
+            var delay = TimeSpan.FromMilliseconds(1);
+            var getFileMetadataPromises = new List<Task>(numItems*2);
+            var fileMetadatas = new Dictionary<int, string>(numItems*2);
 
-            for (int i = 0; i < numItems; i++)
+            for (var i = 0; i < numItems; i++)
             {
-                int capture = i;
+                var capture = i;
                 Func<Task> func = (
                     async () =>
                     {
                         await Task.Delay(RandomTimeSpan.Next(delay));
-                        int fileMetadata = capture;
+                        var fileMetadata = capture;
                         if ((fileMetadata%2) == 0)
                         {
                             fileMetadatas.Add(fileMetadata, fileMetadata.ToString());
@@ -232,11 +232,11 @@ namespace UnitTests.Grains
 
             await Task.WhenAll(getFileMetadataPromises.ToArray());
 
-            List<Task> tagPromises = new List<Task>(fileMetadatas.Count);
+            var tagPromises = new List<Task>(fileMetadatas.Count);
 
-            foreach (KeyValuePair<int, string> keyValuePair in fileMetadatas)
+            foreach (var keyValuePair in fileMetadatas)
             {
-                int fileId = keyValuePair.Key;
+                var fileId = keyValuePair.Key;
                 Func<Task> func = (async () =>
                 {
                     await Task.Delay(RandomTimeSpan.Next(delay));
@@ -248,8 +248,8 @@ namespace UnitTests.Grains
             await Task.WhenAll(tagPromises);
 
             // sort the fileMetadatas according to fileIds.
-            List<string> results = new List<string>(fileMetadatas.Count);
-            for (int i = 0; i < numItems; i++)
+            var results = new List<string>(fileMetadatas.Count);
+            for (var i = 0; i < numItems; i++)
             {
                 string metadata;
                 if (fileMetadatas.TryGetValue(i, out metadata))

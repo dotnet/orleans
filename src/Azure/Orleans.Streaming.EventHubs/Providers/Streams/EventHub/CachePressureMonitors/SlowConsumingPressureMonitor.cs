@@ -98,7 +98,7 @@ namespace Orleans.Streaming.EventHubs
         {
             //if any pressure contribution in current period is bigger than flowControlThreshold
             //we see the cache is under pressure
-            bool underPressure = this.biggestPressureInCurrentWindow > this.FlowControlThreshold;
+            var underPressure = this.biggestPressureInCurrentWindow > this.FlowControlThreshold;
 
             if (underPressure && !this.wasUnderPressure)
             {

@@ -33,7 +33,7 @@ namespace Orleans.Streaming.EventHubs
         public static IStreamQueueCheckpointerFactory CreateFactory(IServiceProvider services, string providerName)
         {
             var options = services.GetOptionsByName<AzureTableStreamCheckpointerOptions>(providerName);
-            IOptions<ClusterOptions> clusterOptions = services.GetProviderClusterOptions(providerName);
+            var clusterOptions = services.GetProviderClusterOptions(providerName);
             return ActivatorUtilities.CreateInstance<EventHubCheckpointerFactory>(services, providerName, options, clusterOptions);
         }
     }

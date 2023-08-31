@@ -359,7 +359,7 @@ namespace UnitTests.Streaming.Reliability
 
             await producerGrain.Ping();
 
-            string when = "Before subscribe";
+            var when = "Before subscribe";
             await CheckConsumerProducerStatus(when, producerGrainId, consumerGrainId, false, false);
 
             logger.LogInformation("AddConsumer: StreamId={StreamId} Provider={Provider}", _streamId, _streamProviderName);
@@ -394,8 +394,8 @@ namespace UnitTests.Streaming.Reliability
 #else
             var grains = new IStreamReliabilityTestGrain[numGrains];
 #endif
-            List<Task> promises = new List<Task>(numGrains);
-            for (int i = 0; i < numGrains; i++)
+            var promises = new List<Task>(numGrains);
+            for (var i = 0; i < numGrains; i++)
             {
                 grains[i] = GetGrain(i + baseId);
 
@@ -437,14 +437,14 @@ namespace UnitTests.Streaming.Reliability
             // Note: This does first SendItem
             await Do_BaselineTest(consumerGrainId, producerGrainId);
 
-            int baseId = 10000 * ++baseConsumerId;
+            var baseId = 10000 * ++baseConsumerId;
 
             var grains1 = await Do_AddConsumerGrains(baseId, numGrains);
-            for (int i = 0; i < numLoops; i++)
+            for (var i = 0; i < numLoops; i++)
             {
                 await producerGrain.SendItem(2);
             }
-            string when1 = "AddConsumers-Send-2";
+            var when1 = "AddConsumers-Send-2";
             // Messages received by original consumer grain
             await CheckReceivedCounts(when1, consumerGrain, numLoops + 1, 0);
             // Messages received by new consumer grains
@@ -457,10 +457,10 @@ namespace UnitTests.Streaming.Reliability
 #endif
             }));
 
-            string when2 = "AddConsumers-Send-3";
+            var when2 = "AddConsumers-Send-3";
             baseId = 10000 * ++baseConsumerId;
             var grains2 = await Do_AddConsumerGrains(baseId, numGrains);
-            for (int i = 0; i < numLoops; i++)
+            for (var i = 0; i < numLoops; i++)
             {
                 await producerGrain.SendItem(3);
             }
@@ -630,13 +630,13 @@ namespace UnitTests.Streaming.Reliability
             // Restart silos
             await RestartAllSilos();
 
-            string when = "After restart all silos";
+            var when = "After restart all silos";
             CheckSilosRunning(when, numExpectedSilos);
 
             // Since we restart all silos, the client might not haave had enough
             // time to reconnect to the new gateways. Let's retry the call if it
             // is the case
-            for (int i = 0; i < 3; i++)
+            for (var i = 0; i < 3; i++)
             {
                 try
                 {
@@ -669,7 +669,7 @@ namespace UnitTests.Streaming.Reliability
             // Restart silos
             await RestartAllSilos();
 
-            string when = "After restart all silos";
+            var when = "After restart all silos";
             CheckSilosRunning(when, numExpectedSilos);
 
             when = "SendItem";
@@ -693,11 +693,11 @@ namespace UnitTests.Streaming.Reliability
 #if USE_GENERICS
             IStreamReliabilityTestGrain<int> producerGrain =
 #else
-            IStreamReliabilityTestGrain producerGrain =
+            var producerGrain =
 #endif
  await Do_BaselineTest(consumerGrainId, producerGrainId);
 
-            string when = "Before restart all silos";
+            var when = "Before restart all silos";
             await StreamTestUtils.CheckPubSubCounts(this.InternalClient, output, when, 1, 1, _streamId, _streamProviderName, StreamTestsConstants.StreamReliabilityNamespace);
 
             // Restart silos
@@ -737,16 +737,16 @@ namespace UnitTests.Streaming.Reliability
             when = "Before kill one silo";
             CheckSilosRunning(when, numExpectedSilos);
 
-            bool sameSilo = await CheckGrainCounts();
+            var sameSilo = await CheckGrainCounts();
 
             // Find which silo the consumer grain is located on
             var consumerGrain = GetGrain(consumerGrainId);
-            SiloAddress siloAddress = await consumerGrain.GetLocation();
+            var siloAddress = await consumerGrain.GetLocation();
 
             output.WriteLine("Consumer grain is located on silo {0} ; Producer on same silo = {1}", siloAddress, sameSilo);
 
             // Kill the silo containing the consumer grain
-            SiloHandle siloToKill = this.HostedCluster.Silos.First(s => s.SiloAddress.Equals(siloAddress));
+            var siloToKill = this.HostedCluster.Silos.First(s => s.SiloAddress.Equals(siloAddress));
             await StopSilo(siloToKill, true, false);
             // Note: Don't restart failed silo for this test case
             // Note: Don't reinitialize client
@@ -777,14 +777,14 @@ namespace UnitTests.Streaming.Reliability
             when = "Before kill one silo";
             CheckSilosRunning(when, numExpectedSilos);
 
-            bool sameSilo = await CheckGrainCounts();
+            var sameSilo = await CheckGrainCounts();
 
             // Find which silo the producer grain is located on
-            SiloAddress siloAddress = await producerGrain.GetLocation();
+            var siloAddress = await producerGrain.GetLocation();
             output.WriteLine("Producer grain is located on silo {0} ; Consumer on same silo = {1}", siloAddress, sameSilo);
 
             // Kill the silo containing the producer grain
-            SiloHandle siloToKill = this.HostedCluster.Silos.First(s => s.SiloAddress.Equals(siloAddress));
+            var siloToKill = this.HostedCluster.Silos.First(s => s.SiloAddress.Equals(siloAddress));
             await StopSilo(siloToKill, true, false);
             // Note: Don't restart failed silo for this test case
             // Note: Don't reinitialize client
@@ -815,16 +815,16 @@ namespace UnitTests.Streaming.Reliability
             when = "Before restart one silo";
             CheckSilosRunning(when, numExpectedSilos);
 
-            bool sameSilo = await CheckGrainCounts();
+            var sameSilo = await CheckGrainCounts();
 
             // Find which silo the consumer grain is located on
             var consumerGrain = GetGrain(consumerGrainId);
-            SiloAddress siloAddress = await consumerGrain.GetLocation();
+            var siloAddress = await consumerGrain.GetLocation();
 
             output.WriteLine("Consumer grain is located on silo {0} ; Producer on same silo = {1}", siloAddress, sameSilo);
 
             // Restart the silo containing the consumer grain
-            SiloHandle siloToKill = this.HostedCluster.Silos.First(s => s.SiloAddress.Equals(siloAddress));
+            var siloToKill = this.HostedCluster.Silos.First(s => s.SiloAddress.Equals(siloAddress));
             await StopSilo(siloToKill, true, true);
             // Note: Don't reinitialize client
 
@@ -854,15 +854,15 @@ namespace UnitTests.Streaming.Reliability
             when = "Before restart one silo";
             CheckSilosRunning(when, numExpectedSilos);
 
-            bool sameSilo = await CheckGrainCounts();
+            var sameSilo = await CheckGrainCounts();
 
             // Find which silo the producer grain is located on
-            SiloAddress siloAddress = await producerGrain.GetLocation();
+            var siloAddress = await producerGrain.GetLocation();
 
             output.WriteLine("Producer grain is located on silo {0} ; Consumer on same silo = {1}", siloAddress, sameSilo);
 
             // Restart the silo containing the consumer grain
-            SiloHandle siloToKill = this.HostedCluster.Silos.First(s => s.SiloAddress.Equals(siloAddress));
+            var siloToKill = this.HostedCluster.Silos.First(s => s.SiloAddress.Equals(siloAddress));
             await StopSilo(siloToKill, true, true);
             // Note: Don't reinitialize client
 
@@ -889,19 +889,19 @@ namespace UnitTests.Streaming.Reliability
             long producerGrainId = Random.Shared.Next();
 
             var producerGrain = GetGrain(producerGrainId);
-            SiloAddress producerLocation = await producerGrain.GetLocation();
+            var producerLocation = await producerGrain.GetLocation();
 
             var consumerGrain = GetGrain(consumerGrainId);
-            SiloAddress consumerLocation = await consumerGrain.GetLocation();
+            var consumerLocation = await consumerGrain.GetLocation();
 
             output.WriteLine("Grain silo locations: Producer={0} Consumer={1}", producerLocation, consumerLocation);
 
             // Note: This does first SendItem
             await Do_BaselineTest(consumerGrainId, producerGrainId);
-            int expectedReceived = 1;
+            var expectedReceived = 1;
 
-            string when = "SendItem-2";
-            for (int i = 0; i < numLoops; i++)
+            var when = "SendItem-2";
+            for (var i = 0; i < numLoops; i++)
             {
                 await producerGrain.SendItem(2);
             }
@@ -912,7 +912,7 @@ namespace UnitTests.Streaming.Reliability
             // Add new silo
             //SiloHandle newSilo = StartAdditionalOrleans();
             //WaitForLivenessToStabilize();
-            SiloHandle newSilo = await this.HostedCluster.StartAdditionalSiloAsync();
+            var newSilo = await this.HostedCluster.StartAdditionalSiloAsync();
             await this.HostedCluster.WaitForLivenessToStabilizeAsync();
 
 
@@ -931,7 +931,7 @@ namespace UnitTests.Streaming.Reliability
             //await CheckReceivedCounts(when, consumerGrain, expectedReceived, 0);
 
             // Find a Consumer Grain on the new silo
-            IStreamReliabilityTestGrain newConsumer = CreateGrainOnSilo(newSilo.SiloAddress);
+            var newConsumer = CreateGrainOnSilo(newSilo.SiloAddress);
             await newConsumer.AddConsumer(_streamId, _streamProviderName);
             output.WriteLine("Grain silo locations: Producer={0} OldConsumer={1} NewConsumer={2}", producerLocation, consumerLocation, newSilo.SiloAddress);
 
@@ -939,7 +939,7 @@ namespace UnitTests.Streaming.Reliability
 
             when = "SendItem-4";
             output.WriteLine(when);
-            for (int i = 0; i < numLoops; i++)
+            for (var i = 0; i < numLoops; i++)
             {
                 await producerGrain.SendItem(4);
             }
@@ -977,9 +977,9 @@ namespace UnitTests.Streaming.Reliability
 
         private async Task StopSilo(SiloHandle silo, bool kill, bool restart)
         {
-            SiloAddress oldSilo = silo.SiloAddress;
-            bool isPrimary = oldSilo.Equals(this.HostedCluster.Primary?.SiloAddress);
-            string siloType = isPrimary ? "Primary" : "Secondary";
+            var oldSilo = silo.SiloAddress;
+            var isPrimary = oldSilo.Equals(this.HostedCluster.Primary?.SiloAddress);
+            var siloType = isPrimary ? "Primary" : "Secondary";
             var action = (restart, kill) switch
             {
                 (true, true) => "Kill and restart",
@@ -993,7 +993,7 @@ namespace UnitTests.Streaming.Reliability
             if (restart)
             {
                 //RestartRuntime(silo, kill);
-                SiloHandle newSilo = await this.HostedCluster.RestartSiloAsync(silo);
+                var newSilo = await this.HostedCluster.RestartSiloAsync(silo);
 
                 logger.LogInformation("Restarted new {SiloType} silo {SiloAddress}", siloType, newSilo.SiloAddress);
 
@@ -1039,7 +1039,7 @@ namespace UnitTests.Streaming.Reliability
             while (true)
             {
                 newGrain = GetGrain(++kp);
-                SiloAddress loc = newGrain.GetLocation().Result;
+                var loc = newGrain.GetLocation().Result;
                 if (loc.Equals(silo))
                     break;
             }
@@ -1058,16 +1058,16 @@ namespace UnitTests.Streaming.Reliability
             var producerGrain = GetGrain(producerGrainId);
             var consumerGrain = GetGrain(consumerGrainId);
 
-            bool isProducer = await producerGrain.IsProducer();
+            var isProducer = await producerGrain.IsProducer();
             output.WriteLine("Grain {0} IsProducer={1}", producerGrainId, isProducer);
             Assert.Equal(expectedNumProducers > 0, isProducer);
 
-            bool isConsumer = await consumerGrain.IsConsumer();
+            var isConsumer = await consumerGrain.IsConsumer();
             output.WriteLine("Grain {0} IsConsumer={1}", consumerGrainId, isConsumer);
             Assert.Equal(expectedNumConsumers > 0, isConsumer);
 
-            int consumerHandleCount = await consumerGrain.GetConsumerHandlesCount();
-            int consumerObserverCount = await consumerGrain.GetConsumerHandlesCount();
+            var consumerHandleCount = await consumerGrain.GetConsumerHandlesCount();
+            var consumerObserverCount = await consumerGrain.GetConsumerHandlesCount();
             output.WriteLine("Grain {0} HandleCount={1} ObserverCount={2}", consumerGrainId, consumerHandleCount, consumerObserverCount);
             Assert.Equal(expectedNumConsumers, consumerHandleCount);
             Assert.Equal(expectedNumConsumers, consumerObserverCount);
@@ -1081,11 +1081,11 @@ namespace UnitTests.Streaming.Reliability
 #if USE_GENERICS
             string grainType = RuntimeTypeNameFormatter.Format(typeof(StreamReliabilityTestGrain<int>));
 #else
-            string grainType = RuntimeTypeNameFormatter.Format(typeof(StreamReliabilityTestGrain));
+            var grainType = RuntimeTypeNameFormatter.Format(typeof(StreamReliabilityTestGrain));
 #endif
-            IManagementGrain mgmtGrain = this.GrainFactory.GetGrain<IManagementGrain>(0);
+            var mgmtGrain = this.GrainFactory.GetGrain<IManagementGrain>(0);
 
-            SimpleGrainStatistic[] grainStats = await mgmtGrain.GetSimpleGrainStatistics();
+            var grainStats = await mgmtGrain.GetSimpleGrainStatistics();
             output.WriteLine("Found grains " + Utils.EnumerableToString(grainStats));
 
             var grainLocs = grainStats.Where(gs => gs.GrainType == grainType).ToArray();
@@ -1093,7 +1093,7 @@ namespace UnitTests.Streaming.Reliability
             Assert.True(grainLocs.Length > 0, "Found too few grains");
             Assert.True(grainLocs.Length <= 2, "Found too many grains " + grainLocs.Length);
 
-            bool sameSilo = grainLocs.Length == 1;
+            var sameSilo = grainLocs.Length == 1;
             if (sameSilo)
             {
                 StreamTestUtils.Assert_AreEqual(output, 2, grainLocs[0].ActivationCount, "Num grains on same Silo " + grainLocs[0].SiloAddress);
@@ -1112,10 +1112,10 @@ namespace UnitTests.Streaming.Reliability
         protected async Task CheckReceivedCounts(string when, IStreamReliabilityTestGrain consumerGrain, int expectedReceivedCount, int expectedErrorsCount)
 #endif
         {
-            long pk = consumerGrain.GetPrimaryKeyLong();
+            var pk = consumerGrain.GetPrimaryKeyLong();
 
-            int receivedCount = 0;
-            for (int i = 0; i < 20; i++)
+            var receivedCount = 0;
+            for (var i = 0; i < 20; i++)
             {
                 receivedCount = await consumerGrain.GetReceivedCount();
                 output.WriteLine("After {0}s ReceivedCount={1} for grain {2}", i, receivedCount, pk);
@@ -1128,7 +1128,7 @@ namespace UnitTests.Streaming.Reliability
             StreamTestUtils.Assert_AreEqual(output, expectedReceivedCount, receivedCount,
                 "ReceivedCount for stream {0} for grain {1} {2}", _streamId, pk, when);
 
-            int errorsCount = await consumerGrain.GetErrorsCount();
+            var errorsCount = await consumerGrain.GetErrorsCount();
             StreamTestUtils.Assert_AreEqual(output, expectedErrorsCount, errorsCount, "ErrorsCount for stream {0} for grain {1} {2}", _streamId, pk, when);
         }
 #if USE_GENERICS
@@ -1137,7 +1137,7 @@ namespace UnitTests.Streaming.Reliability
         protected async Task CheckConsumerCounts(string when, IStreamReliabilityTestGrain consumerGrain, int expectedConsumerCount)
 #endif
         {
-            int consumerCount = await consumerGrain.GetConsumerCount();
+            var consumerCount = await consumerGrain.GetConsumerCount();
             StreamTestUtils.Assert_AreEqual(output, expectedConsumerCount, consumerCount, "ConsumerCount for stream {0} {1}", _streamId, when);
         }
     }

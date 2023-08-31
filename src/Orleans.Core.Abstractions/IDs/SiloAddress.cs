@@ -104,7 +104,7 @@ namespace Orleans.Runtime
         /// <returns>A new silo generation number.</returns>
         public static int AllocateNewGeneration()
         {
-            long elapsed = (DateTime.UtcNow.Ticks - epoch) / TimeSpan.TicksPerSecond;
+            var elapsed = (DateTime.UtcNow.Ticks - epoch) / TimeSpan.TicksPerSecond;
             return unchecked((int)elapsed); // Unchecked to truncate any bits beyond the lower 32
         }
 
@@ -167,13 +167,13 @@ namespace Orleans.Runtime
             // Basically, this should never change unless the data content of SiloAddress changes
 
             // First is the IPEndpoint; then '@'; then the generation
-            int atSign = addr.LastIndexOf(SEPARATOR);
+            var atSign = addr.LastIndexOf(SEPARATOR);
             // IPEndpoint is the host, then ':', then the port
-            int lastColon = addr.LastIndexOf(':', atSign - 1);
+            var lastColon = addr.LastIndexOf(':', atSign - 1);
             if (atSign < 0 || lastColon < 0) throw new FormatException("Invalid string SiloAddress: " + addr);
 
             var host = IPAddress.Parse(addr.AsSpan(0, lastColon));
-            int port = int.Parse(addr.AsSpan(lastColon + 1, atSign - lastColon - 1), NumberStyles.None);
+            var port = int.Parse(addr.AsSpan(lastColon + 1, atSign - lastColon - 1), NumberStyles.None);
             var gen = int.Parse(addr.AsSpan(atSign + 1), NumberStyles.None);
             return New(host, port, gen);
         }
@@ -194,7 +194,7 @@ namespace Orleans.Runtime
 
             // IPEndpoint is the host, then ':', then the port
             var endpointSlice = addr.Slice(0, atSign);
-            int lastColon = endpointSlice.LastIndexOf((byte)':');
+            var lastColon = endpointSlice.LastIndexOf((byte)':');
             if (lastColon < 0) ThrowInvalidUtf8SiloAddress(addr);
 
             var ipSlice = endpointSlice[..lastColon];
@@ -322,7 +322,7 @@ namespace Orleans.Runtime
             offset += sizeof(int);
 
             var hashes = new uint[numHashes];
-            for (int extraBit = 0; extraBit < numHashes; extraBit++)
+            for (var extraBit = 0; extraBit < numHashes; extraBit++)
             {
                 BinaryPrimitives.WriteInt32LittleEndian(bytes.Slice(offset), extraBit);
                 hashes[extraBit] = StableHash.ComputeHash(bytes);
@@ -387,7 +387,7 @@ namespace Orleans.Runtime
             // and is also semantically meaningful - older silos (with smaller Generation) will appear first in the comparison order.
             // Only if Generations are the same, go on to compare Ports and IPAddress (which is more expansive to compare).
             // Alternatively, we could compare ConsistentHashCode or UniformHashCode.
-            int comp = Generation.CompareTo(other.Generation);
+            var comp = Generation.CompareTo(other.Generation);
             if (comp != 0) return comp;
 
             comp = Endpoint.Port.CompareTo(other.Endpoint.Port);

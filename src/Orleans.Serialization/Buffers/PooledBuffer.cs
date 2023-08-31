@@ -185,7 +185,7 @@ public partial struct PooledBuffer : IBufferWriter<byte>, IDisposable
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static void Write<TBufferWriter>(ref TBufferWriter writer, ReadOnlySpan<byte> value) where TBufferWriter : IBufferWriter<byte>
     {
-        Span<byte> destination = writer.GetSpan();
+        var destination = writer.GetSpan();
 
         // Fast path, try copying to the available memory directly
         if (value.Length <= destination.Length)
@@ -201,10 +201,10 @@ public partial struct PooledBuffer : IBufferWriter<byte>, IDisposable
 
     private static void WriteMultiSegment<TBufferWriter>(ref TBufferWriter writer, in ReadOnlySpan<byte> source, Span<byte> destination) where TBufferWriter : IBufferWriter<byte>
     {
-        ReadOnlySpan<byte> input = source;
+        var input = source;
         while (true)
         {
-            int writeSize = Math.Min(destination.Length, input.Length);
+            var writeSize = Math.Min(destination.Length, input.Length);
             input.Slice(0, writeSize).CopyTo(destination);
             writer.Advance(writeSize);
             input = input.Slice(writeSize);

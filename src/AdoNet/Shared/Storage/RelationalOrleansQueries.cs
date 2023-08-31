@@ -127,7 +127,7 @@ namespace Orleans.Tests.SqlUtils
         internal static ReminderEntry GetReminderEntry(IDataRecord record)
         {
             //Having non-null field, GrainId, means with the query filter options, an entry was found.
-            string grainId = record.GetValueOrDefault<string>(nameof(DbStoredQueries.Columns.GrainId));
+            var grainId = record.GetValueOrDefault<string>(nameof(DbStoredQueries.Columns.GrainId));
             if (grainId != null)
             {
                 return new ReminderEntry

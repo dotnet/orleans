@@ -156,9 +156,9 @@ namespace Orleans.Providers
             try
             {
                 var queueId = streamQueueMapper.GetQueueForStream(streamId);
-                ArraySegment<byte> bodyBytes = serializer.Serialize(new MemoryMessageBody(events.Cast<object>(), requestContext));
+                var bodyBytes = serializer.Serialize(new MemoryMessageBody(events.Cast<object>(), requestContext));
                 var messageData = MemoryMessageData.Create(streamId, bodyBytes);
-                IMemoryStreamQueueGrain queueGrain = GetQueueGrain(queueId);
+                var queueGrain = GetQueueGrain(queueId);
                 await queueGrain.Enqueue(messageData);
             }
             catch (Exception exc)

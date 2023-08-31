@@ -889,9 +889,9 @@ namespace Orleans.Serialization.Buffers
 
                 // The number of zeros in the msb position dictates the number of bytes to be read.
                 // Up to a maximum of 5 for a 32bit integer.
-                ref byte readHead = ref Unsafe.Add(ref MemoryMarshal.GetReference(_currentSpan), pos);
+                ref var readHead = ref Unsafe.Add(ref MemoryMarshal.GetReference(_currentSpan), pos);
 
-                ulong result = Unsafe.ReadUnaligned<ulong>(ref readHead);
+                var result = Unsafe.ReadUnaligned<ulong>(ref readHead);
                 var bytesNeeded = BitOperations.TrailingZeroCount((uint)result) + 1;
                 if (bytesNeeded > 5) ThrowOverflowException();
                 _bufferPos = pos + bytesNeeded;
@@ -947,15 +947,15 @@ namespace Orleans.Serialization.Buffers
 
                 // The number of zeros in the msb position dictates the number of bytes to be read.
                 // Up to a maximum of 5 for a 32bit integer.
-                ref byte readHead = ref Unsafe.Add(ref MemoryMarshal.GetReference(_currentSpan), pos);
+                ref var readHead = ref Unsafe.Add(ref MemoryMarshal.GetReference(_currentSpan), pos);
 
-                ulong result = Unsafe.ReadUnaligned<ulong>(ref readHead);
+                var result = Unsafe.ReadUnaligned<ulong>(ref readHead);
 
                 var bytesNeeded = BitOperations.TrailingZeroCount(result) + 1;
                 result >>= bytesNeeded;
                 _bufferPos += bytesNeeded;
 
-                ushort upper = Unsafe.ReadUnaligned<ushort>(ref Unsafe.Add(ref readHead, sizeof(ulong)));
+                var upper = Unsafe.ReadUnaligned<ushort>(ref Unsafe.Add(ref readHead, sizeof(ulong)));
                 result |= ((ulong)upper) << (64 - bytesNeeded);
 
                 // Mask off invalid data

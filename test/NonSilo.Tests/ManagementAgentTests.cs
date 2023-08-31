@@ -9,9 +9,9 @@ namespace UnitTests
         [Fact, TestCategory("Functional"), TestCategory("Management")]
         public void SystemStatusEquals()
         {
-            SystemStatus same1 = SystemStatus.Terminated;
-            SystemStatus same2 = SystemStatus.Terminated;
-            SystemStatus other = SystemStatus.Stopping;
+            var same1 = SystemStatus.Terminated;
+            var same2 = SystemStatus.Terminated;
+            var other = SystemStatus.Stopping;
 
             CheckEquals(same1, same2);
             CheckNotEquals(same1, other);

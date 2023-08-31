@@ -21,7 +21,7 @@ namespace Tester.Redis.Reminders
 
         private static LoggerFilterOptions CreateFilters()
         {
-            LoggerFilterOptions filters = new LoggerFilterOptions();
+            var filters = new LoggerFilterOptions();
             filters.AddFilter(nameof(RedisRemindersTableTests), LogLevel.Trace);
             return filters;
         }

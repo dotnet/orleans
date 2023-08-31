@@ -51,22 +51,22 @@ public class ReminderTests_Cosmos_Standalone
     [SkippableFact, TestCategory("Reminders")]
     public async Task Reminders_AzureTable_InsertNewRowAndReadBack()
     {
-        string clusterId = NewClusterId();
+        var clusterId = NewClusterId();
         var clusterOptions = Options.Create(new ClusterOptions { ClusterId = clusterId, ServiceId = _serviceId });
         var storageOptions = Options.Create(new CosmosReminderTableOptions());
         storageOptions.Value.ConfigureTestDefaults();
         IReminderTable table = new CosmosReminderTable(_loggerFactory, _fixture.Services, storageOptions, clusterOptions);
         await table.Init();
 
-        ReminderEntry[] rows = (await GetAllRows(table)).ToArray();
+        var rows = (await GetAllRows(table)).ToArray();
         Assert.Empty(rows); // "The reminder table (sid={0}, did={1}) was not empty.", ServiceId, clusterId);
 
-        ReminderEntry expected = NewReminderEntry();
+        var expected = NewReminderEntry();
         await table.UpsertRow(expected);
         rows = (await GetAllRows(table)).ToArray();
 
         Assert.Single(rows); // "The reminder table (sid={0}, did={1}) did not contain the correct number of rows (1).", ServiceId, clusterId);
-        ReminderEntry actual = rows[0];
+        var actual = rows[0];
         Assert.Equal(expected.GrainId, actual.GrainId); // "The newly inserted reminder table (sid={0}, did={1}) row did not contain the expected grain reference.", ServiceId, clusterId);
         Assert.Equal(expected.ReminderName, actual.ReminderName); // "The newly inserted reminder table (sid={0}, did={1}) row did not have the expected reminder name.", ServiceId, clusterId);
         Assert.Equal(expected.Period, actual.Period); // "The newly inserted reminder table (sid={0}, did={1}) row did not have the expected period.", ServiceId, clusterId);
@@ -77,15 +77,15 @@ public class ReminderTests_Cosmos_Standalone
 
     private async Task TestTableInsertRate(IReminderTable reminderTable, double numOfInserts)
     {
-        DateTime startedAt = DateTime.UtcNow;
+        var startedAt = DateTime.UtcNow;
 
         try
         {
-            List<Task<bool>> promises = new List<Task<bool>>();
-            for (int i = 0; i < numOfInserts; i++)
+            var promises = new List<Task<bool>>();
+            for (var i = 0; i < numOfInserts; i++)
             {
                 //"177BF46E-D06D-44C0-943B-C12F26DF5373"
-                string s = string.Format("177BF46E-D06D-44C0-943B-C12F26D{0:d5}", i);
+                var s = string.Format("177BF46E-D06D-44C0-943B-C12F26D{0:d5}", i);
 
                 var e = new ReminderEntry
                 {
@@ -96,8 +96,8 @@ public class ReminderTests_Cosmos_Standalone
                     StartAt = DateTime.UtcNow
                 };
 
-                int capture = i;
-                Task<bool> promise = Task.Run(async () =>
+                var capture = i;
+                var promise = Task.Run(async () =>
                 {
                     await reminderTable.UpsertRow(e);
                     _output.WriteLine("Done " + capture);
@@ -113,7 +113,7 @@ public class ReminderTests_Cosmos_Standalone
         {
             _log.LogInformation(exc, "Exception caught");
         }
-        TimeSpan dur = DateTime.UtcNow - startedAt;
+        var dur = DateTime.UtcNow - startedAt;
         _log.LogInformation(
             "Inserted {InsertCount} rows in {Duration}, i.e., {Rate} upserts/sec",
             numOfInserts,
@@ -123,7 +123,7 @@ public class ReminderTests_Cosmos_Standalone
 
     private ReminderEntry NewReminderEntry()
     {
-        Guid guid = Guid.NewGuid();
+        var guid = Guid.NewGuid();
         return new ReminderEntry
         {
             GrainId = _fixture.InternalGrainFactory.GetGrain(LegacyGrainId.NewId()).GetGrainId(),
@@ -140,7 +140,7 @@ public class ReminderTests_Cosmos_Standalone
 
     private async Task<IEnumerable<ReminderEntry>> GetAllRows(IReminderTable table)
     {
-        ReminderTableData data = await table.ReadRows(0, 0xffffffff);
+        var data = await table.ReadRows(0, 0xffffffff);
         return data.Reminders;
     }
 }

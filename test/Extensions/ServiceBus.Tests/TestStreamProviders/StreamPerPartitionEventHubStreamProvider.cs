@@ -22,7 +22,7 @@ namespace ServiceBus.Tests.TestStreamProviders.EventHub
 
         public static Guid GetPartitionGuid(string partition)
         {
-            byte[] bytes = Encoding.UTF8.GetBytes(partition);
+            var bytes = Encoding.UTF8.GetBytes(partition);
             Array.Resize(ref bytes, 10);
             return new Guid(partition.GetHashCode(), bytes[0], bytes[1], bytes[2], bytes[3], bytes[4], bytes[5], bytes[6], bytes[7], bytes[8], bytes[9]);
         }

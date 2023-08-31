@@ -31,7 +31,7 @@ namespace Orleans.Streams
             IDictionary<Guid, GrainId> implicitSubscriptions = implicitTable.GetImplicitSubscribers(streamId, this.grainFactory);
             foreach (var kvp in implicitSubscriptions)
             {
-                GuidId subscriptionId = GuidId.GetGuidId(kvp.Key);
+                var subscriptionId = GuidId.GetGuidId(kvp.Key);
                 result.Add(new PubSubSubscriptionState(subscriptionId, streamId, kvp.Value));
             }
             return Task.FromResult(result);

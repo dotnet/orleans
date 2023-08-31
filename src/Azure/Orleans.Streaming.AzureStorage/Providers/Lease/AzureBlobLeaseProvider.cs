@@ -137,7 +137,7 @@ namespace Orleans.LeaseProviders
 
         public static ILeaseProvider Create(IServiceProvider services, string name)
         {
-            AzureBlobLeaseProviderOptions options = services.GetOptionsByName<AzureBlobLeaseProviderOptions>(name);
+            var options = services.GetOptionsByName<AzureBlobLeaseProviderOptions>(name);
             return new AzureBlobLeaseProvider(options);
         }
     }

@@ -31,8 +31,8 @@ namespace UnitTests.LivenessTests
         [Fact, TestCategory("Functional"), TestCategory("Liveness"), TestCategory("Ring"), TestCategory("RingStandalone")]
         public void ConsistentRingProvider_Test1()
         {
-            SiloAddress silo1 = SiloAddressUtils.NewLocalSiloAddress(0);
-            ConsistentRingProvider ring = new ConsistentRingProvider(silo1, NullLoggerFactory.Instance);
+            var silo1 = SiloAddressUtils.NewLocalSiloAddress(0);
+            var ring = new ConsistentRingProvider(silo1, NullLoggerFactory.Instance);
             output.WriteLine("Silo1 range: {0}. The whole ring is: {1}", ring.GetMyRange(), ring.ToString());
 
             ring.AddServer(SiloAddressUtils.NewLocalSiloAddress(1));
@@ -45,12 +45,12 @@ namespace UnitTests.LivenessTests
         [Fact, TestCategory("Functional"), TestCategory("Liveness"), TestCategory("Ring"), TestCategory("RingStandalone")]
         public void ConsistentRingProvider_Test2()
         {
-            SiloAddress silo1 = SiloAddressUtils.NewLocalSiloAddress(0);
-            VirtualBucketsRingProvider ring = new VirtualBucketsRingProvider(silo1, NullLoggerFactory.Instance, 30);
+            var silo1 = SiloAddressUtils.NewLocalSiloAddress(0);
+            var ring = new VirtualBucketsRingProvider(silo1, NullLoggerFactory.Instance, 30);
             //ring.logger.SetSeverityLevel(Severity.Warning);
             output.WriteLine("\n\n*** Silo1 range: {0}.\n*** The whole ring with 1 silo is:\n{1}\n\n", ring.GetMyRange(), ring.ToString());
 
-            for (int i = 1; i <= 10; i++)
+            for (var i = 1; i <= 10; i++)
             {
                 ring.SiloStatusChangeNotification(SiloAddressUtils.NewLocalSiloAddress(i), SiloStatus.Active);
                 output.WriteLine("\n\n*** Silo1 range: {0}.\n*** The whole ring with {1} silos is:\n{2}\n\n", ring.GetMyRange(), i + 1, ring.ToString());
@@ -60,16 +60,16 @@ namespace UnitTests.LivenessTests
         [Fact, TestCategory("Functional"), TestCategory("Liveness"), TestCategory("Ring"), TestCategory("RingStandalone")]
         public void ConsistentRingProvider_Test3()
         {
-            int NUM_SILOS = 100;
-            double NUM_QUEUES = 10024.0;
-            int NUM_AGENTS = 4;
+            var NUM_SILOS = 100;
+            var NUM_QUEUES = 10024.0;
+            var NUM_AGENTS = 4;
 
-            Random random = new Random();
-            SiloAddress silo1 = SiloAddressUtils.NewLocalSiloAddress(random.Next(100000));
-            VirtualBucketsRingProvider ring = new VirtualBucketsRingProvider(silo1, NullLoggerFactory.Instance, 50);
+            var random = new Random();
+            var silo1 = SiloAddressUtils.NewLocalSiloAddress(random.Next(100000));
+            var ring = new VirtualBucketsRingProvider(silo1, NullLoggerFactory.Instance, 50);
             //ring.logger.SetSeverityLevel(Severity.Warning);
             
-            for (int i = 1; i <= NUM_SILOS - 1; i++)
+            for (var i = 1; i <= NUM_SILOS - 1; i++)
             {
                 ring.SiloStatusChangeNotification(SiloAddressUtils.NewLocalSiloAddress(random.Next(100000)), SiloStatus.Active);
             }
@@ -81,17 +81,17 @@ namespace UnitTests.LivenessTests
             var allAgentRanges = new List<(SiloAddress, List<IRingRangeInternal>)>();
             foreach (var siloRange in siloRanges)
             {
-                List<IRingRangeInternal> agentRanges = new List<IRingRangeInternal>();
-                for(int i=0; i < NUM_AGENTS; i++)
+                var agentRanges = new List<IRingRangeInternal>();
+                for(var i=0; i < NUM_AGENTS; i++)
                 {
-                    IRingRangeInternal agentRange = (IRingRangeInternal)RangeFactory.GetEquallyDividedSubRange(siloRange.Value, NUM_AGENTS, i);
+                    var agentRange = (IRingRangeInternal)RangeFactory.GetEquallyDividedSubRange(siloRange.Value, NUM_AGENTS, i);
                     agentRanges.Add(agentRange);
                 }
                 allAgentRanges.Add((siloRange.Key, agentRanges));
             }
 
-            Dictionary<SiloAddress, List<int>> queueHistogram = GetQueueHistogram(allAgentRanges, (int)NUM_QUEUES);
-            string str = Utils.EnumerableToString(sortedSiloRanges,
+            var queueHistogram = GetQueueHistogram(allAgentRanges, (int)NUM_QUEUES);
+            var str = Utils.EnumerableToString(sortedSiloRanges,
                 tuple => String.Format("Silo {0} -> Range {1:0.000}%, {2} queues: {3}", 
                     tuple.Item1,
                     tuple.Item2.RangePercentage(),
@@ -111,16 +111,16 @@ namespace UnitTests.LivenessTests
         {
             var options = new HashRingStreamQueueMapperOptions();
             options.TotalQueueCount = totalNumQueues;
-            HashRingBasedStreamQueueMapper queueMapper = new HashRingBasedStreamQueueMapper(options, "AzureQueues");
+            var queueMapper = new HashRingBasedStreamQueueMapper(options, "AzureQueues");
             _ = queueMapper.GetAllQueues();
 
-            Dictionary<SiloAddress, List<int>> queueHistogram = new Dictionary<SiloAddress, List<int>>();
+            var queueHistogram = new Dictionary<SiloAddress, List<int>>();
             foreach (var siloRange in siloRanges)
             {
-                List<int> agentRanges = new List<int>();
-                foreach (IRingRangeInternal agentRange in siloRange.Value)
+                var agentRanges = new List<int>();
+                foreach (var agentRange in siloRange.Value)
                 {
-                    int numQueues = queueMapper.GetQueuesForRange(agentRange).Count();
+                    var numQueues = queueMapper.GetQueuesForRange(agentRange).Count();
                     agentRanges.Add(numQueues);
                 }
                 agentRanges.Sort();

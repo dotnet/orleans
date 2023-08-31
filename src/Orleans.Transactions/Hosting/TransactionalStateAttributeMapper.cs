@@ -20,16 +20,16 @@ namespace Orleans.Transactions
 
         public Factory<IGrainContext, object> GetFactory(ParameterInfo parameter, TAttribute attribute)
         {
-            TransactionalStateConfiguration config = AttributeToConfig(attribute);
+            var config = AttributeToConfig(attribute);
             // use generic type args to define collection type.
-            MethodInfo genericCreate = create.MakeGenericMethod(parameter.ParameterType.GetGenericArguments());
-            object[] args = new object[] { config };
+            var genericCreate = create.MakeGenericMethod(parameter.ParameterType.GetGenericArguments());
+            var args = new object[] { config };
             return context => Create(context, genericCreate, args);
         }
 
         private object Create(IGrainContext context, MethodInfo genericCreate, object[] args)
         {
-            ITransactionalStateFactory factory = context.ActivationServices.GetRequiredService<ITransactionalStateFactory>();
+            var factory = context.ActivationServices.GetRequiredService<ITransactionalStateFactory>();
             return genericCreate.Invoke(factory, args);
         }
 

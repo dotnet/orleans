@@ -57,7 +57,7 @@ namespace Benchmarks.Comparison
             Session = services.GetRequiredService<SerializerSessionPool>().GetSession();
             var bytes = new byte[1000];
             var writer = new SingleSegmentBuffer(bytes).CreateWriter(Session);
-            IntStruct intStruct = IntStruct.Create();
+            var intStruct = IntStruct.Create();
             Serializer.Serialize(ref intStruct, ref writer);
             Input = bytes;
 

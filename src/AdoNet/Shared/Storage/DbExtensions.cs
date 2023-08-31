@@ -359,7 +359,7 @@ namespace Orleans.Tests.SqlUtils
             if (!EqualityComparer<T>.Default.Equals(parameters, default(T)))
             {
                 var properties = parameters.GetType().GetProperties();
-                for (int i = 0; i < properties.Length; ++i)
+                for (var i = 0; i < properties.Length; ++i)
                 {
                     var property = properties[i];
                     var value = property.GetValue(parameters, null);
@@ -389,7 +389,7 @@ namespace Orleans.Tests.SqlUtils
             //get garbage collected. Consequently the original struct value would not be set.            
             object obj = Activator.CreateInstance<TResult>();
             var properties = obj.GetType().GetProperties();
-            for (int i = 0; i < properties.Length; ++i)
+            for (var i = 0; i < properties.Length; ++i)
             {
                 var rp = record[properties[i].Name];
                 if (!Equals(rp, DBNull.Value))

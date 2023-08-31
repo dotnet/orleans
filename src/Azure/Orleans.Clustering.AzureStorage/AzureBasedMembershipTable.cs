@@ -49,7 +49,7 @@ namespace Orleans.Runtime.MembershipService
             if (tryInitTableVersion)
             {
                 // ignore return value, since we don't care if I inserted it or not, as long as it is in there.
-                bool created = await tableManager.TryCreateTableVersionEntryAsync();
+                var created = await tableManager.TryCreateTableVersionEntryAsync();
                 if(created) logger.LogInformation("Created new table version row.");
             }
         }
@@ -69,7 +69,7 @@ namespace Orleans.Runtime.MembershipService
             try
             {
                 var entries = await tableManager.FindSiloEntryAndTableVersionRow(key);
-                MembershipTableData data = Convert(entries);
+                var data = Convert(entries);
                 if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug($"Read my entry {{SiloAddress}} Table={Environment.NewLine}{{Data}}", key.ToString(), data.ToString());
                 return data;
             }
@@ -87,7 +87,7 @@ namespace Orleans.Runtime.MembershipService
             try
             {
                 var entries = await tableManager.FindAllSiloEntries();
-                MembershipTableData data = Convert(entries);
+                var data = Convert(entries);
                 if (logger.IsEnabled(LogLevel.Trace)) logger.LogTrace($"ReadAll Table={Environment.NewLine}{{Data}}", data.ToString());
 
                 return data;
@@ -109,7 +109,7 @@ namespace Orleans.Runtime.MembershipService
                 var tableEntry = Convert(entry, tableManager.DeploymentId);
                 var versionEntry = tableManager.CreateTableVersionEntry(tableVersion.Version);
 
-                bool result = await tableManager.InsertSiloEntryConditionally(
+                var result = await tableManager.InsertSiloEntryConditionally(
                     tableEntry, versionEntry, tableVersion.VersionEtag);
 
                 if (result == false)
@@ -134,7 +134,7 @@ namespace Orleans.Runtime.MembershipService
                 var siloEntry = Convert(entry, tableManager.DeploymentId);
                 var versionEntry = tableManager.CreateTableVersionEntry(tableVersion.Version);
 
-                bool result = await tableManager.UpdateSiloEntryConditionally(siloEntry, etag, versionEntry, tableVersion.VersionEtag);
+                var result = await tableManager.UpdateSiloEntryConditionally(siloEntry, etag, versionEntry, tableVersion.VersionEtag);
                 if (result == false)
                     logger.LogWarning(
                         (int)TableStorageErrorCode.AzureTable_24,
@@ -188,7 +188,7 @@ namespace Orleans.Runtime.MembershipService
                         try
                         {
                             
-                            MembershipEntry membershipEntry = Parse(tableEntry);
+                            var membershipEntry = Parse(tableEntry);
                             memEntries.Add(new Tuple<MembershipEntry, string>(membershipEntry, tuple.ETag));
                         }
                         catch (Exception exc)
@@ -222,11 +222,11 @@ namespace Orleans.Runtime.MembershipService
             if (!string.IsNullOrEmpty(tableEntry.ProxyPort))
                 parse.ProxyPort = int.Parse(tableEntry.ProxyPort);
 
-            int port = 0;
+            var port = 0;
             if (!string.IsNullOrEmpty(tableEntry.Port))
                 int.TryParse(tableEntry.Port, out port);
 
-            int gen = 0;
+            var gen = 0;
             if (!string.IsNullOrEmpty(tableEntry.Generation))
                 int.TryParse(tableEntry.Generation, out gen);
 
@@ -259,8 +259,8 @@ namespace Orleans.Runtime.MembershipService
 
             if (!string.IsNullOrEmpty(tableEntry.SuspectingSilos))
             {
-                string[] silos = tableEntry.SuspectingSilos.Split('|');
-                foreach (string silo in silos)
+                var silos = tableEntry.SuspectingSilos.Split('|');
+                foreach (var silo in silos)
                 {
                     suspectingSilos.Add(SiloAddress.FromParsableString(silo));
                 }
@@ -268,15 +268,15 @@ namespace Orleans.Runtime.MembershipService
 
             if (!string.IsNullOrEmpty(tableEntry.SuspectingTimes))
             {
-                string[] times = tableEntry.SuspectingTimes.Split('|');
-                foreach (string time in times)
+                var times = tableEntry.SuspectingTimes.Split('|');
+                foreach (var time in times)
                     suspectingTimes.Add(LogFormatter.ParseDate(time));
             }
 
             if (suspectingSilos.Count != suspectingTimes.Count)
                 throw new OrleansException(String.Format("SuspectingSilos.Length of {0} as read from Azure table is not equal to SuspectingTimes.Length of {1}", suspectingSilos.Count, suspectingTimes.Count));
 
-            for (int i = 0; i < suspectingSilos.Count; i++)
+            for (var i = 0; i < suspectingSilos.Count; i++)
                 parse.AddSuspector(suspectingSilos[i], suspectingTimes[i]);
 
             return parse;
@@ -308,7 +308,7 @@ namespace Orleans.Runtime.MembershipService
             {
                 var siloList = new StringBuilder();
                 var timeList = new StringBuilder();
-                bool first = true;
+                var first = true;
                 foreach (var tuple in memEntry.SuspectTimes)
                 {
                     if (!first)

@@ -297,7 +297,7 @@ namespace Orleans.Runtime
 
             var keyString = Key.ToString();
             // this should grab the least-significant half of n1, suffixing it with the key extension.
-            string idString = keyString;
+            var idString = keyString;
             if (!detailed)
             {
                 if (keyString.Length >= 48)
@@ -383,8 +383,8 @@ namespace Orleans.Runtime
 
         public uint GetHashCode_Modulo(uint umod)
         {
-            int key = Key.GetHashCode();
-            int mod = (int)umod;
+            var key = Key.GetHashCode();
+            var mod = (int)umod;
             key = ((key % mod) + mod) % mod; // key should be positive now. So assert with checked.
             return checked((uint)key);
         }

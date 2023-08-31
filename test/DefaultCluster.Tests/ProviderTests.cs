@@ -39,9 +39,9 @@ namespace DefaultCluster.Tests
         [Fact, TestCategory("BVT"), TestCategory("Providers")]
         public void Providers_TestExtensions()
         {
-            IExtensionTestGrain grain = this.fixture.GrainFactory.GetGrain<IExtensionTestGrain>(GetRandomGrainId());
-            ITestExtension extension = grain.AsReference<ITestExtension>();
-            bool exceptionThrown = true;
+            var grain = this.fixture.GrainFactory.GetGrain<IExtensionTestGrain>(GetRandomGrainId());
+            var extension = grain.AsReference<ITestExtension>();
+            var exceptionThrown = true;
 
             try
             {
@@ -138,9 +138,9 @@ namespace DefaultCluster.Tests
         [Fact, TestCategory("BVT"), TestCategory("Providers")]
         public async Task Providers_AutoInstallExtensionTest()
         {
-            INoOpTestGrain grain = this.fixture.GrainFactory.GetGrain<INoOpTestGrain>(GetRandomGrainId());
-            ISimpleExtension uninstalled = grain.AsReference<ISimpleExtension>();
-            IAutoExtension autoInstalled = grain.AsReference<IAutoExtension>();
+            var grain = this.fixture.GrainFactory.GetGrain<INoOpTestGrain>(GetRandomGrainId());
+            var uninstalled = grain.AsReference<ISimpleExtension>();
+            var autoInstalled = grain.AsReference<IAutoExtension>();
             await Assert.ThrowsAsync<GrainExtensionNotInstalledException>(() => uninstalled.CheckExtension_1());
             await autoInstalled.CheckExtension();
         }

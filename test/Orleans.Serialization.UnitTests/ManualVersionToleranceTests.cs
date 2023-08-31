@@ -444,7 +444,7 @@ namespace Orleans.Serialization.UnitTests
 
             public override string ToString()
             {
-                string refString = Ref == this ? "[this]" : $"[{Ref?.ToString() ?? "null"}]";
+                var refString = Ref == this ? "[this]" : $"[{Ref?.ToString() ?? "null"}]";
                 return $"{base.ToString()}, {nameof(String)}: {String}, {nameof(Int)}: {Int}, Ref: {refString}";
             }
 

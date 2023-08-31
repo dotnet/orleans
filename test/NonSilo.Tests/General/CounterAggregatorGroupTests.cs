@@ -49,18 +49,18 @@ public class CounterAggregatorGroupTests
     [Fact, TestCategory("Functional"), TestCategory("Aggregators")]
     public void TestMultithreadedCorrectness()
     {
-        int numOfIterations = 1000000;
+        var numOfIterations = 1000000;
 
         var group = new CounterAggregatorGroup();
         var counterCount = Environment.ProcessorCount;
 
         Parallel.For(0, Environment.ProcessorCount, j =>
         {
-            for (int i = 0; i < counterCount; i++)
+            for (var i = 0; i < counterCount; i++)
             {
                 var aggregator = group.FindOrCreate(new("test", i));
 
-                for (int k = 0; k < numOfIterations; k++)
+                for (var k = 0; k < numOfIterations; k++)
                 {
                     aggregator.Add(i);
                 }

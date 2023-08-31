@@ -43,14 +43,14 @@ namespace UnitTests.General
         public async Task RequestContext_MultiThreads_ExportToMessage()
         {
             const int NumLoops = 50;
-            string id = "key" + Random.Shared.Next();
+            var id = "key" + Random.Shared.Next();
 
-            Message msg = new Message();
-            Task[] promises = new Task[NumLoops];
-            ManualResetEventSlim flag = new ManualResetEventSlim(false);
-            for (int i = 0; i < NumLoops; i++)
+            var msg = new Message();
+            var promises = new Task[NumLoops];
+            var flag = new ManualResetEventSlim(false);
+            for (var i = 0; i < NumLoops; i++)
             {
-                string key = id + "-" + i;
+                var key = id + "-" + i;
                 RequestContext.Set(key, i);
                 promises[i] = Task.Run(() =>
                 {
@@ -67,11 +67,11 @@ namespace UnitTests.General
         [Fact, TestCategory("Functional"), TestCategory("RequestContext")]
         public void RequestContext_ActivityId_ExportToMessage()
         {
-            Guid activityId = Guid.NewGuid();
-            Guid activityId2 = Guid.NewGuid();
-            Guid nullActivityId = Guid.Empty;
+            var activityId = Guid.NewGuid();
+            var activityId2 = Guid.NewGuid();
+            var nullActivityId = Guid.Empty;
 
-            Message msg = new Message();
+            var msg = new Message();
             msg.RequestContextData = RequestContextExtensions.Export(this.fixture.DeepCopier);
             if (msg.RequestContextData != null) foreach (var kvp in msg.RequestContextData)
                 {
@@ -88,7 +88,7 @@ namespace UnitTests.General
                     headers.Add(kvp.Key, kvp.Value);
                 };
             Assert.True(headers.ContainsKey(RequestContext.CALL_CHAIN_REENTRANCY_HEADER), "ActivityId #1 should be present " + headers.ToStrings(separator: ","));
-            object result = headers[RequestContext.CALL_CHAIN_REENTRANCY_HEADER];
+            var result = headers[RequestContext.CALL_CHAIN_REENTRANCY_HEADER];
             Assert.NotNull(result);// ActivityId #1 should not be null
             Assert.Equal(activityId, result);  // "E2E ActivityId #1 not propagated correctly"
             Assert.Equal(activityId, RequestContextTestUtils.GetActivityId());  // "Original E2E ActivityId #1 should not have changed"
@@ -123,11 +123,11 @@ namespace UnitTests.General
         [Fact, TestCategory("Functional"), TestCategory("RequestContext")]
         public void RequestContext_ActivityId_ExportImport()
         {
-            Guid activityId = Guid.NewGuid();
-            Guid activityId2 = Guid.NewGuid();
-            Guid nullActivityId = Guid.Empty;
+            var activityId = Guid.NewGuid();
+            var activityId2 = Guid.NewGuid();
+            var nullActivityId = Guid.Empty;
 
-            Message msg = new Message();
+            var msg = new Message();
             msg.RequestContextData = RequestContextExtensions.Export(this.fixture.DeepCopier);
             RequestContext.Clear();
             RequestContextExtensions.Import(msg.RequestContextData);
@@ -146,7 +146,7 @@ namespace UnitTests.General
                     headers.Add(kvp.Key, kvp.Value);
                 };
             Assert.NotNull(actId); // "ActivityId #1 should be present " + headers.ToStrings(separator: ",")
-            object result = headers[RequestContext.CALL_CHAIN_REENTRANCY_HEADER];
+            var result = headers[RequestContext.CALL_CHAIN_REENTRANCY_HEADER];
             Assert.NotNull(result);// "ActivityId #1 should not be null"
             Assert.Equal(activityId, result);  // "E2E ActivityId #1 not propagated correctly"
             Assert.Equal(activityId, RequestContextTestUtils.GetActivityId());  // "Original E2E ActivityId #1 should not have changed"
@@ -185,16 +185,16 @@ namespace UnitTests.General
         {
             const int NumLoops = 1000;
 
-            string name1 = "Name" + Random.Shared.Next();
-            string data1 = "Main";
+            var name1 = "Name" + Random.Shared.Next();
+            var data1 = "Main";
 
             RequestContext.Set(name1, data1);
             Assert.Equal(data1, RequestContext.Get(name1));  // "RC.GetData-Main"
 
-            Task[] promises = new Task[NumLoops];
-            for (int i = 0; i < NumLoops; i++)
+            var promises = new Task[NumLoops];
+            for (var i = 0; i < NumLoops; i++)
             {
-                string str = i.ToString(CultureInfo.InvariantCulture);
+                var str = i.ToString(CultureInfo.InvariantCulture);
                 promises[i] = Task.Run(async () =>
                 {
                     await Task.Delay(5);

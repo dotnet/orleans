@@ -54,8 +54,8 @@ namespace UnitTests.StreamingTests
         public async Task LongKey()
         {
             long grainId = 13;
-            int value = 87;
-            IAsyncStream<int> stream = _streamProvider.GetStream<int>(nameof(IImplicitSubscriptionLongKeyGrain), grainId);
+            var value = 87;
+            var stream = _streamProvider.GetStream<int>(nameof(IImplicitSubscriptionLongKeyGrain), grainId);
 
             await stream.OnNextAsync(value);
 
@@ -65,7 +65,7 @@ namespace UnitTests.StreamingTests
 
         private async Task<bool> CheckValue(IImplicitSubscriptionKeyTypeGrain consumer, int expectedValue, bool assertIsTrue)
         {
-            int value = await consumer.GetValue();
+            var value = await consumer.GetValue();
 
             if (assertIsTrue)
             {

@@ -94,7 +94,7 @@ namespace Orleans.Transactions.State
                     case CommitRole.LocalCommit:
                         {
                             // process prepared messages received ahead of time
-                            if (unprocessedPreparedMessages.TryGetValue(record.Timestamp, out PreparedMessages info))
+                            if (unprocessedPreparedMessages.TryGetValue(record.Timestamp, out var info))
                             {
                                 if (info.Status == TransactionalStatus.Ok)
                                 {
@@ -115,7 +115,7 @@ namespace Orleans.Transactions.State
                         {
 
                             // optimization: can immediately proceed if dependency is implied
-                            bool behindRemoteEntryBySameTM = false;
+                            var behindRemoteEntryBySameTM = false;
                                 /* disabled - jbragg - TODO - revisit
                                 commitQueue.Count >= 2
                                 && commitQueue[commitQueue.Count - 2] is TransactionRecord<TState> rce
@@ -204,7 +204,7 @@ namespace Orleans.Transactions.State
             else
             {
                 // this message has arrived ahead of the commit request - we need to remember it
-                if (!this.unprocessedPreparedMessages.TryGetValue(timeStamp, out PreparedMessages info))
+                if (!this.unprocessedPreparedMessages.TryGetValue(timeStamp, out var info))
                 {
                     this.unprocessedPreparedMessages[timeStamp] = info = new PreparedMessages(status);
                 }
@@ -448,7 +448,7 @@ namespace Orleans.Transactions.State
 
         private async Task Restore()
         {
-            TransactionalStorageLoadResponse<TState> loadresponse = await storage.Load();
+            var loadresponse = await storage.Load();
 
             this.storageBatch = new StorageBatch<TState>(loadresponse);
 
@@ -475,7 +475,7 @@ namespace Orleans.Transactions.State
                     if (logger.IsEnabled(LogLevel.Debug))
                         logger.LogDebug("Recover two-phase-commit {TransactionId}", pr.TransactionId);
 
-                    ParticipantId tm = pr.TransactionManager;
+                    var tm = pr.TransactionManager;
 
                     commitQueue.Add(new TransactionRecord<TState>()
                     {
@@ -526,8 +526,8 @@ namespace Orleans.Transactions.State
 
         public int BatchableOperationsCount()
         {
-            int count = 0;
-            int pos = commitQueue.Count - 1;
+            var count = 0;
+            var pos = commitQueue.Count - 1;
             while (pos >= 0 && commitQueue[pos].Batchable)
             {
                 pos--;
@@ -546,7 +546,7 @@ namespace Orleans.Transactions.State
                 try
                 {
                     // count committable entries at the bottom of the commit queue
-                    int committableEntries = 0;
+                    var committableEntries = 0;
                     while (committableEntries < commitQueue.Count && commitQueue[committableEntries].ReadyToCommit)
                     {
                         committableEntries++;
@@ -647,7 +647,7 @@ namespace Orleans.Transactions.State
 
         private async Task Bail(TransactionalStatus status, Exception exception, bool force = false)
         {
-            List<Task> pending = new List<Task>();
+            var pending = new List<Task>();
             pending.Add(RWLock.AbortExecutingTransactions(exception));
             this.RWLock.AbortQueuedTransactions();
 
@@ -748,9 +748,9 @@ namespace Orleans.Transactions.State
         private void CollectEventsForBatch(int batchsize)
         {
             // collect events for batch
-            for (int i = 0; i < batchsize; i++)
+            for (var i = 0; i < batchsize; i++)
             {
-                TransactionRecord<TState> entry = commitQueue[i];
+                var entry = commitQueue[i];
 
                 if (logger.IsEnabled(LogLevel.Trace))
                 {
@@ -859,9 +859,9 @@ namespace Orleans.Transactions.State
 
         private async Task AbortCommits(TransactionalStatus status, int from = 0)
         {
-            List<Task> pending = new List<Task>();
+            var pending = new List<Task>();
             // emtpy the back of the commit queue, starting at specified position
-            for (int i = from; i < commitQueue.Count; i++)
+            for (var i = from; i < commitQueue.Count; i++)
             {
                 pending.Add(NotifyOfAbort(commitQueue[i], i == from ? status : TransactionalStatus.CascadingAbort, exception: null));
             }

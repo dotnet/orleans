@@ -51,7 +51,7 @@ namespace UnitTests.Grains
         public async Task BecomeConsumer(Guid streamId, string streamNamespace, string providerToUse)
         {
             logger.LogInformation("BecomeConsumer");
-            IStreamProvider streamProvider = this.GetStreamProvider(providerToUse);
+            var streamProvider = this.GetStreamProvider(providerToUse);
             consumer = streamProvider.GetStream<int>(streamNamespace, streamId);
             consumerHandle = await consumer.SubscribeAsync(
                 OnNextAsync,

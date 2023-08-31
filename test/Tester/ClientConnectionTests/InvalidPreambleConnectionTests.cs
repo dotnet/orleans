@@ -24,14 +24,14 @@ namespace Tester.ClientConnectionTests
             var gateways = await this.HostedCluster.Client.ServiceProvider.GetRequiredService<IGatewayListProvider>().GetGateways();
             var gwEndpoint = gateways.First().ToIPEndPoint();
 
-            using (Socket s = new Socket(gwEndpoint.AddressFamily, SocketType.Stream, ProtocolType.Tcp))
+            using (var s = new Socket(gwEndpoint.AddressFamily, SocketType.Stream, ProtocolType.Tcp))
             {
                 s.Connect(gwEndpoint);
 
-                Int32 invalidSize = 99999;
+                var invalidSize = 99999;
                 s.Send(BitConverter.GetBytes(invalidSize));
 
-                bool socketClosed = s.Poll(100000, SelectMode.SelectRead) && s.Available == 0;
+                var socketClosed = s.Poll(100000, SelectMode.SelectRead) && s.Available == 0;
                 Assert.True(socketClosed);
             }
         }

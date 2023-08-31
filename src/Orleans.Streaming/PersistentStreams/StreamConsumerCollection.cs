@@ -57,7 +57,7 @@ namespace Orleans.Streams
 
         public void DisposeAll(ILogger logger)
         {
-            foreach (StreamConsumerData consumer in queueData.Values)
+            foreach (var consumer in queueData.Values)
             {
                 consumer.SafeDisposeCursor(logger);
             }

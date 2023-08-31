@@ -63,7 +63,7 @@ namespace Tester.AzureUtils
         {
             if(manager != null && SiloInstanceTableTestConstants.DeleteEntriesAfterTest)
             {
-                TimeSpan timeout = SiloInstanceTableTestConstants.Timeout;
+                var timeout = SiloInstanceTableTestConstants.Timeout;
 
                 output.WriteLine("TestCleanup Timeout={0}", timeout);
 
@@ -107,7 +107,7 @@ namespace Tester.AzureUtils
             await manager.UnregisterSiloInstance(myEntry);
 
             // Create new active entries
-            for (int i = 1; i < 5; i++)
+            for (var i = 1; i < 5; i++)
             {
                 this.generation = i;
                 this.siloAddress = SiloAddressUtils.NewLocalSiloAddress(generation);
@@ -128,7 +128,7 @@ namespace Tester.AzureUtils
         [SkippableFact, TestCategory("Functional")]
         public async Task SiloInstanceTable_Op_CreateSiloEntryConditionally()
         {
-            bool didInsert = await manager.TryCreateTableVersionEntryAsync()
+            var didInsert = await manager.TryCreateTableVersionEntryAsync()
                 .WithTimeout(new AzureStoragePolicyOptions().OperationTimeout);
 
             Assert.True(didInsert, "Did insert");
@@ -143,8 +143,8 @@ namespace Tester.AzureUtils
             RegisterSiloInstance();
 
             var data = await FindSiloEntry(siloAddress);
-            SiloInstanceTableEntry siloEntry = data.Entity;
-            string eTag = data.ETag;
+            var siloEntry = data.Entity;
+            var eTag = data.ETag;
 
             Assert.NotNull(eTag); // ETag should not be null
             Assert.NotNull(siloEntry); // SiloInstanceTableEntry should not be null
@@ -165,8 +165,8 @@ namespace Tester.AzureUtils
             var data = await FindSiloEntry(siloAddress);
             Assert.NotNull(data.Entity); // Data returned should not be null
 
-            SiloInstanceTableEntry siloEntry = data.Entity;
-            string eTag = data.ETag;
+            var siloEntry = data.Entity;
+            var eTag = data.ETag;
 
             Assert.NotNull(eTag); // ETag should not be null
             Assert.NotNull(siloEntry); // SiloInstanceTableEntry should not be null
@@ -184,8 +184,8 @@ namespace Tester.AzureUtils
             await manager.UnregisterSiloInstance(myEntry);
 
             var data = await FindSiloEntry(siloAddress);
-            SiloInstanceTableEntry siloEntry = data.Entity;
-            string eTag = data.ETag;
+            var siloEntry = data.Entity;
+            var eTag = data.ETag;
 
             Assert.NotNull(eTag); // ETag should not be null
             Assert.NotNull(siloEntry); // SiloInstanceTableEntry should not be null
@@ -208,7 +208,7 @@ namespace Tester.AzureUtils
             gateways = await manager.FindAllGatewayProxyEndpoints();
             Assert.Equal(1,  gateways.Count);  // "Number of gateways after Silo.Activate"
 
-            Uri myGateway = gateways.First();
+            var myGateway = gateways.First();
             Assert.Equal(myEntry.Address,  myGateway.Host.ToString());  // "Gateway address"
             Assert.Equal(myEntry.ProxyPort,  myGateway.Port.ToString(CultureInfo.InvariantCulture));  // "Gateway port"
         }
@@ -216,19 +216,19 @@ namespace Tester.AzureUtils
         [SkippableFact, TestCategory("Functional")]
         public void SiloAddress_ToFrom_RowKey()
         {
-            string ipAddress = "1.2.3.4";
-            int port = 5555;
-            int generation = 6666;
+            var ipAddress = "1.2.3.4";
+            var port = 5555;
+            var generation = 6666;
 
-            IPAddress address = IPAddress.Parse(ipAddress);
-            IPEndPoint endpoint = new IPEndPoint(address, port);
-            SiloAddress siloAddress = SiloAddress.New(endpoint, generation);
+            var address = IPAddress.Parse(ipAddress);
+            var endpoint = new IPEndPoint(address, port);
+            var siloAddress = SiloAddress.New(endpoint, generation);
 
-            string MembershipRowKey = SiloInstanceTableEntry.ConstructRowKey(siloAddress);
+            var MembershipRowKey = SiloInstanceTableEntry.ConstructRowKey(siloAddress);
 
             output.WriteLine("SiloAddress = {0} Row Key string = {1}", siloAddress, MembershipRowKey);
 
-            SiloAddress fromRowKey = SiloInstanceTableEntry.UnpackRowKey(MembershipRowKey);
+            var fromRowKey = SiloInstanceTableEntry.UnpackRowKey(MembershipRowKey);
 
             output.WriteLine("SiloAddress result = {0} From Row Key string = {1}", fromRowKey, MembershipRowKey);
 
@@ -238,10 +238,10 @@ namespace Tester.AzureUtils
 
         private SiloInstanceTableEntry RegisterSiloInstance()
         {
-            string partitionKey = this.clusterId;
-            string rowKey = SiloInstanceTableEntry.ConstructRowKey(siloAddress);
+            var partitionKey = this.clusterId;
+            var rowKey = SiloInstanceTableEntry.ConstructRowKey(siloAddress);
 
-            IPEndPoint myEndpoint = siloAddress.Endpoint;
+            var myEndpoint = siloAddress.Endpoint;
 
             myEntry = new SiloInstanceTableEntry
             {
@@ -271,8 +271,8 @@ namespace Tester.AzureUtils
 
         private async Task<(SiloInstanceTableEntry Entity, string ETag)> FindSiloEntry(SiloAddress siloAddr)
         {
-            string partitionKey = this.clusterId;
-            string rowKey = SiloInstanceTableEntry.ConstructRowKey(siloAddr);
+            var partitionKey = this.clusterId;
+            var rowKey = SiloInstanceTableEntry.ConstructRowKey(siloAddr);
 
             output.WriteLine("FindSiloEntry for SiloAddress={0} PartitionKey={1} RowKey={2}", siloAddr, partitionKey, rowKey);
 

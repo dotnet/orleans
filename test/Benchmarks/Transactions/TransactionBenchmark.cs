@@ -102,7 +102,7 @@ namespace Benchmarks.Transactions
         {
             Console.WriteLine($"Cold Run.");
             await FullRunAsync();
-            for(int i=0; i<runs; i++)
+            for(var i=0; i<runs; i++)
             {
                 Console.WriteLine($"Warm Run {i+1}.");
                 await FullRunAsync();
@@ -111,11 +111,11 @@ namespace Benchmarks.Transactions
 
         private async Task FullRunAsync()
         {
-            int runners = Math.Max(1,(int)Math.Sqrt(concurrent));
-            int transactionsPerRunner = Math.Max(1, this.transactionsPerRun / runners);
-            Report[] reports = await Task.WhenAll(Enumerable.Range(0, runners).Select(i => RunAsync(i, transactionsPerRunner, runners)));
-            Report finalReport = new Report();
-            foreach (Report report in reports)
+            var runners = Math.Max(1,(int)Math.Sqrt(concurrent));
+            var transactionsPerRunner = Math.Max(1, this.transactionsPerRun / runners);
+            var reports = await Task.WhenAll(Enumerable.Range(0, runners).Select(i => RunAsync(i, transactionsPerRunner, runners)));
+            var finalReport = new Report();
+            foreach (var report in reports)
             {
                 finalReport.Succeeded += report.Succeeded;
                 finalReport.Failed += report.Failed;
@@ -130,7 +130,7 @@ namespace Benchmarks.Transactions
 
         public async Task<Report> RunAsync(int run, int transactiosPerRun, int concurrentPerRun)
         {
-            ILoadGrain load = this.host.Client.GetGrain<ILoadGrain>(Guid.NewGuid());
+            var load = this.host.Client.GetGrain<ILoadGrain>(Guid.NewGuid());
             await load.Generate(run, transactiosPerRun, concurrentPerRun);
             Report report = null;
             while (report == null)

@@ -17,8 +17,8 @@ namespace Orleans.CodeGenerator.Hashing
                 new char[bytes.Length * 2].AsSpan() :
                 stackalloc char[bytes.Length * 2];
 
-            int pos = 0;
-            foreach (byte b in bytes)
+            var pos = 0;
+            foreach (var b in bytes)
             {
                 ToCharsBuffer(b, result, pos);
                 pos += 2;

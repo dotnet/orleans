@@ -13,14 +13,14 @@ namespace AWSUtils.Tests.MembershipTests
         [Fact]
         public void GetKeysTest()
         {
-            SiloAddress address = SiloAddress.New(new IPEndPoint(IPAddress.Parse("127.0.0.1"), 12345), 67890); 
+            var address = SiloAddress.New(new IPEndPoint(IPAddress.Parse("127.0.0.1"), 12345), 67890); 
             var instanceRecord = new SiloInstanceRecord
             {
                 DeploymentId = "deploymentID",
                 SiloIdentity = SiloInstanceRecord.ConstructSiloIdentity(address)
             };
 
-            Dictionary<string, AttributeValue> keys = instanceRecord.GetKeys();
+            var keys = instanceRecord.GetKeys();
 
             Assert.Equal(2, keys.Count);
             Assert.Equal(instanceRecord.DeploymentId, keys[SiloInstanceRecord.DEPLOYMENT_ID_PROPERTY_NAME].S);

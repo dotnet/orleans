@@ -79,7 +79,7 @@ namespace Orleans.Providers.Streams.Common
             {
                 throw new ArgumentNullException(nameof(segment));
             }
-            int size = BitConverter.ToInt32(segment.Array, segment.Offset + readerOffset);
+            var size = BitConverter.ToInt32(segment.Array, segment.Offset + readerOffset);
             readerOffset += sizeof(int);
             var seg = new ArraySegment<byte>(segment.Array, segment.Offset + readerOffset, size);
             readerOffset += size;
@@ -96,7 +96,7 @@ namespace Orleans.Providers.Streams.Common
             {
                 throw new ArgumentNullException(nameof(segment));
             }
-            int size = BitConverter.ToInt32(segment.Array, segment.Offset + readerOffset);
+            var size = BitConverter.ToInt32(segment.Array, segment.Offset + readerOffset);
             readerOffset += sizeof(int);
             if (size < 0)
             {

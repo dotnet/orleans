@@ -78,17 +78,17 @@ namespace Orleans.Providers.Streams.AzureQueue
                 var queueRef = queue; // store direct ref, in case we are somehow asked to shutdown while we are receiving.
                 if (queueRef == null) return new List<IBatchContainer>();
 
-                int count = maxCount < 0 || maxCount == QueueAdapterConstants.UNLIMITED_GET_QUEUE_MSG ?
+                var count = maxCount < 0 || maxCount == QueueAdapterConstants.UNLIMITED_GET_QUEUE_MSG ?
                     MaxNumberOfMessagesToPeek : Math.Min(maxCount, MaxNumberOfMessagesToPeek) ;
 
                 var task = queueRef.GetQueueMessages(count);
                 outstandingTask = task;
-                IEnumerable<QueueMessage> messages = await task;
+                var messages = await task;
 
-                List<IBatchContainer> azureQueueMessages = new List<IBatchContainer>();
+                var azureQueueMessages = new List<IBatchContainer>();
                 foreach (var message in messages)
                 {
-                    IBatchContainer container = this.dataAdapter.FromQueueMessage(message.MessageText, lastReadMessage++);
+                    var container = this.dataAdapter.FromQueueMessage(message.MessageText, lastReadMessage++);
                     azureQueueMessages.Add(container);
                     this.pending.Add(new PendingDelivery(container.SequenceToken, message));
                 }
@@ -108,18 +108,18 @@ namespace Orleans.Providers.Streams.AzureQueue
                 var queueRef = queue; // store direct ref, in case we are somehow asked to shutdown while we are receiving.
                 if (messages.Count == 0 || queueRef==null) return;
                 // get sequence tokens of delivered messages
-                List<StreamSequenceToken> deliveredTokens = messages.Select(message => message.SequenceToken).ToList();
+                var deliveredTokens = messages.Select(message => message.SequenceToken).ToList();
                 // find oldest delivered message
-                StreamSequenceToken oldest = deliveredTokens.Max();
+                var oldest = deliveredTokens.Max();
                 // finalize all pending messages at or befor the oldest
-                List<PendingDelivery> finalizedDeliveries = pending
+                var finalizedDeliveries = pending
                     .Where(pendingDelivery => !pendingDelivery.Token.Newer(oldest))
                     .ToList();
                 if (finalizedDeliveries.Count == 0) return;
                 // remove all finalized deliveries from pending, regardless of if it was delivered or not.
                 pending.RemoveRange(0, finalizedDeliveries.Count);
                 // get the queue messages for all finalized deliveries that were delivered.
-                List<QueueMessage> deliveredCloudQueueMessages = finalizedDeliveries
+                var deliveredCloudQueueMessages = finalizedDeliveries
                     .Where(finalized => deliveredTokens.Contains(finalized.Token))
                     .Select(finalized => finalized.Message)
                     .ToList();

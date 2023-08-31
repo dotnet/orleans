@@ -89,7 +89,7 @@ namespace Orleans.Runtime
             }
             var sb = new StringBuilder("[");
             var enumerator = dict.GetEnumerator();
-            int index = 0;
+            var index = 0;
             while (enumerator.MoveNext())
             {
                 var pair = enumerator.Current;

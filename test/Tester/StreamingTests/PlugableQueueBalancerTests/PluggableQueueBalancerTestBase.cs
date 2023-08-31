@@ -33,12 +33,12 @@ namespace Tester.StreamingTests
 
         private async Task<bool> CheckLeases(ILeaseManagerGrain leaseManager, int siloCount, int expectedResponsibilityPerBalancer, bool lastTry)
         {
-            Dictionary<string,int> responsibilityMap = await leaseManager.GetResponsibilityMap();
+            var responsibilityMap = await leaseManager.GetResponsibilityMap();
             if(lastTry)
             {
                 //there should be one StreamQueueBalancer per silo
                 Assert.Equal(responsibilityMap.Count, siloCount);
-                foreach (int responsibility in responsibilityMap.Values)
+                foreach (var responsibility in responsibilityMap.Values)
                 {
                     Assert.Equal(expectedResponsibilityPerBalancer, responsibility);
                 }

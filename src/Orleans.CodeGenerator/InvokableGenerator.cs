@@ -22,12 +22,12 @@ namespace Orleans.CodeGenerator
             MethodDescription method)
         {
             var generatedClassName = GetSimpleClassName(interfaceDescription, method);
-            INamedTypeSymbol baseClassType = GetBaseClassType(method);
+            var baseClassType = GetBaseClassType(method);
             var fieldDescriptions = GetFieldDescriptions(method, interfaceDescription);
             var fields = GetFieldDeclarations(method, fieldDescriptions, libraryTypes);
             var (ctor, ctorArgs) = GenerateConstructor(libraryTypes, generatedClassName, method, baseClassType);
 
-            Accessibility accessibility = GetAccessibility(interfaceDescription);
+            var accessibility = GetAccessibility(interfaceDescription);
 
             var targetField = fieldDescriptions.OfType<TargetFieldDescription>().Single();
 
@@ -112,7 +112,7 @@ namespace Orleans.CodeGenerator
             static Accessibility GetAccessibility(InvokableInterfaceDescription interfaceDescription)
             {
                 var t = interfaceDescription.InterfaceType;
-                Accessibility accessibility = t.DeclaredAccessibility;
+                var accessibility = t.DeclaredAccessibility;
                 while (t is not null)
                 {
                     if ((int)t.DeclaredAccessibility < (int)accessibility)

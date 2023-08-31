@@ -24,7 +24,7 @@ namespace DefaultCluster.Tests.SchedulerTests
             // We'll create way more grains than that to make sure we swamp the thread pools
             var grains = new List<IErrorGrain>();
             var grainFullName = typeof(ErrorGrain).FullName;
-            for (int i = 0; i < 100; i++)
+            for (var i = 0; i < 100; i++)
             {
                 grains.Add(this.GrainFactory.GetGrain<IErrorGrain>(GetRandomGrainId(), grainFullName));
             }

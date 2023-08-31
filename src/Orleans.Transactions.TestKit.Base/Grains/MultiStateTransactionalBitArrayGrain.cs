@@ -71,12 +71,12 @@ namespace Orleans.Transactions.TestKit.Correctnesss
 
         public void Set(int index, bool value)
         {
-            int idx = index / BitsInInt;
+            var idx = index / BitsInInt;
             if (idx >= this.value.Length)
             {
                 Array.Resize(ref this.value, idx+1);
             }
-            int shift = 1 << (index % BitsInInt);
+            var shift = 1 << (index % BitsInInt);
             if (value)
             {
                 this.value[idx] |= shift;
@@ -99,7 +99,7 @@ namespace Orleans.Transactions.TestKit.Correctnesss
 
                 string Reverse(string s)
                 {
-                    char[] charArray = s.ToCharArray();
+                    var charArray = s.ToCharArray();
                     Array.Reverse(charArray);
                     return new string(charArray);
                 }

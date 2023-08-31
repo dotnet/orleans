@@ -65,8 +65,8 @@ namespace Orleans.Transactions.TestKit
     {
         public static async Task<List<string>[]> GetNestedTransactionIds(int tier, List<ITransactionAttributionGrain>[] tiers)
         {
-            TransactionInfo ti = TransactionContext.GetTransactionInfo();
-            List<string>[] results = new List<string>[tier + 1 + tiers.Length];
+            var ti = TransactionContext.GetTransactionInfo();
+            var results = new List<string>[tier + 1 + tiers.Length];
             results[tier] = new List<string>(new[] { ti?.Id });
 
             if (tiers.Length == 0)
@@ -74,13 +74,13 @@ namespace Orleans.Transactions.TestKit
                 return results;
             }
 
-            List<ITransactionAttributionGrain> nextTier = tiers.FirstOrDefault();
-            List<ITransactionAttributionGrain>[] nextTiers = tiers.Skip(1).ToArray();
-            List<string>[][] tiersResults = await Task.WhenAll(nextTier.Select(g => g.GetNestedTransactionIds(tier+1, nextTiers)));
-            foreach (List<string>[] result in tiersResults)
+            var nextTier = tiers.FirstOrDefault();
+            var nextTiers = tiers.Skip(1).ToArray();
+            var tiersResults = await Task.WhenAll(nextTier.Select(g => g.GetNestedTransactionIds(tier+1, nextTiers)));
+            foreach (var result in tiersResults)
             {
                 if (result.Length != results.Length) throw new ApplicationException("Invalid result length");
-                for (int i = tier + 1; i < results.Length; i++)
+                for (var i = tier + 1; i < results.Length; i++)
                 {
                     if (results[i] != null)
                     {

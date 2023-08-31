@@ -14,7 +14,7 @@ namespace Orleans.Transactions.TestKit
         public virtual void TransactionGrainsThrowWhenTransactions(string transactionTestGrainClassName)
         {
             const int delta = 5;
-            ITransactionTestGrain grain = RandomTestGrain(transactionTestGrainClassName);
+            var grain = RandomTestGrain(transactionTestGrainClassName);
             Func<Task> task = ()=>grain.Set(delta);
             var response = task.Should().ThrowAsync<OrleansTransactionsDisabledException>();
         }
@@ -24,11 +24,11 @@ namespace Orleans.Transactions.TestKit
             const int delta = 5;
             const int grainCount = TransactionTestConstants.MaxCoordinatedTransactions;
 
-            List<ITransactionTestGrain> grains =
+            var grains =
                 Enumerable.Range(0, grainCount)
                     .Select(i => RandomTestGrain(transactionTestGrainClassName))
                     .ToList();
-            ITransactionCoordinatorGrain coordinator = this.grainFactory.GetGrain<ITransactionCoordinatorGrain>(Guid.NewGuid());
+            var coordinator = this.grainFactory.GetGrain<ITransactionCoordinatorGrain>(Guid.NewGuid());
 
             Func<Task> task = () => coordinator.MultiGrainSet(grains, delta);
             var response = task.Should().ThrowAsync<OrleansTransactionsDisabledException>();

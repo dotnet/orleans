@@ -39,7 +39,7 @@ namespace UnitTests.Grains
 
         public Task<int> GetNumberConsumed()
         {
-            int sum = 0;
+            var sum = 0;
             foreach (var observer in consumerObservers)
             {
                 sum += observer.NumConsumed;

@@ -71,7 +71,7 @@ namespace Orleans.Clustering.DynamoDB
             if (tryInitTableVersion)
             {
                 // ignore return value, since we don't care if I inserted it or not, as long as it is in there.
-                bool created = await TryCreateTableVersionEntryAsync();
+                var created = await TryCreateTableVersionEntryAsync();
                 if(created) logger.LogInformation("Created new table version row.");
             }
         }
@@ -149,7 +149,7 @@ namespace Orleans.Clustering.DynamoDB
                     toDelete.Add(record.GetKeys());
                 }
 
-                List<Task> tasks = new List<Task>();
+                var tasks = new List<Task>();
                 foreach (var batch in toDelete.BatchIEnumerable(MAX_BATCH_SIZE))
                 {
                     tasks.Add(storage.DeleteEntriesAsync(this.options.TableName, batch));
@@ -187,7 +187,7 @@ namespace Orleans.Clustering.DynamoDB
                 var entries = await storage.GetEntriesTxAsync(this.options.TableName,
                     new[] {siloEntryKeys, versionEntryKeys}, fields => new SiloInstanceRecord(fields));
 
-                MembershipTableData data = Convert(entries.ToList());
+                var data = Convert(entries.ToList());
                 if (this.logger.IsEnabled(LogLevel.Trace)) this.logger.LogTrace("Read my entry {SiloAddress} Table: {TableData}", siloAddress.ToString(), data.ToString());
                 return data;
             }
@@ -230,7 +230,7 @@ namespace Orleans.Clustering.DynamoDB
                     return await this.ReadAll();
                 }
 
-                MembershipTableData data = Convert(records);
+                var data = Convert(records);
                 if (this.logger.IsEnabled(LogLevel.Trace)) this.logger.LogTrace("ReadAll Table {Table}", data.ToString());
 
                 return data;
@@ -453,7 +453,7 @@ namespace Orleans.Clustering.DynamoDB
                     {
                         try
                         {
-                            MembershipEntry membershipEntry = Parse(tableEntry);
+                            var membershipEntry = Parse(tableEntry);
                             memEntries.Add(new Tuple<MembershipEntry, string>(membershipEntry,
                                 tableEntry.ETag.ToString(CultureInfo.InvariantCulture)));
                         }
@@ -509,8 +509,8 @@ namespace Orleans.Clustering.DynamoDB
 
             if (!string.IsNullOrEmpty(tableEntry.SuspectingSilos))
             {
-                string[] silos = tableEntry.SuspectingSilos.Split('|');
-                foreach (string silo in silos)
+                var silos = tableEntry.SuspectingSilos.Split('|');
+                foreach (var silo in silos)
                 {
                     suspectingSilos.Add(SiloAddress.FromParsableString(silo));
                 }
@@ -518,15 +518,15 @@ namespace Orleans.Clustering.DynamoDB
 
             if (!string.IsNullOrEmpty(tableEntry.SuspectingTimes))
             {
-                string[] times = tableEntry.SuspectingTimes.Split('|');
-                foreach (string time in times)
+                var times = tableEntry.SuspectingTimes.Split('|');
+                foreach (var time in times)
                     suspectingTimes.Add(LogFormatter.ParseDate(time));
             }
 
             if (suspectingSilos.Count != suspectingTimes.Count)
                 throw new OrleansException($"SuspectingSilos.Length of {suspectingSilos.Count} as read from Azure table is not equal to SuspectingTimes.Length of {suspectingTimes.Count}");
 
-            for (int i = 0; i < suspectingSilos.Count; i++)
+            for (var i = 0; i < suspectingSilos.Count; i++)
                 parse.AddSuspector(suspectingSilos[i], suspectingTimes[i]);
 
             return parse;
@@ -554,7 +554,7 @@ namespace Orleans.Clustering.DynamoDB
             {
                 var siloList = new StringBuilder();
                 var timeList = new StringBuilder();
-                bool first = true;
+                var first = true;
                 foreach (var tuple in memEntry.SuspectTimes)
                 {
                     if (!first)

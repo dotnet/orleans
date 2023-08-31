@@ -34,7 +34,7 @@ namespace Orleans.Providers.Streams.Generator
             this.bufferPool = bufferPool;
             this.serializer = serializer;
             cache = new PooledQueueCache(this, logger, cacheMonitor, monitorWriteInterval);
-            TimePurgePredicate purgePredicate = new TimePurgePredicate(TimeSpan.FromMinutes(5), TimeSpan.FromMinutes(10));
+            var purgePredicate = new TimePurgePredicate(TimeSpan.FromMinutes(5), TimeSpan.FromMinutes(10));
             this.evictionStrategy = new ChronologicalEvictionStrategy(logger, purgePredicate, cacheMonitor, monitorWriteInterval) {PurgeObservable = cache};
         }
 
@@ -42,9 +42,9 @@ namespace Orleans.Providers.Streams.Generator
         public IBatchContainer GetBatchContainer(ref CachedMessage cachedMessage)
         {
             //Deserialize payload
-            int readOffset = 0;
-            ArraySegment<byte> payload = SegmentBuilder.ReadNextBytes(cachedMessage.Segment, ref readOffset);
-            object payloadObject = this.serializer.Deserialize<object>(payload);
+            var readOffset = 0;
+            var payload = SegmentBuilder.ReadNextBytes(cachedMessage.Segment, ref readOffset);
+            var payloadObject = this.serializer.Deserialize<object>(payload);
             return new GeneratedBatchContainer(cachedMessage.StreamId,
                 payloadObject, new EventSequenceTokenV2(cachedMessage.SequenceNumber));
         }
@@ -57,7 +57,7 @@ namespace Orleans.Providers.Streams.Generator
 
         private CachedMessage QueueMessageToCachedMessage(GeneratedBatchContainer queueMessage, DateTime dequeueTimeUtc)
         {
-            StreamPosition streamPosition = GetStreamPosition(queueMessage);
+            var streamPosition = GetStreamPosition(queueMessage);
             return new CachedMessage()
             {
                 StreamId = streamPosition.StreamId,
@@ -71,10 +71,10 @@ namespace Orleans.Providers.Streams.Generator
         // Placed object message payload into a segment from a buffer pool.  When this get's too big, older blocks will be purged
         private ArraySegment<byte> SerializeMessageIntoPooledSegment(GeneratedBatchContainer queueMessage)
         {
-            byte[] serializedPayload = this.serializer.SerializeToArray(queueMessage.Payload);
+            var serializedPayload = this.serializer.SerializeToArray(queueMessage.Payload);
 
             // get size of namespace, offset, partitionkey, properties, and payload
-            int size = SegmentBuilder.CalculateAppendSize(serializedPayload);
+            var size = SegmentBuilder.CalculateAppendSize(serializedPayload);
 
             // get segment
             ArraySegment<byte> segment;
@@ -87,13 +87,13 @@ namespace Orleans.Providers.Streams.Generator
                 // if this fails with clean block, then requested size is too big
                 if (!currentBuffer.TryGetSegment(size, out segment))
                 {
-                    string errmsg = $"Message size is to big. MessageSize: {size}";
+                    var errmsg = $"Message size is to big. MessageSize: {size}";
                     throw new ArgumentOutOfRangeException(nameof(queueMessage), errmsg);
                 }
             }
 
             // encode namespace, offset, partitionkey, properties and payload into segment
-            int writeOffset = 0;
+            var writeOffset = 0;
             SegmentBuilder.Append(segment, ref writeOffset, serializedPayload);
 
             return segment;
@@ -153,8 +153,8 @@ namespace Orleans.Providers.Streams.Generator
         /// <inheritdoc />
         public void AddToCache(IList<IBatchContainer> messages)
         {
-            DateTime utcNow = DateTime.UtcNow;
-            List<CachedMessage> generatedMessages = messages
+            var utcNow = DateTime.UtcNow;
+            var generatedMessages = messages
                 .Cast<GeneratedBatchContainer>()
                 .Select(batch => QueueMessageToCachedMessage(batch, utcNow))
                 .ToList();

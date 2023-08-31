@@ -16,9 +16,9 @@ namespace Orleans.Transactions.TestKit
         {
             const int expected = 5;
 
-            IFaultInjectionTransactionTestGrain grain = grainFactory.GetGrain<IFaultInjectionTransactionTestGrain>(Guid.NewGuid());
+            var grain = grainFactory.GetGrain<IFaultInjectionTransactionTestGrain>(Guid.NewGuid());
             await grain.Set(expected);
-            int actual = await grain.Get();
+            var actual = await grain.Get();
             actual.Should().Be(expected);
             await grain.Deactivate();
             actual = await grain.Get();
@@ -28,12 +28,12 @@ namespace Orleans.Transactions.TestKit
         public virtual async Task SingleGrainWriteTransaction()
         {
             const int delta = 5;
-            IFaultInjectionTransactionTestGrain grain = this.grainFactory.GetGrain<IFaultInjectionTransactionTestGrain>(Guid.NewGuid());
-            int original = await grain.Get();
+            var grain = this.grainFactory.GetGrain<IFaultInjectionTransactionTestGrain>(Guid.NewGuid());
+            var original = await grain.Get();
             await grain.Add(delta);
             await grain.Deactivate();
-            int expected = original + delta;
-            int actual = await grain.Get();
+            var expected = original + delta;
+            var actual = await grain.Get();
             actual.Should().Be(expected);
         }
 
@@ -41,15 +41,15 @@ namespace Orleans.Transactions.TestKit
         {
             const int setval = 5;
             const int addval = 7;
-            int expected = setval + addval;
+            var expected = setval + addval;
             const int grainCount = TransactionTestConstants.MaxCoordinatedTransactions;
             var faultInjectionControl = new FaultInjectionControl() { FaultInjectionPhase = injectionPhase, FaultInjectionType = injectionType };
-            List<IFaultInjectionTransactionTestGrain> grains =
+            var grains =
                 Enumerable.Range(0, grainCount)
                     .Select(i => this.grainFactory.GetGrain<IFaultInjectionTransactionTestGrain>(Guid.NewGuid()))
                     .ToList();
 
-            IFaultInjectionTransactionCoordinatorGrain coordinator = this.grainFactory.GetGrain<IFaultInjectionTransactionCoordinatorGrain>(Guid.NewGuid());
+            var coordinator = this.grainFactory.GetGrain<IFaultInjectionTransactionCoordinatorGrain>(Guid.NewGuid());
 
             await coordinator.MultiGrainSet(grains, setval);
             // add delay between transactions so confirmation errors don't bleed into neighboring transactions
@@ -70,8 +70,8 @@ namespace Orleans.Transactions.TestKit
             catch (OrleansTransactionException e)
             {
                 this.testOutput($"Call failed with exception: {e}, retrying without fault");
-                bool cascadingAbort = false;
-                bool firstAttempt = true;
+                var cascadingAbort = false;
+                var firstAttempt = true;
 
                 do
                 {
@@ -98,7 +98,7 @@ namespace Orleans.Transactions.TestKit
             //if transactional state loaded correctly after reactivation, then following should pass
             foreach (var grain in grains)
             {
-                int actual = await grain.Get();
+                var actual = await grain.Get();
                 actual.Should().Be(expected);
             }
         }

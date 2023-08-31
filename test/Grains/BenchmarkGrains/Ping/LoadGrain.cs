@@ -27,12 +27,12 @@ namespace BenchmarkGrains.Ping
 
         private async Task<Report> RunGeneration(int run, int conncurrent)
         {
-            List<Pending> pendingWork = Enumerable.Range(run * conncurrent, conncurrent).Select(i => new Pending() { Grain = GrainFactory.GetGrain<IPingGrain>(i) }).ToList();
-            Report report = new Report();
-            Stopwatch sw = Stopwatch.StartNew();
+            var pendingWork = Enumerable.Range(run * conncurrent, conncurrent).Select(i => new Pending() { Grain = GrainFactory.GetGrain<IPingGrain>(i) }).ToList();
+            var report = new Report();
+            var sw = Stopwatch.StartNew();
             while (!this.end)
             {
-                foreach(Pending pending in pendingWork.Where(t => t.PendingCall == default))
+                foreach(var pending in pendingWork.Where(t => t.PendingCall == default))
                 {
                     pending.PendingCall = pending.Grain.Run();
                 }
@@ -57,7 +57,7 @@ namespace BenchmarkGrains.Ping
                     await Task.WhenAny(pendingWork.Where(t => !t.PendingCall.IsCompletedSuccessfully).Select(p => p.PendingCall.AsTask()));
                 }
             } catch (Exception) {}
-            foreach (Pending pending in pendingWork.Where(p => p.PendingCall != default))
+            foreach (var pending in pendingWork.Where(p => p.PendingCall != default))
             {
                 if (pending.PendingCall.IsFaulted || pending.PendingCall.IsCanceled)
                 {

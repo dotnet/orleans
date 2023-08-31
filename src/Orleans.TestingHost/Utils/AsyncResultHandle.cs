@@ -65,7 +65,7 @@ namespace Orleans.TestingHost.Utils
         /// <returns>Returns <c>true</c> if operation completes before timeout</returns>
         public async Task<bool> WaitFor(TimeSpan timeout, Func<bool> checkFlag)
         {
-            double remaining = timeout.TotalMilliseconds;
+            var remaining = timeout.TotalMilliseconds;
             while (!checkFlag())
             {
                 if (remaining < 0)

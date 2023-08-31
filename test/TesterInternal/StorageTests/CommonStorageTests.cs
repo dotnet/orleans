@@ -83,7 +83,7 @@ namespace UnitTests.StorageTests.Relational
         {
             //A grain with a random ID will be arranged to the database. Then its state is set to null to simulate the fact
             //it is like a second activation after a one that has succeeded to write.
-            string grainTypeName = GrainTypeGenerator.GetGrainType<Guid>();
+            var grainTypeName = GrainTypeGenerator.GetGrainType<Guid>();
             var (grainId, grainState) = this.GetTestReferenceAndState(RandomUtilities.GetRandom<long>(), null);
 
             await Store_WriteRead(grainTypeName, grainId, grainState).ConfigureAwait(false);
@@ -109,7 +109,7 @@ namespace UnitTests.StorageTests.Relational
             var inconsistentStateVersion = RandomUtilities.GetRandom<int>().ToString(CultureInfo.InvariantCulture);
 
             var inconsistentState = this.GetTestReferenceAndState(RandomUtilities.GetRandom<long>(), inconsistentStateVersion);
-            string grainTypeName = GrainTypeGenerator.GetGrainType<Guid>();
+            var grainTypeName = GrainTypeGenerator.GetGrainType<Guid>();
             var exception = await Record.ExceptionAsync(() => Store_WriteRead(grainTypeName, inconsistentState.GrainId, inconsistentState.GrainState)).ConfigureAwait(false);
 
             Assert.NotNull(exception);
@@ -123,8 +123,8 @@ namespace UnitTests.StorageTests.Relational
             //As data is written and read the Version numbers (ETags) are as checked for correctness (they change).
             //Additionally the Store_WriteRead tests does its validation.
             var grainTypeName = GrainTypeGenerator.GetGrainType<Guid>();
-            int StartOfRange = 33900;
-            int CountOfRange = countOfGrains;
+            var StartOfRange = 33900;
+            var CountOfRange = countOfGrains;
 
             //Since the version is NULL, storage provider tries to insert this data
             //as new state. If there is already data with this class, the writing fails
@@ -146,7 +146,7 @@ namespace UnitTests.StorageTests.Relational
                 Assert.NotEqual(firstVersion, secondVersion);
             };
 
-            int MaxNumberOfThreads = Environment.ProcessorCount * 3;
+            var MaxNumberOfThreads = Environment.ProcessorCount * 3;
             // The purpose of Parallel.ForEachAsync is to ensure the storage provider will be tested from
             // multiple threads concurrently, as would happen in running system also. Nevertheless
             // limit the degree of parallelization (concurrent threads) to avoid unnecessarily
@@ -157,7 +157,7 @@ namespace UnitTests.StorageTests.Relational
             {
                 // This loop writes the state consecutive times to the database to make sure its
                 // version is updated appropriately.
-                for (int k = 0; k < 10; ++k)
+                for (var k = 0; k < 10; ++k)
                 {
                     var versionBefore = grainData.GrainState.ETag;
                     await RetryHelper.RetryOnExceptionAsync(5, RetryOperation.Sigmoid, async () =>

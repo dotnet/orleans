@@ -46,8 +46,8 @@ namespace DefaultCluster.Tests.General
         [Fact]
         public void GrainReferenceComparison_DifferentReference()
         {
-            ISimpleGrain ref1 = this.GrainFactory.GetGrain<ISimpleGrain>(Random.Shared.Next(), UnitTests.Grains.SimpleGrain.SimpleGrainNamePrefix);
-            ISimpleGrain ref2 = this.GrainFactory.GetGrain<ISimpleGrain>(Random.Shared.Next(), UnitTests.Grains.SimpleGrain.SimpleGrainNamePrefix);
+            var ref1 = this.GrainFactory.GetGrain<ISimpleGrain>(Random.Shared.Next(), UnitTests.Grains.SimpleGrain.SimpleGrainNamePrefix);
+            var ref2 = this.GrainFactory.GetGrain<ISimpleGrain>(Random.Shared.Next(), UnitTests.Grains.SimpleGrain.SimpleGrainNamePrefix);
             Assert.True(ref1 != ref2);
             Assert.True(ref2 != ref1);
             Assert.False(ref1 == ref2);
@@ -59,8 +59,8 @@ namespace DefaultCluster.Tests.General
         [Fact, TestCategory("BVT"), TestCategory("AsynchronyPrimitives")]
         public void TaskCompletionSource_Resolve()
         {
-            string str = "Hello TaskCompletionSource";
-            TaskCompletionSource<string> tcs = new TaskCompletionSource<string>();
+            var str = "Hello TaskCompletionSource";
+            var tcs = new TaskCompletionSource<string>();
             Task task = tcs.Task;
             Assert.False(task.IsCompleted, "TCS.Task not yet completed");
             tcs.SetResult(str);
@@ -72,8 +72,8 @@ namespace DefaultCluster.Tests.General
         [Fact]
         public void GrainReference_Pass_this()
         {
-            IChainedGrain g1 = this.GrainFactory.GetGrain<IChainedGrain>(GetRandomGrainId());
-            IChainedGrain g2 = this.GrainFactory.GetGrain<IChainedGrain>(GetRandomGrainId());
+            var g1 = this.GrainFactory.GetGrain<IChainedGrain>(GetRandomGrainId());
+            var g2 = this.GrainFactory.GetGrain<IChainedGrain>(GetRandomGrainId());
 
             g1.PassThis(g2).Wait();
         }
@@ -81,8 +81,8 @@ namespace DefaultCluster.Tests.General
         [Fact]
         public void GrainReference_Pass_this_Nested()
         {
-            IChainedGrain g1 = this.GrainFactory.GetGrain<IChainedGrain>(GetRandomGrainId());
-            IChainedGrain g2 = this.GrainFactory.GetGrain<IChainedGrain>(GetRandomGrainId());
+            var g1 = this.GrainFactory.GetGrain<IChainedGrain>(GetRandomGrainId());
+            var g2 = this.GrainFactory.GetGrain<IChainedGrain>(GetRandomGrainId());
 
             g1.PassThisNested(new ChainGrainHolder { Next = g2 }).Wait();
         }
@@ -90,8 +90,8 @@ namespace DefaultCluster.Tests.General
         [Fact]
         public async Task GrainReference_Pass_Null()
         {
-            IChainedGrain g1 = this.GrainFactory.GetGrain<IChainedGrain>(GetRandomGrainId());
-            IChainedGrain g2 = this.GrainFactory.GetGrain<IChainedGrain>(GetRandomGrainId());
+            var g1 = this.GrainFactory.GetGrain<IChainedGrain>(GetRandomGrainId());
+            var g2 = this.GrainFactory.GetGrain<IChainedGrain>(GetRandomGrainId());
 
             // g1 will pass a null reference to g2
             await g1.PassNullNested(new ChainGrainHolder { Next = g2 });
@@ -103,7 +103,7 @@ namespace DefaultCluster.Tests.General
         [Fact, TestCategory("Serialization"), TestCategory("JSON")]
         public void GrainReference_Json_Serialization()
         {
-            int id = Random.Shared.Next();
+            var id = Random.Shared.Next();
             TestGrainReferenceSerialization(id, true);
         }
 
@@ -139,7 +139,7 @@ namespace DefaultCluster.Tests.General
         [Fact, TestCategory("Serialization"), TestCategory("JSON")]
         public void GrainReference_Json_Serialization_Unresolved()
         {
-            int id = Random.Shared.Next();
+            var id = Random.Shared.Next();
             TestGrainReferenceSerialization(id, false);
         }
 
@@ -180,7 +180,7 @@ namespace DefaultCluster.Tests.General
             Assert.IsAssignableFrom(grain.GetType(), other);
             Assert.NotNull(other);
             Assert.Equal(grain,  other);  // "Deserialized grain reference equality is preserved"
-            int res = other.GetA().Result;
+            var res = other.GetA().Result;
             Assert.Equal(id,  res);  // "Returned values from call to deserialized grain reference"
         }
 
@@ -188,8 +188,8 @@ namespace DefaultCluster.Tests.General
         {
             var settings = OrleansJsonSerializerSettings.GetDefaultSerializerSettings(this.HostedCluster.Client.ServiceProvider);
             // http://james.newtonking.com/json/help/index.html?topic=html/T_Newtonsoft_Json_JsonConvert.htm
-            string json = JsonConvert.SerializeObject(obj, settings);
-            object other = JsonConvert.DeserializeObject(json, typeof(T), settings);
+            var json = JsonConvert.SerializeObject(obj, settings);
+            var other = JsonConvert.DeserializeObject(json, typeof(T), settings);
             return (T)other;
         }
     }

@@ -33,7 +33,7 @@ namespace Orleans.Transactions.Tests
         [Fact]
         public async Task AllSupportedAttributesFromOutsideTransactionTest()
         {
-            ITransactionAttributionGrain top = this.grainFactory.GetTransactionAttributionGrain(Guid.NewGuid());
+            var top = this.grainFactory.GetTransactionAttributionGrain(Guid.NewGuid());
             List<ITransactionAttributionGrain>[] tiers = 
             {
                 new List<ITransactionAttributionGrain>(new[] {
@@ -46,8 +46,8 @@ namespace Orleans.Transactions.Tests
                     })
             };
 
-            List<string>[] results = await top.GetNestedTransactionIds(0, tiers);
-            for(int i=0; i<results.Length; i++)
+            var results = await top.GetNestedTransactionIds(0, tiers);
+            for(var i=0; i<results.Length; i++)
             {
                 this.output.WriteLine($"{i} => {string.Join(",", results[i])}");
             }
@@ -56,12 +56,12 @@ namespace Orleans.Transactions.Tests
             Assert.Equal(2, results.Length);
 
             // make sure top level call has no transactionId
-            List<string> topTransactionIds = results[0];
+            var topTransactionIds = results[0];
             Assert.Single(topTransactionIds);
             Assert.Null(topTransactionIds.First());
 
             // check sub call transactionIds, should be null, null, guid1, guid2, null, null
-            List<string> subcallTransactionIds = results[1];
+            var subcallTransactionIds = results[1];
             Assert.Equal(6, subcallTransactionIds.Count);
 
             Assert.Null(subcallTransactionIds[0]); // no attribute
@@ -92,7 +92,7 @@ namespace Orleans.Transactions.Tests
         [Fact]
         public async Task AllSupportedAttributesFromWithinTransactionTest()
         {
-            ITransactionAttributionGrain top = this.grainFactory.GetTransactionAttributionGrain(Guid.NewGuid(), TransactionOption.Create);
+            var top = this.grainFactory.GetTransactionAttributionGrain(Guid.NewGuid(), TransactionOption.Create);
             List<ITransactionAttributionGrain>[] tiers =
             {
                 new List<ITransactionAttributionGrain>(new[] {
@@ -105,8 +105,8 @@ namespace Orleans.Transactions.Tests
                     })
             };
 
-            List<string>[] results = await top.GetNestedTransactionIds(0, tiers);
-            for (int i = 0; i < results.Length; i++)
+            var results = await top.GetNestedTransactionIds(0, tiers);
+            for (var i = 0; i < results.Length; i++)
             {
                 this.output.WriteLine($"{i} => {string.Join(",", results[i])}");
             }
@@ -115,12 +115,12 @@ namespace Orleans.Transactions.Tests
             Assert.Equal(2, results.Length);
 
             // make sure top level call has transactionId
-            List<string> topTransactionIds = results[0];
+            var topTransactionIds = results[0];
             Assert.Single(topTransactionIds);
             Assert.NotNull(topTransactionIds.First());
 
             // check sub call transactionIds, should be null, null, guid1, guid2, where guid1 should match Id from top
-            List<string> subcallTransactionIds = results[1];
+            var subcallTransactionIds = results[1];
             Assert.Equal(6, subcallTransactionIds.Count);
 
             Assert.Null(subcallTransactionIds[0]); // no attribute
@@ -147,7 +147,7 @@ namespace Orleans.Transactions.Tests
         [Fact]
         public async Task CreateOrJoinTest()
         {
-            ITransactionAttributionGrain top = this.grainFactory.GetTransactionAttributionGrain(Guid.NewGuid(), TransactionOption.CreateOrJoin);
+            var top = this.grainFactory.GetTransactionAttributionGrain(Guid.NewGuid(), TransactionOption.CreateOrJoin);
             List<ITransactionAttributionGrain>[] tiers =
             {
                 new List<ITransactionAttributionGrain>(new[] {
@@ -156,8 +156,8 @@ namespace Orleans.Transactions.Tests
                     })
             };
 
-            List<string>[] results = await top.GetNestedTransactionIds(0, tiers);
-            for (int i = 0; i < results.Length; i++)
+            var results = await top.GetNestedTransactionIds(0, tiers);
+            for (var i = 0; i < results.Length; i++)
             {
                 this.output.WriteLine($"{i} => {string.Join(",", results[i])}");
             }
@@ -166,12 +166,12 @@ namespace Orleans.Transactions.Tests
             Assert.Equal(2, results.Length);
 
             // make sure top level call has transactionId
-            List<string> topTransactionIds = results[0];
+            var topTransactionIds = results[0];
             Assert.Single(topTransactionIds);
             Assert.NotNull(topTransactionIds.First());
 
             // check sub call transactionIds, should be null, null, guid1, guid1, where guid1 should match Id from top
-            List<string> subcallTransactionIds = results[1];
+            var subcallTransactionIds = results[1];
             Assert.Equal(2, subcallTransactionIds.Count);
             // make sure required attributed transactionId matches parent
             Assert.Equal(subcallTransactionIds[0], topTransactionIds.First());
@@ -182,7 +182,7 @@ namespace Orleans.Transactions.Tests
         [Fact]
         public async Task CreateTest()
         {
-            ITransactionAttributionGrain top = this.grainFactory.GetTransactionAttributionGrain(Guid.NewGuid(), TransactionOption.Create);
+            var top = this.grainFactory.GetTransactionAttributionGrain(Guid.NewGuid(), TransactionOption.Create);
             List<ITransactionAttributionGrain>[] tiers =
             {
                 new List<ITransactionAttributionGrain>(new[] {
@@ -191,8 +191,8 @@ namespace Orleans.Transactions.Tests
                     })
             };
 
-            List<string>[] results = await top.GetNestedTransactionIds(0, tiers);
-            for (int i = 0; i < results.Length; i++)
+            var results = await top.GetNestedTransactionIds(0, tiers);
+            for (var i = 0; i < results.Length; i++)
             {
                 this.output.WriteLine($"{i} => {string.Join(",", results[i])}");
             }
@@ -201,12 +201,12 @@ namespace Orleans.Transactions.Tests
             Assert.Equal(2, results.Length);
 
             // make sure top level call has transactionId
-            List<string> topTransactionIds = results[0];
+            var topTransactionIds = results[0];
             Assert.Single(topTransactionIds);
             Assert.NotNull(topTransactionIds.First());
 
             // check sub call transactionIds, should be null, null, guid1, guid2, where guid1 and guid2 should be different and not match top level transactionId
-            List<string> subcallTransactionIds = results[1];
+            var subcallTransactionIds = results[1];
             Assert.Equal(2, subcallTransactionIds.Count);
             // make sure RequiresNew attributed transactionId does not match parents
             Assert.NotEqual(subcallTransactionIds[0], topTransactionIds.First());
@@ -223,7 +223,7 @@ namespace Orleans.Transactions.Tests
         [Fact]
         public async Task SupportedTest()
         {
-            ITransactionAttributionGrain top = this.grainFactory.GetTransactionAttributionGrain(Guid.NewGuid(), TransactionOption.Create);
+            var top = this.grainFactory.GetTransactionAttributionGrain(Guid.NewGuid(), TransactionOption.Create);
             List<ITransactionAttributionGrain>[] tiers =
             {
                 new List<ITransactionAttributionGrain>(new[] {
@@ -234,8 +234,8 @@ namespace Orleans.Transactions.Tests
                     })
             };
 
-            List<string>[] results = await top.GetNestedTransactionIds(0, tiers);
-            for (int i = 0; i < results.Length; i++)
+            var results = await top.GetNestedTransactionIds(0, tiers);
+            for (var i = 0; i < results.Length; i++)
             {
                 this.output.WriteLine($"{i} => {string.Join(",", results[i])}");
             }
@@ -244,18 +244,18 @@ namespace Orleans.Transactions.Tests
             Assert.Equal(3, results.Length);
 
             // make sure top level call has transactionId
-            List<string> topTransactionIds = results[0];
+            var topTransactionIds = results[0];
             Assert.Single(topTransactionIds);
             Assert.NotNull(topTransactionIds.First());
 
             // check first tier call transactionIds, should be a guid which matches the parent
-            List<string> tier1callTransactionIds = results[1];
+            var tier1callTransactionIds = results[1];
             Assert.Single(tier1callTransactionIds);
             // make sure Supported attributed transactionId matchs parents
             Assert.Equal(tier1callTransactionIds[0], topTransactionIds.First());
 
             // check second tier call transactionIds, should be a guid which matches the parent
-            List<string> tier2callTransactionIds = results[2];
+            var tier2callTransactionIds = results[2];
             Assert.Single(tier2callTransactionIds);
             // make sure CreateOrJoin attributed transactionId matchs parents
             Assert.Equal(tier2callTransactionIds[0], topTransactionIds.First());
@@ -264,7 +264,7 @@ namespace Orleans.Transactions.Tests
         [Fact]
         public async Task JoinFailTest()
         {
-            ITransactionAttributionGrain fail = this.grainFactory.GetTransactionAttributionGrain(Guid.NewGuid());
+            var fail = this.grainFactory.GetTransactionAttributionGrain(Guid.NewGuid());
             List<ITransactionAttributionGrain>[] tiers =
             {
                 new List<ITransactionAttributionGrain>(new[] {
@@ -278,7 +278,7 @@ namespace Orleans.Transactions.Tests
         [Fact]
         public async Task NotAllowedFailTest()
         {
-            ITransactionAttributionGrain fail = this.grainFactory.GetTransactionAttributionGrain(Guid.NewGuid(), TransactionOption.Create);
+            var fail = this.grainFactory.GetTransactionAttributionGrain(Guid.NewGuid(), TransactionOption.Create);
             List<ITransactionAttributionGrain>[] tiers =
             {
                 new List<ITransactionAttributionGrain>(new[] {
@@ -286,7 +286,7 @@ namespace Orleans.Transactions.Tests
                     })
             };
 
-            OrleansTransactionAbortedException exception = await Assert.ThrowsAsync<OrleansTransactionAbortedException>(() => fail.GetNestedTransactionIds(0, tiers));
+            var exception = await Assert.ThrowsAsync<OrleansTransactionAbortedException>(() => fail.GetNestedTransactionIds(0, tiers));
             Assert.IsType<NotSupportedException>(exception.InnerException);
         }
     }

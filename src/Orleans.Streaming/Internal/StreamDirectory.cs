@@ -34,10 +34,10 @@ namespace Orleans.Streams
             }
 
             var promises = new List<Task>();
-            List<QualifiedStreamId> streamIds = GetUsedStreamIds();
-            foreach (QualifiedStreamId s in streamIds)
+            var streamIds = GetUsedStreamIds();
+            foreach (var s in streamIds)
             {
-                IStreamControl streamControl = GetStreamControl(s);
+                var streamControl = GetStreamControl(s);
                 if (streamControl != null)
                     promises.Add(streamControl.Cleanup(cleanupProducers, cleanupConsumers));
             }
@@ -54,7 +54,7 @@ namespace Orleans.Streams
         private IStreamControl GetStreamControl(QualifiedStreamId streamId)
         {
             object streamObj;
-            bool ok = allStreams.TryGetValue(streamId, out streamObj);
+            var ok = allStreams.TryGetValue(streamId, out streamObj);
             return ok ? streamObj as IStreamControl : null;
         }
 

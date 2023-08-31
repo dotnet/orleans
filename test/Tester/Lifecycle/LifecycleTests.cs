@@ -16,15 +16,15 @@ namespace Tester
         public async Task FullLifecycleTest()
         {
             const int observersPerStage = 2;
-            Dictionary<TestStages, int> observerCountByStage = new Dictionary<TestStages, int>();
+            var observerCountByStage = new Dictionary<TestStages, int>();
             foreach (TestStages stage in Enum.GetValues(typeof(TestStages)))
             {
                 observerCountByStage[stage] = observersPerStage;
             }
-            Dictionary<TestStages, List<Observer>> observersByStage = await RunLifecycle(observerCountByStage, null, null);
+            var observersByStage = await RunLifecycle(observerCountByStage, null, null);
 
             Assert.Equal(observerCountByStage.Count, observersByStage.Count);
-            foreach (KeyValuePair<TestStages,List<Observer>> kvp in observersByStage)
+            foreach (var kvp in observersByStage)
             {
                 Assert.Equal(observerCountByStage[kvp.Key], kvp.Value.Count);
                 Assert.True(kvp.Value.All(o => o.Started));
@@ -38,7 +38,7 @@ namespace Tester
         public async Task FailOnStartOnEachStageLifecycleTest()
         {
             const int observersPerStage = 2;
-            Dictionary<TestStages, int> observerCountByStage = new Dictionary<TestStages, int>();
+            var observerCountByStage = new Dictionary<TestStages, int>();
             foreach (TestStages stage in Enum.GetValues(typeof(TestStages)))
             {
                 observerCountByStage[stage] = observersPerStage;
@@ -46,10 +46,10 @@ namespace Tester
 
             foreach (TestStages stage in Enum.GetValues(typeof(TestStages)))
             {
-                Dictionary<TestStages, List<Observer>> observersByStage = await RunLifecycle(observerCountByStage, stage, null);
+                var observersByStage = await RunLifecycle(observerCountByStage, stage, null);
 
                 Assert.Equal(observerCountByStage.Count, observersByStage.Count);
-                foreach (KeyValuePair<TestStages, List<Observer>> kvp in observersByStage)
+                foreach (var kvp in observersByStage)
                 {
                     Assert.Equal(observerCountByStage[kvp.Key], kvp.Value.Count);
                     if (kvp.Key < stage)
@@ -79,7 +79,7 @@ namespace Tester
         public async Task FailOnStopOnEachStageLifecycleTest()
         {
             const int observersPerStage = 2;
-            Dictionary<TestStages, int> observerCountByStage = new Dictionary<TestStages, int>();
+            var observerCountByStage = new Dictionary<TestStages, int>();
             foreach (TestStages stage in Enum.GetValues(typeof(TestStages)))
             {
                 observerCountByStage[stage] = observersPerStage;
@@ -87,10 +87,10 @@ namespace Tester
 
             foreach (TestStages stage in Enum.GetValues(typeof(TestStages)))
             {
-                Dictionary<TestStages, List<Observer>> observersByStage = await RunLifecycle(observerCountByStage, null, stage);
+                var observersByStage = await RunLifecycle(observerCountByStage, null, stage);
 
                 Assert.Equal(observerCountByStage.Count, observersByStage.Count);
-                foreach (KeyValuePair<TestStages, List<Observer>> kvp in observersByStage)
+                foreach (var kvp in observersByStage)
                 {
                     Assert.Equal(observerCountByStage[kvp.Key], kvp.Value.Count);
                     if (kvp.Key != stage)
@@ -137,9 +137,9 @@ namespace Tester
             // setup lifecycle observers
             var observersByStage = new Dictionary<TestStages, List<Observer>>();
             var lifecycle = new TestLifecycleSubject();
-            foreach (KeyValuePair<TestStages, int> kvp in observerCountByStage)
+            foreach (var kvp in observerCountByStage)
             {
-                List<Observer> observers = Enumerable
+                var observers = Enumerable
                     .Range(0, kvp.Value)
                     .Select(i => new Observer(failOnStart.HasValue && kvp.Key == failOnStart, failOnStop.HasValue && kvp.Key == failOnStop))
                     .ToList();

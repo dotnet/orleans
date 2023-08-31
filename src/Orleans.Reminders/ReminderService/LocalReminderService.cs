@@ -109,7 +109,7 @@ namespace Orleans.Runtime.ReminderService
                 }
             }
 
-            foreach (LocalReminderData r in localReminders.Values)
+            foreach (var r in localReminders.Values)
             {
                 r.StopReminder();
             }
@@ -156,8 +156,8 @@ namespace Orleans.Runtime.ReminderService
             if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug((int)ErrorCode.RS_Unregister, "UnregisterReminder: {Entry}, LocalTableSequence: {LocalTableSequence}", remData, localTableSequence);
 
             var grainId = remData.GrainId;
-            string reminderName = remData.ReminderName;
-            string eTag = remData.ETag;
+            var reminderName = remData.ReminderName;
+            var eTag = remData.ETag;
 
             await DoResponsibilitySanityCheck(grainId, "RemoveReminder");
 
@@ -168,7 +168,7 @@ namespace Orleans.Runtime.ReminderService
             var success = await reminderTable.RemoveRow(grainId, reminderName, eTag);
             if (success)
             {
-                bool removed = TryStopPreviousTimer(grainId, reminderName);
+                var removed = TryStopPreviousTimer(grainId, reminderName);
                 if (removed)
                 {
                     if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug((int)ErrorCode.RS_Stop, "Stopped reminder {Entry}", reminder);
@@ -328,7 +328,7 @@ namespace Orleans.Runtime.ReminderService
         {
             if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug("Reading rows from {Range}", range.ToString());
             localTableSequence++;
-            long cachedSequence = localTableSequence;
+            var cachedSequence = localTableSequence;
 
             try
             {
@@ -418,7 +418,7 @@ namespace Orleans.Runtime.ReminderService
                     remindersNotInTable.Remove(key);
                 } // foreach reminder read from table
 
-                int remindersCountBeforeRemove = localReminders.Count;
+                var remindersCountBeforeRemove = localReminders.Count;
 
                 // foreach reminder that is not in global table, but exists locally
                 foreach (var kv in remindersNotInTable)

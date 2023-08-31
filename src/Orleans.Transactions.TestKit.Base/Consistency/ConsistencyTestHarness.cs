@@ -71,7 +71,7 @@ namespace Orleans.Transactions.TestKit.Consistency
             this.output = output;
             var localRandom = new Random(options.RandomSeed + partition);
 
-            for (int i = 0; i < count; i++)
+            for (var i = 0; i < count; i++)
             {
                 var target = localRandom.Next(options.NumGrains);
                 output($"({partition},{i}) g{target}");
@@ -155,7 +155,7 @@ namespace Orleans.Transactions.TestKit.Consistency
                     true.Should().BeFalse(msg);
                 };
 
-                HashSet<string> readersOfPreviousVersion = new HashSet<string>();
+                var readersOfPreviousVersion = new HashSet<string>();
                 
                 foreach (var seqnoKvp in grainKvp.Value)
                 {

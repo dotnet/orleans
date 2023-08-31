@@ -53,7 +53,7 @@ namespace UnitTests.Grains
                 }*/
                 return State.X;
             }
-            int nextValue = await State.Next.GetCalculatedValue();
+            var nextValue = await State.Next.GetCalculatedValue();
             return State.X + nextValue;
         }
 

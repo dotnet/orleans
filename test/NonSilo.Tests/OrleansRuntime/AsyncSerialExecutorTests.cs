@@ -22,8 +22,8 @@ namespace UnitTests.OrleansRuntime
         [Fact, TestCategory("Functional"), TestCategory("Async")]
         public async Task AsyncSerialExecutorTests_Small()
         {
-            AsyncSerialExecutor executor = new AsyncSerialExecutor();
-            List<Task> tasks = new List<Task>();
+            var executor = new AsyncSerialExecutor();
+            var tasks = new List<Task>();
             operationsInProgress = 0;
 
             tasks.Add(executor.AddNext(() => Operation(1)));
@@ -36,11 +36,11 @@ namespace UnitTests.OrleansRuntime
         [Fact, TestCategory("Functional"), TestCategory("Async")]
         public async Task AsyncSerialExecutorTests_SerialSubmit()
         {
-            AsyncSerialExecutor executor = new AsyncSerialExecutor();
-            List<Task> tasks = new List<Task>();
-            for (int i = 0; i < 10; i++)
+            var executor = new AsyncSerialExecutor();
+            var tasks = new List<Task>();
+            for (var i = 0; i < 10; i++)
             {
-                int capture = i;
+                var capture = i;
                 output.WriteLine("Submitting Task {0}.", capture);
                 tasks.Add(executor.AddNext(() => Operation(capture)));
             }
@@ -50,12 +50,12 @@ namespace UnitTests.OrleansRuntime
         [Fact, TestCategory("Functional"), TestCategory("Async")]
         public async Task AsyncSerialExecutorTests_ParallelSubmit()
         {
-            AsyncSerialExecutor executor = new AsyncSerialExecutor();
-            ConcurrentStack<Task> tasks = new ConcurrentStack<Task>();
-            List<Task> enqueueTasks = new List<Task>();
-            for (int i = 0; i < 10; i++)
+            var executor = new AsyncSerialExecutor();
+            var tasks = new ConcurrentStack<Task>();
+            var enqueueTasks = new List<Task>();
+            for (var i = 0; i < 10; i++)
             {
-                int capture = i;
+                var capture = i;
                 enqueueTasks.Add(
                     Task.Run(() =>
                     {

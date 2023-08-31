@@ -57,7 +57,7 @@ namespace Orleans
         {
             var resolver = new TaskCompletionSource<TResult>(TaskCreationOptions.RunContinuationsAsynchronously);
             actions.Enqueue(new Tuple<TaskCompletionSource<TResult>, Func<Task<TResult>>>(resolver, func));
-            Task<TResult> task = resolver.Task;
+            var task = resolver.Task;
             ExecuteNext().Ignore();
             return task;
         }
@@ -70,7 +70,7 @@ namespace Orleans
         {
             while (!actions.IsEmpty)
             {
-                bool gotLock = false;
+                var gotLock = false;
                 try
                 {
                     if (!(gotLock = locker.TryGetLock()))
@@ -85,7 +85,7 @@ namespace Orleans
                         {
                             try
                             {
-                                TResult result = await actionTuple.Item2();
+                                var result = await actionTuple.Item2();
                                 actionTuple.Item1.TrySetResult(result);
                             }
                             catch (Exception exc)

@@ -194,7 +194,7 @@ namespace Orleans.Statistics
 
         private async Task Monitor(CancellationToken ct)
         {
-            int i = 0;
+            var i = 0;
             while (true)
             {
                 if (ct.IsCancellationRequested)

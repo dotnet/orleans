@@ -259,7 +259,7 @@ namespace Orleans.Serialization.GeneratedCodeHelpers
                 }
 
                 var isMatch = true;
-                for (int i = 0; i < parameters.Length; i++)
+                for (var i = 0; i < parameters.Length; i++)
                 {
                     if (!parameters[i].ParameterType.Equals(parameterTypes[i]))
                     {

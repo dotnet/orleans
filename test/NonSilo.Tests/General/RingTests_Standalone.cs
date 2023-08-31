@@ -15,7 +15,7 @@ namespace UnitTests.General
         [Fact, TestCategory("Functional"), TestCategory("Ring"), TestCategory("RingStandalone")]
         public void RingStandalone_Basic()
         {
-            Dictionary<SiloAddress, ConsistentRingProvider> rings = CreateServers(count);
+            var rings = CreateServers(count);
             rings = Combine(rings, rings);
             VerifyRing(rings);
         }
@@ -79,12 +79,12 @@ namespace UnitTests.General
             sortedServers = rings.Keys.ToList();
             sortedServers.Sort(CompareSiloAddressesByHash);
             // failures
-            foreach (int i in indexesFails)
+            foreach (var i in indexesFails)
             {
                 fail.Add(sortedServers[i]);
             }
             // joins
-            foreach (int i in indexesJoins)
+            foreach (var i in indexesJoins)
             {
                 holder.Add(sortedServers[i], rings[sortedServers[i]]);
                 rings.Remove(sortedServers[i]);
@@ -97,11 +97,11 @@ namespace UnitTests.General
 
         private Dictionary<SiloAddress, ConsistentRingProvider> CreateServers(int n)
         {
-            Dictionary<SiloAddress, ConsistentRingProvider> rings = new Dictionary<SiloAddress, ConsistentRingProvider>();
+            var rings = new Dictionary<SiloAddress, ConsistentRingProvider>();
 
-            for (int i = 1; i <= n; i++)
+            for (var i = 1; i <= n; i++)
             {
-                SiloAddress addr = SiloAddressUtils.NewLocalSiloAddress(i);
+                var addr = SiloAddressUtils.NewLocalSiloAddress(i);
                 rings.Add(addr, new ConsistentRingProvider(addr, NullLoggerFactory.Instance));
             }
             return rings;
@@ -110,9 +110,9 @@ namespace UnitTests.General
         private Dictionary<SiloAddress, ConsistentRingProvider> Combine(Dictionary<SiloAddress, ConsistentRingProvider> set1, Dictionary<SiloAddress, ConsistentRingProvider> set2)
         {
             // tell set1 about every node in set2
-            foreach (ConsistentRingProvider crp in set1.Values)
+            foreach (var crp in set1.Values)
             {
-                foreach (ConsistentRingProvider other in set2.Values)
+                foreach (var other in set2.Values)
                 {
                     if (!crp.MyAddress.Equals(other.MyAddress))
                     {
@@ -122,9 +122,9 @@ namespace UnitTests.General
             }
 
             // tell set2 about every node in set1 ... even if set1 and set2 overlap, ConsistentRingProvider should be able to handle
-            foreach (ConsistentRingProvider crp in set2.Values)
+            foreach (var crp in set2.Values)
             {
-                foreach (ConsistentRingProvider other in set1.Values)
+                foreach (var other in set1.Values)
                 {
                     if (!crp.MyAddress.Equals(other.MyAddress))
                     {
@@ -134,9 +134,9 @@ namespace UnitTests.General
             }
 
             // tell set2 about every node in set2 ... note that set1 already knows about nodes in set1
-            foreach (ConsistentRingProvider crp in set2.Values)
+            foreach (var crp in set2.Values)
             {
-                foreach (ConsistentRingProvider other in set2.Values)
+                foreach (var other in set2.Values)
                 {
                     if (!crp.MyAddress.Equals(other.MyAddress))
                     {
@@ -151,15 +151,15 @@ namespace UnitTests.General
 
         private void RemoveServers(Dictionary<SiloAddress, ConsistentRingProvider> rings, List<SiloAddress> remove)
         {
-            foreach (SiloAddress addr in remove)
+            foreach (var addr in remove)
             {
                 rings.Remove(addr);
             }
 
             // tell every node about the failed nodes
-            foreach (ConsistentRingProvider crp in rings.Values)
+            foreach (var crp in rings.Values)
             {
-                foreach (SiloAddress addr in remove)
+                foreach (var addr in remove)
                 {
                     crp.RemoveServer(addr);
                 }
@@ -168,9 +168,9 @@ namespace UnitTests.General
 
         private void VerifyRing(Dictionary<SiloAddress, ConsistentRingProvider> rings)
         {
-            RangeBreakable fullring = new RangeBreakable();
+            var fullring = new RangeBreakable();
 
-            foreach (ConsistentRingProvider r in rings.Values)
+            foreach (var r in rings.Values)
             {
                 // see if there is no overlap between the responsibilities of two nodes
                 Assert.True(fullring.Remove(r.GetMyRange()), string.Format("Couldn't find & break range {0} in {1}. Some other node already claimed responsibility.", r.GetMyRange(), fullring));
@@ -218,11 +218,11 @@ namespace UnitTests.General
 
         public bool Remove(IRingRange range)
         {
-            bool wholerange = true;
+            var wholerange = true;
             foreach (SingleRange s in RangeFactory.GetSubRanges(range))
             {
-                bool found = false;
-                foreach (SingleRange m in ranges)
+                var found = false;
+                foreach (var m in ranges)
                 {
                     if (m.Begin == m.End) // treat full range as special case
                     {

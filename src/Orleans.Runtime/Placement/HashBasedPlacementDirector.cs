@@ -17,7 +17,7 @@ namespace Orleans.Runtime.Placement
             }
 
             var sortedSilos = compatibleSilos.OrderBy(s => s).ToArray(); // need to sort the list, so that the outcome is deterministic
-            int hash = (int) (target.GrainIdentity.GetUniformHashCode() & 0x7fffffff); // reset highest order bit to avoid negative ints
+            var hash = (int) (target.GrainIdentity.GetUniformHashCode() & 0x7fffffff); // reset highest order bit to avoid negative ints
 
             return Task.FromResult(sortedSilos[hash % sortedSilos.Length]);
         }

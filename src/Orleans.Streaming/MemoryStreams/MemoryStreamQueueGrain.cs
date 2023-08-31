@@ -43,9 +43,9 @@ namespace Orleans.Providers
         /// <returns></returns>
         public Task<List<MemoryMessageData>> Dequeue(int maxCount)
         {
-            List<MemoryMessageData> list = new List<MemoryMessageData>();
+            var list = new List<MemoryMessageData>();
 
-            for (int i = 0; i < maxCount && _eventQueue.Count > 0; ++i)
+            for (var i = 0; i < maxCount && _eventQueue.Count > 0; ++i)
             {
                 list.Add(_eventQueue.Dequeue());
             }

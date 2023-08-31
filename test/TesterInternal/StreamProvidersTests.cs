@@ -63,10 +63,10 @@ namespace UnitTests.Streaming
         [Fact, TestCategory("Functional"), TestCategory("Streaming"), TestCategory("Providers")]
         public async Task ProvidersTests_ConfigNotLoaded()
         {
-            Guid streamId = Guid.NewGuid();
+            var streamId = Guid.NewGuid();
             var grainFullName = typeof(Streaming_ConsumerGrain).FullName;
             // consumer joins first, producer later
-            IStreaming_ConsumerGrain consumer = this.HostedCluster.GrainFactory.GetGrain<IStreaming_ConsumerGrain>(Guid.NewGuid(), grainFullName);
+            var consumer = this.HostedCluster.GrainFactory.GetGrain<IStreaming_ConsumerGrain>(Guid.NewGuid(), grainFullName);
             await Assert.ThrowsAsync<KeyNotFoundException>(() => consumer.BecomeConsumer(streamId, STREAM_PROVIDER_NAME, null));
         }
 
@@ -75,7 +75,7 @@ namespace UnitTests.Streaming
         {
             var thisRunServiceId = this.fixture.ServiceId;
 
-            SiloHandle siloHandle = this.HostedCluster.GetActiveSilos().First();
+            var siloHandle = this.HostedCluster.GetActiveSilos().First();
             var serviceId = await this.fixture.Client.GetTestHooks(siloHandle).GetServiceId();
             Assert.Equal(thisRunServiceId, serviceId);  // "ServiceId active in silo"
         }

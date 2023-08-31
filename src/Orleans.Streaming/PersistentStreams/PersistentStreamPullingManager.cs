@@ -100,7 +100,7 @@ namespace Orleans.Streams
             await this.queueBalancer.Initialize(this.adapterFactory.GetStreamQueueMapper());
             queueBalancer.SubscribeToQueueDistributionChangeEvents(this);
 
-            List<QueueId> myQueues = queueBalancer.GetMyQueues().ToList();
+            var myQueues = queueBalancer.GetMyQueues().ToList();
             logger.LogInformation(
                 (int)ErrorCode.PersistentStreamPullingManager_03,
                 "Initialize: I am now responsible for {QueueCount} queues: {Queues}.",
@@ -126,7 +126,7 @@ namespace Orleans.Streams
         public async Task StartAgents()
         {
             managerState = RunState.AgentsStarted;
-            List<QueueId> myQueues = queueBalancer.GetMyQueues().ToList();
+            var myQueues = queueBalancer.GetMyQueues().ToList();
 
             logger.LogInformation(
                 (int)ErrorCode.PersistentStreamPullingManager_Starting,
@@ -140,7 +140,7 @@ namespace Orleans.Streams
         public async Task StopAgents()
         {
             managerState = RunState.AgentsStopped;
-            List<QueueId> queuesToRemove = queuesToAgentsMap.Keys.ToList();
+            var queuesToRemove = queuesToAgentsMap.Keys.ToList();
             logger.LogInformation((int)ErrorCode.PersistentStreamPullingManager_Stopping, "Stopping agents for {RemovedCount} queues: {RemovedQueues}",  queuesToRemove.Count, PrintQueues(queuesToRemove) );
             await RemoveQueues(queuesToRemove);
             logger.LogInformation((int)ErrorCode.PersistentStreamPullingManager_Stopped, "Stopped agents.");
@@ -161,7 +161,7 @@ namespace Orleans.Streams
         public Task HandleQueueDistributionChangeNotification()
         {
             latestRingNotificationSequenceNumber++;
-            int notificationSeqNumber = latestRingNotificationSequenceNumber;
+            var notificationSeqNumber = latestRingNotificationSequenceNumber;
             logger.LogInformation(
                 (int)ErrorCode.PersistentStreamPullingManager_04,
                 "Got QueueChangeNotification number {NotificationSequenceNumber} from the queue balancer. managerState = {ManagerState}",
@@ -196,7 +196,7 @@ namespace Orleans.Streams
 
         private async Task QueueDistributionChangeNotification(int notificationSeqNumber)
         {
-            HashSet<QueueId> currentQueues = queueBalancer.GetMyQueues().ToSet();
+            var currentQueues = queueBalancer.GetMyQueues().ToSet();
             logger.LogInformation(
                 (int)ErrorCode.PersistentStreamPullingManager_06,
                 "Executing QueueChangeNotification number {NotificationSequenceNumber}. Queue balancer says I should now own {QueueCount} queues: {Queues}",
@@ -206,10 +206,10 @@ namespace Orleans.Streams
 
             try
             {
-                Task t1 = AddNewQueues(currentQueues, false);
+                var t1 = AddNewQueues(currentQueues, false);
 
-                List<QueueId> queuesToRemove = queuesToAgentsMap.Keys.Where(queueId => !currentQueues.Contains(queueId)).ToList();
-                Task t2 = RemoveQueues(queuesToRemove);
+                var queuesToRemove = queuesToAgentsMap.Keys.Where(queueId => !currentQueues.Contains(queueId)).ToList();
+                var t2 = RemoveQueues(queuesToRemove);
 
                 await Task.WhenAll(t1, t2);
             }
@@ -259,7 +259,7 @@ namespace Orleans.Streams
                     {
                         var agentIdNumber = Interlocked.Increment(ref nextAgentId);
                         var agentId = SystemTargetGrainId.Create(Constants.StreamPullingAgentType, this.Silo, $"{streamProviderName}_{agentIdNumber}_{queueId:H}");
-                        IStreamFailureHandler deliveryFailureHandler = await adapterFactory.GetDeliveryFailureHandler(queueId);
+                        var deliveryFailureHandler = await adapterFactory.GetDeliveryFailureHandler(queueId);
                         agent = new PersistentStreamPullingAgent(agentId, streamProviderName, this.loggerFactory, pubSub, streamFilter, queueId, this.options, this.Silo, queueAdapter, queueAdapterCache, deliveryFailureHandler);
                         this.ActivationServices.GetRequiredService<Catalog>().RegisterSystemTarget(agent);
                         queuesToAgentsMap.Add(queueId, agent);
@@ -371,7 +371,7 @@ namespace Orleans.Streams
         public async Task<object> ExecuteCommand(PersistentStreamProviderCommand command, object arg)
         {
             latestCommandNumber++;
-            int commandSeqNumber = latestCommandNumber;
+            var commandSeqNumber = latestCommandNumber;
 
             try
             {

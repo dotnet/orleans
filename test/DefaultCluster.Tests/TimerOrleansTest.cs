@@ -22,7 +22,7 @@ namespace DefaultCluster.Tests.TimerTests
         [Fact, TestCategory("SlowBVT"), TestCategory("Timers")]
         public async Task TimerOrleansTest_Basic()
         {
-            for (int i = 0; i < 10; i++)
+            for (var i = 0; i < 10; i++)
             {
                 var grain = GrainFactory.GetGrain<ITimerGrain>(GetRandomGrainId());
                 var period = await grain.GetTimerPeriod();
@@ -48,24 +48,24 @@ namespace DefaultCluster.Tests.TimerTests
         [Fact, TestCategory("BVT"), TestCategory("Timers")]
         public async Task TimerOrleansTest_Parallel()
         {
-            TimeSpan period = TimeSpan.Zero;
-            List<ITimerGrain> grains = new List<ITimerGrain>();
-            for (int i = 0; i < 10; i++)
+            var period = TimeSpan.Zero;
+            var grains = new List<ITimerGrain>();
+            for (var i = 0; i < 10; i++)
             {
-                ITimerGrain grain = GrainFactory.GetGrain<ITimerGrain>(GetRandomGrainId());
+                var grain = GrainFactory.GetGrain<ITimerGrain>(GetRandomGrainId());
                 grains.Add(grain);
                 period = await grain.GetTimerPeriod(); // activate grains
             }
 
             var tasks = new List<Task>(grains.Count);
-            for (int i = 0; i < grains.Count; i++)
+            for (var i = 0; i < grains.Count; i++)
             {
-                ITimerGrain grain = grains[i];
+                var grain = grains[i];
                 tasks.Add(
                     Task.Run(
                         async () =>
                         {
-                            int last = await grain.GetCounter();
+                            var last = await grain.GetCounter();
                             var stopwatch = Stopwatch.StartNew();
                             var timeout = period.Multiply(50);
                             while (stopwatch.Elapsed < timeout && last < 10)
@@ -80,9 +80,9 @@ namespace DefaultCluster.Tests.TimerTests
             }
 
             await Task.WhenAll(tasks);
-            for (int i = 0; i < grains.Count; i++)
+            for (var i = 0; i < grains.Count; i++)
             {
-                ITimerGrain grain = grains[i];
+                var grain = grains[i];
                 await grain.StopDefaultTimer();
             }
         }
@@ -90,8 +90,8 @@ namespace DefaultCluster.Tests.TimerTests
         [Fact, TestCategory("BVT"), TestCategory("Timers")]
         public async Task TimerOrleansTest_Migration()
         {
-            ITimerGrain grain = GrainFactory.GetGrain<ITimerGrain>(GetRandomGrainId());
-            TimeSpan period = await grain.GetTimerPeriod();
+            var grain = GrainFactory.GetGrain<ITimerGrain>(GetRandomGrainId());
+            var period = await grain.GetTimerPeriod();
 
             // Ensure that the grain works as it should.
             var last = await grain.GetCounter();
@@ -123,7 +123,7 @@ namespace DefaultCluster.Tests.TimerTests
             last = await grain.GetCounter();
             stopwatch.Stop();
 
-            double maximalNumTicks = stopwatch.Elapsed.Divide(period);
+            var maximalNumTicks = stopwatch.Elapsed.Divide(period);
             Assert.True(
                 last <= maximalNumTicks,
                 $"Assert: last <= maximalNumTicks. Actual: last = {last}, maximalNumTicks = {maximalNumTicks}");
@@ -137,8 +137,8 @@ namespace DefaultCluster.Tests.TimerTests
         public async Task AsyncTimerTest_GrainCall()
         {
             const string testName = "AsyncTimerTest_GrainCall";
-            TimeSpan delay = TimeSpan.FromSeconds(5);
-            TimeSpan wait = delay.Multiply(2);
+            var delay = TimeSpan.FromSeconds(5);
+            var wait = delay.Multiply(2);
 
             ITimerCallGrain grain = null;
 
@@ -151,10 +151,10 @@ namespace DefaultCluster.Tests.TimerTests
 
                 await Task.Delay(wait);
 
-                int tickCount = await grain.GetTickCount();
+                var tickCount = await grain.GetTickCount();
                 Assert.Equal(1, tickCount);
 
-                Exception err = await grain.GetException();
+                var err = await grain.GetException();
                 Assert.Null(err); // Should be no exceptions during timer callback
             }
             catch (Exception exc)

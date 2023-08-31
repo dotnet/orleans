@@ -79,7 +79,7 @@ namespace Orleans.GrainDirectory.AzureStorage
 
             try
             {
-                TableServiceClient tableCreationClient = await GetCloudTableCreationClientAsync();
+                var tableCreationClient = await GetCloudTableCreationClientAsync();
                 var table = tableCreationClient.GetTableClient(TableName);
                 var tableItem = await table.CreateIfNotExistsAsync();
                 var didCreate = tableItem is not null;
@@ -144,7 +144,7 @@ namespace Orleans.GrainDirectory.AzureStorage
         public async Task ClearTableAsync()
         {
             var items = await ReadAllTableEntriesAsync();
-            IEnumerable<Task> work = items.GroupBy(item => item.Item1.PartitionKey)
+            var work = items.GroupBy(item => item.Item1.PartitionKey)
                                           .SelectMany(partition => partition.ToBatch(this.StoragePolicyOptions.MaxBulkUpdateRows))
                                           .Select(batch => DeleteTableEntriesAsync(batch.ToList()));
             await Task.WhenAll(work);
@@ -394,7 +394,7 @@ namespace Orleans.GrainDirectory.AzureStorage
             const string operation = "ReadSingleTableEntryAsync";
             var startTime = DateTime.UtcNow;
             if (Logger.IsEnabled(LogLevel.Trace)) Logger.LogTrace("{Operation} table {TableName} partitionKey {PartitionKey} rowKey {RowKey}", operation, TableName, partitionKey, rowKey);
-            T retrievedResult = default(T);
+            var retrievedResult = default(T);
 
             try
             {
@@ -429,7 +429,7 @@ namespace Orleans.GrainDirectory.AzureStorage
         /// <returns>Enumeration of all entries in the specified table partition.</returns>
         public Task<List<(T Entity, string ETag)>> ReadAllTableEntriesForPartitionAsync(string partitionKey)
         {
-            string query = TableClient.CreateQueryFilter($"PartitionKey eq {partitionKey}");
+            var query = TableClient.CreateQueryFilter($"PartitionKey eq {partitionKey}");
             return ReadTableEntriesAndEtagsAsync(query);
         }
 
@@ -473,7 +473,7 @@ namespace Orleans.GrainDirectory.AzureStorage
                 var entityBatch = new List<TableTransactionAction>();
                 foreach (var tuple in collection)
                 {
-                    T item = tuple.Item1;
+                    var item = tuple.Item1;
                     item.ETag = new ETag(tuple.Item2);
                     entityBatch.Add(new TableTransactionAction(TableTransactionActionType.Delete, item, item.ETag));
                 }
@@ -583,7 +583,7 @@ namespace Orleans.GrainDirectory.AzureStorage
             {
 
                 var entityBatch = new List<TableTransactionAction>(collection.Count);
-                foreach (T entry in collection)
+                foreach (var entry in collection)
                 {
                     entityBatch.Add(new TableTransactionAction(TableTransactionActionType.Add, entry));
                 }
@@ -607,7 +607,7 @@ namespace Orleans.GrainDirectory.AzureStorage
         internal async Task<(string, string)> InsertTwoTableEntriesConditionallyAsync(T data1, T data2, string data2Etag)
         {
             const string operation = "InsertTableEntryConditionally";
-            string data2Str = (data2 == null ? "null" : data2.ToString());
+            var data2Str = (data2 == null ? "null" : data2.ToString());
             var startTime = DateTime.UtcNow;
 
             if (Logger.IsEnabled(LogLevel.Trace)) Logger.LogTrace("{Operation} data1 {Data1} data2 {Data2} table {TableName}", operation, data1, data2Str, TableName);
@@ -645,7 +645,7 @@ namespace Orleans.GrainDirectory.AzureStorage
         internal async Task<(string, string)> UpdateTwoTableEntriesConditionallyAsync(T data1, string data1Etag, T data2, string data2Etag)
         {
             const string operation = "UpdateTableEntryConditionally";
-            string data2Str = (data2 == null ? "null" : data2.ToString());
+            var data2Str = (data2 == null ? "null" : data2.ToString());
             var startTime = DateTime.UtcNow;
             if (Logger.IsEnabled(LogLevel.Trace)) Logger.LogTrace("{Operation} data1 {Data1} data2 {Data2} table {TableName}", operation, data1, data2Str, TableName);
 
@@ -728,14 +728,14 @@ namespace Orleans.GrainDirectory.AzureStorage
     {
         internal static IEnumerable<IEnumerable<TItem>> ToBatch<TItem>(this IEnumerable<TItem> source, int size)
         {
-            using (IEnumerator<TItem> enumerator = source.GetEnumerator())
+            using (var enumerator = source.GetEnumerator())
                 while (enumerator.MoveNext())
                     yield return Take(enumerator, size);
         }
 
         private static IEnumerable<TItem> Take<TItem>(IEnumerator<TItem> source, int size)
         {
-            int i = 0;
+            var i = 0;
             do
                 yield return source.Current;
             while (++i < size && source.MoveNext());

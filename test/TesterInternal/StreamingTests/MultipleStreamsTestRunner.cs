@@ -39,9 +39,9 @@ namespace UnitTests.Streaming
         public async Task StreamTest_MultipleStreams_ManyDifferent_ManyProducerGrainsManyConsumerGrains(Func<bool,SiloHandle> startSiloFunc = null, Action<SiloHandle> stopSiloFunc = null)
         {
             Heading("MultipleStreams_ManyDifferent_ManyProducerGrainsManyConsumerGrains");
-            List<SingleStreamTestRunner> runners = new List<SingleStreamTestRunner>();
-            List<Task> tasks = new List<Task>();
-            for (int i = 0; i < 10; i++)
+            var runners = new List<SingleStreamTestRunner>();
+            var tasks = new List<Task>();
+            for (var i = 0; i < 10; i++)
             {
                 runners.Add(new SingleStreamTestRunner(this.client, this.streamProviderName, i, runFullTest));
             }

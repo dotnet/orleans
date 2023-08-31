@@ -35,7 +35,7 @@ namespace Orleans.Transactions
 
         private ITransactionManager GetManager(string resourceId)
         {
-            if (!this.managers.TryGetValue(resourceId, out ITransactionManager manager))
+            if (!this.managers.TryGetValue(resourceId, out var manager))
             {
                 this.managers[resourceId] = manager = this.factories[resourceId].Invoke();
             }

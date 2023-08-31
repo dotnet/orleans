@@ -27,14 +27,14 @@ namespace DefaultCluster.Tests
             object obj = this.HostedCluster.DeepCopy(data);
             Assert.IsAssignableFrom<LargeTestData>(obj);
 
-            object copy = this.HostedCluster.RoundTripSerializationForTesting(obj);
+            var copy = this.HostedCluster.RoundTripSerializationForTesting(obj);
             Assert.IsAssignableFrom<LargeTestData>(copy);
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Serialization")]
         public void Serialization_ValueTypePhase1()
         {
-            ValueTypeTestData data = new ValueTypeTestData(4);
+            var data = new ValueTypeTestData(4);
 
             object obj = this.HostedCluster.DeepCopy(data);
 
@@ -45,7 +45,7 @@ namespace DefaultCluster.Tests
         [Fact, TestCategory("Serialization")]
         public void Serialization_ValueTypePhase2()
         {
-            ValueTypeTestData data = new ValueTypeTestData(4);
+            var data = new ValueTypeTestData(4);
 
             object copy = this.HostedCluster.RoundTripSerializationForTesting(data);
 

@@ -113,11 +113,11 @@ namespace Orleans.Streaming.EventHubs
         /// <returns></returns>
         public List<StreamPosition> Add(List<EventData> messages, DateTime dequeueTimeUtc)
         {
-            List<StreamPosition> positions = new List<StreamPosition>();
-            List<CachedMessage> cachedMessages = new List<CachedMessage>();
-            foreach (EventData message in messages)
+            var positions = new List<StreamPosition>();
+            var cachedMessages = new List<CachedMessage>();
+            foreach (var message in messages)
             {
-                StreamPosition position = this.dataAdapter.GetStreamPosition(this.Partition, message);
+                var position = this.dataAdapter.GetStreamPosition(this.Partition, message);
                 cachedMessages.Add(this.dataAdapter.FromQueueMessage(position, message, dequeueTimeUtc, this.GetSegment));
                 positions.Add(position);
             }
@@ -193,9 +193,9 @@ namespace Orleans.Streaming.EventHubs
                 return false;
             }
 
-            IEventHubPartitionLocation location = (IEventHubPartitionLocation)token;
+            var location = (IEventHubPartitionLocation)token;
             double cacheSize = cache.Newest.Value.SequenceNumber - cache.Oldest.Value.SequenceNumber;
-            long distanceFromNewestMessage = cache.Newest.Value.SequenceNumber - location.SequenceNumber;
+            var distanceFromNewestMessage = cache.Newest.Value.SequenceNumber - location.SequenceNumber;
             // pressure is the ratio of the distance from the front of the cache to the
             cachePressureContribution = distanceFromNewestMessage / cacheSize;
 

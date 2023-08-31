@@ -50,7 +50,7 @@ namespace Orleans.CodeGenerator
 
             foreach (var type in metadataModel.InvokableInterfaces)
             {
-                string ns = type.GeneratedNamespace;
+                var ns = type.GeneratedNamespace;
                 foreach (var method in type.Methods)
                 {
                     var (invokable, generatedInvokerDescription) = InvokableGenerator.Generate(LibraryTypes, type, method);
@@ -72,7 +72,7 @@ namespace Orleans.CodeGenerator
             // Generate code.
             foreach (var type in metadataModel.SerializableTypes)
             {
-                string ns = type.GeneratedNamespace;
+                var ns = type.GeneratedNamespace;
 
                 // Generate a partial serializer class for each serializable type.
                 var serializer = SerializerGenerator.GenerateSerializer(LibraryTypes, type);

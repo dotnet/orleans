@@ -67,7 +67,7 @@ namespace ServiceBus.Tests.EvictionStrategyTests
             InitForTesting();
             var tasks = new List<Task>();
             //add items into cache, make sure will allocate multiple buffers from the pool
-            int itemAddToCache = 100;
+            var itemAddToCache = 100;
             foreach(var cache in this.cacheList)
                 tasks.Add(AddDataIntoCache(cache, itemAddToCache));
             await Task.WhenAll(tasks);
@@ -80,7 +80,7 @@ namespace ServiceBus.Tests.EvictionStrategyTests
             this.receiver2.TryPurgeFromCache(out _);
 
             //Assert
-            int expectedItemCountInCacheList = itemAddToCache + itemAddToCache;
+            var expectedItemCountInCacheList = itemAddToCache + itemAddToCache;
             Assert.Equal(expectedItemCountInCacheList, GetItemCountInAllCache(this.cacheList));
         }
 
@@ -90,7 +90,7 @@ namespace ServiceBus.Tests.EvictionStrategyTests
             InitForTesting();
             var tasks = new List<Task>();
             //add items into cache
-            int itemAddToCache = 100;
+            var itemAddToCache = 100;
             foreach (var cache in this.cacheList)
                 tasks.Add(AddDataIntoCache(cache, itemAddToCache));
             await Task.WhenAll(tasks);
@@ -105,7 +105,7 @@ namespace ServiceBus.Tests.EvictionStrategyTests
             this.receiver2.TryPurgeFromCache(out _);
 
             //Assert
-            int expectedItemCountInCacheList = itemAddToCache + itemAddToCache;
+            var expectedItemCountInCacheList = itemAddToCache + itemAddToCache;
             Assert.Equal(expectedItemCountInCacheList, GetItemCountInAllCache(this.cacheList));
         }
 
@@ -115,7 +115,7 @@ namespace ServiceBus.Tests.EvictionStrategyTests
             InitForTesting();
             var tasks = new List<Task>();
             //add items into cache
-            int itemAddToCache = 100;
+            var itemAddToCache = 100;
             foreach (var cache in this.cacheList)
                 tasks.Add(AddDataIntoCache(cache, itemAddToCache));
             await Task.WhenAll(tasks);
@@ -130,7 +130,7 @@ namespace ServiceBus.Tests.EvictionStrategyTests
             this.receiver2.TryPurgeFromCache(out _);
 
             //Assert
-            int expectedItemCountInCaches = 0;
+            var expectedItemCountInCaches = 0;
             //items got purged
             Assert.Equal(expectedItemCountInCaches, GetItemCountInAllCache(this.cacheList));
         }
@@ -141,7 +141,7 @@ namespace ServiceBus.Tests.EvictionStrategyTests
             InitForTesting();
             var tasks = new List<Task>();
             //add items into cache
-            int itemAddToCache = 100;
+            var itemAddToCache = 100;
             foreach (var cache in this.cacheList)
                 tasks.Add(AddDataIntoCache(cache, itemAddToCache));
             await Task.WhenAll(tasks);
@@ -161,7 +161,7 @@ namespace ServiceBus.Tests.EvictionStrategyTests
             {
                 var purgedBufferList = strategy.InUseBuffers.ToArray<FixedSizeBuffer>();
                 //last one in purgedBufferList should be current buffer, which shouldn't be purged
-                for (int i = 0; i < purgedBufferList.Count() - 1; i++)
+                for (var i = 0; i < purgedBufferList.Count() - 1; i++)
                     expectedPurgedBuffers.Add(purgedBufferList[i]);
             });
 
@@ -214,7 +214,7 @@ namespace ServiceBus.Tests.EvictionStrategyTests
 
         private int GetItemCountInAllCache(ConcurrentBag<EventHubQueueCacheForTesting> caches)
         {
-            int itemCount = 0;
+            var itemCount = 0;
             foreach (var cache in caches)
             {
                 itemCount += cache.ItemCount;
@@ -225,7 +225,7 @@ namespace ServiceBus.Tests.EvictionStrategyTests
         private async Task AddDataIntoCache(EventHubQueueCacheForTesting cache, int count)
         {
             await Task.Delay(10);
-            List<EventData> messages = Enumerable.Range(0, count)
+            var messages = Enumerable.Range(0, count)
                 .Select(i => MakeEventData(i))
                 .ToList();
             cache.Add(messages, DateTime.UtcNow);

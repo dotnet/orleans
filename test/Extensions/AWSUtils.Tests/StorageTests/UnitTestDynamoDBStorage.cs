@@ -79,7 +79,7 @@ namespace AWSUtils.Tests.StorageTests
 
         public override string ToString()
         {
-            StringBuilder sb = new StringBuilder();
+            var sb = new StringBuilder();
             sb.Append("UnitTestDDBData[");
             sb.Append(" PartitionKey=").Append(PartitionKey);
             sb.Append(" RowKey=").Append(RowKey);

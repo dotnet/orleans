@@ -85,7 +85,7 @@ namespace Orleans.CodeGenerator.SyntaxGeneration
 
                 if (field is object && field.HasConstantValue)
                 {
-                    ulong memberValue = ConvertToUInt64(field.ConstantValue);
+                    var memberValue = ConvertToUInt64(field.ConstantValue);
 
                     if (memberValue == constantToDecode)
                     {

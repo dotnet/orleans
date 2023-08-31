@@ -210,7 +210,7 @@ namespace Orleans.CodeGenerator
                 fields.Add(new ActivatorFieldDescription(libraryTypes.IActivator_1.ToTypeSyntax(serializableTypeDescription.TypeSyntax), ActivatorFieldName));
             }
 
-            int typeIndex = 0;
+            var typeIndex = 0;
             foreach (var member in serializableTypeDescription.Members.Distinct(MemberDescriptionTypeComparer.Default))
             {
                 // Add a codec field for any field in the target which does not have a static codec.
@@ -834,7 +834,7 @@ namespace Orleans.CodeGenerator
             // C#: field.EnsureWireTypeTagDelimited();
             body.Add(ExpressionStatement(InvocationExpression(fieldParam.Member("EnsureWireTypeTagDelimited"))));
 
-            ExpressionSyntax createValueExpression = type.UseActivator switch
+            var createValueExpression = type.UseActivator switch
             {
                 true => InvocationExpression(serializerFields.OfType<ActivatorFieldDescription>().Single().FieldName.ToIdentifierName().Member("Create")),
                 false => type.GetObjectCreationExpression(libraryTypes)

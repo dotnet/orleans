@@ -124,7 +124,7 @@ namespace Orleans
             where TGrainInterface : ISystemTarget
         {
             ISystemTarget reference;
-            ValueTuple<GrainId, Type> key = ValueTuple.Create(grainId, typeof(TGrainInterface));
+            var key = ValueTuple.Create(grainId, typeof(TGrainInterface));
 
             lock (this.typedSystemTargetReferenceCache)
             {

@@ -31,7 +31,7 @@ namespace TestGrains
         public Task ReportResult(Guid streamGuid, string streamProvider, string streamNamespace, int count)
         {
             Dictionary<Guid, int> counts;
-            Tuple<string, string> key = Tuple.Create(streamProvider, streamNamespace);
+            var key = Tuple.Create(streamProvider, streamNamespace);
             if (!reports.TryGetValue(key, out counts))
             {
                 counts = new Dictionary<Guid, int>();
@@ -51,7 +51,7 @@ namespace TestGrains
         public Task<IDictionary<Guid, int>> GetReport(string streamProvider, string streamNamespace)
         {
             Dictionary<Guid, int> counts;
-            Tuple<string, string> key = Tuple.Create(streamProvider, streamNamespace);
+            var key = Tuple.Create(streamProvider, streamNamespace);
             if (!reports.TryGetValue(key, out counts))
             {
                 return Task.FromResult<IDictionary<Guid, int>>(new Dictionary<Guid, int>());

@@ -39,7 +39,7 @@ namespace Tester.StreamingTests
         {
             var responsibilty = await this.leaseManagerGrain.GetLeaseResposibility();
             this.ownedQueues = new List<QueueId>(responsibilty);
-            for(int i = 0; i < responsibilty; i++)
+            for(var i = 0; i < responsibilty; i++)
             {
                 try
                 {

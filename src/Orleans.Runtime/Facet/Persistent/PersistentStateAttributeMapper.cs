@@ -21,14 +21,14 @@ namespace Orleans
                 config = new PersistentStateConfiguration() { StateName = parameter.Name, StorageName = attribute.StorageName };
             }
             // use generic type args to define collection type.
-            MethodInfo genericCreate = create.MakeGenericMethod(parameter.ParameterType.GetGenericArguments());
+            var genericCreate = create.MakeGenericMethod(parameter.ParameterType.GetGenericArguments());
             return context => Create(context, genericCreate, config);
         }
 
         private object Create(IGrainContext context, MethodInfo genericCreate, IPersistentStateConfiguration config)
         {
-            IPersistentStateFactory factory = context.ActivationServices.GetRequiredService<IPersistentStateFactory>();
-            object[] args = new object[] { context, config };
+            var factory = context.ActivationServices.GetRequiredService<IPersistentStateFactory>();
+            var args = new object[] { context, config };
             return genericCreate.Invoke(factory, args);
         }
 

@@ -28,17 +28,17 @@ namespace DefaultCluster.Tests.ActivationsLifeCycleTests
         [Fact, TestCategory("BVT"), TestCategory("ActivateDeactivate"), TestCategory("GetGrain")]
         public async Task WatcherGrain_GetGrain()
         {
-            IActivateDeactivateWatcherGrain grain = this.GrainFactory.GetGrain<IActivateDeactivateWatcherGrain>(1);
+            var grain = this.GrainFactory.GetGrain<IActivateDeactivateWatcherGrain>(1);
             await grain.Clear();
         }
 
         [Fact, TestCategory("BVT"), TestCategory("ActivateDeactivate")]
         public async Task Activate_Simple()
         {
-            int id = Random.Shared.Next();
-            ISimpleActivateDeactivateTestGrain grain = this.GrainFactory.GetGrain<ISimpleActivateDeactivateTestGrain>(id);
+            var id = Random.Shared.Next();
+            var grain = this.GrainFactory.GetGrain<ISimpleActivateDeactivateTestGrain>(id);
 
-            string activation = await grain.DoSomething();
+            var activation = await grain.DoSomething();
 
             await CheckNumActivateDeactivateCalls(1, 0, activation, "After activation");
         }
@@ -46,11 +46,11 @@ namespace DefaultCluster.Tests.ActivationsLifeCycleTests
         [Fact, TestCategory("BVT"), TestCategory("ActivateDeactivate")]
         public async Task Deactivate_Simple()
         {
-            int id = Random.Shared.Next();
-            ISimpleActivateDeactivateTestGrain grain = this.GrainFactory.GetGrain<ISimpleActivateDeactivateTestGrain>(id);
+            var id = Random.Shared.Next();
+            var grain = this.GrainFactory.GetGrain<ISimpleActivateDeactivateTestGrain>(id);
 
             // Activate
-            string activation = await grain.DoSomething();
+            var activation = await grain.DoSomething();
 
             // Deactivate
             await grain.DoDeactivate();
@@ -62,11 +62,11 @@ namespace DefaultCluster.Tests.ActivationsLifeCycleTests
         [Fact, TestCategory("BVT"), TestCategory("ActivateDeactivate")]
         public async Task Reactivate_Simple()
         {
-            int id = Random.Shared.Next();
-            ISimpleActivateDeactivateTestGrain grain = this.GrainFactory.GetGrain<ISimpleActivateDeactivateTestGrain>(id);
+            var id = Random.Shared.Next();
+            var grain = this.GrainFactory.GetGrain<ISimpleActivateDeactivateTestGrain>(id);
 
             // Activate
-            string activation = await grain.DoSomething();
+            var activation = await grain.DoSomething();
             // Deactivate
             await grain.DoDeactivate();
             Thread.Sleep(TimeSpan.FromSeconds(2)); // Allow some time for deactivate to happen
@@ -74,7 +74,7 @@ namespace DefaultCluster.Tests.ActivationsLifeCycleTests
             await CheckNumActivateDeactivateCalls(1, 1, activation, "After deactivation");
 
             // Reactivate
-            string activation2 = await grain.DoSomething();
+            var activation2 = await grain.DoSomething();
 
             Assert.NotEqual(activation, activation2); // New activation created after re-activate
             await CheckNumActivateDeactivateCalls(2, 1, new[] { activation, activation2 }, "After reactivation");
@@ -83,10 +83,10 @@ namespace DefaultCluster.Tests.ActivationsLifeCycleTests
         [Fact, TestCategory("BVT"), TestCategory("ActivateDeactivate")]
         public async Task Activate_TailCall()
         {
-            int id = Random.Shared.Next();
-            ITailCallActivateDeactivateTestGrain grain = this.GrainFactory.GetGrain<ITailCallActivateDeactivateTestGrain>(id);
+            var id = Random.Shared.Next();
+            var grain = this.GrainFactory.GetGrain<ITailCallActivateDeactivateTestGrain>(id);
 
-            string activation = await grain.DoSomething();
+            var activation = await grain.DoSomething();
 
             await CheckNumActivateDeactivateCalls(1, 0, activation, "After activation");
         }
@@ -94,11 +94,11 @@ namespace DefaultCluster.Tests.ActivationsLifeCycleTests
         [Fact, TestCategory("BVT"), TestCategory("ActivateDeactivate")]
         public async Task Deactivate_TailCall()
         {
-            int id = Random.Shared.Next();
-            ITailCallActivateDeactivateTestGrain grain = this.GrainFactory.GetGrain<ITailCallActivateDeactivateTestGrain>(id);
+            var id = Random.Shared.Next();
+            var grain = this.GrainFactory.GetGrain<ITailCallActivateDeactivateTestGrain>(id);
 
             // Activate
-            string activation = await grain.DoSomething();
+            var activation = await grain.DoSomething();
 
             // Deactivate
             await grain.DoDeactivate();
@@ -110,11 +110,11 @@ namespace DefaultCluster.Tests.ActivationsLifeCycleTests
         [Fact, TestCategory("BVT"), TestCategory("ActivateDeactivate")]
         public async Task Reactivate_TailCall()
         {
-            int id = Random.Shared.Next();
-            ITailCallActivateDeactivateTestGrain grain = this.GrainFactory.GetGrain<ITailCallActivateDeactivateTestGrain>(id);
+            var id = Random.Shared.Next();
+            var grain = this.GrainFactory.GetGrain<ITailCallActivateDeactivateTestGrain>(id);
 
             // Activate
-            string activation = await grain.DoSomething();
+            var activation = await grain.DoSomething();
             // Deactivate
             await grain.DoDeactivate();
             Thread.Sleep(TimeSpan.FromSeconds(2)); // Allow some time for deactivate to happen
@@ -122,7 +122,7 @@ namespace DefaultCluster.Tests.ActivationsLifeCycleTests
             await CheckNumActivateDeactivateCalls(1, 1, activation, "After deactivation");
 
             // Reactivate
-            string activation2 = await grain.DoSomething();
+            var activation2 = await grain.DoSomething();
 
             Assert.NotEqual(activation, activation2); // New activation created after re-activate
             await CheckNumActivateDeactivateCalls(2, 1, new[] { activation, activation2 }, "After reactivation");
@@ -131,11 +131,11 @@ namespace DefaultCluster.Tests.ActivationsLifeCycleTests
         [Fact, TestCategory("BVT"), TestCategory("ActivateDeactivate"), TestCategory("Reentrancy")]
         public async Task LongRunning_Deactivate()
         {
-            int id = Random.Shared.Next();
-            ILongRunningActivateDeactivateTestGrain grain = this.GrainFactory.GetGrain<ILongRunningActivateDeactivateTestGrain>(id);
+            var id = Random.Shared.Next();
+            var grain = this.GrainFactory.GetGrain<ILongRunningActivateDeactivateTestGrain>(id);
 
             // Activate
-            string activation = await grain.DoSomething();
+            var activation = await grain.DoSomething();
 
             await CheckNumActivateDeactivateCalls(1, 0, activation, "Before deactivation");
 
@@ -146,7 +146,7 @@ namespace DefaultCluster.Tests.ActivationsLifeCycleTests
             await CheckNumActivateDeactivateCalls(1, 1, activation, "After deactivation");
 
             // Reactivate
-            string activation2 = await grain.DoSomething();
+            var activation2 = await grain.DoSomething();
 
             Assert.NotEqual(activation, activation2); // New activation created after re-activate;
 
@@ -158,8 +158,8 @@ namespace DefaultCluster.Tests.ActivationsLifeCycleTests
         {
             try
             {
-                int id = Random.Shared.Next();
-                IBadActivateDeactivateTestGrain grain = this.GrainFactory.GetGrain<IBadActivateDeactivateTestGrain>(id);
+                var id = Random.Shared.Next();
+                var grain = this.GrainFactory.GetGrain<IBadActivateDeactivateTestGrain>(id);
 
                 await grain.ThrowSomething();
 
@@ -176,10 +176,10 @@ namespace DefaultCluster.Tests.ActivationsLifeCycleTests
         {
             try
             {
-                int id = Random.Shared.Next();
-                IBadActivateDeactivateTestGrain grain = this.GrainFactory.GetGrain<IBadActivateDeactivateTestGrain>(id);
+                var id = Random.Shared.Next();
+                var grain = this.GrainFactory.GetGrain<IBadActivateDeactivateTestGrain>(id);
 
-                long key = await grain.GetKey();
+                var key = await grain.GetKey();
 
                 Assert.True(false, "Expected ThrowSomething call to fail as unable to Activate grain, but returned " + key);
             }
@@ -194,8 +194,8 @@ namespace DefaultCluster.Tests.ActivationsLifeCycleTests
         {
             try
             {
-                int id = Random.Shared.Next();
-                ICreateGrainReferenceTestGrain grain = this.GrainFactory.GetGrain<ICreateGrainReferenceTestGrain>(id);
+                var id = Random.Shared.Next();
+                var grain = this.GrainFactory.GetGrain<ICreateGrainReferenceTestGrain>(id);
 
                 await grain.ForwardCall(this.GrainFactory.GetGrain<IBadActivateDeactivateTestGrain>(id));
 
@@ -212,8 +212,8 @@ namespace DefaultCluster.Tests.ActivationsLifeCycleTests
         {
             try
             {
-                int id = Random.Shared.Next();
-                IBadConstructorTestGrain grain = this.GrainFactory.GetGrain<IBadConstructorTestGrain>(id);
+                var id = Random.Shared.Next();
+                var grain = this.GrainFactory.GetGrain<IBadConstructorTestGrain>(id);
 
                 await grain.DoSomething();
 
@@ -233,21 +233,21 @@ namespace DefaultCluster.Tests.ActivationsLifeCycleTests
         [Fact, TestCategory("BVT"), TestCategory("ActivateDeactivate")]
         public async Task Constructor_CreateGrainReference()
         {
-            int id = Random.Shared.Next();
-            ICreateGrainReferenceTestGrain grain = this.GrainFactory.GetGrain<ICreateGrainReferenceTestGrain>(id);
+            var id = Random.Shared.Next();
+            var grain = this.GrainFactory.GetGrain<ICreateGrainReferenceTestGrain>(id);
 
-            string activation = await grain.DoSomething();
+            var activation = await grain.DoSomething();
             Assert.NotNull(activation);
         }
 
         [Fact, TestCategory("BVT"), TestCategory("ActivateDeactivate")]
         public async Task TaskAction_Deactivate()
         {
-            int id = Random.Shared.Next();
-            ITaskActionActivateDeactivateTestGrain grain = this.GrainFactory.GetGrain<ITaskActionActivateDeactivateTestGrain>(id);
+            var id = Random.Shared.Next();
+            var grain = this.GrainFactory.GetGrain<ITaskActionActivateDeactivateTestGrain>(id);
 
             // Activate
-            string activation = await grain.DoSomething();
+            var activation = await grain.DoSomething();
 
             // Deactivate
             await grain.DoDeactivate();
@@ -259,12 +259,12 @@ namespace DefaultCluster.Tests.ActivationsLifeCycleTests
         [Fact, TestCategory("BVT"), TestCategory("ActivateDeactivate")]
         public async Task DeactivateOnIdleWhileActivate()
         {
-            int id = Random.Shared.Next();
-            IDeactivatingWhileActivatingTestGrain grain = this.GrainFactory.GetGrain<IDeactivatingWhileActivatingTestGrain>(id);
+            var id = Random.Shared.Next();
+            var grain = this.GrainFactory.GetGrain<IDeactivatingWhileActivatingTestGrain>(id);
 
             try
             {
-                string activation = await grain.DoSomething();
+                var activation = await grain.DoSomething();
                 Assert.True(false, "Should have thrown.");
             }
             catch(InvalidOperationException exc)
@@ -296,18 +296,18 @@ namespace DefaultCluster.Tests.ActivationsLifeCycleTests
             string[] forActivations,
             string when = null)
         {
-            string[] activateCalls = await watcher.GetActivateCalls();
+            var activateCalls = await watcher.GetActivateCalls();
             Assert.Equal(expectedActivateCalls, activateCalls.Length);
 
-            string[] deactivateCalls = await watcher.GetDeactivateCalls();
+            var deactivateCalls = await watcher.GetDeactivateCalls();
             Assert.Equal(expectedDeactivateCalls, deactivateCalls.Length);
 
-            for (int i = 0; i < expectedActivateCalls; i++)
+            for (var i = 0; i < expectedActivateCalls; i++)
             {
                 Assert.Equal(forActivations[i], activateCalls[i]);
             }
 
-            for (int i = 0; i < expectedDeactivateCalls; i++)
+            for (var i = 0; i < expectedDeactivateCalls; i++)
             {
                 Assert.Equal(forActivations[i], deactivateCalls[i]);
             }
@@ -316,7 +316,7 @@ namespace DefaultCluster.Tests.ActivationsLifeCycleTests
         private static void AssertIsNotInvalidOperationException(Exception thrownException, string expectedMessageSubstring)
         {
             Console.WriteLine("Received exception: " + thrownException);
-            Exception e = thrownException.GetBaseException();
+            var e = thrownException.GetBaseException();
             Console.WriteLine("Nested exception type: " + e.GetType().FullName);
             Console.WriteLine("Nested exception message: " + e.Message);
 

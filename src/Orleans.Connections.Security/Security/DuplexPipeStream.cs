@@ -48,7 +48,7 @@ namespace Orleans.Connections.Security
 
         public override async Task FlushAsync(CancellationToken cancellationToken)
         {
-            FlushResult r = await _writer.FlushAsync(cancellationToken).ConfigureAwait(false);
+            var r = await _writer.FlushAsync(cancellationToken).ConfigureAwait(false);
             if (r.IsCanceled) throw new OperationCanceledException(cancellationToken);
         }
 
@@ -56,7 +56,7 @@ namespace Orleans.Connections.Security
         {
             ValidateBufferArguments(buffer, offset, count);
 
-            ValueTask<int> t = ReadAsync(buffer.AsMemory(offset, count));
+            var t = ReadAsync(buffer.AsMemory(offset, count));
             return
                 t.IsCompleted ? t.GetAwaiter().GetResult() :
                 t.AsTask().GetAwaiter().GetResult();
@@ -71,24 +71,24 @@ namespace Orleans.Connections.Security
 
         public override async ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken = default)
         {
-            ReadResult result = await _reader.ReadAsync(cancellationToken).ConfigureAwait(false);
+            var result = await _reader.ReadAsync(cancellationToken).ConfigureAwait(false);
 
             if (result.IsCanceled)
             {
                 throw new OperationCanceledException();
             }
 
-            ReadOnlySequence<byte> sequence = result.Buffer;
-            long bufferLength = sequence.Length;
-            SequencePosition consumed = sequence.Start;
+            var sequence = result.Buffer;
+            var bufferLength = sequence.Length;
+            var consumed = sequence.Start;
 
             try
             {
                 if (bufferLength != 0)
                 {
-                    int actual = (int)Math.Min(bufferLength, buffer.Length);
+                    var actual = (int)Math.Min(bufferLength, buffer.Length);
 
-                    ReadOnlySequence<byte> slice = actual == bufferLength ? sequence : sequence.Slice(0, actual);
+                    var slice = actual == bufferLength ? sequence : sequence.Slice(0, actual);
                     consumed = slice.End;
                     slice.CopyTo(buffer.Span);
 
@@ -144,7 +144,7 @@ namespace Orleans.Connections.Security
 
         public override async ValueTask WriteAsync(ReadOnlyMemory<byte> buffer, CancellationToken cancellationToken = default)
         {
-            FlushResult r = await _writer.WriteAsync(buffer, cancellationToken).ConfigureAwait(false);
+            var r = await _writer.WriteAsync(buffer, cancellationToken).ConfigureAwait(false);
             if (r.IsCanceled) throw new OperationCanceledException(cancellationToken);
         }
 

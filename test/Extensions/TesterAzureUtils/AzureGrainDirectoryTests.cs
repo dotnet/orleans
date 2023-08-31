@@ -78,7 +78,7 @@ namespace Tester.AzureUtils
             await this.grainDirectory.UnregisterMany(addresses);
 
             // Now we should only find the old Rth entry
-            for (int i = 0; i < N; i++)
+            for (var i = 0; i < N; i++)
             {
                 if (i == R)
                 {

@@ -18,7 +18,7 @@ namespace Tester
         public void CanResolveFormatter()
         {
             // expected output
-            TestLoggerFactory expected = BuildOptionsExpectedResult();
+            var expected = BuildOptionsExpectedResult();
 
             // actual output
             var services = new ServiceCollection();
@@ -45,7 +45,7 @@ namespace Tester
         public void CanResolveGenericFormatter()
         {
             // expected output
-            TestLoggerFactory expected = BuildOptionsExpectedResult();
+            var expected = BuildOptionsExpectedResult();
 
             // actual output
             var services = new ServiceCollection();
@@ -139,7 +139,7 @@ namespace Tester
         public void FormatterConfiguredTwiceDoesNotLeadToDuplicatedFormatter()
         {
             // expected output
-            TestLoggerFactory expected = BuildOptionsExpectedResult();
+            var expected = BuildOptionsExpectedResult();
 
             // actual output
             var services = new ServiceCollection();
@@ -173,7 +173,7 @@ namespace Tester
         public void CustomFormatterOverridesDefaultFormatter_PreRegistration()
         {
             // expected output
-            TestLoggerFactory expected = BuildOptionsExpectedResult();
+            var expected = BuildOptionsExpectedResult();
 
             // actual output
             var services = new ServiceCollection();
@@ -203,7 +203,7 @@ namespace Tester
         public void CustomFormatterOverridesDefaultFormatter_PostRegistration()
         {
             // expected output
-            TestLoggerFactory expected = BuildOptionsExpectedResult();
+            var expected = BuildOptionsExpectedResult();
 
             // actual output
             var services = new ServiceCollection();
@@ -236,7 +236,7 @@ namespace Tester
         public void NamedFormatterGoldenPath()
         {
             // expected output
-            TestLoggerFactory expected = BuildNamedOptionsExpectedResult();
+            var expected = BuildNamedOptionsExpectedResult();
 
             // actual output
             var services = new ServiceCollection();
@@ -251,7 +251,7 @@ namespace Tester
                 .ToList()
                 .ForEach(i =>
                 {
-                    string name = i.ToString();
+                    var name = i.ToString();
                     services.Configure<TestOptions>(name, (options => options.IntField = i));
                     services.ConfigureNamedOptionForLogging<TestOptions>(name);
                 });
@@ -273,7 +273,7 @@ namespace Tester
         public void NamedGenericFormatterGoldenPath()
         {
             // expected output
-            TestLoggerFactory expected = BuildNamedOptionsExpectedResult();
+            var expected = BuildNamedOptionsExpectedResult();
 
             // actual output
             var services = new ServiceCollection();
@@ -289,7 +289,7 @@ namespace Tester
                 .ToList()
                 .ForEach(i =>
                 {
-                    string name = i.ToString();
+                    var name = i.ToString();
                     services.Configure<TestOptions>(name, (options => options.IntField = i));
                     services.ConfigureNamedOptionForLogging<TestOptions>(name);
                 });
@@ -307,7 +307,7 @@ namespace Tester
         public void CustomFormatterResolverOverridesDefaultFormatter_PreRegistration()
         {
             // expected output
-            TestLoggerFactory expected = BuildNamedOptionsExpectedResult();
+            var expected = BuildNamedOptionsExpectedResult();
 
             // actual output
             var services = new ServiceCollection();
@@ -324,7 +324,7 @@ namespace Tester
                 .ToList()
                 .ForEach(i =>
                 {
-                    string name = i.ToString();
+                    var name = i.ToString();
                     services.Configure<TestOptions>(name, (options => options.IntField = i));
                     services.ConfigureNamedOptionForLogging<TestOptions>(name);
                 });
@@ -348,7 +348,7 @@ namespace Tester
         public void CustomFormatterResolverOverridesDefaultFormatter_PostRegistration()
         {
             // expected output
-            TestLoggerFactory expected = BuildNamedOptionsExpectedResult();
+            var expected = BuildNamedOptionsExpectedResult();
 
             // actual output
             var services = new ServiceCollection();
@@ -365,7 +365,7 @@ namespace Tester
                 .ToList()
                 .ForEach(i =>
                 {
-                    string name = i.ToString();
+                    var name = i.ToString();
                     services.Configure<TestOptions>(name, (options => options.IntField = i));
                     services.ConfigureNamedOptionForLogging<TestOptions>(name);
                 });
@@ -402,7 +402,7 @@ namespace Tester
         private TestLoggerFactory BuildNamedOptionsExpectedResult()
         {
             var services = new ServiceCollection();
-            IOptionFormatter[] formatters = Enumerable
+            var formatters = Enumerable
                 .Range(1, 3)
                 .Select(i =>  TestOptionsFormatter.CreateNamed(i.ToString(), Options.Create(new TestOptions { IntField = i })))
                 .ToArray<IOptionFormatter>();

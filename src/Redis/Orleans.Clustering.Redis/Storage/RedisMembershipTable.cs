@@ -103,7 +103,7 @@ namespace Orleans.Clustering.Redis
         {
             var all = await _db.HashGetAllAsync(_clusterKey);
             var tableVersionRow = all.SingleOrDefault(h => TableVersionKey.Equals(h.Name, StringComparison.Ordinal));
-            TableVersion tableVersion = GetTableVersionFromRow(tableVersionRow.Value);
+            var tableVersion = GetTableVersionFromRow(tableVersionRow.Value);
 
             var data = all.Where(h => !TableVersionKey.Equals(h.Name, StringComparison.Ordinal) && h.Value.HasValue)
                 .Select(x => Tuple.Create(Deserialize(x.Value), tableVersion.VersionEtag))
@@ -126,7 +126,7 @@ namespace Orleans.Clustering.Redis
                 throw new RedisClusteringException($"Unexpected transaction failure while reading key {key}");
             }
 
-            TableVersion tableVersion = GetTableVersionFromRow(await tableVersionRowTask);
+            var tableVersion = GetTableVersionFromRow(await tableVersionRowTask);
             var entryRow = await entryRowTask;
             if (entryRow.HasValue)
             {
@@ -156,7 +156,7 @@ namespace Orleans.Clustering.Redis
                 throw new RedisClusteringException($"Could not find a value for the key {key}");
             }
 
-            TableVersion tableVersion = GetTableVersionFromRow(await tableVersionRowTask).Next();
+            var tableVersion = GetTableVersionFromRow(await tableVersionRowTask).Next();
             var existingEntry = Deserialize(entryRow);
 
             // Update only the IAmAliveTime property.

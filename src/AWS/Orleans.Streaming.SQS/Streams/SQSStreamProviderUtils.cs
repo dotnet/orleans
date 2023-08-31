@@ -22,7 +22,7 @@ namespace OrleansAWSUtils.Streams
             if (clusterId != null)
             {
                 var queueMapper = new HashRingBasedStreamQueueMapper(new HashRingStreamQueueMapperOptions(), providerName);
-                List<QueueId> allQueues = queueMapper.GetAllQueues().ToList();
+                var allQueues = queueMapper.GetAllQueues().ToList();
 
                 var deleteTasks = new List<Task>();
                 foreach (var queueId in allQueues)

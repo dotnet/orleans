@@ -335,7 +335,7 @@ namespace Orleans.EventSourcing.Common
             var time = DateTime.UtcNow;
             var pos = GetConfirmedVersion() + pending.Count;
 
-            bool first = true;
+            var first = true;
             foreach (var e in logEntries)
             {
                 SubmitInternal(time, e, pos++, first ? promise : null);
@@ -528,9 +528,9 @@ namespace Orleans.EventSourcing.Common
 
             NotifyViewChanges(ref version);
 
-            bool haveToWrite = (pending.Count != 0);
+            var haveToWrite = (pending.Count != 0);
 
-            bool haveToRead = needInitialRead || (needRefresh && !haveToWrite);
+            var haveToRead = needInitialRead || (needRefresh && !haveToWrite);
 
             Services.Log(LogLevel.Debug, "<3 Storage htr={0} htw={1}", haveToRead, haveToWrite);
 
@@ -573,7 +573,7 @@ namespace Orleans.EventSourcing.Common
         /// </summary>
         internal async Task UpdatePrimary()
         {
-            int version = GetConfirmedVersion();
+            var version = GetConfirmedVersion();
 
             while (true)
             {
@@ -610,7 +610,7 @@ namespace Orleans.EventSourcing.Common
                     if (stats != null)
                     {
                         var timeNow = DateTime.UtcNow;
-                        for (int i = 0; i < writeResult; i++)
+                        for (var i = 0; i < writeResult; i++)
                         {
                             var latency = timeNow - pending[i].SubmissionTime;
                             stats.StabilizationLatenciesInMsecs.Add(latency.Milliseconds);
@@ -635,8 +635,8 @@ namespace Orleans.EventSourcing.Common
         private void NotifyViewChanges(ref int version, int numWritten = 0)
         {
             var v = GetConfirmedVersion();
-            bool tentativeChanged = (v != version + numWritten);
-            bool confirmedChanged = (v != version);
+            var tentativeChanged = (v != version + numWritten);
+            var confirmedChanged = (v != version);
             if (tentativeChanged || confirmedChanged)
             {
                 tentativeStateInternal = null; // conservative.
@@ -702,7 +702,7 @@ namespace Orleans.EventSourcing.Common
         /// </summary>
         protected void NotifyPromises(int count, bool success)
         {
-            for (int i = 0; i < count; i++)
+            for (var i = 0; i < count; i++)
             {
                 var promise = pending[i].ResultPromise;
                 if (promise != null)
@@ -715,10 +715,10 @@ namespace Orleans.EventSourcing.Common
         /// </summary>
         protected void RemoveStaleConditionalUpdates()
         {
-            int version = GetConfirmedVersion();
-            bool foundFailedConditionalUpdates = false;
+            var version = GetConfirmedVersion();
+            var foundFailedConditionalUpdates = false;
 
-            for (int pos = 0; pos < pending.Count; pos++)
+            for (var pos = 0; pos < pending.Count; pos++)
             {
                 var submissionEntry = pending[pos];
                 if (submissionEntry.ConditionalPosition != unconditional

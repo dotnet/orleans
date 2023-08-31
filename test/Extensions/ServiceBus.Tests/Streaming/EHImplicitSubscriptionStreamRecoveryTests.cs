@@ -100,22 +100,22 @@ namespace ServiceBus.Tests.StreamingTests
 
         private async Task GenerateEvents(string streamNamespace, int streamCount, int eventsInStream)
         {
-            IStreamProvider streamProvider = this.fixture.HostedCluster.ServiceProvider.GetServiceByName<IStreamProvider>(StreamProviderName);
-            IAsyncStream<GeneratedEvent>[] producers =
+            var streamProvider = this.fixture.HostedCluster.ServiceProvider.GetServiceByName<IStreamProvider>(StreamProviderName);
+            var producers =
                 Enumerable.Range(0, streamCount)
                     .Select(i => streamProvider.GetStream<GeneratedEvent>(streamNamespace, Guid.NewGuid()))
                     .ToArray();
 
-            for (int i = 0; i < eventsInStream - 1; i++)
+            for (var i = 0; i < eventsInStream - 1; i++)
             {
                 // send event on each stream
-                for (int j = 0; j < streamCount; j++)
+                for (var j = 0; j < streamCount; j++)
                 {
                     await producers[j].OnNextAsync(new GeneratedEvent { EventType = GeneratedEvent.GeneratedEventType.Fill });
                 }
             }
             // send end events
-            for (int j = 0; j < streamCount; j++)
+            for (var j = 0; j < streamCount; j++)
             {
                 await producers[j].OnNextAsync(new GeneratedEvent { EventType = GeneratedEvent.GeneratedEventType.Report });
             }

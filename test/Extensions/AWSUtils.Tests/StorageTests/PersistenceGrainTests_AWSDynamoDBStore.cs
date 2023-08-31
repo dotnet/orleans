@@ -133,8 +133,8 @@ namespace AWSUtils.Tests.StorageTests
         public async Task AWSDynamoDBStore_ConvertToFromStorageFormat_GrainReference()
         {
             // NOTE: This test requires Silo to be running & Client init so that grain references can be resolved before serialization.
-            Guid id = Guid.NewGuid();
-            IUser grain = this.HostedCluster.GrainFactory.GetGrain<IUser>(id);
+            var id = Guid.NewGuid();
+            var grain = this.HostedCluster.GrainFactory.GetGrain<IUser>(id);
 
             var initialState = new GrainStateContainingGrainReferences { Grain = grain };
             var entity = new GrainStateRecord();
@@ -151,7 +151,7 @@ namespace AWSUtils.Tests.StorageTests
         {
             // NOTE: This test requires Silo to be running & Client init so that grain references can be resolved before serialization.
             Guid[] ids = { Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid() };
-            IUser[] grains = new IUser[3];
+            var grains = new IUser[3];
             grains[0] = this.HostedCluster.GrainFactory.GetGrain<IUser>(ids[0]);
             grains[1] = this.HostedCluster.GrainFactory.GetGrain<IUser>(ids[1]);
             grains[2] = this.HostedCluster.GrainFactory.GetGrain<IUser>(ids[2]);
@@ -171,9 +171,9 @@ namespace AWSUtils.Tests.StorageTests
             Assert.NotNull(convertedState);
             Assert.Equal(initialState.GrainList.Count, convertedState.GrainList.Count);  // "GrainList size"
             Assert.Equal(initialState.GrainDict.Count, convertedState.GrainDict.Count);  // "GrainDict size"
-            for (int i = 0; i < grains.Length; i++)
+            for (var i = 0; i < grains.Length; i++)
             {
-                string iStr = ids[i].ToString();
+                var iStr = ids[i].ToString();
                 Assert.Equal(initialState.GrainList[i], convertedState.GrainList[i]);  // "GrainList #{0}", i
                 Assert.Equal(initialState.GrainDict[iStr], convertedState.GrainDict[iStr]);  // "GrainDict #{0}", i
             }
@@ -186,7 +186,7 @@ namespace AWSUtils.Tests.StorageTests
             options.Service = AWSTestConstants.DynamoDbService;
             options.GrainStorageSerializer = ActivatorUtilities.CreateInstance<OrleansGrainStorageSerializer>(runtime.ServiceProvider);
 
-            DynamoDBGrainStorage store = ActivatorUtilities.CreateInstance<DynamoDBGrainStorage>(runtime.ServiceProvider, "PersistenceGrainTests", options);
+            var store = ActivatorUtilities.CreateInstance<DynamoDBGrainStorage>(runtime.ServiceProvider, "PersistenceGrainTests", options);
             ISiloLifecycleSubject lifecycle = ActivatorUtilities.CreateInstance<SiloLifecycleSubject>(runtime.ServiceProvider, NullLogger<SiloLifecycleSubject>.Instance);
             store.Participate(lifecycle);
             await lifecycle.OnStart();

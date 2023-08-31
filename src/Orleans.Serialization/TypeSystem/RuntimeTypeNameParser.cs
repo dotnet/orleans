@@ -211,7 +211,7 @@ public static class RuntimeTypeNameParser
         var start = s.Index;
         var typeName = ParseSpan(ref s, TypeNameDelimiters);
         var genericArityStart = -1;
-        while (s.TryPeek(out char c))
+        while (s.TryPeek(out var c))
         {
             if (genericArityStart < 0 && c == GenericTypeIndicator)
             {

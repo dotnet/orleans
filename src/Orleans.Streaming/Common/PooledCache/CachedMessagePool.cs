@@ -25,7 +25,7 @@ namespace Orleans.Providers.Streams.Common
         /// <returns>The cached message block which the message was allocated in.</returns>
         public CachedMessageBlock AllocateMessage(CachedMessage message)
         {
-            CachedMessageBlock returnBlock = currentMessageBlock ?? (currentMessageBlock = messagePool.Allocate());
+            var returnBlock = currentMessageBlock ?? (currentMessageBlock = messagePool.Allocate());
             returnBlock.Add(message);
 
             // blocks at capacity are eligable for purge, so we don't want to be holding on to them.

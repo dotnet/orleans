@@ -20,7 +20,7 @@ namespace Tester.Redis.Persistence
             TestUtils.CheckForRedis();
 
             var siloPort = 11111;
-            int gatewayPort = 30000;
+            var gatewayPort = 30000;
             var siloAddress = IPAddress.Loopback;
 
             var host = Host.CreateDefaultBuilder()

@@ -20,14 +20,14 @@ namespace DefaultCluster.Tests
         [Fact, TestCategory("BVT")]
         public async Task DoSomethingGrainEmptyTest()
         {
-            IDoSomethingEmptyGrain doSomething = GetHierarchyGrain<IDoSomethingEmptyGrain>();
+            var doSomething = GetHierarchyGrain<IDoSomethingEmptyGrain>();
             Assert.Equal("DoSomethingEmptyGrain", await doSomething.DoIt());
         }
 
         [Fact, TestCategory("BVT")]
         public async Task DoSomethingGrainEmptyWithMoreTest()
         {
-            IDoSomethingEmptyWithMoreGrain doSomething = GetHierarchyGrain<IDoSomethingEmptyWithMoreGrain>();
+            var doSomething = GetHierarchyGrain<IDoSomethingEmptyWithMoreGrain>();
             Assert.Equal("DoSomethingEmptyWithMoreGrain", await doSomething.DoIt());
             Assert.Equal("DoSomethingEmptyWithMoreGrain", await doSomething.DoMore());
         }
@@ -35,7 +35,7 @@ namespace DefaultCluster.Tests
         [Fact, TestCategory("BVT")]
         public async Task DoSomethingWithMoreEmptyGrainTest()
         {
-            IDoSomethingWithMoreEmptyGrain doSomething = GetHierarchyGrain<IDoSomethingWithMoreEmptyGrain>();
+            var doSomething = GetHierarchyGrain<IDoSomethingWithMoreEmptyGrain>();
             Assert.Equal("DoSomethingWithMoreEmptyGrain", await doSomething.DoIt());
             Assert.Equal("DoSomethingWithMoreEmptyGrain", await doSomething.DoMore());
         }
@@ -43,7 +43,7 @@ namespace DefaultCluster.Tests
         [Fact, TestCategory("BVT")]
         public async Task DoSomethingWithMoreGrainTest()
         {
-            IDoSomethingWithMoreGrain doSomething = GetHierarchyGrain<IDoSomethingWithMoreGrain>();
+            var doSomething = GetHierarchyGrain<IDoSomethingWithMoreGrain>();
             Assert.Equal("DoSomethingWithMoreGrain", await doSomething.DoIt());
             Assert.Equal("DoSomethingWithMoreGrain", await doSomething.DoThat());
         }
@@ -51,7 +51,7 @@ namespace DefaultCluster.Tests
         [Fact, TestCategory("BVT")]
         public async Task DoSomethingCombinedGrainTest()
         {
-            IDoSomethingCombinedGrain doSomething = GetHierarchyGrain<IDoSomethingCombinedGrain>();
+            var doSomething = GetHierarchyGrain<IDoSomethingCombinedGrain>();
             Assert.Equal("DoSomethingCombinedGrain", await doSomething.DoIt());
             Assert.Equal("DoSomethingCombinedGrain", await doSomething.DoMore());
             Assert.Equal("DoSomethingCombinedGrain", await doSomething.DoThat());

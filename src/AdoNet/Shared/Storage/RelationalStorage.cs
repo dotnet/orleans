@@ -214,7 +214,7 @@ namespace Orleans.Tests.SqlUtils
         private static async Task<Tuple<IEnumerable<TResult>, int>> SelectAsync<TResult>(DbDataReader reader, Func<IDataReader, int, CancellationToken, Task<TResult>> selector, CancellationToken cancellationToken)
         {
             var results = new List<TResult>();
-            int resultSetCount = 0;
+            var resultSetCount = 0;
             while(reader.HasRows)
             {
                 while(await reader.ReadAsync(cancellationToken).ConfigureAwait(continueOnCapturedContext: false))
@@ -235,7 +235,7 @@ namespace Orleans.Tests.SqlUtils
         {
             using(var reader = await command.ExecuteReaderAsync(commandBehavior, cancellationToken).ConfigureAwait(continueOnCapturedContext: false))
             {
-                CancellationTokenRegistration cancellationRegistration = default(CancellationTokenRegistration);
+                var cancellationRegistration = default(CancellationTokenRegistration);
                 try
                 {
                     if(cancellationToken.CanBeCanceled && supportsCommandCancellation)

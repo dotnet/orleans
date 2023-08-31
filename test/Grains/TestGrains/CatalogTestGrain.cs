@@ -23,11 +23,11 @@ namespace UnitTests.Grains
         {
             var promises = new List<Task>(nGrains * nCallsToEach);
 
-            for (int i = 0; i < nGrains; i++)
+            for (var i = 0; i < nGrains; i++)
             {
                 var grain = GrainFactory.GetGrain<ICatalogTestGrain>(startingKey + i);
 
-                for (int j = 0; j < nCallsToEach; j++)
+                for (var j = 0; j < nCallsToEach; j++)
                     promises.Add(grain.Initialize());
             }
 

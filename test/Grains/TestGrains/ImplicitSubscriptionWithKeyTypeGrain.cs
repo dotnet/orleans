@@ -20,8 +20,8 @@ namespace UnitTests.Grains
             logger.LogInformation("OnActivateAsync");
 
             value = 0;
-            IStreamProvider streamProvider = this.GetStreamProvider(ImplicitStreamTestConstants.StreamProviderName);
-            IAsyncStream<int> stream = streamProvider.GetStream<int>(nameof(IImplicitSubscriptionLongKeyGrain), this.GetPrimaryKeyLong());
+            var streamProvider = this.GetStreamProvider(ImplicitStreamTestConstants.StreamProviderName);
+            var stream = streamProvider.GetStream<int>(nameof(IImplicitSubscriptionLongKeyGrain), this.GetPrimaryKeyLong());
 
             await stream.SubscribeAsync(
                 (data, token) =>

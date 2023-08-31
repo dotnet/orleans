@@ -103,7 +103,7 @@ namespace ServiceBus.Tests.TestStreamProviders
 
             int IQueueFlowController.GetMaxAddCount()
             {
-                int maxAddCount = base.GetMaxAddCount();
+                var maxAddCount = base.GetMaxAddCount();
                 this.IsUnderPressure = maxAddCount <= 0;
                 return maxAddCount;
             }
@@ -136,7 +136,7 @@ namespace ServiceBus.Tests.TestStreamProviders
             var cacheOptions = services.GetOptionsByName<EventHubStreamCachePressureOptions>(name);
             var evictionOptions = services.GetOptionsByName<StreamCacheEvictionOptions>(name);
             var statisticOptions = services.GetOptionsByName<StreamStatisticOptions>(name);
-            IEventHubDataAdapter dataAdapter = services.GetServiceByName<IEventHubDataAdapter>(name)
+            var dataAdapter = services.GetServiceByName<IEventHubDataAdapter>(name)
                 ?? services.GetService<IEventHubDataAdapter>()
                 ?? ActivatorUtilities.CreateInstance<EventHubDataAdapter>(services);
             var factory = ActivatorUtilities.CreateInstance<EHStreamProviderWithCreatedCacheListAdapterFactory>(services, name, generatorOptions, ehOptions, receiverOptions, 

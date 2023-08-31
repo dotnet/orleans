@@ -148,7 +148,7 @@ namespace Orleans.Runtime.GrainDirectory
                 // Find the last silo with hash smaller than the new silo, and insert the latter after (this is why we have +1 here) the former.
                 // Notice that FindLastIndex might return -1 if this should be the first silo in the list, but then
                 // 'index' will get 0, as needed.
-                int index = existing.MembershipRingList.FindLastIndex(siloAddr => siloAddr.GetConsistentHashCode() < hash) + 1;
+                var index = existing.MembershipRingList.FindLastIndex(siloAddr => siloAddr.GetConsistentHashCode() < hash) + 1;
 
                 this.directoryMembership = new DirectoryMembership(
                     existing.MembershipRingList.Insert(index, silo),
@@ -260,7 +260,7 @@ namespace Orleans.Runtime.GrainDirectory
         internal SiloAddress? FindPredecessor(SiloAddress silo)
         {
             var existing = directoryMembership.MembershipRingList;
-            int index = existing.IndexOf(silo);
+            var index = existing.IndexOf(silo);
             if (index == -1)
             {
                 log.LogWarning(
@@ -276,7 +276,7 @@ namespace Orleans.Runtime.GrainDirectory
         internal SiloAddress? FindSuccessor(SiloAddress silo)
         {
             var existing = directoryMembership.MembershipRingList;
-            int index = existing.IndexOf(silo);
+            var index = existing.IndexOf(silo);
             if (index == -1)
             {
                 log.LogWarning(
@@ -340,12 +340,12 @@ namespace Orleans.Runtime.GrainDirectory
             }
 
             SiloAddress? siloAddress = null;
-            int hash = unchecked((int)grainId.GetUniformHashCode());
+            var hash = unchecked((int)grainId.GetUniformHashCode());
 
             // excludeMySelf from being a TargetSilo if we're not running and the excludeThisSIloIfStopping flag is true. see the comment in the Stop method.
             // excludeThisSIloIfStopping flag was removed because we believe that flag complicates things unnecessarily. We can add it back if it turns out that flag
             // is doing something valuable.
-            bool excludeMySelf = !Running;
+            var excludeMySelf = !Running;
 
             var existing = this.directoryMembership;
             if (existing.MembershipRingList.Count == 0)
@@ -433,7 +433,7 @@ namespace Orleans.Runtime.GrainDirectory
                 forwardAddress = this.CheckIfShouldForward(address.GrainId, hopCount, "RegisterAsync");
                 if (forwardAddress is not null)
                 {
-                    int hash = unchecked((int)address.GrainId.GetUniformHashCode());
+                    var hash = unchecked((int)address.GrainId.GetUniformHashCode());
                     this.log.LogWarning(
                         "RegisterAsync - It seems we are not the owner of activation {Address} (hash: {Hash}), trying to forward it to {ForwardAddress} (hopCount={HopCount})",
                         address,
@@ -455,7 +455,7 @@ namespace Orleans.Runtime.GrainDirectory
                 DirectoryInstruments.RegistrationsSingleActRemoteSent.Add(1);
 
                 // otherwise, notify the owner
-                AddressAndTag result = await GetDirectoryReference(forwardAddress).RegisterAsync(address, previousAddress, hopCount + 1);
+                var result = await GetDirectoryReference(forwardAddress).RegisterAsync(address, previousAddress, hopCount + 1);
 
                 // Caching optimization:
                 // cache the result of a successful RegisterSingleActivation call, only if it is not a duplicate activation.
@@ -689,7 +689,7 @@ namespace Orleans.Runtime.GrainDirectory
                 forwardAddress = this.CheckIfShouldForward(grainId, hopCount, "LookUpAsync");
                 if (forwardAddress is not null)
                 {
-                    int hash = unchecked((int)grainId.GetUniformHashCode());
+                    var hash = unchecked((int)grainId.GetUniformHashCode());
                     this.log.LogWarning(
                         "LookupAsync - It seems we are not the owner of grain {GrainId} (hash: {Hash}), trying to forward it to {ForwardAddress} (hopCount={HopCount})",
                         grainId,

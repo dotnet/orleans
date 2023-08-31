@@ -40,14 +40,14 @@ namespace AWSUtils.Tests.StorageTests
 
         protected async Task Grain_AWSStore_Delete()
         {
-            Guid id = Guid.NewGuid();
-            IAWSStorageTestGrain grain = this.fixture.GrainFactory.GetGrain<IAWSStorageTestGrain>(id);
+            var id = Guid.NewGuid();
+            var grain = this.fixture.GrainFactory.GetGrain<IAWSStorageTestGrain>(id);
 
             await grain.DoWrite(1);
 
             await grain.DoDelete();
 
-            int val = await grain.GetValue(); // Should this throw instead?
+            var val = await grain.GetValue(); // Should this throw instead?
             Assert.Equal(0, val);  // "Value after Delete"
 
             await grain.DoWrite(2);
@@ -58,20 +58,20 @@ namespace AWSUtils.Tests.StorageTests
 
         protected async Task Grain_AWSStore_Read()
         {
-            Guid id = Guid.NewGuid();
-            IAWSStorageTestGrain grain = this.fixture.GrainFactory.GetGrain<IAWSStorageTestGrain>(id);
+            var id = Guid.NewGuid();
+            var grain = this.fixture.GrainFactory.GetGrain<IAWSStorageTestGrain>(id);
 
-            int val = await grain.GetValue();
+            var val = await grain.GetValue();
 
             Assert.Equal(0, val);  // "Initial value"
         }
 
         protected async Task Grain_GuidKey_AWSStore_Read_Write()
         {
-            Guid id = Guid.NewGuid();
-            IAWSStorageTestGrain grain = this.fixture.GrainFactory.GetGrain<IAWSStorageTestGrain>(id);
+            var id = Guid.NewGuid();
+            var grain = this.fixture.GrainFactory.GetGrain<IAWSStorageTestGrain>(id);
 
-            int val = await grain.GetValue();
+            var val = await grain.GetValue();
 
             Assert.Equal(0, val);  // "Initial value"
 
@@ -91,9 +91,9 @@ namespace AWSUtils.Tests.StorageTests
         protected async Task Grain_LongKey_AWSStore_Read_Write()
         {
             long id = Random.Shared.Next();
-            IAWSStorageTestGrain_LongKey grain = this.fixture.GrainFactory.GetGrain<IAWSStorageTestGrain_LongKey>(id);
+            var grain = this.fixture.GrainFactory.GetGrain<IAWSStorageTestGrain_LongKey>(id);
 
-            int val = await grain.GetValue();
+            var val = await grain.GetValue();
 
             Assert.Equal(0, val);  // "Initial value"
 
@@ -113,12 +113,12 @@ namespace AWSUtils.Tests.StorageTests
         protected async Task Grain_LongKeyExtended_AWSStore_Read_Write()
         {
             long id = Random.Shared.Next();
-            string extKey = Random.Shared.Next().ToString(CultureInfo.InvariantCulture);
+            var extKey = Random.Shared.Next().ToString(CultureInfo.InvariantCulture);
 
-            IAWSStorageTestGrain_LongExtendedKey
+            var
                 grain = this.fixture.GrainFactory.GetGrain<IAWSStorageTestGrain_LongExtendedKey>(id, extKey, null);
 
-            int val = await grain.GetValue();
+            var val = await grain.GetValue();
 
             Assert.Equal(0, val);  // "Initial value"
 
@@ -136,19 +136,19 @@ namespace AWSUtils.Tests.StorageTests
             val = await grain.GetValue();
             Assert.Equal(2, val);  // "Value after Re-Read"
 
-            string extKeyValue = await grain.GetExtendedKeyValue();
+            var extKeyValue = await grain.GetExtendedKeyValue();
             Assert.Equal(extKey, extKeyValue);  // "Extended Key"
         }
 
         protected async Task Grain_GuidKeyExtended_AWSStore_Read_Write()
         {
             var id = Guid.NewGuid();
-            string extKey = Random.Shared.Next().ToString(CultureInfo.InvariantCulture);
+            var extKey = Random.Shared.Next().ToString(CultureInfo.InvariantCulture);
 
-            IAWSStorageTestGrain_GuidExtendedKey
+            var
                 grain = this.fixture.GrainFactory.GetGrain<IAWSStorageTestGrain_GuidExtendedKey>(id, extKey, null);
 
-            int val = await grain.GetValue();
+            var val = await grain.GetValue();
 
             Assert.Equal(0, val);  // "Initial value"
 
@@ -166,7 +166,7 @@ namespace AWSUtils.Tests.StorageTests
             val = await grain.GetValue();
             Assert.Equal(2, val);  // "Value after Re-Read"
 
-            string extKeyValue = await grain.GetExtendedKeyValue();
+            var extKeyValue = await grain.GetExtendedKeyValue();
             Assert.Equal(extKey, extKeyValue);  // "Extended Key"
         }
 
@@ -174,9 +174,9 @@ namespace AWSUtils.Tests.StorageTests
         {
             long id = Random.Shared.Next();
 
-            IAWSStorageGenericGrain<int> grain = this.fixture.GrainFactory.GetGrain<IAWSStorageGenericGrain<int>>(id);
+            var grain = this.fixture.GrainFactory.GetGrain<IAWSStorageGenericGrain<int>>(id);
 
-            int val = await grain.GetValue();
+            var val = await grain.GetValue();
 
             Assert.Equal(0, val);  // "Initial value"
 
@@ -196,35 +196,35 @@ namespace AWSUtils.Tests.StorageTests
         protected async Task Grain_Generic_AWSStore_DiffTypes()
         {
             long id1 = Random.Shared.Next();
-            long id2 = id1;
-            long id3 = id1;
+            var id2 = id1;
+            var id3 = id1;
 
-            IAWSStorageGenericGrain<int> grain1 = this.fixture.GrainFactory.GetGrain<IAWSStorageGenericGrain<int>>(id1);
+            var grain1 = this.fixture.GrainFactory.GetGrain<IAWSStorageGenericGrain<int>>(id1);
 
-            IAWSStorageGenericGrain<string> grain2 = this.fixture.GrainFactory.GetGrain<IAWSStorageGenericGrain<string>>(id2);
+            var grain2 = this.fixture.GrainFactory.GetGrain<IAWSStorageGenericGrain<string>>(id2);
 
-            IAWSStorageGenericGrain<double> grain3 = this.fixture.GrainFactory.GetGrain<IAWSStorageGenericGrain<double>>(id3);
+            var grain3 = this.fixture.GrainFactory.GetGrain<IAWSStorageGenericGrain<double>>(id3);
 
-            int val1 = await grain1.GetValue();
+            var val1 = await grain1.GetValue();
             Assert.Equal(0, val1);  // "Initial value - 1"
 
-            string val2 = await grain2.GetValue();
+            var val2 = await grain2.GetValue();
             Assert.Null(val2);  // "Initial value - 2"
 
-            double val3 = await grain3.GetValue();
+            var val3 = await grain3.GetValue();
             Assert.Equal(0.0, val3);  // "Initial value - 3"
 
-            int expected1 = 1;
+            var expected1 = 1;
             await grain1.DoWrite(expected1);
             val1 = await grain1.GetValue();
             Assert.Equal(expected1, val1);  // "Value after Write#1 - 1"
 
-            string expected2 = "Three";
+            var expected2 = "Three";
             await grain2.DoWrite(expected2);
             val2 = await grain2.GetValue();
             Assert.Equal(expected2, val2);  // "Value after Write#1 - 2"
 
-            double expected3 = 5.1;
+            var expected3 = 5.1;
             await grain3.DoWrite(expected3);
             val3 = await grain3.GetValue();
             Assert.Equal(expected3, val3);  // "Value after Write#1 - 3"
@@ -264,10 +264,10 @@ namespace AWSUtils.Tests.StorageTests
             var serviceId = await this.HostedCluster.Client.GetGrain<IServiceIdGrain>(Guid.Empty).GetServiceId();
             output.WriteLine("ClusterId={0} ServiceId={1}", this.HostedCluster.Options.ClusterId, serviceId);
 
-            Guid id = Guid.NewGuid();
-            IAWSStorageTestGrain grain = this.fixture.GrainFactory.GetGrain<IAWSStorageTestGrain>(id);
+            var id = Guid.NewGuid();
+            var grain = this.fixture.GrainFactory.GetGrain<IAWSStorageTestGrain>(id);
 
-            int val = await grain.GetValue();
+            var val = await grain.GetValue();
 
             Assert.Equal(0, val);  // "Initial value"
 
@@ -306,8 +306,8 @@ namespace AWSUtils.Tests.StorageTests
         protected void Persistence_Perf_Activate()
         {
             const string testName = "Persistence_Perf_Activate";
-            int n = LoopIterations_Grain;
-            TimeSpan target = TimeSpan.FromMilliseconds(MaxReadTime * n);
+            var n = LoopIterations_Grain;
+            var target = TimeSpan.FromMilliseconds(MaxReadTime * n);
 
             // Timings for Activate
             RunPerfTest(n, testName, target,
@@ -320,8 +320,8 @@ namespace AWSUtils.Tests.StorageTests
         protected void Persistence_Perf_Write()
         {
             const string testName = "Persistence_Perf_Write";
-            int n = LoopIterations_Grain;
-            TimeSpan target = TimeSpan.FromMilliseconds(MaxWriteTime * n);
+            var n = LoopIterations_Grain;
+            var target = TimeSpan.FromMilliseconds(MaxWriteTime * n);
 
             // Timings for Write
             RunPerfTest(n, testName, target,
@@ -334,8 +334,8 @@ namespace AWSUtils.Tests.StorageTests
         protected void Persistence_Perf_Write_Reread()
         {
             const string testName = "Persistence_Perf_Write_Read";
-            int n = LoopIterations_Grain;
-            TimeSpan target = TimeSpan.FromMilliseconds(MaxWriteTime * n);
+            var n = LoopIterations_Grain;
+            var target = TimeSpan.FromMilliseconds(MaxWriteTime * n);
 
             // Timings for Write
             RunPerfTest(n, testName + "--Write", target,
@@ -355,10 +355,10 @@ namespace AWSUtils.Tests.StorageTests
 
         protected async Task Persistence_Silo_StorageProvider_AWS(string providerName)
         {
-            List<SiloHandle> silos = this.HostedCluster.GetActiveSilos().ToList();
+            var silos = this.HostedCluster.GetActiveSilos().ToList();
             foreach (var silo in silos)
             {
-                ICollection<string> providers = await this.HostedCluster.Client.GetTestHooks(silo).GetStorageProviderNames();
+                var providers = await this.HostedCluster.Client.GetTestHooks(silo).GetStorageProviderNames();
                 Assert.True(providers.Contains(providerName), $"No storage provider found: {providerName}");
             }
         }
@@ -371,14 +371,14 @@ namespace AWSUtils.Tests.StorageTests
             Func<IMemoryStorageTestGrain, Task> actionMemoryStore,
             Func<IAWSStorageTestGrain, Task> actionAWSTable)
         {
-            IEchoTaskGrain[] noStateGrains = new IEchoTaskGrain[n];
-            IPersistenceTestGrain[] memoryGrains = new IPersistenceTestGrain[n];
-            IAWSStorageTestGrain[] awsStoreGrains = new IAWSStorageTestGrain[n];
-            IMemoryStorageTestGrain[] memoryStoreGrains = new IMemoryStorageTestGrain[n];
+            var noStateGrains = new IEchoTaskGrain[n];
+            var memoryGrains = new IPersistenceTestGrain[n];
+            var awsStoreGrains = new IAWSStorageTestGrain[n];
+            var memoryStoreGrains = new IMemoryStorageTestGrain[n];
 
-            for (int i = 0; i < n; i++)
+            for (var i = 0; i < n; i++)
             {
-                Guid id = Guid.NewGuid();
+                var id = Guid.NewGuid();
                 noStateGrains[i] = this.fixture.GrainFactory.GetGrain<IEchoTaskGrain>(id);
                 memoryGrains[i] = this.fixture.GrainFactory.GetGrain<IPersistenceTestGrain>(id);
                 awsStoreGrains[i] = this.fixture.GrainFactory.GetGrain<IAWSStorageTestGrain>(id);
@@ -401,7 +401,7 @@ namespace AWSUtils.Tests.StorageTests
 
             if (elapsed > target.Multiply(timingFactor))
             {
-                string msg = string.Format("{0}: Elapsed time {1} exceeds target time {2}", testName, elapsed, target);
+                var msg = string.Format("{0}: Elapsed time {1} exceeds target time {2}", testName, elapsed, target);
 
                 if (elapsed > target.Multiply(2.0 * timingFactor))
                 {
@@ -416,10 +416,10 @@ namespace AWSUtils.Tests.StorageTests
 
         private void RunIterations(string testName, int n, Func<int, Task> action)
         {
-            List<Task> promises = new List<Task>();
-            Stopwatch sw = Stopwatch.StartNew();
+            var promises = new List<Task>();
+            var sw = Stopwatch.StartNew();
             // Fire off requests in batches
-            for (int i = 0; i < n; i++)
+            for (var i = 0; i < n; i++)
             {
                 var promise = action(i);
                 promises.Add(promise);

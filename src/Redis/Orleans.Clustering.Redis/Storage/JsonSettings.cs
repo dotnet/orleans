@@ -33,13 +33,13 @@ namespace Orleans.Clustering.Redis
 
             public override void WriteJson(JsonWriter writer, object value, JsonSerializer serializer)
             {
-                IPAddress ip = (IPAddress)value;
+                var ip = (IPAddress)value;
                 writer.WriteValue(ip.ToString());
             }
 
             public override object ReadJson(JsonReader reader, Type objectType, object existingValue, JsonSerializer serializer)
             {
-                JToken token = JToken.Load(reader);
+                var token = JToken.Load(reader);
                 return IPAddress.Parse(token.Value<string>());
             }
         }
@@ -53,7 +53,7 @@ namespace Orleans.Clustering.Redis
 
             public override void WriteJson(JsonWriter writer, object value, JsonSerializer serializer)
             {
-                IPEndPoint ep = (IPEndPoint)value;
+                var ep = (IPEndPoint)value;
                 writer.WriteStartObject();
                 writer.WritePropertyName("Address");
                 serializer.Serialize(writer, ep.Address);
@@ -64,9 +64,9 @@ namespace Orleans.Clustering.Redis
 
             public override object ReadJson(JsonReader reader, Type objectType, object existingValue, JsonSerializer serializer)
             {
-                JObject jo = JObject.Load(reader);
-                IPAddress address = jo["Address"].ToObject<IPAddress>(serializer);
-                int port = jo["Port"].Value<int>();
+                var jo = JObject.Load(reader);
+                var address = jo["Address"].ToObject<IPAddress>(serializer);
+                var port = jo["Port"].Value<int>();
                 return new IPEndPoint(address, port);
             }
         }
@@ -80,7 +80,7 @@ namespace Orleans.Clustering.Redis
 
             public override void WriteJson(JsonWriter writer, object value, JsonSerializer serializer)
             {
-                SiloAddress addr = (SiloAddress)value;
+                var addr = (SiloAddress)value;
                 writer.WriteStartObject();
                 writer.WritePropertyName("SiloAddress");
                 writer.WriteValue(addr.ToParsableString());
@@ -89,8 +89,8 @@ namespace Orleans.Clustering.Redis
 
             public override object ReadJson(JsonReader reader, Type objectType, object existingValue, JsonSerializer serializer)
             {
-                JObject jo = JObject.Load(reader);
-                SiloAddress addr = SiloAddress.FromParsableString(jo["SiloAddress"].ToObject<string>());
+                var jo = JObject.Load(reader);
+                var addr = SiloAddress.FromParsableString(jo["SiloAddress"].ToObject<string>());
                 return addr;
             }
         }

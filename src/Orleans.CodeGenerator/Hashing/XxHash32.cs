@@ -69,11 +69,11 @@ namespace Orleans.CodeGenerator.Hashing
             // Data that isn't perfectly mod-16 gets stored in a holdback
             // buffer.
 
-            int held = _length & 0x0F;
+            var held = _length & 0x0F;
 
             if (held != 0)
             {
-                int remain = StripeSize - held;
+                var remain = StripeSize - held;
 
                 if (source.Length >= remain)
                 {
@@ -112,15 +112,15 @@ namespace Orleans.CodeGenerator.Hashing
         /// </summary>
         protected override void GetCurrentHashCore(Span<byte> destination)
         {
-            int remainingLength = _length & 0x0F;
-            ReadOnlySpan<byte> remaining = ReadOnlySpan<byte>.Empty;
+            var remainingLength = _length & 0x0F;
+            var remaining = ReadOnlySpan<byte>.Empty;
 
             if (remainingLength > 0)
             {
                 remaining = new ReadOnlySpan<byte>(_holdback, 0, remainingLength);
             }
 
-            uint acc = _state.Complete(_length, remaining);
+            var acc = _state.Complete(_length, remaining);
             BinaryPrimitives.WriteUInt32BigEndian(destination, acc);
         }
 
@@ -169,7 +169,7 @@ namespace Orleans.CodeGenerator.Hashing
         /// <returns>The XxHash32 hash of the provided data.</returns>
         public static byte[] Hash(ReadOnlySpan<byte> source, int seed = 0)
         {
-            byte[] ret = new byte[HashSize];
+            var ret = new byte[HashSize];
             StaticHash(source, ret, seed);
             return ret;
         }
@@ -218,8 +218,8 @@ namespace Orleans.CodeGenerator.Hashing
 
         private static int StaticHash(ReadOnlySpan<byte> source, Span<byte> destination, int seed)
         {
-            int totalLength = source.Length;
-            State state = new State((uint)seed);
+            var totalLength = source.Length;
+            var state = new State((uint)seed);
 
             while (source.Length >= StripeSize)
             {
@@ -227,7 +227,7 @@ namespace Orleans.CodeGenerator.Hashing
                 source = source.Slice(StripeSize);
             }
 
-            uint val = state.Complete(totalLength, source);
+            var val = state.Complete(totalLength, source);
             BinaryPrimitives.WriteUInt32BigEndian(destination, val);
             return HashSize;
         }

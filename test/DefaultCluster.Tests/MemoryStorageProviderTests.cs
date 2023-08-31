@@ -40,7 +40,7 @@ namespace DefaultCluster.Tests.StorageTests
         {
             var grainWithState = this.GrainFactory.GetGrain<IInitialStateGrain>(0);
 
-            List<string> names = await grainWithState.GetNames();
+            var names = await grainWithState.GetNames();
             Assert.NotNull(names);
             Assert.Empty(names);
 
@@ -76,7 +76,7 @@ namespace DefaultCluster.Tests.StorageTests
             await memoryStorageGrain.WriteStateAsync("grainId", TestGrainState.CreateRandom());
 
             // write new state with null etag
-            string newEtag = await memoryStorageGrain.WriteStateAsync("id", TestGrainState.CreateWithEtag(null));
+            var newEtag = await memoryStorageGrain.WriteStateAsync("id", TestGrainState.CreateWithEtag(null));
             Assert.NotNull(newEtag);
 
             // try to write new state with null etag;
@@ -86,7 +86,7 @@ namespace DefaultCluster.Tests.StorageTests
             ex = await Assert.ThrowsAsync<MemoryStorageEtagMismatchException>(() => memoryStorageGrain.WriteStateAsync("id", TestGrainState.CreateWithEtag(newEtag + "a")));
 
             // Write new state with good etag;
-            string latestEtag = await memoryStorageGrain.WriteStateAsync("id", TestGrainState.CreateWithEtag(newEtag));
+            var latestEtag = await memoryStorageGrain.WriteStateAsync("id", TestGrainState.CreateWithEtag(newEtag));
             Assert.NotNull(latestEtag);
 
             // try delete state with null etag

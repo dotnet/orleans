@@ -93,7 +93,7 @@ internal sealed class AsyncEnumerableGrainExtension : IAsyncEnumerableGrainExten
         request.SetTarget(_grainContext);
         var enumerable = request.InvokeImplementation();
         var enumerator = enumerable.GetAsyncEnumerator();
-        ref var entry = ref CollectionsMarshal.GetValueRefOrAddDefault(_enumerators, requestId, out bool exists);
+        ref var entry = ref CollectionsMarshal.GetValueRefOrAddDefault(_enumerators, requestId, out var exists);
         if (exists)
         {
             return ThrowAlreadyExists(enumerator);

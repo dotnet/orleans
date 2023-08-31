@@ -37,19 +37,19 @@ namespace UnitTests.StorageTests
         [Fact, TestCategory("Functional"), TestCategory("Persistence"), TestCategory("MemoryStore")]
         public void Store_Read()
         {
-            string name = Guid.NewGuid().ToString();//TestContext.TestName;
+            var name = Guid.NewGuid().ToString();//TestContext.TestName;
 
             ILocalDataStore store = new HierarchicalKeyStore(2);
 
-            GrainReference reference = (GrainReference)this.fixture.InternalGrainFactory.GetGrain(LegacyGrainId.NewId());
-            TestStoreGrainState state = new TestStoreGrainState();
+            var reference = (GrainReference)this.fixture.InternalGrainFactory.GetGrain(LegacyGrainId.NewId());
+            var state = new TestStoreGrainState();
             var stateProperties = AsDictionary(state);
             var keys = GetKeys(name, reference);
             store.WriteRow(keys, stateProperties, null);
-            Stopwatch sw = new Stopwatch();
+            var sw = new Stopwatch();
             sw.Start();
             var data = store.ReadRow(keys);
-            TimeSpan readTime = sw.Elapsed;
+            var readTime = sw.Elapsed;
             output.WriteLine("{0} - Read time = {1}", store.GetType().FullName, readTime);
             Assert.Equal(state.A,  data["A"]);  // "A"
             Assert.Equal(state.B,  data["B"]);  // "B"
@@ -59,21 +59,21 @@ namespace UnitTests.StorageTests
         [Fact, TestCategory("Functional"), TestCategory("Persistence"), TestCategory("MemoryStore")]
         public void Store_WriteRead()
         {
-            string name = Guid.NewGuid().ToString();//TestContext.TestName;
+            var name = Guid.NewGuid().ToString();//TestContext.TestName;
 
             ILocalDataStore store = new HierarchicalKeyStore(2);
 
-            GrainReference reference = (GrainReference)fixture.InternalGrainFactory.GetGrain(LegacyGrainId.NewId());
+            var reference = (GrainReference)fixture.InternalGrainFactory.GetGrain(LegacyGrainId.NewId());
             var state = TestStoreGrainState.NewRandomState();
-            Stopwatch sw = new Stopwatch();
+            var sw = new Stopwatch();
             sw.Start();
             var keys = GetKeys(name, reference);
             var stateProperties = AsDictionary(state.State);
             store.WriteRow(keys, stateProperties, state.ETag);
-            TimeSpan writeTime = sw.Elapsed;
+            var writeTime = sw.Elapsed;
             sw.Restart();
             var data = store.ReadRow(keys);
-            TimeSpan readTime = sw.Elapsed;
+            var readTime = sw.Elapsed;
             output.WriteLine("{0} - Write time = {1} Read time = {2}", store.GetType().FullName, writeTime, readTime);
             Assert.Equal(state.State.A,  data["A"]);  // "A"
             Assert.Equal(state.State.B,  data["B"]);  // "B"
@@ -83,20 +83,20 @@ namespace UnitTests.StorageTests
         [Fact, TestCategory("Functional"), TestCategory("Persistence"), TestCategory("MemoryStore")]
         public void Store_Delete()
         {
-            string name = Guid.NewGuid().ToString();//TestContext.TestName;
+            var name = Guid.NewGuid().ToString();//TestContext.TestName;
 
             ILocalDataStore store = new HierarchicalKeyStore(2);
 
-            GrainReference reference = (GrainReference)this.fixture.InternalGrainFactory.GetGrain(LegacyGrainId.NewId());
+            var reference = (GrainReference)this.fixture.InternalGrainFactory.GetGrain(LegacyGrainId.NewId());
             var data = TestStoreGrainState.NewRandomState();
 
             output.WriteLine("Using store = {0}", store.GetType().FullName);
-            Stopwatch sw = new Stopwatch();
+            var sw = new Stopwatch();
 
             var keys = GetKeys(name, reference);
 
             sw.Restart();
-            string eTag = store.WriteRow(keys, AsDictionary(data.State), null);
+            var eTag = store.WriteRow(keys, AsDictionary(data.State), null);
             output.WriteLine("Write returned Etag={0} after {1} {2}", eTag, sw.Elapsed, StorageProviderUtils.PrintOneWrite(keys, data, eTag));
 
             sw.Restart();
@@ -105,7 +105,7 @@ namespace UnitTests.StorageTests
             Assert.NotNull(data); // Should get some data from Read
 
             sw.Restart();
-            bool ok = store.DeleteRow(keys, eTag);
+            var ok = store.DeleteRow(keys, eTag);
             Assert.True(ok, $"Row deleted OK after {sw.Elapsed}. Etag={eTag} Keys={StorageProviderUtils.PrintKeys(keys)}");
 
             sw.Restart();
@@ -129,7 +129,7 @@ namespace UnitTests.StorageTests
         [Fact, TestCategory("Functional"), TestCategory("Persistence"), TestCategory("MemoryStore")]
         public void Store_ReadMulti()
         {
-            string name = Guid.NewGuid().ToString();//TestContext.TestName;
+            var name = Guid.NewGuid().ToString();//TestContext.TestName;
 
             ILocalDataStore store = new HierarchicalKeyStore(2);
 
@@ -169,14 +169,14 @@ namespace UnitTests.StorageTests
         [Fact, TestCategory("Functional"), TestCategory("Persistence"), TestCategory("MemoryStore")]
         public void GrainState_Store_WriteRead()
         {
-            string name = Guid.NewGuid().ToString();//TestContext.TestName;
+            var name = Guid.NewGuid().ToString();//TestContext.TestName;
 
             ILocalDataStore store = new HierarchicalKeyStore(2);
 
-            GrainReference reference = (GrainReference)this.fixture.InternalGrainFactory.GetGrain(LegacyGrainId.NewId());
+            var reference = (GrainReference)this.fixture.InternalGrainFactory.GetGrain(LegacyGrainId.NewId());
             var grainState = TestStoreGrainState.NewRandomState();
             var state = grainState.State;
-            Stopwatch sw = new Stopwatch();
+            var sw = new Stopwatch();
             sw.Start();
             IList<Tuple<string, string>> keys = new[]
             {
@@ -184,10 +184,10 @@ namespace UnitTests.StorageTests
                 Tuple.Create("GrainId", reference.GrainId.ToString())
             }.ToList();
             store.WriteRow(keys, AsDictionary(state), grainState.ETag);
-            TimeSpan writeTime = sw.Elapsed;
+            var writeTime = sw.Elapsed;
             sw.Restart();
             var data = store.ReadRow(keys);
-            TimeSpan readTime = sw.Elapsed;
+            var readTime = sw.Elapsed;
             output.WriteLine("{0} - Write time = {1} Read time = {2}", store.GetType().FullName, writeTime, readTime);
             Assert.Equal(state.A,  data["A"]);  // "A"
             Assert.Equal(state.B,  data["B"]);  // "B"

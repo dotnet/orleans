@@ -40,9 +40,9 @@ namespace UnitTests.OrleansRuntime.Streams
             var accumulator = new Accumulator();
             IObjectPool<TestPooledResource> pool = new ObjectPool<TestPooledResource>(() => new TestPooledResource(accumulator));
             // Allocate and free 10 items
-            for (int i = 0; i < 10; i++)
+            for (var i = 0; i < 10; i++)
             {
-                TestPooledResource resource = pool.Allocate();
+                var resource = pool.Allocate();
                 resource.Dispose();
             }
             // only 1 at a time was ever allocated, so max allocated should be 1
@@ -65,9 +65,9 @@ namespace UnitTests.OrleansRuntime.Streams
             Assert.Equal(10, accumulator.MaxAllocated);
 
             // Allocate and free 10 items
-            for (int i = 0; i < 10; i++)
+            for (var i = 0; i < 10; i++)
             {
-                TestPooledResource resource = pool.Allocate();
+                var resource = pool.Allocate();
                 resource.Dispose();
             }
 
@@ -82,7 +82,7 @@ namespace UnitTests.OrleansRuntime.Streams
             var accumulator = new Accumulator();
             IObjectPool<TestPooledResource> pool = new ObjectPool<TestPooledResource>(() => new TestPooledResource(accumulator));
 
-            for (int i = 0; i < 5; i++)
+            for (var i = 0; i < 5; i++)
             {
                 // Allocate WorkngSet items
                 var resources = Enumerable.Range(0, WorkngSet).Select(v => pool.Allocate()).ToList();
@@ -96,10 +96,10 @@ namespace UnitTests.OrleansRuntime.Streams
                 Assert.Equal(WorkngSet, accumulator.MaxAllocated);
 
                 // Allocate and free 5 items
-                for (int j = 0; j < 5; j++)
+                for (var j = 0; j < 5; j++)
                 {
-                    TestPooledResource resource = pool.Allocate();
-                    int expectedAllocationCount = (i*(5 + 1)) // allocations accumulated in previous loops
+                    var resource = pool.Allocate();
+                    var expectedAllocationCount = (i*(5 + 1)) // allocations accumulated in previous loops
                                                   + (j + 1); // allocations accumulated in this loop
                     Assert.Equal(expectedAllocationCount, resource.AllocationCount);
                     resource.Dispose();

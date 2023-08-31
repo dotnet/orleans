@@ -34,9 +34,9 @@ namespace UnitTests.StorageTests.AdoNet
 
             //Stream in and steam out three binary streams in parallel.
             var streamChecks = new Task<bool>[countOfStreams];
-            for(int i = 0; i < countOfStreams; ++i)
+            for(var i = 0; i < countOfStreams; ++i)
             {
-                int streamId = i;
+                var streamId = i;
                 streamChecks[i] = Task.Run(async () =>
                 {
                     var rb = new byte[streamSize];

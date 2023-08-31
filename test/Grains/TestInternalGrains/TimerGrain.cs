@@ -57,7 +57,7 @@ namespace UnitTestGrains
             if(!Equals(context, RuntimeContext.Current))
                 logger.LogError((int)ErrorCode.Runtime_Error_100146, "Grain not running in the right activation context");
 
-            string name = (string)data;
+            var name = (string)data;
             IDisposable timer;
             if (name == DefaultTimerName)
             {
@@ -100,7 +100,7 @@ namespace UnitTestGrains
         public Task StartTimer(string timerName)
         {
             ThrowIfDeactivating();
-            IDisposable timer = this.RegisterTimer(Tick, timerName, TimeSpan.Zero, period);
+            var timer = this.RegisterTimer(Tick, timerName, TimeSpan.Zero, period);
             allTimers.Add(timerName, timer);
             return Task.CompletedTask;
         }
@@ -108,7 +108,7 @@ namespace UnitTestGrains
         public Task StopTimer(string timerName)
         {
             ThrowIfDeactivating();
-            IDisposable timer = allTimers[timerName];
+            var timer = allTimers[timerName];
             timer.Dispose();
             return Task.CompletedTask;
         }
@@ -193,18 +193,18 @@ namespace UnitTestGrains
 
         private async Task ProcessTimerTick(object data)
         {
-            string step = "TimerTick";
+            var step = "TimerTick";
             LogStatus(step);
             // make sure we run in the right activation context.
             CheckRuntimeContext(step);
 
-            string name = (string)data;
+            var name = (string)data;
             if (name != this.timerName)
             {
                 throw new ArgumentException(string.Format("Wrong timer name: Expected={0} Actual={1}", this.timerName, name));
             }
 
-            ISimpleGrain grain = GrainFactory.GetGrain<ISimpleGrain>(0, SimpleGrain.SimpleGrainNamePrefix);
+            var grain = GrainFactory.GetGrain<ISimpleGrain>(0, SimpleGrain.SimpleGrainNamePrefix);
 
             LogStatus("Before grain call #1");
             await grain.SetA(tickCount);
@@ -225,7 +225,7 @@ namespace UnitTestGrains
             CheckRuntimeContext(step);
 
             LogStatus("Before grain call #3");
-            int res = await grain.GetAxB();
+            var res = await grain.GetAxB();
             step = "After grain call #3 - Result = " + res;
             LogStatus(step);
             CheckRuntimeContext(step);

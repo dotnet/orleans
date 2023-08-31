@@ -41,7 +41,7 @@ namespace Orleans.Streaming.EventHubs
         /// </summary>
         public EventHubMessage(CachedMessage cachedMessage, Serialization.Serializer serializer)
         {
-            int readOffset = 0;
+            var readOffset = 0;
             StreamId = cachedMessage.StreamId;
             Offset = SegmentBuilder.ReadNextString(cachedMessage.Segment, ref readOffset);
             PartitionKey = SegmentBuilder.ReadNextString(cachedMessage.Segment, ref readOffset);

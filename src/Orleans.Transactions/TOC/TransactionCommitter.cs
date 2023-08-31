@@ -67,7 +67,7 @@ namespace Orleans.Transactions
                 () =>
                 {
                     // check if we expired while waiting
-                    if (!this.queue.RWLock.TryGetRecord(info.TransactionId, out TransactionRecord<OperationState> record))
+                    if (!this.queue.RWLock.TryGetRecord(info.TransactionId, out var record))
                     {
                         throw new OrleansCascadingAbortException(info.TransactionId.ToString());
                     }
@@ -136,13 +136,13 @@ namespace Orleans.Transactions
             this.participantId = new ParticipantId(this.config.ServiceName, this.context.GrainReference, ParticipantId.Role.Resource | ParticipantId.Role.PriorityManager);
 
             var storageFactory = this.context.ActivationServices.GetRequiredService<INamedTransactionalStateStorageFactory>();
-            ITransactionalStateStorage<OperationState> storage = storageFactory.Create<OperationState>(this.config.StorageName, this.config.ServiceName);
+            var storage = storageFactory.Create<OperationState>(this.config.StorageName, this.config.ServiceName);
 
             // setup transaction processing pipe
             Action deactivate = () => grainRuntime.DeactivateOnIdle(context);
             var options = this.context.ActivationServices.GetRequiredService<IOptions<TransactionalStateOptions>>();
             var clock = this.context.ActivationServices.GetRequiredService<IClock>();
-            TService service = this.context.ActivationServices.GetRequiredServiceByName<TService>(this.config.ServiceName);
+            var service = this.context.ActivationServices.GetRequiredServiceByName<TService>(this.config.ServiceName);
             var timerManager = this.context.ActivationServices.GetRequiredService<ITimerManager>();
             this.queue = new TocTransactionQueue<TService>(service, options, this.participantId, deactivate, storage, clock, logger, timerManager, this.activationLifetime);
 

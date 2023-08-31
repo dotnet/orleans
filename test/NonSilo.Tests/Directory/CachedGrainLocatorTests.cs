@@ -401,7 +401,7 @@ namespace UnitTests.Directory
 
             var expectedAddr = GenerateGrainAddress(expectedSilo);
 
-            ManualResetEvent mre = new ManualResetEvent(false);
+            var mre = new ManualResetEvent(false);
 
             // Give up control then Run forever
             this.grainDirectory.Unregister(expectedAddr).Returns(async (t) =>
@@ -416,7 +416,7 @@ namespace UnitTests.Directory
             await this.grainLocator.Register(expectedAddr, previousAddress: null);
 
             // Unregister and check if cache was cleaned
-            Task t = this.grainLocator.Unregister(expectedAddr, UnregistrationCause.Force);
+            var t = this.grainLocator.Unregister(expectedAddr, UnregistrationCause.Force);
             Assert.False(this.grainLocator.TryLookupInCache(expectedAddr.GrainId, out _));
 
             // Add back to cache simulating a race from lookup
@@ -444,7 +444,7 @@ namespace UnitTests.Directory
             var expectedAddr = GenerateGrainAddress(expectedSilo);
             var secondAddr = GenerateGrainAddress(secondSilo);
 
-            ManualResetEvent mre = new ManualResetEvent(false);
+            var mre = new ManualResetEvent(false);
 
             // Give up control then Run forever
             this.grainDirectory.Unregister(expectedAddr).Returns(async (t) =>
@@ -460,7 +460,7 @@ namespace UnitTests.Directory
             await this.grainLocator.Register(expectedAddr, previousAddress: null);
 
             // Unregister and check if cache was cleaned
-            Task t = this.grainLocator.Unregister(expectedAddr, UnregistrationCause.Force);
+            var t = this.grainLocator.Unregister(expectedAddr, UnregistrationCause.Force);
             Assert.False(this.grainLocator.TryLookupInCache(expectedAddr.GrainId, out _));
 
             // Add back to cache simulating a race from lookup

@@ -201,7 +201,7 @@ namespace Orleans.Serialization.Codecs
                     }
                 case SchemaType.Encoded:
                     {
-                        var found = reader.Session.TypeCodec.TryReadForAnalysis(ref reader, out Type encoded, out var typeString);
+                        var found = reader.Session.TypeCodec.TryReadForAnalysis(ref reader, out var encoded, out var typeString);
                         reader.Session.ReferencedTypes.RecordReferencedType(encoded);
                         return (encoded, $"Encoded \"{typeString}\" ({(found ? encoded is null ? "null" : RuntimeTypeNameFormatter.Format(encoded) : "not found")})");
                     }

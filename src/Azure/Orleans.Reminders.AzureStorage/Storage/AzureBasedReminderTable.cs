@@ -46,7 +46,7 @@ namespace Orleans.Runtime.ReminderService
 #pragma warning disable RCS1075 // Avoid empty catch clause that catches System.Exception.
                 try
                 {
-                    ReminderEntry converted = ConvertFromTableEntry(entry.Entity, entry.ETag);
+                    var converted = ConvertFromTableEntry(entry.Entity, entry.ETag);
                     remEntries.Add(converted);
                 }
                 catch (Exception)
@@ -78,7 +78,7 @@ namespace Orleans.Runtime.ReminderService
             }
             finally
             {
-                string serviceIdStr = this.remTableManager.ServiceId;
+                var serviceIdStr = this.remTableManager.ServiceId;
                 if (!tableEntry.ServiceId.Equals(serviceIdStr))
                 {
                     this.logger.LogWarning(
@@ -93,8 +93,8 @@ namespace Orleans.Runtime.ReminderService
 
         private static ReminderTableEntry ConvertToTableEntry(ReminderEntry remEntry, string serviceId, string deploymentId)
         {
-            string partitionKey = ReminderTableEntry.ConstructPartitionKey(serviceId, remEntry.GrainId);
-            string rowKey = ReminderTableEntry.ConstructRowKey(remEntry.GrainId, remEntry.ReminderName);
+            var partitionKey = ReminderTableEntry.ConstructPartitionKey(serviceId, remEntry.GrainId);
+            var rowKey = ReminderTableEntry.ConstructRowKey(remEntry.GrainId, remEntry.ReminderName);
 
             var consistentHash = remEntry.GrainId.GetUniformHashCode();
 
@@ -126,7 +126,7 @@ namespace Orleans.Runtime.ReminderService
             try
             {
                 var entries = await this.remTableManager.FindReminderEntries(grainId);
-                ReminderTableData data = ConvertFromTableEntryList(entries);
+                var data = ConvertFromTableEntryList(entries);
                 if (this.logger.IsEnabled(LogLevel.Trace)) this.logger.LogTrace($"Read for grain {{GrainId}} Table={Environment.NewLine}{{Data}}", grainId, data.ToString());
                 return data;
             }
@@ -144,7 +144,7 @@ namespace Orleans.Runtime.ReminderService
             try
             {
                 var entries = await this.remTableManager.FindReminderEntries(begin, end);
-                ReminderTableData data = ConvertFromTableEntryList(entries);
+                var data = ConvertFromTableEntryList(entries);
                 if (this.logger.IsEnabled(LogLevel.Trace)) this.logger.LogTrace($"Read in {{RingRange}} Table={Environment.NewLine}{{Data}}", RangeFactory.CreateRange(begin, end), data);
                 return data;
             }
@@ -179,9 +179,9 @@ namespace Orleans.Runtime.ReminderService
             try
             {
                 if (this.logger.IsEnabled(LogLevel.Debug)) this.logger.LogDebug("UpsertRow entry = {Data}", entry.ToString());
-                ReminderTableEntry remTableEntry = ConvertToTableEntry(entry, this.remTableManager.ServiceId, this.remTableManager.ClusterId);
+                var remTableEntry = ConvertToTableEntry(entry, this.remTableManager.ServiceId, this.remTableManager.ClusterId);
 
-                string result = await this.remTableManager.UpsertRow(remTableEntry);
+                var result = await this.remTableManager.UpsertRow(remTableEntry);
                 if (result == null)
                 {
                     this.logger.LogWarning((int)AzureReminderErrorCode.AzureTable_45,
@@ -210,7 +210,7 @@ namespace Orleans.Runtime.ReminderService
             {
                 if (this.logger.IsEnabled(LogLevel.Trace)) this.logger.LogTrace("RemoveRow entry = {Data}", entry.ToString());
 
-                bool result = await this.remTableManager.DeleteReminderEntryConditionally(entry, eTag);
+                var result = await this.remTableManager.DeleteReminderEntryConditionally(entry, eTag);
                 if (result == false)
                 {
                     this.logger.LogWarning((int)AzureReminderErrorCode.AzureTable_43,

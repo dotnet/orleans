@@ -244,7 +244,7 @@ namespace Orleans.Runtime.MembershipService
 
             // Only consider recency of the last successful ping if this node is monitoring more than one other node.
             // Otherwise, it may fail to vote another node dead in a one or two node cluster.
-            int score = 0;
+            var score = 0;
             if (siloMonitors.Count > 1)
             {
                 var recencyWindow = _clusterMembershipOptions.ProbeTimeout.Multiply(_clusterMembershipOptions.NumMissedProbesLimit);

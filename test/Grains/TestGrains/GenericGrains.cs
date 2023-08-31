@@ -46,13 +46,13 @@ namespace UnitTests.Grains
 
         public Task<string> GetAxB()
         {
-            string retValue = string.Format("{0}x{1}", State.A, State.B);
+            var retValue = string.Format("{0}x{1}", State.A, State.B);
             return Task.FromResult(retValue);
         }
 
         public Task<string> GetAxB(T a, T b)
         {
-            string retValue = string.Format("{0}x{1}", a, b);
+            var retValue = string.Format("{0}x{1}", a, b);
             return Task.FromResult(retValue);
         }
     }
@@ -121,13 +121,13 @@ namespace UnitTests.Grains
 
         public Task<string> GetAxB()
         {
-            string retValue = string.Format("{0}x{1}", State.A, State.B);
+            var retValue = string.Format("{0}x{1}", State.A, State.B);
             return Task.FromResult(retValue);
         }
 
         public Task<string> GetAxB(U a, U b)
         {
-            string retValue = string.Format("{0}x{1}", a, b);
+            var retValue = string.Format("{0}x{1}", a, b);
             return Task.FromResult(retValue);
         }
     }
@@ -164,13 +164,13 @@ namespace UnitTests.Grains
 
         public Task<string> GetAxB()
         {
-            string retValue = string.Format(CultureInfo.InvariantCulture, "{0}x{1}", State.A, State.B);
+            var retValue = string.Format(CultureInfo.InvariantCulture, "{0}x{1}", State.A, State.B);
             return Task.FromResult(retValue);
         }
 
         public Task<string> GetAxB(T a, U b)
         {
-            string retValue = string.Format(CultureInfo.InvariantCulture, "{0}x{1}", a, b);
+            var retValue = string.Format(CultureInfo.InvariantCulture, "{0}x{1}", a, b);
             return Task.FromResult(retValue);
         }
     }
@@ -179,7 +179,7 @@ namespace UnitTests.Grains
     {
         public Task<string> GetAxB(T a, T b)
         {
-            string retValue = string.Format("{0}x{1}", a, b);
+            var retValue = string.Format("{0}x{1}", a, b);
             return Task.FromResult(retValue);
         }
     }
@@ -187,7 +187,7 @@ namespace UnitTests.Grains
     {
         public Task<string> GetAxB(int a, int b)
         {
-            string retValue = string.Format("{0}x{1}", a, b);
+            var retValue = string.Format("{0}x{1}", a, b);
             return Task.FromResult(retValue);
         }
     }
@@ -381,13 +381,13 @@ namespace UnitTests.Grains
 
         public Task<string> GetAxB()
         {
-            string retValue = string.Format(CultureInfo.InvariantCulture, "{0}x{1}", _a, _b);
+            var retValue = string.Format(CultureInfo.InvariantCulture, "{0}x{1}", _a, _b);
             return Task.FromResult(retValue);
         }
 
         public Task<string> GetAxB(T a, U b)
         {
-            string retValue = string.Format(CultureInfo.InvariantCulture, "{0}x{1}", a, b);
+            var retValue = string.Format(CultureInfo.InvariantCulture, "{0}x{1}", a, b);
             return Task.FromResult(retValue);
         }
 
@@ -437,7 +437,7 @@ namespace UnitTests.Grains
     {
         public async Task<T> Echo(T item)
         {
-            long pk = this.GetPrimaryKeyLong();
+            var pk = this.GetPrimaryKeyLong();
             var otherGrain = GrainFactory.GetGrain<ISimpleGenericGrain1<T>>(pk);
             await otherGrain.SetA(item);
             return await otherGrain.GetA();
@@ -445,21 +445,21 @@ namespace UnitTests.Grains
 
         public async Task<T> Echo2(T item)
         {
-            long pk = this.GetPrimaryKeyLong() + 1;
+            var pk = this.GetPrimaryKeyLong() + 1;
             var otherGrain = GrainFactory.GetGrain<IEchoGenericChainGrain<T>>(pk);
             return await otherGrain.Echo(item);
         }
 
         public async Task<T> Echo3(T item)
         {
-            long pk = this.GetPrimaryKeyLong() + 1;
+            var pk = this.GetPrimaryKeyLong() + 1;
             var otherGrain = GrainFactory.GetGrain<IEchoGenericChainGrain<T>>(pk);
             return await otherGrain.Echo2(item);
         }
 
         public async Task<T> Echo4(T item)
         {
-            long pk = this.GetPrimaryKeyLong() + 1;
+            var pk = this.GetPrimaryKeyLong() + 1;
             var otherGrain = GrainFactory.GetGrain<ISimpleGenericGrain1<T>>(pk);
             await otherGrain.SetA(item);
             return await otherGrain.GetA();
@@ -467,14 +467,14 @@ namespace UnitTests.Grains
 
         public async Task<T> Echo5(T item)
         {
-            long pk = this.GetPrimaryKeyLong() + 1;
+            var pk = this.GetPrimaryKeyLong() + 1;
             var otherGrain = GrainFactory.GetGrain<IEchoGenericChainGrain<T>>(pk);
             return await otherGrain.Echo4(item);
         }
 
         public async Task<T> Echo6(T item)
         {
-            long pk = this.GetPrimaryKeyLong() + 1;
+            var pk = this.GetPrimaryKeyLong() + 1;
             var otherGrain = GrainFactory.GetGrain<IEchoGenericChainGrain<T>>(pk);
             return await otherGrain.Echo5(item);
         }

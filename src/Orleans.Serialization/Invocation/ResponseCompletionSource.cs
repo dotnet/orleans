@@ -75,7 +75,7 @@ namespace Orleans.Serialization.Invocation
         /// <inheritdoc />
         public Response GetResult(short token)
         {
-            bool isValid = token == _core.Version;
+            var isValid = token == _core.Version;
             try
             {
                 return _core.GetResult(token);
@@ -92,7 +92,7 @@ namespace Orleans.Serialization.Invocation
         /// <inheritdoc />
         void IValueTaskSource.GetResult(short token)
         {
-            bool isValid = token == _core.Version;
+            var isValid = token == _core.Version;
             try
             {
                 _ = _core.GetResult(token);
@@ -224,7 +224,7 @@ namespace Orleans.Serialization.Invocation
         /// <inheritdoc/>
         public TResult GetResult(short token)
         {
-            bool isValid = token == _core.Version;
+            var isValid = token == _core.Version;
             try
             {
                 return _core.GetResult(token);
@@ -241,7 +241,7 @@ namespace Orleans.Serialization.Invocation
         /// <inheritdoc/>
         void IValueTaskSource.GetResult(short token)
         {
-            bool isValid = token == _core.Version;
+            var isValid = token == _core.Version;
             try
             {
                 _ = _core.GetResult(token);

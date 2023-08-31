@@ -114,7 +114,7 @@ namespace Orleans.Transactions.DynamoDB
 
             try
             {
-                TableDescription tableDescription = await GetTableDescription(tableName);
+                var tableDescription = await GetTableDescription(tableName);
                 await (tableDescription == null
                     ? CreateTableAsync(tableName, keys, attributes, secondaryIndexes, ttlAttributeName)
                     : UpdateTableAsync(tableDescription, attributes, secondaryIndexes, ttlAttributeName));
@@ -232,7 +232,7 @@ namespace Orleans.Transactions.DynamoDB
                     // The table has already been created.
                 }
 
-                TableDescription tableDescription = await TableWaitOnStatusAsync(tableName, TableStatus.CREATING, TableStatus.ACTIVE);
+                var tableDescription = await TableWaitOnStatusAsync(tableName, TableStatus.CREATING, TableStatus.ACTIVE);
                 tableDescription = await TableUpdateTtlAsync(tableDescription, ttlAttributeName);
             }
             catch (Exception exc)
@@ -294,7 +294,7 @@ namespace Orleans.Transactions.DynamoDB
                 // Wait for all table indexes to become ACTIVE.
                 // We can only have one GSI in CREATING state at one time.
                 // We also wait for all indexes to finish UPDATING as the table is not ready to receive queries from Orleans until all indexes are created.
-                List<GlobalSecondaryIndexDescription> globalSecondaryIndexes = tableDescription.GlobalSecondaryIndexes;
+                var globalSecondaryIndexes = tableDescription.GlobalSecondaryIndexes;
                 foreach (var globalSecondaryIndex in globalSecondaryIndexes)
                 {
                     if (globalSecondaryIndex.IndexStatus == IndexStatus.CREATING

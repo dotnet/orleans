@@ -93,7 +93,7 @@ namespace DefaultCluster.Tests.General
         {
             var baseKey = Guid.NewGuid();
 
-            string kx1 = new string('\\', 300);
+            var kx1 = new string('\\', 300);
 
             var localGrainRef = this.GrainFactory.GetGrain<IKeyExtensionTestGrain>(baseKey, kx1, null);
             var remoteGrainRef = await localGrainRef.GetGrainReference();

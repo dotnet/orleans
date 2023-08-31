@@ -365,7 +365,7 @@ public class GeneratedSerializerTests : IDisposable
     public void ClassWithLargeCollectionAndUriRoundTrip()
     {
         var largeCollection = new List<string>(200);
-        for (int i = 0; i < 200; i++)
+        for (var i = 0; i < 200; i++)
         {
             largeCollection.Add(i.ToString());
         }

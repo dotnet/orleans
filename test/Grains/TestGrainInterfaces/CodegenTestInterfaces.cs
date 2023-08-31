@@ -141,7 +141,7 @@ namespace UnitTests.GrainInterfaces
 
             var set1 = new HashSet<KeyValuePair<string, object>>(MyDictionary);
             var set2 = new HashSet<KeyValuePair<string, object>>(actual.MyDictionary);
-            bool ret = set1.SetEquals(set2);
+            var ret = set1.SetEquals(set2);
             return ret;
         }
 

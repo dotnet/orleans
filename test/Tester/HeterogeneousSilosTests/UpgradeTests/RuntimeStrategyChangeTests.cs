@@ -76,7 +76,7 @@ namespace Tester.HeterogeneousSilosTests.UpgradeTests
             // Don't touch to V1
             Assert.Equal(1, await grainV1.GetVersion());
             // But only activate V2
-            for (int i = 1; i < 101; i++)
+            for (var i = 1; i < 101; i++)
             {
                 var grain = Client.GetGrain<IVersionUpgradeTestGrain>(i);
                 Assert.Equal(2, await grain.GetVersion());
@@ -86,13 +86,13 @@ namespace Tester.HeterogeneousSilosTests.UpgradeTests
 
             // Don't touch to existing activation
             Assert.Equal(1, await grainV1.GetVersion());
-            for (int i = 1; i < 101; i++)
+            for (var i = 1; i < 101; i++)
             {
                 var grain = Client.GetGrain<IVersionUpgradeTestGrain>(i);
                 Assert.Equal(2, await grain.GetVersion());
             }
             // But only activate V1
-            for (int i = 101; i < 201; i++)
+            for (var i = 101; i < 201; i++)
             {
                 var grain = Client.GetGrain<IVersionUpgradeTestGrain>(i);
                 Assert.Equal(1, await grain.GetVersion());
@@ -150,7 +150,7 @@ namespace Tester.HeterogeneousSilosTests.UpgradeTests
             await ManagementGrain.SetSelectorStrategy(MinimumVersion.Singleton);
 
             // But only activate V1
-            for (int i = 0; i < 100; i++)
+            for (var i = 0; i < 100; i++)
             {
                 var grain = Client.GetGrain<IVersionUpgradeTestGrain>(i);
                 Assert.Equal(1, await grain.GetVersion());
@@ -160,13 +160,13 @@ namespace Tester.HeterogeneousSilosTests.UpgradeTests
             await ManagementGrain.SetSelectorStrategy(null);
 
             // Don't touch to existing activation
-            for (int i = 0; i < 100; i++)
+            for (var i = 0; i < 100; i++)
             {
                 var grain = Client.GetGrain<IVersionUpgradeTestGrain>(i);
                 Assert.Equal(1, await grain.GetVersion());
             }
             // But only activate V2
-            for (int i = 100; i < 200; i++)
+            for (var i = 100; i < 200; i++)
             {
                 var grain = Client.GetGrain<IVersionUpgradeTestGrain>(i);
                 Assert.Equal(2, await grain.GetVersion());

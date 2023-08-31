@@ -38,7 +38,7 @@ namespace Orleans.Transactions.AzureStorage
 
         public ITransactionalStateStorage<TState> Create<TState>(string stateName, IGrainContext context) where TState : class, new()
         {
-            string partitionKey = MakePartitionKey(context, stateName);
+            var partitionKey = MakePartitionKey(context, stateName);
             return ActivatorUtilities.CreateInstance<AzureTableTransactionalStateStorage<TState>>(context.ActivationServices, this.table, partitionKey, this.jsonSettings);
         }
 
@@ -49,7 +49,7 @@ namespace Orleans.Transactions.AzureStorage
 
         private string MakePartitionKey(IGrainContext context, string stateName)
         {
-            string grainKey = context.GrainReference.GrainId.ToString();
+            var grainKey = context.GrainReference.GrainId.ToString();
             var key = $"{grainKey}_{this.clusterOptions.ServiceId}_{stateName}";
             return AzureTableUtils.SanitizeTableProperty(key);
         }

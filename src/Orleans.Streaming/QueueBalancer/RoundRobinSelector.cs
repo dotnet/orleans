@@ -31,7 +31,7 @@ namespace Orleans.Streams
         public List<T> NextSelection(int newSelectionCount, List<T> existingSelection)
         {
             var selection = new List<T>(Math.Min(newSelectionCount, this.resources.Count));
-            int tries = 0;
+            var tries = 0;
             while (selection.Count < newSelectionCount && tries++ < this.resources.Count)
             {
                 this.lastSelection = (++this.lastSelection) % (this.resources.Count);

@@ -48,7 +48,7 @@ namespace Orleans.Transactions.Azure.Tests
             try
             {
                 var tableCreationClient = GetCloudTableCreationClient(logger);
-                TableClient tableRef = tableCreationClient.GetTableClient(tableName);
+                var tableRef = tableCreationClient.GetTableClient(tableName);
                 var tableItem = await tableRef.CreateIfNotExistsAsync();
                 var didCreate = tableItem is not null;
 

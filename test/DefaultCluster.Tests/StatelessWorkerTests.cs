@@ -30,7 +30,7 @@ namespace DefaultCluster.Tests.General
         {
             var grain = this.GrainFactory.GetGrain<IStatelessWorkerExceptionGrain>(0);
 
-            for (int i=0; i<100; i++)
+            for (var i=0; i<100; i++)
             {
                 var ex = await Assert.ThrowsAsync<Exception>(() => grain.Ping());
                 Assert.Equal("oops", ex.Message);
@@ -43,13 +43,13 @@ namespace DefaultCluster.Tests.General
             var gatewayOptions = this.Fixture.Client.ServiceProvider.GetRequiredService<IOptions<StaticGatewayListProviderOptions>>();
             var gatewaysCount = gatewayOptions.Value.Gateways.Count;
             // do extra calls to trigger activation of ExpectedMaxLocalActivations local activations
-            int numberOfCalls = ExpectedMaxLocalActivations * 3 * gatewaysCount; 
+            var numberOfCalls = ExpectedMaxLocalActivations * 3 * gatewaysCount; 
 
-            IStatelessWorkerGrain grain = this.GrainFactory.GetGrain<IStatelessWorkerGrain>(GetRandomGrainId());
-            List<Task> promises = new List<Task>();
+            var grain = this.GrainFactory.GetGrain<IStatelessWorkerGrain>(GetRandomGrainId());
+            var promises = new List<Task>();
 
             // warmup
-            for (int i = 0; i < gatewaysCount; i++)
+            for (var i = 0; i < gatewaysCount; i++)
                 promises.Add(grain.LongCall()); 
             await Task.WhenAll(promises);
 
@@ -58,7 +58,7 @@ namespace DefaultCluster.Tests.General
             promises.Clear();
             var stopwatch = Stopwatch.StartNew();
 
-            for (int i = 0; i < numberOfCalls; i++)
+            for (var i = 0; i < numberOfCalls; i++)
                 promises.Add(grain.LongCall());
             await Task.WhenAll(promises);
 
@@ -67,7 +67,7 @@ namespace DefaultCluster.Tests.General
             promises.Clear();
 
             var statsTasks = new List<Task<Tuple<Guid, string, List<Tuple<DateTime, DateTime>>>>>();
-            for (int i = 0; i < numberOfCalls; i++)
+            for (var i = 0; i < numberOfCalls; i++)
                 statsTasks.Add(grain.GetCallStats());  // gather stats
             await Task.WhenAll(promises);
 
@@ -76,7 +76,7 @@ namespace DefaultCluster.Tests.General
             {
                 var silo = siloGroup.Key;
 
-                HashSet<Guid> activations = new HashSet<Guid>();
+                var activations = new HashSet<Guid>();
 
                 foreach (var response in siloGroup)
                 {
@@ -86,8 +86,8 @@ namespace DefaultCluster.Tests.General
                     activations.Add(response.Item1);
 
                     output.WriteLine($"Silo {silo} with {activations.Count} activations: Activation {response.Item1}");
-                    int count = 1;
-                    foreach (Tuple<DateTime, DateTime> call in response.Item3)
+                    var count = 1;
+                    foreach (var call in response.Item3)
                         output.WriteLine($"\t{count++}: {LogFormatter.PrintDate(call.Item1)} - {LogFormatter.PrintDate(call.Item2)}");
                 }
 
@@ -121,12 +121,12 @@ namespace DefaultCluster.Tests.General
             }
 
             // do extra calls to trigger activation of ExpectedMaxLocalActivations local activations
-            int numberOfCalls = ExpectedMaxLocalActivations * 3 * gatewaysCount;
+            var numberOfCalls = ExpectedMaxLocalActivations * 3 * gatewaysCount;
 
-            IStatelessWorkerGrain grain = this.GrainFactory.GetGrain<IStatelessWorkerGrain>(GetRandomGrainId());
-            List<Task> promises = new List<Task>();
+            var grain = this.GrainFactory.GetGrain<IStatelessWorkerGrain>(GetRandomGrainId());
+            var promises = new List<Task>();
             
-            for (int i = 0; i < numberOfCalls; i++)
+            for (var i = 0; i < numberOfCalls; i++)
                 promises.Add(grain.LongCall());
             await Task.WhenAll(promises);
 

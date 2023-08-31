@@ -61,7 +61,7 @@ namespace Orleans.Providers.Streams.Common
         /// </summary>
         public int ItemCount { get
             {
-                int count = writeIndex - readIndex;
+                var count = writeIndex - readIndex;
                 return count >= 0 ? count : 0;
             }  
         }
@@ -107,7 +107,7 @@ namespace Orleans.Providers.Streams.Common
                 throw new InvalidOperationException("Block is full");
             }
 
-            int index = writeIndex++;
+            var index = writeIndex++;
             cachedMessages[index] = message;
         }
 
@@ -170,7 +170,7 @@ namespace Orleans.Providers.Streams.Common
         /// <returns>The index of the first message in this block that has a sequence token equal to or before the provided token.</returns>
         public int GetIndexOfFirstMessageLessThanOrEqualTo(StreamSequenceToken token)
         {
-            for (int i = writeIndex - 1; i >= readIndex; i--)
+            for (var i = writeIndex - 1; i >= readIndex; i--)
             {
                 if (cachedMessages[i].Compare(token) <= 0)
                 {
@@ -207,7 +207,7 @@ namespace Orleans.Providers.Streams.Common
                 throw new ArgumentOutOfRangeException(nameof(start));
             }
 
-            for (int i = start; i < writeIndex; i++)
+            for (var i = start; i < writeIndex; i++)
             {
                 if (cachedMessages[i].CompareStreamId(streamId))
                 {

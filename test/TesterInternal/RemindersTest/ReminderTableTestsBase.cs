@@ -89,7 +89,7 @@ namespace UnitTests.RemindersTest
 
             var readReminder = await remindersTable.ReadRow(reminder.GrainId, reminder.ReminderName);
 
-            string etagTemp = reminder.ETag = readReminder.ETag;
+            var etagTemp = reminder.ETag = readReminder.ETag;
 
             Assert.Equal(readReminder.ETag, reminder.ETag);
             Assert.Equal(readReminder.GrainId, reminder.GrainId);
@@ -150,7 +150,7 @@ namespace UnitTests.RemindersTest
                 ? remindersHashes.Where(r => r > beginHash && r <= endHash)
                 : remindersHashes.Where(r => r > beginHash || r <= endHash);
 
-            HashSet<uint> expectedSet = new HashSet<uint>(expectedHashes);
+            var expectedSet = new HashSet<uint>(expectedHashes);
             var returnedHashes = (await rowsTask).Reminders.Select(r => r.GrainId.GetUniformHashCode());
             var returnedSet = new HashSet<uint>(returnedHashes);
 

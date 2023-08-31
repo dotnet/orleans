@@ -15,19 +15,19 @@ namespace UnitTests
         [Fact, TestCategory("Functional"), TestCategory("AsynchronyPrimitives")]
         public void Async_Task_WithTimeout_Wait()
         {
-            TimeSpan timeout = TimeSpan.FromMilliseconds(2000);
-            TimeSpan sleepTime = TimeSpan.FromMilliseconds(4000);
-            TimeSpan delta = TimeSpan.FromMilliseconds(200);
-            Stopwatch watch = new Stopwatch();
+            var timeout = TimeSpan.FromMilliseconds(2000);
+            var sleepTime = TimeSpan.FromMilliseconds(4000);
+            var delta = TimeSpan.FromMilliseconds(200);
+            var watch = new Stopwatch();
             watch.Start();
 
-            Task<int> promise = Task<int>.Factory.StartNew(() =>
+            var promise = Task<int>.Factory.StartNew(() =>
                 {
                     Thread.Sleep(sleepTime);
                     return 5;
                 }).WithTimeout(timeout);
 
-            bool hasThrown = false;
+            var hasThrown = false;
             try
             {
                 promise.WaitWithThrow(timeout);
@@ -48,12 +48,12 @@ namespace UnitTests
         [Fact, TestCategory("Functional"), TestCategory("AsynchronyPrimitives")]
         public async Task Async_Task_WithTimeout_Await()
         {
-            TimeSpan timeout = TimeSpan.FromMilliseconds(2000);
-            TimeSpan sleepTime = TimeSpan.FromMilliseconds(4000);
-            TimeSpan delta = TimeSpan.FromMilliseconds(300);
-            Stopwatch watch = Stopwatch.StartNew();
+            var timeout = TimeSpan.FromMilliseconds(2000);
+            var sleepTime = TimeSpan.FromMilliseconds(4000);
+            var delta = TimeSpan.FromMilliseconds(300);
+            var watch = Stopwatch.StartNew();
 
-            Task<int> promise = Task<int>.Factory.StartNew(() =>
+            var promise = Task<int>.Factory.StartNew(() =>
             {
                 Thread.Sleep(sleepTime);
                 return 5;

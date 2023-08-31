@@ -29,9 +29,9 @@ namespace UnitTests.Grains
             if (index == 0)
             {
                 children = new List<IConcurrentGrain>();
-                for (int i = 0; i < 1; i++)
+                for (var i = 0; i < 1; i++)
                 {
-                    IConcurrentGrain grain = GrainFactory.GetGrain<IConcurrentGrain>((new Random()).Next());
+                    var grain = GrainFactory.GetGrain<IConcurrentGrain>((new Random()).Next());
                     await grain.Initialize(i + 1);
                     children.Add(grain);
                 }
@@ -41,13 +41,13 @@ namespace UnitTests.Grains
         public async Task<int> A()
         {
             callNumber++;
-            int call = callNumber;
+            var call = callNumber;
             logger.LogInformation("A() start callNumber {Call}", call);
-            int i = 1;
-            foreach (IConcurrentGrain child in children)
+            var i = 1;
+            foreach (var child in children)
             {
                 logger.LogInformation("Calling B({Index}, {Call})", i, call);
-                int ret = await child.B(call);
+                var ret = await child.B(call);
                 logger.LogInformation("Resolved the call to B({Index}, {Call})", i, call);
                 i++;
             }
@@ -70,12 +70,12 @@ namespace UnitTests.Grains
             return Task<List<int>>.Factory.StartNew(() =>
             {
                 // just do a lot of modifications of the list
-                for (int i = 0; i < 10; i++)
+                for (var i = 0; i < 10; i++)
                 {
                     if (m_list.Count < 1000)
                         m_list.Add(i);
                 }
-                for (int i = 0; i < 5; i++)
+                for (var i = 0; i < 5; i++)
                 {
                     m_list.RemoveAt(0);
                 }
@@ -96,7 +96,7 @@ namespace UnitTests.Grains
             logger.LogInformation("TailCall_Caller");
             if (doCW)
             {
-                int i = await another.TailCall_Called();
+                var i = await another.TailCall_Called();
                 return i;
             }
             return await another.TailCall_Called();

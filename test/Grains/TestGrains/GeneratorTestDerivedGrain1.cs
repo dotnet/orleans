@@ -7,7 +7,7 @@ namespace UnitTests.Grains
     {
         public Task<byte[]> ByteAppend(byte[] data)
         {
-            byte[] tmp = new byte[myGrainBytes.Length + data.Length];
+            var tmp = new byte[myGrainBytes.Length + data.Length];
             myGrainBytes.CopyTo(tmp, 0);
             data.CopyTo(tmp, myGrainBytes.Length);
             myGrainBytes = tmp;

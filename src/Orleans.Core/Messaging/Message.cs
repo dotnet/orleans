@@ -238,7 +238,7 @@ namespace Orleans.Runtime
         {
             if (!dropExpiredMessages) return false;
 
-            GrainId id = TargetGrain;
+            var id = TargetGrain;
             if (id.IsDefault) return false;
 
             // don't set expiration for one way, system target and system grain messages.

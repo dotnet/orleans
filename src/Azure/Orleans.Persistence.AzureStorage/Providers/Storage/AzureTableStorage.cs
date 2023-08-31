@@ -66,15 +66,15 @@ namespace Orleans.Storage
         {
             if (tableDataManager == null) throw new ArgumentException("GrainState-Table property not initialized");
 
-            string pk = GetKeyString(grainId);
+            var pk = GetKeyString(grainId);
             if (logger.IsEnabled(LogLevel.Trace)) logger.LogTrace((int)AzureProviderErrorCode.AzureTableProvider_ReadingData,
                 "Reading: GrainType={GrainType} Pk={PartitionKey} Grainid={GrainId} from Table={TableName}",
                 grainType,
                 pk,
                 grainId,
                 this.options.TableName);
-            string partitionKey = pk;
-            string rowKey = AzureTableUtils.SanitizeTableProperty(grainType);
+            var partitionKey = pk;
+            var rowKey = AzureTableUtils.SanitizeTableProperty(grainType);
             var entity = await tableDataManager.Read(partitionKey, rowKey).ConfigureAwait(false);
             if (entity is not null)
             {
@@ -92,7 +92,7 @@ namespace Orleans.Storage
         {
             if (tableDataManager == null) throw new ArgumentException("GrainState-Table property not initialized");
 
-            string pk = GetKeyString(grainId);
+            var pk = GetKeyString(grainId);
             if (logger.IsEnabled(LogLevel.Trace))
                 logger.LogTrace((int)AzureProviderErrorCode.AzureTableProvider_WritingData,
                     "Writing: GrainType={GrainType} Pk={PartitionKey} Grainid={GrainId} ETag={ETag} to Table={TableName}",
@@ -137,7 +137,7 @@ namespace Orleans.Storage
         {
             if (tableDataManager == null) throw new ArgumentException("GrainState-Table property not initialized");
 
-            string pk = GetKeyString(grainId);
+            var pk = GetKeyString(grainId);
             if (logger.IsEnabled(LogLevel.Trace)) logger.LogTrace((int)AzureProviderErrorCode.AzureTableProvider_WritingData,
                 "Clearing: GrainType={GrainType} Pk={PartitionKey} Grainid={GrainId} ETag={ETag} DeleteStateOnClear={DeleteStateOnClear} from Table={TableName}",
                 grainType,
@@ -151,7 +151,7 @@ namespace Orleans.Storage
             {
                 ETag = new ETag(grainState.ETag)
             };
-            string operation = "Clearing";
+            var operation = "Clearing";
             try
             {
                 if (this.options.DeleteStateOnClear)
@@ -416,7 +416,7 @@ namespace Orleans.Storage
                             TableName);
                         return default;
                     }
-                    TableEntity stateEntity = data.Entity;
+                    var stateEntity = data.Entity;
                     var record = stateEntity;
                     record.ETag = new ETag(data.ETag);
                     if (logger.IsEnabled(LogLevel.Trace)) logger.LogTrace((int)AzureProviderErrorCode.AzureTableProvider_Storage_DataRead,
@@ -454,7 +454,7 @@ namespace Orleans.Storage
                     TableName,
                     entity.ETag);
 
-                string eTag = string.IsNullOrEmpty(entity.ETag.ToString()) ?
+                var eTag = string.IsNullOrEmpty(entity.ETag.ToString()) ?
                     await tableManager.CreateTableEntryAsync(entity).ConfigureAwait(false) :
                     await tableManager.UpdateTableEntryAsync(entity, entity.ETag).ConfigureAwait(false);
                 entity.ETag = new ETag(eTag);

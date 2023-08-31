@@ -54,7 +54,7 @@ namespace Orleans.Configuration
         /// <returns>A new <see cref="SimpleQueueCacheOptionsValidator"/> instance.</returns>
         public static IConfigurationValidator Create(IServiceProvider services, string name)
         {
-            SimpleQueueCacheOptions queueCacheOptions = services.GetOptionsByName<SimpleQueueCacheOptions>(name);
+            var queueCacheOptions = services.GetOptionsByName<SimpleQueueCacheOptions>(name);
             return new SimpleQueueCacheOptionsValidator(queueCacheOptions, name);
         }
     }

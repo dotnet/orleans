@@ -180,7 +180,7 @@ namespace Orleans.Reminders.DynamoDB
 
             try
             {
-                string expression = string.Empty;
+                var expression = string.Empty;
                 List<ReminderEntry> records;
 
                 if (begin < end)
@@ -298,7 +298,7 @@ namespace Orleans.Reminders.DynamoDB
                 }
                 else
                 {
-                    List<Task> tasks = new List<Task>();
+                    var tasks = new List<Task>();
                     foreach (var batch in records.BatchIEnumerable(25))
                     {
                         tasks.Add(this.storage.DeleteEntriesAsync(this.options.TableName, batch));

@@ -54,7 +54,7 @@ namespace Orleans.Streaming.EventHubs
         {
             // Weight unhealthy contributions thrice as much as healthy ones.
             // This is a crude compensation for the fact that healthy consumers wil consume more often than unhealthy ones.
-            double weight = cachePressureContribution < flowControlThreshold ? 1.0 : 3.0;
+            var weight = cachePressureContribution < flowControlThreshold ? 1.0 : 3.0;
             accumulatedCachePressure += cachePressureContribution * weight;
             cachePressureContributionCount += weight;
         }
@@ -80,8 +80,8 @@ namespace Orleans.Streaming.EventHubs
                 return;
             }
 
-            double pressure = accumulatedCachePressure / cachePressureContributionCount;
-            bool wasUnderPressure = isUnderPressure;
+            var pressure = accumulatedCachePressure / cachePressureContributionCount;
+            var wasUnderPressure = isUnderPressure;
             isUnderPressure = pressure > flowControlThreshold;
             // If we changed state, log
             if (isUnderPressure != wasUnderPressure)

@@ -161,7 +161,7 @@ namespace Orleans.TestingHost
 
             try
             {
-                string startMsg = "----------------------------- STARTING NEW UNIT TEST SILO HOST: " + GetType().FullName + " -------------------------------------";
+                var startMsg = "----------------------------- STARTING NEW UNIT TEST SILO HOST: " + GetType().FullName + " -------------------------------------";
                 WriteLog(startMsg);
                 await InitializeAsync();
 
@@ -179,7 +179,7 @@ namespace Orleans.TestingHost
             {
                 await StopAllSilosAsync();
 
-                Exception baseExc = ex.GetBaseException();
+                var baseExc = ex.GetBaseException();
                 FlushLogToConsole();
 
                 if (baseExc is TimeoutException)
@@ -283,7 +283,7 @@ namespace Orleans.TestingHost
         public async Task WaitForLivenessToStabilizeAsync(bool didKill = false)
         {
             var clusterMembershipOptions = this.ServiceProvider.GetRequiredService<IOptions<ClusterMembershipOptions>>().Value;
-            TimeSpan stabilizationTime = GetLivenessStabilizationTime(clusterMembershipOptions, didKill);
+            var stabilizationTime = GetLivenessStabilizationTime(clusterMembershipOptions, didKill);
             WriteLog(Environment.NewLine + Environment.NewLine + "WaitForLivenessToStabilize is about to sleep for {0}", stabilizationTime);
             await Task.Delay(stabilizationTime);
             WriteLog("WaitForLivenessToStabilize is done sleeping");
@@ -295,7 +295,7 @@ namespace Orleans.TestingHost
         /// </summary>
         public static TimeSpan GetLivenessStabilizationTime(ClusterMembershipOptions clusterMembershipOptions, bool didKill = false)
         {
-            TimeSpan stabilizationTime = TimeSpan.Zero;
+            var stabilizationTime = TimeSpan.Zero;
             if (didKill)
             {
                 // in case of hard kill (kill and not Stop), we should give silos time to detect failures first.
@@ -605,7 +605,7 @@ namespace Orleans.TestingHost
 
         private async Task InitializeAsync()
         {
-            short silosToStart = this.options.InitialSilosCount;
+            var silosToStart = this.options.InitialSilosCount;
 
             if (this.options.UseTestClusterMembership)
             {
@@ -728,7 +728,7 @@ namespace Orleans.TestingHost
 
         private void ReportUnobservedException(object sender, UnhandledExceptionEventArgs eventArgs)
         {
-            Exception exception = (Exception)eventArgs.ExceptionObject;
+            var exception = (Exception)eventArgs.ExceptionObject;
             this.WriteLog("Unobserved exception: {0}", exception);
         }
 

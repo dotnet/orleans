@@ -121,14 +121,14 @@ namespace UnitTests.Grains
         public async Task<string> AwaitAVGrainCallErrorAsync(string data)
         {
             logger.LogInformation("IEchoGrainAsync.AwaitAVGrainErrorAsync={Data}", data);
-            IEchoGrain avGrain = GrainFactory.GetGrain<IEchoGrain>(this.GetPrimaryKey());
+            var avGrain = GrainFactory.GetGrain<IEchoGrain>(this.GetPrimaryKey());
             return await avGrain.EchoError(data);
         }
 
         public Task<int> BlockingCallTimeoutAsync(TimeSpan delay)
         {
             logger.LogInformation("IEchoGrainAsync.BlockingCallTimeout Delay={Delay}", delay);
-            Stopwatch sw = new Stopwatch();
+            var sw = new Stopwatch();
             sw.Start();
             Thread.Sleep(delay);
             logger.LogInformation("IEchoGrainAsync.BlockingCallTimeout Awoke from sleep after {ElapsedDuration}", sw.Elapsed);
@@ -138,7 +138,7 @@ namespace UnitTests.Grains
         public Task<int> BlockingCallTimeoutNoResponseTimeoutOverrideAsync(TimeSpan delay)
         {
             logger.LogInformation("IEchoGrainAsync.BlockingCallTimeoutNoResponseTimeoutOverrideAsync Delay={Delay}", delay);
-            Stopwatch sw = new Stopwatch();
+            var sw = new Stopwatch();
             sw.Start();
             Thread.Sleep(delay);
             logger.LogInformation("IEchoGrainAsync.BlockingCallTimeoutNoResponseTimeoutOverrideAsync Awoke from sleep after {ElapsedDuration}", sw.Elapsed);
@@ -154,7 +154,7 @@ namespace UnitTests.Grains
         public Task PingLocalSiloAsync()
         {
             logger.LogInformation("IEchoGrainAsync.PingLocal");
-            SiloAddress mySilo = _grainContext.Address.SiloAddress;
+            var mySilo = _grainContext.Address.SiloAddress;
             return GetSiloControlReference(mySilo).Ping("PingLocal");
         }
 
@@ -167,12 +167,12 @@ namespace UnitTests.Grains
         public async Task PingOtherSiloAsync()
         {
             logger.LogInformation("IEchoGrainAsync.PingOtherSilo");
-            SiloAddress mySilo = _grainContext.Address.SiloAddress;
+            var mySilo = _grainContext.Address.SiloAddress;
 
-            IManagementGrain mgmtGrain = GrainFactory.GetGrain<IManagementGrain>(0);
+            var mgmtGrain = GrainFactory.GetGrain<IManagementGrain>(0);
             var silos = await mgmtGrain.GetHosts();
 
-            SiloAddress siloAddress = silos.Where(pair => !pair.Key.Equals(mySilo)).Select(pair => pair.Key).First();
+            var siloAddress = silos.Where(pair => !pair.Key.Equals(mySilo)).Select(pair => pair.Key).First();
             logger.LogInformation("Sending Ping to remote silo {SiloAddress}", siloAddress);
 
             await GetSiloControlReference(siloAddress).Ping("PingOtherSilo-" + siloAddress);
@@ -182,12 +182,12 @@ namespace UnitTests.Grains
         public async Task PingClusterMemberAsync()
         {
             logger.LogInformation("IEchoGrainAsync.PingClusterMemberAsync");
-            SiloAddress mySilo = _grainContext.Address.SiloAddress;
+            var mySilo = _grainContext.Address.SiloAddress;
 
-            IManagementGrain mgmtGrain = GrainFactory.GetGrain<IManagementGrain>(0);
+            var mgmtGrain = GrainFactory.GetGrain<IManagementGrain>(0);
             var silos = await mgmtGrain.GetHosts();
 
-            SiloAddress siloAddress = silos.Where(pair => !pair.Key.Equals(mySilo)).Select(pair => pair.Key).First();
+            var siloAddress = silos.Where(pair => !pair.Key.Equals(mySilo)).Select(pair => pair.Key).First();
             logger.LogInformation("Sending Ping to remote silo {SiloAddress}", siloAddress);
 
             var oracle = this.internalGrainFactory.GetSystemTarget<IMembershipService>(Constants.MembershipServiceType, siloAddress);
@@ -247,7 +247,7 @@ namespace UnitTests.Grains
 
         public Task<string> Echo(string data)
         {
-            string name = GetType().Name + ".Echo";
+            var name = GetType().Name + ".Echo";
 
             logger.LogInformation("{Name} Data={Data}", name, data);
             State.LastEcho = data;
@@ -258,10 +258,10 @@ namespace UnitTests.Grains
 
         public async Task<string> CallMethodTask_Await(string data)
         {
-            string name = GetType().Name + ".CallMethodTask_Await";
+            var name = GetType().Name + ".CallMethodTask_Await";
 
             logger.LogInformation("{Name} Data={Data}", name, data);
-            IEchoTaskGrain avGrain = GrainFactory.GetGrain<IEchoTaskGrain>(this.GetPrimaryKey());
+            var avGrain = GrainFactory.GetGrain<IEchoTaskGrain>(this.GetPrimaryKey());
             var result = await avGrain.EchoAsync(data);
             logger.LogInformation("{Name} Result={Result}", name, result);
             return result;
@@ -269,10 +269,10 @@ namespace UnitTests.Grains
 
         public async Task<string> CallMethodAV_Await(string data)
         {
-            string name = GetType().Name + ".CallMethodAV_Await";
+            var name = GetType().Name + ".CallMethodAV_Await";
 
             logger.LogInformation("{Name} Data={Data}", name, data);
-            IEchoGrain avGrain = GrainFactory.GetGrain<IEchoGrain>(this.GetPrimaryKey());
+            var avGrain = GrainFactory.GetGrain<IEchoGrain>(this.GetPrimaryKey());
             var result = await avGrain.Echo(data);
             logger.LogInformation("{Name} Result={Result}", name, result);
             return result;
@@ -281,10 +281,10 @@ namespace UnitTests.Grains
         #pragma warning disable 1998
         public async Task<string> CallMethodTask_Block(string data)
         {
-            string name = GetType().Name + ".CallMethodTask_Block";
+            var name = GetType().Name + ".CallMethodTask_Block";
 
             logger.LogInformation("{Name} Data={Data}", name, data);
-            IEchoTaskGrain avGrain = GrainFactory.GetGrain<IEchoTaskGrain>(this.GetPrimaryKey());
+            var avGrain = GrainFactory.GetGrain<IEchoTaskGrain>(this.GetPrimaryKey());
 
             // Note: We deliberately use .Result here in this test case to block current executing thread
             var result = avGrain.EchoAsync(data).Result;
@@ -297,10 +297,10 @@ namespace UnitTests.Grains
         #pragma warning disable 1998
         public async Task<string> CallMethodAV_Block(string data)
         {
-            string name = GetType().Name + ".CallMethodAV_Block";
+            var name = GetType().Name + ".CallMethodAV_Block";
 
             logger.LogInformation("{Name} Data={Data}", name, data);
-            IEchoGrain avGrain = GrainFactory.GetGrain<IEchoGrain>(this.GetPrimaryKey());
+            var avGrain = GrainFactory.GetGrain<IEchoGrain>(this.GetPrimaryKey());
 
             // Note: We deliberately use .Result here in this test case to block current executing thread
             var result = avGrain.Echo(data).Result;
@@ -340,7 +340,7 @@ namespace UnitTests.Grains
 
         public Task<string> Echo(string data)
         {
-            string name = GetType().Name + ".Echo";
+            var name = GetType().Name + ".Echo";
 
             logger.LogInformation("{Name} Data={Data}", name, data);
             State.LastEcho = data;
@@ -351,10 +351,10 @@ namespace UnitTests.Grains
 
         public async Task<string> CallMethodTask_Await(string data)
         {
-            string name = GetType().Name + ".CallMethodTask_Await";
+            var name = GetType().Name + ".CallMethodTask_Await";
 
             logger.LogInformation("{Name} Data={Data}", name, data);
-            IEchoTaskGrain avGrain = GrainFactory.GetGrain<IEchoTaskGrain>(this.GetPrimaryKey());
+            var avGrain = GrainFactory.GetGrain<IEchoTaskGrain>(this.GetPrimaryKey());
             var result = await avGrain.EchoAsync(data);
             logger.LogInformation("{Name} Result={Result}", name, result);
             return result;
@@ -362,10 +362,10 @@ namespace UnitTests.Grains
 
         public async Task<string> CallMethodAV_Await(string data)
         {
-            string name = GetType().Name + ".CallMethodAV_Await";
+            var name = GetType().Name + ".CallMethodAV_Await";
 
             logger.LogInformation("{Name} Data={Data}", name, data);
-            IEchoGrain avGrain = GrainFactory.GetGrain<IEchoGrain>(this.GetPrimaryKey());
+            var avGrain = GrainFactory.GetGrain<IEchoGrain>(this.GetPrimaryKey());
             var result = await avGrain.Echo(data);
             logger.LogInformation("{Name} Result={Result}", name, result);
             return result;
@@ -374,10 +374,10 @@ namespace UnitTests.Grains
 #pragma warning disable 1998
         public async Task<string> CallMethodTask_Block(string data)
         {
-            string name = GetType().Name + ".CallMethodTask_Block";
+            var name = GetType().Name + ".CallMethodTask_Block";
 
             logger.LogInformation("{Name} Data={Data}", name, data);
-            IEchoTaskGrain avGrain = GrainFactory.GetGrain<IEchoTaskGrain>(this.GetPrimaryKey());
+            var avGrain = GrainFactory.GetGrain<IEchoTaskGrain>(this.GetPrimaryKey());
 
             // Note: We deliberately use .Result here in this test case to block current executing thread
             var result = avGrain.EchoAsync(data).Result;
@@ -390,10 +390,10 @@ namespace UnitTests.Grains
 #pragma warning disable 1998
         public async Task<string> CallMethodAV_Block(string data)
         {
-            string name = GetType().Name + ".CallMethodAV_Block";
+            var name = GetType().Name + ".CallMethodAV_Block";
 
             logger.LogInformation("{Name} Data={Data}", name, data);
-            IEchoGrain avGrain = GrainFactory.GetGrain<IEchoGrain>(this.GetPrimaryKey());
+            var avGrain = GrainFactory.GetGrain<IEchoGrain>(this.GetPrimaryKey());
 
             // Note: We deliberately use .Result here in this test case to block current executing thread
             var result = avGrain.Echo(data).Result;

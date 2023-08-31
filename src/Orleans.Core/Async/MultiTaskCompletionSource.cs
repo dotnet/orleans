@@ -45,7 +45,7 @@ namespace Orleans
         /// <exception cref="InvalidOperationException">This method was called more times than the initially specified count argument allows.</exception>
         public void SetOneResult()
         {
-            int current = Interlocked.Decrement(ref count);
+            var current = Interlocked.Decrement(ref count);
             if (current < 0)
             {
                 throw new InvalidOperationException(

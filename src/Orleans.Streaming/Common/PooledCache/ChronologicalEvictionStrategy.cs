@@ -89,9 +89,9 @@ namespace Orleans.Providers.Streams.Common
         /// <returns><see langword="true" /> if the message should be purged, <see langword="false" /> otherwise.</returns>
         protected virtual bool ShouldPurge(ref CachedMessage cachedMessage, ref CachedMessage newestCachedMessage, DateTime nowUtc)
         {
-            TimeSpan timeInCache = nowUtc - cachedMessage.DequeueTimeUtc;
+            var timeInCache = nowUtc - cachedMessage.DequeueTimeUtc;
             // age of message relative to the most recent event in the cache.
-            TimeSpan relativeAge = newestCachedMessage.EnqueueTimeUtc - cachedMessage.EnqueueTimeUtc;
+            var relativeAge = newestCachedMessage.EnqueueTimeUtc - cachedMessage.EnqueueTimeUtc;
 
             return timePurge.ShouldPurgeFromTime(timeInCache, relativeAge);
         }
@@ -101,8 +101,8 @@ namespace Orleans.Providers.Streams.Common
             //if the cache is empty, then nothing to purge, return
             if (this.PurgeObservable.IsEmpty)
                 return;
-            int itemsPurged = 0;
-            CachedMessage neweswtMessageInCache = this.PurgeObservable.Newest.Value;
+            var itemsPurged = 0;
+            var neweswtMessageInCache = this.PurgeObservable.Newest.Value;
             CachedMessage? lastMessagePurged = null;
             while (!this.PurgeObservable.IsEmpty)
             {
@@ -130,7 +130,7 @@ namespace Orleans.Providers.Streams.Common
         {
             if (this.inUseBuffers.Count <= 0 || !lastMessagePurged.HasValue)
                 return;
-            int memoryReleasedInByte = 0;
+            var memoryReleasedInByte = 0;
             object IdOfLastPurgedBufferId = lastMessagePurged?.Segment.Array;
             // IdOfLastBufferInCache will be null if cache is empty after purge
             object IdOfLastBufferInCacheId = oldestMessageInCache?.Segment.Array;
@@ -167,7 +167,7 @@ namespace Orleans.Providers.Streams.Common
         {
             if (!logger.IsEnabled(LogLevel.Debug))
                 return;
-            int itemCountAfterPurge = purgeObservable.ItemCount;
+            var itemCountAfterPurge = purgeObservable.ItemCount;
             var itemCountBeforePurge = itemCountAfterPurge + itemsPurged;
             if (itemCountAfterPurge == 0)
             {

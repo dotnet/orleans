@@ -49,7 +49,7 @@ namespace UnitTests.StreamingTests
 
             // clean call, to make sure everything is happy and pubsub has state.
             await pubSubGrain.RegisterConsumer(GuidId.GetGuidId(Guid.NewGuid()), streamId, default, null);
-            int consumers = await pubSubGrain.ConsumerCount(streamId);
+            var consumers = await pubSubGrain.ConsumerCount(streamId);
             Assert.Equal(1, consumers);
 
             // inject fault
@@ -74,11 +74,11 @@ namespace UnitTests.StreamingTests
             var faultGrain = this.fixture.GrainFactory.GetGrain<IStorageFaultGrain>(nameof(PubSubRendezvousGrain));
 
             // Add two consumers so when we remove the first it does a storage write, not a storage clear.
-            GuidId subscriptionId1 = GuidId.GetGuidId(Guid.NewGuid());
-            GuidId subscriptionId2 = GuidId.GetGuidId(Guid.NewGuid());
+            var subscriptionId1 = GuidId.GetGuidId(Guid.NewGuid());
+            var subscriptionId2 = GuidId.GetGuidId(Guid.NewGuid());
             await pubSubGrain.RegisterConsumer(subscriptionId1, streamId, default, null);
             await pubSubGrain.RegisterConsumer(subscriptionId2, streamId, default, null);
-            int consumers = await pubSubGrain.ConsumerCount(streamId);
+            var consumers = await pubSubGrain.ConsumerCount(streamId);
             Assert.Equal(2, consumers);
 
             // inject fault
@@ -121,7 +121,7 @@ namespace UnitTests.StreamingTests
 
             // clean call, to make sure everything is happy and pubsub has state.
             await pubSubGrain.RegisterProducer(streamId, default);
-            int producers = await pubSubGrain.ProducerCount(streamId);
+            var producers = await pubSubGrain.ProducerCount(streamId);
             Assert.Equal(1, producers);
 
             // inject fault
@@ -154,7 +154,7 @@ namespace UnitTests.StreamingTests
             // Add two producers so when we remove the first it does a storage write, not a storage clear.
             await pubSubGrain.RegisterProducer(streamId, firstProducer.GetGrainId());
             await pubSubGrain.RegisterProducer(streamId, secondProducer.GetGrainId());
-            int producers = await pubSubGrain.ProducerCount(streamId);
+            var producers = await pubSubGrain.ProducerCount(streamId);
             Assert.Equal(2, producers);
 
             // inject fault

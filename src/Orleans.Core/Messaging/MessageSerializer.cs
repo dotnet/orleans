@@ -82,7 +82,7 @@ namespace Orleans.Runtime.Messaging
                 var header = input.Slice(FramingLength, headerLength);
 
                 // Decode body
-                int bodyOffset = FramingLength + headerLength;
+                var bodyOffset = FramingLength + headerLength;
                 var body = input.Slice(bodyOffset, bodyLength);
 
                 // Build message
@@ -305,7 +305,7 @@ namespace Orleans.Runtime.Messaging
             if (n > 0)
             {
                 var list = new List<GrainAddress>(n);
-                for (int i = 0; i < n; i++)
+                for (var i = 0; i < n; i++)
                 {
                     list.Add(_activationAddressCodec.ReadValue(ref reader, reader.ReadFieldHeader()));
                 }

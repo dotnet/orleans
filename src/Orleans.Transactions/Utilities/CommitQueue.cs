@@ -33,7 +33,7 @@ namespace Orleans.Transactions
             {
                 if (buffer != null)
                 {
-                    for (int i = 0; i < Count; i++)
+                    for (var i = 0; i < Count; i++)
                         yield return buffer[(pos + i) % buffer.Length];
                 }
             }
@@ -69,7 +69,7 @@ namespace Orleans.Transactions
 
         public void Clear()
         {
-            for (int i = 0; i < Count; i++)
+            for (var i = 0; i < Count; i++)
                 buffer[(pos + i) % buffer.Length] = null;
             Count = 0;
             pos = 0;
@@ -88,7 +88,7 @@ namespace Orleans.Transactions
             }
 
             // clear entries so they can ge GCd
-            for (int i = 0; i < howMany; i++)
+            for (var i = 0; i < howMany; i++)
                 buffer[(pos + i) % buffer.Length] = null;
 
             pos = (pos + howMany) % buffer.Length;
@@ -102,7 +102,7 @@ namespace Orleans.Transactions
                 throw new ArgumentException("cannot remove more elements than are in the queue", nameof(howMany));
 
             // clear entries so they can ge GCd
-            for (int i = 0; i < howMany; i++)
+            for (var i = 0; i < howMany; i++)
                 buffer[(pos + Count - i - 1) % buffer.Length] = null;
 
             Count -= howMany;
@@ -111,11 +111,11 @@ namespace Orleans.Transactions
         public int Find(Guid TransactionId, DateTime key)
         {
             // do a binary search
-            int left = 0;
-            int right = Count;
+            var left = 0;
+            var right = Count;
             while (left < right)
             {
-                int mid = (left + right) / 2;
+                var mid = (left + right) / 2;
                 var record = buffer[(pos + mid) % buffer.Length];
                 if (record.Timestamp < key)
                 {
@@ -134,7 +134,7 @@ namespace Orleans.Transactions
                 else
                 {
                     // search to the left
-                    for (int j = mid - 1; j >= left; j--)
+                    for (var j = mid - 1; j >= left; j--)
                     {
                         record = buffer[(pos + j) % buffer.Length];
                         if (record.TransactionId == TransactionId)
@@ -143,7 +143,7 @@ namespace Orleans.Transactions
                             break;
                     }
                     // search to the right
-                    for (int j = mid + 1; j < right; j++)
+                    for (var j = mid + 1; j < right; j++)
                     {
                         record = buffer[(pos + j) % buffer.Length];
                         if (record.TransactionId == TransactionId)

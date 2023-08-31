@@ -40,7 +40,7 @@ namespace Orleans.CodeGenerator
 
         public int GetHashCode(IMemberDescription obj)
         {
-            int hashCode = -499943048;
+            var hashCode = -499943048;
             hashCode = hashCode * -1521134295 + StringComparer.Ordinal.GetHashCode(obj.TypeName);
             hashCode = hashCode * -1521134295 + StringComparer.Ordinal.GetHashCode(obj.AssemblyName);
             return hashCode;

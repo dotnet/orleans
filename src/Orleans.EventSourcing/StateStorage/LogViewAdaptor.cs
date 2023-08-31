@@ -109,7 +109,7 @@ namespace Orleans.EventSourcing.StateStorage
 
             var state = CopyTentativeState();
             var updates = GetCurrentBatchOfUpdates();
-            bool batchsuccessfullywritten = false;
+            var batchsuccessfullywritten = false;
 
             var nextglobalstate = new GrainStateWithMetaDataAndETag<TLogView>(state);
             nextglobalstate.StateAndMetaData.WriteVector = GlobalStateCache.StateAndMetaData.WriteVector;

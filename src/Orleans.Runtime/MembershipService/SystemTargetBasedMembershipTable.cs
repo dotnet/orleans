@@ -37,7 +37,7 @@ namespace Orleans.Runtime.MembershipService
             }
 
             var siloDetails = this.serviceProvider.GetService<ILocalSiloDetails>();
-            bool isPrimarySilo = siloDetails.SiloAddress.Endpoint.Equals(options.PrimarySiloEndpoint);
+            var isPrimarySilo = siloDetails.SiloAddress.Endpoint.Equals(options.PrimarySiloEndpoint);
             if (isPrimarySilo)
             {
                 this.logger.LogInformation((int)ErrorCode.MembershipFactory1, "Creating in-memory membership table");
@@ -61,7 +61,7 @@ namespace Orleans.Runtime.MembershipService
             var timespan = Debugger.IsAttached ? TimeSpan.FromMinutes(5) : TimeSpan.FromSeconds(5);
             // This is a quick temporary solution to enable primary node to start fully before secondaries.
             // Secondary silos waits untill GrainBasedMembershipTable is created. 
-            for (int i = 0; i < 100; i++)
+            for (var i = 0; i < 100; i++)
             {
                 try
                 {
@@ -157,7 +157,7 @@ namespace Orleans.Runtime.MembershipService
         public Task<bool> InsertRow(MembershipEntry entry, TableVersion tableVersion)
         {
             if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug("InsertRow entry = {Entry}, table version = {Version}", entry.ToString(), tableVersion);
-            bool result = table.Insert(entry, tableVersion);
+            var result = table.Insert(entry, tableVersion);
             if (result == false)
                 logger.LogInformation(
                     (int)ErrorCode.MembershipGrainBasedTable2,
@@ -172,7 +172,7 @@ namespace Orleans.Runtime.MembershipService
         public Task<bool> UpdateRow(MembershipEntry entry, string etag, TableVersion tableVersion)
         {
             if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug("UpdateRow entry = {Entry}, etag = {ETag}, table version = {Version}", entry.ToString(), etag, tableVersion);
-            bool result = table.Update(entry, etag, tableVersion);
+            var result = table.Update(entry, etag, tableVersion);
             if (result == false)
                 logger.LogInformation(
                     (int)ErrorCode.MembershipGrainBasedTable3,

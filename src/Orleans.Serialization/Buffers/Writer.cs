@@ -346,7 +346,7 @@ namespace Orleans.Serialization.Buffers
         public void WriteUInt32(uint value)
         {
             nuint pos = (uint)_bufferPos;
-            int newPos = (int)(uint)pos + sizeof(uint);
+            var newPos = (int)(uint)pos + sizeof(uint);
             if ((uint)newPos <= (uint)_currentSpan.Length)
             {
                 _bufferPos = newPos;
@@ -375,7 +375,7 @@ namespace Orleans.Serialization.Buffers
         public void WriteUInt64(ulong value)
         {
             nuint pos = (uint)_bufferPos;
-            int newPos = (int)(uint)pos + sizeof(ulong);
+            var newPos = (int)(uint)pos + sizeof(ulong);
             if ((uint)newPos <= (uint)_currentSpan.Length)
             {
                 _bufferPos = newPos;
@@ -416,7 +416,7 @@ namespace Orleans.Serialization.Buffers
 
             var neededBytes = (int)((uint)BitOperations.Log2(value) / 7);
 
-            uint lower = ((value << 1) + 1) << neededBytes;
+            var lower = ((value << 1) + 1) << neededBytes;
 
             nuint pos = (uint)_bufferPos;
             if ((uint)pos + sizeof(uint) <= (uint)_currentSpan.Length)
@@ -450,7 +450,7 @@ namespace Orleans.Serialization.Buffers
         {
             var neededBytes = (int)((uint)BitOperations.Log2(value) / 7);
 
-            ulong lower = (((ulong)value << 1) + 1) << neededBytes;
+            var lower = (((ulong)value << 1) + 1) << neededBytes;
 
             nuint pos = (uint)_bufferPos;
             if ((uint)pos + sizeof(ulong) <= (uint)_currentSpan.Length)
@@ -475,7 +475,7 @@ namespace Orleans.Serialization.Buffers
 
             var neededBytes = (int)((uint)BitOperations.Log2(value) / 7);
 
-            ulong lower = ((value << 1) + 1) << neededBytes;
+            var lower = ((value << 1) + 1) << neededBytes;
 
             nuint pos = (uint)_bufferPos;
             if ((uint)pos + sizeof(ulong) <= (uint)_currentSpan.Length)
@@ -514,7 +514,7 @@ namespace Orleans.Serialization.Buffers
                 var neededBytes = (int)((uint)BitOperations.Log2(value) / 7);
                 _bufferPos = (int)(uint)pos + neededBytes + 1;
 
-                ulong lower = ((value << 1) + 1) << neededBytes;
+                var lower = ((value << 1) + 1) << neededBytes;
 
                 ref var writeHead = ref Unsafe.Add(ref MemoryMarshal.GetReference(_currentSpan), pos);
                 if (!BitConverter.IsLittleEndian) lower = BinaryPrimitives.ReverseEndianness(lower);
@@ -540,7 +540,7 @@ namespace Orleans.Serialization.Buffers
             var neededBytes = (int)((uint)BitOperations.Log2(value) / 7);
             _bufferPos = neededBytes + 1;
 
-            ulong lower = ((value << 1) + 1) << neededBytes;
+            var lower = ((value << 1) + 1) << neededBytes;
             BinaryPrimitives.WriteUInt64LittleEndian(_currentSpan, lower);
 
             // Write the 2 byte overflow unconditionally

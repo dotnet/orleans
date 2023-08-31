@@ -95,8 +95,8 @@ namespace Orleans.Runtime.ReminderService
 
         internal async Task<List<(ReminderTableEntry Entity, string ETag)>> FindReminderEntries(uint begin, uint end)
         {
-            string sBegin = ReminderTableEntry.ConstructPartitionKey(ServiceId, begin);
-            string sEnd = ReminderTableEntry.ConstructPartitionKey(ServiceId, end);
+            var sBegin = ReminderTableEntry.ConstructPartitionKey(ServiceId, begin);
+            var sEnd = ReminderTableEntry.ConstructPartitionKey(ServiceId, end);
             string query;
             if (begin < end)
             {
@@ -138,8 +138,8 @@ namespace Orleans.Runtime.ReminderService
 
         internal async Task<(ReminderTableEntry Entity, string ETag)> FindReminderEntry(GrainId grainId, string reminderName)
         {
-            string partitionKey = ReminderTableEntry.ConstructPartitionKey(ServiceId, grainId);
-            string rowKey = ReminderTableEntry.ConstructRowKey(grainId, reminderName);
+            var partitionKey = ReminderTableEntry.ConstructPartitionKey(ServiceId, grainId);
+            var rowKey = ReminderTableEntry.ConstructRowKey(grainId, reminderName);
 
             return await ReadSingleTableEntryAsync(partitionKey, rowKey);
         }
@@ -195,7 +195,7 @@ namespace Orleans.Runtime.ReminderService
 
         internal async Task DeleteTableEntries()
         {
-            List<(ReminderTableEntry Entity, string ETag)> entries = await FindAllReminderEntries();
+            var entries = await FindAllReminderEntries();
             // return manager.DeleteTableEntries(entries); // this doesnt work as entries can be across partitions, which is not allowed
             // group by grain hashcode so each query goes to different partition
             var tasks = new List<Task>();

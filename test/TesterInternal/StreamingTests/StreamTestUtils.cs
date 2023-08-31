@@ -18,8 +18,8 @@ namespace UnitTests.StreamingTests
 
         internal static void LogStartTest(string testName, Guid streamId, string streamProviderName, ILogger logger, TestCluster siloHost)
         {
-            SiloAddress primSilo = siloHost.Primary?.SiloAddress;
-            SiloAddress secSilo = siloHost.SecondarySilos.FirstOrDefault()?.SiloAddress;
+            var primSilo = siloHost.Primary?.SiloAddress;
+            var secSilo = siloHost.SecondarySilos.FirstOrDefault()?.SiloAddress;
             logger.LogInformation(
                 "\n\n**START********************** {TestName} ********************************* \n\n"
                 + "Running with initial silos Primary={PrimarySilo} Secondary={SecondarySilo} StreamId={StreamId} StreamProviderName={StreamProviderName} \n\n",
@@ -80,8 +80,8 @@ namespace UnitTests.StreamingTests
         internal static void Assert_AreEqual(ITestOutputHelper output, int expected, int actual, string msg, params object[] args)
         {
             // expected == -1 means don't care / don't assert check value.
-            string prefix = expected == -1 ? "Not-checked" : actual == expected ? "True" : "FALSE";
-            string fmtMsg = String.Format("--> {0}: ", prefix) + String.Format(msg, args);
+            var prefix = expected == -1 ? "Not-checked" : actual == expected ? "True" : "FALSE";
+            var fmtMsg = String.Format("--> {0}: ", prefix) + String.Format(msg, args);
             output.WriteLine(fmtMsg);
             if (expected != -1)
             {

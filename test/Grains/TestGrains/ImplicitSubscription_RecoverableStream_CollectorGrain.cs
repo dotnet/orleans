@@ -35,7 +35,7 @@ namespace TestGrains
 
             await ReadStateAsync();
 
-            Guid streamGuid = this.GetPrimaryKey();
+            var streamGuid = this.GetPrimaryKey();
             if (State.StreamGuid != streamGuid)
             {
                 State.StreamGuid = streamGuid;

@@ -23,11 +23,11 @@ namespace Orleans.Transactions.Tests
         [InlineData(60, 1)]
         public void RateLimitTest(int runTimeInSeconds, double limit)
         {
-            TimeSpan runTime = TimeSpan.FromSeconds(runTimeInSeconds);
-            TransactionRateLoadSheddingOptions options = new TransactionRateLoadSheddingOptions { Enabled = true, Limit = limit };
+            var runTime = TimeSpan.FromSeconds(runTimeInSeconds);
+            var options = new TransactionRateLoadSheddingOptions { Enabled = true, Limit = limit };
             ITransactionAgentStatistics statistics = new TransactionAgentStatistics();
             ITransactionOverloadDetector detector = new TransactionOverloadDetector(statistics, Options.Create(options));
-            Stopwatch sw = Stopwatch.StartNew();
+            var sw = Stopwatch.StartNew();
             long total = 0;
             while (sw.Elapsed < runTime)
             {

@@ -72,31 +72,31 @@ namespace AWSUtils.Tests.Streaming
 
         private async Task SendAndReceiveFromQueueAdapter(IQueueAdapterFactory adapterFactory)
         {
-            IQueueAdapter adapter = await adapterFactory.CreateAdapter();
-            IQueueAdapterCache cache = adapterFactory.GetQueueAdapterCache();
+            var adapter = await adapterFactory.CreateAdapter();
+            var cache = adapterFactory.GetQueueAdapterCache();
 
             // Create receiver per queue
-            IStreamQueueMapper mapper = adapterFactory.GetStreamQueueMapper();
-            Dictionary<QueueId, IQueueAdapterReceiver> receivers = mapper.GetAllQueues().ToDictionary(queueId => queueId, adapter.CreateReceiver);
-            Dictionary<QueueId, IQueueCache> caches = mapper.GetAllQueues().ToDictionary(queueId => queueId, cache.CreateQueueCache);
+            var mapper = adapterFactory.GetStreamQueueMapper();
+            var receivers = mapper.GetAllQueues().ToDictionary(queueId => queueId, adapter.CreateReceiver);
+            var caches = mapper.GetAllQueues().ToDictionary(queueId => queueId, cache.CreateQueueCache);
 
             await Task.WhenAll(receivers.Values.Select(receiver => receiver.Initialize(TimeSpan.FromSeconds(5))));
 
             // test using 2 streams
-            Guid streamId1 = Guid.NewGuid();
-            Guid streamId2 = Guid.NewGuid();
+            var streamId1 = Guid.NewGuid();
+            var streamId2 = Guid.NewGuid();
 
-            int receivedBatches = 0;
+            var receivedBatches = 0;
             var streamsPerQueue = new ConcurrentDictionary<QueueId, HashSet<StreamId>>();
 
             // reader threads (at most 2 active queues because only two streams)
             var work = new List<Task>();
-            foreach (KeyValuePair<QueueId, IQueueAdapterReceiver> receiverKvp in receivers)
+            foreach (var receiverKvp in receivers)
             {
-                QueueId queueId = receiverKvp.Key;
+                var queueId = receiverKvp.Key;
                 var receiver = receiverKvp.Value;
                 var qCache = caches[queueId];
-                Task task = Task.Factory.StartNew(() =>
+                var task = Task.Factory.StartNew(() =>
                 {
                     while (receivedBatches < NumBatches)
                     {
@@ -127,7 +127,7 @@ namespace AWSUtils.Tests.Streaming
             }
 
             // send events
-            List<object> events = CreateEvents(NumMessagesPerBatch);
+            var events = CreateEvents(NumMessagesPerBatch);
             work.Add(Task.Factory.StartNew(() => Enumerable.Range(0, NumBatches)
                 .Select(i => i % 2 == 0 ? streamId1 : streamId2)
                 .ToList()
@@ -141,23 +141,23 @@ namespace AWSUtils.Tests.Streaming
 
             // check to see if all the events are in the cache and we can enumerate through them
             StreamSequenceToken firstInCache = new EventSequenceTokenV2(0);
-            foreach (KeyValuePair<QueueId, HashSet<StreamId>> kvp in streamsPerQueue)
+            foreach (var kvp in streamsPerQueue)
             {
                 var receiver = receivers[kvp.Key];
                 var qCache = caches[kvp.Key];
 
-                foreach (StreamId streamGuid in kvp.Value)
+                foreach (var streamGuid in kvp.Value)
                 {
                     // read all messages in cache for stream
-                    IQueueCacheCursor cursor = qCache.GetCacheCursor(streamGuid, firstInCache);
-                    int messageCount = 0;
+                    var cursor = qCache.GetCacheCursor(streamGuid, firstInCache);
+                    var messageCount = 0;
                     StreamSequenceToken tenthInCache = null;
-                    StreamSequenceToken lastToken = firstInCache;
+                    var lastToken = firstInCache;
                     while (cursor.MoveNext())
                     {
                         Exception ex;
                         messageCount++;
-                        IBatchContainer batch = cursor.GetCurrent(out ex);
+                        var batch = cursor.GetCurrent(out ex);
                         output.WriteLine("Token: {0}", batch.SequenceToken);
                         Assert.True(batch.SequenceToken.CompareTo(lastToken) >= 0, $"order check for event {messageCount}");
                         lastToken = batch.SequenceToken;
@@ -199,7 +199,7 @@ namespace AWSUtils.Tests.Streaming
         internal static string MakeClusterId()
         {
             const string DeploymentIdFormat = "cluster-{0}";
-            string now = DateTime.UtcNow.ToString("yyyy-MM-dd-hh-mm-ss-ffff");
+            var now = DateTime.UtcNow.ToString("yyyy-MM-dd-hh-mm-ss-ffff");
             return String.Format(DeploymentIdFormat, now);
         }
     }

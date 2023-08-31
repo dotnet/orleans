@@ -320,7 +320,7 @@ namespace Orleans.Runtime.Messaging
 
         internal void TryForwardRequest(Message message, GrainAddress oldAddress, SiloAddress forwardingAddress, string failedOperation = null, Exception exc = null)
         {
-            bool forwardingSucceeded = false;
+            var forwardingSucceeded = false;
             try
             {
                 this.messagingTrace.OnDispatcherForwarding(message, oldAddress, forwardingAddress, failedOperation, exc);

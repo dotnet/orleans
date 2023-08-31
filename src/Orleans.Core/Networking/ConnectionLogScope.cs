@@ -42,7 +42,7 @@ namespace Orleans.Runtime.Messaging
 
         public IEnumerator<KeyValuePair<string, object>> GetEnumerator()
         {
-            for (int i = 0; i < Count; ++i)
+            for (var i = 0; i < Count; ++i)
             {
                 yield return this[i];
             }

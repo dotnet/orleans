@@ -147,8 +147,8 @@ namespace Orleans.EventSourcing.CustomStorage
             enter_operation("WriteAsync");
 
             var updates = GetCurrentBatchOfUpdates().Select(submissionentry => submissionentry.Entry).ToList();
-            bool writesuccessful = false;
-            bool transitionssuccessful = false;
+            var writesuccessful = false;
+            var transitionssuccessful = false;
 
             try
             {

@@ -127,7 +127,7 @@ namespace Tester.AzureUtils.Utilities
                 throw new ArgumentNullException(nameof(task));
 
             // whitebox testing results-- we initialize pipeSz with an inconsistent copy of Count because it's better than nothing and will reflect that the pipeline size was in a valid state during some portion of this method, even if it isn't at a properly synchronized moment.
-            int pipeSz = Count;
+            var pipeSz = Count;
             var full = false;
 
             // we should be using a try...finally to execute the whitebox testing logic here but it apparently adds too much latency to be palatable for AsyncPipelineSimpleTest(), which is sensitive to latency.
@@ -177,9 +177,9 @@ namespace Tester.AzureUtils.Utilities
         {
             while (!IsFull && waiting.Count > 0)
             {
-                Tuple<Task,TaskCompletionSource<bool>> next = waiting.First();
+                var next = waiting.First();
                 waiting.RemoveFirst();
-                Task task = next.Item1;
+                var task = next.Item1;
                 if(!task.IsCompleted)
                 {
                     task.ContinueWith(OnTaskCompletion).Ignore();

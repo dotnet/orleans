@@ -121,7 +121,7 @@ namespace TestExtensions
             var currentDir = new DirectoryInfo(Directory.GetCurrentDirectory());
             while (currentDir != null && currentDir.Exists)
             {
-                string filePath = Path.Combine(currentDir.FullName, fileName);
+                var filePath = Path.Combine(currentDir.FullName, fileName);
                 if (File.Exists(filePath))
                 {
                     builder.AddJsonFile(new SerializablePhysicalFileProvider { Root = currentDir.FullName }, fileName, false, false);

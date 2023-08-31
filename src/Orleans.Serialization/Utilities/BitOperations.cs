@@ -54,7 +54,7 @@ namespace Orleans.Serialization.Utilities
         {
             value |= 1;
 
-            uint hi = (uint)(value >> 32);
+            var hi = (uint)(value >> 32);
 
             if (hi == 0)
             {
@@ -120,7 +120,7 @@ namespace Orleans.Serialization.Utilities
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static int TrailingZeroCount(ulong value)
         {
-            uint lo = (uint)value;
+            var lo = (uint)value;
 
             if (lo == 0)
             {

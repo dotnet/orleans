@@ -114,7 +114,7 @@ namespace Orleans.Streaming.EventHubs
                 }
                 this.cache = this.cacheFactory(this.settings.Partition, this.checkpointer, this.loggerFactory);
                 this.flowController = new AggregatedQueueFlowController(MaxMessagesPerRead) { this.cache, LoadShedQueueFlowController.CreateAsPercentOfLoadSheddingLimit(this.loadSheddingOptions, _hostEnvironmentStatistics) };
-                string offset = await this.checkpointer.Load();
+                var offset = await this.checkpointer.Load();
                 this.receiver = this.eventHubReceiverFactory(this.settings, offset, this.logger);
                 watch.Stop();
                 this.monitor?.TrackInitialization(true, watch.Elapsed, null);
@@ -176,12 +176,12 @@ namespace Orleans.Streaming.EventHubs
             // monitor message age
             var dequeueTimeUtc = DateTime.UtcNow;
 
-            DateTime oldestMessageEnqueueTime = messages[0].EnqueuedTime.UtcDateTime;
-            DateTime newestMessageEnqueueTime = messages[messages.Count - 1].EnqueuedTime.UtcDateTime;
+            var oldestMessageEnqueueTime = messages[0].EnqueuedTime.UtcDateTime;
+            var newestMessageEnqueueTime = messages[messages.Count - 1].EnqueuedTime.UtcDateTime;
 
             this.monitor?.TrackMessagesReceived(messages.Count, oldestMessageEnqueueTime, newestMessageEnqueueTime);
 
-            List<StreamPosition> messageStreamPositions = this.cache.Add(messages, dequeueTimeUtc);
+            var messageStreamPositions = this.cache.Add(messages, dequeueTimeUtc);
             foreach (var streamPosition in messageStreamPositions)
             {
                 batches.Add(new StreamActivityNotificationBatch(streamPosition));
@@ -240,12 +240,12 @@ namespace Orleans.Streaming.EventHubs
                 this.logger.LogInformation("Stopping reading from EventHub partition {EventHubName}-{Partition}", this.settings.Hub.EventHubName, this.settings.Partition);
 
                 // clear cache and receiver
-                IEventHubQueueCache localCache = Interlocked.Exchange(ref this.cache, null);
+                var localCache = Interlocked.Exchange(ref this.cache, null);
 
                 var localReceiver = Interlocked.Exchange(ref this.receiver, null);
 
                 // start closing receiver
-                Task closeTask = Task.CompletedTask;
+                var closeTask = Task.CompletedTask;
                 if (localReceiver != null)
                 {
                     closeTask = localReceiver.CloseAsync();

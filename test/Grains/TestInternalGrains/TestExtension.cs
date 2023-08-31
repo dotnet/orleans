@@ -23,7 +23,7 @@ namespace UnitTests.Grains
         // check that one can send messages from within extensions.
         public Task<string> CheckExtension_2()
         {
-            ITestGrain g = grainFactory.GetGrain<ITestGrain>(23);
+            var g = grainFactory.GetGrain<ITestGrain>(23);
             return g.GetLabel();
         }
     }
@@ -70,7 +70,7 @@ namespace UnitTests.Grains
         // check that one can send messages from within extensions.
         public Task<string> CheckExtension_2()
         {
-            ITestGrain g = this.grainFactory.GetGrain<ITestGrain>(24);
+            var g = this.grainFactory.GetGrain<ITestGrain>(24);
             return g.GetLabel();
         }
     }

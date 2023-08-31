@@ -69,14 +69,14 @@ namespace Orleans.Serialization
         /// <inheritdoc/>
         public override void WriteJson(JsonWriter writer, object value, JsonSerializer serializer)
         {
-            IPAddress ip = (IPAddress)value;
+            var ip = (IPAddress)value;
             writer.WriteValue(ip.ToString());
         }
 
         /// <inheritdoc/>
         public override object ReadJson(JsonReader reader, Type objectType, object existingValue, JsonSerializer serializer)
         {
-            JToken token = JToken.Load(reader);
+            var token = JToken.Load(reader);
             return IPAddress.Parse(token.Value<string>());
         }
     }
@@ -93,7 +93,7 @@ namespace Orleans.Serialization
         /// <inheritdoc/>
         public override void WriteJson(JsonWriter writer, object value, JsonSerializer serializer)
         {
-            GrainId id = (GrainId)value;
+            var id = (GrainId)value;
             writer.WriteStartObject();
             writer.WritePropertyName("Type");
             writer.WriteValue(id.Type.ToString());
@@ -105,8 +105,8 @@ namespace Orleans.Serialization
         /// <inheritdoc/>
         public override object ReadJson(JsonReader reader, Type objectType, object existingValue, JsonSerializer serializer)
         {
-            JObject jo = JObject.Load(reader);
-            GrainId grainId = GrainId.Create(jo["Type"].ToObject<string>(), jo["Key"].ToObject<string>());
+            var jo = JObject.Load(reader);
+            var grainId = GrainId.Create(jo["Type"].ToObject<string>(), jo["Key"].ToObject<string>());
             return grainId;
         }
     }
@@ -123,7 +123,7 @@ namespace Orleans.Serialization
         /// <inheritdoc/>
         public override void WriteJson(JsonWriter writer, object value, JsonSerializer serializer)
         {
-            ActivationId id = (ActivationId)value;
+            var id = (ActivationId)value;
             writer.WriteValue(id.ToParsableString());
         }
 
@@ -153,7 +153,7 @@ namespace Orleans.Serialization
         /// <inheritdoc/>
         public override void WriteJson(JsonWriter writer, object value, JsonSerializer serializer)
         {
-            SiloAddress addr = (SiloAddress)value;
+            var addr = (SiloAddress)value;
             writer.WriteValue(addr.ToParsableString());
         }
 
@@ -185,7 +185,7 @@ namespace Orleans.Serialization
         /// <inheritdoc/>
         public override void WriteJson(JsonWriter writer, object value, JsonSerializer serializer)
         {
-            MembershipVersion typedValue = (MembershipVersion)value;
+            var typedValue = (MembershipVersion)value;
             writer.WriteValue(typedValue.Value);
         }
 
@@ -215,7 +215,7 @@ namespace Orleans.Serialization
         /// <inheritdoc/>
         public override void WriteJson(JsonWriter writer, object value, JsonSerializer serializer)
         {
-            UniqueKey key = (UniqueKey)value;
+            var key = (UniqueKey)value;
             writer.WriteStartObject();
             writer.WritePropertyName("UniqueKey");
             writer.WriteValue(key.ToHexString());
@@ -225,8 +225,8 @@ namespace Orleans.Serialization
         /// <inheritdoc/>
         public override object ReadJson(JsonReader reader, Type objectType, object existingValue, JsonSerializer serializer)
         {
-            JObject jo = JObject.Load(reader);
-            UniqueKey addr = UniqueKey.Parse(jo["UniqueKey"].ToObject<string>().AsSpan());
+            var jo = JObject.Load(reader);
+            var addr = UniqueKey.Parse(jo["UniqueKey"].ToObject<string>().AsSpan());
             return addr;
         }
     }
@@ -246,7 +246,7 @@ namespace Orleans.Serialization
         /// <inheritdoc/>
         public override void WriteJson(JsonWriter writer, object value, JsonSerializer serializer)
         {
-            IPEndPoint ep = (IPEndPoint)value;
+            var ep = (IPEndPoint)value;
             writer.WriteStartObject();
             writer.WritePropertyName("Address");
             serializer.Serialize(writer, ep.Address);
@@ -258,9 +258,9 @@ namespace Orleans.Serialization
         /// <inheritdoc/>
         public override object ReadJson(JsonReader reader, Type objectType, object existingValue, JsonSerializer serializer)
         {
-            JObject jo = JObject.Load(reader);
-            IPAddress address = jo["Address"].ToObject<IPAddress>(serializer);
-            int port = jo["Port"].Value<int>();
+            var jo = JObject.Load(reader);
+            var address = jo["Address"].ToObject<IPAddress>(serializer);
+            var port = jo["Port"].Value<int>();
             return new IPEndPoint(address, port);
         }
     }
@@ -309,9 +309,9 @@ namespace Orleans.Serialization
         /// <inheritdoc/>
         public override object ReadJson(JsonReader reader, Type objectType, object existingValue, JsonSerializer serializer)
         {
-            JObject jo = JObject.Load(reader);
+            var jo = JObject.Load(reader);
             var id = jo["Id"];
-            GrainId grainId = GrainId.Create(id["Type"].ToObject<string>(), id["Key"].ToObject<string>());
+            var grainId = GrainId.Create(id["Type"].ToObject<string>(), id["Key"].ToObject<string>());
             var iface = GrainInterfaceType.Create(jo["Interface"].ToString());
             return this.referenceActivator.CreateReference(grainId, iface);
         }

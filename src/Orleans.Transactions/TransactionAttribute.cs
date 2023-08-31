@@ -171,7 +171,7 @@ namespace Orleans
         {
             Response response;
             var transactionInfo = this.TransactionInfo;
-            bool startedNewTransaction = false;
+            var startedNewTransaction = false;
             try
             {
                 if (IsTransactionRequired && transactionInfo == null)

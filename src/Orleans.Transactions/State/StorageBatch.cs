@@ -86,7 +86,7 @@ namespace Orleans.Transactions
 
         public async Task<string> Store(ITransactionalStateStorage<TState> storage)
         {
-            List<PendingTransactionState<TState>> list = this.prepares.Values.ToList();
+            var list = this.prepares.Values.ToList();
             return await storage.Store(ETag, this.MetaData, list,
                 (confirm > 0) ? confirmUpTo : (long?)null,
                 (cancelAbove < cancelAboveStart) ? cancelAbove : (long?)null);
@@ -158,7 +158,7 @@ namespace Orleans.Transactions
             // remove all redundant prepare records that are superseded by a later confirmed state
             while (true)
             {
-                long? first = this.prepares.Values.FirstOrDefault()?.SequenceId;
+                var first = this.prepares.Values.FirstOrDefault()?.SequenceId;
 
                 if (first.HasValue && first < confirmUpTo)
                 {
@@ -206,7 +206,7 @@ namespace Orleans.Transactions
             if (this.storeConditions.Count == 0)
                 return true;
 
-            bool[] results = await Task.WhenAll(this.storeConditions.Select(a => a.Invoke()));
+            var results = await Task.WhenAll(this.storeConditions.Select(a => a.Invoke()));
             return results.All(b => b);
         }
     }

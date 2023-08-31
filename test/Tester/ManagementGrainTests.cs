@@ -54,7 +54,7 @@ namespace UnitTests.Management
             }
 
             var numberOfActiveSilos = 1 + HostedCluster.SecondarySilos.Count; // Primary + secondaries
-            Dictionary<SiloAddress, SiloStatus> siloStatuses = mgmtGrain.GetHosts(true).Result;
+            var siloStatuses = mgmtGrain.GetHosts(true).Result;
             Assert.NotNull(siloStatuses);
             Assert.Equal(numberOfActiveSilos, siloStatuses.Count);
         }
@@ -78,7 +78,7 @@ namespace UnitTests.Management
         [Fact, TestCategory("BVT"), TestCategory("Management")]
         public void GetSimpleGrainStatistics()
         {
-            SimpleGrainStatistic[] stats = this.GetSimpleGrainStatisticsRunner("Initial");
+            var stats = this.GetSimpleGrainStatisticsRunner("Initial");
             Assert.True(stats.Length > 0, "Got some grain statistics: " + stats.Length);
             foreach (var s in stats)
             {
@@ -102,25 +102,25 @@ namespace UnitTests.Management
             where TGrainInterface : IGrainWithIntegerKey
             where TGrain : TGrainInterface
         {
-            SimpleGrainStatistic[] stats = this.GetSimpleGrainStatisticsRunner("Before Create");
+            var stats = this.GetSimpleGrainStatisticsRunner("Before Create");
             Assert.True(stats.Length > 0, "Got some grain statistics: " + stats.Length);
 
-            string grainType = RuntimeTypeNameFormatter.Format(typeof(TGrain));
-            int initialStatisticsCount = stats.Count(s => s.GrainType == grainType);
-            int initialActivationsCount = stats.Where(s => s.GrainType == grainType).Sum(s => s.ActivationCount);
+            var grainType = RuntimeTypeNameFormatter.Format(typeof(TGrain));
+            var initialStatisticsCount = stats.Count(s => s.GrainType == grainType);
+            var initialActivationsCount = stats.Where(s => s.GrainType == grainType).Sum(s => s.ActivationCount);
             var grain1 = this.fixture.Client.GetGrain<TGrainInterface>(Random.Shared.Next());
             callGrainMethodAction(grain1); // Call grain method
             stats = this.GetSimpleGrainStatisticsRunner("After Invoke");
             Assert.True(stats.Count(s => s.GrainType == grainType) >= initialStatisticsCount, "Activation counter now exists for grain: " + grainType);
-            int expectedActivationsCount = initialActivationsCount + 1;
-            int actualActivationsCount = stats.Where(s => s.GrainType == grainType).Sum(s => s.ActivationCount);
+            var expectedActivationsCount = initialActivationsCount + 1;
+            var actualActivationsCount = stats.Where(s => s.GrainType == grainType).Sum(s => s.ActivationCount);
             Assert.Equal(expectedActivationsCount, actualActivationsCount);
         }
 
         private SimpleGrainStatistic[] GetSimpleGrainStatisticsRunner(string when)
         {
-            SimpleGrainStatistic[] stats = mgmtGrain.GetSimpleGrainStatistics(null).Result;
-            StringBuilder sb = new StringBuilder();
+            var stats = mgmtGrain.GetSimpleGrainStatistics(null).Result;
+            var sb = new StringBuilder();
             foreach (var s in stats) sb.AppendLine().Append(s);
             sb.AppendLine();
             output.WriteLine("Grain statistics returned by Orleans Management Grain - " + when + " : " + sb);

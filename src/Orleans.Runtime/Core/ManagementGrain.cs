@@ -86,7 +86,7 @@ namespace Orleans.Runtime.Management
         {
             var silos = GetSiloAddresses(siloAddresses);
             logger.LogInformation("Forcing garbage collection on {SiloAddresses}", Utils.EnumerableToString(silos));
-            List<Task> actionPromises = PerformPerSiloAction(silos,
+            var actionPromises = PerformPerSiloAction(silos,
                 s => GetSiloControlReference(s).ForceGarbageCollection());
             return Task.WhenAll(actionPromises);
         }
@@ -100,8 +100,8 @@ namespace Orleans.Runtime.Management
 
         public async Task ForceActivationCollection(TimeSpan ageLimit)
         {
-            Dictionary<SiloAddress, SiloStatus> hosts = await GetHosts(true);
-            SiloAddress[] silos = hosts.Keys.ToArray();
+            var hosts = await GetHosts(true);
+            var silos = hosts.Keys.ToArray();
             await ForceActivationCollection(silos, ageLimit);
         }
 
@@ -109,7 +109,7 @@ namespace Orleans.Runtime.Management
         {
             var silos = GetSiloAddresses(siloAddresses);
             logger.LogInformation("Forcing runtime statistics collection on {SiloAddresses}", Utils.EnumerableToString(silos));
-            List<Task> actionPromises = PerformPerSiloAction(
+            var actionPromises = PerformPerSiloAction(
                 silos,
                 s => GetSiloControlReference(s).ForceRuntimeStatisticsCollection());
             return Task.WhenAll(actionPromises);
@@ -120,7 +120,7 @@ namespace Orleans.Runtime.Management
             var silos = GetSiloAddresses(siloAddresses);
             if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug("GetRuntimeStatistics on {SiloAddresses}", Utils.EnumerableToString(silos));
             var promises = new List<Task<SiloRuntimeStatistics>>();
-            foreach (SiloAddress siloAddress in silos)
+            foreach (var siloAddress in silos)
                 promises.Add(GetSiloControlReference(siloAddress).GetRuntimeStatistics());
 
             return Task.WhenAll(promises);
@@ -137,8 +137,8 @@ namespace Orleans.Runtime.Management
 
         public async Task<SimpleGrainStatistic[]> GetSimpleGrainStatistics()
         {
-            Dictionary<SiloAddress, SiloStatus> hosts = await GetHosts(true);
-            SiloAddress[] silos = hosts.Keys.ToArray();
+            var hosts = await GetHosts(true);
+            var silos = hosts.Keys.ToArray();
             return await GetSimpleGrainStatistics(silos);
         }
 
@@ -146,7 +146,7 @@ namespace Orleans.Runtime.Management
         {
             if (hostsIds == null)
             {
-                Dictionary<SiloAddress, SiloStatus> hosts = await GetHosts(true);
+                var hosts = await GetHosts(true);
                 hostsIds = hosts.Keys.ToArray();
             }
 
@@ -158,8 +158,8 @@ namespace Orleans.Runtime.Management
 
         public async Task<int> GetGrainActivationCount(GrainReference grainReference)
         {
-            Dictionary<SiloAddress, SiloStatus> hosts = await GetHosts(true);
-            List<SiloAddress> hostsIds = hosts.Keys.ToList();
+            var hosts = await GetHosts(true);
+            var hostsIds = hosts.Keys.ToList();
             var tasks = new List<Task<DetailedGrainReport>>();
             foreach (var silo in hostsIds)
                 tasks.Add(GetSiloControlReference(silo).GetDetailedGrainReport(grainReference.GrainId));
@@ -201,15 +201,15 @@ namespace Orleans.Runtime.Management
 
         public async Task<int> GetTotalActivationCount()
         {
-            Dictionary<SiloAddress, SiloStatus> hosts = await GetHosts(true);
-            List<SiloAddress> silos = hosts.Keys.ToList();
+            var hosts = await GetHosts(true);
+            var silos = hosts.Keys.ToList();
             var tasks = new List<Task<int>>();
             foreach (var silo in silos)
                 tasks.Add(GetSiloControlReference(silo).GetActivationCount());
 
             await Task.WhenAll(tasks);
-            int sum = 0;
-            foreach (Task<int> task in tasks)
+            var sum = 0;
+            foreach (var task in tasks)
                 sum += task.Result;
 
             return sum;
@@ -243,7 +243,7 @@ namespace Orleans.Runtime.Management
             }
 
             if (grainProperties != default &&
-                grainProperties.Properties.TryGetValue(WellKnownGrainTypeProperties.PlacementStrategy, out string placementStrategy))
+                grainProperties.Properties.TryGetValue(WellKnownGrainTypeProperties.PlacementStrategy, out var placementStrategy))
             {
                 if (placementStrategy == nameof(StatelessWorkerPlacement))
                 {
@@ -313,7 +313,7 @@ namespace Orleans.Runtime.Management
             }
 
             var actionPromises = new List<Task<object>>();
-            foreach (SiloAddress siloAddress in silos.Keys.ToArray())
+            foreach (var siloAddress in silos.Keys.ToArray())
                 actionPromises.Add(action(GetSiloControlReference(siloAddress)));
 
             return await Task.WhenAll(actionPromises);
@@ -341,7 +341,7 @@ namespace Orleans.Runtime.Management
         private List<Task> PerformPerSiloAction(SiloAddress[] siloAddresses, Func<SiloAddress, Task> perSiloAction)
         {
             var requestsToSilos = new List<Task>();
-            foreach (SiloAddress siloAddress in siloAddresses)
+            foreach (var siloAddress in siloAddresses)
                 requestsToSilos.Add(perSiloAction(siloAddress));
 
             return requestsToSilos;

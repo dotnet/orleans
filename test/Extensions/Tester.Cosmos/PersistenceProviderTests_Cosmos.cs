@@ -151,12 +151,12 @@ public class PersistenceProviderTests_Cosmos
 
         var storedGrainState = new GrainState<TestStoreGrainState>(new TestStoreGrainState());
 
-        Stopwatch sw = new Stopwatch();
+        var sw = new Stopwatch();
         sw.Start();
 
         await store.ReadStateAsync(grainTypeName, grainId, storedGrainState);
 
-        TimeSpan readTime = sw.Elapsed;
+        var readTime = sw.Elapsed;
         output.WriteLine("{0} - Read time = {1}", store.GetType().FullName, readTime);
 
         var storedState = storedGrainState.State;
@@ -170,12 +170,12 @@ public class PersistenceProviderTests_Cosmos
     {
         grainState ??= TestStoreGrainState.NewRandomState();
 
-        Stopwatch sw = new Stopwatch();
+        var sw = new Stopwatch();
         sw.Start();
 
         await store.WriteStateAsync(grainTypeName, grainId, grainState);
 
-        TimeSpan writeTime = sw.Elapsed;
+        var writeTime = sw.Elapsed;
         sw.Restart();
 
         var storedGrainState = new GrainState<TestStoreGrainState>
@@ -183,7 +183,7 @@ public class PersistenceProviderTests_Cosmos
             State = new TestStoreGrainState()
         };
         await store.ReadStateAsync(grainTypeName, grainId, storedGrainState);
-        TimeSpan readTime = sw.Elapsed;
+        var readTime = sw.Elapsed;
         output.WriteLine("{0} - Write time = {1} Read time = {2}", store.GetType().FullName, writeTime, readTime);
         Assert.Equal(grainState.State.A, storedGrainState.State.A);
         Assert.Equal(grainState.State.B, storedGrainState.State.B);
@@ -202,12 +202,12 @@ public class PersistenceProviderTests_Cosmos
             grainState = TestStoreGrainState.NewRandomState();
         }
 
-        Stopwatch sw = new Stopwatch();
+        var sw = new Stopwatch();
         sw.Start();
 
         await store.WriteStateAsync(grainTypeName, grainId, grainState);
 
-        TimeSpan writeTime = sw.Elapsed;
+        var writeTime = sw.Elapsed;
         sw.Restart();
 
         await store.ClearStateAsync(grainTypeName, grainId, grainState);
@@ -217,7 +217,7 @@ public class PersistenceProviderTests_Cosmos
             State = new TestStoreGrainState()
         };
         await store.ReadStateAsync(grainTypeName, grainId, storedGrainState);
-        TimeSpan readTime = sw.Elapsed;
+        var readTime = sw.Elapsed;
         output.WriteLine("{0} - Write time = {1} Read time = {2}", store.GetType().FullName, writeTime, readTime);
         Assert.NotNull(storedGrainState.State);
         Assert.Equal(default(string), storedGrainState.State.A);

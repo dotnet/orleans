@@ -88,7 +88,7 @@ namespace Orleans.Runtime
                     }
 
                     var properties = _resolver.GetGrainProperties(grainType);
-                    List<IConfigureGrainContext> configureActions = new List<IConfigureGrainContext>();
+                    var configureActions = new List<IConfigureGrainContext>();
                     foreach (var provider in _configuratorProviders)
                     {
                         if (provider.TryGetConfigurator(grainType, properties, out var configurator))

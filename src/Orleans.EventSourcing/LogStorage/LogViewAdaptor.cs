@@ -67,7 +67,7 @@ namespace Orleans.EventSourcing.LogStorage
 
         private void UpdateConfirmedView()
         {
-            for (int i = ConfirmedVersionInternal; i < GlobalLog.StateAndMetaData.Log.Count; i++)
+            for (var i = ConfirmedVersionInternal; i < GlobalLog.StateAndMetaData.Log.Count; i++)
             {
                 try
                 {
@@ -142,7 +142,7 @@ namespace Orleans.EventSourcing.LogStorage
             enter_operation("WriteAsync");
 
             var updates = GetCurrentBatchOfUpdates();
-            bool batchsuccessfullywritten = false;
+            var batchsuccessfullywritten = false;
 
             var writebit = GlobalLog.StateAndMetaData.FlipBit(Services.MyClusterId);
             foreach (var x in updates)

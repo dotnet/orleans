@@ -128,7 +128,7 @@ namespace Orleans.Runtime.Host
         {
             dynamic instances = role.Instances;
             var list = new List<string>();
-            foreach(dynamic instance in instances)
+            foreach(var instance in instances)
                 list.Add(ExtractInstanceName(instance.Id,DeploymentId));
             
             return list;

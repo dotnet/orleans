@@ -45,7 +45,7 @@ namespace Tester.AzureUtils
         public void AzureTableErrorCode_BadTableName()
         {
             
-            string tableName = "abc-123";
+            var tableName = "abc-123";
             Assert.Throws<ArgumentException>(() =>
             AzureTableUtils.ValidateTableName(tableName));
         }

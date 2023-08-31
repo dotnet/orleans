@@ -119,7 +119,7 @@ namespace DistributedTests.Server.Configurator
             }
 
             events = new List<IBatchContainer>(maxCount);
-            for (int i = 0; i < maxCount; i++)
+            for (var i = 0; i < maxCount; i++)
             {
                 var streamId = _streamIds[_sequenceId % _streamIds.Count];
                 var container = new GeneratedBatchContainer(streamId, _payload, new EventSequenceTokenV2(_sequenceId));

@@ -154,8 +154,8 @@ namespace DistributedTests.Client
                 var failures = 0;
                 long completed = 0;
                 var reportBlocks = 0;
-                long minStartTime = long.MaxValue;
-                long maxEndTime = long.MinValue;
+                var minStartTime = long.MaxValue;
+                var maxEndTime = long.MinValue;
                 for (var i = statingBlockIndex; i < blocks.Count; i++)
                 {
                     var b = blocks[i];
