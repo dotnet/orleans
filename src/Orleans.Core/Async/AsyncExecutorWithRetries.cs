@@ -44,7 +44,7 @@ namespace Orleans.Internal
             TimeSpan maxExecutionTime,
             IBackoffProvider onErrorBackOff)
         {
-            Func<int, Task<bool>> function = async (int i) => { await action(i); return true; };
+            async Task<bool> function(int i) { await action(i); return true; }
             return ExecuteWithRetriesHelper<bool>(
                 function,
                 0,

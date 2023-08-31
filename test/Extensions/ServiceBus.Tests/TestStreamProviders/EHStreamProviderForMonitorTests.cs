@@ -79,8 +79,8 @@ namespace ServiceBus.Tests.TestStreamProviders
             var loggerFactory = this.serviceProvider.GetRequiredService<ILoggerFactory>();
             var eventHubPath = this.ehOptions.EventHubName;
             var sharedDimensions = new EventHubMonitorAggregationDimensions(eventHubPath);
-            Func<EventHubCacheMonitorDimensions, ILoggerFactory, ICacheMonitor> cacheMonitorFactory = (dimensions, logger) => this.cacheMonitorForTesting;
-            Func<EventHubBlockPoolMonitorDimensions, ILoggerFactory, IBlockPoolMonitor> blockPoolMonitorFactory = (dimensions, logger) => this.blockPoolMonitorForTesting;
+            ICacheMonitor cacheMonitorFactory(EventHubCacheMonitorDimensions dimensions, ILoggerFactory logger) => this.cacheMonitorForTesting;
+            IBlockPoolMonitor blockPoolMonitorFactory(EventHubBlockPoolMonitorDimensions dimensions, ILoggerFactory logger) => this.blockPoolMonitorForTesting;
             return new CacheFactoryForMonitorTesting(
                 this.cachePressureInjectionMonitor,
                 this.cacheOptions,

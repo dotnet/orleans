@@ -353,7 +353,7 @@ namespace UnitTests.General
             for (int i = 0; i < numTasks; i++)
             {
                 var closureInt = i;
-                Func<Task> func = async () => { await ContextTester(closureInt); };
+                async Task func() { await ContextTester(closureInt); }
                 tasks[i] = Task.Run(func);
             }
 
@@ -400,7 +400,7 @@ namespace UnitTests.General
             for (int i = 0; i < numTasks; i++)
             {
                 var closureInt = i;
-                Func<Task> func = async () => { await ContextTester(closureInt); };
+                async Task func() { await ContextTester(closureInt); }
                 tasks[i] = Task.Run(func);
             }
 

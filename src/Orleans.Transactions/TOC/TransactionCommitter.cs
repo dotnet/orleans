@@ -139,7 +139,7 @@ namespace Orleans.Transactions
             ITransactionalStateStorage<OperationState> storage = storageFactory.Create<OperationState>(this.config.StorageName, this.config.ServiceName);
 
             // setup transaction processing pipe
-            Action deactivate = () => grainRuntime.DeactivateOnIdle(context);
+            void deactivate() => grainRuntime.DeactivateOnIdle(context);
             var options = this.context.ActivationServices.GetRequiredService<IOptions<TransactionalStateOptions>>();
             var clock = this.context.ActivationServices.GetRequiredService<IClock>();
             TService service = this.context.ActivationServices.GetRequiredServiceByName<TService>(this.config.ServiceName);

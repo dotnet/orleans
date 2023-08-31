@@ -513,7 +513,7 @@ namespace Orleans.Runtime
             logger.LogInformation((int)ErrorCode.Catalog_ShutdownActivations_1, "DeactivateActivationsFromCollector: total {Count} to promptly Destroy.", list.Count);
             CatalogInstruments.ActiviationShutdownViaCollection();
 
-            Action<Task> signalCompletion = task => mtcs.SetOneResult();
+            void signalCompletion(Task task) => mtcs.SetOneResult();
             var reason = GetDeactivationReason();
             for (var i = 0; i < list.Count; i++)
             {

@@ -74,7 +74,7 @@ namespace Orleans.Transactions.TestKit
         {
             var endOnCommand = new[] { false };
             var index = new[] { 0 };
-            Func<int> getIndex = () => index[0]++;
+            int getIndex() => index[0]++;
             List<ExpectedGrainActivity> txGrains = Enumerable.Range(0, concurrent * 2)
                 .Select(i => Guid.NewGuid())
                 .Select(grainId => new ExpectedGrainActivity(grainId, TestGrain<ITransactionalBitArrayGrain>(transactionTestGrainClassName, grainId)))

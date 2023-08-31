@@ -265,10 +265,10 @@ namespace UnitTests.Grains
             for (var i = 1; i <= count; ++i)
             {
                 int capture = i;
-                Func<Task<bool>> func = async () =>
-                    {
-                        return await ProduceItem($"parallel#{capture}");
-                    };
+                async Task<bool> func()
+                {
+                    return await ProduceItem($"parallel#{capture}");
+                }
                 // Need to call on different threads to force parallel execution.
                 tasks[capture - 1] = Task.Factory.StartNew(func).Unwrap();
             }

@@ -98,7 +98,7 @@ namespace Tests.GeoClusterTests
         private async Task ThreeCheckers(string grainClass, int phases)
         {
             // Global 
-            Func<Task> checker1 = async () =>
+            async Task checker1()
             {
                 int x = GetRandom();
                 var grain = this.fixture.GrainFactory.GetGrain<ILogTestGrain>(x, grainClass);
@@ -106,10 +106,10 @@ namespace Tests.GeoClusterTests
                 int a = await grain.GetAGlobal();
                 Assert.Equal(x, a); // value of A survive grain call
                 Assert.Equal(1, await grain.GetConfirmedVersion());
-            };
+            }
 
             // Local
-            Func<Task> checker2 = async () =>
+            async Task checker2()
             {
                 int x = GetRandom();
                 var grain = this.fixture.GrainFactory.GetGrain<ILogTestGrain>(x, grainClass);
@@ -117,10 +117,10 @@ namespace Tests.GeoClusterTests
                 await grain.SetALocal(x);
                 int a = await grain.GetALocal();
                 Assert.Equal(x, a); // value of A survive grain call
-            };
+            }
 
             // Local then Global
-            Func<Task> checker3 = async () =>
+            async Task checker3()
             {
                 // Local then Global
                 int x = GetRandom();
@@ -129,7 +129,7 @@ namespace Tests.GeoClusterTests
                 int a = await grain.GetAGlobal();
                 Assert.Equal(x, a);
                 Assert.Equal(1, await grain.GetConfirmedVersion());
-            };
+            }
 
             // test them in sequence
             await checker1();
