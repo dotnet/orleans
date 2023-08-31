@@ -95,7 +95,7 @@ namespace Orleans.EventSourcing
         /// </summary>
         protected TGrainState State
         {
-            get { return this.LogViewAdaptor.ConfirmedView; }
+            get { return LogViewAdaptor.ConfirmedView; }
         }
 
         /// <summary>
@@ -104,7 +104,7 @@ namespace Orleans.EventSourcing
         /// </summary>
         protected int Version
         {
-            get { return this.LogViewAdaptor.ConfirmedVersion; }
+            get { return LogViewAdaptor.ConfirmedVersion; }
         }
 
         /// <summary>
@@ -121,7 +121,7 @@ namespace Orleans.EventSourcing
         /// </summary>
         protected TGrainState TentativeState
         {
-            get { return this.LogViewAdaptor.TentativeView; }
+            get { return LogViewAdaptor.TentativeView; }
         }
 
         /// <summary>

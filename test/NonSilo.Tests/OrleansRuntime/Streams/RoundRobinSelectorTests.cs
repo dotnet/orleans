@@ -14,8 +14,8 @@ namespace UnitTests.OrleansRuntime.Streams
 
         public RoundRobinSelectorTests(ITestOutputHelper output) : base(output)
         {
-            this.resources = Enumerable.Range(0, ResourceCount).Select(i => $"resource_{i}").ToList();
-            this.resourceSelector = new RoundRobinSelector<string>(this.resources);
+            resources = Enumerable.Range(0, ResourceCount).Select(i => $"resource_{i}").ToList();
+            resourceSelector = new RoundRobinSelector<string>(resources);
         }
 
         [Fact]
@@ -39,10 +39,10 @@ namespace UnitTests.OrleansRuntime.Streams
         [Fact]
         public void NextSelectionWontReSelectExistingSelectionsWithDuplicatesTest()
         {
-            var duplicateResources = new List<string>(this.resources);
-            duplicateResources.AddRange(this.resources);
+            var duplicateResources = new List<string>(resources);
+            duplicateResources.AddRange(resources);
             var resourceSelectorWithDuplicates = new RoundRobinSelector<string>(duplicateResources);
-            base.NextSelectionWontReSelectExistingSelections(this.resources, resourceSelectorWithDuplicates);
+            base.NextSelectionWontReSelectExistingSelections(resources, resourceSelectorWithDuplicates);
         }
     }
 }

@@ -31,8 +31,8 @@ namespace Tester.Redis.Reminders
             TestUtils.CheckForRedis();
 
             RedisReminderTable reminderTable = new(
-                this.loggerFactory.CreateLogger<RedisReminderTable>(),
-                this.clusterOptions,
+                loggerFactory.CreateLogger<RedisReminderTable>(),
+                clusterOptions,
                 Options.Create(new RedisReminderTableOptions()
                 {
                     ConfigurationOptions = ConfigurationOptions.Parse(GetConnectionString().Result),

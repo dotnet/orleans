@@ -14,12 +14,12 @@ namespace Tester.StreamingTests
         [SkippableFact]
         public virtual async Task ResumeAfterInactivity()
         {
-            var streamProvider = this.Client.GetStreamProvider(StreamProviderName);
+            var streamProvider = Client.GetStreamProvider(StreamProviderName);
 
             // Tested stream and corresponding grain
             var key = Guid.NewGuid();
             var stream = streamProvider.GetStream<byte[]>(nameof(IImplicitSubscriptionCounterGrain), key);
-            var grain = this.Client.GetGrain<IImplicitSubscriptionCounterGrain>(key);
+            var grain = Client.GetGrain<IImplicitSubscriptionCounterGrain>(key);
 
             // Data that will be sent to the grains
             var interestingData = new byte[1] { 1 };
@@ -42,12 +42,12 @@ namespace Tester.StreamingTests
         [SkippableFact]
         public virtual async Task ResumeAfterDeactivation()
         {
-            var streamProvider = this.Client.GetStreamProvider(StreamProviderName);
+            var streamProvider = Client.GetStreamProvider(StreamProviderName);
 
             // Tested stream and corresponding grain
             var key = Guid.NewGuid();
             var stream = streamProvider.GetStream<byte[]>(nameof(IImplicitSubscriptionCounterGrain), key);
-            var grain = this.Client.GetGrain<IImplicitSubscriptionCounterGrain>(key);
+            var grain = Client.GetGrain<IImplicitSubscriptionCounterGrain>(key);
 
             // Data that will be sent to the grains
             var interestingData = new byte[1] { 1 };
@@ -71,13 +71,13 @@ namespace Tester.StreamingTests
         [SkippableFact]
         public virtual async Task ResumeAfterDeactivationActiveStream()
         {
-            var streamProvider = this.Client.GetStreamProvider(StreamProviderName);
+            var streamProvider = Client.GetStreamProvider(StreamProviderName);
 
             // Tested stream and corresponding grain
             var key = Guid.NewGuid();
             var stream = streamProvider.GetStream<byte[]>(nameof(IImplicitSubscriptionCounterGrain), key);
             var otherStream = streamProvider.GetStream<byte[]>(nameof(IImplicitSubscriptionCounterGrain), Guid.NewGuid());
-            var grain = this.Client.GetGrain<IImplicitSubscriptionCounterGrain>(key);
+            var grain = Client.GetGrain<IImplicitSubscriptionCounterGrain>(key);
             await grain.DeactivateOnEvent(true);
 
             // Data that will be sent to the grains

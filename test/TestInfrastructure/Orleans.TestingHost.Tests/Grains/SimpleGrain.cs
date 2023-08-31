@@ -26,7 +26,7 @@
 
         public Task SetB(int b)
         {
-            this.B = b;
+            B = b;
             return Task.CompletedTask;
         }
 

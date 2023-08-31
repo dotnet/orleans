@@ -13,7 +13,7 @@ namespace NonSilo.Tests.Utilities
 
         public int DisposedCounter { get; private set; }
 
-        public Task<bool> NextTick(TimeSpan? overrideDelay = null) => this.nextTick(overrideDelay);
+        public Task<bool> NextTick(TimeSpan? overrideDelay = null) => nextTick(overrideDelay);
 
         public bool CheckHealth(DateTime lastCheckTime, out string reason)
         {
@@ -21,6 +21,6 @@ namespace NonSilo.Tests.Utilities
             return true;
         }
 
-        public void Dispose() => ++this.DisposedCounter;
+        public void Dispose() => ++DisposedCounter;
     }
 }

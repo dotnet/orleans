@@ -41,12 +41,12 @@ namespace Orleans.Streams
             this.logger = logger;
             this.stream = stream;
             this.streamProviderName = streamProviderName;
-            this.providerRuntime = runtime;
+            providerRuntime = runtime;
             this.pubSub = pubSub;
-            this.IsRewindable = isRewindable;
-            this.myExtension = null;
-            this.myGrainReference = null;
-            this.bindExtLock = new AsyncLock();
+            IsRewindable = isRewindable;
+            myExtension = null;
+            myGrainReference = null;
+            bindExtLock = new AsyncLock();
         }
 
         public Task<StreamSubscriptionHandle<T>> SubscribeAsync(IAsyncObserver<T> observer)

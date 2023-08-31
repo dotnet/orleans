@@ -17,7 +17,7 @@ namespace Orleans.Transactions.State
         public async Task<TransactionalStatus> CommitReadOnly(Guid transactionId, AccessCounter accessCount, DateTime timeStamp)
         {
             // validate the lock
-            var (status, record) = await this.queue.RWLock.ValidateLock(transactionId, accessCount);
+            var (status, record) = await queue.RWLock.ValidateLock(transactionId, accessCount);
             var valid = status == TransactionalStatus.Ok;
 
             record.Timestamp = timeStamp;
@@ -26,41 +26,41 @@ namespace Orleans.Transactions.State
 
             if (!valid)
             {
-                await this.queue.NotifyOfAbort(record, status, exception: null);
+                await queue.NotifyOfAbort(record, status, exception: null);
             }
             else
             {
-                this.queue.Clock.Merge(record.Timestamp);
+                queue.Clock.Merge(record.Timestamp);
             }
 
-            this.queue.RWLock.Notify();
+            queue.RWLock.Notify();
             return await record.PromiseForTA.Task;
         }
 
         public async Task Abort(Guid transactionId)
         {
-            await this.queue.Ready();
+            await queue.Ready();
             // release the lock
-            this.queue.RWLock.Rollback(transactionId);
+            queue.RWLock.Rollback(transactionId);
 
-            this.queue.RWLock.Notify();
+            queue.RWLock.Notify();
         }
 
         public async Task Cancel(Guid transactionId, DateTime timeStamp, TransactionalStatus status)
         {
-            await this.queue.Ready();
-            await this.queue.NotifyOfCancel(transactionId, timeStamp, status);
+            await queue.Ready();
+            await queue.NotifyOfCancel(transactionId, timeStamp, status);
         }
 
         public async Task Confirm(Guid transactionId, DateTime timeStamp)
         {
-            await this.queue.Ready();
-            await this.queue.NotifyOfConfirm(transactionId, timeStamp);
+            await queue.Ready();
+            await queue.NotifyOfConfirm(transactionId, timeStamp);
         }
 
         public async Task Prepare(Guid transactionId, AccessCounter accessCount, DateTime timeStamp, ParticipantId transactionManager)
         {
-            await this.queue.NotifyOfPrepare(transactionId, accessCount, timeStamp, transactionManager);
+            await queue.NotifyOfPrepare(transactionId, accessCount, timeStamp, transactionManager);
         }
     }
 }

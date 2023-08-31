@@ -15,8 +15,8 @@ namespace TestExtensions
                     configureClientBuilder?.Invoke(clientBuilder);
                 }).Build();
 
-            this.Client = host.Services.GetRequiredService<IClusterClient>();
-            this.RuntimeClient = this.Client.ServiceProvider.GetRequiredService<OutsideRuntimeClient>();
+            Client = host.Services.GetRequiredService<IClusterClient>();
+            RuntimeClient = Client.ServiceProvider.GetRequiredService<OutsideRuntimeClient>();
             RuntimeClient.ConsumeServices();
         }
 
@@ -30,18 +30,18 @@ namespace TestExtensions
             return result;
         }
         
-        public IGrainFactory GrainFactory => this.RuntimeClient.InternalGrainFactory;
+        public IGrainFactory GrainFactory => RuntimeClient.InternalGrainFactory;
 
-        internal IInternalGrainFactory InternalGrainFactory => this.RuntimeClient.InternalGrainFactory;
+        internal IInternalGrainFactory InternalGrainFactory => RuntimeClient.InternalGrainFactory;
 
-        internal IServiceProvider Services => this.Client.ServiceProvider;
+        internal IServiceProvider Services => Client.ServiceProvider;
 
-        public DeepCopier DeepCopier => this.RuntimeClient.ServiceProvider.GetRequiredService<DeepCopier>();
+        public DeepCopier DeepCopier => RuntimeClient.ServiceProvider.GetRequiredService<DeepCopier>();
         public Serializer Serializer => RuntimeClient.ServiceProvider.GetRequiredService<Serializer>();
         
         public void Dispose()
         {
-            this.RuntimeClient?.Dispose();
+            RuntimeClient?.Dispose();
         }
     }
 }

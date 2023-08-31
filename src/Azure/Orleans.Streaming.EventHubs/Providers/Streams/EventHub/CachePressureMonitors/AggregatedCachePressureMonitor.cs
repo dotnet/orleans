@@ -25,9 +25,9 @@ namespace Orleans.Streaming.EventHubs
         /// <param name="monitor"></param>
         public AggregatedCachePressureMonitor(ILogger logger, ICacheMonitor monitor = null)
         {
-            this.isUnderPressure = false;
+            isUnderPressure = false;
             this.logger = logger;
-            this.CacheMonitor = monitor;
+            CacheMonitor = monitor;
         }
 
         /// <summary>
@@ -36,7 +36,7 @@ namespace Orleans.Streaming.EventHubs
         /// <param name="cachePressureContribution"></param>
         public void RecordCachePressureContribution(double cachePressureContribution)
         {
-            this.ForEach(monitor =>
+            ForEach(monitor =>
             {
                 monitor.RecordCachePressureContribution(cachePressureContribution);
             });
@@ -48,7 +48,7 @@ namespace Orleans.Streaming.EventHubs
         /// <param name="monitor"></param>
         public void AddCachePressureMonitor(ICachePressureMonitor monitor)
         {
-            this.Add(monitor);
+            Add(monitor);
         }
 
         /// <summary>
@@ -59,12 +59,12 @@ namespace Orleans.Streaming.EventHubs
         public bool IsUnderPressure(DateTime utcNow)
         {
             bool underPressure = this.Any(monitor => monitor.IsUnderPressure(utcNow));
-            if (this.isUnderPressure != underPressure)
+            if (isUnderPressure != underPressure)
             {
-                this.isUnderPressure = underPressure;
-                this.CacheMonitor?.TrackCachePressureMonitorStatusChange(this.GetType().Name, this.isUnderPressure, null, null, null);
+                isUnderPressure = underPressure;
+                CacheMonitor?.TrackCachePressureMonitorStatusChange(GetType().Name, isUnderPressure, null, null, null);
                 logger.LogInformation(
-                    this.isUnderPressure
+                    isUnderPressure
                     ? "Ingesting messages too fast. Throttling message reading."
                     : "Message ingestion is healthy.");
             }

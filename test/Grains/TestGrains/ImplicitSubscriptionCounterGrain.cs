@@ -24,54 +24,54 @@ namespace UnitTests.Grains
 
         public ImplicitSubscriptionCounterGrain(ILoggerFactory loggerFactory)
         {
-            this.logger = loggerFactory.CreateLogger($"{nameof(ImplicitSubscriptionCounterGrain)} {this.IdentityString}");
+            logger = loggerFactory.CreateLogger($"{nameof(ImplicitSubscriptionCounterGrain)} {IdentityString}");
         }
 
         public override Task OnActivateAsync(CancellationToken cancellationToken)
         {
-            this.logger.LogInformation("OnActivateAsync");
+            logger.LogInformation("OnActivateAsync");
             return base.OnActivateAsync(cancellationToken);
         }
 
         public override Task OnDeactivateAsync(DeactivationReason reason, CancellationToken cancellationToken)
         {
-            this.logger.LogInformation($"OnDeactivateAsync: {reason}");
+            logger.LogInformation($"OnDeactivateAsync: {reason}");
             return base.OnDeactivateAsync(reason, cancellationToken);
         }
 
-        public Task<int> GetErrorCounter() => Task.FromResult(this.State.ErrorCounter);
+        public Task<int> GetErrorCounter() => Task.FromResult(State.ErrorCounter);
 
-        public Task<int> GetEventCounter() => Task.FromResult(this.State.EventCounter);
+        public Task<int> GetEventCounter() => Task.FromResult(State.EventCounter);
 
         public Task Deactivate()
         {
-            this.DeactivateOnIdle();
+            DeactivateOnIdle();
             return Task.CompletedTask;
         }
 
         public async Task OnSubscribed(IStreamSubscriptionHandleFactory handleFactory)
         {
-            this.logger.LogInformation($"OnSubscribed: {handleFactory.ProviderName}/{handleFactory.StreamId}");
+            logger.LogInformation($"OnSubscribed: {handleFactory.ProviderName}/{handleFactory.StreamId}");
 
-            await handleFactory.Create<byte[]>().ResumeAsync(OnNext, OnError, OnCompleted, this.State.Token);
+            await handleFactory.Create<byte[]>().ResumeAsync(OnNext, OnError, OnCompleted, State.Token);
 
             async Task OnNext(byte[] value, StreamSequenceToken token)
             {
-                this.logger.LogInformation("Received: [{Value} {Token}]", value, token);
-                this.State.EventCounter++;
-                this.State.Token = token;
-                await this.WriteStateAsync();
-                if (this.deactivateOnEvent)
+                logger.LogInformation("Received: [{Value} {Token}]", value, token);
+                State.EventCounter++;
+                State.Token = token;
+                await WriteStateAsync();
+                if (deactivateOnEvent)
                 {
-                    this.DeactivateOnIdle();
+                    DeactivateOnIdle();
                 }
             }
 
             async Task OnError(Exception ex)
             {
-                this.logger.LogError("Error: {Exception}", ex);
-                this.State.ErrorCounter++;
-                await this.WriteStateAsync();
+                logger.LogError("Error: {Exception}", ex);
+                State.ErrorCounter++;
+                await WriteStateAsync();
             }
 
             Task OnCompleted() => Task.CompletedTask;
@@ -79,7 +79,7 @@ namespace UnitTests.Grains
 
         public Task DeactivateOnEvent(bool deactivate)
         {
-            this.deactivateOnEvent = deactivate;
+            deactivateOnEvent = deactivate;
             return Task.CompletedTask;
         }
     }

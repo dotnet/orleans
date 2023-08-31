@@ -223,11 +223,11 @@ namespace Orleans.TestingHost.Tests
             var builder = new TestClusterBuilder(2);
             builder.Options.ServiceId = Guid.NewGuid().ToString();
             builder.ConfigureHostConfiguration(TestDefaultConfiguration.ConfigureHostConfiguration);
-            this.testCluster = builder.Build();
+            testCluster = builder.Build();
 
-            await this.testCluster.DeployAsync();
+            await testCluster.DeployAsync();
 
-            var grain = this.testCluster.Client.GetGrain<ISimpleGrain>(1);
+            var grain = testCluster.Client.GetGrain<ISimpleGrain>(1);
 
             await grain.SetA(2);
             Assert.Equal(2, await grain.GetA());
@@ -239,11 +239,11 @@ namespace Orleans.TestingHost.Tests
             var builder = new TestClusterBuilder(2);
             builder.ConfigureHostConfiguration(TestDefaultConfiguration.ConfigureHostConfiguration);
             builder.AddSiloBuilderConfigurator<SiloConfigurator>();
-            this.testCluster = builder.Build();
+            testCluster = builder.Build();
 
-            await this.testCluster.DeployAsync();
+            await testCluster.DeployAsync();
 
-            var grain = this.testCluster.Client.GetGrain<ISimpleGrain>(1);
+            var grain = testCluster.Client.GetGrain<ISimpleGrain>(1);
 
             await grain.SetA(2);
             Assert.Equal(2, await grain.GetA());
@@ -258,7 +258,7 @@ namespace Orleans.TestingHost.Tests
         }
         public void Dispose()
         {
-            this.testCluster?.StopAllSilos();
+            testCluster?.StopAllSilos();
         }
 
         public Task InitializeAsync()
@@ -268,7 +268,7 @@ namespace Orleans.TestingHost.Tests
 
         public async Task DisposeAsync()
         {
-            await this.testCluster.StopAllSilosAsync();
+            await testCluster.StopAllSilosAsync();
         }
     }
 }

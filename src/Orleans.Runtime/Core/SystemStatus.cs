@@ -53,7 +53,7 @@ namespace Orleans.Runtime
         public static readonly SystemStatus Terminated = new SystemStatus(InternalSystemStatus.Terminated);
 
         private readonly InternalSystemStatus value;
-        private SystemStatus(InternalSystemStatus name) { this.value = name; }
+        private SystemStatus(InternalSystemStatus name) { value = name; }
 
         /// <see cref="object.ToString"/>
         public override string ToString() { return this.value.ToString(); }
@@ -62,6 +62,6 @@ namespace Orleans.Runtime
         /// <see cref="object.Equals(object)"/>
         public override bool Equals(object obj) { var ss = obj as SystemStatus; return ss != null && this.Equals(ss); }
         /// <see cref="IEquatable{T}.Equals(T)"/>
-        public bool Equals(SystemStatus other) { return (other != null) && this.value.Equals(other.value); }
+        public bool Equals(SystemStatus other) { return (other != null) && value.Equals(other.value); }
     }
 }

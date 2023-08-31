@@ -36,7 +36,7 @@ namespace Orleans.ClientObservers
         }
 
         /// <inheritdoc />
-        public void StopSendingToGateway(SiloAddress gateway) => this.gatewayManager.MarkAsUnavailableForSend(gateway);
+        public void StopSendingToGateway(SiloAddress gateway) => gatewayManager.MarkAsUnavailableForSend(gateway);
 
         internal override ObserverGrainId GetObserverGrainId(ClientGrainId clientId) => ObserverGrainId.Create(clientId, ScopedId);
 

@@ -13,10 +13,10 @@ namespace DefaultCluster.Tests.General
         [Fact]
         public async Task OneWayMethodsReturnSynchronously_ViaClient()
         {
-            var grain = this.Client.GetGrain<IOneWayGrain>(Guid.NewGuid());
+            var grain = Client.GetGrain<IOneWayGrain>(Guid.NewGuid());
 
             var observer = new SimpleGrainObserver();
-            var task = grain.Notify(this.Client.CreateObjectReference<ISimpleGrainObserver>(observer));
+            var task = grain.Notify(Client.CreateObjectReference<ISimpleGrainObserver>(observer));
             Assert.True(task.Status == TaskStatus.RanToCompletion, "Task should be synchronously completed.");
             await observer.ReceivedValue.WithTimeout(TimeSpan.FromSeconds(10));
             var count = await grain.GetCount();
@@ -30,11 +30,11 @@ namespace DefaultCluster.Tests.General
         [Fact]
         public async Task OneWayMethodReturnSynchronously_ViaGrain()
         {
-            var grain = this.Client.GetGrain<IOneWayGrain>(Guid.NewGuid());
-            var otherGrain = this.Client.GetGrain<IOneWayGrain>(Guid.NewGuid());
+            var grain = Client.GetGrain<IOneWayGrain>(Guid.NewGuid());
+            var otherGrain = Client.GetGrain<IOneWayGrain>(Guid.NewGuid());
 
             var observer = new SimpleGrainObserver();
-            var observerReference = this.Client.CreateObjectReference<ISimpleGrainObserver>(observer);
+            var observerReference = Client.CreateObjectReference<ISimpleGrainObserver>(observer);
             var completedSynchronously = await grain.NotifyOtherGrain(otherGrain, observerReference);
             Assert.True(completedSynchronously, "Task should be synchronously completed.");
             await observer.ReceivedValue.WithTimeout(TimeSpan.FromSeconds(10));
@@ -45,10 +45,10 @@ namespace DefaultCluster.Tests.General
         [Fact]
         public async Task OneWayMethodsReturnSynchronously_ViaClient_ValueTask()
         {
-            var grain = this.Client.GetGrain<IOneWayGrain>(Guid.NewGuid());
+            var grain = Client.GetGrain<IOneWayGrain>(Guid.NewGuid());
 
             var observer = new SimpleGrainObserver();
-            var task = grain.NotifyValueTask(this.Client.CreateObjectReference<ISimpleGrainObserver>(observer));
+            var task = grain.NotifyValueTask(Client.CreateObjectReference<ISimpleGrainObserver>(observer));
             Assert.True(task.IsCompleted, "ValueTask should be synchronously completed.");
             await observer.ReceivedValue.WithTimeout(TimeSpan.FromSeconds(10));
             var count = await grain.GetCount();
@@ -62,11 +62,11 @@ namespace DefaultCluster.Tests.General
         [Fact]
         public async Task OneWayMethodReturnSynchronously_ViaGrain_ValueTask()
         {
-            var grain = this.Client.GetGrain<IOneWayGrain>(Guid.NewGuid());
-            var otherGrain = this.Client.GetGrain<IOneWayGrain>(Guid.NewGuid());
+            var grain = Client.GetGrain<IOneWayGrain>(Guid.NewGuid());
+            var otherGrain = Client.GetGrain<IOneWayGrain>(Guid.NewGuid());
 
             var observer = new SimpleGrainObserver();
-            var observerReference = this.Client.CreateObjectReference<ISimpleGrainObserver>(observer);
+            var observerReference = Client.CreateObjectReference<ISimpleGrainObserver>(observer);
             var completedSynchronously = await grain.NotifyOtherGrainValueTask(otherGrain, observerReference);
             Assert.True(completedSynchronously, "Task should be synchronously completed.");
             await observer.ReceivedValue.WithTimeout(TimeSpan.FromSeconds(10));
@@ -77,10 +77,10 @@ namespace DefaultCluster.Tests.General
         private class SimpleGrainObserver : ISimpleGrainObserver
         {
             private readonly TaskCompletionSource<int> completion = new TaskCompletionSource<int>();
-            public Task ReceivedValue => this.completion.Task;
+            public Task ReceivedValue => completion.Task;
             public void StateChanged(int a, int b)
             {
-                this.completion.SetResult(b);
+                completion.SetResult(b);
             }
         }
     }

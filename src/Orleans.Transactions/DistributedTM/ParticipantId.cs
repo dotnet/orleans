@@ -31,9 +31,9 @@ namespace Orleans.Transactions
 
         public ParticipantId(string name, GrainReference reference, Role supportedRoles)
         {
-            this.Name = name;
-            this.Reference = reference;
-            this.SupportedRoles = supportedRoles;
+            Name = name;
+            Reference = reference;
+            SupportedRoles = supportedRoles;
         }
 
         public override string ToString()

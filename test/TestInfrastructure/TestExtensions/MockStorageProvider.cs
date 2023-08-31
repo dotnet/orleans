@@ -92,8 +92,8 @@ namespace UnitTests.StorageTests
             _id = ++_instanceNum;
             this.numKeys = numKeys;
             this.copier = copier;
-            this.Name = name;
-            this.logger = loggerFactory.CreateLogger($"Storage.{this.GetType().Name}-{this._id}");
+            Name = name;
+            logger = loggerFactory.CreateLogger($"Storage.{GetType().Name}-{_id}");
 
             logger.LogInformation("Init Name={Name}", name);
             Interlocked.Increment(ref initCount);
@@ -140,7 +140,7 @@ namespace UnitTests.StorageTests
         {
             lock (StateStore)
             {
-                this.logger.LogInformation("Setting stored value {Name} for {GrainId} to {Value}", name, grainId, val);
+                logger.LogInformation("Setting stored value {Name} for {GrainId} to {Value}", name, grainId, val);
                 var keys = MakeGrainStateKeys(grainType, grainId);
                 var storedDict = StateStore.ReadRow(keys);
                 if (!storedDict.ContainsKey(stateStoreKey))
@@ -200,7 +200,7 @@ namespace UnitTests.StorageTests
             {
                 var storedState = GetLastState(grainType, grainId, grainState);
                 grainState.RecordExists = storedState != null;
-                grainState.State = (T)this.copier.Copy(storedState); // Read current state data
+                grainState.State = (T)copier.Copy(storedState); // Read current state data
             }
             return Task.CompletedTask;
         }
@@ -211,7 +211,7 @@ namespace UnitTests.StorageTests
             Interlocked.Increment(ref writeCount);
             lock (StateStore)
             {
-                var storedState = this.copier.Copy(grainState.State); // Store current state data
+                var storedState = copier.Copy(grainState.State); // Store current state data
                 var stateStore = new Dictionary<string, object> {{ stateStoreKey, storedState }};
                 StateStore.WriteRow(MakeGrainStateKeys(grainType, grainId), stateStore, grainState.ETag);
 

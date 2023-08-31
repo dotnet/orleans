@@ -10,10 +10,10 @@ namespace Orleans.Runtime.Messaging
             MessagingTrace messagingTrace,
             NetworkingTrace networkingTrace)
         {
-            this.ServiceProvider = serviceProvider;
-            this.MessageFactory = messageFactory;
-            this.MessagingTrace = messagingTrace;
-            this.NetworkingTrace = networkingTrace;
+            ServiceProvider = serviceProvider;
+            MessageFactory = messageFactory;
+            MessagingTrace = messagingTrace;
+            NetworkingTrace = networkingTrace;
         }
 
         public MessageFactory MessageFactory { get; }

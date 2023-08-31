@@ -11,7 +11,7 @@ namespace Analyzers.Tests
             => base.GetDiagnosticsAsync(source, extraUsings.Concat(new[] { "Orleans.Concurrency" }).ToArray());
 
         [Fact]
-        public async Task AlwaysInterleave_Analyzer_NoWarningsIfAttributeIsNotUsed() => await this.AssertNoDiagnostics(@"
+        public async Task AlwaysInterleave_Analyzer_NoWarningsIfAttributeIsNotUsed() => await AssertNoDiagnostics(@"
 class C
 {
     Task M() => Task.CompletedTask;
@@ -19,7 +19,7 @@ class C
 ");
 
         [Fact]
-        public async Task AlwaysInterleave_Analyzer_NoWarningsIfAttributeIsUsedOnInterface() => await this.AssertNoDiagnostics(@"
+        public async Task AlwaysInterleave_Analyzer_NoWarningsIfAttributeIsUsedOnInterface() => await AssertNoDiagnostics(@"
 public interface I : IGrain
 {
     [AlwaysInterleave]
@@ -30,7 +30,7 @@ public interface I : IGrain
         [Fact]
         public async Task AlwaysInterleave_Analyzer_WarningIfAttributeisUsedOnGrainClass()
         {
-            var (diagnostics, source) = await this.GetDiagnosticsAsync(@"
+            var (diagnostics, source) = await GetDiagnosticsAsync(@"
 public interface I : IGrain
 {
     Task<int> Method();

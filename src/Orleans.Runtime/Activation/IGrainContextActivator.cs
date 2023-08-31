@@ -55,7 +55,7 @@ namespace Orleans.Runtime
             var grainId = address.GrainId;
             if (!_activators.TryGetValue(grainId.Type, out var activator))
             {
-                activator = this.CreateActivator(grainId.Type);
+                activator = CreateActivator(grainId.Type);
             }
 
             var result = activator.Activator.CreateContext(address);
@@ -74,7 +74,7 @@ namespace Orleans.Runtime
                 if (!_activators.TryGetValue(grainType, out var configuredActivator))
                 {
                     IGrainContextActivator unconfiguredActivator = null;
-                    foreach (var provider in this._activatorProviders)
+                    foreach (var provider in _activatorProviders)
                     {
                         if (provider.TryGet(grainType, out unconfiguredActivator))
                         {
@@ -424,7 +424,7 @@ namespace Orleans.Runtime
         public List<IMayInterleavePredicate> MayInterleavePredicates { get; } = new List<IMayInterleavePredicate>();
         public bool MayInterleave(object instance, Message message)
         {
-            foreach (var predicate in this.MayInterleavePredicates)
+            foreach (var predicate in MayInterleavePredicates)
             {
                 if (predicate.Invoke(instance, message.BodyObject as IInvokable)) return true;
             }

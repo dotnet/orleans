@@ -17,13 +17,13 @@ namespace Orleans.Placement
         {
             if (placement == null) throw new ArgumentNullException(nameof(placement));
 
-            this.PlacementStrategy = placement;
+            PlacementStrategy = placement;
         }
 
         /// <inheritdoc />
         public virtual void Populate(IServiceProvider services, Type grainClass, GrainType grainType, Dictionary<string, string> properties)
         {
-            this.PlacementStrategy?.PopulateGrainProperties(services, grainClass, grainType, properties);
+            PlacementStrategy?.PopulateGrainProperties(services, grainClass, grainType, properties);
         }
     }
 

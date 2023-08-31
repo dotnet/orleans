@@ -77,19 +77,19 @@ namespace Orleans.Transactions.TestKit
 
         public override Task OnActivateAsync(CancellationToken cancellationToken)
         {
-            this.logger = this.loggerFactory.CreateLogger(this.GetGrainId().ToString());
+            logger = loggerFactory.CreateLogger(this.GetGrainId().ToString());
             return base.OnActivateAsync(cancellationToken);
         }
 
         public async Task Set(int newValue)
         {
-            foreach(var data in this.dataArray)
+            foreach(var data in dataArray)
             {
                 await data.PerformUpdate(state =>
                 {
-                    this.logger.LogInformation("Setting from {Value} to {NewValue}.", state.Value, newValue);
+                    logger.LogInformation("Setting from {Value} to {NewValue}.", state.Value, newValue);
                     state.Value = newValue;
-                    this.logger.LogInformation("Set to {Value}.", state.Value);
+                    logger.LogInformation("Set to {Value}.", state.Value);
                 });
             }
         }
@@ -101,9 +101,9 @@ namespace Orleans.Transactions.TestKit
             {
                 result[i] = await dataArray[i].PerformUpdate(state =>
                 {
-                    this.logger.LogInformation("Adding {NumberToAdd} to value {Value}.", numberToAdd, state.Value);
+                    logger.LogInformation("Adding {NumberToAdd} to value {Value}.", numberToAdd, state.Value);
                     state.Value += numberToAdd;
-                    this.logger.LogInformation("Value after Adding {NumberToAdd} is {Value}.", numberToAdd, state.Value);
+                    logger.LogInformation("Value after Adding {NumberToAdd} is {Value}.", numberToAdd, state.Value);
                     return state.Value;
                 });
             }
@@ -117,7 +117,7 @@ namespace Orleans.Transactions.TestKit
             {
                 result[i] = await dataArray[i].PerformRead(state =>
                 {
-                    this.logger.LogInformation("Get {Value}.", state.Value);
+                    logger.LogInformation("Get {Value}.", state.Value);
                     return state.Value;
                 });
             }

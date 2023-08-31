@@ -52,23 +52,23 @@ namespace Orleans.Providers.Streams.Common
         public void TrackObjectAllocated()
         {
             long memoryAllocatedInByte = blockSizeInBytes;
-            this.blockPoolMonitor.TrackMemoryAllocated(memoryAllocatedInByte);
+            blockPoolMonitor.TrackMemoryAllocated(memoryAllocatedInByte);
         }
 
         /// <inheritdoc />
         public void TrackObjectReleased()
         {
             long memoryReleasedInByte = blockSizeInBytes;
-            this.blockPoolMonitor.TrackMemoryReleased(memoryReleasedInByte);
+            blockPoolMonitor.TrackMemoryReleased(memoryReleasedInByte);
         }
 
         /// <inheritdoc />
         public void Report(long totalObjects, long availableObjects, long claimedObjects)
         {
-            var totalMemoryInByte = totalObjects * this.blockSizeInBytes;
-            var availableMemoryInByte = availableObjects * this.blockSizeInBytes;
-            var claimedMemoryInByte = claimedObjects * this.blockSizeInBytes;
-            this.blockPoolMonitor.Report(totalMemoryInByte, availableMemoryInByte, claimedMemoryInByte);
+            var totalMemoryInByte = totalObjects * blockSizeInBytes;
+            var availableMemoryInByte = availableObjects * blockSizeInBytes;
+            var claimedMemoryInByte = claimedObjects * blockSizeInBytes;
+            blockPoolMonitor.Report(totalMemoryInByte, availableMemoryInByte, claimedMemoryInByte);
         }
     }
 }

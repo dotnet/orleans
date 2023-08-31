@@ -17,7 +17,7 @@ namespace Orleans.Runtime.Messaging
 
         public async Task OnStop(CancellationToken ct)
         {
-            await Task.Run(() => this.connectionManager.Close(ct));
+            await Task.Run(() => connectionManager.Close(ct));
         }
 
         public void Participate(TLifecycle lifecycle)

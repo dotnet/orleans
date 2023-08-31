@@ -39,13 +39,13 @@ namespace Orleans.Streaming.EventHubs.Testing
         /// <inheritdoc />
         public void StopProducingOnStream(StreamId streamId)
         {
-            (this.generator as IStreamDataGeneratingController)?.StopProducingOnStream(streamId);
+            (generator as IStreamDataGeneratingController)?.StopProducingOnStream(streamId);
         }
 
         /// <inheritdoc />
         public void ConfigureDataGeneratorForStream(StreamId streamId)
         {
-            (this.generator as IStreamDataGeneratingController)?.AddDataGeneratorForStream(streamId);
+            (generator as IStreamDataGeneratingController)?.AddDataGeneratorForStream(streamId);
         }
 
         /// <inheritdoc />

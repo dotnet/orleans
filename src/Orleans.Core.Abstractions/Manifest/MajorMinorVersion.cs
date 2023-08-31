@@ -49,7 +49,7 @@ namespace Orleans.Metadata
         public bool Equals(MajorMinorVersion other) => Major == other.Major && Minor == other.Minor;
 
         /// <inheritdoc />
-        public override bool Equals(object obj) => obj is MajorMinorVersion other && this.Equals(other);
+        public override bool Equals(object obj) => obj is MajorMinorVersion other && Equals(other);
 
         /// <inheritdoc />
         public override int GetHashCode() => HashCode.Combine(Major, Minor);

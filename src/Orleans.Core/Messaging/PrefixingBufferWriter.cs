@@ -71,7 +71,7 @@ namespace Orleans.Runtime.Messaging
                 ThrowPrefixSize();
             }
 
-            this.expectedPrefixSize = prefixSize;
+            expectedPrefixSize = prefixSize;
             this.payloadSizeHint = payloadSizeHint;
             this.memoryPool = memoryPool;
             static void ThrowPrefixSize() => throw new ArgumentOutOfRangeException(nameof(prefixSize));
@@ -138,23 +138,23 @@ namespace Orleans.Runtime.Messaging
         /// <param name="prefix">The prefix to write in. The length must match the one given in the constructor.</param>
         public void Complete(ReadOnlySpan<byte> prefix)
         {
-            if (prefix.Length != this.expectedPrefixSize)
+            if (prefix.Length != expectedPrefixSize)
             {
                 ThrowPrefixLength();
                 static void ThrowPrefixLength() => throw new ArgumentOutOfRangeException(nameof(prefix), "Prefix was not expected length.");
             }
 
-            if (this.prefixMemory.Length == 0)
+            if (prefixMemory.Length == 0)
             {
                 // No payload was actually written, and we never requested memory, so just write it out.
-                this.innerWriter.Write(prefix);
+                innerWriter.Write(prefix);
             }
             else
             {
                 // Payload has been written, so write in the prefix then commit the payload.
-                prefix.CopyTo(this.prefixMemory.Span);
-                this.innerWriter.Advance(prefix.Length + this.advanced);
-                if (this.privateWriter != null)
+                prefix.CopyTo(prefixMemory.Span);
+                innerWriter.Advance(prefix.Length + advanced);
+                if (privateWriter != null)
                     CompletePrivateWriter();
             }
         }
@@ -189,7 +189,7 @@ namespace Orleans.Runtime.Messaging
 
         public void Dispose()
         {
-            this.privateWriter?.Dispose();
+            privateWriter?.Dispose();
         }
 
         /// <summary>
@@ -268,54 +268,54 @@ namespace Orleans.Runtime.Messaging
             /// </summary>
             public void Dispose()
             {
-                var current = this.first;
+                var current = first;
                 while (current != null)
                 {
-                    current = this.RecycleAndGetNext(current);
+                    current = RecycleAndGetNext(current);
                 }
 
-                this.first = this.last = null;
+                first = last = null;
             }
 
             private Memory<byte> Append(int sizeHint)
             {
                 var array = memoryPool.Rent(Math.Min(sizeHint > 0 ? sizeHint : DefaultBufferSize, memoryPool.MaxBufferSize));
 
-                var segment = this.segmentPool.Count > 0 ? this.segmentPool.Pop() : new SequenceSegment();
+                var segment = segmentPool.Count > 0 ? segmentPool.Pop() : new SequenceSegment();
                 segment.SetMemory(array);
 
-                if (this.last == null)
+                if (last == null)
                 {
-                    this.first = this.last = segment;
+                    first = last = segment;
                 }
                 else
                 {
-                    if (this.last.Length > 0)
+                    if (last.Length > 0)
                     {
                         // Add a new block.
-                        this.last.SetNext(segment);
+                        last.SetNext(segment);
                     }
                     else
                     {
                         // The last block is completely unused. Replace it instead of appending to it.
-                        var current = this.first;
-                        if (this.first != this.last)
+                        var current = first;
+                        if (first != last)
                         {
-                            while (current.Next != this.last)
+                            while (current.Next != last)
                             {
                                 current = current.Next;
                             }
                         }
                         else
                         {
-                            this.first = segment;
+                            first = segment;
                         }
 
                         current.SetNext(segment);
-                        this.RecycleAndGetNext(this.last);
+                        RecycleAndGetNext(last);
                     }
 
-                    this.last = segment;
+                    last = segment;
                 }
 
                 return segment.AvailableMemory;
@@ -326,7 +326,7 @@ namespace Orleans.Runtime.Messaging
                 var recycledSegment = segment;
                 segment = segment.Next;
                 recycledSegment.ResetMemory();
-                this.segmentPool.Push(recycledSegment);
+                segmentPool.Push(recycledSegment);
                 return segment;
             }
 
@@ -358,7 +358,7 @@ namespace Orleans.Runtime.Messaging
 
                 internal Memory<byte> AvailableMemory;
 
-                internal int Length => this.End - this.Start;
+                internal int Length => End - Start;
 
                 internal new SequenceSegment Next
                 {
@@ -368,27 +368,27 @@ namespace Orleans.Runtime.Messaging
 
                 internal void SetMemory(IMemoryOwner<byte> memoryOwner)
                 {
-                    this.MemoryOwner = memoryOwner;
-                    this.AvailableMemory = memoryOwner.Memory;
+                    MemoryOwner = memoryOwner;
+                    AvailableMemory = memoryOwner.Memory;
                 }
 
                 internal void ResetMemory()
                 {
-                    this.MemoryOwner.Dispose();
-                    this.MemoryOwner = null;
-                    this.AvailableMemory = default;
+                    MemoryOwner.Dispose();
+                    MemoryOwner = null;
+                    AvailableMemory = default;
 
-                    this.Memory = default;
-                    this.Next = null;
-                    this.RunningIndex = 0;
-                    this.Start = 0;
-                    this.End = 0;
+                    Memory = default;
+                    Next = null;
+                    RunningIndex = 0;
+                    Start = 0;
+                    End = 0;
                 }
 
                 internal void SetNext(SequenceSegment segment)
                 {
-                    segment.RunningIndex = this.RunningIndex + this.End;
-                    this.Next = segment;
+                    segment.RunningIndex = RunningIndex + End;
+                    Next = segment;
                 }
 
                 public void Advance(int count)

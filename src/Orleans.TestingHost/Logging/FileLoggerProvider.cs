@@ -16,19 +16,19 @@ namespace Orleans.TestingHost.Logging
         /// <param name="filePath">The log file path.</param>
         public FileLoggerProvider(string filePath)
         {
-            this.output = new FileLoggingOutput(filePath);
+            output = new FileLoggingOutput(filePath);
         }
 
         /// <inheritdoc />
         public ILogger CreateLogger(string categoryName)
         {
-            return new FileLogger(this.output, categoryName);
+            return new FileLogger(output, categoryName);
         }
 
         /// <inheritdoc />
         public void Dispose()
         {
-            this.output.Dispose();
+            output.Dispose();
         }
     }
 

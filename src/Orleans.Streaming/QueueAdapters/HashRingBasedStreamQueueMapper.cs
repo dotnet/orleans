@@ -37,7 +37,7 @@ namespace Orleans.Streams
                 }
             }
 
-            this.hashRing = new(queueIds);
+            hashRing = new(queueIds);
         }
 
         /// <inheritdoc/>

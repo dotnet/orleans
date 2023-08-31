@@ -22,7 +22,7 @@ namespace Orleans.Runtime.Development
         /// <param name="grainFactory">The grain factory.</param>
         public InMemoryLeaseProvider(IGrainFactory grainFactory)
         {
-            this.leaseProvider = GetLeaseProviderGrain(grainFactory);
+            leaseProvider = GetLeaseProviderGrain(grainFactory);
         }
 
         /// <inheritdoc/>
@@ -30,7 +30,7 @@ namespace Orleans.Runtime.Development
         {
             try
             {
-                return await this.leaseProvider.Acquire(category, leaseRequests);
+                return await leaseProvider.Acquire(category, leaseRequests);
             } catch (Exception ex)
             {
                 return leaseRequests.Select(request => new AcquireLeaseResult(new AcquiredLease(request.ResourceKey), ResponseCode.TransientFailure, ex)).ToArray();
@@ -40,7 +40,7 @@ namespace Orleans.Runtime.Development
         /// <inheritdoc/>
         public Task Release(string category, AcquiredLease[] acquiredLeases)
         {
-            return this.leaseProvider.Release(category, acquiredLeases);
+            return leaseProvider.Release(category, acquiredLeases);
         }
 
         /// <inheritdoc/>
@@ -48,7 +48,7 @@ namespace Orleans.Runtime.Development
         {
             try
             {
-                return await this.leaseProvider.Renew(category, acquiredLeases);
+                return await leaseProvider.Renew(category, acquiredLeases);
             }
             catch (Exception ex)
             {
@@ -101,14 +101,14 @@ namespace Orleans.Runtime.Development
 
         public Task Reset()
         {
-            this.leases.Clear();
+            leases.Clear();
             return Task.CompletedTask;
         }
 
         private AcquireLeaseResult Acquire(string category, LeaseRequest leaseRequest)
         {
             DateTime now = DateTime.UtcNow;
-            Lease lease = this.leases.GetValueOrAddNew(Tuple.Create(category, leaseRequest.ResourceKey));
+            Lease lease = leases.GetValueOrAddNew(Tuple.Create(category, leaseRequest.ResourceKey));
             if(lease.ExpiredUtc < now)
             {
                 lease.ExpiredUtc = now + leaseRequest.Duration;
@@ -120,7 +120,7 @@ namespace Orleans.Runtime.Development
         private void Release(string category, AcquiredLease acquiredLease)
         {
             Tuple<string,string> leaseKey = Tuple.Create(category, acquiredLease.ResourceKey);
-            if (this.leases.TryGetValue(leaseKey, out Lease lease) && lease.Token == acquiredLease.Token)
+            if (leases.TryGetValue(leaseKey, out Lease lease) && lease.Token == acquiredLease.Token)
             {
                 leases.Remove(leaseKey);
             }
@@ -130,7 +130,7 @@ namespace Orleans.Runtime.Development
         {
             DateTime now = DateTime.UtcNow;
             // if lease exists, and we have the right token, and lease has not expired, renew.
-            if (!this.leases.TryGetValue(Tuple.Create(category, acquiredLease.ResourceKey), out Lease lease) || lease.Token != acquiredLease.Token)
+            if (!leases.TryGetValue(Tuple.Create(category, acquiredLease.ResourceKey), out Lease lease) || lease.Token != acquiredLease.Token)
             {
                 return new AcquireLeaseResult(new AcquiredLease(acquiredLease.ResourceKey), ResponseCode.InvalidToken, new OrleansException("Invalid token provided, caller is not the owner."));
             }

@@ -66,13 +66,13 @@ namespace UnitTests.StreamingTests
         [Fact, TestCategory("BVT"), TestCategory("Streaming")]
         public async Task ValidateGeneratedStreamsTest()
         {
-            this.fixture.Logger.LogInformation("************************ ValidateGeneratedStreamsTest *********************************");
+            fixture.Logger.LogInformation("************************ ValidateGeneratedStreamsTest *********************************");
             await TestingUtils.WaitUntilAsync(CheckCounters, Timeout);
         }
 
         private async Task<bool> CheckCounters(bool assertIsTrue)
         {
-            var reporter = this.fixture.GrainFactory.GetGrain<IGeneratedEventReporterGrain>(GeneratedStreamTestConstants.ReporterId);
+            var reporter = fixture.GrainFactory.GetGrain<IGeneratedEventReporterGrain>(GeneratedStreamTestConstants.ReporterId);
 
             var report = await reporter.GetReport(Fixture.StreamProviderName, Fixture.StreamNamespace);
             if (assertIsTrue)

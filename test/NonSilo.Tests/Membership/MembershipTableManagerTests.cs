@@ -30,18 +30,18 @@ namespace NonSilo.Tests.Membership
         public MembershipTableManagerTests(ITestOutputHelper output)
         {
             this.output = output;
-            this.loggerFactory = new LoggerFactory(new[] { new XunitLoggerProvider(this.output) });
+            loggerFactory = new LoggerFactory(new[] { new XunitLoggerProvider(this.output) });
 
-            this.localSiloDetails = Substitute.For<ILocalSiloDetails>();
-            this.localSilo = Silo("127.0.0.1:100@100");
-            this.localSiloDetails.SiloAddress.Returns(this.localSilo);
-            this.localSiloDetails.DnsHostName.Returns("MyServer11");
-            this.localSiloDetails.Name.Returns(Guid.NewGuid().ToString("N"));
+            localSiloDetails = Substitute.For<ILocalSiloDetails>();
+            localSilo = Silo("127.0.0.1:100@100");
+            localSiloDetails.SiloAddress.Returns(localSilo);
+            localSiloDetails.DnsHostName.Returns("MyServer11");
+            localSiloDetails.Name.Returns(Guid.NewGuid().ToString("N"));
 
-            this.fatalErrorHandler = Substitute.For<IFatalErrorHandler>();
-            this.fatalErrorHandler.IsUnexpected(default).ReturnsForAnyArgs(true);
-            this.membershipGossiper = Substitute.For<IMembershipGossiper>();
-            this.lifecycle = new SiloLifecycleSubject(this.loggerFactory.CreateLogger<SiloLifecycleSubject>());
+            fatalErrorHandler = Substitute.For<IFatalErrorHandler>();
+            fatalErrorHandler.IsUnexpected(default).ReturnsForAnyArgs(true);
+            membershipGossiper = Substitute.For<IMembershipGossiper>();
+            lifecycle = new SiloLifecycleSubject(loggerFactory.CreateLogger<SiloLifecycleSubject>());
         }
 
         /// <summary>
@@ -51,7 +51,7 @@ namespace NonSilo.Tests.Membership
         public async Task MembershipTableManager_NewCluster()
         {
             var membershipTable = new InMemoryMembershipTable(new TableVersion(123, "123"));
-            await this.BasicScenarioTest(membershipTable, gracefulShutdown: true);
+            await BasicScenarioTest(membershipTable, gracefulShutdown: true);
         }
 
         /// <summary>
@@ -70,7 +70,7 @@ namespace NonSilo.Tests.Membership
             };
             var membershipTable = new InMemoryMembershipTable(new TableVersion(123, "123"), otherSilos);
 
-            await this.BasicScenarioTest(membershipTable, gracefulShutdown: false);
+            await BasicScenarioTest(membershipTable, gracefulShutdown: false);
         }
 
         private async Task BasicScenarioTest(InMemoryMembershipTable membershipTable, bool gracefulShutdown = true)
@@ -92,23 +92,23 @@ namespace NonSilo.Tests.Membership
                 });
 
             var manager = new MembershipTableManager(
-                localSiloDetails: this.localSiloDetails,
+                localSiloDetails: localSiloDetails,
                 clusterMembershipOptions: Options.Create(new ClusterMembershipOptions()),
                 membershipTable: membershipTable,
-                fatalErrorHandler: this.fatalErrorHandler,
-                gossiper: this.membershipGossiper,
-                log: this.loggerFactory.CreateLogger<MembershipTableManager>(),
+                fatalErrorHandler: fatalErrorHandler,
+                gossiper: membershipGossiper,
+                log: loggerFactory.CreateLogger<MembershipTableManager>(),
                 timerFactory: timerFactory,
-                this.lifecycle);
+                lifecycle);
 
             // Validate that the initial snapshot is valid and contains the local silo.
             var initialSnapshot = manager.MembershipTableSnapshot;
             Assert.NotNull(initialSnapshot);
             Assert.NotNull(initialSnapshot.Entries);
-            var localSiloEntry = initialSnapshot.Entries[this.localSilo];
+            var localSiloEntry = initialSnapshot.Entries[localSilo];
             Assert.Equal(SiloStatus.Created, localSiloEntry.Status);
-            Assert.Equal(this.localSiloDetails.Name, localSiloEntry.SiloName);
-            Assert.Equal(this.localSiloDetails.DnsHostName, localSiloEntry.HostName);
+            Assert.Equal(localSiloDetails.Name, localSiloEntry.SiloName);
+            Assert.Equal(localSiloDetails.DnsHostName, localSiloEntry.HostName);
             Assert.Equal(SiloStatus.Created, manager.CurrentStatus);
 
             Assert.NotNull(manager.MembershipTableUpdates);
@@ -121,9 +121,9 @@ namespace NonSilo.Tests.Membership
             // All of these checks were performed before any lifecycle methods have a chance to run.
             // This is in order to verify that a service accessing membership in its constructor will
             // see the correct results regardless of initialization order.
-            ((ILifecycleParticipant<ISiloLifecycle>)manager).Participate(this.lifecycle);
+            ((ILifecycleParticipant<ISiloLifecycle>)manager).Participate(lifecycle);
 
-            await this.lifecycle.OnStart();
+            await lifecycle.OnStart();
 
             var calls = membershipTable.Calls;
             Assert.NotEmpty(calls);
@@ -138,11 +138,11 @@ namespace NonSilo.Tests.Membership
             var update1 = currentEnumerator.Current;
 
             // Transition to joining.
-            this.membershipGossiper.ClearReceivedCalls();
+            membershipGossiper.ClearReceivedCalls();
             await manager.UpdateStatus(SiloStatus.Joining);
-            await this.membershipGossiper.ReceivedWithAnyArgs().GossipToRemoteSilos(default, default, default, default);
+            await membershipGossiper.ReceivedWithAnyArgs().GossipToRemoteSilos(default, default, default, default);
             Assert.Equal(SiloStatus.Joining, manager.CurrentStatus);
-            localSiloEntry = manager.MembershipTableSnapshot.Entries[this.localSilo];
+            localSiloEntry = manager.MembershipTableSnapshot.Entries[localSilo];
             Assert.Equal(SiloStatus.Joining, localSiloEntry.Status);
 
             // An update should have been issued.
@@ -152,9 +152,9 @@ namespace NonSilo.Tests.Membership
 
             var update2 = currentEnumerator.Current;
             Assert.Equal(update2.Version, manager.MembershipTableSnapshot.Version);
-            var entry = Assert.Single(update2.Entries, e => e.Key.Equals(this.localSilo));
-            Assert.Equal(this.localSilo, entry.Key);
-            Assert.Equal(this.localSilo, entry.Value.SiloAddress);
+            var entry = Assert.Single(update2.Entries, e => e.Key.Equals(localSilo));
+            Assert.Equal(localSilo, entry.Key);
+            Assert.Equal(localSilo, entry.Value.SiloAddress);
             Assert.Equal(SiloStatus.Joining, entry.Value.Status);
 
             calls = membershipTable.Calls.Skip(2).ToList();
@@ -175,14 +175,14 @@ namespace NonSilo.Tests.Membership
             var cts = new CancellationTokenSource();
             if (!gracefulShutdown) cts.Cancel();
             Assert.Equal(0, timers.First().DisposedCounter);
-            var stopped = this.lifecycle.OnStop(cts.Token);
+            var stopped = lifecycle.OnStop(cts.Token);
 
             // Complete any timers that were waiting.
             while (timerCalls.TryDequeue(out var t)) t.Completion.TrySetResult(false);
 
             await stopped;
             Assert.Equal(1, timers.First().DisposedCounter);
-            this.fatalErrorHandler.DidNotReceiveWithAnyArgs().OnFatalException(default, default, default);
+            fatalErrorHandler.DidNotReceiveWithAnyArgs().OnFatalException(default, default, default);
         }
 
         /// <summary>
@@ -208,23 +208,23 @@ namespace NonSilo.Tests.Membership
             var membershipTable = new InMemoryMembershipTable(new TableVersion(123, "123"), otherSilos);
 
             var manager = new MembershipTableManager(
-                localSiloDetails: this.localSiloDetails,
+                localSiloDetails: localSiloDetails,
                 clusterMembershipOptions: Options.Create(new ClusterMembershipOptions()),
                 membershipTable: membershipTable,
-                fatalErrorHandler: this.fatalErrorHandler,
-                gossiper: this.membershipGossiper,
-                log: this.loggerFactory.CreateLogger<MembershipTableManager>(),
-                timerFactory: new AsyncTimerFactory(this.loggerFactory),
-                this.lifecycle);
+                fatalErrorHandler: fatalErrorHandler,
+                gossiper: membershipGossiper,
+                log: loggerFactory.CreateLogger<MembershipTableManager>(),
+                timerFactory: new AsyncTimerFactory(loggerFactory),
+                lifecycle);
 
             // Validate that the initial snapshot is valid and contains the local silo.
             var snapshot = manager.MembershipTableSnapshot;
             Assert.NotNull(snapshot);
             Assert.NotNull(snapshot.Entries);
-            var localSiloEntry = snapshot.Entries[this.localSilo];
+            var localSiloEntry = snapshot.Entries[localSilo];
             Assert.Equal(SiloStatus.Created, localSiloEntry.Status);
-            Assert.Equal(this.localSiloDetails.Name, localSiloEntry.SiloName);
-            Assert.Equal(this.localSiloDetails.DnsHostName, localSiloEntry.HostName);
+            Assert.Equal(localSiloDetails.Name, localSiloEntry.SiloName);
+            Assert.Equal(localSiloDetails.DnsHostName, localSiloEntry.HostName);
             Assert.Equal(SiloStatus.Created, manager.CurrentStatus);
 
             Assert.NotNull(manager.MembershipTableUpdates);
@@ -237,9 +237,9 @@ namespace NonSilo.Tests.Membership
             // All of these checks were performed before any lifecycle methods have a chance to run.
             // This is in order to verify that a service accessing membership in its constructor will
             // see the correct results regardless of initialization order.
-            ((ILifecycleParticipant<ISiloLifecycle>)manager).Participate(this.lifecycle);
+            ((ILifecycleParticipant<ISiloLifecycle>)manager).Participate(lifecycle);
 
-            await this.lifecycle.OnStart();
+            await lifecycle.OnStart();
 
             var calls = membershipTable.Calls;
             Assert.NotEmpty(calls);
@@ -267,9 +267,9 @@ namespace NonSilo.Tests.Membership
             var latest = membershipUpdates.Current;
             Assert.Equal(SiloStatus.Dead, latest.GetSiloStatus(predecessor.SiloAddress));
 
-            var entry = Assert.Single(latest.Entries, e => e.Key.Equals(this.localSilo));
-            Assert.Equal(this.localSilo, entry.Key);
-            Assert.Equal(this.localSilo, entry.Value.SiloAddress);
+            var entry = Assert.Single(latest.Entries, e => e.Key.Equals(localSilo));
+            Assert.Equal(localSilo, entry.Key);
+            Assert.Equal(localSilo, entry.Value.SiloAddress);
             Assert.Equal(SiloStatus.Joining, entry.Value.Status);
 
             calls = membershipTable.Calls.Skip(2).ToList();
@@ -277,8 +277,8 @@ namespace NonSilo.Tests.Membership
             Assert.Contains(calls, call => call.Method.Equals(nameof(IMembershipTable.InsertRow)));
             Assert.Contains(calls, call => call.Method.Equals(nameof(IMembershipTable.ReadAll)));
 
-            await this.lifecycle.OnStop();
-            this.fatalErrorHandler.DidNotReceiveWithAnyArgs().OnFatalException(default, default, default);
+            await lifecycle.OnStop();
+            fatalErrorHandler.DidNotReceiveWithAnyArgs().OnFatalException(default, default, default);
         }
 
         /// <summary>
@@ -302,25 +302,25 @@ namespace NonSilo.Tests.Membership
             var membershipTable = new InMemoryMembershipTable(new TableVersion(123, "123"), otherSilos);
 
             var manager = new MembershipTableManager(
-                localSiloDetails: this.localSiloDetails,
+                localSiloDetails: localSiloDetails,
                 clusterMembershipOptions: Options.Create(new ClusterMembershipOptions()),
                 membershipTable: membershipTable,
-                fatalErrorHandler: this.fatalErrorHandler,
-                gossiper: this.membershipGossiper,
-                log: this.loggerFactory.CreateLogger<MembershipTableManager>(),
-                timerFactory: new AsyncTimerFactory(this.loggerFactory),
-                this.lifecycle);
+                fatalErrorHandler: fatalErrorHandler,
+                gossiper: membershipGossiper,
+                log: loggerFactory.CreateLogger<MembershipTableManager>(),
+                timerFactory: new AsyncTimerFactory(loggerFactory),
+                lifecycle);
 
-            ((ILifecycleParticipant<ISiloLifecycle>)manager).Participate(this.lifecycle);
+            ((ILifecycleParticipant<ISiloLifecycle>)manager).Participate(lifecycle);
 
-            await this.lifecycle.OnStart();
+            await lifecycle.OnStart();
 
             // Silo should kill itself during the joining phase
             await manager.UpdateStatus(SiloStatus.Joining);
 
-            this.fatalErrorHandler.ReceivedWithAnyArgs().OnFatalException(default, default, default);
+            fatalErrorHandler.ReceivedWithAnyArgs().OnFatalException(default, default, default);
 
-            await this.lifecycle.OnStop();
+            await lifecycle.OnStop();
         }
 
         /// <summary>
@@ -334,7 +334,7 @@ namespace NonSilo.Tests.Membership
         {
             var otherSilos = new[]
             {
-                Entry(this.localSilo, SiloStatus.Dead),
+                Entry(localSilo, SiloStatus.Dead),
                 Entry(Silo("127.0.0.1:200@100"), SiloStatus.Active),
                 Entry(Silo("127.0.0.1:300@100"), SiloStatus.ShuttingDown),
                 Entry(Silo("127.0.0.1:400@100"), SiloStatus.Joining),
@@ -343,27 +343,27 @@ namespace NonSilo.Tests.Membership
             var membershipTable = new InMemoryMembershipTable(new TableVersion(123, "123"), otherSilos);
 
             var manager = new MembershipTableManager(
-                localSiloDetails: this.localSiloDetails,
+                localSiloDetails: localSiloDetails,
                 clusterMembershipOptions: Options.Create(new ClusterMembershipOptions()),
                 membershipTable: membershipTable,
-                fatalErrorHandler: this.fatalErrorHandler,
-                gossiper: this.membershipGossiper,
-                log: this.loggerFactory.CreateLogger<MembershipTableManager>(),
-                timerFactory: new AsyncTimerFactory(this.loggerFactory),
-                this.lifecycle);
+                fatalErrorHandler: fatalErrorHandler,
+                gossiper: membershipGossiper,
+                log: loggerFactory.CreateLogger<MembershipTableManager>(),
+                timerFactory: new AsyncTimerFactory(loggerFactory),
+                lifecycle);
 
-            ((ILifecycleParticipant<ISiloLifecycle>)manager).Participate(this.lifecycle);
+            ((ILifecycleParticipant<ISiloLifecycle>)manager).Participate(lifecycle);
 
-            await this.lifecycle.OnStart();
+            await lifecycle.OnStart();
 
             // Silo should kill itself during the joining phase
             await manager.UpdateStatus(SiloStatus.Joining);
 
-            this.fatalErrorHandler.ReceivedWithAnyArgs().OnFatalException(default, default, default);
+            fatalErrorHandler.ReceivedWithAnyArgs().OnFatalException(default, default, default);
 
             var cts = new CancellationTokenSource();
             cts.Cancel();
-            await this.lifecycle.OnStop(cts.Token);
+            await lifecycle.OnStop(cts.Token);
         }
 
         /// <summary>
@@ -380,36 +380,36 @@ namespace NonSilo.Tests.Membership
             var membershipTable = new InMemoryMembershipTable(new TableVersion(123, "123"), otherSilos);
 
             var manager = new MembershipTableManager(
-                localSiloDetails: this.localSiloDetails,
+                localSiloDetails: localSiloDetails,
                 clusterMembershipOptions: Options.Create(new ClusterMembershipOptions()),
                 membershipTable: membershipTable,
-                fatalErrorHandler: this.fatalErrorHandler,
-                gossiper: this.membershipGossiper,
-                log: this.loggerFactory.CreateLogger<MembershipTableManager>(),
-                timerFactory: new AsyncTimerFactory(this.loggerFactory),
-                siloLifecycle: this.lifecycle);
-            ((ILifecycleParticipant<ISiloLifecycle>)manager).Participate(this.lifecycle);
-            await this.lifecycle.OnStart();
+                fatalErrorHandler: fatalErrorHandler,
+                gossiper: membershipGossiper,
+                log: loggerFactory.CreateLogger<MembershipTableManager>(),
+                timerFactory: new AsyncTimerFactory(loggerFactory),
+                siloLifecycle: lifecycle);
+            ((ILifecycleParticipant<ISiloLifecycle>)manager).Participate(lifecycle);
+            await lifecycle.OnStart();
 
             // Silo should kill itself during the joining phase
             await manager.UpdateStatus(SiloStatus.Joining);
 
-            this.fatalErrorHandler.DidNotReceiveWithAnyArgs().OnFatalException(default, default, default);
+            fatalErrorHandler.DidNotReceiveWithAnyArgs().OnFatalException(default, default, default);
 
             // Mark the silo as dead
             while (true)
             {
                 var table = await membershipTable.ReadAll();
-                var row = table.Members.Single(e => e.Item1.SiloAddress.Equals(this.localSilo));
+                var row = table.Members.Single(e => e.Item1.SiloAddress.Equals(localSilo));
                 var entry = row.Item1.WithStatus(SiloStatus.Dead);
                 if (await membershipTable.UpdateRow(entry, row.Item2, table.Version.Next())) break;
             }
 
             // Refresh silo status and check that it determines it's dead.
             await manager.Refresh();
-            this.fatalErrorHandler.ReceivedWithAnyArgs().OnFatalException(default, default, default);
+            fatalErrorHandler.ReceivedWithAnyArgs().OnFatalException(default, default, default);
 
-            await this.lifecycle.OnStop();
+            await lifecycle.OnStop();
         }
 
         /// <summary>
@@ -425,30 +425,30 @@ namespace NonSilo.Tests.Membership
             var membershipTable = new InMemoryMembershipTable(new TableVersion(123, "123"), otherSilos);
 
             var manager = new MembershipTableManager(
-                localSiloDetails: this.localSiloDetails,
+                localSiloDetails: localSiloDetails,
                 clusterMembershipOptions: Options.Create(new ClusterMembershipOptions()),
                 membershipTable: membershipTable,
-                fatalErrorHandler: this.fatalErrorHandler,
-                gossiper: this.membershipGossiper,
-                log: this.loggerFactory.CreateLogger<MembershipTableManager>(),
-                timerFactory: new AsyncTimerFactory(this.loggerFactory),
-                siloLifecycle: this.lifecycle);
-            ((ILifecycleParticipant<ISiloLifecycle>)manager).Participate(this.lifecycle);
-            await this.lifecycle.OnStart();
+                fatalErrorHandler: fatalErrorHandler,
+                gossiper: membershipGossiper,
+                log: loggerFactory.CreateLogger<MembershipTableManager>(),
+                timerFactory: new AsyncTimerFactory(loggerFactory),
+                siloLifecycle: lifecycle);
+            ((ILifecycleParticipant<ISiloLifecycle>)manager).Participate(lifecycle);
+            await lifecycle.OnStart();
             await manager.UpdateStatus(SiloStatus.Active);
 
             // Mark the silo as dead
             while (true)
             {
                 var table = await membershipTable.ReadAll();
-                var row = table.Members.Single(e => e.Item1.SiloAddress.Equals(this.localSilo));
+                var row = table.Members.Single(e => e.Item1.SiloAddress.Equals(localSilo));
                 var entry = row.Item1.WithStatus(SiloStatus.Dead);
                 if (await membershipTable.UpdateRow(entry, row.Item2, table.Version.Next())) break;
             }
 
-            this.fatalErrorHandler.DidNotReceiveWithAnyArgs().OnFatalException(default, default, default);
+            fatalErrorHandler.DidNotReceiveWithAnyArgs().OnFatalException(default, default, default);
             await manager.TryToSuspectOrKill(otherSilos.First().SiloAddress);
-            this.fatalErrorHandler.ReceivedWithAnyArgs().OnFatalException(default, default, default);
+            fatalErrorHandler.ReceivedWithAnyArgs().OnFatalException(default, default, default);
         }
 
         /// <summary>
@@ -465,16 +465,16 @@ namespace NonSilo.Tests.Membership
             var membershipTable = new InMemoryMembershipTable(new TableVersion(123, "123"), otherSilos);
 
             var manager = new MembershipTableManager(
-                localSiloDetails: this.localSiloDetails,
+                localSiloDetails: localSiloDetails,
                 clusterMembershipOptions: Options.Create(new ClusterMembershipOptions()),
                 membershipTable: membershipTable,
-                fatalErrorHandler: this.fatalErrorHandler,
-                gossiper: this.membershipGossiper,
-                log: this.loggerFactory.CreateLogger<MembershipTableManager>(),
-                timerFactory: new AsyncTimerFactory(this.loggerFactory),
-                siloLifecycle: this.lifecycle);
-            ((ILifecycleParticipant<ISiloLifecycle>)manager).Participate(this.lifecycle);
-            await this.lifecycle.OnStart();
+                fatalErrorHandler: fatalErrorHandler,
+                gossiper: membershipGossiper,
+                log: loggerFactory.CreateLogger<MembershipTableManager>(),
+                timerFactory: new AsyncTimerFactory(loggerFactory),
+                siloLifecycle: lifecycle);
+            ((ILifecycleParticipant<ISiloLifecycle>)manager).Participate(lifecycle);
+            await lifecycle.OnStart();
             await manager.UpdateStatus(SiloStatus.Active);
 
             var victim = otherSilos.Last().SiloAddress;
@@ -496,16 +496,16 @@ namespace NonSilo.Tests.Membership
             var membershipTable = new InMemoryMembershipTable(new TableVersion(123, "123"), otherSilos);
 
             var manager = new MembershipTableManager(
-                localSiloDetails: this.localSiloDetails,
+                localSiloDetails: localSiloDetails,
                 clusterMembershipOptions: Options.Create(new ClusterMembershipOptions()),
                 membershipTable: membershipTable,
-                fatalErrorHandler: this.fatalErrorHandler,
-                gossiper: this.membershipGossiper,
-                log: this.loggerFactory.CreateLogger<MembershipTableManager>(),
-                timerFactory: new AsyncTimerFactory(this.loggerFactory),
-                siloLifecycle: this.lifecycle);
-            ((ILifecycleParticipant<ISiloLifecycle>)manager).Participate(this.lifecycle);
-            await this.lifecycle.OnStart();
+                fatalErrorHandler: fatalErrorHandler,
+                gossiper: membershipGossiper,
+                log: loggerFactory.CreateLogger<MembershipTableManager>(),
+                timerFactory: new AsyncTimerFactory(loggerFactory),
+                siloLifecycle: lifecycle);
+            ((ILifecycleParticipant<ISiloLifecycle>)manager).Participate(lifecycle);
+            await lifecycle.OnStart();
             await manager.UpdateStatus(SiloStatus.Active);
 
             var victim = otherSilos.First().SiloAddress;
@@ -536,21 +536,21 @@ namespace NonSilo.Tests.Membership
 
             var clusterMembershipOptions = new ClusterMembershipOptions();
             var manager = new MembershipTableManager(
-                localSiloDetails: this.localSiloDetails,
+                localSiloDetails: localSiloDetails,
                 clusterMembershipOptions: Options.Create(clusterMembershipOptions),
                 membershipTable: membershipTable,
-                fatalErrorHandler: this.fatalErrorHandler,
-                gossiper: this.membershipGossiper,
-                log: this.loggerFactory.CreateLogger<MembershipTableManager>(),
-                timerFactory: new AsyncTimerFactory(this.loggerFactory),
-                siloLifecycle: this.lifecycle);
+                fatalErrorHandler: fatalErrorHandler,
+                gossiper: membershipGossiper,
+                log: loggerFactory.CreateLogger<MembershipTableManager>(),
+                timerFactory: new AsyncTimerFactory(loggerFactory),
+                siloLifecycle: lifecycle);
 
             // Rig the local clock.
             var now = DateTime.UtcNow;
             manager.GetDateTimeUtcNow = () => now;
 
-            ((ILifecycleParticipant<ISiloLifecycle>)manager).Participate(this.lifecycle);
-            await this.lifecycle.OnStart();
+            ((ILifecycleParticipant<ISiloLifecycle>)manager).Participate(lifecycle);
+            await lifecycle.OnStart();
             await manager.UpdateStatus(SiloStatus.Active);
 
             // Add some suspect times. The time difference between them is larger than the recency window (DeathVoteExpirationTimeout),
@@ -580,9 +580,9 @@ namespace NonSilo.Tests.Membership
             // Check that:
             //   a) Adding our vote changes nothing, since our clock is too far behind
             //   b) The silo is not mistakenly declared dead, since the difference between the two votes is larger than DeathVoteExpirationTimeout.
-            this.fatalErrorHandler.DidNotReceiveWithAnyArgs().OnFatalException(default, default, default);
+            fatalErrorHandler.DidNotReceiveWithAnyArgs().OnFatalException(default, default, default);
             await manager.TryToSuspectOrKill(victim);
-            this.fatalErrorHandler.DidNotReceiveWithAnyArgs().OnFatalException(default, default, default);
+            fatalErrorHandler.DidNotReceiveWithAnyArgs().OnFatalException(default, default, default);
 
             // The victim should be alive as no second vote fell within the recency window of the latest vote.
             await manager.Refresh();
@@ -609,16 +609,16 @@ namespace NonSilo.Tests.Membership
             var membershipTable = new InMemoryMembershipTable(new TableVersion(123, "123"), otherSilos);
 
             var manager = new MembershipTableManager(
-                localSiloDetails: this.localSiloDetails,
+                localSiloDetails: localSiloDetails,
                 clusterMembershipOptions: Options.Create(new ClusterMembershipOptions()),
                 membershipTable: membershipTable,
-                fatalErrorHandler: this.fatalErrorHandler,
-                gossiper: this.membershipGossiper,
-                log: this.loggerFactory.CreateLogger<MembershipTableManager>(),
-                timerFactory: new AsyncTimerFactory(this.loggerFactory),
-                siloLifecycle: this.lifecycle);
-            ((ILifecycleParticipant<ISiloLifecycle>)manager).Participate(this.lifecycle);
-            await this.lifecycle.OnStart();
+                fatalErrorHandler: fatalErrorHandler,
+                gossiper: membershipGossiper,
+                log: loggerFactory.CreateLogger<MembershipTableManager>(),
+                timerFactory: new AsyncTimerFactory(loggerFactory),
+                siloLifecycle: lifecycle);
+            ((ILifecycleParticipant<ISiloLifecycle>)manager).Participate(lifecycle);
+            await lifecycle.OnStart();
             await manager.UpdateStatus(SiloStatus.Active);
 
             // Try to declare an unknown silo dead
@@ -659,9 +659,9 @@ namespace NonSilo.Tests.Membership
                 if (await membershipTable.UpdateRow(entry, row.Item2, table.Version.Next())) break;
             }
 
-            this.fatalErrorHandler.DidNotReceiveWithAnyArgs().OnFatalException(default, default, default);
+            fatalErrorHandler.DidNotReceiveWithAnyArgs().OnFatalException(default, default, default);
             await manager.TryToSuspectOrKill(victim);
-            this.fatalErrorHandler.ReceivedWithAnyArgs().OnFatalException(default, default, default);
+            fatalErrorHandler.ReceivedWithAnyArgs().OnFatalException(default, default, default);
 
             // We killed ourselves and should not have marked the other silo as dead.
             await manager.Refresh();
@@ -697,16 +697,16 @@ namespace NonSilo.Tests.Membership
             var membershipTable = new InMemoryMembershipTable(new TableVersion(123, "123"), otherSilos);
 
             var manager = new MembershipTableManager(
-                localSiloDetails: this.localSiloDetails,
+                localSiloDetails: localSiloDetails,
                 clusterMembershipOptions: Options.Create(new ClusterMembershipOptions()),
                 membershipTable: membershipTable,
-                fatalErrorHandler: this.fatalErrorHandler,
-                gossiper: this.membershipGossiper,
-                log: this.loggerFactory.CreateLogger<MembershipTableManager>(),
+                fatalErrorHandler: fatalErrorHandler,
+                gossiper: membershipGossiper,
+                log: loggerFactory.CreateLogger<MembershipTableManager>(),
                 timerFactory: timerFactory,
-                siloLifecycle: this.lifecycle);
-            ((ILifecycleParticipant<ISiloLifecycle>)manager).Participate(this.lifecycle);
-            await this.lifecycle.OnStart();
+                siloLifecycle: lifecycle);
+            ((ILifecycleParticipant<ISiloLifecycle>)manager).Participate(lifecycle);
+            await lifecycle.OnStart();
             
             // Test that retries occur after an exception.
             (TimeSpan? DelayOverride, TaskCompletionSource<bool> Completion) timer = (default, default);
@@ -714,7 +714,7 @@ namespace NonSilo.Tests.Membership
             var counter = 0;
             membershipTable.OnReadAll = () => { if (counter++ == 0) throw new Exception("no"); };
             timer.Completion.TrySetResult(true);
-            this.fatalErrorHandler.DidNotReceiveWithAnyArgs().OnFatalException(default, default, default);
+            fatalErrorHandler.DidNotReceiveWithAnyArgs().OnFatalException(default, default, default);
 
             // A shorter delay should be provided after a transient failure.
             while (!timerCalls.TryDequeue(out timer)) await Task.Delay(10);
@@ -730,9 +730,9 @@ namespace NonSilo.Tests.Membership
             // If for some reason the timer itself fails (or something else), the silo should crash
             while (!timerCalls.TryDequeue(out timer)) await Task.Delay(10);
             timer.Completion.TrySetException(new Exception("no again"));
-            this.fatalErrorHandler.ReceivedWithAnyArgs().OnFatalException(default, default, default);
+            fatalErrorHandler.ReceivedWithAnyArgs().OnFatalException(default, default, default);
             Assert.False(timerCalls.TryDequeue(out timer));
-            await this.lifecycle.OnStop();
+            await lifecycle.OnStop();
         }
 
         private static SiloAddress Silo(string value) => SiloAddress.FromParsableString(value);

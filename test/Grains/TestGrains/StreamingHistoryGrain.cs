@@ -12,14 +12,14 @@ namespace UnitTests.Grains
         public async Task BecomeConsumer(StreamId streamId, string provider, string filterData = null)
         {
             var stream = this.GetStreamProvider(provider).GetStream<int>(streamId);
-            this.subscriptionHandles.Add(await stream.SubscribeAsync(this, null, filterData));
+            subscriptionHandles.Add(await stream.SubscribeAsync(this, null, filterData));
         }
 
-        public Task<List<int>> GetReceivedItems() => Task.FromResult(this.receivedItems);
+        public Task<List<int>> GetReceivedItems() => Task.FromResult(receivedItems);
 
         public async Task StopBeingConsumer()
         {
-            foreach (var sub in this.subscriptionHandles)
+            foreach (var sub in subscriptionHandles)
             {
                 await sub.UnsubscribeAsync();
             }
@@ -31,7 +31,7 @@ namespace UnitTests.Grains
 
         public Task OnNextAsync(int item, StreamSequenceToken token = null)
         {
-            this.receivedItems.Add(item);
+            receivedItems.Add(item);
             return Task.CompletedTask;
         }
     }

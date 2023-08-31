@@ -32,7 +32,7 @@ namespace NonSilo.Tests.Membership
         {
             get
             {
-                lock (this.tableLock) return new List<(string, object)>(this.calls);
+                lock (tableLock) return new List<(string, object)>(calls);
             }
         }
 
@@ -40,25 +40,25 @@ namespace NonSilo.Tests.Membership
 
         public void ClearCalls()
         {
-            lock (this.tableLock) this.calls.Clear();
+            lock (tableLock) calls.Clear();
         }
 
         public void Reset()
         {
-            lock (this.tableLock)
+            lock (tableLock)
             {
-                this.entries = ImmutableList<(MembershipEntry, string)>.Empty;
-                this.version = this.version.Next();
+                entries = ImmutableList<(MembershipEntry, string)>.Empty;
+                version = version.Next();
             }
         }
 
         public Task CleanupDefunctSiloEntries(DateTimeOffset beforeDate)
         {
-            lock (this.tableLock)
+            lock (tableLock)
             {
-                this.calls.Add((nameof(CleanupDefunctSiloEntries), beforeDate));
+                calls.Add((nameof(CleanupDefunctSiloEntries), beforeDate));
                 var newEntries = ImmutableList.CreateBuilder<(MembershipEntry, string)>();
-                foreach (var (entry, etag) in this.entries)
+                foreach (var (entry, etag) in entries)
                 {
                     if (entry.Status == SiloStatus.Dead
                         && new DateTime(Math.Max(entry.IAmAliveTime.Ticks, entry.StartTime.Ticks), DateTimeKind.Utc) < beforeDate)
@@ -69,7 +69,7 @@ namespace NonSilo.Tests.Membership
                     newEntries.Add((entry, etag));
                 }
 
-                this.entries = newEntries.ToImmutable();
+                entries = newEntries.ToImmutable();
             }
 
             return Task.CompletedTask;
@@ -77,9 +77,9 @@ namespace NonSilo.Tests.Membership
 
         public Task DeleteMembershipTableEntries(string clusterId)
         {
-            lock (this.tableLock)
+            lock (tableLock)
             {
-                this.calls.Add((nameof(DeleteMembershipTableEntries), clusterId));
+                calls.Add((nameof(DeleteMembershipTableEntries), clusterId));
             }
 
             return Task.CompletedTask;
@@ -87,9 +87,9 @@ namespace NonSilo.Tests.Membership
 
         public Task InitializeMembershipTable(bool tryInitTableVersion)
         {
-            lock (this.tableLock)
+            lock (tableLock)
             {
-                this.calls.Add((nameof(InitializeMembershipTable), tryInitTableVersion));
+                calls.Add((nameof(InitializeMembershipTable), tryInitTableVersion));
             }
 
             return Task.CompletedTask;
@@ -97,18 +97,18 @@ namespace NonSilo.Tests.Membership
 
         public Task<bool> InsertRow(MembershipEntry entry, TableVersion tableVersion)
         {
-            lock (this.tableLock)
+            lock (tableLock)
             {
-                this.calls.Add((nameof(InsertRow), (entry, tableVersion)));
-                this.ValidateVersion(tableVersion);
+                calls.Add((nameof(InsertRow), (entry, tableVersion)));
+                ValidateVersion(tableVersion);
 
-                if (this.entries.Any(e => e.Item1.SiloAddress.Equals(entry.SiloAddress)))
+                if (entries.Any(e => e.Item1.SiloAddress.Equals(entry.SiloAddress)))
                 {
                     return Task.FromResult(false);
                 }
 
-                this.version = new TableVersion(tableVersion.Version, tableVersion.Version.ToString());
-                this.entries = this.entries.Add((entry, this.version.VersionEtag));
+                version = new TableVersion(tableVersion.Version, tableVersion.Version.ToString());
+                entries = entries.Add((entry, version.VersionEtag));
 
                 return Task.FromResult(true);
             }
@@ -116,49 +116,49 @@ namespace NonSilo.Tests.Membership
 
         public Task<MembershipTableData> ReadAll()
         {
-            this.OnReadAll?.Invoke();
-            lock (this.tableLock)
+            OnReadAll?.Invoke();
+            lock (tableLock)
             {
-                this.calls.Add((nameof(ReadAll), null));
+                calls.Add((nameof(ReadAll), null));
                 var result = new MembershipTableData(
-                    this.entries.Select(e => Tuple.Create(e.Item1, e.Item2)).ToList(),
-                    this.version);
+                    entries.Select(e => Tuple.Create(e.Item1, e.Item2)).ToList(),
+                    version);
                 return Task.FromResult(result);
             }
         }
 
         public Task<MembershipTableData> ReadRow(SiloAddress key)
         {
-            lock (this.tableLock)
+            lock (tableLock)
             {
-                this.calls.Add((nameof(ReadRow), key));
+                calls.Add((nameof(ReadRow), key));
                 var result = new MembershipTableData(
-                    this.entries.Where(e => e.Item1.SiloAddress.Equals(key)).Select(e => Tuple.Create(e.Item1, e.Item2)).ToList(),
-                    this.version);
+                    entries.Where(e => e.Item1.SiloAddress.Equals(key)).Select(e => Tuple.Create(e.Item1, e.Item2)).ToList(),
+                    version);
                 return Task.FromResult(result);
             }
         }
 
         public Task UpdateIAmAlive(MembershipEntry entry)
         {
-            lock (this.tableLock)
+            lock (tableLock)
             {
-                this.calls.Add((nameof(UpdateIAmAlive), entry));
-                var existingEntry = this.entries.Single(e => e.Item1.SiloAddress.Equals(entry.SiloAddress));
+                calls.Add((nameof(UpdateIAmAlive), entry));
+                var existingEntry = entries.Single(e => e.Item1.SiloAddress.Equals(entry.SiloAddress));
                 var replacement = existingEntry.Item1.Copy();
                 replacement.IAmAliveTime = entry.IAmAliveTime;
-                this.entries = this.entries.Replace(existingEntry, (replacement, Guid.NewGuid().ToString()));
+                entries = entries.Replace(existingEntry, (replacement, Guid.NewGuid().ToString()));
                 return Task.CompletedTask;
             }
         }
 
         public Task<bool> UpdateRow(MembershipEntry entry, string etag, TableVersion tableVersion)
         {
-            lock (this.tableLock)
+            lock (tableLock)
             {
-                this.calls.Add((nameof(UpdateRow), (entry, etag, tableVersion)));
-                this.ValidateVersion(tableVersion);
-                var existingEntry = this.entries.FirstOrDefault(e => e.Item1.SiloAddress.Equals(entry.SiloAddress));
+                calls.Add((nameof(UpdateRow), (entry, etag, tableVersion)));
+                ValidateVersion(tableVersion);
+                var existingEntry = entries.FirstOrDefault(e => e.Item1.SiloAddress.Equals(entry.SiloAddress));
                 if (existingEntry.Item1 is null) return Task.FromResult(false);
 
                 if (!etag.Equals(existingEntry.Item2))
@@ -166,22 +166,22 @@ namespace NonSilo.Tests.Membership
                     throw new InvalidOperationException($"Mismatching row etag. Required: {existingEntry.Item2}, Provided: {etag}");
                 }
 
-                this.version = new TableVersion(tableVersion.Version, tableVersion.Version.ToString());
-                this.entries = this.entries.Replace(existingEntry, (entry, this.version.VersionEtag));
+                version = new TableVersion(tableVersion.Version, tableVersion.Version.ToString());
+                entries = entries.Replace(existingEntry, (entry, version.VersionEtag));
                 return Task.FromResult(true);
             }
         }
 
         private void ValidateVersion(TableVersion tableVersion)
         {
-            lock (this.tableLock)
+            lock (tableLock)
             {
-                if (this.version.VersionEtag != tableVersion.VersionEtag)
+                if (version.VersionEtag != tableVersion.VersionEtag)
                 {
                     throw new InvalidOperationException("Etag mismatch");
                 }
 
-                if (this.version.Version >= tableVersion.Version)
+                if (version.Version >= tableVersion.Version)
                 {
                     throw new InvalidOperationException("Version must increase on update");
                 }

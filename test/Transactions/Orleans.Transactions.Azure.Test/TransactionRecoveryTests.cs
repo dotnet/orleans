@@ -17,14 +17,14 @@ namespace Orleans.Transactions.AzureStorage.Tests
 
         public TransactionRecoveryTests(ITestOutputHelper helper)
         {
-            this.EnsurePreconditionsMet();
+            EnsurePreconditionsMet();
             this.helper = helper;
         }
 
         public override async Task InitializeAsync()
         {
             await base.InitializeAsync();
-            this.testRunner = new TransactionRecoveryTestsRunnerxUnit(this.HostedCluster, helper);
+            testRunner = new TransactionRecoveryTestsRunnerxUnit(HostedCluster, helper);
         }
 
         protected override void CheckPreconditionsOrThrow()
@@ -46,7 +46,7 @@ namespace Orleans.Transactions.AzureStorage.Tests
         [InlineData(TransactionTestConstants.DoubleStateTransactionalGrain, 20)]
         public Task TransactionWillRecoverAfterRandomSiloGracefulShutdown(string transactionTestGrainClassName, int concurrent)
         {
-            return this.testRunner.TransactionWillRecoverAfterRandomSiloGracefulShutdown(transactionTestGrainClassName, concurrent);
+            return testRunner.TransactionWillRecoverAfterRandomSiloGracefulShutdown(transactionTestGrainClassName, concurrent);
         }
 
         [SkippableTheory]
@@ -54,7 +54,7 @@ namespace Orleans.Transactions.AzureStorage.Tests
         [InlineData(TransactionTestConstants.DoubleStateTransactionalGrain, 20)]
         public Task TransactionWillRecoverAfterRandomSiloUnGracefulShutdown(string transactionTestGrainClassName, int concurrent)
         {
-            return this.testRunner.TransactionWillRecoverAfterRandomSiloUnGracefulShutdown(transactionTestGrainClassName, concurrent);
+            return testRunner.TransactionWillRecoverAfterRandomSiloUnGracefulShutdown(transactionTestGrainClassName, concurrent);
         }
 
         private class SiloBuilderConfiguratorUsingAzureClustering : ISiloConfigurator

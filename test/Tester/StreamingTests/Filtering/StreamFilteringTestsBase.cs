@@ -66,8 +66,8 @@ namespace Tester.StreamingTests.Filtering
     public abstract class StreamFilteringTestsBase : OrleansTestingBase
     {
         protected readonly BaseTestClusterFixture fixture;
-        private IClusterClient clusterClient => this.fixture.Client;
-        private CustomStreamFilter streamFilter => this.fixture.HostedCluster.ServiceProvider.GetServiceByName<IStreamFilter>(ProviderName) as CustomStreamFilter;
+        private IClusterClient clusterClient => fixture.Client;
+        private CustomStreamFilter streamFilter => fixture.HostedCluster.ServiceProvider.GetServiceByName<IStreamFilter>(ProviderName) as CustomStreamFilter;
 
         protected ILogger logger => fixture.Logger;
 
@@ -86,13 +86,13 @@ namespace Tester.StreamingTests.Filtering
 
             const int numberOfEvents = 10;
             var streamId = StreamId.Create("IgnoreBadFilter", "my-stream");
-            var grain = this.clusterClient.GetGrain<IStreamingHistoryGrain>("IgnoreBadFilter");
+            var grain = clusterClient.GetGrain<IStreamingHistoryGrain>("IgnoreBadFilter");
 
             try
             {
                 await grain.BecomeConsumer(streamId, ProviderName, "throw");
 
-                var stream = this.clusterClient.GetStreamProvider(ProviderName).GetStream<int>(streamId);
+                var stream = clusterClient.GetStreamProvider(ProviderName).GetStream<int>(streamId);
 
                 for (var i = 0; i < numberOfEvents; i++)
                 {
@@ -121,13 +121,13 @@ namespace Tester.StreamingTests.Filtering
 
             const int numberOfEvents = 10;
             var streamId = StreamId.Create("OnlyEvenItems", "my-stream");
-            var grain = this.clusterClient.GetGrain<IStreamingHistoryGrain>("OnlyEvenItems");
+            var grain = clusterClient.GetGrain<IStreamingHistoryGrain>("OnlyEvenItems");
 
             try
             {
                 await grain.BecomeConsumer(streamId, ProviderName, "even");
 
-                var stream = this.clusterClient.GetStreamProvider(ProviderName).GetStream<int>(streamId);
+                var stream = clusterClient.GetStreamProvider(ProviderName).GetStream<int>(streamId);
 
                 for (var i = 0; i < numberOfEvents; i++)
                 {
@@ -160,14 +160,14 @@ namespace Tester.StreamingTests.Filtering
 
             const int numberOfEvents = 10;
             var streamId = StreamId.Create("MultipleSubscriptionsDifferentFilterData", "my-stream");
-            var grain = this.clusterClient.GetGrain<IStreamingHistoryGrain>("MultipleSubscriptionsDifferentFilterData");
+            var grain = clusterClient.GetGrain<IStreamingHistoryGrain>("MultipleSubscriptionsDifferentFilterData");
 
             try
             {
                 await grain.BecomeConsumer(streamId, ProviderName, "only3");
                 await grain.BecomeConsumer(streamId, ProviderName, "only7");
 
-                var stream = this.clusterClient.GetStreamProvider(ProviderName).GetStream<int>(streamId);
+                var stream = clusterClient.GetStreamProvider(ProviderName).GetStream<int>(streamId);
 
                 for (var i = 0; i < numberOfEvents; i++)
                 {
@@ -191,7 +191,7 @@ namespace Tester.StreamingTests.Filtering
 
         private void EnsureStreamFilterIsRegistered()
         {
-            if (this.streamFilter == null)
+            if (streamFilter == null)
             {
                 throw new XunitException("CustomStreamFilter not registered as a filter!");
             }

@@ -26,7 +26,7 @@ namespace Tester.AzureUtils
 
             public void Dispose()
             {
-                this.LoggerFactory.Dispose();
+                LoggerFactory.Dispose();
             }
         }
 
@@ -41,15 +41,15 @@ namespace Tester.AzureUtils
         {
             TestUtils.CheckForAzureStorage();
             this.output = output;
-            this.clusterId = "test-" + Guid.NewGuid();
+            clusterId = "test-" + Guid.NewGuid();
             generation = SiloAddress.AllocateNewGeneration();
             siloAddress = SiloAddressUtils.NewLocalSiloAddress(generation);
 
-            output.WriteLine("ClusterId={0} Generation={1}", this.clusterId, generation);
+            output.WriteLine("ClusterId={0} Generation={1}", clusterId, generation);
 
             output.WriteLine("Initializing SiloInstanceManager");
             manager = OrleansSiloInstanceManager.GetManager(
-                this.clusterId,
+                clusterId,
                 fixture.LoggerFactory,
                 new AzureStorageClusteringOptions { TableName = new AzureStorageClusteringOptions().TableName }.ConfigureTestDefaults())
                 .WaitForResultWithThrow(SiloInstanceTableTestConstants.Timeout);
@@ -64,7 +64,7 @@ namespace Tester.AzureUtils
 
                 output.WriteLine("TestCleanup Timeout={0}", timeout);
 
-                manager.DeleteTableEntries(this.clusterId).WaitWithThrow(timeout);
+                manager.DeleteTableEntries(clusterId).WaitWithThrow(timeout);
 
                 output.WriteLine("TestCleanup -  Finished");
                 manager = null;
@@ -98,7 +98,7 @@ namespace Tester.AzureUtils
         {
             // Register a silo entry
             await manager.TryCreateTableVersionEntryAsync();
-            this.generation = 0;
+            generation = 0;
             RegisterSiloInstance();
             // and mark it as dead
             await manager.UnregisterSiloInstance(myEntry);
@@ -106,8 +106,8 @@ namespace Tester.AzureUtils
             // Create new active entries
             for (int i = 1; i < 5; i++)
             {
-                this.generation = i;
-                this.siloAddress = SiloAddressUtils.NewLocalSiloAddress(generation);
+                generation = i;
+                siloAddress = SiloAddressUtils.NewLocalSiloAddress(generation);
                 var instance = RegisterSiloInstance();
                 await manager.ActivateSiloInstance(instance);
             }
@@ -235,7 +235,7 @@ namespace Tester.AzureUtils
 
         private SiloInstanceTableEntry RegisterSiloInstance()
         {
-            string partitionKey = this.clusterId;
+            string partitionKey = clusterId;
             string rowKey = SiloInstanceTableEntry.ConstructRowKey(siloAddress);
 
             IPEndPoint myEndpoint = siloAddress.Endpoint;
@@ -245,7 +245,7 @@ namespace Tester.AzureUtils
                 PartitionKey = partitionKey,
                 RowKey = rowKey,
 
-                DeploymentId = this.clusterId,
+                DeploymentId = clusterId,
                 Address = myEndpoint.Address.ToString(),
                 Port = myEndpoint.Port.ToString(CultureInfo.InvariantCulture),
                 Generation = generation.ToString(CultureInfo.InvariantCulture),
@@ -268,7 +268,7 @@ namespace Tester.AzureUtils
 
         private async Task<(SiloInstanceTableEntry Entity, string ETag)> FindSiloEntry(SiloAddress siloAddr)
         {
-            string partitionKey = this.clusterId;
+            string partitionKey = clusterId;
             string rowKey = SiloInstanceTableEntry.ConstructRowKey(siloAddr);
 
             output.WriteLine("FindSiloEntry for SiloAddress={0} PartitionKey={1} RowKey={2}", siloAddr, partitionKey, rowKey);

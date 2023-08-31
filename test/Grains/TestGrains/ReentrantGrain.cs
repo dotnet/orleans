@@ -37,7 +37,7 @@ namespace UnitTests.Grains
 
         public NonRentrantGrain(ILoggerFactory loggerFactory)
         {
-            this.logger = loggerFactory.CreateLogger($"{this.GetType().Name}-{this.IdentityString}");
+            logger = loggerFactory.CreateLogger($"{GetType().Name}-{IdentityString}");
         }
 
         public override Task OnActivateAsync(CancellationToken cancellationToken)
@@ -78,7 +78,7 @@ namespace UnitTests.Grains
 
         public MayInterleaveStaticPredicateGrain(ILoggerFactory loggerFactory)
         {
-            this.logger = loggerFactory.CreateLogger($"{this.GetType().Name}-{this.IdentityString}");
+            logger = loggerFactory.CreateLogger($"{GetType().Name}-{IdentityString}");
         }
 
         public static bool MayInterleave(IInvokable req)
@@ -162,7 +162,7 @@ namespace UnitTests.Grains
 
         public MayInterleaveInstancedPredicateGrain(ILoggerFactory loggerFactory)
         {
-            this.logger = loggerFactory.CreateLogger($"{this.GetType().Name}-{this.IdentityString}");
+            logger = loggerFactory.CreateLogger($"{GetType().Name}-{IdentityString}");
         }
 
         public bool MayInterleave(IInvokable req)
@@ -267,7 +267,7 @@ namespace UnitTests.Grains
 
         public ReentrantSelfManagedGrain1(ILoggerFactory loggerFactory)
         {
-            this.logger = loggerFactory.CreateLogger($"{this.GetType().Name}-{this.IdentityString}");
+            logger = loggerFactory.CreateLogger($"{GetType().Name}-{IdentityString}");
         }
 
         public override Task OnActivateAsync(CancellationToken cancellationToken)
@@ -314,7 +314,7 @@ namespace UnitTests.Grains
 
         public NonReentrantSelfManagedGrain1(ILoggerFactory loggerFactory)
         {
-            this.logger = loggerFactory.CreateLogger($"{this.GetType().Name}-{this.IdentityString}");
+            logger = loggerFactory.CreateLogger($"{GetType().Name}-{IdentityString}");
         }
 
         public override Task OnActivateAsync(CancellationToken cancellationToken)
@@ -362,7 +362,7 @@ namespace UnitTests.Grains
 
         public FanOutGrain(ILoggerFactory loggerFactory)
         {
-            this.logger = loggerFactory.CreateLogger($"{this.GetType().Name}-{this.IdentityString}");
+            logger = loggerFactory.CreateLogger($"{GetType().Name}-{IdentityString}");
         }
 
         public override Task OnActivateAsync(CancellationToken cancellationToken)
@@ -482,7 +482,7 @@ namespace UnitTests.Grains
 
         public FanOutACGrain(ILoggerFactory loggerFactory)
         {
-            this.logger = loggerFactory.CreateLogger($"{this.GetType().Name}-{this.IdentityString}");
+            logger = loggerFactory.CreateLogger($"{GetType().Name}-{IdentityString}");
         }
 
         public override Task OnActivateAsync(CancellationToken cancellationToken)
@@ -600,7 +600,7 @@ namespace UnitTests.Grains
 
         public ReentrantTaskGrain(ILoggerFactory loggerFactory)
         {
-            this.logger = loggerFactory.CreateLogger($"{this.GetType().Name}-{this.IdentityString}");
+            logger = loggerFactory.CreateLogger($"{GetType().Name}-{IdentityString}");
         }
 
         public override Task OnActivateAsync(CancellationToken cancellationToken)
@@ -638,7 +638,7 @@ namespace UnitTests.Grains
 
         public NonReentrantTaskGrain(ILoggerFactory loggerFactory)
         {
-            this.logger = loggerFactory.CreateLogger($"{this.GetType().Name}-{this.IdentityString}");
+            logger = loggerFactory.CreateLogger($"{GetType().Name}-{IdentityString}");
         }
 
         public override Task OnActivateAsync(CancellationToken cancellationToken)

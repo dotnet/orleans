@@ -73,7 +73,7 @@ namespace DependencyInjection.Tests.Autofac
         [Fact]
         public async Task ClusterStart()
         {
-            var grain = this.fixture.Client.GetGrain<ISimpleGrain>(0);
+            var grain = fixture.Client.GetGrain<ISimpleGrain>(0);
             await grain.IncrementA();
         }
     }

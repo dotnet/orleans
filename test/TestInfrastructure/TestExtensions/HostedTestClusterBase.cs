@@ -13,16 +13,16 @@ namespace TestExtensions
     public abstract class HostedTestClusterEnsureDefaultStarted : OrleansTestingBase
     {
         protected DefaultClusterFixture Fixture { get; private set; }
-        protected TestCluster HostedCluster => this.Fixture.HostedCluster;
+        protected TestCluster HostedCluster => Fixture.HostedCluster;
 
-        protected IGrainFactory GrainFactory => this.HostedCluster.GrainFactory;
+        protected IGrainFactory GrainFactory => HostedCluster.GrainFactory;
 
-        protected IClusterClient Client => this.HostedCluster.Client;
-        protected ILogger Logger => this.Client.ServiceProvider.GetRequiredService<ILoggerFactory>().CreateLogger("Application");
+        protected IClusterClient Client => HostedCluster.Client;
+        protected ILogger Logger => Client.ServiceProvider.GetRequiredService<ILoggerFactory>().CreateLogger("Application");
 
         protected HostedTestClusterEnsureDefaultStarted(DefaultClusterFixture fixture)
         {
-            this.Fixture = fixture;
+            Fixture = fixture;
         }
     }
 

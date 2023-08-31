@@ -63,6 +63,6 @@ namespace Orleans.Streams
             return allStreams.Select(kv => kv.Key).ToList();
         }
 
-        public async ValueTask DisposeAsync() => await this.Cleanup(cleanupProducers: true, cleanupConsumers: false).ConfigureAwait(false);
+        public async ValueTask DisposeAsync() => await Cleanup(cleanupProducers: true, cleanupConsumers: false).ConfigureAwait(false);
     }
 }

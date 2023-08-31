@@ -77,11 +77,11 @@ namespace Orleans.Transactions.Abstractions
 
         public TransactionalStorageLoadResponse(string etag, TState committedState, long committedSequenceId, TransactionalStateMetaData metadata, IReadOnlyList<PendingTransactionState<TState>> pendingStates)
         {
-            this.ETag = etag;
-            this.CommittedState = committedState;
-            this.CommittedSequenceId = committedSequenceId;
-            this.Metadata = metadata;
-            this.PendingStates = pendingStates;
+            ETag = etag;
+            CommittedState = committedState;
+            CommittedSequenceId = committedSequenceId;
+            Metadata = metadata;
+            PendingStates = pendingStates;
         }
 
         [Id(0)]

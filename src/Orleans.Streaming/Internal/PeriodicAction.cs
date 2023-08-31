@@ -11,15 +11,15 @@ namespace Orleans
         public PeriodicAction(TimeSpan period, Action action, DateTime? start = null)
         {
             this.period = period;
-            this.nextUtc = start ?? DateTime.UtcNow + period;
+            nextUtc = start ?? DateTime.UtcNow + period;
             this.action = action;
         }
 
         public bool TryAction(DateTime nowUtc)
         {
-            if (nowUtc < this.nextUtc) return false;
-            this.nextUtc = nowUtc + this.period;
-            this.action();
+            if (nowUtc < nextUtc) return false;
+            nextUtc = nowUtc + period;
+            action();
             return true;
         }
     }

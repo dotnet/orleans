@@ -24,7 +24,7 @@ namespace Orleans.Serialization
         /// </summary>
         public OrleansJsonSerializer(IOptions<OrleansJsonSerializerOptions> options)
         {
-            this.settings = options.Value.JsonSerializerSettings;
+            settings = options.Value.JsonSerializerSettings;
         }
 
         /// <summary>
@@ -40,7 +40,7 @@ namespace Orleans.Serialization
                 return null;
             }
 
-            return JsonConvert.DeserializeObject(input, expectedType, this.settings);
+            return JsonConvert.DeserializeObject(input, expectedType, settings);
         }
 
         /// <summary>
@@ -48,7 +48,7 @@ namespace Orleans.Serialization
         /// </summary>
         /// <param name="item">The object to serialize.</param>
         /// <param name="expectedType">The type the deserializer should expect.</param>
-        public string Serialize(object item, Type expectedType) => JsonConvert.SerializeObject(item, expectedType, this.settings);
+        public string Serialize(object item, Type expectedType) => JsonConvert.SerializeObject(item, expectedType, settings);
     }
 
     /// <summary>
@@ -310,7 +310,7 @@ namespace Orleans.Serialization
             var id = jo["Id"];
             GrainId grainId = GrainId.Create(id["Type"].ToObject<string>(), id["Key"].ToObject<string>());
             var iface = GrainInterfaceType.Create(jo["Interface"].ToString());
-            return this.referenceActivator.CreateReference(grainId, iface);
+            return referenceActivator.CreateReference(grainId, iface);
         }
     }
 }

@@ -38,15 +38,15 @@ namespace Orleans.Streams
         public StreamSubscriptionHandlerFactory(IStreamProvider streamProvider, StreamId streamId, string providerName, GuidId subscriptionId)
         {
             this.streamProvider = streamProvider ?? throw new ArgumentNullException(nameof(streamProvider));
-            this.StreamId = streamId;
-            this.ProviderName = providerName;
-            this.SubscriptionId = subscriptionId;
+            StreamId = streamId;
+            ProviderName = providerName;
+            SubscriptionId = subscriptionId;
         }
 
         /// <inheritdoc />
         public StreamSubscriptionHandle<T> Create<T>()
         {
-            var stream = this.streamProvider.GetStream<T>(StreamId) as StreamImpl<T>;
+            var stream = streamProvider.GetStream<T>(StreamId) as StreamImpl<T>;
             return new StreamSubscriptionHandleImpl<T>(SubscriptionId, stream);
         }
     }

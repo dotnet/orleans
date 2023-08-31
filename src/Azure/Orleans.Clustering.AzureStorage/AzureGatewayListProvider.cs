@@ -19,23 +19,23 @@ namespace Orleans.AzureUtils
         public AzureGatewayListProvider(ILoggerFactory loggerFactory, IOptions<AzureStorageGatewayOptions> options, IOptions<ClusterOptions> clusterOptions, IOptions<GatewayOptions> gatewayOptions)
         {
             this.loggerFactory = loggerFactory;
-            this.clusterId = clusterOptions.Value.ClusterId;
-            this.MaxStaleness = gatewayOptions.Value.GatewayListRefreshPeriod;
+            clusterId = clusterOptions.Value.ClusterId;
+            MaxStaleness = gatewayOptions.Value.GatewayListRefreshPeriod;
             this.options = options.Value;
         }
 
         public async Task InitializeGatewayListProvider()
         {
-            this.siloInstanceManager = await OrleansSiloInstanceManager.GetManager(
-                this.clusterId,
-                this.loggerFactory,
-                this.options);
+            siloInstanceManager = await OrleansSiloInstanceManager.GetManager(
+                clusterId,
+                loggerFactory,
+                options);
         }
         // no caching
         public Task<IList<Uri>> GetGateways()
         {
             // FindAllGatewayProxyEndpoints already returns a deep copied List<Uri>.
-            return this.siloInstanceManager.FindAllGatewayProxyEndpoints();
+            return siloInstanceManager.FindAllGatewayProxyEndpoints();
         }
 
         public TimeSpan MaxStaleness { get; }

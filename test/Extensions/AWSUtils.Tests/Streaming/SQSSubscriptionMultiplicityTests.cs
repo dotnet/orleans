@@ -56,7 +56,7 @@ namespace AWSUtils.Tests.Streaming
         public override async Task InitializeAsync()
         {
             await base.InitializeAsync();
-            runner = new SubscriptionMultiplicityTestRunner(SQSStreamProviderName, this.HostedCluster);
+            runner = new SubscriptionMultiplicityTestRunner(SQSStreamProviderName, HostedCluster);
         }
 
         public override async Task DisposeAsync()

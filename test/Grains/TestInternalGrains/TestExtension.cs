@@ -68,7 +68,7 @@ namespace UnitTests.Grains
         // check that one can send messages from within extensions.
         public Task<string> CheckExtension_2()
         {
-            ITestGrain g = this.grainFactory.GetGrain<ITestGrain>(24);
+            ITestGrain g = grainFactory.GetGrain<ITestGrain>(24);
             return g.GetLabel();
         }
     }

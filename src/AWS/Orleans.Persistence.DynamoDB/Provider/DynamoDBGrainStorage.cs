@@ -54,7 +54,7 @@ namespace Orleans.Storage
 
         public void Participate(ISiloLifecycle lifecycle)
         {
-            lifecycle.Subscribe(OptionFormattingUtilities.Name<DynamoDBGrainStorage>(this.name), this.options.InitStage, Init, Close);
+            lifecycle.Subscribe(OptionFormattingUtilities.Name<DynamoDBGrainStorage>(name), options.InitStage, Init, Close);
         }
 
         /// <summary> Initialization function for this storage provider. </summary>
@@ -65,24 +65,24 @@ namespace Orleans.Storage
             try
             {
                 var initMsg = string.Format("Init: Name={0} ServiceId={1} Table={2} DeleteStateOnClear={3}",
-                        this.name, this.options.ServiceId, this.options.TableName, this.options.DeleteStateOnClear);
+                        name, options.ServiceId, options.TableName, options.DeleteStateOnClear);
 
-                this.logger.LogInformation((int)ErrorCode.StorageProviderBase, $"AWS DynamoDB Grain Storage {this.name} is initializing: {initMsg}");
+                logger.LogInformation((int)ErrorCode.StorageProviderBase, $"AWS DynamoDB Grain Storage {name} is initializing: {initMsg}");
 
-                this.storage = new DynamoDBStorage(
-                    this.logger,
-                    this.options.Service,
-                    this.options.AccessKey,
-                    this.options.SecretKey,
-                    this.options.Token,
-                    this.options.ProfileName,
-                    this.options.ReadCapacityUnits,
-                    this.options.WriteCapacityUnits,
-                    this.options.UseProvisionedThroughput,
-                    this.options.CreateIfNotExists,
-                    this.options.UpdateIfExists);
+                storage = new DynamoDBStorage(
+                    logger,
+                    options.Service,
+                    options.AccessKey,
+                    options.SecretKey,
+                    options.Token,
+                    options.ProfileName,
+                    options.ReadCapacityUnits,
+                    options.WriteCapacityUnits,
+                    options.UseProvisionedThroughput,
+                    options.CreateIfNotExists,
+                    options.UpdateIfExists);
 
-                await storage.InitializeTable(this.options.TableName,
+                await storage.InitializeTable(options.TableName,
                     new List<KeySchemaElement>
                     {
                         new KeySchemaElement { AttributeName = GRAIN_REFERENCE_PROPERTY_NAME, KeyType = KeyType.HASH },
@@ -94,15 +94,15 @@ namespace Orleans.Storage
                         new AttributeDefinition { AttributeName = GRAIN_TYPE_PROPERTY_NAME, AttributeType = ScalarAttributeType.S }
                     },
                     secondaryIndexes: null,
-                    ttlAttributeName: this.options.TimeToLive.HasValue ? GRAIN_TTL_PROPERTY_NAME : null);
+                    ttlAttributeName: options.TimeToLive.HasValue ? GRAIN_TTL_PROPERTY_NAME : null);
                 stopWatch.Stop();
-                this.logger.LogInformation((int)ErrorCode.StorageProviderBase,
-                    $"Initializing provider {this.name} of type {this.GetType().Name} in stage {this.options.InitStage} took {stopWatch.ElapsedMilliseconds} Milliseconds.");
+                logger.LogInformation((int)ErrorCode.StorageProviderBase,
+                    $"Initializing provider {name} of type {GetType().Name} in stage {options.InitStage} took {stopWatch.ElapsedMilliseconds} Milliseconds.");
             }
             catch (Exception exc)
             {
                 stopWatch.Stop();
-                this.logger.LogError((int)ErrorCode.Provider_ErrorFromInit, $"Initialization failed for provider {this.name} of type {this.GetType().Name} in stage {this.options.InitStage} in {stopWatch.ElapsedMilliseconds} Milliseconds.", exc);
+                logger.LogError((int)ErrorCode.Provider_ErrorFromInit, $"Initialization failed for provider {name} of type {GetType().Name} in stage {options.InitStage} in {stopWatch.ElapsedMilliseconds} Milliseconds.", exc);
                 throw;
             }
         }
@@ -114,21 +114,21 @@ namespace Orleans.Storage
         /// <see cref="IGrainStorage.ReadStateAsync{T}"/>
         public async Task ReadStateAsync<T>(string grainType, GrainId grainId, IGrainState<T> grainState)
         {
-            if (this.storage == null) throw new ArgumentException("GrainState-Table property not initialized");
+            if (storage == null) throw new ArgumentException("GrainState-Table property not initialized");
 
             string partitionKey = GetKeyString(grainId);
-            if (this.logger.IsEnabled(LogLevel.Trace))
-                this.logger.LogTrace(
+            if (logger.IsEnabled(LogLevel.Trace))
+                logger.LogTrace(
                     (int)ErrorCode.StorageProviderBase,
                     "Reading: GrainType={GrainType} Pk={PartitionKey} GrainId={GrainId} from Table={TableName}",
                     grainType,
                     partitionKey,
                     grainId,
-                    this.options.TableName);
+                    options.TableName);
 
             string rowKey = AWSUtils.ValidateDynamoDBRowKey(grainType);
 
-            var record = await this.storage.ReadSingleEntryAsync(this.options.TableName,
+            var record = await storage.ReadSingleEntryAsync(options.TableName,
                 new Dictionary<string, AttributeValue>
                 {
                     { GRAIN_REFERENCE_PROPERTY_NAME, new AttributeValue(partitionKey) },
@@ -160,7 +160,7 @@ namespace Orleans.Storage
         /// <see cref="IGrainStorage.WriteStateAsync{T}"/>
         public async Task WriteStateAsync<T>(string grainType, GrainId grainId, IGrainState<T> grainState)
         {
-            if (this.storage == null) throw new ArgumentException("GrainState-Table property not initialized");
+            if (storage == null) throw new ArgumentException("GrainState-Table property not initialized");
 
             string partitionKey = GetKeyString(grainId);
             string rowKey = AWSUtils.ValidateDynamoDBRowKey(grainType);
@@ -178,14 +178,14 @@ namespace Orleans.Storage
             }
             catch (Exception exc)
             {
-                this.logger.LogError(
+                logger.LogError(
                     (int)ErrorCode.StorageProviderBase,
                     exc,
                     "Error Writing: GrainType={GrainType} Grainid={GrainId} ETag={ETag} to Table={TableName}",
                     grainType,
                     grainId,
                     grainState.ETag,
-                    this.options.TableName);
+                    options.TableName);
                 throw;
             }
         }
@@ -193,9 +193,9 @@ namespace Orleans.Storage
         private async Task WriteStateInternal<T>(IGrainState<T> grainState, GrainStateRecord record, bool clear = false)
         {
             var fields = new Dictionary<string, AttributeValue>();
-            if (this.options.TimeToLive.HasValue)
+            if (options.TimeToLive.HasValue)
             {
-                fields.Add(GRAIN_TTL_PROPERTY_NAME, new AttributeValue { N = ((DateTimeOffset)DateTime.UtcNow.Add(this.options.TimeToLive.Value)).ToUnixTimeSeconds().ToString() });
+                fields.Add(GRAIN_TTL_PROPERTY_NAME, new AttributeValue { N = ((DateTimeOffset)DateTime.UtcNow.Add(options.TimeToLive.Value)).ToUnixTimeSeconds().ToString() });
             }
 
             if (record.State != null && record.State.Length > 0)
@@ -219,7 +219,7 @@ namespace Orleans.Storage
                 newEtag++;
                 fields.Add(ETAG_PROPERTY_NAME, new AttributeValue { N = newEtag.ToString() });
 
-                await this.storage.PutEntryAsync(this.options.TableName, fields).ConfigureAwait(false);
+                await storage.PutEntryAsync(options.TableName, fields).ConfigureAwait(false);
             }
             else if (string.IsNullOrWhiteSpace(grainState.ETag))
             {
@@ -228,7 +228,7 @@ namespace Orleans.Storage
                 fields.Add(ETAG_PROPERTY_NAME, new AttributeValue { N = "0" });
 
                 var expression = $"attribute_not_exists({GRAIN_REFERENCE_PROPERTY_NAME}) AND attribute_not_exists({GRAIN_TYPE_PROPERTY_NAME})";
-                await this.storage.PutEntryAsync(this.options.TableName, fields, expression).ConfigureAwait(false);
+                await storage.PutEntryAsync(options.TableName, fields, expression).ConfigureAwait(false);
             }
             else
             {
@@ -244,7 +244,7 @@ namespace Orleans.Storage
 
                 var conditionalValues = new Dictionary<string, AttributeValue> { { CURRENT_ETAG_ALIAS, new AttributeValue { N = currentEtag.ToString() } } };
                 var expression = $"{ETAG_PROPERTY_NAME} = {CURRENT_ETAG_ALIAS}";
-                await this.storage.UpsertEntryAsync(this.options.TableName, keys, fields, expression, conditionalValues).ConfigureAwait(false);
+                await storage.UpsertEntryAsync(options.TableName, keys, fields, expression, conditionalValues).ConfigureAwait(false);
             }
 
             grainState.ETag = newEtag.ToString();
@@ -260,20 +260,20 @@ namespace Orleans.Storage
         /// <see cref="IGrainStorage.ClearStateAsync{T}"/>
         public async Task ClearStateAsync<T>(string grainType, GrainId grainId, IGrainState<T> grainState)
         {
-            if (this.storage == null) throw new ArgumentException("GrainState-Table property not initialized");
+            if (storage == null) throw new ArgumentException("GrainState-Table property not initialized");
 
             string partitionKey = GetKeyString(grainId);
-            if (this.logger.IsEnabled(LogLevel.Trace))
+            if (logger.IsEnabled(LogLevel.Trace))
             {
-                this.logger.LogTrace(
+                logger.LogTrace(
                     (int)ErrorCode.StorageProviderBase,
                     "Clearing: GrainType={GrainType} Pk={PartitionKey} GrainId={GrainId} ETag={ETag} DeleteStateOnClear={DeleteStateOnClear} from Table={TableName}",
                     grainType,
                     partitionKey,
                     grainId,
                     grainState.ETag,
-                    this.options.DeleteStateOnClear,
-                    this.options.TableName);
+                    options.DeleteStateOnClear,
+                    options.TableName);
             }
             string rowKey = AWSUtils.ValidateDynamoDBRowKey(grainType);
             var record = new GrainStateRecord { GrainReference = partitionKey, ETag = string.IsNullOrWhiteSpace(grainState.ETag) ? 0 : int.Parse(grainState.ETag), GrainType = rowKey };
@@ -281,14 +281,14 @@ namespace Orleans.Storage
             var operation = "Clearing";
             try
             {
-                if (this.options.DeleteStateOnClear)
+                if (options.DeleteStateOnClear)
                 {
                     operation = "Deleting";
                     var keys = new Dictionary<string, AttributeValue>();
                     keys.Add(GRAIN_REFERENCE_PROPERTY_NAME, new AttributeValue(record.GrainReference));
                     keys.Add(GRAIN_TYPE_PROPERTY_NAME, new AttributeValue(record.GrainType));
 
-                    await this.storage.DeleteEntryAsync(this.options.TableName, keys).ConfigureAwait(false);
+                    await storage.DeleteEntryAsync(options.TableName, keys).ConfigureAwait(false);
                     grainState.ETag = null;
                 }
                 else
@@ -298,7 +298,7 @@ namespace Orleans.Storage
             }
             catch (Exception exc)
             {
-                this.logger.LogError(
+                logger.LogError(
                     (int)ErrorCode.StorageProviderBase,
                     exc,
                     "Error {Operation}: GrainType={GrainType} GrainId={GrainId} ETag={ETag} from Table={TableName}",
@@ -306,7 +306,7 @@ namespace Orleans.Storage
                     grainType,
                     grainId,
                     grainState.ETag,
-                    this.options.TableName);
+                    options.TableName);
                 throw;
             }
         }
@@ -330,7 +330,7 @@ namespace Orleans.Storage
             T dataValue = default;
             try
             {
-                dataValue = this.options.GrainStorageSerializer.Deserialize<T>(entity.State);
+                dataValue = options.GrainStorageSerializer.Deserialize<T>(entity.State);
             }
             catch (Exception exc)
             {
@@ -343,7 +343,7 @@ namespace Orleans.Storage
                 }
 
                 var message = sb.ToString();
-                this.logger.LogError(exc, "{Message}", message);
+                logger.LogError(exc, "{Message}", message);
                 throw new AggregateException(message, exc);
             }
 
@@ -354,10 +354,10 @@ namespace Orleans.Storage
         {
             int dataSize;
             // Convert to binary format
-            entity.State = this.options.GrainStorageSerializer.Serialize(grainState).ToArray();
+            entity.State = options.GrainStorageSerializer.Serialize(grainState).ToArray();
             dataSize = BINARY_STATE_PROPERTY_NAME.Length + entity.State.Length;
 
-            if (this.logger.IsEnabled(LogLevel.Trace)) this.logger.LogTrace("Writing binary data size = {DataSize} for grain id = Partition={Partition} / Row={Row}",
+            if (logger.IsEnabled(LogLevel.Trace)) logger.LogTrace("Writing binary data size = {DataSize} for grain id = Partition={Partition} / Row={Row}",
                 dataSize, entity.GrainReference, entity.GrainType);
 
             var pkSize = GRAIN_REFERENCE_PROPERTY_NAME.Length + entity.GrainReference.Length;

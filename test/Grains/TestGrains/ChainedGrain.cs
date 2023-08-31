@@ -29,7 +29,7 @@ namespace UnitTests.Grains
 
         public ChainedGrain(ILoggerFactory loggerFactory)
         {
-            this.logger = loggerFactory.CreateLogger($"{this.GetType().Name}-{this.IdentityString}");
+            logger = loggerFactory.CreateLogger($"{GetType().Name}-{IdentityString}");
         }
 
         Task<IChainedGrain> IChainedGrain.GetNext() { return Task.FromResult(State.Next); } 

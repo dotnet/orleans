@@ -47,7 +47,7 @@ namespace Orleans.Streaming.EventHubs
             var options = partitionSettings.Hub;
             receiverOptions.ConnectionOptions = options.ConnectionOptions;
             var connection = options.CreateConnection(options.ConnectionOptions);
-            this.client = new PartitionReceiver(options.ConsumerGroup, partitionSettings.Partition, GetEventPosition(), connection, receiverOptions);
+            client = new PartitionReceiver(options.ConsumerGroup, partitionSettings.Partition, GetEventPosition(), connection, receiverOptions);
 
             EventPosition GetEventPosition()
             {

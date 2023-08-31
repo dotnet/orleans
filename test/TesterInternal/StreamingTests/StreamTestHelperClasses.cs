@@ -43,18 +43,18 @@ namespace UnitTests.StreamingTests
         public Task BecomeConsumer(Guid streamId, string providerToUse)
         {
             _providerToUse = providerToUse;
-            return _consumer.BecomeConsumer(streamId, this.client.GetStreamProvider(providerToUse), null);
+            return _consumer.BecomeConsumer(streamId, client.GetStreamProvider(providerToUse), null);
         }
         
         public Task BecomeConsumer(Guid streamId, string providerToUse, string streamNamespace)
         {
             _providerToUse = providerToUse;
-            return _consumer.BecomeConsumer(streamId, this.client.GetStreamProvider(providerToUse), streamNamespace);
+            return _consumer.BecomeConsumer(streamId, client.GetStreamProvider(providerToUse), streamNamespace);
         }
 
         public Task StopBeingConsumer()
         {
-            return _consumer.StopBeingConsumer(this.client.GetStreamProvider(_providerToUse));
+            return _consumer.StopBeingConsumer(client.GetStreamProvider(_providerToUse));
         }
 
         public Task<int> GetConsumerCount()
@@ -80,7 +80,7 @@ namespace UnitTests.StreamingTests
         private Streaming_ProducerClientObject(ILogger logger, IClusterClient client)
         {
             this.client = client;
-            this.producer = ProducerObserver.NewObserver(logger, client);
+            producer = ProducerObserver.NewObserver(logger, client);
         }
 
         public static Streaming_ProducerClientObject NewObserver(ILogger logger, IClusterClient client)
@@ -92,28 +92,28 @@ namespace UnitTests.StreamingTests
 
         public Task BecomeProducer(Guid streamId, string providerToUse, string streamNamespace)
         {
-            this.producer.BecomeProducer(streamId, this.client.GetStreamProvider(providerToUse), streamNamespace);
+            producer.BecomeProducer(streamId, client.GetStreamProvider(providerToUse), streamNamespace);
             return Task.CompletedTask;
         }
 
         public Task ProduceSequentialSeries(int count)
         {
-             return this.producer.ProduceSequentialSeries(count);
+             return producer.ProduceSequentialSeries(count);
         }
 
         public Task ProduceParallelSeries(int count)
         {
-             return this.producer.ProduceParallelSeries(count);
+             return producer.ProduceParallelSeries(count);
         }
 
         public Task<int> GetItemsProduced()
         {
-            return this.producer.ItemsProduced;
+            return producer.ItemsProduced;
         }
 
         public Task ProducePeriodicSeries(int count)
         {
-            return this.producer.ProducePeriodicSeries(timerCallback =>
+            return producer.ProducePeriodicSeries(timerCallback =>
                     {
                         return new AsyncTaskSafeTimer(NullLogger.Instance, timerCallback, null, TimeSpan.Zero, TimeSpan.FromMilliseconds(10));
                     }, count);
@@ -121,37 +121,37 @@ namespace UnitTests.StreamingTests
 
         public Task<Guid> GetStreamId()
         {
-            return this.producer.StreamId;
+            return producer.StreamId;
         }
 
         public Task<string> GetProviderName()
         {
-            return Task.FromResult(this.producer.ProviderName);
+            return Task.FromResult(producer.ProviderName);
         }
 
         public Task AddNewConsumerGrain(Guid consumerGrainId)
         {
-            return this.producer.AddNewConsumerGrain(consumerGrainId);
+            return producer.AddNewConsumerGrain(consumerGrainId);
         }
 
         public Task<int> GetExpectedItemsProduced()
         {
-            return this.producer.ExpectedItemsProduced;
+            return producer.ExpectedItemsProduced;
         }
 
         public Task<int> GetProducerCount()
         {
-            return this.producer.ProducerCount;
+            return producer.ProducerCount;
         }
 
         public Task StopBeingProducer()
         {
-            return this.producer.StopBeingProducer();
+            return producer.StopBeingProducer();
         }
 
         public Task VerifyFinished()
         {
-            return this.producer.VerifyFinished();
+            return producer.VerifyFinished();
         }
 
         public Task DeactivateProducerOnIdle()

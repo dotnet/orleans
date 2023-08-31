@@ -35,15 +35,15 @@ namespace AWSUtils.Tests.MembershipTests
             if (!AWSTestConstants.IsDynamoDbAvailable)
                 throw new SkipException("Unable to connect to AWS DynamoDB simulator");
             var options = new DynamoDBClusteringOptions();
-            DynamoDBMembershipHelper.ParseDataConnectionString(this.connectionString, options);
-            return new DynamoDBMembershipTable(this.loggerFactory, Options.Create(options), this._clusterOptions);
+            DynamoDBMembershipHelper.ParseDataConnectionString(connectionString, options);
+            return new DynamoDBMembershipTable(loggerFactory, Options.Create(options), _clusterOptions);
         }
 
         protected override IGatewayListProvider CreateGatewayListProvider(ILogger logger)
         {
             var options = new DynamoDBGatewayOptions();
-            DynamoDBGatewayListProviderHelper.ParseDataConnectionString(this.connectionString, options);
-            return new DynamoDBGatewayListProvider(this.loggerFactory.CreateLogger<DynamoDBGatewayListProvider>(), Options.Create(options), this._clusterOptions, this._gatewayOptions);
+            DynamoDBGatewayListProviderHelper.ParseDataConnectionString(connectionString, options);
+            return new DynamoDBGatewayListProvider(loggerFactory.CreateLogger<DynamoDBGatewayListProvider>(), Options.Create(options), _clusterOptions, _gatewayOptions);
         }
 
         protected override Task<string> GetConnectionString()

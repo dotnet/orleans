@@ -16,7 +16,7 @@ namespace UnitTests.Grains.ProgrammaticSubscribe
 
         public TypedProducerGrain(ILoggerFactory loggerFactory)
         {
-            this.logger = loggerFactory.CreateLogger($"{this.GetType().Name}-{this.IdentityString}");
+            logger = loggerFactory.CreateLogger($"{GetType().Name}-{IdentityString}");
         }
 
         public override Task OnActivateAsync(CancellationToken cancellationToken)
@@ -93,7 +93,7 @@ namespace UnitTests.Grains.ProgrammaticSubscribe
         private async Task Fire([CallerMemberName] string caller = null)
         {
             numProducedItems++;
-            await ProducerOnNextAsync(this.producer);
+            await ProducerOnNextAsync(producer);
             logger.LogInformation("{Caller} (item={Item})", caller, numProducedItems);
         }
 
@@ -111,7 +111,7 @@ namespace UnitTests.Grains.ProgrammaticSubscribe
 
         protected override Task ProducerOnNextAsync(IAsyncStream<int> theProducer)
         {
-            return theProducer.OnNextAsync(this.numProducedItems);
+            return theProducer.OnNextAsync(numProducedItems);
         }
     }
 
@@ -123,7 +123,7 @@ namespace UnitTests.Grains.ProgrammaticSubscribe
 
         protected override Task ProducerOnNextAsync(IAsyncStream<Apple> theProducer)
         {
-            return theProducer.OnNextAsync(new Apple(this.numProducedItems));
+            return theProducer.OnNextAsync(new Apple(numProducedItems));
         }
     }
 

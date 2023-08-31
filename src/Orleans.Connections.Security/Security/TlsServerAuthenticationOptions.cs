@@ -47,6 +47,6 @@ namespace Orleans.Connections.Security
             set => Value.CertificateRevocationCheckMode = value;
         }
 
-        public object SslServerAuthenticationOptions => this.Value;
+        public object SslServerAuthenticationOptions => Value;
     }
 }

@@ -44,7 +44,7 @@ namespace Orleans.Runtime
             DeepCopier deepCopier,
             GrainReferenceActivator referenceActivator)
         {
-            this.incomingMessages = Channel.CreateUnbounded<Message>(new UnboundedChannelOptions
+            incomingMessages = Channel.CreateUnbounded<Message>(new UnboundedChannelOptions
             {
                 SingleReader = true,
                 SingleWriter = false,
@@ -54,19 +54,19 @@ namespace Orleans.Runtime
             this.runtimeClient = runtimeClient;
             this.grainReferenceRuntime = grainReferenceRuntime;
             this.grainFactory = grainFactory;
-            this.invokableObjects = new InvokableObjectManager(
+            invokableObjects = new InvokableObjectManager(
                 this,
                 runtimeClient,
                 deepCopier,
                 messagingTrace,
                 logger);
-            this.siloMessageCenter = messageCenter;
+            siloMessageCenter = messageCenter;
             this.messagingTrace = messagingTrace;
             this.logger = logger;
 
-            this.ClientId = CreateHostedClientGrainId(siloDetails.SiloAddress);
-            this.Address = Gateway.GetClientActivationAddress(this.ClientId.GrainId, siloDetails.SiloAddress);
-            this.GrainReference = referenceActivator.CreateReference(this.ClientId.GrainId, default);
+            ClientId = CreateHostedClientGrainId(siloDetails.SiloAddress);
+            Address = Gateway.GetClientActivationAddress(ClientId.GrainId, siloDetails.SiloAddress);
+            GrainReference = referenceActivator.CreateReference(ClientId.GrainId, default);
             _serviceProviderScope = runtimeClient.ServiceProvider.CreateScope();
         }
 
@@ -77,11 +77,11 @@ namespace Orleans.Runtime
 
         public GrainReference GrainReference { get; }
 
-        public GrainId GrainId => this.ClientId.GrainId;
+        public GrainId GrainId => ClientId.GrainId;
 
         public object GrainInstance => null;
 
-        public ActivationId ActivationId => this.Address.ActivationId;
+        public ActivationId ActivationId => Address.ActivationId;
 
         public GrainAddress Address { get; }
 
@@ -96,16 +96,16 @@ namespace Orleans.Runtime
         public PlacementStrategy PlacementStrategy => null;
 
         /// <inheritdoc />
-        public override string ToString() => $"{nameof(HostedClient)}_{this.Address}";
+        public override string ToString() => $"{nameof(HostedClient)}_{Address}";
 
         /// <inheritdoc />
         public IAddressable CreateObjectReference(IAddressable obj)
         {
             if (obj is GrainReference) throw new ArgumentException("Argument obj is already a grain reference.");
 
-            var observerId = ObserverGrainId.Create(this.ClientId);
-            var grainReference = this.grainFactory.GetGrain(observerId.GrainId);
-            if (!this.invokableObjects.TryRegister(obj, observerId))
+            var observerId = ObserverGrainId.Create(ClientId);
+            var grainReference = grainFactory.GetGrain(observerId.GrainId);
+            if (!invokableObjects.TryRegister(obj, observerId))
             {
                 throw new ArgumentException(
                     string.Format("Failed to add new observer {0} to localObjects collection.", grainReference),
@@ -179,18 +179,18 @@ namespace Orleans.Runtime
         /// <inheritdoc />
         public bool TryDispatchToClient(Message message)
         {
-            if (!ClientGrainId.TryParse(message.TargetGrain, out var targetClient) || !this.ClientId.Equals(targetClient))
+            if (!ClientGrainId.TryParse(message.TargetGrain, out var targetClient) || !ClientId.Equals(targetClient))
             {
                 return false;
             }
 
             if (message.IsExpired)
             {
-                this.messagingTrace.OnDropExpiredMessage(message, MessagingInstruments.Phase.Receive);
+                messagingTrace.OnDropExpiredMessage(message, MessagingInstruments.Phase.Receive);
                 return true;
             }
 
-            this.ReceiveMessage(message);
+            ReceiveMessage(message);
             return true;
         }
 
@@ -201,34 +201,34 @@ namespace Orleans.Runtime
             if (msg.Direction == Message.Directions.Response)
             {
                 // Requests are made through the runtime client, so deliver responses to the rutnime client so that the request callback can be executed.
-                this.runtimeClient.ReceiveResponse(msg);
+                runtimeClient.ReceiveResponse(msg);
             }
             else
             {
                 // Requests against client objects are scheduled for execution on the client.
-                this.incomingMessages.Writer.TryWrite(msg);
+                incomingMessages.Writer.TryWrite(msg);
             }
         }
 
         /// <inheritdoc />
         void IDisposable.Dispose()
         {
-            if (this.disposing) return;
-            this.disposing = true;
+            if (disposing) return;
+            disposing = true;
             _serviceProviderScope.Dispose();
-            Utils.SafeExecute(() => this.siloMessageCenter.SetHostedClient(null));
-            Utils.SafeExecute(() => this.incomingMessages.Writer.TryComplete());
-            Utils.SafeExecute(() => this.messagePump?.GetAwaiter().GetResult());
+            Utils.SafeExecute(() => siloMessageCenter.SetHostedClient(null));
+            Utils.SafeExecute(() => incomingMessages.Writer.TryComplete());
+            Utils.SafeExecute(() => messagePump?.GetAwaiter().GetResult());
         }
 
         private void Start()
         {
-            this.messagePump = Task.Run(this.RunClientMessagePump);
+            messagePump = Task.Run(RunClientMessagePump);
         }
 
         private async Task RunClientMessagePump()
         {
-            var reader = this.incomingMessages.Reader;
+            var reader = incomingMessages.Reader;
             while (true)
             {
                 try
@@ -236,9 +236,9 @@ namespace Orleans.Runtime
                     var more = await reader.WaitToReadAsync();
                     if (!more)
                     {
-                        if (this.logger.IsEnabled(LogLevel.Debug))
+                        if (logger.IsEnabled(LogLevel.Debug))
                         {
-                            this.logger.LogDebug($"{nameof(Runtime.HostedClient)} completed processing all messages. Shutting down.");
+                            logger.LogDebug($"{nameof(Runtime.HostedClient)} completed processing all messages. Shutting down.");
                         }
                         break;
                     }
@@ -250,17 +250,17 @@ namespace Orleans.Runtime
                         {
                             case Message.Directions.OneWay:
                             case Message.Directions.Request:
-                                this.invokableObjects.Dispatch(message);
+                                invokableObjects.Dispatch(message);
                                 break;
                             default:
-                                this.logger.LogError((int)ErrorCode.Runtime_Error_100327, "Message not supported: {Message}", message);
+                                logger.LogError((int)ErrorCode.Runtime_Error_100327, "Message not supported: {Message}", message);
                                 break;
                         }
                     }
                 }
                 catch (Exception exception)
                 {
-                    this.logger.LogError((int)ErrorCode.Runtime_Error_100326, exception, "RunClientMessagePump has thrown an exception. Continuing.");
+                    logger.LogError((int)ErrorCode.Runtime_Error_100326, exception, "RunClientMessagePump has thrown an exception. Continuing.");
                 }
             }
         }
@@ -274,20 +274,20 @@ namespace Orleans.Runtime
                 if (cancellation.IsCancellationRequested) return Task.CompletedTask;
 
                 // Register with the message center so that we can receive messages.
-                this.siloMessageCenter.SetHostedClient(this);
+                siloMessageCenter.SetHostedClient(this);
 
                 // Start pumping messages.
-                this.Start();
+                Start();
                 return Task.CompletedTask;
             }
 
             async Task OnStop(CancellationToken cancellation)
             {
-                this.incomingMessages.Writer.TryComplete();
+                incomingMessages.Writer.TryComplete();
 
-                if (this.messagePump != null)
+                if (messagePump != null)
                 {
-                    await Task.WhenAny(cancellation.WhenCancelled(), this.messagePump);
+                    await Task.WhenAny(cancellation.WhenCancelled(), messagePump);
                 }
             }
         }
@@ -299,20 +299,20 @@ namespace Orleans.Runtime
             where TExtensionInterface : class, IGrainExtension
         {
             (TExtension, TExtensionInterface) result;
-            if (this.TryGetExtension(out result))
+            if (TryGetExtension(out result))
             {
                 return result;
             }
 
-            lock (this.lockObj)
+            lock (lockObj)
             {
-                if (this.TryGetExtension(out result))
+                if (TryGetExtension(out result))
                 {
                     return result;
                 }
 
                 var implementation = newExtensionFunc();
-                var reference = this.grainFactory.CreateObjectReference<TExtensionInterface>(implementation);
+                var reference = grainFactory.CreateObjectReference<TExtensionInterface>(implementation);
                 _extensions[typeof(TExtensionInterface)] = (implementation, reference);
                 result = (implementation, reference);
                 return result;
@@ -354,25 +354,25 @@ namespace Orleans.Runtime
         public TExtensionInterface GetExtension<TExtensionInterface>()
             where TExtensionInterface : class, IGrainExtension
         {
-            if (this.TryGetExtension<TExtensionInterface>(out var result))
+            if (TryGetExtension<TExtensionInterface>(out var result))
             {
                 return result;
             }
 
-            lock (this.lockObj)
+            lock (lockObj)
             {
-                if (this.TryGetExtension(out result))
+                if (TryGetExtension(out result))
                 {
                     return result;
                 }
 
-                var implementation = this.ActivationServices.GetServiceByKey<Type, IGrainExtension>(typeof(TExtensionInterface));
+                var implementation = ActivationServices.GetServiceByKey<Type, IGrainExtension>(typeof(TExtensionInterface));
                 if (implementation is null)
                 {
                     throw new GrainExtensionNotInstalledException($"No extension of type {typeof(TExtensionInterface)} is installed on this instance and no implementations are registered for automated install");
                 }
 
-                var reference = this.GrainReference.Cast<TExtensionInterface>();
+                var reference = GrainReference.Cast<TExtensionInterface>();
                 _extensions[typeof(TExtensionInterface)] = (implementation, reference);
                 result = (TExtensionInterface)implementation;
                 return result;

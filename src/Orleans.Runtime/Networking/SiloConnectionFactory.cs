@@ -45,7 +45,7 @@ namespace Orleans.Runtime.Messaging
         {
             EnsureInitialized();
 
-            if (this.siloStatusOracle.IsDeadSilo(address))
+            if (siloStatusOracle.IsDeadSilo(address))
             {
                 throw new ConnectionAbortedException($"Denying connection to known-dead silo {address}");
             }
@@ -60,19 +60,19 @@ namespace Orleans.Runtime.Messaging
             return new SiloConnection(
                 address,
                 context,
-                this.ConnectionDelegate,
-                this.messageCenter,
-                this.localSiloDetails,
-                this.connectionManager,
-                this.ConnectionOptions,
-                this.connectionShared,
-                this.probeRequestMonitor,
-                this.connectionPreambleHelper);
+                ConnectionDelegate,
+                messageCenter,
+                localSiloDetails,
+                connectionManager,
+                ConnectionOptions,
+                connectionShared,
+                probeRequestMonitor,
+                connectionPreambleHelper);
         }
 
         protected override void ConfigureConnectionBuilder(IConnectionBuilder connectionBuilder)
         {
-            var configureDelegate = (SiloConnectionOptions.ISiloConnectionBuilderOptions)this.siloConnectionOptions;
+            var configureDelegate = (SiloConnectionOptions.ISiloConnectionBuilderOptions)siloConnectionOptions;
             configureDelegate.ConfigureSiloOutboundBuilder(connectionBuilder);
             base.ConfigureConnectionBuilder(connectionBuilder);
         }
@@ -81,14 +81,14 @@ namespace Orleans.Runtime.Messaging
         {
             if (!isInitialized)
             {
-                lock (this.initializationLock)
+                lock (initializationLock)
                 {
                     if (!isInitialized)
                     {
-                        this.messageCenter = this.serviceProvider.GetRequiredService<MessageCenter>();
-                        this.connectionManager = this.serviceProvider.GetRequiredService<ConnectionManager>();
-                        this.siloStatusOracle = this.serviceProvider.GetRequiredService<ISiloStatusOracle>();
-                        this.isInitialized = true;
+                        messageCenter = serviceProvider.GetRequiredService<MessageCenter>();
+                        connectionManager = serviceProvider.GetRequiredService<ConnectionManager>();
+                        siloStatusOracle = serviceProvider.GetRequiredService<ISiloStatusOracle>();
+                        isInitialized = true;
                     }
                 }
             }

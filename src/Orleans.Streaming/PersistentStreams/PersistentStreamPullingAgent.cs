@@ -65,7 +65,7 @@ namespace Orleans.Streams
             this.queueAdapterCache = queueAdapterCache;
             numMessages = 0;
 
-            logger = loggerFactory.CreateLogger($"{this.GetType().Namespace}.{streamProviderName}");
+            logger = loggerFactory.CreateLogger($"{GetType().Namespace}.{streamProviderName}");
             logger.LogInformation(
                 (int)ErrorCode.PersistentStreamPullingAgent_01,
                 "Created {Name} {Id} for Stream Provider {StreamProvider} on silo {Silo} for Queue {Queue}.",
@@ -129,7 +129,7 @@ namespace Orleans.Streams
 
             try
             {
-                receiverInitTask = OrleansTaskExtentions.SafeExecute(() => receiver.Initialize(this.options.InitQueueTimeout))
+                receiverInitTask = OrleansTaskExtentions.SafeExecute(() => receiver.Initialize(options.InitQueueTimeout))
                     .LogException(logger, ErrorCode.PersistentStreamPullingAgent_03, $"QueueAdapterReceiver {QueueId:H} failed to Initialize.");
                 receiverInitTask.Ignore();
             }
@@ -141,8 +141,8 @@ namespace Orleans.Streams
 
             // Setup a reader for a new receiver.
             // Even if the receiver failed to initialise, treat it as OK and start pumping it. It's receiver responsibility to retry initialization.
-            var randomTimerOffset = RandomTimeSpan.Next(this.options.GetQueueMsgsTimerPeriod);
-            timer = RegisterGrainTimer(AsyncTimerCallback, QueueId, randomTimerOffset, this.options.GetQueueMsgsTimerPeriod);
+            var randomTimerOffset = RandomTimeSpan.Next(options.GetQueueMsgsTimerPeriod);
+            timer = RegisterGrainTimer(AsyncTimerCallback, QueueId, randomTimerOffset, options.GetQueueMsgsTimerPeriod);
 
             StreamInstruments.RegisterPersistentStreamPubSubCacheSizeObserve(() => new Measurement<int>(pubSubCache.Count, new KeyValuePair<string, object>("name", StatisticUniquePostfix)));
 
@@ -158,7 +158,7 @@ namespace Orleans.Streams
             {
                 var tmp = timer;
                 timer = null;
-                Utils.SafeExecute(tmp.Dispose, this.logger);
+                Utils.SafeExecute(tmp.Dispose, logger);
 
                 try
                 {
@@ -166,11 +166,11 @@ namespace Orleans.Streams
                 }
                 catch (Exception ex)
                 {
-                    this.logger.LogWarning(ex, "Waiting for the last timer tick failed");
+                    logger.LogWarning(ex, "Waiting for the last timer tick failed");
                 }
             }
 
-            this.queueCache = null;
+            queueCache = null;
 
             Task localReceiverInitTask = receiverInitTask;
             if (localReceiverInitTask != null)
@@ -189,11 +189,11 @@ namespace Orleans.Streams
 
             try
             {
-                IQueueAdapterReceiver localReceiver = this.receiver;
-                this.receiver = null;
+                IQueueAdapterReceiver localReceiver = receiver;
+                receiver = null;
                 if (localReceiver != null)
                 {
-                    var task = OrleansTaskExtentions.SafeExecute(() => localReceiver.Shutdown(this.options.InitQueueTimeout));
+                    var task = OrleansTaskExtentions.SafeExecute(() => localReceiver.Shutdown(options.InitQueueTimeout));
                     task = task.LogException(logger, ErrorCode.PersistentStreamPullingAgent_07,
                         $"QueueAdapterReceiver {QueueId} failed to Shutdown.");
                     await task;
@@ -263,7 +263,7 @@ namespace Orleans.Streams
             StreamConsumerData data;
             if (!streamDataCollection.TryGetConsumer(subscriptionId, out data))
             {
-                var consumerReference = this.RuntimeClient.InternalGrainFactory
+                var consumerReference = RuntimeClient.InternalGrainFactory
                     .GetGrain(streamConsumer)
                     .AsReference<IStreamConsumerExtension>();
                 data = streamDataCollection.AddConsumer(subscriptionId, streamId, consumerReference, filterData);
@@ -292,7 +292,7 @@ namespace Orleans.Streams
                          AsyncExecutorWithRetries.INFINITE_RETRIES,
                          // Do not retry if the agent is shutting down, or if the exception is ClientNotAvailableException
                          (exception, i) => exception is not ClientNotAvailableException && !IsShutdown,
-                         this.options.MaxEventDeliveryTime,
+                         options.MaxEventDeliveryTime,
                          DeliveryBackoffProvider);
 
                     if (requestedHandshakeToken != null)
@@ -413,7 +413,7 @@ namespace Orleans.Streams
 
         private bool ReadLoopRetryExceptionFilter(Exception e, int retryCounter)
         {
-            this.logger.LogWarning(
+            logger.LogWarning(
                 (int)ErrorCode.PersistentStreamPullingAgent_12,
                 e,
                 "Exception while retrying the {RetryCounter}th time reading from queue {QueueId}",
@@ -440,7 +440,7 @@ namespace Orleans.Streams
 
             var now = DateTime.UtcNow;
             // Try to cleanup the pubsub cache at the cadence of 10 times in the configurable StreamInactivityPeriod.
-            if ((now - lastTimeCleanedPubSubCache) >= this.options.StreamInactivityPeriod.Divide(StreamInactivityCheckFrequency))
+            if ((now - lastTimeCleanedPubSubCache) >= options.StreamInactivityPeriod.Divide(StreamInactivityCheckFrequency))
             {
                 lastTimeCleanedPubSubCache = now;
                 CleanupPubSubCache(now);
@@ -507,8 +507,8 @@ namespace Orleans.Streams
                     }
                     else
                     {
-                        if(this.logger.IsEnabled(LogLevel.Debug))
-                            this.logger.LogDebug(
+                        if(logger.IsEnabled(LogLevel.Debug))
+                            logger.LogDebug(
                                 $"Pulled new messages in stream {streamId} from the queue, but pulling agent haven't succeeded in" +
                                                               $"RegisterStream yet, will start deliver on this stream after RegisterStream succeeded");
                     }
@@ -613,7 +613,7 @@ namespace Orleans.Streams
                                 AsyncExecutorWithRetries.INFINITE_RETRIES,
                                 // Do not retry if the agent is shutting down, or if the exception is ClientNotAvailableException
                                 (exception, i) => exception is not ClientNotAvailableException && !IsShutdown,
-                                this.options.MaxEventDeliveryTime,
+                                options.MaxEventDeliveryTime,
                                 DeliveryBackoffProvider);
                             if (newToken != null)
                             {
@@ -661,7 +661,7 @@ namespace Orleans.Streams
 
         private IBatchContainer GetBatchForConsumer(IQueueCacheCursor cursor, StreamId streamId, string filterData)
         {
-            if (this.options.BatchContainerBatchSize <= 1)
+            if (options.BatchContainerBatchSize <= 1)
             {
                 if (!cursor.MoveNext())
                 {
@@ -670,12 +670,12 @@ namespace Orleans.Streams
 
                 return cursor.GetCurrent(out _);
             }
-            else if (this.options.BatchContainerBatchSize > 1)
+            else if (options.BatchContainerBatchSize > 1)
             {
                 int i = 0;
                 var batchContainers = new List<IBatchContainer>();
 
-                while (i < this.options.BatchContainerBatchSize)
+                while (i < options.BatchContainerBatchSize)
                 {
                     if (!cursor.MoveNext())
                     {
@@ -712,7 +712,7 @@ namespace Orleans.Streams
             }
             catch (Exception ex)
             {
-                this.logger.LogWarning(ex, "Failed to deliver message to consumer on {SubscriptionId} for stream {StreamId}, may retry.", consumerData.SubscriptionId, consumerData.StreamId);
+                logger.LogWarning(ex, "Failed to deliver message to consumer on {SubscriptionId} for stream {StreamId}, may retry.", consumerData.SubscriptionId, consumerData.StreamId);
                 throw;
             }
         }
@@ -864,14 +864,14 @@ namespace Orleans.Streams
 
         private bool ShouldDeliverBatch(StreamId streamId, IBatchContainer batchContainer, string filterData)
         {
-            if (this.streamFilter is NoOpStreamFilter)
+            if (streamFilter is NoOpStreamFilter)
                 return true;
 
             try
             {
                 foreach (var evt in batchContainer.GetEvents<object>())
                 {
-                    if (this.streamFilter.ShouldDeliver(streamId, evt.Item1, filterData))
+                    if (streamFilter.ShouldDeliver(streamId, evt.Item1, filterData))
                         return true;
                 }
                 return false;
@@ -882,7 +882,7 @@ namespace Orleans.Streams
                     (int)ErrorCode.PersistentStreamPullingAgent_13,
                     exc,
                     "Ignoring exception while trying to evaluate subscription filter '{Filter}' with data '{FilterData}' on stream {StreamId}",
-                    this.streamFilter.GetType().Name,
+                    streamFilter.GetType().Name,
                     filterData,
                     streamId);
             }

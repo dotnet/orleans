@@ -40,8 +40,8 @@ namespace Orleans.Runtime
             _typeManagementOptions = typeManagementOptions.Value;
             _services = services;
             _gatewayManager = gatewayManager;
-            this.LocalGrainManifest = clientManifestProvider.ClientManifest;
-            _current = new ClusterManifest(MajorMinorVersion.Zero, ImmutableDictionary<SiloAddress, GrainManifest>.Empty, ImmutableArray.Create(this.LocalGrainManifest));
+            LocalGrainManifest = clientManifestProvider.ClientManifest;
+            _current = new ClusterManifest(MajorMinorVersion.Zero, ImmutableDictionary<SiloAddress, GrainManifest>.Empty, ImmutableArray.Create(LocalGrainManifest));
             _updates = new AsyncEnumerable<ClusterManifest>(
                 (previous, proposed) => previous is null || proposed.Version == MajorMinorVersion.Zero || proposed.Version > previous.Version,
                 _current)

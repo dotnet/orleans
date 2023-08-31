@@ -18,10 +18,10 @@ namespace Orleans.Streams.Core
         /// <param name="grainId">The grain identifier.</param>
         public StreamSubscription(Guid subscriptionId, string streamProviderName, StreamId streamId, GrainId grainId)
         {
-            this.SubscriptionId = subscriptionId;
-            this.StreamProviderName = streamProviderName;
-            this.StreamId = streamId;
-            this.GrainId = grainId;
+            SubscriptionId = subscriptionId;
+            StreamProviderName = streamProviderName;
+            StreamId = streamId;
+            GrainId = grainId;
         }
 
         /// <summary>

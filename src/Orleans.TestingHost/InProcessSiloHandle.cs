@@ -70,7 +70,7 @@ namespace Orleans.TestingHost
 
             try
             {
-                await Task.Run(() => this.SiloHost.StopAsync(ct));
+                await Task.Run(() => SiloHost.StopAsync(ct));
             }
             catch (Exception exc)
             {
@@ -79,14 +79,14 @@ namespace Orleans.TestingHost
             }
             finally
             {
-                this.isActive = false;
+                isActive = false;
             }
         }
 
         /// <inheritdoc />
         protected override void Dispose(bool disposing)
         {
-            if (!this.IsActive) return;
+            if (!IsActive) return;
 
             if (disposing)
             {
@@ -98,14 +98,14 @@ namespace Orleans.TestingHost
                 {
                 }
 
-                this.SiloHost?.Dispose();
+                SiloHost?.Dispose();
             }
         }
 
         /// <inheritdoc />
         public override async ValueTask DisposeAsync()
         {
-            if (!this.IsActive) return;
+            if (!IsActive) return;
 
             try
             {
@@ -113,7 +113,7 @@ namespace Orleans.TestingHost
             }
             finally
             {
-                if (this.SiloHost is IAsyncDisposable asyncDisposable)
+                if (SiloHost is IAsyncDisposable asyncDisposable)
                 {
                     await asyncDisposable.DisposeAsync().ConfigureAwait(false);
                 }

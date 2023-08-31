@@ -83,19 +83,19 @@ namespace Orleans.Configuration
 
         public void ValidateConfiguration()
         {
-            if (string.IsNullOrWhiteSpace(this.options.TableName))
+            if (string.IsNullOrWhiteSpace(options.TableName))
                 throw new OrleansConfigurationException(
-                    $"Configuration for DynamoDBGrainStorage {this.name} is invalid. {nameof(this.options.TableName)} is not valid.");
+                    $"Configuration for DynamoDBGrainStorage {name} is invalid. {nameof(options.TableName)} is not valid.");
 
-            if (this.options.UseProvisionedThroughput)
+            if (options.UseProvisionedThroughput)
             {
-                if (this.options.ReadCapacityUnits == 0)
+                if (options.ReadCapacityUnits == 0)
                     throw new OrleansConfigurationException(
-                        $"Configuration for DynamoDBGrainStorage {this.name} is invalid. {nameof(this.options.ReadCapacityUnits)} is not valid.");
+                        $"Configuration for DynamoDBGrainStorage {name} is invalid. {nameof(options.ReadCapacityUnits)} is not valid.");
 
-                if (this.options.WriteCapacityUnits == 0)
+                if (options.WriteCapacityUnits == 0)
                     throw new OrleansConfigurationException(
-                        $"Configuration for DynamoDBGrainStorage {this.name} is invalid. {nameof(this.options.WriteCapacityUnits)} is not valid.");
+                        $"Configuration for DynamoDBGrainStorage {name} is invalid. {nameof(options.WriteCapacityUnits)} is not valid.");
             }
         }
     }

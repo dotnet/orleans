@@ -41,7 +41,7 @@ namespace Orleans.Metadata
             {
                 if (attr is IGrainTypeProviderAttribute typeProviderAttribute)
                 {
-                    grainType = typeProviderAttribute.GetGrainType(this._serviceProvider, grainClass);
+                    grainType = typeProviderAttribute.GetGrainType(_serviceProvider, grainClass);
                     return true;
                 }
             }
@@ -91,10 +91,10 @@ namespace Orleans
         /// </param>
         public GrainTypeAttribute(string grainType)
         {
-            this._grainType = GrainType.Create(grainType);
+            _grainType = GrainType.Create(grainType);
         }
 
         /// <inheritdoc />
-        public GrainType GetGrainType(IServiceProvider services, Type type) => this._grainType;
+        public GrainType GetGrainType(IServiceProvider services, Type type) => _grainType;
     }
 }

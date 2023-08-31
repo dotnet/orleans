@@ -37,17 +37,17 @@ namespace Orleans.Transactions.TestKit
 
         public override Task OnActivateAsync(CancellationToken cancellationToken)
         {
-            this.logger = this.loggerFactory.CreateLogger(this.GetGrainId().ToString());
-            this.logger.LogInformation("GrainId {GrainId}", this.GetPrimaryKey());
+            logger = loggerFactory.CreateLogger(this.GetGrainId().ToString());
+            logger.LogInformation("GrainId {GrainId}", this.GetPrimaryKey());
 
             return base.OnActivateAsync(cancellationToken);
         }
 
         public Task Set(int newValue)
         {
-            return this.data.PerformUpdate(d =>
+            return data.PerformUpdate(d =>
             {
-                this.logger.LogInformation("Setting value {NewValue}.", newValue);
+                logger.LogInformation("Setting value {NewValue}.", newValue);
                 d.Value = newValue;
             });
         }
@@ -55,30 +55,30 @@ namespace Orleans.Transactions.TestKit
         public Task Add(int numberToAdd, FaultInjectionControl faultInjectionControl = null)
         {
             //reset in case control from last tx isn't cleared for some reason
-            this.data.FaultInjectionControl.Reset();
+            data.FaultInjectionControl.Reset();
             //dont replace it with this.data.FaultInjectionControl = faultInjectionControl, 
             //this.data.FaultInjectionControl must remain the same reference
             if (faultInjectionControl != null)
             {
-                this.data.FaultInjectionControl.FaultInjectionPhase = faultInjectionControl.FaultInjectionPhase;
-                this.data.FaultInjectionControl.FaultInjectionType = faultInjectionControl.FaultInjectionType;
+                data.FaultInjectionControl.FaultInjectionPhase = faultInjectionControl.FaultInjectionPhase;
+                data.FaultInjectionControl.FaultInjectionType = faultInjectionControl.FaultInjectionType;
             }
            
-            return this.data.PerformUpdate(d =>
+            return data.PerformUpdate(d =>
             {
-                this.logger.LogInformation("Adding {NumberToAdd} to value {Value}.", numberToAdd, d.Value);
+                logger.LogInformation("Adding {NumberToAdd} to value {Value}.", numberToAdd, d.Value);
                 d.Value += numberToAdd;
             });
         }
 
         public Task<int> Get()
         {
-            return this.data.PerformRead<int>(d => d.Value);
+            return data.PerformRead<int>(d => d.Value);
         }
 
         public Task Deactivate()
         {
-            this.DeactivateOnIdle();
+            DeactivateOnIdle();
             return Task.CompletedTask;
         }
     }

@@ -289,34 +289,34 @@ namespace Orleans.TestingHost
             {
                 if (ct.IsCancellationRequested)
                 {
-                    this.Process?.Kill();
+                    Process?.Kill();
                 }
                 else
                 {
                     using var registration = ct.Register(() =>
                     {
-                        var process = this.Process;
+                        var process = Process;
                         if (process is not null)
                         {
                             process.Kill();
                         }
                     });
 
-                    await this.Process.StandardInput.WriteLineAsync(StandaloneSiloHost.ShutdownCommand);
+                    await Process.StandardInput.WriteLineAsync(StandaloneSiloHost.ShutdownCommand);
                     var linkedCts = new CancellationTokenSource();
                     await Task.WhenAny(_runTask, Task.Delay(TimeSpan.FromMinutes(2), linkedCts.Token));
                 }
             }
             finally
             {
-                this.isActive = false;
+                isActive = false;
             }
         }
 
         /// <inheritdoc />
         protected override void Dispose(bool disposing)
         {
-            if (!this.IsActive) return;
+            if (!IsActive) return;
 
             if (disposing)
             {
@@ -328,7 +328,7 @@ namespace Orleans.TestingHost
                 {
                 }
 
-                this.Process?.Dispose();
+                Process?.Dispose();
             }
 
             AppDomain.CurrentDomain.ProcessExit -= _processExitHandler;
@@ -337,10 +337,10 @@ namespace Orleans.TestingHost
         /// <inheritdoc />
         public override async ValueTask DisposeAsync()
         {
-            if (!this.IsActive) return;
+            if (!IsActive) return;
 
             await StopSiloAsync(true).ConfigureAwait(false);
-            this.Process?.Dispose();
+            Process?.Dispose();
             AppDomain.CurrentDomain.ProcessExit -= _processExitHandler;
         }
     }

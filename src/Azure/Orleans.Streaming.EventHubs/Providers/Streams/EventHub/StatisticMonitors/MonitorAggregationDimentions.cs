@@ -18,7 +18,7 @@ namespace Orleans.Streaming.EventHubs
         /// <param name="ehHubPath"></param>
         public EventHubMonitorAggregationDimensions(string ehHubPath)
         {
-            this.EventHubPath = ehHubPath;
+            EventHubPath = ehHubPath;
         }
 
         /// <summary>
@@ -27,7 +27,7 @@ namespace Orleans.Streaming.EventHubs
         /// <param name="dimensions"></param>
         public EventHubMonitorAggregationDimensions(EventHubMonitorAggregationDimensions dimensions)
         {
-            this.EventHubPath = dimensions.EventHubPath;
+            EventHubPath = dimensions.EventHubPath;
         }
 
         /// <summary>
@@ -56,7 +56,7 @@ namespace Orleans.Streaming.EventHubs
         public EventHubReceiverMonitorDimensions(EventHubMonitorAggregationDimensions dimensions, string ehPartition)
             :base(dimensions)
         {
-            this.EventHubPartition = ehPartition;
+            EventHubPartition = ehPartition;
         }
 
         /// <summary>
@@ -86,7 +86,7 @@ namespace Orleans.Streaming.EventHubs
         public EventHubCacheMonitorDimensions(EventHubMonitorAggregationDimensions dimensions, string ehPartition, string blockPoolId)
             :base(dimensions, ehPartition)
         {
-            this.BlockPoolId = blockPoolId;
+            BlockPoolId = blockPoolId;
         }
 
         /// <summary>
@@ -115,7 +115,7 @@ namespace Orleans.Streaming.EventHubs
         public EventHubBlockPoolMonitorDimensions(EventHubMonitorAggregationDimensions dimensions, string blockPoolId)
             :base(dimensions)
         {
-            this.BlockPoolId = blockPoolId;
+            BlockPoolId = blockPoolId;
         }
 
         /// <summary>

@@ -12,62 +12,62 @@ namespace Orleans.Runtime.ReminderService
 
         public InMemoryReminderTable(IGrainFactory grainFactory)
         {
-            this.reminderTableGrain = grainFactory.GetGrain<IReminderTableGrain>(ReminderTableGrainId);
+            reminderTableGrain = grainFactory.GetGrain<IReminderTableGrain>(ReminderTableGrainId);
         }
 
         public Task Init() => Task.CompletedTask;
 
         public Task<ReminderEntry> ReadRow(GrainId grainId, string reminderName)
         {
-            this.ThrowIfNotAvailable();
-            return this.reminderTableGrain.ReadRow(grainId, reminderName);
+            ThrowIfNotAvailable();
+            return reminderTableGrain.ReadRow(grainId, reminderName);
         }
 
         public Task<ReminderTableData> ReadRows(GrainId grainId)
         {
-            this.ThrowIfNotAvailable();
-            return this.reminderTableGrain.ReadRows(grainId);
+            ThrowIfNotAvailable();
+            return reminderTableGrain.ReadRows(grainId);
         }
 
         public Task<ReminderTableData> ReadRows(uint begin, uint end)
         {
-            return this.isAvailable ? this.reminderTableGrain.ReadRows(begin, end) : Task.FromResult(new ReminderTableData());
+            return isAvailable ? reminderTableGrain.ReadRows(begin, end) : Task.FromResult(new ReminderTableData());
         }
 
         public Task<bool> RemoveRow(GrainId grainId, string reminderName, string eTag)
         {
-            this.ThrowIfNotAvailable();
-            return this.reminderTableGrain.RemoveRow(grainId, reminderName, eTag);
+            ThrowIfNotAvailable();
+            return reminderTableGrain.RemoveRow(grainId, reminderName, eTag);
         }
 
         public Task TestOnlyClearTable()
         {
-            this.ThrowIfNotAvailable();
-            return this.reminderTableGrain.TestOnlyClearTable();
+            ThrowIfNotAvailable();
+            return reminderTableGrain.TestOnlyClearTable();
         }
 
         public Task<string> UpsertRow(ReminderEntry entry)
         {
-            this.ThrowIfNotAvailable();
-            return this.reminderTableGrain.UpsertRow(entry);
+            ThrowIfNotAvailable();
+            return reminderTableGrain.UpsertRow(entry);
         }
 
         private void ThrowIfNotAvailable()
         {
-            if (!this.isAvailable) throw new InvalidOperationException("The reminder service is not currently available.");
+            if (!isAvailable) throw new InvalidOperationException("The reminder service is not currently available.");
         }
 
         void ILifecycleParticipant<ISiloLifecycle>.Participate(ISiloLifecycle lifecycle)
         {
             Task OnApplicationServicesStart(CancellationToken ct)
             {
-                this.isAvailable = true;
+                isAvailable = true;
                 return Task.CompletedTask;
             }
 
             Task OnApplicationServicesStop(CancellationToken ct)
             {
-                this.isAvailable = false;
+                isAvailable = false;
                 return Task.CompletedTask;
             }
 

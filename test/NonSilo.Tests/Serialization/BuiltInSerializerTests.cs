@@ -29,7 +29,7 @@ namespace UnitTests.Serialization
         public BuiltInSerializerTests(ITestOutputHelper output, TestEnvironmentFixture fixture)
         {
             this.output = output;
-            this.environment = fixture;
+            environment = fixture;
         }
 
         [Fact, TestCategory("BVT"), TestCategory("CodeGen")]

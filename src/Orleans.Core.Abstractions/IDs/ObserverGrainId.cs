@@ -18,7 +18,7 @@ namespace Orleans.Runtime
         /// </summary>
         private ObserverGrainId(GrainId grainId)
         {
-            this.GrainId = grainId;
+            GrainId = grainId;
         }
 
         /// <summary>
@@ -100,16 +100,16 @@ namespace Orleans.Runtime
         }
 
         /// <inheritdoc/>
-        public bool Equals(ObserverGrainId other) => this.GrainId.Equals(other.GrainId);
+        public bool Equals(ObserverGrainId other) => GrainId.Equals(other.GrainId);
 
         /// <inheritdoc/>
-        public override bool Equals(object? obj) => obj is ObserverGrainId observer && this.Equals(observer);
+        public override bool Equals(object? obj) => obj is ObserverGrainId observer && Equals(observer);
 
         /// <inheritdoc/>
-        public override int GetHashCode() => this.GrainId.GetHashCode();
+        public override int GetHashCode() => GrainId.GetHashCode();
 
         /// <inheritdoc/>
-        public override string ToString() => this.GrainId.ToString();
+        public override string ToString() => GrainId.ToString();
 
         string IFormattable.ToString(string? format, IFormatProvider? formatProvider) => ToString();
 
@@ -117,6 +117,6 @@ namespace Orleans.Runtime
             => ((ISpanFormattable)GrainId).TryFormat(destination, out charsWritten, format, provider);
 
         /// <inheritdoc/>
-        public int CompareTo(ObserverGrainId other) => this.GrainId.CompareTo(other.GrainId);
+        public int CompareTo(ObserverGrainId other) => GrainId.CompareTo(other.GrainId);
     }
 }

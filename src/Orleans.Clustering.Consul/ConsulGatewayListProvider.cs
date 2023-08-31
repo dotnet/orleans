@@ -26,15 +26,15 @@ namespace Orleans.Runtime.Membership
             IOptions<ClusterOptions> clusterOptions)
         {
             this.logger = logger;
-            this.clusterId = clusterOptions.Value.ClusterId;
-            this.maxStaleness = gatewayOptions.Value.GatewayListRefreshPeriod;
+            clusterId = clusterOptions.Value.ClusterId;
+            maxStaleness = gatewayOptions.Value.GatewayListRefreshPeriod;
             this.options = options.Value;
-            this.kvRootFolder = options.Value.KvRootFolder;
+            kvRootFolder = options.Value.KvRootFolder;
         }
 
         public TimeSpan MaxStaleness
         {
-            get { return this.maxStaleness; }
+            get { return maxStaleness; }
         }
 
         public bool IsUpdatable
@@ -49,7 +49,7 @@ namespace Orleans.Runtime.Membership
 
         public async Task<IList<Uri>> GetGateways()
         {
-            var membershipTableData = await ConsulBasedMembershipTable.ReadAll(this.consulClient, this.clusterId, this.kvRootFolder, this.logger, null);
+            var membershipTableData = await ConsulBasedMembershipTable.ReadAll(consulClient, clusterId, kvRootFolder, logger, null);
             if (membershipTableData == null) return new List<Uri>();
 
             return membershipTableData.Members.Select(e => e.Item1).

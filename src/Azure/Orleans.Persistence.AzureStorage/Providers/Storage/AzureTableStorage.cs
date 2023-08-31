@@ -53,7 +53,7 @@ namespace Orleans.Storage
             this.options = options;
             this.clusterOptions = clusterOptions.Value;
             this.name = name;
-            this.storageSerializer = options.GrainStorageSerializer;
+            storageSerializer = options.GrainStorageSerializer;
             this.logger = logger;
         }
 
@@ -69,7 +69,7 @@ namespace Orleans.Storage
                 grainType,
                 pk,
                 grainId,
-                this.options.TableName);
+                options.TableName);
             string partitionKey = pk;
             string rowKey = AzureTableUtils.SanitizeTableProperty(grainType);
             var entity = await tableDataManager.Read(partitionKey, rowKey).ConfigureAwait(false);
@@ -97,7 +97,7 @@ namespace Orleans.Storage
                     pk,
                     grainId,
                     grainState.ETag,
-                    this.options.TableName);
+                    options.TableName);
 
             var rowKey = AzureTableUtils.SanitizeTableProperty(grainType);
             var entity = new TableEntity(pk, rowKey)
@@ -107,7 +107,7 @@ namespace Orleans.Storage
             ConvertToStorageFormat(grainState.State, entity);
             try
             {
-                await DoOptimisticUpdate(() => tableDataManager.Write(entity), grainType, grainId, this.options.TableName, grainState.ETag).ConfigureAwait(false);
+                await DoOptimisticUpdate(() => tableDataManager.Write(entity), grainType, grainId, options.TableName, grainState.ETag).ConfigureAwait(false);
                 grainState.ETag = entity.ETag.ToString();
                 grainState.RecordExists = true;
             }
@@ -118,7 +118,7 @@ namespace Orleans.Storage
                     grainType,
                     grainId,
                     grainState.ETag,
-                    this.options.TableName);
+                    options.TableName);
                 throw;
             }
         }
@@ -141,8 +141,8 @@ namespace Orleans.Storage
                 pk,
                 grainId,
                 grainState.ETag,
-                this.options.DeleteStateOnClear,
-                this.options.TableName);
+                options.DeleteStateOnClear,
+                options.TableName);
             var rowKey = AzureTableUtils.SanitizeTableProperty(grainType);
             var entity = new TableEntity(pk, rowKey)
             {
@@ -151,14 +151,14 @@ namespace Orleans.Storage
             string operation = "Clearing";
             try
             {
-                if (this.options.DeleteStateOnClear)
+                if (options.DeleteStateOnClear)
                 {
                     operation = "Deleting";
-                    await DoOptimisticUpdate(() => tableDataManager.Delete(entity), grainType, grainId, this.options.TableName, grainState.ETag).ConfigureAwait(false);
+                    await DoOptimisticUpdate(() => tableDataManager.Delete(entity), grainType, grainId, options.TableName, grainState.ETag).ConfigureAwait(false);
                 }
                 else
                 {
-                    await DoOptimisticUpdate(() => tableDataManager.Write(entity), grainType, grainId, this.options.TableName, grainState.ETag).ConfigureAwait(false);
+                    await DoOptimisticUpdate(() => tableDataManager.Write(entity), grainType, grainId, options.TableName, grainState.ETag).ConfigureAwait(false);
                 }
 
                 grainState.ETag = entity.ETag.ToString(); // Update in-memory data to the new ETag
@@ -173,7 +173,7 @@ namespace Orleans.Storage
                     grainType,
                     grainId,
                     grainState.ETag,
-                    this.options.TableName);
+                    options.TableName);
                 throw;
             }
         }
@@ -207,7 +207,7 @@ namespace Orleans.Storage
             string basePropertyName;
 
             // Convert to binary format
-            var data = this.storageSerializer.Serialize<T>(grainState);
+            var data = storageSerializer.Serialize<T>(grainState);
             basePropertyName = BINARY_DATA_PROPERTY_NAME;
 
             dataSize = data.ToMemory().Length;
@@ -344,7 +344,7 @@ namespace Orleans.Storage
                 var input = binaryData.Length > 0
                     ? new BinaryData(binaryData)
                     : new BinaryData(stringData);
-                dataValue = this.storageSerializer.Deserialize<T>(input);
+                dataValue = storageSerializer.Deserialize<T>(input);
             }
             catch (Exception exc)
             {
@@ -492,28 +492,28 @@ namespace Orleans.Storage
             var stopWatch = Stopwatch.StartNew();
             try
             {
-                this.logger.LogInformation((int)AzureProviderErrorCode.AzureTableProvider_InitProvider,
+                logger.LogInformation((int)AzureProviderErrorCode.AzureTableProvider_InitProvider,
                     "AzureTableGrainStorage {ProviderName} initializing: {Options}",
                     name,
-                    this.options.ToString());
-                this.tableDataManager = new GrainStateTableDataManager(this.options, this.logger);
-                await this.tableDataManager.InitTableAsync();
+                    options.ToString());
+                tableDataManager = new GrainStateTableDataManager(options, logger);
+                await tableDataManager.InitTableAsync();
                 stopWatch.Stop();
-                this.logger.LogInformation((int)AzureProviderErrorCode.AzureTableProvider_InitProvider,
+                logger.LogInformation((int)AzureProviderErrorCode.AzureTableProvider_InitProvider,
                     "Initializing provider {ProviderName} of type {ProviderType} in stage {Stage} took {ElapsedMilliseconds} Milliseconds.",
-                    this.name,
-                    this.GetType().Name,
-                    this.options.InitStage,
+                    name,
+                    GetType().Name,
+                    options.InitStage,
                     stopWatch.ElapsedMilliseconds);
             }
             catch (Exception ex)
             {
                 stopWatch.Stop();
-                this.logger.LogError((int)ErrorCode.Provider_ErrorFromInit, ex,
+                logger.LogError((int)ErrorCode.Provider_ErrorFromInit, ex,
                     "Initialization failed for provider {ProviderName} of type {ProviderType} in stage {Stage} in {ElapsedMilliseconds} Milliseconds.",
-                    this.name,
-                    this.GetType().Name,
-                    this.options.InitStage,
+                    name,
+                    GetType().Name,
+                    options.InitStage,
                     stopWatch.ElapsedMilliseconds);
                 throw;
             }
@@ -521,13 +521,13 @@ namespace Orleans.Storage
 
         private Task Close(CancellationToken ct)
         {
-            this.tableDataManager = null;
+            tableDataManager = null;
             return Task.CompletedTask;
         }
 
         public void Participate(ISiloLifecycle lifecycle)
         {
-            lifecycle.Subscribe(OptionFormattingUtilities.Name<AzureTableGrainStorage>(this.name), this.options.InitStage, Init, Close);
+            lifecycle.Subscribe(OptionFormattingUtilities.Name<AzureTableGrainStorage>(name), options.InitStage, Init, Close);
         }
     }
 

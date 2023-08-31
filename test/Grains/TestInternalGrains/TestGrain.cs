@@ -15,7 +15,7 @@ namespace UnitTests.Grains
 
         public TestGrain(ILoggerFactory loggerFactory)
         {
-            this.logger = loggerFactory.CreateLogger($"{this.GetType().Name}-{this.IdentityString}");
+            logger = loggerFactory.CreateLogger($"{GetType().Name}-{IdentityString}");
         }
 
         public override Task OnActivateAsync(CancellationToken cancellationToken)
@@ -161,7 +161,7 @@ namespace UnitTests.Grains
 
         public GuidTestGrain(ILoggerFactory loggerFactory)
         {
-            this.logger = loggerFactory.CreateLogger($"{this.GetType().Name}-{this.IdentityString}");
+            logger = loggerFactory.CreateLogger($"{GetType().Name}-{IdentityString}");
         }
 
         public override Task OnActivateAsync(CancellationToken cancellationToken)
@@ -213,26 +213,26 @@ namespace UnitTests.Grains
 
         public OneWayGrain(GrainLocator grainLocator) => this.grainLocator = grainLocator;
 
-        private ILocalGrainDirectory LocalGrainDirectory => this.ServiceProvider.GetRequiredService<ILocalGrainDirectory>();
-        private ILocalSiloDetails LocalSiloDetails => this.ServiceProvider.GetRequiredService<ILocalSiloDetails>();
+        private ILocalGrainDirectory LocalGrainDirectory => ServiceProvider.GetRequiredService<ILocalGrainDirectory>();
+        private ILocalSiloDetails LocalSiloDetails => ServiceProvider.GetRequiredService<ILocalSiloDetails>();
 
         public Task Notify()
         {
-            this.count++;
+            count++;
             return Task.CompletedTask;
         }
 
         public Task Notify(ISimpleGrainObserver observer)
         {
-            this.count++;
-            observer.StateChanged(this.count - 1, this.count);
+            count++;
+            observer.StateChanged(count - 1, count);
             return Task.CompletedTask;
         }
 
         public ValueTask NotifyValueTask(ISimpleGrainObserver observer)
         {
-            this.count++;
-            observer.StateChanged(this.count - 1, this.count);
+            count++;
+            observer.StateChanged(count - 1, count);
             return default;
         }
 
@@ -254,15 +254,15 @@ namespace UnitTests.Grains
 
         public async Task<IOneWayGrain> GetOtherGrain()
         {
-            return this.other ?? (this.other = await GetGrainOnOtherSilo());
+            return other ?? (other = await GetGrainOnOtherSilo());
 
             async Task<IOneWayGrain> GetGrainOnOtherSilo()
             {
                 while (true)
                 {
-                    var candidate = this.GrainFactory.GetGrain<IOneWayGrain>(Guid.NewGuid());
+                    var candidate = GrainFactory.GetGrain<IOneWayGrain>(Guid.NewGuid());
                     var directorySilo = await candidate.GetPrimaryForGrain();
-                    var thisSilo = await this.GetSiloAddress();
+                    var thisSilo = await GetSiloAddress();
                     var candidateSilo = await candidate.GetSiloAddress();
                     if (!directorySilo.Equals(candidateSilo)
                         && !directorySilo.Equals(thisSilo)
@@ -282,7 +282,7 @@ namespace UnitTests.Grains
         public Task<string> GetActivationAddress(IGrain grain)
         {
             var grainId = ((GrainReference)grain).GrainId;
-            if (this.grainLocator.TryLookupInCache(grainId, out var result))
+            if (grainLocator.TryLookupInCache(grainId, out var result))
             {
                 return Task.FromResult(result.ToString());
             }
@@ -290,13 +290,13 @@ namespace UnitTests.Grains
             return Task.FromResult<string>(null);
         }
 
-        public Task NotifyOtherGrain() => this.other.Notify(this.AsReference<ISimpleGrainObserver>());
+        public Task NotifyOtherGrain() => other.Notify(this.AsReference<ISimpleGrainObserver>());
 
-        public Task<int> GetCount() => Task.FromResult(this.count);
+        public Task<int> GetCount() => Task.FromResult(count);
 
         public Task Deactivate()
         {
-            this.DeactivateOnIdle();
+            DeactivateOnIdle();
             return Task.CompletedTask;
         }
 
@@ -312,20 +312,20 @@ namespace UnitTests.Grains
 
         public Task<SiloAddress> GetSiloAddress()
         {
-            return Task.FromResult(this.LocalSiloDetails.SiloAddress);
+            return Task.FromResult(LocalSiloDetails.SiloAddress);
         }
 
         public Task<SiloAddress> GetPrimaryForGrain()
         {
-            var grainId = (GrainId)this.GrainId;
-            var primaryForGrain = this.LocalGrainDirectory.GetPrimaryForGrain(grainId);
+            var grainId = (GrainId)GrainId;
+            var primaryForGrain = LocalGrainDirectory.GetPrimaryForGrain(grainId);
             return Task.FromResult(primaryForGrain);
         }
 
         public void StateChanged(int a, int b)
         {
             _numSignals++;
-            this.tcs.TrySetResult(null);
+            tcs.TrySetResult(null);
         }
 
         public async Task SendSignalTo(IOneWayGrain grain)
@@ -333,12 +333,12 @@ namespace UnitTests.Grains
             await grain.Signal(_id);
         }
 
-        public Task SignalSelfViaOther() => this.other.SendSignalTo(this.AsReference<IOneWayGrain>());
+        public Task SignalSelfViaOther() => other.SendSignalTo(this.AsReference<IOneWayGrain>());
 
         public async Task<(int NumSignals, string SignallerId)> WaitForSignal()
         {
-            var signallerId = await this.tcs.Task;
-            this.tcs = new(TaskCreationOptions.RunContinuationsAsynchronously);
+            var signallerId = await tcs.Task;
+            tcs = new(TaskCreationOptions.RunContinuationsAsynchronously);
             return (_numSignals, signallerId);
         }
 
@@ -356,25 +356,25 @@ namespace UnitTests.Grains
 
         public Task Notify()
         {
-            this.count++;
+            count++;
             return Task.CompletedTask;
         }
 
         public Task Notify(ISimpleGrainObserver observer)
         {
-            this.count++;
-            observer.StateChanged(this.count - 1, this.count);
+            count++;
+            observer.StateChanged(count - 1, count);
             return Task.CompletedTask;
         }
 
         public ValueTask NotifyValueTask(ISimpleGrainObserver observer)
         {
-            this.count++;
-            observer.StateChanged(this.count - 1, this.count);
+            count++;
+            observer.StateChanged(count - 1, count);
             return default;
         }
 
-        public Task<int> GetCount() => Task.FromResult(this.count);
+        public Task<int> GetCount() => Task.FromResult(count);
 
         public Task Throws()
         {

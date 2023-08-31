@@ -35,13 +35,13 @@ namespace Orleans.Providers.GCP.Streams.PubSub
             IOptions<ClusterOptions> clusterOptions, 
             ILoggerFactory loggerFactory)
         {
-            this._providerName = name;
+            _providerName = name;
             this.options = options;
             this.clusterOptions = clusterOptions.Value;
             this.loggerFactory = loggerFactory;
-            this._adaptorFactory = () => ActivatorUtilities.GetServiceOrCreateInstance<TDataAdapter>(serviceProvider);
-            this._streamQueueMapper = new HashRingBasedStreamQueueMapper(queueMapperOptions, this._providerName);
-            this._adapterCache = new SimpleQueueAdapterCache(cacheOptions, this._providerName, loggerFactory);
+            _adaptorFactory = () => ActivatorUtilities.GetServiceOrCreateInstance<TDataAdapter>(serviceProvider);
+            _streamQueueMapper = new HashRingBasedStreamQueueMapper(queueMapperOptions, _providerName);
+            _adapterCache = new SimpleQueueAdapterCache(cacheOptions, _providerName, loggerFactory);
         }
 
         public virtual void Init()
@@ -56,8 +56,8 @@ namespace Orleans.Providers.GCP.Streams.PubSub
 
         public virtual Task<IQueueAdapter> CreateAdapter()
         {
-            var adapter = new PubSubAdapter<TDataAdapter>(_adaptorFactory(), this.loggerFactory, _streamQueueMapper,
-                this.options.ProjectId, this.options.TopicId, this.clusterOptions.ServiceId, this._providerName, this.options.Deadline, this.options.CustomEndpoint);
+            var adapter = new PubSubAdapter<TDataAdapter>(_adaptorFactory(), loggerFactory, _streamQueueMapper,
+                options.ProjectId, options.TopicId, clusterOptions.ServiceId, _providerName, options.Deadline, options.CustomEndpoint);
             return Task.FromResult<IQueueAdapter>(adapter);
         }
 

@@ -15,13 +15,13 @@ namespace Orleans.Runtime
             IOptions<ClusterOptions> clusterOptions,
             IOptions<EndpointOptions> siloEndpointOptions)
         {
-            this.Name = siloOptions.Value.SiloName;
-            this.ClusterId = clusterOptions.Value.ClusterId;
-            this.DnsHostName = Dns.GetHostName();
+            Name = siloOptions.Value.SiloName;
+            ClusterId = clusterOptions.Value.ClusterId;
+            DnsHostName = Dns.GetHostName();
 
             var endpointOptions = siloEndpointOptions.Value;
-            this.siloAddressLazy = new Lazy<SiloAddress>(() => SiloAddress.New(endpointOptions.AdvertisedIPAddress, endpointOptions.SiloPort, SiloAddress.AllocateNewGeneration()));
-            this.gatewayAddressLazy = new Lazy<SiloAddress>(() =>
+            siloAddressLazy = new Lazy<SiloAddress>(() => SiloAddress.New(endpointOptions.AdvertisedIPAddress, endpointOptions.SiloPort, SiloAddress.AllocateNewGeneration()));
+            gatewayAddressLazy = new Lazy<SiloAddress>(() =>
             {
                 var publicProxyEndpoint = endpointOptions.GetPublicProxyEndpoint();
                 return publicProxyEndpoint != null
@@ -40,9 +40,9 @@ namespace Orleans.Runtime
         public string DnsHostName { get; }
 
         /// <inheritdoc />
-        public SiloAddress SiloAddress => this.siloAddressLazy.Value;
+        public SiloAddress SiloAddress => siloAddressLazy.Value;
 
         /// <inheritdoc />
-        public SiloAddress GatewayAddress => this.gatewayAddressLazy.Value;
+        public SiloAddress GatewayAddress => gatewayAddressLazy.Value;
     }
 }

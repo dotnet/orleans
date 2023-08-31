@@ -27,9 +27,9 @@ namespace Orleans.Metadata
             ImmutableDictionary<SiloAddress, GrainManifest> silos,
             ImmutableArray<GrainManifest> allGrainManifests)
         {
-            this.Version = version;
-            this.Silos = silos;
-            this.AllGrainManifests = allGrainManifests;
+            Version = version;
+            Silos = silos;
+            AllGrainManifests = allGrainManifests;
         }
 
         /// <summary>

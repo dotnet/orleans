@@ -21,14 +21,14 @@ namespace UnitTestGrains
 
         public TimerGrain(ILoggerFactory loggerFactory)
         {
-            this.logger = loggerFactory.CreateLogger($"{this.GetType().Name}-{this.IdentityString}");
+            logger = loggerFactory.CreateLogger($"{GetType().Name}-{IdentityString}");
         }
 
         public override Task OnActivateAsync(CancellationToken cancellationToken)
         {
             ThrowIfDeactivating();
             context = RuntimeContext.Current;
-            defaultTimer = this.RegisterTimer(Tick, DefaultTimerName, period, period);
+            defaultTimer = RegisterTimer(Tick, DefaultTimerName, period, period);
             allTimers = new Dictionary<string, IDisposable>();
             return Task.CompletedTask;
         }
@@ -95,7 +95,7 @@ namespace UnitTestGrains
         public Task StartTimer(string timerName)
         {
             ThrowIfDeactivating();
-            IDisposable timer = this.RegisterTimer(Tick, timerName, TimeSpan.Zero, period);
+            IDisposable timer = RegisterTimer(Tick, timerName, TimeSpan.Zero, period);
             allTimers.Add(timerName, timer);
             return Task.CompletedTask;
         }
@@ -141,7 +141,7 @@ namespace UnitTestGrains
 
         public TimerCallGrain(ILoggerFactory loggerFactory)
         {
-            this.logger = loggerFactory.CreateLogger($"{this.GetType().Name}-{this.IdentityString}");
+            logger = loggerFactory.CreateLogger($"{GetType().Name}-{IdentityString}");
         }
 
         public Task<int> GetTickCount() { return Task.FromResult(tickCount); }
@@ -157,17 +157,17 @@ namespace UnitTestGrains
         public Task StartTimer(string name, TimeSpan delay)
         {
             logger.LogInformation("StartTimer Name={Name} Delay={Delay}", name, delay);
-            this.timerName = name;
-            this.timer = base.RegisterTimer(TimerTick, name, delay, Constants.INFINITE_TIMESPAN); // One shot timer
+            timerName = name;
+            timer = base.RegisterTimer(TimerTick, name, delay, Constants.INFINITE_TIMESPAN); // One shot timer
             return Task.CompletedTask;
         }
 
         public Task StopTimer(string name)
         {
             logger.LogInformation("StopTimer Name={Name}", name);
-            if (name != this.timerName)
+            if (name != timerName)
             {
-                throw new ArgumentException($"Wrong timer name: Expected={this.timerName} Actual={name}");
+                throw new ArgumentException($"Wrong timer name: Expected={timerName} Actual={name}");
             }
             timer.Dispose();
             return Task.CompletedTask;
@@ -181,7 +181,7 @@ namespace UnitTestGrains
             }
             catch (Exception exc)
             {
-                this.tickException = exc;
+                tickException = exc;
                 throw;
             }
         }
@@ -194,9 +194,9 @@ namespace UnitTestGrains
             CheckRuntimeContext(step);
 
             string name = (string)data;
-            if (name != this.timerName)
+            if (name != timerName)
             {
-                throw new ArgumentException(string.Format("Wrong timer name: Expected={0} Actual={1}", this.timerName, name));
+                throw new ArgumentException(string.Format("Wrong timer name: Expected={0} Actual={1}", timerName, name));
             }
 
             ISimpleGrain grain = GrainFactory.GetGrain<ISimpleGrain>(0, SimpleGrain.SimpleGrainNamePrefix);
@@ -268,26 +268,26 @@ namespace UnitTestGrains
 
         public Task<string> GetRuntimeInstanceId()
         {
-            return Task.FromResult(this.RuntimeIdentity);
+            return Task.FromResult(RuntimeIdentity);
         }
 
         public async Task StartAndWaitTimerTick(TimeSpan dueTime)
         {
-            this.completionSource = new TaskCompletionSource<int>();
-            var timer = this.RegisterTimer(TimerTick, null, dueTime, TimeSpan.FromMilliseconds(-1));
-            await this.completionSource.Task;
+            completionSource = new TaskCompletionSource<int>();
+            var timer = RegisterTimer(TimerTick, null, dueTime, TimeSpan.FromMilliseconds(-1));
+            await completionSource.Task;
         }
 
         public Task StartStuckTimer(TimeSpan dueTime)
         {
-            this.completionSource = new TaskCompletionSource<int>();
-            var timer = this.RegisterTimer(StuckTimerTick, null, dueTime, TimeSpan.FromSeconds(1));
+            completionSource = new TaskCompletionSource<int>();
+            var timer = RegisterTimer(StuckTimerTick, null, dueTime, TimeSpan.FromSeconds(1));
             return Task.CompletedTask;
         }
 
         private Task TimerTick(object state)
         {
-            this.completionSource.SetResult(1);
+            completionSource.SetResult(1);
             return Task.CompletedTask;
         }
 

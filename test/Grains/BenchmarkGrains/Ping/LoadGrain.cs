@@ -10,14 +10,14 @@ namespace BenchmarkGrains.Ping
 
         public Task Generate(int run, int conncurrent)
         {
-            this.runTask = RunGeneration(run, conncurrent);
+            runTask = RunGeneration(run, conncurrent);
             return Task.CompletedTask;
         }
 
         public async Task<Report> TryGetReport()
         {
-            this.end = true;
-            return await this.runTask;
+            end = true;
+            return await runTask;
         }
 
         private async Task<Report> RunGeneration(int run, int conncurrent)
@@ -25,7 +25,7 @@ namespace BenchmarkGrains.Ping
             List<Pending> pendingWork = Enumerable.Range(run * conncurrent, conncurrent).Select(i => new Pending() { Grain = GrainFactory.GetGrain<IPingGrain>(i) }).ToList();
             Report report = new Report();
             Stopwatch sw = Stopwatch.StartNew();
-            while (!this.end)
+            while (!end)
             {
                 foreach(Pending pending in pendingWork.Where(t => t.PendingCall == default))
                 {

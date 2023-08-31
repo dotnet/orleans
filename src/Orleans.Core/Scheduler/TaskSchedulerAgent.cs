@@ -33,7 +33,7 @@ namespace Orleans.Runtime
         {
             Cts = new CancellationTokenSource();
 
-            this.Log = loggerFactory.CreateLogger(this.GetType());
+            Log = loggerFactory.CreateLogger(GetType());
             var typeName = GetType().FullName;
             if (typeName.StartsWith("Orleans.", StringComparison.Ordinal))
             {
@@ -64,9 +64,9 @@ namespace Orleans.Runtime
                 State = AgentState.Running;
             }
 
-            Task.Run(() => this.StartAsync()).Ignore();
+            Task.Run(() => StartAsync()).Ignore();
 
-            if (Log.IsEnabled(LogLevel.Debug)) Log.LogDebug("Started asynch agent {Name}", this.Name);
+            if (Log.IsEnabled(LogLevel.Debug)) Log.LogDebug("Started asynch agent {Name}", Name);
         }
 
         private async Task StartAsync()
@@ -74,28 +74,28 @@ namespace Orleans.Runtime
             var handled = false;
             try
             {
-                await this.Run();
+                await Run();
             }
             catch (Exception exception)
             {
-                this.HandleFault(exception);
+                HandleFault(exception);
                 handled = true;
             }
             finally
             {
                 if (!handled)
                 {
-                    if (this.OnFault == FaultBehavior.RestartOnFault && !this.Cts.IsCancellationRequested)
+                    if (OnFault == FaultBehavior.RestartOnFault && !Cts.IsCancellationRequested)
                     {
                         try
                         {
                             if (Log.IsEnabled(LogLevel.Debug)) Log.LogDebug("Run completed on agent {Name} - restarting", Name);
-                            this.Start();
+                            Start();
                         }
                         catch (Exception exc)
                         {
-                            this.Log.LogError((int)ErrorCode.Runtime_Error_100027, exc, $"Unable to restart {nameof(TaskSchedulerAgent)}");
-                            this.State = AgentState.Stopped;
+                            Log.LogError((int)ErrorCode.Runtime_Error_100027, exc, $"Unable to restart {nameof(TaskSchedulerAgent)}");
+                            State = AgentState.Stopped;
                         }
                     }
                 }

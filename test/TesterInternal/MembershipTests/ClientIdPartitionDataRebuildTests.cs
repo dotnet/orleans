@@ -20,16 +20,16 @@ namespace UnitTests.MembershipTests
 
             public void StateChanged(int a, int b)
             {
-                this.lastA = a;
-                this.lastB = b;
-                this.semaphore.Release();
+                lastA = a;
+                lastB = b;
+                semaphore.Release();
             }
 
             public async Task WaitForNotification(int expectedA, int expectedB, TimeSpan timeout)
             {
-                Assert.True(await this.semaphore.WaitAsync(timeout), "No notification received");
-                Assert.Equal(expectedA, this.lastA);
-                Assert.Equal(expectedB, this.lastB);
+                Assert.True(await semaphore.WaitAsync(timeout), "No notification received");
+                Assert.Equal(expectedA, lastA);
+                Assert.Equal(expectedB, lastB);
             }
         }
 
@@ -49,7 +49,7 @@ namespace UnitTests.MembershipTests
             // Ensure the client entry is on Silo2 partition and get a grain that live on Silo3
             var grain = await SetupTestAndPickGrain<ISimpleObserverableGrain>(g => g.GetRuntimeInstanceId());
             var observer = new Observer();
-            var reference = this.hostedCluster.GrainFactory.CreateObjectReference<ISimpleGrainObserver>(observer);
+            var reference = hostedCluster.GrainFactory.CreateObjectReference<ISimpleGrainObserver>(observer);
 
             await grain.Subscribe(reference);
 
@@ -58,7 +58,7 @@ namespace UnitTests.MembershipTests
             await observer.WaitForNotification(10, 0, TimeSpan.FromSeconds(10));
 
             // Kill the silo that hold directory client entry
-            await this.hostedCluster.SecondarySilos[0].StopSiloAsync(stopGracefully: false);
+            await hostedCluster.SecondarySilos[0].StopSiloAsync(stopGracefully: false);
             await Task.Delay(5000);
 
             // Second notification should work since the directory was "rebuilt" when
@@ -76,7 +76,7 @@ namespace UnitTests.MembershipTests
 
             // Launch a long task and kill the silo that hold directory client entry
             var promise = grain.DoLongAction(TimeSpan.FromSeconds(10), "LongAction");
-            await this.hostedCluster.SecondarySilos[0].StopSiloAsync(stopGracefully: false);
+            await hostedCluster.SecondarySilos[0].StopSiloAsync(stopGracefully: false);
 
             // It should work since the directory was "rebuilt" when
             // silos in cluster detected the dead one
@@ -90,20 +90,20 @@ namespace UnitTests.MembershipTests
             CreateAndDeployTestCluster();
             for (var i = 0; i < 100; i++)
             {
-                if (this.hostedCluster.Client == null)
+                if (hostedCluster.Client == null)
                 {
-                    await this.hostedCluster.InitializeClientAsync();
+                    await hostedCluster.InitializeClientAsync();
                 }
 
-                var client = this.hostedCluster.ServiceProvider.GetRequiredService<OutsideRuntimeClient>();
+                var client = hostedCluster.ServiceProvider.GetRequiredService<OutsideRuntimeClient>();
                 clientId = client.CurrentActivationAddress.GrainId;
-                var report = await TestUtils.GetDetailedGrainReport(this.hostedCluster.InternalGrainFactory, clientId, hostedCluster.Primary);
-                if (this.hostedCluster.SecondarySilos[0].SiloAddress.Equals(report.PrimaryForGrain))
+                var report = await TestUtils.GetDetailedGrainReport(hostedCluster.InternalGrainFactory, clientId, hostedCluster.Primary);
+                if (hostedCluster.SecondarySilos[0].SiloAddress.Equals(report.PrimaryForGrain))
                 {
                     break;
                 }
                 clientId = default;
-                await this.hostedCluster.KillClientAsync();
+                await hostedCluster.KillClientAsync();
             }
             Assert.False(clientId.IsDefault);
 
@@ -111,7 +111,7 @@ namespace UnitTests.MembershipTests
             T grain = null;
             for (var i = 0; i < 100; i++)
             {
-                grain = this.hostedCluster.GrainFactory.GetGrain<T>(i);
+                grain = hostedCluster.GrainFactory.GetGrain<T>(i);
                 var instanceId = await getRuntimeInstanceId(grain);
                 if (instanceId.Contains(hostedCluster.SecondarySilos[1].SiloAddress.Endpoint.ToString()))
                 {
@@ -130,8 +130,8 @@ namespace UnitTests.MembershipTests
 
             builder.AddSiloBuilderConfigurator<SiloConfigurator>();
             builder.AddClientBuilderConfigurator<ClientConfigurator>();
-            this.hostedCluster = builder.Build();
-            this.hostedCluster.Deploy();
+            hostedCluster = builder.Build();
+            hostedCluster.Deploy();
         }
 
         public class SiloConfigurator : ISiloConfigurator

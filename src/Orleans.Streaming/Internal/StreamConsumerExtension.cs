@@ -101,13 +101,13 @@ namespace Orleans.Streams
             {
                 return await observer.DeliverItem(item, currentToken, handshakeToken);
             }
-            else if(this.streamSubscriptionObserver != null)
+            else if(streamSubscriptionObserver != null)
             {
-                var streamProvider = this.providerRuntime.ServiceProvider.GetServiceByName<IStreamProvider>(streamId.ProviderName);
+                var streamProvider = providerRuntime.ServiceProvider.GetServiceByName<IStreamProvider>(streamId.ProviderName);
                 if(streamProvider != null)
                 {
                     var subscriptionHandlerFactory = new StreamSubscriptionHandlerFactory(streamProvider, streamId, streamId.ProviderName, subscriptionId);
-                    await this.streamSubscriptionObserver.OnSubscribed(subscriptionHandlerFactory);
+                    await streamSubscriptionObserver.OnSubscribed(subscriptionHandlerFactory);
                     //check if an observer were attached after handling the new subscription, deliver on it if attached
                     if (allStreamObservers.TryGetValue(subscriptionId, out observer))
                     {
@@ -136,13 +136,13 @@ namespace Orleans.Streams
             {
                 return await observer.DeliverBatch(batch, handshakeToken);
             }
-            else if(this.streamSubscriptionObserver != null)
+            else if(streamSubscriptionObserver != null)
             {
-                var streamProvider = this.providerRuntime.ServiceProvider.GetServiceByName<IStreamProvider>(streamId.ProviderName);
+                var streamProvider = providerRuntime.ServiceProvider.GetServiceByName<IStreamProvider>(streamId.ProviderName);
                 if (streamProvider != null)
                 {
                     var subscriptionHandlerFactory = new StreamSubscriptionHandlerFactory(streamProvider, streamId, streamId.ProviderName, subscriptionId);
-                    await this.streamSubscriptionObserver.OnSubscribed(subscriptionHandlerFactory);
+                    await streamSubscriptionObserver.OnSubscribed(subscriptionHandlerFactory);
                     // check if an observer were attached after handling the new subscription, deliver on it if attached
                     if (allStreamObservers.TryGetValue(subscriptionId, out observer))
                     {

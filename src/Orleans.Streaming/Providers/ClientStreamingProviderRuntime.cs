@@ -27,12 +27,12 @@ namespace Orleans.Providers
             ClientGrainContext clientContext)
         {
             this.grainFactory = grainFactory;
-            this.ServiceProvider = serviceProvider;
+            ServiceProvider = serviceProvider;
             this.implicitSubscriberTable = implicitSubscriberTable;
             this.clientContext = clientContext;
-            this.runtimeClient = serviceProvider.GetService<IRuntimeClient>();
+            runtimeClient = serviceProvider.GetService<IRuntimeClient>();
             //all async timer created through current class all share this logger for perf reasons
-            this.timerLogger = loggerFactory.CreateLogger<AsyncTaskSafeTimer>();
+            timerLogger = loggerFactory.CreateLogger<AsyncTaskSafeTimer>();
             grainBasedPubSub = new GrainBasedPubSubRuntime(GrainFactory);
             var tmp = new ImplicitStreamPubSub(this.grainFactory, this.implicitSubscriberTable);
             implicitPubSub = tmp;
@@ -40,7 +40,7 @@ namespace Orleans.Providers
             streamDirectory = new StreamDirectory();
         }
 
-        public IGrainFactory GrainFactory => this.grainFactory;
+        public IGrainFactory GrainFactory => grainFactory;
         public IServiceProvider ServiceProvider { get; }
 
         public StreamDirectory GetStreamDirectory()
@@ -63,14 +63,14 @@ namespace Orleans.Providers
 
         public string ExecutingEntityIdentity()
         {
-            return this.runtimeClient.CurrentActivationIdentity;
+            return runtimeClient.CurrentActivationIdentity;
         }
 
         public (TExtension, TExtensionInterface) BindExtension<TExtension, TExtensionInterface>(Func<TExtension> newExtensionFunc)
             where TExtension : class, TExtensionInterface
             where TExtensionInterface : class, IGrainExtension
         {
-            return this.clientContext.GetOrSetExtension<TExtension, TExtensionInterface>(newExtensionFunc);
+            return clientContext.GetOrSetExtension<TExtension, TExtensionInterface>(newExtensionFunc);
         }
 
         public IStreamPubSub PubSub(StreamPubSubType pubSubType)
@@ -92,7 +92,7 @@ namespace Orleans.Providers
         {
             lifecycle.Subscribe<ClientStreamingProviderRuntime>(ServiceLifecycleStage.RuntimeInitialize,
                 ct => Task.CompletedTask,
-                async ct => await this.Reset(!ct.IsCancellationRequested));
+                async ct => await Reset(!ct.IsCancellationRequested));
         }
     }
 }

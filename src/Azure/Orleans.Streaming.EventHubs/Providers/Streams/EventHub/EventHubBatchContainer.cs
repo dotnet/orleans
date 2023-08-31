@@ -42,7 +42,7 @@ namespace Orleans.Streaming.EventHubs
         [NonSerialized]
         private Body payload;
 
-        private Body GetPayload() => payload ?? (payload = this.Serializer.Deserialize<Body>(eventHubMessage.Payload));
+        private Body GetPayload() => payload ?? (payload = Serializer.Deserialize<Body>(eventHubMessage.Payload));
 
         [Serializable]
         [GenerateSerializer]
@@ -60,14 +60,14 @@ namespace Orleans.Streaming.EventHubs
         public EventHubBatchContainer(EventHubMessage eventHubMessage, Serializer serializer)
         {
             this.eventHubMessage = eventHubMessage;
-            this.Serializer = serializer;
+            Serializer = serializer;
             token = new EventHubSequenceTokenV2(eventHubMessage.Offset, eventHubMessage.SequenceNumber, 0);
         }
 
         [GeneratedActivatorConstructor]
         internal EventHubBatchContainer(Serializer serializer)
         {
-            this.Serializer = serializer;
+            Serializer = serializer;
         }
 
         /// <summary>

@@ -1596,7 +1596,7 @@ namespace Orleans.Runtime
             {
                 if (_shared.Logger.IsEnabled(LogLevel.Trace))
                 {
-                    _shared.Logger.LogTrace("FinishDeactivating activation {Activation}", this.ToDetailedString());
+                    _shared.Logger.LogTrace("FinishDeactivating activation {Activation}", ToDetailedString());
                 }
 
                 StopAllTimers();
@@ -1645,7 +1645,7 @@ namespace Orleans.Runtime
 
                 if (_shared.Logger.IsEnabled(LogLevel.Trace))
                 {
-                    _shared.Logger.LogTrace("Completed async portion of FinishDeactivating for activation {Activation}", this.ToDetailedString());
+                    _shared.Logger.LogTrace("Completed async portion of FinishDeactivating for activation {Activation}", ToDetailedString());
                 }
             }
             catch (Exception ex)
@@ -1693,7 +1693,7 @@ namespace Orleans.Runtime
 
             if (_shared.Logger.IsEnabled(LogLevel.Trace))
             {
-                _shared.Logger.LogTrace("Completed final portion of FinishDeactivating for activation {Activation}", this.ToDetailedString());
+                _shared.Logger.LogTrace("Completed final portion of FinishDeactivating for activation {Activation}", ToDetailedString());
             }
 
             async Task CallGrainDeactivate(CancellationToken ct)

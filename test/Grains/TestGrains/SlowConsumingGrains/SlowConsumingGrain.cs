@@ -15,7 +15,7 @@ namespace UnitTests.Grains
 
         public SlowConsumingGrain(ILoggerFactory loggerFactory)
         {
-            this.logger = loggerFactory.CreateLogger($"{this.GetType().Name}-{this.IdentityString}");
+            logger = loggerFactory.CreateLogger($"{GetType().Name}-{IdentityString}");
         }
 
         public override Task OnActivateAsync(CancellationToken cancellationToken)
@@ -27,7 +27,7 @@ namespace UnitTests.Grains
 
         public Task<int> GetNumberConsumed()
         {
-            return Task.FromResult(this.ConsumerObserver.NumConsumed);
+            return Task.FromResult(ConsumerObserver.NumConsumed);
         }
 
         public async Task BecomeConsumer(Guid streamId, string streamNamespace, string providerToUse)
@@ -64,7 +64,7 @@ namespace UnitTests.Grains
         internal SlowObserver(SlowConsumingGrain grain, ILogger logger)
         {
             NumConsumed = 0;
-            this.slowConsumingGrain = grain;
+            slowConsumingGrain = grain;
             this.logger = logger;
         }
 
@@ -79,21 +79,21 @@ namespace UnitTests.Grains
             else
             {
                 // slow consumer keep asking for the first item it received to mimic slow consuming behavior
-                this.slowConsumingGrain.ConsumerHandle = await this.slowConsumingGrain.ConsumerHandle.ResumeAsync(this.slowConsumingGrain.ConsumerObserver, firstToken);
+                slowConsumingGrain.ConsumerHandle = await slowConsumingGrain.ConsumerHandle.ResumeAsync(slowConsumingGrain.ConsumerObserver, firstToken);
             }
 
-            this.logger.LogInformation("Consumer {HashCode} OnNextAsync() received item {Item}, with NumConsumed {NumConsumed}", this.GetHashCode(), item, NumConsumed);
+            logger.LogInformation("Consumer {HashCode} OnNextAsync() received item {Item}, with NumConsumed {NumConsumed}", GetHashCode(), item, NumConsumed);
         }
 
         public Task OnCompletedAsync()
         {
-            this.logger.LogInformation("Consumer {HashCode} OnCompletedAsync()", this.GetHashCode());
+            logger.LogInformation("Consumer {HashCode} OnCompletedAsync()", GetHashCode());
             return Task.CompletedTask;
         }
 
         public Task OnErrorAsync(Exception ex)
         {
-            this.logger.LogInformation(ex, "Consumer {HashCode} OnErrorAsync()", this.GetHashCode());
+            logger.LogInformation(ex, "Consumer {HashCode} OnErrorAsync()", GetHashCode());
             return Task.CompletedTask;
         }
     }

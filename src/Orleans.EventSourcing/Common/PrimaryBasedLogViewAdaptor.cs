@@ -119,7 +119,7 @@ namespace Orleans.EventSourcing.Common
         /// </summary>
         protected virtual void ProcessNotifications()
         {
-            if (lastVersionNotified > this.GetConfirmedVersion())
+            if (lastVersionNotified > GetConfirmedVersion())
             {
                 Services.Log(LogLevel.Debug, "force refresh because of version notification v{0}", lastVersionNotified);
                 needRefresh = true;
@@ -154,8 +154,8 @@ namespace Orleans.EventSourcing.Common
             TLogView initialstate, ILogConsistencyProtocolServices services)
         {
             Debug.Assert(host != null && services != null && initialstate != null);
-            this.Host = host;
-            this.Services = services;
+            Host = host;
+            Services = services;
             InitializeConfirmedView(initialstate);
             worker = new BatchWorkerFromDelegate(Work);
         }
@@ -353,7 +353,7 @@ namespace Orleans.EventSourcing.Common
         private void SubmitInternal(DateTime time, TLogEntry logentry, int conditionalPosition = unconditional, TaskCompletionSource<bool> resultPromise = null)
         {
             // create a submission entry
-            var submissionentry = this.MakeSubmissionEntry(logentry);
+            var submissionentry = MakeSubmissionEntry(logentry);
             submissionentry.SubmissionTime = time;
             submissionentry.ResultPromise = resultPromise;
             submissionentry.ConditionalPosition = conditionalPosition;
@@ -362,11 +362,11 @@ namespace Orleans.EventSourcing.Common
             pending.Add(submissionentry);
 
             // if we have a tentative state in use, update it
-            if (this.tentativeStateInternal != null)
+            if (tentativeStateInternal != null)
             {
                 try
                 {
-                    Host.UpdateView(this.tentativeStateInternal, logentry);
+                    Host.UpdateView(tentativeStateInternal, logentry);
                 }
                 catch (Exception e)
                 {
@@ -497,13 +497,13 @@ namespace Orleans.EventSourcing.Common
         private void CalculateTentativeState()
         {
             // copy the confirmed view
-            this.tentativeStateInternal = Services.DeepCopy(LastConfirmedView());
+            tentativeStateInternal = Services.DeepCopy(LastConfirmedView());
 
             // Now apply all operations in pending 
-            foreach (var u in this.pending)
+            foreach (var u in pending)
                 try
                 {
-                    Host.UpdateView(this.tentativeStateInternal, u.Entry);
+                    Host.UpdateView(tentativeStateInternal, u.Entry);
                 }
                 catch (Exception e)
                 {

@@ -171,27 +171,27 @@ namespace UnitTests.GrainInterfaces
         public SomeStruct(int readonlyField)
             : this()
         {
-            this.ReadonlyField = readonlyField;
+            ReadonlyField = readonlyField;
         }
 
         public readonly int GetValueWithPrivateGetter()
         {
-            return this.ValueWithPrivateGetter;
+            return ValueWithPrivateGetter;
         }
 
         public readonly int GetPrivateValue()
         {
-            return this.PrivateValue;
+            return PrivateValue;
         }
 
         public void SetPrivateValue(int value)
         {
-            this.PrivateValue = value;
+            PrivateValue = value;
         }
 
         public void SetValueWithPrivateSetter(int value)
         {
-            this.ValueWithPrivateSetter = value;
+            ValueWithPrivateSetter = value;
         }
     }
 
@@ -224,10 +224,10 @@ namespace UnitTests.GrainInterfaces
         public IEchoGrain SomeGrainReference { get; set; }
         
 #pragma warning disable 618
-        public int GetObsoleteInt() => this.ObsoleteInt;
+        public int GetObsoleteInt() => ObsoleteInt;
         public void SetObsoleteInt(int value)
         {
-            this.ObsoleteInt = value;
+            ObsoleteInt = value;
         }
 #pragma warning restore 618
 

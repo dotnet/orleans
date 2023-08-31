@@ -38,7 +38,7 @@ namespace Orleans.AzureUtils
             storage = new AzureTableDataManager<SiloInstanceTableEntry>(
                 options,
                 loggerFactory.CreateLogger<AzureTableDataManager<SiloInstanceTableEntry>>());
-            this.storagePolicyOptions = options.StoragePolicyOptions;
+            storagePolicyOptions = options.StoragePolicyOptions;
         }
 
         public static async Task<OrleansSiloInstanceManager> GetManager(
@@ -112,7 +112,7 @@ namespace Orleans.AzureUtils
 
         public async Task<IList<Uri>> FindAllGatewayProxyEndpoints()
         {
-            if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug((int)ErrorCode.Runtime_Error_100277, "Searching for active gateway silos for deployment {DeploymentId}.", this.DeploymentId);
+            if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug((int)ErrorCode.Runtime_Error_100277, "Searching for active gateway silos for deployment {DeploymentId}.", DeploymentId);
 
             try
             {
@@ -122,18 +122,18 @@ namespace Orleans.AzureUtils
 
                 var gatewaySiloInstances = queryResults.Select(entity => ConvertToGatewayUri(entity.Item1)).ToList();
 
-                logger.LogInformation((int)ErrorCode.Runtime_Error_100278, "Found {GatewaySiloCount} active Gateway Silos for deployment {DeploymentId}.", gatewaySiloInstances.Count, this.DeploymentId);
+                logger.LogInformation((int)ErrorCode.Runtime_Error_100278, "Found {GatewaySiloCount} active Gateway Silos for deployment {DeploymentId}.", gatewaySiloInstances.Count, DeploymentId);
                 return gatewaySiloInstances;
             }catch(Exception exc)
             {
-                logger.LogError((int)ErrorCode.Runtime_Error_100331, exc, "Error searching for active gateway silos for deployment {DeploymentId} ", this.DeploymentId);
+                logger.LogError((int)ErrorCode.Runtime_Error_100331, exc, "Error searching for active gateway silos for deployment {DeploymentId} ", DeploymentId);
                 throw;
             }
         }
 
         public async Task<string> DumpSiloInstanceTable()
         {
-            var queryResults = await storage.ReadAllTableEntriesForPartitionAsync(this.DeploymentId);
+            var queryResults = await storage.ReadAllTableEntriesForPartitionAsync(DeploymentId);
 
             SiloInstanceTableEntry[] entries = queryResults.Select(entry => entry.Item1).ToArray();
 
@@ -192,14 +192,14 @@ namespace Orleans.AzureUtils
 
         private async Task DeleteEntriesBatch(List<(SiloInstanceTableEntry, string)> entriesList)
         {
-            if (entriesList.Count <= this.storagePolicyOptions.MaxBulkUpdateRows)
+            if (entriesList.Count <= storagePolicyOptions.MaxBulkUpdateRows)
             {
                 await storage.DeleteTableEntriesAsync(entriesList);
             }
             else
             {
                 var tasks = new List<Task>();
-                foreach (var batch in entriesList.BatchIEnumerable(this.storagePolicyOptions.MaxBulkUpdateRows))
+                foreach (var batch in entriesList.BatchIEnumerable(storagePolicyOptions.MaxBulkUpdateRows))
                 {
                     tasks.Add(storage.DeleteTableEntriesAsync(batch));
                 }
@@ -230,7 +230,7 @@ namespace Orleans.AzureUtils
 
         internal async Task<List<(SiloInstanceTableEntry, string)>> FindAllSiloEntries()
         {
-            var queryResults = await storage.ReadAllTableEntriesForPartitionAsync(this.DeploymentId);
+            var queryResults = await storage.ReadAllTableEntriesForPartitionAsync(DeploymentId);
 
             var asList = queryResults.ToList();
             if (asList.Count < 1)

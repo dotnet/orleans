@@ -51,8 +51,8 @@ namespace Orleans.Providers.Streams.Generator
         {
             StreamId = streamId;
             EnqueueTimeUtc = DateTime.UtcNow;
-            this.Payload = payload;
-            this.RealToken = token;
+            Payload = payload;
+            RealToken = token;
         }
 
         /// <inheritdoc />

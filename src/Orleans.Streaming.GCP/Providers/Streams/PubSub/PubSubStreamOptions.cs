@@ -13,8 +13,8 @@ namespace Orleans.Configuration
         private TimeSpan? deadline;
         public TimeSpan? Deadline
         {
-            get { return this.deadline; }
-            set { this.deadline = (value.HasValue) ? TimeSpan.FromTicks(Math.Min(value.Value.Ticks, MAX_DEADLINE.Ticks)) : value; }
+            get { return deadline; }
+            set { deadline = (value.HasValue) ? TimeSpan.FromTicks(Math.Min(value.Value.Ticks, MAX_DEADLINE.Ticks)) : value; }
         }
         public static readonly TimeSpan MAX_DEADLINE = TimeSpan.FromSeconds(600);
     }

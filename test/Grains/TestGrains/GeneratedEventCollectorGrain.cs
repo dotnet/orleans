@@ -18,7 +18,7 @@ namespace TestGrains
 
         public GeneratedEventCollectorGrain(ILoggerFactory loggerFactory)
         {
-            this.logger = loggerFactory.CreateLogger($"{this.GetType().Name}-{this.IdentityString}");
+            logger = loggerFactory.CreateLogger($"{GetType().Name}-{IdentityString}");
         }
 
         public override async Task OnActivateAsync(CancellationToken cancellationToken)
@@ -44,14 +44,14 @@ namespace TestGrains
 
         public Task OnNextAsync(IList<SequentialItem<GeneratedEvent>> items)
         {
-            this.accumulated += items.Count;
-            logger.LogInformation("Received {Count} generated event. Accumulated {Accumulated} events so far.", items.Count, this.accumulated);
+            accumulated += items.Count;
+            logger.LogInformation("Received {Count} generated event. Accumulated {Accumulated} events so far.", items.Count, accumulated);
             if (items.Last().Item.EventType == GeneratedEvent.GeneratedEventType.Fill)
             {
                 return Task.CompletedTask;
             }
-            var reporter = this.GrainFactory.GetGrain<IGeneratedEventReporterGrain>(GeneratedStreamTestConstants.ReporterId);
-            return reporter.ReportResult(this.GetPrimaryKey(), GeneratedStreamTestConstants.StreamProviderName, StreamNamespace, this.accumulated);
+            var reporter = GrainFactory.GetGrain<IGeneratedEventReporterGrain>(GeneratedStreamTestConstants.ReporterId);
+            return reporter.ReportResult(this.GetPrimaryKey(), GeneratedStreamTestConstants.StreamProviderName, StreamNamespace, accumulated);
         }
     }
 }

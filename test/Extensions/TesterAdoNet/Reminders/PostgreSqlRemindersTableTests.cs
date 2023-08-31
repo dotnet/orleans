@@ -27,11 +27,11 @@ namespace UnitTests.RemindersTest
         {
             var options = new AdoNetReminderTableOptions
             {
-                Invariant = this.GetAdoInvariant(),
-                ConnectionString = this.connectionStringFixture.ConnectionString
+                Invariant = GetAdoInvariant(),
+                ConnectionString = connectionStringFixture.ConnectionString
             };
             return new AdoNetReminderTable(
-                this.clusterOptions,
+                clusterOptions,
                 Options.Create(options));
         }
 

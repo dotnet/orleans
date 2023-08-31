@@ -28,7 +28,7 @@ namespace UnitTests.General
         {
             this.output = output;
             this.fixture = fixture;
-            this.runtimeClient = this.fixture.Client.ServiceProvider.GetRequiredService<OutsideRuntimeClient>();
+            runtimeClient = this.fixture.Client.ServiceProvider.GetRequiredService<OutsideRuntimeClient>();
 
             RequestContextTestUtils.ClearActivityId();
             RequestContext.Clear();
@@ -44,7 +44,7 @@ namespace UnitTests.General
         public async Task RequestContext_ActivityId_Simple()
         {
             Guid activityId = Guid.NewGuid();
-            IRequestContextTestGrain grain = this.fixture.GrainFactory.GetGrain<IRequestContextTestGrain>(GetRandomGrainId());
+            IRequestContextTestGrain grain = fixture.GrainFactory.GetGrain<IRequestContextTestGrain>(GetRandomGrainId());
 
             RequestContextTestUtils.SetActivityId(activityId);
             Guid result = await grain.E2EActivityId();
@@ -59,7 +59,7 @@ namespace UnitTests.General
             string val = "TraceValue-" + id;
             string val2 = val + "-2";
 
-            var grain = this.fixture.GrainFactory.GetGrain<IRequestContextTestGrain>(id);
+            var grain = fixture.GrainFactory.GetGrain<IRequestContextTestGrain>(id);
 
             RequestContext.Set(key, val);
             var result = await grain.TraceIdEcho();
@@ -86,7 +86,7 @@ namespace UnitTests.General
             string val = "TraceValue-" + id;
             string val2 = val + "-2";
 
-            var grain = this.fixture.GrainFactory.GetGrain<IRequestContextTaskGrain>(id);
+            var grain = fixture.GrainFactory.GetGrain<IRequestContextTaskGrain>(id);
 
             RequestContext.Set(key, val);
             var result = await grain.TraceIdEcho();
@@ -117,9 +117,9 @@ namespace UnitTests.General
         [Fact, TestCategory("Functional"), TestCategory("RequestContext")]
         public async Task RequestContext_Task_TestRequestContext()
         {
-            var grain = this.fixture.GrainFactory.GetGrain<IRequestContextTaskGrain>(1);
+            var grain = fixture.GrainFactory.GetGrain<IRequestContextTaskGrain>(1);
             Tuple<string, string> requestContext = await grain.TestRequestContext();
-            this.fixture.Logger.LogInformation("Request Context is: {RequestContext}", requestContext);
+            fixture.Logger.LogInformation("Request Context is: {RequestContext}", requestContext);
             Assert.Equal("binks",  requestContext.Item1);  // "Item1=" + requestContext.Item1
             Assert.Equal("binks",  requestContext.Item2);  // "Item2=" + requestContext.Item2
         }
@@ -131,7 +131,7 @@ namespace UnitTests.General
             Guid activityId2 = Guid.NewGuid();
             Guid nullActivityId = Guid.Empty;
 
-            IRequestContextTestGrain grain = this.fixture.GrainFactory.GetGrain<IRequestContextTestGrain>(GetRandomGrainId());
+            IRequestContextTestGrain grain = fixture.GrainFactory.GetGrain<IRequestContextTestGrain>(GetRandomGrainId());
 
             RequestContext.Set(RequestContext.CALL_CHAIN_REENTRANCY_HEADER, activityId);
             Guid result = await grain.E2EActivityId();
@@ -156,7 +156,7 @@ namespace UnitTests.General
             Guid activityId2 = Guid.NewGuid();
             Guid nullActivityId = Guid.Empty;
 
-            IRequestContextTestGrain grain = this.fixture.GrainFactory.GetGrain<IRequestContextTestGrain>(GetRandomGrainId());
+            IRequestContextTestGrain grain = fixture.GrainFactory.GetGrain<IRequestContextTestGrain>(GetRandomGrainId());
 
             Assert.Null(RequestContext.Get(RequestContext.CALL_CHAIN_REENTRANCY_HEADER));
             RequestContext.ReentrancyId = activityId;
@@ -187,7 +187,7 @@ namespace UnitTests.General
             Guid activityId2 = Guid.NewGuid();
             Guid nullActivityId = Guid.Empty;
 
-            IRequestContextProxyGrain grain = this.fixture.GrainFactory.GetGrain<IRequestContextProxyGrain>(GetRandomGrainId());
+            IRequestContextProxyGrain grain = fixture.GrainFactory.GetGrain<IRequestContextProxyGrain>(GetRandomGrainId());
 
             Assert.Null(RequestContext.Get(RequestContext.CALL_CHAIN_REENTRANCY_HEADER));
             RequestContext.ReentrancyId = activityId;
@@ -218,7 +218,7 @@ namespace UnitTests.General
 
             RequestContext.Clear();
 
-            IRequestContextTestGrain grain = this.fixture.GrainFactory.GetGrain<IRequestContextTestGrain>(GetRandomGrainId());
+            IRequestContextTestGrain grain = fixture.GrainFactory.GetGrain<IRequestContextTestGrain>(GetRandomGrainId());
 
             Guid result = await grain.E2EActivityId();
             Assert.Equal(nullActivityId,  result);  // "E2E ActivityId should not exist"
@@ -248,7 +248,7 @@ namespace UnitTests.General
         {
             Guid nullActivityId = Guid.Empty;
 
-            IRequestContextTestGrain grain = this.fixture.GrainFactory.GetGrain<IRequestContextTestGrain>(GetRandomGrainId());
+            IRequestContextTestGrain grain = fixture.GrainFactory.GetGrain<IRequestContextTestGrain>(GetRandomGrainId());
 
             Guid result = grain.E2EActivityId().Result;
             Assert.Equal(nullActivityId,  result);  // "E2E ActivityId should not exist"
@@ -280,7 +280,7 @@ namespace UnitTests.General
             Guid activityId = Guid.NewGuid();
             Guid activityId2 = Guid.NewGuid();
 
-            IRequestContextTestGrain grain = this.fixture.GrainFactory.GetGrain<IRequestContextTestGrain>(GetRandomGrainId());
+            IRequestContextTestGrain grain = fixture.GrainFactory.GetGrain<IRequestContextTestGrain>(GetRandomGrainId());
 
             RequestContext.ReentrancyId = activityId;
             Guid result = await grain.E2EActivityId();
@@ -322,7 +322,7 @@ namespace UnitTests.General
         public void StateChanged(int a, int b)
         {
             output.WriteLine("RequestContextGrainObserver.StateChanged a={0} b={1}", a, b);
-            this.action?.Invoke(a, b, this.result);
+            action?.Invoke(a, b, result);
         }
     }
 

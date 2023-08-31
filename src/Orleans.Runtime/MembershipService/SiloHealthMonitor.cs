@@ -154,7 +154,7 @@ namespace Orleans.Runtime.MembershipService
                     {
                         activeMembersSnapshot = membershipSnapshot;
                         otherNodes = membershipSnapshot.Members.Values
-                            .Where(v => v.Status == SiloStatus.Active && v.SiloAddress != this.SiloAddress && v.SiloAddress != _localSiloDetails.SiloAddress)
+                            .Where(v => v.Status == SiloStatus.Active && v.SiloAddress != SiloAddress && v.SiloAddress != _localSiloDetails.SiloAddress)
                             .Select(s => s.SiloAddress)
                             .ToArray();
                     }
@@ -166,7 +166,7 @@ namespace Orleans.Runtime.MembershipService
                     if (isDirectProbe)
                     {
                         // Probe the silo directly.
-                        probeResult = await this.ProbeDirectly(cancellation.Token).ConfigureAwait(false);
+                        probeResult = await ProbeDirectly(cancellation.Token).ConfigureAwait(false);
                     }
                     else
                     {
@@ -176,7 +176,7 @@ namespace Orleans.Runtime.MembershipService
                         // Select a timeout which will allow the intermediary node to attempt to probe the target node and still respond to this node
                         // if the remote node does not respond in time.
                         // Attempt to account for local health degradation by extending the timeout period.
-                        probeResult = await this.ProbeIndirectly(intermediary, timeout, cancellation.Token).ConfigureAwait(false);
+                        probeResult = await ProbeIndirectly(intermediary, timeout, cancellation.Token).ConfigureAwait(false);
 
                         // If the intermediary is not entirely healthy, remove it from consideration and continue to probe.
                         // Note that all recused silos will be included in the consideration set the next time cluster membership changes.

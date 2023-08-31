@@ -25,8 +25,8 @@ namespace Benchmarks.Transactions
             var builder = new TestClusterBuilder(4);
             builder.AddSiloBuilderConfigurator<SiloMemoryStorageConfigurator>();
             builder.AddSiloBuilderConfigurator<SiloTransactionConfigurator>();
-            this.host = builder.Build();
-            this.host.Deploy();
+            host = builder.Build();
+            host.Deploy();
         }
 
         public void MemoryThrottledSetup()
@@ -35,8 +35,8 @@ namespace Benchmarks.Transactions
             builder.AddSiloBuilderConfigurator<SiloMemoryStorageConfigurator>();
             builder.AddSiloBuilderConfigurator<SiloTransactionConfigurator>();
             builder.AddSiloBuilderConfigurator<SiloTransactionThrottlingConfigurator>();
-            this.host = builder.Build();
-            this.host.Deploy();
+            host = builder.Build();
+            host.Deploy();
         }
 
         public void AzureSetup()
@@ -44,8 +44,8 @@ namespace Benchmarks.Transactions
             var builder = new TestClusterBuilder(4);
             builder.AddSiloBuilderConfigurator<SiloAzureStorageConfigurator>();
             builder.AddSiloBuilderConfigurator<SiloTransactionConfigurator>();
-            this.host = builder.Build();
-            this.host.Deploy();
+            host = builder.Build();
+            host.Deploy();
         }
 
         public void AzureThrottledSetup()
@@ -54,8 +54,8 @@ namespace Benchmarks.Transactions
             builder.AddSiloBuilderConfigurator<SiloAzureStorageConfigurator>();
             builder.AddSiloBuilderConfigurator<SiloTransactionConfigurator>();
             builder.AddSiloBuilderConfigurator<SiloTransactionThrottlingConfigurator>();
-            this.host = builder.Build();
-            this.host.Deploy();
+            host = builder.Build();
+            host.Deploy();
         }
 
         public class SiloMemoryStorageConfigurator : ISiloConfigurator
@@ -103,7 +103,7 @@ namespace Benchmarks.Transactions
         private async Task FullRunAsync()
         {
             int runners = Math.Max(1,(int)Math.Sqrt(concurrent));
-            int transactionsPerRunner = Math.Max(1, this.transactionsPerRun / runners);
+            int transactionsPerRunner = Math.Max(1, transactionsPerRun / runners);
             Report[] reports = await Task.WhenAll(Enumerable.Range(0, runners).Select(i => RunAsync(i, transactionsPerRunner, runners)));
             Report finalReport = new Report();
             foreach (Report report in reports)
@@ -121,7 +121,7 @@ namespace Benchmarks.Transactions
 
         public async Task<Report> RunAsync(int run, int transactiosPerRun, int concurrentPerRun)
         {
-            ILoadGrain load = this.host.Client.GetGrain<ILoadGrain>(Guid.NewGuid());
+            ILoadGrain load = host.Client.GetGrain<ILoadGrain>(Guid.NewGuid());
             await load.Generate(run, transactiosPerRun, concurrentPerRun);
             Report report = null;
             while (report == null)

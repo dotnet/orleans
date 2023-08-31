@@ -57,34 +57,34 @@ namespace Tester.AzureUtils.Lease
         [SkippableFact]
         public async Task LeaseBalancedQueueBalancer_SupportAutoScaleScenario()
         {
-            var mgmtGrain = this.GrainFactory.GetGrain<IManagementGrain>(0);
+            var mgmtGrain = GrainFactory.GetGrain<IManagementGrain>(0);
             //6 queue and 4 silo, then each agent manager should own queues/agents in range of [1, 2]
             await TestingUtils.WaitUntilAsync(lastTry => AgentManagerOwnCorrectAmountOfAgents(1, 2, mgmtGrain, lastTry), TimeOut);
             //stop one silo, 6 queues, 3 silo, then each agent manager should own 2 queues 
-            await this.HostedCluster.StopSiloAsync(this.HostedCluster.SecondarySilos[0]);
+            await HostedCluster.StopSiloAsync(HostedCluster.SecondarySilos[0]);
             await TestingUtils.WaitUntilAsync(lastTry => AgentManagerOwnCorrectAmountOfAgents(2, 2, mgmtGrain, lastTry), TimeOut);
             //stop another silo, 6 queues, 2 silo, then each agent manager should own 3 queues
-            await this.HostedCluster.StopSiloAsync(this.HostedCluster.SecondarySilos[0]);
+            await HostedCluster.StopSiloAsync(HostedCluster.SecondarySilos[0]);
             await TestingUtils.WaitUntilAsync(lastTry => AgentManagerOwnCorrectAmountOfAgents(3, 3, mgmtGrain, lastTry), TimeOut);
             //start one silo, 6 queues, 3 silo, then each agent manager should own 2 queues
-            this.HostedCluster.StartAdditionalSilo(true);
+            HostedCluster.StartAdditionalSilo(true);
             await TestingUtils.WaitUntilAsync(lastTry => AgentManagerOwnCorrectAmountOfAgents(2, 2, mgmtGrain, lastTry), TimeOut);
         }
 
         [SkippableFact]
         public async Task LeaseBalancedQueueBalancer_SupportUnexpectedNodeFailureScenerio()
         {
-            var mgmtGrain = this.GrainFactory.GetGrain<IManagementGrain>(0);
+            var mgmtGrain = GrainFactory.GetGrain<IManagementGrain>(0);
             //6 queue and 4 silo, then each agent manager should own queues/agents in range of [1, 2]
             await TestingUtils.WaitUntilAsync(lastTry => AgentManagerOwnCorrectAmountOfAgents(1, 2, mgmtGrain, lastTry), TimeOut);
             //stop one silo, 6 queues, 3 silo, then each agent manager should own 2 queues 
-            await this.HostedCluster.KillSiloAsync(this.HostedCluster.SecondarySilos[0]);
+            await HostedCluster.KillSiloAsync(HostedCluster.SecondarySilos[0]);
             await TestingUtils.WaitUntilAsync(lastTry => AgentManagerOwnCorrectAmountOfAgents(2, 2, mgmtGrain, lastTry), TimeOut);
             //stop another silo, 6 queues, 2 silo, then each agent manager should own 3 queues
-            await this.HostedCluster.KillSiloAsync(this.HostedCluster.SecondarySilos[0]);
+            await HostedCluster.KillSiloAsync(HostedCluster.SecondarySilos[0]);
             await TestingUtils.WaitUntilAsync(lastTry => AgentManagerOwnCorrectAmountOfAgents(3, 3, mgmtGrain, lastTry), TimeOut);
             //start one silo, 6 queues, 3 silo, then each agent manager should own 2 queues
-            this.HostedCluster.StartAdditionalSilo(true);
+            HostedCluster.StartAdditionalSilo(true);
             await TestingUtils.WaitUntilAsync(lastTry => AgentManagerOwnCorrectAmountOfAgents(2, 2, mgmtGrain, lastTry), TimeOut);
         }
 

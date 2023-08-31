@@ -17,7 +17,7 @@ namespace Tester.EventSourcingTests
         [Fact, TestCategory("EventSourcing"), TestCategory("Functional")]
         public async Task Record()
         {
-            var grain = this.fixture.GrainFactory.GetGrain<ICountersGrain>(GrainId.Create("simple-counters-grain", "0"));
+            var grain = fixture.GrainFactory.GetGrain<ICountersGrain>(GrainId.Create("simple-counters-grain", "0"));
 
             var currentstate = await grain.GetTentativeState();
             Assert.NotNull(currentstate);
@@ -39,7 +39,7 @@ namespace Tester.EventSourcingTests
         [Fact, TestCategory("EventSourcing"), TestCategory("Functional")]
         public async Task ConcurrentIncrements()
         {
-            var grain = this.fixture.GrainFactory.GetGrain<ICountersGrain>(GrainId.Create("simple-counters-grain", "0"));
+            var grain = fixture.GrainFactory.GetGrain<ICountersGrain>(GrainId.Create("simple-counters-grain", "0"));
             await ConcurrentIncrementsRunner(grain, 50, false);
         }
 

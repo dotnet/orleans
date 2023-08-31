@@ -35,7 +35,7 @@ namespace Orleans.Providers.Streams.Generator
             this.serializer = serializer;
             cache = new PooledQueueCache(this, logger, cacheMonitor, monitorWriteInterval);
             TimePurgePredicate purgePredicate = new TimePurgePredicate(TimeSpan.FromMinutes(5), TimeSpan.FromMinutes(10));
-            this.evictionStrategy = new ChronologicalEvictionStrategy(logger, purgePredicate, cacheMonitor, monitorWriteInterval) {PurgeObservable = cache};
+            evictionStrategy = new ChronologicalEvictionStrategy(logger, purgePredicate, cacheMonitor, monitorWriteInterval) {PurgeObservable = cache};
         }
 
         /// <inheritdoc />
@@ -44,7 +44,7 @@ namespace Orleans.Providers.Streams.Generator
             //Deserialize payload
             int readOffset = 0;
             ArraySegment<byte> payload = SegmentBuilder.ReadNextBytes(cachedMessage.Segment, ref readOffset);
-            object payloadObject = this.serializer.Deserialize<object>(payload);
+            object payloadObject = serializer.Deserialize<object>(payload);
             return new GeneratedBatchContainer(cachedMessage.StreamId,
                 payloadObject, new EventSequenceTokenV2(cachedMessage.SequenceNumber));
         }
@@ -71,7 +71,7 @@ namespace Orleans.Providers.Streams.Generator
         // Placed object message payload into a segment from a buffer pool.  When this get's too big, older blocks will be purged
         private ArraySegment<byte> SerializeMessageIntoPooledSegment(GeneratedBatchContainer queueMessage)
         {
-            byte[] serializedPayload = this.serializer.SerializeToArray(queueMessage.Payload);
+            byte[] serializedPayload = serializer.SerializeToArray(queueMessage.Payload);
 
             // get size of namespace, offset, partitionkey, properties, and payload
             int size = SegmentBuilder.CalculateAppendSize(serializedPayload);
@@ -83,7 +83,7 @@ namespace Orleans.Providers.Streams.Generator
                 // no block or block full, get new block and try again
                 currentBuffer = bufferPool.Allocate();
                 //call EvictionStrategy's OnBlockAllocated method
-                this.evictionStrategy.OnBlockAllocated(currentBuffer);
+                evictionStrategy.OnBlockAllocated(currentBuffer);
                 // if this fails with clean block, then requested size is too big
                 if (!currentBuffer.TryGetSegment(size, out segment))
                 {
@@ -165,7 +165,7 @@ namespace Orleans.Providers.Streams.Generator
         public bool TryPurgeFromCache(out IList<IBatchContainer> purgedItems)
         {
             purgedItems = null;
-            this.evictionStrategy.PerformPurge(DateTime.UtcNow);
+            evictionStrategy.PerformPurge(DateTime.UtcNow);
             return false;
         }
 

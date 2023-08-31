@@ -36,48 +36,48 @@ namespace Orleans.Runtime.Versions
     {
         public async Task SetCompatibilityStrategy(CompatibilityStrategy strategy)
         {
-            this.State.CompatibilityOverride = strategy;
-            await this.WriteStateAsync();
+            State.CompatibilityOverride = strategy;
+            await WriteStateAsync();
         }
 
         public async Task SetSelectorStrategy(VersionSelectorStrategy strategy)
         {
-            this.State.SelectorOverride = strategy;
-            await this.WriteStateAsync();
+            State.SelectorOverride = strategy;
+            await WriteStateAsync();
         }
 
         public async Task SetCompatibilityStrategy(GrainInterfaceType ifaceId, CompatibilityStrategy strategy)
         {
-            this.State.CompatibilityStrategies[ifaceId] = strategy;
-            await this.WriteStateAsync();
+            State.CompatibilityStrategies[ifaceId] = strategy;
+            await WriteStateAsync();
         }
 
         public async Task SetSelectorStrategy(GrainInterfaceType ifaceId, VersionSelectorStrategy strategy)
         {
-            this.State.VersionSelectorStrategies[ifaceId] = strategy;
-            await this.WriteStateAsync();
+            State.VersionSelectorStrategies[ifaceId] = strategy;
+            await WriteStateAsync();
         }
 
         public bool IsEnabled { get; }
 
         public Task<Dictionary<GrainInterfaceType, CompatibilityStrategy>> GetCompatibilityStrategies()
         {
-            return Task.FromResult(this.State.CompatibilityStrategies);
+            return Task.FromResult(State.CompatibilityStrategies);
         }
 
         public Task<Dictionary<GrainInterfaceType, VersionSelectorStrategy>> GetSelectorStrategies()
         {
-            return Task.FromResult(this.State.VersionSelectorStrategies);
+            return Task.FromResult(State.VersionSelectorStrategies);
         }
 
         public Task<CompatibilityStrategy> GetCompatibilityStrategy()
         {
-            return Task.FromResult(this.State.CompatibilityOverride);
+            return Task.FromResult(State.CompatibilityOverride);
         }
 
         public Task<VersionSelectorStrategy> GetSelectorStrategy()
         {
-            return Task.FromResult(this.State.SelectorOverride);
+            return Task.FromResult(State.SelectorOverride);
         }
     }
 }

@@ -25,7 +25,7 @@ namespace UnitTests.Management
             mgmtGrain = this.fixture.Client.GetGrain<IManagementGrain>(0);
         }
 
-        private TestCluster HostedCluster => this.fixture.HostedCluster;
+        private TestCluster HostedCluster => fixture.HostedCluster;
 
         public class Fixture : BaseTestClusterFixture
         {
@@ -33,7 +33,7 @@ namespace UnitTests.Management
             {
                 // The ActivationCount tests rely on CounterStatistic, which is a shared static value, so isolation
                 // between silos is obtained using AppDomains.
-                builder.CreateSiloAsync = StandaloneSiloHandle.CreateForAssembly(this.GetType().Assembly);
+                builder.CreateSiloAsync = StandaloneSiloHandle.CreateForAssembly(GetType().Assembly);
                 builder.Properties["GrainAssembly"] = $"{typeof(SimpleGrain).Assembly}";
             }
         }
@@ -72,7 +72,7 @@ namespace UnitTests.Management
         [Fact, TestCategory("BVT"), TestCategory("Management")]
         public void GetSimpleGrainStatistics()
         {
-            SimpleGrainStatistic[] stats = this.GetSimpleGrainStatisticsRunner("Initial");
+            SimpleGrainStatistic[] stats = GetSimpleGrainStatisticsRunner("Initial");
             Assert.True(stats.Length > 0, "Got some grain statistics: " + stats.Length);
             foreach (var s in stats)
             {
@@ -96,15 +96,15 @@ namespace UnitTests.Management
             where TGrainInterface : IGrainWithIntegerKey
             where TGrain : TGrainInterface
         {
-            SimpleGrainStatistic[] stats = this.GetSimpleGrainStatisticsRunner("Before Create");
+            SimpleGrainStatistic[] stats = GetSimpleGrainStatisticsRunner("Before Create");
             Assert.True(stats.Length > 0, "Got some grain statistics: " + stats.Length);
 
             string grainType = RuntimeTypeNameFormatter.Format(typeof(TGrain));
             int initialStatisticsCount = stats.Count(s => s.GrainType == grainType);
             int initialActivationsCount = stats.Where(s => s.GrainType == grainType).Sum(s => s.ActivationCount);
-            var grain1 = this.fixture.Client.GetGrain<TGrainInterface>(Random.Shared.Next());
+            var grain1 = fixture.Client.GetGrain<TGrainInterface>(Random.Shared.Next());
             callGrainMethodAction(grain1); // Call grain method
-            stats = this.GetSimpleGrainStatisticsRunner("After Invoke");
+            stats = GetSimpleGrainStatisticsRunner("After Invoke");
             Assert.True(stats.Count(s => s.GrainType == grainType) >= initialStatisticsCount, "Activation counter now exists for grain: " + grainType);
             int expectedActivationsCount = initialActivationsCount + 1;
             int actualActivationsCount = stats.Where(s => s.GrainType == grainType).Sum(s => s.ActivationCount);

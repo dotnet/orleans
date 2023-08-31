@@ -25,7 +25,7 @@ namespace Benchmarks.MapReduce
         public async Task Bench()
         {
             var pipelines = Enumerable
-                .Range(0, this._pipelineParallelization)
+                .Range(0, _pipelineParallelization)
                 .AsParallel()
                 .WithDegreeOfParallelism(4)
                 .Select(async i =>
@@ -53,7 +53,7 @@ namespace Benchmarks.MapReduce
 
             // used for imitation of complex processing pipelines
             var intermediateGrains = Enumerable
-                .Range(0, this._intermediateStagesCount)
+                .Range(0, _intermediateStagesCount)
                 .Select(i =>
                 {
                     var intermediateProcessor =
@@ -87,9 +87,9 @@ namespace Benchmarks.MapReduce
 
             List<Dictionary<string, int>> resultList = new List<Dictionary<string, int>>();
 
-            while (Interlocked.Increment(ref this._currentRepeat) < this._repeats)
+            while (Interlocked.Increment(ref _currentRepeat) < _repeats)
             {
-                await mapper.SendAsync(this._text);
+                await mapper.SendAsync(_text);
                 while (!resultList.Any() || resultList.First().Count < 84) // rough way of checking of pipeline completition.
                 {
                     resultList = await collector.ReceiveAll();

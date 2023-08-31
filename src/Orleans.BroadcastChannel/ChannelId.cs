@@ -33,13 +33,13 @@ namespace Orleans.BroadcastChannel
         /// Gets the namespace.
         /// </summary>
         /// <value>The namespace.</value>
-        public ReadOnlyMemory<byte> Namespace => fullKey.AsMemory(0, this.keyIndex);
+        public ReadOnlyMemory<byte> Namespace => fullKey.AsMemory(0, keyIndex);
 
         /// <summary>
         /// Gets the key.
         /// </summary>
         /// <value>The key.</value>
-        public ReadOnlyMemory<byte> Key => fullKey.AsMemory(this.keyIndex);
+        public ReadOnlyMemory<byte> Key => fullKey.AsMemory(keyIndex);
 
         private ChannelId(byte[] fullKey, ushort keyIndex, int hash)
         {
@@ -56,8 +56,8 @@ namespace Orleans.BroadcastChannel
         private ChannelId(SerializationInfo info, StreamingContext context)
         {
             fullKey = (byte[])info.GetValue("fk", typeof(byte[]))!;
-            this.keyIndex = info.GetUInt16("ki");
-            this.hash = info.GetInt32("fh");
+            keyIndex = info.GetUInt16("ki");
+            hash = info.GetInt32("fh");
         }
 
         /// <summary>
@@ -133,7 +133,7 @@ namespace Orleans.BroadcastChannel
         public bool Equals(ChannelId other) => fullKey.AsSpan().SequenceEqual(other.fullKey);
 
         /// <inheritdoc/>
-        public override bool Equals(object? obj) => obj is ChannelId other ? this.Equals(other) : false;
+        public override bool Equals(object? obj) => obj is ChannelId other ? Equals(other) : false;
 
         /// <summary>
         /// Compares two <see cref="ChannelId"/> instances for equality.
@@ -155,8 +155,8 @@ namespace Orleans.BroadcastChannel
         public void GetObjectData(SerializationInfo info, StreamingContext context)
         {
             info.AddValue("fk", fullKey);
-            info.AddValue("ki", this.keyIndex);
-            info.AddValue("fh", this.hash);
+            info.AddValue("ki", keyIndex);
+            info.AddValue("fh", hash);
         }
 
         /// <inheritdoc/>
@@ -188,7 +188,7 @@ namespace Orleans.BroadcastChannel
         }
 
         /// <inheritdoc/>
-        public override int GetHashCode() => this.hash;
+        public override int GetHashCode() => hash;
 
         internal uint GetUniformHashCode() => (uint)hash;
 
@@ -234,7 +234,7 @@ namespace Orleans.BroadcastChannel
 
         public bool Equals(InternalChannelId other) => ChannelId.Equals(other) && ProviderName.Equals(other.ProviderName);
 
-        public override bool Equals(object? obj) => obj is InternalChannelId other ? this.Equals(other) : false;
+        public override bool Equals(object? obj) => obj is InternalChannelId other ? Equals(other) : false;
 
         public static bool operator ==(InternalChannelId s1, InternalChannelId s2) => s1.Equals(s2);
 

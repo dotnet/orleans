@@ -16,16 +16,16 @@ namespace Orleans.Transactions
 
         public DateTime UtcNow()
         {
-            lock (this.lockable)
+            lock (lockable)
             {
-                var ticks = previous = Math.Max(previous + 1, this.clock.UtcNow().Ticks);
+                var ticks = previous = Math.Max(previous + 1, clock.UtcNow().Ticks);
                 return new DateTime(ticks, DateTimeKind.Utc);
             }
         }
 
         public DateTime Merge(DateTime timestamp)
         {
-            lock (this.lockable)
+            lock (lockable)
             {
                 var ticks = previous = Math.Max(previous, timestamp.Ticks);
                 return new DateTime(ticks, DateTimeKind.Utc);
@@ -34,9 +34,9 @@ namespace Orleans.Transactions
 
         public DateTime MergeUtcNow(DateTime timestamp)
         {
-            lock (this.lockable)
+            lock (lockable)
             {
-                var ticks = previous = Math.Max(Math.Max(previous + 1, timestamp.Ticks + 1), this.clock.UtcNow().Ticks);
+                var ticks = previous = Math.Max(Math.Max(previous + 1, timestamp.Ticks + 1), clock.UtcNow().Ticks);
                 return new DateTime(ticks, DateTimeKind.Utc);
             }
         }

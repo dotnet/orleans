@@ -33,18 +33,18 @@ namespace ServiceBus.Tests.TestStreamProviders
             : base(name, options, ehOptions, receiverOptions, cacheOptions, evictionOptions, statisticOptions, dataAdatper, serviceProvider, loggerFactory, hostEnvironmentStatistics)
 
         {
-            this.createdCaches = new ConcurrentBag<QueueCacheForTesting>();
+            createdCaches = new ConcurrentBag<QueueCacheForTesting>();
             this.cacheOptions = cacheOptions;
-            this.staticticOptions = statisticOptions;
+            staticticOptions = statisticOptions;
             this.ehOptions = ehOptions;
             this.evictionOptions = evictionOptions;
         }
 
         protected override IEventHubQueueCacheFactory CreateCacheFactory(EventHubStreamCachePressureOptions options)
         {
-            var eventHubPath = this.ehOptions.EventHubName;
+            var eventHubPath = ehOptions.EventHubName;
             var sharedDimensions = new EventHubMonitorAggregationDimensions(eventHubPath);
-            return new CacheFactoryForTesting(this.Name, this.cacheOptions, this.evictionOptions,this.staticticOptions, base.dataAdapter, this.createdCaches, sharedDimensions, this.serviceProvider.GetRequiredService<ILoggerFactory>());
+            return new CacheFactoryForTesting(Name, cacheOptions, evictionOptions,staticticOptions, base.dataAdapter, createdCaches, sharedDimensions, serviceProvider.GetRequiredService<ILoggerFactory>());
         }
 
         private class CacheFactoryForTesting : EventHubQueueCacheFactory
@@ -76,13 +76,13 @@ namespace ServiceBus.Tests.TestStreamProviders
                 EventHubMonitorAggregationDimensions sharedDimensions)
             {
                 var cacheMonitorDimensions = new EventHubCacheMonitorDimensions(sharedDimensions, partition, blockPoolId);
-                var cacheMonitor = this.CacheMonitorFactory(cacheMonitorDimensions, loggerFactory);
-                var cacheLogger = loggerFactory.CreateLogger($"{typeof(EventHubQueueCache).FullName}.{this.name}.{partition}");
+                var cacheMonitor = CacheMonitorFactory(cacheMonitorDimensions, loggerFactory);
+                var cacheLogger = loggerFactory.CreateLogger($"{typeof(EventHubQueueCache).FullName}.{name}.{partition}");
                 var evictionStrategy = new ChronologicalEvictionStrategy(cacheLogger, timePurge, cacheMonitor, options.StatisticMonitorWriteInterval);
                 //set defaultMaxAddCount to 10 so TryCalculateCachePressureContribution will start to calculate real contribution shortly
                 var cache = new QueueCacheForTesting(DefaultMaxAddCount, bufferPool, dataAdatper, evictionStrategy, checkpointer,
                     cacheLogger, cacheMonitor, options.StatisticMonitorWriteInterval);
-                this.caches.Add(cache);
+                caches.Add(cache);
                 return cache;
             }
         }
@@ -100,7 +100,7 @@ namespace ServiceBus.Tests.TestStreamProviders
             int IQueueFlowController.GetMaxAddCount()
             {
                 int maxAddCount = base.GetMaxAddCount();
-                this.IsUnderPressure = maxAddCount <= 0;
+                IsUnderPressure = maxAddCount <= 0;
                 return maxAddCount;
             }
         }
@@ -119,7 +119,7 @@ namespace ServiceBus.Tests.TestStreamProviders
             switch (command)
             {
                 case IsCacheBackPressureTriggeredCommand:
-                    return Task.FromResult<object>(this.createdCaches.Any(cache => cache.IsUnderPressure));
+                    return Task.FromResult<object>(createdCaches.Any(cache => cache.IsUnderPressure));
                 default: return base.ExecuteCommand(command, arg);
             }
         }

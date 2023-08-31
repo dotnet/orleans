@@ -33,8 +33,8 @@ namespace Orleans.Providers.Streams.Common
                 throw new ArgumentOutOfRangeException(nameof(blockSizeInByte), "blockSize must be positive value.");
             }
             count = 0;
-            this.SizeInByte = blockSizeInByte;
-            buffer = new byte[this.SizeInByte];
+            SizeInByte = blockSizeInByte;
+            buffer = new byte[SizeInByte];
         }
 
         /// <summary>

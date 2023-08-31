@@ -26,7 +26,7 @@ namespace UnitTests.Grains
 
         public EchoGrain(ILoggerFactory loggerFactory)
         {
-            this.logger = loggerFactory.CreateLogger($"{this.GetType().Name}-{this.IdentityString}");
+            logger = loggerFactory.CreateLogger($"{GetType().Name}-{IdentityString}");
         }
 
         public override Task OnActivateAsync(CancellationToken cancellationToken)
@@ -185,7 +185,7 @@ namespace UnitTests.Grains
             SiloAddress siloAddress = silos.Where(pair => !pair.Key.Equals(mySilo)).Select(pair => pair.Key).First();
             logger.LogInformation("Sending Ping to remote silo {SiloAddress}", siloAddress);
 
-            var oracle = this.internalGrainFactory.GetSystemTarget<IMembershipService>(Constants.MembershipServiceType, siloAddress);
+            var oracle = internalGrainFactory.GetSystemTarget<IMembershipService>(Constants.MembershipServiceType, siloAddress);
 
             await oracle.Ping(1);
             logger.LogInformation("Ping reply received for {SiloAddress}", siloAddress);
@@ -193,7 +193,7 @@ namespace UnitTests.Grains
 
         private ISiloControl GetSiloControlReference(SiloAddress silo)
         {
-            return this.internalGrainFactory.GetSystemTarget<ISiloControl>(Constants.SiloControlType, silo);
+            return internalGrainFactory.GetSystemTarget<ISiloControl>(Constants.SiloControlType, silo);
         }
 
         public Task OrleansDebuggerHelper_GetGrainInstance_Test()
@@ -207,7 +207,7 @@ namespace UnitTests.Grains
             result = OrleansDebuggerHelper.GetGrainInstance(this.AsReference<IDebuggerHelperTestGrain>());
             Assert.Same(this, result);
 
-            result = OrleansDebuggerHelper.GetGrainInstance(this.GrainFactory.GetGrain<IEchoGrain>(Guid.NewGuid()));
+            result = OrleansDebuggerHelper.GetGrainInstance(GrainFactory.GetGrain<IEchoGrain>(Guid.NewGuid()));
             Assert.Null(result);
 
             return Task.CompletedTask;
@@ -221,7 +221,7 @@ namespace UnitTests.Grains
 
         public BlockingEchoTaskGrain(ILoggerFactory loggerFactory)
         {
-            this.logger = loggerFactory.CreateLogger($"{this.GetType().Name}-{this.IdentityString}");
+            logger = loggerFactory.CreateLogger($"{GetType().Name}-{IdentityString}");
         }
 
         public override Task OnActivateAsync(CancellationToken cancellationToken)
@@ -314,7 +314,7 @@ namespace UnitTests.Grains
 
         public ReentrantBlockingEchoTaskGrain(ILoggerFactory loggerFactory)
         {
-            this.logger = loggerFactory.CreateLogger($"{this.GetType().Name}-{this.IdentityString}");
+            logger = loggerFactory.CreateLogger($"{GetType().Name}-{IdentityString}");
         }
 
         public override Task OnActivateAsync(CancellationToken cancellationToken)

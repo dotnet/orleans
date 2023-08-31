@@ -181,17 +181,17 @@ namespace Tester
 
             public Task OnStart(CancellationToken ct)
             {
-                this.Started = true;
-                this.FailedOnStart = this.failOnStart;
-                if (this.failOnStart) throw new Exception("failOnStart");
+                Started = true;
+                FailedOnStart = failOnStart;
+                if (failOnStart) throw new Exception("failOnStart");
                 return Task.CompletedTask;
             }
 
             public Task OnStop(CancellationToken ct)
             {
-                this.Stopped = true;
-                this.FailedOnStop = this.failOnStop;
-                if (this.failOnStop) throw new Exception("failOnStop");
+                Stopped = true;
+                FailedOnStop = failOnStop;
+                if (failOnStop) throw new Exception("failOnStop");
                 return Task.CompletedTask;
             }
         }
@@ -207,13 +207,13 @@ namespace Tester
 
             private Task OnStartStage(TestStages stage)
             {
-                this.Started[stage] = true;
+                Started[stage] = true;
                 return Task.CompletedTask;
             }
 
             private Task OnStopStage(TestStages stage)
             {
-                this.Stopped[stage] = true;
+                Stopped[stage] = true;
                 return Task.CompletedTask;
             }
 

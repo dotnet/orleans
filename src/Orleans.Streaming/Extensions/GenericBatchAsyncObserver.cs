@@ -23,17 +23,17 @@ namespace Orleans.Streams
 
         public Task OnNextAsync(IList<SequentialItem<T>> items)
         {
-            return this.onNextAsync(items);
+            return onNextAsync(items);
         }
 
         public Task OnCompletedAsync()
         {
-            return this.onCompletedAsync();
+            return onCompletedAsync();
         }
 
         public Task OnErrorAsync(Exception ex)
         {
-            return this.onErrorAsync(ex);
+            return onErrorAsync(ex);
         }
     }
 }

@@ -12,7 +12,7 @@ namespace BenchmarkGrains.MapReduce
 
         public Task SendAsync(T t)
         {
-            this._items.Add(t);
+            _items.Add(t);
             return Task.CompletedTask;
         }
 
@@ -33,8 +33,8 @@ namespace BenchmarkGrains.MapReduce
 
         public Task<List<T>> ReceiveAll()
         {
-            var items = this._items.ToList();
-            this._items.Clear();
+            var items = _items.ToList();
+            _items.Clear();
             return Task.FromResult(items);
         }
     }

@@ -25,7 +25,7 @@ namespace Tester.ClientConnectionTests
         [Fact]
         public async Task ConnectIsRetryableTest()
         {
-            var gateways = await this.HostedCluster.Client.ServiceProvider.GetRequiredService<IGatewayListProvider>().GetGateways();
+            var gateways = await HostedCluster.Client.ServiceProvider.GetRequiredService<IGatewayListProvider>().GetGateways();
             var gwEndpoint = gateways.First();
 
             // Create a client with no gateway endpoint and then add a gateway endpoint when the client fails to connect.
@@ -45,7 +45,7 @@ namespace Tester.ClientConnectionTests
                     clientBuilder
                         .Configure<ClusterOptions>(options =>
                         {
-                            var existingClientOptions = this.HostedCluster.ServiceProvider
+                            var existingClientOptions = HostedCluster.ServiceProvider
                                 .GetRequiredService<IOptions<ClusterOptions>>().Value;
                             options.ClusterId = existingClientOptions.ClusterId;
                             options.ServiceId = existingClientOptions.ServiceId;
@@ -68,7 +68,7 @@ namespace Tester.ClientConnectionTests
 
             public Task InitializeGatewayListProvider() => Task.CompletedTask;
 
-            public Task<IList<Uri>> GetGateways() => Task.FromResult<IList<Uri>>(this.Gateways);
+            public Task<IList<Uri>> GetGateways() => Task.FromResult<IList<Uri>>(Gateways);
 
             public TimeSpan MaxStaleness => TimeSpan.FromSeconds(30);
 

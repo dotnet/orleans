@@ -42,10 +42,10 @@ namespace Orleans.LeaseProviders
         /// <param name="startTimeUtc"></param>
         public AcquiredLease(string resourceKey, TimeSpan duration, string token, DateTime startTimeUtc)
         {
-            this.ResourceKey = resourceKey;
-            this.Duration = duration;
-            this.Token = token;
-            this.StartTimeUtc = startTimeUtc;
+            ResourceKey = resourceKey;
+            Duration = duration;
+            Token = token;
+            StartTimeUtc = startTimeUtc;
         }
 
         /// <summary>
@@ -54,7 +54,7 @@ namespace Orleans.LeaseProviders
         /// <param name="resourceKey"></param>
         public AcquiredLease(string resourceKey)
         {
-            this.ResourceKey = resourceKey;
+            ResourceKey = resourceKey;
         }
     }
 
@@ -84,9 +84,9 @@ namespace Orleans.LeaseProviders
 
         public AcquireLeaseResult(AcquiredLease acquiredLease, ResponseCode statusCode, Exception failureException)
         {
-            this.AcquiredLease = acquiredLease;
-            this.StatusCode = statusCode;
-            this.FailureException = failureException;
+            AcquiredLease = acquiredLease;
+            StatusCode = statusCode;
+            FailureException = failureException;
         }
     }
 
@@ -136,8 +136,8 @@ namespace Orleans.LeaseProviders
         /// <param name="duration"></param>
         public LeaseRequest(string resourceKey, TimeSpan duration)
         {
-            this.ResourceKey = resourceKey;
-            this.Duration = duration;
+            ResourceKey = resourceKey;
+            Duration = duration;
         }
     }
 

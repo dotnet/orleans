@@ -20,7 +20,7 @@ namespace Orleans.Runtime.Messaging
         {
             this.connectionFactory = connectionFactory;
             this.serviceProvider = serviceProvider;
-            this.ConnectionOptions = connectionOptions.Value;
+            ConnectionOptions = connectionOptions.Value;
         }
 
         protected ConnectionOptions ConnectionOptions { get; }
@@ -29,14 +29,14 @@ namespace Orleans.Runtime.Messaging
         {
             get
             {
-                if (this.connectionDelegate != null) return this.connectionDelegate;
+                if (connectionDelegate != null) return connectionDelegate;
 
                 lock (this)
                 {
-                    if (this.connectionDelegate != null) return this.connectionDelegate;
+                    if (connectionDelegate != null) return connectionDelegate;
 
                     // Configure the connection builder using the user-defined options.
-                    var connectionBuilder = new ConnectionBuilder(this.serviceProvider);
+                    var connectionBuilder = new ConnectionBuilder(serviceProvider);
                     connectionBuilder.Use(next =>
                     {
                         return context =>
@@ -45,9 +45,9 @@ namespace Orleans.Runtime.Messaging
                             return next(context);
                         };
                     });
-                    this.ConfigureConnectionBuilder(connectionBuilder);
+                    ConfigureConnectionBuilder(connectionBuilder);
                     Connection.ConfigureBuilder(connectionBuilder);
-                    return this.connectionDelegate = connectionBuilder.Build();
+                    return connectionDelegate = connectionBuilder.Build();
                 }
             }
         }
@@ -58,8 +58,8 @@ namespace Orleans.Runtime.Messaging
 
         public virtual async ValueTask<Connection> ConnectAsync(SiloAddress address, CancellationToken cancellationToken)
         {
-            var connectionContext = await this.connectionFactory.ConnectAsync(address.Endpoint, cancellationToken);
-            var connection = this.CreateConnection(address, connectionContext);
+            var connectionContext = await connectionFactory.ConnectAsync(address.Endpoint, cancellationToken);
+            var connection = CreateConnection(address, connectionContext);
             return connection;
         }
     }

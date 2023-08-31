@@ -58,24 +58,24 @@ namespace Orleans.Streaming.EventHubs
             TimeSpan? cacheMonitorWriteInterval,
             TimeSpan? metadataMinTimeInCache)
         {
-            this.Partition = partition;
+            Partition = partition;
             this.defaultMaxAddCount = defaultMaxAddCount;
             this.bufferPool = bufferPool;
             this.dataAdapter = dataAdapter;
             this.checkpointer = checkpointer;
-            this.cache = new PooledQueueCache(dataAdapter, logger, cacheMonitor, cacheMonitorWriteInterval, metadataMinTimeInCache);
+            cache = new PooledQueueCache(dataAdapter, logger, cacheMonitor, cacheMonitorWriteInterval, metadataMinTimeInCache);
             this.cacheMonitor = cacheMonitor;
             this.evictionStrategy = evictionStrategy;
-            this.evictionStrategy.OnPurged = this.OnPurge;
-            this.evictionStrategy.PurgeObservable = this.cache;
-            this.cachePressureMonitor = new AggregatedCachePressureMonitor(logger, cacheMonitor);
+            this.evictionStrategy.OnPurged = OnPurge;
+            this.evictionStrategy.PurgeObservable = cache;
+            cachePressureMonitor = new AggregatedCachePressureMonitor(logger, cacheMonitor);
             this.logger = logger;
         }
 
         /// <inheritdoc />
         public void SignalPurge()
         {
-            this.evictionStrategy.PerformPurge(DateTime.UtcNow);
+            evictionStrategy.PerformPurge(DateTime.UtcNow);
         }
 
         /// <summary>
@@ -84,8 +84,8 @@ namespace Orleans.Streaming.EventHubs
         /// <param name="monitor"></param>
         public void AddCachePressureMonitor(ICachePressureMonitor monitor)
         {
-            monitor.CacheMonitor = this.cacheMonitor;
-            this.cachePressureMonitor.AddCachePressureMonitor(monitor);
+            monitor.CacheMonitor = cacheMonitor;
+            cachePressureMonitor.AddCachePressureMonitor(monitor);
         }
 
         /// <summary>
@@ -94,7 +94,7 @@ namespace Orleans.Streaming.EventHubs
         /// <filterpriority>2</filterpriority>
         public void Dispose()
         {
-            this.evictionStrategy.OnPurged = null;
+            evictionStrategy.OnPurged = null;
         }
 
         /// <summary>
@@ -117,8 +117,8 @@ namespace Orleans.Streaming.EventHubs
             List<CachedMessage> cachedMessages = new List<CachedMessage>();
             foreach (EventData message in messages)
             {
-                StreamPosition position = this.dataAdapter.GetStreamPosition(this.Partition, message);
-                cachedMessages.Add(this.dataAdapter.FromQueueMessage(position, message, dequeueTimeUtc, this.GetSegment));
+                StreamPosition position = dataAdapter.GetStreamPosition(Partition, message);
+                cachedMessages.Add(dataAdapter.FromQueueMessage(position, message, dequeueTimeUtc, GetSegment));
                 positions.Add(position);
             }
             cache.Add(cachedMessages, dequeueTimeUtc);
@@ -172,7 +172,7 @@ namespace Orleans.Streaming.EventHubs
             }
             if (lastItemPurged.HasValue)
             {
-                checkpointer.Update(this.dataAdapter.GetOffset(lastItemPurged.Value), DateTime.UtcNow);
+                checkpointer.Update(dataAdapter.GetOffset(lastItemPurged.Value), DateTime.UtcNow);
             }
         }
 
@@ -211,7 +211,7 @@ namespace Orleans.Streaming.EventHubs
                 // no block or block full, get new block and try again
                 currentBuffer = bufferPool.Allocate();
                 //call EvictionStrategy's OnBlockAllocated method
-                this.evictionStrategy.OnBlockAllocated(currentBuffer);
+                evictionStrategy.OnBlockAllocated(currentBuffer);
                 // if this fails with clean block, then requested size is too big
                 if (!currentBuffer.TryGetSegment(size, out segment))
                 {

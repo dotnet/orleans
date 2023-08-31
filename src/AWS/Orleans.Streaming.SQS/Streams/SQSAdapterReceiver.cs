@@ -85,7 +85,7 @@ namespace OrleansAWSUtils.Streams
                 IEnumerable<SQSMessage> messages = await task;
 
                 List<IBatchContainer> messageBatch = messages
-                    .Select(msg => (IBatchContainer)SQSBatchContainer.FromSQSMessage(this.serializer, msg, lastReadMessage++)).ToList();
+                    .Select(msg => (IBatchContainer)SQSBatchContainer.FromSQSMessage(serializer, msg, lastReadMessage++)).ToList();
 
                 return messageBatch;
             }

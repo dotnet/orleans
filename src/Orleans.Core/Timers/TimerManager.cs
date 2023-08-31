@@ -44,19 +44,19 @@ namespace Orleans.Timers.Internal
 
             public DelayTimer(DateTime dueTime, CancellationToken cancellationToken)
             {
-                this.DueTime = dueTime;
-                this.CancellationToken = cancellationToken;
+                DueTime = dueTime;
+                CancellationToken = cancellationToken;
             }
 
-            public Task<bool> Completion => this.completion.Task;
+            public Task<bool> Completion => completion.Task;
 
             public DateTime DueTime { get; }
 
             public CancellationToken CancellationToken { get; }
 
-            public void OnTimeout() => this.completion.TrySetResult(true);
+            public void OnTimeout() => completion.TrySetResult(true);
 
-            public void OnCanceled() => this.completion.TrySetResult(false);
+            public void OnCanceled() => completion.TrySetResult(false);
 
             DelayTimer ILinkedListElement<DelayTimer>.Next { get; set; }
         }
@@ -268,7 +268,7 @@ namespace Orleans.Timers.Internal
 
             public void FireTimers()
             {
-                var current = this.Head;
+                var current = Head;
                 while (current != null)
                 {
                     try

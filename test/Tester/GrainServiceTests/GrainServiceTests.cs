@@ -26,7 +26,7 @@ namespace Tester
 
         public GrainServiceTests(Fixture fixture)
         {
-            this.GrainFactory = fixture.GrainFactory;
+            GrainFactory = fixture.GrainFactory;
         }
 
         public IGrainFactory GrainFactory { get; set; }
@@ -34,7 +34,7 @@ namespace Tester
         [Fact, TestCategory("BVT"), TestCategory("GrainServices")]
         public async Task SimpleInvokeGrainService()
         {
-            IGrainServiceTestGrain grain = this.GrainFactory.GetGrain<IGrainServiceTestGrain>(0);
+            IGrainServiceTestGrain grain = GrainFactory.GetGrain<IGrainServiceTestGrain>(0);
             var grainId = await grain.GetHelloWorldUsingCustomService();
             Assert.Equal("Hello World from Test Grain Service", grainId);
             var prop = await grain.GetServiceConfigProperty();

@@ -31,7 +31,7 @@ namespace Orleans.Transactions.TestKit
             var tasks = new Task[numThreads];
             for (int i = 0; i < numThreads; i++)
             {
-                tasks[i] = harness.RunRandomTransactionSequence(i, numTxsPerThread, grainFactory, this.testOutput);
+                tasks[i] = harness.RunRandomTransactionSequence(i, numTxsPerThread, grainFactory, testOutput);
             }
 
             // wait for the test to finish

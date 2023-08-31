@@ -35,10 +35,10 @@ namespace Orleans.Configuration
         /// <inheritdoc />
         public void ValidateConfiguration()
         {
-            if (this.options.ChooseOutOf <= 0)
+            if (options.ChooseOutOf <= 0)
             {
                 throw new OrleansConfigurationException(
-                    $"The value of {nameof(ActivationCountBasedPlacementOptions)}.{nameof(this.options.ChooseOutOf)} must be greater than 0.");
+                    $"The value of {nameof(ActivationCountBasedPlacementOptions)}.{nameof(options.ChooseOutOf)} must be greater than 0.");
             }
         }
     }

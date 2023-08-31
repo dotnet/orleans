@@ -18,31 +18,31 @@ namespace UnitTests.General
 
         public DisabledCallChainReentrancyTests(Fixture fixture)
         {
-            this.runner = new DisabledCallChainReentrancyTestRunner(fixture.GrainFactory, fixture.Logger);
+            runner = new DisabledCallChainReentrancyTestRunner(fixture.GrainFactory, fixture.Logger);
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Tasks"), TestCategory("Reentrancy")]
         public void NonReentrantGrain()
         {
-            this.runner.NonReentrantGrain(false);
+            runner.NonReentrantGrain(false);
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Tasks"), TestCategory("Reentrancy")]
         public void NonReentrantGrain_WithMayInterleaveStaticPredicate_WhenPredicateReturnsFalse()
         {
-            this.runner.NonReentrantGrain_WithMayInterleaveStaticPredicate_WhenPredicateReturnsFalse(false);
+            runner.NonReentrantGrain_WithMayInterleaveStaticPredicate_WhenPredicateReturnsFalse(false);
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Tasks"), TestCategory("Reentrancy")]
         public void NonReentrantGrain_WithMayInterleaveInstancedPredicate_WhenPredicateReturnsFalse()
         {
-            this.runner.NonReentrantGrain_WithMayInterleaveInstancedPredicate_WhenPredicateReturnsFalse(false);
+            runner.NonReentrantGrain_WithMayInterleaveInstancedPredicate_WhenPredicateReturnsFalse(false);
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Tasks"), TestCategory("Reentrancy")]
         public void UnorderedNonReentrantGrain()
         {
-            this.runner.UnorderedNonReentrantGrain(false);
+            runner.UnorderedNonReentrantGrain(false);
         }
     }
 }

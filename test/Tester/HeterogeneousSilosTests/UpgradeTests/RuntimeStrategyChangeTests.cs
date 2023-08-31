@@ -17,7 +17,7 @@ namespace Tester.HeterogeneousSilosTests.UpgradeTests
         public async Task ChangeCompatibilityStrategy()
         {
             await StartSiloV1();
-            var resolver = this.Client.ServiceProvider.GetService<GrainInterfaceTypeResolver>();
+            var resolver = Client.ServiceProvider.GetService<GrainInterfaceTypeResolver>();
             var ifaceId = resolver.GetGrainInterfaceType(typeof(IVersionUpgradeTestGrain));
 
             var grainV1 = Client.GetGrain<IVersionUpgradeTestGrain>(0);
@@ -62,7 +62,7 @@ namespace Tester.HeterogeneousSilosTests.UpgradeTests
         public async Task ChangeVersionSelectorStrategy()
         {
             await StartSiloV1();
-            var resolver = this.Client.ServiceProvider.GetService<GrainInterfaceTypeResolver>();
+            var resolver = Client.ServiceProvider.GetService<GrainInterfaceTypeResolver>();
             var ifaceId = resolver.GetGrainInterfaceType(typeof(IVersionUpgradeTestGrain));
 
             // Only V1 exists

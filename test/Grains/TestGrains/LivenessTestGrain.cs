@@ -11,7 +11,7 @@ namespace UnitTests.Grains
 
         public LivenessTestGrain(ILoggerFactory loggerFactory)
         {
-            this.logger = loggerFactory.CreateLogger($"{this.GetType().Name}-{this.IdentityString}");
+            logger = loggerFactory.CreateLogger($"{GetType().Name}-{IdentityString}");
         }
 
         public override Task OnActivateAsync(CancellationToken cancellationToken)
@@ -60,7 +60,7 @@ namespace UnitTests.Grains
 
         public Task<string> GetRuntimeInstanceId()
         {
-            return Task.FromResult(this.RuntimeIdentity);
+            return Task.FromResult(RuntimeIdentity);
         }
 
         public Task<string> GetUniqueId()

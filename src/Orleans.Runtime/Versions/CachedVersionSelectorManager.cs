@@ -16,9 +16,9 @@ namespace Orleans.Runtime.Versions
         public CachedVersionSelectorManager(GrainVersionManifest grainInterfaceVersions, VersionSelectorManager versionSelectorManager, CompatibilityDirectorManager compatibilityDirectorManager)
         {
             this.grainInterfaceVersions = grainInterfaceVersions;
-            this.VersionSelectorManager = versionSelectorManager;
-            this.CompatibilityDirectorManager = compatibilityDirectorManager;
-            this.suitableSilosCache = new ConcurrentDictionary<(GrainType Type, GrainInterfaceType Interface, ushort Version), CachedEntry>();
+            VersionSelectorManager = versionSelectorManager;
+            CompatibilityDirectorManager = compatibilityDirectorManager;
+            suitableSilosCache = new ConcurrentDictionary<(GrainType Type, GrainInterfaceType Interface, ushort Version), CachedEntry>();
         }
 
         public VersionSelectorManager VersionSelectorManager { get; }
@@ -28,7 +28,7 @@ namespace Orleans.Runtime.Versions
         public CachedEntry GetSuitableSilos(GrainType grainType, GrainInterfaceType interfaceId, ushort requestedVersion)
         {
             var key = ValueTuple.Create(grainType, interfaceId, requestedVersion);
-            if (!suitableSilosCache.TryGetValue(key, out var entry) || entry.Version < this.grainInterfaceVersions.LatestVersion)
+            if (!suitableSilosCache.TryGetValue(key, out var entry) || entry.Version < grainInterfaceVersions.LatestVersion)
             {
                 entry = suitableSilosCache[key] = GetSuitableSilosImpl(key);
             }
@@ -38,7 +38,7 @@ namespace Orleans.Runtime.Versions
 
         public void ResetCache()
         {
-            this.suitableSilosCache.Clear();
+            suitableSilosCache.Clear();
         }
 
         private CachedEntry GetSuitableSilosImpl((GrainType Type, GrainInterfaceType Interface, ushort Version) key)
@@ -47,15 +47,15 @@ namespace Orleans.Runtime.Versions
             var interfaceType = key.Interface;
             var requestedVersion = key.Version;
 
-            var versionSelector = this.VersionSelectorManager.GetSelector(interfaceType);
-            var compatibilityDirector = this.CompatibilityDirectorManager.GetDirector(interfaceType);
-            (var version, var available) = this.grainInterfaceVersions.GetAvailableVersions(interfaceType);
+            var versionSelector = VersionSelectorManager.GetSelector(interfaceType);
+            var compatibilityDirector = CompatibilityDirectorManager.GetDirector(interfaceType);
+            (var version, var available) = grainInterfaceVersions.GetAvailableVersions(interfaceType);
             var versions = versionSelector.GetSuitableVersion(
                 requestedVersion, 
                 available, 
                 compatibilityDirector);
 
-            (_, var result) = this.grainInterfaceVersions.GetSupportedSilos(grainType, interfaceType, versions);
+            (_, var result) = grainInterfaceVersions.GetSupportedSilos(grainType, interfaceType, versions);
 
             return new CachedEntry
             {

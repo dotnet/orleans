@@ -105,33 +105,33 @@ namespace Orleans.TestingHost
         {
             var result = new Dictionary<string, string>
             {
-                [nameof(ClusterId)] = this.ClusterId,
-                [nameof(ServiceId)] = this.ServiceId,
-                [nameof(BaseSiloPort)] = this.BaseSiloPort.ToString(),
-                [nameof(BaseGatewayPort)] = this.BaseGatewayPort.ToString(),
-                [nameof(UseTestClusterMembership)] = this.UseTestClusterMembership.ToString(),
-                [nameof(InitializeClientOnDeploy)] = this.InitializeClientOnDeploy.ToString(),
-                [nameof(InitialSilosCount)] = this.InitialSilosCount.ToString(),
-                [nameof(ApplicationBaseDirectory)] = this.ApplicationBaseDirectory,
-                [nameof(ConfigureFileLogging)] = this.ConfigureFileLogging.ToString(),
-                [nameof(AssumeHomogenousSilosForTesting)] = this.AssumeHomogenousSilosForTesting.ToString(),
-                [nameof(GatewayPerSilo)] = this.GatewayPerSilo.ToString(),
-                [nameof(ConnectionTransport)] = this.ConnectionTransport.ToString(),
+                [nameof(ClusterId)] = ClusterId,
+                [nameof(ServiceId)] = ServiceId,
+                [nameof(BaseSiloPort)] = BaseSiloPort.ToString(),
+                [nameof(BaseGatewayPort)] = BaseGatewayPort.ToString(),
+                [nameof(UseTestClusterMembership)] = UseTestClusterMembership.ToString(),
+                [nameof(InitializeClientOnDeploy)] = InitializeClientOnDeploy.ToString(),
+                [nameof(InitialSilosCount)] = InitialSilosCount.ToString(),
+                [nameof(ApplicationBaseDirectory)] = ApplicationBaseDirectory,
+                [nameof(ConfigureFileLogging)] = ConfigureFileLogging.ToString(),
+                [nameof(AssumeHomogenousSilosForTesting)] = AssumeHomogenousSilosForTesting.ToString(),
+                [nameof(GatewayPerSilo)] = GatewayPerSilo.ToString(),
+                [nameof(ConnectionTransport)] = ConnectionTransport.ToString(),
             };
             
-            if (this.SiloBuilderConfiguratorTypes != null)
+            if (SiloBuilderConfiguratorTypes != null)
             {
-                for (int i = 0; i < this.SiloBuilderConfiguratorTypes.Count; i++)
+                for (int i = 0; i < SiloBuilderConfiguratorTypes.Count; i++)
                 {
-                    result[$"{nameof(SiloBuilderConfiguratorTypes)}:{i}"] = this.SiloBuilderConfiguratorTypes[i];
+                    result[$"{nameof(SiloBuilderConfiguratorTypes)}:{i}"] = SiloBuilderConfiguratorTypes[i];
                 }
             }
 
-            if (this.ClientBuilderConfiguratorTypes != null)
+            if (ClientBuilderConfiguratorTypes != null)
             {
-                for (int i = 0; i < this.ClientBuilderConfiguratorTypes.Count; i++)
+                for (int i = 0; i < ClientBuilderConfiguratorTypes.Count; i++)
                 {
-                    result[$"{nameof(ClientBuilderConfiguratorTypes)}:{i}"] = this.ClientBuilderConfiguratorTypes[i];
+                    result[$"{nameof(ClientBuilderConfiguratorTypes)}:{i}"] = ClientBuilderConfiguratorTypes[i];
                 }
             }
 
@@ -212,10 +212,10 @@ namespace Orleans.TestingHost
         /// <returns>The options dictionary.</returns>
         public Dictionary<string, string> ToDictionary() => new Dictionary<string, string>
         {
-            [nameof(SiloPort)] = this.SiloPort.ToString(),
-            [nameof(GatewayPort)] = this.GatewayPort.ToString(),
-            [nameof(SiloName)] = this.SiloName,
-            [nameof(PrimarySiloPort)] = this.PrimarySiloPort.ToString()
+            [nameof(SiloPort)] = SiloPort.ToString(),
+            [nameof(GatewayPort)] = GatewayPort.ToString(),
+            [nameof(SiloName)] = SiloName,
+            [nameof(PrimarySiloPort)] = PrimarySiloPort.ToString()
         };
     }
 

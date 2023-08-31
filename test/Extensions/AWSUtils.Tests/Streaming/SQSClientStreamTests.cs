@@ -29,7 +29,7 @@ namespace AWSUtils.Tests.Streaming
         public override async Task InitializeAsync()
         {
             await base.InitializeAsync();
-            runner = new ClientStreamTestRunner(this.HostedCluster);
+            runner = new ClientStreamTestRunner(HostedCluster);
         }
 
         protected override void ConfigureTestCluster(TestClusterBuilder builder)

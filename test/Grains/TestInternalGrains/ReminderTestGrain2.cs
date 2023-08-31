@@ -33,25 +33,25 @@ namespace UnitTests.Grains
         public ReminderTestGrain2(IServiceProvider services, IReminderTable reminderTable, ILoggerFactory loggerFactory)
         {
             this.reminderTable = reminderTable;
-            this.unvalidatedReminderRegistry = new UnvalidatedReminderRegistry(services);
-            this.logger = loggerFactory.CreateLogger($"{this.GetType().Name}-{this.IdentityString}");
-            this.reminderOptions = services.GetService<IOptions<ReminderOptions>>();
+            unvalidatedReminderRegistry = new UnvalidatedReminderRegistry(services);
+            logger = loggerFactory.CreateLogger($"{GetType().Name}-{IdentityString}");
+            reminderOptions = services.GetService<IOptions<ReminderOptions>>();
         }
 
         public override Task OnActivateAsync(CancellationToken cancellationToken)
         {
-            this._id = Guid.NewGuid().ToString();
-            this.allReminders = new Dictionary<string, ReminderState>();
-            this.sequence = new Dictionary<string, long>();
-            this.period = GetDefaultPeriod(this.logger);
-            this.logger.LogInformation("OnActivateAsync.");
-            this.filePrefix = "g" + this.GrainId.ToString().Replace('/', '_') + "_";
+            _id = Guid.NewGuid().ToString();
+            allReminders = new Dictionary<string, ReminderState>();
+            sequence = new Dictionary<string, long>();
+            period = GetDefaultPeriod(logger);
+            logger.LogInformation("OnActivateAsync.");
+            filePrefix = "g" + GrainId.ToString().Replace('/', '_') + "_";
             return GetMissingReminders();
         }
 
         public override Task OnDeactivateAsync(DeactivationReason reason, CancellationToken cancellationToken)
         {
-            this.logger.LogInformation("OnDeactivateAsync");
+            logger.LogInformation("OnDeactivateAsync");
             return Task.CompletedTask;
         }
 
@@ -59,8 +59,8 @@ namespace UnitTests.Grains
 
         public async Task<IGrainReminder> StartReminder(string reminderName, TimeSpan? p = null, bool validate = false)
         {
-            TimeSpan usePeriod = p ?? this.period;
-            this.logger.LogInformation("Starting reminder {ReminderName}.", reminderName);
+            TimeSpan usePeriod = p ?? period;
+            logger.LogInformation("Starting reminder {ReminderName}.", reminderName);
             TimeSpan dueTime;
             if (reminderOptions.Value.MinimumReminderPeriod < TimeSpan.FromSeconds(2))
                 dueTime = TimeSpan.FromSeconds(2) - reminderOptions.Value.MinimumReminderPeriod;
@@ -70,14 +70,14 @@ namespace UnitTests.Grains
             if (validate)
                 r = await this.RegisterOrUpdateReminder(reminderName, dueTime, usePeriod);
             else
-                r = await this.unvalidatedReminderRegistry.RegisterOrUpdateReminder(GrainId, reminderName, dueTime, usePeriod);
+                r = await unvalidatedReminderRegistry.RegisterOrUpdateReminder(GrainId, reminderName, dueTime, usePeriod);
 
-            this.allReminders[reminderName] = new(r);
-            this.sequence[reminderName] = 0;
+            allReminders[reminderName] = new(r);
+            sequence[reminderName] = 0;
 
             string fileName = GetFileName(reminderName);
             File.Delete(fileName); // if successfully started, then remove any old data
-            this.logger.LogInformation("Started reminder {Reminder}", r);
+            logger.LogInformation("Started reminder {Reminder}", r);
             return r;
         }
 
@@ -87,9 +87,9 @@ namespace UnitTests.Grains
             // it doesn't know which reminders were registered against the grain
             // hence, this activation may receive a reminder that it didn't register itself, but
             // the previous activation (incarnation of the grain) registered... so, play it safe
-            if (!this.sequence.ContainsKey(reminderName))
+            if (!sequence.ContainsKey(reminderName))
             {
-                this.sequence.Add(reminderName, 0); // we'll get upto date to the latest sequence number while processing this tick
+                sequence.Add(reminderName, 0); // we'll get upto date to the latest sequence number while processing this tick
             }
 
             allReminders[reminderName].Fired.Add(status.CurrentTickTime);
@@ -108,16 +108,16 @@ namespace UnitTests.Grains
             // end of calculating tick sequence number
 
             // do switch-ing here
-            if (sequenceNumber < this.sequence[reminderName])
+            if (sequenceNumber < sequence[reminderName])
             {
-                this.logger.LogInformation("ReceiveReminder: {Reminder} Incorrect tick {ExpectedSequenceNumber} vs. {SequenceNumber} with status {Status}.", reminderName, this.sequence[reminderName], sequenceNumber, status);
+                logger.LogInformation("ReceiveReminder: {Reminder} Incorrect tick {ExpectedSequenceNumber} vs. {SequenceNumber} with status {Status}.", reminderName, sequence[reminderName], sequenceNumber, status);
                 return Task.CompletedTask;
             }
-            this.sequence[reminderName] = sequenceNumber;
-            this.logger.LogInformation("ReceiveReminder: {ReminderNAme} Sequence # {SequenceNumber} with status {Status}.", reminderName, this.sequence[reminderName], status);
+            sequence[reminderName] = sequenceNumber;
+            logger.LogInformation("ReceiveReminder: {ReminderNAme} Sequence # {SequenceNumber} with status {Status}.", reminderName, sequence[reminderName], status);
 
             string fileName = GetFileName(reminderName);
-            string counterValue = this.sequence[reminderName].ToString(CultureInfo.InvariantCulture);
+            string counterValue = sequence[reminderName].ToString(CultureInfo.InvariantCulture);
             File.WriteAllText(fileName, counterValue);
 
             return Task.CompletedTask;
@@ -125,11 +125,11 @@ namespace UnitTests.Grains
 
         public async Task StopReminder(string reminderName)
         {
-            this.logger.LogInformation("Stopping reminder {ReminderName}.", reminderName);
+            logger.LogInformation("Stopping reminder {ReminderName}.", reminderName);
             // we dont reset counter as we want the test methods to be able to read it even after stopping the reminder
             //return UnregisterReminder(allReminders[reminderName]);
             ReminderState state;
-            if (this.allReminders.TryGetValue(reminderName, out state))
+            if (allReminders.TryGetValue(reminderName, out state))
             {
                 await this.UnregisterReminder(state.Reminder);
                 state.Log.Add((DateTime.UtcNow, $"Unregistering {reminderName}"));
@@ -140,7 +140,7 @@ namespace UnitTests.Grains
                 // during failures, there may be reminders registered by an earlier activation that we dont have cached locally
                 // therefore, we need to update our local cache
                 await GetMissingReminders();
-                if (this.allReminders.TryGetValue(reminderName, out state))
+                if (allReminders.TryGetValue(reminderName, out state))
                 {
                     await this.UnregisterReminder(state.Reminder);
                     state.Log.Add((DateTime.UtcNow, $"Unregistering {reminderName}"));
@@ -150,7 +150,7 @@ namespace UnitTests.Grains
                 {
                     //var reminders = await this.GetRemindersList();
                     throw new OrleansException(string.Format(
-                        "Could not find reminder {0} in grain {1}", reminderName, this.IdentityString));
+                        "Could not find reminder {0} in grain {1}", reminderName, IdentityString));
                 }
             }
         }
@@ -158,19 +158,19 @@ namespace UnitTests.Grains
         private async Task GetMissingReminders()
         {
             List<IGrainReminder> reminders = await this.GetReminders();
-            this.logger.LogInformation("Got missing reminders {Reminders}", Utils.EnumerableToString(reminders));
+            logger.LogInformation("Got missing reminders {Reminders}", Utils.EnumerableToString(reminders));
             foreach (IGrainReminder l in reminders)
             {
-                if (!this.allReminders.ContainsKey(l.ReminderName))
+                if (!allReminders.ContainsKey(l.ReminderName))
                 {
-                    this.allReminders.Add(l.ReminderName, new ReminderState(Reminder: l) { Registered = DateTime.UtcNow, Log = { (DateTime.UtcNow, $"Adding missing: {l.ReminderName}") } });
+                    allReminders.Add(l.ReminderName, new ReminderState(Reminder: l) { Registered = DateTime.UtcNow, Log = { (DateTime.UtcNow, $"Adding missing: {l.ReminderName}") } });
                 }
             }
         }
 
         public async Task StopReminder(IGrainReminder reminder)
         {
-            this.logger.LogInformation("Stopping reminder (using ref) {Reminder}.", reminder);
+            logger.LogInformation("Stopping reminder (using ref) {Reminder}.", reminder);
             // we dont reset counter as we want the test methods to be able to read it even after stopping the reminder
             await this.UnregisterReminder(reminder);
             var state = allReminders[reminder.ReminderName];
@@ -180,12 +180,12 @@ namespace UnitTests.Grains
 
         public Task<TimeSpan> GetReminderPeriod(string reminderName)
         {
-            return Task.FromResult(this.period);
+            return Task.FromResult(period);
         }
 
         public Task<(TimeSpan DueTime, TimeSpan Period)> GetReminderDueTimeAndPeriod(string reminderName)
         {
-            return Task.FromResult((this.period - TimeSpan.FromSeconds(2), this.period));
+            return Task.FromResult((period - TimeSpan.FromSeconds(2), period));
         }
 
         public Task<long> GetCounter(string name)
@@ -208,7 +208,7 @@ namespace UnitTests.Grains
 
         private string GetFileName(string reminderName)
         {
-            return string.Format("{0}{1}", this.filePrefix, reminderName);
+            return string.Format("{0}{1}", filePrefix, reminderName);
         }
 
         public static TimeSpan GetDefaultPeriod(ILogger log)
@@ -221,7 +221,7 @@ namespace UnitTests.Grains
 
         public async Task EraseReminderTable()
         {
-            await this.reminderTable.TestOnlyClearTable();
+            await reminderTable.TestOnlyClearTable();
         }
     }
 
@@ -245,53 +245,53 @@ namespace UnitTests.Grains
 
         public ReminderTestCopyGrain(IServiceProvider services, ILoggerFactory loggerFactory)
         {
-            this.unvalidatedReminderRegistry = new UnvalidatedReminderRegistry(services);
-            this.logger = loggerFactory.CreateLogger($"{this.GetType().Name}-{this.IdentityString}");
+            unvalidatedReminderRegistry = new UnvalidatedReminderRegistry(services);
+            logger = loggerFactory.CreateLogger($"{GetType().Name}-{IdentityString}");
         }
 
         public override async Task OnActivateAsync(CancellationToken cancellationToken)
         {
-            this.myId = new Random().Next();
-            this.allReminders = new Dictionary<string, IGrainReminder>();
-            this.sequence = new Dictionary<string, long>();
-            this.period = ReminderTestGrain2.GetDefaultPeriod(this.logger);
-            this.logger.LogInformation("OnActivateAsync.");
-            this.filePrefix = "gc" + this.GrainId.Key + "_";
+            myId = new Random().Next();
+            allReminders = new Dictionary<string, IGrainReminder>();
+            sequence = new Dictionary<string, long>();
+            period = ReminderTestGrain2.GetDefaultPeriod(logger);
+            logger.LogInformation("OnActivateAsync.");
+            filePrefix = "gc" + GrainId.Key + "_";
             await GetMissingReminders();
         }
 
         public override Task OnDeactivateAsync(DeactivationReason reason, CancellationToken cancellationToken)
         {
-            this.logger.LogInformation("OnDeactivateAsync.");
+            logger.LogInformation("OnDeactivateAsync.");
             return Task.CompletedTask;
         }
 
         public async Task<IGrainReminder> StartReminder(string reminderName, TimeSpan? p = null, bool validate = false)
         {
-            TimeSpan usePeriod = p ?? this.period;
-            this.logger.LogInformation("Starting reminder {ReminderName} for {GrainId}", reminderName, this.GrainId);
+            TimeSpan usePeriod = p ?? period;
+            logger.LogInformation("Starting reminder {ReminderName} for {GrainId}", reminderName, GrainId);
             IGrainReminder r;
             if (validate)
                 r = await this.RegisterOrUpdateReminder(reminderName, usePeriod - TimeSpan.FromSeconds(2), usePeriod);
             else
-                r = await this.unvalidatedReminderRegistry.RegisterOrUpdateReminder(
-                    this.GrainId,
+                r = await unvalidatedReminderRegistry.RegisterOrUpdateReminder(
+                    GrainId,
                     reminderName,
                     usePeriod - TimeSpan.FromSeconds(2),
                     usePeriod);
-            if (this.allReminders.ContainsKey(reminderName))
+            if (allReminders.ContainsKey(reminderName))
             {
-                this.allReminders[reminderName] = r;
-                this.sequence[reminderName] = 0;
+                allReminders[reminderName] = r;
+                sequence[reminderName] = 0;
             }
             else
             {
-                this.allReminders.Add(reminderName, r);
-                this.sequence.Add(reminderName, 0);
+                allReminders.Add(reminderName, r);
+                sequence.Add(reminderName, 0);
             }
 
             File.Delete(GetFileName(reminderName)); // if successfully started, then remove any old data
-            this.logger.LogInformation("Started reminder {Reminder}.", r);
+            logger.LogInformation("Started reminder {Reminder}.", r);
             return r;
         }
 
@@ -301,11 +301,11 @@ namespace UnitTests.Grains
             // it doesn't know which reminders were registered against the grain
             // hence, this activation may receive a reminder that it didn't register itself, but
             // the previous activation (incarnation of the grain) registered... so, play it safe
-            if (!this.sequence.ContainsKey(reminderName))
+            if (!sequence.ContainsKey(reminderName))
             {
                 // allReminders.Add(reminderName, r); // not using allReminders at the moment
                 //counters.Add(reminderName, 0);
-                this.sequence.Add(reminderName, 0); // we'll get upto date to the latest sequence number while processing this tick
+                sequence.Add(reminderName, 0); // we'll get upto date to the latest sequence number while processing this tick
             }
 
             // calculating tick sequence number
@@ -322,27 +322,27 @@ namespace UnitTests.Grains
             // end of calculating tick sequence number
 
             // do switch-ing here
-            if (sequenceNumber < this.sequence[reminderName])
+            if (sequenceNumber < sequence[reminderName])
             {
-                this.logger.LogInformation("{ReminderName} Incorrect tick {ExpectedSequenceNumber} vs. {SequenceNumber} with status {Status}.", reminderName, this.sequence[reminderName], sequenceNumber, status);
+                logger.LogInformation("{ReminderName} Incorrect tick {ExpectedSequenceNumber} vs. {SequenceNumber} with status {Status}.", reminderName, sequence[reminderName], sequenceNumber, status);
                 return Task.CompletedTask;
             }
 
-            this.sequence[reminderName] = sequenceNumber;
-            this.logger.LogInformation("{ReminderName} Sequence # {SequenceNumber} with status {Status}.", reminderName, this.sequence[reminderName], status);
+            sequence[reminderName] = sequenceNumber;
+            logger.LogInformation("{ReminderName} Sequence # {SequenceNumber} with status {Status}.", reminderName, sequence[reminderName], status);
 
-            File.WriteAllText(GetFileName(reminderName), this.sequence[reminderName].ToString());
+            File.WriteAllText(GetFileName(reminderName), sequence[reminderName].ToString());
 
             return Task.CompletedTask;
         }
 
         public async Task StopReminder(string reminderName)
         {
-            this.logger.LogInformation("Stopping reminder {Reminder}.", reminderName);
+            logger.LogInformation("Stopping reminder {Reminder}.", reminderName);
             // we dont reset counter as we want the test methods to be able to read it even after stopping the reminder
             //return UnregisterReminder(allReminders[reminderName]);
             IGrainReminder reminder;
-            if (this.allReminders.TryGetValue(reminderName, out reminder))
+            if (allReminders.TryGetValue(reminderName, out reminder))
             {
                 await this.UnregisterReminder(reminder);
             }
@@ -351,7 +351,7 @@ namespace UnitTests.Grains
                 // during failures, there may be reminders registered by an earlier activation that we dont have cached locally
                 // therefore, we need to update our local cache
                 await GetMissingReminders();
-                await this.UnregisterReminder(this.allReminders[reminderName]);
+                await this.UnregisterReminder(allReminders[reminderName]);
             }
         }
 
@@ -360,23 +360,23 @@ namespace UnitTests.Grains
             List<IGrainReminder> reminders = await this.GetReminders();
             foreach (IGrainReminder l in reminders)
             {
-                if (!this.allReminders.ContainsKey(l.ReminderName))
+                if (!allReminders.ContainsKey(l.ReminderName))
                 {
-                    this.allReminders.Add(l.ReminderName, l);
+                    allReminders.Add(l.ReminderName, l);
                 }
             }
         }
 
         public async Task StopReminder(IGrainReminder reminder)
         {
-            this.logger.LogInformation("Stopping reminder (using ref) {Reminder}.", reminder);
+            logger.LogInformation("Stopping reminder (using ref) {Reminder}.", reminder);
             // we dont reset counter as we want the test methods to be able to read it even after stopping the reminder
             await this.UnregisterReminder(reminder);
         }
 
         public Task<TimeSpan> GetReminderPeriod(string reminderName)
         {
-            return Task.FromResult(this.period);
+            return Task.FromResult(period);
         }
 
         public Task<long> GetCounter(string name)
@@ -395,7 +395,7 @@ namespace UnitTests.Grains
 
         private string GetFileName(string reminderName)
         {
-            return string.Format("{0}{1}", this.filePrefix, reminderName);
+            return string.Format("{0}{1}", filePrefix, reminderName);
         }
     }
 
@@ -405,20 +405,20 @@ namespace UnitTests.Grains
 
         public WrongReminderGrain(ILoggerFactory loggerFactory)
         {
-            this.logger = loggerFactory.CreateLogger($"{this.GetType().Name}-{this.IdentityString}");
+            logger = loggerFactory.CreateLogger($"{GetType().Name}-{IdentityString}");
         }
 
         public override Task OnActivateAsync(CancellationToken cancellationToken)
         {
-            this.logger.LogInformation("OnActivateAsync.");
+            logger.LogInformation("OnActivateAsync.");
             return Task.CompletedTask;
         }
 
         public async Task<bool> StartReminder(string reminderName)
         {
-            this.logger.LogInformation("Starting reminder {Reminder}.", reminderName);
+            logger.LogInformation("Starting reminder {Reminder}.", reminderName);
             IGrainReminder r = await this.RegisterOrUpdateReminder(reminderName, TimeSpan.FromSeconds(2), TimeSpan.FromSeconds(3));
-            this.logger.LogInformation("Started reminder {Reminder}. It shouldn't have succeeded!", r);
+            logger.LogInformation("Started reminder {Reminder}. It shouldn't have succeeded!", r);
             return true;
         }
     }

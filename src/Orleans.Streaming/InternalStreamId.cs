@@ -31,7 +31,7 @@ namespace Orleans.Runtime
 
         public bool Equals(QualifiedStreamId other) => StreamId.Equals(other) && ProviderName.Equals(other.ProviderName);
 
-        public override bool Equals(object? obj) => obj is QualifiedStreamId other ? this.Equals(other) : false;
+        public override bool Equals(object? obj) => obj is QualifiedStreamId other ? Equals(other) : false;
 
         public static bool operator ==(QualifiedStreamId s1, QualifiedStreamId s2) => s1.Equals(s2);
 

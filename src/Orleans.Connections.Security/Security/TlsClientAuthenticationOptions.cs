@@ -25,28 +25,28 @@ namespace Orleans.Connections.Security
 
         public X509CertificateCollection ClientCertificates
         {
-            get => this.Value.ClientCertificates;
-            set => this.Value.ClientCertificates = value;
+            get => Value.ClientCertificates;
+            set => Value.ClientCertificates = value;
         }
 
         public SslProtocols EnabledSslProtocols
         {
-            get => this.Value.EnabledSslProtocols;
-            set => this.Value.EnabledSslProtocols = value;
+            get => Value.EnabledSslProtocols;
+            set => Value.EnabledSslProtocols = value;
         }
 
         public X509RevocationMode CertificateRevocationCheckMode
         {
-            get => this.Value.CertificateRevocationCheckMode;
-            set => this.Value.CertificateRevocationCheckMode = value;
+            get => Value.CertificateRevocationCheckMode;
+            set => Value.CertificateRevocationCheckMode = value;
         }
 
         public string TargetHost
         {
-            get => this.Value.TargetHost;
-            set => this.Value.TargetHost = value;
+            get => Value.TargetHost;
+            set => Value.TargetHost = value;
         }
 
-        public object SslClientAuthenticationOptions => this.Value;
+        public object SslClientAuthenticationOptions => Value;
     }
 }

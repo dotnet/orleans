@@ -14,7 +14,7 @@ namespace UnitTests.Grains
 
         public Passive_ConsumerGrain(ILoggerFactory loggerFactory)
         {
-            this.logger = loggerFactory.CreateLogger($"{this.GetType().Name}-{this.IdentityString}");
+            logger = loggerFactory.CreateLogger($"{GetType().Name}-{IdentityString}");
         }
 
         public override Task OnActivateAsync(CancellationToken cancellationToken)
@@ -28,7 +28,7 @@ namespace UnitTests.Grains
 
         public Task<int> GetCountOfOnAddFuncCalled()
         {
-            return Task.FromResult(this.onAddCalledCount);
+            return Task.FromResult(onAddCalledCount);
         }
 
         public Task<int> GetNumberConsumed()
@@ -63,11 +63,11 @@ namespace UnitTests.Grains
         public async Task OnSubscribed(IStreamSubscriptionHandleFactory handleFactory)
         {
             logger.LogInformation("OnAdd");
-            this.onAddCalledCount++;
-            var observer = new CounterObserver<IFruit>(this.logger);
+            onAddCalledCount++;
+            var observer = new CounterObserver<IFruit>(logger);
             var newhandle = handleFactory.Create<IFruit>();
-            this.consumerHandles.Add(await newhandle.ResumeAsync(observer));
-            this.consumerObservers.Add(observer);
+            consumerHandles.Add(await newhandle.ResumeAsync(observer));
+            consumerObservers.Add(observer);
         }
     }
 
@@ -77,7 +77,7 @@ namespace UnitTests.Grains
 
         public Jerk_ConsumerGrain(ILoggerFactory loggerFactory)
         {
-            this.logger = loggerFactory.CreateLogger($"{this.GetType().Name}-{this.IdentityString}");
+            logger = loggerFactory.CreateLogger($"{GetType().Name}-{IdentityString}");
         }
 
         public override Task OnActivateAsync(CancellationToken cancellationToken)
@@ -105,26 +105,26 @@ namespace UnitTests.Grains
         private readonly ILogger logger;
         internal CounterObserver(ILogger logger)
         {
-            this.NumConsumed = 0;
+            NumConsumed = 0;
             this.logger = logger;
         }
 
         public Task OnNextAsync(T item, StreamSequenceToken token = null)
         {
-            this.NumConsumed++;
-            this.logger.LogInformation("Consumer {HashCode} OnNextAsync() received item {Item}, with NumConsumed {NumConsumed}", this.GetHashCode(), item, NumConsumed);
+            NumConsumed++;
+            logger.LogInformation("Consumer {HashCode} OnNextAsync() received item {Item}, with NumConsumed {NumConsumed}", GetHashCode(), item, NumConsumed);
             return Task.CompletedTask;
         }
 
         public Task OnCompletedAsync()
         {
-            this.logger.LogInformation("Consumer {HashCode} OnCompletedAsync()", this.GetHashCode());
+            logger.LogInformation("Consumer {HashCode} OnCompletedAsync()", GetHashCode());
             return Task.CompletedTask;
         }
 
         public Task OnErrorAsync(Exception ex)
         {
-            this.logger.LogInformation(ex, "Consumer {HashCode} OnErrorAsync()", this.GetHashCode());
+            logger.LogInformation(ex, "Consumer {HashCode} OnErrorAsync()", GetHashCode());
             return Task.CompletedTask;
         }
     }

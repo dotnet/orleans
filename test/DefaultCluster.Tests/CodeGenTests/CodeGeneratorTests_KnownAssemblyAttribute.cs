@@ -17,14 +17,14 @@ namespace DefaultCluster.Tests.General
         private async Task SiloSerializerExists(Type t)
         {
             var id = Guid.NewGuid();
-            var grain = this.GrainFactory.GetGrain<ISerializerPresenceTest>(id);
+            var grain = GrainFactory.GetGrain<ISerializerPresenceTest>(id);
             var serializerExists = await grain.SerializerExistsForType(t);
             Assert.True(serializerExists);
         }
 
         private void ClientSerializerExists(Type t)
         {
-            Assert.True(this.HostedCluster.GetSerializer().CanSerialize(t));
+            Assert.True(HostedCluster.GetSerializer().CanSerialize(t));
         }
 
         [Fact, TestCategory("BVT"), TestCategory("CodeGen"), TestCategory("Serialization")]

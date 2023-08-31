@@ -50,7 +50,7 @@ namespace Tests.GeoClusterTests
         {
             this.fixture = fixture;
             fixture.EnsurePreconditionsMet();
-            this.random = new Random();
+            random = new Random();
         }
 
         [SkippableFact]
@@ -97,7 +97,7 @@ namespace Tests.GeoClusterTests
             async Task checker1()
             {
                 int x = GetRandom();
-                var grain = this.fixture.GrainFactory.GetGrain<ILogTestGrain>(x, grainClass);
+                var grain = fixture.GrainFactory.GetGrain<ILogTestGrain>(x, grainClass);
                 await grain.SetAGlobal(x);
                 int a = await grain.GetAGlobal();
                 Assert.Equal(x, a); // value of A survive grain call
@@ -108,7 +108,7 @@ namespace Tests.GeoClusterTests
             async Task checker2()
             {
                 int x = GetRandom();
-                var grain = this.fixture.GrainFactory.GetGrain<ILogTestGrain>(x, grainClass);
+                var grain = fixture.GrainFactory.GetGrain<ILogTestGrain>(x, grainClass);
                 Assert.Equal(0, await grain.GetConfirmedVersion());
                 await grain.SetALocal(x);
                 int a = await grain.GetALocal();
@@ -120,7 +120,7 @@ namespace Tests.GeoClusterTests
             {
                 // Local then Global
                 int x = GetRandom();
-                var grain = this.fixture.GrainFactory.GetGrain<ILogTestGrain>(x, grainClass);
+                var grain = fixture.GrainFactory.GetGrain<ILogTestGrain>(x, grainClass);
                 await grain.SetALocal(x);
                 int a = await grain.GetAGlobal();
                 Assert.Equal(x, a);

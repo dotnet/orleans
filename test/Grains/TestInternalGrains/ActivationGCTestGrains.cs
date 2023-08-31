@@ -57,7 +57,7 @@ namespace UnitTests.Grains
             }
 
             burstCount = count;
-            this.activationCollector.Debug_OnDecideToCollectActivation = OnCollectActivation;
+            activationCollector.Debug_OnDecideToCollectActivation = OnCollectActivation;
             return Task.CompletedTask;
         }
 

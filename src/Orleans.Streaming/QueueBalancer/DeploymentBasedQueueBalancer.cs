@@ -61,14 +61,14 @@ namespace Orleans.Streams
             {
                 throw new ArgumentNullException(nameof(queueMapper));
             }
-            this.allQueues = queueMapper.GetAllQueues().ToList();
+            allQueues = queueMapper.GetAllQueues().ToList();
             NotifyAfterStart().Ignore();
             return base.Initialize(queueMapper);
         }
         
         private async Task NotifyAfterStart()
         {
-            await Task.Delay(this.options.SiloMaturityPeriod);
+            await Task.Delay(options.SiloMaturityPeriod);
             isStarting = false;
             await NotifyListeners();
         }
@@ -76,14 +76,14 @@ namespace Orleans.Streams
         private async Task RecordImmatureSilo(SiloAddress updatedSilo)
         {
             immatureSilos[updatedSilo] = true;      // record as immature
-            await Task.Delay(this.options.SiloMaturityPeriod);
+            await Task.Delay(options.SiloMaturityPeriod);
             immatureSilos[updatedSilo] = false;     // record as mature
         }
 
         public override IEnumerable<QueueId> GetMyQueues()
         {
             BestFitBalancer<string, QueueId> balancer = GetBalancer();
-            bool useIdealDistribution = this.options.IsFixed || isStarting;
+            bool useIdealDistribution = options.IsFixed || isStarting;
             Dictionary<string, List<QueueId>> distribution = useIdealDistribution
                 ? balancer.IdealDistribution
                 : balancer.GetDistribution(GetActiveSilos(siloStatusOracle, immatureSilos));
@@ -176,7 +176,7 @@ namespace Orleans.Streams
             if (tasks.Count > 0)
             {
                 await Task.WhenAll(tasks);
-                await this.NotifyListeners(); // notify, uncoditionaly, and deal with changes it in GetMyQueues()
+                await NotifyListeners(); // notify, uncoditionaly, and deal with changes it in GetMyQueues()
             }
         }
     }

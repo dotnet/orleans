@@ -23,12 +23,12 @@ namespace Orleans.Runtime
             ILogger<ClusterMembershipService> log,
             IFatalErrorHandler fatalErrorHandler)
         {
-            this.snapshot = membershipTableManager.MembershipTableSnapshot.CreateClusterMembershipSnapshot();
-            this.updates = new AsyncEnumerable<ClusterMembershipSnapshot>(
+            snapshot = membershipTableManager.MembershipTableSnapshot.CreateClusterMembershipSnapshot();
+            updates = new AsyncEnumerable<ClusterMembershipSnapshot>(
                 (previous, proposed) => proposed.Version == MembershipVersion.MinValue || proposed.Version > previous.Version,
-                this.snapshot)
+                snapshot)
             {
-                OnPublished = update => Interlocked.Exchange(ref this.snapshot, update)
+                OnPublished = update => Interlocked.Exchange(ref snapshot, update)
             };
             this.membershipTableManager = membershipTableManager;
             this.log = log;
@@ -39,22 +39,22 @@ namespace Orleans.Runtime
         {
             get
             {
-                var tableSnapshot = this.membershipTableManager.MembershipTableSnapshot;
-                if (this.snapshot.Version == tableSnapshot.Version)
+                var tableSnapshot = membershipTableManager.MembershipTableSnapshot;
+                if (snapshot.Version == tableSnapshot.Version)
                 {
-                    return this.snapshot;
+                    return snapshot;
                 }
 
-                this.updates.TryPublish(tableSnapshot.CreateClusterMembershipSnapshot());
-                return this.snapshot;
+                updates.TryPublish(tableSnapshot.CreateClusterMembershipSnapshot());
+                return snapshot;
             }
         }
 
-        public IAsyncEnumerable<ClusterMembershipSnapshot> MembershipUpdates => this.updates;
+        public IAsyncEnumerable<ClusterMembershipSnapshot> MembershipUpdates => updates;
 
         public ValueTask Refresh(MembershipVersion targetVersion)
         {
-            if (targetVersion != default && targetVersion != MembershipVersion.MinValue && this.snapshot.Version >= targetVersion)
+            if (targetVersion != default && targetVersion != MembershipVersion.MinValue && snapshot.Version >= targetVersion)
                 return default;
 
             return RefreshAsync(targetVersion);
@@ -64,37 +64,37 @@ namespace Orleans.Runtime
                 var didRefresh = false;
                 do
                 {
-                    if (!didRefresh || this.membershipTableManager.MembershipTableSnapshot.Version < v)
+                    if (!didRefresh || membershipTableManager.MembershipTableSnapshot.Version < v)
                     {
-                        await this.membershipTableManager.Refresh();
+                        await membershipTableManager.Refresh();
                         didRefresh = true;
                     }
 
                     await Task.Delay(TimeSpan.FromMilliseconds(10));
-                } while (this.snapshot.Version < v || this.snapshot.Version < this.membershipTableManager.MembershipTableSnapshot.Version);
+                } while (snapshot.Version < v || snapshot.Version < membershipTableManager.MembershipTableSnapshot.Version);
             }
         }
 
-        public async Task<bool> TryKill(SiloAddress siloAddress) => await this.membershipTableManager.TryKill(siloAddress);
+        public async Task<bool> TryKill(SiloAddress siloAddress) => await membershipTableManager.TryKill(siloAddress);
 
         private async Task ProcessMembershipUpdates(CancellationToken ct)
         {
             try
             {
-                if (this.log.IsEnabled(LogLevel.Debug)) this.log.LogDebug("Starting to process membership updates");
-                await foreach (var tableSnapshot in this.membershipTableManager.MembershipTableUpdates.WithCancellation(ct))
+                if (log.IsEnabled(LogLevel.Debug)) log.LogDebug("Starting to process membership updates");
+                await foreach (var tableSnapshot in membershipTableManager.MembershipTableUpdates.WithCancellation(ct))
                 {
-                    this.updates.TryPublish(tableSnapshot.CreateClusterMembershipSnapshot());
+                    updates.TryPublish(tableSnapshot.CreateClusterMembershipSnapshot());
                 }
             }
-            catch (Exception exception) when (this.fatalErrorHandler.IsUnexpected(exception))
+            catch (Exception exception) when (fatalErrorHandler.IsUnexpected(exception))
             {
-                this.log.LogError(exception, "Error processing membership updates");
-                this.fatalErrorHandler.OnFatalException(this, nameof(ProcessMembershipUpdates), exception);
+                log.LogError(exception, "Error processing membership updates");
+                fatalErrorHandler.OnFatalException(this, nameof(ProcessMembershipUpdates), exception);
             }
             finally
             {
-                if (this.log.IsEnabled(LogLevel.Debug)) this.log.LogDebug("Stopping membership update processor");
+                if (log.IsEnabled(LogLevel.Debug)) log.LogDebug("Stopping membership update processor");
             }
         }
 
@@ -104,7 +104,7 @@ namespace Orleans.Runtime
             var cancellation = new CancellationTokenSource();
             Task OnRuntimeInitializeStart(CancellationToken _)
             {
-                tasks.Add(Task.Run(() => this.ProcessMembershipUpdates(cancellation.Token)));
+                tasks.Add(Task.Run(() => ProcessMembershipUpdates(cancellation.Token)));
                 return Task.CompletedTask;
             }
 
@@ -124,7 +124,7 @@ namespace Orleans.Runtime
 
         void IDisposable.Dispose()
         {
-            this.updates.Dispose();
+            updates.Dispose();
         }
     }
 }

@@ -50,7 +50,7 @@ namespace Tester
 
         public TestGrainService(GrainId id, Silo silo, ILoggerFactory loggerFactory, IOptions<TestGrainServiceOptions> options) : base(id, silo, loggerFactory)
         {
-            this.config = options.Value;
+            config = options.Value;
         }
 
         private bool started = false;

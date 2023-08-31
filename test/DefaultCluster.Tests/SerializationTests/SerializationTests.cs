@@ -22,10 +22,10 @@ namespace DefaultCluster.Tests
             data.SetBit(13);
             data.SetEnemy(17, CampaignEnemyTestType.Enemy1);
 
-            object obj = this.HostedCluster.DeepCopy(data);
+            object obj = HostedCluster.DeepCopy(data);
             Assert.IsAssignableFrom<LargeTestData>(obj);
 
-            object copy = this.HostedCluster.RoundTripSerializationForTesting(obj);
+            object copy = HostedCluster.RoundTripSerializationForTesting(obj);
             Assert.IsAssignableFrom<LargeTestData>(copy);
         }
 
@@ -34,7 +34,7 @@ namespace DefaultCluster.Tests
         {
             ValueTypeTestData data = new ValueTypeTestData(4);
 
-            object obj = this.HostedCluster.DeepCopy(data);
+            object obj = HostedCluster.DeepCopy(data);
 
             Assert.IsAssignableFrom<ValueTypeTestData>(obj);
             Assert.Equal<int>(4, ((ValueTypeTestData)obj).Value);
@@ -45,7 +45,7 @@ namespace DefaultCluster.Tests
         {
             ValueTypeTestData data = new ValueTypeTestData(4);
 
-            object copy = this.HostedCluster.RoundTripSerializationForTesting(data);
+            object copy = HostedCluster.RoundTripSerializationForTesting(data);
 
             Assert.IsAssignableFrom<ValueTypeTestData>(copy);
             Assert.Equal<int>(4, ((ValueTypeTestData)copy).Value);

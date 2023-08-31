@@ -145,7 +145,7 @@ namespace Orleans.GrainDirectory.AzureStorage
         {
             var items = await ReadAllTableEntriesAsync();
             IEnumerable<Task> work = items.GroupBy(item => item.Item1.PartitionKey)
-                                          .SelectMany(partition => partition.ToBatch(this.StoragePolicyOptions.MaxBulkUpdateRows))
+                                          .SelectMany(partition => partition.ToBatch(StoragePolicyOptions.MaxBulkUpdateRows))
                                           .Select(batch => DeleteTableEntriesAsync(batch.ToList()));
             await Task.WhenAll(work);
         }
@@ -457,10 +457,10 @@ namespace Orleans.GrainDirectory.AzureStorage
 
             if (collection == null) throw new ArgumentNullException(nameof(collection));
 
-            if (collection.Count > this.StoragePolicyOptions.MaxBulkUpdateRows)
+            if (collection.Count > StoragePolicyOptions.MaxBulkUpdateRows)
             {
                 throw new ArgumentOutOfRangeException(nameof(collection), collection.Count,
-                        "Too many rows for bulk delete - max " + this.StoragePolicyOptions.MaxBulkUpdateRows);
+                        "Too many rows for bulk delete - max " + StoragePolicyOptions.MaxBulkUpdateRows);
             }
 
             if (collection.Count == 0)
@@ -523,13 +523,13 @@ namespace Orleans.GrainDirectory.AzureStorage
                     }
 
 #if !ORLEANS_TRANSACTIONS
-                    IBackoffProvider backoff = new FixedBackoff(this.StoragePolicyOptions.PauseBetweenOperationRetries);
+                    IBackoffProvider backoff = new FixedBackoff(StoragePolicyOptions.PauseBetweenOperationRetries);
 
                     List<(T, string)> results = await AsyncExecutorWithRetries.ExecuteWithRetries(
                         counter => executeQueryHandleContinuations(),
-                        this.StoragePolicyOptions.MaxOperationRetries,
+                        StoragePolicyOptions.MaxOperationRetries,
                         (exc, counter) => AzureTableUtils.AnalyzeReadException(exc.GetBaseException(), counter, TableName, Logger),
-                        this.StoragePolicyOptions.OperationTimeout,
+                        StoragePolicyOptions.OperationTimeout,
                         backoff);
 #else
                     List<(T, string)> results = await executeQueryHandleContinuations();
@@ -565,10 +565,10 @@ namespace Orleans.GrainDirectory.AzureStorage
         {
             const string operation = "BulkInsertTableEntries";
             if (collection == null) throw new ArgumentNullException(nameof(collection));
-            if (collection.Count > this.StoragePolicyOptions.MaxBulkUpdateRows)
+            if (collection.Count > StoragePolicyOptions.MaxBulkUpdateRows)
             {
                 throw new ArgumentOutOfRangeException(nameof(collection), collection.Count,
-                        "Too many rows for bulk update - max " + this.StoragePolicyOptions.MaxBulkUpdateRows);
+                        "Too many rows for bulk update - max " + StoragePolicyOptions.MaxBulkUpdateRows);
             }
 
             if (collection.Count == 0)
@@ -717,7 +717,7 @@ namespace Orleans.GrainDirectory.AzureStorage
         private void CheckAlertSlowAccess(DateTime startOperation, string operation)
         {
             var timeSpan = DateTime.UtcNow - startOperation;
-            if (timeSpan > this.StoragePolicyOptions.OperationTimeout)
+            if (timeSpan > StoragePolicyOptions.OperationTimeout)
             {
                 Logger.LogWarning((int)Utilities.ErrorCode.AzureTable_15, "Slow access to Azure Table {TableName} for {Operation}, which took {Duration}", TableName, operation, timeSpan);
             }

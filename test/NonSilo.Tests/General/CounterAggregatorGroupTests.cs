@@ -9,7 +9,7 @@ public class CounterAggregatorGroupTests
     private readonly ITestOutputHelper _output;
     public CounterAggregatorGroupTests(ITestOutputHelper output)
     {
-        this._output = output;
+        _output = output;
     }
 
     [Fact, TestCategory("Functional"), TestCategory("Aggregators")]

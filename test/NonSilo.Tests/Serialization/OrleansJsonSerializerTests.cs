@@ -19,7 +19,7 @@ namespace UnitTests.Serialization
 
         public OrleansJsonSerializerTests()
         {
-            this.environment = SerializationTestEnvironment.InitializeWithDefaults(
+            environment = SerializationTestEnvironment.InitializeWithDefaults(
                 builder =>
                     builder.ConfigureServices(services =>
                         services.AddSerializer(serializerBuilder =>
@@ -31,7 +31,7 @@ namespace UnitTests.Serialization
         [Fact]
         public void OrleansJsonSerializer_ExternalSerializer_Client()
         {
-            TestSerializationRoundTrip(this.environment.Serializer);
+            TestSerializationRoundTrip(environment.Serializer);
         }
 
         [Fact]

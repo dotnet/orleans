@@ -28,23 +28,23 @@ namespace Orleans.Transactions.Tests
         [Fact]
         public async Task AllSupportedAttributesFromOutsideTransactionTest()
         {
-            ITransactionAttributionGrain top = this.grainFactory.GetTransactionAttributionGrain(Guid.NewGuid());
+            ITransactionAttributionGrain top = grainFactory.GetTransactionAttributionGrain(Guid.NewGuid());
             List<ITransactionAttributionGrain>[] tiers = 
             {
                 new List<ITransactionAttributionGrain>(new[] {
-                    this.grainFactory.GetTransactionAttributionGrain(Guid.NewGuid()),
-                    this.grainFactory.GetTransactionAttributionGrain(Guid.NewGuid(), TransactionOption.Suppress),
-                    this.grainFactory.GetTransactionAttributionGrain(Guid.NewGuid(), TransactionOption.CreateOrJoin),
-                    this.grainFactory.GetTransactionAttributionGrain(Guid.NewGuid(), TransactionOption.Create),
-                    this.grainFactory.GetTransactionAttributionGrain(Guid.NewGuid(), TransactionOption.Supported),
-                    this.grainFactory.GetTransactionAttributionGrain(Guid.NewGuid(), TransactionOption.NotAllowed)
+                    grainFactory.GetTransactionAttributionGrain(Guid.NewGuid()),
+                    grainFactory.GetTransactionAttributionGrain(Guid.NewGuid(), TransactionOption.Suppress),
+                    grainFactory.GetTransactionAttributionGrain(Guid.NewGuid(), TransactionOption.CreateOrJoin),
+                    grainFactory.GetTransactionAttributionGrain(Guid.NewGuid(), TransactionOption.Create),
+                    grainFactory.GetTransactionAttributionGrain(Guid.NewGuid(), TransactionOption.Supported),
+                    grainFactory.GetTransactionAttributionGrain(Guid.NewGuid(), TransactionOption.NotAllowed)
                     })
             };
 
             List<string>[] results = await top.GetNestedTransactionIds(0, tiers);
             for(int i=0; i<results.Length; i++)
             {
-                this.output.WriteLine($"{i} => {string.Join(",", results[i])}");
+                output.WriteLine($"{i} => {string.Join(",", results[i])}");
             }
 
             // make sure there are 2 tiers
@@ -87,23 +87,23 @@ namespace Orleans.Transactions.Tests
         [Fact]
         public async Task AllSupportedAttributesFromWithinTransactionTest()
         {
-            ITransactionAttributionGrain top = this.grainFactory.GetTransactionAttributionGrain(Guid.NewGuid(), TransactionOption.Create);
+            ITransactionAttributionGrain top = grainFactory.GetTransactionAttributionGrain(Guid.NewGuid(), TransactionOption.Create);
             List<ITransactionAttributionGrain>[] tiers =
             {
                 new List<ITransactionAttributionGrain>(new[] {
-                    this.grainFactory.GetTransactionAttributionGrain(Guid.NewGuid()),
-                    this.grainFactory.GetTransactionAttributionGrain(Guid.NewGuid(), TransactionOption.Suppress),
-                    this.grainFactory.GetTransactionAttributionGrain(Guid.NewGuid(), TransactionOption.CreateOrJoin),
-                    this.grainFactory.GetTransactionAttributionGrain(Guid.NewGuid(), TransactionOption.Create),
-                    this.grainFactory.GetTransactionAttributionGrain(Guid.NewGuid(), TransactionOption.Join),
-                    this.grainFactory.GetTransactionAttributionGrain(Guid.NewGuid(), TransactionOption.Supported)
+                    grainFactory.GetTransactionAttributionGrain(Guid.NewGuid()),
+                    grainFactory.GetTransactionAttributionGrain(Guid.NewGuid(), TransactionOption.Suppress),
+                    grainFactory.GetTransactionAttributionGrain(Guid.NewGuid(), TransactionOption.CreateOrJoin),
+                    grainFactory.GetTransactionAttributionGrain(Guid.NewGuid(), TransactionOption.Create),
+                    grainFactory.GetTransactionAttributionGrain(Guid.NewGuid(), TransactionOption.Join),
+                    grainFactory.GetTransactionAttributionGrain(Guid.NewGuid(), TransactionOption.Supported)
                     })
             };
 
             List<string>[] results = await top.GetNestedTransactionIds(0, tiers);
             for (int i = 0; i < results.Length; i++)
             {
-                this.output.WriteLine($"{i} => {string.Join(",", results[i])}");
+                output.WriteLine($"{i} => {string.Join(",", results[i])}");
             }
 
             // make sure there are 2 tiers
@@ -142,19 +142,19 @@ namespace Orleans.Transactions.Tests
         [Fact]
         public async Task CreateOrJoinTest()
         {
-            ITransactionAttributionGrain top = this.grainFactory.GetTransactionAttributionGrain(Guid.NewGuid(), TransactionOption.CreateOrJoin);
+            ITransactionAttributionGrain top = grainFactory.GetTransactionAttributionGrain(Guid.NewGuid(), TransactionOption.CreateOrJoin);
             List<ITransactionAttributionGrain>[] tiers =
             {
                 new List<ITransactionAttributionGrain>(new[] {
-                    this.grainFactory.GetTransactionAttributionGrain(Guid.NewGuid(), TransactionOption.CreateOrJoin),
-                    this.grainFactory.GetTransactionAttributionGrain(Guid.NewGuid(), TransactionOption.CreateOrJoin),
+                    grainFactory.GetTransactionAttributionGrain(Guid.NewGuid(), TransactionOption.CreateOrJoin),
+                    grainFactory.GetTransactionAttributionGrain(Guid.NewGuid(), TransactionOption.CreateOrJoin),
                     })
             };
 
             List<string>[] results = await top.GetNestedTransactionIds(0, tiers);
             for (int i = 0; i < results.Length; i++)
             {
-                this.output.WriteLine($"{i} => {string.Join(",", results[i])}");
+                output.WriteLine($"{i} => {string.Join(",", results[i])}");
             }
 
             // make sure there are 2 tiers
@@ -177,19 +177,19 @@ namespace Orleans.Transactions.Tests
         [Fact]
         public async Task CreateTest()
         {
-            ITransactionAttributionGrain top = this.grainFactory.GetTransactionAttributionGrain(Guid.NewGuid(), TransactionOption.Create);
+            ITransactionAttributionGrain top = grainFactory.GetTransactionAttributionGrain(Guid.NewGuid(), TransactionOption.Create);
             List<ITransactionAttributionGrain>[] tiers =
             {
                 new List<ITransactionAttributionGrain>(new[] {
-                    this.grainFactory.GetTransactionAttributionGrain(Guid.NewGuid(), TransactionOption.Create),
-                    this.grainFactory.GetTransactionAttributionGrain(Guid.NewGuid(), TransactionOption.Create),
+                    grainFactory.GetTransactionAttributionGrain(Guid.NewGuid(), TransactionOption.Create),
+                    grainFactory.GetTransactionAttributionGrain(Guid.NewGuid(), TransactionOption.Create),
                     })
             };
 
             List<string>[] results = await top.GetNestedTransactionIds(0, tiers);
             for (int i = 0; i < results.Length; i++)
             {
-                this.output.WriteLine($"{i} => {string.Join(",", results[i])}");
+                output.WriteLine($"{i} => {string.Join(",", results[i])}");
             }
 
             // make sure there are 2 tiers
@@ -218,21 +218,21 @@ namespace Orleans.Transactions.Tests
         [Fact]
         public async Task SupportedTest()
         {
-            ITransactionAttributionGrain top = this.grainFactory.GetTransactionAttributionGrain(Guid.NewGuid(), TransactionOption.Create);
+            ITransactionAttributionGrain top = grainFactory.GetTransactionAttributionGrain(Guid.NewGuid(), TransactionOption.Create);
             List<ITransactionAttributionGrain>[] tiers =
             {
                 new List<ITransactionAttributionGrain>(new[] {
-                    this.grainFactory.GetTransactionAttributionGrain(Guid.NewGuid(), TransactionOption.Supported),
+                    grainFactory.GetTransactionAttributionGrain(Guid.NewGuid(), TransactionOption.Supported),
                     }),
                 new List<ITransactionAttributionGrain>(new[] {
-                    this.grainFactory.GetTransactionAttributionGrain(Guid.NewGuid(), TransactionOption.CreateOrJoin),
+                    grainFactory.GetTransactionAttributionGrain(Guid.NewGuid(), TransactionOption.CreateOrJoin),
                     })
             };
 
             List<string>[] results = await top.GetNestedTransactionIds(0, tiers);
             for (int i = 0; i < results.Length; i++)
             {
-                this.output.WriteLine($"{i} => {string.Join(",", results[i])}");
+                output.WriteLine($"{i} => {string.Join(",", results[i])}");
             }
 
             // make sure there are 3 tiers
@@ -259,11 +259,11 @@ namespace Orleans.Transactions.Tests
         [Fact]
         public async Task JoinFailTest()
         {
-            ITransactionAttributionGrain fail = this.grainFactory.GetTransactionAttributionGrain(Guid.NewGuid());
+            ITransactionAttributionGrain fail = grainFactory.GetTransactionAttributionGrain(Guid.NewGuid());
             List<ITransactionAttributionGrain>[] tiers =
             {
                 new List<ITransactionAttributionGrain>(new[] {
-                    this.grainFactory.GetTransactionAttributionGrain(Guid.NewGuid(), TransactionOption.Join),
+                    grainFactory.GetTransactionAttributionGrain(Guid.NewGuid(), TransactionOption.Join),
                     })
             };
 
@@ -273,11 +273,11 @@ namespace Orleans.Transactions.Tests
         [Fact]
         public async Task NotAllowedFailTest()
         {
-            ITransactionAttributionGrain fail = this.grainFactory.GetTransactionAttributionGrain(Guid.NewGuid(), TransactionOption.Create);
+            ITransactionAttributionGrain fail = grainFactory.GetTransactionAttributionGrain(Guid.NewGuid(), TransactionOption.Create);
             List<ITransactionAttributionGrain>[] tiers =
             {
                 new List<ITransactionAttributionGrain>(new[] {
-                    this.grainFactory.GetTransactionAttributionGrain(Guid.NewGuid(), TransactionOption.NotAllowed),
+                    grainFactory.GetTransactionAttributionGrain(Guid.NewGuid(), TransactionOption.NotAllowed),
                     })
             };
 

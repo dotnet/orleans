@@ -6,14 +6,14 @@ namespace UnitTests.Grains
     {
         public async Task SetStateAndDeactivate(NullableState state)
         {
-            this.State = state;
+            State = state;
             await WriteStateAsync();
             DeactivateOnIdle();
         }
 
         public Task<NullableState> GetState()
         {
-            return Task.FromResult(this.State);
+            return Task.FromResult(State);
         }
     }
 }

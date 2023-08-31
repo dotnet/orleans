@@ -29,7 +29,7 @@ namespace TestGrains
 
         public ImplicitSubscription_NonTransientError_RecoverableStream_CollectorGrain(ILoggerFactory loggerFactory)
         {
-            this.logger = loggerFactory.CreateLogger("RecoverableStreamCollectorGrain " + base.IdentityString);
+            logger = loggerFactory.CreateLogger("RecoverableStreamCollectorGrain " + base.IdentityString);
         }
 
         public override async Task OnActivateAsync(CancellationToken cancellationToken)

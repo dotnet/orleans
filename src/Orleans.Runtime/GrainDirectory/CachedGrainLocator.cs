@@ -35,7 +35,7 @@ namespace Orleans.Runtime.GrainDirectory
         {
             this.grainDirectoryResolver = grainDirectoryResolver;
             this.clusterMembershipService = clusterMembershipService;
-            this.cache = new LRUBasedGrainDirectoryCache(GrainDirectoryOptions.DEFAULT_CACHE_SIZE, GrainDirectoryOptions.DEFAULT_MAXIMUM_CACHE_TTL);
+            cache = new LRUBasedGrainDirectoryCache(GrainDirectoryOptions.DEFAULT_CACHE_SIZE, GrainDirectoryOptions.DEFAULT_MAXIMUM_CACHE_TTL);
         }
 
         public async ValueTask<GrainAddress> Lookup(GrainId grainId)
@@ -70,7 +70,7 @@ namespace Orleans.Runtime.GrainDirectory
             else
             {
                 // Add to the local cache and return it
-                this.cache.AddOrUpdate(entry, 0);
+                cache.AddOrUpdate(entry, 0);
             }
 
             return entry;
@@ -103,7 +103,7 @@ namespace Orleans.Runtime.GrainDirectory
             }
 
             // Cache update
-            this.cache.AddOrUpdate(result, (int)result.MembershipVersion.Value);
+            cache.AddOrUpdate(result, (int)result.MembershipVersion.Value);
 
             return result;
         }
@@ -111,15 +111,15 @@ namespace Orleans.Runtime.GrainDirectory
         public async Task Unregister(GrainAddress address, UnregistrationCause cause)
         {
             // Remove from local cache first so we don't return it anymore
-            this.cache.Remove(address);
+            cache.Remove(address);
 
             // Remove from grain directory which may take significantly longer
             await GetGrainDirectory(address.GrainId.Type).Unregister(address);
 
             // There is the potential for a lookup to race with the Unregister and add the bad entry back to the cache.
-            if (this.cache.LookUp(address.GrainId, out var entry, out _) && entry == address)
+            if (cache.LookUp(address.GrainId, out var entry, out _) && entry == address)
             {
-                this.cache.Remove(address);
+                cache.Remove(address);
             }
         }
 
@@ -127,27 +127,27 @@ namespace Orleans.Runtime.GrainDirectory
         {
             Task OnStart(CancellationToken ct)
             {
-                this.listenToClusterChangeTask = ListenToClusterChange();
+                listenToClusterChangeTask = ListenToClusterChange();
                 return Task.CompletedTask;
             };
             async Task OnStop(CancellationToken ct)
             {
-                this.shutdownToken.Cancel();
+                shutdownToken.Cancel();
                 if (listenToClusterChangeTask != default && !ct.IsCancellationRequested)
                     await listenToClusterChangeTask.WithCancellation(ct);
             };
             lifecycle.Subscribe(nameof(CachedGrainLocator), ServiceLifecycleStage.RuntimeGrainServices, OnStart, OnStop);
         }
 
-        private IGrainDirectory GetGrainDirectory(GrainType grainType) => this.grainDirectoryResolver.Resolve(grainType);
+        private IGrainDirectory GetGrainDirectory(GrainType grainType) => grainDirectoryResolver.Resolve(grainType);
 
         private async Task ListenToClusterChange()
         {
-            var previousSnapshot = this.clusterMembershipService.CurrentSnapshot;
+            var previousSnapshot = clusterMembershipService.CurrentSnapshot;
 
             ((ITestAccessor)this).LastMembershipVersion = previousSnapshot.Version;
 
-            var updates = this.clusterMembershipService.MembershipUpdates.WithCancellation(this.shutdownToken.Token);
+            var updates = clusterMembershipService.MembershipUpdates.WithCancellation(shutdownToken.Token);
             await foreach (var snapshot in updates)
             {
                 // Active filtering: detect silos that went down and try to clean proactively the directory
@@ -160,11 +160,11 @@ namespace Orleans.Runtime.GrainDirectory
                 if (deadSilos.Count > 0)
                 {
                     var tasks = new List<Task>();
-                    foreach (var directory in this.grainDirectoryResolver.Directories)
+                    foreach (var directory in grainDirectoryResolver.Directories)
                     {
                         tasks.Add(directory.UnregisterSilos(deadSilos));
                     }
-                    await Task.WhenAll(tasks).WithCancellation(this.shutdownToken.Token);
+                    await Task.WhenAll(tasks).WithCancellation(shutdownToken.Token);
                 }
 
                 ((ITestAccessor)this).LastMembershipVersion = snapshot.Version;
@@ -176,7 +176,7 @@ namespace Orleans.Runtime.GrainDirectory
 
         private bool IsKnownDeadSilo(SiloAddress siloAddress, MembershipVersion membershipVersion)
         {
-            var current = this.clusterMembershipService.CurrentSnapshot;
+            var current = clusterMembershipService.CurrentSnapshot;
 
             // Check if the target silo is in the cluster
             if (current.Members.TryGetValue(siloAddress, out var value))
@@ -203,13 +203,13 @@ namespace Orleans.Runtime.GrainDirectory
                 ThrowUnsupportedGrainType(grainId);
             }
 
-            if (this.cache.LookUp(grainId, out address, out var version))
+            if (cache.LookUp(grainId, out address, out var version))
             {
                 // If the silo is dead, remove the entry
                 if (IsKnownDeadSilo(address.SiloAddress, new MembershipVersion(version)))
                 {
                     address = default;
-                    this.cache.Remove(grainId);
+                    cache.Remove(grainId);
                 }
                 else
                 {

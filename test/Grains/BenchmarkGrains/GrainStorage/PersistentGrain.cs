@@ -27,8 +27,8 @@ namespace BenchmarkGrains.GrainStorage
 
         public async Task Init(int payloadSize)
         {
-            this.persistentState.State.Payload = Enumerable.Range(0, payloadSize).Select(i => (byte)i).ToArray();
-            await this.persistentState.WriteStateAsync();
+            persistentState.State.Payload = Enumerable.Range(0, payloadSize).Select(i => (byte)i).ToArray();
+            await persistentState.WriteStateAsync();
         }
 
         public async Task<Report> TrySet(int index)
@@ -37,16 +37,16 @@ namespace BenchmarkGrains.GrainStorage
             bool success;
             try
             {
-                await this.persistentState.ReadStateAsync();
-                this.persistentState.State.Payload[index] = (byte)(this.persistentState.State.Payload[index] + 1);
-                await this.persistentState.WriteStateAsync();
+                await persistentState.ReadStateAsync();
+                persistentState.State.Payload[index] = (byte)(persistentState.State.Payload[index] + 1);
+                await persistentState.WriteStateAsync();
                 sw.Stop();
                 logger.LogInformation("Grain {GrainId} took {WriteTimeMs}ms to set state.", this.GetPrimaryKey(), sw.ElapsedMilliseconds);
                 success = true;
             } catch(Exception ex)
             {
                 sw.Stop();
-                this.logger.LogError(ex, "Grain {GrainId} failed to set state in {WriteTimeMs}ms to set state.",  this.GetPrimaryKey(), sw.ElapsedMilliseconds );
+                logger.LogError(ex, "Grain {GrainId} failed to set state in {WriteTimeMs}ms to set state.",  this.GetPrimaryKey(), sw.ElapsedMilliseconds );
                 success = false;
             }
 

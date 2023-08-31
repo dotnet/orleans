@@ -25,12 +25,12 @@ namespace Orleans.Runtime
             GrainReferenceActivator referenceActivator,
             GrainInterfaceTypeResolver interfaceTypeResolver)
         {
-            this.RuntimeClient = runtimeClient;
+            RuntimeClient = runtimeClient;
             this.cancellationTokenRuntime = cancellationTokenRuntime;
             this.referenceActivator = referenceActivator;
             this.interfaceTypeResolver = interfaceTypeResolver;
-            this.filters = outgoingCallFilters.ToArray();
-            this.sendRequest = (GrainReference reference, IResponseCompletionSource callback, IInvokable body, InvokeMethodOptions options) => RuntimeClient.SendRequest(reference, body, callback, options);
+            filters = outgoingCallFilters.ToArray();
+            sendRequest = (GrainReference reference, IResponseCompletionSource callback, IInvokable body, InvokeMethodOptions options) => RuntimeClient.SendRequest(reference, body, callback, options);
         }
 
         public IRuntimeClient RuntimeClient { get; private set; }
@@ -38,11 +38,11 @@ namespace Orleans.Runtime
         public ValueTask<TResult> InvokeMethodAsync<TResult>(GrainReference reference, IInvokable request, InvokeMethodOptions options)
         {
             // TODO: Remove expensive interface type check
-            if (this.filters.Length == 0 && request is not IOutgoingGrainCallFilter)
+            if (filters.Length == 0 && request is not IOutgoingGrainCallFilter)
             {
                 SetGrainCancellationTokensTarget(reference, request);
                 var responseCompletionSource = ResponseCompletionSourcePool.Get<TResult>();
-                this.RuntimeClient.SendRequest(reference, request, responseCompletionSource, options);
+                RuntimeClient.SendRequest(reference, request, responseCompletionSource, options);
                 return responseCompletionSource.AsValueTask();
             }
             else
@@ -58,7 +58,7 @@ namespace Orleans.Runtime
             {
                 SetGrainCancellationTokensTarget(reference, request);
                 var responseCompletionSource = ResponseCompletionSourcePool.Get();
-                this.RuntimeClient.SendRequest(reference, request, responseCompletionSource, options);
+                RuntimeClient.SendRequest(reference, request, responseCompletionSource, options);
                 return responseCompletionSource.AsVoidValueTask();
             }
             else
@@ -75,7 +75,7 @@ namespace Orleans.Runtime
             if (filters.Length == 0 && request is not IOutgoingGrainCallFilter)
             {
                 SetGrainCancellationTokensTarget(reference, request);
-                this.RuntimeClient.SendRequest(reference, request, context: null, options);
+                RuntimeClient.SendRequest(reference, request, context: null, options);
             }
             else
             {
@@ -86,7 +86,7 @@ namespace Orleans.Runtime
         private async ValueTask<TResult> InvokeMethodWithFiltersAsync<TResult>(GrainReference reference, IInvokable request, InvokeMethodOptions options)
         {
             SetGrainCancellationTokensTarget(reference, request);
-            var invoker = new OutgoingCallInvoker<TResult>(reference, request, options, this.sendRequest, this.filters);
+            var invoker = new OutgoingCallInvoker<TResult>(reference, request, options, sendRequest, filters);
             await invoker.Invoke();
             return invoker.TypedResult;
         }
@@ -94,7 +94,7 @@ namespace Orleans.Runtime
         private async ValueTask InvokeMethodWithFiltersAsync(GrainReference reference, IInvokable request, InvokeMethodOptions options)
         {
             SetGrainCancellationTokensTarget(reference, request);
-            var invoker = new OutgoingCallInvoker<object>(reference, request, options, this.sendRequest, this.filters);
+            var invoker = new OutgoingCallInvoker<object>(reference, request, options, sendRequest, filters);
             await invoker.Invoke();
         }
 
@@ -106,8 +106,8 @@ namespace Orleans.Runtime
                 return grain;
             }
 
-            var interfaceType = this.interfaceTypeResolver.GetGrainInterfaceType(grainInterface);
-            return this.referenceActivator.CreateReference(grainId, interfaceType);
+            var interfaceType = interfaceTypeResolver.GetGrainInterfaceType(grainInterface);
+            return referenceActivator.CreateReference(grainId, interfaceType);
         }
 
         /// <summary>
@@ -124,7 +124,7 @@ namespace Orleans.Runtime
                     continue;
                 }
 
-                grainToken.AddGrainReference(this.cancellationTokenRuntime, target);
+                grainToken.AddGrainReference(cancellationTokenRuntime, target);
             }
         }
     }

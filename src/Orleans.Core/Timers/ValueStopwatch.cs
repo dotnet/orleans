@@ -39,7 +39,7 @@ namespace Orleans.Runtime
         /// <summary>
         /// Returns the elapsed time.
         /// </summary>
-        public TimeSpan Elapsed => TimeSpan.FromTicks(this.ElapsedTicks);
+        public TimeSpan Elapsed => TimeSpan.FromTicks(ElapsedTicks);
 
         /// <summary>
         /// Returns the elapsed ticks.
@@ -53,7 +53,7 @@ namespace Orleans.Runtime
                 var timestamp = this._value;
 
                 long delta;
-                if (this.IsRunning)
+                if (IsRunning)
                 {
                     // The stopwatch is still running.
                     var start = timestamp;
@@ -102,7 +102,7 @@ namespace Orleans.Runtime
             var timestamp = this._value;
 
             // If already started, do nothing.
-            if (this.IsRunning) return;
+            if (IsRunning) return;
 
             // Stopwatch is stopped, therefore value is zero or negative.
             // Add the negative value to the current timestamp to start the stopwatch again.
@@ -129,7 +129,7 @@ namespace Orleans.Runtime
             var timestamp = this._value;
 
             // If already stopped, do nothing.
-            if (!this.IsRunning) return;
+            if (!IsRunning) return;
 
             var end = GetTimestamp();
             var delta = end - timestamp;

@@ -33,14 +33,14 @@
 
         public async Task SetState(SomeAbstractClass input)
         {
-            this.State.Classes = new List<SomeAbstractClass> { input };
-            this.DeactivateOnIdle();
-            await this.WriteStateAsync();
+            State.Classes = new List<SomeAbstractClass> { input };
+            DeactivateOnIdle();
+            await WriteStateAsync();
         }
 
         public Task<SomeAbstractClass> GetState()
         {
-            return Task.FromResult(this.State.Classes.FirstOrDefault());
+            return Task.FromResult(State.Classes.FirstOrDefault());
         }
 
         [Serializable]

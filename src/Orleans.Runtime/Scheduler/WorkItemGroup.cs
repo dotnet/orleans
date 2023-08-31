@@ -41,7 +41,7 @@ namespace Orleans.Runtime.Scheduler
 
         public IGrainContext GrainContext { get; set; }
 
-        internal bool IsSystemGroup => this.GrainContext is ISystemTargetBase;
+        internal bool IsSystemGroup => GrainContext is ISystemTargetBase;
 
         public string Name => GrainContext?.ToString() ?? "Unknown";
 
@@ -89,10 +89,10 @@ namespace Orleans.Runtime.Scheduler
 #if DEBUG
             if (log.IsEnabled(LogLevel.Trace))
             {
-                this.log.LogTrace(
+                log.LogTrace(
                     "EnqueueWorkItem {Task} into {GrainContext} when TaskScheduler.Current={TaskScheduler}",
                     task,
-                    this.GrainContext,
+                    GrainContext,
                     System.Threading.Tasks.TaskScheduler.Current);
             }
 #endif
@@ -107,13 +107,13 @@ namespace Orleans.Runtime.Scheduler
                 if (maxPendingItemsLimit > 0 && count > maxPendingItemsLimit)
                 {
                     var now = ValueStopwatch.GetTimestamp();
-                    if (ValueStopwatch.FromTimestamp(this.lastLongQueueWarningTimestamp, now).Elapsed > TimeSpan.FromSeconds(10))
+                    if (ValueStopwatch.FromTimestamp(lastLongQueueWarningTimestamp, now).Elapsed > TimeSpan.FromSeconds(10))
                     {
                         log.LogWarning(
                             (int)ErrorCode.SchedulerTooManyPendingItems,
                             "{PendingWorkItemCount} pending work items for group {WorkGroupName}, exceeding the warning threshold of {WarningThreshold}",
                             count,
-                            this.Name,
+                            Name,
                             maxPendingItemsLimit);
                     }
 
@@ -141,7 +141,7 @@ namespace Orleans.Runtime.Scheduler
         /// </summary>
         internal IEnumerable<Task> GetScheduledTasks()
         {
-            foreach (var task in this.workItems)
+            foreach (var task in workItems)
             {
                 yield return task;
             }
@@ -169,7 +169,7 @@ namespace Orleans.Runtime.Scheduler
         {
             try
             {
-                RuntimeContext.SetExecutionContext(this.GrainContext);
+                RuntimeContext.SetExecutionContext(GrainContext);
 
                 // Process multiple items -- drain the applicationMessageQueue (up to max items) for this physical activation
                 int count = 0;
@@ -197,7 +197,7 @@ namespace Orleans.Runtime.Scheduler
                         log.LogTrace(
                         "About to execute task {Task} in GrainContext={GrainContext}",
                         OrleansTaskExtentions.ToString(task),
-                        this.GrainContext);
+                        GrainContext);
                     }
 #endif
                     var taskStart = stopwatch.Elapsed;
@@ -208,7 +208,7 @@ namespace Orleans.Runtime.Scheduler
                     }
                     catch (Exception ex)
                     {
-                        this.log.LogError(
+                        log.LogError(
                             (int)ErrorCode.SchedulerExceptionFromExecute,
                             ex,
                             "Worker thread caught an exception thrown from Execute by task {Task}",
@@ -222,11 +222,11 @@ namespace Orleans.Runtime.Scheduler
                         if (taskLength > schedulingOptions.TurnWarningLengthThreshold)
                         {
                             SchedulerInstruments.LongRunningTurnsCounter.Add(1);
-                            this.log.LogWarning(
+                            log.LogWarning(
                                 (int)ErrorCode.SchedulerTurnTooLong3,
                                 "Task {Task} in WorkGroup {GrainContext} took elapsed time {Duration} for execution, which is longer than {TurnWarningLengthThreshold}. Running on thread {Thread}",
                                 OrleansTaskExtentions.ToString(task),
-                                this.GrainContext.ToString(),
+                                GrainContext.ToString(),
                                 taskLength.ToString("g"),
                                 schedulingOptions.TurnWarningLengthThreshold,
                                 Thread.CurrentThread.ManagedThreadId.ToString());
@@ -240,7 +240,7 @@ namespace Orleans.Runtime.Scheduler
             }
             catch (Exception ex)
             {
-                this.log.LogError(
+                log.LogError(
                     (int)ErrorCode.Runtime_Error_100032,
                     ex,
                     "Worker thread {Thread} caught an exception thrown from IWorkItem.Execute",
@@ -287,7 +287,7 @@ namespace Orleans.Runtime.Scheduler
                 sb.AppendFormat("TaskRunner={0}; ", TaskScheduler);
                 if (GrainContext != null)
                 {
-                    var detailedStatus = this.GrainContext switch
+                    var detailedStatus = GrainContext switch
                     {
                         ActivationData activationData => activationData.ToDetailedString(includeExtraDetails: true),
                         SystemTarget systemTarget => systemTarget.ToDetailedString(),

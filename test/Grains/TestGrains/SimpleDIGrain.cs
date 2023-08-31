@@ -24,13 +24,13 @@ namespace UnitTests.Grains
             // get the object Id for injected GrainFactory, 
             // object Id will be the same if the underlying object is the same,
             // this is one way to prove that this GrainFactory is injected from DI
-            this.grainFactoryId = ObjectIdGenerator.GetId(this.injectedGrainFactory, out _);
+            grainFactoryId = ObjectIdGenerator.GetId(this.injectedGrainFactory, out _);
             this.grainContextAccessor = grainContextAccessor;
         }
 
         public override Task OnActivateAsync(CancellationToken cancellationToken)
         {
-            this.originalGrainContext = this.grainContextAccessor.GrainContext;
+            originalGrainContext = grainContextAccessor.GrainContext;
             return base.OnActivateAsync(cancellationToken);
         }
 
@@ -41,35 +41,35 @@ namespace UnitTests.Grains
 
         public Task<string> GetStringValue()
         {
-            return Task.FromResult(this.grainContextAccessor.GrainContext.GrainId.ToString());
+            return Task.FromResult(grainContextAccessor.GrainContext.GrainId.ToString());
         }
 
         public Task<string> GetInjectedSingletonServiceValue()
         {
-            return Task.FromResult(this.injectedService.GetInstanceValue());
+            return Task.FromResult(injectedService.GetInstanceValue());
         }
 
         public Task<string> GetInjectedScopedServiceValue()
         {
-            return Task.FromResult(this.injectedScopedService.GetInstanceValue());
+            return Task.FromResult(injectedScopedService.GetInstanceValue());
         }
 
         public Task<long> GetGrainFactoryId()
         {
-            return Task.FromResult(this.grainFactoryId);
+            return Task.FromResult(grainFactoryId);
         }
 
         public Task DoDeactivate()
         {
-            this.DeactivateOnIdle();
+            DeactivateOnIdle();
             return Task.CompletedTask;
         }
 
         public Task AssertCanResolveSameServiceInstances()
         {
-            if (!ReferenceEquals(this.ServiceProvider.GetRequiredService<IInjectedService>(), this.injectedService)) throw new Exception("singleton not equal");
-            if (!ReferenceEquals(this.ServiceProvider.GetRequiredService<IInjectedScopedService>(), this.injectedScopedService)) throw new Exception("scoped not equal");
-            if (!ReferenceEquals(this.ServiceProvider.GetRequiredService<IGrainContextAccessor>().GrainContext, this.originalGrainContext)) throw new Exception("scoped grain activation context not equal");
+            if (!ReferenceEquals(ServiceProvider.GetRequiredService<IInjectedService>(), injectedService)) throw new Exception("singleton not equal");
+            if (!ReferenceEquals(ServiceProvider.GetRequiredService<IInjectedScopedService>(), injectedScopedService)) throw new Exception("scoped not equal");
+            if (!ReferenceEquals(ServiceProvider.GetRequiredService<IGrainContextAccessor>().GrainContext, originalGrainContext)) throw new Exception("scoped grain activation context not equal");
 
             return Task.CompletedTask;
         }
@@ -96,11 +96,11 @@ namespace UnitTests.Grains
 
         public Task<string> GetStringValue()
         {
-            return Task.FromResult(this.someValueThatIsNotRegistered);
+            return Task.FromResult(someValueThatIsNotRegistered);
         }
         public Task DoDeactivate()
         {
-            this.DeactivateOnIdle();
+            DeactivateOnIdle();
             return Task.CompletedTask;
         }
     }
@@ -120,16 +120,16 @@ namespace UnitTests.Grains
         {
             return Task.FromResult(DateTime.UtcNow.Ticks);
         }
-        public string GetInstanceValue() => this.instanceValue;
+        public string GetInstanceValue() => instanceValue;
 
         public InjectedService(ILoggerFactory loggerFactory)
         {
-            this.logger = loggerFactory.CreateLogger<InjectedService>();
+            logger = loggerFactory.CreateLogger<InjectedService>();
         }
 
         public void Dispose()
         {
-            logger.LogInformation("Disposed instance {Value}", this.instanceValue);
+            logger.LogInformation("Disposed instance {Value}", instanceValue);
         }
     }
 
@@ -145,14 +145,14 @@ namespace UnitTests.Grains
 
         public InjectedScopedService(ILoggerFactory loggerFactory)
         {
-            this.logger = loggerFactory.CreateLogger<InjectedScopedService>();
+            logger = loggerFactory.CreateLogger<InjectedScopedService>();
         }
 
         public void Dispose()
         {
-            logger.LogInformation("Disposed instance {Value}", this.instanceValue);
+            logger.LogInformation("Disposed instance {Value}", instanceValue);
         }
 
-        public string GetInstanceValue() =>  this.instanceValue;
+        public string GetInstanceValue() =>  instanceValue;
     }
 }

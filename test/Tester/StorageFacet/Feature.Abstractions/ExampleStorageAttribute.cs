@@ -9,8 +9,8 @@
 
         public ExampleStorageAttribute(string storageProviderName = null, string stateName = null)
         {
-            this.StorageProviderName = storageProviderName;
-            this.StateName = stateName;
+            StorageProviderName = storageProviderName;
+            StateName = stateName;
         }
     }
 }

@@ -33,14 +33,14 @@ namespace Orleans.Transactions
 
         public async Task<TransactionalStorageLoadResponse<TState>> Load()
         {
-            await this.StateStorage.ReadStateAsync();
+            await StateStorage.ReadStateAsync();
             var state = stateStorage.State;
             return new TransactionalStorageLoadResponse<TState>(stateStorage.Etag, state.CommittedState, state.CommittedSequenceId, state.Metadata, state.PendingStates);
         }
 
         public async Task<string> Store(string expectedETag, TransactionalStateMetaData metadata, List<PendingTransactionState<TState>> statesToPrepare, long? commitUpTo, long? abortAfter)
         {
-            if (this.StateStorage.Etag != expectedETag)
+            if (StateStorage.Etag != expectedETag)
                 throw new ArgumentException(nameof(expectedETag), "Etag does not match");
             var state = stateStorage.State;
             state.Metadata = metadata;
@@ -101,7 +101,7 @@ namespace Orleans.Transactions
 
         private StateStorageBridge<TransactionalStateRecord<TState>> GetStateStorage()
         {
-            return new(this.stateName, context, grainStorage, loggerFactory);
+            return new(stateName, context, grainStorage, loggerFactory);
         }
     }
 

@@ -6,13 +6,13 @@ namespace Orleans.Transactions.Abstractions
         private readonly string storage;
         public TransactionalStateConfiguration(ITransactionalStateConfiguration config, ParticipantId.Role supportedRoles = ParticipantId.Role.Resource | ParticipantId.Role.Manager)
         {
-            this.name = config.StateName;
-            this.storage = config.StorageName;
-            this.SupportedRoles = supportedRoles;
+            name = config.StateName;
+            storage = config.StorageName;
+            SupportedRoles = supportedRoles;
         }
-        public string StateName => this.name;
+        public string StateName => name;
 
-        public string StorageName => this.storage;
+        public string StorageName => storage;
 
         public ParticipantId.Role SupportedRoles { get; }
     }

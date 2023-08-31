@@ -24,32 +24,32 @@ namespace Orleans.Runtime.MembershipService
         }
         public async Task InitializeMembershipTable(bool tryInitTableVersion)
         {
-            this.grain = await GetMembershipTable();
+            grain = await GetMembershipTable();
         }
 
         private async Task<IMembershipTableSystemTarget> GetMembershipTable()
         {
-            var options = this.serviceProvider.GetRequiredService<IOptions<DevelopmentClusterMembershipOptions>>().Value;
+            var options = serviceProvider.GetRequiredService<IOptions<DevelopmentClusterMembershipOptions>>().Value;
             if (options.PrimarySiloEndpoint == null)
             {
                 throw new OrleansConfigurationException(
                     $"{nameof(DevelopmentClusterMembershipOptions)}.{nameof(options.PrimarySiloEndpoint)} must be set when using development clustering.");
             }
 
-            var siloDetails = this.serviceProvider.GetService<ILocalSiloDetails>();
+            var siloDetails = serviceProvider.GetService<ILocalSiloDetails>();
             bool isPrimarySilo = siloDetails.SiloAddress.Endpoint.Equals(options.PrimarySiloEndpoint);
             if (isPrimarySilo)
             {
-                this.logger.LogInformation((int)ErrorCode.MembershipFactory1, "Creating in-memory membership table");
+                logger.LogInformation((int)ErrorCode.MembershipFactory1, "Creating in-memory membership table");
                 var catalog = serviceProvider.GetRequiredService<Catalog>();
                 catalog.RegisterSystemTarget(ActivatorUtilities.CreateInstance<MembershipTableSystemTarget>(serviceProvider));
             }
 
-            var grainFactory = this.serviceProvider.GetRequiredService<IInternalGrainFactory>();
+            var grainFactory = serviceProvider.GetRequiredService<IInternalGrainFactory>();
             var result = grainFactory.GetSystemTarget<IMembershipTableSystemTarget>(Constants.SystemMembershipTableType, SiloAddress.New(options.PrimarySiloEndpoint, 0));
             if (isPrimarySilo)
             {
-                await this.WaitForTableGrainToInit(result);
+                await WaitForTableGrainToInit(result);
             }
 
             return result;
@@ -90,17 +90,17 @@ namespace Orleans.Runtime.MembershipService
             }
         }
 
-        public Task DeleteMembershipTableEntries(string clusterId) => this.grain.DeleteMembershipTableEntries(clusterId);
+        public Task DeleteMembershipTableEntries(string clusterId) => grain.DeleteMembershipTableEntries(clusterId);
 
-        public Task<MembershipTableData> ReadRow(SiloAddress key) => this.grain.ReadRow(key);
+        public Task<MembershipTableData> ReadRow(SiloAddress key) => grain.ReadRow(key);
 
-        public Task<MembershipTableData> ReadAll() => this.grain.ReadAll();
+        public Task<MembershipTableData> ReadAll() => grain.ReadAll();
 
-        public Task<bool> InsertRow(MembershipEntry entry, TableVersion tableVersion) => this.grain.InsertRow(entry, tableVersion);
+        public Task<bool> InsertRow(MembershipEntry entry, TableVersion tableVersion) => grain.InsertRow(entry, tableVersion);
 
-        public Task<bool> UpdateRow(MembershipEntry entry, string etag, TableVersion tableVersion) => this.grain.UpdateRow(entry, etag, tableVersion);
+        public Task<bool> UpdateRow(MembershipEntry entry, string etag, TableVersion tableVersion) => grain.UpdateRow(entry, etag, tableVersion);
 
-        public Task UpdateIAmAlive(MembershipEntry entry) => this.grain.UpdateIAmAlive(entry);
+        public Task UpdateIAmAlive(MembershipEntry entry) => grain.UpdateIAmAlive(entry);
 
         public Task CleanupDefunctSiloEntries(DateTimeOffset beforeDate)
         {

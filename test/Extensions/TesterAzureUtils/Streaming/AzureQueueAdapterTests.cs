@@ -30,7 +30,7 @@ namespace Tester.AzureUtils.Streaming
         {
             this.output = output;
             this.fixture = fixture;
-            this.loggerFactory = this.fixture.Services.GetService<ILoggerFactory>();
+            loggerFactory = this.fixture.Services.GetService<ILoggerFactory>();
         }
 
         public Task InitializeAsync() => Task.CompletedTask;
@@ -39,7 +39,7 @@ namespace Tester.AzureUtils.Streaming
         {
             if (!string.IsNullOrWhiteSpace(TestDefaultConfiguration.DataConnectionString))
             {
-                await AzureQueueStreamProviderUtils.DeleteAllUsedAzureQueues(this.loggerFactory, azureQueueNames, new AzureQueueOptions().ConfigureTestDefaults());
+                await AzureQueueStreamProviderUtils.DeleteAllUsedAzureQueues(loggerFactory, azureQueueNames, new AzureQueueOptions().ConfigureTestDefaults());
             }
         }
 
@@ -52,7 +52,7 @@ namespace Tester.AzureUtils.Streaming
                 QueueNames = azureQueueNames
             };
             options.ConfigureTestDefaults();
-            var serializer = this.fixture.Services.GetService<Serializer>();
+            var serializer = fixture.Services.GetService<Serializer>();
             var queueCacheOptions = new SimpleQueueCacheOptions();
             var queueDataAdapter = new AzureQueueDataAdapterV2(serializer);
             var adapterFactory = new AzureQueueAdapterFactory(
@@ -109,7 +109,7 @@ namespace Tester.AzureUtils.Streaming
                                     set.Add(message.StreamId);
                                     return set;
                                 });
-                            this.output.WriteLine("Queue {0} received message on stream {1}", queueId,
+                            output.WriteLine("Queue {0} received message on stream {1}", queueId,
                                 message.StreamId);
                             Assert.Equal(NumMessagesPerBatch / 2, message.GetEvents<int>().Count());  // "Half the events were ints"
                             Assert.Equal(NumMessagesPerBatch / 2, message.GetEvents<string>().Count());  // "Half the events were strings"
@@ -128,7 +128,7 @@ namespace Tester.AzureUtils.Streaming
                 .ToList()
                 .ForEach(streamId =>
                     adapter.QueueMessageBatchAsync(StreamId.Create(streamId.ToString(), streamId),
-                        events.Take(NumMessagesPerBatch).ToArray(), null, RequestContextExtensions.Export(this.fixture.DeepCopier)).Wait())));
+                        events.Take(NumMessagesPerBatch).ToArray(), null, RequestContextExtensions.Export(fixture.DeepCopier)).Wait())));
             await Task.WhenAll(work);
 
             // Make sure we got back everything we sent
@@ -153,7 +153,7 @@ namespace Tester.AzureUtils.Streaming
                         Exception ex;
                         messageCount++;
                         IBatchContainer batch = cursor.GetCurrent(out ex);
-                        this.output.WriteLine("Token: {0}", batch.SequenceToken);
+                        output.WriteLine("Token: {0}", batch.SequenceToken);
                         Assert.True(batch.SequenceToken.CompareTo(lastToken) >= 0, $"order check for event {messageCount}");
                         lastToken = batch.SequenceToken;
                         if (messageCount == 10)
@@ -161,7 +161,7 @@ namespace Tester.AzureUtils.Streaming
                             tenthInCache = batch.SequenceToken;
                         }
                     }
-                    this.output.WriteLine("On Queue {0} we received a total of {1} message on stream {2}", kvp.Key, messageCount, streamGuid);
+                    output.WriteLine("On Queue {0} we received a total of {1} message on stream {2}", kvp.Key, messageCount, streamGuid);
                     Assert.Equal(NumBatches / 2, messageCount);
                     Assert.NotNull(tenthInCache);
 
@@ -172,7 +172,7 @@ namespace Tester.AzureUtils.Streaming
                     {
                         messageCount++;
                     }
-                    this.output.WriteLine("On Queue {0} we received a total of {1} message on stream {2}", kvp.Key, messageCount, streamGuid);
+                    output.WriteLine("On Queue {0} we received a total of {1} message on stream {2}", kvp.Key, messageCount, streamGuid);
                     const int expected = NumBatches / 2 - 10 + 1; // all except the first 10, including the 10th (10 + 1)
                     Assert.Equal(expected, messageCount);
                 }

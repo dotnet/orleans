@@ -15,9 +15,9 @@ namespace UnitTests.OrleansRuntime
         [TestCategory("BVT")]
         public async Task GetActivationAddressTest()
         {
-            var managementGrain = this.Fixture.Client.GetGrain<IManagementGrain>(0);
-            var grain1 = this.Fixture.Client.GetGrain<IDumbGrain>(Guid.NewGuid());
-            var grain2 = this.Fixture.Client.GetGrain<IDumbGrain>(Guid.NewGuid());
+            var managementGrain = Fixture.Client.GetGrain<IManagementGrain>(0);
+            var grain1 = Fixture.Client.GetGrain<IDumbGrain>(Guid.NewGuid());
+            var grain2 = Fixture.Client.GetGrain<IDumbGrain>(Guid.NewGuid());
 
             var grain1Address = await managementGrain.GetActivationAddress(grain1);
             Assert.Null(grain1Address);
@@ -33,7 +33,7 @@ namespace UnitTests.OrleansRuntime
             Assert.NotNull(grain1Address2);
             Assert.True(grain1Address.Equals(grain1Address2));
 
-            var worker = this.Fixture.Client.GetGrain<IDumbWorker>(0);
+            var worker = Fixture.Client.GetGrain<IDumbWorker>(0);
             await Assert.ThrowsAnyAsync<InvalidOperationException>(async () => await managementGrain.GetActivationAddress(worker));
         }
     }

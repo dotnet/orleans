@@ -37,13 +37,13 @@ namespace OrleansAWSUtils.Streams
             Orleans.Serialization.Serializer serializer, 
             ILoggerFactory loggerFactory)
         {
-            this.providerName = name;
+            providerName = name;
             this.sqsOptions = sqsOptions;
             this.clusterOptions = clusterOptions.Value;
             this.serializer = serializer.GetSerializer<SQSBatchContainer>();
             this.loggerFactory = loggerFactory;
-            streamQueueMapper = new HashRingBasedStreamQueueMapper(queueMapperOptions, this.providerName);
-            adapterCache = new SimpleQueueAdapterCache(cacheOptions, this.providerName, this.loggerFactory);
+            streamQueueMapper = new HashRingBasedStreamQueueMapper(queueMapperOptions, providerName);
+            adapterCache = new SimpleQueueAdapterCache(cacheOptions, providerName, this.loggerFactory);
         }
 
 
@@ -60,7 +60,7 @@ namespace OrleansAWSUtils.Streams
         /// <summary>Creates the Azure Queue based adapter.</summary>
         public virtual Task<IQueueAdapter> CreateAdapter()
         {
-            var adapter = new SQSAdapter(this.serializer, this.streamQueueMapper, this.loggerFactory, this.sqsOptions.ConnectionString, this.clusterOptions.ServiceId, this.providerName);
+            var adapter = new SQSAdapter(serializer, streamQueueMapper, loggerFactory, sqsOptions.ConnectionString, clusterOptions.ServiceId, providerName);
             return Task.FromResult<IQueueAdapter>(adapter);
         }
 

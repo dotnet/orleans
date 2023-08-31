@@ -34,7 +34,7 @@ namespace Orleans.Metadata
                     { IsGenericType: true } when grainClass is { IsGenericType: true } => @interface.GetGenericTypeDefinition(),
                     _ => @interface
                 };
-                var interfaceId = this.interfaceTypeResolver.GetGrainInterfaceType(type);
+                var interfaceId = interfaceTypeResolver.GetGrainInterfaceType(type);
                 var key = (uint)counter < (uint)_cachedKeys.Length ? (_cachedKeys[counter] ??= GetKey(counter)) : GetKey(counter);
                 properties[key] = interfaceId.ToString();
                 ++counter;

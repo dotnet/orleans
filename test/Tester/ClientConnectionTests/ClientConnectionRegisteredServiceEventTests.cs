@@ -18,8 +18,8 @@ namespace Tester
         public override async Task InitializeAsync()
         {
             await base.InitializeAsync();
-            this.clusterConnectionLostNotifier = this.HostedCluster.ServiceProvider.GetRequiredService<EventNotifier<EventArgs>>();
-            this.gatewayCountChangedNotifier = this.HostedCluster.ServiceProvider.GetRequiredService<EventNotifier<GatewayCountChangedEventArgs>>();
+            clusterConnectionLostNotifier = HostedCluster.ServiceProvider.GetRequiredService<EventNotifier<EventArgs>>();
+            gatewayCountChangedNotifier = HostedCluster.ServiceProvider.GetRequiredService<EventNotifier<GatewayCountChangedEventArgs>>();
         }
 
         protected override void ConfigureTestCluster(TestClusterBuilder builder)
@@ -31,14 +31,14 @@ namespace Tester
         {
             private ImmutableList<Action<TEventArgs>> subscribers = ImmutableList<Action<TEventArgs>>.Empty;
 
-            public void Subscribe(Action<TEventArgs> action) => ImmutableInterlocked.Update(ref this.subscribers, (subs, sub) => subs.Add(sub), action);
+            public void Subscribe(Action<TEventArgs> action) => ImmutableInterlocked.Update(ref subscribers, (subs, sub) => subs.Add(sub), action);
 
             public void Unsubscribe(Action<TEventArgs> action) =>
-                ImmutableInterlocked.Update(ref this.subscribers, (subs, sub) => subs.Remove(sub), action);
+                ImmutableInterlocked.Update(ref subscribers, (subs, sub) => subs.Remove(sub), action);
 
             public void Notify(TEventArgs arg)
             {
-                foreach (var sub in this.subscribers)
+                foreach (var sub in subscribers)
                 {
                     sub(arg);
                 }
@@ -63,12 +63,12 @@ namespace Tester
         [Fact, TestCategory("SlowBVT")]
         public async Task EventSendWhenDisconnectedFromCluster()
         {
-            var runtime = this.HostedCluster.ServiceProvider.GetRequiredService<OutsideRuntimeClient>();
+            var runtime = HostedCluster.ServiceProvider.GetRequiredService<OutsideRuntimeClient>();
 
             var semaphore = new SemaphoreSlim(0, 1);
             void ReleaseSemaphoreAction(EventArgs args) => semaphore.Release();
 
-            this.clusterConnectionLostNotifier.Subscribe(ReleaseSemaphoreAction);
+            clusterConnectionLostNotifier.Subscribe(ReleaseSemaphoreAction);
 
             try
             {
@@ -79,13 +79,13 @@ namespace Tester
                     await grain.SetLabel(i.ToString());
                 }
 
-                await this.HostedCluster.StopAllSilosAsync();
+                await HostedCluster.StopAllSilosAsync();
 
                 Assert.True(await semaphore.WaitAsync(TimeSpan.FromSeconds(10)));
             }
             finally
             {
-                this.clusterConnectionLostNotifier.Unsubscribe(ReleaseSemaphoreAction);
+                clusterConnectionLostNotifier.Unsubscribe(ReleaseSemaphoreAction);
             }
         }
 
@@ -107,23 +107,23 @@ namespace Tester
                 }
             }
 
-            this.gatewayCountChangedNotifier.Subscribe(ReleaseGatewaySemaphoreAction);
+            gatewayCountChangedNotifier.Subscribe(ReleaseGatewaySemaphoreAction);
 
             try
             {
-                var silo = this.HostedCluster.SecondarySilos[0];
+                var silo = HostedCluster.SecondarySilos[0];
                 await silo.StopSiloAsync(true);
 
                 Assert.True(await lostGatewaySemaphore.WaitAsync(TimeSpan.FromSeconds(20)));
 
-                await this.HostedCluster.RestartStoppedSecondarySiloAsync(silo.Name);
+                await HostedCluster.RestartStoppedSecondarySiloAsync(silo.Name);
 
                 // Clients need prodding to reconnect.
                 var remainingAttempts = 90;
                 bool reconnected;
                 do
                 {
-                    this.Client.GetGrain<ITestGrain>(Guid.NewGuid().GetHashCode()).SetLabel("test").Ignore();
+                    Client.GetGrain<ITestGrain>(Guid.NewGuid().GetHashCode()).SetLabel("test").Ignore();
                     reconnected = await regainedGatewaySemaphore.WaitAsync(TimeSpan.FromSeconds(1));
                 } while (!reconnected && --remainingAttempts > 0);
 
@@ -131,7 +131,7 @@ namespace Tester
             }
             finally
             {
-                this.gatewayCountChangedNotifier.Unsubscribe(ReleaseGatewaySemaphoreAction);
+                gatewayCountChangedNotifier.Unsubscribe(ReleaseGatewaySemaphoreAction);
             }
         }
     }

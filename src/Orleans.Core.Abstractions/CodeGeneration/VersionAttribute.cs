@@ -30,7 +30,7 @@ namespace Orleans.CodeGeneration
         /// <inheritdoc />
         void IGrainInterfacePropertiesProviderAttribute.Populate(IServiceProvider services, Type type, Dictionary<string, string> properties)
         {
-            properties[WellKnownGrainInterfaceProperties.Version] = this.Version.ToString(CultureInfo.InvariantCulture);
+            properties[WellKnownGrainInterfaceProperties.Version] = Version.ToString(CultureInfo.InvariantCulture);
         }
     }
 }

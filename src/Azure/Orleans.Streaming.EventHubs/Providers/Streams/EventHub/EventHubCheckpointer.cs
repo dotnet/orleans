@@ -26,7 +26,7 @@ namespace Orleans.Streaming.EventHubs
 
         public Task<IStreamQueueCheckpointer<string>> Create(string partition)
         {
-            return EventHubCheckpointer.Create(options, providerName, partition, this.clusterOptions.ServiceId.ToString(), loggerFactory);
+            return EventHubCheckpointer.Create(options, providerName, partition, clusterOptions.ServiceId.ToString(), loggerFactory);
         }
 
         public static IStreamQueueCheckpointerFactory CreateFactory(IServiceProvider services, string providerName)
@@ -85,8 +85,8 @@ namespace Orleans.Streaming.EventHubs
             {
                 throw new ArgumentNullException(nameof(partition));
             }
-            this.logger = loggerFactory.CreateLogger<EventHubCheckpointer>();
-            this.logger.LogInformation(
+            logger = loggerFactory.CreateLogger<EventHubCheckpointer>();
+            logger.LogInformation(
                 "Creating EventHub checkpointer for partition {Partition} of stream provider {StreamProviderName} with serviceId {ServiceId}.",
                 partition,
                 streamProviderName,

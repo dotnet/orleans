@@ -55,14 +55,14 @@ namespace Tester.StreamingTests
         [Fact, TestCategory("Functional"), TestCategory("Streaming")]
         public async Task BatchedMemoryStreamProducerOnDroppedClientTest()
         {
-            this.fixture.Logger.LogInformation("************************ BatchedMemoryStreamProducerOnDroppedClientTest *********************************");
+            fixture.Logger.LogInformation("************************ BatchedMemoryStreamProducerOnDroppedClientTest *********************************");
             await runner.StreamProducerOnDroppedClientTest(Fixture.StreamProviderName, Fixture.StreamNamespace);
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Streaming")]
         public async Task BatchedMemoryStreamConsumerOnDroppedClientTest()
         {
-            this.fixture.Logger.LogInformation("************************ BatchedMemoryStreamConsumerOnDroppedClientTest *********************************");
+            fixture.Logger.LogInformation("************************ BatchedMemoryStreamConsumerOnDroppedClientTest *********************************");
             await runner.StreamConsumerOnDroppedClientTest(Fixture.StreamProviderName, Fixture.StreamNamespace, output,
                     null, true);
         }

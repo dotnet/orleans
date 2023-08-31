@@ -39,23 +39,23 @@ namespace Orleans.Streams
                 throw new ArgumentNullException(nameof(batchContainers));
             }
 
-            this.BatchContainers = batchContainers;
+            BatchContainers = batchContainers;
 
-            var containerDelegate = this.BatchContainers[0];
-            this.SequenceToken = containerDelegate.SequenceToken;
-            this.StreamId = containerDelegate.StreamId;
+            var containerDelegate = BatchContainers[0];
+            SequenceToken = containerDelegate.SequenceToken;
+            StreamId = containerDelegate.StreamId;
         }
 
         /// <inheritdoc/>
         public IEnumerable<Tuple<T, StreamSequenceToken>> GetEvents<T>()
         {
-            return this.BatchContainers.SelectMany(batchContainer => batchContainer.GetEvents<T>());
+            return BatchContainers.SelectMany(batchContainer => batchContainer.GetEvents<T>());
         }
 
         /// <inheritdoc/>
         public bool ImportRequestContext()
         {
-            return this.BatchContainers[0].ImportRequestContext();
+            return BatchContainers[0].ImportRequestContext();
         }
     }
 }

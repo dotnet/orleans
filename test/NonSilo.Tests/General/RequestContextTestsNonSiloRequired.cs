@@ -50,7 +50,7 @@ namespace UnitTests.General
                 promises[i] = Task.Run(() =>
                 {
                     flag.Wait();
-                    msg.RequestContextData = RequestContextExtensions.Export(this.fixture.DeepCopier);
+                    msg.RequestContextData = RequestContextExtensions.Export(fixture.DeepCopier);
                 });
                 flag.Set();
                 Thread.Sleep(1);
@@ -67,7 +67,7 @@ namespace UnitTests.General
             Guid nullActivityId = Guid.Empty;
 
             Message msg = new Message();
-            msg.RequestContextData = RequestContextExtensions.Export(this.fixture.DeepCopier);
+            msg.RequestContextData = RequestContextExtensions.Export(fixture.DeepCopier);
             if (msg.RequestContextData != null) foreach (var kvp in msg.RequestContextData)
                 {
                     headers.Add(kvp.Key, kvp.Value);
@@ -77,7 +77,7 @@ namespace UnitTests.General
 
             RequestContext.ReentrancyId = activityId;
             msg = new Message();
-            msg.RequestContextData = RequestContextExtensions.Export(this.fixture.DeepCopier);
+            msg.RequestContextData = RequestContextExtensions.Export(fixture.DeepCopier);
             if (msg.RequestContextData != null) foreach (var kvp in msg.RequestContextData)
                 {
                     headers.Add(kvp.Key, kvp.Value);
@@ -91,7 +91,7 @@ namespace UnitTests.General
 
             RequestContextTestUtils.SetActivityId(nullActivityId);
             msg = new Message();
-            msg.RequestContextData = RequestContextExtensions.Export(this.fixture.DeepCopier);
+            msg.RequestContextData = RequestContextExtensions.Export(fixture.DeepCopier);
             if (msg.RequestContextData != null) foreach (var kvp in msg.RequestContextData)
                 {
                     headers.Add(kvp.Key, kvp.Value);
@@ -101,7 +101,7 @@ namespace UnitTests.General
 
             RequestContextTestUtils.SetActivityId(activityId2);
             msg = new Message();
-            msg.RequestContextData = RequestContextExtensions.Export(this.fixture.DeepCopier);
+            msg.RequestContextData = RequestContextExtensions.Export(fixture.DeepCopier);
             foreach (var kvp in msg.RequestContextData)
             {
                 headers.Add(kvp.Key, kvp.Value);
@@ -123,7 +123,7 @@ namespace UnitTests.General
             Guid nullActivityId = Guid.Empty;
 
             Message msg = new Message();
-            msg.RequestContextData = RequestContextExtensions.Export(this.fixture.DeepCopier);
+            msg.RequestContextData = RequestContextExtensions.Export(fixture.DeepCopier);
             RequestContext.Clear();
             RequestContextExtensions.Import(msg.RequestContextData);
             var actId = RequestContext.Get(RequestContext.CALL_CHAIN_REENTRANCY_HEADER);
@@ -132,7 +132,7 @@ namespace UnitTests.General
 
             RequestContextTestUtils.SetActivityId(activityId);
             msg = new Message();
-            msg.RequestContextData = RequestContextExtensions.Export(this.fixture.DeepCopier);
+            msg.RequestContextData = RequestContextExtensions.Export(fixture.DeepCopier);
             RequestContext.Clear();
             RequestContextExtensions.Import(msg.RequestContextData);
             actId = RequestContext.Get(RequestContext.CALL_CHAIN_REENTRANCY_HEADER);
@@ -149,7 +149,7 @@ namespace UnitTests.General
 
             RequestContextTestUtils.SetActivityId(nullActivityId);
             msg = new Message();
-            msg.RequestContextData = RequestContextExtensions.Export(this.fixture.DeepCopier);
+            msg.RequestContextData = RequestContextExtensions.Export(fixture.DeepCopier);
             RequestContext.Clear();
             RequestContextExtensions.Import(msg.RequestContextData);
             actId = RequestContext.Get(RequestContext.CALL_CHAIN_REENTRANCY_HEADER);
@@ -158,7 +158,7 @@ namespace UnitTests.General
 
             RequestContextTestUtils.SetActivityId(activityId2);
             msg = new Message();
-            msg.RequestContextData = RequestContextExtensions.Export(this.fixture.DeepCopier);
+            msg.RequestContextData = RequestContextExtensions.Export(fixture.DeepCopier);
             RequestContext.Clear();
             RequestContextExtensions.Import(msg.RequestContextData);
             actId = RequestContext.Get(RequestContext.CALL_CHAIN_REENTRANCY_HEADER);

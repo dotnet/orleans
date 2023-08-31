@@ -24,12 +24,12 @@ namespace Orleans.Providers
             ClientGrainContext clientContext)
         {
             this.grainFactory = grainFactory;
-            this.ServiceProvider = serviceProvider;
+            ServiceProvider = serviceProvider;
             this.clientContext = clientContext;
         }
 
         /// <inheritdoc/>
-        public IGrainFactory GrainFactory => this.grainFactory;
+        public IGrainFactory GrainFactory => grainFactory;
 
         /// <inheritdoc/>
         public IServiceProvider ServiceProvider { get; }
@@ -39,7 +39,7 @@ namespace Orleans.Providers
             where TExtension : class, TExtensionInterface
             where TExtensionInterface : class, IGrainExtension
         {
-            return this.clientContext.GetOrSetExtension<TExtension, TExtensionInterface>(newExtensionFunc);
+            return clientContext.GetOrSetExtension<TExtension, TExtensionInterface>(newExtensionFunc);
         }
     }
 }

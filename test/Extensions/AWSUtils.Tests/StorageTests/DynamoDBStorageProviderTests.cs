@@ -27,7 +27,7 @@ namespace AWSUtils.Tests.StorageTests
             this.output = output;
             this.fixture = fixture;
             providerCfgProps["DataConnectionString"] = $"Service={AWSTestConstants.DynamoDbService}";
-            this.providerRuntime = new ClientProviderRuntime(
+            providerRuntime = new ClientProviderRuntime(
                 fixture.InternalGrainFactory,
                 fixture.Services,
                 fixture.Services.GetRequiredService<ClientGrainContext>());
@@ -161,9 +161,9 @@ namespace AWSUtils.Tests.StorageTests
 
         private async Task<DynamoDBGrainStorage> InitDynamoDBGrainStorage(DynamoDBStorageOptions options)
         {
-            options.GrainStorageSerializer = ActivatorUtilities.CreateInstance<JsonGrainStorageSerializer>(this.providerRuntime.ServiceProvider);
-            DynamoDBGrainStorage store = ActivatorUtilities.CreateInstance<DynamoDBGrainStorage>(this.providerRuntime.ServiceProvider, "StorageProviderTests", options);
-            ISiloLifecycleSubject lifecycle = ActivatorUtilities.CreateInstance<SiloLifecycleSubject>(this.providerRuntime.ServiceProvider, NullLogger<SiloLifecycleSubject>.Instance);
+            options.GrainStorageSerializer = ActivatorUtilities.CreateInstance<JsonGrainStorageSerializer>(providerRuntime.ServiceProvider);
+            DynamoDBGrainStorage store = ActivatorUtilities.CreateInstance<DynamoDBGrainStorage>(providerRuntime.ServiceProvider, "StorageProviderTests", options);
+            ISiloLifecycleSubject lifecycle = ActivatorUtilities.CreateInstance<SiloLifecycleSubject>(providerRuntime.ServiceProvider, NullLogger<SiloLifecycleSubject>.Instance);
             store.Participate(lifecycle);
             await lifecycle.OnStart();
             return store;
@@ -195,7 +195,7 @@ namespace AWSUtils.Tests.StorageTests
             await store.ReadStateAsync(grainTypeName, reference, storedGrainState);
 
             TimeSpan readTime = sw.Elapsed;
-            this.output.WriteLine("{0} - Read time = {1}", store.GetType().FullName, readTime);
+            output.WriteLine("{0} - Read time = {1}", store.GetType().FullName, readTime);
 
             var storedState = storedGrainState.State;
             Assert.Equal(grainState.State.A, storedState.A);
@@ -227,7 +227,7 @@ namespace AWSUtils.Tests.StorageTests
             };
             await store.ReadStateAsync(grainTypeName, reference, storedGrainState);
             TimeSpan readTime = sw.Elapsed;
-            this.output.WriteLine("{0} - Write time = {1} Read time = {2}", store.GetType().FullName, writeTime, readTime);
+            output.WriteLine("{0} - Write time = {1} Read time = {2}", store.GetType().FullName, writeTime, readTime);
             Assert.Equal(grainState.State.A, storedGrainState.State.A);
             Assert.Equal(grainState.State.B, storedGrainState.State.B);
             Assert.Equal(grainState.State.C, storedGrainState.State.C);
@@ -261,7 +261,7 @@ namespace AWSUtils.Tests.StorageTests
             };
             await store.ReadStateAsync(grainTypeName, reference, storedGrainState);
             TimeSpan readTime = sw.Elapsed;
-            this.output.WriteLine("{0} - Write time = {1} Read time = {2}", store.GetType().FullName, writeTime, readTime);
+            output.WriteLine("{0} - Write time = {1} Read time = {2}", store.GetType().FullName, writeTime, readTime);
             Assert.NotNull(storedGrainState.State);
             Assert.Equal(default, storedGrainState.State.A);
             Assert.Equal(default, storedGrainState.State.B);

@@ -28,7 +28,7 @@ namespace Orleans.Transactions.TestKit
         public virtual async Task SingleGrainWriteTransaction()
         {
             const int delta = 5;
-            IFaultInjectionTransactionTestGrain grain = this.grainFactory.GetGrain<IFaultInjectionTransactionTestGrain>(Guid.NewGuid());
+            IFaultInjectionTransactionTestGrain grain = grainFactory.GetGrain<IFaultInjectionTransactionTestGrain>(Guid.NewGuid());
             int original = await grain.Get();
             await grain.Add(delta);
             await grain.Deactivate();
@@ -46,10 +46,10 @@ namespace Orleans.Transactions.TestKit
             var faultInjectionControl = new FaultInjectionControl() { FaultInjectionPhase = injectionPhase, FaultInjectionType = injectionType };
             List<IFaultInjectionTransactionTestGrain> grains =
                 Enumerable.Range(0, grainCount)
-                    .Select(i => this.grainFactory.GetGrain<IFaultInjectionTransactionTestGrain>(Guid.NewGuid()))
+                    .Select(i => grainFactory.GetGrain<IFaultInjectionTransactionTestGrain>(Guid.NewGuid()))
                     .ToList();
 
-            IFaultInjectionTransactionCoordinatorGrain coordinator = this.grainFactory.GetGrain<IFaultInjectionTransactionCoordinatorGrain>(Guid.NewGuid());
+            IFaultInjectionTransactionCoordinatorGrain coordinator = grainFactory.GetGrain<IFaultInjectionTransactionCoordinatorGrain>(Guid.NewGuid());
 
             await coordinator.MultiGrainSet(grains, setval);
             // add delay between transactions so confirmation errors don't bleed into neighboring transactions
@@ -69,7 +69,7 @@ namespace Orleans.Transactions.TestKit
             }
             catch (OrleansTransactionException e)
             {
-                this.testOutput($"Call failed with exception: {e}, retrying without fault");
+                testOutput($"Call failed with exception: {e}, retrying without fault");
                 bool cascadingAbort = false;
                 bool firstAttempt = true;
 
@@ -83,7 +83,7 @@ namespace Orleans.Transactions.TestKit
                     }
                     catch (OrleansCascadingAbortException)
                     {
-                        this.testOutput($"Retry failed with OrleansCascadingAbortException: {e}, retrying without fault");
+                        testOutput($"Retry failed with OrleansCascadingAbortException: {e}, retrying without fault");
                         // should only encounter this when faulting after storage write
                         injectionType.Should().Be(FaultInjectionType.ExceptionAfterStore);
                         // only allow one retry

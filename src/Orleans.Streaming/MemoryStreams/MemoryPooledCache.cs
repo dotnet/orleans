@@ -43,8 +43,8 @@ namespace Orleans.Providers
         {
             this.bufferPool = bufferPool;
             this.serializer = serializer;
-            this.cache = new PooledQueueCache(this, logger, cacheMonitor, monitorWriteInterval, purgeMetadataInterval);
-            this.evictionStrategy = new ChronologicalEvictionStrategy(logger, purgePredicate, cacheMonitor, monitorWriteInterval) {PurgeObservable = cache};
+            cache = new PooledQueueCache(this, logger, cacheMonitor, monitorWriteInterval, purgeMetadataInterval);
+            evictionStrategy = new ChronologicalEvictionStrategy(logger, purgePredicate, cacheMonitor, monitorWriteInterval) {PurgeObservable = cache};
         }
 
         private CachedMessage QueueMessageToCachedMessage(MemoryMessageData queueMessage, DateTime dequeueTimeUtc)
@@ -73,7 +73,7 @@ namespace Orleans.Providers
                 // no block or block full, get new block and try again
                 currentBuffer = bufferPool.Allocate();
                 //call EvictionStrategy's OnBlockAllocated method
-                this.evictionStrategy.OnBlockAllocated(currentBuffer);
+                evictionStrategy.OnBlockAllocated(currentBuffer);
                 // if this fails with clean block, then requested size is too big
                 if (!currentBuffer.TryGetSegment(size, out segment))
                 {
@@ -160,7 +160,7 @@ namespace Orleans.Providers
         public bool TryPurgeFromCache(out IList<IBatchContainer> purgedItems)
         {
             purgedItems = null;
-            this.evictionStrategy.PerformPurge(DateTime.UtcNow);
+            evictionStrategy.PerformPurge(DateTime.UtcNow);
             return false;
         }
 
@@ -184,7 +184,7 @@ namespace Orleans.Providers
             ArraySegment<byte> payload = SegmentBuilder.ReadNextBytes(cachedMessage.Segment, ref readOffset);
             MemoryMessageData message = MemoryMessageData.Create(cachedMessage.StreamId, new ArraySegment<byte>(payload.ToArray()));
             message.SequenceNumber = cachedMessage.SequenceNumber;
-            return new MemoryBatchContainer<TSerializer>(message, this.serializer);
+            return new MemoryBatchContainer<TSerializer>(message, serializer);
         }
 
         /// <inheritdoc/>

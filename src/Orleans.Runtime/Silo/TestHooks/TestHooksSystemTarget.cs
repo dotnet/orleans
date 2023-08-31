@@ -54,7 +54,7 @@ namespace Orleans.Runtime.TestHooks
             this.siloStatusOracle = siloStatusOracle;
             this.hostEnvironmentStatistics = hostEnvironmentStatistics;
             this.loadSheddingOptions = loadSheddingOptions.Value;
-            this.consistentRingProvider = this.serviceProvider.GetRequiredService<IConsistentRingProvider>();
+            consistentRingProvider = this.serviceProvider.GetRequiredService<IConsistentRingProvider>();
         }
 
         public Task<SiloAddress> GetConsistentRingPrimaryTargetSilo(uint key)
@@ -67,54 +67,54 @@ namespace Orleans.Runtime.TestHooks
             return Task.FromResult(consistentRingProvider.ToString()); 
         }
         
-        public Task<string> GetServiceId() => Task.FromResult(this.serviceProvider.GetRequiredService<IOptions<ClusterOptions>>().Value.ServiceId);
+        public Task<string> GetServiceId() => Task.FromResult(serviceProvider.GetRequiredService<IOptions<ClusterOptions>>().Value.ServiceId);
 
         public Task<bool> HasStorageProvider(string providerName)
         {
-            return Task.FromResult(this.serviceProvider.GetServiceByName<IGrainStorage>(providerName) != null);
+            return Task.FromResult(serviceProvider.GetServiceByName<IGrainStorage>(providerName) != null);
         }
 
         public Task<bool> HasStreamProvider(string providerName)
         {
-            return Task.FromResult(this.serviceProvider.GetServiceByName<IGrainStorage>(providerName) != null);
+            return Task.FromResult(serviceProvider.GetServiceByName<IGrainStorage>(providerName) != null);
         }
 
         public Task<ICollection<string>> GetStorageProviderNames()
         {
-            var storageProviderCollection = this.serviceProvider.GetRequiredService<IKeyedServiceCollection<string, IGrainStorage>>();
-            return Task.FromResult<ICollection<string>>(storageProviderCollection.GetServices(this.serviceProvider).Select(keyedService => keyedService.Key).ToArray());
+            var storageProviderCollection = serviceProvider.GetRequiredService<IKeyedServiceCollection<string, IGrainStorage>>();
+            return Task.FromResult<ICollection<string>>(storageProviderCollection.GetServices(serviceProvider).Select(keyedService => keyedService.Key).ToArray());
         }
 
-        public Task<int> UnregisterGrainForTesting(GrainId grain) => Task.FromResult(this.serviceProvider.GetRequiredService<Catalog>().UnregisterGrainForTesting(grain));
+        public Task<int> UnregisterGrainForTesting(GrainId grain) => Task.FromResult(serviceProvider.GetRequiredService<Catalog>().UnregisterGrainForTesting(grain));
         
         public Task LatchIsOverloaded(bool overloaded, TimeSpan latchPeriod)
         {
             if (overloaded)
             {
-                this.LatchCpuUsage(this.loadSheddingOptions.LoadSheddingLimit + 1, latchPeriod);
+                LatchCpuUsage(loadSheddingOptions.LoadSheddingLimit + 1, latchPeriod);
             }
             else
             {
-                this.LatchCpuUsage(this.loadSheddingOptions.LoadSheddingLimit - 1, latchPeriod);
+                LatchCpuUsage(loadSheddingOptions.LoadSheddingLimit - 1, latchPeriod);
             }
 
             return Task.CompletedTask;
         }
 
-        public Task<Dictionary<SiloAddress, SiloStatus>> GetApproximateSiloStatuses() => Task.FromResult(this.siloStatusOracle.GetApproximateSiloStatuses());
+        public Task<Dictionary<SiloAddress, SiloStatus>> GetApproximateSiloStatuses() => Task.FromResult(siloStatusOracle.GetApproximateSiloStatuses());
 
         private void LatchCpuUsage(float? cpuUsage, TimeSpan latchPeriod)
         {
-            var previousValue = this.hostEnvironmentStatistics.CpuUsage;
-            this.hostEnvironmentStatistics.CpuUsage = cpuUsage;
+            var previousValue = hostEnvironmentStatistics.CpuUsage;
+            hostEnvironmentStatistics.CpuUsage = cpuUsage;
             Task.Delay(latchPeriod).ContinueWith(t =>
                 {
-                    var currentCpuUsage = this.hostEnvironmentStatistics.CpuUsage;
+                    var currentCpuUsage = hostEnvironmentStatistics.CpuUsage;
 
                     // ReSharper disable once CompareOfFloatsByEqualityOperator
                     if (currentCpuUsage == cpuUsage)
                     {
-                        this.hostEnvironmentStatistics.CpuUsage = previousValue;
+                        hostEnvironmentStatistics.CpuUsage = previousValue;
                     }
                 }).Ignore();
         }

@@ -97,7 +97,7 @@ namespace UnitTests.Grains
 
         public StreamLifecycleTestGrainBase(ILoggerFactory loggerFactory)
         {
-            this.logger = loggerFactory.CreateLogger($"{this.GetType().Name}-{this.IdentityString}");
+            logger = loggerFactory.CreateLogger($"{GetType().Name}-{IdentityString}");
         }
 
         protected Task RecordActivate()
@@ -183,7 +183,7 @@ namespace UnitTests.Grains
                     logger.LogInformation("ReconnectConsumerHandles SubscriptionHandles={Handles} Grain={Grain}", Utils.EnumerableToString(handles), this.AsReference<IStreamLifecycleConsumerGrain>());
                     foreach (var handle in handles)
                     {
-                        var observer = new MyStreamObserver<int>(this.logger);
+                        var observer = new MyStreamObserver<int>(logger);
                         StreamSubscriptionHandle<int> subsHandle = await handle.ResumeAsync(observer);
                         Observers.Add(subsHandle, observer);
                     }
@@ -237,7 +237,7 @@ namespace UnitTests.Grains
 
             //var subsHandle = await State.Stream.SubscribeAsync(observer);
 
-            var (myExtension, myExtensionReference) = this.streamProviderRuntime.BindExtension<StreamConsumerExtension, IStreamConsumerExtension>(
+            var (myExtension, myExtensionReference) = streamProviderRuntime.BindExtension<StreamConsumerExtension, IStreamConsumerExtension>(
                 () => new StreamConsumerExtension(streamProviderRuntime));
             string extKey = providerName + "_" + Encoding.UTF8.GetString(State.Stream.StreamId.Namespace.ToArray());
             var id = new QualifiedStreamId(providerName, streamId);

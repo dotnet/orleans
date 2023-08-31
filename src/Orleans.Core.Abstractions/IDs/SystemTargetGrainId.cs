@@ -218,7 +218,7 @@ namespace Orleans.Runtime
         public bool Equals(SystemTargetGrainId other) => _grainId.Equals(other._grainId);
 
         /// <inheritdoc/>
-        public override bool Equals(object? obj) => obj is SystemTargetGrainId observer && this.Equals(observer);
+        public override bool Equals(object? obj) => obj is SystemTargetGrainId observer && Equals(observer);
 
         /// <inheritdoc/>
         public override int GetHashCode() => _grainId.GetHashCode();

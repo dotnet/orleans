@@ -18,8 +18,8 @@ namespace Orleans.Transactions.TestKit
 
         public FaultInjectionTransactionalStateAttribute(string stateName, string storageName = null)
         {
-            this.StateName = stateName;
-            this.StorageName = storageName;
+            StateName = stateName;
+            StorageName = storageName;
         }
     }
 
@@ -38,8 +38,8 @@ namespace Orleans.Transactions.TestKit
 
         public IFaultInjectionTransactionalState<TState> Create<TState>(IFaultInjectionTransactionalStateConfiguration config) where TState : class, new()
         {
-            var currentContext = this.contextAccessor.GrainContext;
-            TransactionalState<TState> transactionalState = ActivatorUtilities.CreateInstance<TransactionalState<TState>>(currentContext.ActivationServices, new TransactionalStateConfiguration(config), this.contextAccessor);
+            var currentContext = contextAccessor.GrainContext;
+            TransactionalState<TState> transactionalState = ActivatorUtilities.CreateInstance<TransactionalState<TState>>(currentContext.ActivationServices, new TransactionalStateConfiguration(config), contextAccessor);
             FaultInjectionTransactionalState<TState> deactivationTransactionalState = ActivatorUtilities.CreateInstance<FaultInjectionTransactionalState<TState>>(currentContext.ActivationServices, transactionalState);
             deactivationTransactionalState.Participate(currentContext.ObservableLifecycle);
             return deactivationTransactionalState;

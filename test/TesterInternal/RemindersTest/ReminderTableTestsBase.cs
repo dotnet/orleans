@@ -26,23 +26,23 @@ namespace UnitTests.RemindersTest
 
         protected ReminderTableTestsBase(ConnectionStringFixture fixture, TestEnvironmentFixture clusterFixture, LoggerFilterOptions filters)
         {
-            this.connectionStringFixture = fixture;
+            connectionStringFixture = fixture;
             fixture.InitializeConnectionStringAccessor(GetConnectionString);
-            loggerFactory = TestingUtils.CreateDefaultLoggerFactory($"{this.GetType()}.log", filters);
-            this.ClusterFixture = clusterFixture;
+            loggerFactory = TestingUtils.CreateDefaultLoggerFactory($"{GetType()}.log", filters);
+            ClusterFixture = clusterFixture;
             logger = loggerFactory.CreateLogger<ReminderTableTestsBase>();
             var serviceId = Guid.NewGuid().ToString() + "/foo";
             var clusterId = "test-" + serviceId + "/foo2";
 
             logger.LogInformation("ClusterId={ClusterId}", clusterId);
-            this.clusterOptions = Options.Create(new ClusterOptions { ClusterId = clusterId, ServiceId = serviceId });
+            clusterOptions = Options.Create(new ClusterOptions { ClusterId = clusterId, ServiceId = serviceId });
 
-            this.remindersTable = this.CreateRemindersTable();
+            remindersTable = CreateRemindersTable();
         }
 
         public virtual async Task InitializeAsync()
         {
-            await this.remindersTable.Init().WithTimeout(TimeSpan.FromMinutes(1));
+            await remindersTable.Init().WithTimeout(TimeSpan.FromMinutes(1));
         }
 
         public virtual async Task DisposeAsync()

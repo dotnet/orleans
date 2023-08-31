@@ -30,7 +30,7 @@ namespace Orleans.Runtime.MembershipService
             this.log = log;
             if (this.clusterMembershipOptions.DefunctSiloCleanupPeriod.HasValue)
             {
-                this.cleanupDefunctSilosTimer = timerFactory.Create(
+                cleanupDefunctSilosTimer = timerFactory.Create(
                     this.clusterMembershipOptions.DefunctSiloCleanupPeriod.Value,
                     nameof(CleanupDefunctSilos));
             }
@@ -38,55 +38,55 @@ namespace Orleans.Runtime.MembershipService
 
         public void Dispose()
         {
-            this.cleanupDefunctSilosTimer?.Dispose();
+            cleanupDefunctSilosTimer?.Dispose();
         }
 
         private async Task CleanupDefunctSilos()
         {
-            if (!this.clusterMembershipOptions.DefunctSiloCleanupPeriod.HasValue)
+            if (!clusterMembershipOptions.DefunctSiloCleanupPeriod.HasValue)
             {
-                if (this.log.IsEnabled(LogLevel.Debug))
+                if (log.IsEnabled(LogLevel.Debug))
                 {
-                    this.log.LogDebug($"Membership table cleanup is disabled due to {nameof(ClusterMembershipOptions)}.{nameof(ClusterMembershipOptions.DefunctSiloCleanupPeriod)} not being specified");
+                    log.LogDebug($"Membership table cleanup is disabled due to {nameof(ClusterMembershipOptions)}.{nameof(ClusterMembershipOptions.DefunctSiloCleanupPeriod)} not being specified");
                 }
 
                 return;
             }
 
-            if (this.log.IsEnabled(LogLevel.Debug)) this.log.LogDebug("Starting membership table cleanup agent");
+            if (log.IsEnabled(LogLevel.Debug)) log.LogDebug("Starting membership table cleanup agent");
             try
             {
-                var period = this.clusterMembershipOptions.DefunctSiloCleanupPeriod.Value;
+                var period = clusterMembershipOptions.DefunctSiloCleanupPeriod.Value;
 
                 // The first cleanup should be scheduled for shortly after silo startup.
                 var delay = RandomTimeSpan.Next(TimeSpan.FromMinutes(2), TimeSpan.FromMinutes(10));
-                while (await this.cleanupDefunctSilosTimer.NextTick(delay))
+                while (await cleanupDefunctSilosTimer.NextTick(delay))
                 {
                     // Select a random time within the next window.
                     // The purpose of this is to add jitter to a process which could be affected by contention with other silos.
                     delay = RandomTimeSpan.Next(period, period + TimeSpan.FromMinutes(5));
                     try
                     {
-                        var dateLimit = DateTime.UtcNow - this.clusterMembershipOptions.DefunctSiloExpiration;
-                        await this.membershipTableProvider.CleanupDefunctSiloEntries(dateLimit);
+                        var dateLimit = DateTime.UtcNow - clusterMembershipOptions.DefunctSiloExpiration;
+                        await membershipTableProvider.CleanupDefunctSiloEntries(dateLimit);
                     }
                     catch (Exception exception) when (exception is NotImplementedException or MissingMethodException)
                     {
-                        this.cleanupDefunctSilosTimer.Dispose();
-                        this.log.LogWarning(
+                        cleanupDefunctSilosTimer.Dispose();
+                        log.LogWarning(
                             (int)ErrorCode.MembershipCleanDeadEntriesFailure,
                             $"{nameof(IMembershipTable.CleanupDefunctSiloEntries)} operation is not supported by the current implementation of {nameof(IMembershipTable)}. Disabling the timer now.");
                         return;
                     }
                     catch (Exception exception)
                     {
-                        this.log.LogError((int)ErrorCode.MembershipCleanDeadEntriesFailure, exception, "Failed to clean up defunct membership table entries");
+                        log.LogError((int)ErrorCode.MembershipCleanDeadEntriesFailure, exception, "Failed to clean up defunct membership table entries");
                     }
                 }
             }
             finally
             {
-                if (this.log.IsEnabled(LogLevel.Debug)) this.log.LogDebug("Stopped membership table cleanup agent");
+                if (log.IsEnabled(LogLevel.Debug)) log.LogDebug("Stopped membership table cleanup agent");
             }
         }
 
@@ -97,13 +97,13 @@ namespace Orleans.Runtime.MembershipService
 
             Task OnStart(CancellationToken ct)
             {
-                tasks.Add(Task.Run(() => this.CleanupDefunctSilos()));
+                tasks.Add(Task.Run(() => CleanupDefunctSilos()));
                 return Task.CompletedTask;
             }
 
             async Task OnStop(CancellationToken ct)
             {
-                this.cleanupDefunctSilosTimer?.Dispose();
+                cleanupDefunctSilosTimer?.Dispose();
                 await Task.WhenAny(ct.WhenCancelled(), Task.WhenAll(tasks));
             }
         }

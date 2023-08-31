@@ -55,55 +55,55 @@ namespace ServiceBus.Tests.StreamingTests
         public EHBatchedSubscriptionMultiplicityTests(Fixture fixture)
         {
             this.fixture = fixture;
-            this.runner = new SubscriptionMultiplicityTestRunner(StreamProviderName, fixture.HostedCluster);
+            runner = new SubscriptionMultiplicityTestRunner(StreamProviderName, fixture.HostedCluster);
         }
 
         [Fact, TestCategory("EventHub"), TestCategory("Streaming")]
         public async Task EHBatchedMultipleParallelSubscriptionTest()
         {
-            this.fixture.Logger.LogInformation("************************ EHBatchedMultipleParallelSubscriptionTest *********************************");
+            fixture.Logger.LogInformation("************************ EHBatchedMultipleParallelSubscriptionTest *********************************");
             await runner.MultipleParallelSubscriptionTest(Guid.NewGuid(), StreamNamespace);
         }
 
         [Fact, TestCategory("EventHub"), TestCategory("Streaming")]
         public async Task EHBatchedMultipleLinearSubscriptionTest()
         {
-            this.fixture.Logger.LogInformation("************************ EHBatchedMultipleLinearSubscriptionTest *********************************");
+            fixture.Logger.LogInformation("************************ EHBatchedMultipleLinearSubscriptionTest *********************************");
             await runner.MultipleLinearSubscriptionTest(Guid.NewGuid(), StreamNamespace);
         }
 
         [Fact, TestCategory("EventHub"), TestCategory("Streaming")]
         public async Task EHBatchedMultipleSubscriptionTest_AddRemove()
         {
-            this.fixture.Logger.LogInformation("************************ EHBatchedMultipleSubscriptionTest_AddRemove *********************************");
+            fixture.Logger.LogInformation("************************ EHBatchedMultipleSubscriptionTest_AddRemove *********************************");
             await runner.MultipleSubscriptionTest_AddRemove(Guid.NewGuid(), StreamNamespace);
         }
 
         [Fact, TestCategory("EventHub"), TestCategory("Streaming")]
         public async Task EHBatchedResubscriptionTest()
         {
-            this.fixture.Logger.LogInformation("************************ EHBatchedResubscriptionTest *********************************");
+            fixture.Logger.LogInformation("************************ EHBatchedResubscriptionTest *********************************");
             await runner.ResubscriptionTest(Guid.NewGuid(), StreamNamespace);
         }
 
         [Fact, TestCategory("EventHub"), TestCategory("Streaming")]
         public async Task EHBatchedResubscriptionAfterDeactivationTest()
         {
-            this.fixture.Logger.LogInformation("************************ EHBatchedResubscriptionAfterDeactivationTest *********************************");
+            fixture.Logger.LogInformation("************************ EHBatchedResubscriptionAfterDeactivationTest *********************************");
             await runner.ResubscriptionAfterDeactivationTest(Guid.NewGuid(), StreamNamespace);
         }
 
         [Fact, TestCategory("EventHub"), TestCategory("Streaming")]
         public async Task EHBatchedActiveSubscriptionTest()
         {
-            this.fixture.Logger.LogInformation("************************ EHBatchedActiveSubscriptionTest *********************************");
+            fixture.Logger.LogInformation("************************ EHBatchedActiveSubscriptionTest *********************************");
             await runner.ActiveSubscriptionTest(Guid.NewGuid(), StreamNamespace);
         }
 
         [Fact, TestCategory("EventHub"), TestCategory("Streaming")]
         public async Task EHBatchedTwoIntermitentStreamTest()
         {
-            this.fixture.Logger.LogInformation("************************ EHBatchedTwoIntermitentStreamTest *********************************");
+            fixture.Logger.LogInformation("************************ EHBatchedTwoIntermitentStreamTest *********************************");
             await runner.TwoIntermitentStreamTest(Guid.NewGuid());
         }
     }

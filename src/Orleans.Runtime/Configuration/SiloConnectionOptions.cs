@@ -18,28 +18,28 @@ namespace Orleans.Configuration
         /// Configures silo outbound connections.
         /// </summary>
         /// <param name="configure">The configuration delegate.</param>
-        public void ConfigureSiloOutboundConnection(Action<IConnectionBuilder> configure) => this.siloOutboundDelegates.Add(configure);
+        public void ConfigureSiloOutboundConnection(Action<IConnectionBuilder> configure) => siloOutboundDelegates.Add(configure);
 
         /// <summary>
         /// Configures silo inbound connections from other silos.
         /// </summary>
         /// <param name="configure">The configuration delegate.</param>
-        public void ConfigureSiloInboundConnection(Action<IConnectionBuilder> configure) => this.siloInboundDelegates.Add(configure);
+        public void ConfigureSiloInboundConnection(Action<IConnectionBuilder> configure) => siloInboundDelegates.Add(configure);
 
         /// <summary>
         /// Configures silo inbound connections from clients.
         /// </summary>
         /// <param name="configure">The configuration delegate.</param>
-        public void ConfigureGatewayInboundConnection(Action<IConnectionBuilder> configure) => this.gatewayInboundDelegates.Add(configure);
+        public void ConfigureGatewayInboundConnection(Action<IConnectionBuilder> configure) => gatewayInboundDelegates.Add(configure);
 
         /// <inheritdoc/>
-        void ISiloConnectionBuilderOptions.ConfigureSiloOutboundBuilder(IConnectionBuilder builder) => this.siloOutboundDelegates.Invoke(builder);
+        void ISiloConnectionBuilderOptions.ConfigureSiloOutboundBuilder(IConnectionBuilder builder) => siloOutboundDelegates.Invoke(builder);
 
         /// <inheritdoc/>
-        void ISiloConnectionBuilderOptions.ConfigureSiloInboundBuilder(IConnectionBuilder builder) => this.siloInboundDelegates.Invoke(builder);
+        void ISiloConnectionBuilderOptions.ConfigureSiloInboundBuilder(IConnectionBuilder builder) => siloInboundDelegates.Invoke(builder);
 
         /// <inheritdoc/>
-        void ISiloConnectionBuilderOptions.ConfigureGatewayInboundBuilder(IConnectionBuilder builder) => this.gatewayInboundDelegates.Invoke(builder);
+        void ISiloConnectionBuilderOptions.ConfigureGatewayInboundBuilder(IConnectionBuilder builder) => gatewayInboundDelegates.Invoke(builder);
 
         /// <summary>
         /// Options for silo networking.

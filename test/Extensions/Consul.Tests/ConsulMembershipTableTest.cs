@@ -32,22 +32,22 @@ namespace Consul.Tests
         {
             ConsulTestUtils.EnsureConsul();
             var options = new ConsulClusteringOptions();
-            var address = new Uri(this.connectionString);
+            var address = new Uri(connectionString);
 
             options.ConfigureConsulClient(address);
             
-            return new ConsulBasedMembershipTable(loggerFactory.CreateLogger<ConsulBasedMembershipTable>(), Options.Create(options), this._clusterOptions);
+            return new ConsulBasedMembershipTable(loggerFactory.CreateLogger<ConsulBasedMembershipTable>(), Options.Create(options), _clusterOptions);
         }
 
         protected override IGatewayListProvider CreateGatewayListProvider(ILogger logger)
         {
             ConsulTestUtils.EnsureConsul();
             var options = new ConsulClusteringOptions();
-            var address = new Uri(this.connectionString);
+            var address = new Uri(connectionString);
 
             options.ConfigureConsulClient(address);
             
-            return new ConsulGatewayListProvider(loggerFactory.CreateLogger<ConsulGatewayListProvider>(), Options.Create(options), this._gatewayOptions, this._clusterOptions);
+            return new ConsulGatewayListProvider(loggerFactory.CreateLogger<ConsulGatewayListProvider>(), Options.Create(options), _gatewayOptions, _clusterOptions);
         }
 
         protected override async Task<string> GetConnectionString()

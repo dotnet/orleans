@@ -56,7 +56,7 @@ namespace Orleans.Streams
 
         public void AddFilter(string filterData)
         {
-            this.FilterData = filterData;
+            FilterData = filterData;
         }
 
         public override bool Equals(object obj)

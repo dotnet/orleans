@@ -43,14 +43,14 @@ namespace Orleans.Runtime.Messaging
             IAsyncTimerFactory timerFactory)
         {
             this.messageCenter = messageCenter;
-            this.messagingOptions = options.Value;
+            messagingOptions = options.Value;
             this.loggerFactory = loggerFactory;
-            this.logger = this.loggerFactory.CreateLogger<Gateway>();
-            this.clientDropTimeout = messagingOptions.ClientDropTimeout;
+            logger = this.loggerFactory.CreateLogger<Gateway>();
+            clientDropTimeout = messagingOptions.ClientDropTimeout;
             clientsReplyRoutingCache = new ClientsReplyRoutingCache(messagingOptions.ResponseTimeout);
-            this.gatewayAddress = siloDetails.GatewayAddress;
-            this.gatewayMaintenanceTimer = timerFactory.Create(messagingOptions.ClientDropTimeout, nameof(PerformGatewayMaintenance));
-            this.gatewayMaintenanceTask = Task.Run(PerformGatewayMaintenance);
+            gatewayAddress = siloDetails.GatewayAddress;
+            gatewayMaintenanceTimer = timerFactory.Create(messagingOptions.ClientDropTimeout, nameof(PerformGatewayMaintenance));
+            gatewayMaintenanceTask = Task.Run(PerformGatewayMaintenance);
         }
 
         public static GrainAddress GetClientActivationAddress(GrainId clientId, SiloAddress siloAddress)
@@ -93,12 +93,12 @@ namespace Orleans.Runtime.Messaging
                     if (client.Value.IsConnected)
                     {
                         var observer = ClientGatewayObserver.GetObserver(grainFactory, client.Key);
-                        observer.StopSendingToGateway(this.gatewayAddress);
+                        observer.StopSendingToGateway(gatewayAddress);
                     }
                 }
             }
 
-            await Task.Delay(this.messagingOptions.ClientGatewayShutdownNotificationTimeout);
+            await Task.Delay(messagingOptions.ClientGatewayShutdownNotificationTimeout);
         }
 
         internal async Task StopAsync()
@@ -213,10 +213,10 @@ namespace Orleans.Runtime.Messaging
         private bool IsTargetingLocalGateway(SiloAddress siloAddress)
         {
             // Special case if the address used by the client was loopback
-            return this.gatewayAddress.Matches(siloAddress)
+            return gatewayAddress.Matches(siloAddress)
                 || (IPAddress.IsLoopback(siloAddress.Endpoint.Address)
-                    && siloAddress.Endpoint.Port == this.gatewayAddress.Endpoint.Port
-                    && siloAddress.Generation == this.gatewayAddress.Generation);
+                    && siloAddress.Endpoint.Port == gatewayAddress.Endpoint.Port
+                    && siloAddress.Generation == gatewayAddress.Generation);
         }
 
         // There is NO need to acquire individual ClientState lock, since we only close an older socket.

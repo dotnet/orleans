@@ -23,13 +23,13 @@ namespace Orleans.Runtime.Messaging
 
         public Task OnStart(CancellationToken ct)
         {
-            this.siloStatusOracle.SubscribeToSiloStatusEvents(this);
+            siloStatusOracle.SubscribeToSiloStatusEvents(this);
             return Task.CompletedTask;
         }
 
         public Task OnStop(CancellationToken ct)
         {
-            this.siloStatusOracle.UnSubscribeFromSiloStatusEvents(this);
+            siloStatusOracle.UnSubscribeFromSiloStatusEvents(this);
             return Task.CompletedTask;
         }
 
@@ -42,7 +42,7 @@ namespace Orleans.Runtime.Messaging
         {
             if (status == SiloStatus.Dead && updatedSilo != siloStatusOracle.SiloAddress)
             {
-                _ = Task.Run(() => this.CloseConnectionAsync(updatedSilo));
+                _ = Task.Run(() => CloseConnectionAsync(updatedSilo));
             }
         }
 
@@ -53,11 +53,11 @@ namespace Orleans.Runtime.Messaging
                 // Allow a short grace period to complete sending pending messages (eg, gossip responses)
                 await Task.Delay(TimeSpan.FromSeconds(10));
 
-                await this.connectionManager.CloseAsync(silo);
+                await connectionManager.CloseAsync(silo);
             }
             catch (Exception exception)
             {
-                this.log.LogInformation(exception, "Exception while closing connections to defunct silo {SiloAddress}", silo);
+                log.LogInformation(exception, "Exception while closing connections to defunct silo {SiloAddress}", silo);
             }
         }
     }

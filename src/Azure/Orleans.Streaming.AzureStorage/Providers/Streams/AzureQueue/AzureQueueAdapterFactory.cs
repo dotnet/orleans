@@ -31,18 +31,18 @@ namespace Orleans.Providers.Streams.AzureQueue
             IQueueDataAdapter<string, IBatchContainer> dataAdapter,
             ILoggerFactory loggerFactory)
         {
-            this.providerName = name;
+            providerName = name;
             this.options = options ?? throw new ArgumentNullException(nameof(options));
             this.dataAdapter = dataAdapter ?? throw new ArgumentNullException(nameof(dataAdapter));
             this.loggerFactory = loggerFactory ?? throw new ArgumentNullException(nameof(loggerFactory));
-            this.streamQueueMapper = new(options.QueueNames, providerName);
-            this.adapterCache = new SimpleQueueAdapterCache(cacheOptions, this.providerName, this.loggerFactory);
+            streamQueueMapper = new(options.QueueNames, providerName);
+            adapterCache = new SimpleQueueAdapterCache(cacheOptions, providerName, this.loggerFactory);
         }
 
         /// <summary> Init the factory.</summary>
         public virtual void Init()
         {
-            this.StreamFailureHandlerFactory = this.StreamFailureHandlerFactory ??
+            StreamFailureHandlerFactory = StreamFailureHandlerFactory ??
                     ((qid) => Task.FromResult<IStreamFailureHandler>(new NoOpStreamDeliveryFailureHandler()));
         }
 
@@ -50,11 +50,11 @@ namespace Orleans.Providers.Streams.AzureQueue
         public virtual Task<IQueueAdapter> CreateAdapter()
         {
             var adapter = new AzureQueueAdapter(
-                this.dataAdapter,
-                this.streamQueueMapper,
-                this.loggerFactory,
-                this.options,
-                this.providerName);
+                dataAdapter,
+                streamQueueMapper,
+                loggerFactory,
+                options,
+                providerName);
             return Task.FromResult<IQueueAdapter>(adapter);
         }
 

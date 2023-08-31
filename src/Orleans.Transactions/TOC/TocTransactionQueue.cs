@@ -30,7 +30,7 @@ namespace Orleans.Transactions.TOC
 
         protected override void OnLocalCommit(TransactionRecord<TransactionCommitter<TService>.OperationState> entry)
         {
-            base.storageBatch.AddStorePreCondition(() => entry.State.Operation.Commit(entry.TransactionId, this.service));
+            base.storageBatch.AddStorePreCondition(() => entry.State.Operation.Commit(entry.TransactionId, service));
             base.OnLocalCommit(entry);
         }
     }

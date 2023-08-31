@@ -178,7 +178,7 @@ namespace Orleans.Streams
 
         private IInternalStreamProvider? GetStreamProvider()
         {
-            return this.runtimeClient?.ServiceProvider.GetRequiredServiceByName<IStreamProvider>(streamId.ProviderName) as IInternalStreamProvider;
+            return runtimeClient?.ServiceProvider.GetRequiredServiceByName<IStreamProvider>(streamId.ProviderName) as IInternalStreamProvider;
         }
 
         public int CompareTo(IAsyncStream<T>? other)
@@ -211,7 +211,7 @@ namespace Orleans.Streams
 
         void IOnDeserialized.OnDeserialized(DeserializationContext  context)
         {
-            this.runtimeClient = context?.RuntimeClient as IRuntimeClient;
+            runtimeClient = context?.RuntimeClient as IRuntimeClient;
         }
     }
 }

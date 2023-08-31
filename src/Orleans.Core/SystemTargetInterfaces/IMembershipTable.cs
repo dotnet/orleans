@@ -232,7 +232,7 @@ namespace Orleans
         internal Dictionary<SiloAddress, SiloStatus> GetSiloStatuses(Func<SiloStatus, bool> filter, bool includeMyself, SiloAddress myAddress)
         {
             var result = new Dictionary<SiloAddress, SiloStatus>();
-            foreach (var memberEntry in this.Members)
+            foreach (var memberEntry in Members)
             {
                 var entry = memberEntry.Item1;
                 if (!includeMyself && entry.SiloAddress.Equals(myAddress)) continue;
@@ -351,14 +351,14 @@ namespace Orleans
 
         internal MembershipEntry WithStatus(SiloStatus status)
         {
-            var updated = this.Copy();
+            var updated = Copy();
             updated.Status = status;
             return updated;
         }
 
         internal ImmutableList<Tuple<SiloAddress, DateTime>> GetFreshVotes(DateTime now, TimeSpan expiration)
         {
-            if (this.SuspectTimes == null)
+            if (SuspectTimes == null)
                 return ImmutableList<Tuple<SiloAddress, DateTime>>.Empty;
 
             var result = ImmutableList.CreateBuilder<Tuple<SiloAddress, DateTime>>();
@@ -366,7 +366,7 @@ namespace Orleans
             // Find the latest time from the set of suspect times and the local time.
             // This prevents local clock skew from resulting in a different tally of fresh votes.
             var recencyWindowEndTime = Max(now, SuspectTimes);
-            foreach (var voter in this.SuspectTimes)
+            foreach (var voter in SuspectTimes)
             {
                 // If now is smaller than otherVoterTime, than assume the otherVoterTime is fresh.
                 // This could happen if clocks are not synchronized and the other voter clock is ahead of mine.

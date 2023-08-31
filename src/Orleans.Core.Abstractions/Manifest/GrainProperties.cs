@@ -21,7 +21,7 @@ namespace Orleans.Metadata
         /// </param>
         public GrainProperties(ImmutableDictionary<string, string> values)
         {
-            this.Properties = values;
+            Properties = values;
         }
 
         /// <summary>
@@ -38,10 +38,10 @@ namespace Orleans.Metadata
         /// </returns>
         public string ToDetailedString()
         {
-            if (this.Properties is null) return string.Empty;
+            if (Properties is null) return string.Empty;
             var result = new StringBuilder("[");
             bool first = true;
-            foreach (var entry in this.Properties)
+            foreach (var entry in Properties)
             {
                 if (!first)
                 {
@@ -232,7 +232,7 @@ namespace Orleans.Metadata
             {
                 if (attr is IGrainPropertiesProviderAttribute providerAttribute)
                 {
-                    providerAttribute.Populate(this.serviceProvider, grainClass, grainType, properties);
+                    providerAttribute.Populate(serviceProvider, grainClass, grainType, properties);
                 }
             }
         }
@@ -295,7 +295,7 @@ namespace Orleans.Metadata
                     continue;
                 }
 
-                foreach (var binding in providerAttribute.GetBindings(this.serviceProvider, grainClass, grainType))
+                foreach (var binding in providerAttribute.GetBindings(serviceProvider, grainClass, grainType))
                 {
                     foreach (var pair in binding)
                     {

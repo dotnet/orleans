@@ -64,14 +64,14 @@ namespace Orleans.Transactions
 
         public StorageBatch(TransactionalStateMetaData metaData, string etag, long confirmUpTo, long cancelAbove)
         {
-            this.MetaData = metaData ?? throw new ArgumentNullException(nameof(metaData));
-            this.ETag = etag;
+            MetaData = metaData ?? throw new ArgumentNullException(nameof(metaData));
+            ETag = etag;
             this.confirmUpTo = confirmUpTo;
             this.cancelAbove = cancelAbove;
-            this.cancelAboveStart = cancelAbove;
-            this.followUpActions = new List<Action>();
-            this.storeConditions = new List<Func<Task<bool>>>();
-            this.prepares = new SortedDictionary<long, PendingTransactionState<TState>>();
+            cancelAboveStart = cancelAbove;
+            followUpActions = new List<Action>();
+            storeConditions = new List<Func<Task<bool>>>();
+            prepares = new SortedDictionary<long, PendingTransactionState<TState>>();
         }
 
         public StorageBatch(StorageBatch<TState> previous)
@@ -86,8 +86,8 @@ namespace Orleans.Transactions
 
         public async Task<string> Store(ITransactionalStateStorage<TState> storage)
         {
-            List<PendingTransactionState<TState>> list = this.prepares.Values.ToList();
-            return await storage.Store(ETag, this.MetaData, list,
+            List<PendingTransactionState<TState>> list = prepares.Values.ToList();
+            return await storage.Store(ETag, MetaData, list,
                 (confirm > 0) ? confirmUpTo : (long?)null,
                 (cancelAbove < cancelAboveStart) ? cancelAbove : (long?)null);
         }
@@ -120,7 +120,7 @@ namespace Orleans.Transactions
             if (MetaData.TimeStamp < timestamp)
                 MetaData.TimeStamp = timestamp;
 
-            this.prepares[sequenceNumber] = new PendingTransactionState<TState>
+            prepares[sequenceNumber] = new PendingTransactionState<TState>
             {
                 SequenceId = sequenceNumber,
                 TransactionId = transactionId.ToString(),
@@ -140,7 +140,7 @@ namespace Orleans.Transactions
             cancel++;
             total++;
 
-            this.prepares.Remove(sequenceNumber);
+            prepares.Remove(sequenceNumber);
 
             if (cancelAbove > sequenceNumber - 1)
             {
@@ -158,11 +158,11 @@ namespace Orleans.Transactions
             // remove all redundant prepare records that are superseded by a later confirmed state
             while (true)
             {
-                long? first = this.prepares.Values.FirstOrDefault()?.SequenceId;
+                long? first = prepares.Values.FirstOrDefault()?.SequenceId;
 
                 if (first.HasValue && first < confirmUpTo)
                 {
-                    this.prepares.Remove(first.Value);
+                    prepares.Remove(first.Value);
                 }
                 else
                 {
@@ -198,15 +198,15 @@ namespace Orleans.Transactions
 
         public void AddStorePreCondition(Func<Task<bool>> action)
         {
-            this.storeConditions.Add(action);
+            storeConditions.Add(action);
         }
 
         public async Task<bool> CheckStorePreConditions()
         {
-            if (this.storeConditions.Count == 0)
+            if (storeConditions.Count == 0)
                 return true;
 
-            bool[] results = await Task.WhenAll(this.storeConditions.Select(a => a.Invoke()));
+            bool[] results = await Task.WhenAll(storeConditions.Select(a => a.Invoke()));
             return results.All(b => b);
         }
     }

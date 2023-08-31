@@ -11,30 +11,30 @@ namespace UnitTests.Directory
         private ClusterMembershipSnapshot snapshot;
         private readonly AsyncEnumerable<ClusterMembershipSnapshot> updates;
 
-        ClusterMembershipSnapshot IClusterMembershipService.CurrentSnapshot => this.snapshot;
+        ClusterMembershipSnapshot IClusterMembershipService.CurrentSnapshot => snapshot;
 
-        public MembershipVersion CurrentVersion => this.snapshot.Version;
+        public MembershipVersion CurrentVersion => snapshot.Version;
 
-        IAsyncEnumerable<ClusterMembershipSnapshot> IClusterMembershipService.MembershipUpdates => this.updates;
+        IAsyncEnumerable<ClusterMembershipSnapshot> IClusterMembershipService.MembershipUpdates => updates;
 
         public IClusterMembershipService Target => this;
 
         public MockClusterMembershipService(Dictionary<SiloAddress, (SiloStatus Status, string Name)> initialStatuses = null)
         {
-            this.statuses = initialStatuses ?? new Dictionary<SiloAddress, (SiloStatus Status, string Name)>();
-            this.snapshot = ToSnapshot(this.statuses, ++version);
-            this.updates = this.updates = new AsyncEnumerable<ClusterMembershipSnapshot>(
+            statuses = initialStatuses ?? new Dictionary<SiloAddress, (SiloStatus Status, string Name)>();
+            snapshot = ToSnapshot(statuses, ++version);
+            updates = updates = new AsyncEnumerable<ClusterMembershipSnapshot>(
                 (previous, proposed) => proposed.Version == MembershipVersion.MinValue || proposed.Version > previous.Version,
-                this.snapshot)
+                snapshot)
             {
-                OnPublished = update => Interlocked.Exchange(ref this.snapshot, update)
+                OnPublished = update => Interlocked.Exchange(ref snapshot, update)
             };
         }
 
         public void UpdateSiloStatus(SiloAddress siloAddress, SiloStatus siloStatus, string name)
         {
-            this.statuses[siloAddress] = (siloStatus, name);
-            this.updates.Publish(ToSnapshot(this.statuses, ++version));
+            statuses[siloAddress] = (siloStatus, name);
+            updates.Publish(ToSnapshot(statuses, ++version));
         }
 
         internal static ClusterMembershipSnapshot ToSnapshot(Dictionary<SiloAddress, (SiloStatus Status, string Name)> statuses, long version)

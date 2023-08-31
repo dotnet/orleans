@@ -47,11 +47,11 @@ namespace UnitTests.General
             var activationCounts = await GetPerSiloActivationCounts();
             LogCounts(activationCounts);
             logger.LogInformation("-----------------------------------------------------------------");
-            AssertIsInRange(activationCounts[this.HostedCluster.Primary], perSilo, leavy);
-            AssertIsInRange(activationCounts[this.HostedCluster.SecondarySilos.First()], perSilo, leavy);
+            AssertIsInRange(activationCounts[HostedCluster.Primary], perSilo, leavy);
+            AssertIsInRange(activationCounts[HostedCluster.SecondarySilos.First()], perSilo, leavy);
 
-            SiloHandle silo3 = this.HostedCluster.StartAdditionalSilo();
-            await this.HostedCluster.WaitForLivenessToStabilizeAsync();
+            SiloHandle silo3 = HostedCluster.StartAdditionalSilo();
+            await HostedCluster.WaitForLivenessToStabilizeAsync();
 
             logger.LogInformation("\n\n\n----- Phase 2 -----\n\n");
             await AddTestGrains(perSilo);
@@ -64,8 +64,8 @@ namespace UnitTests.General
             LogCounts(activationCounts);
             logger.LogInformation("-----------------------------------------------------------------");
             double expected = (6.0 * perSilo) / 3.0;
-            AssertIsInRange(activationCounts[this.HostedCluster.Primary], expected, leavy);
-            AssertIsInRange(activationCounts[this.HostedCluster.SecondarySilos.First()], expected, leavy);
+            AssertIsInRange(activationCounts[HostedCluster.Primary], expected, leavy);
+            AssertIsInRange(activationCounts[HostedCluster.SecondarySilos.First()], expected, leavy);
             AssertIsInRange(activationCounts[silo3], expected, leavy);
 
             logger.LogInformation("\n\n\n----- Phase 3 -----\n\n");
@@ -78,8 +78,8 @@ namespace UnitTests.General
             LogCounts(activationCounts);
             logger.LogInformation("-----------------------------------------------------------------");
             expected = (9.0 * perSilo) / 3.0;
-            AssertIsInRange(activationCounts[this.HostedCluster.Primary], expected, leavy);
-            AssertIsInRange(activationCounts[this.HostedCluster.SecondarySilos.First()], expected, leavy);
+            AssertIsInRange(activationCounts[HostedCluster.Primary], expected, leavy);
+            AssertIsInRange(activationCounts[HostedCluster.SecondarySilos.First()], expected, leavy);
             AssertIsInRange(activationCounts[silo3], expected, leavy);
 
             logger.LogInformation("-----------------------------------------------------------------");
@@ -93,8 +93,8 @@ namespace UnitTests.General
         [SkippableFact(Skip = "https://github.com/dotnet/orleans/issues/4008"), TestCategory("Functional")]
         public async Task ElasticityTest_StoppingSilos()
         {
-            List<SiloHandle> runtimes = await this.HostedCluster.StartAdditionalSilosAsync(2);
-            await this.HostedCluster.WaitForLivenessToStabilizeAsync();
+            List<SiloHandle> runtimes = await HostedCluster.StartAdditionalSilosAsync(2);
+            await HostedCluster.WaitForLivenessToStabilizeAsync();
             int stopLeavy = leavy;
 
             await AddTestGrains(perSilo);
@@ -106,13 +106,13 @@ namespace UnitTests.General
             logger.LogInformation("-----------------------------------------------------------------");
             LogCounts(activationCounts);
             logger.LogInformation("-----------------------------------------------------------------");
-            AssertIsInRange(activationCounts[this.HostedCluster.Primary], perSilo, stopLeavy);
-            AssertIsInRange(activationCounts[this.HostedCluster.SecondarySilos.First()], perSilo, stopLeavy);
+            AssertIsInRange(activationCounts[HostedCluster.Primary], perSilo, stopLeavy);
+            AssertIsInRange(activationCounts[HostedCluster.SecondarySilos.First()], perSilo, stopLeavy);
             AssertIsInRange(activationCounts[runtimes[0]], perSilo, stopLeavy);
             AssertIsInRange(activationCounts[runtimes[1]], perSilo, stopLeavy);
 
-            await this.HostedCluster.StopSiloAsync(runtimes[0]);
-            await this.HostedCluster.WaitForLivenessToStabilizeAsync();
+            await HostedCluster.StopSiloAsync(runtimes[0]);
+            await HostedCluster.WaitForLivenessToStabilizeAsync();
             await InvokeAllGrains();
 
             activationCounts = await GetPerSiloActivationCounts();
@@ -120,8 +120,8 @@ namespace UnitTests.General
             LogCounts(activationCounts);
             logger.LogInformation("-----------------------------------------------------------------");
             double expected = perSilo * 1.33;
-            AssertIsInRange(activationCounts[this.HostedCluster.Primary], expected, stopLeavy);
-            AssertIsInRange(activationCounts[this.HostedCluster.SecondarySilos.First()], expected, stopLeavy);
+            AssertIsInRange(activationCounts[HostedCluster.Primary], expected, stopLeavy);
+            AssertIsInRange(activationCounts[HostedCluster.SecondarySilos.First()], expected, stopLeavy);
             AssertIsInRange(activationCounts[runtimes[1]], expected, stopLeavy);
 
             logger.LogInformation("-----------------------------------------------------------------");
@@ -134,8 +134,8 @@ namespace UnitTests.General
         [SkippableFact(Skip = "https://github.com/dotnet/orleans/issues/4008"), TestCategory("Functional")]
         public async Task ElasticityTest_AllSilosCPUTooHigh()
         {
-            var taintedGrainPrimary = await GetGrainAtSilo(this.HostedCluster.Primary.SiloAddress);
-            var taintedGrainSecondary = await GetGrainAtSilo(this.HostedCluster.SecondarySilos.First().SiloAddress);
+            var taintedGrainPrimary = await GetGrainAtSilo(HostedCluster.Primary.SiloAddress);
+            var taintedGrainSecondary = await GetGrainAtSilo(HostedCluster.SecondarySilos.First().SiloAddress);
 
             await taintedGrainPrimary.EnableOverloadDetection(false);
             await taintedGrainSecondary.EnableOverloadDetection(false);
@@ -144,7 +144,7 @@ namespace UnitTests.General
             await taintedGrainSecondary.LatchCpuUsage(110.0f);
 
             await Assert.ThrowsAsync<OrleansException>(() =>
-                this.AddTestGrains(1));
+                AddTestGrains(1));
         }
 
         /// <summary>
@@ -153,15 +153,15 @@ namespace UnitTests.General
         [SkippableFact(Skip= "https://github.com/dotnet/orleans/issues/4008"), TestCategory("Functional")]
         public async Task ElasticityTest_AllSilosOverloaded()
         {
-            var taintedGrainPrimary = await GetGrainAtSilo(this.HostedCluster.Primary.SiloAddress);
-            var taintedGrainSecondary = await GetGrainAtSilo(this.HostedCluster.SecondarySilos.First().SiloAddress);
+            var taintedGrainPrimary = await GetGrainAtSilo(HostedCluster.Primary.SiloAddress);
+            var taintedGrainSecondary = await GetGrainAtSilo(HostedCluster.SecondarySilos.First().SiloAddress);
 
             await taintedGrainPrimary.LatchCpuUsage(110.0f);
             await taintedGrainSecondary.LatchOverloaded();
 
             // OrleansException or GateWayTooBusyException
             var exception = await Assert.ThrowsAnyAsync<Exception>(() =>
-                this.AddTestGrains(1));
+                AddTestGrains(1));
 
             Assert.True(exception is OrleansException || exception is GatewayTooBusyException);
         }
@@ -198,7 +198,7 @@ namespace UnitTests.General
         {
             while (true)
             {
-                IPlacementTestGrain grain = this.GrainFactory.GetGrain<IRandomPlacementTestGrain>(Guid.NewGuid());
+                IPlacementTestGrain grain = GrainFactory.GetGrain<IRandomPlacementTestGrain>(Guid.NewGuid());
                 SiloAddress address = await grain.GetLocation();
                 if (address.Equals(silo))
                     return grain;
@@ -219,9 +219,9 @@ namespace UnitTests.General
             string name,
             string assertMsg)
         {
-            await this.HostedCluster.WaitForLivenessToStabilizeAsync();
+            await HostedCluster.WaitForLivenessToStabilizeAsync();
             logger.LogInformation("********************** Starting the test {Name} ******************************", name);
-            var taintedSilo = this.HostedCluster.StartAdditionalSilo();
+            var taintedSilo = HostedCluster.StartAdditionalSilo();
 
             const long sampleSize = 10;
 
@@ -231,7 +231,7 @@ namespace UnitTests.General
                 Enumerable.Range(0, (int)sampleSize).
                 Select(
                     n =>
-                        this.GrainFactory.GetGrain<IActivationCountBasedPlacementTestGrain>(Guid.NewGuid()));
+                        GrainFactory.GetGrain<IActivationCountBasedPlacementTestGrain>(Guid.NewGuid()));
 
             // make the grain's silo undesirable for new grains.
             taint(taintedGrain).Wait();
@@ -263,8 +263,8 @@ namespace UnitTests.General
             var promises = new List<Task>();
             for (var i = 0; i < amount; i++)
             {
-                IActivationCountBasedPlacementTestGrain grain = this.GrainFactory.GetGrain<IActivationCountBasedPlacementTestGrain>(Guid.NewGuid());
-                this.grains.Add(grain);
+                IActivationCountBasedPlacementTestGrain grain = GrainFactory.GetGrain<IActivationCountBasedPlacementTestGrain>(Guid.NewGuid());
+                grains.Add(grain);
                 // Make sure we activate grain:
                 promises.Add(grain.Nop());
             }
@@ -285,10 +285,10 @@ namespace UnitTests.General
         {
             string fullTypeName = "UnitTests.Grains.ActivationCountBasedPlacementTestGrain";
 
-            IManagementGrain mgmtGrain = this.GrainFactory.GetGrain<IManagementGrain>(0);
+            IManagementGrain mgmtGrain = GrainFactory.GetGrain<IManagementGrain>(0);
             SimpleGrainStatistic[] stats = await mgmtGrain.GetSimpleGrainStatistics();
 
-            return this.HostedCluster.GetActiveSilos()
+            return HostedCluster.GetActiveSilos()
                 .ToDictionary(
                     s => s,
                     s => stats
@@ -299,7 +299,7 @@ namespace UnitTests.General
         private void LogCounts(Dictionary<SiloHandle, int> activationCounts)
         {
             var sb = new StringBuilder();
-            foreach (var silo in this.HostedCluster.GetActiveSilos())
+            foreach (var silo in HostedCluster.GetActiveSilos())
             {
                 int count;
                 activationCounts.TryGetValue(silo, out count);

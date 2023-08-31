@@ -85,29 +85,29 @@ namespace Orleans.Transactions
 
         public OrleansTransactionInDoubtException(string transactionId) : base(string.Format("Transaction {0} is InDoubt", transactionId))
         {
-            this.TransactionId = transactionId;
+            TransactionId = transactionId;
         }
 
         public OrleansTransactionInDoubtException(string transactionId, Exception exc) : base(string.Format("Transaction {0} is InDoubt", transactionId), exc)
         {
-            this.TransactionId = transactionId;
+            TransactionId = transactionId;
         }
 
         public OrleansTransactionInDoubtException(string transactionId, string msg, Exception innerException) : base(string.Format("Transaction {0} is InDoubt: {1}", transactionId, msg), innerException)
         {
-            this.TransactionId = transactionId;
+            TransactionId = transactionId;
         }
 
         private OrleansTransactionInDoubtException(SerializationInfo info, StreamingContext context)
             : base(info, context)
         {
-            this.TransactionId = info.GetString(nameof(this.TransactionId));
+            TransactionId = info.GetString(nameof(TransactionId));
         }
 
         public override void GetObjectData(SerializationInfo info, StreamingContext context)
         {
             base.GetObjectData(info, context);
-            info.AddValue(nameof(this.TransactionId), this.TransactionId);
+            info.AddValue(nameof(TransactionId), TransactionId);
         }
     }
 
@@ -126,12 +126,12 @@ namespace Orleans.Transactions
  
         public OrleansTransactionAbortedException(string transactionId, string msg, Exception innerException) : base(msg, innerException)
         {
-            this.TransactionId = transactionId;
+            TransactionId = transactionId;
         }
 
         public OrleansTransactionAbortedException(string transactionId, string msg) : base(msg)
         {
-            this.TransactionId = transactionId;
+            TransactionId = transactionId;
         }
 
         public OrleansTransactionAbortedException(string transactionId, Exception innerException)
@@ -143,13 +143,13 @@ namespace Orleans.Transactions
         protected OrleansTransactionAbortedException(SerializationInfo info, StreamingContext context)
             : base(info, context)
         {
-            this.TransactionId = info.GetString(nameof(this.TransactionId));
+            TransactionId = info.GetString(nameof(TransactionId));
         }
 
         public override void GetObjectData(SerializationInfo info, StreamingContext context)
         {
             base.GetObjectData(info, context);
-            info.AddValue(nameof(this.TransactionId), this.TransactionId);
+            info.AddValue(nameof(TransactionId), TransactionId);
         }
     }
 
@@ -166,7 +166,7 @@ namespace Orleans.Transactions
         public OrleansCascadingAbortException(string transactionId, string dependentId)
             : base(transactionId, string.Format("Transaction {0} aborted because its dependent transaction {1} aborted", transactionId, dependentId))
         {
-            this.DependentTransactionId = dependentId;
+            DependentTransactionId = dependentId;
         }
 
         public OrleansCascadingAbortException(string transactionId)
@@ -182,13 +182,13 @@ namespace Orleans.Transactions
         private OrleansCascadingAbortException(SerializationInfo info, StreamingContext context)
             : base(info, context)
         {
-            this.DependentTransactionId = info.GetString(nameof(this.DependentTransactionId));
+            DependentTransactionId = info.GetString(nameof(DependentTransactionId));
         }
 
         public override void GetObjectData(SerializationInfo info, StreamingContext context)
         {
             base.GetObjectData(info, context);
-            info.AddValue(nameof(this.DependentTransactionId), this.DependentTransactionId);
+            info.AddValue(nameof(DependentTransactionId), DependentTransactionId);
         }
     }
 

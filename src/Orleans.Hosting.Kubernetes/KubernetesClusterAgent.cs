@@ -325,7 +325,7 @@ namespace Orleans.Hosting.Kubernetes
 
                         if (eventType == WatchEventType.Deleted)
                         {
-                            if (this.TryMatchSilo(pod, out var member) && member.Status != SiloStatus.Dead)
+                            if (TryMatchSilo(pod, out var member) && member.Status != SiloStatus.Dead)
                             {
                                 if (_logger.IsEnabled(LogLevel.Information))
                                 {

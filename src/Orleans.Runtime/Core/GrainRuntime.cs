@@ -37,7 +37,7 @@ namespace Orleans.Runtime
             get
             {
                 CheckRuntimeContext(RuntimeContext.Current);
-                return this.grainFactory;
+                return grainFactory;
             }
         }
 
@@ -46,7 +46,7 @@ namespace Orleans.Runtime
             get
             {
                 CheckRuntimeContext(RuntimeContext.Current);
-                return this.timerRegistry;
+                return timerRegistry;
             }
         }
 
@@ -55,7 +55,7 @@ namespace Orleans.Runtime
             get
             {
                 CheckRuntimeContext(RuntimeContext.Current);
-                return this.serviceProvider;
+                return serviceProvider;
             }
         }
 
@@ -81,7 +81,7 @@ namespace Orleans.Runtime
             if (grainContext is null) throw new ArgumentNullException(nameof(grainContext));
             var grainType = grainContext.GrainInstance?.GetType() ?? throw new ArgumentNullException(nameof(IGrainContext.GrainInstance));
             IGrainStorage grainStorage = GrainStorageHelpers.GetGrainStorage(grainType, ServiceProvider);
-            return new StateStorageBridge<TGrainState>("state", grainContext, grainStorage, this.loggerFactory);
+            return new StateStorageBridge<TGrainState>("state", grainContext, grainStorage, loggerFactory);
         }
 
         public static void CheckRuntimeContext(IGrainContext context)

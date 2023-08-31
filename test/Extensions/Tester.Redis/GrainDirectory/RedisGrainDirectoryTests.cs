@@ -32,7 +32,7 @@ namespace Tester.Redis.GrainDirectory
             var directory = new RedisGrainDirectory(
                 directoryOptions,
                 clusterOptions,
-                this.loggerFactory.CreateLogger<RedisGrainDirectory>());
+                loggerFactory.CreateLogger<RedisGrainDirectory>());
             directory.Initialize().GetAwaiter().GetResult();
             return directory;
         }

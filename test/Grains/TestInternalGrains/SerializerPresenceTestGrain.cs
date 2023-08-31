@@ -8,7 +8,7 @@ namespace UnitTests.Grains
     {
         public Task<bool> SerializerExistsForType(Type t)
         {
-            return Task.FromResult(this.ServiceProvider.GetRequiredService<Serializer>().CanSerialize(t));
+            return Task.FromResult(ServiceProvider.GetRequiredService<Serializer>().CanSerialize(t));
         }
 
         public Task TakeSerializedData(object data)

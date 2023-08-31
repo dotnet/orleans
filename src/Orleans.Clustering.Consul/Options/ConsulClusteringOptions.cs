@@ -43,7 +43,7 @@ namespace Orleans.Configuration
 
         public ConsulClusteringOptions()
         {
-            this.CreateClient = () => new ConsulClient();
+            CreateClient = () => new ConsulClient();
         }
 
         internal void Validate(string name)

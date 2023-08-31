@@ -24,6 +24,6 @@ namespace Orleans.Runtime
 
         public bool IsWaiting => (_statusFlags & 0x2) != 0;
 
-        public override string ToString() => $"IsExecuting: {IsExecuting}, IsWaiting: {IsWaiting}, Diagnostics: [{string.Join(", ", this.Diagnostics)}]";
+        public override string ToString() => $"IsExecuting: {IsExecuting}, IsWaiting: {IsWaiting}, Diagnostics: [{string.Join(", ", Diagnostics)}]";
     }
 }

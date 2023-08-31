@@ -11,7 +11,7 @@ namespace Orleans.Runtime
         /// <summary>
         /// Creates a new <see cref="ClientGrainId"/> instance.
         /// </summary>
-        private ClientGrainId(GrainId grainId) => this.GrainId = grainId;
+        private ClientGrainId(GrainId grainId) => GrainId = grainId;
 
         /// <summary>
         /// Gets the underlying <see cref="GrainId"/>.
@@ -60,10 +60,10 @@ namespace Orleans.Runtime
         public override bool Equals(object? obj) => obj is ClientGrainId clientId && GrainId.Equals(clientId.GrainId);
 
         /// <inheritdoc/>
-        public override int GetHashCode() => this.GrainId.GetHashCode();
+        public override int GetHashCode() => GrainId.GetHashCode();
 
         /// <inheritdoc/>
-        public override string ToString() => this.GrainId.ToString();
+        public override string ToString() => GrainId.ToString();
 
         string IFormattable.ToString(string? format, IFormatProvider? formatProvider) => ToString();
 
@@ -71,10 +71,10 @@ namespace Orleans.Runtime
             => ((ISpanFormattable)GrainId).TryFormat(destination, out charsWritten, format, provider);
 
         /// <inheritdoc/>
-        public bool Equals(ClientGrainId other) => this.GrainId.Equals(other.GrainId);
+        public bool Equals(ClientGrainId other) => GrainId.Equals(other.GrainId);
 
         /// <inheritdoc/>
-        public int CompareTo(ClientGrainId other) => this.GrainId.CompareTo(other.GrainId);
+        public int CompareTo(ClientGrainId other) => GrainId.CompareTo(other.GrainId);
 
         /// <summary>
         /// Compares the provided operands for equality.

@@ -58,7 +58,7 @@ namespace Tester.AzureUtils.Streaming
         public override async Task InitializeAsync()
         {
             await base.InitializeAsync();
-            runner = new SubscriptionMultiplicityTestRunner(AQStreamProviderName, this.HostedCluster);
+            runner = new SubscriptionMultiplicityTestRunner(AQStreamProviderName, HostedCluster);
         }
 
         public override async Task DisposeAsync()
@@ -68,7 +68,7 @@ namespace Tester.AzureUtils.Streaming
             {
                 await AzureQueueStreamProviderUtils.DeleteAllUsedAzureQueues(
                     NullLoggerFactory.Instance,
-                    AzureQueueUtilities.GenerateQueueNames(this.HostedCluster.Options.ClusterId, queueCount),
+                    AzureQueueUtilities.GenerateQueueNames(HostedCluster.Options.ClusterId, queueCount),
                     new AzureQueueOptions().ConfigureTestDefaults());
             }
         }

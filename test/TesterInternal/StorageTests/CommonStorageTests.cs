@@ -57,7 +57,7 @@ namespace UnitTests.StorageTests.Relational
         internal async Task PersistenceStorage_Relational_WriteReadIdCyrillic()
         {
             var grainTypeName = GrainTypeGenerator.GetGrainType<Guid>();
-            var grainReference = this.GetTestReferenceAndState(0, null);
+            var grainReference = GetTestReferenceAndState(0, null);
             var grainState = grainReference.GrainState;
             await Storage.WriteStateAsync(grainTypeName, grainReference.GrainId, grainState).ConfigureAwait(false);
             var storedGrainState = new GrainState<TestState1> { State = new TestState1() };
@@ -80,7 +80,7 @@ namespace UnitTests.StorageTests.Relational
             //A grain with a random ID will be arranged to the database. Then its state is set to null to simulate the fact
             //it is like a second activation after a one that has succeeded to write.
             string grainTypeName = GrainTypeGenerator.GetGrainType<Guid>();
-            var (grainId, grainState) = this.GetTestReferenceAndState(RandomUtilities.GetRandom<long>(), null);
+            var (grainId, grainState) = GetTestReferenceAndState(RandomUtilities.GetRandom<long>(), null);
 
             await Store_WriteRead(grainTypeName, grainId, grainState).ConfigureAwait(false);
             grainState.ETag = null;
@@ -104,7 +104,7 @@ namespace UnitTests.StorageTests.Relational
             //Some version not expected to be in the storage for this type and ID.
             var inconsistentStateVersion = RandomUtilities.GetRandom<int>().ToString(CultureInfo.InvariantCulture);
 
-            var inconsistentState = this.GetTestReferenceAndState(RandomUtilities.GetRandom<long>(), inconsistentStateVersion);
+            var inconsistentState = GetTestReferenceAndState(RandomUtilities.GetRandom<long>(), inconsistentStateVersion);
             string grainTypeName = GrainTypeGenerator.GetGrainType<Guid>();
             var exception = await Record.ExceptionAsync(() => Store_WriteRead(grainTypeName, inconsistentState.GrainId, inconsistentState.GrainState)).ConfigureAwait(false);
 

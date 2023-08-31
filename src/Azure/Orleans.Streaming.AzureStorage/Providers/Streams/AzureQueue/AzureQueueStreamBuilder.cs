@@ -54,10 +54,10 @@ namespace Orleans.Hosting
                 {
                     op.QueueNames =
                         AzureQueueStreamProviderUtils.GenerateDefaultAzureQueueNames(clusterOp.Value.ServiceId,
-                            this.Name);
+                            Name);
                 }
             }));
-            this.ConfigureDelegate(services => services.TryAddSingleton<IQueueDataAdapter<string, IBatchContainer>, AzureQueueDataAdapterV2>());
+            ConfigureDelegate(services => services.TryAddSingleton<IQueueDataAdapter<string, IBatchContainer>, AzureQueueDataAdapterV2>());
         }
     }
 
@@ -76,10 +76,10 @@ namespace Orleans.Hosting
                 if (op.QueueNames == null || op.QueueNames?.Count == 0)
                 {
                     op.QueueNames =
-                        AzureQueueStreamProviderUtils.GenerateDefaultAzureQueueNames(clusterOp.Value.ServiceId, this.Name);
+                        AzureQueueStreamProviderUtils.GenerateDefaultAzureQueueNames(clusterOp.Value.ServiceId, Name);
                 }
             }));
-            this.ConfigureDelegate(services => services.TryAddSingleton<IQueueDataAdapter<string, IBatchContainer>, AzureQueueDataAdapterV2>());
+            ConfigureDelegate(services => services.TryAddSingleton<IQueueDataAdapter<string, IBatchContainer>, AzureQueueDataAdapterV2>());
         }
     }
 }

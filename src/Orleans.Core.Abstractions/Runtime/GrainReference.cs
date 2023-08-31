@@ -28,14 +28,14 @@ namespace Orleans.Runtime
             CopyContextPool copyContextPool,
             IServiceProvider serviceProvider)
         {
-            this.GrainType = grainType;
-            this.InterfaceType = grainInterfaceType;
-            this.Runtime = runtime;
-            this.InvokeMethodOptions = invokeMethodOptions;
-            this.CodecProvider = codecProvider;
-            this.CopyContextPool = copyContextPool;
-            this.ServiceProvider = serviceProvider;
-            this.InterfaceVersion = interfaceVersion;
+            GrainType = grainType;
+            InterfaceType = grainInterfaceType;
+            Runtime = runtime;
+            InvokeMethodOptions = invokeMethodOptions;
+            CodecProvider = codecProvider;
+            CopyContextPool = copyContextPool;
+            ServiceProvider = serviceProvider;
+            InterfaceVersion = interfaceVersion;
         }
 
         /// <summary>
@@ -335,10 +335,10 @@ namespace Orleans.Runtime
         }
 
         /// <inheritdoc />
-        public bool Equals(GrainReference other) => other is not null && this.GrainId.Equals(other.GrainId);
+        public bool Equals(GrainReference other) => other is not null && GrainId.Equals(other.GrainId);
 
         /// <inheritdoc />
-        public override int GetHashCode() => this.GrainId.GetHashCode();
+        public override int GetHashCode() => GrainId.GetHashCode();
 
         /// <summary>
         /// Get a uniform hash code for this grain reference.
@@ -409,7 +409,7 @@ namespace Orleans.Runtime
         /// <returns>The result of the invocation.</returns>
         protected ValueTask<T> InvokeAsync<T>(IRequest methodDescription)
         {
-            return this.Runtime.InvokeMethodAsync<T>(this, methodDescription, methodDescription.Options);
+            return Runtime.InvokeMethodAsync<T>(this, methodDescription, methodDescription.Options);
         }
 
         /// <summary>
@@ -419,7 +419,7 @@ namespace Orleans.Runtime
         /// <returns>A <see cref="ValueTask"/> representing the operation.</returns>
         protected ValueTask InvokeAsync(IRequest methodDescription)
         {
-            return this.Runtime.InvokeMethodAsync(this, methodDescription, methodDescription.Options);
+            return Runtime.InvokeMethodAsync(this, methodDescription, methodDescription.Options);
         }
 
         /// <summary>
@@ -428,7 +428,7 @@ namespace Orleans.Runtime
         /// <param name="methodDescription">The method description.</param>
         protected void Invoke(IRequest methodDescription)
         {
-            this.Runtime.InvokeMethod(this, methodDescription, methodDescription.Options);
+            Runtime.InvokeMethod(this, methodDescription, methodDescription.Options);
         }
     }
 

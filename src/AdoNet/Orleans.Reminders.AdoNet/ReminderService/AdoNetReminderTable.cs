@@ -16,28 +16,28 @@ namespace Orleans.Runtime.ReminderService
             IOptions<ClusterOptions> clusterOptions, 
             IOptions<AdoNetReminderTableOptions> storageOptions)
         {
-            this.serviceId = clusterOptions.Value.ServiceId;
-            this.options = storageOptions.Value;
+            serviceId = clusterOptions.Value.ServiceId;
+            options = storageOptions.Value;
         }
 
         public async Task Init()
         {
-            this.orleansQueries = await RelationalOrleansQueries.CreateInstance(this.options.Invariant, this.options.ConnectionString);
+            orleansQueries = await RelationalOrleansQueries.CreateInstance(options.Invariant, options.ConnectionString);
         }
 
         public Task<ReminderTableData> ReadRows(GrainId grainId)
         {
-            return this.orleansQueries.ReadReminderRowsAsync(this.serviceId, grainId);
+            return orleansQueries.ReadReminderRowsAsync(serviceId, grainId);
         }
 
         public Task<ReminderTableData> ReadRows(uint beginHash, uint endHash)
         {
-            return this.orleansQueries.ReadReminderRowsAsync(this.serviceId, beginHash, endHash);
+            return orleansQueries.ReadReminderRowsAsync(serviceId, beginHash, endHash);
         }
 
         public Task<ReminderEntry> ReadRow(GrainId grainId, string reminderName)
         {
-            return this.orleansQueries.ReadReminderRowAsync(this.serviceId, grainId, reminderName);
+            return orleansQueries.ReadReminderRowAsync(serviceId, grainId, reminderName);
         }   
         
         public Task<string> UpsertRow(ReminderEntry entry)
@@ -47,17 +47,17 @@ namespace Orleans.Runtime.ReminderService
                 entry.StartAt = new DateTime(entry.StartAt.Ticks, DateTimeKind.Utc);
             }
 
-            return this.orleansQueries.UpsertReminderRowAsync(this.serviceId, entry.GrainId, entry.ReminderName, entry.StartAt, entry.Period);            
+            return orleansQueries.UpsertReminderRowAsync(serviceId, entry.GrainId, entry.ReminderName, entry.StartAt, entry.Period);            
         }
 
         public Task<bool> RemoveRow(GrainId grainId, string reminderName, string eTag)
         {
-            return this.orleansQueries.DeleteReminderRowAsync(this.serviceId, grainId, reminderName, eTag);            
+            return orleansQueries.DeleteReminderRowAsync(serviceId, grainId, reminderName, eTag);            
         }
 
         public Task TestOnlyClearTable()
         {
-            return this.orleansQueries.DeleteReminderRowsAsync(this.serviceId);
+            return orleansQueries.DeleteReminderRowsAsync(serviceId);
         }
     }
 }

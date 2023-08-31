@@ -21,7 +21,7 @@ namespace Orleans
             _runtimeClient = runtimeClient;
         }
 
-        public GrainReference GrainReference => _grainReference ??= (GrainReference)_runtimeClient.InternalGrainFactory.GetGrain(this.GrainId);
+        public GrainReference GrainReference => _grainReference ??= (GrainReference)_runtimeClient.InternalGrainFactory.GetGrain(GrainId);
 
         public GrainId GrainId => _runtimeClient.CurrentActivationAddress.GrainId;
 
@@ -98,14 +98,14 @@ namespace Orleans
             where TExtensionInterface : class, IGrainExtension
         {
             (TExtension, TExtensionInterface) result;
-            if (this.TryGetExtension(out result))
+            if (TryGetExtension(out result))
             {
                 return result;
             }
 
             lock (_lockObj)
             {
-                if (this.TryGetExtension(out result))
+                if (TryGetExtension(out result))
                 {
                     return result;
                 }
@@ -153,25 +153,25 @@ namespace Orleans
         public TExtensionInterface GetExtension<TExtensionInterface>()
             where TExtensionInterface : class, IGrainExtension
         {
-            if (this.TryGetExtension<TExtensionInterface>(out var result))
+            if (TryGetExtension<TExtensionInterface>(out var result))
             {
                 return result;
             }
 
             lock (_lockObj)
             {
-                if (this.TryGetExtension(out result))
+                if (TryGetExtension(out result))
                 {
                     return result;
                 }
 
-                var implementation = this.ActivationServices.GetServiceByKey<Type, IGrainExtension>(typeof(TExtensionInterface));
+                var implementation = ActivationServices.GetServiceByKey<Type, IGrainExtension>(typeof(TExtensionInterface));
                 if (implementation is null)
                 {
                     throw new GrainExtensionNotInstalledException($"No extension of type {typeof(TExtensionInterface)} is installed on this instance and no implementations are registered for automated install");
                 }
 
-                var reference = this.GrainReference.Cast<TExtensionInterface>();
+                var reference = GrainReference.Cast<TExtensionInterface>();
                 _extensions[typeof(TExtensionInterface)] = (implementation, reference);
                 result = (TExtensionInterface)implementation;
                 return result;

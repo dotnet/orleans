@@ -54,13 +54,13 @@ namespace Orleans.Runtime.ReminderService
             _referenceActivator = referenceActivator;
             _grainInterfaceType = interfaceTypeResolver.GetGrainInterfaceType(typeof(IRemindable));
             this.reminderOptions = reminderOptions.Value;
-            this.initTimeout = this.reminderOptions.InitializationTimeout;
+            initTimeout = this.reminderOptions.InitializationTimeout;
             this.reminderTable = reminderTable;
             this.asyncTimerFactory = asyncTimerFactory;
             ReminderInstruments.RegisterActiveRemindersObserve(() => localReminders.Count);
             startedTask = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
-            this.logger = loggerFactory.CreateLogger<LocalReminderService>();
-            this.listRefreshTimer = asyncTimerFactory.Create(this.reminderOptions.RefreshReminderListPeriod, "ReminderService.ReminderListRefresher");
+            logger = loggerFactory.CreateLogger<LocalReminderService>();
+            listRefreshTimer = asyncTimerFactory.Create(this.reminderOptions.RefreshReminderListPeriod, "ReminderService.ReminderListRefresher");
             catalog.RegisterSystemTarget(this);
         }
 
@@ -102,7 +102,7 @@ namespace Orleans.Runtime.ReminderService
             if (listRefreshTimer != null)
             {
                 listRefreshTimer.Dispose();
-                if (this.runTask is Task task)
+                if (runTask is Task task)
                 {
                     await task;
                 }
@@ -277,7 +277,7 @@ namespace Orleans.Runtime.ReminderService
                 }
                 catch (Exception exception)
                 {
-                    this.logger.LogWarning(exception, "Exception while reading reminders");
+                    logger.LogWarning(exception, "Exception while reading reminders");
                     overrideDelay = RandomTimeSpan.Next(TimeSpan.FromSeconds(10), TimeSpan.FromSeconds(20));
                 }
             }
@@ -286,7 +286,7 @@ namespace Orleans.Runtime.ReminderService
         protected override async Task StartInBackground()
         {
             await DoInitialReadAndUpdateReminders();
-            this.runTask = RunAsync();
+            runTask = RunAsync();
         }
 
         private async Task DoInitialReadAndUpdateReminders()
@@ -296,7 +296,7 @@ namespace Orleans.Runtime.ReminderService
                 if (StoppedCancellationTokenSource.IsCancellationRequested) return;
 
                 initialReadCallCount++;
-                await this.ReadAndUpdateReminders();
+                await ReadAndUpdateReminders();
                 Status = GrainServiceStatus.Started;
                 startedTask.TrySetResult(true);
             }
@@ -310,14 +310,14 @@ namespace Orleans.Runtime.ReminderService
                         (int)ErrorCode.RS_ServiceInitialLoadFailing,
                         ex,
                         "ReminderService failed initial load of reminders and will retry. Attempt #{AttemptNumber}",
-                        this.initialReadCallCount);
+                        initialReadCallCount);
                 }
                 else
                 {
                     logger.LogError(
                         (int)ErrorCode.RS_ServiceInitialLoadFailed,
                         ex,
-                        "ReminderService failed initial load of reminders and cannot guarantee that the service will be eventually start without manual intervention or restarting the silo. Attempt #{AttemptNumber}", this.initialReadCallCount);
+                        "ReminderService failed initial load of reminders and cannot guarantee that the service will be eventually start without manual intervention or restarting the silo. Attempt #{AttemptNumber}", initialReadCallCount);
                     startedTask.TrySetException(new OrleansException("ReminderService failed initial load of reminders and cannot guarantee that the service will be eventually start without manual intervention or restarting the silo.", ex));
                 }
             }
@@ -493,7 +493,7 @@ namespace Orleans.Runtime.ReminderService
                 case GrainServiceStatus.Booting:
                     // if service didn't finish the initial load, it could still be loading normally or it might have already
                     // failed a few attempts and callers should not be hold waiting for it to complete
-                    var task = this.startedTask.Task;
+                    var task = startedTask.Task;
                     if (task.IsCompleted)
                     {
                         // task at this point is already Faulted
@@ -570,7 +570,7 @@ namespace Orleans.Runtime.ReminderService
                 ETag = entry.ETag;
                 LocalSequenceNumber = -1;
                 logger = reminderService.logger;
-                this.timer = reminderService.asyncTimerFactory.Create(period, "");
+                timer = reminderService.asyncTimerFactory.Create(period, "");
             }
 
             public ReminderIdentity Identity { get; }
@@ -592,7 +592,7 @@ namespace Orleans.Runtime.ReminderService
                 if (runTask is null)
                 {
                     using var suppressExecutionContext = new ExecutionContextSuppressor();
-                    this.runTask = this.RunAsync();
+                    runTask = RunAsync();
                 }
                 else
                 {
@@ -608,7 +608,7 @@ namespace Orleans.Runtime.ReminderService
             private async Task RunAsync()
             {
                 TimeSpan? dueTimeSpan = CalculateDueTime();
-                while (await this.timer.NextTick(dueTimeSpan))
+                while (await timer.NextTick(dueTimeSpan))
                 {
                     try
                     {
@@ -620,8 +620,8 @@ namespace Orleans.Runtime.ReminderService
                         logger.LogWarning(
                             exception,
                             "Exception firing reminder \"{ReminderName}\" for grain {GrainId}",
-                            this.Identity.ReminderName,
-                            this.Identity.GrainId);
+                            Identity.ReminderName,
+                            Identity.GrainId);
                     }
 
                     dueTimeSpan = CalculateDueTime();
@@ -670,7 +670,7 @@ namespace Orleans.Runtime.ReminderService
 
                 if (logger.IsEnabled(LogLevel.Trace))
                 {
-                    logger.LogTrace("Triggering tick for {Instance}, status {Status}, now {CurrentTime}", this.ToString(), status, before);
+                    logger.LogTrace("Triggering tick for {Instance}, status {Status}, now {CurrentTime}", ToString(), status, before);
                 }
 
                 try
@@ -694,9 +694,9 @@ namespace Orleans.Runtime.ReminderService
                         // to the after time.
                         logger.LogTrace(
                             "Tick triggered for {Instance}, dt {DueTime} sec, next@~ {NextDueTime}",
-                            this.ToString(),
+                            ToString(),
                             (after - before).TotalSeconds,
-                            after + this.period);
+                            after + period);
                     }
                 }
                 catch (Exception exc)
@@ -706,8 +706,8 @@ namespace Orleans.Runtime.ReminderService
                         (int)ErrorCode.RS_Tick_Delivery_Error,
                         exc,
                         "Could not deliver reminder tick for {Instance}, next {NextDueTime}.",
-                        this.ToString(),
-                        after + this.period);
+                        ToString(),
+                        after + period);
                     // What to do with repeated failures to deliver a reminder's ticks?
                 }
             }
@@ -729,8 +729,8 @@ namespace Orleans.Runtime.ReminderService
                 if (string.IsNullOrWhiteSpace(reminderName))
                     throw new ArgumentException("The reminder name is either null or whitespace.", nameof(reminderName));
 
-                this.GrainId = grainId;
-                this.ReminderName = reminderName;
+                GrainId = grainId;
+                ReminderName = reminderName;
             }
 
             public readonly bool Equals(ReminderIdentity other) => GrainId.Equals(other.GrainId) && ReminderName.Equals(other.ReminderName);

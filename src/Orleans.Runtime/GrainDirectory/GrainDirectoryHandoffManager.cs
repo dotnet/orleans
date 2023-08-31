@@ -71,9 +71,9 @@ namespace Orleans.Runtime.GrainDirectory
 
         private async Task ProcessAddedSiloAsync(SiloAddress addedSilo, List<GrainAddress> splitPartListSingle)
         {
-            if (!this.localDirectory.Running) return;
+            if (!localDirectory.Running) return;
 
-            if (this.siloStatusOracle.GetApproximateSiloStatus(addedSilo) == SiloStatus.Active)
+            if (siloStatusOracle.GetApproximateSiloStatus(addedSilo) == SiloStatus.Active)
             {
                 if (splitPartListSingle.Count > 0)
                 {
@@ -108,22 +108,22 @@ namespace Orleans.Runtime.GrainDirectory
 
         private async Task AcceptExistingRegistrationsAsync(List<GrainAddress> singleActivations)
         {
-            if (!this.localDirectory.Running) return;
+            if (!localDirectory.Running) return;
 
-            if (this.logger.IsEnabled(LogLevel.Debug))
+            if (logger.IsEnabled(LogLevel.Debug))
             {
-                this.logger.LogDebug($"{nameof(AcceptExistingRegistrations)}: accepting {{Count}} single-activation registrations", singleActivations.Count);
+                logger.LogDebug($"{nameof(AcceptExistingRegistrations)}: accepting {{Count}} single-activation registrations", singleActivations.Count);
             }
 
-            var tasks = singleActivations.Select(addr => this.localDirectory.RegisterAsync(addr, previousAddress: null, 1)).ToArray();
+            var tasks = singleActivations.Select(addr => localDirectory.RegisterAsync(addr, previousAddress: null, 1)).ToArray();
             try
             {
                 await Task.WhenAll(tasks);
             }
             catch (Exception exception)
             {
-                if (this.logger.IsEnabled(LogLevel.Warning))
-                    this.logger.LogWarning(exception, $"Exception registering activations in {nameof(AcceptExistingRegistrations)}");
+                if (logger.IsEnabled(LogLevel.Warning))
+                    logger.LogWarning(exception, $"Exception registering activations in {nameof(AcceptExistingRegistrations)}");
                 throw;
             }
             finally
@@ -163,18 +163,18 @@ namespace Orleans.Runtime.GrainDirectory
             while (duplicates.Count > 0)
             {
                 var pair = duplicates.FirstOrDefault();
-                if (this.siloStatusOracle.GetApproximateSiloStatus(pair.Key) == SiloStatus.Active)
+                if (siloStatusOracle.GetApproximateSiloStatus(pair.Key) == SiloStatus.Active)
                 {
-                    if (this.logger.IsEnabled(LogLevel.Debug))
+                    if (logger.IsEnabled(LogLevel.Debug))
                     {
-                        this.logger.LogDebug(
+                        logger.LogDebug(
                             $"{nameof(DestroyDuplicateActivations)} will destroy {{Count}} duplicate activations on silo {{SiloAddress}}: {{Duplicates}}",
                             duplicates.Count,
                             pair.Key,
                             string.Join("\n * ", pair.Value.Select(_ => _)));
                     }
 
-                    var remoteCatalog = this.grainFactory.GetSystemTarget<ICatalog>(Constants.CatalogType, pair.Key);
+                    var remoteCatalog = grainFactory.GetSystemTarget<ICatalog>(Constants.CatalogType, pair.Key);
                     await remoteCatalog.DeleteActivations(pair.Value, DeactivationReasonCode.DuplicateActivation, "This grain has been activated elsewhere");
                 }
 
@@ -186,10 +186,10 @@ namespace Orleans.Runtime.GrainDirectory
         {
             lock (this)
             {
-                this.pendingOperations.Enqueue((name, state, action));
-                if (this.pendingOperations.Count <= 2)
+                pendingOperations.Enqueue((name, state, action));
+                if (pendingOperations.Count <= 2)
                 {
-                    this.localDirectory.RemoteGrainDirectory.WorkItemGroup.QueueTask(ExecutePendingOperations, localDirectory.RemoteGrainDirectory);
+                    localDirectory.RemoteGrainDirectory.WorkItemGroup.QueueTask(ExecutePendingOperations, localDirectory.RemoteGrainDirectory);
                 }
             }
         }
@@ -205,9 +205,9 @@ namespace Orleans.Runtime.GrainDirectory
                     (string Name, object State, Func<GrainDirectoryHandoffManager, object, Task> Action) op;
                     lock (this)
                     {
-                        if (this.pendingOperations.Count == 0) break;
+                        if (pendingOperations.Count == 0) break;
 
-                        op = this.pendingOperations.Peek();
+                        op = pendingOperations.Peek();
                     }
 
                     dequeueCount++;
@@ -222,14 +222,14 @@ namespace Orleans.Runtime.GrainDirectory
                     {
                         if (dequeueCount < MAX_OPERATION_DEQUEUE)
                         {
-                            if (this.logger.IsEnabled(LogLevel.Warning))
-                                this.logger.LogWarning(exception, "{Operation} failed, will be retried", op.Name);
+                            if (logger.IsEnabled(LogLevel.Warning))
+                                logger.LogWarning(exception, "{Operation} failed, will be retried", op.Name);
                             await Task.Delay(RetryDelay);
                         }
                         else
                         {
-                            if (this.logger.IsEnabled(LogLevel.Warning))
-                                this.logger.LogWarning(exception, "{Operation} failed, will NOT be retried", op.Name);
+                            if (logger.IsEnabled(LogLevel.Warning))
+                                logger.LogWarning(exception, "{Operation} failed, will NOT be retried", op.Name);
                         }
                     }
                     if (dequeueCount == 0 || dequeueCount >= MAX_OPERATION_DEQUEUE)
@@ -238,7 +238,7 @@ namespace Orleans.Runtime.GrainDirectory
                         {
                             // Remove the operation from the queue if it was a success
                             // or if we tried too many times
-                            this.pendingOperations.Dequeue();
+                            pendingOperations.Dequeue();
                         }
                     }
                 }

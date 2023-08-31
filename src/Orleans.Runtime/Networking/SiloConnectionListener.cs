@@ -43,33 +43,33 @@ namespace Orleans.Runtime.Messaging
             this.endpointOptions = endpointOptions.Value;
         }
 
-        public override EndPoint Endpoint => this.endpointOptions.GetListeningSiloEndpoint();
+        public override EndPoint Endpoint => endpointOptions.GetListeningSiloEndpoint();
 
         protected override Connection CreateConnection(ConnectionContext context)
         {
             return new SiloConnection(
                 default,
                 context,
-                this.ConnectionDelegate,
-                this.messageCenter,
-                this.localSiloDetails,
-                this.connectionManager,
-                this.ConnectionOptions,
-                this.connectionShared,
-                this.probeRequestMonitor,
-                this.connectionPreambleHelper);
+                ConnectionDelegate,
+                messageCenter,
+                localSiloDetails,
+                connectionManager,
+                ConnectionOptions,
+                connectionShared,
+                probeRequestMonitor,
+                connectionPreambleHelper);
         }
 
         protected override void ConfigureConnectionBuilder(IConnectionBuilder connectionBuilder)
         {
-            var configureDelegate = (SiloConnectionOptions.ISiloConnectionBuilderOptions)this.siloConnectionOptions;
+            var configureDelegate = (SiloConnectionOptions.ISiloConnectionBuilderOptions)siloConnectionOptions;
             configureDelegate.ConfigureSiloInboundBuilder(connectionBuilder);
             base.ConfigureConnectionBuilder(connectionBuilder);
         }
 
         void ILifecycleParticipant<ISiloLifecycle>.Participate(ISiloLifecycle lifecycle)
         {
-            if (this.Endpoint is null) return;
+            if (Endpoint is null) return;
 
             lifecycle.Subscribe(nameof(SiloConnectionListener), ServiceLifecycleStage.RuntimeInitialize - 1, this);
         }

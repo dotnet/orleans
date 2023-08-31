@@ -55,7 +55,7 @@ namespace Tester.EventSourcingTests
         [Fact(Skip = "Flaky test. See https://github.com/dotnet/orleans/issues/5605"), TestCategory("EventSourcing"), TestCategory("Functional")]
         public async Task AccountWithLog()
         {
-            var account = this.fixture.GrainFactory.GetGrain<IAccountGrain>($"Account-{Guid.NewGuid()}", "TestGrains.AccountGrain");
+            var account = fixture.GrainFactory.GetGrain<IAccountGrain>($"Account-{Guid.NewGuid()}", "TestGrains.AccountGrain");
             await TestSequence(account, true);
         }
 
@@ -63,7 +63,7 @@ namespace Tester.EventSourcingTests
         [Fact, TestCategory("EventSourcing"), TestCategory("Functional")]
         public async Task AccountWithoutLog()
         {
-            var account = this.fixture.GrainFactory.GetGrain<IAccountGrain>($"Account-{Guid.NewGuid()}", "TestGrains.AccountGrain_PersistStateOnly");
+            var account = fixture.GrainFactory.GetGrain<IAccountGrain>($"Account-{Guid.NewGuid()}", "TestGrains.AccountGrain_PersistStateOnly");
             await TestSequence(account, false);
         }
 

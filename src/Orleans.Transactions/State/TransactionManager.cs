@@ -18,7 +18,7 @@ namespace Orleans.Transactions.State
         public async Task<TransactionalStatus> PrepareAndCommit(Guid transactionId, AccessCounter accessCount, DateTime timeStamp, List<ParticipantId> writeResources, int totalResources)
         {
             // validate the lock
-            var (status, record) = await this.queue.RWLock.ValidateLock(transactionId, accessCount);
+            var (status, record) = await queue.RWLock.ValidateLock(transactionId, accessCount);
             var valid = status == TransactionalStatus.Ok;
 
             record.Timestamp = timeStamp;
@@ -30,26 +30,26 @@ namespace Orleans.Transactions.State
 
             if (!valid)
             {
-                await this.queue.NotifyOfAbort(record, status, exception: null);
+                await queue.NotifyOfAbort(record, status, exception: null);
             }
             else
             {
-                this.queue.Clock.Merge(record.Timestamp);
+                queue.Clock.Merge(record.Timestamp);
             }
 
-            this.queue.RWLock.Notify();
+            queue.RWLock.Notify();
             return await record.PromiseForTA.Task;
         }
 
         public Task Prepared(Guid transactionId, DateTime timeStamp, ParticipantId resource, TransactionalStatus status)
         {
-            return this.queue.NotifyOfPrepared(transactionId, timeStamp, status);
+            return queue.NotifyOfPrepared(transactionId, timeStamp, status);
         }
 
         public async Task Ping(Guid transactionId, DateTime timeStamp, ParticipantId resource)
         {
-            await this.queue.Ready();
-            await this.queue.NotifyOfPing(transactionId, timeStamp, resource);
+            await queue.Ready();
+            await queue.NotifyOfPing(transactionId, timeStamp, resource);
         }
     }
 }

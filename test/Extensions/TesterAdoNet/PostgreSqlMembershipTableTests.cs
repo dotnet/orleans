@@ -30,19 +30,19 @@ namespace UnitTests.MembershipTests
             var options = new AdoNetClusteringSiloOptions()
             {
                 Invariant = GetAdoInvariant(),
-                ConnectionString = this.connectionString,
+                ConnectionString = connectionString,
             };
-            return new AdoNetClusteringTable(this.Services, this._clusterOptions, Options.Create(options), this.loggerFactory.CreateLogger<AdoNetClusteringTable>());
+            return new AdoNetClusteringTable(Services, _clusterOptions, Options.Create(options), loggerFactory.CreateLogger<AdoNetClusteringTable>());
         }
 
         protected override IGatewayListProvider CreateGatewayListProvider(ILogger logger)
         {
             var options = new AdoNetClusteringClientOptions()
             {
-                ConnectionString = this.connectionString,
+                ConnectionString = connectionString,
                 Invariant = GetAdoInvariant()
             };
-            return new AdoNetGatewayListProvider(this.loggerFactory.CreateLogger<AdoNetGatewayListProvider>(), this.Services, Options.Create(options), this._gatewayOptions, this._clusterOptions);
+            return new AdoNetGatewayListProvider(loggerFactory.CreateLogger<AdoNetGatewayListProvider>(), Services, Options.Create(options), _gatewayOptions, _clusterOptions);
         }
 
         protected override string GetAdoInvariant()

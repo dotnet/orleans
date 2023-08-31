@@ -45,7 +45,7 @@ namespace UnitTests.CatalogTests
             var promises = new List<Task>(nRunnerGrains);
             for (int i = 0; i < nRunnerGrains; i++)
             {
-                runnerGrains[i] = this.fixture.GrainFactory.GetGrain<ICatalogTestGrain>(-i);
+                runnerGrains[i] = fixture.GrainFactory.GetGrain<ICatalogTestGrain>(-i);
                 promises.Add(runnerGrains[i].Initialize());
             }
 

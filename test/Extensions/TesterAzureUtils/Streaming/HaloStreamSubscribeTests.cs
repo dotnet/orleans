@@ -71,10 +71,10 @@ namespace UnitTests.HaloTests.Streaming
                 if (!string.IsNullOrWhiteSpace(TestDefaultConfiguration.DataConnectionString))
                 {
                     await AzureQueueStreamProviderUtils.DeleteAllUsedAzureQueues(NullLoggerFactory.Instance,
-                        AzureQueueUtilities.GenerateQueueNames(this.HostedCluster.Options.ClusterId, queueCount),
+                        AzureQueueUtilities.GenerateQueueNames(HostedCluster.Options.ClusterId, queueCount),
                         new AzureQueueOptions().ConfigureTestDefaults());
                     await AzureQueueStreamProviderUtils.DeleteAllUsedAzureQueues(NullLoggerFactory.Instance,
-                        AzureQueueUtilities.GenerateQueueNames($"{this.HostedCluster.Options.ClusterId}2", queueCount),
+                        AzureQueueUtilities.GenerateQueueNames($"{HostedCluster.Options.ClusterId}2", queueCount),
                         new AzureQueueOptions().ConfigureTestDefaults());
                 }
             }
@@ -94,13 +94,13 @@ namespace UnitTests.HaloTests.Streaming
             this.fixture = fixture;
             HostedCluster = fixture.HostedCluster;
             fixture.EnsurePreconditionsMet();
-            this.loggerFactory = fixture.HostedCluster.ServiceProvider.GetService<ILoggerFactory>();
+            loggerFactory = fixture.HostedCluster.ServiceProvider.GetService<ILoggerFactory>();
         }
 
         [SkippableFact, TestCategory("Functional")]
         public async Task Halo_AzureQueue_ResubscribeTest_ConsumerProducer()
         {
-            this.fixture.Logger.LogInformation("\n\n************************ Halo_AzureQueue_ResubscribeTest_ConsumerProducer ********************************* \n\n");
+            fixture.Logger.LogInformation("\n\n************************ Halo_AzureQueue_ResubscribeTest_ConsumerProducer ********************************* \n\n");
             _streamId = Guid.NewGuid();
             _streamProvider = AzureQueueStreamProviderName;
             Guid consumerGuid = Guid.NewGuid();
@@ -112,7 +112,7 @@ namespace UnitTests.HaloTests.Streaming
         [SkippableFact, TestCategory("Functional")]
         public async Task Halo_AzureQueue_ResubscribeTest_ProducerConsumer()
         {
-            this.fixture.Logger.LogInformation("\n\n************************ Halo_AzureQueue_ResubscribeTest_ProducerConsumer ********************************* \n\n");
+            fixture.Logger.LogInformation("\n\n************************ Halo_AzureQueue_ResubscribeTest_ProducerConsumer ********************************* \n\n");
             _streamId = Guid.NewGuid();
             _streamProvider = AzureQueueStreamProviderName;
             Guid producerGuid = Guid.NewGuid();
@@ -124,10 +124,10 @@ namespace UnitTests.HaloTests.Streaming
         private async Task ConsumerProducerTest(Guid consumerGuid, Guid producerGuid)
         {
             // consumer joins first, producer later
-            IConsumerEventCountingGrain consumer = this.fixture.GrainFactory.GetGrain<IConsumerEventCountingGrain>(consumerGuid);
+            IConsumerEventCountingGrain consumer = fixture.GrainFactory.GetGrain<IConsumerEventCountingGrain>(consumerGuid);
             await consumer.BecomeConsumer(_streamId, _streamProvider);
 
-            IProducerEventCountingGrain producer = this.fixture.GrainFactory.GetGrain<IProducerEventCountingGrain>(producerGuid);
+            IProducerEventCountingGrain producer = fixture.GrainFactory.GetGrain<IProducerEventCountingGrain>(producerGuid);
             await producer.BecomeProducer(_streamId, _streamProvider);
 
             await producer.SendEvent();
@@ -142,10 +142,10 @@ namespace UnitTests.HaloTests.Streaming
         private async Task ProducerConsumerTest(Guid producerGuid, Guid consumerGuid)
         {
             // producer joins first, consumer later
-            IProducerEventCountingGrain producer = this.fixture.GrainFactory.GetGrain<IProducerEventCountingGrain>(producerGuid);
+            IProducerEventCountingGrain producer = fixture.GrainFactory.GetGrain<IProducerEventCountingGrain>(producerGuid);
             await producer.BecomeProducer(_streamId, _streamProvider);
 
-            IConsumerEventCountingGrain consumer = this.fixture.GrainFactory.GetGrain<IConsumerEventCountingGrain>(consumerGuid);
+            IConsumerEventCountingGrain consumer = fixture.GrainFactory.GetGrain<IConsumerEventCountingGrain>(consumerGuid);
             await consumer.BecomeConsumer(_streamId, _streamProvider);
 
             await producer.SendEvent();
@@ -161,7 +161,7 @@ namespace UnitTests.HaloTests.Streaming
         {
             var numProduced = await producer.GetNumberProduced();
             var numConsumed = await consumer.GetNumberConsumed();
-            this.fixture.Logger.LogInformation("CheckCounters: numProduced = {ProducedCount}, numConsumed = {ConsumedCount}", numProduced, numConsumed);
+            fixture.Logger.LogInformation("CheckCounters: numProduced = {ProducedCount}, numConsumed = {ConsumedCount}", numProduced, numConsumed);
             return numProduced == numConsumed;
         }
     }

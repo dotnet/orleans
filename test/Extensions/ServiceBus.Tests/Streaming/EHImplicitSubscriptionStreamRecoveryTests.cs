@@ -76,26 +76,26 @@ namespace ServiceBus.Tests.StreamingTests
         {
             this.fixture = fixture;
             fixture.EnsurePreconditionsMet();
-            this.runner = new ImplicitSubscritionRecoverableStreamTestRunner(this.fixture.GrainFactory, StreamProviderName);
+            runner = new ImplicitSubscritionRecoverableStreamTestRunner(this.fixture.GrainFactory, StreamProviderName);
         }
 
         [SkippableFact(Skip="https://github.com/dotnet/orleans/issues/5633")]
         public async Task Recoverable100EventStreamsWithTransientErrorsTest()
         {
-            this.fixture.Logger.LogInformation("************************ EHRecoverable100EventStreamsWithTransientErrorsTest *********************************");
+            fixture.Logger.LogInformation("************************ EHRecoverable100EventStreamsWithTransientErrorsTest *********************************");
             await runner.Recoverable100EventStreamsWithTransientErrors(GenerateEvents, ImplicitSubscription_TransientError_RecoverableStream_CollectorGrain.StreamNamespace, 4, 100);
         }
 
         [SkippableFact(Skip= "https://github.com/dotnet/orleans/issues/5638")]
         public async Task Recoverable100EventStreamsWith1NonTransientErrorTest()
         {
-            this.fixture.Logger.LogInformation("************************ EHRecoverable100EventStreamsWith1NonTransientErrorTest *********************************");
+            fixture.Logger.LogInformation("************************ EHRecoverable100EventStreamsWith1NonTransientErrorTest *********************************");
             await runner.Recoverable100EventStreamsWith1NonTransientError(GenerateEvents, ImplicitSubscription_NonTransientError_RecoverableStream_CollectorGrain.StreamNamespace, 4, 100);
         }
 
         private async Task GenerateEvents(string streamNamespace, int streamCount, int eventsInStream)
         {
-            IStreamProvider streamProvider = this.fixture.HostedCluster.ServiceProvider.GetServiceByName<IStreamProvider>(StreamProviderName);
+            IStreamProvider streamProvider = fixture.HostedCluster.ServiceProvider.GetServiceByName<IStreamProvider>(StreamProviderName);
             IAsyncStream<GeneratedEvent>[] producers =
                 Enumerable.Range(0, streamCount)
                     .Select(i => streamProvider.GetStream<GeneratedEvent>(streamNamespace, Guid.NewGuid()))

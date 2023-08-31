@@ -83,19 +83,19 @@ namespace Tester.HeterogeneousSilosTests
             SetupAndDeployCluster(typeof(RandomPlacement), typeof(TestGrain));
 
             // Should fail
-            var exception = Assert.Throws<ArgumentException>(() => this.cluster.GrainFactory.GetGrain<ITestGrain>(0));
+            var exception = Assert.Throws<ArgumentException>(() => cluster.GrainFactory.GetGrain<ITestGrain>(0));
             Assert.Contains("Could not find an implementation for interface", exception.Message);
 
             // Should not fail
-            this.cluster.GrainFactory.GetGrain<ISimpleGrainWithAsyncMethods>(0);
+            cluster.GrainFactory.GetGrain<ISimpleGrainWithAsyncMethods>(0);
         }
 
 
         [Fact]
         public async Task MergeGrainResolverTests()
         {
-            await MergeGrainResolverTestsImpl<ITestGrain>(typeof(RandomPlacement), true, this.CallITestGrainMethod, typeof(TestGrain));
-            await MergeGrainResolverTestsImpl<ITestGrain>(typeof(PreferLocalPlacement), true, this.CallITestGrainMethod, typeof(TestGrain));
+            await MergeGrainResolverTestsImpl<ITestGrain>(typeof(RandomPlacement), true, CallITestGrainMethod, typeof(TestGrain));
+            await MergeGrainResolverTestsImpl<ITestGrain>(typeof(PreferLocalPlacement), true, CallITestGrainMethod, typeof(TestGrain));
             // TODO Check ActivationCountBasedPlacement in tests
             //await MergeGrainResolverTestsImpl("ActivationCountBasedPlacement", typeof(TestGrain));
         }
@@ -103,8 +103,8 @@ namespace Tester.HeterogeneousSilosTests
         [Fact]
         public async Task MergeGrainResolverWithClientRefreshTests()
         {
-            await MergeGrainResolverTestsImpl<ITestGrain>(typeof(RandomPlacement), false, this.CallITestGrainMethod, typeof(TestGrain));
-            await MergeGrainResolverTestsImpl<ITestGrain>(typeof(PreferLocalPlacement), false, this.CallITestGrainMethod, typeof(TestGrain));
+            await MergeGrainResolverTestsImpl<ITestGrain>(typeof(RandomPlacement), false, CallITestGrainMethod, typeof(TestGrain));
+            await MergeGrainResolverTestsImpl<ITestGrain>(typeof(PreferLocalPlacement), false, CallITestGrainMethod, typeof(TestGrain));
             // TODO Check ActivationCountBasedPlacement in tests
             //await MergeGrainResolverTestsImpl("ActivationCountBasedPlacement", typeof(TestGrain));
         }
@@ -112,15 +112,15 @@ namespace Tester.HeterogeneousSilosTests
         [Fact]
         public async Task StatelessWorkerPlacementTests()
         {
-            await MergeGrainResolverTestsImpl<IStatelessWorkerGrain>(typeof(RandomPlacement), true, this.CallIStatelessWorkerGrainMethod, typeof(StatelessWorkerGrain));
-            await MergeGrainResolverTestsImpl<IStatelessWorkerGrain>(typeof(PreferLocalPlacement), true, this.CallIStatelessWorkerGrainMethod, typeof(StatelessWorkerGrain));
+            await MergeGrainResolverTestsImpl<IStatelessWorkerGrain>(typeof(RandomPlacement), true, CallIStatelessWorkerGrainMethod, typeof(StatelessWorkerGrain));
+            await MergeGrainResolverTestsImpl<IStatelessWorkerGrain>(typeof(PreferLocalPlacement), true, CallIStatelessWorkerGrainMethod, typeof(StatelessWorkerGrain));
         }
 
         [Fact]
         public async Task StatelessWorkerPlacementWithClientRefreshTests()
         {
-            await MergeGrainResolverTestsImpl<IStatelessWorkerGrain>(typeof(RandomPlacement), false, this.CallIStatelessWorkerGrainMethod, typeof(StatelessWorkerGrain));
-            await MergeGrainResolverTestsImpl<IStatelessWorkerGrain>(typeof(PreferLocalPlacement), false, this.CallIStatelessWorkerGrainMethod, typeof(StatelessWorkerGrain));
+            await MergeGrainResolverTestsImpl<IStatelessWorkerGrain>(typeof(RandomPlacement), false, CallIStatelessWorkerGrainMethod, typeof(StatelessWorkerGrain));
+            await MergeGrainResolverTestsImpl<IStatelessWorkerGrain>(typeof(PreferLocalPlacement), false, CallIStatelessWorkerGrainMethod, typeof(StatelessWorkerGrain));
         }
 
         private async Task CallITestGrainMethod(IGrain grain)
@@ -143,7 +143,7 @@ namespace Tester.HeterogeneousSilosTests
             var delayTimeout = RefreshInterval.Add(RefreshInterval);
 
             // Should fail
-            var exception = Assert.Throws<ArgumentException>(() => this.cluster.GrainFactory.GetGrain<T>(0));
+            var exception = Assert.Throws<ArgumentException>(() => cluster.GrainFactory.GetGrain<T>(0));
             Assert.Contains("Could not find an implementation for interface", exception.Message);
 
             // Start a new silo with TestGrain
@@ -164,7 +164,7 @@ namespace Tester.HeterogeneousSilosTests
             for (var i = 0; i < 5; i++)
             {
                 // Success
-                var g = this.cluster.GrainFactory.GetGrain<T>(i);
+                var g = cluster.GrainFactory.GetGrain<T>(i);
                 await func(g);
             }
 
@@ -184,7 +184,7 @@ namespace Tester.HeterogeneousSilosTests
             }
 
             // Should fail
-            exception = Assert.Throws<ArgumentException>(() => this.cluster.GrainFactory.GetGrain<T>(0));
+            exception = Assert.Throws<ArgumentException>(() => cluster.GrainFactory.GetGrain<T>(0));
             Assert.Contains("Could not find an implementation for interface", exception.Message);
         }
 
@@ -197,14 +197,14 @@ namespace Tester.HeterogeneousSilosTests
         {
             try
             {
-                if (this.cluster is TestCluster c)
+                if (cluster is TestCluster c)
                 {
                     await c.StopAllSilosAsync();
                 }
             }
             finally
             {
-                this.cluster?.Dispose();
+                cluster?.Dispose();
             }
         }
     }

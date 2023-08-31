@@ -53,18 +53,18 @@ namespace Orleans.Configuration
         {
             if(configurationOptions == null)
                 throw new OrleansConfigurationException($"Invalid AdoNetGrainStorageOptions for AdoNetGrainStorage {name}. Options is required.");
-            this.options = configurationOptions;
+            options = configurationOptions;
             this.name = name;
         }
         /// <inheritdoc cref="IConfigurationValidator"/>
         public void ValidateConfiguration()
         {
-            if (string.IsNullOrWhiteSpace(this.options.Invariant))
+            if (string.IsNullOrWhiteSpace(options.Invariant))
             {
                 throw new OrleansConfigurationException($"Invalid {nameof(AdoNetGrainStorageOptions)} values for {nameof(AdoNetGrainStorage)} \"{name}\". {nameof(options.Invariant)} is required.");
             }
 
-            if (string.IsNullOrWhiteSpace(this.options.ConnectionString))
+            if (string.IsNullOrWhiteSpace(options.ConnectionString))
             {
                 throw new OrleansConfigurationException($"Invalid {nameof(AdoNetGrainStorageOptions)} values for {nameof(AdoNetGrainStorage)} \"{name}\". {nameof(options.ConnectionString)} is required.");
             }

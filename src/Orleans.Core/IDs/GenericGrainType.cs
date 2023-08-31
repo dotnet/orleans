@@ -27,7 +27,7 @@ namespace Orleans.Runtime
         /// <summary>
         /// Returns <see langword="true" /> if this instance contains concrete type parameters.
         /// </summary>
-        public bool IsConstructed => TypeConverterExtensions.IsConstructed(this.GrainType.Value);
+        public bool IsConstructed => TypeConverterExtensions.IsConstructed(GrainType.Value);
 
         /// <summary>
         /// Returns the generic grain type corresponding to the provided value.
@@ -58,24 +58,24 @@ namespace Orleans.Runtime
         /// </summary>
         public GenericGrainType Construct(TypeConverter formatter, params Type[] typeArguments)
         {
-            var constructed = formatter.GetConstructed(this.GrainType.Value, typeArguments);
+            var constructed = formatter.GetConstructed(GrainType.Value, typeArguments);
             return new GenericGrainType(new GrainType(constructed));
         }
         /// <summary>
         /// Returns the type arguments which this instance was constructed with.
         /// </summary>
-        public Type[] GetArguments(TypeConverter formatter) => formatter.GetArguments(this.GrainType.Value);
+        public Type[] GetArguments(TypeConverter formatter) => formatter.GetArguments(GrainType.Value);
 
         /// <inheritdoc/>
-        public override string ToString() => this.GrainType.ToString();
+        public override string ToString() => GrainType.ToString();
 
         /// <inheritdoc/>
-        public bool Equals(GenericGrainType other) => this.GrainType.Equals(other.GrainType);
+        public bool Equals(GenericGrainType other) => GrainType.Equals(other.GrainType);
 
         /// <inheritdoc/>
-        public override bool Equals(object obj) => obj is GenericGrainType other && this.Equals(other);
+        public override bool Equals(object obj) => obj is GenericGrainType other && Equals(other);
 
         /// <inheritdoc/>
-        public override int GetHashCode() => this.GrainType.GetHashCode();
+        public override int GetHashCode() => GrainType.GetHashCode();
     }
 }

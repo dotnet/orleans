@@ -30,11 +30,11 @@ namespace Tester.AzureUtils.Streaming
                 if (!string.IsNullOrWhiteSpace(TestDefaultConfiguration.DataConnectionString))
                 {
                     await AzureQueueStreamProviderUtils.DeleteAllUsedAzureQueues(NullLoggerFactory.Instance,
-                        AzureQueueUtilities.GenerateQueueNames($"{this.HostedCluster.Options.ClusterId}{StreamProviderName}", queueCount),
+                        AzureQueueUtilities.GenerateQueueNames($"{HostedCluster.Options.ClusterId}{StreamProviderName}", queueCount),
                         new AzureQueueOptions().ConfigureTestDefaults());
 
                     await AzureQueueStreamProviderUtils.DeleteAllUsedAzureQueues(NullLoggerFactory.Instance,
-                        AzureQueueUtilities.GenerateQueueNames($"{this.HostedCluster.Options.ClusterId}{StreamProviderName2}", queueCount),
+                        AzureQueueUtilities.GenerateQueueNames($"{HostedCluster.Options.ClusterId}{StreamProviderName2}", queueCount),
                         new AzureQueueOptions().ConfigureTestDefaults());
                 }
             }

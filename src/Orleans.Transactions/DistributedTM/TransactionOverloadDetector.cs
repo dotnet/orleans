@@ -43,33 +43,33 @@ namespace Orleans.Transactions
         {
             this.statistics = statistics;
             this.options = options.Value;
-            this.monitor = new PeriodicAction(MetricsCheck, this.RecordStatistics);
-            this.lastStatistics = TransactionAgentStatistics.Copy(statistics);
-            this.lastCheckTime = DateTime.UtcNow;
+            monitor = new PeriodicAction(MetricsCheck, RecordStatistics);
+            lastStatistics = TransactionAgentStatistics.Copy(statistics);
+            lastCheckTime = DateTime.UtcNow;
         }
 
         private void RecordStatistics()
         {
-            ITransactionAgentStatistics current = TransactionAgentStatistics.Copy(this.statistics);
+            ITransactionAgentStatistics current = TransactionAgentStatistics.Copy(statistics);
             DateTime now = DateTime.UtcNow;
 
-            this.transactionStartedPerSecond = CalculateTps(this.lastStatistics.TransactionsStarted, this.lastCheckTime, current.TransactionsStarted, now);
-            this.lastStatistics = current;
-            this.lastCheckTime = now;
+            transactionStartedPerSecond = CalculateTps(lastStatistics.TransactionsStarted, lastCheckTime, current.TransactionsStarted, now);
+            lastStatistics = current;
+            lastCheckTime = now;
         }
 
         public bool IsOverloaded()
         {
-            if (!this.options.Enabled)
+            if (!options.Enabled)
                 return false;
 
             DateTime now = DateTime.UtcNow;
-            this.monitor.TryAction(now);
-            double txPerSecondCurrently = CalculateTps(this.lastStatistics.TransactionsStarted, this.lastCheckTime, this.statistics.TransactionsStarted, now);
+            monitor.TryAction(now);
+            double txPerSecondCurrently = CalculateTps(lastStatistics.TransactionsStarted, lastCheckTime, statistics.TransactionsStarted, now);
             //decaying utilization for tx per second
-            var aggregratedTxPerSecond = (this.transactionStartedPerSecond + (2.0 * txPerSecondCurrently)) / 3.0;
+            var aggregratedTxPerSecond = (transactionStartedPerSecond + (2.0 * txPerSecondCurrently)) / 3.0;
             
-            return aggregratedTxPerSecond > this.options.Limit;
+            return aggregratedTxPerSecond > options.Limit;
         }
 
         private static double CalculateTps(long startCounter, DateTime startTimeUtc, long currentCounter, DateTime curentTimeUtc)

@@ -18,7 +18,7 @@ namespace UnitTests
 
         public void NonReentrantGrain(bool performDeadlockDetection)
         {
-            INonReentrantGrain nonreentrant = this.grainFactory.GetGrain<INonReentrantGrain>(OrleansTestingBase.GetRandomGrainId());
+            INonReentrantGrain nonreentrant = grainFactory.GetGrain<INonReentrantGrain>(OrleansTestingBase.GetRandomGrainId());
             nonreentrant.SetSelf(nonreentrant).Wait();
             bool timeout = false;
             bool deadlock = false;
@@ -38,12 +38,12 @@ namespace UnitTests
             {
                 Assert.True(timeout, "Non-reentrant grain should timeout");
             }
-            this.logger.LogInformation("Reentrancy NonReentrantGrain Test finished OK.");
+            logger.LogInformation("Reentrancy NonReentrantGrain Test finished OK.");
         }
 
         public void NonReentrantGrain_WithMayInterleaveStaticPredicate_WhenPredicateReturnsFalse(bool performDeadlockDetection)
         {
-            var grain = this.grainFactory.GetGrain<IMayInterleaveStaticPredicateGrain>(OrleansTestingBase.GetRandomGrainId());
+            var grain = grainFactory.GetGrain<IMayInterleaveStaticPredicateGrain>(OrleansTestingBase.GetRandomGrainId());
             grain.SetSelf(grain).Wait();
             bool timeout = false;
             bool deadlock = false;
@@ -63,12 +63,12 @@ namespace UnitTests
             {
                 Assert.True(timeout, "Non-reentrant grain should timeout when MayInterleave predicate returns false");
             }
-            this.logger.LogInformation("Reentrancy NonReentrantGrain_WithMayInterleavePredicate_WhenPredicateReturnsFalse Test finished OK.");
+            logger.LogInformation("Reentrancy NonReentrantGrain_WithMayInterleavePredicate_WhenPredicateReturnsFalse Test finished OK.");
         }
 
         public void NonReentrantGrain_WithMayInterleaveInstancedPredicate_WhenPredicateReturnsFalse(bool performDeadlockDetection)
         {
-            var grain = this.grainFactory.GetGrain<IMayInterleaveInstancedPredicateGrain>(OrleansTestingBase.GetRandomGrainId());
+            var grain = grainFactory.GetGrain<IMayInterleaveInstancedPredicateGrain>(OrleansTestingBase.GetRandomGrainId());
             grain.SetSelf(grain).Wait();
             bool timeout = false;
             bool deadlock = false;
@@ -88,12 +88,12 @@ namespace UnitTests
             {
                 Assert.True(timeout, "Non-reentrant grain should timeout when MayInterleave predicate returns false");
             }
-            this.logger.LogInformation("Reentrancy NonReentrantGrain_WithMayInterleaveInstancedPredicate_WhenPredicateReturnsFalse Test finished OK.");
+            logger.LogInformation("Reentrancy NonReentrantGrain_WithMayInterleaveInstancedPredicate_WhenPredicateReturnsFalse Test finished OK.");
         }
 
         public void UnorderedNonReentrantGrain(bool performDeadlockDetection)
         {
-            IUnorderedNonReentrantGrain unonreentrant = this.grainFactory.GetGrain<IUnorderedNonReentrantGrain>(OrleansTestingBase.GetRandomGrainId());
+            IUnorderedNonReentrantGrain unonreentrant = grainFactory.GetGrain<IUnorderedNonReentrantGrain>(OrleansTestingBase.GetRandomGrainId());
             unonreentrant.SetSelf(unonreentrant).Wait();
             bool timeout = false;
             bool deadlock = false;
@@ -114,7 +114,7 @@ namespace UnitTests
                 Assert.True(timeout, "Non-reentrant grain should timeout");
             }
 
-            this.logger.LogInformation("Reentrancy UnorderedNonReentrantGrain Test finished OK.");
+            logger.LogInformation("Reentrancy UnorderedNonReentrantGrain Test finished OK.");
         }
     }
 }

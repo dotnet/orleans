@@ -103,7 +103,7 @@ namespace Orleans.Configuration
         /// <summary>
         /// /// Gets the period after which a silo is ignored for initial connectivity validation if it has not updated its heartbeat in the silo membership table.
         /// </summary>
-        internal TimeSpan AllowedIAmAliveMissPeriod => this.IAmAliveTablePublishTimeout.Multiply(this.NumMissedTableIAmAliveLimit);
+        internal TimeSpan AllowedIAmAliveMissPeriod => IAmAliveTablePublishTimeout.Multiply(NumMissedTableIAmAliveLimit);
 
         /// <summary>
         /// Gets the amount of time to wait for the cluster membership system to terminate during shutdown.

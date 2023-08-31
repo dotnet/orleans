@@ -91,7 +91,7 @@ namespace Orleans
 
         private async Task ScheduleNotify(DateTime time, DateTime now)
         {
-            await TimerManager.Delay(time - now, this.CancellationToken);
+            await TimerManager.Delay(time - now, CancellationToken);
 
             if (scheduledNotify == time)
             {
@@ -129,9 +129,9 @@ namespace Orleans
 
                     // see if someone created a promise for waiting for the next work cycle
                     // if so, take it and remove it
-                    signal = this.nextWorkCyclePromise;
-                    this.nextWorkCyclePromise = null;
-                    this.nextWorkCycle = null;
+                    signal = nextWorkCyclePromise;
+                    nextWorkCyclePromise = null;
+                    nextWorkCycle = null;
 
                     // start the next work cycle
                     taskToSignal = Start();
@@ -216,7 +216,7 @@ namespace Orleans
         public BatchWorkerFromDelegate(Func<Task> work, CancellationToken cancellationToken = default)
         {
             this.work = work;
-            this.CancellationToken = cancellationToken;
+            CancellationToken = cancellationToken;
         }
 
         /// <inheritdoc />

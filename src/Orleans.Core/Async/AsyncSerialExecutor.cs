@@ -121,7 +121,7 @@ namespace Orleans
         /// <returns>The result of the scheduled function invocation.</returns>
         public Task AddNext(Func<Task> func)
         {
-            return this.executor.AddNext(() => Wrap(func));
+            return executor.AddNext(() => Wrap(func));
         }
 
         private async Task<bool> Wrap(Func<Task> func)

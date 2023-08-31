@@ -8,7 +8,7 @@ namespace BenchmarkGrains.MapReduce
 
         public Task Init(ITargetProcessor<TInput> processor)
         {
-            this._processor = processor;
+            _processor = processor;
             return Task.CompletedTask;
         }
 

@@ -15,7 +15,7 @@ namespace UnitTests.Grains
 
         public StatelessWorkerStreamProducerGrain(ILoggerFactory loggerFactory)
         {
-            this.logger = loggerFactory.CreateLogger($"{this.GetType().Name}-{this.IdentityString}");
+            logger = loggerFactory.CreateLogger($"{GetType().Name}-{IdentityString}");
         }
 
         public async Task Produce(Guid streamId, string providerToUse, string message)

@@ -118,7 +118,7 @@ namespace Orleans.Runtime
             {
                 if (attr is IGrainInterfaceTypeProviderAttribute provider)
                 {
-                    grainInterfaceType = provider.GetGrainInterfaceType(this._serviceProvider, type);
+                    grainInterfaceType = provider.GetGrainInterfaceType(_serviceProvider, type);
                     return true;
                 }
             }

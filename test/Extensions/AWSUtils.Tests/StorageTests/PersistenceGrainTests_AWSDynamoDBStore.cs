@@ -130,12 +130,12 @@ namespace AWSUtils.Tests.StorageTests
         {
             // NOTE: This test requires Silo to be running & Client init so that grain references can be resolved before serialization.
             Guid id = Guid.NewGuid();
-            IUser grain = this.HostedCluster.GrainFactory.GetGrain<IUser>(id);
+            IUser grain = HostedCluster.GrainFactory.GetGrain<IUser>(id);
 
             var initialState = new GrainStateContainingGrainReferences { Grain = grain };
             var entity = new GrainStateRecord();
             var storage = await InitDynamoDBTableStorageProvider(
-                this.HostedCluster.ServiceProvider.GetRequiredService<IProviderRuntime>(), "TestTable");
+                HostedCluster.ServiceProvider.GetRequiredService<IProviderRuntime>(), "TestTable");
             storage.ConvertToStorageFormat(initialState, entity);
             var convertedState = storage.ConvertFromStorageFormat<GrainStateContainingGrainReferences>(entity);
             Assert.NotNull(convertedState); // Converted state
@@ -148,9 +148,9 @@ namespace AWSUtils.Tests.StorageTests
             // NOTE: This test requires Silo to be running & Client init so that grain references can be resolved before serialization.
             Guid[] ids = { Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid() };
             IUser[] grains = new IUser[3];
-            grains[0] = this.HostedCluster.GrainFactory.GetGrain<IUser>(ids[0]);
-            grains[1] = this.HostedCluster.GrainFactory.GetGrain<IUser>(ids[1]);
-            grains[2] = this.HostedCluster.GrainFactory.GetGrain<IUser>(ids[2]);
+            grains[0] = HostedCluster.GrainFactory.GetGrain<IUser>(ids[0]);
+            grains[1] = HostedCluster.GrainFactory.GetGrain<IUser>(ids[1]);
+            grains[2] = HostedCluster.GrainFactory.GetGrain<IUser>(ids[2]);
 
             var initialState = new GrainStateContainingGrainReferences();
             foreach (var g in grains)
@@ -161,7 +161,7 @@ namespace AWSUtils.Tests.StorageTests
             var entity = new GrainStateRecord();
             var storage =
                 await InitDynamoDBTableStorageProvider(
-                    this.HostedCluster.ServiceProvider.GetRequiredService<IProviderRuntime>(), "TestTable");
+                    HostedCluster.ServiceProvider.GetRequiredService<IProviderRuntime>(), "TestTable");
             storage.ConvertToStorageFormat(initialState, entity);
             var convertedState = storage.ConvertFromStorageFormat<GrainStateContainingGrainReferences>(entity);
             Assert.NotNull(convertedState);

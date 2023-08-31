@@ -23,8 +23,8 @@ namespace Orleans.Runtime.MembershipService
         {
             this.serviceProvider = serviceProvider;
             this.logger = logger;
-            this.clusteringTableOptions = clusteringOptions.Value;
-            this.clusterId = clusterOptions.Value.ClusterId;
+            clusteringTableOptions = clusteringOptions.Value;
+            clusterId = clusterOptions.Value.ClusterId;
         }
 
         public async Task InitializeMembershipTable(bool tryInitTableVersion)
@@ -57,7 +57,7 @@ namespace Orleans.Runtime.MembershipService
                 logger.LogTrace("AdoNetClusteringTable.ReadRow called with key: {Key}.", key);
             try
             {
-                return await orleansQueries.MembershipReadRowAsync(this.clusterId, key);
+                return await orleansQueries.MembershipReadRowAsync(clusterId, key);
             }
             catch (Exception ex)
             {
@@ -72,7 +72,7 @@ namespace Orleans.Runtime.MembershipService
             if (logger.IsEnabled(LogLevel.Trace)) logger.LogTrace("AdoNetClusteringTable.ReadAll called.");
             try
             {
-                return await orleansQueries.MembershipReadAllAsync(this.clusterId);
+                return await orleansQueries.MembershipReadAllAsync(clusterId);
             }
             catch (Exception ex)
             {
@@ -108,7 +108,7 @@ namespace Orleans.Runtime.MembershipService
 
             try
             {
-                return await orleansQueries.InsertMembershipRowAsync(this.clusterId, entry, tableVersion.VersionEtag);
+                return await orleansQueries.InsertMembershipRowAsync(clusterId, entry, tableVersion.VersionEtag);
             }
             catch (Exception ex)
             {
@@ -140,7 +140,7 @@ namespace Orleans.Runtime.MembershipService
 
             try
             {
-                return await orleansQueries.UpdateMembershipRowAsync(this.clusterId, entry, tableVersion.VersionEtag);
+                return await orleansQueries.UpdateMembershipRowAsync(clusterId, entry, tableVersion.VersionEtag);
             }
             catch (Exception ex)
             {
@@ -161,7 +161,7 @@ namespace Orleans.Runtime.MembershipService
             }
             try
             {
-                await orleansQueries.UpdateIAmAliveTimeAsync(this.clusterId, entry.SiloAddress, entry.IAmAliveTime);
+                await orleansQueries.UpdateIAmAliveTimeAsync(clusterId, entry.SiloAddress, entry.IAmAliveTime);
             }
             catch (Exception ex)
             {
@@ -194,7 +194,7 @@ namespace Orleans.Runtime.MembershipService
                 logger.LogTrace("IMembershipTable.CleanupDefunctSiloEntries called with beforeDate {beforeDate} and clusterId {ClusterId}.", beforeDate, clusterId);
             try
             {
-                await orleansQueries.CleanupDefunctSiloEntriesAsync(beforeDate, this.clusterId);
+                await orleansQueries.CleanupDefunctSiloEntriesAsync(beforeDate, clusterId);
             }
             catch (Exception ex)
             {
@@ -208,7 +208,7 @@ namespace Orleans.Runtime.MembershipService
         {
             try
             {
-                return await orleansQueries.InsertMembershipVersionRowAsync(this.clusterId);
+                return await orleansQueries.InsertMembershipVersionRowAsync(clusterId);
             }
             catch (Exception ex)
             {

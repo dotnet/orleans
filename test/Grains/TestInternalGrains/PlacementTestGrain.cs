@@ -96,31 +96,31 @@ namespace UnitTests.Grains
 
         public Task EnableOverloadDetection(bool enabled)
         {
-            this.overloadDetector.Enabled = enabled;
+            overloadDetector.Enabled = enabled;
             return Task.CompletedTask;
         }
 
         public Task LatchOverloaded()
         {
-            this.hostEnvironmentStatistics.CpuUsage = this.loadSheddingOptions.LoadSheddingLimit + 1;
+            hostEnvironmentStatistics.CpuUsage = loadSheddingOptions.LoadSheddingLimit + 1;
             return PropigateStatisticsToCluster(GrainFactory);
         }
 
         public Task UnlatchOverloaded()
         {
-            this.hostEnvironmentStatistics.CpuUsage = null;
+            hostEnvironmentStatistics.CpuUsage = null;
             return PropigateStatisticsToCluster(GrainFactory);
         }
 
         public Task LatchCpuUsage(float value)
         {
-            this.hostEnvironmentStatistics.CpuUsage = value;
+            hostEnvironmentStatistics.CpuUsage = value;
             return PropigateStatisticsToCluster(GrainFactory);
         }
 
         public Task UnlatchCpuUsage()
         {
-            this.hostEnvironmentStatistics.CpuUsage = null;
+            hostEnvironmentStatistics.CpuUsage = null;
             return PropigateStatisticsToCluster(GrainFactory);
         }
 
@@ -186,7 +186,7 @@ namespace UnitTests.Grains
     {
         public Task<PlacementStrategy> GetDefaultPlacement()
         {
-            var defaultStrategy = this.ServiceProvider.GetRequiredService<PlacementStrategy>();
+            var defaultStrategy = ServiceProvider.GetRequiredService<PlacementStrategy>();
             return Task.FromResult(defaultStrategy);
         }
     }
@@ -203,7 +203,7 @@ namespace UnitTests.Grains
 
         public LocalContentGrain(ILoggerFactory loggerFactory)
         {
-            this.logger = loggerFactory.CreateLogger($"{this.GetType().Name}-{this.IdentityString}");
+            logger = loggerFactory.CreateLogger($"{GetType().Name}-{IdentityString}");
         }
 
         public override Task OnActivateAsync(CancellationToken cancellationToken)
@@ -233,7 +233,7 @@ namespace UnitTests.Grains
 
         public TestContentGrain(ILoggerFactory loggerFactory)
         {
-            this.logger = loggerFactory.CreateLogger($"{this.GetType().Name}-{this.IdentityString}");
+            logger = loggerFactory.CreateLogger($"{GetType().Name}-{IdentityString}");
         }
 
         public override Task OnActivateAsync(CancellationToken cancellationToken)

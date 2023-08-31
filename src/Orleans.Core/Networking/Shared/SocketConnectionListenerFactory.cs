@@ -26,7 +26,7 @@ namespace Orleans.Networking.Shared
 
             this.socketConnectionOptions = socketConnectionOptions.Value;
             var logger = loggerFactory.CreateLogger("Orleans.Sockets");
-            this.trace = new SocketsTrace(logger);
+            trace = new SocketsTrace(logger);
             this.schedulers = schedulers;
         }
 
@@ -37,7 +37,7 @@ namespace Orleans.Networking.Shared
                 throw new ArgumentNullException(nameof(endpoint));
             }
 
-            var listener = new SocketConnectionListener(ipEndpoint, this.socketConnectionOptions, this.trace, this.schedulers);
+            var listener = new SocketConnectionListener(ipEndpoint, socketConnectionOptions, trace, schedulers);
             listener.Bind();
             return new ValueTask<IConnectionListener>(listener);
         }

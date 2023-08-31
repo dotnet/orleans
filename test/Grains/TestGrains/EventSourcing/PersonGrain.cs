@@ -9,7 +9,7 @@ namespace TestGrains
 
         public Task RegisterBirth(PersonAttributes props)
         {
-            if (this.State.FirstName == null)
+            if (State.FirstName == null)
             {
                 RaiseEvent(new PersonRegistered(props.FirstName, props.LastName, props.Gender));
 

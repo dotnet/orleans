@@ -23,7 +23,7 @@ namespace DefaultCluster.Tests.General
 
         private async Task StateClassTests_Test(string grainClass)
         {
-            var grain = this.GrainFactory.GetGrain<ISimplePersistentGrain>(GetRandomGrainId(), grainClass);
+            var grain = GrainFactory.GetGrain<ISimplePersistentGrain>(GetRandomGrainId(), grainClass);
             var originalVersion = await grain.GetVersion();
             await grain.SetA(98, true); // deactivate grain after setting A
 

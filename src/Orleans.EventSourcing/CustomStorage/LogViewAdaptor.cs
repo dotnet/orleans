@@ -176,7 +176,7 @@ namespace Orleans.EventSourcing.CustomStorage
                     foreach (var u in updates)
                     {
                         version++;
-                        Host.UpdateView(this.cached, u);
+                        Host.UpdateView(cached, u);
                     }
 
                     transitionssuccessful = true;

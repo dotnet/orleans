@@ -16,8 +16,8 @@ namespace Tester.HeterogeneousSilosTests.UpgradeTests
 
         private TimeSpan waitDelay;
 
-        protected IClusterClient Client => this.cluster.Client;
-        protected IManagementGrain ManagementGrain => this.cluster.Client.GetGrain<IManagementGrain>(0);
+        protected IClusterClient Client => cluster.Client;
+        protected IManagementGrain ManagementGrain => cluster.Client.GetGrain<IManagementGrain>(0);
 #if DEBUG
         private const string BuildConfiguration = "Debug";
 #else
@@ -187,25 +187,25 @@ namespace Tester.HeterogeneousSilosTests.UpgradeTests
         private async Task<SiloHandle> StartSilo(FileInfo grainAssembly)
         {
             SiloHandle silo;
-            if (this.siloIdx == 0)
+            if (siloIdx == 0)
             {
                 // Setup configuration
-                this.builder = new TestClusterBuilder(1);
+                builder = new TestClusterBuilder(1);
                 builder.CreateSiloAsync = StandaloneSiloHandle.Create;
-                TestDefaultConfiguration.ConfigureTestCluster(this.builder);
+                TestDefaultConfiguration.ConfigureTestCluster(builder);
                 builder.AddSiloBuilderConfigurator<VersionGrainsSiloBuilderConfigurator>();
                 builder.AddClientBuilderConfigurator<VersionGrainsClientConfigurator>();
-                builder.Properties[nameof(SiloCount)] = this.SiloCount.ToString();
+                builder.Properties[nameof(SiloCount)] = SiloCount.ToString();
                 builder.Properties[nameof(RefreshInterval)] = RefreshInterval.ToString();
-                builder.Properties[nameof(VersionSelectorStrategy)] = this.VersionSelectorStrategy.Name;
-                builder.Properties[nameof(CompatibilityStrategy)] = this.CompatibilityStrategy.Name;
+                builder.Properties[nameof(VersionSelectorStrategy)] = VersionSelectorStrategy.Name;
+                builder.Properties[nameof(CompatibilityStrategy)] = CompatibilityStrategy.Name;
                 builder.Properties["GrainAssembly"] = grainAssembly.FullName;
                 builder.Properties[StandaloneSiloHandle.ExecutablePathConfigKey] = grainAssembly.FullName;
                 waitDelay = TestCluster.GetLivenessStabilizationTime(new ClusterMembershipOptions(), didKill: false);
 
-                this.cluster = builder.Build();
-                await this.cluster.DeployAsync();
-                silo = this.cluster.Primary;
+                cluster = builder.Build();
+                await cluster.DeployAsync();
+                silo = cluster.Primary;
             }
             else
             {
@@ -229,8 +229,8 @@ namespace Tester.HeterogeneousSilosTests.UpgradeTests
                 silo = await TestCluster.StartSiloAsync(cluster, siloIdx, testClusterOptions, sources);
             }
 
-            this.deployedSilos.Add(silo);
-            this.siloIdx++;
+            deployedSilos.Add(silo);
+            siloIdx++;
 
             return silo;
         }
@@ -238,7 +238,7 @@ namespace Tester.HeterogeneousSilosTests.UpgradeTests
         protected async Task StopSilo(SiloHandle handle)
         {
             await handle?.StopSiloAsync(true);
-            this.deployedSilos.Remove(handle);
+            deployedSilos.Remove(handle);
             await Task.Delay(waitDelay);
         }
 
@@ -248,8 +248,8 @@ namespace Tester.HeterogeneousSilosTests.UpgradeTests
             {
                 if (deployedSilos.Count == 0) return;
 
-                var primarySilo = this.deployedSilos[0];
-                foreach (var silo in this.deployedSilos.Skip(1))
+                var primarySilo = deployedSilos[0];
+                foreach (var silo in deployedSilos.Skip(1))
                 {
                     silo.Dispose();
                 }
@@ -257,7 +257,7 @@ namespace Tester.HeterogeneousSilosTests.UpgradeTests
             }
             finally
             {
-                this.cluster?.Dispose();
+                cluster?.Dispose();
             }
         }
 
@@ -270,8 +270,8 @@ namespace Tester.HeterogeneousSilosTests.UpgradeTests
         {
             if (deployedSilos.Count == 0) return;
 
-            var primarySilo = this.deployedSilos[0];
-            foreach (var silo in this.deployedSilos.Skip(1))
+            var primarySilo = deployedSilos[0];
+            foreach (var silo in deployedSilos.Skip(1))
             {
                 await silo.DisposeAsync();
             }

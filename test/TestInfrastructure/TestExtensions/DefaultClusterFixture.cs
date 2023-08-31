@@ -14,9 +14,9 @@ namespace TestExtensions
 
         public TestCluster HostedCluster { get; private set; }
 
-        public IGrainFactory GrainFactory => this.HostedCluster?.GrainFactory;
+        public IGrainFactory GrainFactory => HostedCluster?.GrainFactory;
 
-        public IClusterClient Client => this.HostedCluster?.Client;
+        public IClusterClient Client => HostedCluster?.Client;
 
         public ILogger Logger { get; private set; }
 
@@ -32,13 +32,13 @@ namespace TestExtensions
                 await testCluster.DeployAsync().ConfigureAwait(false);
             }
 
-            this.HostedCluster = testCluster;
-            this.Logger = this.Client.ServiceProvider.GetRequiredService<ILoggerFactory>().CreateLogger("Application");
+            HostedCluster = testCluster;
+            Logger = Client.ServiceProvider.GetRequiredService<ILoggerFactory>().CreateLogger("Application");
         }
 
         public virtual async Task DisposeAsync()
         {
-            var cluster = this.HostedCluster;
+            var cluster = HostedCluster;
             if (cluster is null) return;
 
             try

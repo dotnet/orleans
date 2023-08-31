@@ -56,7 +56,7 @@ namespace UnitTests.Grains
         {
             if (extender == null)
             {
-                extender = new GenericTestExtension<T>(this, this.GrainFactory);
+                extender = new GenericTestExtension<T>(this, GrainFactory);
                 _grainContext.SetComponent<IGenericTestExtension<T>>(extender);
             }
 

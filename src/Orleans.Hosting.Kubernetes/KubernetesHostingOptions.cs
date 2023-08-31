@@ -47,7 +47,7 @@ namespace Orleans.Hosting.Kubernetes
 
         public KubernetesHostingOptions()
         {
-            _clientConfiguration = new Lazy<KubernetesClientConfiguration>(() => this.GetClientConfiguration());
+            _clientConfiguration = new Lazy<KubernetesClientConfiguration>(() => GetClientConfiguration());
         }
 
         /// <summary>

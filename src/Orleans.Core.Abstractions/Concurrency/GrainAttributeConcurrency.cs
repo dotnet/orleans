@@ -114,7 +114,7 @@ namespace Orleans.Concurrency
         /// </param>
         public MayInterleaveAttribute(string callbackMethodName)
         {
-            this.CallbackMethodName = callbackMethodName;
+            CallbackMethodName = callbackMethodName;
         }
 
         /// <summary>
@@ -126,7 +126,7 @@ namespace Orleans.Concurrency
         /// <inheritdoc/>
         public void Populate(IServiceProvider services, Type grainClass, GrainType grainType, Dictionary<string, string> properties)
         {
-            properties[WellKnownGrainTypeProperties.MayInterleavePredicate] = this.CallbackMethodName;
+            properties[WellKnownGrainTypeProperties.MayInterleavePredicate] = CallbackMethodName;
         }
     }
 

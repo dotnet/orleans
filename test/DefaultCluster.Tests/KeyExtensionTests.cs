@@ -19,11 +19,11 @@ namespace DefaultCluster.Tests.General
             const string kx1 = "1";
             const string kx2 = "2";
 
-            var grain1 = this.GrainFactory.GetGrain<IKeyExtensionTestGrain>(baseKey, kx1, null);
+            var grain1 = GrainFactory.GetGrain<IKeyExtensionTestGrain>(baseKey, kx1, null);
             var grainId1 = await grain1.GetGrainReference();
             var activationId1 = await grain1.GetActivationId();
 
-            var grain2 = this.GrainFactory.GetGrain<IKeyExtensionTestGrain>(baseKey, kx2, null);
+            var grain2 = GrainFactory.GetGrain<IKeyExtensionTestGrain>(baseKey, kx2, null);
             var grainId2 = await grain2.GetGrainReference();
             var activationId2 = await grain2.GetActivationId();
 
@@ -39,11 +39,11 @@ namespace DefaultCluster.Tests.General
 
             const string kx = "1";
 
-            var grain1 = this.GrainFactory.GetGrain<IKeyExtensionTestGrain>(baseKey1, kx, null);
+            var grain1 = GrainFactory.GetGrain<IKeyExtensionTestGrain>(baseKey1, kx, null);
             var grainId1 = await grain1.GetGrainReference();
             var activationId1 = await grain1.GetActivationId();
 
-            var grain2 = this.GrainFactory.GetGrain<IKeyExtensionTestGrain>(baseKey2, kx, null);
+            var grain2 = GrainFactory.GetGrain<IKeyExtensionTestGrain>(baseKey2, kx, null);
             var grainId2 = await grain2.GetGrainReference();
             var activationId2 = await grain2.GetActivationId();
 
@@ -58,7 +58,7 @@ namespace DefaultCluster.Tests.General
             {
                 var baseKey = Guid.NewGuid();
 
-                this.GrainFactory.GetGrain<IKeyExtensionTestGrain>(baseKey, "", null);
+                GrainFactory.GetGrain<IKeyExtensionTestGrain>(baseKey, "", null);
             });
         }
 
@@ -69,7 +69,7 @@ namespace DefaultCluster.Tests.General
             {
                 var baseKey = Guid.NewGuid();
 
-                this.GrainFactory.GetGrain<IKeyExtensionTestGrain>(baseKey, " \t\n\r", null);
+                GrainFactory.GetGrain<IKeyExtensionTestGrain>(baseKey, " \t\n\r", null);
             });
         }
 
@@ -80,7 +80,7 @@ namespace DefaultCluster.Tests.General
             {
                 var baseKey = Guid.NewGuid();
 
-                this.GrainFactory.GetGrain<IKeyExtensionTestGrain>(baseKey, null, null);
+                GrainFactory.GetGrain<IKeyExtensionTestGrain>(baseKey, null, null);
             });
         }
 
@@ -91,7 +91,7 @@ namespace DefaultCluster.Tests.General
 
             string kx1 = new string('\\', 300);
 
-            var localGrainRef = this.GrainFactory.GetGrain<IKeyExtensionTestGrain>(baseKey, kx1, null);
+            var localGrainRef = GrainFactory.GetGrain<IKeyExtensionTestGrain>(baseKey, kx1, null);
             var remoteGrainRef = await localGrainRef.GetGrainReference();
 
             Assert.Equal(localGrainRef, remoteGrainRef); // Mismatched grain ID.
@@ -102,7 +102,7 @@ namespace DefaultCluster.Tests.General
         {
             const string key = "foo";
 
-            var grain = this.GrainFactory.GetGrain<IStringGrain>(key);
+            var grain = GrainFactory.GetGrain<IStringGrain>(key);
             var key2 = ((GrainReference) grain).GetPrimaryKeyString();
 
             Assert.Equal(key, key2); // Unexpected key was returned.

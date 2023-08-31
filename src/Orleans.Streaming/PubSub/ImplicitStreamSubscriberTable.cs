@@ -224,8 +224,8 @@ namespace Orleans.Streams
         {
             public StreamSubscriberPredicate(StreamSubscriber subscriber, IStreamNamespacePredicate predicate)
             {
-                this.Subscriber = subscriber;
-                this.Predicate = predicate;
+                Subscriber = subscriber;
+                Predicate = predicate;
             }
 
             public StreamSubscriber Subscriber { get; }
@@ -236,11 +236,11 @@ namespace Orleans.Streams
         {
             public StreamSubscriber(GrainBindings grainBindings, IStreamIdMapper streamIdMapper)
             {
-                this.GrainBindings = grainBindings;
+                GrainBindings = grainBindings;
                 this.streamIdMapper = streamIdMapper;
             }
 
-            public GrainType GrainType => this.GrainBindings.GrainType;
+            public GrainType GrainType => GrainBindings.GrainType;
 
             private GrainBindings GrainBindings { get; }
 
@@ -254,8 +254,8 @@ namespace Orleans.Streams
 
             internal GrainId GetGrainId(QualifiedStreamId streamId)
             {
-                var grainKeyId = this.streamIdMapper.GetGrainKeyId(this.GrainBindings, streamId);
-                return GrainId.Create(this.GrainType, grainKeyId);
+                var grainKeyId = streamIdMapper.GetGrainKeyId(GrainBindings, streamId);
+                return GrainId.Create(GrainType, grainKeyId);
             }
         }
 
@@ -263,9 +263,9 @@ namespace Orleans.Streams
         {
             public Cache(MajorMinorVersion version, List<StreamSubscriberPredicate> predicates)
             {
-                this.Version = version;
-                this.Predicates = predicates;
-                this.Namespaces = new ConcurrentDictionary<string, HashSet<StreamSubscriber>>();
+                Version = version;
+                Predicates = predicates;
+                Namespaces = new ConcurrentDictionary<string, HashSet<StreamSubscriber>>();
             }
 
             public MajorMinorVersion Version { get; }

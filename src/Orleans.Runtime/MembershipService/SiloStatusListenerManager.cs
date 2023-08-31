@@ -32,9 +32,9 @@ namespace Orleans.Runtime.MembershipService
 
         public bool Subscribe(ISiloStatusListener listener)
         {
-            lock (this.listenersLock)
+            lock (listenersLock)
             {
-                foreach (var reference in this.listeners)
+                foreach (var reference in listeners)
                 {
                     if (!reference.TryGetTarget(out var existing))
                     {
@@ -44,25 +44,25 @@ namespace Orleans.Runtime.MembershipService
                     if (ReferenceEquals(existing, listener)) return false;
                 }
 
-                this.listeners = this.listeners.Add(new WeakReference<ISiloStatusListener>(listener));
+                listeners = listeners.Add(new WeakReference<ISiloStatusListener>(listener));
                 return true;
             }
         }
 
         public bool Unsubscribe(ISiloStatusListener listener)
         {
-            lock (this.listenersLock)
+            lock (listenersLock)
             {
-                for (var i = 0; i < this.listeners.Count; i++)
+                for (var i = 0; i < listeners.Count; i++)
                 {
-                    if (!this.listeners[i].TryGetTarget(out var existing))
+                    if (!listeners[i].TryGetTarget(out var existing))
                     {
                         continue;
                     }
 
                     if (ReferenceEquals(existing, listener))
                     {
-                        this.listeners = this.listeners.RemoveAt(i);
+                        listeners = listeners.RemoveAt(i);
                         return true;
                     }
                 }
@@ -76,24 +76,24 @@ namespace Orleans.Runtime.MembershipService
             ClusterMembershipSnapshot previous = default;
             try
             {
-                if (this.log.IsEnabled(LogLevel.Debug)) this.log.LogDebug("Starting to process membership updates");
-                await foreach (var tableSnapshot in this.membershipTableManager.MembershipTableUpdates.WithCancellation(this.cancellation.Token))
+                if (log.IsEnabled(LogLevel.Debug)) log.LogDebug("Starting to process membership updates");
+                await foreach (var tableSnapshot in membershipTableManager.MembershipTableUpdates.WithCancellation(cancellation.Token))
                 {
                     var snapshot = tableSnapshot.CreateClusterMembershipSnapshot();
 
                     var update = (previous is null || snapshot.Version == MembershipVersion.MinValue) ? snapshot.AsUpdate() : snapshot.CreateUpdate(previous);
-                    this.NotifyObservers(update);
+                    NotifyObservers(update);
                     previous = snapshot;
                 }
             }
-            catch (Exception exception) when (this.fatalErrorHandler.IsUnexpected(exception))
+            catch (Exception exception) when (fatalErrorHandler.IsUnexpected(exception))
             {
-                this.log.LogError(exception, "Error processing membership updates");
-                this.fatalErrorHandler.OnFatalException(this, nameof(ProcessMembershipUpdates), exception);
+                log.LogError(exception, "Error processing membership updates");
+                fatalErrorHandler.OnFatalException(this, nameof(ProcessMembershipUpdates), exception);
             }
             finally
             {
-                if (this.log.IsEnabled(LogLevel.Debug)) this.log.LogDebug("Stopping membership update processor");
+                if (log.IsEnabled(LogLevel.Debug)) log.LogDebug("Stopping membership update processor");
             }
         }
 
@@ -102,7 +102,7 @@ namespace Orleans.Runtime.MembershipService
             if (!update.HasChanges) return;
 
             List<WeakReference<ISiloStatusListener>> toRemove = null;
-            var subscribers = this.listeners;
+            var subscribers = listeners;
             foreach (var change in update.Changes)
             {
                 for (var i = 0; i < subscribers.Count; ++i)
@@ -120,7 +120,7 @@ namespace Orleans.Runtime.MembershipService
                     }
                     catch (Exception exception)
                     {
-                        this.log.LogError(
+                        log.LogError(
                             exception,
                             "Exception while calling " + nameof(ISiloStatusListener.SiloStatusChangeNotification) + " on listener {Listener}",
                             listener);
@@ -130,11 +130,11 @@ namespace Orleans.Runtime.MembershipService
 
             if (toRemove != null)
             {
-                lock (this.listenersLock)
+                lock (listenersLock)
                 {
-                    var builder = this.listeners.ToBuilder();
+                    var builder = listeners.ToBuilder();
                     foreach (var entry in toRemove) builder.Remove(entry);
-                    this.listeners = builder.ToImmutable();
+                    listeners = builder.ToImmutable();
                 }
             }
         }
@@ -148,13 +148,13 @@ namespace Orleans.Runtime.MembershipService
 
             Task OnStart(CancellationToken ct)
             {
-                tasks.Add(Task.Run(() => this.ProcessMembershipUpdates()));
+                tasks.Add(Task.Run(() => ProcessMembershipUpdates()));
                 return Task.CompletedTask;
             }
 
             Task OnStop(CancellationToken ct)
             {
-                this.cancellation.Cancel(throwOnFirstException: false);
+                cancellation.Cancel(throwOnFirstException: false);
                 return Task.WhenAny(ct.WhenCancelled(), Task.WhenAll(tasks));
             }
         }

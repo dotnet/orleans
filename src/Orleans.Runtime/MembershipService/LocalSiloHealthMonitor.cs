@@ -310,7 +310,7 @@ namespace Orleans.Runtime.MembershipService
                         _log.LogWarning("Self-monitoring determined that local health is degraded. Degradation score is {Score}/{MaxScore} (lower is better). Complaints: {Complaints}", score, MaxScore, complaintsString);
                     }
 
-                    this.Complaints = ImmutableArray.CreateRange(complaints);
+                    Complaints = ImmutableArray.CreateRange(complaints);
                 }
                 catch (Exception exception)
                 {
@@ -326,7 +326,7 @@ namespace Orleans.Runtime.MembershipService
 
         public Task OnStart(CancellationToken ct)
         {
-            _runTask = Task.Run(this.Run);
+            _runTask = Task.Run(Run);
             _isActive = true;
             return Task.CompletedTask;
         }

@@ -8,7 +8,7 @@ namespace Tester.StorageFacet.Implementations
     {
         private IExampleStorageConfig config;
 
-        public string Name => this.config.StateName;
+        public string Name => config.StateName;
         public TState State { get; set; }
 
         public Task Save()
@@ -18,12 +18,12 @@ namespace Tester.StorageFacet.Implementations
 
         public string GetExtendedInfo()
         {
-            return $"Blob:{this.Name}, StateType:{typeof(TState).Name}";
+            return $"Blob:{Name}, StateType:{typeof(TState).Name}";
         }
 
         public void Configure(IExampleStorageConfig cfg)
         {
-            this.config = cfg;
+            config = cfg;
         }
     }
 
@@ -37,7 +37,7 @@ namespace Tester.StorageFacet.Implementations
 
         public IExampleStorage<TState> Create<TState>(IExampleStorageConfig config)
         {
-            var storage = this.contextAccessor.GrainContext.ActivationServices.GetRequiredService<BlobExampleStorage<TState>>();
+            var storage = contextAccessor.GrainContext.ActivationServices.GetRequiredService<BlobExampleStorage<TState>>();
             storage.Configure(config);
             return storage;
         }

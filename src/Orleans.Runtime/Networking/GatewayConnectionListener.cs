@@ -38,7 +38,7 @@ namespace Orleans.Runtime.Messaging
         {
             this.siloConnectionOptions = siloConnectionOptions.Value;
             this.overloadDetector = overloadDetector;
-            this.gateway = messageCenter.Gateway;
+            gateway = messageCenter.Gateway;
             this.localSiloDetails = localSiloDetails;
             this.messageCenter = messageCenter;
             this.connectionShared = connectionShared;
@@ -47,32 +47,32 @@ namespace Orleans.Runtime.Messaging
             this.endpointOptions = endpointOptions.Value;
         }
 
-        public override EndPoint Endpoint => this.endpointOptions.GetListeningProxyEndpoint();
+        public override EndPoint Endpoint => endpointOptions.GetListeningProxyEndpoint();
 
         protected override Connection CreateConnection(ConnectionContext context)
         {
             return new GatewayInboundConnection(
                 context,
-                this.ConnectionDelegate,
-                this.gateway,
-                this.overloadDetector,
-                this.localSiloDetails,
-                this.ConnectionOptions,
-                this.messageCenter,
-                this.connectionShared,
-                this.connectionPreambleHelper);
+                ConnectionDelegate,
+                gateway,
+                overloadDetector,
+                localSiloDetails,
+                ConnectionOptions,
+                messageCenter,
+                connectionShared,
+                connectionPreambleHelper);
         }
 
         protected override void ConfigureConnectionBuilder(IConnectionBuilder connectionBuilder)
         {
-            var configureDelegate = (SiloConnectionOptions.ISiloConnectionBuilderOptions)this.siloConnectionOptions;
+            var configureDelegate = (SiloConnectionOptions.ISiloConnectionBuilderOptions)siloConnectionOptions;
             configureDelegate.ConfigureGatewayInboundBuilder(connectionBuilder);
             base.ConfigureConnectionBuilder(connectionBuilder);
         }
 
         void ILifecycleParticipant<ISiloLifecycle>.Participate(ISiloLifecycle lifecycle)
         {
-            if (this.Endpoint is null) return;
+            if (Endpoint is null) return;
 
             lifecycle.Subscribe(nameof(GatewayConnectionListener), ServiceLifecycleStage.RuntimeInitialize - 1, this);
             lifecycle.Subscribe(nameof(GatewayConnectionListener), ServiceLifecycleStage.Active, _ => Task.Run(Start));

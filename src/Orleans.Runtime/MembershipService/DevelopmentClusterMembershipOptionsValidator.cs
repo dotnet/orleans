@@ -14,12 +14,12 @@ namespace Orleans.Configuration
         public DevelopmentClusterMembershipOptionsValidator(IOptions<DevelopmentClusterMembershipOptions> options, IServiceProvider serviceProvider)
         {
             this.options = options.Value;
-            this.membershipTable = serviceProvider.GetService<IMembershipTable>();
+            membershipTable = serviceProvider.GetService<IMembershipTable>();
         }
 
         public void ValidateConfiguration()
         {
-            if (this.membershipTable is SystemTargetBasedMembershipTable && this.options.PrimarySiloEndpoint is null)
+            if (membershipTable is SystemTargetBasedMembershipTable && options.PrimarySiloEndpoint is null)
             {
                 throw new OrleansConfigurationException("Development clustering is enabled but no value is specified ");
             }

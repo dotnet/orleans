@@ -38,21 +38,21 @@ namespace Orleans.Runtime
             this.request = request;
             this.options = options;
             this.sendRequest = sendRequest;
-            this.grainReference = grain;
+            grainReference = grain;
             this.filters = filters;
-            this.stages = filters.Length;
+            stages = filters.Length;
             SourceContext = RuntimeContext.Current;
 
             if (request is IOutgoingGrainCallFilter requestFilter)
             {
                 this.requestFilter = requestFilter;
-                ++this.stages;
+                ++stages;
             }
         }
 
-        public IInvokable Request => this.request;
+        public IInvokable Request => request;
 
-        public object Grain => this.grainReference;
+        public object Grain => grainReference;
 
         public MethodInfo InterfaceMethod => request.GetMethod();
 
@@ -80,41 +80,41 @@ namespace Orleans.Runtime
             {
                 // Execute each stage in the pipeline. Each successive call to this method will invoke the next stage.
                 // Stages which are not implemented (eg, because the user has not specified an interceptor) are skipped.
-                if (stage < this.filters.Length)
+                if (stage < filters.Length)
                 {
                     // Call each of the specified interceptors.
-                    var systemWideFilter = this.filters[stage];
+                    var systemWideFilter = filters[stage];
                     stage++;
                     await systemWideFilter.Invoke(this);
 
                     // If Response is null some filter did not continue the call chain
-                    if (this.Response is null)
+                    if (Response is null)
                     {
                         ThrowBrokenCallFilterChain(systemWideFilter.GetType().Name);
                     }
 
                     return;
                 }
-                else if (stage < this.stages)
+                else if (stage < stages)
                 {
                     stage++;
-                    await this.requestFilter.Invoke(this);
+                    await requestFilter.Invoke(this);
 
                     // If Response is null some filter did not continue the call chain
-                    if (this.Response is null)
+                    if (Response is null)
                     {
-                        ThrowBrokenCallFilterChain(this.requestFilter.GetType().Name);
+                        ThrowBrokenCallFilterChain(requestFilter.GetType().Name);
                     }
 
                     return;
                 }
-                else if (stage == this.stages)
+                else if (stage == stages)
                 {
                     // Finally call the root-level invoker.
                     stage++;
                     var responseCompletionSource = ResponseCompletionSourcePool.Get();
-                    this.sendRequest(this.grainReference, responseCompletionSource, this.request, this.options);
-                    this.Response = await responseCompletionSource.AsValueTask();
+                    sendRequest(grainReference, responseCompletionSource, request, options);
+                    Response = await responseCompletionSource.AsValueTask();
 
                     return;
                 }

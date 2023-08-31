@@ -16,15 +16,15 @@ namespace Orleans.Runtime
         /// <param name="changes">The changes.</param>
         public ClusterMembershipUpdate(ClusterMembershipSnapshot snapshot, ImmutableArray<ClusterMember> changes)
         {
-            this.Snapshot = snapshot;
-            this.Changes = changes;
+            Snapshot = snapshot;
+            Changes = changes;
         }
 
         /// <summary>
         /// Gets a value indicating whether this instance has changes.
         /// </summary>
         /// <value><see langword="true"/> if this instance has changes; otherwise, <see langword="false"/>.</value>
-        public bool HasChanges => !this.Changes.IsDefaultOrEmpty;
+        public bool HasChanges => !Changes.IsDefaultOrEmpty;
 
         /// <summary>
         /// Gets the changes.

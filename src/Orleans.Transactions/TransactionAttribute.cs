@@ -102,7 +102,7 @@ namespace Orleans
 
         protected void SetTransactionOptions(TransactionOption txOption)
         {
-            this.TransactionOption = txOption;
+            TransactionOption = txOption;
         }
 
         async Task IOutgoingGrainCallFilter.Invoke(IOutgoingGrainCallContext context)
@@ -161,7 +161,7 @@ namespace Orleans
             }
             else
             {
-                this.TransactionInfo = transactionInfo?.Fork();
+                TransactionInfo = transactionInfo?.Fork();
             }
 
             return transactionInfo;
@@ -170,7 +170,7 @@ namespace Orleans
         public override async ValueTask<Response> Invoke()
         {
             Response response;
-            var transactionInfo = this.TransactionInfo;
+            var transactionInfo = TransactionInfo;
             bool startedNewTransaction = false;
             try
             {
@@ -180,7 +180,7 @@ namespace Orleans
                     var transactionTimeout = Debugger.IsAttached ? TimeSpan.FromMinutes(30) : TimeSpan.FromSeconds(10);
 
                     // Start a new transaction
-                    var isReadOnly = (this.Options | InvokeMethodOptions.ReadOnly) == InvokeMethodOptions.ReadOnly;
+                    var isReadOnly = (Options | InvokeMethodOptions.ReadOnly) == InvokeMethodOptions.ReadOnly;
                     transactionInfo = await TransactionAgent.StartTransaction(isReadOnly, transactionTimeout);
                     startedNewTransaction = true;
                 }

@@ -42,28 +42,28 @@ namespace Orleans.Reminders.DynamoDB
             IOptions<ClusterOptions> clusterOptions,
             IOptions<DynamoDBReminderStorageOptions> storageOptions)
         {
-            this.logger = loggerFactory.CreateLogger<DynamoDBReminderTable>();
-            this.serviceId = clusterOptions.Value.ServiceId;
-            this.options = storageOptions.Value;
+            logger = loggerFactory.CreateLogger<DynamoDBReminderTable>();
+            serviceId = clusterOptions.Value.ServiceId;
+            options = storageOptions.Value;
         }
 
         /// <summary>Initialize current instance with specific global configuration and logger</summary>
         public Task Init()
         {
-            this.storage = new DynamoDBStorage(
-                this.logger,
-                this.options.Service,
-                this.options.AccessKey,
-                this.options.SecretKey,
-                this.options.Token,
-                this.options.ProfileName,
-                this.options.ReadCapacityUnits,
-                this.options.WriteCapacityUnits,
-                this.options.UseProvisionedThroughput,
-                this.options.CreateIfNotExists,
-                this.options.UpdateIfExists);
+            storage = new DynamoDBStorage(
+                logger,
+                options.Service,
+                options.AccessKey,
+                options.SecretKey,
+                options.Token,
+                options.ProfileName,
+                options.ReadCapacityUnits,
+                options.WriteCapacityUnits,
+                options.UseProvisionedThroughput,
+                options.CreateIfNotExists,
+                options.UpdateIfExists);
 
-            this.logger.LogInformation((int)ErrorCode.ReminderServiceBase, "Initializing AWS DynamoDB Reminders Table");
+            logger.LogInformation((int)ErrorCode.ReminderServiceBase, "Initializing AWS DynamoDB Reminders Table");
 
             var serviceIdGrainHashGlobalSecondaryIndex = new GlobalSecondaryIndex
             {
@@ -87,7 +87,7 @@ namespace Orleans.Reminders.DynamoDB
                 }
             };
 
-            return this.storage.InitializeTable(this.options.TableName,
+            return storage.InitializeTable(options.TableName,
                 new List<KeySchemaElement>
                 {
                     new KeySchemaElement { AttributeName = REMINDER_ID_PROPERTY_NAME, KeyType = KeyType.HASH },
@@ -112,7 +112,7 @@ namespace Orleans.Reminders.DynamoDB
         /// <returns> Return the ReminderTableData if the rows were read successfully </returns>
         public async Task<ReminderEntry> ReadRow(GrainId grainId, string reminderName)
         {
-            var reminderId = ConstructReminderId(this.serviceId, grainId, reminderName);
+            var reminderId = ConstructReminderId(serviceId, grainId, reminderName);
 
             var keys = new Dictionary<string, AttributeValue>
                 {
@@ -122,16 +122,16 @@ namespace Orleans.Reminders.DynamoDB
 
             try
             {
-                return await this.storage.ReadSingleEntryAsync(this.options.TableName, keys, this.Resolve).ConfigureAwait(false);
+                return await storage.ReadSingleEntryAsync(options.TableName, keys, Resolve).ConfigureAwait(false);
             }
             catch (Exception exc)
             {
-                this.logger.LogWarning(
+                logger.LogWarning(
                     (int)ErrorCode.ReminderServiceBase,
                     exc,
                     "Intermediate error reading reminder entry {Utils.DictionaryToString(keys)} from table {this.options.TableName}.",
                     Utils.DictionaryToString(keys),
-                    this.options.TableName);
+                    options.TableName);
                 throw;
             }
         }
@@ -145,25 +145,25 @@ namespace Orleans.Reminders.DynamoDB
         {
             var expressionValues = new Dictionary<string, AttributeValue>
                 {
-                    { $":{SERVICE_ID_PROPERTY_NAME}", new AttributeValue(this.serviceId) },
+                    { $":{SERVICE_ID_PROPERTY_NAME}", new AttributeValue(serviceId) },
                     { $":{GRAIN_REFERENCE_PROPERTY_NAME}", new AttributeValue(grainId.ToString()) }
                 };
 
             try
             {
                 var expression = $"{SERVICE_ID_PROPERTY_NAME} = :{SERVICE_ID_PROPERTY_NAME} AND {GRAIN_REFERENCE_PROPERTY_NAME} = :{GRAIN_REFERENCE_PROPERTY_NAME}";
-                var records = await this.storage.QueryAllAsync(this.options.TableName, expressionValues, expression, this.Resolve, SERVICE_ID_GRAIN_REFERENCE_INDEX, consistentRead: false).ConfigureAwait(false);
+                var records = await storage.QueryAllAsync(options.TableName, expressionValues, expression, Resolve, SERVICE_ID_GRAIN_REFERENCE_INDEX, consistentRead: false).ConfigureAwait(false);
 
                 return new ReminderTableData(records);
             }
             catch (Exception exc)
             {
-                this.logger.LogWarning(
+                logger.LogWarning(
                     (int)ErrorCode.ReminderServiceBase,
                     exc,
                     "Intermediate error reading reminder entry {Entries} from table {TableName}.",
                     Utils.DictionaryToString(expressionValues),
-                    this.options.TableName);
+                    options.TableName);
                 throw;
             }
         }
@@ -187,30 +187,30 @@ namespace Orleans.Reminders.DynamoDB
                 {
                     expressionValues = new Dictionary<string, AttributeValue>
                     {
-                        { $":{SERVICE_ID_PROPERTY_NAME}", new AttributeValue(this.serviceId) },
+                        { $":{SERVICE_ID_PROPERTY_NAME}", new AttributeValue(serviceId) },
                         { $":Begin{GRAIN_HASH_PROPERTY_NAME}", new AttributeValue { N = (begin + 1).ToString() } },
                         { $":End{GRAIN_HASH_PROPERTY_NAME}", new AttributeValue { N = end.ToString() } }
                     };
                     expression = $"{SERVICE_ID_PROPERTY_NAME} = :{SERVICE_ID_PROPERTY_NAME} AND {GRAIN_HASH_PROPERTY_NAME} BETWEEN :Begin{GRAIN_HASH_PROPERTY_NAME} AND :End{GRAIN_HASH_PROPERTY_NAME}";
-                    records = await this.storage.QueryAllAsync(this.options.TableName, expressionValues, expression, this.Resolve, SERVICE_ID_GRAIN_HASH_INDEX, consistentRead: false).ConfigureAwait(false);
+                    records = await storage.QueryAllAsync(options.TableName, expressionValues, expression, Resolve, SERVICE_ID_GRAIN_HASH_INDEX, consistentRead: false).ConfigureAwait(false);
                 }
                 else
                 {
                     expressionValues = new Dictionary<string, AttributeValue>
                     {
-                        { $":{SERVICE_ID_PROPERTY_NAME}", new AttributeValue(this.serviceId) },
+                        { $":{SERVICE_ID_PROPERTY_NAME}", new AttributeValue(serviceId) },
                         { $":End{GRAIN_HASH_PROPERTY_NAME}", new AttributeValue { N = end.ToString() } }
                     };
                     expression = $"{SERVICE_ID_PROPERTY_NAME} = :{SERVICE_ID_PROPERTY_NAME} AND {GRAIN_HASH_PROPERTY_NAME} <= :End{GRAIN_HASH_PROPERTY_NAME}";
-                    records = await this.storage.QueryAllAsync(this.options.TableName, expressionValues, expression, this.Resolve, SERVICE_ID_GRAIN_HASH_INDEX, consistentRead: false).ConfigureAwait(false);
+                    records = await storage.QueryAllAsync(options.TableName, expressionValues, expression, Resolve, SERVICE_ID_GRAIN_HASH_INDEX, consistentRead: false).ConfigureAwait(false);
 
                     expressionValues = new Dictionary<string, AttributeValue>
                     {
-                        { $":{SERVICE_ID_PROPERTY_NAME}", new AttributeValue(this.serviceId) },
+                        { $":{SERVICE_ID_PROPERTY_NAME}", new AttributeValue(serviceId) },
                         { $":Begin{GRAIN_HASH_PROPERTY_NAME}", new AttributeValue { N = begin.ToString() } }
                     };
                     expression = $"{SERVICE_ID_PROPERTY_NAME} = :{SERVICE_ID_PROPERTY_NAME} AND {GRAIN_HASH_PROPERTY_NAME} > :Begin{GRAIN_HASH_PROPERTY_NAME}";
-                    records.AddRange(await this.storage.QueryAllAsync(this.options.TableName, expressionValues, expression, this.Resolve, SERVICE_ID_GRAIN_HASH_INDEX, consistentRead: false).ConfigureAwait(false));
+                    records.AddRange(await storage.QueryAllAsync(options.TableName, expressionValues, expression, Resolve, SERVICE_ID_GRAIN_HASH_INDEX, consistentRead: false).ConfigureAwait(false));
 
                 }
 
@@ -218,12 +218,12 @@ namespace Orleans.Reminders.DynamoDB
             }
             catch (Exception exc)
             {
-                this.logger.LogWarning(
+                logger.LogWarning(
                     (int)ErrorCode.ReminderServiceBase,
                     exc,
                     "Intermediate error reading reminder entry {Utils.DictionaryToString(expressionValues)} from table {this.options.TableName}.",
                     Utils.DictionaryToString(expressionValues),
-                    this.options.TableName);
+                    options.TableName);
                 throw;
             }
         }
@@ -249,7 +249,7 @@ namespace Orleans.Reminders.DynamoDB
         /// <returns> Return true if the row was removed </returns>
         public async Task<bool> RemoveRow(GrainId grainId, string reminderName, string eTag)
         {
-            var reminderId = ConstructReminderId(this.serviceId, grainId, reminderName);
+            var reminderId = ConstructReminderId(serviceId, grainId, reminderName);
 
             var keys = new Dictionary<string, AttributeValue>
                 {
@@ -262,7 +262,7 @@ namespace Orleans.Reminders.DynamoDB
                 var conditionalValues = new Dictionary<string, AttributeValue> { { CURRENT_ETAG_ALIAS, new AttributeValue { N = eTag } } };
                 var expression = $"{ETAG_PROPERTY_NAME} = {CURRENT_ETAG_ALIAS}";
 
-                await this.storage.DeleteEntryAsync(this.options.TableName, keys, expression, conditionalValues).ConfigureAwait(false);
+                await storage.DeleteEntryAsync(options.TableName, keys, expression, conditionalValues).ConfigureAwait(false);
                 return true;
             }
             catch (ConditionalCheckFailedException)
@@ -279,13 +279,13 @@ namespace Orleans.Reminders.DynamoDB
         {
             var expressionValues = new Dictionary<string, AttributeValue>
                 {
-                    { $":{SERVICE_ID_PROPERTY_NAME}", new AttributeValue(this.serviceId) }
+                    { $":{SERVICE_ID_PROPERTY_NAME}", new AttributeValue(serviceId) }
                 };
 
             try
             {
                 var expression = $"{SERVICE_ID_PROPERTY_NAME} = :{SERVICE_ID_PROPERTY_NAME}";
-                var records = await this.storage.ScanAsync(this.options.TableName, expressionValues, expression,
+                var records = await storage.ScanAsync(options.TableName, expressionValues, expression,
                     item => new Dictionary<string, AttributeValue>
                     {
                         { REMINDER_ID_PROPERTY_NAME, item[REMINDER_ID_PROPERTY_NAME] },
@@ -294,26 +294,26 @@ namespace Orleans.Reminders.DynamoDB
 
                 if (records.Count <= 25)
                 {
-                    await this.storage.DeleteEntriesAsync(this.options.TableName, records);
+                    await storage.DeleteEntriesAsync(options.TableName, records);
                 }
                 else
                 {
                     List<Task> tasks = new List<Task>();
                     foreach (var batch in records.BatchIEnumerable(25))
                     {
-                        tasks.Add(this.storage.DeleteEntriesAsync(this.options.TableName, batch));
+                        tasks.Add(storage.DeleteEntriesAsync(options.TableName, batch));
                     }
                     await Task.WhenAll(tasks);
                 }
             }
             catch (Exception exc)
             {
-                this.logger.LogWarning(
+                logger.LogWarning(
                     (int)ErrorCode.ReminderServiceBase,
                     exc,
                     "Intermediate error removing reminder entries {Entries} from table {TableName}.",
                     Utils.DictionaryToString(expressionValues),
-                    this.options.TableName);
+                    options.TableName);
                 throw;
             }
         }
@@ -325,13 +325,13 @@ namespace Orleans.Reminders.DynamoDB
         /// <returns> Return the entry ETag if entry was upsert successfully </returns>
         public async Task<string> UpsertRow(ReminderEntry entry)
         {
-            var reminderId = ConstructReminderId(this.serviceId, entry.GrainId, entry.ReminderName);
+            var reminderId = ConstructReminderId(serviceId, entry.GrainId, entry.ReminderName);
 
             var fields = new Dictionary<string, AttributeValue>
                 {
                     { REMINDER_ID_PROPERTY_NAME, new AttributeValue(reminderId) },
                     { GRAIN_HASH_PROPERTY_NAME, new AttributeValue { N = entry.GrainId.GetUniformHashCode().ToString() } },
-                    { SERVICE_ID_PROPERTY_NAME, new AttributeValue(this.serviceId) },
+                    { SERVICE_ID_PROPERTY_NAME, new AttributeValue(serviceId) },
                     { GRAIN_REFERENCE_PROPERTY_NAME, new AttributeValue( entry.GrainId.ToString()) },
                     { PERIOD_PROPERTY_NAME, new AttributeValue(entry.Period.ToString()) },
                     { START_TIME_PROPERTY_NAME, new AttributeValue(entry.StartAt.ToString()) },
@@ -341,16 +341,16 @@ namespace Orleans.Reminders.DynamoDB
 
             try
             {
-                if (this.logger.IsEnabled(LogLevel.Debug)) this.logger.LogDebug("UpsertRow entry = {Entry}, etag = {ETag}", entry.ToString(), entry.ETag);
+                if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug("UpsertRow entry = {Entry}, etag = {ETag}", entry.ToString(), entry.ETag);
 
-                await this.storage.PutEntryAsync(this.options.TableName, fields);
+                await storage.PutEntryAsync(options.TableName, fields);
 
                 entry.ETag = fields[ETAG_PROPERTY_NAME].N;
                 return entry.ETag;
             }
             catch (Exception exc)
             {
-                this.logger.LogWarning(
+                logger.LogWarning(
                     (int)ErrorCode.ReminderServiceBase,
                     exc,
                     "Intermediate error updating entry {Entry} to the table {TableName}.",

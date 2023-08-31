@@ -21,12 +21,12 @@ namespace DefaultCluster.Tests.General
 
         public TGrainInterface GetGrain<TGrainInterface>(long i) where TGrainInterface : IGrainWithIntegerKey
         {
-            return  this.GrainFactory.GetGrain<TGrainInterface>(i);
+            return  GrainFactory.GetGrain<TGrainInterface>(i);
         }
 
         public TGrainInterface GetGrain<TGrainInterface>() where TGrainInterface : IGrainWithIntegerKey
         {
-            return  this.GrainFactory.GetGrain<TGrainInterface>(GetRandomGrainId());
+            return  GrainFactory.GetGrain<TGrainInterface>(GetRandomGrainId());
         }
 
         /// Can instantiate multiple concrete grain types that implement
@@ -262,7 +262,7 @@ namespace DefaultCluster.Tests.General
         [Fact, TestCategory("BVT"), TestCategory("Generics")]
         public async Task Generic_SimpleGrain_GetGrain()
         {
-            var grain =  this.GrainFactory.GetGrain<ISimpleGenericGrain1<int>>(grainId++);
+            var grain =  GrainFactory.GetGrain<ISimpleGenericGrain1<int>>(grainId++);
             await grain.GetA();
         }
 
@@ -273,7 +273,7 @@ namespace DefaultCluster.Tests.General
             var b = a + 1;
             var expected = a + "x" + b;
 
-            var grain =  this.GrainFactory.GetGrain<ISimpleGenericGrain1<int>>(grainId++);
+            var grain =  GrainFactory.GetGrain<ISimpleGenericGrain1<int>>(grainId++);
 
             await grain.SetA(a);
 
@@ -290,7 +290,7 @@ namespace DefaultCluster.Tests.General
             var b = a + 1;
             var expected = a + "x" + b;
 
-            var grain =  this.GrainFactory.GetGrain<ISimpleGenericGrain1<int>>(grainId++);
+            var grain =  GrainFactory.GetGrain<ISimpleGenericGrain1<int>>(grainId++);
 
             // explicitly use .Wait() and .Result to make sure the client does not deadlock in these cases.
             grain.SetA(a).Wait();
@@ -308,7 +308,7 @@ namespace DefaultCluster.Tests.General
             var b = a + 1;
             var expected = a + "x" + b;
 
-            var grain =  this.GrainFactory.GetGrain<ISimpleGenericGrain1<int>>(grainId++);
+            var grain =  GrainFactory.GetGrain<ISimpleGenericGrain1<int>>(grainId++);
 
             var setAPromise = grain.SetA(a);
             var setBPromise = grain.SetB(b);
@@ -321,9 +321,9 @@ namespace DefaultCluster.Tests.General
         [Fact, TestCategory("BVT"), TestCategory("Generics")]
         public async Task Generic_SimpleGrain2_GetGrain()
         {
-            var g1 =  this.GrainFactory.GetGrain<ISimpleGenericGrain1<int>>(grainId++);
-            var g2 =  this.GrainFactory.GetGrain<ISimpleGenericGrainU<int>>(grainId++);
-            var g3 =  this.GrainFactory.GetGrain<ISimpleGenericGrain2<int, int>>(grainId++);
+            var g1 =  GrainFactory.GetGrain<ISimpleGenericGrain1<int>>(grainId++);
+            var g2 =  GrainFactory.GetGrain<ISimpleGenericGrainU<int>>(grainId++);
+            var g3 =  GrainFactory.GetGrain<ISimpleGenericGrain2<int, int>>(grainId++);
             await g1.GetA();
             await g2.GetA();
             await g3.GetA();
@@ -332,7 +332,7 @@ namespace DefaultCluster.Tests.General
         [Fact, TestCategory("BVT"), TestCategory("Generics")]
         public async Task Generic_SimpleGrainGenericParameterWithMultipleArguments_GetGrain()
         {
-            var g1 =  this.GrainFactory.GetGrain<ISimpleGenericGrain1<Dictionary<int, int>>>(GetRandomGrainId());
+            var g1 =  GrainFactory.GetGrain<ISimpleGenericGrain1<Dictionary<int, int>>>(GetRandomGrainId());
             await g1.GetA();
         }
 
@@ -343,9 +343,9 @@ namespace DefaultCluster.Tests.General
             var b = a + 1;
             var expected = a + "x" + b;
 
-            var g1 =  this.GrainFactory.GetGrain<ISimpleGenericGrain1<int>>(grainId++);
-            var g2 =  this.GrainFactory.GetGrain<ISimpleGenericGrainU<int>>(grainId++);
-            var g3 =  this.GrainFactory.GetGrain<ISimpleGenericGrain2<int, int>>(grainId++);
+            var g1 =  GrainFactory.GetGrain<ISimpleGenericGrain1<int>>(grainId++);
+            var g2 =  GrainFactory.GetGrain<ISimpleGenericGrainU<int>>(grainId++);
+            var g3 =  GrainFactory.GetGrain<ISimpleGenericGrain2<int, int>>(grainId++);
 
             string r1 = await g1.GetAxB(a, b);
             string r2 = await g2.GetAxB(a, b);
@@ -358,7 +358,7 @@ namespace DefaultCluster.Tests.General
         [Fact, TestCategory("BVT"), TestCategory("Generics")]
         public async Task Generic_SimpleGrainControlFlow3()
         {
-            ISimpleGenericGrain2<int, float> g =  this.GrainFactory.GetGrain<ISimpleGenericGrain2<int, float>>(grainId++);
+            ISimpleGenericGrain2<int, float> g =  GrainFactory.GetGrain<ISimpleGenericGrain2<int, float>>(grainId++);
             await g.SetA(3);
             await g.SetB(1.25f);
             Assert.Equal("3x1.25", await g.GetAxB());
@@ -367,7 +367,7 @@ namespace DefaultCluster.Tests.General
         [Fact, TestCategory("BVT"), TestCategory("Generics")]
         public async Task Generic_BasicGrainControlFlow()
         {
-            IBasicGenericGrain<int, float> g =  this.GrainFactory.GetGrain<IBasicGenericGrain<int, float>>(0);
+            IBasicGenericGrain<int, float> g =  GrainFactory.GetGrain<IBasicGenericGrain<int, float>>(0);
             await g.SetA(3);
             await g.SetB(1.25f);
             Assert.Equal("3x1.25", await g.GetAxB());
@@ -379,7 +379,7 @@ namespace DefaultCluster.Tests.General
             string a = Random.Shared.Next(100).ToString(CultureInfo.InvariantCulture);
             string b = Random.Shared.Next(100).ToString(CultureInfo.InvariantCulture);
 
-            var g1 =  this.GrainFactory.GetGrain<IGrainWithListFields>(grainId++);
+            var g1 =  GrainFactory.GetGrain<IGrainWithListFields>(grainId++);
 
             var p1 = g1.AddItem(a);
             var p2 = g1.AddItem(b);
@@ -399,7 +399,7 @@ namespace DefaultCluster.Tests.General
             int b = Random.Shared.Next(100);
 
 
-            var g1 =  this.GrainFactory.GetGrain<IGenericGrainWithListFields<int>>(grainId++);
+            var g1 =  GrainFactory.GetGrain<IGenericGrainWithListFields<int>>(grainId++);
 
             var p1 = g1.AddItem(a);
             var p2 = g1.AddItem(b);
@@ -419,7 +419,7 @@ namespace DefaultCluster.Tests.General
             int b = Random.Shared.Next(100);
             string expected = a + "x" + b;
 
-            var g1 =  this.GrainFactory.GetGrain<IGenericGrainWithNoProperties<int>>(grainId++);
+            var g1 =  GrainFactory.GetGrain<IGenericGrainWithNoProperties<int>>(grainId++);
 
             string r1 = await g1.GetAxB(a, b);
             Assert.Equal(expected, r1);
@@ -433,7 +433,7 @@ namespace DefaultCluster.Tests.General
             string expected = a + "x" + b;
 
             long grainId = GetRandomGrainId();
-            var g1 =  this.GrainFactory.GetGrain<IGrainWithNoProperties>(grainId);
+            var g1 =  GrainFactory.GetGrain<IGrainWithNoProperties>(grainId);
 
             string r1 = await g1.GetAxB(a, b);
             Assert.Equal(expected, r1);
@@ -443,7 +443,7 @@ namespace DefaultCluster.Tests.General
         public async Task Generic_ReaderWriterGrain1()
         {
             int a = Random.Shared.Next(100);
-            var g =  this.GrainFactory.GetGrain<IGenericReaderWriterGrain1<int>>(grainId++);
+            var g =  GrainFactory.GetGrain<IGenericReaderWriterGrain1<int>>(grainId++);
             await g.SetValue(a);
             var res = await g.GetValue();
             Assert.Equal(a, res);
@@ -455,7 +455,7 @@ namespace DefaultCluster.Tests.General
             int a = Random.Shared.Next(100);
             string b = "bbbbb";
 
-            var g =  this.GrainFactory.GetGrain<IGenericReaderWriterGrain2<int, string>>(grainId++);
+            var g =  GrainFactory.GetGrain<IGenericReaderWriterGrain2<int, string>>(grainId++);
             await g.SetValue1(a);
             await g.SetValue2(b);
             var r1 = await g.GetValue1();
@@ -471,7 +471,7 @@ namespace DefaultCluster.Tests.General
             string b = "bbbbb";
             double c = 3.145;
 
-            var g =  this.GrainFactory.GetGrain<IGenericReaderWriterGrain3<int, string, double>>(grainId++);
+            var g =  GrainFactory.GetGrain<IGenericReaderWriterGrain3<int, string, double>>(grainId++);
             await g.SetValue1(a);
             await g.SetValue2(b);
             await g.SetValue3(c);
@@ -486,9 +486,9 @@ namespace DefaultCluster.Tests.General
         [Fact, TestCategory("BVT"), TestCategory("Generics")]
         public async Task Generic_Non_Primitive_Type_Argument()
         {
-            IEchoHubGrain<Guid, string> g1 =  this.GrainFactory.GetGrain<IEchoHubGrain<Guid, string>>(1);
-            IEchoHubGrain<Guid, int> g2 =  this.GrainFactory.GetGrain<IEchoHubGrain<Guid, int>>(1);
-            IEchoHubGrain<Guid, byte[]> g3 =  this.GrainFactory.GetGrain<IEchoHubGrain<Guid, byte[]>>(1);
+            IEchoHubGrain<Guid, string> g1 =  GrainFactory.GetGrain<IEchoHubGrain<Guid, string>>(1);
+            IEchoHubGrain<Guid, int> g2 =  GrainFactory.GetGrain<IEchoHubGrain<Guid, int>>(1);
+            IEchoHubGrain<Guid, byte[]> g3 =  GrainFactory.GetGrain<IEchoHubGrain<Guid, byte[]>>(1);
 
             Assert.NotEqual((GrainReference)g1, (GrainReference)g2);
             Assert.NotEqual((GrainReference)g1, (GrainReference)g3);
@@ -508,7 +508,7 @@ namespace DefaultCluster.Tests.General
         {
             const string msg1 = "Hello from EchoGenericChainGrain-1";
 
-            IEchoGenericChainGrain<string> g1 =  this.GrainFactory.GetGrain<IEchoGenericChainGrain<string>>(GetRandomGrainId());
+            IEchoGenericChainGrain<string> g1 =  GrainFactory.GetGrain<IEchoGenericChainGrain<string>>(GetRandomGrainId());
 
             string received = await g1.Echo(msg1);
             Assert.Equal(msg1, received);
@@ -519,7 +519,7 @@ namespace DefaultCluster.Tests.General
         {
             const string msg2 = "Hello from EchoGenericChainGrain-2";
 
-            IEchoGenericChainGrain<string> g2 =  this.GrainFactory.GetGrain<IEchoGenericChainGrain<string>>(GetRandomGrainId());
+            IEchoGenericChainGrain<string> g2 =  GrainFactory.GetGrain<IEchoGenericChainGrain<string>>(GetRandomGrainId());
 
             string received = await g2.Echo2(msg2);
             Assert.Equal(msg2, received);
@@ -530,7 +530,7 @@ namespace DefaultCluster.Tests.General
         {
             const string msg3 = "Hello from EchoGenericChainGrain-3";
 
-            IEchoGenericChainGrain<string> g3 =  this.GrainFactory.GetGrain<IEchoGenericChainGrain<string>>(GetRandomGrainId());
+            IEchoGenericChainGrain<string> g3 =  GrainFactory.GetGrain<IEchoGenericChainGrain<string>>(GetRandomGrainId());
 
             string received = await g3.Echo3(msg3);
             Assert.Equal(msg3, received);
@@ -541,7 +541,7 @@ namespace DefaultCluster.Tests.General
         {
             const string msg4 = "Hello from EchoGenericChainGrain-4";
 
-            var g4 = this.GrainFactory.GetGrain<IEchoGenericChainGrain<string>>(GetRandomGrainId());
+            var g4 = GrainFactory.GetGrain<IEchoGenericChainGrain<string>>(GetRandomGrainId());
 
             string received = await g4.Echo4(msg4);
             Assert.Equal(msg4, received);
@@ -552,7 +552,7 @@ namespace DefaultCluster.Tests.General
         {
             const string msg5 = "Hello from EchoGenericChainGrain-5";
 
-            var g5 = this.GrainFactory.GetGrain<IEchoGenericChainGrain<string>>(GetRandomGrainId());
+            var g5 = GrainFactory.GetGrain<IEchoGenericChainGrain<string>>(GetRandomGrainId());
 
             string received = await g5.Echo5(msg5);
             Assert.Equal(msg5, received);
@@ -563,7 +563,7 @@ namespace DefaultCluster.Tests.General
         {
             const string msg6 = "Hello from EchoGenericChainGrain-6";
 
-            var g6 = this.GrainFactory.GetGrain<IEchoGenericChainGrain<string>>(GetRandomGrainId());
+            var g6 = GrainFactory.GetGrain<IEchoGenericChainGrain<string>>(GetRandomGrainId());
 
             string received = await g6.Echo6(msg6);
             Assert.Equal(msg6, received);
@@ -573,7 +573,7 @@ namespace DefaultCluster.Tests.General
         [Fact, TestCategory("BVT"), TestCategory("Generics")]
         public async Task Generic_1Argument_GenericCallOnly()
         {
-            var grain =  this.GrainFactory.GetGrain<IGeneric1Argument<string>>(Guid.NewGuid(), "UnitTests.Grains.Generic1ArgumentGrain");
+            var grain =  GrainFactory.GetGrain<IGeneric1Argument<string>>(Guid.NewGuid(), "UnitTests.Grains.Generic1ArgumentGrain");
             var s1 = Guid.NewGuid().ToString();
             var s2 = await grain.Ping(s1);
             Assert.Equal(s1, s2);
@@ -584,7 +584,7 @@ namespace DefaultCluster.Tests.General
         {
 
             var id = Guid.NewGuid();
-            var nonGenericFacet =  this.GrainFactory.GetGrain<INonGenericBase>(id, "UnitTests.Grains.Generic1ArgumentGrain");
+            var nonGenericFacet =  GrainFactory.GetGrain<INonGenericBase>(id, "UnitTests.Grains.Generic1ArgumentGrain");
             await Assert.ThrowsAsync<ArgumentException>(async () =>
             {
                 try
@@ -602,11 +602,11 @@ namespace DefaultCluster.Tests.General
         public async Task Generic_1Argument_GenericCallFirst()
         {
             var id = Guid.NewGuid();
-            var grain =  this.GrainFactory.GetGrain<IGeneric1Argument<string>>(id, "UnitTests.Grains.Generic1ArgumentGrain");
+            var grain =  GrainFactory.GetGrain<IGeneric1Argument<string>>(id, "UnitTests.Grains.Generic1ArgumentGrain");
             var s1 = Guid.NewGuid().ToString();
             var s2 = await grain.Ping(s1);
             Assert.Equal(s1, s2);
-            var nonGenericFacet =  this.GrainFactory.GetGrain<INonGenericBase>(id, "UnitTests.Grains.Generic1ArgumentGrain");
+            var nonGenericFacet =  GrainFactory.GetGrain<INonGenericBase>(id, "UnitTests.Grains.Generic1ArgumentGrain");
             await Assert.ThrowsAsync<ArgumentException>(async () =>
             {
                 try
@@ -623,10 +623,10 @@ namespace DefaultCluster.Tests.General
         [Fact, TestCategory("BVT"), TestCategory("Generics")]
         public async Task DifferentTypeArgsProduceIndependentActivations()
         {
-            var grain1 =  this.GrainFactory.GetGrain<IDbGrain<int>>(0);
+            var grain1 =  GrainFactory.GetGrain<IDbGrain<int>>(0);
             await grain1.SetValue(123);
 
-            var grain2 =  this.GrainFactory.GetGrain<IDbGrain<string>>(0);
+            var grain2 =  GrainFactory.GetGrain<IDbGrain<string>>(0);
             var v = await grain2.GetValue();
             Assert.Null(v);
         }
@@ -635,7 +635,7 @@ namespace DefaultCluster.Tests.General
         public async Task Generic_PingSelf()
         {
             var id = Guid.NewGuid();
-            var grain =  this.GrainFactory.GetGrain<IGenericPingSelf<string>>(id);
+            var grain =  GrainFactory.GetGrain<IGenericPingSelf<string>>(id);
             var s1 = Guid.NewGuid().ToString();
             var s2 = await grain.PingSelf(s1);
             Assert.Equal(s1, s2);
@@ -646,8 +646,8 @@ namespace DefaultCluster.Tests.General
         {
             var id = Guid.NewGuid();
             var targetId = Guid.NewGuid();
-            var grain =  this.GrainFactory.GetGrain<IGenericPingSelf<string>>(id);
-            var target =  this.GrainFactory.GetGrain<IGenericPingSelf<string>>(targetId);
+            var grain =  GrainFactory.GetGrain<IGenericPingSelf<string>>(id);
+            var target =  GrainFactory.GetGrain<IGenericPingSelf<string>>(targetId);
             var s1 = Guid.NewGuid().ToString();
             var s2 = await grain.PingOther(target, s1);
             Assert.Equal(s1, s2);
@@ -658,8 +658,8 @@ namespace DefaultCluster.Tests.General
         {
             var id = Guid.NewGuid();
             var targetId = Guid.NewGuid();
-            var grain =  this.GrainFactory.GetGrain<IGenericPingSelf<string>>(id);
-            var target =  this.GrainFactory.GetGrain<IGenericPingSelf<string>>(targetId);
+            var grain =  GrainFactory.GetGrain<IGenericPingSelf<string>>(id);
+            var target =  GrainFactory.GetGrain<IGenericPingSelf<string>>(targetId);
             var s1 = Guid.NewGuid().ToString();
             var s2 = await grain.PingSelfThroughOther(target, s1);
             Assert.Equal(s1, s2);
@@ -670,8 +670,8 @@ namespace DefaultCluster.Tests.General
         {
             var id = Guid.NewGuid();
             var targetId = Guid.NewGuid();
-            var grain =  this.GrainFactory.GetGrain<IGenericPingSelf<string>>(id);
-            var target =  this.GrainFactory.GetGrain<IGenericPingSelf<string>>(targetId);
+            var grain =  GrainFactory.GetGrain<IGenericPingSelf<string>>(id);
+            var target =  GrainFactory.GetGrain<IGenericPingSelf<string>>(targetId);
             var s1 = Guid.NewGuid().ToString();
             await grain.ScheduleDelayedPingToSelfAndDeactivate(target, s1, TimeSpan.FromSeconds(5));
             await Task.Delay(TimeSpan.FromSeconds(6));
@@ -683,7 +683,7 @@ namespace DefaultCluster.Tests.General
         public async Task SerializationTests_Generic_CircularReferenceTest()
         {
             var grainId = Guid.NewGuid();
-            var grain =  this.GrainFactory.GetGrain<ICircularStateTestGrain>(primaryKey: grainId, keyExtension: grainId.ToString("N"));
+            var grain =  GrainFactory.GetGrain<ICircularStateTestGrain>(primaryKey: grainId, keyExtension: grainId.ToString("N"));
             _ = await grain.GetState();
         }
                 
@@ -691,14 +691,14 @@ namespace DefaultCluster.Tests.General
         public async Task Generic_GrainWithTypeConstraints()
         {
             var grainId = Guid.NewGuid().ToString();
-            var grain =  this.GrainFactory.GetGrain<IGenericGrainWithConstraints<List<int>, int, string>>(grainId);
+            var grain =  GrainFactory.GetGrain<IGenericGrainWithConstraints<List<int>, int, string>>(grainId);
             var result = await grain.GetCount();
             Assert.Equal(0, result);
             await grain.Add(42);
             result = await grain.GetCount();
             Assert.Equal(1, result);
 
-            var unmanagedGrain = this.GrainFactory.GetGrain<IUnmanagedArgGrain<DateTime>>(Guid.NewGuid());
+            var unmanagedGrain = GrainFactory.GetGrain<IUnmanagedArgGrain<DateTime>>(Guid.NewGuid());
             {
                 var echoInput = DateTime.UtcNow;
                 var echoOutput = await unmanagedGrain.Echo(echoInput);
@@ -719,7 +719,7 @@ namespace DefaultCluster.Tests.General
         public async Task Generic_GrainWithValueTypeState()
         {
             Guid id = Guid.NewGuid();
-            var grain = this.GrainFactory.GetGrain<IValueTypeTestGrain>(id);
+            var grain = GrainFactory.GetGrain<IValueTypeTestGrain>(id);
 
             var initial = await grain.GetStateData();
             Assert.Equal(new ValueTypeTestData(0), initial);
@@ -734,7 +734,7 @@ namespace DefaultCluster.Tests.General
         [Fact(Skip = "https://github.com/dotnet/orleans/issues/1655 Casting from non-generic to generic interface fails with an obscure error message"), TestCategory("Functional"), TestCategory("Cast"), TestCategory("Generics")]
         public async Task Generic_CastToGenericInterfaceAfterActivation() 
         {
-            var grain =  this.GrainFactory.GetGrain<INonGenericCastableGrain>(Guid.NewGuid());
+            var grain =  GrainFactory.GetGrain<INonGenericCastableGrain>(Guid.NewGuid());
             await grain.DoSomething(); //activates original grain type here
 
             var castRef = grain.AsReference<ISomeGenericGrain<string>>();
@@ -746,7 +746,7 @@ namespace DefaultCluster.Tests.General
 
         [Fact(Skip= "https://github.com/dotnet/orleans/issues/1655 Casting from non-generic to generic interface fails with an obscure error message"), TestCategory("Functional"), TestCategory("Cast"), TestCategory("Generics")]
         public async Task Generic_CastToDifferentlyConcretizedGenericInterfaceBeforeActivation() {
-            var grain =  this.GrainFactory.GetGrain<INonGenericCastableGrain>(Guid.NewGuid());
+            var grain =  GrainFactory.GetGrain<INonGenericCastableGrain>(Guid.NewGuid());
 
             var castRef = grain.AsReference<IIndependentlyConcretizedGenericGrain<string>>();
 
@@ -757,7 +757,7 @@ namespace DefaultCluster.Tests.General
         
         [Fact, TestCategory("BVT"), TestCategory("Cast")]
         public async Task Generic_CastToDifferentlyConcretizedInterfaceBeforeActivation() {
-            var grain =  this.GrainFactory.GetGrain<INonGenericCastableGrain>(Guid.NewGuid());
+            var grain =  GrainFactory.GetGrain<INonGenericCastableGrain>(Guid.NewGuid());
 
             var castRef = grain.AsReference<IIndependentlyConcretizedGrain>();
 
@@ -768,7 +768,7 @@ namespace DefaultCluster.Tests.General
         
         [Fact, TestCategory("BVT"), TestCategory("Cast"), TestCategory("Generics")]
         public async Task Generic_CastGenericInterfaceToNonGenericInterfaceBeforeActivation() {
-            var grain =  this.GrainFactory.GetGrain<IGenericCastableGrain<string>>(Guid.NewGuid());
+            var grain =  GrainFactory.GetGrain<IGenericCastableGrain<string>>(Guid.NewGuid());
 
             var castRef = grain.AsReference<INonGenericCastGrain>();
 
@@ -785,7 +785,7 @@ namespace DefaultCluster.Tests.General
         [Fact, TestCategory("BVT"), TestCategory("Generics")]
         public async Task GenericGrainStateParameterMismatchTest()
         {
-            var grain = this.GrainFactory.GetGrain<IGenericGrainWithGenericState<int, List<Guid>, string>>(Guid.NewGuid());
+            var grain = GrainFactory.GetGrain<IGenericGrainWithGenericState<int, List<Guid>, string>>(Guid.NewGuid());
             var result = await grain.GetStateType();
             Assert.Equal(typeof(List<Guid>), result);
         }
@@ -812,7 +812,7 @@ namespace DefaultCluster.Tests.General
 
             [Fact(Skip = "Currently unsupported"), TestCategory("Generics")]
             public async Task Generic_PartiallySpecifyingGenericGrainFulfilsInterface() {
-                var grain =  this.GrainFactory.GetGrain<IGrainWithTwoGenArgs<string, int>>(Guid.NewGuid());
+                var grain =  GrainFactory.GetGrain<IGrainWithTwoGenArgs<string, int>>(Guid.NewGuid());
 
                 var concreteGenArgs = await GetConcreteGenArgs(grain);
 
@@ -826,7 +826,7 @@ namespace DefaultCluster.Tests.General
             public async Task Generic_GenericGrainCanReuseOwnGenArgRepeatedly() {
                 //resolves correctly but can't be activated: too many gen args supplied for concrete class
 
-                var grain =  this.GrainFactory.GetGrain<IGrainReceivingRepeatedGenArgs<int, int>>(Guid.NewGuid());
+                var grain =  GrainFactory.GetGrain<IGrainReceivingRepeatedGenArgs<int, int>>(Guid.NewGuid());
 
                 var concreteGenArgs = await GetConcreteGenArgs(grain);
 
@@ -838,7 +838,7 @@ namespace DefaultCluster.Tests.General
 
             [Fact(Skip = "Currently unsupported"), TestCategory("Generics")]
             public async Task Generic_PartiallySpecifyingGenericInterfaceIsCastable() {
-                var grain =  this.GrainFactory.GetGrain<IPartiallySpecifyingInterface<string>>(Guid.NewGuid());
+                var grain =  GrainFactory.GetGrain<IPartiallySpecifyingInterface<string>>(Guid.NewGuid());
 
                 await grain.Hello();
 
@@ -852,7 +852,7 @@ namespace DefaultCluster.Tests.General
 
             [Fact(Skip = "Currently unsupported"), TestCategory("Generics")]
             public async Task Generic_PartiallySpecifyingGenericInterfaceIsCastable_Activating() {
-                var grain =  this.GrainFactory.GetGrain<IPartiallySpecifyingInterface<string>>(Guid.NewGuid());
+                var grain =  GrainFactory.GetGrain<IPartiallySpecifyingInterface<string>>(Guid.NewGuid());
 
                 var castRef = grain.AsReference<IGrainWithTwoGenArgs<string, int>>();
 
@@ -867,7 +867,7 @@ namespace DefaultCluster.Tests.General
                 //again resolves to the correct generic type definition, but fails on activation as too many args
                 //gen args aren't being properly inferred from matched concrete type
 
-                var grain =  this.GrainFactory.GetGrain<IReceivingRepeatedGenArgsAmongstOthers<int, string, int>>(Guid.NewGuid());
+                var grain =  GrainFactory.GetGrain<IReceivingRepeatedGenArgsAmongstOthers<int, string, int>>(Guid.NewGuid());
 
                 var concreteGenArgs = await GetConcreteGenArgs(grain);
 
@@ -879,7 +879,7 @@ namespace DefaultCluster.Tests.General
 
             [Fact(Skip = "Currently unsupported"), TestCategory("Generics")]
             public async Task Generic_RepeatedGenArgsWorkAmongstInterfacesInTypeResolution() {
-                var grain =  this.GrainFactory.GetGrain<IReceivingRepeatedGenArgsFromOtherInterface<bool, bool, bool>>(Guid.NewGuid());
+                var grain =  GrainFactory.GetGrain<IReceivingRepeatedGenArgsFromOtherInterface<bool, bool, bool>>(Guid.NewGuid());
 
                 var concreteGenArgs = await GetConcreteGenArgs(grain);
 
@@ -891,7 +891,7 @@ namespace DefaultCluster.Tests.General
 
             [Fact(Skip = "Currently unsupported"), TestCategory("Generics")]
             public async Task Generic_RepeatedGenArgsWorkAmongstInterfacesInCasting() {
-                var grain =  this.GrainFactory.GetGrain<IReceivingRepeatedGenArgsFromOtherInterface<bool, bool, bool>>(Guid.NewGuid());
+                var grain =  GrainFactory.GetGrain<IReceivingRepeatedGenArgsFromOtherInterface<bool, bool, bool>>(Guid.NewGuid());
 
                 await grain.Hello();
 
@@ -907,7 +907,7 @@ namespace DefaultCluster.Tests.General
             public async Task Generic_RepeatedGenArgsWorkAmongstInterfacesInCasting_Activating() {
                 //Only errors on invocation: wrong arity again
 
-                var grain =  this.GrainFactory.GetGrain<IReceivingRepeatedGenArgsFromOtherInterface<bool, bool, bool>>(Guid.NewGuid());
+                var grain =  GrainFactory.GetGrain<IReceivingRepeatedGenArgsFromOtherInterface<bool, bool, bool>>(Guid.NewGuid());
 
                 var castRef = grain.AsReference<ISpecifyingGenArgsRepeatedlyToParentInterface<bool>>();
 
@@ -919,7 +919,7 @@ namespace DefaultCluster.Tests.General
 
             [Fact(Skip = "Currently unsupported"), TestCategory("Generics")]
             public async Task Generic_RearrangedGenArgsOfCorrectArityAreResolved() {
-                var grain =  this.GrainFactory.GetGrain<IReceivingRearrangedGenArgs<int, long>>(Guid.NewGuid());
+                var grain =  GrainFactory.GetGrain<IReceivingRearrangedGenArgs<int, long>>(Guid.NewGuid());
 
                 var concreteGenArgs = await GetConcreteGenArgs(grain);
 
@@ -931,7 +931,7 @@ namespace DefaultCluster.Tests.General
 
             [Fact(Skip = "Currently unsupported"), TestCategory("Generics")]
             public async Task Generic_RearrangedGenArgsOfCorrectNumberAreCastable() {
-                var grain =  this.GrainFactory.GetGrain<ISpecifyingRearrangedGenArgsToParentInterface<int, long>>(Guid.NewGuid());
+                var grain =  GrainFactory.GetGrain<ISpecifyingRearrangedGenArgsToParentInterface<int, long>>(Guid.NewGuid());
 
                 await grain.Hello();
 
@@ -945,7 +945,7 @@ namespace DefaultCluster.Tests.General
 
             [Fact(Skip = "Currently unsupported"), TestCategory("Generics")]
             public async Task Generic_RearrangedGenArgsOfCorrectNumberAreCastable_Activating() {
-                var grain =  this.GrainFactory.GetGrain<ISpecifyingRearrangedGenArgsToParentInterface<int, long>>(Guid.NewGuid());
+                var grain =  GrainFactory.GetGrain<ISpecifyingRearrangedGenArgsToParentInterface<int, long>>(Guid.NewGuid());
 
                 var castRef = grain.AsReference<IReceivingRearrangedGenArgsViaCast<long, int>>();
 
@@ -1001,7 +1001,7 @@ namespace DefaultCluster.Tests.General
 
             [Fact(Skip = "Currently unsupported"), TestCategory("Generics")]
             public async Task Generic_CanCastToFullySpecifiedInterfaceUnrelatedToConcreteGenArgs() {
-                var grain =  this.GrainFactory.GetGrain<IArbitraryInterface<int, long>>(Guid.NewGuid());
+                var grain =  GrainFactory.GetGrain<IArbitraryInterface<int, long>>(Guid.NewGuid());
 
                 await grain.Hello();
 
@@ -1015,7 +1015,7 @@ namespace DefaultCluster.Tests.General
 
             [Fact(Skip = "Currently unsupported"), TestCategory("Generics")]
             public async Task Generic_CanCastToFullySpecifiedInterfaceUnrelatedToConcreteGenArgs_Activating() {
-                var grain =  this.GrainFactory.GetGrain<IArbitraryInterface<int, long>>(Guid.NewGuid());
+                var grain =  GrainFactory.GetGrain<IArbitraryInterface<int, long>>(Guid.NewGuid());
 
                 _ = grain.AsReference<IInterfaceUnrelatedToConcreteGenArgs<float>>();
 
@@ -1027,7 +1027,7 @@ namespace DefaultCluster.Tests.General
 
             [Fact(Skip = "Currently unsupported"), TestCategory("Generics")]
             public async Task Generic_GenArgsCanBeFurtherSpecialized() {
-                var grain =  this.GrainFactory.GetGrain<IInterfaceTakingFurtherSpecializedGenArg<List<int>>>(Guid.NewGuid());
+                var grain =  GrainFactory.GetGrain<IInterfaceTakingFurtherSpecializedGenArg<List<int>>>(Guid.NewGuid());
 
                 var concreteGenArgs = await GetConcreteGenArgs(grain);
 
@@ -1039,7 +1039,7 @@ namespace DefaultCluster.Tests.General
 
             [Fact(Skip = "Currently unsupported"), TestCategory("Generics")]
             public async Task Generic_GenArgsCanBeFurtherSpecializedIntoArrays() {
-                var grain =  this.GrainFactory.GetGrain<IInterfaceTakingFurtherSpecializedGenArg<long[]>>(Guid.NewGuid());
+                var grain =  GrainFactory.GetGrain<IInterfaceTakingFurtherSpecializedGenArg<long[]>>(Guid.NewGuid());
 
                 var concreteGenArgs = await GetConcreteGenArgs(grain);
 
@@ -1051,7 +1051,7 @@ namespace DefaultCluster.Tests.General
 
             [Fact(Skip = "Currently unsupported"), TestCategory("Generics")]
             public async Task Generic_CanCastBetweenInterfacesWithFurtherSpecializedGenArgs() {
-                var grain =  this.GrainFactory.GetGrain<IAnotherReceivingFurtherSpecializedGenArg<List<int>>>(Guid.NewGuid());
+                var grain =  GrainFactory.GetGrain<IAnotherReceivingFurtherSpecializedGenArg<List<int>>>(Guid.NewGuid());
 
                 await grain.Hello();
                 _ = grain.AsReference<IYetOneMoreReceivingFurtherSpecializedGenArg<int[]>>();
@@ -1064,7 +1064,7 @@ namespace DefaultCluster.Tests.General
 
             [Fact(Skip = "Currently unsupported"), TestCategory("Generics")]
             public async Task Generic_CanCastBetweenInterfacesWithFurtherSpecializedGenArgs_Activating() {
-                var grain =  this.GrainFactory.GetGrain<IAnotherReceivingFurtherSpecializedGenArg<List<int>>>(Guid.NewGuid());
+                var grain =  GrainFactory.GetGrain<IAnotherReceivingFurtherSpecializedGenArg<List<int>>>(Guid.NewGuid());
                 _ = grain.AsReference<IYetOneMoreReceivingFurtherSpecializedGenArg<int[]>>();
 
                 var response = await grain.Hello();

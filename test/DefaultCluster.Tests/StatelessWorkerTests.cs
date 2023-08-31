@@ -24,7 +24,7 @@ namespace DefaultCluster.Tests.General
         [Fact, TestCategory("SlowBVT"), TestCategory("StatelessWorker")]
         public async Task StatelessWorkerThrowExceptionConstructor()
         {
-            var grain = this.GrainFactory.GetGrain<IStatelessWorkerExceptionGrain>(0);
+            var grain = GrainFactory.GetGrain<IStatelessWorkerExceptionGrain>(0);
 
             for (int i=0; i<100; i++)
             {
@@ -36,12 +36,12 @@ namespace DefaultCluster.Tests.General
         [Fact, TestCategory("SlowBVT"), TestCategory("StatelessWorker")]
         public async Task StatelessWorkerActivationsPerSiloDoNotExceedMaxLocalWorkersCount()
         {
-            var gatewayOptions = this.Fixture.Client.ServiceProvider.GetRequiredService<IOptions<StaticGatewayListProviderOptions>>();
+            var gatewayOptions = Fixture.Client.ServiceProvider.GetRequiredService<IOptions<StaticGatewayListProviderOptions>>();
             var gatewaysCount = gatewayOptions.Value.Gateways.Count;
             // do extra calls to trigger activation of ExpectedMaxLocalActivations local activations
             int numberOfCalls = ExpectedMaxLocalActivations * 3 * gatewaysCount; 
 
-            IStatelessWorkerGrain grain = this.GrainFactory.GetGrain<IStatelessWorkerGrain>(GetRandomGrainId());
+            IStatelessWorkerGrain grain = GrainFactory.GetGrain<IStatelessWorkerGrain>(GetRandomGrainId());
             List<Task> promises = new List<Task>();
 
             // warmup
@@ -100,7 +100,7 @@ namespace DefaultCluster.Tests.General
             // We are trying to trigger a race condition and need more than 1 attempt to reliably reproduce the issue.
             for (var attempt = 0; attempt < 100; attempt ++)
             {
-                var grain = this.GrainFactory.GetGrain<IStatelessWorkerGrain>(attempt);
+                var grain = GrainFactory.GetGrain<IStatelessWorkerGrain>(attempt);
                 await Task.WhenAll(Enumerable.Range(0, 10).Select(_ => grain.DummyCall()));
             }
         }
@@ -108,7 +108,7 @@ namespace DefaultCluster.Tests.General
         [SkippableFact(Skip = "Skipping test for now, since there seems to be a bug"), TestCategory("Functional"), TestCategory("StatelessWorker")]
         public async Task StatelessWorkerFastActivationsDontFailInMultiSiloDeployment()
         {
-            var gatewayOptions = this.Fixture.Client.ServiceProvider.GetRequiredService<IOptions<StaticGatewayListProviderOptions>>();
+            var gatewayOptions = Fixture.Client.ServiceProvider.GetRequiredService<IOptions<StaticGatewayListProviderOptions>>();
             var gatewaysCount = gatewayOptions.Value.Gateways.Count;
 
             if (gatewaysCount < 2)
@@ -119,7 +119,7 @@ namespace DefaultCluster.Tests.General
             // do extra calls to trigger activation of ExpectedMaxLocalActivations local activations
             int numberOfCalls = ExpectedMaxLocalActivations * 3 * gatewaysCount;
 
-            IStatelessWorkerGrain grain = this.GrainFactory.GetGrain<IStatelessWorkerGrain>(GetRandomGrainId());
+            IStatelessWorkerGrain grain = GrainFactory.GetGrain<IStatelessWorkerGrain>(GetRandomGrainId());
             List<Task> promises = new List<Task>();
             
             for (int i = 0; i < numberOfCalls; i++)

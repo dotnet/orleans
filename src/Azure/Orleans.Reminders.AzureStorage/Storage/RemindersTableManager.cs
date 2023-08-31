@@ -206,7 +206,7 @@ namespace Orleans.Runtime.ReminderService
 
             foreach (var entriesPerPartition in groupedByHash.Values)
             {
-                    foreach (var batch in entriesPerPartition.BatchIEnumerable(this.StoragePolicyOptions.MaxBulkUpdateRows))
+                    foreach (var batch in entriesPerPartition.BatchIEnumerable(StoragePolicyOptions.MaxBulkUpdateRows))
                 {
                     tasks.Add(DeleteTableEntriesAsync(batch));
                 }

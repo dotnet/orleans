@@ -46,8 +46,8 @@ namespace Tester.CustomPlacementTests
             this.fixture = fixture;
 
             // sort silo IDs into an array
-            this.silos = fixture.HostedCluster.GetActiveSilos().OrderBy(s => s.SiloAddress).Select(h => h.SiloAddress.ToString()).ToArray();
-            this.siloAddresses = fixture.HostedCluster.GetActiveSilos().Select(h => h.SiloAddress).OrderBy(s => s).ToArray();
+            silos = fixture.HostedCluster.GetActiveSilos().OrderBy(s => s.SiloAddress).Select(h => h.SiloAddress.ToString()).ToArray();
+            siloAddresses = fixture.HostedCluster.GetActiveSilos().Select(h => h.SiloAddress).OrderBy(s => s).ToArray();
         }
 
         [Fact]
@@ -58,7 +58,7 @@ namespace Tester.CustomPlacementTests
             Task<string>[] tasks = new Task<string>[nGrains];
             for (int i = 0; i < nGrains; i++)
             {
-                var g = this.fixture.GrainFactory.GetGrain<ICustomPlacementTestGrain>(Guid.NewGuid(),
+                var g = fixture.GrainFactory.GetGrain<ICustomPlacementTestGrain>(Guid.NewGuid(),
                     "UnitTests.Grains.CustomPlacement_FixedSiloGrain");
                 tasks[i] = g.GetRuntimeInstanceId();
             }
@@ -82,7 +82,7 @@ namespace Tester.CustomPlacementTests
             Task<string>[] tasks = new Task<string>[nGrains];
             for (int i = 0; i < nGrains; i++)
             {
-                var g = this.fixture.GrainFactory.GetGrain<ICustomPlacementTestGrain>(Guid.NewGuid(),
+                var g = fixture.GrainFactory.GetGrain<ICustomPlacementTestGrain>(Guid.NewGuid(),
                     "UnitTests.Grains.CustomPlacement_ExcludeOneGrain");
                 tasks[i] = g.GetRuntimeInstanceId();
             }
@@ -106,7 +106,7 @@ namespace Tester.CustomPlacementTests
             for (int i = 0; i < nGrains; i++)
             {
                 RequestContext.Set(TestPlacementStrategyFixedSiloDirector.TARGET_SILO_INDEX, targetSilo);
-                var g = this.fixture.GrainFactory.GetGrain<ICustomPlacementTestGrain>(Guid.NewGuid(),
+                var g = fixture.GrainFactory.GetGrain<ICustomPlacementTestGrain>(Guid.NewGuid(),
                     "UnitTests.Grains.CustomPlacement_RequestContextBased");
                 tasks[i] = g.GetRuntimeInstanceId();
                 RequestContext.Clear();
@@ -129,7 +129,7 @@ namespace Tester.CustomPlacementTests
             List<GrainId> grains = new List<GrainId>();
             for (int i = 0; i < nGrains; i++)
             {
-                var g = this.fixture.GrainFactory.GetGrain<IHashBasedPlacementGrain>(Guid.NewGuid(),
+                var g = fixture.GrainFactory.GetGrain<IHashBasedPlacementGrain>(Guid.NewGuid(),
                     "UnitTests.Grains.HashBasedBasedPlacementGrain");
                 grains.Add(g.GetGrainId());
                 tasks[i] = g.GetSiloAddress();

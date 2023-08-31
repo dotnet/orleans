@@ -28,29 +28,29 @@ namespace Orleans.Transactions
         {
             if (overloadDetector.IsOverloaded())
             {
-                this.statistics.TrackTransactionThrottled();
+                statistics.TrackTransactionThrottled();
                 throw new OrleansStartTransactionFailedException(new OrleansTransactionOverloadException());
             }
 
             var guid = Guid.NewGuid();
-            DateTime ts = this.clock.UtcNow();
+            DateTime ts = clock.UtcNow();
 
             if (logger.IsEnabled(LogLevel.Trace))
                 logger.LogTrace("{TotalMilliseconds} start transaction {TransactionId} at {TimeStamp}", stopwatch.Elapsed.TotalMilliseconds.ToString("f2"), guid, ts.ToString("o"));
-            this.statistics.TrackTransactionStarted();
+            statistics.TrackTransactionStarted();
             return Task.FromResult<TransactionInfo>(new TransactionInfo(guid, ts, ts));
         }
 
         public async Task<(TransactionalStatus, Exception)> Resolve(TransactionInfo transactionInfo)
         {
-            transactionInfo.TimeStamp = this.clock.MergeUtcNow(transactionInfo.TimeStamp);
+            transactionInfo.TimeStamp = clock.MergeUtcNow(transactionInfo.TimeStamp);
 
             if (logger.IsEnabled(LogLevel.Trace))
                 logger.LogTrace("{ElapsedMilliseconds} prepare {TransactionInfo}", stopwatch.Elapsed.TotalMilliseconds.ToString("f2"), transactionInfo);
 
             if (transactionInfo.Participants.Count == 0)
             {
-                this.statistics.TrackTransactionSucceeded();
+                statistics.TrackTransactionSucceeded();
                 return (TransactionalStatus.Ok, null);
             }
 
@@ -65,14 +65,14 @@ namespace Orleans.Transactions
                     ? await CommitReadOnlyTransaction(transactionInfo, resources)
                     : await CommitReadWriteTransaction(transactionInfo, writeParticipants, resources, manager.Value);
                 if (status == TransactionalStatus.Ok)
-                    this.statistics.TrackTransactionSucceeded();
+                    statistics.TrackTransactionSucceeded();
                 else
-                    this.statistics.TrackTransactionFailed();
+                    statistics.TrackTransactionFailed();
                 return (status, exception);
             }
             catch (Exception)
             {
-                this.statistics.TrackTransactionFailed();
+                statistics.TrackTransactionFailed();
                 throw;
             }
         }
@@ -119,7 +119,7 @@ namespace Orleans.Transactions
             {
                 if (logger.IsEnabled(LogLevel.Debug))
                     logger.LogDebug("{TotalMilliseconds} failure {TransactionId} CommitReadOnly", stopwatch.Elapsed.TotalMilliseconds.ToString("f2"), transactionInfo.TransactionId);
-                this.logger.LogWarning(ex, "Unknown error while commiting readonly transaction {TransactionId}", transactionInfo.TransactionId);
+                logger.LogWarning(ex, "Unknown error while commiting readonly transaction {TransactionId}", transactionInfo.TransactionId);
                 status = TransactionalStatus.PresumedAbort;
                 exception = ex;
             }
@@ -139,7 +139,7 @@ namespace Orleans.Transactions
                             "{TotalMilliseconds} failure aborting {TransactionId} CommitReadOnly",
                             stopwatch.Elapsed.TotalMilliseconds.ToString("f2"),
                             transactionInfo.TransactionId);
-                    this.logger.LogWarning(
+                    logger.LogWarning(
                         ex,
                         "Failed to abort readonly transaction {TransactionId}",
                         transactionInfo.TransactionId);
@@ -188,7 +188,7 @@ namespace Orleans.Transactions
             {
                 if (logger.IsEnabled(LogLevel.Debug))
                     logger.LogDebug("{TotalMilliseconds} failure {TransactionId} CommitReadWriteTransaction", stopwatch.Elapsed.TotalMilliseconds.ToString("f2"), transactionInfo.TransactionId);
-                this.logger.LogWarning(ex, "Unknown error while committing transaction {TransactionId}", transactionInfo.TransactionId);
+                logger.LogWarning(ex, "Unknown error while committing transaction {TransactionId}", transactionInfo.TransactionId);
                 status = TransactionalStatus.PresumedAbort;
                 exception = ex;
             }
@@ -213,7 +213,7 @@ namespace Orleans.Transactions
                 {
                     if (logger.IsEnabled(LogLevel.Debug))
                         logger.LogDebug("{TotalMilliseconds} failure aborting {TransactionId} CommitReadWriteTransaction", stopwatch.Elapsed.TotalMilliseconds.ToString("f2"), transactionInfo.TransactionId);
-                    this.logger.LogWarning(ex, "Failed to abort transaction {TransactionId}", transactionInfo.TransactionId);
+                    logger.LogWarning(ex, "Failed to abort transaction {TransactionId}", transactionInfo.TransactionId);
                 }
             }
 
@@ -225,7 +225,7 @@ namespace Orleans.Transactions
 
         public async Task Abort(TransactionInfo transactionInfo)
         {
-            this.statistics.TrackTransactionFailed();
+            statistics.TrackTransactionFailed();
 
             List<ParticipantId> participants = transactionInfo.Participants.Keys.ToList();
 

@@ -15,7 +15,7 @@ namespace Orleans.Runtime.Versions
         private readonly IInternalGrainFactory grainFactory;
         private readonly IServiceProvider services;
         private readonly string clusterId;
-        private IVersionStoreGrain StoreGrain => this.grainFactory.GetGrain<IVersionStoreGrain>(this.clusterId);
+        private IVersionStoreGrain StoreGrain => grainFactory.GetGrain<IVersionStoreGrain>(clusterId);
 
         public bool IsEnabled { get; private set; }
 
@@ -23,8 +23,8 @@ namespace Orleans.Runtime.Versions
         {
             this.grainFactory = grainFactory;
             this.services = services;
-            this.clusterId = siloDetails.ClusterId;
-            this.IsEnabled = false;
+            clusterId = siloDetails.ClusterId;
+            IsEnabled = false;
         }
 
         public async Task SetCompatibilityStrategy(CompatibilityStrategy strategy)
@@ -84,12 +84,12 @@ namespace Orleans.Runtime.Versions
 
         public void Participate(ISiloLifecycle lifecycle)
         {
-            lifecycle.Subscribe<GrainVersionStore>(ServiceLifecycleStage.ApplicationServices, this.OnStart);
+            lifecycle.Subscribe<GrainVersionStore>(ServiceLifecycleStage.ApplicationServices, OnStart);
         }
 
         private Task OnStart(CancellationToken token)
         {
-            this.IsEnabled = this.services.GetService<IGrainStorage>() != null;
+            IsEnabled = services.GetService<IGrainStorage>() != null;
             return Task.CompletedTask;
         }
     }

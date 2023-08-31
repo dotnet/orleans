@@ -6,11 +6,11 @@ namespace NonSilo.Tests.Utilities
     {
         public DelegateAsyncTimerFactory(Func<TimeSpan, string, IAsyncTimer> create)
         {
-            this.CreateDelegate = create;
+            CreateDelegate = create;
         }
 
         public Func<TimeSpan, string, IAsyncTimer> CreateDelegate { get; set; }
 
-        public IAsyncTimer Create(TimeSpan period, string name) => this.CreateDelegate(period, name);
+        public IAsyncTimer Create(TimeSpan period, string name) => CreateDelegate(period, name);
     }
 }

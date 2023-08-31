@@ -19,12 +19,12 @@ namespace Orleans.Configuration
         /// <inheritdoc />
         public void ValidateConfiguration()
         {
-            if (string.IsNullOrWhiteSpace(this.options.Invariant))
+            if (string.IsNullOrWhiteSpace(options.Invariant))
             {
                 throw new OrleansConfigurationException($"Invalid {nameof(AdoNetReminderTableOptions)} values for {nameof(AdoNetReminderTable)}. {nameof(options.Invariant)} is required.");
             }
 
-            if (string.IsNullOrWhiteSpace(this.options.ConnectionString))
+            if (string.IsNullOrWhiteSpace(options.ConnectionString))
             {
                 throw new OrleansConfigurationException($"Invalid {nameof(AdoNetReminderTableOptions)} values for {nameof(AdoNetReminderTable)}. {nameof(options.ConnectionString)} is required.");
             }

@@ -15,9 +15,9 @@ namespace Tester.Directories
 
         protected GrainDirectoryTests(ITestOutputHelper testOutput)
         {
-            this.loggerFactory = new LoggerFactory();
-            this.loggerFactory.AddProvider(new XunitLoggerProvider(testOutput));
-            this.grainDirectory = GetGrainDirectory();
+            loggerFactory = new LoggerFactory();
+            loggerFactory.AddProvider(new XunitLoggerProvider(testOutput));
+            grainDirectory = GetGrainDirectory();
         }
 
         protected abstract T GetGrainDirectory();
@@ -33,13 +33,13 @@ namespace Tester.Directories
                 MembershipVersion = new MembershipVersion(51)
             };
 
-            Assert.Equal(expected, await this.grainDirectory.Register(expected, null));
+            Assert.Equal(expected, await grainDirectory.Register(expected, null));
 
-            Assert.Equal(expected, await this.grainDirectory.Lookup(expected.GrainId));
+            Assert.Equal(expected, await grainDirectory.Lookup(expected.GrainId));
 
-            await this.grainDirectory.Unregister(expected);
+            await grainDirectory.Unregister(expected);
 
-            Assert.Null(await this.grainDirectory.Lookup(expected.GrainId));
+            Assert.Null(await grainDirectory.Lookup(expected.GrainId));
         }
 
         [SkippableFact]
@@ -69,11 +69,11 @@ namespace Tester.Directories
                 MembershipVersion = new MembershipVersion(51)
             };
 
-            Assert.Equal(expected, await this.grainDirectory.Register(expected, null));
-            Assert.Equal(expected, await this.grainDirectory.Register(differentActivation, null));
-            Assert.Equal(expected, await this.grainDirectory.Register(differentSilo, null));
+            Assert.Equal(expected, await grainDirectory.Register(expected, null));
+            Assert.Equal(expected, await grainDirectory.Register(differentActivation, null));
+            Assert.Equal(expected, await grainDirectory.Register(differentSilo, null));
 
-            Assert.Equal(expected, await this.grainDirectory.Lookup(expected.GrainId));
+            Assert.Equal(expected, await grainDirectory.Lookup(expected.GrainId));
         }
 
         /// <summary>
@@ -107,15 +107,15 @@ namespace Tester.Directories
             };
 
             // Success, no registration exists, so the previous address is ignored.
-            Assert.Equal(initial, await this.grainDirectory.Register(initial, differentSilo));
+            Assert.Equal(initial, await grainDirectory.Register(initial, differentSilo));
 
             // Success, the previous address matches the existing registration.
-            Assert.Equal(differentActivation, await this.grainDirectory.Register(differentActivation, initial));
+            Assert.Equal(differentActivation, await grainDirectory.Register(differentActivation, initial));
 
             // Failure, the previous address does not match the existing registration.
-            Assert.Equal(differentActivation, await this.grainDirectory.Register(differentSilo, initial));
+            Assert.Equal(differentActivation, await grainDirectory.Register(differentSilo, initial));
 
-            Assert.Equal(differentActivation, await this.grainDirectory.Lookup(initial.GrainId));
+            Assert.Equal(differentActivation, await grainDirectory.Lookup(initial.GrainId));
         }
 
         [SkippableFact]
@@ -137,15 +137,15 @@ namespace Tester.Directories
                 MembershipVersion = new MembershipVersion(51)
             };
 
-            Assert.Equal(expected, await this.grainDirectory.Register(expected, null));
-            await this.grainDirectory.Unregister(otherEntry);
-            Assert.Equal(expected, await this.grainDirectory.Lookup(expected.GrainId));
+            Assert.Equal(expected, await grainDirectory.Register(expected, null));
+            await grainDirectory.Unregister(otherEntry);
+            Assert.Equal(expected, await grainDirectory.Lookup(expected.GrainId));
         }
 
         [SkippableFact]
         public async Task LookupNotFound()
         {
-            Assert.Null(await this.grainDirectory.Lookup(GrainId.Parse("user/somerandomuser_" + Guid.NewGuid().ToString("N"))));
+            Assert.Null(await grainDirectory.Lookup(GrainId.Parse("user/somerandomuser_" + Guid.NewGuid().ToString("N"))));
         }
     }
 }

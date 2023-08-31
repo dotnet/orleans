@@ -17,7 +17,7 @@ namespace UnitTests.Grains.Directories
             _siloAddress = siloDetails.SiloAddress;
         }
 
-        public Task<int> Ping() => Task.FromResult(++this.counter);
+        public Task<int> Ping() => Task.FromResult(++counter);
 
         public Task Reset()
         {

@@ -8,7 +8,7 @@ namespace UnitTests
 
         public void InitializeConnectionStringAccessor(Func<Task<string>> connectionStringAccessor)
         {
-            Interlocked.CompareExchange(ref this.connectionStringLazy,
+            Interlocked.CompareExchange(ref connectionStringLazy,
                 new Lazy<Task<string>>(connectionStringAccessor, LazyThreadSafetyMode.ExecutionAndPublication), null);
         }
 
@@ -16,13 +16,13 @@ namespace UnitTests
         {
             get
             {
-                if (this.connectionStringLazy == null)
+                if (connectionStringLazy == null)
                 {
                     throw new InvalidOperationException(
                         $"{nameof(InitializeConnectionStringAccessor)} was not called before accessing the connection string");
                 }
 
-                var connString = this.connectionStringLazy.Value.Result;
+                var connString = connectionStringLazy.Value.Result;
                 if (connString != null)
                 {
                     return connString;

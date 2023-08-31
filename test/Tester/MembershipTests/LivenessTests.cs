@@ -25,11 +25,11 @@ namespace UnitTests.MembershipTests
 
         protected async Task Do_Liveness_OracleTest_1()
         {
-            output.WriteLine("ClusterId= {0}", this.HostedCluster.Options.ClusterId);
+            output.WriteLine("ClusterId= {0}", HostedCluster.Options.ClusterId);
 
-            SiloHandle silo3 = await this.HostedCluster.StartAdditionalSiloAsync();
+            SiloHandle silo3 = await HostedCluster.StartAdditionalSiloAsync();
 
-            IManagementGrain mgmtGrain = this.GrainFactory.GetGrain<IManagementGrain>(0);
+            IManagementGrain mgmtGrain = GrainFactory.GetGrain<IManagementGrain>(0);
 
             Dictionary<SiloAddress, SiloStatus> statuses = await mgmtGrain.GetHosts(false);
             foreach (var pair in statuses)
@@ -41,7 +41,7 @@ namespace UnitTests.MembershipTests
 
             IPEndPoint address = silo3.SiloAddress.Endpoint;
             output.WriteLine("About to stop {0}", address);
-            await this.HostedCluster.StopSiloAsync(silo3);
+            await HostedCluster.StopSiloAsync(silo3);
 
             // TODO: Should we be allowing time for changes to percolate?
 
@@ -68,25 +68,25 @@ namespace UnitTests.MembershipTests
 
         protected async Task Do_Liveness_OracleTest_2(int silo2Kill, bool restart = true, bool startTimers = false)
         {
-            await this.HostedCluster.StartAdditionalSilosAsync(numAdditionalSilos);
-            await this.HostedCluster.WaitForLivenessToStabilizeAsync();
+            await HostedCluster.StartAdditionalSilosAsync(numAdditionalSilos);
+            await HostedCluster.WaitForLivenessToStabilizeAsync();
 
             for (int i = 0; i < numGrains; i++)
             {
                 await SendTraffic(i + 1, startTimers);
             }
 
-            SiloHandle silo2KillHandle = this.HostedCluster.Silos[silo2Kill];
+            SiloHandle silo2KillHandle = HostedCluster.Silos[silo2Kill];
 
             logger.LogInformation("\n\n\n\nAbout to kill {Endpoint}\n\n\n", silo2KillHandle.SiloAddress.Endpoint);
 
             if (restart)
-                await this.HostedCluster.RestartSiloAsync(silo2KillHandle);
+                await HostedCluster.RestartSiloAsync(silo2KillHandle);
             else
-                await this.HostedCluster.KillSiloAsync(silo2KillHandle);
+                await HostedCluster.KillSiloAsync(silo2KillHandle);
 
             bool didKill = !restart;
-            await this.HostedCluster.WaitForLivenessToStabilizeAsync(didKill);
+            await HostedCluster.WaitForLivenessToStabilizeAsync(didKill);
 
             logger.LogInformation("\n\n\n\nAbout to start sending msg to grain again\n\n\n");
 
@@ -104,25 +104,25 @@ namespace UnitTests.MembershipTests
 
         protected async Task Do_Liveness_OracleTest_3()
         {
-            var moreSilos = await this.HostedCluster.StartAdditionalSilosAsync(1);
-            await this.HostedCluster.WaitForLivenessToStabilizeAsync();
+            var moreSilos = await HostedCluster.StartAdditionalSilosAsync(1);
+            await HostedCluster.WaitForLivenessToStabilizeAsync();
 
             await TestTraffic();
 
             logger.LogInformation("\n\n\n\nAbout to stop a first silo.\n\n\n");
-            var siloToStop = this.HostedCluster.SecondarySilos[0];
-            await this.HostedCluster.StopSiloAsync(siloToStop);
+            var siloToStop = HostedCluster.SecondarySilos[0];
+            await HostedCluster.StopSiloAsync(siloToStop);
 
             await TestTraffic();
 
             logger.LogInformation("\n\n\n\nAbout to re-start a first silo.\n\n\n");
             
-            await this.HostedCluster.RestartStoppedSecondarySiloAsync(siloToStop.Name);
+            await HostedCluster.RestartStoppedSecondarySiloAsync(siloToStop.Name);
 
             await TestTraffic();
 
             logger.LogInformation("\n\n\n\nAbout to stop a second silo.\n\n\n");
-            await this.HostedCluster.StopSiloAsync(moreSilos[0]);
+            await HostedCluster.StopSiloAsync(moreSilos[0]);
 
             await TestTraffic();
 
@@ -148,7 +148,7 @@ namespace UnitTests.MembershipTests
         {
             try
             {
-                ILivenessTestGrain grain = this.GrainFactory.GetGrain<ILivenessTestGrain>(key);
+                ILivenessTestGrain grain = GrainFactory.GetGrain<ILivenessTestGrain>(key);
                 Assert.Equal(key, grain.GetPrimaryKeyLong());
                 Assert.Equal(key.ToString(CultureInfo.InvariantCulture), await grain.GetLabel());
                 await LogGrainIdentity(logger, grain);

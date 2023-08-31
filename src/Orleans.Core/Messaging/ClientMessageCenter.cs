@@ -79,13 +79,13 @@ namespace Orleans.Messaging
             this.connectionManager = connectionManager;
             MyAddress = SiloAddress.New(localAddress, 0, gen);
             ClientId = clientId;
-            this.RuntimeClient = runtimeClient;
+            RuntimeClient = runtimeClient;
             this.messageFactory = messageFactory;
             this.connectionStatusListener = connectionStatusListener;
             Running = false;
             this.gatewayManager = gatewayManager;
             numMessages = 0;
-            this.grainBuckets = new WeakReference<ClientOutboundConnection>[clientMessagingOptions.Value.ClientSenderBuckets];
+            grainBuckets = new WeakReference<ClientOutboundConnection>[clientMessagingOptions.Value.ClientSenderBuckets];
             logger = loggerFactory.CreateLogger<ClientMessageCenter>();
             if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug("Proxy grain client constructed");
             ClientInstruments.RegisterConnectedGatewayCountObserve(() => connectionManager.ConnectionCount);
@@ -155,7 +155,7 @@ namespace Orleans.Messaging
 
         public void DispatchLocalMessage(Message message)
         {
-            var handler = this.messageHandler;
+            var handler = messageHandler;
             if (handler is null)
             {
                 ThrowNullMessageHandler();
@@ -172,14 +172,14 @@ namespace Orleans.Messaging
         {
             if (!Running)
             {
-                this.logger.LogError(
+                logger.LogError(
                     (int)ErrorCode.ProxyClient_MsgCtrNotRunning,
                     "Ignoring {Message} because the Client message center is not running",
                     msg);
                 return;
             }
 
-            var connectionTask = this.GetGatewayConnection(msg);
+            var connectionTask = GetGatewayConnection(msg);
             if (connectionTask.IsCompletedSuccessfully)
             {
                 var connection = connectionTask.Result;
@@ -187,9 +187,9 @@ namespace Orleans.Messaging
 
                 connection.Send(msg);
 
-                if (this.logger.IsEnabled(LogLevel.Trace))
+                if (logger.IsEnabled(LogLevel.Trace))
                 {
-                    this.logger.LogTrace(
+                    logger.LogTrace(
                         (int)ErrorCode.ProxyClient_QueueRequest,
                         "Sending message {Message} via gateway {Gateway}",
                         msg,
@@ -211,9 +211,9 @@ namespace Orleans.Messaging
 
                         connection.Send(message);
 
-                        if (this.logger.IsEnabled(LogLevel.Trace))
+                        if (logger.IsEnabled(LogLevel.Trace))
                         {
-                            this.logger.LogTrace(
+                            logger.LogTrace(
                                 (int)ErrorCode.ProxyClient_QueueRequest,
                                 "Sending message {Message} via gateway {Gateway}",
                                 message,
@@ -227,7 +227,7 @@ namespace Orleans.Messaging
                             ++message.RetryCount;
 
                             _ = Task.Factory.StartNew(
-                                state => this.SendMessage((Message)state),
+                                state => SendMessage((Message)state),
                                 message,
                                 CancellationToken.None,
                                 TaskCreationOptions.DenyChildAttach,
@@ -235,7 +235,7 @@ namespace Orleans.Messaging
                         }
                         else
                         {
-                            this.RejectMessage(message, $"Unable to send message due to exception {exception}", exception);
+                            RejectMessage(message, $"Unable to send message due to exception {exception}", exception);
                         }
                     }
                 }
@@ -248,7 +248,7 @@ namespace Orleans.Messaging
             if (msg.TargetSilo != null && gatewayManager.IsGatewayAvailable(msg.TargetSilo))
             {
                 var siloAddress = SiloAddress.New(msg.TargetSilo.Endpoint, 0);
-                var connectionTask = this.connectionManager.GetConnection(siloAddress);
+                var connectionTask = connectionManager.GetConnection(siloAddress);
                 if (connectionTask.IsCompletedSuccessfully) return connectionTask;
 
                 return ConnectAsync(msg.TargetSilo, connectionTask, msg, directGatewayMessage: true);
@@ -279,7 +279,7 @@ namespace Orleans.Messaging
 
                 var gatewayAddress = gatewayAddresses[msgNumber % numGateways];
 
-                var connectionTask = this.connectionManager.GetConnection(gatewayAddress);
+                var connectionTask = connectionManager.GetConnection(gatewayAddress);
                 if (connectionTask.IsCompletedSuccessfully) return connectionTask;
 
                 return ConnectAsync(gatewayAddress, connectionTask, msg, directGatewayMessage: false);
@@ -315,10 +315,10 @@ namespace Orleans.Messaging
                 return new ValueTask<Connection>(default(Connection));
             }
 
-            var gatewayConnection = this.connectionManager.GetConnection(addr);
+            var gatewayConnection = connectionManager.GetConnection(addr);
             if (gatewayConnection.IsCompletedSuccessfully)
             {
-                this.UpdateBucket(index, (ClientOutboundConnection)gatewayConnection.Result);
+                UpdateBucket(index, (ClientOutboundConnection)gatewayConnection.Result);
                 return gatewayConnection;
             }
 
@@ -332,13 +332,13 @@ namespace Orleans.Messaging
                 try
                 {
                     var connection = (ClientOutboundConnection)await connectionTask.ConfigureAwait(false);
-                    this.UpdateBucket(bucketIndex, connection);
+                    UpdateBucket(bucketIndex, connection);
                     return connection;
                 }
                 catch
                 {
-                    this.gatewayManager.MarkAsDead(gatewayAddress);
-                    this.UpdateBucket(bucketIndex, null);
+                    gatewayManager.MarkAsDead(gatewayAddress);
+                    UpdateBucket(bucketIndex, null);
                     throw;
                 }
             }
@@ -361,7 +361,7 @@ namespace Orleans.Messaging
                 }
                 finally
                 {
-                    if (result is null) this.gatewayManager.MarkAsDead(gateway);
+                    if (result is null) gatewayManager.MarkAsDead(gateway);
                 }
             }
 
@@ -375,17 +375,17 @@ namespace Orleans.Messaging
 
         private void UpdateBucket(uint index, ClientOutboundConnection connection)
         {
-            lock (this.grainBucketUpdateLock)
+            lock (grainBucketUpdateLock)
             {
-                var value = this.grainBuckets[index] ?? new WeakReference<ClientOutboundConnection>(connection);
+                var value = grainBuckets[index] ?? new WeakReference<ClientOutboundConnection>(connection);
                 value.SetTarget(connection);
-                this.grainBuckets[index] = value;
+                grainBuckets[index] = value;
             }
         }
 
         public void RegisterLocalMessageHandler(Action<Message> handler)
         {
-            this.messageHandler = handler;
+            messageHandler = handler;
         }
 
         public void RejectMessage(Message msg, string reason, Exception exc = null)
@@ -400,7 +400,7 @@ namespace Orleans.Messaging
             {
                 if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug((int)ErrorCode.ProxyClient_RejectingMsg, "Rejecting message: {Message}. Reason = {Reason}", msg, reason);
                 MessagingInstruments.OnRejectedMessage(msg);
-                var error = this.messageFactory.CreateRejectionResponse(msg, Message.RejectionTypes.Unrecoverable, reason, exc);
+                var error = messageFactory.CreateRejectionResponse(msg, Message.RejectionTypes.Unrecoverable, reason, exc);
                 DispatchLocalMessage(error);
             }
         }
@@ -408,7 +408,7 @@ namespace Orleans.Messaging
         internal void OnGatewayConnectionOpen()
         {
             int newCount = Interlocked.Increment(ref numberOfConnectedGateways);
-            this.connectionStatusListener.NotifyGatewayCountChanged(newCount, newCount - 1);
+            connectionStatusListener.NotifyGatewayCountChanged(newCount, newCount - 1);
         }
 
         internal void OnGatewayConnectionClosed()
@@ -416,10 +416,10 @@ namespace Orleans.Messaging
             var gatewayCount = Interlocked.Decrement(ref numberOfConnectedGateways);
             if (gatewayCount == 0)
             {
-                this.connectionStatusListener.NotifyClusterConnectionLost();
+                connectionStatusListener.NotifyClusterConnectionLost();
             }
 
-            this.connectionStatusListener.NotifyGatewayCountChanged(gatewayCount, gatewayCount + 1);
+            connectionStatusListener.NotifyGatewayCountChanged(gatewayCount, gatewayCount + 1);
         }
 
         public void Dispose()

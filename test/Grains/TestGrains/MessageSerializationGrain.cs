@@ -51,15 +51,15 @@ namespace UnitTests.Grains
 
         private async Task<IMessageSerializationGrain> GetGrainOnOtherSilo()
         {
-            if (this.grainOnOtherSilo != null) return this.grainOnOtherSilo;
+            if (grainOnOtherSilo != null) return grainOnOtherSilo;
 
             // Find a grain on another silo.
             IMessageSerializationGrain otherGrain;
             var id = this.GetPrimaryKeyLong();
-            var currentSiloIdentity = await this.GetSiloIdentity();
+            var currentSiloIdentity = await GetSiloIdentity();
             while (true)
             {
-                otherGrain = this.GrainFactory.GetGrain<IMessageSerializationGrain>(++id);
+                otherGrain = GrainFactory.GetGrain<IMessageSerializationGrain>(++id);
                 var otherIdentity = await otherGrain.GetSiloIdentity();
                 if (!string.Equals(otherIdentity, currentSiloIdentity))
                 {
@@ -67,12 +67,12 @@ namespace UnitTests.Grains
                 }
             }
 
-            return this.grainOnOtherSilo = otherGrain;
+            return grainOnOtherSilo = otherGrain;
         }
 
         public Task<string> GetSiloIdentity()
         {
-            return Task.FromResult(this.RuntimeIdentity);
+            return Task.FromResult(RuntimeIdentity);
         }
     }
 }

@@ -263,8 +263,8 @@ namespace Orleans
             /// <param name="map">The interface map.</param>
             public Cache(MajorMinorVersion version, Dictionary<GrainInterfaceType, CacheEntry> map)
             {
-                this.Version = version;
-                this.Map = map;
+                Version = version;
+                Map = map;
             }
 
             /// <summary>
@@ -290,8 +290,8 @@ namespace Orleans
             /// <param name="implementations">The set of other implementations along with their grain type prefixes.</param>
             public CacheEntry(GrainType primaryImplementation, List<(string Prefix, GrainType GrainType)> implementations)
             {
-                this.PrimaryImplementation = primaryImplementation;
-                this.Implementations = implementations;
+                PrimaryImplementation = primaryImplementation;
+                Implementations = implementations;
             }
 
             /// <summary>

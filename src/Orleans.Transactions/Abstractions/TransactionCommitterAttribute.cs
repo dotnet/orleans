@@ -10,8 +10,8 @@ namespace Orleans.Transactions.Abstractions
 
         public TransactionCommitterAttribute(string serviceName, string storageName = null)
         {
-            this.ServiceName = serviceName;
-            this.StorageName = storageName;
+            ServiceName = serviceName;
+            StorageName = storageName;
         }
     }
 }

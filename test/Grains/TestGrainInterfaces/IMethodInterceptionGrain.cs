@@ -86,7 +86,7 @@ namespace UnitTests.GrainInterfaces
     [AttributeUsage(AttributeTargets.Method)]
     public class TestMethodTagAttribute : Attribute
     {
-        public TestMethodTagAttribute(string tag) => this.Tag = tag;
+        public TestMethodTagAttribute(string tag) => Tag = tag;
         public string Tag { get; }
     }
 }

@@ -48,14 +48,14 @@ namespace UnitTests.GrainInterfaces
             CustomPlacementScenario result;
             if (properties.Properties.TryGetValue(ScenarioKey, out var value) && Enum.TryParse(value, out result))
             {
-                this.Scenario = result;
+                Scenario = result;
             }
         }
 
         public override void PopulateGrainProperties(IServiceProvider services, Type grainClass, GrainType grainType, Dictionary<string, string> properties)
         {
             base.PopulateGrainProperties(services, grainClass, grainType, properties);
-            properties[ScenarioKey] = this.Scenario.ToString();
+            properties[ScenarioKey] = Scenario.ToString();
         }
     }
 

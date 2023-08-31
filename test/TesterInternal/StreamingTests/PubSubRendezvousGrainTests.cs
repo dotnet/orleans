@@ -37,10 +37,10 @@ namespace UnitTests.StreamingTests
         [Fact, TestCategory("BVT"), TestCategory("Streaming"), TestCategory("PubSub")]
         public async Task RegisterConsumerFaultTest()
         {
-            this.fixture.Logger.LogInformation("************************ RegisterConsumerFaultTest *********************************");
+            fixture.Logger.LogInformation("************************ RegisterConsumerFaultTest *********************************");
             var streamId = new QualifiedStreamId("ProviderName", StreamId.Create("StreamNamespace", Guid.NewGuid()));
-            var pubSubGrain = this.fixture.GrainFactory.GetGrain<IPubSubRendezvousGrain>(streamId.ToString());
-            var faultGrain = this.fixture.GrainFactory.GetGrain<IStorageFaultGrain>(nameof(PubSubRendezvousGrain));
+            var pubSubGrain = fixture.GrainFactory.GetGrain<IPubSubRendezvousGrain>(streamId.ToString());
+            var faultGrain = fixture.GrainFactory.GetGrain<IStorageFaultGrain>(nameof(PubSubRendezvousGrain));
 
             // clean call, to make sure everything is happy and pubsub has state.
             await pubSubGrain.RegisterConsumer(GuidId.GetGuidId(Guid.NewGuid()), streamId, default, null);
@@ -63,10 +63,10 @@ namespace UnitTests.StreamingTests
         [Fact, TestCategory("BVT"), TestCategory("Streaming"), TestCategory("PubSub")]
         public async Task UnregisterConsumerFaultTest()
         {
-            this.fixture.Logger.LogInformation("************************ UnregisterConsumerFaultTest *********************************");
+            fixture.Logger.LogInformation("************************ UnregisterConsumerFaultTest *********************************");
             var streamId = new QualifiedStreamId("ProviderName", StreamId.Create("StreamNamespace", Guid.NewGuid()));
-            var pubSubGrain = this.fixture.GrainFactory.GetGrain<IPubSubRendezvousGrain>(streamId.ToString());
-            var faultGrain = this.fixture.GrainFactory.GetGrain<IStorageFaultGrain>(nameof(PubSubRendezvousGrain));
+            var pubSubGrain = fixture.GrainFactory.GetGrain<IPubSubRendezvousGrain>(streamId.ToString());
+            var faultGrain = fixture.GrainFactory.GetGrain<IStorageFaultGrain>(nameof(PubSubRendezvousGrain));
 
             // Add two consumers so when we remove the first it does a storage write, not a storage clear.
             GuidId subscriptionId1 = GuidId.GetGuidId(Guid.NewGuid());
@@ -109,10 +109,10 @@ namespace UnitTests.StreamingTests
         [Fact(Skip = "This test fails because the producer must be grain reference which is not implied by the IStreamProducerExtension"), TestCategory("BVT"), TestCategory("Streaming"), TestCategory("PubSub")]
         public async Task RegisterProducerFaultTest()
         {
-            this.fixture.Logger.LogInformation("************************ RegisterProducerFaultTest *********************************");
+            fixture.Logger.LogInformation("************************ RegisterProducerFaultTest *********************************");
             var streamId = new QualifiedStreamId("ProviderName", StreamId.Create("StreamNamespace", Guid.NewGuid()));
-            var pubSubGrain = this.fixture.GrainFactory.GetGrain<IPubSubRendezvousGrain>(streamId.ToString());
-            var faultGrain = this.fixture.GrainFactory.GetGrain<IStorageFaultGrain>(nameof(PubSubRendezvousGrain));
+            var pubSubGrain = fixture.GrainFactory.GetGrain<IPubSubRendezvousGrain>(streamId.ToString());
+            var faultGrain = fixture.GrainFactory.GetGrain<IStorageFaultGrain>(nameof(PubSubRendezvousGrain));
 
             // clean call, to make sure everything is happy and pubsub has state.
             await pubSubGrain.RegisterProducer(streamId, default);
@@ -139,10 +139,10 @@ namespace UnitTests.StreamingTests
         [Fact(Skip = "This test fails because the producer must be grain reference which is not implied by the IStreamProducerExtension"), TestCategory("BVT"), TestCategory("Streaming"), TestCategory("PubSub")]
         public async Task UnregisterProducerFaultTest()
         {
-            this.fixture.Logger.LogInformation("************************ UnregisterProducerFaultTest *********************************");
+            fixture.Logger.LogInformation("************************ UnregisterProducerFaultTest *********************************");
             var streamId = new QualifiedStreamId("ProviderName", StreamId.Create("StreamNamespace", Guid.NewGuid()));
-            var pubSubGrain = this.fixture.GrainFactory.GetGrain<IPubSubRendezvousGrain>(streamId.ToString());
-            var faultGrain = this.fixture.GrainFactory.GetGrain<IStorageFaultGrain>(nameof(PubSubRendezvousGrain));
+            var pubSubGrain = fixture.GrainFactory.GetGrain<IPubSubRendezvousGrain>(streamId.ToString());
+            var faultGrain = fixture.GrainFactory.GetGrain<IStorageFaultGrain>(nameof(PubSubRendezvousGrain));
 
             IStreamProducerExtension firstProducer = new DummyStreamProducerExtension();
             IStreamProducerExtension secondProducer = new DummyStreamProducerExtension();

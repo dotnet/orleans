@@ -89,12 +89,12 @@ namespace Orleans.Runtime
                 if (stage < numFilters)
                 {
                     // Call each of the specified interceptors.
-                    var systemWideFilter = this.filters[stage];
+                    var systemWideFilter = filters[stage];
                     stage++;
                     await systemWideFilter.Invoke(this);
 
                     // If Response is null some filter did not continue the call chain
-                    if (this.Response is null)
+                    if (Response is null)
                     {
                         ThrowBrokenCallFilterChain(systemWideFilter.GetType().Name);
                     }
@@ -107,14 +107,14 @@ namespace Orleans.Runtime
                     stage++;
 
                     // Grain-level invoker, if present.
-                    if (this.Grain is IIncomingGrainCallFilter grainClassLevelFilter)
+                    if (Grain is IIncomingGrainCallFilter grainClassLevelFilter)
                     {
                         await grainClassLevelFilter.Invoke(this);
 
                         // If Response is null some filter did not continue the call chain
-                        if (this.Response is null)
+                        if (Response is null)
                         {
-                            ThrowBrokenCallFilterChain(this.Grain.GetType().Name);
+                            ThrowBrokenCallFilterChain(Grain.GetType().Name);
                         }
                         return;
                     }
@@ -124,15 +124,15 @@ namespace Orleans.Runtime
                 {
                     // Finally call the root-level invoker.
                     stage++;
-                    this.Response = await request.Invoke();
+                    Response = await request.Invoke();
 
                     // Propagate exceptions to other filters.
-                    if (this.Response.Exception is { } exception)
+                    if (Response.Exception is { } exception)
                     {
                         ExceptionDispatchInfo.Capture(exception).Throw();
                     }
 
-                    this.Response = this.responseCopier.Copy(this.Response);
+                    Response = responseCopier.Copy(Response);
 
                     return;
                 }
@@ -160,8 +160,8 @@ namespace Orleans.Runtime
 
         private (MethodInfo ImplementationMethod, MethodInfo InterfaceMethod) GetMethodEntry()
         {
-            var interfaceType = this.request.GetInterfaceType();
-            var implementationType = this.request.GetTarget().GetType();
+            var interfaceType = request.GetInterfaceType();
+            var implementationType = request.GetTarget().GetType();
 
             // Get or create the implementation map for this object.
             var implementationMap = interfaceToImplementationMapping.GetOrCreate(

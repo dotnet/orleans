@@ -84,19 +84,19 @@ namespace Orleans.Providers.Streams.Common
         {
             this.cacheDataAdapter = cacheDataAdapter ?? throw new ArgumentNullException(nameof(cacheDataAdapter));
             this.logger = logger ?? throw new ArgumentNullException(nameof(logger));
-            this.ItemCount = 0;
+            ItemCount = 0;
             pool = new CachedMessagePool(cacheDataAdapter);
             messageBlocks = new LinkedList<CachedMessageBlock>();
             this.cacheMonitor = cacheMonitor;
             if (this.cacheMonitor != null && cacheMonitorWriteInterval.HasValue)
             {
-                this.periodicMonitoring = new PeriodicAction(cacheMonitorWriteInterval.Value, this.ReportCacheMessageStatistics);
+                periodicMonitoring = new PeriodicAction(cacheMonitorWriteInterval.Value, ReportCacheMessageStatistics);
             }
 
             if (purgeMetadataInterval.HasValue)
             {
                 this.purgeMetadataInterval = purgeMetadataInterval.Value;
-                this.periodicMetadaPurging = new PeriodicAction(purgeMetadataInterval.Value.Divide(5), this.PurgeMetadata);
+                periodicMetadaPurging = new PeriodicAction(purgeMetadataInterval.Value.Divide(5), PurgeMetadata);
             }
         }
 
@@ -121,18 +121,18 @@ namespace Orleans.Providers.Streams.Common
 
         private void ReportCacheMessageStatistics()
         {
-            if (this.IsEmpty)
+            if (IsEmpty)
             {
-                this.cacheMonitor.ReportMessageStatistics(null, null, null, this.ItemCount);
+                cacheMonitor.ReportMessageStatistics(null, null, null, ItemCount);
             }
             else
             {
-                var newestMessage = this.Newest.Value;
-                var oldestMessage = this.Oldest.Value;
+                var newestMessage = Newest.Value;
+                var oldestMessage = Oldest.Value;
                 var newestMessageEnqueueTime = newestMessage.EnqueueTimeUtc;
                 var oldestMessageEnqueueTime = oldestMessage.EnqueueTimeUtc;
                 var oldestMessageDequeueTime = oldestMessage.DequeueTimeUtc;
-                this.cacheMonitor.ReportMessageStatistics(oldestMessageEnqueueTime, oldestMessageDequeueTime, newestMessageEnqueueTime, this.ItemCount);
+                cacheMonitor.ReportMessageStatistics(oldestMessageEnqueueTime, oldestMessageDequeueTime, newestMessageEnqueueTime, ItemCount);
             }
         }
 
@@ -141,9 +141,9 @@ namespace Orleans.Providers.Streams.Common
             var now = DateTime.UtcNow;
 
             // Get all keys older than this.purgeMetadataInterval
-            foreach (var kvp in this.lastPurgedToken)
+            foreach (var kvp in lastPurgedToken)
             {
-                if (kvp.Value.TimeStamp + this.purgeMetadataInterval < now)
+                if (kvp.Value.TimeStamp + purgeMetadataInterval < now)
                 {
                     lastPurgedToken.Remove(kvp.Key);
                 }
@@ -153,15 +153,15 @@ namespace Orleans.Providers.Streams.Common
         private void TrackAndPurgeMetadata(CachedMessage messageToRemove)
         {
             // If tracking of evicted message metadata is disabled, do nothing
-            if (this.periodicMetadaPurging == null)
+            if (periodicMetadaPurging == null)
                 return;
 
             var now = DateTime.UtcNow;
             var streamId = messageToRemove.StreamId;
-            var token = this.cacheDataAdapter.GetSequenceToken(ref messageToRemove);
-            this.lastPurgedToken[streamId] = (now, token);
+            var token = cacheDataAdapter.GetSequenceToken(ref messageToRemove);
+            lastPurgedToken[streamId] = (now, token);
 
-            this.periodicMetadaPurging.TryAction(now);
+            periodicMetadaPurging.TryAction(now);
         }
 
         private void SetCursor(Cursor cursor, StreamSequenceToken sequenceToken)
@@ -201,7 +201,7 @@ namespace Orleans.Providers.Streams.Common
             if (oldestMessage.Compare(sequenceToken) > 0)
             {
                 // Check if we missed an event since we last purged the cache
-                if (this.lastPurgedToken.TryGetValue(cursor.StreamId, out var entry) && sequenceToken.CompareTo(entry.Token) >= 0)
+                if (lastPurgedToken.TryGetValue(cursor.StreamId, out var entry) && sequenceToken.CompareTo(entry.Token) >= 0)
                 {
                     // If the token is more recent than the last purged token, then we didn't lose anything. Start from the oldest message in cache
                     cursor.State = CursorStates.Set;
@@ -315,11 +315,11 @@ namespace Orleans.Providers.Streams.Common
                     if (cursor.IsNewestInBlock)
                     {
                         cursor.CurrentBlock = cursor.CurrentBlock.Previous;
-                        cursor.CurrentBlock.Value.TryFindFirstMessage(cursor.StreamId, this.cacheDataAdapter, out index);
+                        cursor.CurrentBlock.Value.TryFindFirstMessage(cursor.StreamId, cacheDataAdapter, out index);
                     }
                     else
                     {
-                        cursor.CurrentBlock.Value.TryFindNextMessage(cursor.Index + 1, cursor.StreamId, this.cacheDataAdapter, out index);
+                        cursor.CurrentBlock.Value.TryFindNextMessage(cursor.Index + 1, cursor.StreamId, cacheDataAdapter, out index);
                     }
                     cursor.Index = index;
                 }
@@ -346,9 +346,9 @@ namespace Orleans.Providers.Streams.Common
         {
             foreach (var message in messages)
             {
-                this.Add(message);
+                Add(message);
             }
-            this.cacheMonitor?.TrackMessagesAdded(messages.Count);
+            cacheMonitor?.TrackMessagesAdded(messages.Count);
             periodicMonitoring?.TryAction(dequeueTime);
         }
 
@@ -368,16 +368,16 @@ namespace Orleans.Providers.Streams.Common
         /// </summary>
         public void RemoveOldestMessage()
         {
-            TrackAndPurgeMetadata(this.messageBlocks.Last.Value.OldestMessage);
+            TrackAndPurgeMetadata(messageBlocks.Last.Value.OldestMessage);
 
-            this.messageBlocks.Last.Value.Remove();
-            this.ItemCount--;
-            CachedMessageBlock lastCachedMessageBlock = this.messageBlocks.Last.Value;
+            messageBlocks.Last.Value.Remove();
+            ItemCount--;
+            CachedMessageBlock lastCachedMessageBlock = messageBlocks.Last.Value;
             // if block is currently empty, but all capacity has been exausted, remove
             if (lastCachedMessageBlock.IsEmpty && !lastCachedMessageBlock.HasCapacity)
             {
                 lastCachedMessageBlock.Dispose();
-                this.messageBlocks.RemoveLast();
+                messageBlocks.RemoveLast();
             }
         }
 

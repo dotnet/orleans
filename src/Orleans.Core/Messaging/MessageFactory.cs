@@ -30,7 +30,7 @@ namespace Orleans.Runtime
                 IsUnordered = (options & InvokeMethodOptions.Unordered) != 0,
                 IsAlwaysInterleave = (options & InvokeMethodOptions.AlwaysInterleave) != 0,
                 BodyObject = body,
-                RequestContextData = RequestContextExtensions.Export(this.deepCopier),
+                RequestContextData = RequestContextExtensions.Export(deepCopier),
             };
 
             messagingTrace.OnCreateMessage(message);
@@ -52,7 +52,7 @@ namespace Orleans.Runtime
                 SendingGrain = request.TargetGrain,
                 CacheInvalidationHeader = request.CacheInvalidationHeader,
                 TimeToLive = request.TimeToLive,
-                RequestContextData = RequestContextExtensions.Export(this.deepCopier),
+                RequestContextData = RequestContextExtensions.Export(deepCopier),
             };
 
             messagingTrace.OnCreateMessage(response);
@@ -61,7 +61,7 @@ namespace Orleans.Runtime
 
         public Message CreateRejectionResponse(Message request, Message.RejectionTypes type, string info, Exception ex = null)
         {
-            var response = this.CreateResponseMessage(request);
+            var response = CreateResponseMessage(request);
             response.Result = Message.ResponseTypes.Rejection;
             response.BodyObject = new RejectionResponse
             {
@@ -69,8 +69,8 @@ namespace Orleans.Runtime
                 RejectionInfo = info,
                 Exception = ex,
             };
-            if (this.logger.IsEnabled(LogLevel.Debug))
-                this.logger.LogDebug(
+            if (logger.IsEnabled(LogLevel.Debug))
+                logger.LogDebug(
                     ex,
                     "Creating {RejectionType} rejection with info '{Info}' at:" + Environment.NewLine + "{StackTrace}",
                     type,
@@ -81,11 +81,11 @@ namespace Orleans.Runtime
 
         internal Message CreateDiagnosticResponseMessage(Message request, bool isExecuting, bool isWaiting, List<string> diagnostics)
         {
-            var response = this.CreateResponseMessage(request);
+            var response = CreateResponseMessage(request);
             response.Result = Message.ResponseTypes.Status;
             response.BodyObject = new StatusResponse(isExecuting, isWaiting, diagnostics);
 
-            if (this.logger.IsEnabled(LogLevel.Debug)) this.logger.LogDebug("Creating {RequestMessage} status update with diagnostics {Diagnostics}", request, diagnostics);
+            if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug("Creating {RequestMessage} status update with diagnostics {Diagnostics}", request, diagnostics);
 
             return response;
         }

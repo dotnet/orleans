@@ -28,7 +28,7 @@ namespace Tester.AzureUtils.Streaming
             TestUtils.CheckForAzureStorage();
 
             // Define a cluster of 4, but 2 will be stopped.
-            builder.CreateSiloAsync = StandaloneSiloHandle.CreateForAssembly(this.GetType().Assembly);
+            builder.CreateSiloAsync = StandaloneSiloHandle.CreateForAssembly(GetType().Assembly);
             builder.Options.InitialSilosCount = 2;
             builder.AddSiloBuilderConfigurator<MySiloBuilderConfigurator>();
         }
@@ -69,7 +69,7 @@ namespace Tester.AzureUtils.Streaming
             if (!string.IsNullOrWhiteSpace(TestDefaultConfiguration.DataConnectionString))
             {
                 await AzureQueueStreamProviderUtils.DeleteAllUsedAzureQueues(NullLoggerFactory.Instance,
-                    AzureQueueUtilities.GenerateQueueNames(this.HostedCluster.Options.ClusterId, queueCount),
+                    AzureQueueUtilities.GenerateQueueNames(HostedCluster.Options.ClusterId, queueCount),
                     new AzureQueueOptions().ConfigureTestDefaults());
             }
         }
@@ -89,7 +89,7 @@ namespace Tester.AzureUtils.Streaming
         {
             await ValidateAgentsState(2, 2, "1");
 
-            await this.HostedCluster.StartAdditionalSilosAsync(2, true);
+            await HostedCluster.StartAdditionalSilosAsync(2, true);
             await ValidateAgentsState(4, 2, "2");
 
             await Task.Delay(SILO_IMMATURE_PERIOD + LEEWAY);
@@ -99,7 +99,7 @@ namespace Tester.AzureUtils.Streaming
 
         private async Task ValidateAgentsState(int numExpectedSilos, int numExpectedAgentsPerSilo, string callContext)
         {
-            var mgmt = this.GrainFactory.GetGrain<IManagementGrain>(0);
+            var mgmt = GrainFactory.GetGrain<IManagementGrain>(0);
 
             object[] results = await mgmt.SendControlCommandToProvider(adapterType, adapterName, (int)PersistentStreamProviderCommand.GetNumberRunningAgents);
             Assert.Equal(numExpectedSilos, results.Length);

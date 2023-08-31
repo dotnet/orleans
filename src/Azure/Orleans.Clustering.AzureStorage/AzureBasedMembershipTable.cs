@@ -29,19 +29,19 @@ namespace Orleans.Runtime.MembershipService
             IOptions<ClusterOptions> clusterOptions)
         {
             this.loggerFactory = loggerFactory;
-            this.logger = loggerFactory.CreateLogger<AzureBasedMembershipTable>();
-            this.options = clusteringOptions.Value;
-            this.clusterId = clusterOptions.Value.ClusterId;
+            logger = loggerFactory.CreateLogger<AzureBasedMembershipTable>();
+            options = clusteringOptions.Value;
+            clusterId = clusterOptions.Value.ClusterId;
         }
 
         public async Task InitializeMembershipTable(bool tryInitTableVersion)
         {
             LogFormatter.SetExceptionDecoder(typeof(RequestFailedException), AzureTableUtils.PrintStorageException);
 
-            this.tableManager = await OrleansSiloInstanceManager.GetManager(
-                this.clusterId,
-                this.loggerFactory,
-                this.options);
+            tableManager = await OrleansSiloInstanceManager.GetManager(
+                clusterId,
+                loggerFactory,
+                options);
 
             // even if I am not the one who created the table,
             // try to insert an initial table version if it is not already there,

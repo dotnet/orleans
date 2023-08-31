@@ -24,11 +24,11 @@ namespace AWSUtils.Tests.RemindersTest
                 throw new SkipException("Unable to connect to AWS DynamoDB simulator");
 
             var options = new DynamoDBReminderStorageOptions();
-            options.ParseConnectionString(this.connectionStringFixture.ConnectionString);
+            options.ParseConnectionString(connectionStringFixture.ConnectionString);
 
             return new DynamoDBReminderTable(
-                this.loggerFactory,
-                this.clusterOptions,
+                loggerFactory,
+                clusterOptions,
                 Options.Create(options));
         }
 

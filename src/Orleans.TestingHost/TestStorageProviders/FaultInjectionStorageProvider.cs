@@ -47,14 +47,14 @@ namespace Orleans.TestingHost
             IGrainFactory grainFactory, FaultInjectionGrainStorageOptions faultInjectionOptions)
         {
             this.realStorageProvider = realStorageProvider;
-            this.logger = loggerFactory.CreateLogger($"{this.GetType().FullName}.{name}");
+            logger = loggerFactory.CreateLogger($"{GetType().FullName}.{name}");
             this.grainFactory = grainFactory;
-            this.options = faultInjectionOptions;
+            options = faultInjectionOptions;
         }
 
         private Task InsertDelay()
         {
-            return Task.Delay(this.options.Latency);
+            return Task.Delay(options.Latency);
         }
            
         /// <summary>Faults if exception is provided, otherwise calls through to  decorated storage provider.</summary>

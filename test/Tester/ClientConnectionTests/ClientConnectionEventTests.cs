@@ -20,7 +20,7 @@ namespace Tester
         public override async Task InitializeAsync()
         {
            await base.InitializeAsync();
-           this.runtimeClient = this.HostedCluster.Client.ServiceProvider.GetRequiredService<OutsideRuntimeClient>();
+           runtimeClient = HostedCluster.Client.ServiceProvider.GetRequiredService<OutsideRuntimeClient>();
         }
 
         public class Configurator : IClientBuilderConfigurator
@@ -34,10 +34,10 @@ namespace Tester
         [Fact, TestCategory("SlowBVT")]
         public async Task EventSendWhenDisconnectedFromCluster()
         {
-            var runtime = this.HostedCluster.ServiceProvider.GetRequiredService<OutsideRuntimeClient>();
+            var runtime = HostedCluster.ServiceProvider.GetRequiredService<OutsideRuntimeClient>();
 
             var semaphore = new SemaphoreSlim(0, 1);
-            this.runtimeClient.ClusterConnectionLost += (sender, args) => semaphore.Release();
+            runtimeClient.ClusterConnectionLost += (sender, args) => semaphore.Release();
 
             // Burst lot of call, to be sure that we are connected to all silos
             for (int i = 0; i < 100; i++)
@@ -46,7 +46,7 @@ namespace Tester
                 await grain.SetLabel(i.ToString());
             }
 
-            await this.HostedCluster.StopAllSilosAsync();
+            await HostedCluster.StopAllSilosAsync();
 
             Assert.True(await semaphore.WaitAsync(TimeSpan.FromSeconds(10)));
         }
@@ -57,7 +57,7 @@ namespace Tester
             var regainedGatewaySemaphore = new SemaphoreSlim(0, 1);
             var lostGatewaySemaphore = new SemaphoreSlim(0, 1);
 
-            this.runtimeClient.GatewayCountChanged += (sender, args) =>
+            runtimeClient.GatewayCountChanged += (sender, args) =>
             {
                 if (args.NumberOfConnectedGateways == 1)
                 {
@@ -69,19 +69,19 @@ namespace Tester
                 }
             };
 
-            var silo = this.HostedCluster.SecondarySilos[0];
+            var silo = HostedCluster.SecondarySilos[0];
             await silo.StopSiloAsync(true);
 
             Assert.True(await lostGatewaySemaphore.WaitAsync(TimeSpan.FromSeconds(20)));
 
-            await this.HostedCluster.RestartStoppedSecondarySiloAsync(silo.Name);
+            await HostedCluster.RestartStoppedSecondarySiloAsync(silo.Name);
 
             // Clients need prodding to reconnect.
             var remainingAttempts = 90;
             bool reconnected;
             do
             {
-                this.Client.GetGrain<ITestGrain>(Guid.NewGuid().GetHashCode()).SetLabel("test").Ignore();
+                Client.GetGrain<ITestGrain>(Guid.NewGuid().GetHashCode()).SetLabel("test").Ignore();
                 reconnected = await regainedGatewaySemaphore.WaitAsync(TimeSpan.FromSeconds(1));
             } while (!reconnected && --remainingAttempts > 0);
 

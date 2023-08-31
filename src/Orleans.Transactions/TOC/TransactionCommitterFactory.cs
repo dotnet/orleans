@@ -17,7 +17,7 @@ namespace Orleans.Transactions
         public ITransactionCommitter<TService> Create<TService>(ITransactionCommitterConfiguration config) where TService : class
         {
             var currentContext = contextAccessor.GrainContext;
-            TransactionCommitter<TService> transactionalState = ActivatorUtilities.CreateInstance<TransactionCommitter<TService>>(currentContext.ActivationServices, config, this.contextAccessor);
+            TransactionCommitter<TService> transactionalState = ActivatorUtilities.CreateInstance<TransactionCommitter<TService>>(currentContext.ActivationServices, config, contextAccessor);
             transactionalState.Participate(currentContext.ObservableLifecycle);
             return transactionalState;
         }

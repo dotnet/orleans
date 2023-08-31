@@ -12,7 +12,7 @@ namespace TestExtensions
             this.output = output;
         }
 
-        public ILogger CreateLogger(string categoryName) => new XunitLogger(this.output, categoryName);
+        public ILogger CreateLogger(string categoryName) => new XunitLogger(output, categoryName);
 
         public void Dispose()
         {
@@ -37,7 +37,7 @@ namespace TestExtensions
 
             public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception exception, Func<TState, Exception, string> formatter)
             {
-                this.output.WriteLine($"{logLevel} [{this.category}.{eventId.Name ?? eventId.Id.ToString()}] {formatter(state, exception)}");
+                output.WriteLine($"{logLevel} [{category}.{eventId.Name ?? eventId.Id.ToString()}] {formatter(state, exception)}");
             }
         }
     }

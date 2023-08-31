@@ -17,12 +17,12 @@ namespace Orleans.Transactions.TestKit.Correctnesss
     {
         protected bool Equals(BitArrayState other)
         {
-            if (ReferenceEquals(null, this.value)) return false;
+            if (ReferenceEquals(null, value)) return false;
             if (ReferenceEquals(null, other.value)) return false;
-            if (this.value.Length != other.value.Length) return false;
-            for (var i = 0; i < this.value.Length; i++)
+            if (value.Length != other.value.Length) return false;
+            for (var i = 0; i < value.Length; i++)
             {
-                if (this.value[i] != other.value[i])
+                if (value[i] != other.value[i])
                 {
                     return false;
                 }
@@ -35,7 +35,7 @@ namespace Orleans.Transactions.TestKit.Correctnesss
         {
             if (ReferenceEquals(null, obj)) return false;
             if (ReferenceEquals(this, obj)) return true;
-            if (obj.GetType() != this.GetType()) return false;
+            if (obj.GetType() != GetType()) return false;
             return Equals((BitArrayState) obj);
         }
 
@@ -54,7 +54,7 @@ namespace Orleans.Transactions.TestKit.Correctnesss
         public int[] Value => value;
 
         [JsonIgnore]
-        public int Length => this.value.Length;
+        public int Length => value.Length;
 
         public BitArrayState()
         {
@@ -62,10 +62,10 @@ namespace Orleans.Transactions.TestKit.Correctnesss
 
         public BitArrayState(BitArrayState other)
         {
-            this.value = new int[other.value.Length];
+            value = new int[other.value.Length];
             for (var i = 0; i < other.value.Length; i++)
             {
-                this.value[i] = other.value[i];
+                value[i] = other.value[i];
             }
         }
 
@@ -86,14 +86,14 @@ namespace Orleans.Transactions.TestKit.Correctnesss
 
         public IEnumerator<int> GetEnumerator()
         {
-            foreach (var v in this.value) yield return v;
+            foreach (var v in value) yield return v;
         }
 
         public override string ToString()
         {
             // Write the values from least significant bit to most significant bit
             var builder = new StringBuilder();
-            foreach (var v in this.value)
+            foreach (var v in value)
             {
                 builder.Append(Reverse(Convert.ToString(v, 2)).PadRight(BitsInInt, '0'));
 
@@ -109,7 +109,7 @@ namespace Orleans.Transactions.TestKit.Correctnesss
 
         public int this[int index]
         {
-            get => this.value[index];
+            get => value[index];
             set => this.value[index] = value;
         }
 
@@ -219,8 +219,8 @@ namespace Orleans.Transactions.TestKit.Correctnesss
         
         public override Task OnActivateAsync(CancellationToken cancellationToken)
         {
-            this.logger = this.loggerFactory.CreateLogger(this.GetGrainId().ToString());
-            this.logger.LogTrace("GrainId: {GrainId}.", this.GetPrimaryKey());
+            logger = loggerFactory.CreateLogger(this.GetGrainId().ToString());
+            logger.LogTrace("GrainId: {GrainId}.", this.GetPrimaryKey());
 
             return base.OnActivateAsync(cancellationToken);
         }
@@ -232,21 +232,21 @@ namespace Orleans.Transactions.TestKit.Correctnesss
 
         public Task SetBit(int index)
         {
-            return Task.WhenAll(this.dataArray
+            return Task.WhenAll(dataArray
                 .Select(data => data.PerformUpdate(state =>
                 {
-                    this.logger.LogTrace("Setting bit {Index} in state {State}. Transaction {CurrentTransactionId}", index, state, TransactionContext.CurrentTransactionId);
+                    logger.LogTrace("Setting bit {Index} in state {State}. Transaction {CurrentTransactionId}", index, state, TransactionContext.CurrentTransactionId);
                     state.Set(index, true);
-                    this.logger.LogTrace("Set bit {Index} in state {State}.", index, state);
+                    logger.LogTrace("Set bit {Index} in state {State}.", index, state);
                 })));
         }
 
         public async Task<List<BitArrayState>> Get()
         {
-            return (await Task.WhenAll(this.dataArray
+            return (await Task.WhenAll(dataArray
                 .Select(state => state.PerformRead(s =>
                 {
-                    this.logger.LogTrace("Get state {State}.", s);
+                    logger.LogTrace("Get state {State}.", s);
                     return s;
                 })))).ToList();
         }

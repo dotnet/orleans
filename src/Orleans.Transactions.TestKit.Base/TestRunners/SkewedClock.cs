@@ -10,7 +10,7 @@ namespace Orleans.Transactions.TestKit
         public SkewedClock(TimeSpan minSkew, TimeSpan maxSkew)
         {
             this.minSkew = minSkew;
-            this.skewRangeTicks = (int)(maxSkew.Ticks - minSkew.Ticks);
+            skewRangeTicks = (int)(maxSkew.Ticks - minSkew.Ticks);
         }
 
         public DateTime UtcNow()

@@ -11,7 +11,7 @@ namespace Orleans.Providers.Streams.Common
         /// <param name="queueId">The queue identifier.</param>
         public ReceiverMonitorDimensions(string queueId)
         {
-            this.QueueId = queueId;
+            QueueId = queueId;
         }
 
         /// <summary>
@@ -40,7 +40,7 @@ namespace Orleans.Providers.Streams.Common
         public CacheMonitorDimensions(string queueId, string blockPoolId)
             :base(queueId)
         {
-            this.BlockPoolId = blockPoolId;
+            BlockPoolId = blockPoolId;
         }
 
         /// <summary>
@@ -61,7 +61,7 @@ namespace Orleans.Providers.Streams.Common
         /// <param name="blockPoolId">The block pool identifier.</param>
         public BlockPoolMonitorDimensions(string blockPoolId)
         {
-            this.BlockPoolId = blockPoolId;
+            BlockPoolId = blockPoolId;
         }
 
         /// <summary>

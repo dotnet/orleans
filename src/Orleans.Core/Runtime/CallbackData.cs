@@ -20,23 +20,23 @@ namespace Orleans.Runtime
             Message msg)
         {
             this.shared = shared;
-            this.context = ctx;
-            this.Message = msg;
-            this.stopwatch = ValueStopwatch.StartNew();
+            context = ctx;
+            Message = msg;
+            stopwatch = ValueStopwatch.StartNew();
         }
 
         public Message Message { get; } // might hold metadata used by response pipeline
 
-        public bool IsCompleted => this.completed == 1;
+        public bool IsCompleted => completed == 1;
 
         public void OnStatusUpdate(StatusResponse status)
         {
-            this.lastKnownStatus = status;
+            lastKnownStatus = status;
         }
 
         public bool IsExpired(long currentTimestamp)
         {
-            var duration = currentTimestamp - this.stopwatch.GetRawTimestamp();
+            var duration = currentTimestamp - stopwatch.GetRawTimestamp();
             return duration > GetResponseTimeoutStopwatchTicks();
         }
 
@@ -60,19 +60,19 @@ namespace Orleans.Runtime
                 return;
             }
 
-            this.shared.Unregister(this.Message);
+            shared.Unregister(Message);
 
-            this.stopwatch.Stop();
-            ApplicationRequestInstruments.OnAppRequestsEnd((long)this.stopwatch.Elapsed.TotalMilliseconds);
+            stopwatch.Stop();
+            ApplicationRequestInstruments.OnAppRequestsEnd((long)stopwatch.Elapsed.TotalMilliseconds);
             ApplicationRequestInstruments.OnAppRequestsTimedOut();
 
-            OrleansCallBackDataEvent.Log.OnTimeout(this.Message);
+            OrleansCallBackDataEvent.Log.OnTimeout(Message);
 
-            var msg = this.Message; // Local working copy
+            var msg = Message; // Local working copy
 
             var statusMessage = lastKnownStatus is StatusResponse status ? $"Last known status is {status}. " : string.Empty;
             var timeout = GetResponseTimeout();
-            this.shared.Logger.LogWarning(
+            shared.Logger.LogWarning(
                 (int)ErrorCode.Runtime_Error_100157,
                 "Response did not arrive on time in {Timeout} for message: {Message}. {StatusMessage}. About to break its promise.",
                 timeout,
@@ -85,42 +85,42 @@ namespace Orleans.Runtime
 
         public void OnTargetSiloFail()
         {
-            if (Interlocked.CompareExchange(ref this.completed, 1, 0) != 0)
+            if (Interlocked.CompareExchange(ref completed, 1, 0) != 0)
             {
                 return;
             }
 
-            this.shared.Unregister(this.Message);
-            this.stopwatch.Stop();
-            ApplicationRequestInstruments.OnAppRequestsEnd((long)this.stopwatch.Elapsed.TotalMilliseconds);
+            shared.Unregister(Message);
+            stopwatch.Stop();
+            ApplicationRequestInstruments.OnAppRequestsEnd((long)stopwatch.Elapsed.TotalMilliseconds);
 
-            OrleansCallBackDataEvent.Log.OnTargetSiloFail(this.Message);
-            var msg = this.Message;
+            OrleansCallBackDataEvent.Log.OnTargetSiloFail(Message);
+            var msg = Message;
             var statusMessage = lastKnownStatus is StatusResponse status ? $"Last known status is {status}. " : string.Empty;
-            this.shared.Logger.LogWarning(
+            shared.Logger.LogWarning(
                 (int)ErrorCode.Runtime_Error_100157,
                 "The target silo became unavailable for message: {Message}. {StatusMessage}See {TroubleshootingHelpLink} for troubleshooting help. About to break its promise.",
                 msg,
                 statusMessage,
                 Constants.TroubleshootingHelpLink);
             var exception = new SiloUnavailableException($"The target silo became unavailable for message: {msg}. {statusMessage}See {Constants.TroubleshootingHelpLink} for troubleshooting help.");
-            this.context.Complete(Response.FromException(exception));
+            context.Complete(Response.FromException(exception));
         }
 
         public void DoCallback(Message response)
         {
-            if (Interlocked.CompareExchange(ref this.completed, 1, 0) != 0)
+            if (Interlocked.CompareExchange(ref completed, 1, 0) != 0)
             {
                 return;
             }
 
-            OrleansCallBackDataEvent.Log.DoCallback(this.Message);
+            OrleansCallBackDataEvent.Log.DoCallback(Message);
 
-            this.stopwatch.Stop();
-            ApplicationRequestInstruments.OnAppRequestsEnd((long)this.stopwatch.Elapsed.TotalMilliseconds);
+            stopwatch.Stop();
+            ApplicationRequestInstruments.OnAppRequestsEnd((long)stopwatch.Elapsed.TotalMilliseconds);
 
             // do callback outside the CallbackData lock. Just not a good practice to hold a lock for this unrelated operation.
-            ResponseCallback(response, this.context);
+            ResponseCallback(response, context);
         }
 
         public static void ResponseCallback(Message message, IResponseCompletionSource context)

@@ -24,14 +24,14 @@ namespace Tester.StreamingTests
         [SkippableFact]
         public async Task Programmatic_Subscribe_Provider_WithExplicitPubsub_TryGetStreamSubscrptionManager()
         {
-            var subGrain = this.fixture.HostedCluster.GrainFactory.GetGrain<ISubscribeGrain>(Guid.NewGuid());
+            var subGrain = fixture.HostedCluster.GrainFactory.GetGrain<ISubscribeGrain>(Guid.NewGuid());
             Assert.True(await subGrain.CanGetSubscriptionManager(StreamProviderName));
         }
         
         [SkippableFact]
         public async Task Programmatic_Subscribe_CanUseNullNamespace()
         {
-            var subscriptionManager = new SubscriptionManager(this.fixture.HostedCluster);
+            var subscriptionManager = new SubscriptionManager(fixture.HostedCluster);
             var streamId = new FullStreamIdentity(Guid.NewGuid(), null, StreamProviderName);
             await subscriptionManager.AddSubscription<IPassive_ConsumerGrain>(streamId,
                 Guid.NewGuid());
@@ -42,13 +42,13 @@ namespace Tester.StreamingTests
         [SkippableFact]
         public async Task StreamingTests_Consumer_Producer_Subscribe()
         {
-            var subscriptionManager = new SubscriptionManager(this.fixture.HostedCluster);
+            var subscriptionManager = new SubscriptionManager(fixture.HostedCluster);
             var streamId = new FullStreamIdentity(Guid.NewGuid(), "EmptySpace", StreamProviderName);
             //set up subscription for 10 consumer grains
             var subscriptions = await subscriptionManager.SetupStreamingSubscriptionForStream<IPassive_ConsumerGrain>(streamId, 10);
-            var consumers = subscriptions.Select(sub => this.fixture.HostedCluster.GrainFactory.GetGrain<IPassive_ConsumerGrain>(sub.GrainId)).ToList();
+            var consumers = subscriptions.Select(sub => fixture.HostedCluster.GrainFactory.GetGrain<IPassive_ConsumerGrain>(sub.GrainId)).ToList();
 
-            var producer = this.fixture.HostedCluster.GrainFactory.GetGrain<ITypedProducerGrainProducingApple>(Guid.NewGuid());
+            var producer = fixture.HostedCluster.GrainFactory.GetGrain<ITypedProducerGrainProducingApple>(Guid.NewGuid());
             await producer.BecomeProducer(streamId.Guid, streamId.Namespace, streamId.ProviderName);
 
             await producer.StartPeriodicProducing();
@@ -61,7 +61,7 @@ namespace Tester.StreamingTests
             foreach (var consumer in consumers)
             {
                 tasks.Add(TestingUtils.WaitUntilAsync(lastTry => CheckCounters(new List<ITypedProducerGrain> { producer }, 
-                    consumer, lastTry, this.fixture.Logger), _timeout));
+                    consumer, lastTry, fixture.Logger), _timeout));
             }
             await Task.WhenAll(tasks);
 
@@ -74,12 +74,12 @@ namespace Tester.StreamingTests
         [SkippableFact(Skip= "https://github.com/dotnet/orleans/issues/5635")]
         public async Task StreamingTests_Consumer_Producer_UnSubscribe()
         {
-            var subscriptionManager = new SubscriptionManager(this.fixture.HostedCluster);
+            var subscriptionManager = new SubscriptionManager(fixture.HostedCluster);
             var streamId = new FullStreamIdentity(Guid.NewGuid(), "EmptySpace", StreamProviderName);
             //set up subscription for consumer grains
             var subscriptions = await subscriptionManager.SetupStreamingSubscriptionForStream<IPassive_ConsumerGrain>(streamId, 2);
 
-            var producer = this.fixture.GrainFactory.GetGrain<ITypedProducerGrainProducingApple>(Guid.NewGuid());
+            var producer = fixture.GrainFactory.GetGrain<ITypedProducerGrainProducingApple>(Guid.NewGuid());
             await producer.BecomeProducer(streamId.Guid, streamId.Namespace, streamId.ProviderName);
 
             await producer.StartPeriodicProducing();
@@ -91,8 +91,8 @@ namespace Tester.StreamingTests
             // remove subscription
             await subscriptionManager.RemoveSubscription(streamId, subscription.SubscriptionId);
             var numProducedWhenUnSub = await producer.GetNumberProduced();
-            var consumerUnSub = this.fixture.GrainFactory.GetGrain<IPassive_ConsumerGrain>(subscription.GrainId);
-            var consumerNormal = this.fixture.GrainFactory.GetGrain<IPassive_ConsumerGrain>(subscriptions[1].GrainId);
+            var consumerUnSub = fixture.GrainFactory.GetGrain<IPassive_ConsumerGrain>(subscription.GrainId);
+            var consumerNormal = fixture.GrainFactory.GetGrain<IPassive_ConsumerGrain>(subscriptions[1].GrainId);
             //assert consumer grain's onAdd func got called.
             Assert.True((await consumerUnSub.GetCountOfOnAddFuncCalled()) > 0);
             await TestingUtils.WaitUntilAsync(lastTry => ProducerHasProducedSinceLastCheck(numProducedWhenUnSub, producer, lastTry), _timeout);
@@ -103,7 +103,7 @@ namespace Tester.StreamingTests
 
             //assert normal consumer consumed equal to produced
             await TestingUtils.WaitUntilAsync(
-            lastTry =>CheckCounters(new List<ITypedProducerGrain> { producer }, consumerNormal, lastTry, this.fixture.Logger), _timeout);
+            lastTry =>CheckCounters(new List<ITypedProducerGrain> { producer }, consumerNormal, lastTry, fixture.Logger), _timeout);
 
             //asert unsubscribed consumer consumed less than produced
             numProduced = await producer.GetNumberProduced();
@@ -119,7 +119,7 @@ namespace Tester.StreamingTests
         [SkippableFact]
         public async Task StreamingTests_Consumer_Producer_GetSubscriptions()
         {
-            var subscriptionManager = new SubscriptionManager(this.fixture.HostedCluster);
+            var subscriptionManager = new SubscriptionManager(fixture.HostedCluster);
             var streamId = new FullStreamIdentity(Guid.NewGuid(), "EmptySpace", StreamProviderName);
             //set up subscriptions
             var expectedSubscriptions = await subscriptionManager.SetupStreamingSubscriptionForStream<IPassive_ConsumerGrain>(streamId, 2);
@@ -142,12 +142,12 @@ namespace Tester.StreamingTests
         [SkippableFact]
         public async Task StreamingTests_Consumer_Producer_ConsumerUnsubscribeOnAdd()
         {
-            var subscriptionManager = new SubscriptionManager(this.fixture.HostedCluster);
+            var subscriptionManager = new SubscriptionManager(fixture.HostedCluster);
             var streamId = new FullStreamIdentity(Guid.NewGuid(), "EmptySpace", StreamProviderName);
             //set up subscriptions
             await subscriptionManager.SetupStreamingSubscriptionForStream<IJerk_ConsumerGrain>(streamId, 10);
             //producer start producing 
-            var producer = this.fixture.GrainFactory.GetGrain<ITypedProducerGrainProducingInt>(Guid.NewGuid());
+            var producer = fixture.GrainFactory.GetGrain<ITypedProducerGrainProducingInt>(Guid.NewGuid());
             await producer.BecomeProducer(streamId.Guid, streamId.Namespace, streamId.ProviderName);
 
             await producer.StartPeriodicProducing();
@@ -168,13 +168,13 @@ namespace Tester.StreamingTests
         [SkippableFact(Skip="https://github.com/dotnet/orleans/issues/5650")]
         public async Task StreamingTests_Consumer_Producer_SubscribeToTwoStream_MessageWithPolymorphism()
         {
-            var subscriptionManager = new SubscriptionManager(this.fixture.HostedCluster);
+            var subscriptionManager = new SubscriptionManager(fixture.HostedCluster);
             var streamId = new FullStreamIdentity(Guid.NewGuid(), "EmptySpace", StreamProviderName);
             //set up subscription for 10 consumer grains
             var subscriptions = await subscriptionManager.SetupStreamingSubscriptionForStream<IPassive_ConsumerGrain>(streamId, 10);
-            var consumers = subscriptions.Select(sub => this.fixture.GrainFactory.GetGrain<IPassive_ConsumerGrain>(sub.GrainId)).ToList();
+            var consumers = subscriptions.Select(sub => fixture.GrainFactory.GetGrain<IPassive_ConsumerGrain>(sub.GrainId)).ToList();
 
-            var producer = this.fixture.GrainFactory.GetGrain<ITypedProducerGrainProducingApple>(Guid.NewGuid());
+            var producer = fixture.GrainFactory.GetGrain<ITypedProducerGrainProducingApple>(Guid.NewGuid());
             await producer.BecomeProducer(streamId.Guid, streamId.Namespace, streamId.ProviderName);
 
             await producer.StartPeriodicProducing();
@@ -183,7 +183,7 @@ namespace Tester.StreamingTests
             await TestingUtils.WaitUntilAsync(lastTry => ProducerHasProducedSinceLastCheck(numProduced, producer, lastTry), _timeout);
             // set up the new stream to subscribe, which produce strings
             var streamId2 = new FullStreamIdentity(Guid.NewGuid(), "EmptySpace2", StreamProviderName);
-            var producer2 = this.fixture.GrainFactory.GetGrain<ITypedProducerGrainProducingApple>(Guid.NewGuid());
+            var producer2 = fixture.GrainFactory.GetGrain<ITypedProducerGrainProducingApple>(Guid.NewGuid());
             await producer2.BecomeProducer(streamId2.Guid, streamId2.Namespace, streamId2.ProviderName);
 
             //register the consumer grain to second stream
@@ -199,7 +199,7 @@ namespace Tester.StreamingTests
             foreach (var consumer in consumers)
             {
                 tasks2.Add(TestingUtils.WaitUntilAsync(lastTry => CheckCounters(new List<ITypedProducerGrain> { producer, producer2 },
-                    consumer, lastTry, this.fixture.Logger), _timeout));
+                    consumer, lastTry, fixture.Logger), _timeout));
             }
             await Task.WhenAll(tasks);
 
@@ -212,13 +212,13 @@ namespace Tester.StreamingTests
         [SkippableFact]
         public async Task StreamingTests_Consumer_Producer_SubscribeToStreamsHandledByDifferentStreamProvider()
         {
-            var subscriptionManager = new SubscriptionManager(this.fixture.HostedCluster);
+            var subscriptionManager = new SubscriptionManager(fixture.HostedCluster);
             var streamId = new FullStreamIdentity(Guid.NewGuid(), "EmptySpace", StreamProviderName);
             //set up subscription for 10 consumer grains
             var subscriptions = await subscriptionManager.SetupStreamingSubscriptionForStream<IPassive_ConsumerGrain>(streamId, 10);
-            var consumers = subscriptions.Select(sub => this.fixture.GrainFactory.GetGrain<IPassive_ConsumerGrain>(sub.GrainId)).ToList();
+            var consumers = subscriptions.Select(sub => fixture.GrainFactory.GetGrain<IPassive_ConsumerGrain>(sub.GrainId)).ToList();
 
-            var producer = this.fixture.GrainFactory.GetGrain<ITypedProducerGrainProducingApple>(Guid.NewGuid());
+            var producer = fixture.GrainFactory.GetGrain<ITypedProducerGrainProducingApple>(Guid.NewGuid());
             await producer.BecomeProducer(streamId.Guid, streamId.Namespace, streamId.ProviderName);
 
             await producer.StartPeriodicProducing();
@@ -227,7 +227,7 @@ namespace Tester.StreamingTests
             await TestingUtils.WaitUntilAsync(lastTry => ProducerHasProducedSinceLastCheck(numProduced, producer, lastTry), _timeout);
             // set up the new stream to subscribe, which produce strings
             var streamId2 = new FullStreamIdentity(Guid.NewGuid(), "EmptySpace2", StreamProviderName2);
-            var producer2 = this.fixture.GrainFactory.GetGrain<ITypedProducerGrainProducingApple>(Guid.NewGuid());
+            var producer2 = fixture.GrainFactory.GetGrain<ITypedProducerGrainProducingApple>(Guid.NewGuid());
             await producer2.BecomeProducer(streamId2.Guid, streamId2.Namespace, streamId2.ProviderName);
 
             //register the consumer grain to second stream
@@ -243,7 +243,7 @@ namespace Tester.StreamingTests
             foreach (var consumer in consumers)
             {
                 tasks2.Add(TestingUtils.WaitUntilAsync(lastTry => CheckCounters(new List<ITypedProducerGrain> { producer, producer2 },
-                    consumer, lastTry, this.fixture.Logger), _timeout));
+                    consumer, lastTry, fixture.Logger), _timeout));
             }
             await Task.WhenAll(tasks);
 
@@ -297,10 +297,10 @@ namespace Tester.StreamingTests
         private readonly IStreamSubscriptionManager subManager;
         public SubscriptionManager(TestCluster cluster)
         {
-            this.grainFactory = cluster.GrainFactory;
-            this.serviceProvider = cluster.ServiceProvider;
+            grainFactory = cluster.GrainFactory;
+            serviceProvider = cluster.ServiceProvider;
             var admin = serviceProvider.GetRequiredService<IStreamSubscriptionManagerAdmin>();
-            this.subManager = admin.GetStreamSubscriptionManager(StreamSubscriptionManagerType.ExplicitSubscribeOnly);
+            subManager = admin.GetStreamSubscriptionManager(StreamSubscriptionManagerType.ExplicitSubscribeOnly);
         }
 
         public async Task<List<StreamSubscription>> SetupStreamingSubscriptionForStream<TGrainInterface>(FullStreamIdentity streamIdentity, int grainCount)
@@ -310,7 +310,7 @@ namespace Tester.StreamingTests
             while (grainCount > 0)
             {
                 var grainId = Guid.NewGuid();
-                var grainRef = this.grainFactory.GetGrain<TGrainInterface>(grainId) as GrainReference;
+                var grainRef = grainFactory.GetGrain<TGrainInterface>(grainId) as GrainReference;
                 subscriptions.Add(await subManager.AddSubscription(streamIdentity.ProviderName, streamIdentity, grainRef));
                 grainCount--;
             }
@@ -320,8 +320,8 @@ namespace Tester.StreamingTests
         public async Task<StreamSubscription> AddSubscription<TGrainInterface>(FullStreamIdentity streamId, Guid grainId)
             where TGrainInterface : IGrainWithGuidKey
         {
-            var grainRef = this.grainFactory.GetGrain<TGrainInterface>(grainId) as GrainReference;
-            var sub = await this.subManager
+            var grainRef = grainFactory.GetGrain<TGrainInterface>(grainId) as GrainReference;
+            var sub = await subManager
                 .AddSubscription(streamId.ProviderName, streamId, grainRef);
             return sub;
         }

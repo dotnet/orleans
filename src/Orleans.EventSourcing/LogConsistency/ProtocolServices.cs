@@ -23,16 +23,16 @@ namespace Orleans.Runtime.LogConsistency
             ILocalSiloDetails siloDetails)
         {
             this.grainContext = grainContext;
-            this.log = loggerFactory.CreateLogger<ProtocolServices>();
+            log = loggerFactory.CreateLogger<ProtocolServices>();
             this.deepCopier = deepCopier;
-            this.MyClusterId = siloDetails.ClusterId;
+            MyClusterId = siloDetails.ClusterId;
         }
 
         public GrainId GrainId => grainContext.GrainId;
 
         public string MyClusterId { get; }
 
-        public T DeepCopy<T>(T value) => this.deepCopier.Copy(value);
+        public T DeepCopy<T>(T value) => deepCopier.Copy(value);
 
         public void ProtocolError(string msg, bool throwexception)
         {
@@ -45,7 +45,7 @@ namespace Orleans.Runtime.LogConsistency
             if (!throwexception)
                 return;
 
-            throw new OrleansException(string.Format("{0} (grain={1}, cluster={2})", msg, grainContext.GrainId, this.MyClusterId));
+            throw new OrleansException(string.Format("{0} (grain={1}, cluster={2})", msg, grainContext.GrainId, MyClusterId));
         }
 
         public void CaughtException(string where, Exception e)

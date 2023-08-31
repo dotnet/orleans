@@ -14,7 +14,7 @@ namespace Orleans.Streams.Core
         public StreamSubscriptionManager(IStreamPubSub streamPubSub, string managerType)
         {
             this.streamPubSub = streamPubSub;
-            this.type = managerType;
+            type = managerType;
         }
 
         public async Task<StreamSubscription> AddSubscription(string streamProviderName, StreamId streamId, GrainReference grainRef)

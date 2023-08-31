@@ -43,10 +43,10 @@ namespace Tester.ClientConnectionTests
         public async Task ConnectToGwAfterStallConnectionOpened()
         {
             Socket stalledSocket;
-            var gwEndpoint = this.HostedCluster.Primary.GatewayAddress.Endpoint;
+            var gwEndpoint = HostedCluster.Primary.GatewayAddress.Endpoint;
 
             // Close current client connection
-            await this.Client.ServiceProvider.GetRequiredService<IHost>().StopAsync();
+            await Client.ServiceProvider.GetRequiredService<IHost>().StopAsync();
 
             // Stall connection to GW
             using (stalledSocket = new Socket(gwEndpoint.AddressFamily, SocketType.Stream, ProtocolType.Tcp))
@@ -55,7 +55,7 @@ namespace Tester.ClientConnectionTests
 
                 // Try to reconnect to GW
                 var stopwatch = Stopwatch.StartNew();
-                await this.HostedCluster.InitializeClientAsync();
+                await HostedCluster.InitializeClientAsync();
                 stopwatch.Stop();
 
                 // Check that we were able to connect before the first connection timeout
@@ -69,7 +69,7 @@ namespace Tester.ClientConnectionTests
         public async Task SiloJoinAfterStallConnectionOpened()
         {
             Socket stalledSocket;
-            var siloEndpoint = this.HostedCluster.Primary.SiloAddress.Endpoint;
+            var siloEndpoint = HostedCluster.Primary.SiloAddress.Endpoint;
 
             // Stall connection to GW
             using (stalledSocket = new Socket(siloEndpoint.AddressFamily, SocketType.Stream, ProtocolType.Tcp))
@@ -77,7 +77,7 @@ namespace Tester.ClientConnectionTests
                 await stalledSocket.ConnectAsync(siloEndpoint);
 
                 // Try to add a new silo in the cluster
-                this.HostedCluster.StartAdditionalSilo();
+                HostedCluster.StartAdditionalSilo();
 
                 // Wait for the silo to join the cluster
                 Assert.True(await WaitForClusterSize(2));
@@ -88,7 +88,7 @@ namespace Tester.ClientConnectionTests
 
         private async Task<bool> WaitForClusterSize(int expectedSize)
         {
-            var mgmtGrain = this.Client.GetGrain<IManagementGrain>(0);
+            var mgmtGrain = Client.GetGrain<IManagementGrain>(0);
             var timeout = TestCluster.GetLivenessStabilizationTime(new Orleans.Configuration.ClusterMembershipOptions());
             var stopWatch = Stopwatch.StartNew();
             do

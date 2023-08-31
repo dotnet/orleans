@@ -16,7 +16,7 @@ namespace UnitTests.Grains
 
         public SimpleActivateDeactivateTestGrain(ILoggerFactory loggerFactory)
         {
-            this.logger = loggerFactory.CreateLogger($"{this.GetType().Name}-{this.IdentityString}");
+            logger = loggerFactory.CreateLogger($"{GetType().Name}-{IdentityString}");
         }
 
         public override async Task OnActivateAsync(CancellationToken cancellationToken)
@@ -71,7 +71,7 @@ namespace UnitTests.Grains
 
         public TailCallActivateDeactivateTestGrain(ILoggerFactory loggerFactory)
         {
-            this.logger = loggerFactory.CreateLogger($"{this.GetType().Name}-{this.IdentityString}");
+            logger = loggerFactory.CreateLogger($"{GetType().Name}-{IdentityString}");
         }
 
         public override Task OnActivateAsync(CancellationToken cancellationToken)
@@ -134,7 +134,7 @@ namespace UnitTests.Grains
 
         public LongRunningActivateDeactivateTestGrain(ILoggerFactory loggerFactory)
         {
-            this.logger = loggerFactory.CreateLogger($"{this.GetType().Name}-{this.IdentityString}");
+            logger = loggerFactory.CreateLogger($"{GetType().Name}-{IdentityString}");
         }
 
         public override async Task OnActivateAsync(CancellationToken cancellationToken)
@@ -219,7 +219,7 @@ namespace UnitTests.Grains
 
         public TaskActionActivateDeactivateTestGrain(ILoggerFactory loggerFactory)
         {
-            this.logger = loggerFactory.CreateLogger($"{this.GetType().Name}-{this.IdentityString}");
+            logger = loggerFactory.CreateLogger($"{GetType().Name}-{IdentityString}");
         }
 
         public override async Task OnActivateAsync(CancellationToken cancellationToken)
@@ -322,7 +322,7 @@ namespace UnitTests.Grains
 
         public BadActivateDeactivateTestGrain(ILoggerFactory loggerFactory)
         {
-            this.logger = loggerFactory.CreateLogger($"{this.GetType().Name}-{this.IdentityString}");
+            logger = loggerFactory.CreateLogger($"{GetType().Name}-{IdentityString}");
         }
 
         public override Task OnActivateAsync(CancellationToken cancellationToken)
@@ -380,13 +380,13 @@ namespace UnitTests.Grains
 
         public DeactivatingWhileActivatingTestGrain(ILoggerFactory loggerFactory)
         {
-            this.logger = loggerFactory.CreateLogger($"{this.GetType().Name}-{this.IdentityString}");
+            logger = loggerFactory.CreateLogger($"{GetType().Name}-{IdentityString}");
         }
 
         public override Task OnActivateAsync(CancellationToken cancellationToken)
         {
             logger.LogInformation("OnActivateAsync");
-            this.DeactivateOnIdle();
+            DeactivateOnIdle();
             return Task.CompletedTask;
         }
 
@@ -412,7 +412,7 @@ namespace UnitTests.Grains
 
         public CreateGrainReferenceTestGrain(ILoggerFactory loggerFactory)
         {
-            this.logger = loggerFactory.CreateLogger($"{this.GetType().Name}-{this.IdentityString}");
+            logger = loggerFactory.CreateLogger($"{GetType().Name}-{IdentityString}");
         }
 
         public override Task OnActivateAsync(CancellationToken cancellationToken)

@@ -47,7 +47,7 @@ namespace Orleans.Hosting
             string name, Action<Action<IServiceCollection>> configureServicesDelegate)
             : base(name, configureServicesDelegate, MemoryAdapterFactory<TSerializer>.Create)
         {
-            this.ConfigureDelegate(services => services.ConfigureNamedOptionForLogging<HashRingStreamQueueMapperOptions>(name));
+            ConfigureDelegate(services => services.ConfigureNamedOptionForLogging<HashRingStreamQueueMapperOptions>(name));
         }
     }
 

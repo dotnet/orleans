@@ -45,7 +45,7 @@ namespace Orleans.Streaming.EventHubs
             this.logger = logger;
             nextCheckedTime = DateTime.MinValue;
             isUnderPressure = false;
-            this.CacheMonitor = monitor;
+            CacheMonitor = monitor;
         }
 
         /// <inheritdoc />
@@ -85,8 +85,8 @@ namespace Orleans.Streaming.EventHubs
             // If we changed state, log
             if (isUnderPressure != wasUnderPressure)
             {
-                this.CacheMonitor?.TrackCachePressureMonitorStatusChange(this.GetType().Name, isUnderPressure, cachePressureContributionCount, pressure, this.flowControlThreshold);
-                if(this.logger.IsEnabled(LogLevel.Debug))
+                CacheMonitor?.TrackCachePressureMonitorStatusChange(GetType().Name, isUnderPressure, cachePressureContributionCount, pressure, flowControlThreshold);
+                if(logger.IsEnabled(LogLevel.Debug))
                     logger.LogDebug(isUnderPressure
                     ? $"Ingesting messages too fast. Throttling message reading. AccumulatedCachePressure: {accumulatedCachePressure}, Contributions: {cachePressureContributionCount}, AverageCachePressure: {pressure}, Threshold: {flowControlThreshold}"
                     : $"Message ingestion is healthy. AccumulatedCachePressure: {accumulatedCachePressure}, Contributions: {cachePressureContributionCount}, AverageCachePressure: {pressure}, Threshold: {flowControlThreshold}");

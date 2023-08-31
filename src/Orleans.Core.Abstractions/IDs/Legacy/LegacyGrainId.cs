@@ -30,7 +30,7 @@ namespace Orleans.Runtime
 
         internal LegacyGrainId(UniqueKey key)
         {
-            this.Key = key;
+            Key = key;
         }
 
         public static implicit operator GrainId(LegacyGrainId legacy) => legacy.ToGrainId();
@@ -197,7 +197,7 @@ namespace Orleans.Runtime
 
         public GrainId ToGrainId()
         {
-            return new GrainId(GetGrainType(Key), this.GetGrainKey());
+            return new GrainId(GetGrainType(Key), GetGrainKey());
         }
 
         public static bool TryConvertFromGrainId(GrainId id, out LegacyGrainId legacyId)

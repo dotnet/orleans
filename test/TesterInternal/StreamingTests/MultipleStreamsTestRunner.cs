@@ -20,10 +20,10 @@ namespace UnitTests.Streaming
         internal MultipleStreamsTestRunner(IInternalClusterClient client, string streamProvider, int testNum = 0, bool fullTest = true)
         {
             this.client = client;
-            this.streamProviderName = streamProvider;
-            this.logger = (TestingUtils.CreateDefaultLoggerFactory($"{this.GetType().Name}.log")).CreateLogger<MultipleStreamsTestRunner>();
-            this.testNumber = testNum;
-            this.runFullTest = fullTest;
+            streamProviderName = streamProvider;
+            logger = (TestingUtils.CreateDefaultLoggerFactory($"{GetType().Name}.log")).CreateLogger<MultipleStreamsTestRunner>();
+            testNumber = testNum;
+            runFullTest = fullTest;
         }
 
         private void Heading(string testName)
@@ -38,7 +38,7 @@ namespace UnitTests.Streaming
             List<Task> tasks = new List<Task>();
             for (int i = 0; i < 10; i++)
             {
-                runners.Add(new SingleStreamTestRunner(this.client, this.streamProviderName, i, runFullTest));
+                runners.Add(new SingleStreamTestRunner(client, streamProviderName, i, runFullTest));
             }
             foreach (var runner in runners)
             {
