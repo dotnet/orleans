@@ -1,5 +1,7 @@
 using System;
 using System.Collections.Generic;
+using System.Threading.Tasks;
+using Orleans.Runtime.CollectionGuards;
 
 namespace Orleans.Configuration
 {
@@ -22,6 +24,51 @@ namespace Orleans.Configuration
         /// Gets or sets the default period of inactivity necessary for a grain to be available for collection and deactivation.
         /// </summary>
         public TimeSpan CollectionAge { get; set; } = TimeSpan.FromMinutes(15);
+
+        /// <summary>
+        /// If used with <see cref="ProcessMemoryGrainCollectionGuard"/>, this sets the threshold in bytes for when
+        /// the system will start evicting grains.
+        ///
+        /// If set to 0 or null, the grains will never evade eviction based on GC memory pressure.
+        /// </summary>
+        public long? CollectionGCMemoryThreshold { get; set; }
+
+        /// <summary>
+        /// If used with <see cref="SystemMemoryGrainCollectionGuard"/>, this sets the threshold in bytes for when
+        /// how much memory must be available for the system to start evicting grains.
+        ///
+        /// If set to 0 or null, the grains will never evade eviction based on available system memory.
+        /// </summary>
+        public long? CollectionSystemMemoryFreeThreshold { get; set; }
+
+        /// <summary>
+        /// If used with <see cref="SystemMemoryGrainCollectionGuard"/>, this sets the threshold in percent for when
+        /// how much memory must be available for the system to start evicting grains.
+        ///
+        /// If set to 0 or null, the grains will never evade eviction based on available system memory.
+        ///
+        /// The range is from 0.0 to 100.0.
+        /// </summary>
+        public float? CollectionSystemMemoryFreePercentThreshold { get; set; }
+
+        /// <summary>
+        /// When collection starts, how often should we check if we should continue collection. This
+        /// value is only user if collection guards are enabled.
+        ///
+        /// 0 means that guards will not be checked during collection. This is probably not ideal
+        /// if guards are in place because "a lot" of grains will be deactivated at once.
+        /// </summary>
+        public int CollectionBatchSize { get; set; } = 0;
+
+        /// <summary>
+        /// When finished collecting a batch, optionally wait for a period of time before starting the next batch.
+        /// Typically this is used to allow the system to perform GC.
+        ///
+        /// This value will be used with a call to Task.Delay.
+        ///
+        /// If it is 0, no call to Task.Delay will be made.
+        /// </summary>
+        public int CollectionBatchDelay { get; set; } = 0;
 
         /// <summary>
         /// Period of inactivity necessary for a grain to be available for collection and deactivation by grain type.

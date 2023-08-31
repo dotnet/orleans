@@ -13,7 +13,7 @@ using Orleans.Statistics;
 namespace Orleans.Runtime
 {
     /// <summary>
-    /// Identifies activations that have been idle long enough to be deactivated.
+    /// Identifies activations that should be deactivated.
     /// </summary>
     internal class ActivationCollector : IActivationWorkingSetObserver, IHealthCheckParticipant, ILifecycleParticipant<ISiloLifecycle>
     {
@@ -29,15 +29,18 @@ namespace Orleans.Runtime
         private int collectionNumber;
         private int _activationCount;
         private readonly IOptions<GrainCollectionOptions> _options;
+        private readonly IEnumerable<IGrainCollectionGuard> _collectionGuards;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="ActivationCollector"/> class.
         /// </summary>
         /// <param name="timerFactory">The timer factory.</param>
         /// <param name="options">The options.</param>
+        /// <param name="collectionGuards">The collection guards.</param>
         /// <param name="logger">The logger.</param>
         public ActivationCollector(
             IAsyncTimerFactory timerFactory,
+            IEnumerable<IGrainCollectionGuard> collectionGuards,
             IOptions<GrainCollectionOptions> options,
             ILogger<ActivationCollector> logger)
         {
@@ -47,6 +50,7 @@ namespace Orleans.Runtime
             nextTicket = MakeTicketFromDateTime(DateTime.UtcNow);
             this.logger = logger;
             _collectionTimer = timerFactory.Create(quantum, "ActivationCollector");
+            _collectionGuards = collectionGuards;
         }
 
         // Return the number of activations that were used (touched) in the last recencyPeriod.
@@ -74,8 +78,10 @@ namespace Orleans.Runtime
         /// Collects all eligible grain activations which have been idle for at least <paramref name="ageLimit"/>.
         /// </summary>
         /// <param name="ageLimit">The age limit.</param>
+        /// <param name="forceCollection">if set to <c>true</c> forces collection.</param>
         /// <returns>A <see cref="Task"/> representing the work performed.</returns>
-        public Task CollectActivations(TimeSpan ageLimit) => CollectActivationsImpl(false, ageLimit);
+        public Task CollectActivations(TimeSpan ageLimit, bool forceCollection = false)
+            => CollectActivationsImpl(false, ageLimit, forceCollection);
 
         /// <summary>
         /// Schedules the provided grain context for collection if it becomes idle for the specified duration.
@@ -269,7 +275,10 @@ namespace Orleans.Runtime
             List<ICollectibleGrainContext> condemned = null;
             var now = DateTime.UtcNow;
             var reason = GetDeactivationReason();
-            foreach (var kv in buckets)
+
+            // Order the buckets by key so that the activations scheduled for collection first
+            // are collected first.
+            foreach (var kv in buckets.OrderBy(x => x.Key))
             {
                 var bucket = kv.Value;
                 foreach (var kvp in bucket.Items)
@@ -277,34 +286,15 @@ namespace Orleans.Runtime
                     var activation = kvp.Value;
                     lock (activation)
                     {
-                        if (!activation.IsValid)
+                        if (activation.IsValid
+                            && activation.KeepAliveUntil <= now
+                            && activation.IsInactive
+                            && activation.GetIdleness() >= ageLimit
+                            && bucket.TryRemove(activation))
                         {
-                            // Do nothing: don't collect, don't reschedule.
-                        }
-                        else if (activation.KeepAliveUntil > now)
-                        {
-                            // do nothing
-                        }
-                        else if (!activation.IsInactive)
-                        {
-                            // do nothing
-                        }
-                        else
-                        {
-                            if (activation.GetIdleness() >= ageLimit)
-                            {
-                                if (bucket.TryRemove(activation))
-                                {
-                                    // we removed the activation from the collector. it's our responsibility to deactivate it.
-                                    activation.Deactivate(reason, cancellationToken: default);
-                                    AddActivationToList(activation, ref condemned);
-                                }
-                                // someone else has already deactivated the activation, so there's nothing to do.
-                            }
-                            else
-                            {
-                                // activation is not idle long enough for collection. do nothing.
-                            }
+                            // We removed the activation from the collector. It's our responsibility to deactivate it.
+                            activation.Deactivate(reason, cancellationToken: default);
+                            AddActivationToList(activation, ref condemned);
                         }
                     }
                 }
@@ -461,8 +451,16 @@ namespace Orleans.Runtime
             }
         }
 
-        private async Task CollectActivationsImpl(bool scanStale, TimeSpan ageLimit = default(TimeSpan))
+        private async Task CollectActivationsImpl(bool scanStale,
+            TimeSpan ageLimit = default(TimeSpan),
+            bool forceCollection = false)
         {
+            if (forceCollection == false
+                && CollectionGuarded() == true)
+            {
+                return;
+            }
+
             var watch = ValueStopwatch.StartNew();
             var number = Interlocked.Increment(ref collectionNumber);
             long memBefore = GC.GetTotalMemory(false) / (1024 * 1024);
@@ -485,7 +483,7 @@ namespace Orleans.Runtime
             {
                 count = list.Count;
                 if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug("CollectActivations {Activations}", list.ToStrings(d => d.GrainId.ToString() + d.ActivationId));
-                await DeactivateActivationsFromCollector(list);
+                await DeactivateActivationsFromCollector(list, forceCollection);
             }
 
             long memAfter = GC.GetTotalMemory(false) / (1024 * 1024);
@@ -505,15 +503,38 @@ namespace Orleans.Runtime
             }
         }
 
-        private async Task DeactivateActivationsFromCollector(List<ICollectibleGrainContext> list)
+        /// <summary>
+        /// Check to see whether any of the collection guards are set.
+        /// </summary>
+        /// <returns>true if collection is guarded, false if collection should start/continue</returns>
+        private bool CollectionGuarded() => _collectionGuards
+            .Any(collectionGuard => collectionGuard.ShouldCollect() == false);
+
+        private async Task DeactivateActivationsFromCollector(List<ICollectibleGrainContext> list,
+            bool forceCollection)
+        {
+            if (forceCollection == false
+                && _options.Value.CollectionBatchSize != 0
+                && _collectionGuards.Count() != 0)
+            {
+                await BatchDeactivateActivationsFromCollector(list);
+            }
+            else
+            {
+                await DeactivateAllIdleActivationsFromCollector(list);
+            }
+        }
+
+        private async Task DeactivateAllIdleActivationsFromCollector(List<ICollectibleGrainContext> list)
         {
             var cts = new CancellationTokenSource(_options.Value.DeactivationTimeout);
             var mtcs = new MultiTaskCompletionSource(list.Count);
 
-            logger.LogInformation((int)ErrorCode.Catalog_ShutdownActivations_1, "DeactivateActivationsFromCollector: total {Count} to promptly Destroy.", list.Count);
+            logger.LogInformation((int)ErrorCode.Catalog_ShutdownActivations_1,
+                "DeactivateActivationsFromCollector: total {Count} to promptly Destroy.", list.Count);
             CatalogInstruments.ActiviationShutdownViaCollection();
 
-            Action<Task> signalCompletion = task => mtcs.SetOneResult();
+            Action<Task> signalCompletion = _ => mtcs.SetOneResult();
             var reason = GetDeactivationReason();
             for (var i = 0; i < list.Count; i++)
             {
@@ -524,6 +545,52 @@ namespace Orleans.Runtime
             }
 
             await mtcs.Task;
+        }
+
+        /// <summary>
+        /// Deactivate grains in batches using the Options.CollectionGuardFrequency as batch size
+        /// </summary>
+        private async Task BatchDeactivateActivationsFromCollector(List<ICollectibleGrainContext> list)
+        {
+            var cts = new CancellationTokenSource(_options.Value.DeactivationTimeout);
+            var i = 0;
+            var reason = GetDeactivationReason();
+
+            while (i < list.Count)
+            {
+                var batchSize = Math.Min(_options.Value.CollectionBatchSize, list.Count - i);
+                var multiTaskCompletionSource = new MultiTaskCompletionSource(batchSize);
+
+                for (var j = 0; j < batchSize; j++)
+                {
+                    _ = list[i + j]
+                        .DeactivateAsync(reason, cts.Token)
+                        .ContinueWith(
+                            _ => multiTaskCompletionSource.SetOneResult(),
+                            cts.Token);
+                }
+
+                i += batchSize;
+                await multiTaskCompletionSource.Task;
+
+                if (_options.Value.CollectionBatchDelay != 0)
+                {
+                    await Task.Delay(_options.Value.CollectionBatchDelay, cts.Token);
+                }
+
+                if (CollectionGuarded() == true)
+                {
+                    break;
+                }
+            }
+
+            if (logger.IsEnabled(LogLevel.Debug))
+            {
+                logger.LogDebug("CollectActivations #{NumberOfActivations} {Activations}", i,
+                    list
+                        .Take(i)
+                        .ToStrings(d => d.GrainId.ToString() + d.ActivationId));
+            }
         }
 
         /// <inheritdoc/>
