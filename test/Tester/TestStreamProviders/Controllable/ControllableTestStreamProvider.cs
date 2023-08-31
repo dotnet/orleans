@@ -23,15 +23,9 @@ namespace Tester.TestStreamProviders.Controllable
         public string Name { get; private set; }
 
         public Task QueueMessageBatchAsync<T>(StreamId streamId, IEnumerable<T> events, StreamSequenceToken token,
-            Dictionary<string, object> requestContext)
-        {
-            return Task.CompletedTask;
-        }
+            Dictionary<string, object> requestContext) => Task.CompletedTask;
 
-        public IQueueAdapterReceiver CreateReceiver(QueueId queueId)
-        {
-            throw new NotImplementedException();
-        }
+        public IQueueAdapterReceiver CreateReceiver(QueueId queueId) => throw new NotImplementedException();
 
         public bool IsRewindable { get; private set; }
         public StreamProviderDirection Direction { get; private set; }
@@ -41,15 +35,9 @@ namespace Tester.TestStreamProviders.Controllable
             Name = name;
         }
 
-        public Task<IQueueAdapter> CreateAdapter()
-        {
-            return Task.FromResult<IQueueAdapter>(this);
-        }
+        public Task<IQueueAdapter> CreateAdapter() => Task.FromResult<IQueueAdapter>(this);
 
-        public IQueueAdapterCache GetQueueAdapterCache()
-        {
-            throw new NotImplementedException();
-        }
+        public IQueueAdapterCache GetQueueAdapterCache() => throw new NotImplementedException();
 
         public IStreamQueueMapper GetStreamQueueMapper()
         {
@@ -58,10 +46,7 @@ namespace Tester.TestStreamProviders.Controllable
             return new HashRingBasedStreamQueueMapper(options, Name);
         }
 
-        public Task<IStreamFailureHandler> GetDeliveryFailureHandler(QueueId queueId)
-        {
-            throw new NotImplementedException();
-        }
+        public Task<IStreamFailureHandler> GetDeliveryFailureHandler(QueueId queueId) => throw new NotImplementedException();
 
         public Task<object> ExecuteCommand(int command, object arg)
         {

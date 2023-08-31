@@ -18,15 +18,9 @@ namespace UnitTests.Grains
     {
         private IReentrantGrain Self { get; set; }
 
-        public Task<string> One()
-        {
-            return Task.FromResult("one");
-        }
+        public Task<string> One() => Task.FromResult("one");
 
-        public async Task<string> Two()
-        {
-            return await Self.One() + " two";
-        }
+        public async Task<string> Two() => await Self.One() + " two";
 
         public Task SetSelf(IReentrantGrain self)
         {
@@ -115,25 +109,13 @@ namespace UnitTests.Grains
 
         // this interleaves only when arg == "reentrant"
         // and test predicate will throw when arg = "err"
-        public Task<string> One(string arg)
-        {
-            return Task.FromResult("one");
-        }
+        public Task<string> One(string arg) => Task.FromResult("one");
 
-        public async Task<string> Two()
-        {
-            return await Self.One("") + " two";
-        }
+        public async Task<string> Two() => await Self.One("") + " two";
 
-        public async Task<string> TwoReentrant()
-        {
-            return await Self.One("reentrant") + " two";
-        }
+        public async Task<string> TwoReentrant() => await Self.One("reentrant") + " two";
 
-        public Task Exceptional()
-        {
-            return Self.One("err");
-        }
+        public Task Exceptional() => Self.One("err");
 
         public async Task SubscribeToStream()
         {
@@ -146,10 +128,7 @@ namespace UnitTests.Grains
             });
         }
 
-        public Task PushToStream(string item)
-        {
-            return GetStream().OnNextAsync(item);
-        }
+        public Task PushToStream(string item) => GetStream().OnNextAsync(item);
 
         IAsyncStream<string> GetStream() =>
             this.GetStreamProvider("sms").GetStream<string>("test-stream-interleave", Guid.Empty);
@@ -199,25 +178,13 @@ namespace UnitTests.Grains
 
         // this interleaves only when arg == "reentrant"
         // and test predicate will throw when arg = "err"
-        public Task<string> One(string arg)
-        {
-            return Task.FromResult("one");
-        }
+        public Task<string> One(string arg) => Task.FromResult("one");
 
-        public async Task<string> Two()
-        {
-            return await Self.One("") + " two";
-        }
+        public async Task<string> Two() => await Self.One("") + " two";
 
-        public async Task<string> TwoReentrant()
-        {
-            return await Self.One("reentrant") + " two";
-        }
+        public async Task<string> TwoReentrant() => await Self.One("reentrant") + " two";
 
-        public Task Exceptional()
-        {
-            return Self.One("err");
-        }
+        public Task Exceptional() => Self.One("err");
 
         public async Task SubscribeToStream()
         {
@@ -230,10 +197,7 @@ namespace UnitTests.Grains
             });
         }
 
-        public Task PushToStream(string item)
-        {
-            return GetStream().OnNextAsync(item);
-        }
+        public Task PushToStream(string item) => GetStream().OnNextAsync(item);
 
         IAsyncStream<string> GetStream() =>
             this.GetStreamProvider("sms").GetStream<string>("test-stream-interleave", Guid.Empty);
@@ -249,15 +213,9 @@ namespace UnitTests.Grains
     {
         private IUnorderedNonReentrantGrain Self { get; set; }
 
-        public Task<string> One()
-        {
-            return Task.FromResult("one");
-        }
+        public Task<string> One() => Task.FromResult("one");
 
-        public async Task<string> Two()
-        {
-            return await Self.One() + " two";
-        }
+        public async Task<string> Two() => await Self.One() + " two";
 
         public Task SetSelf(IUnorderedNonReentrantGrain self)
         {
@@ -276,15 +234,9 @@ namespace UnitTests.Grains
             this.logger = loggerFactory.CreateLogger($"{this.GetType().Name}-{this.IdentityString}");
         }
 
-        public override Task OnActivateAsync(CancellationToken cancellationToken)
-        {
-            return Task.CompletedTask;
-        }
+        public override Task OnActivateAsync(CancellationToken cancellationToken) => Task.CompletedTask;
 
-        public Task<int> GetCounter()
-        {
-            return Task.FromResult(1);
-        }
+        public Task<int> GetCounter() => Task.FromResult(1);
 
         public Task SetDestination(long id)
         {
@@ -323,15 +275,9 @@ namespace UnitTests.Grains
             this.logger = loggerFactory.CreateLogger($"{this.GetType().Name}-{this.IdentityString}");
         }
 
-        public override Task OnActivateAsync(CancellationToken cancellationToken)
-        {
-            return Task.CompletedTask;
-        }
+        public override Task OnActivateAsync(CancellationToken cancellationToken) => Task.CompletedTask;
 
-        public Task<int> GetCounter()
-        {
-            return Task.FromResult(1);
-        }
+        public Task<int> GetCounter() => Task.FromResult(1);
 
         public Task SetDestination(long id)
         {
@@ -371,10 +317,7 @@ namespace UnitTests.Grains
             this.logger = loggerFactory.CreateLogger($"{this.GetType().Name}-{this.IdentityString}");
         }
 
-        public override Task OnActivateAsync(CancellationToken cancellationToken)
-        {
-            return Task.CompletedTask;
-        }
+        public override Task OnActivateAsync(CancellationToken cancellationToken) => Task.CompletedTask;
 
         public async Task FanOutReentrant(int offset, int num)
         {
@@ -491,10 +434,7 @@ namespace UnitTests.Grains
             this.logger = loggerFactory.CreateLogger($"{this.GetType().Name}-{this.IdentityString}");
         }
 
-        public override Task OnActivateAsync(CancellationToken cancellationToken)
-        {
-            return Task.CompletedTask;
-        }
+        public override Task OnActivateAsync(CancellationToken cancellationToken) => Task.CompletedTask;
 
         public async Task FanOutACReentrant(int offset, int num)
         {
@@ -609,10 +549,7 @@ namespace UnitTests.Grains
             this.logger = loggerFactory.CreateLogger($"{this.GetType().Name}-{this.IdentityString}");
         }
 
-        public override Task OnActivateAsync(CancellationToken cancellationToken)
-        {
-            return Task.CompletedTask;
-        }
+        public override Task OnActivateAsync(CancellationToken cancellationToken) => Task.CompletedTask;
 
         public Task SetDestination(long id)
         {
@@ -630,10 +567,7 @@ namespace UnitTests.Grains
             logger.LogInformation("After GetCounter() - got value={Counter}", ctr);
         }
 
-        public Task<int> GetCounter()
-        {
-            return Task.FromResult(++count);
-        }
+        public Task<int> GetCounter() => Task.FromResult(++count);
     }
 
     public class NonReentrantTaskGrain : Grain, INonReentrantTaskGrain
@@ -647,10 +581,7 @@ namespace UnitTests.Grains
             this.logger = loggerFactory.CreateLogger($"{this.GetType().Name}-{this.IdentityString}");
         }
 
-        public override Task OnActivateAsync(CancellationToken cancellationToken)
-        {
-            return Task.CompletedTask;
-        }
+        public override Task OnActivateAsync(CancellationToken cancellationToken) => Task.CompletedTask;
 
         public Task SetDestination(long id)
         {
@@ -668,9 +599,6 @@ namespace UnitTests.Grains
             logger.LogInformation("After GetCounter() - got value={Counter}", ctr);
         }
 
-        public Task<int> GetCounter()
-        {
-            return Task.FromResult(++count);
-        }
+        public Task<int> GetCounter() => Task.FromResult(++count);
     }
 }

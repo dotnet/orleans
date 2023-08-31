@@ -100,10 +100,7 @@ namespace Orleans.Transactions
             return stateStorage.Etag!;
         }
 
-        private StateStorageBridge<TransactionalStateRecord<TState>> GetStateStorage()
-        {
-            return new(this.stateName, context, grainStorage, loggerFactory);
-        }
+        private StateStorageBridge<TransactionalStateRecord<TState>> GetStateStorage() => new(this.stateName, context, grainStorage, loggerFactory);
     }
 
     [Serializable]

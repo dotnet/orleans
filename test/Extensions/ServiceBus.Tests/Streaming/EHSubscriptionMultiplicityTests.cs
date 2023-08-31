@@ -23,10 +23,7 @@ namespace ServiceBus.Tests.StreamingTests
 
         public class Fixture : BaseEventHubTestClusterFixture
         {
-            protected override void ConfigureTestCluster(TestClusterBuilder builder)
-            {
-                builder.AddSiloBuilderConfigurator<MySiloBuilderConfigurator>();
-            }
+            protected override void ConfigureTestCluster(TestClusterBuilder builder) => builder.AddSiloBuilderConfigurator<MySiloBuilderConfigurator>();
 
             private class MySiloBuilderConfigurator : ISiloConfigurator
             {

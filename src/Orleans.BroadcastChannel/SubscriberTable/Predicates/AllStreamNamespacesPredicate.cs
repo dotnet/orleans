@@ -9,9 +9,6 @@ namespace Orleans.BroadcastChannel
         public string PredicatePattern => "*";
 
         /// <inheritdoc/>
-        public bool IsMatch(string streamNamespace)
-        {
-            return true;
-        }
+        public bool IsMatch(string streamNamespace) => true;
     }
 }

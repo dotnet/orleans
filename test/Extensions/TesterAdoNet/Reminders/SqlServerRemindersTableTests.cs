@@ -43,10 +43,7 @@ namespace UnitTests.RemindersTest
                 Options.Create(options));
         }
 
-        protected override string GetAdoInvariant()
-        {
-            return AdoNetInvariants.InvariantNameSqlServer;
-        }
+        protected override string GetAdoInvariant() => AdoNetInvariants.InvariantNameSqlServer;
 
         protected override async Task<string> GetConnectionString()
         {
@@ -60,21 +57,12 @@ namespace UnitTests.RemindersTest
         }
 
         [SkippableFact]
-        public async Task RemindersTable_SqlServer_RemindersRange()
-        {
-            await RemindersRange(iterations: 30);
-        }
+        public async Task RemindersTable_SqlServer_RemindersRange() => await RemindersRange(iterations: 30);
 
         [SkippableFact]
-        public async Task RemindersTable_SqlServer_RemindersParallelUpsert()
-        {
-            await RemindersParallelUpsert();
-        }
+        public async Task RemindersTable_SqlServer_RemindersParallelUpsert() => await RemindersParallelUpsert();
 
         [SkippableFact]
-        public async Task RemindersTable_SqlServer_ReminderSimple()
-        {
-            await ReminderSimple();
-        }
+        public async Task RemindersTable_SqlServer_ReminderSimple() => await ReminderSimple();
     }
 }

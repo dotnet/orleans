@@ -33,10 +33,7 @@ namespace Orleans.Runtime.Messaging
             return Task.CompletedTask;
         }
 
-        public void Participate(ISiloLifecycle lifecycle)
-        {
-            lifecycle.Subscribe(nameof(SiloConnectionMaintainer), ServiceLifecycleStage.RuntimeInitialize, this);
-        }
+        public void Participate(ISiloLifecycle lifecycle) => lifecycle.Subscribe(nameof(SiloConnectionMaintainer), ServiceLifecycleStage.RuntimeInitialize, this);
 
         public void SiloStatusChangeNotification(SiloAddress updatedSilo, SiloStatus status)
         {

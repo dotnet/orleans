@@ -61,10 +61,7 @@ namespace OrleansAWSUtils.Streams
             this.requestContext = requestContext;
         }
 
-        public IEnumerable<Tuple<T, StreamSequenceToken>> GetEvents<T>()
-        {
-            return events.OfType<T>().Select((e, i) => Tuple.Create<T, StreamSequenceToken>(e, sequenceToken.CreateSequenceTokenForEvent(i)));
-        }
+        public IEnumerable<Tuple<T, StreamSequenceToken>> GetEvents<T>() => events.OfType<T>().Select((e, i) => Tuple.Create<T, StreamSequenceToken>(e, sequenceToken.CreateSequenceTokenForEvent(i)));
 
         internal static SendMessageRequest ToSQSMessage<T>(
             Serializer<SQSBatchContainer> serializer,
@@ -103,9 +100,6 @@ namespace OrleansAWSUtils.Streams
             return false;
         }
 
-        public override string ToString()
-        {
-            return string.Format("[SQSBatchContainer:Stream={0},#Items={1}]", StreamId, events.Count);
-        }
+        public override string ToString() => string.Format("[SQSBatchContainer:Stream={0},#Items={1}]", StreamId, events.Count);
     }
 }

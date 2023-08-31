@@ -39,10 +39,7 @@ namespace DefaultCluster.Tests.General
             observer2 = null;
         }
 
-        private ISimpleObserverableGrain GetGrain()
-        {
-            return this.GrainFactory.GetGrain<ISimpleObserverableGrain>(GetRandomGrainId());
-        }
+        private ISimpleObserverableGrain GetGrain() => this.GrainFactory.GetGrain<ISimpleObserverableGrain>(GetRandomGrainId());
 
         [Fact, TestCategory("BVT")]
         public async Task ObserverTest_SimpleNotification()

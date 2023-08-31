@@ -41,10 +41,7 @@ namespace Orleans.Connections.Security
             await _writer.CompleteAsync().ConfigureAwait(false);
         }
 
-        public override void Flush()
-        {
-            FlushAsync().GetAwaiter().GetResult();
-        }
+        public override void Flush() => FlushAsync().GetAwaiter().GetResult();
 
         public override async Task FlushAsync(CancellationToken cancellationToken)
         {
@@ -110,30 +107,15 @@ namespace Orleans.Connections.Security
             throw new InvalidOperationException("Read zero bytes unexpectedly");
         }
 
-        public override IAsyncResult BeginRead(byte[] buffer, int offset, int count, AsyncCallback callback, object state)
-        {
-            return TaskToApm.Begin(ReadAsync(buffer, offset, count), callback, state);
-        }
+        public override IAsyncResult BeginRead(byte[] buffer, int offset, int count, AsyncCallback callback, object state) => TaskToApm.Begin(ReadAsync(buffer, offset, count), callback, state);
 
-        public override int EndRead(IAsyncResult asyncResult)
-        {
-            return TaskToApm.End<int>(asyncResult);
-        }
+        public override int EndRead(IAsyncResult asyncResult) => TaskToApm.End<int>(asyncResult);
 
-        public override long Seek(long offset, SeekOrigin origin)
-        {
-            throw new NotSupportedException();
-        }
+        public override long Seek(long offset, SeekOrigin origin) => throw new NotSupportedException();
 
-        public override void SetLength(long value)
-        {
-            throw new NotSupportedException();
-        }
+        public override void SetLength(long value) => throw new NotSupportedException();
 
-        public override void Write(byte[] buffer, int offset, int count)
-        {
-            WriteAsync(buffer, offset, count, CancellationToken.None).GetAwaiter().GetResult();
-        }
+        public override void Write(byte[] buffer, int offset, int count) => WriteAsync(buffer, offset, count, CancellationToken.None).GetAwaiter().GetResult();
 
         public override Task WriteAsync(byte[] buffer, int offset, int count, CancellationToken cancellationToken)
         {
@@ -148,20 +130,11 @@ namespace Orleans.Connections.Security
             if (r.IsCanceled) throw new OperationCanceledException(cancellationToken);
         }
 
-        public override IAsyncResult BeginWrite(byte[] buffer, int offset, int count, AsyncCallback callback, object state)
-        {
-            return TaskToApm.Begin(WriteAsync(buffer, offset, count), callback, state);
-        }
+        public override IAsyncResult BeginWrite(byte[] buffer, int offset, int count, AsyncCallback callback, object state) => TaskToApm.Begin(WriteAsync(buffer, offset, count), callback, state);
 
-        public override void EndWrite(IAsyncResult asyncResult)
-        {
-            TaskToApm.End(asyncResult);
-        }
+        public override void EndWrite(IAsyncResult asyncResult) => TaskToApm.End(asyncResult);
 
-        public override Task CopyToAsync(Stream destination, int bufferSize, CancellationToken cancellationToken)
-        {
-            return _reader.CopyToAsync(destination, cancellationToken);
-        }
+        public override Task CopyToAsync(Stream destination, int bufferSize, CancellationToken cancellationToken) => _reader.CopyToAsync(destination, cancellationToken);
 
         /// <summary>
         /// Provides support for efficiently using Tasks to implement the APM (Begin/End) pattern.

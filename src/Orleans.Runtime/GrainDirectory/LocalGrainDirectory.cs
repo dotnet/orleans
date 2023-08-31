@@ -769,15 +769,9 @@ namespace Orleans.Runtime.GrainDirectory
             }
         }
 
-        public void InvalidateCacheEntry(GrainId grainId)
-        {
-            DirectoryCache.Remove(grainId);
-        }
+        public void InvalidateCacheEntry(GrainId grainId) => DirectoryCache.Remove(grainId);
 
-        public void InvalidateCacheEntry(GrainAddress activationAddress)
-        {
-            DirectoryCache.Remove(activationAddress);
-        }
+        public void InvalidateCacheEntry(GrainAddress activationAddress) => DirectoryCache.Remove(activationAddress);
 
         /// <summary>
         /// For testing purposes only.
@@ -802,20 +796,11 @@ namespace Orleans.Runtime.GrainDirectory
             return 0;
         }
 
-        internal IRemoteGrainDirectory GetDirectoryReference(SiloAddress silo)
-        {
-            return this.grainFactory.GetSystemTarget<IRemoteGrainDirectory>(Constants.DirectoryServiceType, silo);
-        }
+        internal IRemoteGrainDirectory GetDirectoryReference(SiloAddress silo) => this.grainFactory.GetSystemTarget<IRemoteGrainDirectory>(Constants.DirectoryServiceType, silo);
 
-        private bool IsSiloNextInTheRing(SiloAddress siloAddr, int hash, bool excludeMySelf)
-        {
-            return siloAddr.GetConsistentHashCode() <= hash && (!excludeMySelf || !siloAddr.Equals(MyAddress));
-        }
+        private bool IsSiloNextInTheRing(SiloAddress siloAddr, int hash, bool excludeMySelf) => siloAddr.GetConsistentHashCode() <= hash && (!excludeMySelf || !siloAddr.Equals(MyAddress));
 
-        public bool IsSiloInCluster(SiloAddress silo)
-        {
-            return this.directoryMembership.MembershipCache.Contains(silo);
-        }
+        public bool IsSiloInCluster(SiloAddress silo) => this.directoryMembership.MembershipCache.Contains(silo);
 
         public void CachePlacementDecision(GrainId grainId, SiloAddress siloAddress) => this.DirectoryCache.AddOrUpdate(new GrainAddress { GrainId = grainId, SiloAddress = siloAddress }, 0);
         public bool TryCachedLookup(GrainId grainId, [NotNullWhen(true)] out GrainAddress? address) => (address = GetLocalCacheData(grainId)) is not null;

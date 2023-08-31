@@ -22,6 +22,6 @@ namespace UnitTests.StorageTests.Relational
         /// <summary>
         /// <see cref="IHasher.Hash(byte[])"/>.
         /// </summary>
-        public int Hash(byte[] data) { return ConstantHash; }
+        public int Hash(byte[] data) => ConstantHash;
     }
 }

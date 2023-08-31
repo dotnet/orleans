@@ -145,9 +145,6 @@ namespace Tester.Directories
         }
 
         [SkippableFact]
-        public async Task LookupNotFound()
-        {
-            Assert.Null(await this.grainDirectory.Lookup(GrainId.Parse("user/somerandomuser_" + Guid.NewGuid().ToString("N"))));
-        }
+        public async Task LookupNotFound() => Assert.Null(await this.grainDirectory.Lookup(GrainId.Parse("user/somerandomuser_" + Guid.NewGuid().ToString("N"))));
     }
 }

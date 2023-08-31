@@ -32,10 +32,7 @@ namespace TestExtensions
             }
         }
 
-        public void EnsurePreconditionsMet()
-        {
-            this.preconditionsException?.Throw();
-        }
+        public void EnsurePreconditionsMet() => this.preconditionsException?.Throw();
 
         protected virtual void CheckPreconditionsOrThrow() { }
 

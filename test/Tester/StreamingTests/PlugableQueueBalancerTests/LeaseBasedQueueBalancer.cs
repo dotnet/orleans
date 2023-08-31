@@ -25,15 +25,9 @@ namespace Tester.StreamingTests
             await GetInitialLease();
         }
 
-        public Task Shutdown()
-        {
-            return Task.CompletedTask;
-        }
+        public Task Shutdown() => Task.CompletedTask;
 
-        public IEnumerable<QueueId> GetMyQueues()
-        {
-            return this.ownedQueues;
-        }
+        public IEnumerable<QueueId> GetMyQueues() => this.ownedQueues;
 
         private async Task GetInitialLease()
         {
@@ -51,16 +45,12 @@ namespace Tester.StreamingTests
             await this.leaseManagerGrain.RecordBalancerResponsibility(id.ToString(), this.ownedQueues.Count);
         }
 
-        public bool SubscribeToQueueDistributionChangeEvents(IStreamQueueBalanceListener observer)
-        {
+        public bool SubscribeToQueueDistributionChangeEvents(IStreamQueueBalanceListener observer) =>
             //no op operation
-            return true;
-        }
+            true;
 
-        public bool UnSubscribeFromQueueDistributionChangeEvents(IStreamQueueBalanceListener observer)
-        {
+        public bool UnSubscribeFromQueueDistributionChangeEvents(IStreamQueueBalanceListener observer) =>
             //no op operation
-            return true;
-        }
+            true;
     }
 }

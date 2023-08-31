@@ -116,10 +116,7 @@ namespace Samples.StorageProviders
         /// http://msdn.microsoft.com/en-us/library/system.web.script.serialization.javascriptserializer.aspx
         /// for more on the JSON serializer.
         /// </remarks>
-        protected static string ConvertToStorageFormat<T>(IGrainState<T> grainState)
-        {
-            return JsonConvert.SerializeObject(grainState.State);
-        }
+        protected static string ConvertToStorageFormat<T>(IGrainState<T> grainState) => JsonConvert.SerializeObject(grainState.State);
 
         /// <summary>
         /// Constructs a grain state instance by deserializing a JSON document.

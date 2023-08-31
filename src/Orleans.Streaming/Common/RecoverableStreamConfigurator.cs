@@ -21,20 +21,14 @@ namespace Orleans.Hosting
         /// </summary>
         /// <param name="configurator">The configuration builder.</param>
         /// <param name="configureOptions">The configuration delegate.</param>
-        public static void ConfigureStatistics(this ISiloRecoverableStreamConfigurator configurator, Action<OptionsBuilder<StreamStatisticOptions>> configureOptions)
-        {
-            configurator.Configure(configureOptions);
-        }
+        public static void ConfigureStatistics(this ISiloRecoverableStreamConfigurator configurator, Action<OptionsBuilder<StreamStatisticOptions>> configureOptions) => configurator.Configure(configureOptions);
 
         /// <summary>
         /// Configures cache eviction options for a reliable stream provider.
         /// </summary>
         /// <param name="configurator">The configuration builder.</param>
         /// <param name="configureOptions">The configuration delegate.</param>
-        public static void ConfigureCacheEviction(this ISiloRecoverableStreamConfigurator configurator, Action<OptionsBuilder<StreamCacheEvictionOptions>> configureOptions)
-        {
-            configurator.Configure(configureOptions);
-        }
+        public static void ConfigureCacheEviction(this ISiloRecoverableStreamConfigurator configurator, Action<OptionsBuilder<StreamCacheEvictionOptions>> configureOptions) => configurator.Configure(configureOptions);
     }
 
     /// <summary>

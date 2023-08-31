@@ -36,15 +36,9 @@ namespace Tester
             Gateways = new List<Uri>();
         }
 
-        public Task InitializeGatewayListProvider()
-        {
-            return Task.CompletedTask;
-        }
+        public Task InitializeGatewayListProvider() => Task.CompletedTask;
 
-        public Task<IList<Uri>> GetGateways()
-        {
-            return Task.FromResult(Gateways);
-        }
+        public Task<IList<Uri>> GetGateways() => Task.FromResult(Gateways);
     }
 
     public class GatewayConnectionTests : TestClusterPerTest

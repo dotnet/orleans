@@ -22,10 +22,7 @@ namespace Orleans.Serialization.Buffers.Adaptors
         }
 
         /// <inheritdoc />
-        public void Advance(int count)
-        {
-            _stream.Position += count;
-        }
+        public void Advance(int count) => _stream.Position += count;
 
         /// <inheritdoc />
         public Memory<byte> GetMemory(int sizeHint = 0)

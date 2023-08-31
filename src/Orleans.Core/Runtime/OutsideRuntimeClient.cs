@@ -315,10 +315,7 @@ namespace Orleans
             }
         }
 
-        private void UnregisterCallback(CorrelationId id)
-        {
-            callbacks.TryRemove(id, out _);
-        }
+        private void UnregisterCallback(CorrelationId id) => callbacks.TryRemove(id, out _);
 
         public void Reset()
         {
@@ -332,10 +329,7 @@ namespace Orleans
             ConstructorReset();
         }
 
-        private void ConstructorReset()
-        {
-            Utils.SafeExecute(() => this.Dispose());
-        }
+        private void ConstructorReset() => Utils.SafeExecute(() => this.Dispose());
 
         /// <inheritdoc />
         public TimeSpan GetResponseTimeout() => this.sharedCallbackData.ResponseTimeout;

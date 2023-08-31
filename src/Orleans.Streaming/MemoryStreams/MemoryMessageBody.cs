@@ -47,22 +47,13 @@ namespace Orleans.Providers
         }
 
         /// <inheritdoc />
-        public ArraySegment<byte> Serialize(MemoryMessageBody body)
-        {
-            return new ArraySegment<byte>(serializer.SerializeToArray(body));
-        }
+        public ArraySegment<byte> Serialize(MemoryMessageBody body) => new ArraySegment<byte>(serializer.SerializeToArray(body));
 
         /// <inheritdoc />
-        public MemoryMessageBody Deserialize(ArraySegment<byte> bodyBytes)
-        {
-            return serializer.Deserialize(bodyBytes.ToArray());
-        }
+        public MemoryMessageBody Deserialize(ArraySegment<byte> bodyBytes) => serializer.Deserialize(bodyBytes.ToArray());
 
         /// <inheritdoc />
-        void IOnDeserialized.OnDeserialized(DeserializationContext context)
-        {
-            this.serializer = context.ServiceProvider.GetRequiredService<Serializer<MemoryMessageBody>>();
-        }
+        void IOnDeserialized.OnDeserialized(DeserializationContext context) => this.serializer = context.ServiceProvider.GetRequiredService<Serializer<MemoryMessageBody>>();
     }
 
     /// <summary>

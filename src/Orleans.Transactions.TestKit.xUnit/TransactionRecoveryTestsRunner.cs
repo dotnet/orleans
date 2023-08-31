@@ -15,17 +15,11 @@ namespace Orleans.Transactions.TestKit.xUnit
         [SkippableTheory]
         [InlineData(TransactionTestConstants.SingleStateTransactionalGrain, 30)]
         [InlineData(TransactionTestConstants.DoubleStateTransactionalGrain, 20)]
-        public override Task TransactionWillRecoverAfterRandomSiloGracefulShutdown(string transactionTestGrainClassName, int concurrent)
-        {
-            return base.TransactionWillRecoverAfterRandomSiloGracefulShutdown(transactionTestGrainClassName, concurrent);
-        }
+        public override Task TransactionWillRecoverAfterRandomSiloGracefulShutdown(string transactionTestGrainClassName, int concurrent) => base.TransactionWillRecoverAfterRandomSiloGracefulShutdown(transactionTestGrainClassName, concurrent);
 
         [SkippableTheory]
         [InlineData(TransactionTestConstants.SingleStateTransactionalGrain, 30)]
         [InlineData(TransactionTestConstants.DoubleStateTransactionalGrain, 20)]
-        public override Task TransactionWillRecoverAfterRandomSiloUnGracefulShutdown(string transactionTestGrainClassName, int concurrent)
-        {
-            return base.TransactionWillRecoverAfterRandomSiloUnGracefulShutdown(transactionTestGrainClassName, concurrent);
-        }
+        public override Task TransactionWillRecoverAfterRandomSiloUnGracefulShutdown(string transactionTestGrainClassName, int concurrent) => base.TransactionWillRecoverAfterRandomSiloUnGracefulShutdown(transactionTestGrainClassName, concurrent);
     }
 }

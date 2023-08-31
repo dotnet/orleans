@@ -130,9 +130,6 @@ namespace Orleans.Runtime
         }
 
         /// <inheritdoc />
-        public void Dispose()
-        {
-            _cancellation.Cancel();
-        }
+        public void Dispose() => _cancellation.Cancel();
     }
 }

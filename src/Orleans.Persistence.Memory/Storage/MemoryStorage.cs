@@ -177,11 +177,9 @@ namespace Orleans.Storage
         /// http://msdn.microsoft.com/en-us/library/system.web.script.serialization.javascriptserializer.aspx
         /// for more on the JSON serializer.
         /// </remarks>
-        internal ReadOnlyMemory<byte> ConvertToStorageFormat<T>(T grainState)
-        {
+        internal ReadOnlyMemory<byte> ConvertToStorageFormat<T>(T grainState) =>
             // Convert to binary format
-            return this.storageSerializer.Serialize<T>(grainState);
-        }
+            this.storageSerializer.Serialize<T>(grainState);
     }
 
     /// <summary>

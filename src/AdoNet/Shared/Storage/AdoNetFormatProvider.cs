@@ -25,10 +25,7 @@ namespace Orleans.Tests.SqlUtils
         /// </summary>
         /// <param name="formatType">Requested format type</param>
         /// <returns></returns>
-        public object GetFormat(Type formatType)
-        {
-            return formatType == typeof(ICustomFormatter) ? formatter : null;
-        }
+        public object GetFormat(Type formatType) => formatType == typeof(ICustomFormatter) ? formatter : null;
 
 
         private class AdoNetFormatter: ICustomFormatter

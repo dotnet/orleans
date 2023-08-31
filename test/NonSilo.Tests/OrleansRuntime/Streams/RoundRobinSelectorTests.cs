@@ -21,22 +21,13 @@ namespace UnitTests.OrleansRuntime.Streams
         }
 
         [Fact]
-        public void NextSelectionWillGoThroughEveryResourceIfExistingSelectionEmptyTest()
-        {
-            base.NextSelectionWillGoThroughEveryResourceIfExistingSelectionEmpty(resources, resourceSelector);
-        }
+        public void NextSelectionWillGoThroughEveryResourceIfExistingSelectionEmptyTest() => base.NextSelectionWillGoThroughEveryResourceIfExistingSelectionEmpty(resources, resourceSelector);
 
         [Fact]
-        public void NextSelectionWontGoInfinitelyTest()
-        {
-            base.NextSelectionWontGoInfinitely(resources, resourceSelector);
-        }
+        public void NextSelectionWontGoInfinitelyTest() => base.NextSelectionWontGoInfinitely(resources, resourceSelector);
 
         [Fact]
-        public void NextSelectionWontReSelectExistingSelectionsTest()
-        {
-            base.NextSelectionWontReSelectExistingSelections(resources, resourceSelector);
-        }
+        public void NextSelectionWontReSelectExistingSelectionsTest() => base.NextSelectionWontReSelectExistingSelections(resources, resourceSelector);
 
         [Fact]
         public void NextSelectionWontReSelectExistingSelectionsWithDuplicatesTest()

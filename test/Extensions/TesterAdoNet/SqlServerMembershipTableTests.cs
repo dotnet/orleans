@@ -49,10 +49,7 @@ namespace UnitTests.MembershipTests
             return new AdoNetGatewayListProvider(this.loggerFactory.CreateLogger<AdoNetGatewayListProvider>(), this.Services, Options.Create(options), _gatewayOptions, this._clusterOptions);
         }
 
-        protected override string GetAdoInvariant()
-        {
-            return AdoNetInvariants.InvariantNameSqlServer;
-        }
+        protected override string GetAdoInvariant() => AdoNetInvariants.InvariantNameSqlServer;
 
         protected override async Task<string> GetConnectionString()
         {
@@ -66,57 +63,30 @@ namespace UnitTests.MembershipTests
         }
 
         [SkippableFact]
-        public async Task MembershipTable_SqlServer_GetGateways()
-        {
-            await MembershipTable_GetGateways();
-        }
+        public async Task MembershipTable_SqlServer_GetGateways() => await MembershipTable_GetGateways();
 
         [SkippableFact]
-        public async Task MembershipTable_SqlServer_ReadAll_EmptyTable()
-        {
-            await MembershipTable_ReadAll_EmptyTable();
-        }
+        public async Task MembershipTable_SqlServer_ReadAll_EmptyTable() => await MembershipTable_ReadAll_EmptyTable();
 
         [SkippableFact]
-        public async Task MembershipTable_SqlServer_InsertRow()
-        {
-            await MembershipTable_InsertRow();
-        }
+        public async Task MembershipTable_SqlServer_InsertRow() => await MembershipTable_InsertRow();
 
         [SkippableFact]
-        public async Task MembershipTable_SqlServer_ReadRow_Insert_Read()
-        {
-            await MembershipTable_ReadRow_Insert_Read();
-        }
+        public async Task MembershipTable_SqlServer_ReadRow_Insert_Read() => await MembershipTable_ReadRow_Insert_Read();
 
         [SkippableFact]
-        public async Task MembershipTable_SqlServer_ReadAll_Insert_ReadAll()
-        {
-            await MembershipTable_ReadAll_Insert_ReadAll();
-        }
+        public async Task MembershipTable_SqlServer_ReadAll_Insert_ReadAll() => await MembershipTable_ReadAll_Insert_ReadAll();
 
         [SkippableFact]
-        public async Task MembershipTable_SqlServer_UpdateRow()
-        {
-            await MembershipTable_UpdateRow();
-        }
+        public async Task MembershipTable_SqlServer_UpdateRow() => await MembershipTable_UpdateRow();
 
         [SkippableFact]
-        public async Task MembershipTable_SqlServer_UpdateRowInParallel()
-        {
-            await MembershipTable_UpdateRowInParallel();
-        }
+        public async Task MembershipTable_SqlServer_UpdateRowInParallel() => await MembershipTable_UpdateRowInParallel();
 
         [SkippableFact]
-        public async Task MembershipTable_SqlServer_UpdateIAmAlive()
-        {
-            await MembershipTable_UpdateIAmAlive();
-        }
+        public async Task MembershipTable_SqlServer_UpdateIAmAlive() => await MembershipTable_UpdateIAmAlive();
 
         [SkippableFact]
-        public async Task MembershipTableSqlServerSql_CleanupDefunctSiloEntries()
-        {
-            await MembershipTable_CleanupDefunctSiloEntries();
-        }
+        public async Task MembershipTableSqlServerSql_CleanupDefunctSiloEntries() => await MembershipTable_CleanupDefunctSiloEntries();
     }
 }

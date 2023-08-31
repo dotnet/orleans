@@ -36,10 +36,7 @@ namespace Orleans.TestingHost.Utils
         /// Is the storage emulator already started.
         /// </summary>
         /// <returns><see langword="true" /> if this instance is started; otherwise, <see langword="false" />.</returns>
-        public static bool IsStarted()
-        {
-            return GetStorageEmulatorProcess();
-        }
+        public static bool IsStarted() => GetStorageEmulatorProcess();
 
 
         /// <summary>
@@ -203,9 +200,6 @@ namespace Orleans.TestingHost.Utils
         /// Determines the Program Files base directory.
         /// </summary>
         /// <returns>The Program files base directory.</returns>
-        private static string GetProgramFilesBasePath()
-        {
-            return Environment.Is64BitOperatingSystem ? Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86) : Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles);
-        }
+        private static string GetProgramFilesBasePath() => Environment.Is64BitOperatingSystem ? Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86) : Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles);
     }
 }

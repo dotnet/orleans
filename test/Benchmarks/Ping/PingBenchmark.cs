@@ -74,10 +74,7 @@ namespace Benchmarks.Ping
             Console.CancelKeyPress += _onCancelEvent;
         }
 
-        private void CancelPressed(object sender, ConsoleCancelEventArgs e)
-        {
-            Environment.Exit(0);
-        }
+        private void CancelPressed(object sender, ConsoleCancelEventArgs e) => Environment.Exit(0);
 
         [Benchmark]
         public ValueTask Ping() => grain.Run();

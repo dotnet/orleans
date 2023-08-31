@@ -268,10 +268,7 @@ namespace Tester.HeterogeneousSilosTests.UpgradeTests
             }
         }
 
-        public Task InitializeAsync()
-        {
-            return Task.CompletedTask;
-        }
+        public Task InitializeAsync() => Task.CompletedTask;
 
         public async Task DisposeAsync()
         {
@@ -292,10 +289,7 @@ namespace Tester.HeterogeneousSilosTests.UpgradeTests
 
         public class VersionGrainsClientConfigurator : IClientBuilderConfigurator
         {
-            public void Configure(IConfiguration configuration, IClientBuilder clientBuilder)
-            {
-                clientBuilder.Configure<GatewayOptions>(options => options.PreferedGatewayIndex = 0);
-            }
+            public void Configure(IConfiguration configuration, IClientBuilder clientBuilder) => clientBuilder.Configure<GatewayOptions>(options => options.PreferedGatewayIndex = 0);
         }
     }
 }

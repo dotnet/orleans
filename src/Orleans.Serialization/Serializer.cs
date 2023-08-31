@@ -1188,10 +1188,7 @@ namespace Orleans.Serialization
         /// <param name="source">The source buffer.</param>
         /// <param name="result">The deserialized value.</param>
         /// <returns>The deserialized value.</returns>
-        public void Deserialize<TInput>(ref Reader<TInput> source, scoped ref T result)
-        {
-            _codec.Deserialize(ref source, ref result);
-        }
+        public void Deserialize<TInput>(ref Reader<TInput> source, scoped ref T result) => _codec.Deserialize(ref source, ref result);
 
         /// <summary>
         /// Deserialize a value of type <typeparamref name="T"/> from <paramref name="source"/>.

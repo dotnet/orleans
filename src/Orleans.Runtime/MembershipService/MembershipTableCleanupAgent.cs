@@ -36,10 +36,7 @@ namespace Orleans.Runtime.MembershipService
             }
         }
 
-        public void Dispose()
-        {
-            this.cleanupDefunctSilosTimer?.Dispose();
-        }
+        public void Dispose() => this.cleanupDefunctSilosTimer?.Dispose();
 
         private async Task CleanupDefunctSilos()
         {

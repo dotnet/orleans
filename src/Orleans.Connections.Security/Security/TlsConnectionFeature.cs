@@ -28,9 +28,6 @@ namespace Orleans.Connections.Security
 
         public int KeyExchangeStrength { get; set; }
 
-        public Task<X509Certificate2> GetRemoteCertificateAsync(CancellationToken cancellationToken)
-        {
-            return Task.FromResult(RemoteCertificate);
-        }
+        public Task<X509Certificate2> GetRemoteCertificateAsync(CancellationToken cancellationToken) => Task.FromResult(RemoteCertificate);
     }
 }

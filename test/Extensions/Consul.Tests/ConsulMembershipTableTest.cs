@@ -53,63 +53,33 @@ namespace Consul.Tests
             return new ConsulGatewayListProvider(loggerFactory.CreateLogger<ConsulGatewayListProvider>(), Options.Create(options), this._gatewayOptions, this._clusterOptions);
         }
 
-        protected override async Task<string> GetConnectionString()
-        {
-            return await ConsulTestUtils.EnsureConsulAsync() ? ConsulTestUtils.ConsulConnectionString : null;
-        }
+        protected override async Task<string> GetConnectionString() => await ConsulTestUtils.EnsureConsulAsync() ? ConsulTestUtils.ConsulConnectionString : null;
 
         [SkippableFact, TestCategory("Functional")]
-        public async Task MembershipTable_Consul_GetGateways()
-        {
-            await MembershipTable_GetGateways();
-        }
+        public async Task MembershipTable_Consul_GetGateways() => await MembershipTable_GetGateways();
 
         [SkippableFact, TestCategory("Functional")]
-        public async Task MembershipTable_Consul_ReadAll_EmptyTable()
-        {
-            await MembershipTable_ReadAll_EmptyTable();
-        }
+        public async Task MembershipTable_Consul_ReadAll_EmptyTable() => await MembershipTable_ReadAll_EmptyTable();
 
         [SkippableFact, TestCategory("Functional")]
-        public async Task MembershipTable_Consul_InsertRow()
-        {
-            await MembershipTable_InsertRow(false);
-        }
+        public async Task MembershipTable_Consul_InsertRow() => await MembershipTable_InsertRow(false);
 
         [SkippableFact, TestCategory("Functional")]
-        public async Task MembershipTable_Consul_ReadRow_Insert_Read()
-        {
-            await MembershipTable_ReadRow_Insert_Read(false);
-        }
+        public async Task MembershipTable_Consul_ReadRow_Insert_Read() => await MembershipTable_ReadRow_Insert_Read(false);
 
         [SkippableFact, TestCategory("Functional")]
-        public async Task MembershipTable_Consul_ReadAll_Insert_ReadAll()
-        {
-            await MembershipTable_ReadAll_Insert_ReadAll(false);
-        }
+        public async Task MembershipTable_Consul_ReadAll_Insert_ReadAll() => await MembershipTable_ReadAll_Insert_ReadAll(false);
 
         [SkippableFact, TestCategory("Functional")]
-        public async Task MembershipTable_Consul_UpdateRow()
-        {
-            await MembershipTable_UpdateRow(false);
-        }
+        public async Task MembershipTable_Consul_UpdateRow() => await MembershipTable_UpdateRow(false);
 
         [SkippableFact, TestCategory("Functional")]
-        public async Task MembershipTable_Consul_UpdateRowInParallel()
-        {
-            await MembershipTable_UpdateRowInParallel(false);
-        }
+        public async Task MembershipTable_Consul_UpdateRowInParallel() => await MembershipTable_UpdateRowInParallel(false);
 
         [SkippableFact, TestCategory("Functional")]
-        public async Task MembershipTable_Consul_UpdateIAmAlive()
-        {
-            await MembershipTable_UpdateIAmAlive(false);
-        }
+        public async Task MembershipTable_Consul_UpdateIAmAlive() => await MembershipTable_UpdateIAmAlive(false);
 
         [SkippableFact, TestCategory("Functional")]
-        public async Task MembershipTable_Consul_CleanupDefunctSiloEntries()
-        {
-            await MembershipTable_CleanupDefunctSiloEntries(false);
-        }
+        public async Task MembershipTable_Consul_CleanupDefunctSiloEntries() => await MembershipTable_CleanupDefunctSiloEntries(false);
     }
 }

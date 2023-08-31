@@ -74,9 +74,6 @@ namespace UnitTests.Grains
             return this.grainOnOtherSilo = otherGrain;
         }
 
-        public Task<string> GetSiloIdentity()
-        {
-            return Task.FromResult(this.RuntimeIdentity);
-        }
+        public Task<string> GetSiloIdentity() => Task.FromResult(this.RuntimeIdentity);
     }
 }

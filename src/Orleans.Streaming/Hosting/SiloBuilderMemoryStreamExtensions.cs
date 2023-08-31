@@ -19,10 +19,7 @@ namespace Orleans.Hosting
         /// <param name="configure">The configuration delegate.</param>
         /// <returns>The silo builder.</returns>
         public static ISiloBuilder AddMemoryStreams(this ISiloBuilder builder, string name,
-                Action<ISiloMemoryStreamConfigurator> configure = null)
-        {
-            return AddMemoryStreams<DefaultMemoryMessageBodySerializer>(builder, name, configure);
-        }
+                Action<ISiloMemoryStreamConfigurator> configure = null) => AddMemoryStreams<DefaultMemoryMessageBodySerializer>(builder, name, configure);
 
         /// <summary>
         /// Configure silo to use memory streams.

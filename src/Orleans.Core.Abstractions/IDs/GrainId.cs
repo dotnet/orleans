@@ -146,12 +146,10 @@ namespace Orleans.Runtime
         /// <summary>
         /// Generates a uniform, stable hash code for a grain id.
         /// </summary>
-        public uint GetUniformHashCode()
-        {
+        public uint GetUniformHashCode() =>
             // This value must be stable for a given id and equal for all nodes in a cluster.
             // HashCode.Combine does not currently offer stability with respect to its inputs.
-            return _type.GetUniformHashCode() * 31 + _key.GetUniformHashCode();
-        }
+            _type.GetUniformHashCode() * 31 + _key.GetUniformHashCode();
 
         /// <inheritdoc/>
         public void GetObjectData(SerializationInfo info, StreamingContext context)

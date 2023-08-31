@@ -58,15 +58,9 @@ namespace Orleans.Providers.Streams.Common
         }
 
         /// <inheritdoc />
-        public void TrackMemoryReleased(long releasedMemoryInByte)
-        {
-            Interlocked.Add(ref _releasedMemory, releasedMemoryInByte);
-        }
+        public void TrackMemoryReleased(long releasedMemoryInByte) => Interlocked.Add(ref _releasedMemory, releasedMemoryInByte);
 
         /// <inheritdoc />
-        public void TrackMemoryAllocated(long allocatedMemoryInByte)
-        {
-            Interlocked.Add(ref _allocatedMemory, allocatedMemoryInByte);
-        }
+        public void TrackMemoryAllocated(long allocatedMemoryInByte) => Interlocked.Add(ref _allocatedMemory, allocatedMemoryInByte);
     }
 }

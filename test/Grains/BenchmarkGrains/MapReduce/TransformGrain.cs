@@ -31,10 +31,7 @@ namespace BenchmarkGrains.MapReduce
             return Task.CompletedTask;
         }
 
-        public Task<TOutput> ConsumeMessage()
-        {
-            throw new NotImplementedException();
-        }
+        public Task<TOutput> ConsumeMessage() => throw new NotImplementedException();
 
         public Task LinkTo(ITargetGrain<TOutput> t)
         {
@@ -42,10 +39,7 @@ namespace BenchmarkGrains.MapReduce
             return Task.CompletedTask;
         }
 
-        public Task<GrainDataflowMessageStatus> OfferMessage(TInput messageValue, bool consumeToAccept)
-        {
-            throw new NotImplementedException();
-        }
+        public Task<GrainDataflowMessageStatus> OfferMessage(TInput messageValue, bool consumeToAccept) => throw new NotImplementedException();
 
         public Task SendAsync(TInput t)
         {
@@ -54,10 +48,7 @@ namespace BenchmarkGrains.MapReduce
             return Task.CompletedTask;
         }
 
-        public Task SendAsync(TInput t, GrainCancellationToken gct)
-        {
-            throw new NotImplementedException();
-        }
+        public Task SendAsync(TInput t, GrainCancellationToken gct) => throw new NotImplementedException();
 
         private void NotifyOfPendingWork()
         {
@@ -94,9 +85,6 @@ namespace BenchmarkGrains.MapReduce
             return base.OnDeactivateAsync(reason, cancellationToken);
         }
 
-        public Task<List<TOutput>> ReceiveAll()
-        {
-            throw new NotImplementedException();
-        }
+        public Task<List<TOutput>> ReceiveAll() => throw new NotImplementedException();
     }
 }

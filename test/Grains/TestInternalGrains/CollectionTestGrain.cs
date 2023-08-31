@@ -26,10 +26,7 @@ namespace UnitTests.Grains
             _grainContext = grainContext;
         }
 
-        protected virtual ILogger Logger()
-        {
-            return logger;
-        }
+        protected virtual ILogger Logger() => logger;
 
         public override Task OnActivateAsync(CancellationToken cancellationToken)
         {
@@ -124,10 +121,7 @@ namespace UnitTests.Grains
         {
         }
 
-        protected override ILogger Logger()
-        {
-            return logger;
-        }
+        protected override ILogger Logger() => logger;
 
         public override Task OnActivateAsync(CancellationToken cancellationToken)
         {

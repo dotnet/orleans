@@ -68,10 +68,7 @@ namespace Orleans.Runtime
             _componentWatchdogThread.Start();
         }
 
-        public void Stop()
-        {
-            _cancellation.Cancel();
-        }
+        public void Stop() => _cancellation.Cancel();
 
         protected void RunPlatformWatchdog()
         {

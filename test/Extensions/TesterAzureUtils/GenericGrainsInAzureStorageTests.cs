@@ -17,10 +17,7 @@ namespace Tester.AzureUtils.General
 
         public class Fixture : BaseAzureTestClusterFixture
         {
-            protected override void ConfigureTestCluster(TestClusterBuilder builder)
-            {
-                builder.AddSiloBuilderConfigurator<SiloBuilderConfigurator>();
-            }
+            protected override void ConfigureTestCluster(TestClusterBuilder builder) => builder.AddSiloBuilderConfigurator<SiloBuilderConfigurator>();
 
             protected override void CheckPreconditionsOrThrow()
             {
@@ -73,10 +70,7 @@ namespace Tester.AzureUtils.General
 
         public class Fixture : BaseAzureTestClusterFixture
         {
-            protected override void ConfigureTestCluster(TestClusterBuilder builder)
-            {
-                builder.AddSiloBuilderConfigurator<StorageSiloBuilderConfigurator>();
-            }
+            protected override void ConfigureTestCluster(TestClusterBuilder builder) => builder.AddSiloBuilderConfigurator<StorageSiloBuilderConfigurator>();
 
             private class StorageSiloBuilderConfigurator : ISiloConfigurator
             {

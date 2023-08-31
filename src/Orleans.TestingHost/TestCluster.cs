@@ -145,10 +145,7 @@ namespace Orleans.TestingHost
         /// Deploys the cluster using the specified configuration and starts the client in-process.
         /// It will start the number of silos defined in <see cref="TestClusterOptions.InitialSilosCount"/>.
         /// </summary>
-        public void Deploy()
-        {
-            this.DeployAsync().GetAwaiter().GetResult();
-        }
+        public void Deploy() => this.DeployAsync().GetAwaiter().GetResult();
 
         /// <summary>
         /// Deploys the cluster using the specified configuration and starts the client in-process.
@@ -316,19 +313,13 @@ namespace Orleans.TestingHost
         /// Start an additional silo, so that it joins the existing cluster.
         /// </summary>
         /// <returns>SiloHandle for the newly started silo.</returns>
-        public SiloHandle StartAdditionalSilo(bool startAdditionalSiloOnNewPort = false)
-        {
-            return StartAdditionalSiloAsync(startAdditionalSiloOnNewPort).GetAwaiter().GetResult();
-        }
+        public SiloHandle StartAdditionalSilo(bool startAdditionalSiloOnNewPort = false) => StartAdditionalSiloAsync(startAdditionalSiloOnNewPort).GetAwaiter().GetResult();
 
         /// <summary>
         /// Start an additional silo, so that it joins the existing cluster.
         /// </summary>
         /// <returns>SiloHandle for the newly started silo.</returns>
-        public async Task<SiloHandle> StartAdditionalSiloAsync(bool startAdditionalSiloOnNewPort = false)
-        {
-            return (await this.StartAdditionalSilosAsync(1, startAdditionalSiloOnNewPort)).Single();
-        }
+        public async Task<SiloHandle> StartAdditionalSiloAsync(bool startAdditionalSiloOnNewPort = false) => (await this.StartAdditionalSilosAsync(1, startAdditionalSiloOnNewPort)).Single();
 
         /// <summary>
         /// Start a number of additional silo, so that they join the existing cluster.
@@ -417,10 +408,7 @@ namespace Orleans.TestingHost
         /// <summary>
         /// Stop all current silos.
         /// </summary>
-        public void StopAllSilos()
-        {
-            StopAllSilosAsync().GetAwaiter().GetResult();
-        }
+        public void StopAllSilos() => StopAllSilosAsync().GetAwaiter().GetResult();
 
         /// <summary>
         /// Stop all current silos.
@@ -721,10 +709,7 @@ namespace Orleans.TestingHost
         /// Gets the log.
         /// </summary>
         /// <returns>The log contents.</returns>
-        public string GetLog()
-        {
-            return this.log.ToString();
-        }
+        public string GetLog() => this.log.ToString();
 
         private void ReportUnobservedException(object sender, UnhandledExceptionEventArgs eventArgs)
         {
@@ -732,15 +717,9 @@ namespace Orleans.TestingHost
             this.WriteLog("Unobserved exception: {0}", exception);
         }
 
-        private void WriteLog(string format, params object[] args)
-        {
-            log.AppendFormat(format + Environment.NewLine, args);
-        }
+        private void WriteLog(string format, params object[] args) => log.AppendFormat(format + Environment.NewLine, args);
 
-        private void FlushLogToConsole()
-        {
-            Console.WriteLine(GetLog());
-        }
+        private void FlushLogToConsole() => Console.WriteLine(GetLog());
 
         /// <inheritdoc/>
         public async ValueTask DisposeAsync()

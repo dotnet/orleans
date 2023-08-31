@@ -24,10 +24,7 @@ namespace Orleans.Runtime
         /// </summary>
         /// <param name="newContext">The new context.</param>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        internal static void SetExecutionContext(IGrainContext newContext)
-        {
-            _threadLocalContext = newContext;
-        }
+        internal static void SetExecutionContext(IGrainContext newContext) => _threadLocalContext = newContext;
 
         /// <summary>
         /// Sets the current grain context.
@@ -45,9 +42,6 @@ namespace Orleans.Runtime
         /// Resets the current grain context.
         /// </summary>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        internal static void ResetExecutionContext()
-        {
-            _threadLocalContext = null;
-        }
+        internal static void ResetExecutionContext() => _threadLocalContext = null;
     }
 }

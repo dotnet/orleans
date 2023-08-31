@@ -120,15 +120,9 @@ namespace Orleans.Runtime
             return result;
         }
 
-        public void Add(TKey key, TValue value)
-        {
-            GetOrAdd(key, static (value, key) => value, value);
-        }
+        public void Add(TKey key, TValue value) => GetOrAdd(key, static (value, key) => value, value);
 
-        public void AddOrUpdate(TKey key, TValue value)
-        {
-            AddOrUpdate(key, static (value, key) => value, value);
-        }
+        public void AddOrUpdate(TKey key, TValue value) => AddOrUpdate(key, static (value, key) => value, value);
 
         public bool ContainsKey(TKey key) => cache.ContainsKey(key);
 
@@ -249,10 +243,7 @@ namespace Orleans.Runtime
             }
         }
 
-        public IEnumerator<KeyValuePair<TKey, TValue>> GetEnumerator()
-        {
-            return cache.Select(p => new KeyValuePair<TKey, TValue>(p.Key, p.Value.Value)).GetEnumerator();
-        }
+        public IEnumerator<KeyValuePair<TKey, TValue>> GetEnumerator() => cache.Select(p => new KeyValuePair<TKey, TValue>(p.Key, p.Value.Value)).GetEnumerator();
 
         IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
     }

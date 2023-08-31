@@ -19,10 +19,7 @@ namespace Orleans.Runtime.Host
 
         private class MembershipEntryConverter : JsonConverter
         {
-            public override bool CanConvert(Type objectType)
-            {
-                return (objectType == typeof(MembershipEntry));
-            }
+            public override bool CanConvert(Type objectType) => (objectType == typeof(MembershipEntry));
 
             public override void WriteJson(JsonWriter writer, object value, JsonSerializer serializer)
             {
@@ -58,10 +55,7 @@ namespace Orleans.Runtime.Host
 
         private class SiloAddressConverter : JsonConverter
         {
-            public override bool CanConvert(Type objectType)
-            {
-                return (objectType == typeof(SiloAddress));
-            }
+            public override bool CanConvert(Type objectType) => (objectType == typeof(SiloAddress));
 
             public override void WriteJson(JsonWriter writer, object value, JsonSerializer serializer)
             {

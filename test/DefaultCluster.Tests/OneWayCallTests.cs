@@ -80,10 +80,7 @@ namespace DefaultCluster.Tests.General
         {
             private readonly TaskCompletionSource<int> completion = new TaskCompletionSource<int>();
             public Task ReceivedValue => this.completion.Task;
-            public void StateChanged(int a, int b)
-            {
-                this.completion.SetResult(b);
-            }
+            public void StateChanged(int a, int b) => this.completion.SetResult(b);
         }
     }
 }

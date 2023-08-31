@@ -42,9 +42,6 @@ namespace UnitTests.StorageTests.AdoNet
         }
 
         [SkippableFact, TestCategory("Functional")]
-        public async Task CancellationToken_MySql_Test()
-        {
-            await CancellationTokenTest(_storage, CancellationTestTimeoutLimit);
-        }
+        public async Task CancellationToken_MySql_Test() => await CancellationTokenTest(_storage, CancellationTestTimeoutLimit);
     }
 }

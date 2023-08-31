@@ -22,10 +22,7 @@ namespace UnitTests.General
         private const int leavy = 300;
         private const int perSilo = 1000;
 
-        protected override void ConfigureTestCluster(TestClusterBuilder builder)
-        {
-            builder.AddSiloBuilderConfigurator<SiloConfigurator>();
-        }
+        protected override void ConfigureTestCluster(TestClusterBuilder builder) => builder.AddSiloBuilderConfigurator<SiloConfigurator>();
 
         private class SiloConfigurator : ISiloConfigurator
         {

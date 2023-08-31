@@ -21,10 +21,7 @@ namespace Tester.ClientConnectionTests
     [TestCategory("Functional")]
     public class ClusterClientTests : TestClusterPerTest
     {
-        protected override void ConfigureTestCluster(TestClusterBuilder builder)
-        {
-            builder.Options.ConnectionTransport = ConnectionTransportType.TcpSocket;
-        }
+        protected override void ConfigureTestCluster(TestClusterBuilder builder) => builder.Options.ConnectionTransport = ConnectionTransportType.TcpSocket;
 
         /// <summary>
         /// Ensures that ClusterClient.Connect can be retried.

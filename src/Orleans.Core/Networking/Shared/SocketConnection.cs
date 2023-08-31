@@ -77,10 +77,7 @@ namespace Orleans.Networking.Shared
 
         public override MemoryPool<byte> MemoryPool { get; }
 
-        public void Start()
-        {
-            _processingTask = StartAsync();
-        }
+        public void Start() => _processingTask = StartAsync();
 
         private async Task StartAsync()
         {

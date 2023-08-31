@@ -26,9 +26,6 @@ namespace Orleans.Streams
         public string PredicatePattern => $"{Prefix}{this.targetStreamNamespace}";
 
         /// <inheritdoc/>
-        public bool IsMatch(string streamNamespace)
-        {
-            return string.Equals(targetStreamNamespace, streamNamespace?.Trim());
-        }
+        public bool IsMatch(string streamNamespace) => string.Equals(targetStreamNamespace, streamNamespace?.Trim());
     }
 }

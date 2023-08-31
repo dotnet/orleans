@@ -37,9 +37,6 @@ namespace BenchmarkGrains.MapReduce
     [Orleans.GenerateSerializer]
     public class EmptyProcessor : ITransformProcessor<Dictionary<string, int>, Dictionary<string, int>>
     {
-        public Dictionary<string, int> Process(Dictionary<string, int> input)
-        {
-            return input;
-        }
+        public Dictionary<string, int> Process(Dictionary<string, int> input) => input;
     }
 }

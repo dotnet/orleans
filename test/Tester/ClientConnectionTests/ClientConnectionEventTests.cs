@@ -17,10 +17,7 @@ namespace Tester
     {
         private OutsideRuntimeClient runtimeClient;
 
-        protected override void ConfigureTestCluster(TestClusterBuilder builder)
-        {
-            builder.AddClientBuilderConfigurator<Configurator>();
-        }
+        protected override void ConfigureTestCluster(TestClusterBuilder builder) => builder.AddClientBuilderConfigurator<Configurator>();
 
         public override async Task InitializeAsync()
         {
@@ -30,10 +27,7 @@ namespace Tester
 
         public class Configurator : IClientBuilderConfigurator
         {
-            public void Configure(IConfiguration configuration, IClientBuilder clientBuilder)
-            {
-                clientBuilder.Configure<GatewayOptions>(options => options.GatewayListRefreshPeriod = TimeSpan.FromSeconds(1));
-            }
+            public void Configure(IConfiguration configuration, IClientBuilder clientBuilder) => clientBuilder.Configure<GatewayOptions>(options => options.GatewayListRefreshPeriod = TimeSpan.FromSeconds(1));
         }
 
         [Fact, TestCategory("SlowBVT")]

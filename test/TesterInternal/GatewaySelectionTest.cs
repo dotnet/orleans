@@ -92,10 +92,7 @@ namespace UnitTests.MessageCenterTests
                 list = gatewayUris;
             }
 
-            public Task<IList<Uri>> GetGateways()
-            {
-                return Task.FromResult(list);
-            }
+            public Task<IList<Uri>> GetGateways() => Task.FromResult(list);
 
             public TimeSpan MaxStaleness
             {
@@ -106,10 +103,7 @@ namespace UnitTests.MessageCenterTests
             {
                 get { return false; }
             }
-            public Task InitializeGatewayListProvider()
-            {
-                return Task.CompletedTask;
-            }
+            public Task InitializeGatewayListProvider() => Task.CompletedTask;
         }
     }
 }

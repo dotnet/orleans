@@ -65,10 +65,7 @@ namespace Tester.AzureUtils.Streaming
                 }
             }
 
-            protected override void CheckPreconditionsOrThrow()
-            {
-                TestUtils.CheckForEventHub();
-            }
+            protected override void CheckPreconditionsOrThrow() => TestUtils.CheckForEventHub();
         }
 
         protected override string ProviderName => StreamTestsConstants.AZURE_QUEUE_STREAM_PROVIDER_NAME;

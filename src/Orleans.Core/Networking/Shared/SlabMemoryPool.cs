@@ -207,10 +207,7 @@ namespace Orleans.Networking.Shared
             }
         }
 
-        private static void ThrowArgumentOutOfRangeException_BufferRequestTooLarge(int maxSize)
-        {
-            throw new ArgumentOutOfRangeException("size", $"Cannot allocate more than {maxSize} bytes in a single buffer");
-        }
+        private static void ThrowArgumentOutOfRangeException_BufferRequestTooLarge(int maxSize) => throw new ArgumentOutOfRangeException("size", $"Cannot allocate more than {maxSize} bytes in a single buffer");
 
         private static void ThrowObjectDisposedException() => throw new ObjectDisposedException("MemoryPool");
     }

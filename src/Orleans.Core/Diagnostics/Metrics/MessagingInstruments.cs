@@ -45,30 +45,15 @@ namespace Orleans.Runtime
             Respond,
         }
 
-        internal static void OnMessageExpired(Phase phase)
-        {
-            ExpiredMessagesCounter.Add(1, new KeyValuePair<string, object>("Phase", phase));
-        }
+        internal static void OnMessageExpired(Phase phase) => ExpiredMessagesCounter.Add(1, new KeyValuePair<string, object>("Phase", phase));
 
-        internal static void OnPingSend(SiloAddress destination)
-        {
-            PingSendCounter.Add(1, new KeyValuePair<string, object>("Destination", destination.ToString()));
-        }
+        internal static void OnPingSend(SiloAddress destination) => PingSendCounter.Add(1, new KeyValuePair<string, object>("Destination", destination.ToString()));
 
-        internal static void OnPingReceive(SiloAddress destination)
-        {
-            PingReceivedCounter.Add(1, new KeyValuePair<string, object>("Destination", destination.ToString()));
-        }
+        internal static void OnPingReceive(SiloAddress destination) => PingReceivedCounter.Add(1, new KeyValuePair<string, object>("Destination", destination.ToString()));
 
-        internal static void OnPingReplyReceived(SiloAddress replier)
-        {
-            PingReplyReceivedCounter.Add(1, new KeyValuePair<string, object>("Destination", replier.ToString()));
-        }
+        internal static void OnPingReplyReceived(SiloAddress replier) => PingReplyReceivedCounter.Add(1, new KeyValuePair<string, object>("Destination", replier.ToString()));
 
-        internal static void OnPingReplyMissed(SiloAddress replier)
-        {
-            PingReplyMissedCounter.Add(1, new KeyValuePair<string, object>("Destination", replier.ToString()));
-        }
+        internal static void OnPingReplyMissed(SiloAddress replier) => PingReplyMissedCounter.Add(1, new KeyValuePair<string, object>("Destination", replier.ToString()));
 
         internal static void OnFailedSentMessage(Message msg)
         {
@@ -88,10 +73,7 @@ namespace Orleans.Runtime
             RejectedMessagesCounter.Add(1, new KeyValuePair<string, object>("Direction", msg.Direction.ToString()));
         }
 
-        internal static void OnMessageReRoute(Message msg)
-        {
-            ReroutedMessagesCounter.Add(1, new KeyValuePair<string, object>("Direction", msg.Direction.ToString()));
-        }
+        internal static void OnMessageReRoute(Message msg) => ReroutedMessagesCounter.Add(1, new KeyValuePair<string, object>("Direction", msg.Direction.ToString()));
 
         internal static void OnMessageReceive(Message msg, int numTotalBytes, int headerBytes, ConnectionDirection connectionDirection, SiloAddress remoteSiloAddress = null)
         {

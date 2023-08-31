@@ -55,15 +55,9 @@ namespace Orleans.Runtime.Messaging
 
         protected override IMessageCenter MessageCenter => this.messageCenter;
 
-        protected override void RecordMessageReceive(Message msg, int numTotalBytes, int headerBytes)
-        {
-            MessagingInstruments.OnMessageReceive(msg, numTotalBytes, headerBytes, ConnectionDirection, RemoteSiloAddress);
-        }
+        protected override void RecordMessageReceive(Message msg, int numTotalBytes, int headerBytes) => MessagingInstruments.OnMessageReceive(msg, numTotalBytes, headerBytes, ConnectionDirection, RemoteSiloAddress);
 
-        protected override void RecordMessageSend(Message msg, int numTotalBytes, int headerBytes)
-        {
-            MessagingInstruments.OnMessageSend(msg, numTotalBytes, headerBytes, ConnectionDirection, RemoteSiloAddress);
-        }
+        protected override void RecordMessageSend(Message msg, int numTotalBytes, int headerBytes) => MessagingInstruments.OnMessageSend(msg, numTotalBytes, headerBytes, ConnectionDirection, RemoteSiloAddress);
 
         protected override void OnReceivedMessage(Message msg)
         {

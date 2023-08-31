@@ -12,10 +12,7 @@ namespace DefaultCluster.Tests
         {
         }
 
-        private T GetHierarchyGrain<T>() where T : IDoSomething, IGrainWithIntegerKey
-        {
-            return GrainFactory.GetGrain<T>(GetRandomGrainId());
-        }
+        private T GetHierarchyGrain<T>() where T : IDoSomething, IGrainWithIntegerKey => GrainFactory.GetGrain<T>(GetRandomGrainId());
 
         [Fact, TestCategory("BVT")]
         public async Task DoSomethingGrainEmptyTest()

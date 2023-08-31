@@ -112,11 +112,9 @@ namespace Orleans.Runtime
             return sb.ToString();
         }
 
-        public static string TimeSpanToString(TimeSpan timeSpan)
-        {
+        public static string TimeSpanToString(TimeSpan timeSpan) =>
             //00:03:32.8289777
-            return $"{timeSpan.Hours}h:{timeSpan.Minutes}m:{timeSpan.Seconds}s.{timeSpan.Milliseconds}ms";
-        }
+            $"{timeSpan.Hours}h:{timeSpan.Minutes}m:{timeSpan.Seconds}s.{timeSpan.Milliseconds}ms";
 
         public static long TicksToMilliSeconds(long ticks) => ticks / TimeSpan.TicksPerMillisecond;
 

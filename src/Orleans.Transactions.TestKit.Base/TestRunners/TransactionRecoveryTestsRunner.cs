@@ -60,15 +60,9 @@ namespace Orleans.Transactions.TestKit
             this.logger = this.testCluster.ServiceProvider.GetService<ILogger<TransactionRecoveryTestsRunner>>();
         }
 
-        public virtual Task TransactionWillRecoverAfterRandomSiloGracefulShutdown(string transactionTestGrainClassName, int concurrent)
-        {
-            return TransactionWillRecoverAfterRandomSiloFailure(transactionTestGrainClassName, concurrent, true);
-        }
+        public virtual Task TransactionWillRecoverAfterRandomSiloGracefulShutdown(string transactionTestGrainClassName, int concurrent) => TransactionWillRecoverAfterRandomSiloFailure(transactionTestGrainClassName, concurrent, true);
 
-        public virtual Task TransactionWillRecoverAfterRandomSiloUnGracefulShutdown(string transactionTestGrainClassName, int concurrent)
-        {
-            return TransactionWillRecoverAfterRandomSiloFailure(transactionTestGrainClassName, concurrent, false);
-        }
+        public virtual Task TransactionWillRecoverAfterRandomSiloUnGracefulShutdown(string transactionTestGrainClassName, int concurrent) => TransactionWillRecoverAfterRandomSiloFailure(transactionTestGrainClassName, concurrent, false);
 
         protected virtual async Task TransactionWillRecoverAfterRandomSiloFailure(string transactionTestGrainClassName, int concurrent, bool gracefulShutdown)
         {
@@ -173,11 +167,9 @@ namespace Orleans.Transactions.TestKit
             }
         }
 
-        private async Task<bool> AllTxSucceed(List<ExpectedGrainActivity>[] transactionGroups, int index)
-        {
+        private async Task<bool> AllTxSucceed(List<ExpectedGrainActivity>[] transactionGroups, int index) =>
             // null return indicates none failed
-            return (await RunAllTxReportFailed(transactionGroups, index) == null);
-        }
+            (await RunAllTxReportFailed(transactionGroups, index) == null);
 
         private async Task SetBit(List<ExpectedGrainActivity> grains, int index)
         {

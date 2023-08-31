@@ -49,28 +49,16 @@ namespace Orleans.Streams
             this.bindExtLock = new AsyncLock();
         }
 
-        public Task<StreamSubscriptionHandle<T>> SubscribeAsync(IAsyncObserver<T> observer)
-        {
-            return SubscribeAsyncImpl(observer, null, null);
-        }
+        public Task<StreamSubscriptionHandle<T>> SubscribeAsync(IAsyncObserver<T> observer) => SubscribeAsyncImpl(observer, null, null);
 
         public Task<StreamSubscriptionHandle<T>> SubscribeAsync(
             IAsyncObserver<T> observer,
             StreamSequenceToken token,
-            string filterData = null)
-        {
-            return SubscribeAsyncImpl(observer, null, token, filterData);
-        }
+            string filterData = null) => SubscribeAsyncImpl(observer, null, token, filterData);
 
-        public Task<StreamSubscriptionHandle<T>> SubscribeAsync(IAsyncBatchObserver<T> batchObserver)
-        {
-            return SubscribeAsyncImpl(null, batchObserver, null);
-        }
+        public Task<StreamSubscriptionHandle<T>> SubscribeAsync(IAsyncBatchObserver<T> batchObserver) => SubscribeAsyncImpl(null, batchObserver, null);
 
-        public Task<StreamSubscriptionHandle<T>> SubscribeAsync(IAsyncBatchObserver<T> batchObserver, StreamSequenceToken token)
-        {
-            return SubscribeAsyncImpl(null, batchObserver, token);
-        }
+        public Task<StreamSubscriptionHandle<T>> SubscribeAsync(IAsyncBatchObserver<T> batchObserver, StreamSequenceToken token) => SubscribeAsyncImpl(null, batchObserver, token);
 
         private async Task<StreamSubscriptionHandle<T>> SubscribeAsyncImpl(
             IAsyncObserver<T> observer,
@@ -124,18 +112,12 @@ namespace Orleans.Streams
         public Task<StreamSubscriptionHandle<T>> ResumeAsync(
             StreamSubscriptionHandle<T> handle,
             IAsyncObserver<T> observer,
-            StreamSequenceToken token = null)
-        {
-            return ResumeAsyncImpl(handle, observer, null, token);
-        }
+            StreamSequenceToken token = null) => ResumeAsyncImpl(handle, observer, null, token);
 
         public Task<StreamSubscriptionHandle<T>> ResumeAsync(
             StreamSubscriptionHandle<T> handle,
             IAsyncBatchObserver<T> batchObserver,
-            StreamSequenceToken token = null)
-        {
-            return ResumeAsyncImpl(handle, null, batchObserver, token);
-        }
+            StreamSequenceToken token = null) => ResumeAsyncImpl(handle, null, batchObserver, token);
 
         private async Task<StreamSubscriptionHandle<T>> ResumeAsyncImpl(
             StreamSubscriptionHandle<T> handle,
@@ -226,15 +208,9 @@ namespace Orleans.Streams
         }
 
         // Used in test.
-        internal bool InternalRemoveObserver(StreamSubscriptionHandle<T> handle)
-        {
-            return myExtension != null && myExtension.RemoveObserver(((StreamSubscriptionHandleImpl<T>)handle).SubscriptionId);
-        }
+        internal bool InternalRemoveObserver(StreamSubscriptionHandle<T> handle) => myExtension != null && myExtension.RemoveObserver(((StreamSubscriptionHandleImpl<T>)handle).SubscriptionId);
 
-        internal Task<int> DiagGetConsumerObserversCount()
-        {
-            return Task.FromResult(myExtension.DiagCountStreamObservers<T>(stream.InternalStreamId));
-        }
+        internal Task<int> DiagGetConsumerObserversCount() => Task.FromResult(myExtension.DiagCountStreamObservers<T>(stream.InternalStreamId));
 
         private async Task BindExtensionLazy()
         {

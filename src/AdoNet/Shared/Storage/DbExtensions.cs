@@ -103,10 +103,7 @@ namespace Orleans.Tests.SqlUtils
         /// <param name="direction">The direction of the parameter.</param>
         /// <param name="size">The size of the parameter value.</param>
         /// <param name="dbType">the <see cref="DbType"/> of the parameter.</param>
-        public static void AddParameter<T>(this IDbCommand command, string parameterName, T value, ParameterDirection direction = ParameterDirection.Input, int? size = null, DbType? dbType = null)
-        {
-            command.Parameters.Add(command.CreateParameter(direction, parameterName, value, size));
-        }
+        public static void AddParameter<T>(this IDbCommand command, string parameterName, T value, ParameterDirection direction = ParameterDirection.Input, int? size = null, DbType? dbType = null) => command.Parameters.Add(command.CreateParameter(direction, parameterName, value, size));
 
         /// <summary>
         /// Returns a value if it is not <see cref="System.DBNull"/>, <em>default(TValue)</em> otherwise.
@@ -190,10 +187,7 @@ namespace Orleans.Tests.SqlUtils
         /// <param name="default">The default value if value in position is <see cref="System.DBNull"/>.</param>
         /// <returns>Either the given value or the default for the requested type.</returns>
         /// <exception cref="IndexOutOfRangeException"/>                
-        public static TValue GetValueOrDefault<TValue>(this IDataRecord record, int ordinal, TValue @default = default(TValue))
-        {
-            return record.IsDBNull(ordinal) ? @default : (TValue)record.GetValue(ordinal);
-        }
+        public static TValue GetValueOrDefault<TValue>(this IDataRecord record, int ordinal, TValue @default = default(TValue)) => record.IsDBNull(ordinal) ? @default : (TValue)record.GetValue(ordinal);
 
 
         /// <summary>
@@ -205,11 +199,7 @@ namespace Orleans.Tests.SqlUtils
         /// <param name="default">The default value if value in position is <see cref="System.DBNull"/>.</param>
         /// <returns>Either the given value or the default for the requested type.</returns>
         /// <exception cref="IndexOutOfRangeException"/>                
-        public static async Task<TValue> GetValueOrDefaultAsync<TValue>(this DbDataReader record, int ordinal, TValue @default = default(TValue))
-        {
-
-            return (await record.IsDBNullAsync(ordinal).ConfigureAwait(false)) ? @default : (await record.GetFieldValueAsync<TValue>(ordinal).ConfigureAwait(false));
-        }
+        public static async Task<TValue> GetValueOrDefaultAsync<TValue>(this DbDataReader record, int ordinal, TValue @default = default(TValue)) => (await record.IsDBNullAsync(ordinal).ConfigureAwait(false)) ? @default : (await record.GetFieldValueAsync<TValue>(ordinal).ConfigureAwait(false));
 
 
         /// <summary>

@@ -31,10 +31,7 @@ namespace Orleans.Clustering.Redis
         /// <summary>
         /// The default multiplexer creation delegate.
         /// </summary>
-        public static async Task<IConnectionMultiplexer> DefaultCreateMultiplexer(RedisClusteringOptions options)
-        {
-            return await ConnectionMultiplexer.ConnectAsync(options.ConfigurationOptions);
-        }
+        public static async Task<IConnectionMultiplexer> DefaultCreateMultiplexer(RedisClusteringOptions options) => await ConnectionMultiplexer.ConnectAsync(options.ConfigurationOptions);
     }
 
     internal class RedactRedisConfigurationOptions : RedactAttribute

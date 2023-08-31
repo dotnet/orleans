@@ -141,10 +141,7 @@ namespace Orleans.Storage
             this.Serializer = options.Value.GrainStorageSerializer;
         }
 
-        public void Participate(ISiloLifecycle lifecycle)
-        {
-            lifecycle.Subscribe(OptionFormattingUtilities.Name<AdoNetGrainStorage>(this.name), this.options.InitStage, Init, Close);
-        }
+        public void Participate(ISiloLifecycle lifecycle) => lifecycle.Subscribe(OptionFormattingUtilities.Name<AdoNetGrainStorage>(this.name), this.options.InitStage, Init, Close);
         /// <summary>Clear state data function for this storage provider.</summary>
         /// <see cref="IGrainStorage.ClearStateAsync{T}"/>.
         public async Task ClearStateAsync<T>(string grainType, GrainId grainReference, IGrainState<T> grainState)
@@ -429,10 +426,7 @@ namespace Orleans.Storage
         /// <summary>
         /// Close this provider
         /// </summary>
-        private Task Close(CancellationToken token)
-        {
-            return Task.CompletedTask;
-        }
+        private Task Close(CancellationToken token) => Task.CompletedTask;
 
 
         /// <summary>

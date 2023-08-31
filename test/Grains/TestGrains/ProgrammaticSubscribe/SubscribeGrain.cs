@@ -14,10 +14,7 @@ namespace UnitTests.Grains.ProgrammaticSubscribe
 
     public class SubscribeGrain : Grain, ISubscribeGrain
     {
-        public Task<bool> CanGetSubscriptionManager(string providerName)
-        {
-            return Task.FromResult(this.ServiceProvider.GetServiceByName<IStreamProvider>(providerName).TryGetStreamSubscriptionManager(out _));
-        }
+        public Task<bool> CanGetSubscriptionManager(string providerName) => Task.FromResult(this.ServiceProvider.GetServiceByName<IStreamProvider>(providerName).TryGetStreamSubscriptionManager(out _));
     }
 
     [Serializable]

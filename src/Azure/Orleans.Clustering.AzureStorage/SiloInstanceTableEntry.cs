@@ -40,10 +40,7 @@ namespace Orleans.AzureUtils
         internal const string TABLE_VERSION_ROW = "VersionRow"; // Row key for version row.
         internal const char Seperator = '-';
 
-        public static string ConstructRowKey(SiloAddress silo)
-        {
-            return string.Format("{0}-{1}-{2}", silo.Endpoint.Address, silo.Endpoint.Port, silo.Generation);
-        }
+        public static string ConstructRowKey(SiloAddress silo) => string.Format("{0}-{1}-{2}", silo.Endpoint.Address, silo.Endpoint.Port, silo.Generation);
         internal static SiloAddress UnpackRowKey(string rowKey)
         {
             var debugInfo = "UnpackRowKey";

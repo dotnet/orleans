@@ -22,10 +22,7 @@ namespace UnitTests.General
     {
         public class Fixture : BaseTestClusterFixture
         {
-            protected override void ConfigureTestCluster(TestClusterBuilder builder)
-            {
-                builder.ConfigureHostConfiguration(TestDefaultConfiguration.ConfigureHostConfiguration);
-            }
+            protected override void ConfigureTestCluster(TestClusterBuilder builder) => builder.ConfigureHostConfiguration(TestDefaultConfiguration.ConfigureHostConfiguration);
         }
 
         private readonly Fixture fixture;

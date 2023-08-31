@@ -186,19 +186,13 @@ namespace Orleans.Runtime
         /// Called on creation of an activation.
         /// </summary>
         /// <param name="grainContext">The grain activation.</param>
-        public void OnCreateActivation(IGrainContext grainContext)
-        {
-            GrainInstruments.IncrementGrainCounts(GrainTypeName);
-        }
+        public void OnCreateActivation(IGrainContext grainContext) => GrainInstruments.IncrementGrainCounts(GrainTypeName);
 
         /// <summary>
         /// Called when an activation is disposed.
         /// </summary>
         /// <param name="grainContext">The grain activation.</param>
-        public void OnDestroyActivation(IGrainContext grainContext)
-        {
-            GrainInstruments.DecrementGrainCounts(GrainTypeName);
-        }
+        public void OnDestroyActivation(IGrainContext grainContext) => GrainInstruments.DecrementGrainCounts(GrainTypeName);
     }
 
     internal interface IActivationLifecycleObserver

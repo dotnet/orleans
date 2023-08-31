@@ -35,10 +35,7 @@ namespace OrleansAWSUtils.Streams
             this.streamQueueMapper = streamQueueMapper;
         }
 
-        public IQueueAdapterReceiver CreateReceiver(QueueId queueId)
-        {
-            return SQSAdapterReceiver.Create(this.serializer, this.loggerFactory, queueId, DataConnectionString, this.ServiceId);
-        }
+        public IQueueAdapterReceiver CreateReceiver(QueueId queueId) => SQSAdapterReceiver.Create(this.serializer, this.loggerFactory, queueId, DataConnectionString, this.ServiceId);
 
         public async Task QueueMessageBatchAsync<T>(StreamId streamId, IEnumerable<T> events, StreamSequenceToken token, Dictionary<string, object> requestContext)
         {

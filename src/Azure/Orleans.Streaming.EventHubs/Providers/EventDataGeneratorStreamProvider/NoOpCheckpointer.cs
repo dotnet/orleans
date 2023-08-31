@@ -7,10 +7,7 @@ namespace Orleans.Streaming.EventHubs.Testing
     public class NoOpCheckpointerFactory : IStreamQueueCheckpointerFactory
     {
         public static NoOpCheckpointerFactory Instance = new NoOpCheckpointerFactory();
-        public Task<IStreamQueueCheckpointer<string>> Create(string partition)
-        {
-            return Task.FromResult<IStreamQueueCheckpointer<string>>(NoOpCheckpointer.Instance);
-        }
+        public Task<IStreamQueueCheckpointer<string>> Create(string partition) => Task.FromResult<IStreamQueueCheckpointer<string>>(NoOpCheckpointer.Instance);
     }
     /// <summary>
     /// NoOpCheckpointer is used in EventDataGeneratorStreamProvider ecosystem to replace the default Checkpointer which requires a back end storage. In EventHubDataGeneratorStreamProvider,
@@ -22,10 +19,7 @@ namespace Orleans.Streaming.EventHubs.Testing
         public static NoOpCheckpointer Instance = new NoOpCheckpointer();
 
         public bool CheckpointExists => true;
-        public Task<string> Load()
-        {
-            return Task.FromResult(EventHubConstants.StartOfStream);
-        }
+        public Task<string> Load() => Task.FromResult(EventHubConstants.StartOfStream);
         public void Update(string offset, DateTime utcNow)
         {
         }

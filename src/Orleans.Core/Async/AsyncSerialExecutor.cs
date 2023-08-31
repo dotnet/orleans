@@ -32,18 +32,12 @@ namespace Orleans
             /// <returns>
             /// <see langword="true"/> if the lock was acquired and <see langword="false"/> otherwise.
             /// </returns>
-            public bool TryGetLock()
-            {
-                return Interlocked.Exchange(ref lockState, Locked) != Locked;
-            }
+            public bool TryGetLock() => Interlocked.Exchange(ref lockState, Locked) != Locked;
 
             /// <summary>
             /// Releases the lock unconditionally.
             /// </summary>
-            public void ReleaseLock()
-            {
-                Interlocked.Exchange(ref lockState, Unlocked);
-            }
+            public void ReleaseLock() => Interlocked.Exchange(ref lockState, Unlocked);
         }
 
         /// <summary>
@@ -119,10 +113,7 @@ namespace Orleans
         /// </summary>
         /// <param name="func">The function to schedule for invocation.</param>
         /// <returns>The result of the scheduled function invocation.</returns>
-        public Task AddNext(Func<Task> func)
-        {
-            return this.executor.AddNext(() => Wrap(func));
-        }
+        public Task AddNext(Func<Task> func) => this.executor.AddNext(() => Wrap(func));
 
         private async Task<bool> Wrap(Func<Task> func)
         {

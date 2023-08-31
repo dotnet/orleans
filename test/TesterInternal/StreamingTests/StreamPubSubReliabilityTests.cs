@@ -44,10 +44,7 @@ namespace UnitTests.StreamingTests
         }
         public class ClientConfiguretor : IClientBuilderConfigurator
         {
-            public void Configure(IConfiguration configuration, IClientBuilder clientBuilder)
-            {
-                clientBuilder.AddMemoryStreams<DefaultMemoryMessageBodySerializer>(StreamTestsConstants.SMS_STREAM_PROVIDER_NAME);
-            }
+            public void Configure(IConfiguration configuration, IClientBuilder clientBuilder) => clientBuilder.AddMemoryStreams<DefaultMemoryMessageBodySerializer>(StreamTestsConstants.SMS_STREAM_PROVIDER_NAME);
         }
 
         private const string PubSubStoreProviderName = "PubSubStore";
@@ -69,18 +66,12 @@ namespace UnitTests.StreamingTests
             _fixture = fixture;
         }
 
-        public async Task InitializeAsync()
-        {
-            await SetErrorInjection(PubSubStoreProviderName, ErrorInjectionPoint.None);
-        }
+        public async Task InitializeAsync() => await SetErrorInjection(PubSubStoreProviderName, ErrorInjectionPoint.None);
 
         public Task DisposeAsync() => Task.CompletedTask;
 
         [Fact, TestCategory("Functional"), TestCategory("Streaming"), TestCategory("PubSub")]
-        public async Task PubSub_Store_Baseline()
-        {
-            await Test_PubSub_Stream(StreamProviderName, StreamId);
-        }
+        public async Task PubSub_Store_Baseline() => await Test_PubSub_Stream(StreamProviderName, StreamId);
 
         [Fact, TestCategory("Functional"), TestCategory("Streaming"), TestCategory("PubSub")]
         public async Task PubSub_Store_ReadError()

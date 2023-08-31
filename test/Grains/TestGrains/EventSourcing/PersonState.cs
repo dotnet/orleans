@@ -23,14 +23,8 @@ namespace TestGrains
             this.Gender = @event.Gender;
         }
 
-        public void Apply(PersonMarried @event)
-        {
-            this.IsMarried = true;
-        }
+        public void Apply(PersonMarried @event) => this.IsMarried = true;
 
-        public void Apply(PersonLastNameChanged @event)
-        {
-            this.LastName = @event.LastName;
-        }
+        public void Apply(PersonLastNameChanged @event) => this.LastName = @event.LastName;
     }
 }

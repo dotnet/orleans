@@ -39,10 +39,7 @@ namespace Orleans.Transactions.TestKit.Correctnesss
             return Equals((BitArrayState) obj);
         }
 
-        public override int GetHashCode()
-        {
-            return (value != null ? value.GetHashCode() : 0);
-        }
+        public override int GetHashCode() => (value != null ? value.GetHashCode() : 0);
 
         private static readonly int BitsInInt = sizeof(int) * 8;
 
@@ -225,10 +222,7 @@ namespace Orleans.Transactions.TestKit.Correctnesss
             return base.OnActivateAsync(cancellationToken);
         }
 
-        public Task Ping()
-        {
-            return Task.CompletedTask;
-        }
+        public Task Ping() => Task.CompletedTask;
 
         public Task SetBit(int index)
         {

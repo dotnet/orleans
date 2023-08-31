@@ -60,24 +60,12 @@ namespace Orleans.Runtime.Versions
 
         public bool IsEnabled { get; }
 
-        public Task<Dictionary<GrainInterfaceType, CompatibilityStrategy>> GetCompatibilityStrategies()
-        {
-            return Task.FromResult(this.State.CompatibilityStrategies);
-        }
+        public Task<Dictionary<GrainInterfaceType, CompatibilityStrategy>> GetCompatibilityStrategies() => Task.FromResult(this.State.CompatibilityStrategies);
 
-        public Task<Dictionary<GrainInterfaceType, VersionSelectorStrategy>> GetSelectorStrategies()
-        {
-            return Task.FromResult(this.State.VersionSelectorStrategies);
-        }
+        public Task<Dictionary<GrainInterfaceType, VersionSelectorStrategy>> GetSelectorStrategies() => Task.FromResult(this.State.VersionSelectorStrategies);
 
-        public Task<CompatibilityStrategy> GetCompatibilityStrategy()
-        {
-            return Task.FromResult(this.State.CompatibilityOverride);
-        }
+        public Task<CompatibilityStrategy> GetCompatibilityStrategy() => Task.FromResult(this.State.CompatibilityOverride);
 
-        public Task<VersionSelectorStrategy> GetSelectorStrategy()
-        {
-            return Task.FromResult(this.State.SelectorOverride);
-        }
+        public Task<VersionSelectorStrategy> GetSelectorStrategy() => Task.FromResult(this.State.SelectorOverride);
     }
 }

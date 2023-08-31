@@ -139,10 +139,7 @@ namespace Orleans.Providers
         }
 
         /// <inheritdoc/>
-        public int GetMaxAddCount()
-        {
-            return 100;
-        }
+        public int GetMaxAddCount() => 100;
 
         /// <inheritdoc/>
         public void AddToCache(IList<IBatchContainer> messages)
@@ -165,16 +162,10 @@ namespace Orleans.Providers
         }
 
         /// <inheritdoc/>
-        public IQueueCacheCursor GetCacheCursor(StreamId streamId, StreamSequenceToken token)
-        {
-            return new Cursor(cache, streamId, token);
-        }
+        public IQueueCacheCursor GetCacheCursor(StreamId streamId, StreamSequenceToken token) => new Cursor(cache, streamId, token);
 
         /// <inheritdoc/>
-        public bool IsUnderPressure()
-        {
-            return false;
-        }
+        public bool IsUnderPressure() => false;
 
         /// <inheritdoc/>
         public IBatchContainer GetBatchContainer(ref CachedMessage cachedMessage)
@@ -188,9 +179,6 @@ namespace Orleans.Providers
         }
 
         /// <inheritdoc/>
-        public StreamSequenceToken GetSequenceToken(ref CachedMessage cachedMessage)
-        {
-            return new EventSequenceToken(cachedMessage.SequenceNumber);
-        }
+        public StreamSequenceToken GetSequenceToken(ref CachedMessage cachedMessage) => new EventSequenceToken(cachedMessage.SequenceNumber);
     }
 }

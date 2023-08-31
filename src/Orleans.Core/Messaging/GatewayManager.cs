@@ -196,10 +196,7 @@ namespace Orleans.Messaging
             return cachedLiveGateways;
         }
 
-        public bool IsGatewayAvailable(SiloAddress siloAddress)
-        {
-            return cachedLiveGatewaysSet.Contains(siloAddress);
-        }
+        public bool IsGatewayAvailable(SiloAddress siloAddress) => cachedLiveGatewaysSet.Contains(siloAddress);
 
         internal void ExpediteUpdateLiveGatewaysSnapshot()
         {
@@ -363,9 +360,6 @@ namespace Orleans.Messaging
             }
         }
 
-        public void Dispose()
-        {
-            this.gatewayRefreshTimer?.Dispose();
-        }
+        public void Dispose() => this.gatewayRefreshTimer?.Dispose();
     }
 }

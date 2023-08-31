@@ -13,18 +13,12 @@ namespace Orleans.Hosting
         /// <summary>
         /// Adds a state storage log consistency provider as default consistency provider"/>
         /// </summary>
-        public static ISiloBuilder AddStateStorageBasedLogConsistencyProviderAsDefault(this ISiloBuilder builder)
-        {
-            return builder.AddStateStorageBasedLogConsistencyProvider(ProviderConstants.DEFAULT_STORAGE_PROVIDER_NAME);
-        }
+        public static ISiloBuilder AddStateStorageBasedLogConsistencyProviderAsDefault(this ISiloBuilder builder) => builder.AddStateStorageBasedLogConsistencyProvider(ProviderConstants.DEFAULT_STORAGE_PROVIDER_NAME);
 
         /// <summary>
         /// Adds a state storage log consistency provider"/>
         /// </summary>
-        public static ISiloBuilder AddStateStorageBasedLogConsistencyProvider(this ISiloBuilder builder, string name = "StateStorage")
-        {
-            return builder.ConfigureServices(services => services.AddStateStorageBasedLogConsistencyProvider(name));
-        }
+        public static ISiloBuilder AddStateStorageBasedLogConsistencyProvider(this ISiloBuilder builder, string name = "StateStorage") => builder.ConfigureServices(services => services.AddStateStorageBasedLogConsistencyProvider(name));
 
         internal static IServiceCollection AddStateStorageBasedLogConsistencyProvider(this IServiceCollection services, string name)
         {

@@ -186,23 +186,14 @@ namespace UnitTests.ActivationsLifeCycleTests
         }
 
         [Fact, TestCategory("Functional")]
-        public async Task DeactivateOnIdle_NonExistentActivation_1()
-        {
-            await DeactivateOnIdle_NonExistentActivation_Runner(0);
-        }
+        public async Task DeactivateOnIdle_NonExistentActivation_1() => await DeactivateOnIdle_NonExistentActivation_Runner(0);
 
         [Fact, TestCategory("Functional")]
-        public async Task DeactivateOnIdle_NonExistentActivation_2()
-        {
-            await DeactivateOnIdle_NonExistentActivation_Runner(1);
-        }
+        public async Task DeactivateOnIdle_NonExistentActivation_2() => await DeactivateOnIdle_NonExistentActivation_Runner(1);
 
         public class ClientConfigurator : IClientBuilderConfigurator
         {
-            public void Configure(IConfiguration configuration, IClientBuilder clientBuilder)
-            {
-                clientBuilder.Configure<StaticGatewayListProviderOptions>(options => { options.Gateways = options.Gateways.Take(1).ToList(); });
-            }
+            public void Configure(IConfiguration configuration, IClientBuilder clientBuilder) => clientBuilder.Configure<StaticGatewayListProviderOptions>(options => { options.Gateways = options.Gateways.Take(1).ToList(); });
         }
 
         public class SiloConfigurator : IHostConfigurator

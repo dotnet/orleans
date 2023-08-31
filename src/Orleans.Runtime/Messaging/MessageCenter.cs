@@ -368,10 +368,7 @@ namespace Orleans.Runtime.Messaging
         /// Reroute a message coming in through a gateway
         /// </summary>
         /// <param name="message"></param>
-        internal void RerouteMessage(Message message)
-        {
-            ResendMessageImpl(message);
-        }
+        internal void RerouteMessage(Message message) => ResendMessageImpl(message);
 
         internal bool TryForwardMessage(Message message, SiloAddress forwardingAddress)
         {
@@ -406,10 +403,7 @@ namespace Orleans.Runtime.Messaging
 
         // Forwarding is used by the receiver, usually when it cannot process the message and forwards it to another silo to perform the processing
         // (got here due to duplicate activation, outdated cache, silo is shutting down/overloaded, ...).
-        private static bool MayForward(Message message, SiloMessagingOptions messagingOptions)
-        {
-            return message.ForwardCount < messagingOptions.MaxForwardCount;
-        }
+        private static bool MayForward(Message message, SiloMessagingOptions messagingOptions) => message.ForwardCount < messagingOptions.MaxForwardCount;
 
         /// <summary>
         /// Send an outgoing message, may complete synchronously
@@ -577,9 +571,6 @@ namespace Orleans.Runtime.Messaging
             }
         }
 
-        public async ValueTask DisposeAsync()
-        {
-            await StopAsync();
-        }
+        public async ValueTask DisposeAsync() => await StopAsync();
     }
 }

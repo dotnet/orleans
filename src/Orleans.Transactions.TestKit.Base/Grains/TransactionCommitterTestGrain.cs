@@ -25,9 +25,6 @@ namespace Orleans.Transactions.TestKit
             return base.OnActivateAsync(cancellationToken);
         }
 
-        public Task Commit(ITransactionCommitOperation<IRemoteCommitService> operation)
-        {
-            return this.committer.OnCommit(operation);
-        }
+        public Task Commit(ITransactionCommitOperation<IRemoteCommitService> operation) => this.committer.OnCommit(operation);
     }
 }

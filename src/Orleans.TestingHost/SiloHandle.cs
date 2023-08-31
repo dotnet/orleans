@@ -66,9 +66,6 @@ namespace Orleans.TestingHost
         }
 
         /// <inheritdoc />
-        public override string ToString()
-        {
-            return SiloAddress.ToString();
-        }
+        public override string ToString() => SiloAddress.ToString();
     }
 }

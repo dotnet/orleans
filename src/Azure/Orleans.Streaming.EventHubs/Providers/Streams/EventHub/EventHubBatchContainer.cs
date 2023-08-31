@@ -75,10 +75,7 @@ namespace Orleans.Streaming.EventHubs
         /// </summary>
         /// <typeparam name="T"></typeparam>
         /// <returns></returns>
-        public IEnumerable<Tuple<T, StreamSequenceToken>> GetEvents<T>()
-        {
-            return GetPayload().Events.Cast<T>().Select((e, i) => Tuple.Create<T, StreamSequenceToken>(e, new EventHubSequenceTokenV2(token.EventHubOffset, token.SequenceNumber, i)));
-        }
+        public IEnumerable<Tuple<T, StreamSequenceToken>> GetEvents<T>() => GetPayload().Events.Cast<T>().Select((e, i) => Tuple.Create<T, StreamSequenceToken>(e, new EventHubSequenceTokenV2(token.EventHubOffset, token.SequenceNumber, i)));
 
         /// <summary>
         /// Gives an opportunity to IBatchContainer to set any data in the RequestContext before this IBatchContainer is sent to consumers.

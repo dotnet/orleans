@@ -28,9 +28,6 @@ namespace Orleans.CodeGeneration
         public ushort Version { get; private set; }
 
         /// <inheritdoc />
-        void IGrainInterfacePropertiesProviderAttribute.Populate(IServiceProvider services, Type type, Dictionary<string, string> properties)
-        {
-            properties[WellKnownGrainInterfaceProperties.Version] = this.Version.ToString(CultureInfo.InvariantCulture);
-        }
+        void IGrainInterfacePropertiesProviderAttribute.Populate(IServiceProvider services, Type type, Dictionary<string, string> properties) => properties[WellKnownGrainInterfaceProperties.Version] = this.Version.ToString(CultureInfo.InvariantCulture);
     }
 }

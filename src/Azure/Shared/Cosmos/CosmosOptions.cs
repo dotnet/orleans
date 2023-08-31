@@ -65,10 +65,7 @@ public abstract class CosmosOptions
     /// </summary>
     /// <param name="connectionString">The connection string.</param>
     /// <see cref="CosmosClient(string, CosmosClientOptions)"/>
-    public void ConfigureCosmosClient(string connectionString)
-    {
-        CreateClient = _ => new(new CosmosClient(connectionString, ClientOptions));
-    }
+    public void ConfigureCosmosClient(string connectionString) => CreateClient = _ => new(new CosmosClient(connectionString, ClientOptions));
 
     /// <summary>
     /// Configures the Cosmos DB client.
@@ -76,10 +73,7 @@ public abstract class CosmosOptions
     /// <param name="accountEndpoint">The account endpoint. In the form of <code>https://{databaseaccount}.documents.azure.com:443/</code>, <see href="https://docs.microsoft.com/en-us/rest/api/cosmos-db/cosmosdb-resource-uri-syntax-for-rest"/></param>
     /// <param name="authKeyOrResourceTokenCredential"><see cref="AzureKeyCredential"/> with master-key or resource token.</param>
     /// <see cref="CosmosClient(string, AzureKeyCredential, CosmosClientOptions)"/>
-    public void ConfigureCosmosClient(string accountEndpoint, AzureKeyCredential authKeyOrResourceTokenCredential)
-    {
-        CreateClient = _ => new(new CosmosClient(accountEndpoint, authKeyOrResourceTokenCredential, ClientOptions));
-    }
+    public void ConfigureCosmosClient(string accountEndpoint, AzureKeyCredential authKeyOrResourceTokenCredential) => CreateClient = _ => new(new CosmosClient(accountEndpoint, authKeyOrResourceTokenCredential, ClientOptions));
 
     /// <summary>
     /// Configures the Cosmos DB client.
@@ -87,10 +81,7 @@ public abstract class CosmosOptions
     /// <param name="accountEndpoint">The account endpoint. In the form of <code>https://{databaseaccount}.documents.azure.com:443/</code>, <see href="https://docs.microsoft.com/en-us/rest/api/cosmos-db/cosmosdb-resource-uri-syntax-for-rest"/></param>
     /// <param name="tokenCredential">The token to provide AAD for authorization.</param>
     /// <see cref="CosmosClient(string, TokenCredential, CosmosClientOptions)"/>
-    public void ConfigureCosmosClient(string accountEndpoint, TokenCredential tokenCredential)
-    {
-        CreateClient = _ => new(new CosmosClient(accountEndpoint, tokenCredential, ClientOptions));
-    }
+    public void ConfigureCosmosClient(string accountEndpoint, TokenCredential tokenCredential) => CreateClient = _ => new(new CosmosClient(accountEndpoint, tokenCredential, ClientOptions));
 
     /// <summary>
     /// Configures the Cosmos DB client.
@@ -98,19 +89,13 @@ public abstract class CosmosOptions
     /// <param name="accountEndpoint">The account endpoint. In the form of <code>https://{databaseaccount}.documents.azure.com:443/</code>, <see href="https://docs.microsoft.com/en-us/rest/api/cosmos-db/cosmosdb-resource-uri-syntax-for-rest"/></param>
     /// <param name="authKeyOrResourceToken">The Cosmos account key or resource token to use to create the client.</param>
     /// <see cref="CosmosClient(string, TokenCredential, CosmosClientOptions)"/>
-    public void ConfigureCosmosClient(string accountEndpoint, string authKeyOrResourceToken)
-    {
-        CreateClient = _ => new(new CosmosClient(accountEndpoint, authKeyOrResourceToken, ClientOptions));
-    }
+    public void ConfigureCosmosClient(string accountEndpoint, string authKeyOrResourceToken) => CreateClient = _ => new(new CosmosClient(accountEndpoint, authKeyOrResourceToken, ClientOptions));
 
     /// <summary>
     /// Configures the Cosmos DB client.
     /// </summary>
     /// <param name="createClient">The delegate used to create the Cosmos DB client.</param>
-    public void ConfigureCosmosClient(Func<IServiceProvider, ValueTask<CosmosClient>> createClient)
-    {
-        CreateClient = createClient ?? throw new ArgumentNullException(nameof(createClient));
-    }
+    public void ConfigureCosmosClient(Func<IServiceProvider, ValueTask<CosmosClient>> createClient) => CreateClient = createClient ?? throw new ArgumentNullException(nameof(createClient));
 
     /// <summary>
     /// Factory method for creating a <see cref="CosmosClient"/>.

@@ -17,10 +17,7 @@ namespace UnitTests.StorageTests
 {
     public static class SiloBuilderExtensions
     {
-        public static ISiloBuilder AddTestStorageProvider<T>(this ISiloBuilder builder, string name) where T : IGrainStorage
-        {
-            return builder.AddTestStorageProvider(name, (sp, n) => ActivatorUtilities.CreateInstance<T>(sp));
-        }
+        public static ISiloBuilder AddTestStorageProvider<T>(this ISiloBuilder builder, string name) where T : IGrainStorage => builder.AddTestStorageProvider(name, (sp, n) => ActivatorUtilities.CreateInstance<T>(sp));
 
         public static ISiloBuilder AddTestStorageProvider<T>(this ISiloBuilder builder, string name, Func<IServiceProvider, string, T> createInstance) where T : IGrainStorage
         {
@@ -138,10 +135,7 @@ namespace UnitTests.StorageTests
 
         }
 
-        public void SetValue(SetValueArgs args)
-        {
-            SetValue(args.StateType, args.GrainType, args.GrainId, args.Name, args.Val);
-        }
+        public void SetValue(SetValueArgs args) => SetValue(args.StateType, args.GrainType, args.GrainId, args.Name, args.Val);
 
         private void SetValue(Type stateType, string grainType, GrainId grainId, string name, object val)
         {
@@ -163,15 +157,9 @@ namespace UnitTests.StorageTests
             }
         }
 
-        public object GetLastState()
-        {
-            return LastState;
-        }
+        public object GetLastState() => LastState;
 
-        public T GetLastState<T>()
-        {
-            return (T) LastState;
-        }
+        public T GetLastState<T>() => (T)LastState;
 
         private object GetLastState<T>(string grainType, GrainId grainId, IGrainState<T> grainState)
         {

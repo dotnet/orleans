@@ -10,10 +10,7 @@ namespace UnitTests.Grains
 {
     public class RequestContextTestGrain : Grain, IRequestContextTestGrain
     {
-        public Task<string> TraceIdEcho()
-        {
-            return Task.FromResult(RequestContext.Get("TraceId") as string);
-        }
+        public Task<string> TraceIdEcho() => Task.FromResult(RequestContext.Get("TraceId") as string);
 
         public Task<string> TraceIdDoubleEcho()
         {
@@ -21,10 +18,7 @@ namespace UnitTests.Grains
             return grain.TraceIdEcho();
         }
 
-        public Task<string> TraceIdDelayedEcho1()
-        {
-            return Task.Factory.StartNew(() => RequestContext.Get("TraceId") as string);
-        }
+        public Task<string> TraceIdDelayedEcho1() => Task.Factory.StartNew(() => RequestContext.Get("TraceId") as string);
 
         public async Task<string> TraceIdDelayedEcho2()
         {
@@ -32,10 +26,7 @@ namespace UnitTests.Grains
             return RequestContext.Get("TraceId") as string;
         }
 
-        public Task<Guid> E2EActivityId()
-        {
-            return Task.FromResult(RequestContext.ReentrancyId);
-        }
+        public Task<Guid> E2EActivityId() => Task.FromResult(RequestContext.ReentrancyId);
     }
 
     public class RequestContextTaskGrain : Grain, IRequestContextTaskGrain
@@ -122,10 +113,7 @@ namespace UnitTests.Grains
             });
         }
 
-        public Task<Guid> E2EActivityId()
-        {
-            return Task.FromResult(RequestContext.ReentrancyId);
-        }
+        public Task<Guid> E2EActivityId() => Task.FromResult(RequestContext.ReentrancyId);
 
         public async Task<Tuple<string, string>> TestRequestContext()
         {

@@ -256,10 +256,7 @@ internal class CosmosGrainStorage : IGrainStorage, ILifecycleParticipant<ISiloLi
         }
     }
 
-    public void Participate(ISiloLifecycle lifecycle)
-    {
-        lifecycle.Subscribe(OptionFormattingUtilities.Name<CosmosGrainStorage>(_name), _options.InitStage, Init);
-    }
+    public void Participate(ISiloLifecycle lifecycle) => lifecycle.Subscribe(OptionFormattingUtilities.Name<CosmosGrainStorage>(_name), _options.InitStage, Init);
 
     private string GetKeyString(GrainId grainId) => $"{Sanitize(_serviceId)}{KEY_STRING_SEPARATOR}{Sanitize(grainId.Type.ToString()!)}{SeparatorChar}{Sanitize(grainId.Key.ToString()!)}";
 

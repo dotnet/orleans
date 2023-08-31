@@ -11,9 +11,6 @@ namespace Orleans.Transactions.Abstractions
         /// <param name="transactionalState">Transactional state to perform update upon.</param>
         /// <param name="updateAction">An action that updates the state.</param>
         public static Task PerformUpdate<TState>(this ITransactionalState<TState> transactionalState, Action<TState> updateAction)
-            where TState : class, new()
-        {
-            return transactionalState.PerformUpdate<bool>(state => { updateAction(state); return true; });
-        }
+            where TState : class, new() => transactionalState.PerformUpdate<bool>(state => { updateAction(state); return true; });
     }
 }

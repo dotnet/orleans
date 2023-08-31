@@ -9,10 +9,7 @@ namespace UnitTests.Grains
     {
         private IClientAddressableTestProducer producer;
 
-        public Task<IClientAddressableTestProducer> GetProducer()
-        {
-            return Task.FromResult(producer);
-        }
+        public Task<IClientAddressableTestProducer> GetProducer() => Task.FromResult(producer);
 
         public Task SetProducer(IClientAddressableTestProducer producer)
         {

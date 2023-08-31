@@ -128,14 +128,8 @@ namespace Orleans.Runtime
             ThrowInvalidCall();
         }
 
-        private void ThrowInvalidCall()
-        {
-            throw new InvalidOperationException($"{typeof(OutgoingCallInvoker<TResult>)}.{nameof(Invoke)}() received an invalid call.");
-        }
+        private void ThrowInvalidCall() => throw new InvalidOperationException($"{typeof(OutgoingCallInvoker<TResult>)}.{nameof(Invoke)}() received an invalid call.");
 
-        private void ThrowBrokenCallFilterChain(string filterName)
-        {
-            throw new InvalidOperationException($"{typeof(OutgoingCallInvoker<TResult>)}.{nameof(Invoke)}() invoked a broken filter: {filterName}.");
-        }
+        private void ThrowBrokenCallFilterChain(string filterName) => throw new InvalidOperationException($"{typeof(OutgoingCallInvoker<TResult>)}.{nameof(Invoke)}() invoked a broken filter: {filterName}.");
     }
 }

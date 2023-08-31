@@ -20,10 +20,7 @@ namespace TestGrains
         [Orleans.Id(1)]
         public string Origin { get; set; }
 
-        public void Update(XDocument document)
-        {
-            document.Initialize(Timestamp, Origin);
-        }
+        public void Update(XDocument document) => document.Initialize(Timestamp, Origin);
     }
 
 
@@ -55,10 +52,7 @@ namespace TestGrains
         [Orleans.Id(0)]
         public Guid Guid { get; set; }
 
-        public void Update(XDocument document)
-        {
-            document.FindPost(Guid.ToString())?.Remove();
-        }
+        public void Update(XDocument document) => document.FindPost(Guid.ToString())?.Remove();
     }
 
     [Serializable]
@@ -70,10 +64,7 @@ namespace TestGrains
         [Orleans.Id(1)]
         public string Text { get; set; }
 
-        public void Update(XDocument document)
-        {
-            document.FindPost(Guid.ToString())?.ReplaceText(Text);
-        }
+        public void Update(XDocument document) => document.FindPost(Guid.ToString())?.ReplaceText(Text);
     }
 }
    

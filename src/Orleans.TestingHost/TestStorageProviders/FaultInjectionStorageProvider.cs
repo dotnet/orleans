@@ -52,11 +52,8 @@ namespace Orleans.TestingHost
             this.options = faultInjectionOptions;
         }
 
-        private Task InsertDelay()
-        {
-            return Task.Delay(this.options.Latency);
-        }
-           
+        private Task InsertDelay() => Task.Delay(this.options.Latency);
+
         /// <summary>Faults if exception is provided, otherwise calls through to  decorated storage provider.</summary>
         /// <returns>Completion promise for the Read operation on the specified grain.</returns>
         public async Task ReadStateAsync<T>(string grainType, GrainId grainId, IGrainState<T> grainState)
@@ -134,10 +131,7 @@ namespace Orleans.TestingHost
         }
 
         /// <inheritdoc />
-        public void Participate(ISiloLifecycle lifecycle)
-        {
-            (realStorageProvider as ILifecycleParticipant<ISiloLifecycle>)?.Participate(lifecycle);
-        }
+        public void Participate(ISiloLifecycle lifecycle) => (realStorageProvider as ILifecycleParticipant<ISiloLifecycle>)?.Participate(lifecycle);
     }
 
     /// <summary>

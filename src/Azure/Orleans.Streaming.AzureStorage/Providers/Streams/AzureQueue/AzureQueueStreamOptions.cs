@@ -59,10 +59,7 @@ namespace Orleans.Configuration
         /// <summary>
         /// Configures the <see cref="QueueServiceClient"/> using the provided callback.
         /// </summary>
-        public void ConfigureQueueServiceClient(Func<Task<QueueServiceClient>> createClientCallback)
-        {
-            CreateClient = createClientCallback ?? throw new ArgumentNullException(nameof(createClientCallback));
-        }
+        public void ConfigureQueueServiceClient(Func<Task<QueueServiceClient>> createClientCallback) => CreateClient = createClientCallback ?? throw new ArgumentNullException(nameof(createClientCallback));
 
         /// <summary>
         /// Configures the <see cref="QueueServiceClient"/> using an authenticated service URI and a <see cref="Azure.Core.TokenCredential"/>.

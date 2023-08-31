@@ -35,10 +35,7 @@ namespace UnitTests.Grains
             return Task.CompletedTask;
         }
 
-        public Task<string> GetLabel()
-        {
-            return Task.FromResult(this.label);
-        }
+        public Task<string> GetLabel() => Task.FromResult(this.label);
 
         public Task SetLabel(string label)
         {
@@ -48,10 +45,7 @@ namespace UnitTests.Grains
             return Task.CompletedTask;
         }
 
-        public Task<IStressTestGrain> GetGrainReference()
-        {
-            return Task.FromResult(this.AsReference<IStressTestGrain>());
-        }
+        public Task<IStressTestGrain> GetGrainReference() => Task.FromResult(this.AsReference<IStressTestGrain>());
 
         public Task PingOthers(long[] others)
         {
@@ -83,25 +77,13 @@ namespace UnitTests.Grains
             return Task.FromResult(list);
         }
 
-        public Task<byte[]> Echo(byte[] data)
-        {
-            return Task.FromResult(data);
-        }
+        public Task<byte[]> Echo(byte[] data) => Task.FromResult(data);
 
-        public Task Ping(byte[] data)
-        {
-            return Task.CompletedTask;
-        }
+        public Task Ping(byte[] data) => Task.CompletedTask;
 
-        public async Task PingWithDelay(byte[] data, TimeSpan delay)
-        {
-            await Task.Delay(delay);
-        }
+        public async Task PingWithDelay(byte[] data, TimeSpan delay) => await Task.Delay(delay);
 
-        public Task Send(byte[] data)
-        {
-            return Task.CompletedTask;
-        }
+        public Task Send(byte[] data) => Task.CompletedTask;
 
         public Task DeactivateSelf()
         {
@@ -128,25 +110,13 @@ namespace UnitTests.Grains
             return Task.CompletedTask;
         }
 
-        public Task<string> GetRuntimeInstanceId()
-        {
-            return Task.FromResult(this.RuntimeIdentity);
-        }
+        public Task<string> GetRuntimeInstanceId() => Task.FromResult(this.RuntimeIdentity);
 
-        public Task<byte[]> Echo(byte[] data)
-        {
-            return Task.FromResult(data);
-        }
+        public Task<byte[]> Echo(byte[] data) => Task.FromResult(data);
 
-        public Task Ping(byte[] data)
-        {
-            return Task.CompletedTask;
-        }
+        public Task Ping(byte[] data) => Task.CompletedTask;
 
-        public async Task PingWithDelay(byte[] data, TimeSpan delay)
-        {
-            await Task.Delay(delay);
-        }
+        public async Task PingWithDelay(byte[] data, TimeSpan delay) => await Task.Delay(delay);
 
         public Task PingMutableArray(byte[] data, long nextGrain, bool nextGrainIsRemote)
         {
@@ -285,25 +255,13 @@ namespace UnitTests.Grains
             return Task.CompletedTask;
         }
 
-        public Task<byte[]> Echo(byte[] data)
-        {
-            return Task.FromResult(data);
-        }
+        public Task<byte[]> Echo(byte[] data) => Task.FromResult(data);
 
-        public Task<string> GetRuntimeInstanceId()
-        {
-            return Task.FromResult(this.RuntimeIdentity);
-        }
+        public Task<string> GetRuntimeInstanceId() => Task.FromResult(this.RuntimeIdentity);
 
-        public Task Ping(byte[] data)
-        {
-            return Task.CompletedTask;
-        }
+        public Task Ping(byte[] data) => Task.CompletedTask;
 
-        public async Task PingWithDelay(byte[] data, TimeSpan delay)
-        {
-            await Task.Delay(delay);
-        }
+        public async Task PingWithDelay(byte[] data, TimeSpan delay) => await Task.Delay(delay);
 
         public Task PingMutableArray(byte[] data, long nextGrain, bool nextGrainIsRemote)
         {

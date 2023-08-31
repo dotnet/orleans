@@ -39,10 +39,7 @@ namespace UnitTests.StreamingTests
             this.runFullTest = fullTest;
         }
 
-        private void Heading(string testName)
-        {
-            logger.LogInformation("\n\n************************ {TestNumber} {StreamProviderName}_{TestName} ********************************* \n\n", testNumber, streamProviderName, testName);
-        }
+        private void Heading(string testName) => logger.LogInformation("\n\n************************ {TestNumber} {StreamProviderName}_{TestName} ********************************* \n\n", testNumber, streamProviderName, testName);
 
         //------------------------ One to One ----------------------//
         public async Task StreamTest_01_OneProducerGrainOneConsumerGrain()

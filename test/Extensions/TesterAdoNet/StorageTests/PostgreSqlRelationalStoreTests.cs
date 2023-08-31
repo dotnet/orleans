@@ -49,9 +49,6 @@ namespace UnitTests.StorageTests.AdoNet
         }
 
         [SkippableFact, TestCategory("Functional")]
-        public async Task CancellationToken_PostgreSql_Test()
-        {
-            await CancellationTokenTest(_storage, CancellationTestTimeoutLimit);
-        }
+        public async Task CancellationToken_PostgreSql_Test() => await CancellationTokenTest(_storage, CancellationTestTimeoutLimit);
     }
 }

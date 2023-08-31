@@ -18,8 +18,8 @@ namespace UnitTests.Grains
             this.logger = logger;
         }
 
-        public Task<string[]> GetActivateCalls() { return Task.FromResult(activationCalls.ToArray()); }
-        public Task<string[]> GetDeactivateCalls() { return Task.FromResult(deactivationCalls.ToArray()); }
+        public Task<string[]> GetActivateCalls() => Task.FromResult(activationCalls.ToArray());
+        public Task<string[]> GetDeactivateCalls() => Task.FromResult(deactivationCalls.ToArray());
 
         public Task Clear()
         {

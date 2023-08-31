@@ -23,10 +23,7 @@ namespace DefaultCluster.Tests
             return Task.CompletedTask;
         }
 
-        public Task<Int32> GetAxB()
-        {
-            return Task.FromResult(m_a * m_b);
-        }
+        public Task<Int32> GetAxB() => Task.FromResult(m_a * m_b);
 
         public async Task<Int32> GetAxBError()
         {

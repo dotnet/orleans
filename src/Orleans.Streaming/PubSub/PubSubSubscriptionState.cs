@@ -54,10 +54,7 @@ namespace Orleans.Streams
             state = SubscriptionStates.Active;
         }
 
-        public void AddFilter(string filterData)
-        {
-            this.FilterData = filterData;
-        }
+        public void AddFilter(string filterData) => this.FilterData = filterData;
 
         public override bool Equals(object obj)
         {
@@ -80,10 +77,7 @@ namespace Orleans.Streams
             return SubscriptionId.Equals(subscriptionId);
         }
 
-        public override int GetHashCode()
-        {
-            return SubscriptionId.GetHashCode();
-        }
+        public override int GetHashCode() => SubscriptionId.GetHashCode();
 
         public static bool operator ==(PubSubSubscriptionState left, PubSubSubscriptionState right)
         {
@@ -107,9 +101,6 @@ namespace Orleans.Streams
                 SubscriptionId, Stream, Consumer);
         }
 
-        public void Fault()
-        {
-            state = SubscriptionStates.Faulted;
-        }
+        public void Fault() => state = SubscriptionStates.Faulted;
     }
 }

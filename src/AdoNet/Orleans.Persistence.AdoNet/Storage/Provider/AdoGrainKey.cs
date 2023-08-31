@@ -113,9 +113,6 @@ namespace Orleans.Storage
             return string.Format($"{primaryKey}{(keyExtension != null ? GrainIdAndExtensionSeparator + keyExtension : string.Empty)}");
         }
 
-        private static Guid ToGuidKey(long n0Key, long n1Key)
-        {
-            return new Guid((uint)(n0Key & 0xffffffff), (ushort)(n0Key >> 32), (ushort)(n0Key >> 48), (byte)n1Key, (byte)(n1Key >> 8), (byte)(n1Key >> 16), (byte)(n1Key >> 24), (byte)(n1Key >> 32), (byte)(n1Key >> 40), (byte)(n1Key >> 48), (byte)(n1Key >> 56));
-        }
+        private static Guid ToGuidKey(long n0Key, long n1Key) => new Guid((uint)(n0Key & 0xffffffff), (ushort)(n0Key >> 32), (ushort)(n0Key >> 48), (byte)n1Key, (byte)(n1Key >> 8), (byte)(n1Key >> 16), (byte)(n1Key >> 24), (byte)(n1Key >> 32), (byte)(n1Key >> 40), (byte)(n1Key >> 48), (byte)(n1Key >> 56));
     }
 }

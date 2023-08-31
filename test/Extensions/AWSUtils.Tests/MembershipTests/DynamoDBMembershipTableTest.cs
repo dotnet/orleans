@@ -48,63 +48,33 @@ namespace AWSUtils.Tests.MembershipTests
             return new DynamoDBGatewayListProvider(this.loggerFactory.CreateLogger<DynamoDBGatewayListProvider>(), Options.Create(options), this._clusterOptions, this._gatewayOptions);
         }
 
-        protected override Task<string> GetConnectionString()
-        {
-            return Task.FromResult(AWSTestConstants.IsDynamoDbAvailable ? $"Service={AWSTestConstants.DynamoDbService}" : null);
-        }
+        protected override Task<string> GetConnectionString() => Task.FromResult(AWSTestConstants.IsDynamoDbAvailable ? $"Service={AWSTestConstants.DynamoDbService}" : null);
 
         [SkippableFact, TestCategory("Functional")]
-        public async Task MembershipTable_DynamoDB_GetGateways()
-        {
-            await MembershipTable_GetGateways();
-        }
+        public async Task MembershipTable_DynamoDB_GetGateways() => await MembershipTable_GetGateways();
 
         [SkippableFact, TestCategory("Functional")]
-        public async Task MembershipTable_DynamoDB_ReadAll_EmptyTable()
-        {
-            await MembershipTable_ReadAll_EmptyTable();
-        }
+        public async Task MembershipTable_DynamoDB_ReadAll_EmptyTable() => await MembershipTable_ReadAll_EmptyTable();
 
         [SkippableFact, TestCategory("Functional")]
-        public async Task MembershipTable_DynamoDB_InsertRow()
-        {
-            await MembershipTable_InsertRow();
-        }
+        public async Task MembershipTable_DynamoDB_InsertRow() => await MembershipTable_InsertRow();
 
         [SkippableFact, TestCategory("Functional")]
-        public async Task MembershipTable_DynamoDB_ReadRow_Insert_Read()
-        {
-            await MembershipTable_ReadRow_Insert_Read();
-        }
+        public async Task MembershipTable_DynamoDB_ReadRow_Insert_Read() => await MembershipTable_ReadRow_Insert_Read();
 
         [SkippableFact, TestCategory("Functional")]
-        public async Task MembershipTable_DynamoDB_ReadAll_Insert_ReadAll()
-        {
-            await MembershipTable_ReadAll_Insert_ReadAll();
-        }
+        public async Task MembershipTable_DynamoDB_ReadAll_Insert_ReadAll() => await MembershipTable_ReadAll_Insert_ReadAll();
 
         [SkippableFact, TestCategory("Functional")]
-        public async Task MembershipTable_DynamoDB_UpdateRow()
-        {
-            await MembershipTable_UpdateRow();
-        }
+        public async Task MembershipTable_DynamoDB_UpdateRow() => await MembershipTable_UpdateRow();
 
         [SkippableFact, TestCategory("Functional")]
-        public async Task MembershipTable_DynamoDB_CleanupDefunctSiloEntries()
-        {
-            await MembershipTable_CleanupDefunctSiloEntries();
-        }
+        public async Task MembershipTable_DynamoDB_CleanupDefunctSiloEntries() => await MembershipTable_CleanupDefunctSiloEntries();
 
         [SkippableFact]
-        public async Task MembershipTable_DynamoDB_UpdateRowInParallel()
-        {
-            await MembershipTable_UpdateRowInParallel();
-        }
+        public async Task MembershipTable_DynamoDB_UpdateRowInParallel() => await MembershipTable_UpdateRowInParallel();
 
         [SkippableFact]
-        public async Task MembershipTable_DynamoDB_UpdateIAmAlive()
-        {
-            await MembershipTable_UpdateIAmAlive();
-        }
+        public async Task MembershipTable_DynamoDB_UpdateIAmAlive() => await MembershipTable_UpdateIAmAlive();
     }
 }

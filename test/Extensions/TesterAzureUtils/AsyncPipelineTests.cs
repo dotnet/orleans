@@ -91,12 +91,9 @@ namespace UnitTests.AsyncPrimitivesTests
             }
             return result;
         }
-        
+
         [Fact, TestCategory("Functional")]
-        public async Task AsyncPipelineSingleThreadedBlackBoxConsistencyTest()
-        {
-            await AsyncPipelineBlackBoxConsistencyTest(1);
-        }
+        public async Task AsyncPipelineSingleThreadedBlackBoxConsistencyTest() => await AsyncPipelineBlackBoxConsistencyTest(1);
 
         private async Task AsyncPipelineBlackBoxConsistencyTest(int workerCount)
         {

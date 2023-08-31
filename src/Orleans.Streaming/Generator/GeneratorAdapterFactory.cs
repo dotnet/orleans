@@ -123,35 +123,20 @@ namespace Orleans.Providers.Streams.Generator
         }
 
         /// <inheritdoc />
-        public Task<IQueueAdapter> CreateAdapter()
-        {
-            return Task.FromResult<IQueueAdapter>(this);
-        }
+        public Task<IQueueAdapter> CreateAdapter() => Task.FromResult<IQueueAdapter>(this);
 
         /// <inheritdoc />
-        public IQueueAdapterCache GetQueueAdapterCache()
-        {
-            return this;
-        }
+        public IQueueAdapterCache GetQueueAdapterCache() => this;
 
         /// <inheritdoc />
-        public IStreamQueueMapper GetStreamQueueMapper()
-        {
-            return streamQueueMapper ?? (streamQueueMapper = new HashRingBasedStreamQueueMapper(this.queueMapperOptions, this.Name));
-        }
+        public IStreamQueueMapper GetStreamQueueMapper() => streamQueueMapper ?? (streamQueueMapper = new HashRingBasedStreamQueueMapper(this.queueMapperOptions, this.Name));
 
         /// <inheritdoc />
-        public Task<IStreamFailureHandler> GetDeliveryFailureHandler(QueueId queueId)
-        {
-            return Task.FromResult(streamFailureHandler ?? (streamFailureHandler = new NoOpStreamDeliveryFailureHandler()));
-        }
+        public Task<IStreamFailureHandler> GetDeliveryFailureHandler(QueueId queueId) => Task.FromResult(streamFailureHandler ?? (streamFailureHandler = new NoOpStreamDeliveryFailureHandler()));
 
         /// <inheritdoc />
         public Task QueueMessageBatchAsync<T>(StreamId streamId, IEnumerable<T> events, StreamSequenceToken token,
-            Dictionary<string, object> requestContext)
-        {
-            return Task.CompletedTask;
-        }
+            Dictionary<string, object> requestContext) => Task.CompletedTask;
 
         /// <inheritdoc />
         public IQueueAdapterReceiver CreateReceiver(QueueId queueId)
@@ -225,10 +210,7 @@ namespace Orleans.Providers.Streams.Generator
                 return batches;
             }
 
-            public Task MessagesDeliveredAsync(IList<IBatchContainer> messages)
-            {
-                return Task.CompletedTask;
-            }
+            public Task MessagesDeliveredAsync(IList<IBatchContainer> messages) => Task.CompletedTask;
 
             public Task Shutdown(TimeSpan timeout)
             {

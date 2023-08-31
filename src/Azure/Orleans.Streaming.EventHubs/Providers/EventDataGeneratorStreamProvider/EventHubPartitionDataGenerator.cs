@@ -79,11 +79,8 @@ namespace Orleans.Streaming.EventHubs.Testing
             events.Add(sequenceNumber);
             return events;
         }
-        
-        public static Func<StreamId, IStreamDataGenerator<EventData>> CreateFactory(IServiceProvider services)
-        {
-            return (streamId) => ActivatorUtilities.CreateInstance<SimpleStreamEventDataGenerator>(services, streamId);
-        }
+
+        public static Func<StreamId, IStreamDataGenerator<EventData>> CreateFactory(IServiceProvider services) => (streamId) => ActivatorUtilities.CreateInstance<SimpleStreamEventDataGenerator>(services, streamId);
 
 
         private class WrappedEventData : EventData

@@ -29,10 +29,7 @@ namespace Orleans.Runtime.ReminderService
             return this.reminderTableGrain.ReadRows(grainId);
         }
 
-        public Task<ReminderTableData> ReadRows(uint begin, uint end)
-        {
-            return this.isAvailable ? this.reminderTableGrain.ReadRows(begin, end) : Task.FromResult(new ReminderTableData());
-        }
+        public Task<ReminderTableData> ReadRows(uint begin, uint end) => this.isAvailable ? this.reminderTableGrain.ReadRows(begin, end) : Task.FromResult(new ReminderTableData());
 
         public Task<bool> RemoveRow(GrainId grainId, string reminderName, string eTag)
         {

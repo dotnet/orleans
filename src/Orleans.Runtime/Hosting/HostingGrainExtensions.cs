@@ -15,9 +15,6 @@ namespace Orleans.Hosting
         /// <typeparam name="TExtension">The implementation of <typeparamref name="TExtensionInterface"/>.</typeparam>
         public static ISiloBuilder AddGrainExtension<TExtensionInterface, TExtension>(this ISiloBuilder builder)
             where TExtensionInterface : class, IGrainExtension
-            where TExtension : class, TExtensionInterface
-        {
-            return builder.ConfigureServices(services => services.AddTransientKeyedService<Type, IGrainExtension, TExtension>(typeof(TExtensionInterface)));
-        }
+            where TExtension : class, TExtensionInterface => builder.ConfigureServices(services => services.AddTransientKeyedService<Type, IGrainExtension, TExtension>(typeof(TExtensionInterface)));
     }
 }

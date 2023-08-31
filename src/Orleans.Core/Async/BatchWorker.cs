@@ -220,9 +220,6 @@ namespace Orleans
         }
 
         /// <inheritdoc />
-        protected override Task Work()
-        {
-            return work();
-        }
+        protected override Task Work() => work();
     }
 }

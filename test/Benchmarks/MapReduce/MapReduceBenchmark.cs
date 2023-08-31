@@ -42,10 +42,7 @@ namespace Benchmarks.MapReduce
         }
 
         [GlobalCleanup]
-        public void Teardown()
-        {
-            _host.StopAllSilos();
-        }
+        public void Teardown() => _host.StopAllSilos();
 
         private async Task BenchCore()
         {
@@ -102,10 +99,7 @@ namespace Benchmarks.MapReduce
             }
         }
 
-        public void Dispose()
-        {
-            _host?.Dispose();
-        }
+        public void Dispose() => _host?.Dispose();
 
         private readonly string _text = @"Historically, the world of data and the world of objects" +
           @" have not been well integrated. Programmers work in C# or Visual Basic" +

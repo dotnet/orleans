@@ -76,10 +76,7 @@ namespace NonSilo.Tests.Membership
 
         private static SiloAddress Silo(string value) => SiloAddress.FromParsableString(value);
 
-        private static MembershipEntry Entry(SiloAddress address, SiloStatus status)
-        {
-            return new MembershipEntry { SiloAddress = address, Status = status };
-        }
+        private static MembershipEntry Entry(SiloAddress address, SiloStatus status) => new MembershipEntry { SiloAddress = address, Status = status };
 
         private static MembershipTableData Table(params MembershipEntry[] entries)
         {

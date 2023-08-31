@@ -87,30 +87,12 @@ public class ClassWithEnumTestData
             }
         }
 
-        public void SetBit(int n, bool value = true)
-        {
-            boolArray[n] = value;
-        }
-        public bool GetBit(int n)
-        {
-            return boolArray[n];
-        }
-        public void SetEnemy(int n, CampaignEnemyTestType enemy)
-        {
-            classArray[n].Enemy = enemy;
-        }
-        public CampaignEnemyTestType GetEnemy(int n)
-        {
-            return classArray[n].Enemy;
-        }
-        public void SetNumber(string name, int value)
-        {
-            stringIntDict[name] = value;
-        }
-        public int GetNumber(string name)
-        {
-            return stringIntDict[name];
-        }
+        public void SetBit(int n, bool value = true) => boolArray[n] = value;
+        public bool GetBit(int n) => boolArray[n];
+        public void SetEnemy(int n, CampaignEnemyTestType enemy) => classArray[n].Enemy = enemy;
+        public CampaignEnemyTestType GetEnemy(int n) => classArray[n].Enemy;
+        public void SetNumber(string name, int value) => stringIntDict[name] = value;
+        public int GetNumber(string name) => stringIntDict[name];
 
 
         // This class is not actually used anywhere. It is here to test that the serializer generator properly handles
@@ -130,10 +112,7 @@ public class ClassWithEnumTestData
                 s = myT.ToString();
             }
 
-            public override string ToString()
-            {
-                return s;
-            }
+            public override string ToString() => s;
 
             public void SetT(T t)
             {

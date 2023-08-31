@@ -74,10 +74,7 @@ namespace Orleans.BroadcastChannel
             }
         }
 
-        public void Attach<T>(InternalChannelId streamId, Func<T, Task> onPublished, Func<Exception, Task> onError)
-        {
-            _handlers.TryAdd(streamId, new Callback<T>(onPublished, onError));
-        }
+        public void Attach<T>(InternalChannelId streamId, Func<T, Task> onPublished, Func<Exception, Task> onError) => _handlers.TryAdd(streamId, new Callback<T>(onPublished, onError));
 
         private async ValueTask<ICallback> GetStreamCallback(InternalChannelId streamId)
         {

@@ -17,35 +17,17 @@ namespace Tester
         {
         }
 
-        public Task<string> GetHelloWorldUsingCustomService()
-        {
-            return GetGrainService(CurrentGrainReference.GrainId).GetHelloWorldUsingCustomService(CurrentGrainReference);
-        }
+        public Task<string> GetHelloWorldUsingCustomService() => GetGrainService(CurrentGrainReference.GrainId).GetHelloWorldUsingCustomService(CurrentGrainReference);
 
-        public Task<bool> HasStarted()
-        {
-            return GetGrainService(CurrentGrainReference.GrainId).HasStarted();
-        }
+        public Task<bool> HasStarted() => GetGrainService(CurrentGrainReference.GrainId).HasStarted();
 
-        public Task<bool> HasStartedInBackground()
-        {
-            return GetGrainService(CurrentGrainReference.GrainId).HasStartedInBackground();
-        }
+        public Task<bool> HasStartedInBackground() => GetGrainService(CurrentGrainReference.GrainId).HasStartedInBackground();
 
-        public Task<bool> HasInit()
-        {
-            return GetGrainService(CurrentGrainReference.GrainId).HasInit();
-        }
+        public Task<bool> HasInit() => GetGrainService(CurrentGrainReference.GrainId).HasInit();
 
-        public Task<string> GetServiceConfigProperty()
-        {
-            return GetGrainService(CurrentGrainReference.GrainId).GetServiceConfigProperty();
-        }
+        public Task<string> GetServiceConfigProperty() => GetGrainService(CurrentGrainReference.GrainId).GetServiceConfigProperty();
 
-        public Task<string> EchoViaExtension(string what)
-        {
-            return GetGrainService(CurrentGrainReference.GrainId).AsReference<IEchoExtension>().Echo(what);
-        }
+        public Task<string> EchoViaExtension(string what) => GetGrainService(CurrentGrainReference.GrainId).AsReference<IEchoExtension>().Echo(what);
     }
 
     public class TestGrainService : GrainService, ITestGrainService
@@ -73,10 +55,7 @@ namespace Tester
             return base.Start();
         }
 
-        public Task<string> GetHelloWorldUsingCustomService(GrainReference reference)
-        {
-            return Task.FromResult("Hello World from Test Grain Service");
-        }
+        public Task<string> GetHelloWorldUsingCustomService(GrainReference reference) => Task.FromResult("Hello World from Test Grain Service");
 
         protected override Task StartInBackground()
         {
@@ -84,25 +63,13 @@ namespace Tester
             return Task.CompletedTask;
         }
 
-        public Task<bool> HasStarted()
-        {
-            return Task.FromResult(started);
-        }
+        public Task<bool> HasStarted() => Task.FromResult(started);
 
-        public Task<bool> HasStartedInBackground()
-        {
-            return Task.FromResult(startedInBackground);
-        }
+        public Task<bool> HasStartedInBackground() => Task.FromResult(startedInBackground);
 
-        public Task<bool> HasInit()
-        {
-            return Task.FromResult(init);
-        }
+        public Task<bool> HasInit() => Task.FromResult(init);
 
-        public Task<string> GetServiceConfigProperty()
-        {
-            return Task.FromResult(config.ConfigProperty);
-        }
+        public Task<string> GetServiceConfigProperty() => Task.FromResult(config.ConfigProperty);
     }
 
     public static class TestGrainServicesSiloBuilderExtensions

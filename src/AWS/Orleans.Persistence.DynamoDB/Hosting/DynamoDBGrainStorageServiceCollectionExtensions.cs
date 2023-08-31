@@ -18,26 +18,17 @@ namespace Orleans.Hosting
         /// <summary>
         /// Configure silo to use AWS DynamoDB storage as the default grain storage.
         /// </summary>
-        public static IServiceCollection AddDynamoDBGrainStorageAsDefault(this IServiceCollection services, Action<DynamoDBStorageOptions> configureOptions)
-        {
-            return services.AddDynamoDBGrainStorage(ProviderConstants.DEFAULT_STORAGE_PROVIDER_NAME, ob => ob.Configure(configureOptions));
-        }
+        public static IServiceCollection AddDynamoDBGrainStorageAsDefault(this IServiceCollection services, Action<DynamoDBStorageOptions> configureOptions) => services.AddDynamoDBGrainStorage(ProviderConstants.DEFAULT_STORAGE_PROVIDER_NAME, ob => ob.Configure(configureOptions));
 
         /// <summary>
         /// Configure silo to use AWS DynamoDB storage for grain storage.
         /// </summary>
-        public static IServiceCollection AddDynamoDBGrainStorage(this IServiceCollection services, string name, Action<DynamoDBStorageOptions> configureOptions)
-        {
-            return services.AddDynamoDBGrainStorage(name, ob => ob.Configure(configureOptions));
-        }
+        public static IServiceCollection AddDynamoDBGrainStorage(this IServiceCollection services, string name, Action<DynamoDBStorageOptions> configureOptions) => services.AddDynamoDBGrainStorage(name, ob => ob.Configure(configureOptions));
 
         /// <summary>
         /// Configure silo to use AWS DynamoDB storage as the default grain storage.
         /// </summary>
-        public static IServiceCollection AddDynamoDBGrainStorageAsDefault(this IServiceCollection services, Action<OptionsBuilder<DynamoDBStorageOptions>> configureOptions = null)
-        {
-            return services.AddDynamoDBGrainStorage(ProviderConstants.DEFAULT_STORAGE_PROVIDER_NAME, configureOptions);
-        }
+        public static IServiceCollection AddDynamoDBGrainStorageAsDefault(this IServiceCollection services, Action<OptionsBuilder<DynamoDBStorageOptions>> configureOptions = null) => services.AddDynamoDBGrainStorage(ProviderConstants.DEFAULT_STORAGE_PROVIDER_NAME, configureOptions);
 
         /// <summary>
         /// Configure silo to use AWS DynamoDB storage for grain storage.

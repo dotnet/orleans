@@ -6,10 +6,7 @@ namespace UnitTests.Grains
 {
     public abstract class CustomPlacementBaseGrain : Grain, ICustomPlacementTestGrain
     {
-        public Task<string> GetRuntimeInstanceId()
-        {
-            return Task.FromResult(RuntimeIdentity);
-        }
+        public Task<string> GetRuntimeInstanceId() => Task.FromResult(RuntimeIdentity);
     }
 
     [TestPlacementStrategy(CustomPlacementScenario.FixedSilo)]

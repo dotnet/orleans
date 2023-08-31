@@ -119,8 +119,5 @@ public static class GrainReminderExtensions
     /// <summary>
     /// Gets the <see cref="IReminderRegistry"/>.
     /// </summary>
-    private static IReminderRegistry GetReminderRegistry(IGrainContext grainContext)
-    {
-        return grainContext.ActivationServices.GetRequiredService<IReminderRegistry>();
-    }
+    private static IReminderRegistry GetReminderRegistry(IGrainContext grainContext) => grainContext.ActivationServices.GetRequiredService<IReminderRegistry>();
 }

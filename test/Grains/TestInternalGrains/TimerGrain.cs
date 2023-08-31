@@ -78,10 +78,7 @@ namespace UnitTestGrains
             return Task.CompletedTask;
         }
 
-        public Task<TimeSpan> GetTimerPeriod()
-        {
-            return Task.FromResult(period);
-        }
+        public Task<TimeSpan> GetTimerPeriod() => Task.FromResult(period);
 
         public Task<int> GetCounter()
         {
@@ -149,8 +146,8 @@ namespace UnitTestGrains
             this.logger = loggerFactory.CreateLogger($"{this.GetType().Name}-{this.IdentityString}");
         }
 
-        public Task<int> GetTickCount() { return Task.FromResult(tickCount); }
-        public Task<Exception> GetException() { return Task.FromResult(tickException); }
+        public Task<int> GetTickCount() => Task.FromResult(tickCount);
+        public Task<Exception> GetException() => Task.FromResult(tickException);
 
         public override Task OnActivateAsync(CancellationToken cancellationToken)
         {
@@ -271,10 +268,7 @@ namespace UnitTestGrains
     {
         private TaskCompletionSource<int> completionSource;
 
-        public Task<string> GetRuntimeInstanceId()
-        {
-            return Task.FromResult(this.RuntimeIdentity);
-        }
+        public Task<string> GetRuntimeInstanceId() => Task.FromResult(this.RuntimeIdentity);
 
         public async Task StartAndWaitTimerTick(TimeSpan dueTime)
         {
@@ -296,9 +290,6 @@ namespace UnitTestGrains
             return Task.CompletedTask;
         }
 
-        private async Task StuckTimerTick(object state)
-        {
-            await completionSource.Task;
-        }
+        private async Task StuckTimerTick(object state) => await completionSource.Task;
     }
 }

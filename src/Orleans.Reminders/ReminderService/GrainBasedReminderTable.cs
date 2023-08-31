@@ -160,10 +160,7 @@ namespace Orleans.Runtime.ReminderService
             return Task.FromResult(false);
         }
 
-        void IGrainMigrationParticipant.OnDehydrate(IDehydrationContext dehydrationContext)
-        {
-            dehydrationContext.TryAddValue("table", _reminderTable);
-        }
+        void IGrainMigrationParticipant.OnDehydrate(IDehydrationContext dehydrationContext) => dehydrationContext.TryAddValue("table", _reminderTable);
 
         void IGrainMigrationParticipant.OnRehydrate(IRehydrationContext rehydrationContext)
         {

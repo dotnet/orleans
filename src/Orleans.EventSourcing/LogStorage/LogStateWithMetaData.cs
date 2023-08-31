@@ -41,10 +41,7 @@ namespace Orleans.EventSourcing.LogStorage
         /// <summary>
         /// Convert current GrainStateWithMetaDataAndETag object information to a string
         /// </summary>
-        public override string ToString()
-        {
-            return string.Format("v{0} Flags={1} ETag={2} Data={3}", StateAndMetaData.GlobalVersion, StateAndMetaData.WriteVector, ETag, StateAndMetaData.Log);
-        }
+        public override string ToString() => string.Format("v{0} Flags={1} ETag={2} Data={3}", StateAndMetaData.GlobalVersion, StateAndMetaData.WriteVector, ETag, StateAndMetaData.Log);
     }
 
 
@@ -95,9 +92,7 @@ namespace Orleans.EventSourcing.LogStorage
         /// </summary>
         /// <param name="Replica">The replica for which we want to look up the bit</param>
         /// <returns></returns>
-        public bool GetBit(string Replica) {
-            return StringEncodedWriteVector.GetBit(WriteVector, Replica);
-        }
+        public bool GetBit(string Replica) => StringEncodedWriteVector.GetBit(WriteVector, Replica);
 
         /// <summary>
         /// toggle one of the bits in <see cref="WriteVector"/> and return the new value.

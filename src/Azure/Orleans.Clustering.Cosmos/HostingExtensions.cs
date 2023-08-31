@@ -98,10 +98,7 @@ public static class HostingExtensions
     /// <returns>The provided <paramref name="services"/>.</returns>
     public static IServiceCollection UseCosmosClustering(
         this IServiceCollection services,
-        Action<CosmosClusteringOptions> configureOptions)
-    {
-        return services.UseCosmosClustering(ob => ob.Configure(configureOptions));
-    }
+        Action<CosmosClusteringOptions> configureOptions) => services.UseCosmosClustering(ob => ob.Configure(configureOptions));
 
     /// <summary>
     /// Adds clustering backed by Azure Cosmos DB.
@@ -125,10 +122,7 @@ public static class HostingExtensions
     /// <returns>The provided <paramref name="services"/>.</returns>
     public static IServiceCollection UseCosmosGatewayListProvider(
         this IServiceCollection services,
-        Action<CosmosClusteringOptions> configureOptions)
-    {
-        return services.UseCosmosGatewayListProvider(ob => ob.Configure(configureOptions));
-    }
+        Action<CosmosClusteringOptions> configureOptions) => services.UseCosmosGatewayListProvider(ob => ob.Configure(configureOptions));
 
     /// <summary>
     /// Adds clustering backed by Azure Cosmos DB.

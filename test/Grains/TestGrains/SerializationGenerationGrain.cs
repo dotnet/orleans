@@ -9,30 +9,15 @@ namespace TestGrains
     using UnitTests.GrainInterfaces;
     public class SerializationGenerationGrain : Grain<SerializationGenerationGrain.MyState>, ISerializationGenerationGrain
     {
-        public Task<object> RoundTripObject(object input)
-        {
-            return Task.FromResult(input);
-        }
+        public Task<object> RoundTripObject(object input) => Task.FromResult(input);
 
-        public Task<SomeStruct> RoundTripStruct(SomeStruct input)
-        {
-            return Task.FromResult(input);
-        }
+        public Task<SomeStruct> RoundTripStruct(SomeStruct input) => Task.FromResult(input);
 
-        public Task<SomeAbstractClass> RoundTripClass(SomeAbstractClass input)
-        {
-            return Task.FromResult(input);
-        }
+        public Task<SomeAbstractClass> RoundTripClass(SomeAbstractClass input) => Task.FromResult(input);
 
-        public Task<ISomeInterface> RoundTripInterface(ISomeInterface input)
-        {
-            return Task.FromResult(input);
-        }
+        public Task<ISomeInterface> RoundTripInterface(ISomeInterface input) => Task.FromResult(input);
 
-        public Task<SomeAbstractClass.SomeEnum> RoundTripEnum(SomeAbstractClass.SomeEnum input)
-        {
-            return Task.FromResult(input);
-        }
+        public Task<SomeAbstractClass.SomeEnum> RoundTripEnum(SomeAbstractClass.SomeEnum input) => Task.FromResult(input);
 
         public async Task SetState(SomeAbstractClass input)
         {
@@ -41,10 +26,7 @@ namespace TestGrains
             await this.WriteStateAsync();
         }
 
-        public Task<SomeAbstractClass> GetState()
-        {
-            return Task.FromResult(this.State.Classes.FirstOrDefault());
-        }
+        public Task<SomeAbstractClass> GetState() => Task.FromResult(this.State.Classes.FirstOrDefault());
 
         [Serializable]
         [GenerateSerializer]

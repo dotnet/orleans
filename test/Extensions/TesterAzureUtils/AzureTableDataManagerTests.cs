@@ -15,10 +15,7 @@ namespace Tester.AzureUtils
         private readonly string PartitionKey;
         private readonly UnitTestAzureTableDataManager manager;
 
-        private UnitTestAzureTableData GenerateNewData()
-        {
-            return new UnitTestAzureTableData("JustData", PartitionKey, "RK-" + Guid.NewGuid());
-        }
+        private UnitTestAzureTableData GenerateNewData() => new UnitTestAzureTableData("JustData", PartitionKey, "RK-" + Guid.NewGuid());
 
         public AzureTableDataManagerTests()
         {

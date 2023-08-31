@@ -88,10 +88,7 @@ namespace UnitTests.General
                 }
             }
 
-            public object CreateInstance(IGrainContext context)
-            {
-                return new ExplicitlyRegisteredSimpleDIGrain(new InjectedService(NullLoggerFactory.Instance), HardcodedValue, _released);
-            }
+            public object CreateInstance(IGrainContext context) => new ExplicitlyRegisteredSimpleDIGrain(new InjectedService(NullLoggerFactory.Instance), HardcodedValue, _released);
 
             public ValueTask DisposeInstance(IGrainContext context, object instance)
             {

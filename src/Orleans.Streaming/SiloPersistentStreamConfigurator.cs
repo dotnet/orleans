@@ -48,10 +48,7 @@ namespace Orleans.Hosting
         /// <param name="services">The services.</param>
         /// <param name="name">The name.</param>
         /// <returns>The newly created instance.</returns>
-        public static IConfigurationValidator Create(IServiceProvider services, string name)
-        {
-            return new PersistentStreamStorageConfigurationValidator(services, name);
-        }
+        public static IConfigurationValidator Create(IServiceProvider services, string name) => new PersistentStreamStorageConfigurationValidator(services, name);
     }
 
     /// <summary>

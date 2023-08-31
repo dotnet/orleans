@@ -34,10 +34,7 @@ namespace UnitTests.Grains
 
     public class MethodInterceptionGrain : IMethodInterceptionGrain, IIncomingGrainCallFilter
     {
-        public Task<string> One()
-        {
-            throw new InvalidOperationException("Not allowed to actually invoke this method!");
-        }
+        public Task<string> One() => throw new InvalidOperationException("Not allowed to actually invoke this method!");
 
         [MessWithResult]
         public Task<string> Echo(string someArg) => Task.FromResult(someArg);
@@ -46,10 +43,7 @@ namespace UnitTests.Grains
 
         public Task<string> SayHello() => Task.FromResult("Hello");
 
-        public Task<string> Throw()
-        {
-            throw new MyDomainSpecificException("Oi!");
-        }
+        public Task<string> Throw() => throw new MyDomainSpecificException("Oi!");
 
         public Task FilterThrows() => Task.CompletedTask;
 
@@ -216,20 +210,11 @@ namespace UnitTests.Grains
             }
         }
 
-        public Task<int> SumSet(HashSet<int> numbers)
-        {
-            return Task.FromResult(numbers.Sum());
-        }
+        public Task<int> SumSet(HashSet<int> numbers) => Task.FromResult(numbers.Sum());
 
-        public Task SystemWideCallFilterMarker()
-        {
-            return Task.CompletedTask;
-        }
+        public Task SystemWideCallFilterMarker() => Task.CompletedTask;
 
-        public Task GrainSpecificCallFilterMarker()
-        {
-            return Task.CompletedTask;
-        }
+        public Task GrainSpecificCallFilterMarker() => Task.CompletedTask;
     }
 
     public class CaterpillarGrain : ICaterpillarGrain, IIncomingGrainCallFilter

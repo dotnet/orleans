@@ -38,30 +38,15 @@ namespace UnitTests.Grains
             return base.OnActivateAsync(cancellationToken);
         }
 
-        public Task<long> GetLongValue()
-        {
-            return injectedService.GetTicks();
-        }
+        public Task<long> GetLongValue() => injectedService.GetTicks();
 
-        public Task<string> GetStringValue()
-        {
-            return Task.FromResult(this.grainContextAccessor.GrainContext.GrainId.ToString());
-        }
+        public Task<string> GetStringValue() => Task.FromResult(this.grainContextAccessor.GrainContext.GrainId.ToString());
 
-        public Task<string> GetInjectedSingletonServiceValue()
-        {
-            return Task.FromResult(this.injectedService.GetInstanceValue());
-        }
+        public Task<string> GetInjectedSingletonServiceValue() => Task.FromResult(this.injectedService.GetInstanceValue());
 
-        public Task<string> GetInjectedScopedServiceValue()
-        {
-            return Task.FromResult(this.injectedScopedService.GetInstanceValue());
-        }
+        public Task<string> GetInjectedScopedServiceValue() => Task.FromResult(this.injectedScopedService.GetInstanceValue());
 
-        public Task<long> GetGrainFactoryId()
-        {
-            return Task.FromResult(this.grainFactoryId);
-        }
+        public Task<long> GetGrainFactoryId() => Task.FromResult(this.grainFactoryId);
 
         public Task DoDeactivate()
         {
@@ -93,15 +78,9 @@ namespace UnitTests.Grains
             this.numberOfReleasedInstancesBeforeThisActivation = numberOfReleasedInstancesBeforeThisActivation;
         }
 
-        public Task<long> GetLongValue()
-        {
-            return Task.FromResult((long)numberOfReleasedInstancesBeforeThisActivation);
-        }
+        public Task<long> GetLongValue() => Task.FromResult((long)numberOfReleasedInstancesBeforeThisActivation);
 
-        public Task<string> GetStringValue()
-        {
-            return Task.FromResult(this.someValueThatIsNotRegistered);
-        }
+        public Task<string> GetStringValue() => Task.FromResult(this.someValueThatIsNotRegistered);
         public Task DoDeactivate()
         {
             this.DeactivateOnIdle();
@@ -120,10 +99,7 @@ namespace UnitTests.Grains
         private readonly string instanceValue = Guid.NewGuid().ToString();
         private readonly ILogger logger;
 
-        public Task<long> GetTicks()
-        {
-            return Task.FromResult(DateTime.UtcNow.Ticks);
-        }
+        public Task<long> GetTicks() => Task.FromResult(DateTime.UtcNow.Ticks);
         public string GetInstanceValue() => this.instanceValue;
 
         public InjectedService(ILoggerFactory loggerFactory)
@@ -131,10 +107,7 @@ namespace UnitTests.Grains
             this.logger = loggerFactory.CreateLogger<InjectedService>();
         }
 
-        public void Dispose()
-        {
-            logger.LogInformation("Disposed instance {Value}", this.instanceValue);
-        }
+        public void Dispose() => logger.LogInformation("Disposed instance {Value}", this.instanceValue);
     }
 
     public interface IInjectedScopedService
@@ -152,10 +125,7 @@ namespace UnitTests.Grains
             this.logger = loggerFactory.CreateLogger<InjectedScopedService>();
         }
 
-        public void Dispose()
-        {
-            logger.LogInformation("Disposed instance {Value}", this.instanceValue);
-        }
+        public void Dispose() => logger.LogInformation("Disposed instance {Value}", this.instanceValue);
 
         public string GetInstanceValue() =>  this.instanceValue;
     }

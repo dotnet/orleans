@@ -50,10 +50,7 @@ namespace Orleans.Providers.Streams.Generator
         }
 
         /// <inheritdoc />
-        public StreamSequenceToken GetSequenceToken(ref CachedMessage cachedMessage)
-        {
-            return new EventSequenceTokenV2(cachedMessage.SequenceNumber);
-        }
+        public StreamSequenceToken GetSequenceToken(ref CachedMessage cachedMessage) => new EventSequenceTokenV2(cachedMessage.SequenceNumber);
 
         private CachedMessage QueueMessageToCachedMessage(GeneratedBatchContainer queueMessage, DateTime dequeueTimeUtc)
         {
@@ -99,10 +96,7 @@ namespace Orleans.Providers.Streams.Generator
             return segment;
         }
 
-        private StreamPosition GetStreamPosition(GeneratedBatchContainer queueMessage)
-        {
-            return new StreamPosition(queueMessage.StreamId, queueMessage.RealToken);
-        }
+        private StreamPosition GetStreamPosition(GeneratedBatchContainer queueMessage) => new StreamPosition(queueMessage.StreamId, queueMessage.RealToken);
 
         private class Cursor : IQueueCacheCursor
         {
@@ -148,7 +142,7 @@ namespace Orleans.Providers.Streams.Generator
         }
 
         /// <inheritdoc />
-        public int GetMaxAddCount() { return 100; }
+        public int GetMaxAddCount() => 100;
 
         /// <inheritdoc />
         public void AddToCache(IList<IBatchContainer> messages)
@@ -170,15 +164,9 @@ namespace Orleans.Providers.Streams.Generator
         }
 
         /// <inheritdoc />
-        public IQueueCacheCursor GetCacheCursor(StreamId streamId, StreamSequenceToken token)
-        {
-            return new Cursor(cache, streamId, token);
-        }
+        public IQueueCacheCursor GetCacheCursor(StreamId streamId, StreamSequenceToken token) => new Cursor(cache, streamId, token);
 
         /// <inheritdoc />
-        public bool IsUnderPressure()
-        {
-            return false;
-        }
+        public bool IsUnderPressure() => false;
     }
 }

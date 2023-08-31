@@ -61,10 +61,7 @@ namespace Orleans.Serialization
     public class IPAddressConverter : JsonConverter
     {
         /// <inheritdoc/>
-        public override bool CanConvert(Type objectType)
-        {
-            return (objectType == typeof(IPAddress));
-        }
+        public override bool CanConvert(Type objectType) => (objectType == typeof(IPAddress));
 
         /// <inheritdoc/>
         public override void WriteJson(JsonWriter writer, object value, JsonSerializer serializer)
@@ -145,10 +142,7 @@ namespace Orleans.Serialization
     public class SiloAddressJsonConverter : JsonConverter
     {
         /// <inheritdoc/>
-        public override bool CanConvert(Type objectType)
-        {
-            return (objectType == typeof(SiloAddress));
-        }
+        public override bool CanConvert(Type objectType) => (objectType == typeof(SiloAddress));
 
         /// <inheritdoc/>
         public override void WriteJson(JsonWriter writer, object value, JsonSerializer serializer)
@@ -207,10 +201,7 @@ namespace Orleans.Serialization
     public class UniqueKeyConverter : JsonConverter
     {
         /// <inheritdoc/>
-        public override bool CanConvert(Type objectType)
-        {
-            return (objectType == typeof(UniqueKey));
-        }
+        public override bool CanConvert(Type objectType) => (objectType == typeof(UniqueKey));
 
         /// <inheritdoc/>
         public override void WriteJson(JsonWriter writer, object value, JsonSerializer serializer)
@@ -238,10 +229,7 @@ namespace Orleans.Serialization
     public class IPEndPointConverter : JsonConverter
     {
         /// <inheritdoc/>
-        public override bool CanConvert(Type objectType)
-        {
-            return (objectType == typeof(IPEndPoint));
-        }
+        public override bool CanConvert(Type objectType) => (objectType == typeof(IPEndPoint));
 
         /// <inheritdoc/>
         public override void WriteJson(JsonWriter writer, object value, JsonSerializer serializer)
@@ -284,10 +272,7 @@ namespace Orleans.Serialization
         }
 
         /// <inheritdoc/>
-        public override bool CanConvert(Type objectType)
-        {
-            return AddressableType.IsAssignableFrom(objectType);
-        }
+        public override bool CanConvert(Type objectType) => AddressableType.IsAssignableFrom(objectType);
 
         /// <inheritdoc/>
         public override void WriteJson(JsonWriter writer, object value, JsonSerializer serializer)

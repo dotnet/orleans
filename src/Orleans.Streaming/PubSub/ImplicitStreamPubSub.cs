@@ -37,10 +37,7 @@ namespace Orleans.Streams
             return Task.FromResult(result);
         }
 
-        public Task UnregisterProducer(QualifiedStreamId streamId, GrainId streamProducer)
-        {
-            return Task.CompletedTask;
-        }
+        public Task UnregisterProducer(QualifiedStreamId streamId, GrainId streamProducer) => Task.CompletedTask;
 
         public Task RegisterConsumer(GuidId subscriptionId, QualifiedStreamId streamId, GrainId streamConsumer, string filterData)
         {
@@ -61,15 +58,9 @@ namespace Orleans.Streams
             return Task.CompletedTask;
         }
 
-        public Task<int> ProducerCount(QualifiedStreamId streamId)
-        {
-            return Task.FromResult(0);
-        }
+        public Task<int> ProducerCount(QualifiedStreamId streamId) => Task.FromResult(0);
 
-        public Task<int> ConsumerCount(QualifiedStreamId streamId)
-        {
-            return Task.FromResult(0);
-        }
+        public Task<int> ConsumerCount(QualifiedStreamId streamId) => Task.FromResult(0);
 
         public Task<List<StreamSubscription>> GetAllSubscriptions(QualifiedStreamId streamId, GrainId streamConsumer = default)
         {
@@ -95,15 +86,9 @@ namespace Orleans.Streams
             }   
         }
 
-        internal bool IsImplicitSubscriber(GrainId grainId, QualifiedStreamId streamId)
-        {
-            return implicitTable.IsImplicitSubscriber(grainId, streamId);
-        }
+        internal bool IsImplicitSubscriber(GrainId grainId, QualifiedStreamId streamId) => implicitTable.IsImplicitSubscriber(grainId, streamId);
 
-        internal bool IsImplicitSubscriber(GuidId subscriptionId, QualifiedStreamId streamId)
-        {
-            return SubscriptionMarker.IsImplicitSubscription(subscriptionId.Guid);
-        }
+        internal bool IsImplicitSubscriber(GuidId subscriptionId, QualifiedStreamId streamId) => SubscriptionMarker.IsImplicitSubscription(subscriptionId.Guid);
 
         public GuidId CreateSubscriptionId(QualifiedStreamId streamId, GrainId grainId)
         {
@@ -115,9 +100,6 @@ namespace Orleans.Streams
             return GuidId.GetGuidId(subscriptionGuid);
         }
 
-        public Task<bool> FaultSubscription(QualifiedStreamId streamId, GuidId subscriptionId)
-        {
-            return Task.FromResult(false);
-        }
+        public Task<bool> FaultSubscription(QualifiedStreamId streamId, GuidId subscriptionId) => Task.FromResult(false);
     }
 }

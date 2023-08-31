@@ -28,16 +28,10 @@ namespace NonSilo.Tests.Membership
         }
 
         [Fact]
-        public async Task MembershipTableCleanupAgent_Enabled_BasicScenario()
-        {
-            await this.BasicScenario(enabled: true);
-        }
+        public async Task MembershipTableCleanupAgent_Enabled_BasicScenario() => await this.BasicScenario(enabled: true);
 
         [Fact]
-        public async Task MembershipTableCleanupAgent_Disabled_BasicScenario()
-        {
-            await this.BasicScenario(enabled: false);
-        }
+        public async Task MembershipTableCleanupAgent_Disabled_BasicScenario() => await this.BasicScenario(enabled: false);
 
         private async Task BasicScenario(bool enabled)
         {

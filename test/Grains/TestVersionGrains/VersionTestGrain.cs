@@ -8,19 +8,15 @@ namespace TestVersionGrains
 {
     public class VersionUpgradeTestGrain : Grain, IVersionUpgradeTestGrain
     {
-        public Task<int> GetVersion()
-        {
+        public Task<int> GetVersion() =>
 #if VERSION_1
-            return Task.FromResult(1);
+            Task.FromResult(1);
 #else
-            return Task.FromResult(2);
+            Task.FromResult(2);
 #endif
-        }
 
-        public Task<int> ProxyGetVersion(IVersionUpgradeTestGrain other)
-        {
-            return other.GetVersion();
-        }
+
+        public Task<int> ProxyGetVersion(IVersionUpgradeTestGrain other) => other.GetVersion();
 
         public async Task<bool> LongRunningTask(TimeSpan taskTime)
         {
@@ -32,13 +28,12 @@ namespace TestVersionGrains
     [VersionAwareStrategy]
     public class VersionPlacementTestGrain : Grain, IVersionPlacementTestGrain
     {
-        public Task<int> GetVersion()
-        {
+        public Task<int> GetVersion() =>
 #if VERSION_1
-            return Task.FromResult(1);
+            Task.FromResult(1);
 #else
-            return Task.FromResult(2);
+            Task.FromResult(2);
 #endif
-        }
+
     }
 }

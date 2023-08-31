@@ -30,10 +30,7 @@ namespace UnitTests.Grains
             return Task.CompletedTask;
         }
 
-        public Task<int> GetNumberConsumed()
-        {
-            return Task.FromResult(this.ConsumerObserver.NumConsumed);
-        }
+        public Task<int> GetNumberConsumed() => Task.FromResult(this.ConsumerObserver.NumConsumed);
 
         public async Task BecomeConsumer(Guid streamId, string streamNamespace, string providerToUse)
         {

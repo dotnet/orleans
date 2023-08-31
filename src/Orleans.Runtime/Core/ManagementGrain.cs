@@ -347,10 +347,7 @@ namespace Orleans.Runtime.Management
             return requestsToSilos;
         }
 
-        private ISiloControl GetSiloControlReference(SiloAddress silo)
-        {
-            return this.internalGrainFactory.GetSystemTarget<ISiloControl>(Constants.SiloControlType, silo);
-        }
+        private ISiloControl GetSiloControlReference(SiloAddress silo) => this.internalGrainFactory.GetSystemTarget<ISiloControl>(Constants.SiloControlType, silo);
 
         public async ValueTask<List<GrainId>> GetActiveGrains(GrainType grainType)
         {

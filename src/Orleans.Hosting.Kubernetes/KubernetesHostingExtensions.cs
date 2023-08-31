@@ -16,18 +16,12 @@ namespace Orleans.Hosting
         /// <summary>
         /// Adds Kubernetes hosting support.
         /// </summary>
-        public static ISiloBuilder UseKubernetesHosting(this ISiloBuilder siloBuilder)
-        {
-            return siloBuilder.ConfigureServices(services => services.UseKubernetesHosting(configureOptions: null));
-        }
+        public static ISiloBuilder UseKubernetesHosting(this ISiloBuilder siloBuilder) => siloBuilder.ConfigureServices(services => services.UseKubernetesHosting(configureOptions: null));
 
         /// <summary>
         /// Adds Kubernetes hosting support.
         /// </summary>
-        public static ISiloBuilder UseKubernetesHosting(this ISiloBuilder siloBuilder, Action<OptionsBuilder<KubernetesHostingOptions>> configureOptions)
-        {
-            return siloBuilder.ConfigureServices(services => services.UseKubernetesHosting(configureOptions));
-        }
+        public static ISiloBuilder UseKubernetesHosting(this ISiloBuilder siloBuilder, Action<OptionsBuilder<KubernetesHostingOptions>> configureOptions) => siloBuilder.ConfigureServices(services => services.UseKubernetesHosting(configureOptions));
 
         /// <summary>
         /// Adds Kubernetes hosting support.

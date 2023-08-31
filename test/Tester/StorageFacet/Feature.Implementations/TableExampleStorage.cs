@@ -16,15 +16,9 @@ namespace Tester.StorageFacet.Implementations
         public string Name => this.config.StateName;
         public TState State { get; set; }
 
-        public Task Save()
-        {
-            return Task.CompletedTask;
-        }
+        public Task Save() => Task.CompletedTask;
 
-        public string GetExtendedInfo()
-        {
-            return $"Table:{this.Name}-ActivateCalled:{this.activateCalled}, StateType:{typeof(TState).Name}";
-        }
+        public string GetExtendedInfo() => $"Table:{this.Name}-ActivateCalled:{this.activateCalled}, StateType:{typeof(TState).Name}";
 
         public Task LoadState(CancellationToken ct)
         {
@@ -32,15 +26,9 @@ namespace Tester.StorageFacet.Implementations
             return Task.CompletedTask;
         }
 
-        public void Participate(IGrainLifecycle lifecycle)
-        {
-            lifecycle.Subscribe(OptionFormattingUtilities.Name<TableExampleStorage<TState>>(this.Name), GrainLifecycleStage.SetupState, LoadState);
-        }
+        public void Participate(IGrainLifecycle lifecycle) => lifecycle.Subscribe(OptionFormattingUtilities.Name<TableExampleStorage<TState>>(this.Name), GrainLifecycleStage.SetupState, LoadState);
 
-        public void Configure(IExampleStorageConfig cfg)
-        {
-            this.config = cfg;
-        }
+        public void Configure(IExampleStorageConfig cfg) => this.config = cfg;
     }
 
     public class TableExampleStorageFactory : IExampleStorageFactory

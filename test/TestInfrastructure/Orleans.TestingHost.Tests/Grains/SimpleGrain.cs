@@ -38,19 +38,10 @@ namespace Orleans.TestingHost.Tests.Grains
             return Task.CompletedTask;
         }
 
-        public Task<int> GetAxB()
-        {
-            return Task.FromResult(A * B);
-        }
+        public Task<int> GetAxB() => Task.FromResult(A * B);
 
-        public Task<int> GetAxB(int a, int b)
-        {
-            return Task.FromResult(a * b);
-        }
+        public Task<int> GetAxB(int a, int b) => Task.FromResult(a * b);
 
-        public Task<int> GetA()
-        {
-            return Task.FromResult(A);
-        }
+        public Task<int> GetA() => Task.FromResult(A);
     }
 }

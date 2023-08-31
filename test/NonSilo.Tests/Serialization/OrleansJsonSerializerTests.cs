@@ -31,10 +31,7 @@ namespace UnitTests.Serialization
         }
 
         [Fact]
-        public void OrleansJsonSerializer_ExternalSerializer_Client()
-        {
-            TestSerializationRoundTrip(this.environment.Serializer);
-        }
+        public void OrleansJsonSerializer_ExternalSerializer_Client() => TestSerializationRoundTrip(this.environment.Serializer);
 
         [Fact]
         public void OrleansJsonSerializer_ExternalSerializer_Silo()

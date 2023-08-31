@@ -135,10 +135,7 @@ namespace UnitTests.General
             return testStorage;
         }
 
-        private static RelationalStorageForTesting CreateTestInstance(string invariantName, string connectionString)
-        {
-            return instanceFactory[invariantName](connectionString);
-        }
+        private static RelationalStorageForTesting CreateTestInstance(string invariantName, string connectionString) => instanceFactory[invariantName](connectionString);
 
         /// <summary>
         /// Constructor
@@ -186,10 +183,7 @@ namespace UnitTests.General
         /// </summary>
         /// <param name="databaseName">The name of the database to create.</param>
         /// <returns>The call will be successful if the DDL query is successful. Otherwise an exception will be thrown.</returns>
-        private async Task CreateDatabaseAsync(string databaseName)
-        {
-            await Storage.ExecuteAsync(string.Format(CreateDatabaseTemplate, databaseName), command => { }).ConfigureAwait(continueOnCapturedContext: false);
-        }
+        private async Task CreateDatabaseAsync(string databaseName) => await Storage.ExecuteAsync(string.Format(CreateDatabaseTemplate, databaseName), command => { }).ConfigureAwait(continueOnCapturedContext: false);
 
 
         /// <summary>
@@ -197,10 +191,7 @@ namespace UnitTests.General
         /// </summary>
         /// <param name="databaseName">The name of the database to drop.</param>
         /// <returns>The call will be successful if the DDL query is successful. Otherwise an exception will be thrown.</returns>
-        private Task DropDatabaseAsync(string databaseName)
-        {
-            return Storage.ExecuteAsync(string.Format(DropDatabaseTemplate, databaseName), command => { });
-        }
+        private Task DropDatabaseAsync(string databaseName) => Storage.ExecuteAsync(string.Format(DropDatabaseTemplate, databaseName), command => { });
 
         /// <summary>
         /// Creates a new instance of the storage based on the old connection string by changing the database name.

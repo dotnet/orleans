@@ -19,26 +19,17 @@ namespace Orleans.Hosting
         /// <summary>
         /// Configure silo to use azure blob storage as the default grain storage.
         /// </summary>
-        public static IServiceCollection AddAzureBlobGrainStorageAsDefault(this IServiceCollection services, Action<AzureBlobStorageOptions> configureOptions)
-        {
-            return services.AddAzureBlobGrainStorage(ProviderConstants.DEFAULT_STORAGE_PROVIDER_NAME, ob => ob.Configure(configureOptions));
-        }
+        public static IServiceCollection AddAzureBlobGrainStorageAsDefault(this IServiceCollection services, Action<AzureBlobStorageOptions> configureOptions) => services.AddAzureBlobGrainStorage(ProviderConstants.DEFAULT_STORAGE_PROVIDER_NAME, ob => ob.Configure(configureOptions));
 
         /// <summary>
         /// Configure silo to use azure blob storage for grain storage.
         /// </summary>
-        public static IServiceCollection AddAzureBlobGrainStorage(this IServiceCollection services, string name, Action<AzureBlobStorageOptions> configureOptions)
-        {
-            return services.AddAzureBlobGrainStorage(name, ob => ob.Configure(configureOptions));
-        }
+        public static IServiceCollection AddAzureBlobGrainStorage(this IServiceCollection services, string name, Action<AzureBlobStorageOptions> configureOptions) => services.AddAzureBlobGrainStorage(name, ob => ob.Configure(configureOptions));
 
         /// <summary>
         /// Configure silo to use azure blob storage as the default grain storage.
         /// </summary>
-        public static IServiceCollection AddAzureBlobGrainStorageAsDefault(this IServiceCollection services, Action<OptionsBuilder<AzureBlobStorageOptions>> configureOptions = null)
-        {
-            return services.AddAzureBlobGrainStorage(ProviderConstants.DEFAULT_STORAGE_PROVIDER_NAME, configureOptions);
-        }
+        public static IServiceCollection AddAzureBlobGrainStorageAsDefault(this IServiceCollection services, Action<OptionsBuilder<AzureBlobStorageOptions>> configureOptions = null) => services.AddAzureBlobGrainStorage(ProviderConstants.DEFAULT_STORAGE_PROVIDER_NAME, configureOptions);
 
         /// <summary>
         /// Configure silo to use azure blob storage for grain storage.

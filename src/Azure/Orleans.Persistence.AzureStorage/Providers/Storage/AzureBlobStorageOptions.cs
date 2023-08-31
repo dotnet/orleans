@@ -67,10 +67,7 @@ namespace Orleans.Configuration
         /// <summary>
         /// Configures the <see cref="BlobServiceClient"/> using the provided callback.
         /// </summary>
-        public void ConfigureBlobServiceClient(Func<Task<BlobServiceClient>> createClientCallback)
-        {
-            CreateClient = createClientCallback ?? throw new ArgumentNullException(nameof(createClientCallback));
-        }
+        public void ConfigureBlobServiceClient(Func<Task<BlobServiceClient>> createClientCallback) => CreateClient = createClientCallback ?? throw new ArgumentNullException(nameof(createClientCallback));
 
         /// <summary>
         /// Configures the <see cref="BlobServiceClient"/> using an authenticated service URI and a <see cref="Azure.Core.TokenCredential"/>.

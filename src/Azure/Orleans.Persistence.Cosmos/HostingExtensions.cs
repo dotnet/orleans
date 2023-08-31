@@ -19,10 +19,7 @@ public static class HostingExtensions
     /// <param name="configureOptions">The delegate used to configure the provider.</param>
     public static ISiloBuilder AddCosmosGrainStorageAsDefault<TPartitionKeyProvider>(
         this ISiloBuilder builder,
-        Action<CosmosGrainStorageOptions> configureOptions) where TPartitionKeyProvider : class, IPartitionKeyProvider
-    {
-        return builder.AddCosmosGrainStorage<TPartitionKeyProvider>(ProviderConstants.DEFAULT_STORAGE_PROVIDER_NAME, configureOptions);
-    }
+        Action<CosmosGrainStorageOptions> configureOptions) where TPartitionKeyProvider : class, IPartitionKeyProvider => builder.AddCosmosGrainStorage<TPartitionKeyProvider>(ProviderConstants.DEFAULT_STORAGE_PROVIDER_NAME, configureOptions);
 
     /// <summary>
     /// Configure silo to use Azure Cosmos DB storage for grain storage using a custom Partition Key Provider.
@@ -50,10 +47,7 @@ public static class HostingExtensions
     public static ISiloBuilder AddCosmosGrainStorageAsDefault(
         this ISiloBuilder builder,
         Action<CosmosGrainStorageOptions> configureOptions,
-        Type customPartitionKeyProviderType)
-    {
-        return builder.AddCosmosGrainStorage(ProviderConstants.DEFAULT_STORAGE_PROVIDER_NAME, configureOptions, customPartitionKeyProviderType);
-    }
+        Type customPartitionKeyProviderType) => builder.AddCosmosGrainStorage(ProviderConstants.DEFAULT_STORAGE_PROVIDER_NAME, configureOptions, customPartitionKeyProviderType);
 
     /// <summary>
     /// Configure silo to use Azure Cosmos DB storage for grain storage using a custom Partition Key Provider.
@@ -84,10 +78,7 @@ public static class HostingExtensions
     /// <param name="configureOptions">The delegate used to configure the provider.</param>
     public static ISiloBuilder AddCosmosGrainStorageAsDefault(
         this ISiloBuilder builder,
-        Action<CosmosGrainStorageOptions> configureOptions)
-    {
-        return builder.AddCosmosGrainStorage(ProviderConstants.DEFAULT_STORAGE_PROVIDER_NAME, configureOptions);
-    }
+        Action<CosmosGrainStorageOptions> configureOptions) => builder.AddCosmosGrainStorage(ProviderConstants.DEFAULT_STORAGE_PROVIDER_NAME, configureOptions);
 
     /// <summary>
     /// Configure silo to use Azure Cosmos DB storage for grain storage.
@@ -112,10 +103,7 @@ public static class HostingExtensions
     /// <param name="configureOptions">The delegate used to configure the provider.</param>
     public static ISiloBuilder AddCosmosGrainStorageAsDefault<TPartitionKeyProvider>(
         this ISiloBuilder builder,
-        Action<OptionsBuilder<CosmosGrainStorageOptions>>? configureOptions = null) where TPartitionKeyProvider : class, IPartitionKeyProvider
-    {
-        return builder.AddCosmosGrainStorage<TPartitionKeyProvider>(ProviderConstants.DEFAULT_STORAGE_PROVIDER_NAME, configureOptions);
-    }
+        Action<OptionsBuilder<CosmosGrainStorageOptions>>? configureOptions = null) where TPartitionKeyProvider : class, IPartitionKeyProvider => builder.AddCosmosGrainStorage<TPartitionKeyProvider>(ProviderConstants.DEFAULT_STORAGE_PROVIDER_NAME, configureOptions);
 
     /// <summary>
     /// Configure silo to use Azure Cosmos DB storage for grain storage using a custom Partition Key Provider.
@@ -143,10 +131,7 @@ public static class HostingExtensions
     public static ISiloBuilder AddCosmosGrainStorageAsDefault(
         this ISiloBuilder builder,
         Type customPartitionKeyProviderType,
-        Action<OptionsBuilder<CosmosGrainStorageOptions>>? configureOptions = null)
-    {
-        return builder.AddCosmosGrainStorage(ProviderConstants.DEFAULT_STORAGE_PROVIDER_NAME, customPartitionKeyProviderType, configureOptions);
-    }
+        Action<OptionsBuilder<CosmosGrainStorageOptions>>? configureOptions = null) => builder.AddCosmosGrainStorage(ProviderConstants.DEFAULT_STORAGE_PROVIDER_NAME, customPartitionKeyProviderType, configureOptions);
 
     /// <summary>
     /// Configure silo to use Azure Cosmos DB storage for grain storage using a custom Partition Key Provider.
@@ -176,10 +161,7 @@ public static class HostingExtensions
     /// <param name="configureOptions">The delegate used to configure the provider.</param>
     public static ISiloBuilder AddCosmosGrainStorageAsDefault(
         this ISiloBuilder builder,
-        Action<OptionsBuilder<CosmosGrainStorageOptions>>? configureOptions = null)
-    {
-        return builder.AddCosmosGrainStorage(ProviderConstants.DEFAULT_STORAGE_PROVIDER_NAME, configureOptions);
-    }
+        Action<OptionsBuilder<CosmosGrainStorageOptions>>? configureOptions = null) => builder.AddCosmosGrainStorage(ProviderConstants.DEFAULT_STORAGE_PROVIDER_NAME, configureOptions);
 
     /// <summary>
     /// Configure silo to use Azure Cosmos DB storage for grain storage.
@@ -203,10 +185,7 @@ public static class HostingExtensions
     /// <param name="configureOptions">The delegate used to configure the provider.</param>
     public static IServiceCollection AddCosmosGrainStorageAsDefault(
         this IServiceCollection services,
-        Action<CosmosGrainStorageOptions> configureOptions)
-    {
-        return services.AddCosmosGrainStorage(ProviderConstants.DEFAULT_STORAGE_PROVIDER_NAME, ob => ob.Configure(configureOptions));
-    }
+        Action<CosmosGrainStorageOptions> configureOptions) => services.AddCosmosGrainStorage(ProviderConstants.DEFAULT_STORAGE_PROVIDER_NAME, ob => ob.Configure(configureOptions));
 
     /// <summary>
     /// Configure silo to use Azure Cosmos DB storage for grain storage.
@@ -217,10 +196,7 @@ public static class HostingExtensions
     public static IServiceCollection AddCosmosGrainStorage(
         this IServiceCollection services,
         string name,
-        Action<CosmosGrainStorageOptions> configureOptions)
-    {
-        return services.AddCosmosGrainStorage(name, ob => ob.Configure(configureOptions));
-    }
+        Action<CosmosGrainStorageOptions> configureOptions) => services.AddCosmosGrainStorage(name, ob => ob.Configure(configureOptions));
 
     /// <summary>
     /// Configure silo to use Azure Cosmos DB storage as the default grain storage.
@@ -229,10 +205,7 @@ public static class HostingExtensions
     /// <param name="configureOptions">The delegate used to configure the provider.</param>
     public static IServiceCollection AddCosmosGrainStorageAsDefault(
         this IServiceCollection services,
-        Action<OptionsBuilder<CosmosGrainStorageOptions>>? configureOptions = null)
-    {
-        return services.AddCosmosGrainStorage(ProviderConstants.DEFAULT_STORAGE_PROVIDER_NAME, configureOptions);
-    }
+        Action<OptionsBuilder<CosmosGrainStorageOptions>>? configureOptions = null) => services.AddCosmosGrainStorage(ProviderConstants.DEFAULT_STORAGE_PROVIDER_NAME, configureOptions);
 
     /// <summary>
     /// Configure silo to use Azure Cosmos DB storage for grain storage.

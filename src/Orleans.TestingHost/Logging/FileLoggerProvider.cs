@@ -20,16 +20,10 @@ namespace Orleans.TestingHost.Logging
         }
 
         /// <inheritdoc />
-        public ILogger CreateLogger(string categoryName)
-        {
-            return new FileLogger(this.output, categoryName);
-        }
+        public ILogger CreateLogger(string categoryName) => new FileLogger(this.output, categoryName);
 
         /// <inheritdoc />
-        public void Dispose()
-        {
-            this.output.Dispose();
-        }
+        public void Dispose() => this.output.Dispose();
     }
 
     /// <summary>

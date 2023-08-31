@@ -59,40 +59,22 @@ namespace UnitTests.General
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Ring")]
-        public async Task Ring_1F_Random()
-        {
-            await FailureTest(Fail.Random, 1);
-        }
+        public async Task Ring_1F_Random() => await FailureTest(Fail.Random, 1);
 
         [Fact, TestCategory("Functional"), TestCategory("Ring")]
-        public async Task Ring_1F_Beginning()
-        {
-            await FailureTest(Fail.First, 1);
-        }
+        public async Task Ring_1F_Beginning() => await FailureTest(Fail.First, 1);
 
         [Fact, TestCategory("Functional"), TestCategory("Ring")]
-        public async Task Ring_1F_End()
-        {
-            await FailureTest(Fail.Last, 1);
-        }
+        public async Task Ring_1F_End() => await FailureTest(Fail.Last, 1);
 
         [Fact, TestCategory("Functional"), TestCategory("Ring")]
-        public async Task Ring_2F_Random()
-        {
-            await FailureTest(Fail.Random, 2);
-        }
+        public async Task Ring_2F_Random() => await FailureTest(Fail.Random, 2);
 
         [Fact, TestCategory("Functional"), TestCategory("Ring")]
-        public async Task Ring_2F_Beginning()
-        {
-            await FailureTest(Fail.First, 2);
-        }
+        public async Task Ring_2F_Beginning() => await FailureTest(Fail.First, 2);
 
         [Fact, TestCategory("Functional"), TestCategory("Ring")]
-        public async Task Ring_2F_End()
-        {
-            await FailureTest(Fail.Last, 2);
-        }
+        public async Task Ring_2F_End() => await FailureTest(Fail.Last, 2);
 
         private async Task FailureTest(Fail failCode, int numOfFailures)
         {
@@ -128,16 +110,10 @@ namespace UnitTests.General
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Ring")]
-        public async Task Ring_1J()
-        {
-            await JoinTest(1);
-        }
+        public async Task Ring_1J() => await JoinTest(1);
 
         [Fact, TestCategory("Functional"), TestCategory("Ring")]
-        public async Task Ring_2J()
-        {
-            await JoinTest(2);
-        }
+        public async Task Ring_2J() => await JoinTest(2);
 
         private async Task JoinTest(int numOfJoins)
         {
@@ -368,10 +344,7 @@ namespace UnitTests.General
             }
         }
 
-        private static void AssertEventually(Action assertion, TimeSpan timeout)
-        {
-            AssertEventually(assertion, timeout, TimeSpan.FromMilliseconds(500));
-        }
+        private static void AssertEventually(Action assertion, TimeSpan timeout) => AssertEventually(assertion, timeout, TimeSpan.FromMilliseconds(500));
 
         private static void AssertEventually(Action assertion, TimeSpan timeout, TimeSpan delayBetweenIterations)
         {

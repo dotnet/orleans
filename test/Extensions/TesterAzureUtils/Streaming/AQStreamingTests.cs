@@ -90,101 +90,56 @@ namespace Tester.AzureUtils.Streaming
         ////------------------------ One to One ----------------------//
 
         [SkippableFact, TestCategory("Functional")]
-        public async Task AQ_01_OneProducerGrainOneConsumerGrain()
-        {
-            await runner.StreamTest_01_OneProducerGrainOneConsumerGrain();
-        }
+        public async Task AQ_01_OneProducerGrainOneConsumerGrain() => await runner.StreamTest_01_OneProducerGrainOneConsumerGrain();
 
         [SkippableFact, TestCategory("Functional")]
-        public async Task AQ_02_OneProducerGrainOneConsumerClient()
-        {
-            await runner.StreamTest_02_OneProducerGrainOneConsumerClient();
-        }
+        public async Task AQ_02_OneProducerGrainOneConsumerClient() => await runner.StreamTest_02_OneProducerGrainOneConsumerClient();
 
         [SkippableFact, TestCategory("Functional")]
-        public async Task AQ_03_OneProducerClientOneConsumerGrain()
-        {
-            await runner.StreamTest_03_OneProducerClientOneConsumerGrain();
-        }
+        public async Task AQ_03_OneProducerClientOneConsumerGrain() => await runner.StreamTest_03_OneProducerClientOneConsumerGrain();
 
         [SkippableFact, TestCategory("Functional")]
-        public async Task AQ_04_OneProducerClientOneConsumerClient()
-        {
-            await runner.StreamTest_04_OneProducerClientOneConsumerClient();
-        }
+        public async Task AQ_04_OneProducerClientOneConsumerClient() => await runner.StreamTest_04_OneProducerClientOneConsumerClient();
 
         //------------------------ MANY to Many different grains ----------------------//
 
         [SkippableFact, TestCategory("Functional")]
-        public async Task AQ_05_ManyDifferent_ManyProducerGrainsManyConsumerGrains()
-        {
-            await runner.StreamTest_05_ManyDifferent_ManyProducerGrainsManyConsumerGrains();
-        }
+        public async Task AQ_05_ManyDifferent_ManyProducerGrainsManyConsumerGrains() => await runner.StreamTest_05_ManyDifferent_ManyProducerGrainsManyConsumerGrains();
 
         [SkippableFact, TestCategory("Functional")]
-        public async Task AQ_06_ManyDifferent_ManyProducerGrainManyConsumerClients()
-        {
-            await runner.StreamTest_06_ManyDifferent_ManyProducerGrainManyConsumerClients();
-        }
+        public async Task AQ_06_ManyDifferent_ManyProducerGrainManyConsumerClients() => await runner.StreamTest_06_ManyDifferent_ManyProducerGrainManyConsumerClients();
 
-        [SkippableFact(Skip="https://github.com/dotnet/orleans/issues/5648"), TestCategory("Functional")]
-        public async Task AQ_07_ManyDifferent_ManyProducerClientsManyConsumerGrains()
-        {
-            await runner.StreamTest_07_ManyDifferent_ManyProducerClientsManyConsumerGrains();
-        }
+        [SkippableFact(Skip = "https://github.com/dotnet/orleans/issues/5648"), TestCategory("Functional")]
+        public async Task AQ_07_ManyDifferent_ManyProducerClientsManyConsumerGrains() => await runner.StreamTest_07_ManyDifferent_ManyProducerClientsManyConsumerGrains();
 
         [SkippableFact, TestCategory("Functional")]
-        public async Task AQ_08_ManyDifferent_ManyProducerClientsManyConsumerClients()
-        {
-            await runner.StreamTest_08_ManyDifferent_ManyProducerClientsManyConsumerClients();
-        }
+        public async Task AQ_08_ManyDifferent_ManyProducerClientsManyConsumerClients() => await runner.StreamTest_08_ManyDifferent_ManyProducerClientsManyConsumerClients();
 
         //------------------------ MANY to Many Same grains ----------------------//
         [SkippableFact, TestCategory("Functional")]
-        public async Task AQ_09_ManySame_ManyProducerGrainsManyConsumerGrains()
-        {
-            await runner.StreamTest_09_ManySame_ManyProducerGrainsManyConsumerGrains();
-        }
+        public async Task AQ_09_ManySame_ManyProducerGrainsManyConsumerGrains() => await runner.StreamTest_09_ManySame_ManyProducerGrainsManyConsumerGrains();
 
         [SkippableFact, TestCategory("Functional")]
-        public async Task AQ_10_ManySame_ManyConsumerGrainsManyProducerGrains()
-        {
-            await runner.StreamTest_10_ManySame_ManyConsumerGrainsManyProducerGrains();
-        }
+        public async Task AQ_10_ManySame_ManyConsumerGrainsManyProducerGrains() => await runner.StreamTest_10_ManySame_ManyConsumerGrainsManyProducerGrains();
 
         [SkippableFact, TestCategory("Functional")]
-        public async Task AQ_11_ManySame_ManyProducerGrainsManyConsumerClients()
-        {
-            await runner.StreamTest_11_ManySame_ManyProducerGrainsManyConsumerClients();
-        }
+        public async Task AQ_11_ManySame_ManyProducerGrainsManyConsumerClients() => await runner.StreamTest_11_ManySame_ManyProducerGrainsManyConsumerClients();
 
         [SkippableFact, TestCategory("Functional")]
-        public async Task AQ_12_ManySame_ManyProducerClientsManyConsumerGrains()
-        {
-            await runner.StreamTest_12_ManySame_ManyProducerClientsManyConsumerGrains();
-        }
+        public async Task AQ_12_ManySame_ManyProducerClientsManyConsumerGrains() => await runner.StreamTest_12_ManySame_ManyProducerClientsManyConsumerGrains();
 
         //------------------------ MANY to Many producer consumer same grain ----------------------//
 
         [SkippableFact, TestCategory("Functional")]
-        public async Task AQ_13_SameGrain_ConsumerFirstProducerLater()
-        {
-            await runner.StreamTest_13_SameGrain_ConsumerFirstProducerLater(false);
-        }
+        public async Task AQ_13_SameGrain_ConsumerFirstProducerLater() => await runner.StreamTest_13_SameGrain_ConsumerFirstProducerLater(false);
 
         [SkippableFact, TestCategory("Functional")]
-        public async Task AQ_14_SameGrain_ProducerFirstConsumerLater()
-        {
-            await runner.StreamTest_14_SameGrain_ProducerFirstConsumerLater(false);
-        }
+        public async Task AQ_14_SameGrain_ProducerFirstConsumerLater() => await runner.StreamTest_14_SameGrain_ProducerFirstConsumerLater(false);
 
         //----------------------------------------------//
 
         [SkippableFact, TestCategory("Functional")]
-        public async Task AQ_15_ConsumeAtProducersRequest()
-        {
-            await runner.StreamTest_15_ConsumeAtProducersRequest();
-        }
+        public async Task AQ_15_ConsumeAtProducersRequest() => await runner.StreamTest_15_ConsumeAtProducersRequest();
 
         [SkippableFact, TestCategory("Functional")]
         public async Task AQ_16_MultipleStreams_ManyDifferent_ManyProducerGrainsManyConsumerGrains()
@@ -211,24 +166,18 @@ namespace Tester.AzureUtils.Streaming
         }*/
 
         [SkippableFact]
-        public async Task AQ_19_ConsumerImplicitlySubscribedToProducerClient()
-        {
+        public async Task AQ_19_ConsumerImplicitlySubscribedToProducerClient() =>
             // todo: currently, the Azure queue queue adaptor doesn't support namespaces, so this test will fail.
             await runner.StreamTest_19_ConsumerImplicitlySubscribedToProducerClient();
-        }
 
         [SkippableFact]
-        public async Task AQ_20_ConsumerImplicitlySubscribedToProducerGrain()
-        {
+        public async Task AQ_20_ConsumerImplicitlySubscribedToProducerGrain() =>
             // todo: currently, the Azure queue queue adaptor doesn't support namespaces, so this test will fail.
             await runner.StreamTest_20_ConsumerImplicitlySubscribedToProducerGrain();
-        }
 
         [SkippableFact(Skip = "Ignored"), TestCategory("Failures")]
-        public async Task AQ_21_GenericConsumerImplicitlySubscribedToProducerGrain()
-        {
+        public async Task AQ_21_GenericConsumerImplicitlySubscribedToProducerGrain() =>
             // todo: currently, the Azure queue queue adaptor doesn't support namespaces, so this test will fail.
             await runner.StreamTest_21_GenericConsumerImplicitlySubscribedToProducerGrain();
-        }
     }
 }

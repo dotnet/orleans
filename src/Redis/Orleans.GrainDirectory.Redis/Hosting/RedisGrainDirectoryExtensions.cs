@@ -18,20 +18,14 @@ namespace Orleans.Hosting
         /// </summary>
         public static ISiloBuilder UseRedisGrainDirectoryAsDefault(
             this ISiloBuilder builder,
-            Action<RedisGrainDirectoryOptions> configureOptions)
-        {
-            return builder.UseRedisGrainDirectoryAsDefault(ob => ob.Configure(configureOptions));
-        }
+            Action<RedisGrainDirectoryOptions> configureOptions) => builder.UseRedisGrainDirectoryAsDefault(ob => ob.Configure(configureOptions));
 
         /// <summary>
         /// Adds a default grain directory which persists entries in Redis.
         /// </summary>
         public static ISiloBuilder UseRedisGrainDirectoryAsDefault(
             this ISiloBuilder builder,
-            Action<OptionsBuilder<RedisGrainDirectoryOptions>> configureOptions)
-        {
-            return builder.ConfigureServices(services => services.AddRedisGrainDirectory(GrainDirectoryAttribute.DEFAULT_GRAIN_DIRECTORY, configureOptions));
-        }
+            Action<OptionsBuilder<RedisGrainDirectoryOptions>> configureOptions) => builder.ConfigureServices(services => services.AddRedisGrainDirectory(GrainDirectoryAttribute.DEFAULT_GRAIN_DIRECTORY, configureOptions));
 
         /// <summary>
         /// Adds a named grain directory which persists entries in Redis.
@@ -39,10 +33,7 @@ namespace Orleans.Hosting
         public static ISiloBuilder AddRedisGrainDirectory(
             this ISiloBuilder builder,
             string name,
-            Action<RedisGrainDirectoryOptions> configureOptions)
-        {
-            return builder.AddRedisGrainDirectory(name, ob => ob.Configure(configureOptions));
-        }
+            Action<RedisGrainDirectoryOptions> configureOptions) => builder.AddRedisGrainDirectory(name, ob => ob.Configure(configureOptions));
 
         /// <summary>
         /// Adds a named grain directory which persists entries in Redis.
@@ -50,10 +41,7 @@ namespace Orleans.Hosting
         public static ISiloBuilder AddRedisGrainDirectory(
             this ISiloBuilder builder,
             string name,
-            Action<OptionsBuilder<RedisGrainDirectoryOptions>> configureOptions)
-        {
-            return builder.ConfigureServices(services => services.AddRedisGrainDirectory(name, configureOptions));
-        }
+            Action<OptionsBuilder<RedisGrainDirectoryOptions>> configureOptions) => builder.ConfigureServices(services => services.AddRedisGrainDirectory(name, configureOptions));
 
         private static IServiceCollection AddRedisGrainDirectory(
             this IServiceCollection services,

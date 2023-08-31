@@ -158,15 +158,9 @@ namespace Orleans.AzureUtils
             return sb.ToString();
         }
 
-        internal Task<string> MergeTableEntryAsync(SiloInstanceTableEntry data)
-        {
-            return storage.MergeTableEntryAsync(data, AzureTableUtils.ANY_ETAG); // we merge this without checking eTags.
-        }
+        internal Task<string> MergeTableEntryAsync(SiloInstanceTableEntry data) => storage.MergeTableEntryAsync(data, AzureTableUtils.ANY_ETAG); // we merge this without checking eTags.
 
-        internal Task<(SiloInstanceTableEntry, string)> ReadSingleTableEntryAsync(string partitionKey, string rowKey)
-        {
-            return storage.ReadSingleTableEntryAsync(partitionKey, rowKey);
-        }
+        internal Task<(SiloInstanceTableEntry, string)> ReadSingleTableEntryAsync(string partitionKey, string rowKey) => storage.ReadSingleTableEntryAsync(partitionKey, rowKey);
 
         internal async Task<int> DeleteTableEntries(string clusterId)
         {

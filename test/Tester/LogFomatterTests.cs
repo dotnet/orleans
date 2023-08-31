@@ -475,10 +475,7 @@ namespace Tester
                     this.optionsMonitor = optionsMonitor;
                 }
 
-                public IOptionFormatter<TestOptions> Resolve(string name)
-                {
-                    return TestOptionsFormatter2.CreateNamed(name, Options.Create(this.optionsMonitor.Get(name)));
-                }
+                public IOptionFormatter<TestOptions> Resolve(string name) => TestOptionsFormatter2.CreateNamed(name, Options.Create(this.optionsMonitor.Get(name)));
             }
         }
 
@@ -516,10 +513,7 @@ namespace Tester
                     this.optionsMonitor = optionsMonitor;
                 }
 
-                public IOptionFormatter<TestOptions> Resolve(string name)
-                {
-                    return TestOptionsFormatter.CreateNamed(name, Options.Create(this.optionsMonitor.Get(name)));
-                }
+                public IOptionFormatter<TestOptions> Resolve(string name) => TestOptionsFormatter.CreateNamed(name, Options.Create(this.optionsMonitor.Get(name)));
             }
         }
 
@@ -527,48 +521,27 @@ namespace Tester
         {
             private readonly ConcurrentDictionary<string, Logger> loggers = new ConcurrentDictionary<string, Logger>();
 
-            public void AddProvider(ILoggerProvider provider)
-            {
-                throw new NotImplementedException();
-            }
+            public void AddProvider(ILoggerProvider provider) => throw new NotImplementedException();
 
-            public ILogger CreateLogger(string categoryName)
-            {
-                return this.loggers.GetOrAdd(categoryName, new Logger());
-            }
+            public ILogger CreateLogger(string categoryName) => this.loggers.GetOrAdd(categoryName, new Logger());
 
             public void Dispose()
             {
             }
 
-            public override string ToString()
-            {
-                return string.Join(":", this.loggers.Select(kvp => $"{kvp.Key} =\n{kvp.Value.ToString()}\n"));
-            }
+            public override string ToString() => string.Join(":", this.loggers.Select(kvp => $"{kvp.Key} =\n{kvp.Value.ToString()}\n"));
 
             private class Logger : ILogger
             {
                 private readonly List<string> entries = new List<string>();
 
-                public IDisposable BeginScope<TState>(TState state)
-                {
-                    throw new NotImplementedException();
-                }
+                public IDisposable BeginScope<TState>(TState state) => throw new NotImplementedException();
 
-                public override string ToString()
-                {
-                    return string.Join(";", this.entries);
-                }
+                public override string ToString() => string.Join(";", this.entries);
 
-                public bool IsEnabled(LogLevel logLevel)
-                {
-                    return true;
-                }
+                public bool IsEnabled(LogLevel logLevel) => true;
 
-                public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception exception, Func<TState, Exception, string> formatter)
-                {
-                    entries.Add(formatter(state, exception));
-                }
+                public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception exception, Func<TState, Exception, string> formatter) => entries.Add(formatter(state, exception));
             }
         }
 
@@ -581,20 +554,11 @@ namespace Tester
                 this.logger = loggerFactory.CreateLogger<T>();
             }
 
-            public IDisposable BeginScope<TState>(TState state)
-            {
-                return logger.BeginScope<TState>(state);
-            }
+            public IDisposable BeginScope<TState>(TState state) => logger.BeginScope<TState>(state);
 
-            public bool IsEnabled(LogLevel logLevel)
-            {
-                return logger.IsEnabled(logLevel);
-            }
+            public bool IsEnabled(LogLevel logLevel) => logger.IsEnabled(logLevel);
 
-            public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception exception, Func<TState, Exception, string> formatter)
-            {
-                logger.Log<TState>(logLevel, eventId, state, exception, formatter);
-            }
+            public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception exception, Func<TState, Exception, string> formatter) => logger.Log<TState>(logLevel, eventId, state, exception, formatter);
         }
 
 

@@ -77,37 +77,25 @@ namespace NonSilo.Tests.Membership
         /// Tests basic operation of <see cref="ClusterHealthMonitor"/> and <see cref="SiloHealthMonitor"/>.
         /// </summary>
         [Fact]
-        public async Task ClusterHealthMonitor_BasicScenario()
-        {
-            await ClusterHealthMonitor_BasicScenario_Runner(enableIndirectProbes: true, numVotesForDeathDeclaration: 2);
-        }
+        public async Task ClusterHealthMonitor_BasicScenario() => await ClusterHealthMonitor_BasicScenario_Runner(enableIndirectProbes: true, numVotesForDeathDeclaration: 2);
 
         /// <summary>
         /// Tests basic operation of <see cref="ClusterHealthMonitor"/> and <see cref="SiloHealthMonitor"/>, but with indirect probes disabled.
         /// </summary>
         [Fact]
-        public async Task ClusterHealthMonitor_NoIndirectProbes()
-        {
-            await ClusterHealthMonitor_BasicScenario_Runner(enableIndirectProbes: false, numVotesForDeathDeclaration: 2);
-        }
+        public async Task ClusterHealthMonitor_NoIndirectProbes() => await ClusterHealthMonitor_BasicScenario_Runner(enableIndirectProbes: false, numVotesForDeathDeclaration: 2);
 
         /// <summary>
         /// Tests basic operation of <see cref="ClusterHealthMonitor"/> and <see cref="SiloHealthMonitor"/>, but with indirect probes disabled.
         /// </summary>
         [Fact]
-        public async Task ClusterHealthMonitor_ThreeVotesNeededToKill()
-        {
-            await ClusterHealthMonitor_BasicScenario_Runner(enableIndirectProbes: true, numVotesForDeathDeclaration: 3);
-        }
+        public async Task ClusterHealthMonitor_ThreeVotesNeededToKill() => await ClusterHealthMonitor_BasicScenario_Runner(enableIndirectProbes: true, numVotesForDeathDeclaration: 3);
 
         /// <summary>
         /// Tests basic operation of <see cref="ClusterHealthMonitor"/> and <see cref="SiloHealthMonitor"/>, but with indirect probes disabled.
         /// </summary>
         [Fact]
-        public async Task ClusterHealthMonitor_OneVoteNeededToKill()
-        {
-            await ClusterHealthMonitor_BasicScenario_Runner(enableIndirectProbes: false, numVotesForDeathDeclaration: 1);
-        }
+        public async Task ClusterHealthMonitor_OneVoteNeededToKill() => await ClusterHealthMonitor_BasicScenario_Runner(enableIndirectProbes: false, numVotesForDeathDeclaration: 1);
 
         private async Task ClusterHealthMonitor_BasicScenario_Runner(bool enableIndirectProbes, int? numVotesForDeathDeclaration = default)
         {

@@ -9,10 +9,7 @@ namespace UnitTests.Grains
 {
     public class RoundtripSerializationGrain : Grain, IRoundtripSerializationGrain
     {
-        public Task<CampaignEnemyTestType> GetEnemyType()
-        {
-            return Task.FromResult(CampaignEnemyTestType.Enemy2);
-        }
+        public Task<CampaignEnemyTestType> GetEnemyType() => Task.FromResult(CampaignEnemyTestType.Enemy2);
 
         public Task<object> GetClosedGenericValue()
         {

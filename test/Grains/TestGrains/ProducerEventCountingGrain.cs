@@ -47,10 +47,7 @@ namespace UnitTests.Grains
             return Task.CompletedTask;
         }
 
-        public Task<int> GetNumberProduced()
-        {
-            return Task.FromResult(_numProducedItems);
-        }
+        public Task<int> GetNumberProduced() => Task.FromResult(_numProducedItems);
 
         public async Task SendEvent()
         {

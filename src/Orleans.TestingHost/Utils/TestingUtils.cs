@@ -21,10 +21,7 @@ namespace Orleans.TestingHost.Utils
         /// </summary>
         /// <param name="builder">The builder.</param>
         /// <param name="filePath">The file path.</param>
-        public static void ConfigureDefaultLoggingBuilder(ILoggingBuilder builder, string filePath)
-        {
-            builder.AddFile(filePath);
-        }
+        public static void ConfigureDefaultLoggingBuilder(ILoggingBuilder builder, string filePath) => builder.AddFile(filePath);
 
         /// <summary>
         /// Create trace file name for a specific node or client in a specific deployment
@@ -52,10 +49,7 @@ namespace Orleans.TestingHost.Utils
         /// </summary>
         /// <param name="filePath">The file path.</param>
         /// <returns>ILoggerFactory.</returns>
-        public static ILoggerFactory CreateDefaultLoggerFactory(string filePath)
-        {
-            return CreateDefaultLoggerFactory(filePath, new LoggerFilterOptions());
-        }
+        public static ILoggerFactory CreateDefaultLoggerFactory(string filePath) => CreateDefaultLoggerFactory(filePath, new LoggerFilterOptions());
 
         /// <summary>
         /// Create the default logger factory, which would configure logger factory with a <see cref="FileLoggerProvider"/> that writes logs to <paramref name="filePath"/> and console.

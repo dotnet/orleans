@@ -95,9 +95,6 @@ namespace Tester.StreamingTests
             return Task.CompletedTask;
         }
 
-        public Task<Dictionary<string, int>> GetResponsibilityMap()
-        {
-            return Task.FromResult(responsibilityMap);
-        }
+        public Task<Dictionary<string, int>> GetResponsibilityMap() => Task.FromResult(responsibilityMap);
     }
 }

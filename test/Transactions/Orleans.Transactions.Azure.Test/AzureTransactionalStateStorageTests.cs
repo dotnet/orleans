@@ -19,10 +19,7 @@ namespace Orleans.Transactions.Azure.Tests
     {
         public int State { get; set; }
 
-        public bool Equals(TestState other)
-        {
-            return other == null?false:this.State.Equals(other.State);
-        }
+        public bool Equals(TestState other) => other == null ? false : this.State.Equals(other.State);
     }
 
     public class AzureTransactionalStateStorageTests : TransactionalStateStorageTestRunnerxUnit<TestState>, IClassFixture<TestFixture>

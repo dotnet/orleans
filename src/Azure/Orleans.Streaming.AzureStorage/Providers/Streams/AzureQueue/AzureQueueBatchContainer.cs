@@ -57,10 +57,7 @@ namespace Orleans.Providers.Streams.AzureQueue
             this.requestContext = requestContext;
         }
 
-        public IEnumerable<Tuple<T, StreamSequenceToken>> GetEvents<T>()
-        {
-            return events.OfType<T>().Select((e, i) => Tuple.Create<T, StreamSequenceToken>(e, sequenceToken.CreateSequenceTokenForEvent(i)));
-        }
+        public IEnumerable<Tuple<T, StreamSequenceToken>> GetEvents<T>() => events.OfType<T>().Select((e, i) => Tuple.Create<T, StreamSequenceToken>(e, sequenceToken.CreateSequenceTokenForEvent(i)));
 
         public bool ImportRequestContext()
         {
@@ -72,10 +69,6 @@ namespace Orleans.Providers.Streams.AzureQueue
             return false;
         }
 
-        public override string ToString()
-        {
-            return string.Format("[AzureQueueBatchContainer:Stream={0},#Items={1}]", StreamId, events.Count);
-            //return string.Format("[AzureBatch:#Items={0},Items{1}]", events.Count, Utils.EnumerableToString(events.Select((e, i) => String.Format("{0}-{1}", e, sequenceToken.CreateSequenceTokenForEvent(i)))));
-        }
+        public override string ToString() => string.Format("[AzureQueueBatchContainer:Stream={0},#Items={1}]", StreamId, events.Count);//return string.Format("[AzureBatch:#Items={0},Items{1}]", events.Count, Utils.EnumerableToString(events.Select((e, i) => String.Format("{0}-{1}", e, sequenceToken.CreateSequenceTokenForEvent(i)))));
     }
 }

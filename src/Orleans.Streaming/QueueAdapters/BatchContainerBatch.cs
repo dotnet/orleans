@@ -47,15 +47,9 @@ namespace Orleans.Streams
         }
 
         /// <inheritdoc/>
-        public IEnumerable<Tuple<T, StreamSequenceToken>> GetEvents<T>()
-        {
-            return this.BatchContainers.SelectMany(batchContainer => batchContainer.GetEvents<T>());
-        }
+        public IEnumerable<Tuple<T, StreamSequenceToken>> GetEvents<T>() => this.BatchContainers.SelectMany(batchContainer => batchContainer.GetEvents<T>());
 
         /// <inheritdoc/>
-        public bool ImportRequestContext()
-        {
-            return this.BatchContainers[0].ImportRequestContext();
-        }
+        public bool ImportRequestContext() => this.BatchContainers[0].ImportRequestContext();
     }
 }

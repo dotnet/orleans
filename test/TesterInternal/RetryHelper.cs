@@ -29,10 +29,7 @@ namespace UnitTests
         /// </summary>
         /// <param name="retryAttempt">The current retry attempt.</param>
         /// <remarks>This function has not received deep scrutiny.</remarks>
-        public static TimeSpan LinearWithTenMilliseconds(int retryAttempt)
-        {
-            return TimeSpan.FromMilliseconds(retryAttempt * 10);
-        }
+        public static TimeSpan LinearWithTenMilliseconds(int retryAttempt) => TimeSpan.FromMilliseconds(retryAttempt * 10);
     }
 
 

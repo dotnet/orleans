@@ -42,9 +42,6 @@ namespace Orleans.Clustering.Redis
             return result;
         }
 
-        public async Task InitializeGatewayListProvider()
-        {
-            await _table.InitializeMembershipTable(true);
-        }
+        public async Task InitializeGatewayListProvider() => await _table.InitializeMembershipTable(true);
     }
 }

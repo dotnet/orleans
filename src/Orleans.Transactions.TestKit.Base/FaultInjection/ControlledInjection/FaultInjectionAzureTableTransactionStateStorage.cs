@@ -22,10 +22,7 @@ namespace Orleans.Transactions.TestKit
             this.stateStorage = azureStateStorage;
         }
 
-        public Task<TransactionalStorageLoadResponse<TState>> Load()
-        {
-            return this.stateStorage.Load();
-        }
+        public Task<TransactionalStorageLoadResponse<TState>> Load() => this.stateStorage.Load();
 
         public async Task<string> Store(
 
@@ -74,9 +71,6 @@ namespace Orleans.Transactions.TestKit
                 context.ActivationServices, azureStateStorage);
         }
 
-        public void Participate(ISiloLifecycle lifecycle)
-        {
-            this.factory.Participate(lifecycle);
-        }
+        public void Participate(ISiloLifecycle lifecycle) => this.factory.Participate(lifecycle);
     }
 }

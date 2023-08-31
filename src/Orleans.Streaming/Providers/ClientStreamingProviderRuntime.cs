@@ -43,10 +43,7 @@ namespace Orleans.Providers
         public IGrainFactory GrainFactory => this.grainFactory;
         public IServiceProvider ServiceProvider { get; }
 
-        public StreamDirectory GetStreamDirectory()
-        {
-            return streamDirectory;
-        }
+        public StreamDirectory GetStreamDirectory() => streamDirectory;
 
         public async Task Reset(bool cleanup = true)
         {
@@ -61,17 +58,11 @@ namespace Orleans.Providers
             }
         }
 
-        public string ExecutingEntityIdentity()
-        {
-            return this.runtimeClient.CurrentActivationIdentity;
-        }
+        public string ExecutingEntityIdentity() => this.runtimeClient.CurrentActivationIdentity;
 
         public (TExtension, TExtensionInterface) BindExtension<TExtension, TExtensionInterface>(Func<TExtension> newExtensionFunc)
             where TExtension : class, TExtensionInterface
-            where TExtensionInterface : class, IGrainExtension
-        {
-            return this.clientContext.GetOrSetExtension<TExtension, TExtensionInterface>(newExtensionFunc);
-        }
+            where TExtensionInterface : class, IGrainExtension => this.clientContext.GetOrSetExtension<TExtension, TExtensionInterface>(newExtensionFunc);
 
         public IStreamPubSub PubSub(StreamPubSubType pubSubType)
         {

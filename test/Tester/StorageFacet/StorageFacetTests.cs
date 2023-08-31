@@ -14,10 +14,7 @@ namespace Tester
 
         public class Fixture : BaseTestClusterFixture
         {
-            protected override void ConfigureTestCluster(TestClusterBuilder builder)
-            {
-                builder.AddSiloBuilderConfigurator<TestSiloBuilderConfigurator>();
-            }
+            protected override void ConfigureTestCluster(TestClusterBuilder builder) => builder.AddSiloBuilderConfigurator<TestSiloBuilderConfigurator>();
 
             private class TestSiloBuilderConfigurator : ISiloConfigurator
             {
@@ -51,16 +48,10 @@ namespace Tester
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Facet")]
-        public Task ExampleStorageFacetHappyPath()
-        {
-            return ExampleStorageHappyPath<IStorageFacetGrain>();
-        }
+        public Task ExampleStorageFacetHappyPath() => ExampleStorageHappyPath<IStorageFacetGrain>();
 
         [Fact, TestCategory("BVT"), TestCategory("Facet")]
-        public Task ExampleStorageFactoryHappyPath()
-        {
-            return ExampleStorageHappyPath<IStorageFactoryGrain>();
-        }
+        public Task ExampleStorageFactoryHappyPath() => ExampleStorageHappyPath<IStorageFactoryGrain>();
 
         private async Task ExampleStorageHappyPath<TGrainInterface>()
             where TGrainInterface : IStorageFacetGrain
@@ -77,16 +68,10 @@ namespace Tester
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Facet")]
-        public Task ExampleStorageFacetDefaultPath()
-        {
-            return ExampleStorageDefaultPath<IStorageDefaultFacetGrain>();
-        }
+        public Task ExampleStorageFacetDefaultPath() => ExampleStorageDefaultPath<IStorageDefaultFacetGrain>();
 
         [Fact, TestCategory("BVT"), TestCategory("Facet")]
-        public Task ExampleStorageFactoryDefaultPath()
-        {
-            return ExampleStorageDefaultPath<IStorageDefaultFactoryGrain>();
-        }
+        public Task ExampleStorageFactoryDefaultPath() => ExampleStorageDefaultPath<IStorageDefaultFactoryGrain>();
 
         private async Task ExampleStorageDefaultPath<TGrainInterface>()
             where TGrainInterface : IStorageFacetGrain

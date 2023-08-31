@@ -95,10 +95,7 @@ namespace Orleans.Runtime
         /// </param>
         /// <returns>The service.</returns>
         public static TService GetRequiredServiceByKey<TKey, TService>(this IServiceProvider services, TKey key)
-            where TService : class
-        {
-            return services.GetServiceByKey<TKey, TService>(key) ?? throw new KeyNotFoundException(key?.ToString());
-        }
+            where TService : class => services.GetServiceByKey<TKey, TService>(key) ?? throw new KeyNotFoundException(key?.ToString());
 
         /// <summary>
         /// Acquire a service by name.
@@ -114,10 +111,7 @@ namespace Orleans.Runtime
         /// </param>
         /// <returns>The service.</returns>
         public static TService GetServiceByName<TService>(this IServiceProvider services, string name)
-            where TService : class
-        {
-            return services.GetServiceByKey<string, TService>(name);
-        }
+            where TService : class => services.GetServiceByKey<string, TService>(name);
 
         /// <summary>
         /// Acquire a service by name, throwing if it is not found.
@@ -133,9 +127,6 @@ namespace Orleans.Runtime
         /// </param>
         /// <returns>The service.</returns>
         public static TService GetRequiredServiceByName<TService>(this IServiceProvider services, string name)
-            where TService : class
-        {
-            return services.GetRequiredServiceByKey<string, TService>(name);
-        }
+            where TService : class => services.GetRequiredServiceByKey<string, TService>(name);
     }
 }

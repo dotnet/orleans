@@ -7,11 +7,8 @@ namespace UnitTests.Grains
     public class ClientAddressableTestConsumerGrain : Grain, IClientAddressableTestConsumer
     {
         private IClientAddressableTestProducer producer;
-        
-        public async Task<int> PollProducer()
-        {
-            return await producer.Poll();
-        }
+
+        public async Task<int> PollProducer() => await producer.Poll();
 
         public async Task Setup()
         {

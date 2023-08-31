@@ -473,10 +473,7 @@ namespace Orleans.Runtime.Messaging
                 TIME_BEFORE_ROUTE_CACHED_ENTRY_EXPIRES = responseTimeout.Multiply(5);
             }
 
-            internal void RecordClientRoute(GrainId client, SiloAddress gateway)
-            {
-                clientRoutes[client] = new(gateway, DateTime.UtcNow);
-            }
+            internal void RecordClientRoute(GrainId client, SiloAddress gateway) => clientRoutes[client] = new(gateway, DateTime.UtcNow);
 
             internal bool TryFindClientRoute(GrainId client, out SiloAddress gateway)
             {

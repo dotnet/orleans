@@ -63,25 +63,13 @@ namespace UnitTests.Grains
             return WriteStateAsync();
         }
 
-        public Task<int> GetAxB()
-        {
-            return Task.FromResult(State.A*State.B);
-        }
+        public Task<int> GetAxB() => Task.FromResult(State.A * State.B);
 
-        public Task<int> GetAxB(int a, int b)
-        {
-            return Task.FromResult(a * b);
-        }
+        public Task<int> GetAxB(int a, int b) => Task.FromResult(a * b);
 
-        public Task<int> GetA()
-        {
-            return Task.FromResult(State.A);
-        }
+        public Task<int> GetA() => Task.FromResult(State.A);
 
-        public Task<Guid> GetVersion()
-        {
-            return Task.FromResult(version);
-        }
+        public Task<Guid> GetVersion() => Task.FromResult(version);
 
         public Task<object> GetRequestContext()
         {

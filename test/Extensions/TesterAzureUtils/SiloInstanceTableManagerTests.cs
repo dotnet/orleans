@@ -27,10 +27,7 @@ namespace Tester.AzureUtils
             public ILoggerFactory LoggerFactory { get; set; } =
                 TestingUtils.CreateDefaultLoggerFactory("SiloInstanceTableManagerTests.log");
 
-            public void Dispose()
-            {
-                this.LoggerFactory.Dispose();
-            }
+            public void Dispose() => this.LoggerFactory.Dispose();
         }
 
         private readonly string clusterId;
@@ -75,10 +72,7 @@ namespace Tester.AzureUtils
         }
 
         [SkippableFact, TestCategory("Functional")]
-        public void SiloInstanceTable_Op_RegisterSiloInstance()
-        {
-            RegisterSiloInstance();
-        }
+        public void SiloInstanceTable_Op_RegisterSiloInstance() => RegisterSiloInstance();
 
         [SkippableFact, TestCategory("Functional")]
         public async Task SiloInstanceTable_Op_ActivateSiloInstance()

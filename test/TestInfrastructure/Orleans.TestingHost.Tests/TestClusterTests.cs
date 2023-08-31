@@ -251,24 +251,12 @@ namespace Orleans.TestingHost.Tests
 
         public class SiloConfigurator : ISiloConfigurator
         {
-            public void Configure(ISiloBuilder hostBuilder)
-            {
-                hostBuilder.AddMemoryGrainStorageAsDefault();
-            }
+            public void Configure(ISiloBuilder hostBuilder) => hostBuilder.AddMemoryGrainStorageAsDefault();
         }
-        public void Dispose()
-        {
-            this.testCluster?.StopAllSilos();
-        }
+        public void Dispose() => this.testCluster?.StopAllSilos();
 
-        public Task InitializeAsync()
-        {
-            return Task.CompletedTask;
-        }
+        public Task InitializeAsync() => Task.CompletedTask;
 
-        public async Task DisposeAsync()
-        {
-            await this.testCluster.StopAllSilosAsync();
-        }
+        public async Task DisposeAsync() => await this.testCluster.StopAllSilosAsync();
     }
 }

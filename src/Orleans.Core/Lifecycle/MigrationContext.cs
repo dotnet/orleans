@@ -142,9 +142,6 @@ internal sealed class MigrationContext : IDehydrationContext, IRehydrationContex
             _serializerSessionPool = serializerSessionPool;
         }
 
-        public void OnDeserializing(MigrationContext context)
-        {
-            context._sessionPool = _serializerSessionPool;
-        }
+        public void OnDeserializing(MigrationContext context) => context._sessionPool = _serializerSessionPool;
     }
 }

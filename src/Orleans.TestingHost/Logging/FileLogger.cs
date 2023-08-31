@@ -101,10 +101,7 @@ namespace Orleans.TestingHost.Logging
         }
 
         /// <inheritdoc />
-        public void Dispose()
-        {
-            Dispose(true);
-        }
+        public void Dispose() => Dispose(true);
 
         private void Dispose(bool disposing)
         {
@@ -151,23 +148,13 @@ namespace Orleans.TestingHost.Logging
         }
 
         /// <inheritdoc />
-        public IDisposable BeginScope<TState>(TState state)
-        {
-            return NullScope.Instance;
-        }
+        public IDisposable BeginScope<TState>(TState state) => NullScope.Instance;
 
         /// <inheritdoc />
-        public bool IsEnabled(LogLevel logLevel)
-        {
-            return true;
-        }
+        public bool IsEnabled(LogLevel logLevel) => true;
 
         /// <inheritdoc />
-        public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception exception, Func<TState, Exception, string> formatter)
-        {
-            this.output.Log(logLevel, eventId, state, exception, formatter, this.category);
-
-        }
+        public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception exception, Func<TState, Exception, string> formatter) => this.output.Log(logLevel, eventId, state, exception, formatter, this.category);
 
         private class NullScope : IDisposable
         {

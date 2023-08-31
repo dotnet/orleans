@@ -14,10 +14,7 @@ public static class InternalServiceCollectionExtensions
     /// <typeparam name="TService">The service type being provided.</typeparam>
     /// <typeparam name="TImplementation">The implementation of <typeparamref name="TService"/>.</typeparam>
     /// <param name="services">The service collection.</param>
-    public static void AddFromExisting<TService, TImplementation>(this IServiceCollection services) where TImplementation : TService
-    {
-        services.AddFromExisting(typeof(TService), typeof(TImplementation));
-    }
+    public static void AddFromExisting<TService, TImplementation>(this IServiceCollection services) where TImplementation : TService => services.AddFromExisting(typeof(TService), typeof(TImplementation));
 
     /// <summary>
     /// Registers an existing registration of <paramref name="implementation"/> as a provider of service type <paramref name="service"/>.

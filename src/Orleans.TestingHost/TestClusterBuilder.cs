@@ -198,10 +198,7 @@ namespace Orleans.TestingHost
                 });
             }
 
-            private static string GetSiloName(int instanceNumber)
-            {
-                return instanceNumber == 0 ? Silo.PrimarySiloName : $"Secondary_{instanceNumber}";
-            }
+            private static string GetSiloName(int instanceNumber) => instanceNumber == 0 ? Silo.PrimarySiloName : $"Secondary_{instanceNumber}";
         }
     }
 }

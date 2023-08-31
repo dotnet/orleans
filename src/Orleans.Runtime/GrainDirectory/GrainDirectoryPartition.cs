@@ -327,10 +327,7 @@ namespace Orleans.Runtime.GrainDirectory
         /// This method is supposed to be used by handoff manager to update the old partition with a new partition.
         /// </summary>
         /// <param name="newPartitionData">new internal partition dictionary</param>
-        internal void Set(Dictionary<GrainId, GrainInfo> newPartitionData)
-        {
-            partitionData = newPartitionData;
-        }
+        internal void Set(Dictionary<GrainId, GrainInfo> newPartitionData) => partitionData = newPartitionData;
 
         /// <summary>
         /// Updates partition with a new delta of changes.

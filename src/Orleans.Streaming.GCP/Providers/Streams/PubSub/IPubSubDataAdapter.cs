@@ -56,9 +56,6 @@ namespace Orleans.Providers.GCP.Streams.PubSub
             return new PubsubMessage { Data = ByteString.CopyFrom(rawBytes) };
         }
 
-        void IOnDeserialized.OnDeserialized(DeserializationContext context)
-        {
-            _serializer = context.ServiceProvider.GetRequiredService<Serializer<PubSubBatchContainer>>();
-        }
+        void IOnDeserialized.OnDeserialized(DeserializationContext context) => _serializer = context.ServiceProvider.GetRequiredService<Serializer<PubSubBatchContainer>>();
     }
 }

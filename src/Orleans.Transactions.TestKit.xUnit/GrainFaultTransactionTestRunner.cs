@@ -14,37 +14,25 @@ namespace Orleans.Transactions.TestKit.xUnit
         [InlineData(TransactionTestConstants.SingleStateTransactionalGrain)]
         [InlineData(TransactionTestConstants.DoubleStateTransactionalGrain)]
         [InlineData(TransactionTestConstants.MaxStateTransactionalGrain)]
-        public override Task AbortTransactionOnExceptions(string grainStates)
-        {
-            return base.AbortTransactionOnExceptions(grainStates);
-        }
+        public override Task AbortTransactionOnExceptions(string grainStates) => base.AbortTransactionOnExceptions(grainStates);
 
         [SkippableTheory]
         [InlineData(TransactionTestConstants.SingleStateTransactionalGrain)]
         [InlineData(TransactionTestConstants.DoubleStateTransactionalGrain)]
         [InlineData(TransactionTestConstants.MaxStateTransactionalGrain)]
-        public override Task MultiGrainAbortTransactionOnExceptions(string grainStates)
-        {
-            return base.MultiGrainAbortTransactionOnExceptions(grainStates);
-        }
+        public override Task MultiGrainAbortTransactionOnExceptions(string grainStates) => base.MultiGrainAbortTransactionOnExceptions(grainStates);
 
         [SkippableTheory]
         [InlineData(TransactionTestConstants.SingleStateTransactionalGrain)]
         [InlineData(TransactionTestConstants.DoubleStateTransactionalGrain)]
         [InlineData(TransactionTestConstants.MaxStateTransactionalGrain)]
-        public override Task AbortTransactionExceptionInnerExceptionOnlyContainsOneRootCauseException(string grainStates)
-        {
-            return base.AbortTransactionExceptionInnerExceptionOnlyContainsOneRootCauseException(grainStates);
-        }
+        public override Task AbortTransactionExceptionInnerExceptionOnlyContainsOneRootCauseException(string grainStates) => base.AbortTransactionExceptionInnerExceptionOnlyContainsOneRootCauseException(grainStates);
 
         [SkippableTheory()]
         [InlineData(TransactionTestConstants.SingleStateTransactionalGrain)]
         [InlineData(TransactionTestConstants.DoubleStateTransactionalGrain)]
         [InlineData(TransactionTestConstants.MaxStateTransactionalGrain)]
-        public override Task AbortTransactionOnOrphanCalls(string grainStates)
-        {
-            return base.AbortTransactionOnOrphanCalls(grainStates);
-        }
+        public override Task AbortTransactionOnOrphanCalls(string grainStates) => base.AbortTransactionOnOrphanCalls(grainStates);
 
     }
 }

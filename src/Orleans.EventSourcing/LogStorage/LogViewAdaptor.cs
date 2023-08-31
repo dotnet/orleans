@@ -46,16 +46,10 @@ namespace Orleans.EventSourcing.LogStorage
         int ConfirmedVersionInternal;
 
         /// <inheritdoc/>
-        protected override TLogView LastConfirmedView()
-        {
-            return ConfirmedViewInternal;
-        }
+        protected override TLogView LastConfirmedView() => ConfirmedViewInternal;
 
         /// <inheritdoc/>
-        protected override int GetConfirmedVersion()
-        {
-            return ConfirmedVersionInternal;
-        }
+        protected override int GetConfirmedVersion() => ConfirmedVersionInternal;
 
         /// <inheritdoc/>
         protected override void InitializeConfirmedView(TLogView initialstate)
@@ -94,10 +88,7 @@ namespace Orleans.EventSourcing.LogStorage
 
         // no special tagging is required, thus we create a plain submission entry
         /// <inheritdoc/>
-        protected override SubmissionEntry<TLogEntry> MakeSubmissionEntry(TLogEntry entry)
-        {
-            return new SubmissionEntry<TLogEntry>() { Entry = entry };
-        }
+        protected override SubmissionEntry<TLogEntry> MakeSubmissionEntry(TLogEntry entry) => new SubmissionEntry<TLogEntry>() { Entry = entry };
 
 
         /// <inheritdoc/>
@@ -224,10 +215,7 @@ namespace Orleans.EventSourcing.LogStorage
         public sealed class UpdateLogStorageFailed : PrimaryOperationFailed
         {
             /// <inheritdoc/>
-            public override string ToString()
-            {
-                return $"write entire log to storage failed: caught {Exception.GetType().Name}: {Exception.Message}";
-            }
+            public override string ToString() => $"write entire log to storage failed: caught {Exception.GetType().Name}: {Exception.Message}";
         }
 
 
@@ -239,10 +227,7 @@ namespace Orleans.EventSourcing.LogStorage
         public sealed class ReadFromLogStorageFailed : PrimaryOperationFailed
         {
             /// <inheritdoc/>
-            public override string ToString()
-            {
-                return $"read entire log from storage failed: caught {Exception.GetType().Name}: {Exception.Message}";
-            }
+            public override string ToString() => $"read entire log from storage failed: caught {Exception.GetType().Name}: {Exception.Message}";
         }
 
 
@@ -270,11 +255,8 @@ namespace Orleans.EventSourcing.LogStorage
             public string ETag { get; set; }
 
             /// <inheritdoc/>
-            public override string ToString()
-            {
-                return string.Format("v{0} ({1} updates by {2}) etag={3}", Version, Updates.Count, Origin, ETag);
-            }
-         }
+            public override string ToString() => string.Format("v{0} ({1} updates by {2}) etag={3}", Version, Updates.Count, Origin, ETag);
+        }
 
         /// <inheritdoc/>
         protected override INotificationMessage Merge(INotificationMessage earlierMessage, INotificationMessage laterMessage)

@@ -83,24 +83,15 @@ namespace Orleans
 
         /// <inheritdoc />
         public TGrainObserverInterface CreateObjectReference<TGrainObserverInterface>(IGrainObserver obj)
-            where TGrainObserverInterface : IGrainObserver
-        {
-            return this.CreateObjectReference<TGrainObserverInterface>((IAddressable)obj);
-        }
+            where TGrainObserverInterface : IGrainObserver => this.CreateObjectReference<TGrainObserverInterface>((IAddressable)obj);
 
         /// <inheritdoc />
         public void DeleteObjectReference<TGrainObserverInterface>(
-            IGrainObserver obj) where TGrainObserverInterface : IGrainObserver
-        {
-            this.runtimeClient.DeleteObjectReference(obj);
-        }
+            IGrainObserver obj) where TGrainObserverInterface : IGrainObserver => this.runtimeClient.DeleteObjectReference(obj);
 
         /// <inheritdoc />
         public TGrainObserverInterface CreateObjectReference<TGrainObserverInterface>(IAddressable obj)
-                where TGrainObserverInterface : IAddressable
-        {
-            return (TGrainObserverInterface)this.CreateObjectReference(typeof(TGrainObserverInterface), obj);
-        }
+                where TGrainObserverInterface : IAddressable => (TGrainObserverInterface)this.CreateObjectReference(typeof(TGrainObserverInterface), obj);
 
         /// <inheritdoc />
         public TGrainInterface Cast<TGrainInterface>(IAddressable grain)
@@ -140,10 +131,7 @@ namespace Orleans
         }
 
         /// <inheritdoc />
-        public TGrainInterface GetGrain<TGrainInterface>(GrainId grainId) where TGrainInterface : IAddressable
-        {
-            return (TGrainInterface)this.CreateGrainReference(typeof(TGrainInterface), grainId);
-        }
+        public TGrainInterface GetGrain<TGrainInterface>(GrainId grainId) where TGrainInterface : IAddressable => (TGrainInterface)this.CreateGrainReference(typeof(TGrainInterface), grainId);
 
         /// <inheritdoc />
         public IAddressable GetGrain(GrainId grainId) => this.referenceActivator.CreateReference(grainId, default);
@@ -184,10 +172,7 @@ namespace Orleans
         }
 
         /// <inheritdoc />
-        public IAddressable GetGrain(GrainId grainId, GrainInterfaceType interfaceType)
-        {
-            return this.referenceActivator.CreateReference(grainId, interfaceType);
-        }
+        public IAddressable GetGrain(GrainId grainId, GrainInterfaceType interfaceType) => this.referenceActivator.CreateReference(grainId, interfaceType);
 
         /// <summary>
         /// Gets a grain reference which implements the specified grain interface type and has the specified grain key, without specifying the grain type directly.

@@ -45,10 +45,7 @@ namespace Orleans.Connections.Security.Tests
             return certificate;
         }
 
-        public static string ConvertToBase64(X509Certificate2 certificate)
-        {
-            return Convert.ToBase64String(certificate.Export(X509ContentType.Pfx, "testing-only"));
-        }
+        public static string ConvertToBase64(X509Certificate2 certificate) => Convert.ToBase64String(certificate.Export(X509ContentType.Pfx, "testing-only"));
 
         public static X509Certificate2 ConvertFromBase64(string encodedCertificate)
         {

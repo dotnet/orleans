@@ -14,14 +14,8 @@ namespace TestInternalGrains
             return Task.CompletedTask;
         }
 
-        public Task<string> GetRuntimeInstanceId()
-        {
-            return Task.FromResult(this.RuntimeIdentity);
-        }
+        public Task<string> GetRuntimeInstanceId() => Task.FromResult(this.RuntimeIdentity);
 
-        public Task<string> GetProxyRuntimeInstanceId()
-        {
-            return proxy.GetRuntimeInstanceId();
-        }
+        public Task<string> GetProxyRuntimeInstanceId() => proxy.GetRuntimeInstanceId();
     }
 }

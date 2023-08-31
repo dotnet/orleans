@@ -55,10 +55,7 @@ namespace Orleans.Transactions.State
                 Interlocked.Increment(ref owner.pendingDeactivationLocks);
             }
 
-            public void Dispose()
-            {
-                Interlocked.Decrement(ref owner.pendingDeactivationLocks);
-            }
+            public void Dispose() => Interlocked.Decrement(ref owner.pendingDeactivationLocks);
         }
     }
 }

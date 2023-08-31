@@ -12,28 +12,10 @@ internal static class StorageInstruments
     private static readonly Counter<int> StorageWriteErrorsCounter = Instruments.Meter.CreateCounter<int>(InstrumentNames.STORAGE_WRITE_ERRORS);
     private static readonly Counter<int> StorageClearErrorsCounter = Instruments.Meter.CreateCounter<int>(InstrumentNames.STORAGE_CLEAR_ERRORS);
 
-    internal static void OnStorageRead(TimeSpan latency)
-    {
-        StorageReadHistogram.Record(latency.TotalMilliseconds);
-    }
-    internal static void OnStorageWrite(TimeSpan latency)
-    {
-        StorageWriteHistogram.Record(latency.TotalMilliseconds);
-    }
-    internal static void OnStorageReadError()
-    {
-        StorageReadErrorsCounter.Add(1);
-    }
-    internal static void OnStorageWriteError()
-    {
-        StorageWriteErrorsCounter.Add(1);
-    }
-    internal static void OnStorageDelete(TimeSpan latency)
-    {
-        StorageClearHistogram.Record(latency.TotalMilliseconds);
-    }
-    internal static void OnStorageDeleteError()
-    {
-        StorageClearErrorsCounter.Add(1);
-    }
+    internal static void OnStorageRead(TimeSpan latency) => StorageReadHistogram.Record(latency.TotalMilliseconds);
+    internal static void OnStorageWrite(TimeSpan latency) => StorageWriteHistogram.Record(latency.TotalMilliseconds);
+    internal static void OnStorageReadError() => StorageReadErrorsCounter.Add(1);
+    internal static void OnStorageWriteError() => StorageWriteErrorsCounter.Add(1);
+    internal static void OnStorageDelete(TimeSpan latency) => StorageClearHistogram.Record(latency.TotalMilliseconds);
+    internal static void OnStorageDeleteError() => StorageClearErrorsCounter.Add(1);
 }

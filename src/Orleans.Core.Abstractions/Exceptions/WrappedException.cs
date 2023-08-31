@@ -89,9 +89,6 @@ namespace Orleans.Runtime
         }
 
         /// <inheritdoc/>
-        public override string ToString()
-        {
-            return $"{nameof(WrappedException)} OriginalType: {OriginalExceptionType}, Message: {Message}";
-        }
+        public override string ToString() => $"{nameof(WrappedException)} OriginalType: {OriginalExceptionType}, Message: {Message}";
     }
 }

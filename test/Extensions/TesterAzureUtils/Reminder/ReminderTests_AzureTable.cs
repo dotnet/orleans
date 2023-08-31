@@ -22,10 +22,7 @@ namespace Tester.AzureUtils.TimerTests
     {
         public class Fixture : BaseAzureTestClusterFixture
         {
-            protected override void ConfigureTestCluster(TestClusterBuilder builder)
-            {
-                builder.AddSiloBuilderConfigurator<SiloConfigurator>();
-            }
+            protected override void ConfigureTestCluster(TestClusterBuilder builder) => builder.AddSiloBuilderConfigurator<SiloConfigurator>();
         }
 
         public class SiloConfigurator : ISiloConfigurator
@@ -47,30 +44,18 @@ namespace Tester.AzureUtils.TimerTests
         // Basic tests
 
         [SkippableFact, TestCategory("Functional")]
-        public async Task Rem_Azure_Basic_StopByRef()
-        {
-            await Test_Reminders_Basic_StopByRef();
-        }
+        public async Task Rem_Azure_Basic_StopByRef() => await Test_Reminders_Basic_StopByRef();
 
         [SkippableFact, TestCategory("Functional")]
-        public async Task Rem_Azure_Basic_ListOps()
-        {
-            await Test_Reminders_Basic_ListOps();
-        }
+        public async Task Rem_Azure_Basic_ListOps() => await Test_Reminders_Basic_ListOps();
 
         // Single join tests ... multi grain, multi reminders
 
         [SkippableFact, TestCategory("Functional")]
-        public async Task Rem_Azure_1J_MultiGrainMultiReminders()
-        {
-            await Test_Reminders_1J_MultiGrainMultiReminders();
-        }
+        public async Task Rem_Azure_1J_MultiGrainMultiReminders() => await Test_Reminders_1J_MultiGrainMultiReminders();
 
         [SkippableFact, TestCategory("Functional")]
-        public async Task Rem_Azure_ReminderNotFound()
-        {
-            await Test_Reminders_ReminderNotFound();
-        }
+        public async Task Rem_Azure_ReminderNotFound() => await Test_Reminders_ReminderNotFound();
 
         [SkippableFact, TestCategory("Functional")]
         public async Task Rem_Azure_Basic()

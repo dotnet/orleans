@@ -9,18 +9,12 @@ namespace UnitTests.Grains
 {
     public class IdleActivationGcTestGrain1: Grain, IIdleActivationGcTestGrain1
     {
-        public Task Nop()
-        {
-            return Task.CompletedTask;
-        }
+        public Task Nop() => Task.CompletedTask;
     }
 
     public class IdleActivationGcTestGrain2: Grain, IIdleActivationGcTestGrain2
     {
-        public Task Nop()
-        {
-            return Task.CompletedTask;
-        }
+        public Task Nop() => Task.CompletedTask;
     }
 
     internal class BusyActivationGcTestGrain1: Grain, IBusyActivationGcTestGrain1
@@ -37,20 +31,11 @@ namespace UnitTests.Grains
             _grainContext = grainContext;
         }
 
-        public Task Nop()
-        {
-            return Task.CompletedTask;
-        }
+        public Task Nop() => Task.CompletedTask;
 
-        public Task Delay(TimeSpan dt)
-        {
-            return Task.Delay(dt);
-        }
+        public Task Delay(TimeSpan dt) => Task.Delay(dt);
 
-        public Task<string> IdentifyActivation()
-        {
-            return Task.FromResult(_id);
-        }
+        public Task<string> IdentifyActivation() => Task.FromResult(_id);
 
         public Task EnableBurstOnCollection(int count)
         {
@@ -81,27 +66,18 @@ namespace UnitTests.Grains
 
     public class BusyActivationGcTestGrain2: Grain, IBusyActivationGcTestGrain2
     {
-        public Task Nop()
-        {
-            return Task.CompletedTask;
-        }
+        public Task Nop() => Task.CompletedTask;
     }
 
     public class CollectionSpecificAgeLimitForTenSecondsActivationGcTestGrain : Grain, ICollectionSpecificAgeLimitForTenSecondsActivationGcTestGrain
     {
-        public Task Nop()
-        {
-            return Task.CompletedTask;
-        }
+        public Task Nop() => Task.CompletedTask;
     }
 
     // Use this Test Class in Non.Silo test [SiloBuilder_GrainCollectionOptionsForZeroSecondsAgeLimitTest]
     public class CollectionSpecificAgeLimitForZeroSecondsActivationGcTestGrain : Grain, ICollectionSpecificAgeLimitForZeroSecondsActivationGcTestGrain
     {
-        public Task Nop()
-        {
-            return Task.CompletedTask;
-        }
+        public Task Nop() => Task.CompletedTask;
     }
 
     [StatelessWorker]
@@ -109,20 +85,11 @@ namespace UnitTests.Grains
     {
         private readonly string _id = Guid.NewGuid().ToString();
 
-        public Task Nop()
-        {
-            return Task.CompletedTask;
-        }
+        public Task Nop() => Task.CompletedTask;
 
-        public Task Delay(TimeSpan dt)
-        {
-            return Task.Delay(dt);
-        }
+        public Task Delay(TimeSpan dt) => Task.Delay(dt);
 
-        public Task<string> IdentifyActivation()
-        {
-            return Task.FromResult(_id);
-        }
+        public Task<string> IdentifyActivation() => Task.FromResult(_id);
 
     }
 }

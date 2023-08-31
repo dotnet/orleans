@@ -56,15 +56,9 @@ namespace Orleans.Runtime.ConsistentRing
             AddServer(myAddress);
         }
 
-        private void Stop()
-        {
-            running = false;
-        }
+        private void Stop() => running = false;
 
-        public IRingRange GetMyRange()
-        {
-            return myRange;
-        }
+        public IRingRange GetMyRange() => myRange;
 
         private int GetRingSize()
         {
@@ -267,10 +261,7 @@ namespace Orleans.Runtime.ConsistentRing
             }
         }
 
-        public SiloAddress GetPrimaryTargetSilo(uint key)
-        {
-            return CalculateTargetSilo(key);
-        }
+        public SiloAddress GetPrimaryTargetSilo(uint key) => CalculateTargetSilo(key);
 
         /// <summary>
         /// Finds the silo that owns the given hash value.

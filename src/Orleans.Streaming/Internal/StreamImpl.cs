@@ -56,25 +56,13 @@ namespace Orleans.Streams
             this.isRewindable = isRewindable;
         }
 
-        public Task<StreamSubscriptionHandle<T>> SubscribeAsync(IAsyncObserver<T> observer)
-        {
-            return GetConsumerInterface().SubscribeAsync(observer, null);
-        }
+        public Task<StreamSubscriptionHandle<T>> SubscribeAsync(IAsyncObserver<T> observer) => GetConsumerInterface().SubscribeAsync(observer, null);
 
-        public Task<StreamSubscriptionHandle<T>> SubscribeAsync(IAsyncObserver<T> observer, StreamSequenceToken? token, string? filterData = null)
-        {
-            return GetConsumerInterface().SubscribeAsync(observer, token, filterData);
-        }
+        public Task<StreamSubscriptionHandle<T>> SubscribeAsync(IAsyncObserver<T> observer, StreamSequenceToken? token, string? filterData = null) => GetConsumerInterface().SubscribeAsync(observer, token, filterData);
 
-        public Task<StreamSubscriptionHandle<T>> SubscribeAsync(IAsyncBatchObserver<T> batchObserver)
-        {
-            return GetConsumerInterface().SubscribeAsync(batchObserver);
-        }
+        public Task<StreamSubscriptionHandle<T>> SubscribeAsync(IAsyncBatchObserver<T> batchObserver) => GetConsumerInterface().SubscribeAsync(batchObserver);
 
-        public Task<StreamSubscriptionHandle<T>> SubscribeAsync(IAsyncBatchObserver<T> batchObserver, StreamSequenceToken? token)
-        {
-            return GetConsumerInterface().SubscribeAsync(batchObserver, token);
-        }
+        public Task<StreamSubscriptionHandle<T>> SubscribeAsync(IAsyncBatchObserver<T> batchObserver, StreamSequenceToken? token) => GetConsumerInterface().SubscribeAsync(batchObserver, token);
 
         public async Task Cleanup(bool cleanupProducers, bool cleanupConsumers)
         {
@@ -93,15 +81,9 @@ namespace Orleans.Streams
             }
         }
 
-        public Task OnNextAsync(T item, StreamSequenceToken? token = null)
-        {
-            return GetProducerInterface().OnNextAsync(item, token);
-        }
+        public Task OnNextAsync(T item, StreamSequenceToken? token = null) => GetProducerInterface().OnNextAsync(item, token);
 
-        public Task OnNextBatchAsync(IEnumerable<T> batch, StreamSequenceToken token)
-        {
-            return GetProducerInterface().OnNextBatchAsync(batch, token);
-        }
+        public Task OnNextBatchAsync(IEnumerable<T> batch, StreamSequenceToken token) => GetProducerInterface().OnNextBatchAsync(batch, token);
 
         public Task OnCompletedAsync()
         {
@@ -118,28 +100,16 @@ namespace Orleans.Streams
         internal Task<StreamSubscriptionHandle<T>> ResumeAsync(
             StreamSubscriptionHandle<T> handle,
             IAsyncObserver<T> observer,
-            StreamSequenceToken token)
-        {
-            return GetConsumerInterface().ResumeAsync(handle, observer, token);
-        }
+            StreamSequenceToken token) => GetConsumerInterface().ResumeAsync(handle, observer, token);
 
         internal Task<StreamSubscriptionHandle<T>> ResumeAsync(
             StreamSubscriptionHandle<T> handle,
             IAsyncBatchObserver<T> observer,
-            StreamSequenceToken token)
-        {
-            return GetConsumerInterface().ResumeAsync(handle, observer, token);
-        }
+            StreamSequenceToken token) => GetConsumerInterface().ResumeAsync(handle, observer, token);
 
-        public Task<IList<StreamSubscriptionHandle<T>>> GetAllSubscriptionHandles()
-        {
-            return GetConsumerInterface().GetAllSubscriptions();
-        }
+        public Task<IList<StreamSubscriptionHandle<T>>> GetAllSubscriptionHandles() => GetConsumerInterface().GetAllSubscriptions();
 
-        internal Task UnsubscribeAsync(StreamSubscriptionHandle<T> handle)
-        {
-            return GetConsumerInterface().UnsubscribeAsync(handle);
-        }
+        internal Task UnsubscribeAsync(StreamSubscriptionHandle<T> handle) => GetConsumerInterface().UnsubscribeAsync(handle);
 
         internal IInternalAsyncBatchObserver<T> GetProducerInterface()
         {
@@ -176,10 +146,7 @@ namespace Orleans.Streams
             return consumerInterface;
         }
 
-        private IInternalStreamProvider? GetStreamProvider()
-        {
-            return this.runtimeClient?.ServiceProvider.GetRequiredServiceByName<IStreamProvider>(streamId.ProviderName) as IInternalStreamProvider;
-        }
+        private IInternalStreamProvider? GetStreamProvider() => this.runtimeClient?.ServiceProvider.GetRequiredServiceByName<IStreamProvider>(streamId.ProviderName) as IInternalStreamProvider;
 
         public int CompareTo(IAsyncStream<T>? other)
         {
@@ -199,19 +166,10 @@ namespace Orleans.Streams
             return o != null && streamId.Equals(o.streamId);
         }
 
-        public override int GetHashCode()
-        {
-            return streamId.GetHashCode();
-        }
+        public override int GetHashCode() => streamId.GetHashCode();
 
-        public override string ToString()
-        {
-            return streamId.ToString();
-        }
+        public override string ToString() => streamId.ToString();
 
-        void IOnDeserialized.OnDeserialized(DeserializationContext  context)
-        {
-            this.runtimeClient = context?.RuntimeClient as IRuntimeClient;
-        }
+        void IOnDeserialized.OnDeserialized(DeserializationContext context) => this.runtimeClient = context?.RuntimeClient as IRuntimeClient;
     }
 }

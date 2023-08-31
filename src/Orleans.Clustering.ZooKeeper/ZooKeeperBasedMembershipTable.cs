@@ -135,10 +135,7 @@ namespace Orleans.Runtime.Membership
         /// </summary>
         /// <returns>The membership information for a given table: MembershipTableData consisting multiple MembershipEntry entries and
         /// TableVersion, all read atomically.</returns>
-        public Task<MembershipTableData> ReadAll()
-        {
-            return ReadAll(this.deploymentConnectionString, this.watcher);
-        }
+        public Task<MembershipTableData> ReadAll() => ReadAll(this.deploymentConnectionString, this.watcher);
 
         internal static Task<MembershipTableData> ReadAll(string deploymentConnectionString, ZooKeeperWatcher watcher)
         {
@@ -295,25 +292,13 @@ namespace Orleans.Runtime.Membership
             return new Tuple<MembershipEntry, string>(me, rowVersion.ToString(CultureInfo.InvariantCulture));
         }
 
-        private static Task<T> UsingZookeeper<T>(Func<ZooKeeper, Task<T>> zkMethod, string deploymentConnectionString, ZooKeeperWatcher watcher, bool canBeReadOnly = false)
-        {
-            return ZooKeeper.Using(deploymentConnectionString, ZOOKEEPER_CONNECTION_TIMEOUT, watcher, zkMethod, canBeReadOnly);
-        }
+        private static Task<T> UsingZookeeper<T>(Func<ZooKeeper, Task<T>> zkMethod, string deploymentConnectionString, ZooKeeperWatcher watcher, bool canBeReadOnly = false) => ZooKeeper.Using(deploymentConnectionString, ZOOKEEPER_CONNECTION_TIMEOUT, watcher, zkMethod, canBeReadOnly);
 
-        private Task UsingZookeeper(string connectString, Func<ZooKeeper, Task> zkMethod)
-        {
-            return ZooKeeper.Using(connectString, ZOOKEEPER_CONNECTION_TIMEOUT, watcher, zkMethod);
-        }
+        private Task UsingZookeeper(string connectString, Func<ZooKeeper, Task> zkMethod) => ZooKeeper.Using(connectString, ZOOKEEPER_CONNECTION_TIMEOUT, watcher, zkMethod);
 
-        private static string ConvertToRowPath(SiloAddress siloAddress)
-        {
-            return "/" + siloAddress.ToParsableString();
-        }
+        private static string ConvertToRowPath(SiloAddress siloAddress) => "/" + siloAddress.ToParsableString();
 
-        private static string ConvertToRowIAmAlivePath(SiloAddress siloAddress)
-        {
-            return ConvertToRowPath(siloAddress) + "/IAmAlive";
-        }
+        private static string ConvertToRowIAmAlivePath(SiloAddress siloAddress) => ConvertToRowPath(siloAddress) + "/IAmAlive";
 
         private static TableVersion ConvertToTableVersion(Stat stat)
         {
@@ -328,15 +313,9 @@ namespace Orleans.Runtime.Membership
                     MembershipSerializerSettings.Instance));
         }
 
-        private static T Deserialize<T>(byte[] data)
-        {
-            return JsonConvert.DeserializeObject<T>(Encoding.UTF8.GetString(data), MembershipSerializerSettings.Instance);
-        }
+        private static T Deserialize<T>(byte[] data) => JsonConvert.DeserializeObject<T>(Encoding.UTF8.GetString(data), MembershipSerializerSettings.Instance);
 
-        public Task CleanupDefunctSiloEntries(DateTimeOffset beforeDate)
-        {
-            throw new NotImplementedException();
-        }
+        public Task CleanupDefunctSiloEntries(DateTimeOffset beforeDate) => throw new NotImplementedException();
     }
 
     /// <summary>

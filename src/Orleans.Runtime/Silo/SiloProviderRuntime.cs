@@ -23,9 +23,6 @@ namespace Orleans.Runtime.Providers
 
         public (TExtension, TExtensionInterface) BindExtension<TExtension, TExtensionInterface>(Func<TExtension> newExtensionFunc)
             where TExtension : class, TExtensionInterface
-            where TExtensionInterface : class, IGrainExtension
-        {
-            return _grainContextAccessor.GrainContext.GetComponent<IGrainExtensionBinder>().GetOrSetExtension<TExtension, TExtensionInterface>(newExtensionFunc);
-        }
+            where TExtensionInterface : class, IGrainExtension => _grainContextAccessor.GrainContext.GetComponent<IGrainExtensionBinder>().GetOrSetExtension<TExtension, TExtensionInterface>(newExtensionFunc);
     }
 }

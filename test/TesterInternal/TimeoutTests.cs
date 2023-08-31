@@ -25,10 +25,7 @@ namespace UnitTests
             originalTimeout = this.runtimeClient.GetResponseTimeout();
         }
 
-        public virtual void Dispose()
-        {
-            this.runtimeClient.SetResponseTimeout(originalTimeout);
-        }
+        public virtual void Dispose() => this.runtimeClient.SetResponseTimeout(originalTimeout);
 
         [Fact, TestCategory("Functional"), TestCategory("Timeout")]
         public void Timeout_LongMethod()

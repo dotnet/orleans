@@ -84,9 +84,6 @@ namespace Orleans.Hosting
             int siloPort,
             int gatewayPort,
             AddressFamily addressFamily = AddressFamily.InterNetwork,
-            bool listenOnAnyHostAddress = false)
-        {
-            return builder.ConfigureEndpoints(null, siloPort, gatewayPort, addressFamily, listenOnAnyHostAddress);
-        }
+            bool listenOnAnyHostAddress = false) => builder.ConfigureEndpoints(null, siloPort, gatewayPort, addressFamily, listenOnAnyHostAddress);
     }
 }

@@ -17,11 +17,9 @@ namespace UnitTests.TestHelper
 
         public bool IsSet { get { return _value != 0; } }
 
-        public bool TrySet()
-        {
+        public bool TrySet() =>
             // attempt to set _value; if we're the first to attempt to do it, return true;
-            return 0 == Interlocked.CompareExchange(ref _value, 1, 0);
-        }
+            0 == Interlocked.CompareExchange(ref _value, 1, 0);
 
         public void ThrowNotInitializedIfSet()
         {

@@ -35,36 +35,18 @@ namespace Orleans.Runtime
 
         public static implicit operator GrainId(LegacyGrainId legacy) => legacy.ToGrainId();
 
-        public static LegacyGrainId NewId()
-        {
-            return FindOrCreateGrainId(UniqueKey.NewKey(Guid.NewGuid(), UniqueKey.Category.Grain));
-        }
+        public static LegacyGrainId NewId() => FindOrCreateGrainId(UniqueKey.NewKey(Guid.NewGuid(), UniqueKey.Category.Grain));
 
-        public static LegacyGrainId NewClientId()
-        {
-            return NewClientId(Guid.NewGuid());
-        }
+        public static LegacyGrainId NewClientId() => NewClientId(Guid.NewGuid());
 
-        internal static LegacyGrainId NewClientId(Guid id)
-        {
-            return FindOrCreateGrainId(UniqueKey.NewKey(id, UniqueKey.Category.Client, 0));
-        }
+        internal static LegacyGrainId NewClientId(Guid id) => FindOrCreateGrainId(UniqueKey.NewKey(id, UniqueKey.Category.Client, 0));
 
-        internal static LegacyGrainId GetGrainId(UniqueKey key)
-        {
-            return FindOrCreateGrainId(key);
-        }
+        internal static LegacyGrainId GetGrainId(UniqueKey key) => FindOrCreateGrainId(key);
 
         // For testing only.
-        internal static LegacyGrainId GetGrainIdForTesting(Guid guid)
-        {
-            return FindOrCreateGrainId(UniqueKey.NewKey(guid));
-        }
+        internal static LegacyGrainId GetGrainIdForTesting(Guid guid) => FindOrCreateGrainId(UniqueKey.NewKey(guid));
 
-        internal static LegacyGrainId GetSystemTargetGrainId(long typeData)
-        {
-            return FindOrCreateGrainId(UniqueKey.NewEmptySystemTargetKey(typeData));
-        }
+        internal static LegacyGrainId GetSystemTargetGrainId(long typeData) => FindOrCreateGrainId(UniqueKey.NewEmptySystemTargetKey(typeData));
 
         internal static GrainType GetGrainType(long typeCode, bool isKeyExt)
         {
@@ -94,15 +76,9 @@ namespace Orleans.Runtime
                 typeCode, primaryKey));
         }
 
-        internal static LegacyGrainId GetGrainServiceGrainId(short id, int typeData)
-        {
-            return FindOrCreateGrainId(UniqueKey.NewGrainServiceKey(id, typeData));
-        }
+        internal static LegacyGrainId GetGrainServiceGrainId(short id, int typeData) => FindOrCreateGrainId(UniqueKey.NewGrainServiceKey(id, typeData));
 
-        internal static LegacyGrainId GetGrainServiceGrainId(int typeData, string systemGrainId)
-        {
-            return FindOrCreateGrainId(UniqueKey.NewGrainServiceKey(systemGrainId, typeData));
-        }
+        internal static LegacyGrainId GetGrainServiceGrainId(int typeData, string systemGrainId) => FindOrCreateGrainId(UniqueKey.NewGrainServiceKey(systemGrainId, typeData));
 
         public Guid PrimaryKey
         {
@@ -129,25 +105,13 @@ namespace Orleans.Runtime
             get { return Key.IsLongKey; }
         }
 
-        public long GetPrimaryKeyLong(out string keyExt)
-        {
-            return Key.PrimaryKeyToLong(out keyExt);
-        }
+        public long GetPrimaryKeyLong(out string keyExt) => Key.PrimaryKeyToLong(out keyExt);
 
-        internal long GetPrimaryKeyLong()
-        {
-            return Key.PrimaryKeyToLong();
-        }
+        internal long GetPrimaryKeyLong() => Key.PrimaryKeyToLong();
 
-        public Guid GetPrimaryKey(out string keyExt)
-        {
-            return Key.PrimaryKeyToGuid(out keyExt);
-        }
+        public Guid GetPrimaryKey(out string keyExt) => Key.PrimaryKeyToGuid(out keyExt);
 
-        internal Guid GetPrimaryKey()
-        {
-            return Key.PrimaryKeyToGuid();
-        }
+        internal Guid GetPrimaryKey() => Key.PrimaryKeyToGuid();
 
         internal string GetPrimaryKeyString()
         {
@@ -180,25 +144,13 @@ namespace Orleans.Runtime
             return buf;
         }
 
-        public static GrainType CreateGrainTypeForGrain(int typeCode)
-        {
-            return new GrainType(CreateGrainType(GrainTypePrefix.LegacyGrainPrefixBytes, (ulong)typeCode));
-        }
+        public static GrainType CreateGrainTypeForGrain(int typeCode) => new GrainType(CreateGrainType(GrainTypePrefix.LegacyGrainPrefixBytes, (ulong)typeCode));
 
-        public static GrainType CreateGrainTypeForSystemTarget(int typeCode)
-        {
-            return new GrainType(CreateGrainType(GrainTypePrefix.SystemTargetPrefixBytes, (ulong)typeCode));
-        }
+        public static GrainType CreateGrainTypeForSystemTarget(int typeCode) => new GrainType(CreateGrainType(GrainTypePrefix.SystemTargetPrefixBytes, (ulong)typeCode));
 
-        private IdSpan GetGrainKey()
-        {
-            return new IdSpan(grainKeyInternCache.FindOrCreate(Key, k => Encoding.UTF8.GetBytes($"{k.N0:X16}{k.N1:X16}{(k.HasKeyExt ? "+" : null)}{k.KeyExt}")));
-        }
+        private IdSpan GetGrainKey() => new IdSpan(grainKeyInternCache.FindOrCreate(Key, k => Encoding.UTF8.GetBytes($"{k.N0:X16}{k.N1:X16}{(k.HasKeyExt ? "+" : null)}{k.KeyExt}")));
 
-        public GrainId ToGrainId()
-        {
-            return new GrainId(GetGrainType(Key), this.GetGrainKey());
-        }
+        public GrainId ToGrainId() => new GrainId(GetGrainType(Key), this.GetGrainKey());
 
         public static bool TryConvertFromGrainId(GrainId id, out LegacyGrainId legacyId)
         {
@@ -206,10 +158,7 @@ namespace Orleans.Runtime
             return legacyId is not null;
         }
 
-        public static LegacyGrainId FromGrainId(GrainId id)
-        {
-            return FromGrainIdInternal(id) ?? ThrowNotLegacyGrainId(id);
-        }
+        public static LegacyGrainId FromGrainId(GrainId id) => FromGrainIdInternal(id) ?? ThrowNotLegacyGrainId(id);
 
         private static LegacyGrainId FromGrainIdInternal(GrainId id)
         {
@@ -242,20 +191,11 @@ namespace Orleans.Runtime
             return FindOrCreateGrainId(UniqueKey.NewKey(n0, n1, typeCodeData, keyExt));
         }
 
-        private static LegacyGrainId ThrowNotLegacyGrainId(GrainId id)
-        {
-            throw new InvalidOperationException($"Cannot convert non-legacy id {id} into legacy id");
-        }
+        private static LegacyGrainId ThrowNotLegacyGrainId(GrainId id) => throw new InvalidOperationException($"Cannot convert non-legacy id {id} into legacy id");
 
-        private static LegacyGrainId FindOrCreateGrainId(UniqueKey key)
-        {
-            return grainIdInternCache.FindOrCreate(key, k => new LegacyGrainId(k));
-        }
+        private static LegacyGrainId FindOrCreateGrainId(UniqueKey key) => grainIdInternCache.FindOrCreate(key, k => new LegacyGrainId(k));
 
-        public bool Equals(LegacyGrainId other)
-        {
-            return other != null && Key.Equals(other.Key);
-        }
+        public bool Equals(LegacyGrainId other) => other != null && Key.Equals(other.Key);
 
         public override bool Equals(object obj)
         {
@@ -264,31 +204,19 @@ namespace Orleans.Runtime
         }
 
         // Keep compiler happy -- it does not like classes to have Equals(...) without GetHashCode() methods
-        public override int GetHashCode()
-        {
-            return Key.GetHashCode();
-        }
+        public override int GetHashCode() => Key.GetHashCode();
 
         /// <summary>
         /// Get a uniformly distributed hash code value for this grain, based on Jenkins Hash function.
         /// NOTE: Hash code value may be positive or NEGATIVE.
         /// </summary>
         /// <returns>Hash code for this LegacyGrainId</returns>
-        public uint GetUniformHashCode()
-        {
-            return Key.GetUniformHashCode();
-        }
+        public uint GetUniformHashCode() => Key.GetUniformHashCode();
 
-        public override string ToString()
-        {
-            return ToStringImpl(false);
-        }
+        public override string ToString() => ToStringImpl(false);
 
         // same as ToString, just full primary key and type code
-        internal string ToDetailedString()
-        {
-            return ToStringImpl(true);
-        }
+        internal string ToDetailedString() => ToStringImpl(true);
 
         // same as ToString, just full primary key and type code
         private string ToStringImpl(bool detailed)
@@ -351,22 +279,17 @@ namespace Orleans.Runtime
         /// Return this LegacyGrainId in a standard string form, suitable for later use with the <c>FromParsableString</c> method.
         /// </summary>
         /// <returns>LegacyGrainId in a standard string format.</returns>
-        internal string ToParsableString()
-        {
+        internal string ToParsableString() =>
             // NOTE: This function must be the "inverse" of FromParsableString, and data must round-trip reliably.
 
-            return Key.ToHexString();
-        }
+            Key.ToHexString();
 
         /// <summary>
         /// Create a new LegacyGrainId object by parsing string in a standard form returned from <c>ToParsableString</c> method.
         /// </summary>
         /// <param name="grainId">String containing the LegacyGrainId info to be parsed.</param>
         /// <returns>New LegacyGrainId object created from the input data.</returns>
-        internal static LegacyGrainId FromParsableString(string grainId)
-        {
-            return FromParsableString(grainId.AsSpan());
-        }
+        internal static LegacyGrainId FromParsableString(string grainId) => FromParsableString(grainId.AsSpan());
 
         /// <summary>
         /// Create a new LegacyGrainId object by parsing string in a standard form returned from <c>ToParsableString</c> method.
@@ -389,9 +312,6 @@ namespace Orleans.Runtime
             return checked((uint)key);
         }
 
-        public int CompareTo(LegacyGrainId other)
-        {
-            return Key.CompareTo(other.Key);
-        }
+        public int CompareTo(LegacyGrainId other) => Key.CompareTo(other.Key);
     }
 }

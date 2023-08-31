@@ -121,9 +121,6 @@ namespace Orleans.TestingHost
             }
         }
 
-        private void WriteLog(object value)
-        {
-            Console.WriteLine(value?.ToString());
-        }
+        private void WriteLog(object value) => Console.WriteLine(value?.ToString());
     }
 }

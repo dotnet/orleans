@@ -39,10 +39,7 @@ namespace Orleans.Streams
         /// <param name="me">The first token</param>
         /// <param name="other">The second token.</param>
         /// <returns><see langword="true" /> if the first token is newer than the second token, <see langword="false" /> otherwise.</returns>
-        static public bool Newer(this StreamSequenceToken me, StreamSequenceToken other)
-        {
-            return me.CompareTo(other) > 0;
-        }
+        static public bool Newer(this StreamSequenceToken me, StreamSequenceToken other) => me.CompareTo(other) > 0;
 
         /// <summary>
         /// Returns <see langword="true"/> if the first token is older than the second token.
@@ -50,9 +47,6 @@ namespace Orleans.Streams
         /// <param name="me">The first token</param>
         /// <param name="other">The second token.</param>
         /// <returns><see langword="true" /> if the first token is older than the second token, <see langword="false" /> otherwise.</returns>
-        static public bool Older(this StreamSequenceToken me, StreamSequenceToken other)
-        {
-            return me.CompareTo(other) < 0;
-        }
+        static public bool Older(this StreamSequenceToken me, StreamSequenceToken other) => me.CompareTo(other) < 0;
     }
 }

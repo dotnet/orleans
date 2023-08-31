@@ -64,12 +64,9 @@ namespace UnitTests.StorageTests.Relational.TestDataSets
         };
 
 
-        public static string GetGrainType<TGrainKey>()
-        {
-            return GetGrainType<TGrainKey, NotApplicable>();
-        }
+        public static string GetGrainType<TGrainKey>() => GetGrainType<TGrainKey, NotApplicable>();
 
-// Orleans.Storage.AdoNetStorageProvider cannot be resolved, because the containing assembly is not referenced since not needed.
+        // Orleans.Storage.AdoNetStorageProvider cannot be resolved, because the containing assembly is not referenced since not needed.
 #pragma warning disable 1574
         /// <summary>
         /// Returns a grain type name.

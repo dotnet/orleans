@@ -51,10 +51,7 @@ namespace Tester.AzureUtils.Persistence
 
         public class ClientBuilderConfigurator : IClientBuilderConfigurator
         {
-            public void Configure(IConfiguration configuration, IClientBuilder clientBuilder)
-            {
-                clientBuilder.UseAzureStorageClustering(gatewayOptions => { gatewayOptions.ConfigureTestDefaults(); });
-            }
+            public void Configure(IConfiguration configuration, IClientBuilder clientBuilder) => clientBuilder.UseAzureStorageClustering(gatewayOptions => { gatewayOptions.ConfigureTestDefaults(); });
         }
 
         public Base_PersistenceGrainTests_AzureStore(ITestOutputHelper output, BaseTestClusterFixture fixture, string grainNamespace = "UnitTests.Grains")
@@ -69,50 +66,23 @@ namespace Tester.AzureUtils.Persistence
 
         public IGrainFactory GrainFactory { get; }
 
-        protected Task Grain_AzureStore_Delete()
-        {
-            return this.basicPersistenceTestsRunner.Grain_GrainStorage_Delete();
-        }
+        protected Task Grain_AzureStore_Delete() => this.basicPersistenceTestsRunner.Grain_GrainStorage_Delete();
 
-        protected Task Grain_AzureStore_Read()
-        {
-            return this.basicPersistenceTestsRunner.Grain_GrainStorage_Read();
-        }
+        protected Task Grain_AzureStore_Read() => this.basicPersistenceTestsRunner.Grain_GrainStorage_Read();
 
-        protected Task Grain_GuidKey_AzureStore_Read_Write()
-        {
-            return this.basicPersistenceTestsRunner.Grain_GuidKey_GrainStorage_Read_Write();
-        }
+        protected Task Grain_GuidKey_AzureStore_Read_Write() => this.basicPersistenceTestsRunner.Grain_GuidKey_GrainStorage_Read_Write();
 
-        protected Task Grain_LongKey_AzureStore_Read_Write()
-        {
-            return this.basicPersistenceTestsRunner.Grain_LongKey_GrainStorage_Read_Write();
-        }
+        protected Task Grain_LongKey_AzureStore_Read_Write() => this.basicPersistenceTestsRunner.Grain_LongKey_GrainStorage_Read_Write();
 
-        protected Task Grain_LongKeyExtended_AzureStore_Read_Write()
-        {
-            return this.basicPersistenceTestsRunner.Grain_LongKeyExtended_GrainStorage_Read_Write();
-        }
+        protected Task Grain_LongKeyExtended_AzureStore_Read_Write() => this.basicPersistenceTestsRunner.Grain_LongKeyExtended_GrainStorage_Read_Write();
 
-        protected Task Grain_GuidKeyExtended_AzureStore_Read_Write()
-        {
-            return this.basicPersistenceTestsRunner.Grain_GuidKeyExtended_GrainStorage_Read_Write();
-        }
+        protected Task Grain_GuidKeyExtended_AzureStore_Read_Write() => this.basicPersistenceTestsRunner.Grain_GuidKeyExtended_GrainStorage_Read_Write();
 
-        protected Task Grain_Generic_AzureStore_Read_Write()
-        {
-            return this.basicPersistenceTestsRunner.Grain_Generic_GrainStorage_Read_Write();
-        }
+        protected Task Grain_Generic_AzureStore_Read_Write() => this.basicPersistenceTestsRunner.Grain_Generic_GrainStorage_Read_Write();
 
-        protected Task Grain_Generic_AzureStore_DiffTypes()
-        {
-            return this.basicPersistenceTestsRunner.Grain_Generic_GrainStorage_DiffTypes();
-        }
+        protected Task Grain_Generic_AzureStore_DiffTypes() => this.basicPersistenceTestsRunner.Grain_Generic_GrainStorage_DiffTypes();
 
-        protected Task Grain_AzureStore_SiloRestart()
-        {
-            return this.basicPersistenceTestsRunner.Grain_GrainStorage_SiloRestart();
-        }
+        protected Task Grain_AzureStore_SiloRestart() => this.basicPersistenceTestsRunner.Grain_GrainStorage_SiloRestart();
 
         protected void Persistence_Perf_Activate()
         {

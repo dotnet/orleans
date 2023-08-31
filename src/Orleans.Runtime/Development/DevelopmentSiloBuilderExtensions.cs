@@ -17,14 +17,8 @@ namespace Orleans.Runtime.Development
         /// </remarks>
         /// <param name="builder">The builder.</param>
         /// <returns>The builder.</returns>
-         public static ISiloBuilder UseInMemoryLeaseProvider(this ISiloBuilder builder)
-        {
-            return builder.ConfigureServices(UseInMemoryLeaseProvider);
-        }
+        public static ISiloBuilder UseInMemoryLeaseProvider(this ISiloBuilder builder) => builder.ConfigureServices(UseInMemoryLeaseProvider);
 
-        private static void UseInMemoryLeaseProvider(IServiceCollection services)
-        {
-            services.AddTransient<ILeaseProvider, InMemoryLeaseProvider>();
-        }
+        private static void UseInMemoryLeaseProvider(IServiceCollection services) => services.AddTransient<ILeaseProvider, InMemoryLeaseProvider>();
     }
 }

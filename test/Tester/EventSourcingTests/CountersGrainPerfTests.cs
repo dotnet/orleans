@@ -102,10 +102,7 @@ namespace Tester.EventSourcingTests
     {
         private readonly string attrname = typeof(RunThisFirstAttribute).AssemblyQualifiedName;
 
-        private bool HasRunThisFirstAttribute(ITestCase testcase)
-        {
-            return testcase.TestMethod.Method.GetCustomAttributes(attrname).Any();
-        }
+        private bool HasRunThisFirstAttribute(ITestCase testcase) => testcase.TestMethod.Method.GetCustomAttributes(attrname).Any();
 
         public IEnumerable<TTestCase> OrderTestCases<TTestCase>(IEnumerable<TTestCase> testCases) where TTestCase : ITestCase
         {

@@ -10,10 +10,7 @@ namespace UnitTests.General
 
         public class Fixture : BaseTestClusterFixture
         {
-            protected override void ConfigureTestCluster(TestClusterBuilder builder)
-            {
-                builder.AddSiloBuilderConfigurator<ReentrancyTestsSiloBuilderConfigurator>();
-            }
+            protected override void ConfigureTestCluster(TestClusterBuilder builder) => builder.AddSiloBuilderConfigurator<ReentrancyTestsSiloBuilderConfigurator>();
         }
 
         public DisabledCallChainReentrancyTests(Fixture fixture)
@@ -22,27 +19,15 @@ namespace UnitTests.General
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Tasks"), TestCategory("Reentrancy")]
-        public void NonReentrantGrain()
-        {
-            this.runner.NonReentrantGrain(false);
-        }
+        public void NonReentrantGrain() => this.runner.NonReentrantGrain(false);
 
         [Fact, TestCategory("Functional"), TestCategory("Tasks"), TestCategory("Reentrancy")]
-        public void NonReentrantGrain_WithMayInterleaveStaticPredicate_WhenPredicateReturnsFalse()
-        {
-            this.runner.NonReentrantGrain_WithMayInterleaveStaticPredicate_WhenPredicateReturnsFalse(false);
-        }
+        public void NonReentrantGrain_WithMayInterleaveStaticPredicate_WhenPredicateReturnsFalse() => this.runner.NonReentrantGrain_WithMayInterleaveStaticPredicate_WhenPredicateReturnsFalse(false);
 
         [Fact, TestCategory("Functional"), TestCategory("Tasks"), TestCategory("Reentrancy")]
-        public void NonReentrantGrain_WithMayInterleaveInstancedPredicate_WhenPredicateReturnsFalse()
-        {
-            this.runner.NonReentrantGrain_WithMayInterleaveInstancedPredicate_WhenPredicateReturnsFalse(false);
-        }
+        public void NonReentrantGrain_WithMayInterleaveInstancedPredicate_WhenPredicateReturnsFalse() => this.runner.NonReentrantGrain_WithMayInterleaveInstancedPredicate_WhenPredicateReturnsFalse(false);
 
         [Fact, TestCategory("Functional"), TestCategory("Tasks"), TestCategory("Reentrancy")]
-        public void UnorderedNonReentrantGrain()
-        {
-            this.runner.UnorderedNonReentrantGrain(false);
-        }
+        public void UnorderedNonReentrantGrain() => this.runner.UnorderedNonReentrantGrain(false);
     }
 }

@@ -134,10 +134,7 @@ namespace Orleans.Providers.Streams.Common
             stateManager.CommitState();
         }
 
-        public IStreamSubscriptionManager GetStreamSubscriptionManager()
-        {
-            return this.streamSubscriptionManager;
-        }
+        public IStreamSubscriptionManager GetStreamSubscriptionManager() => this.streamSubscriptionManager;
 
         private async Task Close(CancellationToken token)
         {
@@ -168,15 +165,9 @@ namespace Orleans.Providers.Streams.Common
             return new PersistentStreamProducer<T>((StreamImpl<T>)stream, this.runtime, queueAdapter, IsRewindable, this.deepCopier);
         }
 
-        IInternalAsyncObservable<T> IInternalStreamProvider.GetConsumerInterface<T>(IAsyncStream<T> streamId)
-        {
-            return GetConsumerInterfaceImpl(streamId);
-        }
+        IInternalAsyncObservable<T> IInternalStreamProvider.GetConsumerInterface<T>(IAsyncStream<T> streamId) => GetConsumerInterfaceImpl(streamId);
 
-        private IInternalAsyncObservable<T> GetConsumerInterfaceImpl<T>(IAsyncStream<T> stream)
-        {
-            return new StreamConsumer<T>((StreamImpl<T>)stream, Name, this.runtime, this.runtime.PubSub(this.pubsubOptions.PubSubType), this.logger, IsRewindable);
-        }
+        private IInternalAsyncObservable<T> GetConsumerInterfaceImpl<T>(IAsyncStream<T> stream) => new StreamConsumer<T>((StreamImpl<T>)stream, Name, this.runtime, this.runtime.PubSub(this.pubsubOptions.PubSubType), this.logger, IsRewindable);
 
         public Task<object> ExecuteCommand(int command, object arg)
         {

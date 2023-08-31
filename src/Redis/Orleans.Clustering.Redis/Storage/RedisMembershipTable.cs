@@ -32,10 +32,7 @@ namespace Orleans.Clustering.Redis
 
         public bool IsInitialized { get; private set; }
 
-        public async Task DeleteMembershipTableEntries(string clusterId)
-        {
-            await _db.KeyDeleteAsync(_clusterKey);
-        }
+        public async Task DeleteMembershipTableEntries(string clusterId) => await _db.KeyDeleteAsync(_clusterKey);
 
         public async Task InitializeMembershipTable(bool tryInitTableVersion)
         {
@@ -55,10 +52,7 @@ namespace Orleans.Clustering.Redis
             this.IsInitialized = true;
         }
 
-        public async Task<bool> InsertRow(MembershipEntry entry, TableVersion tableVersion)
-        {
-            return await UpsertRowInternal(entry, tableVersion, updateTableVersion: true, allowInsertOnly: true) == UpsertResult.Success;
-        }
+        public async Task<bool> InsertRow(MembershipEntry entry, TableVersion tableVersion) => await UpsertRowInternal(entry, tableVersion, updateTableVersion: true, allowInsertOnly: true) == UpsertResult.Success;
 
         private async Task<UpsertResult> UpsertRowInternal(MembershipEntry entry, TableVersion tableVersion, bool updateTableVersion, bool allowInsertOnly)
         {
@@ -111,10 +105,7 @@ namespace Orleans.Clustering.Redis
             return new MembershipTableData(data, tableVersion);
         }
 
-        private static TableVersion GetTableVersionFromRow(RedisValue tableVersionRow)
-        {
-            return tableVersionRow.HasValue ? DeserializeVersion(tableVersionRow) : DefaultTableVersion;
-        }
+        private static TableVersion GetTableVersionFromRow(RedisValue tableVersionRow) => tableVersionRow.HasValue ? DeserializeVersion(tableVersionRow) : DefaultTableVersion;
 
         public async Task<MembershipTableData> ReadRow(SiloAddress key)
         {
@@ -173,10 +164,7 @@ namespace Orleans.Clustering.Redis
             }
         }
 
-        public async Task<bool> UpdateRow(MembershipEntry entry, string etag, TableVersion tableVersion)
-        {
-            return await UpsertRowInternal(entry, tableVersion, updateTableVersion: true, allowInsertOnly: false) == UpsertResult.Success;
-        }
+        public async Task<bool> UpdateRow(MembershipEntry entry, string etag, TableVersion tableVersion) => await UpsertRowInternal(entry, tableVersion, updateTableVersion: true, allowInsertOnly: false) == UpsertResult.Success;
 
         public async Task CleanupDefunctSiloEntries(DateTimeOffset beforeDate)
         {
@@ -191,10 +179,7 @@ namespace Orleans.Clustering.Redis
             }
         }
 
-        public void Dispose()
-        {
-            _muxer?.Dispose();
-        }
+        public void Dispose() => _muxer?.Dispose();
 
         private enum UpsertResult
         {
@@ -219,14 +204,8 @@ namespace Orleans.Clustering.Redis
         private static TableVersion Predeccessor(TableVersion tableVersion) => new TableVersion(tableVersion.Version - 1, (tableVersion.Version - 1).ToString(CultureInfo.InvariantCulture));
 
 
-        private string Serialize(MembershipEntry value)
-        {
-            return JsonConvert.SerializeObject(value, _jsonSerializerSettings);
-        }
+        private string Serialize(MembershipEntry value) => JsonConvert.SerializeObject(value, _jsonSerializerSettings);
 
-        private MembershipEntry Deserialize(string json)
-        {
-            return JsonConvert.DeserializeObject<MembershipEntry>(json, _jsonSerializerSettings);
-        }
+        private MembershipEntry Deserialize(string json) => JsonConvert.DeserializeObject<MembershipEntry>(json, _jsonSerializerSettings);
     }
 }

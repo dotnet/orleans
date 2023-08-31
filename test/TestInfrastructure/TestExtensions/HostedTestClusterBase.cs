@@ -41,9 +41,6 @@ namespace TestExtensions
             return copier.Copy(value);
         }
 
-        public static Serializer GetSerializer(this TestCluster cluster)
-        {
-            return cluster.ServiceProvider.GetRequiredService<Serializer>();
-        }
+        public static Serializer GetSerializer(this TestCluster cluster) => cluster.ServiceProvider.GetRequiredService<Serializer>();
     }
 }

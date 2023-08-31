@@ -42,25 +42,13 @@ namespace UnitTests.Grains
             this.loadSheddingOptions = loadSheddingOptions.Value;
         }
 
-        public Task<IPEndPoint> GetEndpoint()
-        {
-            return Task.FromResult(_grainContext.Address.SiloAddress.Endpoint);
-        }
+        public Task<IPEndPoint> GetEndpoint() => Task.FromResult(_grainContext.Address.SiloAddress.Endpoint);
 
-        public Task<string> GetRuntimeInstanceId()
-        {
-            return Task.FromResult(RuntimeIdentity);
-        }
+        public Task<string> GetRuntimeInstanceId() => Task.FromResult(RuntimeIdentity);
 
-        public Task<string> GetActivationId()
-        {
-            return Task.FromResult(_id);
-        }
+        public Task<string> GetActivationId() => Task.FromResult(_id);
 
-        public Task Nop()
-        {
-            return Task.CompletedTask;
-        }
+        public Task Nop() => Task.CompletedTask;
 
         public Task StartLocalGrains(List<Guid> keys)
         {
@@ -131,10 +119,7 @@ namespace UnitTests.Grains
             return PropigateStatisticsToCluster(GrainFactory);
         }
 
-        public Task<SiloAddress> GetLocation()
-        {
-            return Task.FromResult(_grainContext.Address.SiloAddress);
-        }
+        public Task<SiloAddress> GetLocation() => Task.FromResult(_grainContext.Address.SiloAddress);
     }
 
     [RandomPlacement]
@@ -228,10 +213,7 @@ namespace UnitTests.Grains
             return Task.FromResult(0);
         }
 
-        public Task<object> GetContent()
-        {
-            return Task.FromResult(cachedContent);
-        }
+        public Task<object> GetContent() => Task.FromResult(cachedContent);
     }
 
     public class TestContentGrain : Grain, ITestContentGrain

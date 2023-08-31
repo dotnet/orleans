@@ -15,15 +15,9 @@ namespace UnitTests.Grains
             return Task.CompletedTask;
         }
 
-        public Task<string> HappyPath(string message)
-        {
-            return target.OnHappyPath(message);
-        }
+        public Task<string> HappyPath(string message) => target.OnHappyPath(message);
 
-        public Task SadPath(string message)
-        {
-            return target.OnSadPath(message);
-        }
+        public Task SadPath(string message) => target.OnSadPath(message);
 
         public async Task MicroSerialStressTest(int iterationCount)
         {

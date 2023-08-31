@@ -17,9 +17,6 @@ namespace UnitTests.Grains
             throw new Exception("oops");
         }
 
-        public Task Ping()
-        {
-            return Task.CompletedTask;
-        }
+        public Task Ping() => Task.CompletedTask;
     }
 }

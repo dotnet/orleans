@@ -153,10 +153,7 @@ namespace Orleans.Streams
         /// notification handling we execute them serially, in a non-reentrant way.  We also suppress
         /// and don't execute an older notification if a newer one was already delivered.
         /// </summary>
-        public Task QueueDistributionChangeNotification()
-        {
-            return this.RunOrQueueTask(() => this.HandleQueueDistributionChangeNotification());
-        }
+        public Task QueueDistributionChangeNotification() => this.RunOrQueueTask(() => this.HandleQueueDistributionChangeNotification());
 
         public Task HandleQueueDistributionChangeNotification()
         {

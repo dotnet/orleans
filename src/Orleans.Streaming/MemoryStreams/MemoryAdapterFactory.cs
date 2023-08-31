@@ -123,22 +123,13 @@ namespace Orleans.Providers
         }
 
         /// <inheritdoc />
-        public Task<IQueueAdapter> CreateAdapter()
-        {
-            return Task.FromResult<IQueueAdapter>(this);
-        }
+        public Task<IQueueAdapter> CreateAdapter() => Task.FromResult<IQueueAdapter>(this);
 
         /// <inheritdoc />
-        public IQueueAdapterCache GetQueueAdapterCache()
-        {
-            return this;
-        }
+        public IQueueAdapterCache GetQueueAdapterCache() => this;
 
         /// <inheritdoc />
-        public IStreamQueueMapper GetStreamQueueMapper()
-        {
-            return streamQueueMapper;
-        }
+        public IStreamQueueMapper GetStreamQueueMapper() => streamQueueMapper;
 
         /// <inheritdoc />
         public IQueueAdapterReceiver CreateReceiver(QueueId queueId)
@@ -179,10 +170,7 @@ namespace Orleans.Providers
         }
 
         /// <inheritdoc />
-        public Task<IStreamFailureHandler> GetDeliveryFailureHandler(QueueId queueId)
-        {
-            return Task.FromResult(streamFailureHandler ?? (streamFailureHandler = new NoOpStreamDeliveryFailureHandler()));
-        }
+        public Task<IStreamFailureHandler> GetDeliveryFailureHandler(QueueId queueId) => Task.FromResult(streamFailureHandler ?? (streamFailureHandler = new NoOpStreamDeliveryFailureHandler()));
 
         /// <summary>
         /// Generate a deterministic Guid from a queue Id. 
@@ -199,10 +187,7 @@ namespace Orleans.Providers
         /// <summary>
         /// Get a MemoryStreamQueueGrain instance by queue Id. 
         /// </summary>
-        private IMemoryStreamQueueGrain GetQueueGrain(QueueId queueId)
-        {
-            return queueGrains.GetOrAdd(queueId, (id, arg) => arg.grainFactory.GetGrain<IMemoryStreamQueueGrain>(arg.instance.GenerateDeterministicGuid(id)), (instance: this, grainFactory));
-        }
+        private IMemoryStreamQueueGrain GetQueueGrain(QueueId queueId) => queueGrains.GetOrAdd(queueId, (id, arg) => arg.grainFactory.GetGrain<IMemoryStreamQueueGrain>(arg.instance.GenerateDeterministicGuid(id)), (instance: this, grainFactory));
 
         /// <summary>
         /// Creates a new <see cref="MemoryAdapterFactory{TSerializer}"/> instance.

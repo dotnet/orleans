@@ -74,10 +74,7 @@ namespace Orleans.Transactions
             return new TransactionInfo(this);
         }
 
-        public void Join(TransactionInfo x)
-        {
-            joined.Enqueue(x);
-        }
+        public void Join(TransactionInfo x) => joined.Enqueue(x);
 
         public OrleansTransactionAbortedException MustAbort(Serializer<OrleansTransactionAbortedException> serializer)
         {

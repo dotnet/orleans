@@ -80,20 +80,11 @@ namespace UnitTests.Grains
             }
         }
 
-        public Task<int> GetNumberConsumed()
-        {
-            return Task.FromResult(eventsConsumedCount);
-        }
+        public Task<int> GetNumberConsumed() => Task.FromResult(eventsConsumedCount);
 
-        public Task<int> GetNumberFailed()
-        {
-            return Task.FromResult(eventsFailedCount);
-        }
+        public Task<int> GetNumberFailed() => Task.FromResult(eventsFailedCount);
 
-        public Task<int> GetErrorCount()
-        {
-            return Task.FromResult(errorsCount);
-        }
+        public Task<int> GetErrorCount() => Task.FromResult(errorsCount);
 
         public Task OnNextAsync(int item, StreamSequenceToken token = null)
         {

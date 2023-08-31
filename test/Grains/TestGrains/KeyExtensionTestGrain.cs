@@ -9,14 +9,8 @@ namespace UnitTests.Grains
     {
         private readonly Guid uniqueId = Guid.NewGuid();
 
-        public Task<IKeyExtensionTestGrain> GetGrainReference()
-        {
-            return Task.FromResult(this.AsReference<IKeyExtensionTestGrain>());
-        }
+        public Task<IKeyExtensionTestGrain> GetGrainReference() => Task.FromResult(this.AsReference<IKeyExtensionTestGrain>());
 
-        public Task<string> GetActivationId()
-        {
-            return Task.FromResult(uniqueId.ToString());
-        }
+        public Task<string> GetActivationId() => Task.FromResult(uniqueId.ToString());
     }
 }

@@ -58,10 +58,7 @@ namespace Benchmarks.GrainStorage
 
         public class SiloMemoryStorageConfigurator : ISiloConfigurator
         {
-            public void Configure(ISiloBuilder hostBuilder)
-            {
-                hostBuilder.AddMemoryGrainStorageAsDefault();
-            }
+            public void Configure(ISiloBuilder hostBuilder) => hostBuilder.AddMemoryGrainStorageAsDefault();
         }
 
         public class SiloAzureTableStorageConfigurator : ISiloConfigurator
@@ -138,14 +135,8 @@ namespace Benchmarks.GrainStorage
             return reports;
         }
 
-        public void Teardown()
-        {
-            host.StopAllSilos();
-        }
+        public void Teardown() => host.StopAllSilos();
 
-        public void Dispose()
-        {
-            host?.Dispose();
-        }
+        public void Dispose() => host?.Dispose();
     }
 }

@@ -38,10 +38,7 @@ namespace Orleans.Runtime.Development
         }
 
         /// <inheritdoc/>
-        public Task Release(string category, AcquiredLease[] acquiredLeases)
-        {
-            return this.leaseProvider.Release(category, acquiredLeases);
-        }
+        public Task Release(string category, AcquiredLease[] acquiredLeases) => this.leaseProvider.Release(category, acquiredLeases);
 
         /// <inheritdoc/>
         public async Task<AcquireLeaseResult[]> Renew(string category, AcquiredLease[] acquiredLeases)
@@ -56,10 +53,7 @@ namespace Orleans.Runtime.Development
             }
         }
 
-        private static IDevelopmentLeaseProviderGrain GetLeaseProviderGrain(IGrainFactory grainFactory)
-        {
-            return grainFactory.GetGrain<IDevelopmentLeaseProviderGrain>(0);
-        }
+        private static IDevelopmentLeaseProviderGrain GetLeaseProviderGrain(IGrainFactory grainFactory) => grainFactory.GetGrain<IDevelopmentLeaseProviderGrain>(0);
     }
 
     internal interface IDevelopmentLeaseProviderGrain : ILeaseProvider, IGrainWithIntegerKey
@@ -80,10 +74,7 @@ namespace Orleans.Runtime.Development
     {
         private readonly Dictionary<Tuple<string, string>, Lease> leases = new Dictionary<Tuple<string, string>, Lease>();
 
-        public Task<AcquireLeaseResult[]> Acquire(string category, LeaseRequest[] leaseRequests)
-        {
-            return Task.FromResult(leaseRequests.Select(request => Acquire(category, request)).ToArray());
-        }
+        public Task<AcquireLeaseResult[]> Acquire(string category, LeaseRequest[] leaseRequests) => Task.FromResult(leaseRequests.Select(request => Acquire(category, request)).ToArray());
 
         public Task Release(string category, AcquiredLease[] acquiredLeases)
         {
@@ -94,10 +85,7 @@ namespace Orleans.Runtime.Development
             return Task.CompletedTask;
         }
 
-        public Task<AcquireLeaseResult[]> Renew(string category, AcquiredLease[] acquiredLeases)
-        {
-            return Task.FromResult(acquiredLeases.Select(lease => Renew(category, lease)).ToArray());
-        }
+        public Task<AcquireLeaseResult[]> Renew(string category, AcquiredLease[] acquiredLeases) => Task.FromResult(acquiredLeases.Select(lease => Renew(category, lease)).ToArray());
 
         public Task Reset()
         {

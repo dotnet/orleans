@@ -20,10 +20,7 @@ namespace UnitTests.Grains
 
     public class InitialStateGrain : Grain<Initialized_State>, IInitialStateGrain
     {
-        public Task<List<string>> GetNames()
-        {
-            return Task.FromResult(State.Names);
-        }
+        public Task<List<string>> GetNames() => Task.FromResult(State.Names);
 
         public Task AddName(string name)
         {

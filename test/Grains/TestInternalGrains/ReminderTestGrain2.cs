@@ -185,15 +185,9 @@ namespace UnitTests.Grains
             allReminders[reminder.ReminderName] = state with { Unregistered = DateTime.UtcNow };
         }
 
-        public Task<TimeSpan> GetReminderPeriod(string reminderName)
-        {
-            return Task.FromResult(this.period);
-        }
+        public Task<TimeSpan> GetReminderPeriod(string reminderName) => Task.FromResult(this.period);
 
-        public Task<(TimeSpan DueTime, TimeSpan Period)> GetReminderDueTimeAndPeriod(string reminderName)
-        {
-            return Task.FromResult((this.period - TimeSpan.FromSeconds(2), this.period));
-        }
+        public Task<(TimeSpan DueTime, TimeSpan Period)> GetReminderDueTimeAndPeriod(string reminderName) => Task.FromResult((this.period - TimeSpan.FromSeconds(2), this.period));
 
         public Task<long> GetCounter(string name)
         {
@@ -203,20 +197,11 @@ namespace UnitTests.Grains
             return Task.FromResult(counterValue);
         }
 
-        public Task<IGrainReminder> GetReminderObject(string reminderName)
-        {
-            return this.GetReminder(reminderName);
-        }
+        public Task<IGrainReminder> GetReminderObject(string reminderName) => this.GetReminder(reminderName);
 
-        public async Task<List<IGrainReminder>> GetRemindersList()
-        {
-            return await this.GetReminders();
-        }
+        public async Task<List<IGrainReminder>> GetRemindersList() => await this.GetReminders();
 
-        private string GetFileName(string reminderName)
-        {
-            return string.Format("{0}{1}", this.filePrefix, reminderName);
-        }
+        private string GetFileName(string reminderName) => string.Format("{0}{1}", this.filePrefix, reminderName);
 
         public static TimeSpan GetDefaultPeriod(ILogger log)
         {
@@ -226,10 +211,7 @@ namespace UnitTests.Grains
             return reminderPeriod;
         }
 
-        public async Task EraseReminderTable()
-        {
-            await this.reminderTable.TestOnlyClearTable();
-        }
+        public async Task EraseReminderTable() => await this.reminderTable.TestOnlyClearTable();
     }
 
     // NOTE: do not make changes here ... this is a copy of ReminderTestGrain
@@ -381,29 +363,14 @@ namespace UnitTests.Grains
             await this.UnregisterReminder(reminder);
         }
 
-        public Task<TimeSpan> GetReminderPeriod(string reminderName)
-        {
-            return Task.FromResult(this.period);
-        }
+        public Task<TimeSpan> GetReminderPeriod(string reminderName) => Task.FromResult(this.period);
 
-        public Task<long> GetCounter(string name)
-        {
-            return Task.FromResult(long.Parse(File.ReadAllText(GetFileName(name))));
-        }
+        public Task<long> GetCounter(string name) => Task.FromResult(long.Parse(File.ReadAllText(GetFileName(name))));
 
-        public async Task<IGrainReminder> GetReminderObject(string reminderName)
-        {
-            return await this.GetReminder(reminderName);
-        }
-        public async Task<List<IGrainReminder>> GetRemindersList()
-        {
-            return await this.GetReminders();
-        }
+        public async Task<IGrainReminder> GetReminderObject(string reminderName) => await this.GetReminder(reminderName);
+        public async Task<List<IGrainReminder>> GetRemindersList() => await this.GetReminders();
 
-        private string GetFileName(string reminderName)
-        {
-            return string.Format("{0}{1}", this.filePrefix, reminderName);
-        }
+        private string GetFileName(string reminderName) => string.Format("{0}{1}", this.filePrefix, reminderName);
     }
 
     public class WrongReminderGrain : Grain, IReminderGrainWrong
@@ -435,23 +402,14 @@ namespace UnitTests.Grains
     {
         public UnvalidatedReminderRegistry(IServiceProvider serviceProvider) : base(serviceProvider) { }
 
-        public Task<IGrainReminder> RegisterOrUpdateReminder(GrainId callingGrainId, string reminderName, TimeSpan dueTime, TimeSpan period)
-        {
-            return GetGrainService(callingGrainId).RegisterOrUpdateReminder(callingGrainId, reminderName, dueTime, period);
-        }
+        public Task<IGrainReminder> RegisterOrUpdateReminder(GrainId callingGrainId, string reminderName, TimeSpan dueTime, TimeSpan period) => GetGrainService(callingGrainId).RegisterOrUpdateReminder(callingGrainId, reminderName, dueTime, period);
 
         public Task UnregisterReminder(GrainId callingGrainId, IGrainReminder reminder)
             => GetGrainService(callingGrainId).UnregisterReminder(reminder);
 
-        public Task<IGrainReminder> GetReminder(GrainId callingGrainId, string reminderName)
-        {
-            return GetGrainService(callingGrainId).GetReminder(callingGrainId, reminderName);
-        }
+        public Task<IGrainReminder> GetReminder(GrainId callingGrainId, string reminderName) => GetGrainService(callingGrainId).GetReminder(callingGrainId, reminderName);
 
-        public Task<List<IGrainReminder>> GetReminders(GrainId callingGrainId)
-        {
-            return GetGrainService(callingGrainId).GetReminders(callingGrainId);
-        }
+        public Task<List<IGrainReminder>> GetReminders(GrainId callingGrainId) => GetGrainService(callingGrainId).GetReminders(callingGrainId);
     }
 }
 #pragma warning restore 612, 618

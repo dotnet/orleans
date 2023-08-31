@@ -187,15 +187,9 @@ namespace UnitTests.General
         {
             public Channel<(CallChainOperation Operation, string Grain, int CallIndex)> Operations { get; } = Channel.CreateUnbounded<(CallChainOperation Operation, string Grain, int CallIndex)>();
 
-            public async Task OnEnter(string grain, int callIndex)
-            {
-                await Operations.Writer.WriteAsync((CallChainOperation.Enter, grain, callIndex));
-            }
+            public async Task OnEnter(string grain, int callIndex) => await Operations.Writer.WriteAsync((CallChainOperation.Enter, grain, callIndex));
 
-            public async Task OnExit(string grain, int callIndex)
-            {
-                await Operations.Writer.WriteAsync((CallChainOperation.Exit, grain, callIndex));
-            }
+            public async Task OnExit(string grain, int callIndex) => await Operations.Writer.WriteAsync((CallChainOperation.Exit, grain, callIndex));
 
             public async Task WaitForOperationAsync(CallChainOperation operationType, string grain, int callIndex)
             {

@@ -46,18 +46,12 @@ namespace Orleans.Transactions.AzureStorage.Tests
         [SkippableTheory]
         [InlineData(TransactionTestConstants.SingleStateTransactionalGrain, 30)]
         [InlineData(TransactionTestConstants.DoubleStateTransactionalGrain, 20)]
-        public Task TransactionWillRecoverAfterRandomSiloGracefulShutdown(string transactionTestGrainClassName, int concurrent)
-        {
-            return this.testRunner.TransactionWillRecoverAfterRandomSiloGracefulShutdown(transactionTestGrainClassName, concurrent);
-        }
+        public Task TransactionWillRecoverAfterRandomSiloGracefulShutdown(string transactionTestGrainClassName, int concurrent) => this.testRunner.TransactionWillRecoverAfterRandomSiloGracefulShutdown(transactionTestGrainClassName, concurrent);
 
         [SkippableTheory]
         [InlineData(TransactionTestConstants.SingleStateTransactionalGrain, 30)]
         [InlineData(TransactionTestConstants.DoubleStateTransactionalGrain, 20)]
-        public Task TransactionWillRecoverAfterRandomSiloUnGracefulShutdown(string transactionTestGrainClassName, int concurrent)
-        {
-            return this.testRunner.TransactionWillRecoverAfterRandomSiloUnGracefulShutdown(transactionTestGrainClassName, concurrent);
-        }
+        public Task TransactionWillRecoverAfterRandomSiloUnGracefulShutdown(string transactionTestGrainClassName, int concurrent) => this.testRunner.TransactionWillRecoverAfterRandomSiloUnGracefulShutdown(transactionTestGrainClassName, concurrent);
 
         private class SiloBuilderConfiguratorUsingAzureClustering : ISiloConfigurator
         {

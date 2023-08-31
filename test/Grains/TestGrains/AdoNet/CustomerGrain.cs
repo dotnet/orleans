@@ -12,15 +12,9 @@ namespace Orleans.SqlUtils.StorageProvider.GrainClasses
     {
         private readonly Random _random = new Random();
 
-        public override async Task OnActivateAsync(CancellationToken cancellationToken)
-        {
-            await base.OnActivateAsync(cancellationToken);
-        }
+        public override async Task OnActivateAsync(CancellationToken cancellationToken) => await base.OnActivateAsync(cancellationToken);
 
-        public Task<string> IntroduceSelf()
-        {
-            return Task.FromResult(string.Format("Hello, my name is {0} {1}", State.FirstName, State.LastName));
-        }
+        public Task<string> IntroduceSelf() => Task.FromResult(string.Format("Hello, my name is {0} {1}", State.FirstName, State.LastName));
 
         public async Task Set(int customerId, string firstName, string lastName)
         {

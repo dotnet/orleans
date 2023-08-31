@@ -53,10 +53,7 @@ namespace Orleans.Providers
             return Task.FromResult(list);
         }
 
-        void IGrainMigrationParticipant.OnDehydrate(IDehydrationContext dehydrationContext)
-        {
-            dehydrationContext.TryAddValue("queue", _eventQueue);
-        }
+        void IGrainMigrationParticipant.OnDehydrate(IDehydrationContext dehydrationContext) => dehydrationContext.TryAddValue("queue", _eventQueue);
 
         void IGrainMigrationParticipant.OnRehydrate(IRehydrationContext rehydrationContext)
         {

@@ -298,10 +298,7 @@ internal sealed class AsyncEnumerableGrainExtension : IAsyncEnumerableGrainExten
     }
 
     /// <inheritdoc/>
-    public void Dispose()
-    {
-        _timer.Dispose();
-    }
+    public void Dispose() => _timer.Dispose();
 
     private struct EnumeratorState
     {

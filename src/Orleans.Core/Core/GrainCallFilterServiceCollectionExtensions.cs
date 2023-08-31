@@ -16,10 +16,7 @@ namespace Orleans.Hosting
         /// <param name="filter">The filter.</param>
         /// <returns>The service collection.</returns>
         [Obsolete("Use ISiloBuilder." + nameof(AddIncomingGrainCallFilter), error: true)]
-        public static IServiceCollection AddGrainCallFilter(this IServiceCollection services, IIncomingGrainCallFilter filter)
-        {
-            throw new NotSupportedException($"{nameof(AddGrainCallFilter)} is no longer supported. Use ISiloBuilder.AddIncomingGrainCallFilter(...) instead.");
-        }
+        public static IServiceCollection AddGrainCallFilter(this IServiceCollection services, IIncomingGrainCallFilter filter) => throw new NotSupportedException($"{nameof(AddGrainCallFilter)} is no longer supported. Use ISiloBuilder.AddIncomingGrainCallFilter(...) instead.");
 
         /// <summary>
         /// Adds an <see cref="IIncomingGrainCallFilter"/> to the filter pipeline.
@@ -29,10 +26,7 @@ namespace Orleans.Hosting
         /// <returns>The service collection.</returns>
         [Obsolete("Use ISiloBuilder." + nameof(AddIncomingGrainCallFilter), error: true)]
         public static IServiceCollection AddGrainCallFilter<TImplementation>(this IServiceCollection services)
-            where TImplementation : class, IIncomingGrainCallFilter
-        {
-            throw new NotSupportedException($"{nameof(AddGrainCallFilter)} is no longer supported. Use ISiloBuilder.AddIncomingGrainCallFilter(...) instead.");
-        }
+            where TImplementation : class, IIncomingGrainCallFilter => throw new NotSupportedException($"{nameof(AddGrainCallFilter)} is no longer supported. Use ISiloBuilder.AddIncomingGrainCallFilter(...) instead.");
 
         /// <summary>
         /// Adds an <see cref="IIncomingGrainCallFilter"/> to the filter pipeline via a delegate.
@@ -41,10 +35,7 @@ namespace Orleans.Hosting
         /// <param name="filter">The filter.</param>
         /// <returns>The service collection.</returns>
         [Obsolete("Use ISiloBuilder." + nameof(AddIncomingGrainCallFilter), error: true)]
-        public static IServiceCollection AddGrainCallFilter(this IServiceCollection services, GrainCallFilterDelegate filter)
-        {
-            throw new NotSupportedException($"{nameof(AddGrainCallFilter)} is no longer supported. Use ISiloBuilder.AddIncomingGrainCallFilter(...) instead.");
-        }
+        public static IServiceCollection AddGrainCallFilter(this IServiceCollection services, GrainCallFilterDelegate filter) => throw new NotSupportedException($"{nameof(AddGrainCallFilter)} is no longer supported. Use ISiloBuilder.AddIncomingGrainCallFilter(...) instead.");
 
         /// <summary>
         /// Adds an <see cref="IIncomingGrainCallFilter"/> to the filter pipeline.
@@ -52,10 +43,7 @@ namespace Orleans.Hosting
         /// <param name="services">The service collection.</param>
         /// <param name="filter">The filter.</param>
         /// <returns>The service collection.</returns>
-        internal static IServiceCollection AddIncomingGrainCallFilter(this IServiceCollection services, IIncomingGrainCallFilter filter)
-        {
-            return services.AddSingleton(filter);
-        }
+        internal static IServiceCollection AddIncomingGrainCallFilter(this IServiceCollection services, IIncomingGrainCallFilter filter) => services.AddSingleton(filter);
 
         /// <summary>
         /// Adds an <see cref="IIncomingGrainCallFilter"/> to the filter pipeline.
@@ -64,10 +52,7 @@ namespace Orleans.Hosting
         /// <param name="services">The service collection.</param>
         /// <returns>The service collection.</returns>
         internal static IServiceCollection AddIncomingGrainCallFilter<TImplementation>(this IServiceCollection services)
-            where TImplementation : class, IIncomingGrainCallFilter
-        {
-            return services.AddSingleton<IIncomingGrainCallFilter, TImplementation>();
-        }
+            where TImplementation : class, IIncomingGrainCallFilter => services.AddSingleton<IIncomingGrainCallFilter, TImplementation>();
 
         /// <summary>
         /// Adds an <see cref="IIncomingGrainCallFilter"/> to the filter pipeline via a delegate.
@@ -75,10 +60,7 @@ namespace Orleans.Hosting
         /// <param name="services">The service collection.</param>
         /// <param name="filter">The filter.</param>
         /// <returns>The service collection.</returns>
-        internal static IServiceCollection AddIncomingGrainCallFilter(this IServiceCollection services, IncomingGrainCallFilterDelegate filter)
-        {
-            return services.AddSingleton<IIncomingGrainCallFilter>(new IncomingGrainCallFilterWrapper(filter));
-        }
+        internal static IServiceCollection AddIncomingGrainCallFilter(this IServiceCollection services, IncomingGrainCallFilterDelegate filter) => services.AddSingleton<IIncomingGrainCallFilter>(new IncomingGrainCallFilterWrapper(filter));
 
         /// <summary>
         /// Adds an <see cref="IOutgoingGrainCallFilter"/> to the filter pipeline.
@@ -86,10 +68,7 @@ namespace Orleans.Hosting
         /// <param name="services">The service collection.</param>
         /// <param name="filter">The filter.</param>
         /// <returns>The service collection.</returns>
-        internal static IServiceCollection AddOutgoingGrainCallFilter(this IServiceCollection services, IOutgoingGrainCallFilter filter)
-        {
-            return services.AddSingleton(filter);
-        }
+        internal static IServiceCollection AddOutgoingGrainCallFilter(this IServiceCollection services, IOutgoingGrainCallFilter filter) => services.AddSingleton(filter);
 
         /// <summary>
         /// Adds an <see cref="IOutgoingGrainCallFilter"/> to the filter pipeline.
@@ -98,10 +77,7 @@ namespace Orleans.Hosting
         /// <param name="services">The service collection.</param>
         /// <returns>The service collection.</returns>
         internal static IServiceCollection AddOutgoingGrainCallFilter<TImplementation>(this IServiceCollection services)
-            where TImplementation : class, IOutgoingGrainCallFilter
-        {
-            return services.AddSingleton<IOutgoingGrainCallFilter, TImplementation>();
-        }
+            where TImplementation : class, IOutgoingGrainCallFilter => services.AddSingleton<IOutgoingGrainCallFilter, TImplementation>();
 
         /// <summary>
         /// Adds an <see cref="IOutgoingGrainCallFilter"/> to the filter pipeline via a delegate.
@@ -109,10 +85,7 @@ namespace Orleans.Hosting
         /// <param name="services">The service collection.</param>
         /// <param name="filter">The filter.</param>
         /// <returns>The service collection.</returns>
-        internal static IServiceCollection AddOutgoingGrainCallFilter(this IServiceCollection services, OutgoingGrainCallFilterDelegate filter)
-        {
-            return services.AddSingleton<IOutgoingGrainCallFilter>(new OutgoingGrainCallFilterWrapper(filter));
-        }
+        internal static IServiceCollection AddOutgoingGrainCallFilter(this IServiceCollection services, OutgoingGrainCallFilterDelegate filter) => services.AddSingleton<IOutgoingGrainCallFilter>(new OutgoingGrainCallFilterWrapper(filter));
 
         /// <summary>
         /// Adapts <see cref="OutgoingGrainCallFilterDelegate"/> delegates to the <see cref="IOutgoingGrainCallFilter"/> interface.

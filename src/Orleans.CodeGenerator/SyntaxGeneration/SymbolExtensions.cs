@@ -65,10 +65,7 @@ namespace Orleans.CodeGenerator.SyntaxGeneration
             return result;
         }
 
-        public static string ToDisplayName(this ITypeSymbol typeSymbol, Dictionary<ITypeParameterSymbol, string>? substitutions, bool includeGlobalSpecifier = true, bool includeNamespace = true)
-        {
-            return ToDisplayName(typeSymbol, new DisplayNameOptions { Substitutions = substitutions, IncludeGlobalSpecifier = includeGlobalSpecifier, IncludeNamespace = includeNamespace });
-        }
+        public static string ToDisplayName(this ITypeSymbol typeSymbol, Dictionary<ITypeParameterSymbol, string>? substitutions, bool includeGlobalSpecifier = true, bool includeNamespace = true) => ToDisplayName(typeSymbol, new DisplayNameOptions { Substitutions = substitutions, IncludeGlobalSpecifier = includeGlobalSpecifier, IncludeNamespace = includeNamespace });
 
         public static string ToDisplayName(this ITypeSymbol typeSymbol, DisplayNameOptions options) 
         {

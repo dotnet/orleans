@@ -18,10 +18,7 @@ namespace UnitTests.StreamingTests
         private readonly Fixture fixture;
         public class Fixture : BaseTestClusterFixture
         {
-            protected override void ConfigureTestCluster(TestClusterBuilder builder)
-            {
-                builder.AddSiloBuilderConfigurator<MySiloBuilderConfigurator>();
-            }
+            protected override void ConfigureTestCluster(TestClusterBuilder builder) => builder.AddSiloBuilderConfigurator<MySiloBuilderConfigurator>();
 
             private class MySiloBuilderConfigurator : ISiloConfigurator
             {

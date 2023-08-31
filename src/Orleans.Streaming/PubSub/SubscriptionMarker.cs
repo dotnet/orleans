@@ -10,15 +10,9 @@ namespace Orleans.Streams
     /// </summary>
     internal static class SubscriptionMarker
     {
-        internal static Guid MarkAsExplicitSubscriptionId(Guid subscriptionGuid)
-        {
-            return MarkSubscriptionGuid(subscriptionGuid, false);
-        }
+        internal static Guid MarkAsExplicitSubscriptionId(Guid subscriptionGuid) => MarkSubscriptionGuid(subscriptionGuid, false);
 
-        internal static Guid MarkAsImplictSubscriptionId(Guid subscriptionGuid)
-        {
-            return MarkSubscriptionGuid(subscriptionGuid, true);
-        }
+        internal static Guid MarkAsImplictSubscriptionId(Guid subscriptionGuid) => MarkSubscriptionGuid(subscriptionGuid, true);
 
         internal static bool IsImplicitSubscription(Guid subscriptionGuid)
         {

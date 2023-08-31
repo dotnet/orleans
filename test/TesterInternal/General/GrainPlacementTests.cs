@@ -25,10 +25,7 @@ namespace UnitTests.General
             output.WriteLine("GrainPlacementTests - constructor");
         }
 
-        protected override void ConfigureTestCluster(TestClusterBuilder builder)
-        {
-            builder.AddSiloBuilderConfigurator<SiloConfigurator>();
-        }
+        protected override void ConfigureTestCluster(TestClusterBuilder builder) => builder.AddSiloBuilderConfigurator<SiloConfigurator>();
 
         private class SiloConfigurator : ISiloConfigurator
         {
@@ -138,15 +135,9 @@ namespace UnitTests.General
                 yield return grain.GetActivationId().Result;
         }
 
-        private int ActivationCount(IEnumerable<string> ids)
-        {
-            return ids.GroupBy(id => id).Count();
-        }
+        private int ActivationCount(IEnumerable<string> ids) => ids.GroupBy(id => id).Count();
 
-        private int ActivationCount(IPlacementTestGrain grain, int sampleSize)
-        {
-            return ActivationCount(CollectActivationIds(grain, sampleSize));
-        }
+        private int ActivationCount(IPlacementTestGrain grain, int sampleSize) => ActivationCount(CollectActivationIds(grain, sampleSize));
 
         //[Fact, TestCategory("Placement"), TestCategory("Functional")]
         /*public async Task LocallyPlacedGrainShouldCreateSpecifiedNumberOfMultipleActivations()

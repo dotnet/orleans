@@ -29,10 +29,8 @@ namespace Orleans.Providers.Streams.Common
         /// <param name="timeInCache">The amount of time message has been in this cache</param>
         /// <param name="relativeAge">The age of message relative to the most recent events read</param>
         /// <returns><see langword="true"/> if the message should be purged; otherwise <see langword="false"/>.</returns>
-        public virtual bool ShouldPurgeFromTime(TimeSpan timeInCache, TimeSpan relativeAge)
-        {
+        public virtual bool ShouldPurgeFromTime(TimeSpan timeInCache, TimeSpan relativeAge) =>
             // if time in cache exceeds the minimum and age of data is greater than max allowed, purge
-            return timeInCache > minTimeInCache && relativeAge > maxRelativeMessageAge;
-        }
+            timeInCache > minTimeInCache && relativeAge > maxRelativeMessageAge;
     }
 }

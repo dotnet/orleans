@@ -90,10 +90,7 @@ namespace Orleans.Storage
             string grainId,
             string tableName,
             string storedEtag,
-            string currentEtag)
-        {
-            return string.Format(DefaultMessageFormat, grainType, grainId, tableName, storedEtag, currentEtag);
-        }
+            string currentEtag) => string.Format(DefaultMessageFormat, grainType, grainId, tableName, storedEtag, currentEtag);
 
         /// <summary>
         /// Exception thrown when an azure table storage exception is thrown due to update conditions not being satisfied.

@@ -79,10 +79,7 @@ namespace Orleans.Runtime
 
         public static string SystemTargetName(GrainType id) => singletonSystemTargetNames.TryGetValue(id, out var name) ? name : id.ToString();
 
-        public static bool IsSingletonSystemTarget(GrainType id)
-        {
-            return singletonSystemTargetNames.ContainsKey(id);
-        }
+        public static bool IsSingletonSystemTarget(GrainType id) => singletonSystemTargetNames.ContainsKey(id);
     }
 }
  

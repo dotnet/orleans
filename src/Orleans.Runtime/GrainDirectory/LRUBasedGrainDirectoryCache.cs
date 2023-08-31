@@ -11,11 +11,9 @@ namespace Orleans.Runtime.GrainDirectory
 
         public LRUBasedGrainDirectoryCache(int maxCacheSize, TimeSpan maxEntryAge) => cache = new(maxCacheSize, maxEntryAge);
 
-        public void AddOrUpdate(GrainAddress activationAddress, int version)
-        {
+        public void AddOrUpdate(GrainAddress activationAddress, int version) =>
             // ignore the version number
             cache.AddOrUpdate(activationAddress.GrainId, (activationAddress, version));
-        }
 
         public bool Remove(GrainId key) => cache.RemoveKey(key);
 

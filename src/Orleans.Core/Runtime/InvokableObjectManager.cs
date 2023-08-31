@@ -35,15 +35,9 @@ namespace Orleans
             this.logger = logger;
         }
 
-        public bool TryRegister(IAddressable obj, ObserverGrainId objectId)
-        {
-            return this.localObjects.TryAdd(objectId, new LocalObjectData(obj, objectId, this));
-        }
+        public bool TryRegister(IAddressable obj, ObserverGrainId objectId) => this.localObjects.TryAdd(objectId, new LocalObjectData(obj, objectId, this));
 
-        public bool TryDeregister(ObserverGrainId objectId)
-        {
-            return this.localObjects.TryRemove(objectId, out _);
-        }
+        public bool TryDeregister(ObserverGrainId objectId) => this.localObjects.TryRemove(objectId, out _);
 
         public void Dispatch(Message message)
         {
@@ -344,11 +338,9 @@ namespace Orleans
             public void Activate(Dictionary<string, object> requestContext, CancellationToken? cancellationToken = null) { }
             public void Deactivate(DeactivationReason deactivationReason, CancellationToken? cancellationToken = null) { }
 
-            public void Rehydrate(IRehydrationContext context)
-            {
+            public void Rehydrate(IRehydrationContext context) =>
                 // Migration is not supported, but we need to dispose of the context if it's provided
                 (context as IDisposable)?.Dispose();
-            }
 
             public void Migrate(Dictionary<string, object> requestContext, CancellationToken? cancellationToken = null)
             {

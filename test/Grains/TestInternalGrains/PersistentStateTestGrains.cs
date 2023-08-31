@@ -19,10 +19,7 @@ namespace UnitTests.PersistentState.Grains
             this.persistentState = persistentState;
         }
 
-        public Task<int> GetValue()
-        {
-            return Task.FromResult(this.persistentState.State.Field1);
-        }
+        public Task<int> GetValue() => Task.FromResult(this.persistentState.State.Field1);
 
         public Task DoWrite(int val)
         {
@@ -36,10 +33,7 @@ namespace UnitTests.PersistentState.Grains
             return this.persistentState.State.Field1;
         }
 
-        public Task DoDelete()
-        {
-            return this.persistentState.ClearStateAsync();
-        }
+        public Task DoDelete() => this.persistentState.ClearStateAsync();
     }
 
     [Orleans.Providers.StorageProvider(ProviderName = "GrainStorageForTest")]
@@ -56,10 +50,7 @@ namespace UnitTests.PersistentState.Grains
             this.persistentState = persistentState;
         }
 
-        public Task<int> GetValue()
-        {
-            return Task.FromResult(this.persistentState.State.Field1);
-        }
+        public Task<int> GetValue() => Task.FromResult(this.persistentState.State.Field1);
 
         public Task<string> GetExtendedKeyValue()
         {
@@ -80,9 +71,6 @@ namespace UnitTests.PersistentState.Grains
             return this.persistentState.State.Field1;
         }
 
-        public Task DoDelete()
-        {
-            return this.persistentState.ClearStateAsync();
-        }
+        public Task DoDelete() => this.persistentState.ClearStateAsync();
     }
 }

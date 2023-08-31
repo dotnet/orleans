@@ -40,9 +40,6 @@ namespace Orleans.GrainDirectory
         public string GrainDirectoryName { get; set; }
 
         /// <inheritdoc />
-        public void Populate(IServiceProvider services, Type grainClass, GrainType grainType, Dictionary<string, string> properties)
-        {
-            properties[WellKnownGrainTypeProperties.GrainDirectory] = this.GrainDirectoryName ?? DEFAULT_GRAIN_DIRECTORY;
-        }
+        public void Populate(IServiceProvider services, Type grainClass, GrainType grainType, Dictionary<string, string> properties) => properties[WellKnownGrainTypeProperties.GrainDirectory] = this.GrainDirectoryName ?? DEFAULT_GRAIN_DIRECTORY;
     }
 }

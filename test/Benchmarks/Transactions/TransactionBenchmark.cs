@@ -69,10 +69,7 @@ namespace Benchmarks.Transactions
 
         public class SiloMemoryStorageConfigurator : ISiloConfigurator
         {
-            public void Configure(ISiloBuilder hostBuilder)
-            {
-                hostBuilder.AddMemoryGrainStorageAsDefault();
-            }
+            public void Configure(ISiloBuilder hostBuilder) => hostBuilder.AddMemoryGrainStorageAsDefault();
         }
 
         public class SiloAzureStorageConfigurator : ISiloConfigurator
@@ -141,22 +138,13 @@ namespace Benchmarks.Transactions
             return report;
         }
 
-        public void Teardown()
-        {
-            host.StopAllSilos();
-        }
+        public void Teardown() => host.StopAllSilos();
 
-        public void Dispose()
-        {
-            host?.Dispose();
-        }
+        public void Dispose() => host?.Dispose();
 
         public sealed class SiloTransactionConfigurator : ISiloConfigurator
         {
-            public void Configure(ISiloBuilder hostBuilder)
-            {
-                hostBuilder.UseTransactions();
-            }
+            public void Configure(ISiloBuilder hostBuilder) => hostBuilder.UseTransactions();
         }
     }
 }

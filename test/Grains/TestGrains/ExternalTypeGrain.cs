@@ -23,9 +23,6 @@ namespace UnitTests.Grains
             return Task.CompletedTask;
         }
 
-        public Task<EnumClass> GetEnumModel()
-        {
-            return Task.FromResult( new EnumClass() { EnumsList = new List<DateTimeKind>() { DateTimeKind.Local } });
-        }
+        public Task<EnumClass> GetEnumModel() => Task.FromResult(new EnumClass() { EnumsList = new List<DateTimeKind>() { DateTimeKind.Local } });
     }
 }

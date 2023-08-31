@@ -54,15 +54,9 @@ namespace Orleans.Runtime.MembershipService
             }
         }
 
-        public Task DeleteMembershipTableEntries(string clusterId)
-        {
-            return tableManager.DeleteTableEntries(clusterId);
-        }
+        public Task DeleteMembershipTableEntries(string clusterId) => tableManager.DeleteTableEntries(clusterId);
 
-        public Task CleanupDefunctSiloEntries(DateTimeOffset beforeDate)
-        {
-            return tableManager.CleanupDefunctSiloEntries(beforeDate);
-        }
+        public Task CleanupDefunctSiloEntries(DateTimeOffset beforeDate) => tableManager.CleanupDefunctSiloEntries(beforeDate);
 
         public async Task<MembershipTableData> ReadRow(SiloAddress key)
         {

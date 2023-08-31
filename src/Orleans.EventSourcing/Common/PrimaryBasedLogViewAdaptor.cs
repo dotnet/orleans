@@ -73,16 +73,11 @@ namespace Orleans.EventSourcing.Common
         /// <summary>
         /// Handle protocol messages.
         /// </summary>
-        protected virtual Task<ILogConsistencyProtocolMessage> OnMessageReceived(ILogConsistencyProtocolMessage payload)
-        {
+        protected virtual Task<ILogConsistencyProtocolMessage> OnMessageReceived(ILogConsistencyProtocolMessage payload) =>
             // subclasses that define custom protocol messages must override this
             throw new NotImplementedException();
-        }
 
-        public virtual Task<IReadOnlyList<TLogEntry>> RetrieveLogSegment(int fromVersion, int length)
-        {
-            throw new NotSupportedException();
-        }
+        public virtual Task<IReadOnlyList<TLogEntry>> RetrieveLogSegment(int fromVersion, int length) => throw new NotSupportedException();
 
         /// <summary>
         /// Handle notification messages. Override this to handle notification subtypes.
@@ -213,15 +208,9 @@ namespace Orleans.EventSourcing.Common
             return state;
         }
         /// called at beginning of WriteAsync to the current batch of updates
-        protected TSubmissionEntry[] GetCurrentBatchOfUpdates()
-        {
-            return pending.ToArray(); // must use a copy
-        }
+        protected TSubmissionEntry[] GetCurrentBatchOfUpdates() => pending.ToArray(); // must use a copy
         /// called at beginning of WriteAsync to get current number of pending updates
-        protected int GetNumberPendingUpdates()
-        {
-            return pending.Count;
-        }
+        protected int GetNumberPendingUpdates() => pending.Count;
 
         /// <summary>
         ///  Tentative State. Represents Stable State + effects of pending updates.
@@ -252,10 +241,7 @@ namespace Orleans.EventSourcing.Common
 
 
         /// For use by protocols. Determines if this cluster is part of the configured multicluster.
-        protected bool IsMyClusterJoined()
-        {
-            return true;
-        }
+        protected bool IsMyClusterJoined() => true;
 
         /// <summary>
         /// Block until this cluster is joined to the multicluster.
@@ -480,19 +466,13 @@ namespace Orleans.EventSourcing.Common
         /// <summary>
         /// Disable stats collection
         /// </summary>
-        public void DisableStatsCollection()
-        {
-            stats = null;
-        }
+        public void DisableStatsCollection() => stats = null;
 
         /// <summary>
         /// Get states
         /// </summary>
         /// <returns></returns>
-        public LogConsistencyStatistics GetStats()
-        {
-            return stats;
-        }
+        public LogConsistencyStatistics GetStats() => stats;
 
         private void CalculateTentativeState()
         {

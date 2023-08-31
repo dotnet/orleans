@@ -15,10 +15,7 @@ namespace UnitTests.Grains
             this.grainFactory = grainFactory;
         }
 
-        public Task<string> CheckExtension_1()
-        {
-            return Task.FromResult(grain.ExtensionProperty);
-        }
+        public Task<string> CheckExtension_1() => Task.FromResult(grain.ExtensionProperty);
 
         // check that one can send messages from within extensions.
         public Task<string> CheckExtension_2()
@@ -37,18 +34,12 @@ namespace UnitTests.Grains
             this.someString = someString;
         }
 
-        public Task<string> CheckExtension_1()
-        {
-            return Task.FromResult(someString);
-        }
+        public Task<string> CheckExtension_1() => Task.FromResult(someString);
     }
     
     public class AutoExtension : IAutoExtension
     {
-        public Task<string> CheckExtension()
-        {
-            return Task.FromResult("whoot!");
-        }
+        public Task<string> CheckExtension() => Task.FromResult("whoot!");
     }
 
     public class GenericTestExtension<T> : IGenericTestExtension<T>
@@ -62,10 +53,7 @@ namespace UnitTests.Grains
             this.grainFactory = grainFactory;
         }
 
-        public Task<T> CheckExtension_1()
-        {
-            return Task.FromResult(grain.ExtensionProperty);
-        }
+        public Task<T> CheckExtension_1() => Task.FromResult(grain.ExtensionProperty);
 
         // check that one can send messages from within extensions.
         public Task<string> CheckExtension_2()

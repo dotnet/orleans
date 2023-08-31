@@ -57,10 +57,7 @@ namespace ServiceBus.Tests.EvictionStrategyTests
 
         }
 
-        public bool IsUnderPressure(DateTime utcNow)
-        {
-            return this.isUnderPressure;
-        }
+        public bool IsUnderPressure(DateTime utcNow) => this.isUnderPressure;
     }
 
     internal class PurgeDecisionInjectionPredicate : TimePurgePredicate
@@ -72,9 +69,6 @@ namespace ServiceBus.Tests.EvictionStrategyTests
             this.ShouldPurge = false;
         }
 
-        public override bool ShouldPurgeFromTime(TimeSpan timeInCache, TimeSpan relativeAge)
-        {
-            return this.ShouldPurge;
-        }
+        public override bool ShouldPurgeFromTime(TimeSpan timeInCache, TimeSpan relativeAge) => this.ShouldPurge;
     }
 }

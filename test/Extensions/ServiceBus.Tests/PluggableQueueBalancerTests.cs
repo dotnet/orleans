@@ -54,9 +54,6 @@ namespace ServiceBus.Tests
         }
 
         [Fact(Skip = "https://github.com/dotnet/orleans/issues/4317"), TestCategory("BVT")]
-        public Task PluggableQueueBalancerTest_ShouldUseInjectedQueueBalancerAndBalanceCorrectly()
-        {
-            return base.ShouldUseInjectedQueueBalancerAndBalanceCorrectly(this.fixture, StreamProviderName, SiloCount, TotalQueueCount);
-        }
+        public Task PluggableQueueBalancerTest_ShouldUseInjectedQueueBalancerAndBalanceCorrectly() => base.ShouldUseInjectedQueueBalancerAndBalanceCorrectly(this.fixture, StreamProviderName, SiloCount, TotalQueueCount);
     }
 }

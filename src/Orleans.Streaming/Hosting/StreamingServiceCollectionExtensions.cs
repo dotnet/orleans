@@ -83,9 +83,6 @@ namespace Orleans.Hosting
         /// <param name="services">The service collection.</param>
         /// <param name="name">The stream filter name.</param>
         /// <returns>The service collection.</returns>
-        public static IServiceCollection AddStreamFilter<T>(this IServiceCollection services, string name) where T : class, IStreamFilter
-        {
-            return services.AddSingletonNamedService<IStreamFilter, T>(name);
-        }
+        public static IServiceCollection AddStreamFilter<T>(this IServiceCollection services, string name) where T : class, IStreamFilter => services.AddSingletonNamedService<IStreamFilter, T>(name);
     }
 }

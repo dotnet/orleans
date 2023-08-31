@@ -55,15 +55,9 @@ namespace Orleans.Runtime.GrainDirectory
         {
         }
 
-        public bool Remove(GrainId key)
-        {
-            return false;
-        }
+        public bool Remove(GrainId key) => false;
 
-        public bool Remove(GrainAddress key)
-        {
-            return false;
-        }
+        public bool Remove(GrainAddress key) => false;
 
         public void Clear()
         {

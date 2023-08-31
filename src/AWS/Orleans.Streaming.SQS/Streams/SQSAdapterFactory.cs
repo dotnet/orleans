@@ -65,26 +65,17 @@ namespace OrleansAWSUtils.Streams
         }
 
         /// <summary>Creates the adapter cache.</summary>
-        public virtual IQueueAdapterCache GetQueueAdapterCache()
-        {
-            return adapterCache;
-        }
+        public virtual IQueueAdapterCache GetQueueAdapterCache() => adapterCache;
 
         /// <summary>Creates the factory stream queue mapper.</summary>
-        public IStreamQueueMapper GetStreamQueueMapper()
-        {
-            return streamQueueMapper;
-        }
+        public IStreamQueueMapper GetStreamQueueMapper() => streamQueueMapper;
 
         /// <summary>
         /// Creates a delivery failure handler for the specified queue.
         /// </summary>
         /// <param name="queueId"></param>
         /// <returns></returns>
-        public Task<IStreamFailureHandler> GetDeliveryFailureHandler(QueueId queueId)
-        {
-            return StreamFailureHandlerFactory(queueId);
-        }
+        public Task<IStreamFailureHandler> GetDeliveryFailureHandler(QueueId queueId) => StreamFailureHandlerFactory(queueId);
 
         public static SQSAdapterFactory Create(IServiceProvider services, string name)
         {

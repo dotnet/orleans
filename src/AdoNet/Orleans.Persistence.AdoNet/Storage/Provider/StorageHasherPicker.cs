@@ -36,9 +36,6 @@ namespace Orleans.Storage
         /// <summary>
         /// <see cref="IStorageHasherPicker.PickHasher{T}"/>.
         /// </summary>
-        public IHasher PickHasher<T>(string serviceId, string storageProviderInstanceName, string grainType, GrainId grainId, IGrainState<T> grainState, string tag = null)
-        {
-            return HashProviders.FirstOrDefault();
-        }
+        public IHasher PickHasher<T>(string serviceId, string storageProviderInstanceName, string grainType, GrainId grainId, IGrainState<T> grainState, string tag = null) => HashProviders.FirstOrDefault();
     }
 }

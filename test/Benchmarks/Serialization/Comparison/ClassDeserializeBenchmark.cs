@@ -125,10 +125,7 @@ namespace Benchmarks.Comparison
         }
 
         [Benchmark]
-        public int GoogleProtobuf()
-        {
-            return SumResult(ProtoIntClass.Parser.ParseFrom(GoogleProtoInput));
-        }
+        public int GoogleProtobuf() => SumResult(ProtoIntClass.Parser.ParseFrom(GoogleProtoInput));
 
         [Benchmark]
         public int Hyperion()

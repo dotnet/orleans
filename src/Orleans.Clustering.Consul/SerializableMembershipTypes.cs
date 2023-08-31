@@ -106,20 +106,11 @@ namespace Orleans.Runtime.Host
             }
         }
 
-        internal static string FormatDeploymentSiloKey(string deploymentId, string rootKvFolder, SiloAddress siloAddress)
-        {
-            return $"{FormatDeploymentKVPrefix(deploymentId, rootKvFolder)}{KeySeparator}{siloAddress.ToParsableString()}";
-        }
+        internal static string FormatDeploymentSiloKey(string deploymentId, string rootKvFolder, SiloAddress siloAddress) => $"{FormatDeploymentKVPrefix(deploymentId, rootKvFolder)}{KeySeparator}{siloAddress.ToParsableString()}";
 
-        internal static string FormatSiloIAmAliveKey(string siloKey)
-        {
-            return $"{siloKey}{KeySeparator}{SiloIAmAliveSuffix}";
-        }
+        internal static string FormatSiloIAmAliveKey(string siloKey) => $"{siloKey}{KeySeparator}{SiloIAmAliveSuffix}";
 
-        internal static string FormatSiloIAmAliveKey(string deploymentId, string rootKvFolder, SiloAddress siloAddress)
-        {
-            return FormatSiloIAmAliveKey(FormatDeploymentSiloKey(deploymentId, rootKvFolder, siloAddress));
-        }
+        internal static string FormatSiloIAmAliveKey(string deploymentId, string rootKvFolder, SiloAddress siloAddress) => FormatSiloIAmAliveKey(FormatDeploymentSiloKey(deploymentId, rootKvFolder, siloAddress));
 
         internal static ConsulSiloRegistration FromKVPairs(string deploymentId, KVPair siloKV, KVPair iAmAliveKV)
         {

@@ -22,10 +22,7 @@ namespace AWSUtils.Tests.StorageTests.AWSUtils
             PartitionKey = "PK-DynamoDBDataManagerTests-" + Guid.NewGuid();
         }
 
-        private UnitTestDynamoDBTableData GenerateNewData()
-        {
-            return new UnitTestDynamoDBTableData("JustData", PartitionKey, "RK-" + Guid.NewGuid());
-        }
+        private UnitTestDynamoDBTableData GenerateNewData() => new UnitTestDynamoDBTableData("JustData", PartitionKey, "RK-" + Guid.NewGuid());
 
         [SkippableFact,  TestCategory("Functional")]
         public async Task DynamoDBDataManager_CreateItemAsync()

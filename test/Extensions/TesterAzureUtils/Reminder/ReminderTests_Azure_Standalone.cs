@@ -142,10 +142,7 @@ namespace Tester.AzureUtils.TimerTests
             };
         }
 
-        private string NewClusterId()
-        {
-            return string.Format("ReminderTest.{0}", Guid.NewGuid());
-        }
+        private string NewClusterId() => string.Format("ReminderTest.{0}", Guid.NewGuid());
 
         private async Task<IEnumerable<ReminderEntry>> GetAllRows(IReminderTable table)
         {

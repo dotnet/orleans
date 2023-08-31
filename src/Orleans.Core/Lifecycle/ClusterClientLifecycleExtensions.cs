@@ -13,10 +13,7 @@ namespace Orleans.Runtime
         /// <param name="participant">The lifecycle participant.</param>
         /// <returns>An adapter wrapped around <paramref name="participant"/> which implements <see cref="ILifecycleParticipant{TLifecycle}"/>.</returns>
         public static ILifecycleParticipant<TLifecycle> ParticipateIn<TLifecycle>(this ILifecycleParticipant<ILifecycleObservable> participant)
-            where TLifecycle : ILifecycleObservable
-        {
-            return new Bridge<TLifecycle>(participant);
-        }
+            where TLifecycle : ILifecycleObservable => new Bridge<TLifecycle>(participant);
 
         /// <summary>
         /// Adapts one lifecycle participant to a lifecycle participant of another observer type.
@@ -31,10 +28,7 @@ namespace Orleans.Runtime
                 this.participant = participant;
             }
 
-            public void Participate(TLifecycle lifecycle)
-            {
-                this.participant?.Participate(lifecycle);
-            }
+            public void Participate(TLifecycle lifecycle) => this.participant?.Participate(lifecycle);
         }
     }
 }

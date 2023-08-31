@@ -58,10 +58,7 @@ namespace Orleans.Transactions.AzureStorage.Tests
             TestUtils.CheckForAzureStorage();
         }
 
-        protected override void ConfigureTestCluster(TestClusterBuilder builder)
-        {
-            builder.AddSiloBuilderConfigurator<SiloBuilderConfigurator>();
-        }
+        protected override void ConfigureTestCluster(TestClusterBuilder builder) => builder.AddSiloBuilderConfigurator<SiloBuilderConfigurator>();
 
         public class SiloBuilderConfigurator : ISiloConfigurator
         {

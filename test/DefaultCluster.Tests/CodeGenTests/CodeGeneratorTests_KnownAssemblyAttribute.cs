@@ -24,45 +24,24 @@ namespace DefaultCluster.Tests.General
             Assert.True(serializerExists);
         }
 
-        private void ClientSerializerExists(Type t)
-        {
-            Assert.True(this.HostedCluster.GetSerializer().CanSerialize(t));
-        }
+        private void ClientSerializerExists(Type t) => Assert.True(this.HostedCluster.GetSerializer().CanSerialize(t));
 
         [Fact, TestCategory("BVT"), TestCategory("CodeGen"), TestCategory("Serialization")]
-        public async Task Silo_Serializer_Exists_for_Type_In_Grain_Assembly()
-        {
-            await SiloSerializerExists(typeof(UnitTests.Grains.SimpleGrainState));
-        }
+        public async Task Silo_Serializer_Exists_for_Type_In_Grain_Assembly() => await SiloSerializerExists(typeof(UnitTests.Grains.SimpleGrainState));
 
         [Fact, TestCategory("BVT"), TestCategory("CodeGen"), TestCategory("Serialization")]
-        public void Client_Serializer_Exists_for_Type_In_Grain_Assembly()
-        {
-            ClientSerializerExists(typeof(UnitTests.Grains.SimpleGrainState));
-        }
+        public void Client_Serializer_Exists_for_Type_In_Grain_Assembly() => ClientSerializerExists(typeof(UnitTests.Grains.SimpleGrainState));
 
         [Fact, TestCategory("BVT"), TestCategory("CodeGen"), TestCategory("Serialization")]
-        public async Task Silo_Serializer_Exists_for_Type_In_Known_Assembly()
-        {
-            await SiloSerializerExists(typeof(FSharpOption<int>));
-        }
+        public async Task Silo_Serializer_Exists_for_Type_In_Known_Assembly() => await SiloSerializerExists(typeof(FSharpOption<int>));
 
         [Fact, TestCategory("BVT"), TestCategory("CodeGen"), TestCategory("Serialization")]
-        public void Client_Serializer_Exists_for_Type_In_Known_Assembly()
-        {
-            ClientSerializerExists(typeof(FSharpOption<int>));
-        }
+        public void Client_Serializer_Exists_for_Type_In_Known_Assembly() => ClientSerializerExists(typeof(FSharpOption<int>));
 
         [Fact, TestCategory("BVT"), TestCategory("CodeGen"), TestCategory("Serialization")]
-        public async Task Silo_Serializer_Exists_for_Type_In_Grain_Assembly_containing_KnownAssemblyAttribute()
-        {
-            await SiloSerializerExists(typeof(UnitTests.FSharpTypes.SingleCaseDU));
-        }
+        public async Task Silo_Serializer_Exists_for_Type_In_Grain_Assembly_containing_KnownAssemblyAttribute() => await SiloSerializerExists(typeof(UnitTests.FSharpTypes.SingleCaseDU));
 
         [Fact, TestCategory("BVT"), TestCategory("CodeGen"), TestCategory("Serialization")]
-        public void Client_Serializer_Exists_for_Type_In_Grain_Assembly_containing_KnownAssemblyAttribute()
-        {
-            ClientSerializerExists(typeof(UnitTests.FSharpTypes.SingleCaseDU));
-        }
+        public void Client_Serializer_Exists_for_Type_In_Grain_Assembly_containing_KnownAssemblyAttribute() => ClientSerializerExists(typeof(UnitTests.FSharpTypes.SingleCaseDU));
     }
 }

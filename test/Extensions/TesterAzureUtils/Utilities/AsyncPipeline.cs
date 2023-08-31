@@ -60,10 +60,7 @@ namespace Tester.AzureUtils.Utilities
         /// Adds a new task to this AsyncPipeline.
         /// </summary>
         /// <param name="task">A task to add to this AsyncPipeline.</param>
-        public void Add(Task task)
-        {
-            Add(task, whiteBox: null);
-        }
+        public void Add(Task task) => Add(task, whiteBox: null);
 
         /// <summary>
         /// Adds a collection of tasks to this AsyncPipeline.
@@ -89,10 +86,7 @@ namespace Tester.AzureUtils.Utilities
         /// Waits until all currently queued asynchronous operations are done.
         /// Blocks the calling thread.
         /// </summary>
-        public void Wait()
-        {
-            Wait(null);
-        }
+        public void Wait() => Wait(null);
 
         internal void Wait(WhiteBox whiteBox)
         {

@@ -26,37 +26,22 @@ namespace DefaultCluster.Tests.General
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Generics"), TestCategory("FSharp")]
-        public async Task FSharpGrains_Ping()
-        {
-            await PingTest<int>(1);
-        }
+        public async Task FSharpGrains_Ping() => await PingTest<int>(1);
 
         [Fact, TestCategory("BVT"), TestCategory("Generics"), TestCategory("FSharp"), TestCategory("Serialization")]
-        public async Task FSharpGrains_Ping_Record_ofInt()
-        {
-            await PingTest<UnitTests.FSharpTypes.Record>(UnitTests.FSharpTypes.Record.ofInt(1));
-        }
+        public async Task FSharpGrains_Ping_Record_ofInt() => await PingTest<UnitTests.FSharpTypes.Record>(UnitTests.FSharpTypes.Record.ofInt(1));
 
         /// F# record without Serializable and Immutable attributes applied - yields a more meaningful error message
         [Fact, TestCategory("BVT"), TestCategory("Generics"), TestCategory("FSharp"), TestCategory("Serialization")]
-        public async Task FSharpGrains_Ping_Record_ofIntOption_Some_WithNoAttributes()
-        {
-            await PingTest<RecordOfIntOptionWithNoAttributes>(RecordOfIntOptionWithNoAttributes.ofInt(1));
-        }
+        public async Task FSharpGrains_Ping_Record_ofIntOption_Some_WithNoAttributes() => await PingTest<RecordOfIntOptionWithNoAttributes>(RecordOfIntOptionWithNoAttributes.ofInt(1));
 
         /// F# record with Serializable and Immutable attributes applied - grain call times out,
         /// Debugging the test reveals the same root cause as for FSharpGrains_Record_ofIntOption_WithNoAttributes
         [Fact, TestCategory("BVT"), TestCategory("Generics"), TestCategory("FSharp"), TestCategory("Serialization")]
-        public async Task FSharpGrains_Ping_Record_ofIntOption_Some()
-        {
-            await PingTest<RecordOfIntOption>(RecordOfIntOption.ofInt(1));
-        }
+        public async Task FSharpGrains_Ping_Record_ofIntOption_Some() => await PingTest<RecordOfIntOption>(RecordOfIntOption.ofInt(1));
 
         [Fact, TestCategory("BVT"), TestCategory("Generics"), TestCategory("FSharp"), TestCategory("Serialization")]
-        public async Task FSharpGrains_Ping_Record_ofIntOption_None()
-        {
-            await PingTest<RecordOfIntOption>(RecordOfIntOption.Empty);
-        }
+        public async Task FSharpGrains_Ping_Record_ofIntOption_None() => await PingTest<RecordOfIntOption>(RecordOfIntOption.Empty);
 
         [Fact, TestCategory("BVT"), TestCategory("Generics"), TestCategory("FSharp"), TestCategory("Serialization")]
         public async Task FSharpGrains_Ping_GenericRecord_ofInt()

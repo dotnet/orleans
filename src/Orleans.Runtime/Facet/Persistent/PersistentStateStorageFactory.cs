@@ -31,10 +31,7 @@ namespace Orleans.Runtime
             return new PersistentState<TState>(fullStateName, context, storageProvider);
         }
 
-        protected virtual string GetFullStateName(IGrainContext context, IPersistentStateConfiguration cfg)
-        {
-            return cfg.StateName;
-        }
+        protected virtual string GetFullStateName(IGrainContext context, IPersistentStateConfiguration cfg) => cfg.StateName;
 
         [DoesNotReturn]
         private static void ThrowMissingProviderException(IGrainContext context, IPersistentStateConfiguration cfg)

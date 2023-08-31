@@ -68,10 +68,7 @@ namespace UnitTests.Grains
             blockingMREMap[key] = mre;
         }
 
-        public static bool IsActivated(Guid key)
-        {
-            return grains.Contains(key);
-        }
+        public static bool IsActivated(Guid key) => grains.Contains(key);
 
         public Task RunForever()
         {
@@ -94,15 +91,9 @@ namespace UnitTests.Grains
             return Task.CompletedTask;
         }
 
-        public Task<int> GetNonBlockingCallCounter()
-        {
-            return Task.FromResult(counters[this.GetPrimaryKey()]);
-        }
+        public Task<int> GetNonBlockingCallCounter() => Task.FromResult(counters[this.GetPrimaryKey()]);
 
-        public Task<bool> DidActivationTryToStart(GrainId id)
-        {
-            return Task.FromResult(ActivationCalls.TryGetValue(id, out _));
-        }
+        public Task<bool> DidActivationTryToStart(GrainId id) => Task.FromResult(ActivationCalls.TryGetValue(id, out _));
 
         public Task BlockingDeactivation()
         {
@@ -172,9 +163,6 @@ namespace UnitTests.Grains
             return Task.CompletedTask;
         }
 
-        public Task<bool> IsActivated(Guid key)
-        {
-            return Task.FromResult(StuckGrain.IsActivated(key));
-        }
+        public Task<bool> IsActivated(Guid key) => Task.FromResult(StuckGrain.IsActivated(key));
     }
 }

@@ -78,15 +78,9 @@ namespace Orleans.Streams
             }
         }
 
-        public bool RemoveObserver(GuidId subscriptionId)
-        {
-            return allStreamObservers.TryRemove(subscriptionId, out _);
-        }
+        public bool RemoveObserver(GuidId subscriptionId) => allStreamObservers.TryRemove(subscriptionId, out _);
 
-        public Task<StreamHandshakeToken> DeliverImmutable(GuidId subscriptionId, QualifiedStreamId streamId, object item, StreamSequenceToken currentToken, StreamHandshakeToken handshakeToken)
-        {
-            return DeliverMutable(subscriptionId, streamId, item, currentToken, handshakeToken);
-        }
+        public Task<StreamHandshakeToken> DeliverImmutable(GuidId subscriptionId, QualifiedStreamId streamId, object item, StreamSequenceToken currentToken, StreamHandshakeToken handshakeToken) => DeliverMutable(subscriptionId, streamId, item, currentToken, handshakeToken);
 
         public async Task<StreamHandshakeToken> DeliverMutable(GuidId subscriptionId, QualifiedStreamId streamId, object item, StreamSequenceToken currentToken, StreamHandshakeToken handshakeToken)
         {
@@ -207,10 +201,7 @@ namespace Orleans.Streams
             return Task.FromResult(allStreamObservers.TryGetValue(subscriptionId, out observer) ? observer.GetSequenceToken() : null);
         }
 
-        internal int DiagCountStreamObservers<T>(QualifiedStreamId streamId)
-        {
-            return allStreamObservers.Count(o => o.Value is StreamSubscriptionHandleImpl<T> i && i.SameStreamId(streamId));
-        }
+        internal int DiagCountStreamObservers<T>(QualifiedStreamId streamId) => allStreamObservers.Count(o => o.Value is StreamSubscriptionHandleImpl<T> i && i.SameStreamId(streamId));
 
         internal List<StreamSubscriptionHandleImpl<T>> GetAllStreamHandles<T>()
         {

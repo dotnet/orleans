@@ -28,9 +28,6 @@ namespace Orleans.Streams
             }
         }
 
-        private void InstallStreamConsumerExtension(IGrainContext context, IStreamSubscriptionObserver observer)
-        {
-            _streamProviderRuntime.BindExtension<StreamConsumerExtension, IStreamConsumerExtension>(() => new StreamConsumerExtension(_streamProviderRuntime, observer));
-        }
+        private void InstallStreamConsumerExtension(IGrainContext context, IStreamSubscriptionObserver observer) => _streamProviderRuntime.BindExtension<StreamConsumerExtension, IStreamConsumerExtension>(() => new StreamConsumerExtension(_streamProviderRuntime, observer));
     }
 }

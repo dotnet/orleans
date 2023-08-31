@@ -25,25 +25,13 @@ namespace UnitTests.StreamingTests
             _consumer = ConsumerObserver.NewObserver(logger);
         }
 
-        public static Streaming_ConsumerClientObject NewObserver(ILogger logger, IClusterClient client)
-        {
-            return new Streaming_ConsumerClientObject(logger, client);
-        }
+        public static Streaming_ConsumerClientObject NewObserver(ILogger logger, IClusterClient client) => new Streaming_ConsumerClientObject(logger, client);
 
-        public Task OnNextAsync(StreamItem item, StreamSequenceToken token = null)
-        {
-            return _consumer.OnNextAsync(item, token);
-        }
+        public Task OnNextAsync(StreamItem item, StreamSequenceToken token = null) => _consumer.OnNextAsync(item, token);
 
-        public Task OnCompletedAsync()
-        {
-            return _consumer.OnCompletedAsync();
-        }
+        public Task OnCompletedAsync() => _consumer.OnCompletedAsync();
 
-        public Task OnErrorAsync(Exception ex)
-        {
-            return _consumer.OnErrorAsync(ex);
-        }
+        public Task OnErrorAsync(Exception ex) => _consumer.OnErrorAsync(ex);
 
         public Task BecomeConsumer(Guid streamId, string providerToUse)
         {
@@ -57,25 +45,13 @@ namespace UnitTests.StreamingTests
             return _consumer.BecomeConsumer(streamId, this.client.GetStreamProvider(providerToUse), streamNamespace);
         }
 
-        public Task StopBeingConsumer()
-        {
-            return _consumer.StopBeingConsumer(this.client.GetStreamProvider(_providerToUse));
-        }
+        public Task StopBeingConsumer() => _consumer.StopBeingConsumer(this.client.GetStreamProvider(_providerToUse));
 
-        public Task<int> GetConsumerCount()
-        {
-            return _consumer.ConsumerCount;
-        }
+        public Task<int> GetConsumerCount() => _consumer.ConsumerCount;
 
-        public Task<int> GetItemsConsumed()
-        {
-            return _consumer.ItemsConsumed;
-        }
+        public Task<int> GetItemsConsumed() => _consumer.ItemsConsumed;
 
-        public Task DeactivateConsumerOnIdle()
-        {
-            return Task.CompletedTask;
-        }
+        public Task DeactivateConsumerOnIdle() => Task.CompletedTask;
     }
 
     public class Streaming_ProducerClientObject : IStreaming_ProducerGrain
@@ -101,20 +77,11 @@ namespace UnitTests.StreamingTests
             return Task.CompletedTask;
         }
 
-        public Task ProduceSequentialSeries(int count)
-        {
-             return this.producer.ProduceSequentialSeries(count);
-        }
+        public Task ProduceSequentialSeries(int count) => this.producer.ProduceSequentialSeries(count);
 
-        public Task ProduceParallelSeries(int count)
-        {
-             return this.producer.ProduceParallelSeries(count);
-        }
+        public Task ProduceParallelSeries(int count) => this.producer.ProduceParallelSeries(count);
 
-        public Task<int> GetItemsProduced()
-        {
-            return this.producer.ItemsProduced;
-        }
+        public Task<int> GetItemsProduced() => this.producer.ItemsProduced;
 
         public Task ProducePeriodicSeries(int count)
         {
@@ -124,45 +91,21 @@ namespace UnitTests.StreamingTests
                     }, count);
         }
 
-        public Task<Guid> GetStreamId()
-        {
-            return this.producer.StreamId;
-        }
+        public Task<Guid> GetStreamId() => this.producer.StreamId;
 
-        public Task<string> GetProviderName()
-        {
-            return Task.FromResult(this.producer.ProviderName);
-        }
+        public Task<string> GetProviderName() => Task.FromResult(this.producer.ProviderName);
 
-        public Task AddNewConsumerGrain(Guid consumerGrainId)
-        {
-            return this.producer.AddNewConsumerGrain(consumerGrainId);
-        }
+        public Task AddNewConsumerGrain(Guid consumerGrainId) => this.producer.AddNewConsumerGrain(consumerGrainId);
 
-        public Task<int> GetExpectedItemsProduced()
-        {
-            return this.producer.ExpectedItemsProduced;
-        }
+        public Task<int> GetExpectedItemsProduced() => this.producer.ExpectedItemsProduced;
 
-        public Task<int> GetProducerCount()
-        {
-            return this.producer.ProducerCount;
-        }
+        public Task<int> GetProducerCount() => this.producer.ProducerCount;
 
-        public Task StopBeingProducer()
-        {
-            return this.producer.StopBeingProducer();
-        }
+        public Task StopBeingProducer() => this.producer.StopBeingProducer();
 
-        public Task VerifyFinished()
-        {
-            return this.producer.VerifyFinished();
-        }
+        public Task VerifyFinished() => this.producer.VerifyFinished();
 
-        public Task DeactivateProducerOnIdle()
-        {
-            return Task.CompletedTask;
-        }
+        public Task DeactivateProducerOnIdle() => Task.CompletedTask;
     }
 
     internal class ConsumerProxy
@@ -332,10 +275,7 @@ namespace UnitTests.StreamingTests
             await Task.WhenAll(tasks);
         }
 
-        public Task<int> GetNumActivations(IInternalGrainFactory grainFactory)
-        {
-            return GetNumActivations(_targets.Distinct(), grainFactory);
-    }
+        public Task<int> GetNumActivations(IInternalGrainFactory grainFactory) => GetNumActivations(_targets.Distinct(), grainFactory);
 
         public static async Task<int> GetNumActivations(IEnumerable<IGrain> targets, IInternalGrainFactory grainFactory)
         {
@@ -558,9 +498,6 @@ namespace UnitTests.StreamingTests
             return Task.WhenAll(tasks);
         }
 
-        public Task<int> GetNumActivations(IInternalGrainFactory grainFactory)
-        {
-            return ConsumerProxy.GetNumActivations(_targets.Distinct(), grainFactory);
-        }
+        public Task<int> GetNumActivations(IInternalGrainFactory grainFactory) => ConsumerProxy.GetNumActivations(_targets.Distinct(), grainFactory);
     }
 }

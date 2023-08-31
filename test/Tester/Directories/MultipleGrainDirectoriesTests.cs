@@ -12,10 +12,7 @@ namespace Tester.Directories
 {
     public abstract class MultipleGrainDirectoriesTests : TestClusterPerTest
     {
-        protected override void ConfigureTestCluster(TestClusterBuilder builder)
-        {
-            builder.Options.InitialSilosCount = 2;
-        }
+        protected override void ConfigureTestCluster(TestClusterBuilder builder) => builder.Options.InitialSilosCount = 2;
 
         [SkippableFact, TestCategory("Directory"), TestCategory("Functional")]
         public async Task PingGrain()

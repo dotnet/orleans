@@ -31,10 +31,7 @@ namespace TestGrains
             [Orleans.Id(0)]
             public uint Balance { get; set; }
 
-            public void Apply(DepositTransaction d)
-            {
-                Balance = Balance + d.DepositAmount;
-            }
+            public void Apply(DepositTransaction d) => Balance = Balance + d.DepositAmount;
 
             public void Apply(WithdrawalTransaction d)
             {
@@ -45,10 +42,7 @@ namespace TestGrains
             }
         }
 
-        public Task<uint> Balance()
-        {
-            return Task.FromResult(State.Balance);
-        }
+        public Task<uint> Balance() => Task.FromResult(State.Balance);
 
         public Task Deposit(uint amount, Guid guid, string description)
         {
@@ -83,10 +77,7 @@ namespace TestGrains
             });
         }
 
-        public Task<IReadOnlyList<Transaction>> GetTransactionLog()
-        {
-            return RetrieveConfirmedEvents(0, Version);
-        }
+        public Task<IReadOnlyList<Transaction>> GetTransactionLog() => RetrieveConfirmedEvents(0, Version);
     }
 
     

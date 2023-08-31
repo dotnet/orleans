@@ -34,10 +34,7 @@ namespace UnitTests.SchedulerTests
             this.loggerFactory = OrleansTaskSchedulerBasicTests.InitSchedulerLogging();
         }
 
-        public void Dispose()
-        {
-            this.loggerFactory.Dispose();
-        }
+        public void Dispose() => this.loggerFactory.Dispose();
 
         [Fact, TestCategory("Functional"), TestCategory("Scheduler")]
         public void Sched_AC_Test()

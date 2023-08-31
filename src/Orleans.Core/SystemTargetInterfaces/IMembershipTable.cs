@@ -129,10 +129,7 @@ namespace Orleans
             VersionEtag = eTag;
         }
 
-        public TableVersion Next()
-        {
-            return new TableVersion(Version + 1, VersionEtag);
-        }
+        public TableVersion Next() => new TableVersion(Version + 1, VersionEtag);
 
         public override string ToString() => $"<{Version}, {VersionEtag}>";
         string IFormattable.ToString(string format, IFormatProvider formatProvider) => ToString();

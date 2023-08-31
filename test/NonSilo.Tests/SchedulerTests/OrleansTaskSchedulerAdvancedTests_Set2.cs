@@ -33,11 +33,8 @@ namespace UnitTests.SchedulerTests
             this.context = new UnitTestSchedulingContext();
             this.performanceMetrics = new TestHooksHostEnvironmentStatistics();
         }
-        
-        public void Dispose()
-        {
-            this.loggerFactory.Dispose();
-        }
+
+        public void Dispose() => this.loggerFactory.Dispose();
 
         [Fact, TestCategory("Functional"), TestCategory("Scheduler")]
         public void ActivationSched_SimpleFifoTest()

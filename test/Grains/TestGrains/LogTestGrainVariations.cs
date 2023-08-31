@@ -52,12 +52,9 @@ namespace TestGrains
             }
             return storagegrain;
         }
- 
 
-        public Task<bool> ApplyUpdatesToStorage(IReadOnlyList<object> updates, int expectedversion)
-        {
-            return GetStorageGrain().Update(updates, expectedversion);
-        }
+
+        public Task<bool> ApplyUpdatesToStorage(IReadOnlyList<object> updates, int expectedversion) => GetStorageGrain().Update(updates, expectedversion);
 
         public async Task<KeyValuePair<int, MyGrainState>> ReadStateFromStorage()
         {

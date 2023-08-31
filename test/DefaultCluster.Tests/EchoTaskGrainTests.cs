@@ -32,10 +32,7 @@ namespace DefaultCluster.Tests.General
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Echo")]
-        public void EchoGrain_GetGrain()
-        {
-            grain = this.GrainFactory.GetGrain<IEchoTaskGrain>(Guid.NewGuid());
-        }
+        public void EchoGrain_GetGrain() => grain = this.GrainFactory.GetGrain<IEchoTaskGrain>(Guid.NewGuid());
 
         [Fact, TestCategory("BVT"), TestCategory("Echo")]
         public async Task EchoGrain_Echo()

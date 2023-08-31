@@ -67,10 +67,7 @@ namespace Orleans.Runtime
         /// </summary>
         /// <param name="serviceProvider">The service provider.</param>
         /// <returns>A <see cref="Task"/> representing the work performed.</returns>
-        public virtual Task Init(IServiceProvider serviceProvider)
-        {
-            return Task.CompletedTask;
-        }
+        public virtual Task Init(IServiceProvider serviceProvider) => Task.CompletedTask;
 
         private void OnStatusChange(GrainServiceStatus oldStatus, GrainServiceStatus newStatus)
         {
@@ -128,10 +125,7 @@ namespace Orleans.Runtime
         }
 
         /// <inheritdoc/>
-        void IRingRangeListener.RangeChangeNotification(IRingRange oldRange, IRingRange newRange, bool increased)
-        {
-            this.WorkItemGroup.QueueTask(() => OnRangeChange(oldRange, newRange, increased), this).Ignore();
-        }
+        void IRingRangeListener.RangeChangeNotification(IRingRange oldRange, IRingRange newRange, bool increased) => this.WorkItemGroup.QueueTask(() => OnRangeChange(oldRange, newRange, increased), this).Ignore();
 
         /// <summary>
         /// Invoked when the ring range owned by the service instance changes because of a change in the cluster state

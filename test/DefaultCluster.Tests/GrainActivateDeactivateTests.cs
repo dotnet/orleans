@@ -20,10 +20,7 @@ namespace DefaultCluster.Tests.ActivationsLifeCycleTests
             watcher.Clear().Wait();
         }
 
-        public virtual void Dispose()
-        {
-            watcher.Clear().Wait();
-        }
+        public virtual void Dispose() => watcher.Clear().Wait();
 
         [Fact, TestCategory("BVT"), TestCategory("ActivateDeactivate"), TestCategory("GetGrain")]
         public async Task WatcherGrain_GetGrain()

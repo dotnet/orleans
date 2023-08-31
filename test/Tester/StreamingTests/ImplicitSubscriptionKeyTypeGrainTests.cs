@@ -37,10 +37,7 @@ namespace UnitTests.StreamingTests
 
             private class MyClientBuilderConfigurator : IClientBuilderConfigurator
             {
-                public void Configure(IConfiguration configuration, IClientBuilder clientBuilder)
-                {
-                    clientBuilder.AddMemoryStreams(ImplicitStreamTestConstants.StreamProviderName);
-                }
+                public void Configure(IConfiguration configuration, IClientBuilder clientBuilder) => clientBuilder.AddMemoryStreams(ImplicitStreamTestConstants.StreamProviderName);
             }
         }
 

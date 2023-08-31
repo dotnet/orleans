@@ -25,10 +25,7 @@ namespace Tester.StreamingTests
 
         public class SiloBuilderConfigurator : ISiloConfigurator
         {
-            public void Configure(ISiloBuilder hostBuilder)
-            {
-                hostBuilder.ConfigureServices(services => services.AddTransient<LeaseBasedQueueBalancerForTest>());
-            }
+            public void Configure(ISiloBuilder hostBuilder) => hostBuilder.ConfigureServices(services => services.AddTransient<LeaseBasedQueueBalancerForTest>());
         }
 
         private async Task<bool> CheckLeases(ILeaseManagerGrain leaseManager, int siloCount, int expectedResponsibilityPerBalancer, bool lastTry)

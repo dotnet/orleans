@@ -17,10 +17,7 @@ namespace UnitTests.GrainInterfaces
         [Orleans.Id(0)]
         public int Int { get; set; }
 
-        void IOnDeserialized.OnDeserialized(DeserializationContext context)
-        {
-            this.Context = context;
-        }
+        void IOnDeserialized.OnDeserialized(DeserializationContext context) => this.Context = context;
     }
 
     [Serializable]

@@ -19,26 +19,17 @@ namespace Orleans.Hosting
         /// <summary>
         /// Configures Redis as the default grain storage provider.
         /// </summary>
-        public static IServiceCollection AddRedisGrainStorageAsDefault(this IServiceCollection services, Action<RedisStorageOptions> configureOptions)
-        {
-            return services.AddRedisGrainStorage(ProviderConstants.DEFAULT_STORAGE_PROVIDER_NAME, ob => ob.Configure(configureOptions));
-        }
+        public static IServiceCollection AddRedisGrainStorageAsDefault(this IServiceCollection services, Action<RedisStorageOptions> configureOptions) => services.AddRedisGrainStorage(ProviderConstants.DEFAULT_STORAGE_PROVIDER_NAME, ob => ob.Configure(configureOptions));
 
         /// <summary>
         /// Configures Redis as a grain storage provider.
         /// </summary>
-        public static IServiceCollection AddRedisGrainStorage(this IServiceCollection services, string name, Action<RedisStorageOptions> configureOptions)
-        {
-            return services.AddRedisGrainStorage(name, ob => ob.Configure(configureOptions));
-        }
+        public static IServiceCollection AddRedisGrainStorage(this IServiceCollection services, string name, Action<RedisStorageOptions> configureOptions) => services.AddRedisGrainStorage(name, ob => ob.Configure(configureOptions));
 
         /// <summary>
         /// Configures Redis as the default grain storage provider.
         /// </summary>
-        public static IServiceCollection AddRedisGrainStorageAsDefault(this IServiceCollection services, Action<OptionsBuilder<RedisStorageOptions>> configureOptions = null)
-        {
-            return services.AddRedisGrainStorage(ProviderConstants.DEFAULT_STORAGE_PROVIDER_NAME, configureOptions);
-        }
+        public static IServiceCollection AddRedisGrainStorageAsDefault(this IServiceCollection services, Action<OptionsBuilder<RedisStorageOptions>> configureOptions = null) => services.AddRedisGrainStorage(ProviderConstants.DEFAULT_STORAGE_PROVIDER_NAME, configureOptions);
 
         /// <summary>
         /// Configures Redis as a grain storage provider.

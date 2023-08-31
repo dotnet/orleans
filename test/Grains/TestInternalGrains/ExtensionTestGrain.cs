@@ -78,10 +78,7 @@ namespace UnitTests.Grains
             _grainContext = grainContext;
         }
 
-        public Task DoSomething()
-        {
-            return Task.CompletedTask;
-        }
+        public Task DoSomething() => Task.CompletedTask;
 
         public override Task OnActivateAsync(CancellationToken cancellationToken)
         {

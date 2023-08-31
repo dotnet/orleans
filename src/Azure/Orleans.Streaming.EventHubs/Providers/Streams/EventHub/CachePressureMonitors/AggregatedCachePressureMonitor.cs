@@ -47,10 +47,7 @@ namespace Orleans.Streaming.EventHubs
         /// Add one monitor to this aggregated cache monitor group
         /// </summary>
         /// <param name="monitor"></param>
-        public void AddCachePressureMonitor(ICachePressureMonitor monitor)
-        {
-            this.Add(monitor);
-        }
+        public void AddCachePressureMonitor(ICachePressureMonitor monitor) => this.Add(monitor);
 
         /// <summary>
         /// If any monitor in this aggregated cache monitor group is under pressure, then return true

@@ -27,15 +27,9 @@ namespace UnitTests.Grains
         {
             public int Value { get; private set; }
 
-            public void Increment()
-            {
-                Value++;
-            }
+            public void Increment() => Value++;
 
-            public void Clear()
-            {
-                Value = 0;
-            }
+            public void Clear() => Value = 0;
         }
 
         public override Task OnActivateAsync(CancellationToken cancellationToken)

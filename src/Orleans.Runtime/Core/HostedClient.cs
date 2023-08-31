@@ -221,10 +221,7 @@ namespace Orleans.Runtime
             Utils.SafeExecute(() => this.messagePump?.GetAwaiter().GetResult());
         }
 
-        private void Start()
-        {
-            this.messagePump = Task.Run(this.RunClientMessagePump);
-        }
+        private void Start() => this.messagePump = Task.Run(this.RunClientMessagePump);
 
         private async Task RunClientMessagePump()
         {
@@ -384,11 +381,9 @@ namespace Orleans.Runtime
         public void Deactivate(DeactivationReason deactivationReason, CancellationToken? cancellationToken = null) { }
         public Task Deactivated => Task.CompletedTask;
 
-        public void Rehydrate(IRehydrationContext context)
-        {
+        public void Rehydrate(IRehydrationContext context) =>
             // Migration is not supported, but we need to dispose of the context if it's provided
             (context as IDisposable)?.Dispose();
-        }
 
         public void Migrate(Dictionary<string, object> requestContext, CancellationToken? cancellationToken = null)
         {

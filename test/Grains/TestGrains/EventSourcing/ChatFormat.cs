@@ -22,10 +22,7 @@ namespace TestGrains
             }
         }
 
-        public static XElement GetPostsContainer(this XDocument document)
-        {
-            return document.Elements().Single(x => x.Name.LocalName == "root").Elements().Single(x => x.Name.LocalName == "posts");
-        }
+        public static XElement GetPostsContainer(this XDocument document) => document.Elements().Single(x => x.Name.LocalName == "root").Elements().Single(x => x.Name.LocalName == "posts");
 
         public static XElement MakePost(Guid guid, string user, DateTime timestamp, string text)
         {
@@ -44,10 +41,7 @@ namespace TestGrains
                        .FirstOrDefault();
         }
 
-        public static void ReplaceText(this XElement post, string text)
-        {
-            post.Element("text").ReplaceAll(text);
-        }
+        public static void ReplaceText(this XElement post, string text) => post.Element("text").ReplaceAll(text);
 
         public static void EnforceLimit(this XDocument document)
         {

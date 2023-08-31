@@ -20,30 +20,21 @@ namespace Orleans.Hosting
         /// </summary>
         /// <param name="configurator">The configuration builder.</param>
         /// <param name="configureOptions">The configuration delegate.</param>
-        public static void ConfigurePullingAgent(this ISiloPersistentStreamConfigurator configurator, Action<OptionsBuilder<StreamPullingAgentOptions>> configureOptions = null)
-        {
-            configurator.Configure(configureOptions);
-        }
+        public static void ConfigurePullingAgent(this ISiloPersistentStreamConfigurator configurator, Action<OptionsBuilder<StreamPullingAgentOptions>> configureOptions = null) => configurator.Configure(configureOptions);
 
         /// <summary>
         /// Configures the lifecycle.
         /// </summary>
         /// <param name="configurator">The configuration builder.</param>
         /// <param name="configureOptions">The configuration delegate.</param>
-        public static void ConfigureLifecycle(this ISiloPersistentStreamConfigurator configurator, Action<OptionsBuilder<StreamLifecycleOptions>> configureOptions)
-        {
-            configurator.Configure(configureOptions);
-        }
+        public static void ConfigureLifecycle(this ISiloPersistentStreamConfigurator configurator, Action<OptionsBuilder<StreamLifecycleOptions>> configureOptions) => configurator.Configure(configureOptions);
 
         /// <summary>
         /// Configures partition balancing.
         /// </summary>
         /// <param name="configurator">The configuration builder.</param>
         /// <param name="factory">The partition balancer factory.</param>
-        public static void ConfigurePartitionBalancing(this ISiloPersistentStreamConfigurator configurator, Func<IServiceProvider, string, IStreamQueueBalancer> factory)
-        {
-            configurator.ConfigureComponent(factory);
-        }
+        public static void ConfigurePartitionBalancing(this ISiloPersistentStreamConfigurator configurator, Func<IServiceProvider, string, IStreamQueueBalancer> factory) => configurator.ConfigureComponent(factory);
 
         /// <summary>
         /// Configures partition balancing.
@@ -56,9 +47,6 @@ namespace Orleans.Hosting
             this ISiloPersistentStreamConfigurator configurator,
             Func<IServiceProvider, string, IStreamQueueBalancer> factory,
             Action<OptionsBuilder<TOptions>> configureOptions)
-            where TOptions : class, new()
-        {
-            configurator.ConfigureComponent(factory, configureOptions);
-        }
+            where TOptions : class, new() => configurator.ConfigureComponent(factory, configureOptions);
     }
 }

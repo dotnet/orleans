@@ -249,10 +249,7 @@ namespace ServiceBus.Tests.EvictionStrategyTests
             }
         }
 
-        private Task<IStreamQueueCheckpointer<string>> CheckPointerFactory(string partition)
-        {
-            return Task.FromResult<IStreamQueueCheckpointer<string>>(NoOpCheckpointer.Instance);
-        }
+        private Task<IStreamQueueCheckpointer<string>> CheckPointerFactory(string partition) => Task.FromResult<IStreamQueueCheckpointer<string>>(NoOpCheckpointer.Instance);
 
         private IEventHubQueueCache CacheFactory(string partition, IStreamQueueCheckpointer<string> checkpointer, ILoggerFactory loggerFactory)
         {

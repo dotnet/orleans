@@ -297,10 +297,7 @@ namespace Orleans.Runtime
             GrainInstance = grainInstance;
         }
 
-        public void SetState(ActivationState state)
-        {
-            State = state;
-        }
+        public void SetState(ActivationState state) => State = state;
 
         /// <summary>
         /// Check whether this activation is overloaded.
@@ -395,10 +392,7 @@ namespace Orleans.Runtime
             }
         }
 
-        public void ResetKeepAliveRequest()
-        {
-            KeepAliveUntil = DateTime.MinValue;
-        }
+        public void ResetKeepAliveRequest() => KeepAliveUntil = DateTime.MinValue;
 
         private void ScheduleOperation(object operation)
         {
@@ -1331,10 +1325,7 @@ namespace Orleans.Runtime
 
         #region Activation
 
-        public void Rehydrate(IRehydrationContext context)
-        {
-            ScheduleOperation(new Command.Rehydrate(context));
-        }
+        public void Rehydrate(IRehydrationContext context) => ScheduleOperation(new Command.Rehydrate(context));
 
         public void Activate(Dictionary<string, object> requestContext, CancellationToken? cancellationToken)
         {

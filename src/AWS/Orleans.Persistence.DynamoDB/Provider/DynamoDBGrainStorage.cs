@@ -52,10 +52,7 @@ namespace Orleans.Storage
             this.serviceProvider = serviceProvider;
         }
 
-        public void Participate(ISiloLifecycle lifecycle)
-        {
-            lifecycle.Subscribe(OptionFormattingUtilities.Name<DynamoDBGrainStorage>(this.name), this.options.InitStage, Init, Close);
-        }
+        public void Participate(ISiloLifecycle lifecycle) => lifecycle.Subscribe(OptionFormattingUtilities.Name<DynamoDBGrainStorage>(this.name), this.options.InitStage, Init, Close);
 
         /// <summary> Initialization function for this storage provider. </summary>
         public async Task Init(CancellationToken ct)

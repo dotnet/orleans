@@ -331,14 +331,8 @@ namespace Tester.StreamingTests
             return sub;
         }
 
-        public Task<IEnumerable<StreamSubscription>> GetSubscriptions(FullStreamIdentity streamIdentity)
-        {
-            return subManager.GetSubscriptions(streamIdentity.ProviderName, streamIdentity);
-        }
+        public Task<IEnumerable<StreamSubscription>> GetSubscriptions(FullStreamIdentity streamIdentity) => subManager.GetSubscriptions(streamIdentity.ProviderName, streamIdentity);
 
-        public async Task RemoveSubscription(FullStreamIdentity streamId, Guid subscriptionId)
-        {
-            await subManager.RemoveSubscription(streamId.ProviderName, streamId, subscriptionId);
-        }
+        public async Task RemoveSubscription(FullStreamIdentity streamId, Guid subscriptionId) => await subManager.RemoveSubscription(streamId.ProviderName, streamId, subscriptionId);
     }
 }

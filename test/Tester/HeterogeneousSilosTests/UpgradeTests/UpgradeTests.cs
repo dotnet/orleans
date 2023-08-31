@@ -12,13 +12,11 @@ namespace Tester.HeterogeneousSilosTests.UpgradeTests
     {
         protected override Type VersionSelectorStrategy => typeof(MinimumVersion);
         protected override Type CompatibilityStrategy => typeof(BackwardCompatible);
-        
+
         [Fact]
-        public Task AlwaysCreateActivationWithMinimumVersion()
-        {
+        public Task AlwaysCreateActivationWithMinimumVersion() =>
             // Even after v2 silo is deployed, we should only activate v1 grains
-            return Step1_StartV1Silo_Step2_StartV2Silo_Step3_StopV2Silo(step2Version: 1);
-        }
+            Step1_StartV1Silo_Step2_StartV2Silo_Step3_StopV2Silo(step2Version: 1);
     }
 
     [TestCategory("Versioning"), TestCategory("ExcludeXAML"), TestCategory("SlowBVT")]
@@ -28,27 +26,21 @@ namespace Tester.HeterogeneousSilosTests.UpgradeTests
         protected override Type CompatibilityStrategy => typeof(BackwardCompatible);
 
         [Fact]
-        public Task AlwaysCreateActivationWithLatestVersion()
-        {
+        public Task AlwaysCreateActivationWithLatestVersion() =>
             // After v2 is deployed, we should always activate v2 grains
-            return Step1_StartV1Silo_Step2_StartV2Silo_Step3_StopV2Silo(step2Version: 2);
-        }
+            Step1_StartV1Silo_Step2_StartV2Silo_Step3_StopV2Silo(step2Version: 2);
 
         [Fact]
-        public Task UpgradeProxyCallNoPendingRequest()
-        {
+        public Task UpgradeProxyCallNoPendingRequest() =>
             // v2 -> v1 call should provoke grain activation upgrade.
             // The grain is inactive when receiving the message
-            return ProxyCallNoPendingRequest(expectedVersion: 2);
-        }
+            ProxyCallNoPendingRequest(expectedVersion: 2);
 
         [Fact]
-        public Task UpgradeProxyCallWithPendingRequest()
-        {
+        public Task UpgradeProxyCallWithPendingRequest() =>
             // v2 -> v1 call should provoke grain activation upgrade
             // The grain is already processing a request when receiving the message
-            return ProxyCallWithPendingRequest(expectedVersion: 2);
-        }
+            ProxyCallWithPendingRequest(expectedVersion: 2);
     }
 
     [TestCategory("Versioning"), TestCategory("ExcludeXAML"), TestCategory("SlowBVT")]
@@ -58,20 +50,16 @@ namespace Tester.HeterogeneousSilosTests.UpgradeTests
         protected override Type CompatibilityStrategy => typeof(AllVersionsCompatible);
 
         [Fact]
-        public Task DoNotUpgradeProxyCallNoPendingRequest()
-        {
+        public Task DoNotUpgradeProxyCallNoPendingRequest() =>
             // v2 -> v1 call should provoke grain activation upgrade because they are compatible
             // The grain is inactive when receiving the message
-            return ProxyCallNoPendingRequest(expectedVersion: 1);
-        }
+            ProxyCallNoPendingRequest(expectedVersion: 1);
 
         [Fact]
-        public Task DoNotUpgradeProxyCallWithPendingRequest()
-        {
+        public Task DoNotUpgradeProxyCallWithPendingRequest() =>
             // v2 -> v1 call should provoke grain activation upgrade because they are compatible
             // The grain is already processing a request when receiving the message
-            return ProxyCallWithPendingRequest(expectedVersion: 1);
-        }
+            ProxyCallWithPendingRequest(expectedVersion: 1);
     }
 
     [TestCategory("Versioning"), TestCategory("ExcludeXAML"), TestCategory("SlowBVT")]

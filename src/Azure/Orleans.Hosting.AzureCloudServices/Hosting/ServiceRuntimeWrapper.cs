@@ -160,10 +160,7 @@ namespace Orleans.Runtime.Host
             }
         }
 
-        public string GetConfigurationSettingValue(string configurationSettingName)
-        {
-            return (string) roleEnvironmentType.GetMethod("GetConfigurationSettingValue").Invoke(null, new object[] {configurationSettingName});
-        }
+        public string GetConfigurationSettingValue(string configurationSettingName) => (string)roleEnvironmentType.GetMethod("GetConfigurationSettingValue").Invoke(null, new object[] { configurationSettingName });
 
         public void SubscribeForStoppingNotification(object handlerObject, EventHandler<object> handler)
         {

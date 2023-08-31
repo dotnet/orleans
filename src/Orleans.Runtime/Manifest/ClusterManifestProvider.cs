@@ -227,14 +227,8 @@ namespace Orleans.Runtime.Metadata
                 StopAsync);
         }
 
-        public async ValueTask DisposeAsync()
-        {
-            await this.StopAsync(CancellationToken.None);
-        }
+        public async ValueTask DisposeAsync() => await this.StopAsync(CancellationToken.None);
 
-        public void Dispose()
-        {
-            _cancellation.Cancel();
-        }
+        public void Dispose() => _cancellation.Cancel();
     }
 }

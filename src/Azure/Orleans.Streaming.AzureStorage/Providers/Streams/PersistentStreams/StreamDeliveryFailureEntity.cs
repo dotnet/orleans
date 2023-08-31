@@ -44,45 +44,30 @@ namespace Orleans.Providers.Streams.PersistentStreams
         /// <summary>
         /// Sets the partition key before persist call.
         /// </summary>
-        public virtual void SetPartitionKey(string deploymentId)
-        {
-            PartitionKey = MakeDefaultPartitionKey(StreamProviderName, deploymentId);
-        }
+        public virtual void SetPartitionKey(string deploymentId) => PartitionKey = MakeDefaultPartitionKey(StreamProviderName, deploymentId);
 
         /// <summary>
         /// Default partition key
         /// </summary>
-        public static string MakeDefaultPartitionKey(string streamProviderName, string deploymentId)
-        {
-            return $"DeliveryFailure_{streamProviderName}_{deploymentId}";
-        }
+        public static string MakeDefaultPartitionKey(string streamProviderName, string deploymentId) => $"DeliveryFailure_{streamProviderName}_{deploymentId}";
 
         /// <summary>
         /// Sets the row key before persist call
         /// </summary>
-        public virtual void SetRowkey()
-        {
-            RowKey = $"{ReverseOrderTimestampTicks():x16}_{Guid.NewGuid()}";
-        }
+        public virtual void SetRowkey() => RowKey = $"{ReverseOrderTimestampTicks():x16}_{Guid.NewGuid()}";
 
         /// <summary>
         /// Sets sequence token by serializing it to property.
         /// </summary>
         /// <param name="serializer"></param>
         /// <param name="token"></param>
-        public virtual void SetSequenceToken(Serializer<StreamSequenceToken> serializer, StreamSequenceToken token)
-        {
-            SequenceToken = token != null ? serializer.SerializeToArray(token) : null;
-        }
+        public virtual void SetSequenceToken(Serializer<StreamSequenceToken> serializer, StreamSequenceToken token) => SequenceToken = token != null ? serializer.SerializeToArray(token) : null;
 
         /// <summary>
         /// Gets sequence token by deserializing it from property.
         /// </summary>
         /// <returns></returns>
-        public virtual StreamSequenceToken GetSequenceToken(Serializer<StreamSequenceToken> serializer)
-        {
-            return SequenceToken != null ? serializer.Deserialize(SequenceToken) : null;
-        }
+        public virtual StreamSequenceToken GetSequenceToken(Serializer<StreamSequenceToken> serializer) => SequenceToken != null ? serializer.Deserialize(SequenceToken) : null;
 
         /// <summary>
         /// Returns the number of ticks from now (UTC) to the year 9683.

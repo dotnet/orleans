@@ -35,10 +35,7 @@ namespace Orleans.EventSourcing.CustomStorage
         /// <inheritdoc/>
         public ILogViewAdaptor<TView, TEntry> MakeLogViewAdaptor<TView, TEntry>(ILogViewAdaptorHost<TView, TEntry> hostgrain, TView initialstate, string graintypename, IGrainStorage grainStorage, ILogConsistencyProtocolServices services)
             where TView : class, new()
-            where TEntry : class
-        {
-            return new CustomStorageAdaptor<TView, TEntry>(hostgrain, initialstate, services, PrimaryCluster);
-        }
+            where TEntry : class => new CustomStorageAdaptor<TView, TEntry>(hostgrain, initialstate, services, PrimaryCluster);
     }
 
     public static class LogConsistencyProviderFactory

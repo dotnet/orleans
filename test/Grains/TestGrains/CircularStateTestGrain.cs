@@ -17,9 +17,6 @@ namespace TestGrains
             State.CircularTest1 = c1;
             await WriteStateAsync();
         }
-        public Task<CircularTest1> GetState()
-        {
-            return Task.FromResult(State.CircularTest1);
-        }
+        public Task<CircularTest1> GetState() => Task.FromResult(State.CircularTest1);
     }
 }

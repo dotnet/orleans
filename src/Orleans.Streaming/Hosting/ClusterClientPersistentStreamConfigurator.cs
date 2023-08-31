@@ -21,10 +21,7 @@ namespace Orleans.Hosting
         /// </summary>
         /// <param name="configurator">The configuration builder.</param>
         /// <param name="pubsubType">The stream pub/sub type to use.</param>
-        public static void ConfigureStreamPubSub(this IPersistentStreamConfigurator configurator, StreamPubSubType pubsubType = StreamPubSubOptions.DEFAULT_STREAM_PUBSUB_TYPE)
-        {
-            configurator.Configure<StreamPubSubOptions>(ob => ob.Configure(options => options.PubSubType = pubsubType));
-        }
+        public static void ConfigureStreamPubSub(this IPersistentStreamConfigurator configurator, StreamPubSubType pubsubType = StreamPubSubOptions.DEFAULT_STREAM_PUBSUB_TYPE) => configurator.Configure<StreamPubSubOptions>(ob => ob.Configure(options => options.PubSubType = pubsubType));
     }
 
     /// <summary>
@@ -42,10 +39,7 @@ namespace Orleans.Hosting
         /// </summary>
         /// <param name="configurator">The configuration builder.</param>
         /// <param name="configureOptions">The configuration delegate.</param>
-        public static void ConfigureLifecycle(this IClusterClientPersistentStreamConfigurator configurator, Action<OptionsBuilder<StreamLifecycleOptions>> configureOptions)
-        {
-            configurator.Configure(configureOptions);
-        }
+        public static void ConfigureLifecycle(this IClusterClientPersistentStreamConfigurator configurator, Action<OptionsBuilder<StreamLifecycleOptions>> configureOptions) => configurator.Configure(configureOptions);
     }
 
     /// <summary>

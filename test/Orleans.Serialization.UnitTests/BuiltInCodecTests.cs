@@ -43,10 +43,7 @@ namespace Orleans.Serialization.UnitTests
         protected override IFieldCodec<MyEnum> CreateCodec() => ServiceProvider.GetRequiredService<ICodecProvider>().GetCodec<MyEnum>();
         protected override MyEnum CreateValue() => (MyEnum)Random.Next((int)MyEnum.None, (int)MyEnum.Two);
         protected override MyEnum[] TestValues => new[] { MyEnum.None, MyEnum.One, MyEnum.Two, (MyEnum)(-1), (MyEnum)10_000};
-        protected override void Configure(ISerializerBuilder builder)
-        {
-            builder.Services.RemoveAll(typeof(IFieldCodec<MyEnum>));
-        }
+        protected override void Configure(ISerializerBuilder builder) => builder.Services.RemoveAll(typeof(IFieldCodec<MyEnum>));
 
         protected override Action<Action<MyEnum>> ValueProvider => Gen.Int.Select(v => (MyEnum)v).ToValueProvider();
     }
@@ -60,10 +57,7 @@ namespace Orleans.Serialization.UnitTests
         protected override IDeepCopier<MyEnum> CreateCopier() => ServiceProvider.GetRequiredService<ICodecProvider>().GetDeepCopier<MyEnum>();
         protected override MyEnum CreateValue() => (MyEnum)Random.Next((int)MyEnum.None, (int)MyEnum.Two);
         protected override MyEnum[] TestValues => new[] { MyEnum.None, MyEnum.One, MyEnum.Two, (MyEnum)(-1), (MyEnum)10_000};
-        protected override void Configure(ISerializerBuilder builder)
-        {
-            builder.Services.RemoveAll(typeof(IFieldCodec<MyEnum>));
-        }
+        protected override void Configure(ISerializerBuilder builder) => builder.Services.RemoveAll(typeof(IFieldCodec<MyEnum>));
 
         protected override Action<Action<MyEnum>> ValueProvider => Gen.Int.Select(v => (MyEnum)v).ToValueProvider();
     }

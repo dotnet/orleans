@@ -152,10 +152,7 @@ namespace Orleans.TestingHost
                 AppDomain.CurrentDomain.DomainUnload += this.OnAppDomainUnload;
             }
 
-            private void OnAppDomainUnload(object sender, EventArgs e)
-            {
-                Shutdown();
-            }
+            private void OnAppDomainUnload(object sender, EventArgs e) => Shutdown();
 
             private void Shutdown()
             {

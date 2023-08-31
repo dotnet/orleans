@@ -31,10 +31,7 @@ namespace Orleans.Hosting
         /// <param name="builder">The silo builder.</param>
         /// <param name="configureOptions">The action used to configure the options.</param>
         /// <returns>The silo builder.</returns>
-        public static ISiloBuilder Configure<TOptions>(this ISiloBuilder builder, Action<TOptions> configureOptions) where TOptions : class
-        {
-            return builder.ConfigureServices(services => services.Configure(configureOptions));
-        }
+        public static ISiloBuilder Configure<TOptions>(this ISiloBuilder builder, Action<TOptions> configureOptions) where TOptions : class => builder.ConfigureServices(services => services.Configure(configureOptions));
 
         /// <summary>
         /// Registers a configuration instance which <typeparamref name="TOptions"/> will bind against.
@@ -43,10 +40,7 @@ namespace Orleans.Hosting
         /// <param name="builder">The silo builder.</param>
         /// <param name="configuration">The configuration.</param>
         /// <returns>The silo builder.</returns>
-        public static ISiloBuilder Configure<TOptions>(this ISiloBuilder builder, IConfiguration configuration) where TOptions : class
-        {
-            return builder.ConfigureServices(services => services.AddOptions<TOptions>().Bind(configuration));
-        }
+        public static ISiloBuilder Configure<TOptions>(this ISiloBuilder builder, IConfiguration configuration) where TOptions : class => builder.ConfigureServices(services => services.AddOptions<TOptions>().Bind(configuration));
 
         /// <summary>
         /// Adds a delegate for configuring the provided <see cref="ILoggingBuilder"/>. This may be called multiple times.
@@ -54,9 +48,6 @@ namespace Orleans.Hosting
         /// <param name="builder">The <see cref="ISiloBuilder" /> to configure.</param>
         /// <param name="configureLogging">The delegate that configures the <see cref="ILoggingBuilder"/>.</param>
         /// <returns>The same instance of the <see cref="ISiloBuilder"/> for chaining.</returns>
-        public static ISiloBuilder ConfigureLogging(this ISiloBuilder builder, Action<ILoggingBuilder> configureLogging)
-        {
-            return builder.ConfigureServices(collection => collection.AddLogging(configureLogging));
-        }
+        public static ISiloBuilder ConfigureLogging(this ISiloBuilder builder, Action<ILoggingBuilder> configureLogging) => builder.ConfigureServices(collection => collection.AddLogging(configureLogging));
     }
 }

@@ -54,10 +54,7 @@ namespace Orleans.Streaming.EventHubs.Testing
         /// Generate mocked eventhub partition Ids from EventHubGeneratorStreamProviderSettings
         /// </summary>
         /// <returns></returns>
-        protected override Task<string[]> GetPartitionIdsAsync()
-        {
-            return Task.FromResult(GenerateEventHubPartitions(this.ehGeneratorOptions.EventHubPartitionCount));
-        }
+        protected override Task<string[]> GetPartitionIdsAsync() => Task.FromResult(GenerateEventHubPartitions(this.ehGeneratorOptions.EventHubPartitionCount));
 
         private IEventHubReceiver EHGeneratorReceiverFactory(EventHubPartitionSettings settings, string offset, ILogger logger)
         {

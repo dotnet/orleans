@@ -39,20 +39,11 @@ namespace UnitTests.Grains
             throw new Exception("SetAError-Exception");
         }
 
-        public Task SetBError(int a)
-        {
-            throw new Exception("SetBError-Exception");
-        }
+        public Task SetBError(int a) => throw new Exception("SetBError-Exception");
 
-        public Task<int> GetAxBError()
-        {
-            throw new Exception("GetAxBError-Exception");
-        }
+        public Task<int> GetAxBError() => throw new Exception("GetAxBError-Exception");
 
-        public Task<int> GetAxBError(int a, int b)
-        {
-            throw new Exception("GetAxBError(a,b)-Exception");
-        }
+        public Task<int> GetAxBError(int a, int b) => throw new Exception("GetAxBError(a,b)-Exception");
 
         public Task LongMethod(int waitTime)
         {
@@ -179,10 +170,7 @@ namespace UnitTests.Grains
             return Task.FromResult(11);
         }
 
-        public Task AddChildren(List<IErrorGrain> children)
-        {
-            return Task.CompletedTask;
-        }
+        public Task AddChildren(List<IErrorGrain> children) => Task.CompletedTask;
 
         public async Task<bool> ExecuteDelayed(TimeSpan delay)
         {

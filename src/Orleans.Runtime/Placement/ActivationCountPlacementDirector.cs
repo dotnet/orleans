@@ -114,15 +114,10 @@ namespace Orleans.Runtime.Placement
             return SelectSiloPowerOfK(compatibleSilos);
         }
 
-        public void SiloStatisticsChangeNotification(SiloAddress updatedSilo, SiloRuntimeStatistics newSiloStats)
-        {
+        public void SiloStatisticsChangeNotification(SiloAddress updatedSilo, SiloRuntimeStatistics newSiloStats) =>
             // just create a new empty CachedLocalStat and throw the old one.
             _localCache[updatedSilo] = new(newSiloStats);
-        }
 
-        public void RemoveSilo(SiloAddress removedSilo)
-        {
-            _localCache.TryRemove(removedSilo, out _);
-        }
+        public void RemoveSilo(SiloAddress removedSilo) => _localCache.TryRemove(removedSilo, out _);
     }
 }

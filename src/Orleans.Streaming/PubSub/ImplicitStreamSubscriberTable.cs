@@ -198,10 +198,7 @@ namespace Orleans.Streams
             return SubscriptionMarker.MarkAsImplictSubscriptionId(new(bytes));
         }
 
-        internal static bool IsImplicitSubscribeEligibleNameSpace(string streamNameSpace)
-        {
-            return !string.IsNullOrWhiteSpace(streamNameSpace);
-        }
+        internal static bool IsImplicitSubscribeEligibleNameSpace(string streamNameSpace) => !string.IsNullOrWhiteSpace(streamNameSpace);
 
         /// <summary>
         /// Finds all implicit subscribers for the given stream namespace.

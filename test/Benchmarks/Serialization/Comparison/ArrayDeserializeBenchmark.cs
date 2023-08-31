@@ -55,10 +55,7 @@ public class ArraySerializeBenchmark
     // return byte[]
 
     [Benchmark(Baseline = true), BenchmarkCategory(" byte[]")]
-    public byte[] MessagePackSerialize()
-    {
-        return MessagePackSerializer.Serialize(_value);
-    }
+    public byte[] MessagePackSerialize() => MessagePackSerializer.Serialize(_value);
 
     [Benchmark, BenchmarkCategory(" byte[]")]
     public byte[] ProtobufNetSerialize()
@@ -79,10 +76,7 @@ public class ArraySerializeBenchmark
     }
 
     [Benchmark, BenchmarkCategory(" byte[]")]
-    public byte[] OrleansSerialize()
-    {
-        return _orleansSerializer.SerializeToArray(_value);
-    }
+    public byte[] OrleansSerialize() => _orleansSerializer.SerializeToArray(_value);
 
     // use BufferWriter
 

@@ -8,14 +8,8 @@ namespace Orleans.Internal
     /// </summary>
     internal static class StandardExtensions
     {
-        public static TimeSpan Max(TimeSpan first, TimeSpan second)
-        {
-            return first >= second ? first : second;
-        }
+        public static TimeSpan Max(TimeSpan first, TimeSpan second) => first >= second ? first : second;
 
-        public static TimeSpan Min(TimeSpan first, TimeSpan second)
-        {
-            return first < second ? first : second;
-        }
+        public static TimeSpan Min(TimeSpan first, TimeSpan second) => first < second ? first : second;
     }
 }

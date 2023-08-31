@@ -31,10 +31,7 @@ namespace UnitTests.Streaming
             this.runFullTest = fullTest;
         }
 
-        private void Heading(string testName)
-        {
-            logger.LogInformation("\n\n************************ {StreamProviderName}_{TestNumber}_{TestName} ********************************* \n\n", streamProviderName, testNumber, testName);
-        }
+        private void Heading(string testName) => logger.LogInformation("\n\n************************ {StreamProviderName}_{TestNumber}_{TestName} ********************************* \n\n", streamProviderName, testNumber, testName);
 
         public async Task StreamTest_MultipleStreams_ManyDifferent_ManyProducerGrainsManyConsumerGrains(Func<bool,SiloHandle> startSiloFunc = null, Action<SiloHandle> stopSiloFunc = null)
         {

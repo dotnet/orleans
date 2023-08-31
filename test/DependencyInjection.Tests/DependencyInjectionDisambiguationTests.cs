@@ -42,15 +42,9 @@ namespace DependencyInjection.Tests
 
         private class ValueServiceCollection<TValue> : IKeyedServiceCollection<TValue, IValue<TValue>>
         {
-            public IValue<TValue> GetService(IServiceProvider serviceProvider, TValue name)
-            {
-                return new SomeValue<TValue> { Value = name };
-            }
+            public IValue<TValue> GetService(IServiceProvider serviceProvider, TValue name) => new SomeValue<TValue> { Value = name };
 
-            public IEnumerable<IKeyedService<TValue, IValue<TValue>>> GetServices(IServiceProvider services)
-            {
-                return Enumerable.Empty<IKeyedService<TValue, IValue<TValue>>>();
-            }
+            public IEnumerable<IKeyedService<TValue, IValue<TValue>>> GetServices(IServiceProvider services) => Enumerable.Empty<IKeyedService<TValue, IValue<TValue>>>();
         }
 
         //Build the service container, based on which DI solution you uses

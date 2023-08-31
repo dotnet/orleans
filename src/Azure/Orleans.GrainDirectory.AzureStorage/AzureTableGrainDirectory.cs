@@ -150,11 +150,9 @@ namespace Orleans.GrainDirectory.AzureStorage
             }
         }
 
-        public Task UnregisterSilos(List<SiloAddress> siloAddresses)
-        {
+        public Task UnregisterSilos(List<SiloAddress> siloAddresses) =>
             // Too costly to implement using Azure Table
-            return Task.CompletedTask;
-        }
+            Task.CompletedTask;
 
         private async Task UnregisterManyBlock(List<GrainAddress> addresses)
         {
@@ -183,15 +181,8 @@ namespace Orleans.GrainDirectory.AzureStorage
         }
 
         // Called by lifecycle, should not be called explicitely, except for tests
-        public async Task InitializeIfNeeded(CancellationToken ct = default)
-        {
-            await this.tableDataManager.InitTableAsync();
-        }
+        public async Task InitializeIfNeeded(CancellationToken ct = default) => await this.tableDataManager.InitTableAsync();
 
-        public void Participate(ISiloLifecycle lifecycle)
-        {
-
-            lifecycle.Subscribe(nameof(AzureTableGrainDirectory), ServiceLifecycleStage.RuntimeInitialize, InitializeIfNeeded);
-        }
+        public void Participate(ISiloLifecycle lifecycle) => lifecycle.Subscribe(nameof(AzureTableGrainDirectory), ServiceLifecycleStage.RuntimeInitialize, InitializeIfNeeded);
     }
 }

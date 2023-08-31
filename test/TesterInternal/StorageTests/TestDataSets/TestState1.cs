@@ -20,10 +20,7 @@ namespace UnitTests.StorageTests.Relational.TestDataSets
         [Orleans.Id(2)]
         public long C { get; set; }
 
-        public override bool Equals(object obj)
-        {
-            return Equals(obj as TestState1);
-        }
+        public override bool Equals(object obj) => Equals(obj as TestState1);
 
 
         public bool Equals(TestState1 other)
