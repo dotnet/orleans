@@ -135,6 +135,16 @@ namespace UnitTests.Grains
             throw new InvalidOperationException("Timeout should have been returned to caller before " + delay);
         }
 
+        public Task<int> BlockingCallTimeoutNoResponseTimeoutOverrideAsync(TimeSpan delay)
+        {
+            logger.LogInformation("IEchoGrainAsync.BlockingCallTimeoutNoResponseTimeoutOverrideAsync Delay={Delay}", delay);
+            Stopwatch sw = new Stopwatch();
+            sw.Start();
+            Thread.Sleep(delay);
+            logger.LogInformation("IEchoGrainAsync.BlockingCallTimeoutNoResponseTimeoutOverrideAsync Awoke from sleep after {ElapsedDuration}", sw.Elapsed);
+            throw new InvalidOperationException("Timeout should have been returned to caller before " + delay);
+        }
+
         public Task PingAsync()
         {
             logger.LogInformation("IEchoGrainAsync.Ping");

@@ -1,5 +1,5 @@
 using System;
-using System.Text;
+using System.Diagnostics;
 using System.Threading;
 using Microsoft.Extensions.Logging;
 using Orleans.Serialization.Invocation;
@@ -37,10 +37,23 @@ namespace Orleans.Runtime
         public bool IsExpired(long currentTimestamp)
         {
             var duration = currentTimestamp - this.stopwatch.GetRawTimestamp();
-            return duration > shared.ResponseTimeoutStopwatchTicks;
+            return duration > GetResponseTimeoutStopwatchTicks();
         }
 
-        public void OnTimeout(TimeSpan timeout)
+        private long GetResponseTimeoutStopwatchTicks()
+        {
+            var defaultResponseTimeout = (Message.BodyObject as IInvokable)?.GetDefaultResponseTimeout();
+            if (defaultResponseTimeout.HasValue)
+            {
+                return (long)(defaultResponseTimeout.Value.TotalSeconds * Stopwatch.Frequency);
+            }
+
+            return shared.ResponseTimeoutStopwatchTicks;
+        }
+
+        private TimeSpan GetResponseTimeout() => (Message.BodyObject as IInvokable)?.GetDefaultResponseTimeout() ?? shared.ResponseTimeout;
+
+        public void OnTimeout()
         {
             if (Interlocked.CompareExchange(ref completed, 1, 0) != 0)
             {
@@ -58,6 +71,7 @@ namespace Orleans.Runtime
             var msg = this.Message; // Local working copy
 
             var statusMessage = lastKnownStatus is StatusResponse status ? $"Last known status is {status}. " : string.Empty;
+            var timeout = GetResponseTimeout();
             this.shared.Logger.LogWarning(
                 (int)ErrorCode.Runtime_Error_100157,
                 "Response did not arrive on time in {Timeout} for message: {Message}. {StatusMessage}. About to break its promise.",

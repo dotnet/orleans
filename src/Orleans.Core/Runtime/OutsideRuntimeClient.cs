@@ -233,11 +233,6 @@ namespace Orleans
             var message = this.messageFactory.CreateMessage(request, options);
             OrleansOutsideRuntimeClientEvent.Log.SendRequest(message);
 
-            SendRequestMessage(target, message, context, options);
-        }
-
-        private void SendRequestMessage(GrainReference target, Message message, IResponseCompletionSource context, InvokeMethodOptions options)
-        {
             message.InterfaceType = target.InterfaceType;
             message.InterfaceVersion = target.InterfaceVersion;
             var targetGrainId = target.GrainId;
@@ -254,7 +249,8 @@ namespace Orleans
             if (message.IsExpirableMessage(this.clientMessagingOptions.DropExpiredMessages))
             {
                 // don't set expiration for system target messages.
-                message.TimeToLive = this.clientMessagingOptions.ResponseTimeout;
+                var ttl = request.GetDefaultResponseTimeout() ?? this.clientMessagingOptions.ResponseTimeout;
+                message.TimeToLive = ttl; 
             }
 
             if (!oneWay)
@@ -452,7 +448,7 @@ namespace Orleans
             {
                 var callback = pair.Value;
                 if (callback.IsCompleted) continue;
-                if (callback.IsExpired(currentStopwatchTicks)) callback.OnTimeout(this.clientMessagingOptions.ResponseTimeout);
+                if (callback.IsExpired(currentStopwatchTicks)) callback.OnTimeout();
             }
         }
 

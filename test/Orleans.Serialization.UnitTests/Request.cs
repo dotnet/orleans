@@ -22,6 +22,7 @@ namespace Orleans.Serialization.Invocation
         public abstract Type GetInterfaceType();
 
         public abstract MethodInfo GetMethod();
+        public virtual TimeSpan? GetDefaultResponseTimeout() => null;
     }
 
     [GenerateSerializer]

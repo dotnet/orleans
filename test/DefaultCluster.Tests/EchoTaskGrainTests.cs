@@ -71,27 +71,27 @@ namespace DefaultCluster.Tests.General
         }
 
         [Fact, TestCategory("SlowBVT"), TestCategory("Echo"), TestCategory("Timeout")]
-        public async Task EchoGrain_Timeout_Wait()
+        public async Task EchoGrain_Timeout_ContinueWith()
         {
             grain = this.GrainFactory.GetGrain<IEchoTaskGrain>(Guid.NewGuid());
         
-            TimeSpan delay30 = TimeSpan.FromSeconds(30); // grain call timeout (set in config)
+            TimeSpan delay5 = TimeSpan.FromSeconds(30); // grain call timeout (set in config)
             TimeSpan delay45 = TimeSpan.FromSeconds(45);
             TimeSpan delay60 = TimeSpan.FromSeconds(60);
             Stopwatch sw = new Stopwatch();
             sw.Start();
-            Task<int> promise = grain.BlockingCallTimeoutAsync(delay60);
+            Task<int> promise = grain.BlockingCallTimeoutNoResponseTimeoutOverrideAsync(delay60);
             await promise.ContinueWith(
                 t =>
                 {
-                    if (!t.IsFaulted) Assert.True(false); // BlockingCallTimeout should not have completed successfully
+                    if (!t.IsFaulted) Assert.Fail("BlockingCallTimeout should not have completed successfully");
 
                     Exception exc = t.Exception;
                     while (exc is AggregateException) exc = exc.InnerException;
                     Assert.IsAssignableFrom<TimeoutException>(exc);
                 }).WithTimeout(delay45);
             sw.Stop();
-            Assert.True(TimeIsLonger(sw.Elapsed, delay30), $"Elapsed time out of range: {sw.Elapsed}");
+            Assert.True(TimeIsLonger(sw.Elapsed, delay5), $"Elapsed time out of range: {sw.Elapsed}");
             Assert.True(TimeIsShorter(sw.Elapsed, delay60), $"Elapsed time out of range: {sw.Elapsed}");
         }
 
@@ -100,14 +100,14 @@ namespace DefaultCluster.Tests.General
         {
             grain = this.GrainFactory.GetGrain<IEchoTaskGrain>(Guid.NewGuid());
             
-            TimeSpan delay30 = TimeSpan.FromSeconds(30);
-            TimeSpan delay60 = TimeSpan.FromSeconds(60);
+            TimeSpan delay5 = TimeSpan.FromSeconds(5);
+            TimeSpan delay25 = TimeSpan.FromSeconds(25);
             Stopwatch sw = new Stopwatch();
             sw.Start();
             try
             {
-                int res = await grain.BlockingCallTimeoutAsync(delay60);
-                Assert.True(false); // BlockingCallTimeout should not have completed successfully
+                int res = await grain.BlockingCallTimeoutAsync(delay25);
+                Assert.Fail($"BlockingCallTimeout should not have completed successfully, but returned {res}");
             }
             catch (Exception exc)
             {
@@ -115,23 +115,24 @@ namespace DefaultCluster.Tests.General
                 Assert.IsAssignableFrom<TimeoutException>(exc);
             }
             sw.Stop();
-            Assert.True(TimeIsLonger(sw.Elapsed, delay30), $"Elapsed time out of range: {sw.Elapsed}");
-            Assert.True(TimeIsShorter(sw.Elapsed, delay60), $"Elapsed time out of range: {sw.Elapsed}");
+            Assert.True(TimeIsLonger(sw.Elapsed, delay5), $"Elapsed time out of range: {sw.Elapsed}");
+            Assert.True(TimeIsShorter(sw.Elapsed, delay25), $"Elapsed time out of range: {sw.Elapsed}");
         }
 
         [Fact, TestCategory("SlowBVT"), TestCategory("Echo"), TestCategory("Timeout")]
-        public async Task EchoGrain_Timeout_Result()
+        public void EchoGrain_Timeout_Result()
         {
             grain = this.GrainFactory.GetGrain<IEchoTaskGrain>(Guid.NewGuid());
             
-            TimeSpan delay30 = TimeSpan.FromSeconds(30);
-            TimeSpan delay60 = TimeSpan.FromSeconds(60);
+            TimeSpan delay5 = TimeSpan.FromSeconds(5);
+            TimeSpan delay25 = TimeSpan.FromSeconds(25);
             Stopwatch sw = new Stopwatch();
             sw.Start();
             try
             {
-                int res = await grain.BlockingCallTimeoutAsync(delay60);
-                Assert.True(false, "BlockingCallTimeout should not have completed successfully, but returned " + res);
+                // Note that this method purposely uses Task.Result.
+                int res = grain.BlockingCallTimeoutAsync(delay25).Result;
+                Assert.Fail($"BlockingCallTimeout should not have completed successfully, but returned {res}");
             }
             catch (Exception exc)
             {
@@ -139,8 +140,8 @@ namespace DefaultCluster.Tests.General
                 Assert.IsAssignableFrom<TimeoutException>(exc);
             }
             sw.Stop();
-            Assert.True(TimeIsLonger(sw.Elapsed, delay30), $"Elapsed time out of range: {sw.Elapsed}");
-            Assert.True(TimeIsShorter(sw.Elapsed, delay60), $"Elapsed time out of range: {sw.Elapsed}");
+            Assert.True(TimeIsLonger(sw.Elapsed, delay5), $"Elapsed time out of range: {sw.Elapsed}");
+            Assert.True(TimeIsShorter(sw.Elapsed, delay25), $"Elapsed time out of range: {sw.Elapsed}");
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Echo")]

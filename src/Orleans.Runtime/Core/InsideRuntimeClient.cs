@@ -151,7 +151,7 @@ namespace Orleans.Runtime
 
             if (message.IsExpirableMessage(this.messagingOptions.DropExpiredMessages))
             {
-                message.TimeToLive = sharedData.ResponseTimeout;
+                message.TimeToLive = request.GetDefaultResponseTimeout() ?? sharedData.ResponseTimeout;
             }
 
             var oneWay = (options & InvokeMethodOptions.OneWay) != 0;
@@ -532,12 +532,11 @@ namespace Orleans.Runtime
         private void OnCallbackExpiryTick(object state)
         {
             var currentStopwatchTicks = ValueStopwatch.GetTimestamp();
-            var responseTimeout = this.messagingOptions.ResponseTimeout;
             foreach (var pair in callbacks)
             {
                 var callback = pair.Value;
                 if (callback.IsCompleted) continue;
-                if (callback.IsExpired(currentStopwatchTicks)) callback.OnTimeout(responseTimeout);
+                if (callback.IsExpired(currentStopwatchTicks)) callback.OnTimeout();
             }
         }
     }
