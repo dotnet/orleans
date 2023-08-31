@@ -18,19 +18,19 @@ namespace Orleans.Timers.Internal
         /// <param name="timeSpan">The time span.</param>
         /// <param name="cancellationToken">The cancellation token.</param>
         /// <returns><see langword="true"/> if the timer ran to completion; otherwise <see langword="false"/>.</returns>
-        Task<bool> Delay(TimeSpan timeSpan, CancellationToken cancellationToken = default(CancellationToken));
+        Task<bool> Delay(TimeSpan timeSpan, CancellationToken cancellationToken = default);
     }
 
     internal class TimerManagerImpl : ITimerManager
     {
-        public Task<bool> Delay(TimeSpan timeSpan, CancellationToken cancellationToken = default(CancellationToken)) => TimerManager.Delay(timeSpan, cancellationToken);
+        public Task<bool> Delay(TimeSpan timeSpan, CancellationToken cancellationToken = default) => TimerManager.Delay(timeSpan, cancellationToken);
     }
 
     internal static class TimerManager
     {
-        public static Task<bool> Delay(TimeSpan timeSpan, CancellationToken cancellationToken = default(CancellationToken)) => DelayUntil(DateTime.UtcNow + timeSpan, cancellationToken);
+        public static Task<bool> Delay(TimeSpan timeSpan, CancellationToken cancellationToken = default) => DelayUntil(DateTime.UtcNow + timeSpan, cancellationToken);
 
-        public static Task<bool> DelayUntil(DateTime dueTime, CancellationToken cancellationToken = default(CancellationToken))
+        public static Task<bool> DelayUntil(DateTime dueTime, CancellationToken cancellationToken = default)
         {
             var result = new DelayTimer(dueTime, cancellationToken);
             TimerManager<DelayTimer>.Register(result);

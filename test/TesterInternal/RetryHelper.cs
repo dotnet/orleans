@@ -50,7 +50,7 @@ namespace UnitTests
         /// <param name="operation">The operation to retry.</param>
         /// <param name="cancellation">The cancellation token.</param>
         /// <returns>The result of the retry.</returns>
-        internal static async Task<TResult> RetryOnExceptionAsync<TResult>(int maxAttempts, Func<int, TimeSpan> retryFunction, Func<Task<TResult>> operation, CancellationToken cancellation = default(CancellationToken))
+        internal static async Task<TResult> RetryOnExceptionAsync<TResult>(int maxAttempts, Func<int, TimeSpan> retryFunction, Func<Task<TResult>> operation, CancellationToken cancellation = default)
         {
             const int MinAttempts = 1;
             if(maxAttempts <= MinAttempts)

@@ -394,7 +394,7 @@ namespace Orleans.GrainDirectory.AzureStorage
             const string operation = "ReadSingleTableEntryAsync";
             var startTime = DateTime.UtcNow;
             if (Logger.IsEnabled(LogLevel.Trace)) Logger.LogTrace("{Operation} table {TableName} partitionKey {PartitionKey} rowKey {RowKey}", operation, TableName, partitionKey, rowKey);
-            T retrievedResult = default(T);
+            T retrievedResult = default;
 
             try
             {

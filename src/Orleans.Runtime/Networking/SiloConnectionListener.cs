@@ -49,7 +49,7 @@ namespace Orleans.Runtime.Messaging
         protected override Connection CreateConnection(ConnectionContext context)
         {
             return new SiloConnection(
-                default(SiloAddress),
+                default,
                 context,
                 this.ConnectionDelegate,
                 this.messageCenter,

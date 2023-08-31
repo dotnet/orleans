@@ -405,7 +405,7 @@ public class GeneratedSerializerTests : IDisposable
         original.StringProperty = "bananas";
         result = RoundTripThroughCodec(original);
 
-        Assert.Equal(default(Guid), result.GuidProperty);
+        Assert.Equal(default, result.GuidProperty);
         Assert.Equal(original.GuidProperty, result.GuidProperty);
         Assert.Equal("bananas", result.StringProperty);
     }
