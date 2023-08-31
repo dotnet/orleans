@@ -89,7 +89,11 @@ namespace UnitTests.Grains
                 State.IsProducer,
                 State.ConsumerSubscriptionHandles is { Count: > 0 });
 
-            Observers ??= new Dictionary<StreamSubscriptionHandle<int>, MyStreamObserver<int>>();
+            if (Observers == null)
+#if USE_GENERICS
+                Observers = new Dictionary<StreamSubscriptionHandle<T>, MyStreamObserver<T>>();
+#else
+                Observers = new Dictionary<StreamSubscriptionHandle<int>, MyStreamObserver<int>>();
 #endif
 
             if (State.Stream != null && State.StreamProviderName != null)
