@@ -67,8 +67,8 @@ namespace Orleans.LeaseProviders
             catch (RequestFailedException e)
             {
                 ResponseCode statusCode;
-                //This mapping is based on references : https://docs.microsoft.com/en-us/rest/api/storageservices/blob-service-error-codes
-                // https://docs.microsoft.com/en-us/rest/api/storageservices/Lease-Blob?redirectedfrom=MSDN
+                //This mapping is based on references : https://learn.microsoft.com/rest/api/storageservices/blob-service-error-codes
+                // https://learn.microsoft.com/rest/api/storageservices/Lease-Blob?redirectedfrom=MSDN
                 switch (e.Status)
                 {
                     case 404:
@@ -122,8 +122,8 @@ namespace Orleans.LeaseProviders
             catch (RequestFailedException e)
             {
                 ResponseCode statusCode;
-                //This mapping is based on references : https://docs.microsoft.com/en-us/rest/api/storageservices/blob-service-error-codes
-                // https://docs.microsoft.com/en-us/rest/api/storageservices/Lease-Blob?redirectedfrom=MSDN
+                //This mapping is based on references : https://learn.microsoft.com/rest/api/storageservices/blob-service-error-codes
+                // https://learn.microsoft.com/rest/api/storageservices/Lease-Blob?redirectedfrom=MSDN
                 switch (e.Status)
                 {
                     case 404:

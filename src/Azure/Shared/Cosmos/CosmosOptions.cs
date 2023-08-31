@@ -30,7 +30,7 @@ public abstract class CosmosOptions
     /// <summary>
     /// Database configured throughput. If set to <see langword="null"/>, which is the default value, it will not be configured. 
     /// </summary>
-    /// <seealso href="https://docs.microsoft.com/en-us/azure/cosmos-db/set-throughput"/>
+    /// <seealso href="https://learn.microsoft.com/azure/cosmos-db/set-throughput"/>
     public int? DatabaseThroughput { get; set; }
 
     /// <summary>
@@ -46,7 +46,7 @@ public abstract class CosmosOptions
     /// <summary>
     /// Throughput properties for containers. The default value is <see langword="null"/>, which indicates that the serverless throughput mode will be used.
     /// </summary>
-    /// <seealso href="https://docs.microsoft.com/en-us/azure/cosmos-db/set-throughput"/>
+    /// <seealso href="https://learn.microsoft.com/azure/cosmos-db/set-throughput"/>
     public ThroughputProperties? ContainerThroughputProperties { get; set; }
 
     /// <summary>
@@ -73,7 +73,7 @@ public abstract class CosmosOptions
     /// <summary>
     /// Configures the Cosmos DB client.
     /// </summary>
-    /// <param name="accountEndpoint">The account endpoint. In the form of <code>https://{databaseaccount}.documents.azure.com:443/</code>, <see href="https://docs.microsoft.com/en-us/rest/api/cosmos-db/cosmosdb-resource-uri-syntax-for-rest"/></param>
+    /// <param name="accountEndpoint">The account endpoint. In the form of <code>https://{databaseaccount}.documents.azure.com:443/</code>, <see href="https://learn.microsoft.com/rest/api/cosmos-db/cosmosdb-resource-uri-syntax-for-rest"/></param>
     /// <param name="authKeyOrResourceTokenCredential"><see cref="AzureKeyCredential"/> with master-key or resource token.</param>
     /// <see cref="CosmosClient(string, AzureKeyCredential, CosmosClientOptions)"/>
     public void ConfigureCosmosClient(string accountEndpoint, AzureKeyCredential authKeyOrResourceTokenCredential)
@@ -84,7 +84,7 @@ public abstract class CosmosOptions
     /// <summary>
     /// Configures the Cosmos DB client.
     /// </summary>
-    /// <param name="accountEndpoint">The account endpoint. In the form of <code>https://{databaseaccount}.documents.azure.com:443/</code>, <see href="https://docs.microsoft.com/en-us/rest/api/cosmos-db/cosmosdb-resource-uri-syntax-for-rest"/></param>
+    /// <param name="accountEndpoint">The account endpoint. In the form of <code>https://{databaseaccount}.documents.azure.com:443/</code>, <see href="https://learn.microsoft.com/rest/api/cosmos-db/cosmosdb-resource-uri-syntax-for-rest"/></param>
     /// <param name="tokenCredential">The token to provide AAD for authorization.</param>
     /// <see cref="CosmosClient(string, TokenCredential, CosmosClientOptions)"/>
     public void ConfigureCosmosClient(string accountEndpoint, TokenCredential tokenCredential)
@@ -95,7 +95,7 @@ public abstract class CosmosOptions
     /// <summary>
     /// Configures the Cosmos DB client.
     /// </summary>
-    /// <param name="accountEndpoint">The account endpoint. In the form of <code>https://{databaseaccount}.documents.azure.com:443/</code>, <see href="https://docs.microsoft.com/en-us/rest/api/cosmos-db/cosmosdb-resource-uri-syntax-for-rest"/></param>
+    /// <param name="accountEndpoint">The account endpoint. In the form of <code>https://{databaseaccount}.documents.azure.com:443/</code>, <see href="https://learn.microsoft.com/rest/api/cosmos-db/cosmosdb-resource-uri-syntax-for-rest"/></param>
     /// <param name="authKeyOrResourceToken">The Cosmos account key or resource token to use to create the client.</param>
     /// <see cref="CosmosClient(string, TokenCredential, CosmosClientOptions)"/>
     public void ConfigureCosmosClient(string accountEndpoint, string authKeyOrResourceToken)
