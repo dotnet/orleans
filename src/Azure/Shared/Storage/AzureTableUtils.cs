@@ -5,7 +5,6 @@ using Azure;
 using Azure.Data.Tables;
 using Azure.Data.Tables.Models;
 using Microsoft.Extensions.Logging;
-using Orleans.Runtime;
 using LogLevel = Microsoft.Extensions.Logging.LogLevel;
 
 //

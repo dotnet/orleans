@@ -1,4 +1,3 @@
-using System;
 using TestExtensions;
 using UnitTests.GrainInterfaces;
 using UnitTests.Grains;

@@ -1,6 +1,5 @@
 using System.CommandLine;
 using System.CommandLine.Invocation;
-using DistributedTests;
 using DistributedTests.Server.Configurator;
 using Microsoft.Extensions.Hosting;
 

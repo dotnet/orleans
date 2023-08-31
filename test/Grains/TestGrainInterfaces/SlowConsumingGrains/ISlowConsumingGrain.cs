@@ -1,8 +1,4 @@
-﻿using Orleans;
-using System;
-using System.Threading.Tasks;
-
-namespace UnitTests.GrainInterfaces
+﻿namespace UnitTests.GrainInterfaces
 {
     public interface ISlowConsumingGrain : IGrainWithGuidKey
     {

@@ -1,6 +1,4 @@
-﻿using System.Threading.Tasks;
-
-namespace Tester.StorageFacet.Abstractions
+﻿namespace Tester.StorageFacet.Abstractions
 {
     /// <summary>
     /// Primary storage feature interface.

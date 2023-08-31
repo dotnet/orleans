@@ -1,7 +1,4 @@
-﻿using System;
-using System.Threading.Tasks;
-
-namespace UnitTests.GrainInterfaces
+﻿namespace UnitTests.GrainInterfaces
 {
     [Serializable]
     [Orleans.GenerateSerializer]

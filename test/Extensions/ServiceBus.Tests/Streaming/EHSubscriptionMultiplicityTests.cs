@@ -1,12 +1,8 @@
-using System;
-using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
-using Orleans.Runtime;
 using Orleans.TestingHost;
 using TestExtensions;
 using UnitTests.StreamingTests;
 using Xunit;
-using Orleans.Hosting;
 
 namespace ServiceBus.Tests.StreamingTests
 {

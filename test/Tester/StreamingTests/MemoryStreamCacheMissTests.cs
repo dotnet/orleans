@@ -1,11 +1,6 @@
-using System;
-using System.Threading.Tasks;
 using Microsoft.Extensions.Configuration;
-using Orleans;
-using Orleans.Hosting;
 using Orleans.Providers;
 using Orleans.TestingHost;
-using Xunit;
 using Xunit.Abstractions;
 
 namespace Tester.StreamingTests

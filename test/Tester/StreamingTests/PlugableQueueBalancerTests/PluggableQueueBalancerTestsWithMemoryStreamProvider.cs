@@ -1,9 +1,6 @@
 using Microsoft.Extensions.Configuration;
-using Orleans;
-using Orleans.Hosting;
 using Orleans.Providers;
 using Orleans.TestingHost;
-using System.Threading.Tasks;
 using TestExtensions;
 using Xunit;
 using Microsoft.Extensions.DependencyInjection;

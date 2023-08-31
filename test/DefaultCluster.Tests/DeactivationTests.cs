@@ -1,7 +1,5 @@
 using System.Diagnostics;
-using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
-using Orleans.Runtime;
 using TestExtensions;
 using UnitTests.GrainInterfaces;
 using Xunit;

@@ -5,7 +5,6 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Orleans.Core;
 using Orleans.Runtime;
-using Orleans.Serialization.TypeSystem;
 using Orleans.Storage;
 using Orleans.Transactions.Abstractions;
 

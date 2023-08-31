@@ -1,7 +1,4 @@
-using System.Threading.Tasks;
 using Microsoft.Extensions.Configuration;
-using Orleans;
-using Orleans.Hosting;
 using Orleans.TestingHost;
 using UnitTests.MembershipTests;
 using Xunit;

@@ -1,4 +1,3 @@
-using Orleans.Configuration;
 using Orleans.Runtime;
 using TestExtensions;
 using UnitTests.Serialization;

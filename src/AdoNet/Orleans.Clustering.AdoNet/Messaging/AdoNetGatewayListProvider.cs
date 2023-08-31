@@ -6,7 +6,6 @@ using Microsoft.Extensions.Options;
 using Orleans.Clustering.AdoNet.Storage;
 using Orleans.Messaging;
 using Orleans.Configuration;
-using Microsoft.Extensions.DependencyInjection;
 
 namespace Orleans.Runtime.Membership
 {
