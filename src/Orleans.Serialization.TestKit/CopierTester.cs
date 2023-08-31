@@ -13,7 +13,6 @@ namespace Orleans.Serialization.TestKit
     [ExcludeFromCodeCoverage]
     public abstract class CopierTester<TValue, TCopier> where TCopier : class, IDeepCopier<TValue>
     {
-        private readonly IServiceProvider _serviceProvider;
         private readonly CodecProvider _codecProvider;
 
         protected CopierTester(ITestOutputHelper output)
@@ -35,13 +34,13 @@ namespace Orleans.Serialization.TestKit
 
             _ = services.AddSerializer(Configure);
 
-            _serviceProvider = services.BuildServiceProvider();
-            _codecProvider = _serviceProvider.GetRequiredService<CodecProvider>();
+            ServiceProvider = services.BuildServiceProvider();
+            _codecProvider = ServiceProvider.GetRequiredService<CodecProvider>();
         }
 
         protected Random Random { get; }
 
-        protected IServiceProvider ServiceProvider => _serviceProvider;
+        protected IServiceProvider ServiceProvider { get; }
 
         protected virtual bool IsImmutable => false;
 
@@ -49,7 +48,7 @@ namespace Orleans.Serialization.TestKit
         {
         }
 
-        protected virtual TCopier CreateCopier() => _serviceProvider.GetRequiredService<TCopier>();
+        protected virtual TCopier CreateCopier() => ServiceProvider.GetRequiredService<TCopier>();
         protected abstract TValue CreateValue();
         protected abstract TValue[] TestValues { get; }
         protected virtual bool Equals(TValue left, TValue right) => EqualityComparer<TValue>.Default.Equals(left, right);
@@ -90,7 +89,7 @@ namespace Orleans.Serialization.TestKit
 
             var value = CreateValue();
             var array = new TValue[] { value, value };
-            var arrayCopier = _serviceProvider.GetRequiredService<DeepCopier<TValue[]>>();
+            var arrayCopier = ServiceProvider.GetRequiredService<DeepCopier<TValue[]>>();
             var arrayCopy = arrayCopier.Copy(array);
             Assert.Same(arrayCopy[0], arrayCopy[1]);
 

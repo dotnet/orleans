@@ -29,7 +29,6 @@ namespace Orleans.CodeGenerator
     /// </summary>
     internal sealed class CompoundTypeAliasTree
     {
-        private Dictionary<object, CompoundTypeAliasTree> _children;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="CompoundTypeAliasTree"/> class.
@@ -55,7 +54,7 @@ namespace Orleans.CodeGenerator
         /// </summary>
         public static CompoundTypeAliasTree Create() => new(default, default);
 
-        public Dictionary<object, CompoundTypeAliasTree> Children => _children;
+        public Dictionary<object, CompoundTypeAliasTree> Children { get; private set; }
 
         internal CompoundTypeAliasTree GetChildOrDefault(object key)
         {
@@ -65,7 +64,7 @@ namespace Orleans.CodeGenerator
 
         internal bool TryGetChild(object key, out CompoundTypeAliasTree result)
         {
-            if (_children is { } children)
+            if (Children is { } children)
             {
                 return children.TryGetValue(key, out result);
             }
@@ -127,9 +126,9 @@ namespace Orleans.CodeGenerator
         private CompoundTypeAliasTree AddInternal(CompoundTypeAliasComponent key) => AddInternal(key, default);
         private CompoundTypeAliasTree AddInternal(CompoundTypeAliasComponent key, TypeSyntax value)
         {
-            _children ??= new();
+            Children ??= new();
 
-            if (_children.TryGetValue(key, out var existing))
+            if (Children.TryGetValue(key, out var existing))
             {
                 if (value is not null && existing.Value is not null)
                 {
@@ -141,7 +140,7 @@ namespace Orleans.CodeGenerator
             }
             else
             {
-                return _children[key] = new CompoundTypeAliasTree(key, value);
+                return Children[key] = new CompoundTypeAliasTree(key, value);
             }
         }
     }
@@ -184,21 +183,20 @@ namespace Orleans.CodeGenerator
 
     internal readonly struct Either<T, U> where T : class where U : class
     {
-        private readonly bool _isLeft;
         private readonly object _value;
         public Either(T value)
         {
             _value = value;
-            _isLeft = true;
+            IsLeft = true;
         }
 
         public Either(U value)
         {
             _value = value;
-            _isLeft = false;
+            IsLeft = false;
         }
 
-        public bool IsLeft => _isLeft;
+        public bool IsLeft { get; }
         public bool IsRight => !IsLeft;
         public T LeftValue => (T)_value;
         public U RightValue => (U)_value;

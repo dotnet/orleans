@@ -15,11 +15,9 @@ namespace Orleans.Runtime
     internal sealed class GrainMethodInvoker : IIncomingGrainCallContext
     {
         private readonly Message message;
-        private readonly IInvokable request;
         private readonly List<IIncomingGrainCallFilter> filters;
         private readonly InterfaceToImplementationMappingCache interfaceToImplementationMapping;
         private readonly DeepCopier<Response> responseCopier;
-        private readonly IGrainContext grainContext;
         private int stage;
 
         /// <summary>
@@ -40,18 +38,18 @@ namespace Orleans.Runtime
             DeepCopier<Response> responseCopier)
         {
             this.message = message;
-            this.request = request;
-            this.grainContext = grainContext;
+            this.Request = request;
+            this.TargetContext = grainContext;
             this.filters = filters;
             this.interfaceToImplementationMapping = interfaceToImplementationMapping;
             this.responseCopier = responseCopier;
         }
 
-        public IInvokable Request => request;
+        public IInvokable Request { get; }
 
-        public object Grain => grainContext.GrainInstance;
+        public object Grain => TargetContext.GrainInstance;
 
-        public MethodInfo InterfaceMethod => request.GetMethod();
+        public MethodInfo InterfaceMethod => Request.GetMethod();
 
         public MethodInfo ImplementationMethod => GetMethodEntry().ImplementationMethod;
 
@@ -69,15 +67,15 @@ namespace Orleans.Runtime
 
         public GrainId? SourceId => message.SendingGrain is { IsDefault: false } source ? source : null;
 
-        public IGrainContext TargetContext => grainContext;
+        public IGrainContext TargetContext { get; }
 
-        public GrainId TargetId => grainContext.GrainId;
+        public GrainId TargetId => TargetContext.GrainId;
 
         public GrainInterfaceType InterfaceType => message.InterfaceType;
 
-        public string InterfaceName => request.GetInterfaceName();
+        public string InterfaceName => Request.GetInterfaceName();
 
-        public string MethodName => request.GetMethodName();
+        public string MethodName => Request.GetMethodName();
 
         public async Task Invoke()
         {
@@ -124,7 +122,7 @@ namespace Orleans.Runtime
                 {
                     // Finally call the root-level invoker.
                     stage++;
-                    this.Response = await request.Invoke();
+                    this.Response = await Request.Invoke();
 
                     // Propagate exceptions to other filters.
                     if (this.Response.Exception is { } exception)
@@ -160,8 +158,8 @@ namespace Orleans.Runtime
 
         private (MethodInfo ImplementationMethod, MethodInfo InterfaceMethod) GetMethodEntry()
         {
-            var interfaceType = this.request.GetInterfaceType();
-            var implementationType = this.request.GetTarget().GetType();
+            var interfaceType = this.Request.GetInterfaceType();
+            var implementationType = this.Request.GetTarget().GetType();
 
             // Get or create the implementation map for this object.
             var implementationMap = interfaceToImplementationMapping.GetOrCreate(
@@ -169,7 +167,7 @@ namespace Orleans.Runtime
                 interfaceType);
 
             // Get the method info for the method being invoked.
-            var method = request.GetMethod();
+            var method = Request.GetMethod();
             if (method.IsConstructedGenericMethod)
             {
                 if (implementationMap.TryGetValue(method.GetGenericMethodDefinition(), out var entry))

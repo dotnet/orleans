@@ -24,7 +24,6 @@ namespace Orleans.Runtime
         private readonly IAppEnvironmentStatistics _appEnvironmentStatistics;
         private readonly IHostEnvironmentStatistics _hostEnvironmentStatistics;
         private readonly IOptions<LoadSheddingOptions> _loadSheddingOptions;
-        private readonly ConcurrentDictionary<SiloAddress, SiloRuntimeStatistics> _periodicStats;
         private readonly TimeSpan _statisticsRefreshTime;
         private readonly List<ISiloStatisticsChangeListener> _siloStatisticsChangeListeners;
         private readonly ILogger _logger;
@@ -32,7 +31,7 @@ namespace Orleans.Runtime
         private long _lastUpdateDateTimeTicks;
         private IDisposable _publishTimer;
 
-        public ConcurrentDictionary<SiloAddress, SiloRuntimeStatistics> PeriodicStatistics => _periodicStats;
+        public ConcurrentDictionary<SiloAddress, SiloRuntimeStatistics> PeriodicStatistics { get; }
 
         public SiloRuntimeStatistics LocalRuntimeStatistics { get; private set; }
 
@@ -59,7 +58,7 @@ namespace Orleans.Runtime
             _hostEnvironmentStatistics = hostEnvironmentStatistics;
             _loadSheddingOptions = loadSheddingOptions;
             _statisticsRefreshTime = options.Value.DeploymentLoadPublisherRefreshTime;
-            _periodicStats = new ConcurrentDictionary<SiloAddress, SiloRuntimeStatistics>();
+            PeriodicStatistics = new ConcurrentDictionary<SiloAddress, SiloRuntimeStatistics>();
             _siloStatisticsChangeListeners = new List<ISiloStatisticsChangeListener>();
         }
 
@@ -166,12 +165,12 @@ namespace Orleans.Runtime
             }
 
             // Take only if newer.
-            if (_periodicStats.TryGetValue(siloAddress, out var old) && old.DateTime > siloStats.DateTime)
+            if (PeriodicStatistics.TryGetValue(siloAddress, out var old) && old.DateTime > siloStats.DateTime)
             {
                 return;
             }
 
-            _periodicStats[siloAddress] = siloStats;
+            PeriodicStatistics[siloAddress] = siloStats;
             NotifyAllStatisticsChangeEventsSubscribers(siloAddress, siloStats);
         }
 
@@ -262,7 +261,7 @@ namespace Orleans.Runtime
                 _publishTimer.Dispose();
             }
 
-            _periodicStats.TryRemove(updatedSilo, out _);
+            PeriodicStatistics.TryRemove(updatedSilo, out _);
             NotifyAllStatisticsChangeEventsSubscribers(updatedSilo, null);
         }
     }

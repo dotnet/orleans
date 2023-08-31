@@ -9,17 +9,13 @@ namespace Orleans
     /// </summary>
     public sealed class GrainCancellationTokenSource : IDisposable
     {
-        /// <summary>
-        /// The underlying grain cancellation token.
-        /// </summary>
-        private readonly GrainCancellationToken _grainCancellationToken;
 
         /// <summary>
         /// Initializes the <see cref="T:Orleans.GrainCancellationTokenSource"/>.
         /// </summary>
         public GrainCancellationTokenSource()
         {
-            _grainCancellationToken = new GrainCancellationToken(Guid.NewGuid());
+            Token = new GrainCancellationToken(Guid.NewGuid());
         }
 
         /// <summary>
@@ -28,10 +24,7 @@ namespace Orleans
         /// </summary>
         /// <value>The <see cref="GrainCancellationToken">CancellationToken</see>
         /// associated with this <see cref="GrainCancellationToken"/>.</value>
-        public GrainCancellationToken Token
-        {
-            get { return _grainCancellationToken; }
-        }
+        public GrainCancellationToken Token { get; }
 
         /// <summary>
         /// Gets a value indicating whether cancellation has been requested.
@@ -48,7 +41,7 @@ namespace Orleans
         /// </remarks>
         public bool IsCancellationRequested
         {
-            get { return _grainCancellationToken.IsCancellationRequested; }
+            get { return Token.IsCancellationRequested; }
         }
 
         /// <summary>
@@ -70,7 +63,7 @@ namespace Orleans
         /// <exception cref="ObjectDisposedException">This <see cref="GrainCancellationTokenSource" /> has been disposed.</exception>
         public Task Cancel()
         {
-            return _grainCancellationToken.Cancel();
+            return Token.Cancel();
         }
 
         /// <summary>
@@ -81,7 +74,7 @@ namespace Orleans
         /// </remarks>
         public void Dispose()
         {
-            _grainCancellationToken.Dispose();
+            Token.Dispose();
         }
     }
 }

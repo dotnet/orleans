@@ -17,7 +17,6 @@ namespace Orleans.Runtime.Membership
         private readonly string clusterId;
         private readonly ILogger logger;
         private readonly ConsulClusteringOptions options;
-        private readonly TimeSpan maxStaleness;
         private readonly string kvRootFolder;
 
         public ConsulGatewayListProvider(
@@ -28,15 +27,12 @@ namespace Orleans.Runtime.Membership
         {
             this.logger = logger;
             this.clusterId = clusterOptions.Value.ClusterId;
-            this.maxStaleness = gatewayOptions.Value.GatewayListRefreshPeriod;
+            this.MaxStaleness = gatewayOptions.Value.GatewayListRefreshPeriod;
             this.options = options.Value;
             this.kvRootFolder = options.Value.KvRootFolder;
         }
 
-        public TimeSpan MaxStaleness
-        {
-            get { return this.maxStaleness; }
-        }
+        public TimeSpan MaxStaleness { get; }
 
         public bool IsUpdatable
         {

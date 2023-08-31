@@ -72,11 +72,10 @@ namespace Orleans.Streaming.EventHubs.Testing
 
     internal class IntCounter : IIntCounter
     {
-        private int counter = 0;
-        public int Value { get { return this.counter; } }
+        public int Value { get; private set; } = 0;
         public void Increment()
         {
-            counter++;
+            Value++;
         }
     }
 }

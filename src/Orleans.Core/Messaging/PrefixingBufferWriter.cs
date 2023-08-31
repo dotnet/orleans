@@ -56,8 +56,6 @@ namespace Orleans.Runtime.Messaging
         /// </summary>
         private Sequence privateWriter;
 
-        private int _committedBytes;
-
         /// <summary>
         /// Initializes a new instance of the <see cref="PrefixingBufferWriter"/> class.
         /// </summary>
@@ -77,7 +75,7 @@ namespace Orleans.Runtime.Messaging
             static void ThrowPrefixSize() => throw new ArgumentOutOfRangeException(nameof(prefixSize));
         }
 
-        public int CommittedBytes => _committedBytes;
+        public int CommittedBytes { get; private set; }
 
         /// <inheritdoc />
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -86,7 +84,7 @@ namespace Orleans.Runtime.Messaging
             if (privateWriter == null)
             {
                 advanced += count;
-                _committedBytes += count;
+                CommittedBytes += count;
             }
             else
             {
@@ -98,7 +96,7 @@ namespace Orleans.Runtime.Messaging
         private void AdvancePrivateWriter(int count)
         {
             privateWriter.Advance(count);
-            _committedBytes += count;
+            CommittedBytes += count;
         }
 
         /// <inheritdoc />
@@ -184,7 +182,7 @@ namespace Orleans.Runtime.Messaging
             realMemory = default;
             innerWriter = null;
             advanced = 0;
-            _committedBytes = 0;
+            CommittedBytes = 0;
         }
 
         public void Dispose()

@@ -31,7 +31,6 @@ namespace Orleans.TestingHost
     public class TestCluster : IDisposable, IAsyncDisposable
     {
         private readonly List<SiloHandle> additionalSilos = new List<SiloHandle>();
-        private readonly TestClusterOptions options;
         private readonly StringBuilder log = new StringBuilder();
         private readonly InMemoryTransportConnectionHub _transportHub = new();
         private bool _disposed;
@@ -85,7 +84,7 @@ namespace Orleans.TestingHost
         /// <remarks>This is the options you configured your test cluster with, or the default one. 
         /// If the cluster is being configured via ClusterConfiguration, then this object may not reflect the true settings.
         /// </remarks>
-        public TestClusterOptions Options => this.options;
+        public TestClusterOptions Options { get; }
 
         /// <summary>
         /// The internal client interface.
@@ -135,7 +134,7 @@ namespace Orleans.TestingHost
             IReadOnlyList<IConfigurationSource> configurationSources,
             ITestClusterPortAllocator portAllocator)
         {
-            this.options = options;
+            this.Options = options;
             this.ConfigurationSources = configurationSources.ToArray();
             this.PortAllocator = portAllocator;
             this.CreateSiloAsync = DefaultCreateSiloAsync;
@@ -165,7 +164,7 @@ namespace Orleans.TestingHost
                 WriteLog(startMsg);
                 await InitializeAsync();
 
-                if (this.options.InitializeClientOnDeploy)
+                if (this.Options.InitializeClientOnDeploy)
                 {
                     await WaitForInitialStabilization();
                 }
@@ -342,7 +341,7 @@ namespace Orleans.TestingHost
             if (silosToStart > 0)
             {
                 var siloStartTasks = Enumerable.Range(this.startedInstances, silosToStart)
-                    .Select(instanceNumber => Task.Run(() => StartSiloAsync((short)instanceNumber, this.options, startSiloOnNewPort: startAdditionalSiloOnNewPort))).ToArray();
+                    .Select(instanceNumber => Task.Run(() => StartSiloAsync((short)instanceNumber, this.Options, startSiloOnNewPort: startAdditionalSiloOnNewPort))).ToArray();
 
                 try
                 {
@@ -516,7 +515,7 @@ namespace Orleans.TestingHost
                 var instanceNumber = instance.InstanceNumber;
                 var siloName = instance.Name;
                 await StopSiloAsync(instance);
-                var newInstance = await StartSiloAsync(instanceNumber, this.options);
+                var newInstance = await StartSiloAsync(instanceNumber, this.Options);
 
                 if (siloName == Silo.PrimarySiloName)
                 {
@@ -544,7 +543,7 @@ namespace Orleans.TestingHost
         {
             if (siloName == null) throw new ArgumentNullException(nameof(siloName));
             var siloHandle = this.Silos.Single(s => s.Name.Equals(siloName, StringComparison.Ordinal));
-            var newInstance = await this.StartSiloAsync(this.Silos.IndexOf(siloHandle), this.options);
+            var newInstance = await this.StartSiloAsync(this.Silos.IndexOf(siloHandle), this.Options);
             lock (additionalSilos)
             {
                 additionalSilos.Add(newInstance);
@@ -605,11 +604,11 @@ namespace Orleans.TestingHost
 
         private async Task InitializeAsync()
         {
-            short silosToStart = this.options.InitialSilosCount;
+            short silosToStart = this.Options.InitialSilosCount;
 
-            if (this.options.UseTestClusterMembership)
+            if (this.Options.UseTestClusterMembership)
             {
-                this.Primary = await StartSiloAsync(this.startedInstances, this.options);
+                this.Primary = await StartSiloAsync(this.startedInstances, this.Options);
                 silosToStart--;
             }
 
@@ -620,7 +619,7 @@ namespace Orleans.TestingHost
 
             WriteLog("Done initializing cluster");
 
-            if (this.options.InitializeClientOnDeploy)
+            if (this.Options.InitializeClientOnDeploy)
             {
                 await InitializeClientAsync();
             }

@@ -41,7 +41,6 @@ namespace Orleans.Serialization.Session
 
         private Dictionary<uint, object> _referenceToObjectOverflow;
         private Dictionary<object, uint> _objectToReferenceOverflow;
-        private uint _currentReferenceId;
 
         /// <summary>
         /// Tries to get the referenced object with the specified id.
@@ -67,9 +66,9 @@ namespace Orleans.Serialization.Session
         /// Marks a value field.
         /// </summary>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void MarkValueField() => ++_currentReferenceId;
+        public void MarkValueField() => ++CurrentReferenceId;
 
-        internal uint CreateRecordPlaceholder() => ++_currentReferenceId;
+        internal uint CreateRecordPlaceholder() => ++CurrentReferenceId;
 
         /// <summary>
         /// Gets or adds a reference.
@@ -81,7 +80,7 @@ namespace Orleans.Serialization.Session
         public bool GetOrAddReference(object value, out uint reference)
         {
             // Unconditionally bump the reference counter since a call to this method signifies a potential reference.
-            var nextReference = ++_currentReferenceId;
+            var nextReference = ++CurrentReferenceId;
 
             // Null is always at reference 0
             if (value is null)
@@ -183,7 +182,7 @@ namespace Orleans.Serialization.Session
                 objects[i] = default;
             }
 
-            result[value] = _currentReferenceId;
+            result[value] = CurrentReferenceId;
 
             _objectToReferenceCount = 0;
             _objectToReferenceOverflow = result;
@@ -262,7 +261,7 @@ namespace Orleans.Serialization.Session
         /// </summary>
         /// <param name="value">The value.</param>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void RecordReferenceField(object value) => RecordReferenceField(value, ++_currentReferenceId);
+        public void RecordReferenceField(object value) => RecordReferenceField(value, ++CurrentReferenceId);
 
         /// <summary>
         /// Records a reference field with the specified identifier.
@@ -296,7 +295,7 @@ namespace Orleans.Serialization.Session
         /// Gets or sets the current reference identifier.
         /// </summary>
         /// <value>The current reference identifier.</value>
-        public uint CurrentReferenceId { get => _currentReferenceId; set => _currentReferenceId = value; }
+        public uint CurrentReferenceId { get; set; }
 
         /// <summary>
         /// Resets this instance.

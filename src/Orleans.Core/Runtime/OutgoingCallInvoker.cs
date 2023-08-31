@@ -11,7 +11,6 @@ namespace Orleans.Runtime
     /// </summary>
     internal sealed class OutgoingCallInvoker<TResult> : IOutgoingGrainCallContext
     {
-        private readonly IInvokable request;
         private readonly InvokeMethodOptions options;
         private readonly Action<GrainReference, IResponseCompletionSource, IInvokable, InvokeMethodOptions> sendRequest;
         private readonly IOutgoingGrainCallFilter[] filters;
@@ -35,7 +34,7 @@ namespace Orleans.Runtime
             Action<GrainReference, IResponseCompletionSource, IInvokable, InvokeMethodOptions> sendRequest,
             IOutgoingGrainCallFilter[] filters)
         {
-            this.request = request;
+            this.Request = request;
             this.options = options;
             this.sendRequest = sendRequest;
             this.grainReference = grain;
@@ -50,11 +49,11 @@ namespace Orleans.Runtime
             }
         }
 
-        public IInvokable Request => this.request;
+        public IInvokable Request { get; }
 
         public object Grain => this.grainReference;
 
-        public MethodInfo InterfaceMethod => request.GetMethod();
+        public MethodInfo InterfaceMethod => Request.GetMethod();
 
         public object Result { get => TypedResult; set => TypedResult = (TResult)value; }
 
@@ -70,9 +69,9 @@ namespace Orleans.Runtime
 
         public GrainInterfaceType InterfaceType => grainReference.InterfaceType;
 
-        public string InterfaceName => request.GetInterfaceName();
+        public string InterfaceName => Request.GetInterfaceName();
 
-        public string MethodName => request.GetMethodName();
+        public string MethodName => Request.GetMethodName();
 
         public async Task Invoke()
         {
@@ -113,7 +112,7 @@ namespace Orleans.Runtime
                     // Finally call the root-level invoker.
                     stage++;
                     var responseCompletionSource = ResponseCompletionSourcePool.Get();
-                    this.sendRequest(this.grainReference, responseCompletionSource, this.request, this.options);
+                    this.sendRequest(this.grainReference, responseCompletionSource, this.Request, this.options);
                     this.Response = await responseCompletionSource.AsValueTask();
 
                     return;

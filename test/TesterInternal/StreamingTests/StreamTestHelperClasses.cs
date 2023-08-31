@@ -351,8 +351,6 @@ namespace UnitTests.StreamingTests
     {
         private readonly IStreaming_ProducerGrain[] _targets;
         private readonly ILogger _logger;
-        private readonly Guid _streamId;
-        private readonly string _providerName;
         private readonly InterlockedFlag _cleanedUpFlag;
 
         public Task<int> ExpectedItemsProduced
@@ -360,9 +358,9 @@ namespace UnitTests.StreamingTests
             get { return GetExpectedItemsProduced(); }
         }
 
-        public string ProviderName { get { return _providerName; } }
+        public string ProviderName { get; }
 
-        public Guid StreamIdGuid { get { return _streamId; } }
+        public Guid StreamIdGuid { get; }
 
         public StreamId StreamId { get; }
 
@@ -370,8 +368,8 @@ namespace UnitTests.StreamingTests
         {
             _targets = targets;
             _logger = logger;
-            _streamId = streamId;
-            _providerName = providerName;
+            StreamIdGuid = streamId;
+            ProviderName = providerName;
             _cleanedUpFlag = new InterlockedFlag();
             StreamId = StreamId.Create(null, streamId);
         }

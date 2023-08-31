@@ -32,9 +32,7 @@ namespace Orleans.Streams
         where TBucket : IEquatable<TBucket>, IComparable<TBucket>
         where TResource : IEquatable<TResource>, IComparable<TResource>
     {
-        private readonly Dictionary<TBucket, List<TResource>> idealDistribution;
-
-        public Dictionary<TBucket, List<TResource>> IdealDistribution { get { return idealDistribution; } }
+        public Dictionary<TBucket, List<TResource>> IdealDistribution { get; }
 
         /// <summary>
         /// Constructor.
@@ -54,7 +52,7 @@ namespace Orleans.Streams
                 throw new ArgumentNullException(nameof(resources));
             }
 
-            idealDistribution = BuildIdealDistribution(buckets, resources);
+            IdealDistribution = BuildIdealDistribution(buckets, resources);
         }
 
         /// <summary>
@@ -75,7 +73,7 @@ namespace Orleans.Streams
             HashSet<TBucket> activeBucketsSet = new HashSet<TBucket>(activeBuckets);
             foreach (var bucket in activeBucketsSet)
             {
-                if (!idealDistribution.ContainsKey(bucket))
+                if (!IdealDistribution.ContainsKey(bucket))
                 {
                     throw new ArgumentOutOfRangeException(nameof(activeBuckets), String.Format("Active buckets contain a bucket {0} not in the master list.", bucket));
                 }
@@ -90,7 +88,7 @@ namespace Orleans.Streams
 
             // setup ideal distribution for active buckets and build list of all resources that need redistributed from inactive buckets
             var resourcesToRedistribute = new List<TResource>();
-            foreach (var kv in idealDistribution)
+            foreach (var kv in IdealDistribution)
             {
                 if (activeBucketsSet.Contains(kv.Key))
                     newDistribution.Add(kv.Key, kv.Value);

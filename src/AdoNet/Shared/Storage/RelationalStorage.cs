@@ -25,10 +25,6 @@ namespace Orleans.Tests.SqlUtils
     [DebuggerDisplay("InvariantName = {InvariantName}, ConnectionString = {ConnectionString}")]
     internal class RelationalStorage: IRelationalStorage
     {
-        /// <summary>
-        /// The connection string to use.
-        /// </summary>
-        private readonly string connectionString;
 
         /// <summary>
         /// The invariant name of the connector for this database.
@@ -68,13 +64,7 @@ namespace Orleans.Tests.SqlUtils
         /// <summary>
         /// The connection string used to connect to the database.
         /// </summary>
-        public string ConnectionString
-        {
-            get
-            {
-                return connectionString;
-            }
-        }
+        public string ConnectionString { get; }
 
 
         /// <summary>
@@ -204,7 +194,7 @@ namespace Orleans.Tests.SqlUtils
         /// <param name="connectionString">The connection string this database should use for database operations.</param>
         private RelationalStorage(string invariantName, string connectionString)
         {
-            this.connectionString = connectionString;
+            this.ConnectionString = connectionString;
             this.invariantName = invariantName;
             supportsCommandCancellation = DbConstantsStore.SupportsCommandCancellation(InvariantName);
             isSynchronousAdoNetImplementation = DbConstantsStore.IsSynchronousAdoNetImplementation(InvariantName);
@@ -260,7 +250,7 @@ namespace Orleans.Tests.SqlUtils
             CommandBehavior commandBehavior,
             CancellationToken cancellationToken)
         {
-            using (var connection = DbConnectionFactory.CreateConnection(invariantName, connectionString))
+            using (var connection = DbConnectionFactory.CreateConnection(invariantName, ConnectionString))
             {
                 await connection.OpenAsync(cancellationToken).ConfigureAwait(continueOnCapturedContext: false);
                 using(var command = connection.CreateCommand())

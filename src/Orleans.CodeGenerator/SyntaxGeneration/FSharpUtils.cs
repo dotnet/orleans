@@ -150,30 +150,29 @@ namespace Orleans.CodeGenerator
             private class FSharpUnionCaseFieldDescription : IMemberDescription, ISerializableMember
             {
                 private readonly LibraryTypes _libraryTypes;
-                private readonly IPropertySymbol _property;
 
                 public FSharpUnionCaseFieldDescription(LibraryTypes libraryTypes, IPropertySymbol property, uint ordinal)
                 {
                     _libraryTypes = libraryTypes;
                     FieldId = ordinal;
-                    _property = property;
+                    Property = property;
                 }
 
                 public uint FieldId { get; }
 
-                public bool IsShallowCopyable => _libraryTypes.IsShallowCopyable(Type) || _property.HasAnyAttribute(_libraryTypes.ImmutableAttributes);
+                public bool IsShallowCopyable => _libraryTypes.IsShallowCopyable(Type) || Property.HasAnyAttribute(_libraryTypes.ImmutableAttributes);
 
                 public bool IsValueType => Type.IsValueType;
 
                 public IMemberDescription Member => this;
 
-                public ITypeSymbol Type => _property.Type;
+                public ITypeSymbol Type => Property.Type;
 
-                public INamedTypeSymbol ContainingType => _property.ContainingType;
+                public INamedTypeSymbol ContainingType => Property.ContainingType;
 
-                public ISymbol Symbol => _property;
+                public ISymbol Symbol => Property;
 
-                public string FieldName => _property.Name.ToLowerInvariant(); 
+                public string FieldName => Property.Name.ToLowerInvariant(); 
 
                 /// <summary>
                 /// Gets the name of the setter field.
@@ -191,7 +190,7 @@ namespace Orleans.CodeGenerator
                 /// Gets the <see cref="Property"/> which this field is the backing property for, or
                 /// <see langword="null" /> if this is not the backing field of an auto-property.
                 /// </summary>
-                private IPropertySymbol Property => _property;
+                private IPropertySymbol Property { get; }
 
                 public string AssemblyName => Type.ContainingAssembly.ToDisplayName();
                 public string TypeName => Type.ToDisplayName();
@@ -263,30 +262,29 @@ namespace Orleans.CodeGenerator
             private class FSharpRecordPropertyDescription : IMemberDescription, ISerializableMember
             {
                 private readonly LibraryTypes _libraryTypes;
-                private readonly IPropertySymbol _property;
 
                 public FSharpRecordPropertyDescription(LibraryTypes libraryTypes, IPropertySymbol property, uint ordinal)
                 {
                     _libraryTypes = libraryTypes;
                     FieldId = ordinal;
-                    _property = property;
+                    Property = property;
                 }
 
                 public uint FieldId { get; }
 
-                public bool IsShallowCopyable => _libraryTypes.IsShallowCopyable(Type) || _property.HasAnyAttribute(_libraryTypes.ImmutableAttributes);
+                public bool IsShallowCopyable => _libraryTypes.IsShallowCopyable(Type) || Property.HasAnyAttribute(_libraryTypes.ImmutableAttributes);
 
                 public bool IsValueType => Type.IsValueType;
 
                 public IMemberDescription Member => this;
 
-                public ITypeSymbol Type => _property.Type;
+                public ITypeSymbol Type => Property.Type;
 
-                public ISymbol Symbol => _property;
+                public ISymbol Symbol => Property;
 
-                public INamedTypeSymbol ContainingType => _property.ContainingType;
+                public INamedTypeSymbol ContainingType => Property.ContainingType;
 
-                public string FieldName => _property.Name + "@"; 
+                public string FieldName => Property.Name + "@"; 
 
                 /// <summary>
                 /// Gets the name of the setter field.
@@ -304,7 +302,7 @@ namespace Orleans.CodeGenerator
                 /// Gets the <see cref="Property"/> which this field is the backing property for, or
                 /// <see langword="null" /> if this is not the backing field of an auto-property.
                 /// </summary>
-                private IPropertySymbol Property => _property;
+                private IPropertySymbol Property { get; }
 
                 public string AssemblyName => Type.ContainingAssembly.ToDisplayName();
                 public string TypeName => Type.ToDisplayName();

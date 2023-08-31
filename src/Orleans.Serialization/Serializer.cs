@@ -16,34 +16,33 @@ namespace Orleans.Serialization
     /// </summary>
     public sealed class Serializer 
     {
-        private readonly SerializerSessionPool _sessionPool;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="Serializer"/> class.
         /// </summary>
         /// <param name="sessionPool">The session pool.</param>
-        public Serializer(SerializerSessionPool sessionPool) => _sessionPool = sessionPool;
+        public Serializer(SerializerSessionPool sessionPool) => SessionPool = sessionPool;
 
         /// <summary>
         /// Gets the serializer session pool.
         /// </summary>
-        public SerializerSessionPool SessionPool => _sessionPool;
+        public SerializerSessionPool SessionPool { get; }
 
         /// <summary>
         /// Returns a serializer which is specialized to the provided type parameter.
         /// </summary>
         /// <typeparam name="T">The underlying type for the returned serializer.</typeparam>
-        public Serializer<T> GetSerializer<T>() => new(_sessionPool);
+        public Serializer<T> GetSerializer<T>() => new(SessionPool);
 
         /// <summary>
         /// Returns <see langword="true"/> if the provided type, <typeparamref name="T"/>, can be serialized, and <see langword="false"/> otherwise.
         /// </summary>
-        public bool CanSerialize<T>() => _sessionPool.CodecProvider.TryGetCodec(typeof(T)) is { };
+        public bool CanSerialize<T>() => SessionPool.CodecProvider.TryGetCodec(typeof(T)) is { };
 
         /// <summary>
         /// Returns <see langword="true"/> if the provided type, <paramref name="type"/>, can be serialized, and <see langword="false"/> otherwise.
         /// </summary>
-        public bool CanSerialize(Type type) => _sessionPool.CodecProvider.TryGetCodec(type) is { };
+        public bool CanSerialize(Type type) => SessionPool.CodecProvider.TryGetCodec(type) is { };
 
         /// <summary>
         /// Serializes the provided <paramref name="value"/> into a new array.
@@ -53,7 +52,7 @@ namespace Orleans.Serialization
         /// <returns>A byte array containing the serialized value.</returns>
         public byte[] SerializeToArray<T>(T value)
         {
-            using var session = _sessionPool.GetSession();
+            using var session = SessionPool.GetSession();
             var writer = Writer.CreatePooled(session);
             try
             {
@@ -77,7 +76,7 @@ namespace Orleans.Serialization
         /// <remarks>This method slices the <paramref name="destination"/> to the serialized data length.</remarks>
         public void Serialize<T>(T value, ref Memory<byte> destination)
         {
-            using var session = _sessionPool.GetSession();
+            using var session = SessionPool.GetSession();
             var writer = Writer.Create(destination, session);
             var codec = session.CodecProvider.GetCodec<T>();
             codec.WriteField(ref writer, 0, typeof(T), value);
@@ -114,7 +113,7 @@ namespace Orleans.Serialization
         {
             if (destination is MemoryStream memoryStream)
             {
-                using var session = _sessionPool.GetSession();
+                using var session = SessionPool.GetSession();
                 var writer = Writer.Create(memoryStream, session);
                 var codec = session.CodecProvider.GetCodec<T>();
                 codec.WriteField(ref writer, 0, typeof(T), value);
@@ -122,7 +121,7 @@ namespace Orleans.Serialization
             }
             else
             {
-                using var session = _sessionPool.GetSession();
+                using var session = SessionPool.GetSession();
                 var writer = Writer.CreatePooled(destination, session, sizeHint);
                 try
                 {
@@ -182,7 +181,7 @@ namespace Orleans.Serialization
         /// <param name="destination">The destination where serialized data will be written.</param>
         public void Serialize<T, TBufferWriter>(T value, TBufferWriter destination) where TBufferWriter : IBufferWriter<byte>
         {
-            using var session = _sessionPool.GetSession();
+            using var session = SessionPool.GetSession();
             var writer = Writer.Create(destination, session);
             var codec = session.CodecProvider.GetCodec<T>();
             codec.WriteField(ref writer, 0, typeof(T), value);
@@ -232,7 +231,7 @@ namespace Orleans.Serialization
         /// <remarks>This method slices the <paramref name="destination"/> to the serialized data length.</remarks>
         public void Serialize<T>(T value, ref Span<byte> destination)
         {
-            using var session = _sessionPool.GetSession();
+            using var session = SessionPool.GetSession();
             var writer = Writer.Create(destination, session);
             var codec = session.CodecProvider.GetCodec<T>();
             codec.WriteField(ref writer, 0, typeof(T), value);
@@ -266,7 +265,7 @@ namespace Orleans.Serialization
         /// <returns>The length of the serialized data.</returns>
         public int Serialize<T>(T value, byte[] destination)
         {
-            using var session = _sessionPool.GetSession();
+            using var session = SessionPool.GetSession();
             var writer = Writer.Create(destination, session);
             var codec = session.CodecProvider.GetCodec<T>();
             codec.WriteField(ref writer, 0, typeof(T), value);
@@ -328,7 +327,7 @@ namespace Orleans.Serialization
         /// <returns>The deserialized value.</returns>
         public T Deserialize<T>(Stream source)
         {
-            using var session = _sessionPool.GetSession();
+            using var session = SessionPool.GetSession();
             var reader = Reader.Create(source, session);
             var codec = session.CodecProvider.GetCodec<T>();
             var field = reader.ReadFieldHeader();
@@ -358,7 +357,7 @@ namespace Orleans.Serialization
         /// <returns>The deserialized value.</returns>
         public T Deserialize<T>(ReadOnlySequence<byte> source)
         {
-            using var session = _sessionPool.GetSession();
+            using var session = SessionPool.GetSession();
             var reader = Reader.Create(source, session);
             var codec = session.CodecProvider.GetCodec<T>();
             var field = reader.ReadFieldHeader();
@@ -388,7 +387,7 @@ namespace Orleans.Serialization
         /// <returns>The deserialized value.</returns>
         public T Deserialize<T>(PooledBuffer.BufferSlice source)
         {
-            using var session = _sessionPool.GetSession();
+            using var session = SessionPool.GetSession();
             var reader = Reader.Create(source, session);
             var codec = session.CodecProvider.GetCodec<T>();
             var field = reader.ReadFieldHeader();
@@ -418,7 +417,7 @@ namespace Orleans.Serialization
         /// <returns>The deserialized value.</returns>
         public T Deserialize<T>(ReadOnlySpan<byte> source)
         {
-            using var session = _sessionPool.GetSession();
+            using var session = SessionPool.GetSession();
             var reader = Reader.Create(source, session);
             var codec = session.CodecProvider.GetCodec<T>();
             var field = reader.ReadFieldHeader();

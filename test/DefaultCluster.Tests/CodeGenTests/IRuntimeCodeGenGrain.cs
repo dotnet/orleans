@@ -157,8 +157,6 @@ namespace Tester.CodeGenTests
     [GenerateSerializer]
     public class @event : IEquatable<@event>
     {
-        private static readonly IEqualityComparer<@event> EventComparerInstance = new EventEqualityComparer();
-
         public enum @enum
         {
             @async,
@@ -195,13 +193,7 @@ namespace Tester.CodeGenTests
         [Id(4)]
         public List<@event> @if { get; set; }
 
-        public static IEqualityComparer<@event> EventComparer
-        {
-            get
-            {
-                return EventComparerInstance;
-            }
-        }
+        public static IEqualityComparer<@event> EventComparer { get; } = new EventEqualityComparer();
 
         /// <summary>
         /// Gets or sets the private id.

@@ -46,9 +46,7 @@ namespace Orleans.Streaming.EventHubs
         private readonly EventHubReceiverOptions receiverOptions;
         private readonly StreamStatisticOptions statisticOptions;
         private readonly StreamCacheEvictionOptions cacheEvictionOptions;
-        private HashRingBasedPartitionedStreamQueueMapper streamQueueMapper;
         private string[] partitionIds;
-        private ConcurrentDictionary<QueueId, EventHubAdapterReceiver> receivers;
         private EventHubProducerClient client;
 
         /// <summary>
@@ -99,8 +97,8 @@ namespace Orleans.Streaming.EventHubs
         /// Factory to create a IEventHubReceiver
         /// </summary>
         protected Func<EventHubPartitionSettings, string, ILogger, IEventHubReceiver> EventHubReceiverFactory;
-        internal ConcurrentDictionary<QueueId, EventHubAdapterReceiver> EventHubReceivers => receivers;
-        internal HashRingBasedPartitionedStreamQueueMapper EventHubQueueMapper => streamQueueMapper;
+        internal ConcurrentDictionary<QueueId, EventHubAdapterReceiver> EventHubReceivers { get; private set; }
+        internal HashRingBasedPartitionedStreamQueueMapper EventHubQueueMapper { get; private set; }
 
         public EventHubAdapterFactory(
             string name,
@@ -128,7 +126,7 @@ namespace Orleans.Streaming.EventHubs
 
         public virtual void Init()
         {
-            this.receivers = new ConcurrentDictionary<QueueId, EventHubAdapterReceiver>();
+            this.EventHubReceivers = new ConcurrentDictionary<QueueId, EventHubAdapterReceiver>();
 
             InitEventHubClient();
 
@@ -167,10 +165,10 @@ namespace Orleans.Streaming.EventHubs
         /// <returns></returns>
         public async Task<IQueueAdapter> CreateAdapter()
         {
-            if (this.streamQueueMapper == null)
+            if (this.EventHubQueueMapper == null)
             {
                 this.partitionIds = await GetPartitionIdsAsync();
-                this.streamQueueMapper = this.QueueMapperFactory(this.partitionIds);
+                this.EventHubQueueMapper = this.QueueMapperFactory(this.partitionIds);
             }
             return this;
         }
@@ -191,7 +189,7 @@ namespace Orleans.Streaming.EventHubs
         public IStreamQueueMapper GetStreamQueueMapper()
         {
             //TODO: CreateAdapter must be called first.  Figure out how to safely enforce this
-            return this.streamQueueMapper;
+            return this.EventHubQueueMapper;
         }
 
         /// <summary>
@@ -201,7 +199,7 @@ namespace Orleans.Streaming.EventHubs
         /// <returns></returns>
         public Task<IStreamFailureHandler> GetDeliveryFailureHandler(QueueId queueId)
         {
-            return this.StreamFailureHandlerFactory(this.streamQueueMapper.QueueToPartition(queueId));
+            return this.StreamFailureHandlerFactory(this.EventHubQueueMapper.QueueToPartition(queueId));
         }
 
         /// <summary>
@@ -242,7 +240,7 @@ namespace Orleans.Streaming.EventHubs
 
         private EventHubAdapterReceiver GetOrCreateReceiver(QueueId queueId)
         {
-            return this.receivers.GetOrAdd(queueId, (q, instance) => instance.MakeReceiver(q), this);
+            return this.EventHubReceivers.GetOrAdd(queueId, (q, instance) => instance.MakeReceiver(q), this);
         }
 
         protected virtual void InitEventHubClient()
@@ -270,7 +268,7 @@ namespace Orleans.Streaming.EventHubs
             var config = new EventHubPartitionSettings
             {
                 Hub = ehOptions,
-                Partition = this.streamQueueMapper.QueueToPartition(queueId),
+                Partition = this.EventHubQueueMapper.QueueToPartition(queueId),
                 ReceiverOptions = this.receiverOptions
             };
 
