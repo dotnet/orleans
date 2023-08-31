@@ -307,8 +307,7 @@ namespace Orleans.Streams
                     }
                     else
                     {
-                        if (consumerData.Cursor == null) // if the consumer did not ask for a specific token and we already have a cursor, just keep using it.
-                            consumerData.Cursor = queueCache.GetCacheCursor(consumerData.StreamId, cacheToken);
+                        consumerData.Cursor ??= queueCache.GetCacheCursor(consumerData.StreamId, cacheToken);
                     }
                 }
                 catch (Exception exception)

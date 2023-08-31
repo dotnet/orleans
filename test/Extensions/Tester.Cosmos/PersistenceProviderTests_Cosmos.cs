@@ -197,10 +197,7 @@ public class PersistenceProviderTests_Cosmos
     {
         grainId = fixture.InternalGrainFactory.GetGrain(grainId.IsDefault ? LegacyGrainId.NewId().ToGrainId() : grainId).GetGrainId();
 
-        if (grainState == null)
-        {
-            grainState = TestStoreGrainState.NewRandomState();
-        }
+        grainState ??= TestStoreGrainState.NewRandomState();
 
         Stopwatch sw = new Stopwatch();
         sw.Start();

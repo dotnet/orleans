@@ -47,11 +47,8 @@ namespace Orleans.Providers.GCP.Streams.PubSub
 
         public virtual void Init()
         {
-            if (StreamFailureHandlerFactory == null)
-            {
-                StreamFailureHandlerFactory =
+            StreamFailureHandlerFactory ??=
                     qid => Task.FromResult<IStreamFailureHandler>(new NoOpStreamDeliveryFailureHandler());
-            }
 
         }
 

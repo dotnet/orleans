@@ -139,7 +139,7 @@ namespace Orleans.Runtime
                 return;
             }
 
-            if (_components is null) _components = new Dictionary<Type, object>();
+            _components ??= new Dictionary<Type, object>();
             _components[typeof(TComponent)] = instance;
         }
 

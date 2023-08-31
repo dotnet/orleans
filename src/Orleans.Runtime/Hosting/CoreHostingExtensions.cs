@@ -128,10 +128,7 @@ namespace Orleans.Hosting
         {
             optionsBuilder.Configure((DevelopmentClusterMembershipOptions options, IOptions<EndpointOptions> endpointOptions) =>
             {
-                if (primarySiloEndpoint is null)
-                {
-                    primarySiloEndpoint = endpointOptions.Value.GetPublicSiloEndpoint();
-                }
+                primarySiloEndpoint ??= endpointOptions.Value.GetPublicSiloEndpoint();
 
                 options.PrimarySiloEndpoint = primarySiloEndpoint;
             });

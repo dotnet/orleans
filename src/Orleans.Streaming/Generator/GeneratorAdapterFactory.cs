@@ -99,10 +99,8 @@ namespace Orleans.Providers.Streams.Generator
             this.receivers = new ConcurrentDictionary<QueueId, Receiver>();
             if (CacheMonitorFactory == null)
                 this.CacheMonitorFactory = (dimensions) => new DefaultCacheMonitor(dimensions);
-            if (this.BlockPoolMonitorFactory == null)
-                this.BlockPoolMonitorFactory = (dimensions) => new DefaultBlockPoolMonitor(dimensions);
-            if (this.ReceiverMonitorFactory == null)
-                this.ReceiverMonitorFactory = (dimensions) => new DefaultQueueAdapterReceiverMonitor(dimensions);
+            this.BlockPoolMonitorFactory ??= (dimensions) => new DefaultBlockPoolMonitor(dimensions);
+            this.ReceiverMonitorFactory ??= (dimensions) => new DefaultQueueAdapterReceiverMonitor(dimensions);
             generatorConfig = this.serviceProvider.GetServiceByName<IStreamGeneratorConfig>(this.Name);
             if(generatorConfig == null)
             {
@@ -137,13 +135,13 @@ namespace Orleans.Providers.Streams.Generator
         /// <inheritdoc />
         public IStreamQueueMapper GetStreamQueueMapper()
         {
-            return streamQueueMapper ?? (streamQueueMapper = new HashRingBasedStreamQueueMapper(this.queueMapperOptions, this.Name));
+            return streamQueueMapper ??= new HashRingBasedStreamQueueMapper(this.queueMapperOptions, this.Name);
         }
 
         /// <inheritdoc />
         public Task<IStreamFailureHandler> GetDeliveryFailureHandler(QueueId queueId)
         {
-            return Task.FromResult(streamFailureHandler ?? (streamFailureHandler = new NoOpStreamDeliveryFailureHandler()));
+            return Task.FromResult(streamFailureHandler ??= new NoOpStreamDeliveryFailureHandler());
         }
 
         /// <inheritdoc />

@@ -50,11 +50,8 @@ namespace OrleansAWSUtils.Streams
         /// <summary> Init the factory.</summary>
         public virtual void Init()
         {
-            if (StreamFailureHandlerFactory == null)
-            {
-                StreamFailureHandlerFactory =
+            StreamFailureHandlerFactory ??=
                     qid => Task.FromResult<IStreamFailureHandler>(new NoOpStreamDeliveryFailureHandler());
-            }
         }
 
         /// <summary>Creates the Azure Queue based adapter.</summary>

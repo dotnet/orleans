@@ -122,10 +122,7 @@ namespace Orleans.Transactions
 
         private void Union(TransactionInfo other)
         {
-            if (OriginalException == null)
-            {
-                OriginalException = other.OriginalException;
-            }
+            OriginalException ??= other.OriginalException;
 
             // Take sum of write counts
             foreach (KeyValuePair<ParticipantId, AccessCounter> participant in other.Participants)

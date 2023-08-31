@@ -257,17 +257,11 @@ namespace Orleans.Transactions
                 // resource
                 if(id.IsResource())
                 {
-                    if(resources == null)
-                    {
-                        resources = new List<KeyValuePair<ParticipantId, AccessCounter>>();
-                    }
+                    resources ??= new List<KeyValuePair<ParticipantId, AccessCounter>>();
                     resources.Add(participant);
                     if(participant.Value.Writes > 0)
                     {
-                        if (writers == null)
-                        {
-                            writers = new List<ParticipantId>();
-                        }
+                        writers ??= new List<ParticipantId>();
                         writers.Add(id);
                     }
                 }

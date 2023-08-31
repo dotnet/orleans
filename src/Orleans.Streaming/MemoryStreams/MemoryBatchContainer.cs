@@ -31,7 +31,7 @@ namespace Orleans.Providers
          
         private MemoryMessageBody Payload()
         {
-            return payload ?? (payload = serializer.Deserialize(MessageData.Payload));
+            return payload ??= serializer.Deserialize(MessageData.Payload);
         }
         
         public MemoryBatchContainer(MemoryMessageData messageData, TSerializer serializer)

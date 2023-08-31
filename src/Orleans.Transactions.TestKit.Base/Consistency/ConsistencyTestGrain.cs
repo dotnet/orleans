@@ -42,8 +42,7 @@ namespace Orleans.Transactions.TestKit.Consistency
 
         public async Task<Observation[]> Run(ConsistencyTestOptions options, int depth, string stack, int maxgrain, DateTime stopAfter)
         {
-            if (random == null)
-                random = new Random(options.RandomSeed* options.NumGrains + MyNumber);
+            random ??= new Random(options.RandomSeed* options.NumGrains + MyNumber);
 
             if (depth < options.MaxDepth && random.NextDouble() < recursionProbability)
             {

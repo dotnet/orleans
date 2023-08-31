@@ -102,10 +102,8 @@ namespace Orleans.Providers
             this.queueGrains = new ConcurrentDictionary<QueueId, IMemoryStreamQueueGrain>();
             if (CacheMonitorFactory == null)
                 this.CacheMonitorFactory = (dimensions) => new DefaultCacheMonitor(dimensions);
-            if (this.BlockPoolMonitorFactory == null)
-                this.BlockPoolMonitorFactory = (dimensions) => new DefaultBlockPoolMonitor(dimensions);
-            if (this.ReceiverMonitorFactory == null)
-                this.ReceiverMonitorFactory = (dimensions) => new DefaultQueueAdapterReceiverMonitor(dimensions);
+            this.BlockPoolMonitorFactory ??= (dimensions) => new DefaultBlockPoolMonitor(dimensions);
+            this.ReceiverMonitorFactory ??= (dimensions) => new DefaultQueueAdapterReceiverMonitor(dimensions);
             this.purgePredicate = new TimePurgePredicate(this.cacheOptions.DataMinTimeInCache, this.cacheOptions.DataMaxAgeInCache);
             this.streamQueueMapper = new HashRingBasedStreamQueueMapper(this.queueMapperOptions, this.Name);
         }
@@ -181,7 +179,7 @@ namespace Orleans.Providers
         /// <inheritdoc />
         public Task<IStreamFailureHandler> GetDeliveryFailureHandler(QueueId queueId)
         {
-            return Task.FromResult(streamFailureHandler ?? (streamFailureHandler = new NoOpStreamDeliveryFailureHandler()));
+            return Task.FromResult(streamFailureHandler ??= new NoOpStreamDeliveryFailureHandler());
         }
 
         /// <summary>

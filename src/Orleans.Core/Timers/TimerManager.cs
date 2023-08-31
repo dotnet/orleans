@@ -208,7 +208,7 @@ namespace Orleans.Timers.Internal
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private static ThreadLocalQueue EnsureCurrentThreadHasQueue()
         {
-            return threadLocalQueue ?? (threadLocalQueue = InitializeThreadLocalQueue());
+            return threadLocalQueue ??= InitializeThreadLocalQueue();
 
             ThreadLocalQueue InitializeThreadLocalQueue()
             {
@@ -350,7 +350,7 @@ namespace Orleans.Timers.Internal
             where TList : class, ILinkedList<TElement> where TElement : class, ILinkedListElement<TElement>
         {
             // If this is the first element, update the head.
-            if (list.Head is null) list.Head = element;
+            list.Head ??= element;
 
             // If this is not the first element, update the current tail.
             var prevTail = list.Tail;

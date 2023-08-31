@@ -110,7 +110,7 @@ namespace TestExtensions
 
             private PhysicalFileProvider FileProvider()
             {
-                return this.fileProvider ?? (this.fileProvider = new PhysicalFileProvider(this.Root));
+                return this.fileProvider ??= new PhysicalFileProvider(this.Root);
             }
         }
 

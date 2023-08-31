@@ -150,8 +150,7 @@ namespace Orleans.Streams
                 if (producerInterface != null) 
                     return producerInterface;
 
-                if (provider == null)
-                    provider = GetStreamProvider();
+                provider ??= GetStreamProvider();
                 
                 producerInterface = provider!.GetProducerInterface(this);
             }
@@ -166,8 +165,7 @@ namespace Orleans.Streams
                 {
                     if (consumerInterface == null)
                     {
-                        if (provider == null)
-                            provider = GetStreamProvider();
+                        provider ??= GetStreamProvider();
                         
                         consumerInterface = provider!.GetConsumerInterface(this);
                     }

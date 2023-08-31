@@ -154,8 +154,7 @@ namespace Orleans.Transactions.State
             {
                 // task will be executed once its group acquires the lock
 
-                if (group.Tasks == null)
-                    group.Tasks = new List<Action>();
+                group.Tasks ??= new List<Action>();
 
                 group.Tasks.Add(completion);
             }
@@ -407,10 +406,7 @@ namespace Orleans.Transactions.State
                     if (pos.Next == null) // we did not find this tx.
                     {
                         // add a new empty group to insert this tx, if we have not found one yet
-                        if (group == null)
-                        {
-                            group = pos.Next = new LockGroup();
-                        }
+                        group ??= pos.Next = new LockGroup();
 
                         return false;
                     }
@@ -521,10 +517,7 @@ namespace Orleans.Transactions.State
                     {
                         if (kvp.Value.Timestamp < cachedMin)
                         {
-                            if (multiple == null)
-                            {
-                                multiple = new List<TransactionRecord<TState>>();
-                            }
+                            multiple ??= new List<TransactionRecord<TState>>();
                             multiple.Add(kvp.Value);
                         }
                     }

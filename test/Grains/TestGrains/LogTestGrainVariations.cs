@@ -46,10 +46,7 @@ namespace TestGrains
 
         private ILogTestGrain GetStorageGrain()
         {
-            if (storagegrain == null)
-            {
-                storagegrain = GrainFactory.GetGrain<ILogTestGrain>(this.GetPrimaryKeyLong(), "TestGrains.LogTestGrainSharedStateStorage");
-            }
+            storagegrain ??= GrainFactory.GetGrain<ILogTestGrain>(this.GetPrimaryKeyLong(), "TestGrains.LogTestGrainSharedStateStorage");
             return storagegrain;
         }
  

@@ -35,10 +35,7 @@ namespace UnitTests.ActivationsLifeCycleTests
 
         private void Initialize(TestClusterBuilder builder = null)
         {
-            if (builder == null)
-            {
-                builder = new TestClusterBuilder(1);
-            }
+            builder ??= new TestClusterBuilder(1);
 
             testCluster = builder.Build();
             testCluster.Deploy();

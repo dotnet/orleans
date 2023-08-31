@@ -25,10 +25,7 @@ namespace Orleans.Networking.Shared
         {
             get
             {
-                if (_connectionId == null)
-                {
-                    _connectionId = CorrelationIdGenerator.GetNextId();
-                }
+                _connectionId ??= CorrelationIdGenerator.GetNextId();
 
                 return _connectionId;
             }
@@ -51,7 +48,7 @@ namespace Orleans.Networking.Shared
             get
             {
                 // Lazily allocate connection metadata
-                return _items ?? (_items = new ConnectionItems());
+                return _items ??= new ConnectionItems();
             }
             set
             {

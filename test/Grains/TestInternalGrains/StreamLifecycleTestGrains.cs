@@ -176,10 +176,7 @@ namespace UnitTests.Grains
 
             await RecordActivate();
 
-            if (Observers == null)
-            {
-                Observers = new Dictionary<StreamSubscriptionHandle<int>, MyStreamObserver<int>>();
-            }
+            Observers ??= new Dictionary<StreamSubscriptionHandle<int>, MyStreamObserver<int>>();
 
             if (State.Stream != null && State.StreamProviderName != null)
             {
