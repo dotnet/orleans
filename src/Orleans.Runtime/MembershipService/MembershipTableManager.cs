@@ -37,6 +37,7 @@ namespace Orleans.Runtime.MembershipService
         private readonly SiloAddress myAddress;
         private readonly AsyncEnumerable<MembershipTableSnapshot> updates;
         private readonly IAsyncTimer membershipUpdateTimer;
+        private readonly CancellationTokenSource shutdownCancellation = new();
 
         private MembershipTableSnapshot snapshot;
 
@@ -135,7 +136,7 @@ namespace Orleans.Runtime.MembershipService
 
         private async Task<bool> RefreshInternal(bool requireCleanup)
         {
-            var table = await this.membershipTableProvider.ReadAll();
+            var table = await this.membershipTableProvider.ReadAll(shutdownCancellation.Token);
             this.ProcessTableUpdate(table, "Refresh");
 
             bool success;
@@ -155,7 +156,7 @@ namespace Orleans.Runtime.MembershipService
             return !requireCleanup || success;
         }
 
-        private async Task Start()
+        private async Task Start(CancellationToken cancellationToken)
         {
             try
             {
@@ -167,7 +168,7 @@ namespace Orleans.Runtime.MembershipService
                     LogFormatter.PrintDate(this.siloStartTime));
 
                 // Init the membership table.
-                await this.membershipTableProvider.InitializeMembershipTable(true);
+                await this.membershipTableProvider.InitializeMembershipTable(true, cancellationToken);
 
                 // Perform an initial table read
                 var refreshed = await AsyncExecutorWithRetries.ExecuteWithRetries(
@@ -203,7 +204,7 @@ namespace Orleans.Runtime.MembershipService
                 IAmAliveTime = GetDateTimeUtcNow()
             };
 
-            await this.membershipTableProvider.UpdateIAmAlive(entry);
+            await this.membershipTableProvider.UpdateIAmAlive(entry, shutdownCancellation.Token);
         }
 
         private void DetectNodeMigration(MembershipTableSnapshot snapshot, string myHostname)
@@ -401,7 +402,7 @@ namespace Orleans.Runtime.MembershipService
         //      if failed (on ping or on write exception or on etag) - retry the whole AttemptToJoinActiveNodes
         private async Task<bool> TryUpdateMyStatusGlobalOnce(SiloStatus newStatus)
         {
-            var table = await membershipTableProvider.ReadAll();
+            var table = await membershipTableProvider.ReadAll(shutdownCancellation.Token);
 
             if (log.IsEnabled(LogLevel.Debug))
                 log.LogDebug(
@@ -432,11 +433,11 @@ namespace Orleans.Runtime.MembershipService
             TableVersion next = table.Version.Next();
             if (myEtag != null) // no previous etag for my entry -> its the first write to this entry, so insert instead of update.
             {
-                ok = await membershipTableProvider.UpdateRow(myEntry, myEtag, next);
+                ok = await membershipTableProvider.UpdateRow(myEntry, myEtag, next, shutdownCancellation.Token);
             }
             else
             {
-                ok = await membershipTableProvider.InsertRow(myEntry, next);
+                ok = await membershipTableProvider.InsertRow(myEntry, next, shutdownCancellation.Token);
             }
 
             if (ok)
@@ -651,7 +652,7 @@ namespace Orleans.Runtime.MembershipService
 
         public async Task<bool> TryKill(SiloAddress silo)
         {
-            var table = await membershipTableProvider.ReadAll();
+            var table = await membershipTableProvider.ReadAll(shutdownCancellation.Token);
 
             if (log.IsEnabled(LogLevel.Debug))
             {
@@ -702,7 +703,7 @@ namespace Orleans.Runtime.MembershipService
 
         public async Task<bool> TryToSuspectOrKill(SiloAddress silo)
         {
-            var table = await membershipTableProvider.ReadAll();
+            var table = await membershipTableProvider.ReadAll(shutdownCancellation.Token);
             var now = GetDateTimeUtcNow();
 
             if (log.IsEnabled(LogLevel.Debug)) log.LogDebug("TryToSuspectOrKill: Read Membership table {Table}", table.ToString());
@@ -810,10 +811,10 @@ namespace Orleans.Runtime.MembershipService
                 PrintSuspectList(freshVotes));
 
             // If we fail to update here we will retry later.
-            var ok = await membershipTableProvider.UpdateRow(entry, eTag, table.Version.Next());
+            var ok = await membershipTableProvider.UpdateRow(entry, eTag, table.Version.Next(), shutdownCancellation.Token);
             if (ok)
             {
-                table = await membershipTableProvider.ReadAll();
+                table = await membershipTableProvider.ReadAll(shutdownCancellation.Token);
                 this.ProcessTableUpdate(table, "TrySuspectOrKill");
 
                 // Gossip using the local silo status, since this is just informational to propagate the suspicion vote.
@@ -839,12 +840,12 @@ namespace Orleans.Runtime.MembershipService
 
                 if (log.IsEnabled(LogLevel.Debug)) log.LogDebug("Going to DeclareDead silo {SiloAddress} in the table. About to write entry {Entry}.", entry.SiloAddress, entry.ToString());
                 entry.Status = SiloStatus.Dead;
-                bool ok = await membershipTableProvider.UpdateRow(entry, etag, tableVersion.Next());
+                bool ok = await membershipTableProvider.UpdateRow(entry, etag, tableVersion.Next(), shutdownCancellation.Token);
                 if (ok)
                 {
                     if (log.IsEnabled(LogLevel.Debug)) log.LogDebug("Successfully updated {SiloAddress} status to Dead in the membership table.", entry.SiloAddress);
 
-                    var table = await membershipTableProvider.ReadAll();
+                    var table = await membershipTableProvider.ReadAll(shutdownCancellation.Token);
                     this.ProcessTableUpdate(table, "DeclareDead");
                     GossipToOthers(entry.SiloAddress, entry.Status).Ignore();
                     return true;
@@ -874,12 +875,13 @@ namespace Orleans.Runtime.MembershipService
 
             async Task OnRuntimeGrainServicesStart(CancellationToken ct)
             {
-                await Task.Run(() => this.Start());
+                await Task.Run(() => this.Start(ct));
                 tasks.Add(Task.Run(() => this.PeriodicallyRefreshMembershipTable()));
             }
 
             async Task OnRuntimeGrainServicesStop(CancellationToken ct)
             {
+                shutdownCancellation.Cancel();
                 this.membershipUpdateTimer.Dispose();
 
                 // Allow some minimum time for graceful shutdown.
@@ -890,8 +892,10 @@ namespace Orleans.Runtime.MembershipService
 
         public void Dispose()
         {
+            shutdownCancellation.Cancel();
             this.updates.Dispose();
             this.membershipUpdateTimer.Dispose();
+            shutdownCancellation.Dispose();
         }
     }
 }

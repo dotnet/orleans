@@ -75,7 +75,7 @@ namespace Orleans.Runtime
                 return Task.CompletedTask;
             }
 
-            return ReadStateAsync();
+            return ReadStateAsync(cancellationToken);
         }
 
         public Task OnStop(CancellationToken cancellationToken = default) => Task.CompletedTask;

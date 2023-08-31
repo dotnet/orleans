@@ -63,9 +63,9 @@ namespace UnitTests.StorageTests.Relational
             var grainTypeName = GrainTypeGenerator.GetGrainType<Guid>();
             var grainReference = this.GetTestReferenceAndState(0, null);
             var grainState = grainReference.GrainState;
-            await Storage.WriteStateAsync(grainTypeName, grainReference.GrainId, grainState).ConfigureAwait(false);
+            await Storage.WriteStateAsync(grainTypeName, grainReference.GrainId, grainState, CancellationToken.None).ConfigureAwait(false);
             var storedGrainState = new GrainState<TestState1> { State = new TestState1() };
-            await Storage.ReadStateAsync(grainTypeName, grainReference.GrainId, storedGrainState).ConfigureAwait(false);
+            await Storage.ReadStateAsync(grainTypeName, grainReference.GrainId, storedGrainState, CancellationToken.None).ConfigureAwait(false);
 
             Assert.Equal(grainState.ETag, storedGrainState.ETag);
             Assert.Equal(grainState.State, storedGrainState.State);
@@ -184,12 +184,12 @@ namespace UnitTests.StorageTests.Relational
         {
             //A legal situation for clearing has to be arranged by writing a state to the storage before
             //clearing it. Writing and clearing both change the ETag, so they should differ.
-            await Storage.WriteStateAsync(grainTypeName, grainId, grainState);
+            await Storage.WriteStateAsync(grainTypeName, grainId, grainState, CancellationToken.None);
             var writtenStateVersion = grainState.ETag;
             var recordExitsAfterWriting = grainState.RecordExists;
             Assert.True(recordExitsAfterWriting);
 
-            await Storage.ClearStateAsync(grainTypeName, grainId, grainState).ConfigureAwait(false);
+            await Storage.ClearStateAsync(grainTypeName, grainId, grainState, CancellationToken.None).ConfigureAwait(false);
             var clearedStateVersion = grainState.ETag;
             Assert.NotEqual(writtenStateVersion, clearedStateVersion);
 
@@ -197,7 +197,7 @@ namespace UnitTests.StorageTests.Relational
             Assert.False(recordExitsAfterClearing);
 
             var storedGrainState = new GrainState<T> { State = new T(), ETag = clearedStateVersion };
-            await Storage.WriteStateAsync(grainTypeName, grainId, storedGrainState).ConfigureAwait(false);
+            await Storage.WriteStateAsync(grainTypeName, grainId, storedGrainState, CancellationToken.None).ConfigureAwait(false);
             Assert.Equal(storedGrainState.State, Activator.CreateInstance<T>());
             Assert.True(storedGrainState.RecordExists);
         }
@@ -212,9 +212,9 @@ namespace UnitTests.StorageTests.Relational
         /// <returns></returns>
         internal async Task Store_WriteRead<T>(string grainTypeName, GrainId grainId, GrainState<T> grainState) where T : new()
         {
-            await Storage.WriteStateAsync(grainTypeName, grainId, grainState).ConfigureAwait(false);
+            await Storage.WriteStateAsync(grainTypeName, grainId, grainState, CancellationToken.None).ConfigureAwait(false);
             var storedGrainState = new GrainState<T> { State = new T() };
-            await Storage.ReadStateAsync(grainTypeName, grainId, storedGrainState).ConfigureAwait(false);
+            await Storage.ReadStateAsync(grainTypeName, grainId, storedGrainState, CancellationToken.None).ConfigureAwait(false);
 
             Assert.Equal(grainState.ETag, storedGrainState.ETag);
             Assert.Equal(grainState.State, storedGrainState.State);

@@ -7,6 +7,7 @@ using Orleans.Clustering.AdoNet.Storage;
 using Orleans.Messaging;
 using Orleans.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using System.Threading;
 
 namespace Orleans.Runtime.Membership
 {
@@ -42,18 +43,22 @@ namespace Orleans.Runtime.Membership
             get { return true; }
         }
 
-        public async Task InitializeGatewayListProvider()
+        public Task InitializeGatewayListProvider() => InitializeGatewayListProvider(CancellationToken.None);
+
+        public Task<IList<Uri>> GetGateways() => GetGateways(CancellationToken.None);
+
+        public async Task InitializeGatewayListProvider(CancellationToken cancellationToken)
         {
             if (logger.IsEnabled(LogLevel.Trace)) logger.LogTrace("AdoNetClusteringTable.InitializeGatewayListProvider called.");
-            orleansQueries = await RelationalOrleansQueries.CreateInstance(options.Invariant, options.ConnectionString);
+            orleansQueries = await RelationalOrleansQueries.CreateInstance(options.Invariant, options.ConnectionString, cancellationToken);
         }
 
-        public async Task<IList<Uri>> GetGateways()
+        public async Task<IList<Uri>> GetGateways(CancellationToken cancellationToken)
         {
             if (logger.IsEnabled(LogLevel.Trace)) logger.LogTrace("AdoNetClusteringTable.GetGateways called.");
             try
             {
-                return await orleansQueries.ActiveGatewaysAsync(this.clusterId);
+                return await orleansQueries.ActiveGatewaysAsync(this.clusterId, cancellationToken);
             }
             catch (Exception ex)
             {

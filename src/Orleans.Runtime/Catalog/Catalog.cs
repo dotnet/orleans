@@ -332,7 +332,7 @@ namespace Orleans.Runtime
         {
             try
             {
-                await this.grainLocator.Unregister(address, UnregistrationCause.NonexistentActivation);
+                await this.grainLocator.Unregister(address, UnregistrationCause.NonexistentActivation, CancellationToken.None);
             }
             catch (Exception exc)
             {

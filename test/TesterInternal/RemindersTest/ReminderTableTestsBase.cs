@@ -47,14 +47,14 @@ namespace UnitTests.RemindersTest
 
         public virtual async Task InitializeAsync()
         {
-            await this.remindersTable.Init().WithTimeout(TimeSpan.FromMinutes(1));
+            await this.remindersTable.Init(CancellationToken.None).WithTimeout(TimeSpan.FromMinutes(1));
         }
 
         public virtual async Task DisposeAsync()
         {
             if (remindersTable != null && SiloInstanceTableTestConstants.DeleteEntriesAfterTest)
             {
-                await remindersTable.TestOnlyClearTable();
+                await remindersTable.TestOnlyClearTable(CancellationToken.None);
             }
         }
 
@@ -75,7 +75,7 @@ namespace UnitTests.RemindersTest
                 {
                     return RetryHelper.RetryOnExceptionAsync(5, RetryOperation.Sigmoid, async () =>
                     {
-                        return await remindersTable.UpsertRow(reminder);
+                        return await remindersTable.UpsertRow(reminder, CancellationToken.None);
                     });
                 }));
             }));
@@ -85,9 +85,9 @@ namespace UnitTests.RemindersTest
         protected async Task ReminderSimple()
         {
             var reminder = CreateReminder(MakeTestGrainReference(), "foo/bar\\#b_a_z?");
-            await remindersTable.UpsertRow(reminder);
+            await remindersTable.UpsertRow(reminder, CancellationToken.None);
 
-            var readReminder = await remindersTable.ReadRow(reminder.GrainId, reminder.ReminderName);
+            var readReminder = await remindersTable.ReadRow(reminder.GrainId, reminder.ReminderName, CancellationToken.None);
 
             string etagTemp = reminder.ETag = readReminder.ETag;
 
@@ -98,15 +98,15 @@ namespace UnitTests.RemindersTest
             Assert.Equal(readReminder.StartAt, reminder.StartAt);
             Assert.NotNull(etagTemp);
 
-            reminder.ETag = await remindersTable.UpsertRow(reminder);
+            reminder.ETag = await remindersTable.UpsertRow(reminder, CancellationToken.None);
 
-            var removeRowRes = await remindersTable.RemoveRow(reminder.GrainId, reminder.ReminderName, etagTemp);
+            var removeRowRes = await remindersTable.RemoveRow(reminder.GrainId, reminder.ReminderName, etagTemp, CancellationToken.None);
             Assert.False(removeRowRes, "should have failed. Etag is wrong");
-            removeRowRes = await remindersTable.RemoveRow(reminder.GrainId, "bla", reminder.ETag);
+            removeRowRes = await remindersTable.RemoveRow(reminder.GrainId, "bla", reminder.ETag, CancellationToken.None);
             Assert.False(removeRowRes, "should have failed. reminder name is wrong");
-            removeRowRes = await remindersTable.RemoveRow(reminder.GrainId, reminder.ReminderName, reminder.ETag);
+            removeRowRes = await remindersTable.RemoveRow(reminder.GrainId, reminder.ReminderName, reminder.ETag, CancellationToken.None);
             Assert.True(removeRowRes, "should have succeeded. Etag is right");
-            removeRowRes = await remindersTable.RemoveRow(reminder.GrainId, reminder.ReminderName, reminder.ETag);
+            removeRowRes = await remindersTable.RemoveRow(reminder.GrainId, reminder.ReminderName, reminder.ETag, CancellationToken.None);
             Assert.False(removeRowRes, "should have failed. reminder shouldn't exist");
         }
 
@@ -118,16 +118,16 @@ namespace UnitTests.RemindersTest
 
                 await RetryHelper.RetryOnExceptionAsync(10, RetryOperation.Sigmoid, async () =>
                 {
-                    await remindersTable.UpsertRow(CreateReminder(grainRef, i.ToString()));
+                    await remindersTable.UpsertRow(CreateReminder(grainRef, i.ToString()), CancellationToken.None);
                     return 0;
                 });
             }));
 
-            var rows = await remindersTable.ReadRows(0, uint.MaxValue);
+            var rows = await remindersTable.ReadRows(0, uint.MaxValue, CancellationToken.None);
 
             Assert.Equal(rows.Reminders.Count, iterations);
 
-            rows = await remindersTable.ReadRows(0, 0);
+            rows = await remindersTable.ReadRows(0, 0, CancellationToken.None);
 
             Assert.Equal(rows.Reminders.Count, iterations);
 
@@ -145,7 +145,7 @@ namespace UnitTests.RemindersTest
         private async Task TestRemindersHashInterval(IReminderTable reminderTable, uint beginHash, uint endHash,
             uint[] remindersHashes)
         {
-            var rowsTask = reminderTable.ReadRows(beginHash, endHash);
+            var rowsTask = reminderTable.ReadRows(beginHash, endHash, CancellationToken.None);
             var expectedHashes = beginHash < endHash
                 ? remindersHashes.Where(r => r > beginHash && r <= endHash)
                 : remindersHashes.Where(r => r > beginHash || r <= endHash);

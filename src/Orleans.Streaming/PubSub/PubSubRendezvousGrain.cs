@@ -498,9 +498,9 @@ namespace Orleans.Streams
             }
         }
 
-        private Task ReadStateAsync() => _storage.ReadStateAsync();
-        private Task WriteStateAsync() => _storage.WriteStateAsync();
-        private Task ClearStateAsync() => _storage.ClearStateAsync();
+        private Task ReadStateAsync() => _storage.ReadStateAsync(CancellationToken.None);
+        private Task WriteStateAsync() => _storage.WriteStateAsync(CancellationToken.None);
+        private Task ClearStateAsync() => _storage.ClearStateAsync(CancellationToken.None);
         void IGrainMigrationParticipant.OnDehydrate(IDehydrationContext dehydrationContext) => _storage.OnDehydrate(dehydrationContext);
         void IGrainMigrationParticipant.OnRehydrate(IRehydrationContext rehydrationContext) => _storage.OnRehydrate(rehydrationContext);
     }

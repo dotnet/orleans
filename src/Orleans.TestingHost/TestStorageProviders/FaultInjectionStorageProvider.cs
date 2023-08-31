@@ -6,6 +6,7 @@ using Orleans.Runtime;
 using Orleans.Storage;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
+using System.Threading;
 
 namespace Orleans.TestingHost
 {
@@ -56,10 +57,19 @@ namespace Orleans.TestingHost
         {
             return Task.Delay(this.options.Latency);
         }
-           
+
+        /// <inheritdoc/>
+        public Task ReadStateAsync<T>(string grainType, GrainId grainId, IGrainState<T> grainState) => ReadStateAsync(grainType, grainId, grainState, CancellationToken.None);
+
+        /// <inheritdoc/>
+        public Task WriteStateAsync<T>(string grainType, GrainId grainId, IGrainState<T> grainState) => WriteStateAsync(grainType, grainId, grainState, CancellationToken.None);
+
+        /// <inheritdoc/>
+        public Task ClearStateAsync<T>(string grainType, GrainId grainId, IGrainState<T> grainState) => ClearStateAsync(grainType, grainId, grainState, CancellationToken.None);
+
         /// <summary>Faults if exception is provided, otherwise calls through to  decorated storage provider.</summary>
         /// <returns>Completion promise for the Read operation on the specified grain.</returns>
-        public async Task ReadStateAsync<T>(string grainType, GrainId grainId, IGrainState<T> grainState)
+        public async Task ReadStateAsync<T>(string grainType, GrainId grainId, IGrainState<T> grainState, CancellationToken cancellationToken)
         {
             IStorageFaultGrain faultGrain = grainFactory.GetGrain<IStorageFaultGrain>(grainType);
             try
@@ -79,12 +89,12 @@ namespace Orleans.TestingHost
                 "ReadState for grain {GrainId} of type {GrainType}",
                 grainId,
                 grainType);
-            await realStorageProvider.ReadStateAsync(grainType, grainId, grainState);
+            await realStorageProvider.ReadStateAsync(grainType, grainId, grainState, cancellationToken);
         }
 
         /// <summary>Faults if exception is provided, otherwise calls through to  decorated storage provider.</summary>
         /// <returns>Completion promise for the Write operation on the specified grain.</returns>
-        public async Task WriteStateAsync<T>(string grainType, GrainId grainId, IGrainState<T> grainState)
+        public async Task WriteStateAsync<T>(string grainType, GrainId grainId, IGrainState<T> grainState, CancellationToken cancellationToken)
         {
             IStorageFaultGrain faultGrain = grainFactory.GetGrain<IStorageFaultGrain>(grainType);
             try
@@ -104,12 +114,12 @@ namespace Orleans.TestingHost
                 "WriteState for grain {GrainId} of type {GrainType}",
                 grainId,
                 grainType);
-            await realStorageProvider.WriteStateAsync(grainType, grainId, grainState);
+            await realStorageProvider.WriteStateAsync(grainType, grainId, grainState, cancellationToken);
         }
 
         /// <summary>Faults if exception is provided, otherwise calls through to  decorated storage provider.</summary>
         /// <returns>Completion promise for the Delete operation on the specified grain.</returns>
-        public async Task ClearStateAsync<T>(string grainType, GrainId grainId, IGrainState<T> grainState)
+        public async Task ClearStateAsync<T>(string grainType, GrainId grainId, IGrainState<T> grainState, CancellationToken cancellationToken)
         {
             IStorageFaultGrain faultGrain = grainFactory.GetGrain<IStorageFaultGrain>(grainType);
             try
@@ -130,7 +140,7 @@ namespace Orleans.TestingHost
                 "ClearState for grain {GrainId} of type {GrainType}",
                 grainId,
                 grainType);
-            await realStorageProvider.ClearStateAsync(grainType, grainId, grainState);
+            await realStorageProvider.ClearStateAsync(grainType, grainId, grainState, cancellationToken);
         }
 
         /// <inheritdoc />

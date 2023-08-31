@@ -2,6 +2,7 @@
 using System;
 using System.Diagnostics.CodeAnalysis;
 using System.Runtime.ExceptionServices;
+using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Orleans.Runtime;
@@ -62,14 +63,14 @@ namespace Orleans.Core
         }
 
         /// <inheritdoc />
-        public async Task ReadStateAsync()
+        public async Task ReadStateAsync(CancellationToken cancellationToken)
         {
             try
             {
                 GrainRuntime.CheckRuntimeContext(RuntimeContext.Current);
 
                 var sw = ValueStopwatch.StartNew();
-                await _store.ReadStateAsync(_name, _grainContext.GrainId, GrainState);
+                await _store.ReadStateAsync(_name, _grainContext.GrainId, GrainState, cancellationToken);
                 StorageInstruments.OnStorageRead(sw.Elapsed);
             }
             catch (Exception exc)
@@ -80,14 +81,14 @@ namespace Orleans.Core
         }
 
         /// <inheritdoc />
-        public async Task WriteStateAsync()
+        public async Task WriteStateAsync(CancellationToken cancellationToken)
         {
             try
             {
                 GrainRuntime.CheckRuntimeContext(RuntimeContext.Current);
 
                 var sw = ValueStopwatch.StartNew();
-                await _store.WriteStateAsync(_name, _grainContext.GrainId, GrainState);
+                await _store.WriteStateAsync(_name, _grainContext.GrainId, GrainState, cancellationToken);
                 StorageInstruments.OnStorageWrite(sw.Elapsed);
             }
             catch (Exception exc)
@@ -98,7 +99,7 @@ namespace Orleans.Core
         }
 
         /// <inheritdoc />
-        public async Task ClearStateAsync()
+        public async Task ClearStateAsync(CancellationToken cancellationToken)
         {
             try
             {
@@ -106,7 +107,7 @@ namespace Orleans.Core
 
                 var sw = ValueStopwatch.StartNew();
                 // Clear (most likely Delete) state from external storage
-                await _store.ClearStateAsync(_name, _grainContext.GrainId, GrainState);
+                await _store.ClearStateAsync(_name, _grainContext.GrainId, GrainState, cancellationToken);
                 sw.Stop();
 
                 // Reset the in-memory copy of the state
@@ -170,5 +171,17 @@ namespace Orleans.Core
 
             ExceptionDispatchInfo.Throw(exception);
         }
+
+        /// <inheritdoc/>
+        [Obsolete($"Use the overload which accepts a {nameof(CancellationToken)}")]
+        public Task ClearStateAsync() => ClearStateAsync(CancellationToken.None);
+
+        /// <inheritdoc/>
+        [Obsolete($"Use the overload which accepts a {nameof(CancellationToken)}")]
+        public Task WriteStateAsync() => WriteStateAsync(CancellationToken.None);
+
+        /// <inheritdoc/>
+        [Obsolete($"Use the overload which accepts a {nameof(CancellationToken)}")]
+        public Task ReadStateAsync() => ReadStateAsync(CancellationToken.None);
     }
 }

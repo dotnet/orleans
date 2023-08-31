@@ -1,4 +1,5 @@
 using System.Net;
+using System.Threading;
 using Orleans.Clustering.Cosmos.Models;
 
 namespace Orleans.Clustering.Cosmos;
@@ -32,18 +33,27 @@ internal class CosmosMembershipTable : IMembershipTable
         _queryRequestOptions = new() { PartitionKey = _partitionKey };
     }
 
-    public async Task InitializeMembershipTable(bool tryInitTableVersion)
+    public Task InitializeMembershipTable(bool tryInitTableVersion) => InitializeMembershipTable(tryInitTableVersion, CancellationToken.None);
+    public Task DeleteMembershipTableEntries(string clusterId) => DeleteMembershipTableEntries(clusterId, CancellationToken.None);
+    public Task CleanupDefunctSiloEntries(DateTimeOffset beforeDate) => CleanupDefunctSiloEntries(beforeDate, CancellationToken.None);
+    public Task<MembershipTableData> ReadRow(SiloAddress key) => ReadRow(key, CancellationToken.None);
+    public Task<MembershipTableData> ReadAll() => ReadAll(CancellationToken.None);  
+    public Task<bool> InsertRow(MembershipEntry entry, TableVersion tableVersion) => InsertRow(entry, tableVersion, CancellationToken.None);
+    public Task<bool> UpdateRow(MembershipEntry entry, string etag, TableVersion tableVersion) => UpdateRow(entry, etag, tableVersion, CancellationToken.None);
+    public Task UpdateIAmAlive(MembershipEntry entry) => UpdateIAmAlive(entry, CancellationToken.None);
+
+    public async Task InitializeMembershipTable(bool tryInitTableVersion, CancellationToken cancellationToken)
     {
-        await InitializeCosmosClient().ConfigureAwait(false);
+        await InitializeCosmosClient(cancellationToken).ConfigureAwait(false);
 
         if (_options.IsResourceCreationEnabled)
         {
             if (_options.CleanResourcesOnInitialization)
             {
-                await TryDeleteDatabase().ConfigureAwait(false);
+                await TryDeleteDatabase(cancellationToken).ConfigureAwait(false);
             }
 
-            await TryCreateCosmosResources().ConfigureAwait(false);
+            await TryCreateCosmosResources(cancellationToken).ConfigureAwait(false);
         }
 
         _container = _client.GetContainer(_options.DatabaseName, _options.ContainerName);
@@ -75,11 +85,11 @@ internal class CosmosMembershipTable : IMembershipTable
         }
     }
 
-    public async Task DeleteMembershipTableEntries(string clusterId)
+    public async Task DeleteMembershipTableEntries(string clusterId, CancellationToken cancellationToken)
     {
         try
         {
-            var silos = await ReadSilos().ConfigureAwait(false);
+            var silos = await ReadSilos(status: null, cancellationToken).ConfigureAwait(false);
 
             var batch = _container.CreateTransactionalBatch(_partitionKey);
 
@@ -90,7 +100,7 @@ internal class CosmosMembershipTable : IMembershipTable
 
             batch = batch.DeleteItem(CLUSTER_VERSION_ID);
 
-            await batch.ExecuteAsync().ConfigureAwait(false);
+            await batch.ExecuteAsync(cancellationToken).ConfigureAwait(false);
         }
         catch (Exception ex)
         {
@@ -99,11 +109,11 @@ internal class CosmosMembershipTable : IMembershipTable
         }
     }
 
-    public async Task CleanupDefunctSiloEntries(DateTimeOffset beforeDate)
+    public async Task CleanupDefunctSiloEntries(DateTimeOffset beforeDate, CancellationToken cancellationToken)
     {
         try
         {
-            var silos = (await ReadSilos(SiloStatus.Dead).ConfigureAwait(false)).Where(s => s.IAmAliveTime < beforeDate).ToList();
+            var silos = (await ReadSilos(SiloStatus.Dead, cancellationToken).ConfigureAwait(false)).Where(s => s.IAmAliveTime < beforeDate).ToList();
             if (silos.Count == 0)
             {
                 return;
@@ -116,7 +126,7 @@ internal class CosmosMembershipTable : IMembershipTable
                 batch = batch.DeleteItem(silo.Id);
             }
 
-            await batch.ExecuteAsync().ConfigureAwait(false);
+            await batch.ExecuteAsync(cancellationToken).ConfigureAwait(false);
         }
         catch (Exception ex)
         {
@@ -125,14 +135,14 @@ internal class CosmosMembershipTable : IMembershipTable
         }
     }
 
-    public async Task<MembershipTableData> ReadRow(SiloAddress key)
+    public async Task<MembershipTableData> ReadRow(SiloAddress key, CancellationToken cancellationToken)
     {
         var id = ConstructSiloEntityId(key);
 
         try
         {
-            var readClusterVersionTask = ReadClusterVersion();
-            var readSiloTask = _container.ReadItemAsync<SiloEntity>(id, _partitionKey);
+            var readClusterVersionTask = ReadClusterVersion(cancellationToken);
+            var readSiloTask = _container.ReadItemAsync<SiloEntity>(id, _partitionKey, cancellationToken: cancellationToken);
 
             await Task.WhenAll(readClusterVersionTask, readSiloTask).ConfigureAwait(false);
 
@@ -164,12 +174,12 @@ internal class CosmosMembershipTable : IMembershipTable
         }
     }
 
-    public async Task<MembershipTableData> ReadAll()
+    public async Task<MembershipTableData> ReadAll(CancellationToken cancellationToken)
     {
         try
         {
-            var readClusterVersionTask = ReadClusterVersion();
-            var readSilosTask = ReadSilos();
+            var readClusterVersionTask = ReadClusterVersion(cancellationToken);
+            var readSilosTask = ReadSilos(status: null, cancellationToken);
 
             await Task.WhenAll(readClusterVersionTask, readSilosTask).ConfigureAwait(false);
 
@@ -212,7 +222,7 @@ internal class CosmosMembershipTable : IMembershipTable
         }
     }
 
-    public async Task<bool> InsertRow(MembershipEntry entry, TableVersion tableVersion)
+    public async Task<bool> InsertRow(MembershipEntry entry, TableVersion tableVersion, CancellationToken cancellationToken)
     {
         try
         {
@@ -222,7 +232,7 @@ internal class CosmosMembershipTable : IMembershipTable
             var response = await _container.CreateTransactionalBatch(_partitionKey)
                 .ReplaceItem(versionEntity.Id, versionEntity, new TransactionalBatchItemRequestOptions { IfMatchEtag = tableVersion.VersionEtag })
                 .CreateItem(siloEntity)
-                .ExecuteAsync().ConfigureAwait(false);
+                .ExecuteAsync(cancellationToken).ConfigureAwait(false);
 
             return response.IsSuccessStatusCode;
         }
@@ -234,7 +244,7 @@ internal class CosmosMembershipTable : IMembershipTable
         }
     }
 
-    public async Task<bool> UpdateRow(MembershipEntry entry, string etag, TableVersion tableVersion)
+    public async Task<bool> UpdateRow(MembershipEntry entry, string etag, TableVersion tableVersion, CancellationToken cancellationToken)
     {
         try
         {
@@ -246,7 +256,7 @@ internal class CosmosMembershipTable : IMembershipTable
             var response = await _container.CreateTransactionalBatch(_partitionKey)
                 .ReplaceItem(versionEntity.Id, versionEntity, new TransactionalBatchItemRequestOptions { IfMatchEtag = tableVersion.VersionEtag })
                 .ReplaceItem(siloEntity.Id, siloEntity, new TransactionalBatchItemRequestOptions { IfMatchEtag = siloEntity.ETag })
-                .ExecuteAsync().ConfigureAwait(false);
+                .ExecuteAsync(cancellationToken).ConfigureAwait(false);
 
             return response.IsSuccessStatusCode;
         }
@@ -258,13 +268,13 @@ internal class CosmosMembershipTable : IMembershipTable
         }
     }
 
-    public async Task UpdateIAmAlive(MembershipEntry entry)
+    public async Task UpdateIAmAlive(MembershipEntry entry, CancellationToken cancellationToken)
     {
         var siloEntityId = ConstructSiloEntityId(entry.SiloAddress);
 
         if (_self is not { } selfRow)
         {
-            var response = await _container.ReadItemAsync<SiloEntity>(siloEntityId, _partitionKey).ConfigureAwait(false);
+            var response = await _container.ReadItemAsync<SiloEntity>(siloEntityId, _partitionKey, cancellationToken: cancellationToken).ConfigureAwait(false);
 
             if (response.StatusCode != HttpStatusCode.OK)
             {
@@ -283,7 +293,8 @@ internal class CosmosMembershipTable : IMembershipTable
                 selfRow,
                 siloEntityId,
                 _partitionKey,
-                new ItemRequestOptions { IfMatchEtag = selfRow.ETag }).ConfigureAwait(false);
+                new ItemRequestOptions { IfMatchEtag = selfRow.ETag },
+                cancellationToken).ConfigureAwait(false);
             _self = replaceResponse.Resource;
         }
         catch (Exception exc)
@@ -294,7 +305,7 @@ internal class CosmosMembershipTable : IMembershipTable
         }
     }
 
-    private async Task InitializeCosmosClient()
+    private async Task InitializeCosmosClient(CancellationToken cancellationToken)
     {
         try
         {
@@ -308,11 +319,11 @@ internal class CosmosMembershipTable : IMembershipTable
         }
     }
 
-    private async Task TryDeleteDatabase()
+    private async Task TryDeleteDatabase(CancellationToken cancellationToken)
     {
         try
         {
-            await _client.GetDatabase(_options.DatabaseName).DeleteAsync().ConfigureAwait(false);
+            await _client.GetDatabase(_options.DatabaseName).DeleteAsync(cancellationToken: cancellationToken).ConfigureAwait(false);
         }
         catch (CosmosException dce) when (dce.StatusCode == HttpStatusCode.NotFound)
         {
@@ -326,9 +337,9 @@ internal class CosmosMembershipTable : IMembershipTable
         }
     }
 
-    private async Task TryCreateCosmosResources()
+    private async Task TryCreateCosmosResources(CancellationToken cancellationToken)
     {
-        var dbResponse = await _client.CreateDatabaseIfNotExistsAsync(_options.DatabaseName, _options.DatabaseThroughput).ConfigureAwait(false);
+        var dbResponse = await _client.CreateDatabaseIfNotExistsAsync(_options.DatabaseName, _options.DatabaseThroughput, cancellationToken: cancellationToken).ConfigureAwait(false);
         var db = dbResponse.Database;
 
         var containerProperties = new ContainerProperties(_options.ContainerName, PARTITION_KEY);
@@ -349,23 +360,26 @@ internal class CosmosMembershipTable : IMembershipTable
         {
             var containerResponse = await db.CreateContainerIfNotExistsAsync(
                 containerProperties,
-                _options.ContainerThroughputProperties).ConfigureAwait(false);
+                _options.ContainerThroughputProperties,
+                cancellationToken: cancellationToken).ConfigureAwait(false);
 
             if (retry == maxRetries || dbResponse.StatusCode != HttpStatusCode.Created || containerResponse.StatusCode == HttpStatusCode.Created)
             {
                 break;  // Apparently some throttling logic returns HttpStatusCode.OK (not 429) when the collection wasn't created in a new DB.
             }
-            await Task.Delay(1000);
+
+            await Task.Delay(1000, cancellationToken: cancellationToken);
         }
     }
 
-    private async Task<ClusterVersionEntity?> ReadClusterVersion()
+    private async Task<ClusterVersionEntity?> ReadClusterVersion(CancellationToken cancellationToken)
     {
         try
         {
             var response = await _container.ReadItemAsync<ClusterVersionEntity>(
                 CLUSTER_VERSION_ID,
-                _partitionKey).ConfigureAwait(false);
+                _partitionKey,
+                cancellationToken: cancellationToken).ConfigureAwait(false);
 
             return response.StatusCode == HttpStatusCode.OK
                 ? response.Resource
@@ -381,7 +395,7 @@ internal class CosmosMembershipTable : IMembershipTable
         }
     }
 
-    private async Task<IReadOnlyList<SiloEntity>> ReadSilos(SiloStatus? status = null)
+    private async Task<IReadOnlyList<SiloEntity>> ReadSilos(SiloStatus? status = null, CancellationToken cancellationToken = default)
     {
         try
         {
@@ -399,7 +413,7 @@ internal class CosmosMembershipTable : IMembershipTable
             var silos = new List<SiloEntity>();
             do
             {
-                var items = await iterator.ReadNextAsync().ConfigureAwait(false);
+                var items = await iterator.ReadNextAsync(cancellationToken).ConfigureAwait(false);
                 silos.AddRange(items);
             } while (iterator.HasMoreResults);
 

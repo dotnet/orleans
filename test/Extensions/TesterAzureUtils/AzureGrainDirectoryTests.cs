@@ -60,7 +60,7 @@ namespace Tester.AzureUtils
                     MembershipVersion = new MembershipVersion(51)
                 };
                 addresses.Add(addr);
-                await this.grainDirectory.Register(addr, previousAddress: null);
+                await this.grainDirectory.Register(addr, previousAddress: null, CancellationToken.None);
             }
 
             // Modify the Rth entry locally, to simulate another activation tentative by another silo
@@ -75,7 +75,7 @@ namespace Tester.AzureUtils
             };
 
             // Batch unregister
-            await this.grainDirectory.UnregisterMany(addresses);
+            await this.grainDirectory.UnregisterMany(addresses, CancellationToken.None);
 
             // Now we should only find the old Rth entry
             for (int i = 0; i < N; i++)

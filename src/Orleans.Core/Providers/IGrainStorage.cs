@@ -3,6 +3,7 @@ using System.Runtime.Serialization;
 using System.Threading.Tasks;
 using Orleans.Runtime;
 using System.Net;
+using System.Threading;
 
 namespace Orleans.Storage
 {
@@ -15,8 +16,42 @@ namespace Orleans.Storage
         /// <param name="stateName">Name of the state for this grain</param>
         /// <param name="grainId">Grain ID</param>
         /// <param name="grainState">State data object to be populated for this grain.</param>
+        /// <param name="cancellationToken">The token to monitor for cancellation requests.</param>
         /// <typeparam name="T">The grain state type.</typeparam>
         /// <returns>Completion promise for the Read operation on the specified grain.</returns>
+#pragma warning disable CS0618 // Type or member is obsolete
+        Task ReadStateAsync<T>(string stateName, GrainId grainId, IGrainState<T> grainState, CancellationToken cancellationToken) => ReadStateAsync(stateName, grainId, grainState).WaitAsync(cancellationToken);
+#pragma warning restore CS0618 // Type or member is obsolete
+
+        /// <summary>Write data function for this storage instance.</summary>
+        /// <param name="stateName">Name of the state for this grain</param>
+        /// <param name="grainId">Grain ID</param>
+        /// <param name="grainState">State data object to be written for this grain.</param>
+        /// <param name="cancellationToken">The token to monitor for cancellation requests.</param>
+        /// <typeparam name="T">The grain state type.</typeparam>
+        /// <returns>Completion promise for the Write operation on the specified grain.</returns>
+#pragma warning disable CS0618 // Type or member is obsolete
+        Task WriteStateAsync<T>(string stateName, GrainId grainId, IGrainState<T> grainState, CancellationToken cancellationToken) => WriteStateAsync(stateName, grainId, grainState).WaitAsync(cancellationToken);
+#pragma warning restore CS0618 // Type or member is obsolete
+
+        /// <summary>Delete / Clear data function for this storage instance.</summary>
+        /// <param name="stateName">Name of the state for this grain</param>
+        /// <param name="grainId">Grain ID</param>
+        /// <param name="grainState">Copy of last-known state data object for this grain.</param>
+        /// <param name="cancellationToken">The token to monitor for cancellation requests.</param>
+        /// <typeparam name="T">The grain state type.</typeparam>
+        /// <returns>Completion promise for the Delete operation on the specified grain.</returns>
+#pragma warning disable CS0618 // Type or member is obsolete
+        Task ClearStateAsync<T>(string stateName, GrainId grainId, IGrainState<T> grainState, CancellationToken cancellationToken) => ClearStateAsync(stateName, grainId, grainState).WaitAsync(cancellationToken);
+#pragma warning restore CS0618 // Type or member is obsolete
+
+        /// <summary>Read data function for this storage instance.</summary>
+        /// <param name="stateName">Name of the state for this grain</param>
+        /// <param name="grainId">Grain ID</param>
+        /// <param name="grainState">State data object to be populated for this grain.</param>
+        /// <typeparam name="T">The grain state type.</typeparam>
+        /// <returns>Completion promise for the Read operation on the specified grain.</returns>
+        [Obsolete($"Use the overload which accepts a {nameof(CancellationToken)}")]
         Task ReadStateAsync<T>(string stateName, GrainId grainId, IGrainState<T> grainState);
 
         /// <summary>Write data function for this storage instance.</summary>
@@ -25,6 +60,7 @@ namespace Orleans.Storage
         /// <param name="grainState">State data object to be written for this grain.</param>
         /// <typeparam name="T">The grain state type.</typeparam>
         /// <returns>Completion promise for the Write operation on the specified grain.</returns>
+        [Obsolete($"Use the overload which accepts a {nameof(CancellationToken)}")]
         Task WriteStateAsync<T>(string stateName, GrainId grainId, IGrainState<T> grainState);
 
         /// <summary>Delete / Clear data function for this storage instance.</summary>
@@ -33,6 +69,7 @@ namespace Orleans.Storage
         /// <param name="grainState">Copy of last-known state data object for this grain.</param>
         /// <typeparam name="T">The grain state type.</typeparam>
         /// <returns>Completion promise for the Delete operation on the specified grain.</returns>
+        [Obsolete($"Use the overload which accepts a {nameof(CancellationToken)}")]
         Task ClearStateAsync<T>(string stateName, GrainId grainId, IGrainState<T> grainState);
     }
 

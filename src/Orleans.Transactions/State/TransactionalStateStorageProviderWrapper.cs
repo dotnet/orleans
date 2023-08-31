@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
+using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Orleans.Core;
@@ -34,7 +35,7 @@ namespace Orleans.Transactions
 
         public async Task<TransactionalStorageLoadResponse<TState>> Load()
         {
-            await this.StateStorage.ReadStateAsync();
+            await this.StateStorage.ReadStateAsync(CancellationToken.None);
             var state = stateStorage.State;
             return new TransactionalStorageLoadResponse<TState>(stateStorage.Etag, state.CommittedState, state.CommittedSequenceId, state.Metadata, state.PendingStates);
         }
@@ -96,7 +97,7 @@ namespace Orleans.Transactions
                 }
             }
 
-            await stateStorage.WriteStateAsync();
+            await stateStorage.WriteStateAsync(CancellationToken.None);
             return stateStorage.Etag!;
         }
 

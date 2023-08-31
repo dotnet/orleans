@@ -60,9 +60,17 @@ namespace Orleans.Storage
             this.logger = logger;
         }
 
-        /// <summary> Read state data function for this storage provider. </summary>
-        /// <see cref="IGrainStorage.ReadStateAsync{T}"/>
-        public async Task ReadStateAsync<T>(string grainType, GrainId grainId, IGrainState<T> grainState)
+        /// <inheritdoc/>
+        public Task ReadStateAsync<T>(string grainType, GrainId grainId, IGrainState<T> grainState) => ReadStateAsync(grainType, grainId, grainState, CancellationToken.None);
+
+        /// <inheritdoc/>
+        public Task WriteStateAsync<T>(string grainType, GrainId grainId, IGrainState<T> grainState) => WriteStateAsync(grainType, grainId, grainState, CancellationToken.None);
+
+        /// <inheritdoc/>
+        public Task ClearStateAsync<T>(string grainType, GrainId grainId, IGrainState<T> grainState) => ClearStateAsync(grainType, grainId, grainState, CancellationToken.None);
+
+        /// <inheritdoc/>
+        public async Task ReadStateAsync<T>(string grainType, GrainId grainId, IGrainState<T> grainState, CancellationToken cancellationToken)
         {
             if (tableDataManager == null) throw new ArgumentException("GrainState-Table property not initialized");
 
@@ -75,7 +83,7 @@ namespace Orleans.Storage
                 this.options.TableName);
             string partitionKey = pk;
             string rowKey = AzureTableUtils.SanitizeTableProperty(grainType);
-            var entity = await tableDataManager.Read(partitionKey, rowKey).ConfigureAwait(false);
+            var entity = await tableDataManager.Read(partitionKey, rowKey, cancellationToken).ConfigureAwait(false);
             if (entity is not null)
             {
                 var loadedState = ConvertFromStorageFormat<T>(entity);
@@ -86,9 +94,8 @@ namespace Orleans.Storage
             // Else leave grainState in previous default condition
         }
 
-        /// <summary> Write state data function for this storage provider. </summary>
-        /// <see cref="IGrainStorage.WriteStateAsync{T}"/>
-        public async Task WriteStateAsync<T>(string grainType, GrainId grainId, IGrainState<T> grainState)
+        /// <inheritdoc/>
+        public async Task WriteStateAsync<T>(string grainType, GrainId grainId, IGrainState<T> grainState, CancellationToken cancellationToken)
         {
             if (tableDataManager == null) throw new ArgumentException("GrainState-Table property not initialized");
 
@@ -110,7 +117,7 @@ namespace Orleans.Storage
             ConvertToStorageFormat(grainState.State, entity);
             try
             {
-                await DoOptimisticUpdate(() => tableDataManager.Write(entity), grainType, grainId, this.options.TableName, grainState.ETag).ConfigureAwait(false);
+                await DoOptimisticUpdate(ct => tableDataManager.Write(entity, ct), grainType, grainId, this.options.TableName, grainState.ETag, cancellationToken).ConfigureAwait(false);
                 grainState.ETag = entity.ETag.ToString();
                 grainState.RecordExists = true;
             }
@@ -126,14 +133,8 @@ namespace Orleans.Storage
             }
         }
 
-        /// <summary> Clear / Delete state data function for this storage provider. </summary>
-        /// <remarks>
-        /// If the <c>DeleteStateOnClear</c> is set to <c>true</c> then the table row
-        /// for this grain will be deleted / removed, otherwise the table row will be
-        /// cleared by overwriting with default / null values.
-        /// </remarks>
-        /// <see cref="IGrainStorage.ClearStateAsync{T}"/>
-        public async Task ClearStateAsync<T>(string grainType, GrainId grainId, IGrainState<T> grainState)
+        /// <inheritdoc/>
+        public async Task ClearStateAsync<T>(string grainType, GrainId grainId, IGrainState<T> grainState, CancellationToken cancellationToken)
         {
             if (tableDataManager == null) throw new ArgumentException("GrainState-Table property not initialized");
 
@@ -157,11 +158,11 @@ namespace Orleans.Storage
                 if (this.options.DeleteStateOnClear)
                 {
                     operation = "Deleting";
-                    await DoOptimisticUpdate(() => tableDataManager.Delete(entity), grainType, grainId, this.options.TableName, grainState.ETag).ConfigureAwait(false);
+                    await DoOptimisticUpdate(ct => tableDataManager.Delete(entity, ct), grainType, grainId, this.options.TableName, grainState.ETag, cancellationToken).ConfigureAwait(false);
                 }
                 else
                 {
-                    await DoOptimisticUpdate(() => tableDataManager.Write(entity), grainType, grainId, this.options.TableName, grainState.ETag).ConfigureAwait(false);
+                    await DoOptimisticUpdate(ct => tableDataManager.Write(entity, ct), grainType, grainId, this.options.TableName, grainState.ETag, cancellationToken).ConfigureAwait(false);
                 }
 
                 grainState.ETag = entity.ETag.ToString(); // Update in-memory data to the new ETag
@@ -181,11 +182,11 @@ namespace Orleans.Storage
             }
         }
 
-        private static async Task DoOptimisticUpdate(Func<Task> updateOperation, string grainType, GrainId grainId, string tableName, string currentETag)
+        private static async Task DoOptimisticUpdate(Func<CancellationToken, Task> updateOperation, string grainType, GrainId grainId, string tableName, string currentETag, CancellationToken cancellationToken)
         {
             try
             {
-                await updateOperation.Invoke().ConfigureAwait(false);
+                await updateOperation.Invoke(cancellationToken).ConfigureAwait(false);
             }
             catch (RequestFailedException ex) when (ex.IsPreconditionFailed() || ex.IsConflict() || ex.IsNotFound())
             {
@@ -392,12 +393,12 @@ namespace Orleans.Storage
                 tableManager = new AzureTableDataManager<TableEntity>(options, logger);
             }
 
-            public Task InitTableAsync()
+            public Task InitTableAsync(CancellationToken cancellationToken)
             {
-                return tableManager.InitTableAsync();
+                return tableManager.InitTableAsync(cancellationToken);
             }
 
-            public async Task<TableEntity> Read(string partitionKey, string rowKey)
+            public async Task<TableEntity> Read(string partitionKey, string rowKey, CancellationToken cancellationToken)
             {
                 if (logger.IsEnabled(LogLevel.Trace)) logger.LogTrace((int)AzureProviderErrorCode.AzureTableProvider_Storage_Reading,
                     "Reading: PartitionKey={PartitionKey} RowKey={RowKey} from Table={TableName}",
@@ -406,7 +407,7 @@ namespace Orleans.Storage
                     TableName);
                 try
                 {
-                    var data = await tableManager.ReadSingleTableEntryAsync(partitionKey, rowKey).ConfigureAwait(false);
+                    var data = await tableManager.ReadSingleTableEntryAsync(partitionKey, rowKey, cancellationToken).ConfigureAwait(false);
                     if (data.Entity == null)
                     {
                         if (logger.IsEnabled(LogLevel.Trace)) logger.LogTrace((int)AzureProviderErrorCode.AzureTableProvider_DataNotFound,
@@ -445,7 +446,7 @@ namespace Orleans.Storage
                 }
             }
 
-            public async Task Write(TableEntity entity)
+            public async Task Write(TableEntity entity, CancellationToken cancellationToken)
             {
                 if (logger.IsEnabled(LogLevel.Trace)) logger.LogTrace((int)AzureProviderErrorCode.AzureTableProvider_Storage_Writing,
                     "Writing: PartitionKey={PartitionKey} RowKey={RowKey} to Table={TableName} with ETag={ETag}",
@@ -455,12 +456,12 @@ namespace Orleans.Storage
                     entity.ETag);
 
                 string eTag = string.IsNullOrEmpty(entity.ETag.ToString()) ?
-                    await tableManager.CreateTableEntryAsync(entity).ConfigureAwait(false) :
-                    await tableManager.UpdateTableEntryAsync(entity, entity.ETag).ConfigureAwait(false);
+                    await tableManager.CreateTableEntryAsync(entity, cancellationToken).ConfigureAwait(false) :
+                    await tableManager.UpdateTableEntryAsync(entity, entity.ETag, cancellationToken).ConfigureAwait(false);
                 entity.ETag = new ETag(eTag);
             }
 
-            public async Task Delete(TableEntity entity)
+            public async Task Delete(TableEntity entity, CancellationToken cancellationToken)
             {
                 if (string.IsNullOrWhiteSpace(entity.ETag.ToString()))
                 {
@@ -479,7 +480,7 @@ namespace Orleans.Storage
                     entity.RowKey,
                     TableName,
                     entity.ETag);
-                await tableManager.DeleteTableEntryAsync(entity, entity.ETag).ConfigureAwait(false);
+                await tableManager.DeleteTableEntryAsync(entity, entity.ETag, cancellationToken).ConfigureAwait(false);
                 entity.ETag = default;
             }
         }
@@ -500,7 +501,7 @@ namespace Orleans.Storage
                     name,
                     this.options.ToString());
                 this.tableDataManager = new GrainStateTableDataManager(this.options, this.logger);
-                await this.tableDataManager.InitTableAsync();
+                await this.tableDataManager.InitTableAsync(ct);
                 stopWatch.Stop();
                 this.logger.LogInformation((int)AzureProviderErrorCode.AzureTableProvider_InitProvider,
                     "Initializing provider {ProviderName} of type {ProviderType} in stage {Stage} took {ElapsedMilliseconds} Milliseconds.",

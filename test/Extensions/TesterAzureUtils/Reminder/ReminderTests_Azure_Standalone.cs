@@ -51,7 +51,7 @@ namespace Tester.AzureUtils.TimerTests
             storageOptions.Value.ConfigureTestDefaults();
 
             IReminderTable table = new AzureBasedReminderTable(this.loggerFactory, clusterOptions, storageOptions);
-            await table.Init();
+            await table.Init(CancellationToken.None);
 
             await TestTableInsertRate(table, 10);
             await TestTableInsertRate(table, 500);
@@ -65,13 +65,13 @@ namespace Tester.AzureUtils.TimerTests
             var storageOptions = Options.Create(new AzureTableReminderStorageOptions());
             storageOptions.Value.ConfigureTestDefaults();
             IReminderTable table = new AzureBasedReminderTable(this.loggerFactory, clusterOptions, storageOptions);
-            await table.Init();
+            await table.Init(CancellationToken.None);
 
             ReminderEntry[] rows = (await GetAllRows(table)).ToArray();
             Assert.Empty(rows); // "The reminder table (sid={0}, did={1}) was not empty.", ServiceId, clusterId);
 
             ReminderEntry expected = NewReminderEntry();
-            await table.UpsertRow(expected);
+            await table.UpsertRow(expected, CancellationToken.None);
             rows = (await GetAllRows(table)).ToArray();
 
             Assert.Single(rows); // "The reminder table (sid={0}, did={1}) did not contain the correct number of rows (1).", ServiceId, clusterId);
@@ -108,7 +108,7 @@ namespace Tester.AzureUtils.TimerTests
                     int capture = i;
                     Task<bool> promise = Task.Run(async () =>
                     {
-                        await reminderTable.UpsertRow(e);
+                        await reminderTable.UpsertRow(e, CancellationToken.None);
                         this.output.WriteLine("Done " + capture);
                         return true;
                     });
@@ -149,7 +149,7 @@ namespace Tester.AzureUtils.TimerTests
 
         private async Task<IEnumerable<ReminderEntry>> GetAllRows(IReminderTable table)
         {
-            ReminderTableData data = await table.ReadRows(0, 0xffffffff);
+            ReminderTableData data = await table.ReadRows(0, 0xffffffff, CancellationToken.None);
             return data.Reminders;
         }
     }

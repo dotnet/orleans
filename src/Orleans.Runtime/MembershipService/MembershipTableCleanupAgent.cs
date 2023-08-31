@@ -18,6 +18,7 @@ namespace Orleans.Runtime.MembershipService
         private readonly IMembershipTable membershipTableProvider;
         private readonly ILogger<MembershipTableCleanupAgent> log;
         private readonly IAsyncTimer cleanupDefunctSilosTimer;
+        private readonly CancellationTokenSource shutdownCancellation = new();
 
         public MembershipTableCleanupAgent(
             IOptions<ClusterMembershipOptions> clusterMembershipOptions,
@@ -68,7 +69,7 @@ namespace Orleans.Runtime.MembershipService
                     try
                     {
                         var dateLimit = DateTime.UtcNow - this.clusterMembershipOptions.DefunctSiloExpiration;
-                        await this.membershipTableProvider.CleanupDefunctSiloEntries(dateLimit);
+                        await this.membershipTableProvider.CleanupDefunctSiloEntries(dateLimit, shutdownCancellation.Token);
                     }
                     catch (Exception exception) when (exception is NotImplementedException or MissingMethodException)
                     {
@@ -103,6 +104,7 @@ namespace Orleans.Runtime.MembershipService
 
             async Task OnStop(CancellationToken ct)
             {
+                shutdownCancellation.Cancel();
                 this.cleanupDefunctSilosTimer?.Dispose();
                 await Task.WhenAny(ct.WhenCancelled(), Task.WhenAll(tasks));
             }

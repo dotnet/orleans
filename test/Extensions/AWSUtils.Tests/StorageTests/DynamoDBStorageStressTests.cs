@@ -1,4 +1,4 @@
-﻿using Amazon.DynamoDBv2.Model;
+using Amazon.DynamoDBv2.Model;
 using Orleans.TestingHost.Utils;
 using System;
 using System.Collections.Generic;
@@ -67,7 +67,7 @@ namespace AWSUtils.Tests.StorageTests
             Stopwatch sw = Stopwatch.StartNew();
 
             var keys = new Dictionary<string, AttributeValue> { { ":PK", new AttributeValue(PartitionKey) } };
-            var data = manager.QueryAsync(UnitTestDynamoDBStorage.INSTANCE_TABLE_NAME, keys, $"PartitionKey = :PK", item => new UnitTestDynamoDBTableData(item)).Result;
+            var data = manager.QueryAsync(UnitTestDynamoDBStorage.INSTANCE_TABLE_NAME, keys, $"PartitionKey = :PK", item => new UnitTestDynamoDBTableData(item), cancellationToken: CancellationToken.None).Result;
 
             sw.Stop();
             int count = data.results.Count();

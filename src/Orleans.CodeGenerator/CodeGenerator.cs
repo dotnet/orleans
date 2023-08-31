@@ -22,6 +22,19 @@ namespace Orleans.CodeGenerator
         public List<string> AliasAttributes { get; } = new() { "Orleans.AliasAttribute" };
         public List<string> ImmutableAttributes { get; } = new() { "Orleans.ImmutableAttribute" };
         public List<string> ConstructorAttributes { get; } = new() { "Orleans.OrleansConstructorAttribute", "Microsoft.Extensions.DependencyInjection.ActivatorUtilitiesConstructorAttribute" };
+        public List<string> SuppressedCompilerWarnings { get; } = new()
+        {
+            "CS0162", // CS0162 - Unreachable code detected.
+            "CS0219", // CS0219 - The variable 'V' is assigned but its value is never used.
+            "CS0414", // CS0414 - The private field 'F' is assigned but its value is never used.
+            "CS0618", // CS0616 - Member is obsolete.
+            "CS0649", // CS0649 - Field 'F' is never assigned to, and will always have its default value.
+            "CS0693", // CS0693 - Type parameter 'type parameter' has the same name as the type parameter from outer type 'T'
+            "CS1591", // CS1591 - Missing XML comment for publicly visible type or member 'Type_or_Member'
+            "CS1998", // CS1998 - This async method lacks 'await' operators and will run synchronously
+            "CS9035", // CS9035	- Required member 'M' must be set in the object initializer or attribute constructor.
+        };
+
         public GenerateFieldIds GenerateFieldIds { get; set; }
     }
 
@@ -116,7 +129,13 @@ namespace Orleans.CodeGenerator
                 namespaces.Add(NamespaceDeclaration(ParseName(ns)).WithMembers(List(member)).WithUsings(usings));
             }
 
+            var compilerWarningTrivia = SeparatedList(_options.SuppressedCompilerWarnings.Select(code => (ExpressionSyntax)code.GetUnquotedLiteralExpression()));
+
+            assemblyAttributes[0] = assemblyAttributes[0]
+                .WithLeadingTrivia(TriviaList(new SyntaxTrivia[] { Trivia(PragmaWarningDirectiveTrivia(Token(SyntaxKind.DisableKeyword), compilerWarningTrivia, true)) }));
+
             return CompilationUnit()
+                .WithLeadingTrivia(TriviaList(new SyntaxTrivia[] { Trivia(PragmaWarningDirectiveTrivia(Token(SyntaxKind.RestoreKeyword), compilerWarningTrivia, true)) }))
                 .WithAttributeLists(List(assemblyAttributes))
                 .WithMembers(List(namespaces));
 

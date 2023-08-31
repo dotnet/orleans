@@ -19,18 +19,19 @@ namespace Tester.AzureUtils.Streaming
         public static async Task<int> GetDeliveryFailureCount(string streamProviderName)
         {
             var dataManager = GetDataManager();
-            await dataManager.InitTableAsync();
+            await dataManager.InitTableAsync(CancellationToken.None);
             var deliveryErrors =
                 await dataManager.ReadAllTableEntriesForPartitionAsync(
-                        StreamDeliveryFailureEntity.MakeDefaultPartitionKey(streamProviderName, DeploymentId));
+                        StreamDeliveryFailureEntity.MakeDefaultPartitionKey(streamProviderName, DeploymentId),
+                        CancellationToken.None);
             return deliveryErrors.Count;
         }
 
         public static async Task DeleteAll()
         {
             var dataManager = GetDataManager();
-            await dataManager.InitTableAsync();
-            await dataManager.DeleteTableAsync();
+            await dataManager.InitTableAsync(CancellationToken.None);
+            await dataManager.DeleteTableAsync(CancellationToken.None);
         }
 
         private static AzureTableDataManager<TableEntity> GetDataManager()

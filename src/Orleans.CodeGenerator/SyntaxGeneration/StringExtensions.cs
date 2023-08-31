@@ -27,6 +27,17 @@ namespace Orleans.CodeGenerator.SyntaxGeneration
                 SyntaxFactory.TriviaList());
             return SyntaxFactory.LiteralExpression(SyntaxKind.StringLiteralExpression, syntaxToken);
         }
+        
+        public static LiteralExpressionSyntax GetUnquotedLiteralExpression(this string str)
+        {
+            var syntaxToken = SyntaxFactory.Literal(
+                SyntaxFactory.TriviaList(),
+                str,
+                str,
+                SyntaxFactory.TriviaList());
+            return SyntaxFactory.LiteralExpression(SyntaxKind.StringLiteralExpression, syntaxToken);
+        }
+
 
         public static SyntaxToken ToIdentifier(this string identifier)
         {

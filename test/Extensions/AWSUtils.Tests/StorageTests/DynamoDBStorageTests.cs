@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Threading.Tasks;
@@ -32,9 +32,13 @@ namespace AWSUtils.Tests.StorageTests.AWSUtils
         {
             var expression = "attribute_not_exists(PartitionKey) AND attribute_not_exists(RowKey)";
             var toPersist = GenerateNewData();
-            await manager.PutEntryAsync(UnitTestDynamoDBStorage.INSTANCE_TABLE_NAME, GetValues(toPersist, true), expression);
+            await manager.PutEntryAsync(UnitTestDynamoDBStorage.INSTANCE_TABLE_NAME, GetValues(toPersist, true), expression, cancellationToken: CancellationToken.None);
             var originalEtag = toPersist.ETag;
-            var persisted = await manager.ReadSingleEntryAsync(UnitTestDynamoDBStorage.INSTANCE_TABLE_NAME, GetKeys(toPersist), response => new UnitTestDynamoDBTableData(response) );
+            var persisted = await manager.ReadSingleEntryAsync(
+                UnitTestDynamoDBStorage.INSTANCE_TABLE_NAME,
+                GetKeys(toPersist),
+                response => new UnitTestDynamoDBTableData(response),
+                CancellationToken.None);
             Assert.Equal(toPersist.StringData, persisted.StringData);
             Assert.True(persisted.ETag == 0);
             Assert.Equal(originalEtag, persisted.ETag);
@@ -42,7 +46,7 @@ namespace AWSUtils.Tests.StorageTests.AWSUtils
             await Assert.ThrowsAsync<ConditionalCheckFailedException>(async () =>
             {
                 var toPersist2 = toPersist.Clone();
-                await manager.PutEntryAsync(UnitTestDynamoDBStorage.INSTANCE_TABLE_NAME, GetValues(toPersist, true), expression);
+                await manager.PutEntryAsync(UnitTestDynamoDBStorage.INSTANCE_TABLE_NAME, GetValues(toPersist, true), expression, cancellationToken: CancellationToken.None);
             });
         }
 
@@ -52,11 +56,11 @@ namespace AWSUtils.Tests.StorageTests.AWSUtils
             var expression = "attribute_not_exists(PartitionKey) AND attribute_not_exists(RowKey)";
             var toPersist = GenerateNewData();
             toPersist.StringData = "Create";
-            await manager.PutEntryAsync(UnitTestDynamoDBStorage.INSTANCE_TABLE_NAME, GetValues(toPersist, true), expression);
+            await manager.PutEntryAsync(UnitTestDynamoDBStorage.INSTANCE_TABLE_NAME, GetValues(toPersist, true), expression, cancellationToken: CancellationToken.None);
 
             toPersist.StringData = "Replaced";            
             await manager.UpsertEntryAsync(UnitTestDynamoDBStorage.INSTANCE_TABLE_NAME, GetKeys(toPersist), GetValues(toPersist));
-            var persisted = await manager.ReadSingleEntryAsync(UnitTestDynamoDBStorage.INSTANCE_TABLE_NAME, GetKeys(toPersist), response => new UnitTestDynamoDBTableData(response));
+            var persisted = await manager.ReadSingleEntryAsync(UnitTestDynamoDBStorage.INSTANCE_TABLE_NAME, GetKeys(toPersist), response => new UnitTestDynamoDBTableData(response), CancellationToken.None);
             Assert.Equal("Replaced", persisted.StringData);
             Assert.True(persisted.ETag == 0); //Yes, ETag didn't changed cause we didn't 
 
@@ -66,7 +70,7 @@ namespace AWSUtils.Tests.StorageTests.AWSUtils
             persisted.ETag++; //Increase ETag
             var expValues = new Dictionary<string, AttributeValue> { { ":OldETag", new AttributeValue { N = persistedEtag.ToString() } } };
             await manager.UpsertEntryAsync(UnitTestDynamoDBStorage.INSTANCE_TABLE_NAME, GetKeys(persisted), GetValues(persisted), expression, expValues);
-            persisted = await manager.ReadSingleEntryAsync(UnitTestDynamoDBStorage.INSTANCE_TABLE_NAME, GetKeys(toPersist), response => new UnitTestDynamoDBTableData(response));
+            persisted = await manager.ReadSingleEntryAsync(UnitTestDynamoDBStorage.INSTANCE_TABLE_NAME, GetKeys(toPersist), response => new UnitTestDynamoDBTableData(response), CancellationToken.None);
             Assert.Equal("Updated", persisted.StringData);
             Assert.NotEqual(persistedEtag, persisted.ETag); //Now ETag changed cause we did it
 
@@ -80,9 +84,9 @@ namespace AWSUtils.Tests.StorageTests.AWSUtils
         public async Task DynamoDBDataManager_DeleteItemAsync()
         {
             var toPersist = GenerateNewData();
-            await manager.PutEntryAsync(UnitTestDynamoDBStorage.INSTANCE_TABLE_NAME, GetValues(toPersist, true));
+            await manager.PutEntryAsync(UnitTestDynamoDBStorage.INSTANCE_TABLE_NAME, GetValues(toPersist, true), cancellationToken: CancellationToken.None);
             await manager.DeleteEntryAsync(UnitTestDynamoDBStorage.INSTANCE_TABLE_NAME, GetKeys(toPersist));
-            var persisted = await manager.ReadSingleEntryAsync(UnitTestDynamoDBStorage.INSTANCE_TABLE_NAME, GetKeys(toPersist), response => new UnitTestDynamoDBTableData(response));
+            var persisted = await manager.ReadSingleEntryAsync(UnitTestDynamoDBStorage.INSTANCE_TABLE_NAME, GetKeys(toPersist), response => new UnitTestDynamoDBTableData(response), CancellationToken.None);
             Assert.Null(persisted);
         }
 
@@ -90,12 +94,12 @@ namespace AWSUtils.Tests.StorageTests.AWSUtils
         public async Task DynamoDBDataManager_ReadSingleTableEntryAsync()
         {
             var toPersist = GenerateNewData();
-            await manager.PutEntryAsync(UnitTestDynamoDBStorage.INSTANCE_TABLE_NAME, GetValues(toPersist, true));
-            var persisted = await manager.ReadSingleEntryAsync(UnitTestDynamoDBStorage.INSTANCE_TABLE_NAME, GetKeys(toPersist), response => new UnitTestDynamoDBTableData(response));
+            await manager.PutEntryAsync(UnitTestDynamoDBStorage.INSTANCE_TABLE_NAME, GetValues(toPersist, true), cancellationToken: CancellationToken.None);
+            var persisted = await manager.ReadSingleEntryAsync(UnitTestDynamoDBStorage.INSTANCE_TABLE_NAME, GetKeys(toPersist), response => new UnitTestDynamoDBTableData(response), CancellationToken.None);
             Assert.NotNull(persisted);
 
             var data = GenerateNewData();
-            var notFound = await manager.ReadSingleEntryAsync(UnitTestDynamoDBStorage.INSTANCE_TABLE_NAME, GetKeys(data), response => new UnitTestDynamoDBTableData(response));
+            var notFound = await manager.ReadSingleEntryAsync(UnitTestDynamoDBStorage.INSTANCE_TABLE_NAME, GetKeys(data), response => new UnitTestDynamoDBTableData(response), CancellationToken.None);
             Assert.Null(notFound);
         }
 
@@ -103,12 +107,12 @@ namespace AWSUtils.Tests.StorageTests.AWSUtils
         public async Task DynamoDBDataManager_ReadAllTableEntryByPartitionAsync()
         {
             var toPersist = GenerateNewData();
-            await manager.PutEntryAsync(UnitTestDynamoDBStorage.INSTANCE_TABLE_NAME, GetValues(toPersist, true));
+            await manager.PutEntryAsync(UnitTestDynamoDBStorage.INSTANCE_TABLE_NAME, GetValues(toPersist, true), cancellationToken: CancellationToken.None);
             var toPersist2 = toPersist.Clone();
             toPersist2.RowKey += "otherKey";
-            await manager.PutEntryAsync(UnitTestDynamoDBStorage.INSTANCE_TABLE_NAME, GetValues(toPersist2, true));
+            await manager.PutEntryAsync(UnitTestDynamoDBStorage.INSTANCE_TABLE_NAME, GetValues(toPersist2, true), cancellationToken: CancellationToken.None);
             var keys = new Dictionary<string, AttributeValue> { { ":PK", new AttributeValue(toPersist.PartitionKey) } };
-            var found = await manager.QueryAsync(UnitTestDynamoDBStorage.INSTANCE_TABLE_NAME, keys, $"PartitionKey = :PK", item => new UnitTestDynamoDBTableData(item));
+            var found = await manager.QueryAsync(UnitTestDynamoDBStorage.INSTANCE_TABLE_NAME, keys, $"PartitionKey = :PK", item => new UnitTestDynamoDBTableData(item), cancellationToken: CancellationToken.None);
             Assert.NotNull(found.results);
             Assert.True(found.results.Count == 2);
         }

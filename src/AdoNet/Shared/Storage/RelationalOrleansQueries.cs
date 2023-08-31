@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Data;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 
 using Orleans.Runtime;
@@ -62,26 +63,27 @@ namespace Orleans.Tests.SqlUtils
         /// </summary>
         /// <param name="invariantName">The invariant name of the connector for this database.</param>
         /// <param name="connectionString">The connection string this database should use for database operations.</param>
-        internal static async Task<RelationalOrleansQueries> CreateInstance(string invariantName, string connectionString)
+        internal static async Task<RelationalOrleansQueries> CreateInstance(string invariantName, string connectionString, CancellationToken cancellationToken)
         {
             var storage = RelationalStorage.CreateInstance(invariantName, connectionString);
 
-            var queries = await storage.ReadAsync(DbStoredQueries.GetQueriesKey, DbStoredQueries.Converters.GetQueryKeyAndValue, null);
+            var queries = await storage.ReadAsync(DbStoredQueries.GetQueriesKey, DbStoredQueries.Converters.GetQueryKeyAndValue, null, cancellationToken);
 
             return new RelationalOrleansQueries(storage, new DbStoredQueries(queries.ToDictionary(q => q.Key, q => q.Value)));
         }
 
-        private Task ExecuteAsync(string query, Func<IDbCommand, DbStoredQueries.Columns> parameterProvider)
+        private Task ExecuteAsync(string query, Func<IDbCommand, DbStoredQueries.Columns> parameterProvider, CancellationToken cancellationToken)
         {
-            return storage.ExecuteAsync(query, command => parameterProvider(command));
+            return storage.ExecuteAsync(query, command => parameterProvider(command), cancellationToken: cancellationToken);
         }
 
         private async Task<TAggregate> ReadAsync<TResult, TAggregate>(string query,
             Func<IDataRecord, TResult> selector,
             Func<IDbCommand, DbStoredQueries.Columns> parameterProvider,
-            Func<IEnumerable<TResult>, TAggregate> aggregator)
+            Func<IEnumerable<TResult>, TAggregate> aggregator,
+            CancellationToken cancellationToken)
         {
-            var ret = await storage.ReadAsync(query, selector, command => parameterProvider(command));
+            var ret = await storage.ReadAsync(query, selector, command => parameterProvider(command), cancellationToken);
             return aggregator(ret);
         }
 
@@ -93,13 +95,15 @@ namespace Orleans.Tests.SqlUtils
         /// <param name="serviceId">The service ID.</param>
         /// <param name="grainId">The grain reference (ID).</param>
         /// <returns>Reminder table data.</returns>
-        internal Task<ReminderTableData> ReadReminderRowsAsync(string serviceId, GrainId grainId)
+        internal Task<ReminderTableData> ReadReminderRowsAsync(string serviceId, GrainId grainId, CancellationToken cancellationToken)
         {
-            return ReadAsync(dbStoredQueries.ReadReminderRowsKey, GetReminderEntry, command =>
-                new DbStoredQueries.Columns(command) { ServiceId = serviceId, GrainId = grainId.ToString() },
-                ret => new ReminderTableData(ret.ToList()));
+            return ReadAsync(
+                dbStoredQueries.ReadReminderRowsKey,
+                GetReminderEntry,
+                command => new DbStoredQueries.Columns(command) { ServiceId = serviceId, GrainId = grainId.ToString() },
+                ret => new ReminderTableData(ret.ToList()),
+                cancellationToken);
         }
-
 
         /// <summary>
         /// Reads Orleans reminder data from the tables.
@@ -108,15 +112,18 @@ namespace Orleans.Tests.SqlUtils
         /// <param name="beginHash">The begin hash.</param>
         /// <param name="endHash">The end hash.</param>
         /// <returns>Reminder table data.</returns>
-        internal Task<ReminderTableData> ReadReminderRowsAsync(string serviceId, uint beginHash, uint endHash)
+        internal Task<ReminderTableData> ReadReminderRowsAsync(string serviceId, uint beginHash, uint endHash, CancellationToken cancellationToken)
         {
             var query = (int)beginHash < (int)endHash ? dbStoredQueries.ReadRangeRows1Key : dbStoredQueries.ReadRangeRows2Key;
 
-            return ReadAsync(query, GetReminderEntry, command =>
+            return ReadAsync(
+                query,
+                GetReminderEntry,
+                command =>
                 new DbStoredQueries.Columns(command) { ServiceId = serviceId, BeginHash = beginHash, EndHash = endHash },
-                ret => new ReminderTableData(ret.ToList()));
+                ret => new ReminderTableData(ret.ToList()),
+                cancellationToken);
         }
-
 
         internal static KeyValuePair<string, string> GetQueryKeyAndValue(IDataRecord record)
         {
@@ -151,16 +158,23 @@ namespace Orleans.Tests.SqlUtils
         /// <param name="grainId">The grain reference (ID).</param>
         /// <param name="reminderName">The reminder name to retrieve.</param>
         /// <returns>A remainder entry.</returns>
-        internal Task<ReminderEntry> ReadReminderRowAsync(string serviceId, GrainId grainId,
-            string reminderName)
+        internal Task<ReminderEntry> ReadReminderRowAsync(
+            string serviceId,
+            GrainId grainId,
+            string reminderName,
+            CancellationToken cancellationToken)
         {
-            return ReadAsync(dbStoredQueries.ReadReminderRowKey, GetReminderEntry, command =>
-                new DbStoredQueries.Columns(command)
+            return ReadAsync(
+                dbStoredQueries.ReadReminderRowKey,
+                GetReminderEntry,
+                command => new DbStoredQueries.Columns(command)
                 {
                     ServiceId = serviceId,
                     GrainId = grainId.ToString(),
                     ReminderName = reminderName
-                }, ret => ret.FirstOrDefault());
+                },
+                ret => ret.FirstOrDefault(),
+                cancellationToken);
         }
 
         /// <summary>
@@ -172,11 +186,18 @@ namespace Orleans.Tests.SqlUtils
         /// <param name="startTime">Start time of the reminder.</param>
         /// <param name="period">Period of the reminder.</param>
         /// <returns>The new etag of the either or updated or inserted reminder row.</returns>
-        internal Task<string> UpsertReminderRowAsync(string serviceId, GrainId grainId,
-            string reminderName, DateTime startTime, TimeSpan period)
+        internal Task<string> UpsertReminderRowAsync(
+            string serviceId,
+            GrainId grainId,
+            string reminderName,
+            DateTime startTime,
+            TimeSpan period,
+            CancellationToken cancellationToken)
         {
-            return ReadAsync(dbStoredQueries.UpsertReminderRowKey, DbStoredQueries.Converters.GetVersion, command =>
-                new DbStoredQueries.Columns(command)
+            return ReadAsync(
+                dbStoredQueries.UpsertReminderRowKey,
+                DbStoredQueries.Converters.GetVersion,
+                command => new DbStoredQueries.Columns(command)
                 {
                     ServiceId = serviceId,
                     GrainHash = grainId.GetUniformHashCode(),
@@ -184,7 +205,9 @@ namespace Orleans.Tests.SqlUtils
                     ReminderName = reminderName,
                     StartTime = startTime,
                     Period = period
-                }, ret => ret.First().ToString());
+                },
+                ret => ret.First().ToString(),
+                cancellationToken);
         }
 
         /// <summary>
@@ -195,17 +218,25 @@ namespace Orleans.Tests.SqlUtils
         /// <param name="reminderName"></param>
         /// <param name="etag"></param>
         /// <returns></returns>
-        internal Task<bool> DeleteReminderRowAsync(string serviceId, GrainId grainId, string reminderName,
-            string etag)
+        internal Task<bool> DeleteReminderRowAsync(
+            string serviceId,
+            GrainId grainId,
+            string reminderName,
+            string etag,
+            CancellationToken cancellationToken)
         {
-            return ReadAsync(dbStoredQueries.DeleteReminderRowKey, DbStoredQueries.Converters.GetSingleBooleanValue, command =>
-                new DbStoredQueries.Columns(command)
+            return ReadAsync(
+                dbStoredQueries.DeleteReminderRowKey,
+                DbStoredQueries.Converters.GetSingleBooleanValue,
+                command => new DbStoredQueries.Columns(command)
                 {
                     ServiceId = serviceId,
                     GrainId = grainId.ToString(),
                     ReminderName = reminderName,
                     Version = etag
-                }, ret => ret.First());
+                },
+                ret => ret.First(),
+                cancellationToken);
         }
 
         /// <summary>
@@ -213,10 +244,12 @@ namespace Orleans.Tests.SqlUtils
         /// </summary>
         /// <param name="serviceId"></param>
         /// <returns></returns>
-        internal Task DeleteReminderRowsAsync(string serviceId)
+        internal Task DeleteReminderRowsAsync(string serviceId, CancellationToken cancellationToken)
         {
-            return ExecuteAsync(dbStoredQueries.DeleteReminderRowsKey, command =>
-                new DbStoredQueries.Columns(command) { ServiceId = serviceId });
+            return ExecuteAsync(
+                dbStoredQueries.DeleteReminderRowsKey,
+                command => new DbStoredQueries.Columns(command) { ServiceId = serviceId },
+                cancellationToken);
         }
 
 #endif
@@ -228,11 +261,14 @@ namespace Orleans.Tests.SqlUtils
         /// </summary>
         /// <param name="deploymentId">The deployment for which to query the gateways.</param>
         /// <returns>The gateways for the silo.</returns>
-        internal Task<List<Uri>> ActiveGatewaysAsync(string deploymentId)
+        internal Task<List<Uri>> ActiveGatewaysAsync(string deploymentId, CancellationToken cancellationToken)
         {
-            return ReadAsync(dbStoredQueries.GatewaysQueryKey, DbStoredQueries.Converters.GetGatewayUri, command =>
-                new DbStoredQueries.Columns(command) { DeploymentId = deploymentId, Status = SiloStatus.Active },
-                ret => ret.ToList());
+            return ReadAsync(
+                dbStoredQueries.GatewaysQueryKey,
+                DbStoredQueries.Converters.GetGatewayUri,
+                command => new DbStoredQueries.Columns(command) { DeploymentId = deploymentId, Status = SiloStatus.Active },
+                ret => ret.ToList(),
+                cancellationToken);
         }
 
         /// <summary>
@@ -241,11 +277,14 @@ namespace Orleans.Tests.SqlUtils
         /// <param name="deploymentId">The deployment for which to query data.</param>
         /// <param name="siloAddress">Silo data used as parameters in the query.</param>
         /// <returns>Membership table data.</returns>
-        internal Task<MembershipTableData> MembershipReadRowAsync(string deploymentId, SiloAddress siloAddress)
+        internal Task<MembershipTableData> MembershipReadRowAsync(string deploymentId, SiloAddress siloAddress, CancellationToken cancellationToken)
         {
-            return ReadAsync(dbStoredQueries.MembershipReadRowKey, DbStoredQueries.Converters.GetMembershipEntry, command =>
-                new DbStoredQueries.Columns(command) { DeploymentId = deploymentId, SiloAddress = siloAddress },
-                ConvertToMembershipTableData);
+            return ReadAsync(
+                dbStoredQueries.MembershipReadRowKey,
+                DbStoredQueries.Converters.GetMembershipEntry,
+                command => new DbStoredQueries.Columns(command) { DeploymentId = deploymentId, SiloAddress = siloAddress },
+                ConvertToMembershipTableData,
+                cancellationToken);
         }
 
         /// <summary>
@@ -253,10 +292,14 @@ namespace Orleans.Tests.SqlUtils
         /// </summary>
         /// <param name="deploymentId"></param>
         /// <returns></returns>
-        internal Task<MembershipTableData> MembershipReadAllAsync(string deploymentId)
+        internal Task<MembershipTableData> MembershipReadAllAsync(string deploymentId, CancellationToken cancellationToken)
         {
-            return ReadAsync(dbStoredQueries.MembershipReadAllKey, DbStoredQueries.Converters.GetMembershipEntry, command =>
-                new DbStoredQueries.Columns(command) { DeploymentId = deploymentId }, ConvertToMembershipTableData);
+            return ReadAsync(
+                dbStoredQueries.MembershipReadAllKey,
+                DbStoredQueries.Converters.GetMembershipEntry,
+                command => new DbStoredQueries.Columns(command) { DeploymentId = deploymentId },
+                ConvertToMembershipTableData,
+                cancellationToken);
         }
 
         /// <summary>
@@ -264,10 +307,12 @@ namespace Orleans.Tests.SqlUtils
         /// </summary>
         /// <param name="deploymentId"></param>
         /// <returns></returns>
-        internal Task DeleteMembershipTableEntriesAsync(string deploymentId)
+        internal Task DeleteMembershipTableEntriesAsync(string deploymentId, CancellationToken cancellationToken)
         {
-            return ExecuteAsync(dbStoredQueries.DeleteMembershipTableEntriesKey, command =>
-                new DbStoredQueries.Columns(command) { DeploymentId = deploymentId });
+            return ExecuteAsync(
+                dbStoredQueries.DeleteMembershipTableEntriesKey,
+                command => new DbStoredQueries.Columns(command) { DeploymentId = deploymentId },
+                cancellationToken: cancellationToken);
         }
 
         /// <summary>
@@ -277,10 +322,12 @@ namespace Orleans.Tests.SqlUtils
         /// <param name="beforeDate"></param>
         /// <param name="deploymentId"></param>
         /// <returns></returns>
-        internal Task CleanupDefunctSiloEntriesAsync(DateTimeOffset beforeDate, string deploymentId)
+        internal Task CleanupDefunctSiloEntriesAsync(DateTimeOffset beforeDate, string deploymentId, CancellationToken cancellationToken)
         {
-            return ExecuteAsync(dbStoredQueries.CleanupDefunctSiloEntriesKey, command =>
-                new DbStoredQueries.Columns(command) { DeploymentId = deploymentId, IAmAliveTime = beforeDate.UtcDateTime });
+            return ExecuteAsync(
+                dbStoredQueries.CleanupDefunctSiloEntriesKey,
+                command => new DbStoredQueries.Columns(command) { DeploymentId = deploymentId, IAmAliveTime = beforeDate.UtcDateTime },
+                cancellationToken);
         }
 
         /// <summary>
@@ -290,15 +337,17 @@ namespace Orleans.Tests.SqlUtils
         /// <param name="siloAddress"></param>
         /// <param name="iAmAliveTime"></param>
         /// <returns></returns>
-        internal Task UpdateIAmAliveTimeAsync(string deploymentId, SiloAddress siloAddress, DateTime iAmAliveTime)
+        internal Task UpdateIAmAliveTimeAsync(string deploymentId, SiloAddress siloAddress, DateTime iAmAliveTime, CancellationToken cancellationToken)
         {
-            return ExecuteAsync(dbStoredQueries.UpdateIAmAlivetimeKey, command =>
-                new DbStoredQueries.Columns(command)
+            return ExecuteAsync(
+                dbStoredQueries.UpdateIAmAlivetimeKey,
+                command => new DbStoredQueries.Columns(command)
                 {
                     DeploymentId = deploymentId,
                     SiloAddress = siloAddress,
                     IAmAliveTime = iAmAliveTime
-                });
+                },
+                cancellationToken);
         }
 
         /// <summary>
@@ -306,10 +355,14 @@ namespace Orleans.Tests.SqlUtils
         /// </summary>
         /// <param name="deploymentId">The deployment for which to query data.</param>
         /// <returns><em>TRUE</em> if a row was inserted. <em>FALSE</em> otherwise.</returns>
-        internal Task<bool> InsertMembershipVersionRowAsync(string deploymentId)
+        internal Task<bool> InsertMembershipVersionRowAsync(string deploymentId, CancellationToken cancellationToken)
         {
-            return ReadAsync(dbStoredQueries.InsertMembershipVersionKey, DbStoredQueries.Converters.GetSingleBooleanValue, command =>
-                new DbStoredQueries.Columns(command) { DeploymentId = deploymentId }, ret => ret.First());
+            return ReadAsync(
+                dbStoredQueries.InsertMembershipVersionKey,
+                DbStoredQueries.Converters.GetSingleBooleanValue,
+                command => new DbStoredQueries.Columns(command) { DeploymentId = deploymentId },
+                ret => ret.First(),
+                cancellationToken);
         }
 
         /// <summary>
@@ -319,11 +372,16 @@ namespace Orleans.Tests.SqlUtils
         /// <param name="membershipEntry">The membership entry data to insert.</param>
         /// <param name="etag">The table expected version etag.</param>
         /// <returns><em>TRUE</em> if insert succeeds. <em>FALSE</em> otherwise.</returns>
-        internal Task<bool> InsertMembershipRowAsync(string deploymentId, MembershipEntry membershipEntry,
-            string etag)
+        internal Task<bool> InsertMembershipRowAsync(
+            string deploymentId,
+            MembershipEntry membershipEntry,
+            string etag,
+            CancellationToken cancellationToken)
         {
-            return ReadAsync(dbStoredQueries.InsertMembershipKey, DbStoredQueries.Converters.GetSingleBooleanValue, command =>
-                new DbStoredQueries.Columns(command)
+            return ReadAsync(
+                dbStoredQueries.InsertMembershipKey,
+                DbStoredQueries.Converters.GetSingleBooleanValue,
+                command => new DbStoredQueries.Columns(command)
                 {
                     DeploymentId = deploymentId,
                     IAmAliveTime = membershipEntry.IAmAliveTime,
@@ -334,7 +392,9 @@ namespace Orleans.Tests.SqlUtils
                     Status = membershipEntry.Status,
                     ProxyPort = membershipEntry.ProxyPort,
                     Version = etag
-                }, ret => ret.First());
+                },
+                ret => ret.First(),
+                cancellationToken);
         }
 
         /// <summary>
@@ -344,11 +404,16 @@ namespace Orleans.Tests.SqlUtils
         /// <param name="membershipEntry">The membership data to used to update database.</param>
         /// <param name="etag">The table expected version etag.</param>
         /// <returns><em>TRUE</em> if update SUCCEEDS. <em>FALSE</em> ot</returns>
-        internal Task<bool> UpdateMembershipRowAsync(string deploymentId, MembershipEntry membershipEntry,
-            string etag)
+        internal Task<bool> UpdateMembershipRowAsync(
+            string deploymentId,
+            MembershipEntry membershipEntry,
+            string etag,
+            CancellationToken cancellationToken)
         {
-            return ReadAsync(dbStoredQueries.UpdateMembershipKey, DbStoredQueries.Converters.GetSingleBooleanValue, command =>
-                new DbStoredQueries.Columns(command)
+            return ReadAsync(
+                dbStoredQueries.UpdateMembershipKey,
+                DbStoredQueries.Converters.GetSingleBooleanValue,
+                command => new DbStoredQueries.Columns(command)
                 {
                     DeploymentId = deploymentId,
                     SiloAddress = membershipEntry.SiloAddress,
@@ -356,7 +421,9 @@ namespace Orleans.Tests.SqlUtils
                     Status = membershipEntry.Status,
                     SuspectTimes = membershipEntry.SuspectTimes,
                     Version = etag
-                }, ret => ret.First());
+                },
+                ret => ret.First(),
+                cancellationToken);
         }
 
         private static MembershipTableData ConvertToMembershipTableData(IEnumerable<Tuple<MembershipEntry, int>> ret)
@@ -370,8 +437,6 @@ namespace Orleans.Tests.SqlUtils
             }
             return new MembershipTableData(membershipEntries, new TableVersion(tableVersionEtag, tableVersionEtag.ToString()));
         }
-
 #endif
-
     }
 }

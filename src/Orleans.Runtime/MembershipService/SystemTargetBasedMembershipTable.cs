@@ -1,5 +1,6 @@
 using System;
 using System.Diagnostics;
+using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -65,7 +66,7 @@ namespace Orleans.Runtime.MembershipService
             {
                 try
                 {
-                    await membershipTableSystemTarget.ReadAll().WithTimeout(timespan, $"MembershipGrain trying to read all content of the membership table, failed due to timeout {timespan}");
+                    await membershipTableSystemTarget.ReadAll(CancellationToken.None).WithTimeout(timespan, $"MembershipGrain trying to read all content of the membership table, failed due to timeout {timespan}");
                     logger.LogInformation((int)ErrorCode.MembershipTableGrainInit2, "Connected to membership table provider.");
                     return;
                 }
@@ -90,17 +91,17 @@ namespace Orleans.Runtime.MembershipService
             }
         }
 
-        public Task DeleteMembershipTableEntries(string clusterId) => this.grain.DeleteMembershipTableEntries(clusterId);
+        public Task DeleteMembershipTableEntries(string clusterId) => this.grain.DeleteMembershipTableEntries(clusterId, CancellationToken.None);
 
-        public Task<MembershipTableData> ReadRow(SiloAddress key) => this.grain.ReadRow(key);
+        public Task<MembershipTableData> ReadRow(SiloAddress key) => this.grain.ReadRow(key, CancellationToken.None);
 
-        public Task<MembershipTableData> ReadAll() => this.grain.ReadAll();
+        public Task<MembershipTableData> ReadAll() => this.grain.ReadAll(CancellationToken.None);
 
-        public Task<bool> InsertRow(MembershipEntry entry, TableVersion tableVersion) => this.grain.InsertRow(entry, tableVersion);
+        public Task<bool> InsertRow(MembershipEntry entry, TableVersion tableVersion) => this.grain.InsertRow(entry, tableVersion, CancellationToken.None);
 
-        public Task<bool> UpdateRow(MembershipEntry entry, string etag, TableVersion tableVersion) => this.grain.UpdateRow(entry, etag, tableVersion);
+        public Task<bool> UpdateRow(MembershipEntry entry, string etag, TableVersion tableVersion) => this.grain.UpdateRow(entry, etag, tableVersion, CancellationToken.None);
 
-        public Task UpdateIAmAlive(MembershipEntry entry) => this.grain.UpdateIAmAlive(entry);
+        public Task UpdateIAmAlive(MembershipEntry entry) => this.grain.UpdateIAmAlive(entry, CancellationToken.None);
 
         public Task CleanupDefunctSiloEntries(DateTimeOffset beforeDate)
         {

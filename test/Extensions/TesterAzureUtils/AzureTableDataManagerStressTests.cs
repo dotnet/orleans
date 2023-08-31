@@ -65,7 +65,7 @@ namespace Tester.AzureUtils
 
             Stopwatch sw = Stopwatch.StartNew();
 
-            var data = manager.ReadAllTableEntriesForPartitionAsync(PartitionKey)
+            var data = manager.ReadAllTableEntriesForPartitionAsync(PartitionKey, CancellationToken.None)
                 .WaitForResultWithThrow(new AzureStoragePolicyOptions().CreationTimeout).Select(tuple => tuple.Entity);
 
             sw.Stop();
@@ -86,7 +86,7 @@ namespace Tester.AzureUtils
 
             Stopwatch sw = Stopwatch.StartNew();
 
-            var data = manager.ReadAllTableEntriesAsync()
+            var data = manager.ReadAllTableEntriesAsync(CancellationToken.None)
                 .WaitForResultWithThrow(new AzureStoragePolicyOptions().CreationTimeout).Select(tuple => tuple.Entity);
 
             sw.Stop();
@@ -96,7 +96,7 @@ namespace Tester.AzureUtils
             Assert.True(count >= iterations, $"ReadAllshould return some data: Found={count}");
 
             sw = Stopwatch.StartNew();
-            manager.ClearTableAsync().WaitWithThrow(new AzureStoragePolicyOptions().CreationTimeout);
+            manager.ClearTableAsync(CancellationToken.None).WaitWithThrow(new AzureStoragePolicyOptions().CreationTimeout);
             sw.Stop();
             output.WriteLine("AzureTable_ReadAllTableEntities clear. Cleared table of {0} entries in {1} at {2} RPS", count, sw.Elapsed, count / sw.Elapsed.TotalSeconds);
         }
@@ -116,7 +116,7 @@ namespace Tester.AzureUtils
                 dataObject.PartitionKey = partitionKey;
                 dataObject.RowKey = rowKey;
                 dataObject.StringData = rowKey;
-                var promise = manager.UpsertTableEntryAsync(dataObject);
+                var promise = manager.UpsertTableEntryAsync(dataObject, CancellationToken.None);
                 promises.Add(promise);
                 if ((i % batchSize) == 0 && i > 0)
                 {

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Threading;
 using System.Threading.Tasks;
 using Orleans.Concurrency;
 using Orleans.Runtime;
@@ -17,6 +18,72 @@ namespace Orleans
         /// Initializes this instance.
         /// </summary>
         /// <returns>A Task representing the work performed.</returns>
+#pragma warning disable CS0618 // Type or member is obsolete
+        Task Init(CancellationToken cancellationToken) => Init().WaitAsync(cancellationToken);
+#pragma warning restore CS0618 // Type or member is obsolete
+
+        /// <summary>
+        /// Reads the reminder table entries associated with the specified grain.
+        /// </summary>
+        /// <param name="grainId">The grain ID.</param>
+        /// <returns>The reminder table entries associated with the specified grain.</returns>
+#pragma warning disable CS0618 // Type or member is obsolete
+        Task<ReminderTableData> ReadRows(GrainId grainId, CancellationToken cancellationToken) => ReadRows(grainId).WaitAsync(cancellationToken);
+#pragma warning restore CS0618 // Type or member is obsolete
+
+        /// <summary>
+        /// Return all rows that have their <see cref="GrainId.GetUniformHashCode"/> in the range (start, end]
+        /// </summary>
+        /// <param name="begin">The exclusive lower bound.</param>
+        /// <param name="end">The inclusive upper bound.</param>
+        /// <returns>The reminder table entries which fall within the specified range.</returns>
+#pragma warning disable CS0618 // Type or member is obsolete
+        Task<ReminderTableData> ReadRows(uint begin, uint end, CancellationToken cancellationToken) => ReadRows(begin, end).WaitAsync(cancellationToken);
+#pragma warning restore CS0618 // Type or member is obsolete
+
+        /// <summary>
+        /// Reads a specifie entry.
+        /// </summary>
+        /// <param name="grainId">The grain ID.</param>
+        /// <param name="reminderName">Name of the reminder.</param>
+        /// <returns>The reminder table entry.</returns>
+#pragma warning disable CS0618 // Type or member is obsolete
+        Task<ReminderEntry> ReadRow(GrainId grainId, string reminderName, CancellationToken cancellationToken) => ReadRow(grainId, reminderName).WaitAsync(cancellationToken);
+#pragma warning restore CS0618 // Type or member is obsolete
+
+        /// <summary>
+        /// Upserts the specified entry.
+        /// </summary>
+        /// <param name="entry">The entry.</param>
+        /// <returns>The row's new ETag.</returns>
+#pragma warning disable CS0618 // Type or member is obsolete
+        Task<string> UpsertRow(ReminderEntry entry, CancellationToken cancellationToken) => UpsertRow(entry).WaitAsync(cancellationToken);
+#pragma warning restore CS0618 // Type or member is obsolete
+
+        /// <summary>
+        /// Removes a row from the table.
+        /// </summary>
+        /// <param name="grainId">The grain ID.</param>
+        /// <param name="reminderName">The reminder name.</param>
+        /// /// <param name="eTag">The ETag.</param>
+        /// <returns>true if a row with <paramref name="grainId"/> and <paramref name="reminderName"/> existed and was removed successfully, false otherwise</returns>
+#pragma warning disable CS0618 // Type or member is obsolete
+        Task<bool> RemoveRow(GrainId grainId, string reminderName, string eTag, CancellationToken cancellationToken) => RemoveRow(grainId, reminderName, eTag).WaitAsync(cancellationToken);
+#pragma warning restore CS0618 // Type or member is obsolete
+
+        /// <summary>
+        /// Clears the table.
+        /// </summary>
+        /// <returns>A <see cref="Task"/> representing the work performed.</returns>
+#pragma warning disable CS0618 // Type or member is obsolete
+        Task TestOnlyClearTable(CancellationToken cancellationToken) => TestOnlyClearTable().WaitAsync(cancellationToken);
+#pragma warning restore CS0618 // Type or member is obsolete
+
+        /// <summary>
+        /// Initializes this instance.
+        /// </summary>
+        /// <returns>A Task representing the work performed.</returns>
+        [Obsolete($"Use the overload which accepts a {nameof(CancellationToken)}")]
         Task Init();
 
         /// <summary>
@@ -24,6 +91,7 @@ namespace Orleans
         /// </summary>
         /// <param name="grainId">The grain ID.</param>
         /// <returns>The reminder table entries associated with the specified grain.</returns>
+        [Obsolete($"Use the overload which accepts a {nameof(CancellationToken)}")]
         Task<ReminderTableData> ReadRows(GrainId grainId);
 
         /// <summary>
@@ -32,6 +100,7 @@ namespace Orleans
         /// <param name="begin">The exclusive lower bound.</param>
         /// <param name="end">The inclusive upper bound.</param>
         /// <returns>The reminder table entries which fall within the specified range.</returns>
+        [Obsolete($"Use the overload which accepts a {nameof(CancellationToken)}")]
         Task<ReminderTableData> ReadRows(uint begin, uint end);
 
         /// <summary>
@@ -40,6 +109,7 @@ namespace Orleans
         /// <param name="grainId">The grain ID.</param>
         /// <param name="reminderName">Name of the reminder.</param>
         /// <returns>The reminder table entry.</returns>
+        [Obsolete($"Use the overload which accepts a {nameof(CancellationToken)}")]
         Task<ReminderEntry> ReadRow(GrainId grainId, string reminderName);
 
         /// <summary>
@@ -47,6 +117,7 @@ namespace Orleans
         /// </summary>
         /// <param name="entry">The entry.</param>
         /// <returns>The row's new ETag.</returns>
+        [Obsolete($"Use the overload which accepts a {nameof(CancellationToken)}")]
         Task<string> UpsertRow(ReminderEntry entry);
 
         /// <summary>
@@ -56,12 +127,14 @@ namespace Orleans
         /// <param name="reminderName">The reminder name.</param>
         /// /// <param name="eTag">The ETag.</param>
         /// <returns>true if a row with <paramref name="grainId"/> and <paramref name="reminderName"/> existed and was removed successfully, false otherwise</returns>
+        [Obsolete($"Use the overload which accepts a {nameof(CancellationToken)}")]
         Task<bool> RemoveRow(GrainId grainId, string reminderName, string eTag);
 
         /// <summary>
         /// Clears the table.
         /// </summary>
         /// <returns>A <see cref="Task"/> representing the work performed.</returns>
+        [Obsolete($"Use the overload which accepts a {nameof(CancellationToken)}")]
         Task TestOnlyClearTable();
     }
 

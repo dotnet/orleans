@@ -9,6 +9,7 @@ using Orleans.Runtime.MembershipService;
 using System;
 using System.Collections.Generic;
 using System.Net;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace Orleans.Clustering.DynamoDB
@@ -33,7 +34,7 @@ namespace Orleans.Clustering.DynamoDB
             this.MaxStaleness = gatewayOptions.Value.GatewayListRefreshPeriod;
         }
 
-        public Task InitializeGatewayListProvider()
+        public Task InitializeGatewayListProvider(CancellationToken cancellationToken)
         {
             this.storage = new DynamoDBStorage(
                 this.logger,
@@ -58,10 +59,11 @@ namespace Orleans.Clustering.DynamoDB
                 {
                     new AttributeDefinition { AttributeName = SiloInstanceRecord.DEPLOYMENT_ID_PROPERTY_NAME, AttributeType = ScalarAttributeType.S },
                     new AttributeDefinition { AttributeName = SiloInstanceRecord.SILO_IDENTITY_PROPERTY_NAME, AttributeType = ScalarAttributeType.S }
-                });
+                },
+                cancellationToken: cancellationToken);
         }
 
-        public async Task<IList<Uri>> GetGateways()
+        public async Task<IList<Uri>> GetGateways(CancellationToken cancellationToken)
         {
             var expressionValues = new Dictionary<string, AttributeValue>
             {
@@ -82,7 +84,8 @@ namespace Orleans.Clustering.DynamoDB
                             IPAddress.Parse(gateway[SiloInstanceRecord.ADDRESS_PROPERTY_NAME].S),
                             int.Parse(gateway[SiloInstanceRecord.PROXY_PORT_PROPERTY_NAME].N),
                             int.Parse(gateway[SiloInstanceRecord.GENERATION_PROPERTY_NAME].N)).ToGatewayUri();
-                });
+                },
+                cancellationToken);
 
             return records;
         }
@@ -93,5 +96,8 @@ namespace Orleans.Clustering.DynamoDB
         {
             get { return true; }
         }
+
+        public Task InitializeGatewayListProvider() => InitializeGatewayListProvider(CancellationToken.None);
+        public Task<IList<Uri>> GetGateways() => GetGateways(CancellationToken.None);
     }
 }

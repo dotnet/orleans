@@ -1,11 +1,9 @@
 using Orleans.Persistence.AdoNet.Storage;
 using Orleans.Providers;
 using Orleans.Runtime;
-using Orleans.Serialization;
 using System;
 using System.Collections.Generic;
 using System.Data;
-using System.Data.Common;
 using System.Diagnostics;
 using System.Globalization;
 using System.Linq;
@@ -145,9 +143,18 @@ namespace Orleans.Storage
         {
             lifecycle.Subscribe(OptionFormattingUtilities.Name<AdoNetGrainStorage>(this.name), this.options.InitStage, Init, Close);
         }
-        /// <summary>Clear state data function for this storage provider.</summary>
-        /// <see cref="IGrainStorage.ClearStateAsync{T}"/>.
-        public async Task ClearStateAsync<T>(string grainType, GrainId grainReference, IGrainState<T> grainState)
+
+        /// <inheritdoc/>
+        public Task ReadStateAsync<T>(string grainType, GrainId grainId, IGrainState<T> grainState) => ReadStateAsync(grainType, grainId, grainState, CancellationToken.None);
+
+        /// <inheritdoc/>
+        public Task WriteStateAsync<T>(string grainType, GrainId grainId, IGrainState<T> grainState) => WriteStateAsync(grainType, grainId, grainState, CancellationToken.None);
+
+        /// <inheritdoc/>
+        public Task ClearStateAsync<T>(string grainType, GrainId grainId, IGrainState<T> grainState) => ClearStateAsync(grainType, grainId, grainState, CancellationToken.None);
+
+        /// <inheritdoc/>
+        public async Task ClearStateAsync<T>(string grainType, GrainId grainReference, IGrainState<T> grainState, CancellationToken cancellationToken)
         {
             //It assumed these parameters are always valid. If not, an exception will be thrown,
             //even if not as clear as when using explicitly checked parameters.
@@ -180,7 +187,7 @@ namespace Orleans.Storage
                     command.AddParameter("GrainIdExtensionString", grainId.StringKey);
                     command.AddParameter("ServiceId", serviceId);
                     command.AddParameter("GrainStateVersion", !string.IsNullOrWhiteSpace(grainState.ETag) ? int.Parse(grainState.ETag, CultureInfo.InvariantCulture) : default(int?));
-                }, (selector, resultSetCount, token) => Task.FromResult(selector.GetValue(0).ToString()), cancellationToken: CancellationToken.None).ConfigureAwait(false));
+                }, (selector, resultSetCount, token) => Task.FromResult(selector.GetValue(0).ToString()), cancellationToken: cancellationToken).ConfigureAwait(false));
                 storageVersion = clearRecord.SingleOrDefault();
             }
             catch(Exception ex)
@@ -220,10 +227,8 @@ namespace Orleans.Storage
             }
         }
 
-
-        /// <summary> Read state data function for this storage provider.</summary>
-        /// <see cref="IGrainStorage.ReadStateAsync{T}"/>.
-        public async Task ReadStateAsync<T>(string grainType, GrainId grainReference, IGrainState<T> grainState)
+        /// <inheritdoc/>
+        public async Task ReadStateAsync<T>(string grainType, GrainId grainReference, IGrainState<T> grainState, CancellationToken cancellationToken)
         {
             //It assumed these parameters are always valid. If not, an exception will be thrown, even if not as clear
             //as with explicitly checked parameters.
@@ -272,7 +277,7 @@ namespace Orleans.Storage
                         var result = Tuple.Create(storageState, version?.ToString(CultureInfo.InvariantCulture));
                         return Task.FromResult(result);
                     },
-                    commandBehavior, CancellationToken.None).ConfigureAwait(false)).SingleOrDefault();
+                    commandBehavior, cancellationToken).ConfigureAwait(false)).SingleOrDefault();
 
                 T state = readRecords != null ? (T) readRecords.Item1 : default;
                 string etag = readRecords != null ? readRecords.Item2 : null;
@@ -320,10 +325,8 @@ namespace Orleans.Storage
             }
         }
 
-
-        /// <summary> Write state data function for this storage provider.</summary>
-        /// <see cref="IGrainStorage.WriteStateAsync{T}"/>
-        public async Task WriteStateAsync<T>(string grainType, GrainId grainReference, IGrainState<T> grainState)
+        /// <inheritdoc/>
+        public async Task WriteStateAsync<T>(string grainType, GrainId grainReference, IGrainState<T> grainState, CancellationToken cancellationToken)
         {
             //It assumed these parameters are always valid. If not, an exception will be thrown, even if not as clear
             //as with explicitly checked parameters.
@@ -361,7 +364,7 @@ namespace Orleans.Storage
                     command.AddParameter("GrainStateVersion", !string.IsNullOrWhiteSpace(grainState.ETag) ? int.Parse(grainState.ETag, CultureInfo.InvariantCulture) : default(int?));
                     command.AddParameter("PayloadBinary", serialized.ToArray());
                 }, (selector, resultSetCount, token) =>
-                { return Task.FromResult(selector.GetNullableInt32("NewGrainStateVersion").ToString()); }, cancellationToken: CancellationToken.None).ConfigureAwait(false);
+                { return Task.FromResult(selector.GetNullableInt32("NewGrainStateVersion").ToString()); }, cancellationToken: cancellationToken).ConfigureAwait(false);
                 storageVersion = writeRecord.SingleOrDefault();
             }
             catch(Exception ex)
@@ -425,7 +428,6 @@ namespace Orleans.Storage
                 ConfigUtilities.RedactConnectionStringInfo(Storage.ConnectionString));
         }
 
-
         /// <summary>
         /// Close this provider
         /// </summary>
@@ -433,7 +435,6 @@ namespace Orleans.Storage
         {
             return Task.CompletedTask;
         }
-
 
         /// <summary>
         /// Checks for version inconsistency as defined in the database scripts.

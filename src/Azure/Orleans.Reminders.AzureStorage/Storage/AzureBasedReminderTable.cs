@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Threading;
 using System.Threading.Tasks;
 using Azure;
 using Microsoft.Extensions.Logging;
@@ -29,13 +30,22 @@ namespace Orleans.Runtime.ReminderService
             this.storageOptions = storageOptions.Value;
         }
 
-        public async Task Init()
+        public Task Init() => Init(CancellationToken.None);
+        public Task<ReminderTableData> ReadRows(GrainId grainId) => ReadRows(grainId, CancellationToken.None);
+        public Task<ReminderTableData> ReadRows(uint begin, uint end) => ReadRows(begin, end, CancellationToken.None);
+        public Task<ReminderEntry> ReadRow(GrainId grainId, string reminderName) => ReadRow(grainId, reminderName, CancellationToken.None); 
+        public Task<string> UpsertRow(ReminderEntry entry) => UpsertRow(entry, CancellationToken.None); 
+        public Task<bool> RemoveRow(GrainId grainId, string reminderName, string eTag) => RemoveRow(grainId, reminderName, eTag, CancellationToken.None);
+        public Task TestOnlyClearTable() => TestOnlyClearTable(CancellationToken.None);
+
+        public async Task Init(CancellationToken cancellationToken)
         {
             this.remTableManager = await RemindersTableManager.GetManager(
                 this.clusterOptions.ServiceId,
                 this.clusterOptions.ClusterId,
                 this.loggerFactory,
-                options: this.storageOptions);
+                options: this.storageOptions,
+                cancellationToken);
         }
 
         private ReminderTableData ConvertFromTableEntryList(List<(ReminderTableEntry Entity, string ETag)> entries)
@@ -116,16 +126,16 @@ namespace Orleans.Runtime.ReminderService
             };
         }
 
-        public Task TestOnlyClearTable()
+        public Task TestOnlyClearTable(CancellationToken cancellationToken)
         {
-            return this.remTableManager.DeleteTableEntries();
+            return this.remTableManager.DeleteTableEntries(cancellationToken);
         }
 
-        public async Task<ReminderTableData> ReadRows(GrainId grainId)
+        public async Task<ReminderTableData> ReadRows(GrainId grainId, CancellationToken cancellationToken)
         {
             try
             {
-                var entries = await this.remTableManager.FindReminderEntries(grainId);
+                var entries = await this.remTableManager.FindReminderEntries(grainId, cancellationToken);
                 ReminderTableData data = ConvertFromTableEntryList(entries);
                 if (this.logger.IsEnabled(LogLevel.Trace)) this.logger.LogTrace($"Read for grain {{GrainId}} Table={Environment.NewLine}{{Data}}", grainId, data.ToString());
                 return data;
@@ -139,11 +149,11 @@ namespace Orleans.Runtime.ReminderService
             }
         }
 
-        public async Task<ReminderTableData> ReadRows(uint begin, uint end)
+        public async Task<ReminderTableData> ReadRows(uint begin, uint end, CancellationToken cancellationToken)
         {
             try
             {
-                var entries = await this.remTableManager.FindReminderEntries(begin, end);
+                var entries = await this.remTableManager.FindReminderEntries(begin, end, cancellationToken);
                 ReminderTableData data = ConvertFromTableEntryList(entries);
                 if (this.logger.IsEnabled(LogLevel.Trace)) this.logger.LogTrace($"Read in {{RingRange}} Table={Environment.NewLine}{{Data}}", RangeFactory.CreateRange(begin, end), data);
                 return data;
@@ -157,12 +167,12 @@ namespace Orleans.Runtime.ReminderService
             }
         }
 
-        public async Task<ReminderEntry> ReadRow(GrainId grainId, string reminderName)
+        public async Task<ReminderEntry> ReadRow(GrainId grainId, string reminderName, CancellationToken cancellationToken)
         {
             try
             {
                 if (this.logger.IsEnabled(LogLevel.Debug)) this.logger.LogDebug("ReadRow grainRef = {GrainId} reminderName = {ReminderName}", grainId, reminderName);
-                var result = await this.remTableManager.FindReminderEntry(grainId, reminderName);
+                var result = await this.remTableManager.FindReminderEntry(grainId, reminderName, cancellationToken);
                 return result.Entity is null ? null : ConvertFromTableEntry(result.Entity, result.ETag);
             }
             catch (Exception exc)
@@ -174,14 +184,14 @@ namespace Orleans.Runtime.ReminderService
             }
         }
 
-        public async Task<string> UpsertRow(ReminderEntry entry)
+        public async Task<string> UpsertRow(ReminderEntry entry, CancellationToken cancellationToken)
         {
             try
             {
                 if (this.logger.IsEnabled(LogLevel.Debug)) this.logger.LogDebug("UpsertRow entry = {Data}", entry.ToString());
                 ReminderTableEntry remTableEntry = ConvertToTableEntry(entry, this.remTableManager.ServiceId, this.remTableManager.ClusterId);
 
-                string result = await this.remTableManager.UpsertRow(remTableEntry);
+                string result = await this.remTableManager.UpsertRow(remTableEntry, cancellationToken);
                 if (result == null)
                 {
                     this.logger.LogWarning((int)AzureReminderErrorCode.AzureTable_45,
@@ -198,7 +208,7 @@ namespace Orleans.Runtime.ReminderService
             }
         }
 
-        public async Task<bool> RemoveRow(GrainId grainId, string reminderName, string eTag)
+        public async Task<bool> RemoveRow(GrainId grainId, string reminderName, string eTag, CancellationToken cancellationToken)
         {
             var entry = new ReminderTableEntry
             {
@@ -210,7 +220,7 @@ namespace Orleans.Runtime.ReminderService
             {
                 if (this.logger.IsEnabled(LogLevel.Trace)) this.logger.LogTrace("RemoveRow entry = {Data}", entry.ToString());
 
-                bool result = await this.remTableManager.DeleteReminderEntryConditionally(entry, eTag);
+                bool result = await this.remTableManager.DeleteReminderEntryConditionally(entry, eTag, cancellationToken);
                 if (result == false)
                 {
                     this.logger.LogWarning((int)AzureReminderErrorCode.AzureTable_43,

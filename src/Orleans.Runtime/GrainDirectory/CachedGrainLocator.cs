@@ -38,7 +38,7 @@ namespace Orleans.Runtime.GrainDirectory
             this.cache = new LRUBasedGrainDirectoryCache(GrainDirectoryOptions.DEFAULT_CACHE_SIZE, GrainDirectoryOptions.DEFAULT_MAXIMUM_CACHE_TTL);
         }
 
-        public async ValueTask<GrainAddress> Lookup(GrainId grainId)
+        public async ValueTask<GrainAddress> Lookup(GrainId grainId, CancellationToken cancellationToken)
         {
             var grainType = grainId.Type;
             if (grainType.IsClient() || grainType.IsSystemTarget())
@@ -52,7 +52,7 @@ namespace Orleans.Runtime.GrainDirectory
                 return cachedResult;
             }
 
-            var entry = await GetGrainDirectory(grainId.Type).Lookup(grainId);
+            var entry = await GetGrainDirectory(grainId.Type).Lookup(grainId, CancellationToken.None);
 
             // Nothing found
             if (entry is null)
@@ -64,7 +64,7 @@ namespace Orleans.Runtime.GrainDirectory
             if (IsKnownDeadSilo(entry))
             {
                 // Remove it from the directory
-                await GetGrainDirectory(grainId.Type).Unregister(entry);
+                await GetGrainDirectory(grainId.Type).Unregister(entry, CancellationToken.None);
                 entry = null;
             }
             else
@@ -76,7 +76,7 @@ namespace Orleans.Runtime.GrainDirectory
             return entry;
         }
 
-        public async Task<GrainAddress> Register(GrainAddress address, GrainAddress previousAddress)
+        public async Task<GrainAddress> Register(GrainAddress address, GrainAddress previousAddress, CancellationToken cancellationToken)
         {
             var grainType = address.GrainId.Type;
             if (grainType.IsClient() || grainType.IsSystemTarget())
@@ -92,14 +92,14 @@ namespace Orleans.Runtime.GrainDirectory
                 MembershipVersion = clusterMembershipService.CurrentSnapshot.Version
             };
 
-            var result = await GetGrainDirectory(grainType).Register(address, previousAddress);
+            var result = await GetGrainDirectory(grainType).Register(address, previousAddress, cancellationToken);
 
             // Check if the entry point to a dead silo
             if (IsKnownDeadSilo(result))
             {
                 // Remove outdated entry and retry to register
-                await GetGrainDirectory(grainType).Unregister(result);
-                result = await GetGrainDirectory(grainType).Register(address, previousAddress);
+                await GetGrainDirectory(grainType).Unregister(result, cancellationToken);
+                result = await GetGrainDirectory(grainType).Register(address, previousAddress, cancellationToken);
             }
 
             // Cache update
@@ -108,13 +108,13 @@ namespace Orleans.Runtime.GrainDirectory
             return result;
         }
 
-        public async Task Unregister(GrainAddress address, UnregistrationCause cause)
+        public async Task Unregister(GrainAddress address, UnregistrationCause cause, CancellationToken cancellationToken)
         {
             // Remove from local cache first so we don't return it anymore
             this.cache.Remove(address);
 
             // Remove from grain directory which may take significantly longer
-            await GetGrainDirectory(address.GrainId.Type).Unregister(address);
+            await GetGrainDirectory(address.GrainId.Type).Unregister(address, cancellationToken);
 
             // There is the potential for a lookup to race with the Unregister and add the bad entry back to the cache.
             if (this.cache.LookUp(address.GrainId, out var entry, out _) && entry == address)
@@ -162,7 +162,7 @@ namespace Orleans.Runtime.GrainDirectory
                     var tasks = new List<Task>();
                     foreach (var directory in this.grainDirectoryResolver.Directories)
                     {
-                        tasks.Add(directory.UnregisterSilos(deadSilos));
+                        tasks.Add(directory.UnregisterSilos(deadSilos, shutdownToken.Token));
                     }
                     await Task.WhenAll(tasks).WithCancellation(this.shutdownToken.Token);
                 }
@@ -220,5 +220,9 @@ namespace Orleans.Runtime.GrainDirectory
 
             return false;
         }
+
+        public Task<GrainAddress> Register(GrainAddress address, GrainAddress previousRegistration) => Register(address, previousRegistration, CancellationToken.None);
+        public Task Unregister(GrainAddress address, UnregistrationCause cause) => Unregister(address, cause, CancellationToken.None);
+        public ValueTask<GrainAddress> Lookup(GrainId grainId) => Lookup(grainId, CancellationToken.None);
     }
 }

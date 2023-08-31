@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Orleans.Concurrency;
@@ -262,7 +263,7 @@ namespace Orleans.Runtime.Management
 
             static async ValueTask<SiloAddress> LookupAsync(GrainId grainId, GrainLocator grainLocator)
             {
-                var result = await grainLocator.Lookup(grainId);
+                var result = await grainLocator.Lookup(grainId, CancellationToken.None);
                 return result?.SiloAddress;
             }
         }
