@@ -15,7 +15,7 @@ namespace UnitTests.TestHelper
             _value = 0;
         }
 
-        public bool IsSet { get { return _value != 0; } }
+        public bool IsSet => _value != 0;
 
         public bool TrySet()
         {

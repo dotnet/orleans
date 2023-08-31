@@ -28,10 +28,7 @@ namespace Orleans
         /// </summary>
         /// <value>The <see cref="GrainCancellationToken">CancellationToken</see>
         /// associated with this <see cref="GrainCancellationToken"/>.</value>
-        public GrainCancellationToken Token
-        {
-            get { return _grainCancellationToken; }
-        }
+        public GrainCancellationToken Token => _grainCancellationToken;
 
         /// <summary>
         /// Gets a value indicating whether cancellation has been requested.
@@ -46,10 +43,7 @@ namespace Orleans
         /// concurrently.
         /// </para>
         /// </remarks>
-        public bool IsCancellationRequested
-        {
-            get { return _grainCancellationToken.IsCancellationRequested; }
-        }
+        public bool IsCancellationRequested => _grainCancellationToken.IsCancellationRequested;
 
         /// <summary>
         /// Communicates a request for cancellation.

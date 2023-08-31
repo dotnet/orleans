@@ -68,7 +68,7 @@ namespace Orleans.EventSourcing.Common
         /// <summary>
         /// Whether this cluster supports submitting updates
         /// </summary>
-        protected virtual bool SupportSubmissions {  get { return true;  } }
+        protected virtual bool SupportSubmissions => true;
 
         /// <summary>
         /// Handle protocol messages.
@@ -675,13 +675,7 @@ namespace Orleans.EventSourcing.Common
         }
 
         /// <inheritdoc/>
-        public IEnumerable<TLogEntry> UnconfirmedSuffix
-        {
-            get
-            {
-                return pending.Select(te => te.Entry);
-            }
-        }
+        public IEnumerable<TLogEntry> UnconfirmedSuffix => pending.Select(te => te.Entry);
 
         /// <inheritdoc />
         public async Task ConfirmSubmittedEntries()

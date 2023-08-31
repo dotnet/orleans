@@ -110,10 +110,7 @@ namespace Orleans.Runtime.Host
         public int UpdateDomain { get; private set; }
         public int FaultDomain { get; private set; }
 
-        public string InstanceName
-        {
-            get { return ExtractInstanceName(InstanceId, DeploymentId); }
-        }
+        public string InstanceName => ExtractInstanceName(InstanceId, DeploymentId);
 
         public int RoleInstanceCount
         {

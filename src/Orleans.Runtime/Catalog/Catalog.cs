@@ -236,7 +236,7 @@ namespace Orleans.Runtime
             activations.RemoveTarget(systemTarget);
         }
 
-        public int ActivationCount { get { return activations.Count; } }
+        public int ActivationCount => activations.Count;
 
         /// <summary>
         /// If activation already exists, use it
@@ -403,13 +403,7 @@ namespace Orleans.Runtime
             return DeactivateActivations(reason, activationsToShutdown);
         }
 
-        public SiloStatus LocalSiloStatus
-        {
-            get
-            {
-                return SiloStatusOracle.CurrentStatus;
-            }
-        }
+        public SiloStatus LocalSiloStatus => SiloStatusOracle.CurrentStatus;
 
         public Task DeleteActivations(List<GrainAddress> addresses, DeactivationReasonCode reasonCode, string reasonText)
         {

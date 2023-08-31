@@ -51,10 +51,7 @@ namespace UnitTests.Grains
         [Id(2)]
         private string _streamNamespace;
 
-        public Task<int> ItemsConsumed
-        {
-            get { return Task.FromResult(_itemsConsumed); }
-        }
+        public Task<int> ItemsConsumed => Task.FromResult(_itemsConsumed);
 
         private ConsumerObserver(ILogger logger)
         {
@@ -143,10 +140,7 @@ namespace UnitTests.Grains
             }
         }
 
-        public Task<int> ConsumerCount
-        {
-            get { return Task.FromResult(_subscription == null ? 0 : 1); }
-        }
+        public Task<int> ConsumerCount => Task.FromResult(_subscription == null ? 0 : 1);
 
         [Id(3)]
         public string ProviderName { get; private set; }
@@ -340,10 +334,7 @@ namespace UnitTests.Grains
             }
         }
 
-        public Task<int> ProducerCount
-        {
-            get { return Task.FromResult(_cleanedUpFlag.IsSet ? 0 : 1); }
-        }
+        public Task<int> ProducerCount => Task.FromResult(_cleanedUpFlag.IsSet ? 0 : 1);
 
         public Task StopBeingProducer()
         {

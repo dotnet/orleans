@@ -70,7 +70,7 @@ namespace UnitTests.Grains
         private IAsyncObserver<T> Producer { get; set; }
         private Dictionary<StreamSubscriptionHandle<T>, MyStreamObserver<T>> Observers { get; set; }
 #else
-        private IAsyncStream<int> Stream { get { return State.Stream; } }
+        private IAsyncStream<int> Stream => State.Stream;
         private IAsyncObserver<int> Producer { get; set; }
         private Dictionary<StreamSubscriptionHandle<int>, MyStreamObserver<int>> Observers { get; set; }
 #endif

@@ -21,10 +21,7 @@ namespace UnitTests.General
             };
         public IRelationalStorage Storage { get; private set; }
 
-        public string CurrentConnectionString
-        {
-            get { return Storage?.ConnectionString; }
-        }
+        public string CurrentConnectionString => Storage?.ConnectionString;
 
         /// <summary>
         /// The name of the provider type (MySQL, SQLServer, Oracle, PostgreSQL, etc).
@@ -38,11 +35,11 @@ namespace UnitTests.General
 
         public abstract string CreateStreamTestTable { get; }
 
-        public virtual string DeleteStreamTestTable { get { return "DELETE StreamingTest;"; } }
+        public virtual string DeleteStreamTestTable => "DELETE StreamingTest;";
 
-        public virtual string StreamTestSelect { get { return "SELECT Id, StreamData FROM StreamingTest WHERE Id = @streamId;"; } }
+        public virtual string StreamTestSelect => "SELECT Id, StreamData FROM StreamingTest WHERE Id = @streamId;";
 
-        public virtual string StreamTestInsert { get { return "INSERT INTO StreamingTest(Id, StreamData) VALUES(@id, @streamData);"; } }
+        public virtual string StreamTestInsert => "INSERT INTO StreamingTest(Id, StreamData) VALUES(@id, @streamData);";
 
         /// <summary>
         /// The script that creates Orleans schema in the database, usually CreateOrleansTables_xxxx.sql

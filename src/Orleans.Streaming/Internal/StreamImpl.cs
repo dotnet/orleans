@@ -35,7 +35,7 @@ namespace Orleans.Streams
         [NonSerialized]
         private IRuntimeClient?                                  runtimeClient;
 
-        internal QualifiedStreamId InternalStreamId { get { return streamId; } }
+        internal QualifiedStreamId InternalStreamId => streamId;
         public StreamId StreamId => streamId;
 
         public bool IsRewindable => isRewindable;

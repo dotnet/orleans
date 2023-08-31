@@ -22,7 +22,7 @@ namespace Orleans
 
         IGrainContext IGrainBase.GrainContext => GrainContext;
 
-        public GrainReference GrainReference { get { return GrainContext.GrainReference; } }
+        public GrainReference GrainReference => GrainContext.GrainReference;
 
         internal IGrainRuntime Runtime { get; }
 

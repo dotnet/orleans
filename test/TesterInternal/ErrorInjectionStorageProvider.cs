@@ -49,13 +49,7 @@ namespace UnitTests.StorageTests
             errorInjectionPoint = ErrorInjectionPoint.Unknown;
         }
 
-        public override string Message
-        {
-            get
-            {
-                return "ErrorInjectionPoint=" + Enum.GetName(typeof(ErrorInjectionPoint), errorInjectionPoint);
-            }
-        }
+        public override string Message => "ErrorInjectionPoint=" + Enum.GetName(typeof(ErrorInjectionPoint), errorInjectionPoint);
 
         protected StorageProviderInjectedError(SerializationInfo info, StreamingContext context)
             : base(info, context)

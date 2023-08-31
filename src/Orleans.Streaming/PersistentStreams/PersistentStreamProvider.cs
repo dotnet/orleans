@@ -79,7 +79,7 @@ namespace Orleans.Providers.Streams.Common
         private readonly StreamPubSubOptions pubsubOptions;
         private readonly StreamLifecycleOptions lifeCycleOptions;
         public string Name { get; private set; }
-        public bool IsRewindable { get { return queueAdapter.IsRewindable; } }
+        public bool IsRewindable => queueAdapter.IsRewindable;
 
         public PersistentStreamProvider(
             string name,

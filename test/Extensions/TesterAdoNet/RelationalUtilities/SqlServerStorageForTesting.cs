@@ -15,15 +15,11 @@ namespace UnitTests.General
         {
         }
 
-        public override string CancellationTestQuery { get { return "WAITFOR DELAY '00:00:010'; SELECT 1; "; } }
+        public override string CancellationTestQuery => "WAITFOR DELAY '00:00:010'; SELECT 1; ";
 
-        public override string CreateStreamTestTable { get { return "CREATE TABLE StreamingTest(Id INT NOT NULL, StreamData VARBINARY(MAX) NOT NULL);"; } }
+        public override string CreateStreamTestTable => "CREATE TABLE StreamingTest(Id INT NOT NULL, StreamData VARBINARY(MAX) NOT NULL);";
 
-        protected override string CreateDatabaseTemplate
-        {
-            get
-            {
-                return @"USE [Master];
+        protected override string CreateDatabaseTemplate => @"USE [Master];
                 DECLARE @fileName AS NVARCHAR(255) = CONVERT(NVARCHAR(255), SERVERPROPERTY('instancedefaultdatapath')) + N'{0}';
                 EXEC('CREATE DATABASE [{0}] ON PRIMARY
                 (
@@ -33,24 +29,10 @@ namespace UnitTests.General
                     MAXSIZE = 100MB,
                     FILEGROWTH = 5MB
                 )')";
-            }
-        }
 
-        protected override string DropDatabaseTemplate
-        {
-            get
-            {
-                return @"USE [Master]; ALTER DATABASE [{0}] SET SINGLE_USER WITH ROLLBACK IMMEDIATE; DROP DATABASE [{0}];";
-            }
-        }
+        protected override string DropDatabaseTemplate => @"USE [Master]; ALTER DATABASE [{0}] SET SINGLE_USER WITH ROLLBACK IMMEDIATE; DROP DATABASE [{0}];";
 
-        protected override string ExistsDatabaseTemplate
-        {
-            get
-            {
-                return "SELECT CAST(COUNT(1) AS BIT) FROM sys.databases WHERE name = '{0}'";
-            }
-        }
+        protected override string ExistsDatabaseTemplate => "SELECT CAST(COUNT(1) AS BIT) FROM sys.databases WHERE name = '{0}'";
 
 
         protected override IEnumerable<string> ConvertToExecutableBatches(string setupScript, string dataBaseName)

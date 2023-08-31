@@ -98,7 +98,7 @@ namespace Orleans.Runtime
         /// <summary>
         /// Gets a value indicating whether this instance represents a client (versus a server).
         /// </summary>
-        public bool IsClient { get { return Generation < 0; } }
+        public bool IsClient => Generation < 0;
 
         /// <summary> Allocate a new silo generation number. </summary>
         /// <returns>A new silo generation number.</returns>

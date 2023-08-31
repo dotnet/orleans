@@ -14,13 +14,7 @@ namespace Orleans.EventSourcing.LogStorage
     public class LogConsistencyProvider : ILogViewAdaptorFactory
     {
         /// <inheritdoc/>
-        public bool UsesStorageProvider
-        {
-            get
-            {
-                return true;
-            }
-        }
+        public bool UsesStorageProvider => true;
 
         /// <summary>
         /// Make log view adaptor 

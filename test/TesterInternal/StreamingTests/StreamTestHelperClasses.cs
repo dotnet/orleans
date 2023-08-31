@@ -303,10 +303,7 @@ namespace UnitTests.StreamingTests
             return tasks.Sum(t => t.Result);
         }
 
-        public Task<int> ItemsConsumed
-        {
-            get { return GetItemsConsumed(); }
-        }
+        public Task<int> ItemsConsumed => GetItemsConsumed();
 
         private async Task<int> GetConsumerCount()
         {
@@ -315,10 +312,7 @@ namespace UnitTests.StreamingTests
             return tasks.Sum(t => t.Result);
         }
 
-        public Task<int> ConsumerCount
-        {
-            get { return GetConsumerCount(); }
-        }        
+        public Task<int> ConsumerCount => GetConsumerCount();
 
         public Task StopBeingConsumer()
         {
@@ -355,14 +349,11 @@ namespace UnitTests.StreamingTests
         private readonly string _providerName;
         private readonly InterlockedFlag _cleanedUpFlag;
 
-        public Task<int> ExpectedItemsProduced
-        {
-            get { return GetExpectedItemsProduced(); }
-        }
+        public Task<int> ExpectedItemsProduced => GetExpectedItemsProduced();
 
-        public string ProviderName { get { return _providerName; } }
+        public string ProviderName => _providerName;
 
-        public Guid StreamIdGuid { get { return _streamId; } }
+        public Guid StreamIdGuid => _streamId;
 
         public StreamId StreamId { get; }
 
@@ -522,15 +513,10 @@ namespace UnitTests.StreamingTests
             return tasks.Sum(t => t.Result);
         }
 
-        public Task<int> ProducerCount
-        {
-            get
-            {
+        public Task<int> ProducerCount =>
                 // This method is used by the test code to verify that the object has in fact been disposed properly,
                 // so we choose not to throw if the object has already been disposed.
-                return GetProducerCount();
-            }
-        }
+                GetProducerCount();
 
         public async Task StopBeingProducer()
         {

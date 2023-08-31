@@ -39,7 +39,7 @@ namespace Orleans.Streams
         private RunState managerState;
         private IDisposable queuePrintTimer;
         private int nextAgentId;
-        private int NumberRunningAgents { get { return queuesToAgentsMap.Count; } }
+        private int NumberRunningAgents => queuesToAgentsMap.Count;
 
         internal PersistentStreamPullingManager(
             SystemTargetGrainId managerId,

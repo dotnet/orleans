@@ -28,12 +28,12 @@ namespace Tester.AzureUtils.Utilities
         /// <summary>
         /// The maximal number of async in-flight operations that can be enqueued into this async pipeline.
         /// </summary>
-        public int Capacity { get { return capacity; } }
+        public int Capacity => capacity;
 
         /// <summary>
         /// The number of items currently enqueued into this async pipeline.
         /// </summary>
-        public int Count { get { return running.Count; } }
+        public int Count => running.Count;
 
         /// <summary>
         /// Constructs an empty AsyncPipeline with capacity equal to the DefaultCapacity.
@@ -113,13 +113,7 @@ namespace Tester.AzureUtils.Utilities
             }
         }
 
-        private bool IsFull
-        {
-            get
-            {
-                return Count >= capacity;
-            }
-        }
+        private bool IsFull => Count >= capacity;
 
         internal void Add(Task task, WhiteBox whiteBox)
         {

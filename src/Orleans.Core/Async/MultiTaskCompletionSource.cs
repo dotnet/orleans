@@ -34,10 +34,7 @@ namespace Orleans
         /// <summary>
         /// Gets the task which is completed when a sufficient number of signals are received.
         /// </summary>
-        public Task Task
-        {
-            get { return tcs.Task; }
-        }
+        public Task Task => tcs.Task;
 
         /// <summary>
         /// Signals this instance.

@@ -29,13 +29,13 @@ namespace Orleans.Streams
         private IAsyncBatchObserver<T> batchObserver;
         [NonSerialized]
         private StreamHandshakeToken expectedToken;
-        internal bool IsValid { get { return streamImpl != null; } }
-        internal GuidId SubscriptionId { get { return subscriptionId; } }
-        internal bool IsRewindable { get { return isRewindable; } }
+        internal bool IsValid => streamImpl != null;
+        internal GuidId SubscriptionId => subscriptionId;
+        internal bool IsRewindable => isRewindable;
 
-        public override string ProviderName { get { return this.streamImpl.ProviderName; } }
-        public override StreamId StreamId { get { return streamImpl.StreamId; } }
-        public override Guid HandleId { get { return subscriptionId.Guid; } }
+        public override string ProviderName => this.streamImpl.ProviderName;
+        public override StreamId StreamId => streamImpl.StreamId;
+        public override Guid HandleId => subscriptionId.Guid;
 
 
         [JsonConstructor]

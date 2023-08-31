@@ -56,13 +56,7 @@ namespace Orleans.EventSourcing.CustomStorage
         }
 
         /// <inheritdoc/>
-        protected override bool SupportSubmissions
-        {
-            get
-            {
-                return true;
-            }
-        }
+        protected override bool SupportSubmissions => true;
 
         /// <inheritdoc/>
         protected override SubmissionEntry<TLogEntry> MakeSubmissionEntry(TLogEntry entry)

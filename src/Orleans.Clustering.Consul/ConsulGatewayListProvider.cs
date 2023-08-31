@@ -33,15 +33,9 @@ namespace Orleans.Runtime.Membership
             this.kvRootFolder = options.Value.KvRootFolder;
         }
 
-        public TimeSpan MaxStaleness
-        {
-            get { return this.maxStaleness; }
-        }
+        public TimeSpan MaxStaleness => this.maxStaleness;
 
-        public bool IsUpdatable
-        {
-            get { return true; }
-        }
+        public bool IsUpdatable => true;
         public Task InitializeGatewayListProvider()
         {
             consulClient = options.CreateClient();

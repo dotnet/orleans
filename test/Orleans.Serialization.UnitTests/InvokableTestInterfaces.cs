@@ -289,13 +289,7 @@ namespace Orleans.Serialization.UnitTests
         [Id(4)]
         public List<@event> @if { get; set; }
 
-        public static IEqualityComparer<@event> EventComparer
-        {
-            get
-            {
-                return EventComparerInstance;
-            }
-        }
+        public static IEqualityComparer<@event> EventComparer => EventComparerInstance;
 
         /// <summary>
         /// Gets or sets the private id.

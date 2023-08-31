@@ -104,30 +104,15 @@ namespace Orleans.Runtime
             return FindOrCreateGrainId(UniqueKey.NewGrainServiceKey(systemGrainId, typeData));
         }
 
-        public Guid PrimaryKey
-        {
-            get { return GetPrimaryKey(); }
-        }
+        public Guid PrimaryKey => GetPrimaryKey();
 
-        public long PrimaryKeyLong
-        {
-            get { return GetPrimaryKeyLong(); }
-        }
+        public long PrimaryKeyLong => GetPrimaryKeyLong();
 
-        public string PrimaryKeyString
-        {
-            get { return GetPrimaryKeyString(); }
-        }
+        public string PrimaryKeyString => GetPrimaryKeyString();
 
-        public string IdentityString
-        {
-            get { return ToDetailedString(); }
-        }
+        public string IdentityString => ToDetailedString();
 
-        public bool IsLongKey
-        {
-            get { return Key.IsLongKey; }
-        }
+        public bool IsLongKey => Key.IsLongKey;
 
         public long GetPrimaryKeyLong(out string keyExt)
         {

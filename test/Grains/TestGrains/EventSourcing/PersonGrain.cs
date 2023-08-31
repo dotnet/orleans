@@ -90,13 +90,7 @@ namespace TestGrains
             return Task.FromResult(TentativeVersion);
         }
 
-        private int TentativeVersion
-        {
-            get
-            {
-                return Version + UnconfirmedEvents.Count();
-            }
-        }
+        private int TentativeVersion => Version + UnconfirmedEvents.Count();
 
         // below is a unit test; ideally this code would be in the Tester project,
         // but this test has to run on the grain, not the client, so we had to add it here

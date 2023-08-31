@@ -70,8 +70,8 @@ namespace TestGrains
         private static readonly ConcurrentDictionary<Guid, FaultsState> FaultInjectionTracker = new ConcurrentDictionary<Guid, FaultsState>();
 
         private FaultsState myFaults;
-        private FaultsState Faults { get { return myFaults ?? (myFaults = FaultInjectionTracker.GetOrAdd(this.GetPrimaryKey(), key => new FaultsState())); } }
-     
+        private FaultsState Faults => myFaults ?? (myFaults = FaultInjectionTracker.GetOrAdd(this.GetPrimaryKey(), key => new FaultsState()));
+
         // grain instance state
         private readonly ILogger logger;
         private IAsyncStream<GeneratedEvent> stream;
