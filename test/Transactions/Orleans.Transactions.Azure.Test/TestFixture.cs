@@ -1,6 +1,5 @@
 using Orleans.Runtime;
 using Microsoft.Extensions.DependencyInjection;
-using Orleans.Hosting;
 using Orleans.TestingHost;
 using Orleans.Transactions.TestKit;
 using Orleans.Transactions.Tests;

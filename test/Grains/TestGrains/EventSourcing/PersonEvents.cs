@@ -1,4 +1,3 @@
-using System;
 using TestGrainInterfaces;
 
 namespace TestGrains

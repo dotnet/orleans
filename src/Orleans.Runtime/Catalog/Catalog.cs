@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Diagnostics.Metrics;
 using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Threading;
@@ -12,10 +11,8 @@ using Orleans.Configuration;
 using Orleans.GrainDirectory;
 using Orleans.Metadata;
 using Orleans.Runtime.GrainDirectory;
-using Orleans.Runtime.Placement;
 using Orleans.Runtime.Scheduler;
 using Orleans.Serialization.TypeSystem;
-using Orleans.Statistics;
 
 namespace Orleans.Runtime
 {

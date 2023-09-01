@@ -1,8 +1,6 @@
 using BenchmarkDotNet.Columns;
 using BenchmarkDotNet.Reports;
 using BenchmarkDotNet.Running;
-using System;
-using System.Linq;
 using System.Reflection;
 
 namespace Benchmarks.Utilities

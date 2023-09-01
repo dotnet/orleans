@@ -1,5 +1,3 @@
-using Microsoft.Extensions.ObjectPool;
-
 namespace Orleans.Serialization.Invocation
 {
     /// <summary>

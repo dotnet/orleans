@@ -1,10 +1,8 @@
 //#define REREAD_STATE_AFTER_WRITE_FAILED
 
-using System.Threading.Tasks;
 using Xunit;
 using Xunit.Abstractions;
 using Orleans.TestingHost;
-using Orleans.Hosting;
 using Orleans.Configuration;
 
 // ReSharper disable RedundantAssignment

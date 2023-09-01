@@ -1,7 +1,6 @@
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
-using Orleans.GrainDirectory;
 using Orleans.GrainDirectory.Redis;
 using StackExchange.Redis;
 using Tester.Directories;

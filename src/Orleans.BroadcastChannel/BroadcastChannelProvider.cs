@@ -1,10 +1,7 @@
 using System;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
 using Orleans.BroadcastChannel.SubscriberTable;
-using Orleans.Providers;
-using Orleans.Runtime;
 
 namespace Orleans.BroadcastChannel
 {

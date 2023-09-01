@@ -4,7 +4,6 @@ using System.Diagnostics;
 using System.Threading.Tasks;
 using System.Linq;
 using Microsoft.Extensions.Logging;
-using Orleans.Runtime;
 using Orleans.Transactions.Abstractions;
 
 namespace Orleans.Transactions
