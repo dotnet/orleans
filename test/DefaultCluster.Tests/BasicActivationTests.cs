@@ -113,7 +113,7 @@ namespace DefaultCluster.Tests.General
         [Fact, TestCategory("BVT"), TestCategory("ActivateDeactivate"), TestCategory("GetGrain")]
         public void BasicActivation_ULong_MaxValue()
         {
-            ulong key1AsUlong = UInt64.MaxValue; // == -1L
+            ulong key1AsUlong = ulong.MaxValue; // == -1L
             long key1 = (long)key1AsUlong;
 
             ITestGrain g1 = this.GrainFactory.GetGrain<ITestGrain>(key1);
@@ -134,7 +134,7 @@ namespace DefaultCluster.Tests.General
         [Fact, TestCategory("ActivateDeactivate"), TestCategory("GetGrain")]
         public void BasicActivation_ULong_MinValue()
         {
-            ulong key1AsUlong = UInt64.MinValue; // == zero
+            ulong key1AsUlong = ulong.MinValue; // == zero
             long key1 = (long)key1AsUlong;
 
             ITestGrain g1 = this.GrainFactory.GetGrain<ITestGrain>(key1);
@@ -156,7 +156,7 @@ namespace DefaultCluster.Tests.General
         [Fact, TestCategory("BVT"), TestCategory("ActivateDeactivate"), TestCategory("GetGrain")]
         public void BasicActivation_Long_MaxValue()
         {
-            long key1 = Int32.MaxValue;
+            long key1 = int.MaxValue;
             ulong key1AsUlong = (ulong)key1;
 
             ITestGrain g1 = this.GrainFactory.GetGrain<ITestGrain>(key1);
@@ -177,7 +177,7 @@ namespace DefaultCluster.Tests.General
         [Fact, TestCategory("BVT"), TestCategory("ActivateDeactivate"), TestCategory("GetGrain")]
         public void BasicActivation_Long_MinValue()
         {
-            long key1 = Int64.MinValue;
+            long key1 = long.MinValue;
             ulong key1AsUlong = (ulong)key1;
 
             ITestGrain g1 = this.GrainFactory.GetGrain<ITestGrain>(key1);

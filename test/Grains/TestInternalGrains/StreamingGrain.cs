@@ -26,7 +26,7 @@ namespace UnitTests.Grains
 
         public override string ToString()
         {
-            return String.Format("{0}", Data);
+            return string.Format("{0}", Data);
         }
     }
 
@@ -244,7 +244,7 @@ namespace UnitTests.Grains
             _expectedItemsProduced += count;
             _logger.LogInformation("ProducerObserver.ProduceSequentialSeries: StreamId={StreamId}, num items to produce={Count}.", _streamId, count);
             for (var i = 1; i <= count; ++i)
-                await ProduceItem(String.Format("sequential#{0}", i));
+                await ProduceItem(string.Format("sequential#{0}", i));
         }
 
         public Task ProduceParallelSeries(int count)
@@ -424,7 +424,7 @@ namespace UnitTests.Grains
                 if (_started && !_disposedFlag.IsSet)
                 {
                     --_counter;
-                    bool shouldContinue = await _produceItemFunc(String.Format("periodic#{0}", _counter));
+                    bool shouldContinue = await _produceItemFunc(string.Format("periodic#{0}", _counter));
                     if (!shouldContinue || 0 == _counter)
                         Dispose();
                 }

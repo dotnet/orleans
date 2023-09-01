@@ -32,7 +32,7 @@ namespace UnitTests.Grains
         public Task BecomeProducer(Guid streamId, string providerToUse)
         {
             _logger.LogInformation("Producer.BecomeProducer");
-            if (String.IsNullOrEmpty(providerToUse))
+            if (string.IsNullOrEmpty(providerToUse))
             {
                 throw new ArgumentNullException(nameof(providerToUse));
             }

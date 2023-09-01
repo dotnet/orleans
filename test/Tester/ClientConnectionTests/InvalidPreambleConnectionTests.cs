@@ -25,7 +25,7 @@ namespace Tester.ClientConnectionTests
             {
                 s.Connect(gwEndpoint);
 
-                Int32 invalidSize = 99999;
+                int invalidSize = 99999;
                 s.Send(BitConverter.GetBytes(invalidSize));
 
                 bool socketClosed = s.Poll(100000, SelectMode.SelectRead) && s.Available == 0;

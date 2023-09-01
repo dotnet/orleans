@@ -799,7 +799,7 @@ namespace UnitTests.Grains
         public Task<string> Handle(string prevState, Reducer1Action act) => Task.FromResult(prevState + act);
     }
 
-    public class Reducer2 : IReducer<Int32, Reducer2Action>
+    public class Reducer2 : IReducer<int, Reducer2Action>
     {
         public Task<int> Handle(int prevState, Reducer2Action act) => Task.FromResult(prevState + act.ToString().Length);
     }

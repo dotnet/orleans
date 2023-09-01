@@ -47,7 +47,7 @@ namespace Tester.HeterogeneousSilosTests.UpgradeTests
         {
             var testDirectory = new DirectoryInfo(GetType().Assembly.Location);
 
-            while (String.Compare(testDirectory.Name, CommonParentDirectory, StringComparison.OrdinalIgnoreCase) != 0 || testDirectory.Parent == null)
+            while (string.Compare(testDirectory.Name, CommonParentDirectory, StringComparison.OrdinalIgnoreCase) != 0 || testDirectory.Parent == null)
             {
                 testDirectory = testDirectory.Parent;
             }

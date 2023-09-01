@@ -19,12 +19,12 @@
             return Task.CompletedTask;
         }
 
-        public Task<Int32> GetAxB()
+        public Task<int> GetAxB()
         {
             return Task.FromResult(m_a * m_b);
         }
 
-        public async Task<Int32> GetAxBError()
+        public async Task<int> GetAxBError()
         {
             await Task.CompletedTask;
             throw new Exception("GetAxBError-Exception");
