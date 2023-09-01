@@ -74,7 +74,7 @@ namespace Orleans.Tests.SqlUtils
         ///}).ConfigureAwait(continueOnCapturedContext: false);
         /// </code>
         /// </example>
-        Task<IEnumerable<TResult>> ReadAsync<TResult>(string query, Action<IDbCommand> parameterProvider, Func<IDataRecord, int, CancellationToken, Task<TResult>> selector, CommandBehavior commandBehavior = CommandBehavior.Default, CancellationToken cancellationToken = default(CancellationToken));
+        Task<IEnumerable<TResult>> ReadAsync<TResult>(string query, Action<IDbCommand> parameterProvider, Func<IDataRecord, int, CancellationToken, Task<TResult>> selector, CommandBehavior commandBehavior = CommandBehavior.Default, CancellationToken cancellationToken = default);
 
         /// <summary>
         /// Executes a given statement. Especially intended to use with <em>INSERT</em>, <em>UPDATE</em>, <em>DELETE</em> or <em>DDL</em> queries.
@@ -97,7 +97,7 @@ namespace Orleans.Tests.SqlUtils
         /// }).ConfigureAwait(continueOnCapturedContext: false);
         /// </code>
         /// </example>
-        Task<int> ExecuteAsync(string query, Action<IDbCommand> parameterProvider, CommandBehavior commandBehavior = CommandBehavior.Default, CancellationToken cancellationToken = default(CancellationToken));
+        Task<int> ExecuteAsync(string query, Action<IDbCommand> parameterProvider, CommandBehavior commandBehavior = CommandBehavior.Default, CancellationToken cancellationToken = default);
 
         /// <summary>
         /// The well known invariant name of the underlying database.

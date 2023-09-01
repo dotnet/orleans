@@ -148,7 +148,7 @@ namespace Orleans.Tests.SqlUtils
         ///}).ConfigureAwait(continueOnCapturedContext: false);
         /// </code>
         /// </example>
-        public async Task<IEnumerable<TResult>> ReadAsync<TResult>(string query, Action<IDbCommand> parameterProvider, Func<IDataRecord, int, CancellationToken, Task<TResult>> selector, CommandBehavior commandBehavior = CommandBehavior.Default, CancellationToken cancellationToken = default(CancellationToken))
+        public async Task<IEnumerable<TResult>> ReadAsync<TResult>(string query, Action<IDbCommand> parameterProvider, Func<IDataRecord, int, CancellationToken, Task<TResult>> selector, CommandBehavior commandBehavior = CommandBehavior.Default, CancellationToken cancellationToken = default)
         {
             //If the query is something else that is not acceptable (e.g. an empty string), there will an appropriate database exception.
             if(query == null)
@@ -186,7 +186,7 @@ namespace Orleans.Tests.SqlUtils
         /// }).ConfigureAwait(continueOnCapturedContext: false);
         /// </code>
         /// </example>
-        public async Task<int> ExecuteAsync(string query, Action<IDbCommand> parameterProvider, CommandBehavior commandBehavior = CommandBehavior.Default, CancellationToken cancellationToken = default(CancellationToken))
+        public async Task<int> ExecuteAsync(string query, Action<IDbCommand> parameterProvider, CommandBehavior commandBehavior = CommandBehavior.Default, CancellationToken cancellationToken = default)
         {
             //If the query is something else that is not acceptable (e.g. an empty string), there will an appropriate database exception.
             if(query == null)
@@ -235,7 +235,7 @@ namespace Orleans.Tests.SqlUtils
         {
             using(var reader = await command.ExecuteReaderAsync(commandBehavior, cancellationToken).ConfigureAwait(continueOnCapturedContext: false))
             {
-                CancellationTokenRegistration cancellationRegistration = default(CancellationTokenRegistration);
+                CancellationTokenRegistration cancellationRegistration = default;
                 try
                 {
                     if(cancellationToken.CanBeCanceled && supportsCommandCancellation)

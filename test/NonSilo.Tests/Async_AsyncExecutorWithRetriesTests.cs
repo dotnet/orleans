@@ -115,7 +115,7 @@ namespace NonSilo.Tests
                 myFunc, 
                 maxRetries, 
                 errorFilter,
-                default(TimeSpan),
+                default,
                 new FixedBackoff(TimeSpan.FromSeconds(1)));
 
             int value = promise.Result;
@@ -154,7 +154,7 @@ namespace NonSilo.Tests
                 myFunc,
                 maxRetries,
                 errorFilter,
-                default(TimeSpan),
+                default,
                 new FixedBackoff(TimeSpan.FromSeconds(1)));
             try
             {

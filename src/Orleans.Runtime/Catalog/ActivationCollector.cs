@@ -96,7 +96,7 @@ namespace Orleans.Runtime
 
                 DateTime ticket = MakeTicketFromTimeSpan(timeout);
 
-                if (default(DateTime) != item.CollectionTicket)
+                if (default != item.CollectionTicket)
                 {
                     throw new InvalidOperationException("Call CancelCollection before calling ScheduleCollection.");
                 }
@@ -117,7 +117,7 @@ namespace Orleans.Runtime
             lock (item)
             {
                 DateTime ticket = item.CollectionTicket;
-                if (default(DateTime) == ticket) return false;
+                if (default == ticket) return false;
                 if (IsExpired(ticket)) return false;
 
                 // first, we attempt to remove the ticket.
@@ -460,7 +460,7 @@ namespace Orleans.Runtime
             }
         }
 
-        private async Task CollectActivationsImpl(bool scanStale, TimeSpan ageLimit = default(TimeSpan))
+        private async Task CollectActivationsImpl(bool scanStale, TimeSpan ageLimit = default)
         {
             var watch = ValueStopwatch.StartNew();
             var number = Interlocked.Increment(ref collectionNumber);
