@@ -153,7 +153,7 @@ namespace Orleans.Serialization.Buffers
 
         /// <inheritdoc/>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public readonly void Dispose()
+        public void Dispose()
         {
             if (typeof(TBufferWriter).IsValueType)
             {
