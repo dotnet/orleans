@@ -412,7 +412,7 @@ namespace UnitTests.Streaming.Reliability
             return grains;
         }
 
-        private static int baseConsumerId = 0;
+        private static int _baseConsumerId = 0;
 
         private async Task Test_AddMany_Consumers(string testName, string streamProviderName)
         {
@@ -437,7 +437,7 @@ namespace UnitTests.Streaming.Reliability
             // Note: This does first SendItem
             await Do_BaselineTest(consumerGrainId, producerGrainId);
 
-            int baseId = 10000 * ++baseConsumerId;
+            int baseId = 10000 * ++_baseConsumerId;
 
             var grains1 = await Do_AddConsumerGrains(baseId, numGrains);
             for (int i = 0; i < numLoops; i++)
@@ -458,7 +458,7 @@ namespace UnitTests.Streaming.Reliability
             }));
 
             string when2 = "AddConsumers-Send-3";
-            baseId = 10000 * ++baseConsumerId;
+            baseId = 10000 * ++_baseConsumerId;
             var grains2 = await Do_AddConsumerGrains(baseId, numGrains);
             for (int i = 0; i < numLoops; i++)
             {

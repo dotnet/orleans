@@ -42,7 +42,7 @@ public struct BufferSliceReaderInput
     {
         if (ReferenceEquals(_segment, InitialSegmentSentinel))
         {
-            _segment = _slice._buffer._first;
+            _segment = _slice._buffer.First;
         }
 
         var endPosition = Offset + Length;
@@ -85,10 +85,10 @@ public struct BufferSliceReaderInput
             return result;
         }
 
-        if (_segment != FinalSegmentSentinel && Buffer._currentPosition > 0 && Buffer._writeHead is { } head && _position < endPosition)
+        if (_segment != FinalSegmentSentinel && Buffer.CurrentPosition > 0 && Buffer.WriteHead is { } head && _position < endPosition)
         {
             var finalOffset = Math.Max(Offset - _position, 0);
-            var finalLength = Math.Min(Buffer._currentPosition, endPosition - (_position + finalOffset));
+            var finalLength = Math.Min(Buffer.CurrentPosition, endPosition - (_position + finalOffset));
             if (finalLength == 0)
             {
                 ThrowInsufficientData();

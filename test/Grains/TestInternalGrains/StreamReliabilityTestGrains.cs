@@ -360,35 +360,35 @@ namespace UnitTests.Grains
     public class StreamUnsubscribeTestGrain : Grain<StreamReliabilityTestGrainState>, IStreamUnsubscribeTestGrain
     {
         [NonSerialized]
-        private readonly ILogger logger;
+        private readonly ILogger _logger;
 
         private const string StreamNamespace = StreamTestsConstants.StreamReliabilityNamespace;
 
         public StreamUnsubscribeTestGrain(ILoggerFactory loggerFactory)
         {
-            this.logger = loggerFactory.CreateLogger($"{this.GetType().Name}-{this.IdentityString}");
+            this._logger = loggerFactory.CreateLogger($"{this.GetType().Name}-{this.IdentityString}");
         }
 
         public override Task OnActivateAsync(CancellationToken cancellationToken)
         {
-            logger.LogInformation(String.Format("OnActivateAsync IsProducer = {0}, IsConsumer = {1}.",
+            _logger.LogInformation(String.Format("OnActivateAsync IsProducer = {0}, IsConsumer = {1}.",
                 State.IsProducer, State.ConsumerSubscriptionHandles != null && State.ConsumerSubscriptionHandles.Count > 0));
             return Task.CompletedTask;
         }
 
         public async Task Subscribe(Guid streamId, string providerName)
         {
-            logger.LogInformation("Subscribe StreamId={StreamId} StreamProvider={ProviderName} Grain={Grain}", streamId, providerName, this.AsReference<IStreamUnsubscribeTestGrain>());
+            _logger.LogInformation("Subscribe StreamId={StreamId} StreamProvider={ProviderName} Grain={Grain}", streamId, providerName, this.AsReference<IStreamUnsubscribeTestGrain>());
 
             State.StreamProviderName = providerName;
             if (State.Stream == null)
             {
-                logger.LogInformation("InitStream StreamId={StreamId} StreamProvider={ProviderName}", streamId, providerName);
+                _logger.LogInformation("InitStream StreamId={StreamId} StreamProvider={ProviderName}", streamId, providerName);
                 IStreamProvider streamProvider = this.GetStreamProvider(providerName);
                 State.Stream = streamProvider.GetStream<int>(StreamNamespace, streamId);
             }
 
-            var observer = new MyStreamObserver<int>(logger);
+            var observer = new MyStreamObserver<int>(_logger);
             var consumer = State.Stream;
             var subsHandle = await consumer.SubscribeAsync(observer);
             State.ConsumerSubscriptionHandles.Add(subsHandle);
@@ -397,7 +397,7 @@ namespace UnitTests.Grains
 
         public async Task UnSubscribeFromAllStreams()
         {
-            logger.LogInformation("UnSubscribeFromAllStreams: State.ConsumerSubscriptionHandles.Count={Count}", State.ConsumerSubscriptionHandles.Count);
+            _logger.LogInformation("UnSubscribeFromAllStreams: State.ConsumerSubscriptionHandles.Count={Count}", State.ConsumerSubscriptionHandles.Count);
             if (State.ConsumerSubscriptionHandles.Count == 0) throw new InvalidOperationException("Not a Consumer");
             var handles = State.ConsumerSubscriptionHandles.ToArray();
             foreach (var handle in handles)
