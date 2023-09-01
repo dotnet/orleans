@@ -47,7 +47,7 @@ namespace Orleans.Providers.Streams.Common
         public bool TryGetSegment(int size, out ArraySegment<byte> value)
         {
             value = default;
-            if (size > this.SizeInByte - count)
+            if (size > SizeInByte - count)
             {
                 return false;
             }

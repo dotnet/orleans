@@ -12,9 +12,9 @@ namespace Benchmarks.Ping
             public long EndTimestamp { get; set; }
             public int Successes { get; set; }
             public int Failures { get; set; }
-            public readonly int Completed => this.Successes + this.Failures;
-            public readonly double ElapsedSeconds => (this.EndTimestamp - this.StartTimestamp) / StopwatchTickPerSecond;
-            public readonly double RequestsPerSecond => this.Completed / this.ElapsedSeconds;
+            public readonly int Completed => Successes + Failures;
+            public readonly double ElapsedSeconds => (EndTimestamp - StartTimestamp) / StopwatchTickPerSecond;
+            public readonly double RequestsPerSecond => Completed / ElapsedSeconds;
         }
 
         private Channel<WorkBlock> _completedBlocks;
@@ -35,29 +35,29 @@ namespace Benchmarks.Ping
             Func<int, TState> getStateForWorker,
             bool logIntermediateResults = false)
         {
-            this._numWorkers = maxConcurrency;
-            this._blocksPerWorker = blocksPerWorker;
-            this._requestsPerBlock = requestsPerBlock;
-            this._issueRequest = issueRequest;
-            this._getStateForWorker = getStateForWorker;
-            this._logIntermediateResults = logIntermediateResults;
-            this._tasks = new Task[maxConcurrency];
-            this._states = new TState[maxConcurrency];
+            _numWorkers = maxConcurrency;
+            _blocksPerWorker = blocksPerWorker;
+            _requestsPerBlock = requestsPerBlock;
+            _issueRequest = issueRequest;
+            _getStateForWorker = getStateForWorker;
+            _logIntermediateResults = logIntermediateResults;
+            _tasks = new Task[maxConcurrency];
+            _states = new TState[maxConcurrency];
         }
 
         public async Task Warmup()
         {
-            this.ResetBetweenRuns();
-            var completedBlockReader = this._completedBlocks.Reader;
+            ResetBetweenRuns();
+            var completedBlockReader = _completedBlocks.Reader;
 
-            for (var ree = 0; ree < this._numWorkers; ree++)
+            for (var ree = 0; ree < _numWorkers; ree++)
             {
-                this._states[ree] = _getStateForWorker(ree);
-                this._tasks[ree] = this.RunWorker(this._states[ree], this._requestsPerBlock, 3);
+                _states[ree] = _getStateForWorker(ree);
+                _tasks[ree] = RunWorker(_states[ree], _requestsPerBlock, 3);
             }
 
             // Wait for warmup to complete.
-            await Task.WhenAll(this._tasks);
+            await Task.WhenAll(_tasks);
 
             // Ignore warmup blocks.
             while (completedBlockReader.TryRead(out _)) ;
@@ -68,7 +68,7 @@ namespace Benchmarks.Ping
 
         private void ResetBetweenRuns()
         {
-            this._completedBlocks = Channel.CreateUnbounded<WorkBlock>(
+            _completedBlocks = Channel.CreateUnbounded<WorkBlock>(
                 new UnboundedChannelOptions
                 {
                     SingleReader = true,
@@ -79,18 +79,18 @@ namespace Benchmarks.Ping
 
         public async Task Run()
         {
-            this.ResetBetweenRuns();
-            var completedBlockReader = this._completedBlocks.Reader;
+            ResetBetweenRuns();
+            var completedBlockReader = _completedBlocks.Reader;
 
             // Start the run.
-            for (var i = 0; i < this._numWorkers; i++)
+            for (var i = 0; i < _numWorkers; i++)
             {
-                this._tasks[i] = this.RunWorker(this._states[i], this._requestsPerBlock, this._blocksPerWorker);
+                _tasks[i] = RunWorker(_states[i], _requestsPerBlock, _blocksPerWorker);
             }
 
-            _ = Task.Run(async () => { try { await Task.WhenAll(this._tasks); } catch { } finally { this._completedBlocks.Writer.Complete(); } });
-            var blocks = new List<WorkBlock>(this._numWorkers * this._blocksPerWorker);
-            var blocksPerReport = this._numWorkers * this._blocksPerWorker / 5;
+            _ = Task.Run(async () => { try { await Task.WhenAll(_tasks); } catch { } finally { _completedBlocks.Writer.Complete(); } });
+            var blocks = new List<WorkBlock>(_numWorkers * _blocksPerWorker);
+            var blocksPerReport = _numWorkers * _blocksPerWorker / 5;
             var nextReportBlockCount = blocksPerReport;
             while (true)
             {
@@ -101,14 +101,14 @@ namespace Benchmarks.Ping
                     blocks.Add(block);
                 }
 
-                if (this._logIntermediateResults && blocks.Count >= nextReportBlockCount)
+                if (_logIntermediateResults && blocks.Count >= nextReportBlockCount)
                 {
                     nextReportBlockCount += blocksPerReport;
                     Console.WriteLine("    " + PrintReport(0));
                 }
             }
 
-            if (this._logIntermediateResults) Console.WriteLine("  Total: " + PrintReport(0));
+            if (_logIntermediateResults) Console.WriteLine("  Total: " + PrintReport(0));
             else Console.WriteLine(PrintReport(0));
 
             string PrintReport(int statingBlockIndex)
@@ -140,7 +140,7 @@ namespace Benchmarks.Ping
 
         private async Task RunWorker(TState state, int requestsPerBlock, int numBlocks)
         {
-            var completedBlockWriter = this._completedBlocks.Writer;
+            var completedBlockWriter = _completedBlocks.Writer;
             while (numBlocks > 0)
             {
                 var workBlock = new WorkBlock();
@@ -149,7 +149,7 @@ namespace Benchmarks.Ping
                 {
                     try
                     {
-                        await this._issueRequest(state).ConfigureAwait(false);
+                        await _issueRequest(state).ConfigureAwait(false);
                         ++workBlock.Successes;
                     }
                     catch

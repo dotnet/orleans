@@ -77,17 +77,17 @@ namespace Orleans.Transactions.DynamoDB
             bool updateIfExists = true)
         {
             if (service == null) throw new ArgumentNullException(nameof(service));
-            this._accessKey = accessKey;
+            _accessKey = accessKey;
             this.secretKey = secretKey;
-            this._token = token;
-            this._profileName = profileName;
-            this._service = service;
-            this._useProvisionedThroughput = useProvisionedThroughput;
-            this._provisionedThroughput = this._useProvisionedThroughput
+            _token = token;
+            _profileName = profileName;
+            _service = service;
+            _useProvisionedThroughput = useProvisionedThroughput;
+            _provisionedThroughput = _useProvisionedThroughput
                 ? new ProvisionedThroughput(readCapacityUnits, writeCapacityUnits)
                 : null;
-            this._createIfNotExists = createIfNotExists;
-            this._updateIfExists = updateIfExists;
+            _createIfNotExists = createIfNotExists;
+            _updateIfExists = updateIfExists;
             _logger = logger;
             CreateClient();
         }
@@ -103,7 +103,7 @@ namespace Orleans.Transactions.DynamoDB
         /// <returns></returns>
         public async Task InitializeTable(string tableName, List<KeySchemaElement> keys, List<AttributeDefinition> attributes, List<GlobalSecondaryIndex> secondaryIndexes = null, string ttlAttributeName = null)
         {
-            if (!this._createIfNotExists && !this._updateIfExists)
+            if (!_createIfNotExists && !_updateIfExists)
             {
                 _logger.LogInformation(
                     (int)ErrorCode.StorageProviderBase,
@@ -128,48 +128,48 @@ namespace Orleans.Transactions.DynamoDB
 
         private void CreateClient()
         {
-            if (this._service.StartsWith("http://", StringComparison.OrdinalIgnoreCase) ||
-                this._service.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
+            if (_service.StartsWith("http://", StringComparison.OrdinalIgnoreCase) ||
+                _service.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
             {
                 // Local DynamoDB instance (for testing)
                 var credentials = new BasicAWSCredentials("dummy", "dummyKey");
-                this._ddbClient = new AmazonDynamoDBClient(credentials, new AmazonDynamoDBConfig { ServiceURL = this._service });
+                _ddbClient = new AmazonDynamoDBClient(credentials, new AmazonDynamoDBConfig { ServiceURL = _service });
             }
-            else if (!string.IsNullOrEmpty(this._accessKey) && !string.IsNullOrEmpty(this.secretKey) && !string.IsNullOrEmpty(this._token))
+            else if (!string.IsNullOrEmpty(_accessKey) && !string.IsNullOrEmpty(secretKey) && !string.IsNullOrEmpty(_token))
             {
                 // AWS DynamoDB instance (auth via explicit credentials and token)
-                var credentials = new SessionAWSCredentials(this._accessKey, this.secretKey, this._token);
-                this._ddbClient = new AmazonDynamoDBClient(credentials, new AmazonDynamoDBConfig {RegionEndpoint = AWSUtils.GetRegionEndpoint(this._service)});
+                var credentials = new SessionAWSCredentials(_accessKey, secretKey, _token);
+                _ddbClient = new AmazonDynamoDBClient(credentials, new AmazonDynamoDBConfig {RegionEndpoint = AWSUtils.GetRegionEndpoint(_service)});
             }
-            else if (!string.IsNullOrEmpty(this._accessKey) && !string.IsNullOrEmpty(this.secretKey))
+            else if (!string.IsNullOrEmpty(_accessKey) && !string.IsNullOrEmpty(secretKey))
             {
                 // AWS DynamoDB instance (auth via explicit credentials)
-                var credentials = new BasicAWSCredentials(this._accessKey, this.secretKey);
-                this._ddbClient = new AmazonDynamoDBClient(credentials, new AmazonDynamoDBConfig { RegionEndpoint = AWSUtils.GetRegionEndpoint(this._service) });
+                var credentials = new BasicAWSCredentials(_accessKey, secretKey);
+                _ddbClient = new AmazonDynamoDBClient(credentials, new AmazonDynamoDBConfig { RegionEndpoint = AWSUtils.GetRegionEndpoint(_service) });
             }
-            else if (!string.IsNullOrEmpty(this._profileName))
+            else if (!string.IsNullOrEmpty(_profileName))
             {
                 // AWS DynamoDB instance (auth via explicit credentials and token found in a named profile)
                 var chain = new CredentialProfileStoreChain();
-                if (chain.TryGetAWSCredentials(this._profileName, out var credentials))
+                if (chain.TryGetAWSCredentials(_profileName, out var credentials))
                 {
-                    this._ddbClient = new AmazonDynamoDBClient(
+                    _ddbClient = new AmazonDynamoDBClient(
                         credentials,
                         new AmazonDynamoDBConfig
                         {
-                            RegionEndpoint = AWSUtils.GetRegionEndpoint(this._service)
+                            RegionEndpoint = AWSUtils.GetRegionEndpoint(_service)
                         });
                 }
                 else
                 {
                     throw new InvalidOperationException(
-                        $"AWS named profile '{this._profileName}' provided, but credentials could not be retrieved");
+                        $"AWS named profile '{_profileName}' provided, but credentials could not be retrieved");
                 }
             }
             else
             {
                 // AWS DynamoDB instance (implicit auth - EC2 IAM Roles etc)
-                this._ddbClient = new AmazonDynamoDBClient(new AmazonDynamoDBConfig { RegionEndpoint = AWSUtils.GetRegionEndpoint(this._service) });
+                _ddbClient = new AmazonDynamoDBClient(new AmazonDynamoDBConfig { RegionEndpoint = AWSUtils.GetRegionEndpoint(_service) });
             }
         }
 
@@ -204,13 +204,13 @@ namespace Orleans.Transactions.DynamoDB
                 TableName = tableName,
                 AttributeDefinitions = attributes,
                 KeySchema = keys,
-                BillingMode = this._useProvisionedThroughput ? BillingMode.PROVISIONED : BillingMode.PAY_PER_REQUEST,
+                BillingMode = _useProvisionedThroughput ? BillingMode.PROVISIONED : BillingMode.PAY_PER_REQUEST,
                 ProvisionedThroughput = _provisionedThroughput
             };
 
             if (secondaryIndexes != null && secondaryIndexes.Count > 0)
             {
-                if (this._useProvisionedThroughput)
+                if (_useProvisionedThroughput)
                 {
                     secondaryIndexes.ForEach(i =>
                     {
@@ -244,7 +244,7 @@ namespace Orleans.Transactions.DynamoDB
 
         private async ValueTask UpdateTableAsync(TableDescription tableDescription, List<AttributeDefinition> attributes, List<GlobalSecondaryIndex> secondaryIndexes = null, string ttlAttributeName = null)
         {
-            if (!this._updateIfExists)
+            if (!_updateIfExists)
             {
                 _logger.LogWarning((int)ErrorCode.StorageProviderBase, "The config value 'updateIfExists' is false. The table structure for table '{TableName}' will not be updated.", tableDescription.TableName);
                 return;
@@ -265,9 +265,9 @@ namespace Orleans.Transactions.DynamoDB
             {
                 TableName = tableDescription.TableName,
                 AttributeDefinitions = attributes,
-                BillingMode = this._useProvisionedThroughput ? BillingMode.PROVISIONED : BillingMode.PAY_PER_REQUEST,
+                BillingMode = _useProvisionedThroughput ? BillingMode.PROVISIONED : BillingMode.PAY_PER_REQUEST,
                 ProvisionedThroughput = _provisionedThroughput,
-                GlobalSecondaryIndexUpdates = this._useProvisionedThroughput
+                GlobalSecondaryIndexUpdates = _useProvisionedThroughput
                     ? tableDescription.GlobalSecondaryIndexes.Select(gsi => new GlobalSecondaryIndexUpdate
                     {
                         Update = new UpdateGlobalSecondaryIndexAction
@@ -283,7 +283,7 @@ namespace Orleans.Transactions.DynamoDB
             {
                 if ((request.ProvisionedThroughput?.ReadCapacityUnits ?? 0) != tableDescription.ProvisionedThroughput?.ReadCapacityUnits        // PROVISIONED Throughput read capacity change
                     || (request.ProvisionedThroughput?.WriteCapacityUnits ?? 0) != tableDescription.ProvisionedThroughput?.WriteCapacityUnits   // PROVISIONED Throughput write capacity change
-                    || (tableDescription.ProvisionedThroughput?.ReadCapacityUnits != 0 && tableDescription.ProvisionedThroughput?.WriteCapacityUnits != 0 && this._useProvisionedThroughput == false /* from PROVISIONED to PAY_PER_REQUEST */))
+                    || (tableDescription.ProvisionedThroughput?.ReadCapacityUnits != 0 && tableDescription.ProvisionedThroughput?.WriteCapacityUnits != 0 && _useProvisionedThroughput == false /* from PROVISIONED to PAY_PER_REQUEST */))
                 {
                     await _ddbClient.UpdateTableAsync(request);
                     tableDescription = await TableWaitOnStatusAsync(tableDescription.TableName, TableStatus.UPDATING, TableStatus.ACTIVE);

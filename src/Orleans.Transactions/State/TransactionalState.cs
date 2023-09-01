@@ -213,10 +213,10 @@ namespace Orleans.Transactions
 
             // setup transaction processing pipe
             void deactivate() => grainRuntime.DeactivateOnIdle(context);
-            var options = this.context.ActivationServices.GetRequiredService<IOptions<TransactionalStateOptions>>();
-            var clock = this.context.ActivationServices.GetRequiredService<IClock>();
-            var timerManager = this.context.ActivationServices.GetRequiredService<ITimerManager>();
-            this.queue = new TransactionQueue<TState>(options, this.participantId, deactivate, storage, clock, logger, timerManager, this.activationLifetime);
+            var options = context.ActivationServices.GetRequiredService<IOptions<TransactionalStateOptions>>();
+            var clock = context.ActivationServices.GetRequiredService<IClock>();
+            var timerManager = context.ActivationServices.GetRequiredService<ITimerManager>();
+            queue = new TransactionQueue<TState>(options, participantId, deactivate, storage, clock, logger, timerManager, activationLifetime);
 
             setupResourceFactory(context, config.StateName, queue);
 

@@ -198,10 +198,10 @@ namespace Orleans.Runtime.Messaging
         /// <param name="sizeHint">The size requested by the caller to either <see cref="GetMemory(int)"/> or <see cref="GetSpan(int)"/>.</param>
         private void Initialize(int sizeHint)
         {
-            int sizeToRequest = this.expectedPrefixSize + Math.Max(sizeHint, this.payloadSizeHint);
-            var memory = this.innerWriter.GetMemory(sizeToRequest);
-            this.prefixMemory = memory[..this.expectedPrefixSize];
-            this.realMemory = memory[this.expectedPrefixSize..];
+            int sizeToRequest = expectedPrefixSize + Math.Max(sizeHint, payloadSizeHint);
+            var memory = innerWriter.GetMemory(sizeToRequest);
+            prefixMemory = memory[..expectedPrefixSize];
+            realMemory = memory[expectedPrefixSize..];
         }
 
         /// <summary>
@@ -215,13 +215,13 @@ namespace Orleans.Runtime.Messaging
         {
             private const int DefaultBufferSize = 4 * 1024;
 
-            private readonly Stack<SequenceSegment> segmentPool = new Stack<SequenceSegment>();
+            private readonly Stack<SequenceSegment> _segmentPool = new Stack<SequenceSegment>();
 
-            private readonly MemoryPool<byte> memoryPool;
+            private readonly MemoryPool<byte> _memoryPool;
 
-            private SequenceSegment first;
+            private SequenceSegment _first;
 
-            private SequenceSegment last;
+            private SequenceSegment _last;
 
             /// <summary>
             /// Initializes a new instance of the <see cref="Sequence"/> class.
@@ -230,7 +230,7 @@ namespace Orleans.Runtime.Messaging
             public Sequence(MemoryPool<byte> memoryPool)
             {
                 if (memoryPool is null) ThrowNull();
-                this.memoryPool = memoryPool;
+                _memoryPool = memoryPool;
 
                 static void ThrowNull() => throw new ArgumentNullException(nameof(memoryPool));
             }
@@ -239,7 +239,7 @@ namespace Orleans.Runtime.Messaging
             /// Gets this sequence expressed as a <see cref="ReadOnlySequence{T}"/>.
             /// </summary>
             /// <returns>A read only sequence representing the data in this object.</returns>
-            public ReadOnlySequence<byte> AsReadOnlySequence => first != null ? new(first, first.Start, last, last.End) : default;
+            public ReadOnlySequence<byte> AsReadOnlySequence => _first != null ? new(_first, _first.Start, _last, _last.End) : default;
 
             /// <summary>
             /// Gets the value to display in a debugger datatip.
@@ -251,7 +251,7 @@ namespace Orleans.Runtime.Messaging
             /// returned by a prior call to <see cref="GetMemory(int)"/>.
             /// </summary>
             /// <param name="count">The number of elements written into memory.</param>
-            public void Advance(int count) => last.Advance(count);
+            public void Advance(int count) => _last.Advance(count);
 
             /// <summary>
             /// Gets writable memory that can be initialized and added to the sequence via a subsequent call to <see cref="Advance(int)"/>.
@@ -259,7 +259,7 @@ namespace Orleans.Runtime.Messaging
             /// <param name="sizeHint">The size of the memory required, or 0 to just get a convenient (non-empty) buffer.</param>
             /// <returns>The requested memory.</returns>
             public Memory<byte> GetMemory(int sizeHint)
-                => last?.TrailingSlack is { Length: > 0 } slack && (uint)slack.Length >= (uint)sizeHint ? slack : Append(sizeHint);
+                => _last?.TrailingSlack is { Length: > 0 } slack && (uint)slack.Length >= (uint)sizeHint ? slack : Append(sizeHint);
 
             /// <summary>
             /// Clears the entire sequence, recycles associated memory into pools,
@@ -268,54 +268,54 @@ namespace Orleans.Runtime.Messaging
             /// </summary>
             public void Dispose()
             {
-                var current = first;
+                var current = _first;
                 while (current != null)
                 {
                     current = RecycleAndGetNext(current);
                 }
 
-                first = last = null;
+                _first = _last = null;
             }
 
             private Memory<byte> Append(int sizeHint)
             {
-                var array = memoryPool.Rent(Math.Min(sizeHint > 0 ? sizeHint : DefaultBufferSize, memoryPool.MaxBufferSize));
+                var array = _memoryPool.Rent(Math.Min(sizeHint > 0 ? sizeHint : DefaultBufferSize, _memoryPool.MaxBufferSize));
 
-                var segment = segmentPool.Count > 0 ? segmentPool.Pop() : new SequenceSegment();
+                var segment = _segmentPool.Count > 0 ? _segmentPool.Pop() : new SequenceSegment();
                 segment.SetMemory(array);
 
-                if (last == null)
+                if (_last == null)
                 {
-                    first = last = segment;
+                    _first = _last = segment;
                 }
                 else
                 {
-                    if (last.Length > 0)
+                    if (_last.Length > 0)
                     {
                         // Add a new block.
-                        last.SetNext(segment);
+                        _last.SetNext(segment);
                     }
                     else
                     {
                         // The last block is completely unused. Replace it instead of appending to it.
-                        var current = first;
-                        if (first != last)
+                        var current = _first;
+                        if (_first != _last)
                         {
-                            while (current.Next != last)
+                            while (current.Next != _last)
                             {
                                 current = current.Next;
                             }
                         }
                         else
                         {
-                            first = segment;
+                            _first = segment;
                         }
 
                         current.SetNext(segment);
-                        RecycleAndGetNext(last);
+                        RecycleAndGetNext(_last);
                     }
 
-                    last = segment;
+                    _last = segment;
                 }
 
                 return segment.AvailableMemory;
@@ -326,7 +326,7 @@ namespace Orleans.Runtime.Messaging
                 var recycledSegment = segment;
                 segment = segment.Next;
                 recycledSegment.ResetMemory();
-                segmentPool.Push(recycledSegment);
+                _segmentPool.Push(recycledSegment);
                 return segment;
             }
 
@@ -352,7 +352,7 @@ namespace Orleans.Runtime.Messaging
                 /// </remarks>
                 internal int End { get; private set; }
 
-                internal Memory<byte> TrailingSlack => this.AvailableMemory[this.End..];
+                internal Memory<byte> TrailingSlack => AvailableMemory[End..];
 
                 private IMemoryOwner<byte> MemoryOwner;
 
@@ -399,8 +399,8 @@ namespace Orleans.Runtime.Messaging
                     // If we ever support creating these instances on existing arrays, such that
                     // this.Start isn't 0 at the beginning, we'll have to "pin" this.Start and remove
                     // Advance, forcing Sequence<T> itself to track it, the way Pipe does it internally.
-                    this.Memory = AvailableMemory[..value];
-                    this.End = value;
+                    Memory = AvailableMemory[..value];
+                    End = value;
 
                     static void ThrowNegative() => throw new ArgumentOutOfRangeException(
                         nameof(count),

@@ -203,11 +203,11 @@ namespace Orleans.Tests.SqlUtils
         /// <param name="connectionString">The connection string this database should use for database operations.</param>
         private RelationalStorage(string invariantName, string connectionString)
         {
-            this._connectionString = connectionString;
-            this._invariantName = invariantName;
+            _connectionString = connectionString;
+            _invariantName = invariantName;
             _supportsCommandCancellation = DbConstantsStore.SupportsCommandCancellation(InvariantName);
             _isSynchronousAdoNetImplementation = DbConstantsStore.IsSynchronousAdoNetImplementation(InvariantName);
-            this._databaseCommandInterceptor = DbConstantsStore.GetDatabaseCommandInterceptor(InvariantName);
+            _databaseCommandInterceptor = DbConstantsStore.GetDatabaseCommandInterceptor(InvariantName);
         }
 
         private static async Task<Tuple<IEnumerable<TResult>, int>> SelectAsync<TResult>(DbDataReader reader, Func<IDataReader, int, CancellationToken, Task<TResult>> selector, CancellationToken cancellationToken)

@@ -31,10 +31,10 @@ namespace Orleans.Transactions.AzureStorage
 
         public static string MakeRowKey(long sequenceId)
         {
-            return $"{RK_PREFIX}{sequenceId.ToString("x16")}";
+            return $"{RK_PREFIX}{sequenceId:x16}";
         }
 
-        public long SequenceId => long.Parse(this.RowKey[RK_PREFIX.Length..], NumberStyles.AllowHexSpecifier);
+        public long SequenceId => long.Parse(RowKey[RK_PREFIX.Length..], NumberStyles.AllowHexSpecifier);
 
         // Row keys range from s0000000000000001 to s7fffffffffffffff
         public const string RK_PREFIX = "s_";

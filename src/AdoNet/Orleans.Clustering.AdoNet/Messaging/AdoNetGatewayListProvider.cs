@@ -25,16 +25,16 @@ namespace Orleans.Runtime.Membership
             IOptions<GatewayOptions> gatewayOptions,
             IOptions<ClusterOptions> clusterOptions)
         {
-            this._logger = logger;
-            this._serviceProvider = serviceProvider;
-            this._options = options.Value;
-            this._clusterId = clusterOptions.Value.ClusterId;
-            this._maxStaleness = gatewayOptions.Value.GatewayListRefreshPeriod;
+            _logger = logger;
+            _serviceProvider = serviceProvider;
+            _options = options.Value;
+            _clusterId = clusterOptions.Value.ClusterId;
+            _maxStaleness = gatewayOptions.Value.GatewayListRefreshPeriod;
         }
 
         public TimeSpan MaxStaleness
         {
-            get { return this._maxStaleness; }
+            get { return _maxStaleness; }
         }
 
         public bool IsUpdatable
@@ -53,7 +53,7 @@ namespace Orleans.Runtime.Membership
             if (_logger.IsEnabled(LogLevel.Trace)) _logger.LogTrace("AdoNetClusteringTable.GetGateways called.");
             try
             {
-                return await _orleansQueries.ActiveGatewaysAsync(this._clusterId);
+                return await _orleansQueries.ActiveGatewaysAsync(_clusterId);
             }
             catch (Exception ex)
             {

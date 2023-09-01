@@ -28,13 +28,13 @@ namespace Orleans.Runtime
 
         private ValueStopwatch(long timestamp)
         {
-            this._value = timestamp;
+            _value = timestamp;
         }
 
         /// <summary>
         /// Returns true if this instance is running or false otherwise.
         /// </summary>
-        public readonly bool IsRunning => this._value > 0;
+        public readonly bool IsRunning => _value > 0;
 
         /// <summary>
         /// Returns the elapsed time.
@@ -50,7 +50,7 @@ namespace Orleans.Runtime
             {
                 // A positive timestamp value indicates the start time of a running stopwatch,
                 // a negative value indicates the negative total duration of a stopped stopwatch.
-                var timestamp = this._value;
+                var timestamp = _value;
 
                 long delta;
                 if (IsRunning)
@@ -92,14 +92,14 @@ namespace Orleans.Runtime
         /// a negative value indicates the negative total duration of a stopped stopwatch.
         /// </remarks>
         /// <returns>The raw counter value.</returns>
-        public readonly long GetRawTimestamp() => this._value;
+        public readonly long GetRawTimestamp() => _value;
 
         /// <summary>
         /// Starts the stopwatch.
         /// </summary>
         public void Start()
         {
-            var timestamp = this._value;
+            var timestamp = _value;
 
             // If already started, do nothing.
             if (IsRunning) return;
@@ -108,25 +108,25 @@ namespace Orleans.Runtime
             // Add the negative value to the current timestamp to start the stopwatch again.
             var newValue = GetTimestamp() + timestamp;
             if (newValue == 0) newValue = 1;
-            this._value = newValue;
+            _value = newValue;
         }
 
         /// <summary>
         /// Restarts this stopwatch, beginning from zero time elapsed.
         /// </summary>
-        public void Restart() => this._value = GetTimestamp();
+        public void Restart() => _value = GetTimestamp();
 
         /// <summary>
         /// Resets this stopwatch into a stopped state with no elapsed duration.
         /// </summary>
-        public void Reset() => this._value = 0;
+        public void Reset() => _value = 0;
 
         /// <summary>
         /// Stops this stopwatch.
         /// </summary>
         public void Stop()
         {
-            var timestamp = this._value;
+            var timestamp = _value;
 
             // If already stopped, do nothing.
             if (!IsRunning) return;
@@ -134,7 +134,7 @@ namespace Orleans.Runtime
             var end = GetTimestamp();
             var delta = end - timestamp;
 
-            this._value = -delta;
+            _value = -delta;
         }
     }
 }

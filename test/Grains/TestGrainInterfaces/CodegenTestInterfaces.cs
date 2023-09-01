@@ -238,12 +238,12 @@ namespace UnitTests.GrainInterfaces
         {
             get
             {
-                return this._nonSerializedIntField;
+                return _nonSerializedIntField;
             }
 
             set
             {
-                this._nonSerializedIntField = value;
+                _nonSerializedIntField = value;
             }
         }
 
@@ -319,7 +319,7 @@ namespace UnitTests.GrainInterfaces
             new NestedPrivateClass()
         };
 
-        public IEnumerable CoolBeans => this._coolBeans;
+        public IEnumerable CoolBeans => _coolBeans;
 
         private class NestedPrivateClass
         {
@@ -338,8 +338,8 @@ namespace UnitTests.GrainInterfaces
         private readonly byte[] _value;
 #pragma warning restore IDE0032 // Use auto property
 
-        public ReadOnlyStructWithReadOnlyArray(byte[] value) => this._value = value;
+        public ReadOnlyStructWithReadOnlyArray(byte[] value) => _value = value;
 
-        public byte[] Value => this._value;
+        public byte[] Value => _value;
     }
 }

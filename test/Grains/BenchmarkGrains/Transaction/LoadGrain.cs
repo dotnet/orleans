@@ -7,19 +7,19 @@ namespace BenchmarkGrains.Transaction
     [GrainType("txload")]
     public class LoadGrain : Grain, ILoadGrain
     {
-        private Task<Report> runTask;
+        private Task<Report> _runTask;
 
         public Task Generate(int run, int transactions, int conncurrent)
         {
-            runTask = RunGeneration(run, transactions, conncurrent);
-            runTask.Ignore();
+            _runTask = RunGeneration(run, transactions, conncurrent);
+            _runTask.Ignore();
             return Task.CompletedTask;
         }
 
         public async Task<Report> TryGetReport()
         {
-            if (!this.runTask.IsCompleted) return default;
-            return await this.runTask;
+            if (!_runTask.IsCompleted) return default;
+            return await _runTask;
         }
 
         private async Task<Report> RunGeneration(int run, int transactions, int conncurrent)

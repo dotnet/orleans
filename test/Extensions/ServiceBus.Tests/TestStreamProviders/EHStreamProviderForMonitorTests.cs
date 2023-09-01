@@ -76,8 +76,10 @@ namespace ServiceBus.Tests.TestStreamProviders
             var loggerFactory = serviceProvider.GetRequiredService<ILoggerFactory>();
             var eventHubPath = ehOptions.EventHubName;
             var sharedDimensions = new EventHubMonitorAggregationDimensions(eventHubPath);
-            ICacheMonitor cacheMonitorFactory(EventHubCacheMonitorDimensions dimensions, ILoggerFactory logger) => this.cacheMonitorForTesting;
-            IBlockPoolMonitor blockPoolMonitorFactory(EventHubBlockPoolMonitorDimensions dimensions, ILoggerFactory logger) => this.blockPoolMonitorForTesting;
+
+            ICacheMonitor cacheMonitorFactory(EventHubCacheMonitorDimensions dimensions, ILoggerFactory logger) => cacheMonitorForTesting;
+            IBlockPoolMonitor blockPoolMonitorFactory(EventHubBlockPoolMonitorDimensions dimensions, ILoggerFactory logger) => blockPoolMonitorForTesting;
+
             return new CacheFactoryForMonitorTesting(
                 cachePressureInjectionMonitor,
                 this.cacheOptions,
@@ -149,25 +151,24 @@ namespace ServiceBus.Tests.TestStreamProviders
     public class CachePressureInjectionMonitor : ICachePressureMonitor
     {
         public bool UnderPressure { get; set; }
-        private bool wasUnderPressur;
+        private bool wasUnderPressure;
         public ICacheMonitor CacheMonitor { set; private get; }
         public CachePressureInjectionMonitor()
         {
             UnderPressure = false;
-            wasUnderPressur = UnderPressure;
+            wasUnderPressure = UnderPressure;
         }
 
         public void RecordCachePressureContribution(double cachePressureContribution)
         {
-
         }
 
         public bool IsUnderPressure(DateTime utcNow)
         {
-            if (wasUnderPressur != UnderPressure)
+            if (wasUnderPressure != UnderPressure)
             {
                 CacheMonitor?.TrackCachePressureMonitorStatusChange(GetType().Name, UnderPressure, null, null, null);
-                wasUnderPressur = UnderPressure;
+                wasUnderPressure = UnderPressure;
             }
             return UnderPressure;
         }

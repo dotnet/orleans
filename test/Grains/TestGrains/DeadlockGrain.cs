@@ -35,21 +35,22 @@ namespace UnitTests.Grains
 
     public class DeadlockNonReentrantGrain : Grain, IDeadlockNonReentrantGrain
     {
-        private readonly ILogger logger;
-        public DeadlockNonReentrantGrain(ILoggerFactory loggerFactory) => this.logger = loggerFactory.CreateLogger(this.Id);
+        private readonly ILogger _logger;
+
+        public DeadlockNonReentrantGrain(ILoggerFactory loggerFactory) => _logger = loggerFactory.CreateLogger(Id);
         private string Id { get { return string.Format("DeadlockNonReentrantGrain {0}", base.IdentityString); } }
 
         public async Task CallNext_1(List<(long GrainId, bool Blocking)> callChain, int currCallIndex)
         {
             using var _ = RequestContext.AllowCallChainReentrancy();
-            logger.LogInformation("Inside grain {Id} CallNext_1().", Id);
+            _logger.LogInformation("Inside grain {Id} CallNext_1().", Id);
             await DeadlockGrain.CallNext(GrainFactory, callChain, currCallIndex);
         }
 
         public async Task CallNext_2(List<(long GrainId, bool Blocking)> callChain, int currCallIndex)
         {
             using var _ = RequestContext.AllowCallChainReentrancy();
-            logger.LogInformation("Inside grain {Id} CallNext_2().", Id);
+            _logger.LogInformation("Inside grain {Id} CallNext_2().", Id);
             await DeadlockGrain.CallNext(GrainFactory, callChain, currCallIndex);
         }
     }
@@ -57,21 +58,21 @@ namespace UnitTests.Grains
     [Reentrant]
     public class DeadlockReentrantGrain : Grain, IDeadlockReentrantGrain
     {
-        private readonly ILogger logger;
-        public DeadlockReentrantGrain(ILoggerFactory loggerFactory) => logger = loggerFactory.CreateLogger(Id);
+        private readonly ILogger _logger;
+        public DeadlockReentrantGrain(ILoggerFactory loggerFactory) => _logger = loggerFactory.CreateLogger(Id);
         private string Id => $"DeadlockReentrantGrain {base.IdentityString}";
 
         public async Task CallNext_1(List<(long GrainId, bool Blocking)> callChain, int currCallIndex)
         {
             using var _ = RequestContext.AllowCallChainReentrancy();
-            logger.LogInformation("Inside grain {Id} CallNext_1()", Id);
+            _logger.LogInformation("Inside grain {Id} CallNext_1()", Id);
             await DeadlockGrain.CallNext(GrainFactory, callChain, currCallIndex);
         }
 
         public async Task CallNext_2(List<(long GrainId, bool Blocking)> callChain, int currCallIndex)
         {
             using var _ = RequestContext.AllowCallChainReentrancy();
-            logger.LogInformation("Inside grain {Id} CallNext_2()", Id);
+            _logger.LogInformation("Inside grain {Id} CallNext_2()", Id);
             await DeadlockGrain.CallNext(GrainFactory, callChain, currCallIndex);
         }
     }
