@@ -307,12 +307,11 @@ namespace UnitTests.StorageTests
             {
                 IMemoryStorageTestGrain grain = this.HostedCluster.GrainFactory.GetGrain<IMemoryStorageTestGrain>(Guid.NewGuid());
                 int idx = i; // Capture
-                Func<Task<int>> asyncFunc =
-                    async () =>
-                    {
-                        await grain.DoWrite(idx);
-                        return await grain.DoRead();
-                    };
+                async Task<int> asyncFunc()
+                {
+                    await grain.DoWrite(idx);
+                    return await grain.DoRead();
+                }
                 promises[i] = Task.Run(asyncFunc);
             }
             await Task.WhenAll(promises);
