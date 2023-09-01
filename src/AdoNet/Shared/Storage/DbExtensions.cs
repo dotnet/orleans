@@ -26,7 +26,7 @@ namespace Orleans.Tests.SqlUtils
         /// <summary>
         /// An explicit map of type CLR viz database type conversions.
         /// </summary>
-        static readonly ReadOnlyDictionary<Type, DbType> typeMap = new ReadOnlyDictionary<Type, DbType>(new Dictionary<Type, DbType>
+        private static readonly ReadOnlyDictionary<Type, DbType> typeMap = new ReadOnlyDictionary<Type, DbType>(new Dictionary<Type, DbType>
         {
             { typeof(object),   DbType.Object },
             { typeof(int),      DbType.Int32 },
@@ -117,7 +117,7 @@ namespace Orleans.Tests.SqlUtils
         /// <param name="default">The default value if value in position is <see cref="System.DBNull"/>.</param>
         /// <returns>Either the given value or the default for the requested type.</returns>
         /// <remarks>This function throws if the given <see paramref="fieldName"/> does not exist.</remarks>
-        public static TValue GetValueOrDefault<TValue>(this IDataRecord record, string fieldName, TValue @default = default(TValue))
+        public static TValue GetValueOrDefault<TValue>(this IDataRecord record, string fieldName, TValue @default = default)
         {
 
             try
@@ -165,7 +165,7 @@ namespace Orleans.Tests.SqlUtils
         /// <returns>Either the given value or the default for the requested type.</returns>
         /// <exception cref="DataException"/>
         /// <remarks>This function throws if the given <see paramref="fieldName"/> does not exist.</remarks>
-        public static async Task<TValue> GetValueOrDefaultAsync<TValue>(this DbDataReader record, string fieldName, TValue @default = default(TValue))
+        public static async Task<TValue> GetValueOrDefaultAsync<TValue>(this DbDataReader record, string fieldName, TValue @default = default)
         {
             try
             {
@@ -190,7 +190,7 @@ namespace Orleans.Tests.SqlUtils
         /// <param name="default">The default value if value in position is <see cref="System.DBNull"/>.</param>
         /// <returns>Either the given value or the default for the requested type.</returns>
         /// <exception cref="IndexOutOfRangeException"/>                
-        public static TValue GetValueOrDefault<TValue>(this IDataRecord record, int ordinal, TValue @default = default(TValue))
+        public static TValue GetValueOrDefault<TValue>(this IDataRecord record, int ordinal, TValue @default = default)
         {
             return record.IsDBNull(ordinal) ? @default : (TValue)record.GetValue(ordinal);
         }
@@ -205,7 +205,7 @@ namespace Orleans.Tests.SqlUtils
         /// <param name="default">The default value if value in position is <see cref="System.DBNull"/>.</param>
         /// <returns>Either the given value or the default for the requested type.</returns>
         /// <exception cref="IndexOutOfRangeException"/>                
-        public static async Task<TValue> GetValueOrDefaultAsync<TValue>(this DbDataReader record, int ordinal, TValue @default = default(TValue))
+        public static async Task<TValue> GetValueOrDefaultAsync<TValue>(this DbDataReader record, int ordinal, TValue @default = default)
         {
 
             return (await record.IsDBNullAsync(ordinal).ConfigureAwait(false)) ? @default : (await record.GetFieldValueAsync<TValue>(ordinal).ConfigureAwait(false));
@@ -331,7 +331,7 @@ namespace Orleans.Tests.SqlUtils
         /// <returns>Value in the given field indicated by <see paramref="fieldName"/>.</returns>
         /// <exception cref="DataException"/>
         /// <remarks>This function throws if the given <see paramref="fieldName"/> does not exist.</remarks>        
-        public static async Task<TValue> GetValueAsync<TValue>(this DbDataReader record, string fieldName, CancellationToken cancellationToken = default(CancellationToken))
+        public static async Task<TValue> GetValueAsync<TValue>(this DbDataReader record, string fieldName, CancellationToken cancellationToken = default)
         {
             try
             {
@@ -356,7 +356,7 @@ namespace Orleans.Tests.SqlUtils
         /// <remarks>Does not support collection parameters currently. Does not cache reflection results.</remarks>
         public static void ReflectionParameterProvider<T>(this IDbCommand command, T parameters, IReadOnlyDictionary<string, string> nameMap = null)
         {
-            if (!EqualityComparer<T>.Default.Equals(parameters, default(T)))
+            if (!EqualityComparer<T>.Default.Equals(parameters, default))
             {
                 var properties = parameters.GetType().GetProperties();
                 for (int i = 0; i < properties.Length; ++i)

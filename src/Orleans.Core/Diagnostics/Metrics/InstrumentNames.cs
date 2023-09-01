@@ -160,6 +160,6 @@ internal static class InstrumentNames
     public const string STREAMS_QUEUE_CACHE_UNDER_PRESSURE = "orleans-streams-queue-cache-under-pressure";
     public const string STREAMS_QUEUE_CACHE_PRESSURE_CONTRIBUTION_COUNT = "orleans-streams-queue-cache-pressure-contribution-count";
 
-    public const string RUNTIME_MEMORY_TOTAL_PHSYSICAL_MEMORY_MB = "orleans-runtime-total-phsyical-memory";
+    public const string RUNTIME_MEMORY_TOTAL_PHYSICAL_MEMORY_MB = "orleans-runtime-total-physical-memory";
     public const string RUNTIME_MEMORY_AVAILABLE_MEMORY_MB = "orleans-runtime-available-memory";
 }

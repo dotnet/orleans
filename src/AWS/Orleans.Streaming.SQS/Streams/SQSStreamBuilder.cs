@@ -3,7 +3,6 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 using OrleansAWSUtils.Streams;
-using Orleans.Providers.Streams.Common;
 
 namespace Orleans.Hosting
 {

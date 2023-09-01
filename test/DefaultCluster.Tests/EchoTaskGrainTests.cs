@@ -1,22 +1,18 @@
-using System;
 using System.Diagnostics;
-using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Orleans.Internal;
 using Orleans.Runtime;
 using TestExtensions;
 using UnitTests.GrainInterfaces;
 using Xunit;
-using Xunit.Sdk;
 
 namespace DefaultCluster.Tests.General
 {
     public class EchoTaskGrainTests : HostedTestClusterEnsureDefaultStarted
     {
         private readonly TimeSpan timeout = Debugger.IsAttached ? TimeSpan.FromMinutes(10) : TimeSpan.FromSeconds(10);
-
-        const string expectedEcho = "Hello from EchoGrain";
-        const string expectedEchoError = "Error from EchoGrain";
+        private const string expectedEcho = "Hello from EchoGrain";
+        private const string expectedEchoError = "Error from EchoGrain";
         private IEchoTaskGrain grain;
 
         public static readonly TimeSpan Epsilon = TimeSpan.FromSeconds(1);

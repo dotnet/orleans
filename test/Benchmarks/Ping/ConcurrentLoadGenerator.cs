@@ -1,7 +1,4 @@
-using System;
-using System.Threading.Tasks;
 using System.Threading.Channels;
-using System.Collections.Generic;
 using System.Diagnostics;
 
 namespace Benchmarks.Ping

@@ -1,6 +1,4 @@
-using System;
 using System.Globalization;
-using System.Threading.Tasks;
 using Orleans.Internal;
 using Orleans.Runtime;
 using Xunit;
@@ -117,7 +115,7 @@ namespace NonSilo.Tests
                 myFunc, 
                 maxRetries, 
                 errorFilter,
-                default(TimeSpan),
+                default,
                 new FixedBackoff(TimeSpan.FromSeconds(1)));
 
             int value = promise.Result;
@@ -156,7 +154,7 @@ namespace NonSilo.Tests
                 myFunc,
                 maxRetries,
                 errorFilter,
-                default(TimeSpan),
+                default,
                 new FixedBackoff(TimeSpan.FromSeconds(1)));
             try
             {

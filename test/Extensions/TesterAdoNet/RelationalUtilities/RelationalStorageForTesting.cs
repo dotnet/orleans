@@ -1,12 +1,6 @@
-using System;
-using System.Collections.Generic;
 using System.Data.Common;
-using System.IO;
-using System.Linq;
-using System.Threading.Tasks;
 using Orleans.Tests.SqlUtils;
 using Tester.RelationalUtilities;
-using Xunit.Sdk;
 
 namespace UnitTests.General
 {
@@ -117,7 +111,7 @@ namespace UnitTests.General
 
             Console.WriteLine("Creating database tables...");
 
-            var setupScript = String.Empty;
+            var setupScript = string.Empty;
 
             // Concatenate scripts
             foreach (var fileName in testStorage.SetupSqlScriptFileNames)

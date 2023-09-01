@@ -227,7 +227,7 @@ namespace Orleans.Runtime
             var keySpan = id.Key.Value.Span;
             if (keySpan.Length < 32) return null;
 
-            if (!Utf8Parser.TryParse(keySpan.Slice(0, 16), out ulong n0, out len, 'X') || len < 16)
+            if (!Utf8Parser.TryParse(keySpan[..16], out ulong n0, out len, 'X') || len < 16)
                 return null;
 
             if (!Utf8Parser.TryParse(keySpan.Slice(16, 16), out ulong n1, out len, 'X') || len < 16)
@@ -236,7 +236,7 @@ namespace Orleans.Runtime
             if (keySpan.Length > 32)
             {
                 if (keySpan[32] != '+') return null;
-                keyExt = Encoding.UTF8.GetString(keySpan.Slice(33));
+                keyExt = Encoding.UTF8.GetString(keySpan[33..]);
             }
 
             return FindOrCreateGrainId(UniqueKey.NewKey(n0, n1, typeCodeData, keyExt));
@@ -301,7 +301,7 @@ namespace Orleans.Runtime
             if (!detailed)
             {
                 if (keyString.Length >= 48)
-                    idString = keyString.Substring(24, 8) + keyString.Substring(48);
+                    idString = keyString.Substring(24, 8) + keyString[48..];
                 else
                     idString = keyString.Substring(24, 8);
             }
@@ -312,7 +312,7 @@ namespace Orleans.Runtime
                 case UniqueKey.Category.Grain:
                 case UniqueKey.Category.KeyExtGrain:
                     var typeString = TypeCode.ToString("X");
-                    if (!detailed) typeString = typeString.Substring(Math.Max(0, typeString.Length - 8));
+                    if (!detailed) typeString = typeString[Math.Max(0, typeString.Length - 8)..];
                     fullString = $"*grn/{typeString}/{idString}";
                     break;
                 case UniqueKey.Category.Client:
@@ -329,7 +329,7 @@ namespace Orleans.Runtime
                     fullString = "???/" + idString;
                     break;
             }
-            return detailed ? String.Format("{0}-0x{1, 8:X8}", fullString, GetUniformHashCode()) : fullString;
+            return detailed ? string.Format("{0}-0x{1, 8:X8}", fullString, GetUniformHashCode()) : fullString;
         }
 
         public static bool IsLegacyGrainType(Type type)

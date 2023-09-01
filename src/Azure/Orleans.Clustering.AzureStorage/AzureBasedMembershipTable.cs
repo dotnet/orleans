@@ -249,10 +249,10 @@ namespace Orleans.Runtime.MembershipService
                 parse.FaultZone = int.Parse(tableEntry.FaultZone);
 
             parse.StartTime = !string.IsNullOrEmpty(tableEntry.StartTime) ?
-                LogFormatter.ParseDate(tableEntry.StartTime) : default(DateTime);
+                LogFormatter.ParseDate(tableEntry.StartTime) : default;
 
             parse.IAmAliveTime = !string.IsNullOrEmpty(tableEntry.IAmAliveTime) ?
-                LogFormatter.ParseDate(tableEntry.IAmAliveTime) : default(DateTime);
+                LogFormatter.ParseDate(tableEntry.IAmAliveTime) : default;
 
             var suspectingSilos = new List<SiloAddress>();
             var suspectingTimes = new List<DateTime>();
@@ -274,7 +274,7 @@ namespace Orleans.Runtime.MembershipService
             }
 
             if (suspectingSilos.Count != suspectingTimes.Count)
-                throw new OrleansException(String.Format("SuspectingSilos.Length of {0} as read from Azure table is not equal to SuspectingTimes.Length of {1}", suspectingSilos.Count, suspectingTimes.Count));
+                throw new OrleansException(string.Format("SuspectingSilos.Length of {0} as read from Azure table is not equal to SuspectingTimes.Length of {1}", suspectingSilos.Count, suspectingTimes.Count));
 
             for (int i = 0; i < suspectingSilos.Count; i++)
                 parse.AddSuspector(suspectingSilos[i], suspectingTimes[i]);
@@ -326,8 +326,8 @@ namespace Orleans.Runtime.MembershipService
             }
             else
             {
-                tableEntry.SuspectingSilos = String.Empty;
-                tableEntry.SuspectingTimes = String.Empty;
+                tableEntry.SuspectingSilos = string.Empty;
+                tableEntry.SuspectingTimes = string.Empty;
             }
             tableEntry.PartitionKey = deploymentId;
             tableEntry.RowKey = SiloInstanceTableEntry.ConstructRowKey(memEntry.SiloAddress);

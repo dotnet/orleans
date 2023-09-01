@@ -21,10 +21,10 @@ namespace Orleans.Serialization.TestKit
         public void Advance(int bytes) => _written += bytes;
 
         [Pure]
-        public readonly Memory<byte> GetMemory(int sizeHint = 0) => _buffer.AsMemory().Slice(_written);
+        public readonly Memory<byte> GetMemory(int sizeHint = 0) => _buffer.AsMemory()[_written..];
 
         [Pure]
-        public readonly Span<byte> GetSpan(int sizeHint) => _buffer.AsSpan().Slice(_written);
+        public readonly Span<byte> GetSpan(int sizeHint) => _buffer.AsSpan()[_written..];
 
         [Pure]
         public readonly ReadOnlySequence<byte> GetReadOnlySequence(int maxSegmentSize) => _buffer.Take(_written).Batch(maxSegmentSize).ToReadOnlySequence();

@@ -7,7 +7,6 @@ using System.Collections.Generic;
 using System.Linq;
 using Orleans.CodeGenerator.Diagnostics;
 using static Microsoft.CodeAnalysis.CSharp.SyntaxFactory;
-using System.Threading;
 
 namespace Orleans.CodeGenerator
 {

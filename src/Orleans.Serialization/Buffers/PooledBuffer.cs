@@ -205,9 +205,9 @@ public partial struct PooledBuffer : IBufferWriter<byte>, IDisposable
         while (true)
         {
             int writeSize = Math.Min(destination.Length, input.Length);
-            input.Slice(0, writeSize).CopyTo(destination);
+            input[..writeSize].CopyTo(destination);
             writer.Advance(writeSize);
-            input = input.Slice(writeSize);
+            input = input[writeSize..];
             if (input.Length > 0)
             {
                 destination = writer.GetSpan();
@@ -316,9 +316,9 @@ public partial struct PooledBuffer : IBufferWriter<byte>, IDisposable
         while (true)
         {
             var writeSize = Math.Min(destination.Length, input.Length);
-            input.Slice(0, writeSize).CopyTo(destination);
+            input[..writeSize].CopyTo(destination);
             Advance(writeSize);
-            input = input.Slice(writeSize);
+            input = input[writeSize..];
             if (input.Length > 0)
             {
                 destination = GetSpan();

@@ -1,15 +1,10 @@
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
-using System.Diagnostics.CodeAnalysis;
 using System.Linq.Expressions;
 using System.Text.Json;
-using System.Text.Json.Serialization;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.FSharp.Core;
 using Newtonsoft.Json;
 using Orleans;
-using Orleans.Serialization.UnitTests;
 
 [GenerateSerializer]
 public record Person([property: Id(0)] int Age, [property: Id(1)] string Name)
@@ -68,12 +63,12 @@ public sealed class MyJsonSerializableAttribute : Attribute
 {
 }
 
-interface IMyBase
+internal interface IMyBase
 {
     MyValue BaseValue { get; set; }
 }
 
-interface IMySub : IMyBase
+internal interface IMySub : IMyBase
 {
     MyValue SubValue { get; set; }
 }

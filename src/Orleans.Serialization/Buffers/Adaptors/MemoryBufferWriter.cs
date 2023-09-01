@@ -48,7 +48,7 @@ namespace Orleans.Serialization.Buffers.Adaptors
                 ThrowInsufficientCapacity(sizeHint);
             }
 
-            return _buffer.Slice(_bytesWritten);
+            return _buffer[_bytesWritten..];
         }
 
         /// <inheritdoc />
@@ -59,7 +59,7 @@ namespace Orleans.Serialization.Buffers.Adaptors
                 ThrowInsufficientCapacity(sizeHint);
             }
 
-            return _buffer.Span.Slice(_bytesWritten);
+            return _buffer.Span[_bytesWritten..];
         }
 
         private void ThrowInsufficientCapacity(int sizeHint) => throw new InvalidOperationException($"Insufficient capacity to perform the requested operation. Buffer size is {_buffer.Length}. Current length is {_bytesWritten} and requested size increase is {sizeHint}");
