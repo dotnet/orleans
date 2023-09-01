@@ -117,7 +117,7 @@ namespace UnitTests.Serialization
 
             Span<byte> lengthFields = stackalloc byte[8];
             BinaryPrimitives.WriteInt32LittleEndian(lengthFields, headerSize);
-            BinaryPrimitives.WriteInt32LittleEndian(lengthFields.Slice(4), bodySize);
+            BinaryPrimitives.WriteInt32LittleEndian(lengthFields[4..], bodySize);
             writer.Write(lengthFields);
             writer.FlushAsync().AsTask().GetAwaiter().GetResult();
 
