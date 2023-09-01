@@ -46,11 +46,11 @@ namespace UnitTests.StorageTests
             }
         }
 
-        const string DefaultGrainStateName = "state";
-        const string MockStorageProviderName1 = "test1";
-        const string MockStorageProviderName2 = "test2";
-        const string MockStorageProviderNameLowerCase = "lowercase";
-        const string ErrorInjectorProviderName = "ErrorInjector";
+        private const string DefaultGrainStateName = "state";
+        private const string MockStorageProviderName1 = "test1";
+        private const string MockStorageProviderName2 = "test2";
+        private const string MockStorageProviderNameLowerCase = "lowercase";
+        private const string ErrorInjectorProviderName = "ErrorInjector";
         private readonly ITestOutputHelper output;
 
         protected TestCluster HostedCluster { get; }
@@ -1277,7 +1277,7 @@ namespace UnitTests.StorageTests
             return providerState;
         }
 
-        class ProviderState
+        private class ProviderState
         {
             public MockStorageProvider.StateForTest ProviderStateForTest { get; set; }
             public PersistenceTestGrainState LastStoredGrainState { get; set; }

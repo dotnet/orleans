@@ -10,12 +10,12 @@ namespace UnitTestGrains
     public class TimerGrain : Grain, ITimerGrain
     {
         private bool deactivating;
-        int counter = 0;
-        Dictionary<string, IDisposable> allTimers;
-        IDisposable defaultTimer;
+        private int counter = 0;
+        private Dictionary<string, IDisposable> allTimers;
+        private IDisposable defaultTimer;
         private static readonly TimeSpan period = TimeSpan.FromMilliseconds(100);
-        readonly string DefaultTimerName = "DEFAULT TIMER";
-        IGrainContext context;
+        private readonly string DefaultTimerName = "DEFAULT TIMER";
+        private IGrainContext context;
 
         private readonly ILogger logger;
 

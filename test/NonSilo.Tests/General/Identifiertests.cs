@@ -17,8 +17,9 @@ namespace UnitTests.General
         private readonly TestEnvironmentFixture environment;
         private static Random random => Random.Shared;
 
-        class A { }
-        class B : A { }
+        private class A { }
+
+        private class B : A { }
         
         public IdentifierTests(ITestOutputHelper output, TestEnvironmentFixture fixture)
         {
