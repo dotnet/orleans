@@ -157,9 +157,9 @@ namespace Orleans.Serialization.Buffers
         {
             if (typeof(TBufferWriter).IsValueType)
             {
-                if (Output is IDisposable)
+                if (Output is IDisposable disposable)
                 {
-                    ((IDisposable)Output).Dispose();
+                    disposable.Dispose();
                 }
             }
             else
