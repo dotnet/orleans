@@ -190,7 +190,7 @@ namespace Orleans.GrainDirectory.AzureStorage
 
         internal static void ValidateTableName(string tableName)
         {
-            // Regular expression from documentation: https://docs.microsoft.com/rest/api/storageservices/understanding-the-table-service-data-model#table-names
+            // Regular expression from documentation: https://learn.microsoft.com/rest/api/storageservices/understanding-the-table-service-data-model#table-names
             if (!TableNameRegex().IsMatch(tableName))
             {
                 throw new ArgumentException($"Table name \"{tableName}\" is invalid according to the following rules:"
