@@ -26,7 +26,7 @@ namespace Orleans.Runtime
         /// </summary>
         /// <returns>A new stopwatch.</returns>
         public static CoarseStopwatch FromTimestamp(long timestamp) => new(timestamp);
-        
+
         private CoarseStopwatch(long timestamp)
         {
             _value = timestamp;
@@ -40,8 +40,8 @@ namespace Orleans.Runtime
         /// <summary>
         /// Returns true if this instance is running or false otherwise.
         /// </summary>
-        public bool IsRunning => _value > 0;
-        
+        public readonly bool IsRunning => _value > 0;
+
         /// <summary>
         /// Returns the elapsed time.
         /// </summary>
@@ -50,19 +50,19 @@ namespace Orleans.Runtime
         /// <summary>
         /// Returns a value indicating whether this instance has the default value.
         /// </summary>
-        public bool IsDefault => _value == 0;
+        public readonly bool IsDefault => _value == 0;
 
         /// <summary>
         /// Returns the elapsed ticks.
         /// </summary>
-        public long ElapsedMilliseconds
+        public readonly long ElapsedMilliseconds
         {
             get
             {
                 // A positive timestamp value indicates the start time of a running stopwatch,
                 // a negative value indicates the negative total duration of a stopped stopwatch.
                 var timestamp = _value;
-                
+
                 long delta;
                 if (IsRunning)
                 {
@@ -103,7 +103,7 @@ namespace Orleans.Runtime
         /// a negative value indicates the negative total duration of a stopped stopwatch.
         /// </remarks>
         /// <returns>The raw counter value.</returns>
-        public long GetRawTimestamp() => _value;
+        public readonly long GetRawTimestamp() => _value;
 
         /// <summary>
         /// Starts the stopwatch.
@@ -111,7 +111,7 @@ namespace Orleans.Runtime
         public void Start()
         {
             var timestamp = _value;
-            
+
             // If already started, do nothing.
             if (IsRunning) return;
 
@@ -148,10 +148,10 @@ namespace Orleans.Runtime
             _value = -delta;
         }
 
-        public override bool Equals(object obj) => obj is CoarseStopwatch stopwatch && _value == stopwatch._value;
-        public bool Equals(CoarseStopwatch other) => _value == other._value;
-        public override int GetHashCode() => HashCode.Combine(_value);
-        public static bool operator== (CoarseStopwatch left, CoarseStopwatch right) => left.Equals(right);
-        public static bool operator!= (CoarseStopwatch left, CoarseStopwatch right) => !left.Equals(right);
+        public override readonly bool Equals(object obj) => obj is CoarseStopwatch stopwatch && _value == stopwatch._value;
+        public readonly bool Equals(CoarseStopwatch other) => _value == other._value;
+        public override readonly int GetHashCode() => HashCode.Combine(_value);
+        public static bool operator ==(CoarseStopwatch left, CoarseStopwatch right) => left.Equals(right);
+        public static bool operator !=(CoarseStopwatch left, CoarseStopwatch right) => !left.Equals(right);
     }
 }

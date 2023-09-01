@@ -244,7 +244,7 @@ namespace Orleans.Runtime
             // don't set expiration for one way, system target and system grain messages.
             return Direction != Directions.OneWay && !id.IsSystemTarget();
         }
-        
+
         internal void AddToCacheInvalidationHeader(GrainAddress address)
         {
             var list = new List<GrainAddress>();
@@ -364,23 +364,23 @@ grow:
 
             public int ForwardCount
             {
-                get => (int)(_fields >> ForwardCountShift);
+                readonly get => (int)(_fields >> ForwardCountShift);
                 set => _fields = (_fields & ~ForwardCountMask) | (uint)value << ForwardCountShift;
             }
 
             public Directions Direction
             {
-                get => (Directions)((_fields & DirectionMask) >> DirectionShift);
+                readonly get => (Directions)((_fields & DirectionMask) >> DirectionShift);
                 set => _fields = (_fields & ~DirectionMask) | (uint)value << DirectionShift;
             }
 
             public ResponseTypes ResponseType
             {
-                get => (ResponseTypes)((_fields & ResponseTypeMask) >> ResponseTypeShift);
+                readonly get => (ResponseTypes)((_fields & ResponseTypeMask) >> ResponseTypeShift);
                 set => _fields = (_fields & ~ResponseTypeMask) | (uint)value << ResponseTypeShift;
             }
 
-            public bool HasFlag(MessageFlags flag) => (_fields & (uint)flag) != 0;
+            public readonly bool HasFlag(MessageFlags flag) => (_fields & (uint)flag) != 0;
 
             public void SetFlag(MessageFlags flag, bool value) => _fields = value switch
             {

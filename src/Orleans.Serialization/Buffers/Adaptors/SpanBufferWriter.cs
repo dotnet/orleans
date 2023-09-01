@@ -25,18 +25,18 @@ namespace Orleans.Serialization.Buffers.Adaptors
         /// Gets the number of bytes written.
         /// </summary>
         /// <value>The number of bytes written.</value>
-        public int BytesWritten => _bytesWritten;
+        public readonly int BytesWritten => _bytesWritten;
 
         /// <inheritdoc />
         public void Advance(int count) => _bytesWritten += count;
 
         /// <inheritdoc />
-        public Memory<byte> GetMemory(int sizeHint = 0) => throw GetException(sizeHint);
+        public readonly Memory<byte> GetMemory(int sizeHint = 0) => throw GetException(sizeHint);
 
         /// <inheritdoc />
-        public Span<byte> GetSpan(int sizeHint = 0) => throw GetException(sizeHint);
+        public readonly Span<byte> GetSpan(int sizeHint = 0) => throw GetException(sizeHint);
 
-        private Exception GetException(int sizeHint)
+        private readonly Exception GetException(int sizeHint)
         {
             return _bytesWritten + sizeHint > _maxLength
                 ? new InvalidOperationException($"Insufficient capacity to perform the requested operation. Buffer size is {_maxLength}. Current length is {_bytesWritten} and requested size increase is {sizeHint}")

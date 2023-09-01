@@ -32,7 +32,7 @@ public struct BufferSliceReaderInput
     internal readonly int Length => _slice._length;
     internal long PreviousBuffersSize;
 
-    internal BufferSliceReaderInput ForkFrom(int position)
+    internal readonly BufferSliceReaderInput ForkFrom(int position)
     {
         var sliced = _slice.Slice(position);
         return new BufferSliceReaderInput(in sliced);

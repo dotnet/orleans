@@ -153,7 +153,7 @@ namespace Orleans.Serialization.Buffers
 
         /// <inheritdoc/>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void Dispose()
+        public readonly void Dispose()
         {
             if (typeof(TBufferWriter).IsValueType)
             {
@@ -178,13 +178,13 @@ namespace Orleans.Serialization.Buffers
         /// Gets the position.
         /// </summary>
         /// <value>The position.</value>
-        public int Position => _previousBuffersSize + _bufferPos;
+        public readonly int Position => _previousBuffersSize + _bufferPos;
 
         /// <summary>
         /// Gets the current writable span.
         /// </summary>
         /// <value>The current writable span.</value>
-        public Span<byte> WritableSpan
+        public readonly Span<byte> WritableSpan
         {
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             get => _currentSpan.Slice(_bufferPos);

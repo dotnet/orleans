@@ -178,12 +178,12 @@ namespace UnitTests.GrainInterfaces
             this.ReadonlyField = readonlyField;
         }
 
-        public int GetValueWithPrivateGetter()
+        public readonly int GetValueWithPrivateGetter()
         {
             return this.ValueWithPrivateGetter;
         }
 
-        public int GetPrivateValue()
+        public readonly int GetPrivateValue()
         {
             return this.PrivateValue;
         }
