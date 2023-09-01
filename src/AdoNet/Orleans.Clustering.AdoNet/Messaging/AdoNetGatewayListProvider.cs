@@ -11,12 +11,13 @@ namespace Orleans.Runtime.Membership
 {
     public class AdoNetGatewayListProvider : IGatewayListProvider
     {
-        private readonly ILogger logger;
-        private readonly string clusterId;
-        private readonly AdoNetClusteringClientOptions options;
-        private RelationalOrleansQueries orleansQueries;
-        private readonly IServiceProvider serviceProvider;
-        private readonly TimeSpan maxStaleness;
+        private readonly ILogger _logger;
+        private readonly string _clusterId;
+        private readonly AdoNetClusteringClientOptions _options;
+        private RelationalOrleansQueries _orleansQueries;
+        private readonly IServiceProvider _serviceProvider;
+        private readonly TimeSpan _maxStaleness;
+
         public AdoNetGatewayListProvider(
             ILogger<AdoNetGatewayListProvider> logger, 
             IServiceProvider serviceProvider,
@@ -24,16 +25,16 @@ namespace Orleans.Runtime.Membership
             IOptions<GatewayOptions> gatewayOptions,
             IOptions<ClusterOptions> clusterOptions)
         {
-            this.logger = logger;
-            this.serviceProvider = serviceProvider;
-            this.options = options.Value;
-            this.clusterId = clusterOptions.Value.ClusterId;
-            this.maxStaleness = gatewayOptions.Value.GatewayListRefreshPeriod;
+            this._logger = logger;
+            this._serviceProvider = serviceProvider;
+            this._options = options.Value;
+            this._clusterId = clusterOptions.Value.ClusterId;
+            this._maxStaleness = gatewayOptions.Value.GatewayListRefreshPeriod;
         }
 
         public TimeSpan MaxStaleness
         {
-            get { return this.maxStaleness; }
+            get { return this._maxStaleness; }
         }
 
         public bool IsUpdatable
@@ -43,20 +44,20 @@ namespace Orleans.Runtime.Membership
 
         public async Task InitializeGatewayListProvider()
         {
-            if (logger.IsEnabled(LogLevel.Trace)) logger.LogTrace("AdoNetClusteringTable.InitializeGatewayListProvider called.");
-            orleansQueries = await RelationalOrleansQueries.CreateInstance(options.Invariant, options.ConnectionString);
+            if (_logger.IsEnabled(LogLevel.Trace)) _logger.LogTrace("AdoNetClusteringTable.InitializeGatewayListProvider called.");
+            _orleansQueries = await RelationalOrleansQueries.CreateInstance(_options.Invariant, _options.ConnectionString);
         }
 
         public async Task<IList<Uri>> GetGateways()
         {
-            if (logger.IsEnabled(LogLevel.Trace)) logger.LogTrace("AdoNetClusteringTable.GetGateways called.");
+            if (_logger.IsEnabled(LogLevel.Trace)) _logger.LogTrace("AdoNetClusteringTable.GetGateways called.");
             try
             {
-                return await orleansQueries.ActiveGatewaysAsync(this.clusterId);
+                return await _orleansQueries.ActiveGatewaysAsync(this._clusterId);
             }
             catch (Exception ex)
             {
-                if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug(ex, "AdoNetClusteringTable.Gateways failed");
+                if (_logger.IsEnabled(LogLevel.Debug)) _logger.LogDebug(ex, "AdoNetClusteringTable.Gateways failed");
                 throw;
             }
         }

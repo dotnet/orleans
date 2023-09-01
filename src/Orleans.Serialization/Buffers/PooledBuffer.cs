@@ -20,25 +20,25 @@ namespace Orleans.Serialization.Buffers;
 [Immutable]
 public partial struct PooledBuffer : IBufferWriter<byte>, IDisposable
 {
-    internal SequenceSegment _first;
-    internal SequenceSegment _last;
-    internal SequenceSegment _writeHead;
-    internal int _totalLength;
-    internal int _currentPosition;
+    internal SequenceSegment First;
+    internal SequenceSegment Last;
+    internal SequenceSegment WriteHead;
+    internal int TotalLength;
+    internal int CurrentPosition;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="PooledBuffer"/> struct.
     /// </summary>
     public PooledBuffer()
     {
-        _first = _last = null;
-        _writeHead = null;
-        _totalLength = 0;
-        _currentPosition = 0;
+        First = Last = null;
+        WriteHead = null;
+        TotalLength = 0;
+        CurrentPosition = 0;
     }
 
     /// <summary>Gets the total length which has been written.</summary>
-    public readonly int Length => _totalLength + _currentPosition;
+    public readonly int Length => TotalLength + CurrentPosition;
 
     /// <summary>
     /// Returns the data which has been written as an array.
@@ -48,7 +48,7 @@ public partial struct PooledBuffer : IBufferWriter<byte>, IDisposable
     {
         var result = new byte[Length];
         var resultSpan = result.AsSpan();
-        var current = _first;
+        var current = First;
         while (current != null)
         {
             var span = current.CommittedMemory.Span;
@@ -57,9 +57,9 @@ public partial struct PooledBuffer : IBufferWriter<byte>, IDisposable
             current = current.Next as SequenceSegment;
         }
 
-        if (_writeHead is not null && _currentPosition > 0)
+        if (WriteHead is not null && CurrentPosition > 0)
         {
-            _writeHead.Array.AsSpan(0, _currentPosition).CopyTo(resultSpan);
+            WriteHead.Array.AsSpan(0, CurrentPosition).CopyTo(resultSpan);
         }
 
         return result;
@@ -69,12 +69,12 @@ public partial struct PooledBuffer : IBufferWriter<byte>, IDisposable
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public void Advance(int bytes)
     {
-        if (_writeHead is null || _currentPosition > _writeHead.Array.Length)
+        if (WriteHead is null || CurrentPosition > WriteHead.Array.Length)
         {
             ThrowInvalidOperation();
         }
 
-        _currentPosition += bytes;
+        CurrentPosition += bytes;
 
         [DoesNotReturn]
         [MethodImpl(MethodImplOptions.NoInlining)]
@@ -86,19 +86,19 @@ public partial struct PooledBuffer : IBufferWriter<byte>, IDisposable
     /// </summary>
     public void Reset()
     {
-        var current = _first;
+        var current = First;
         while (current != null)
         {
             var previous = current;
             current = previous.Next as SequenceSegment;
             previous.Return();
-            Debug.Assert(current == null || current != _writeHead);
+            Debug.Assert(current == null || current != WriteHead);
         }
 
-        _writeHead?.Return();
+        WriteHead?.Return();
 
-        _first = _last = _writeHead = null;
-        _currentPosition = _totalLength = 0;
+        First = Last = WriteHead = null;
+        CurrentPosition = TotalLength = 0;
     }
 
     /// <inheritdoc/>
@@ -108,30 +108,30 @@ public partial struct PooledBuffer : IBufferWriter<byte>, IDisposable
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public Memory<byte> GetMemory(int sizeHint = 0)
     {
-        if (_writeHead is null || sizeHint >= _writeHead.Array.Length - _currentPosition)
+        if (WriteHead is null || sizeHint >= WriteHead.Array.Length - CurrentPosition)
         {
             return GetMemorySlow(sizeHint);
         }
 
-        return _writeHead.AsMemory(_currentPosition);
+        return WriteHead.AsMemory(CurrentPosition);
     }
 
     /// <inheritdoc/>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public Span<byte> GetSpan(int sizeHint = 0)
     {
-        if (_writeHead is null || sizeHint >= _writeHead.Array.Length - _currentPosition)
+        if (WriteHead is null || sizeHint >= WriteHead.Array.Length - CurrentPosition)
         {
             return GetSpanSlow(sizeHint);
         }
 
-        return _writeHead.Array.AsSpan(_currentPosition);
+        return WriteHead.Array.AsSpan(CurrentPosition);
     }
 
     /// <summary>Copies the contents of this writer to a span.</summary>
     public readonly void CopyTo(Span<byte> output)
     {
-        var current = _first;
+        var current = First;
         while (output.Length > 0 && current != null)
         {
             var segment = current.CommittedMemory.Span;
@@ -141,9 +141,9 @@ public partial struct PooledBuffer : IBufferWriter<byte>, IDisposable
             current = current.Next as SequenceSegment;
         }
 
-        if (output.Length > 0 && _currentPosition > 0 && _writeHead is not null)
+        if (output.Length > 0 && CurrentPosition > 0 && WriteHead is not null)
         {
-            var span = _writeHead.Array.AsSpan(0, Math.Min(output.Length, _currentPosition));
+            var span = WriteHead.Array.AsSpan(0, Math.Min(output.Length, CurrentPosition));
             span.CopyTo(output);
         }
     }
@@ -151,7 +151,7 @@ public partial struct PooledBuffer : IBufferWriter<byte>, IDisposable
     /// <summary>Copies the contents of this writer to another writer.</summary>
     public readonly void CopyTo<TBufferWriter>(ref Writer<TBufferWriter> writer) where TBufferWriter : IBufferWriter<byte>
     {
-        var current = _first;
+        var current = First;
         while (current != null)
         {
             var span = current.CommittedMemory.Span;
@@ -159,16 +159,16 @@ public partial struct PooledBuffer : IBufferWriter<byte>, IDisposable
             current = current.Next as SequenceSegment;
         }
 
-        if (_currentPosition > 0 && _writeHead is not null)
+        if (CurrentPosition > 0 && WriteHead is not null)
         {
-            writer.Write(_writeHead.Array.AsSpan(0, _currentPosition));
+            writer.Write(WriteHead.Array.AsSpan(0, CurrentPosition));
         }
     }
 
     /// <summary>Copies the contents of this writer to another writer.</summary>
     public readonly void CopyTo<TBufferWriter>(ref TBufferWriter writer) where TBufferWriter : IBufferWriter<byte>
     {
-        var current = _first;
+        var current = First;
         while (current != null)
         {
             var span = current.CommittedMemory.Span;
@@ -176,9 +176,9 @@ public partial struct PooledBuffer : IBufferWriter<byte>, IDisposable
             current = current.Next as SequenceSegment;
         }
 
-        if (_currentPosition > 0 && _writeHead is not null)
+        if (CurrentPosition > 0 && WriteHead is not null)
         {
-            Write(ref writer, _writeHead.Array.AsSpan(0, _currentPosition));
+            Write(ref writer, WriteHead.Array.AsSpan(0, CurrentPosition));
         }
     }
 
@@ -235,12 +235,12 @@ public partial struct PooledBuffer : IBufferWriter<byte>, IDisposable
         }
 
         Commit();
-        if (_first == _last)
+        if (First == Last)
         {
-            return new ReadOnlySequence<byte>(_first!.CommittedMemory);
+            return new ReadOnlySequence<byte>(First!.CommittedMemory);
         }
 
-        return new ReadOnlySequence<byte>(_first!, 0, _last!, _last!.CommittedMemory.Length);
+        return new ReadOnlySequence<byte>(First!, 0, Last!, Last!.CommittedMemory.Length);
     }
 
     /// <summary>
@@ -340,31 +340,31 @@ public partial struct PooledBuffer : IBufferWriter<byte>, IDisposable
     {
         Commit();
         var newBuffer = SequenceSegmentPool.Shared.Rent(sizeHint);
-        return _writeHead = newBuffer;
+        return WriteHead = newBuffer;
     }
 
     private void Commit()
     {
-        if (_currentPosition == 0 || _writeHead is null)
+        if (CurrentPosition == 0 || WriteHead is null)
         {
             return;
         }
 
-        _writeHead.Commit(_totalLength, _currentPosition);
-        _totalLength += _currentPosition;
-        if (_first is null)
+        WriteHead.Commit(TotalLength, CurrentPosition);
+        TotalLength += CurrentPosition;
+        if (First is null)
         {
-            _first = _writeHead;
+            First = WriteHead;
         }
         else
         {
-            Debug.Assert(_last is not null);
-            _last.SetNext(_writeHead);
+            Debug.Assert(Last is not null);
+            Last.SetNext(WriteHead);
         }
 
-        _last = _writeHead;
-        _writeHead = null;
-        _currentPosition = 0;
+        Last = WriteHead;
+        WriteHead = null;
+        CurrentPosition = 0;
     }
 
     /// <summary>
@@ -372,9 +372,11 @@ public partial struct PooledBuffer : IBufferWriter<byte>, IDisposable
     /// </summary>
     public readonly struct BufferSlice
     {
+#pragma warning disable IDE1006 // Naming Styles
         internal readonly PooledBuffer _buffer;
         internal readonly int _offset;
         internal readonly int _length;
+#pragma warning restore IDE1006 // Naming Styles
 
         /// <summary>
         /// Initializes a new instance of the <see cref="BufferSlice"/> type.
@@ -508,7 +510,7 @@ public partial struct PooledBuffer : IBufferWriter<byte>, IDisposable
             {
                 if (ReferenceEquals(_segment, InitialSegmentSentinel))
                 {
-                    _segment = Buffer._first;
+                    _segment = Buffer.First;
                 }
 
                 var endPosition = Offset + Length;
@@ -555,10 +557,10 @@ public partial struct PooledBuffer : IBufferWriter<byte>, IDisposable
                 // Account for the uncommitted data at the end of the buffer.
                 // The write head is only linked to the previous buffers when Commit() is called and it is set to null afterwards,
                 // meaning that if the write head is not null, the other buffers are not linked to it and it therefore has not been enumerated.
-                if (_segment != FinalSegmentSentinel && Buffer._currentPosition > 0 && Buffer._writeHead is { } head && _position < endPosition)
+                if (_segment != FinalSegmentSentinel && Buffer.CurrentPosition > 0 && Buffer.WriteHead is { } head && _position < endPosition)
                 {
                     var finalOffset = Math.Max(Offset - _position, 0);
-                    var finalLength = Math.Min(Buffer._currentPosition, endPosition - (_position + finalOffset));
+                    var finalLength = Math.Min(Buffer.CurrentPosition, endPosition - (_position + finalOffset));
                     if (finalLength == 0)
                     {
                         Current = Span<byte>.Empty;

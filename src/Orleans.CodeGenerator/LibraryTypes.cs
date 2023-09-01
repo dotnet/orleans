@@ -67,18 +67,18 @@ namespace Orleans.CodeGenerator
             Task = Type("System.Threading.Tasks.Task");
             Task_1 = Type("System.Threading.Tasks.Task`1");
             this.Type = Type("System.Type");
-            Uri = Type("System.Uri");
-            Int128 = TypeOrDefault("System.Int128");
-            UInt128 = TypeOrDefault("System.UInt128");
-            Half = TypeOrDefault("System.Half");
-            DateOnly = TypeOrDefault("System.DateOnly");
-            DateTimeOffset = Type("System.DateTimeOffset");
-            BitVector32 = Type("System.Collections.Specialized.BitVector32");
-            Guid = Type("System.Guid");
-            CompareInfo = Type("System.Globalization.CompareInfo");
-            CultureInfo = Type("System.Globalization.CultureInfo");
-            Version = Type("System.Version");
-            TimeOnly = TypeOrDefault("System.TimeOnly");
+            _uri = Type("System.Uri");
+            _int128 = TypeOrDefault("System.Int128");
+            _uInt128 = TypeOrDefault("System.UInt128");
+            _half = TypeOrDefault("System.Half");
+            _dateOnly = TypeOrDefault("System.DateOnly");
+            _dateTimeOffset = Type("System.DateTimeOffset");
+            _bitVector32 = Type("System.Collections.Specialized.BitVector32");
+            _guid = Type("System.Guid");
+            _compareInfo = Type("System.Globalization.CompareInfo");
+            _cultureInfo = Type("System.Globalization.CultureInfo");
+            _version = Type("System.Version");
+            _timeOnly = TypeOrDefault("System.TimeOnly");
             ICodecProvider = Type("Orleans.Serialization.Serializers.ICodecProvider");
             ValueSerializer = Type("Orleans.Serialization.Serializers.IValueSerializer`1");
             ValueTask = Type("System.Threading.Tasks.ValueTask");
@@ -148,10 +148,10 @@ namespace Orleans.CodeGenerator
             Exception = Type("System.Exception");
             ImmutableAttributes = options.ImmutableAttributes.Select(Type).ToArray();
             TimeSpan = Type("System.TimeSpan");
-            IPAddress = Type("System.Net.IPAddress");
-            IPEndPoint = Type("System.Net.IPEndPoint");
-            CancellationToken = Type("System.Threading.CancellationToken");
-            ImmutableContainerTypes = new[]
+            _ipAddress = Type("System.Net.IPAddress");
+            _ipEndPoint = Type("System.Net.IPEndPoint");
+            _cancellationToken = Type("System.Threading.CancellationToken");
+            _immutableContainerTypes = new[]
             {
                     compilation.GetSpecialType(SpecialType.System_Nullable_T),
                     Type("System.Tuple`1"),
@@ -227,10 +227,10 @@ namespace Orleans.CodeGenerator
         public INamedTypeSymbol Task { get; private set; }
         public INamedTypeSymbol Task_1 { get; private set; }
         public INamedTypeSymbol Type { get; private set; }
-        private readonly INamedTypeSymbol Uri;
-        private readonly INamedTypeSymbol? DateOnly;
-        private readonly INamedTypeSymbol DateTimeOffset;
-        private readonly INamedTypeSymbol? TimeOnly;
+        private INamedTypeSymbol _uri;
+        private INamedTypeSymbol? _dateOnly;
+        private INamedTypeSymbol _dateTimeOffset;
+        private INamedTypeSymbol? _timeOnly;
         public INamedTypeSymbol MethodInfo { get; private set; }
         public INamedTypeSymbol ICodecProvider { get; private set; }
         public INamedTypeSymbol ValueSerializer { get; private set; }
@@ -257,38 +257,38 @@ namespace Orleans.CodeGenerator
         public INamedTypeSymbol CopyContext { get; private set; }
         public Compilation Compilation { get; private set; }
         public INamedTypeSymbol TimeSpan { get; private set; }
-        private readonly INamedTypeSymbol IPAddress;
-        private readonly INamedTypeSymbol IPEndPoint;
-        private readonly INamedTypeSymbol CancellationToken;
-        private readonly INamedTypeSymbol[] ImmutableContainerTypes;
-        private readonly INamedTypeSymbol Guid;
-        private readonly INamedTypeSymbol BitVector32;
-        private readonly INamedTypeSymbol CompareInfo;
-        private readonly INamedTypeSymbol CultureInfo;
-        private readonly INamedTypeSymbol Version;
-        private readonly INamedTypeSymbol? Int128;
-        private readonly INamedTypeSymbol? UInt128;
-        private readonly INamedTypeSymbol? Half;
+        private INamedTypeSymbol _ipAddress;
+        private INamedTypeSymbol _ipEndPoint;
+        private INamedTypeSymbol _cancellationToken;
+        private INamedTypeSymbol[] _immutableContainerTypes;
+        private INamedTypeSymbol _guid;
+        private INamedTypeSymbol _bitVector32;
+        private INamedTypeSymbol _compareInfo;
+        private INamedTypeSymbol _cultureInfo;
+        private INamedTypeSymbol _version;
+        private INamedTypeSymbol? _int128;
+        private INamedTypeSymbol? _uInt128;
+        private INamedTypeSymbol? _half;
         private INamedTypeSymbol[]? _regularShallowCopyableTypes;
         private INamedTypeSymbol[] RegularShallowCopyableType => _regularShallowCopyableTypes ??= new List<INamedTypeSymbol?>
         {
             TimeSpan,
-            DateOnly,
-            TimeOnly,
-            DateTimeOffset,
-            Guid,
-            BitVector32,
-            CompareInfo,
-            CultureInfo,
-            Version,
-            IPAddress,
-            IPEndPoint,
-            CancellationToken,
+            _dateOnly,
+            _timeOnly,
+            _dateTimeOffset,
+            _guid,
+            _bitVector32,
+            _compareInfo,
+            _cultureInfo,
+            _version,
+            _ipAddress,
+            _ipEndPoint,
+            _cancellationToken,
             Type,
-            Uri,
-            UInt128,
-            Int128,
-            Half
+            _uri,
+            _uInt128,
+            _int128,
+            _half
         }.Where(t => t is {}).ToArray()!;
 
         public INamedTypeSymbol[] ImmutableAttributes { get; private set; }
@@ -368,7 +368,7 @@ namespace Orleans.CodeGenerator
             else if (namedType.IsGenericType)
             {
                 var def = namedType.ConstructedFrom;
-                foreach (var t in ImmutableContainerTypes)
+                foreach (var t in _immutableContainerTypes)
                 {
                     if (SymbolEqualityComparer.Default.Equals(t, def))
                         return _shallowCopyableTypes[type] = AreShallowCopyable(namedType.TypeArguments);

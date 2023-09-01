@@ -88,7 +88,7 @@ namespace Orleans.Serialization.WireProtocol
         public Type FieldType
         {
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            get
+            readonly get
             {
 #if DEBUG
                 if (!IsSchemaTypeValid)

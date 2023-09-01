@@ -25,7 +25,7 @@ namespace Orleans.Serialization.Buffers.Adaptors
         /// Gets the number of bytes written.
         /// </summary>
         /// <value>The number of bytes written.</value>
-        public int BytesWritten => _bytesWritten;
+        public readonly int BytesWritten => _bytesWritten;
 
         /// <inheritdoc />
         public void Advance(int count)
