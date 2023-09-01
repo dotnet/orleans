@@ -227,10 +227,10 @@ namespace Orleans.CodeGenerator
         public INamedTypeSymbol Task { get; private set; }
         public INamedTypeSymbol Task_1 { get; private set; }
         public INamedTypeSymbol Type { get; private set; }
-        private INamedTypeSymbol Uri;
-        private INamedTypeSymbol? DateOnly;
-        private INamedTypeSymbol DateTimeOffset;
-        private INamedTypeSymbol? TimeOnly;
+        private readonly INamedTypeSymbol Uri;
+        private readonly INamedTypeSymbol? DateOnly;
+        private readonly INamedTypeSymbol DateTimeOffset;
+        private readonly INamedTypeSymbol? TimeOnly;
         public INamedTypeSymbol MethodInfo { get; private set; }
         public INamedTypeSymbol ICodecProvider { get; private set; }
         public INamedTypeSymbol ValueSerializer { get; private set; }
@@ -257,18 +257,18 @@ namespace Orleans.CodeGenerator
         public INamedTypeSymbol CopyContext { get; private set; }
         public Compilation Compilation { get; private set; }
         public INamedTypeSymbol TimeSpan { get; private set; }
-        private INamedTypeSymbol IPAddress;
-        private INamedTypeSymbol IPEndPoint;
-        private INamedTypeSymbol CancellationToken;
-        private INamedTypeSymbol[] ImmutableContainerTypes;
-        private INamedTypeSymbol Guid;
-        private INamedTypeSymbol BitVector32;
-        private INamedTypeSymbol CompareInfo;
-        private INamedTypeSymbol CultureInfo;
-        private INamedTypeSymbol Version;
-        private INamedTypeSymbol? Int128;
-        private INamedTypeSymbol? UInt128;
-        private INamedTypeSymbol? Half;
+        private readonly INamedTypeSymbol IPAddress;
+        private readonly INamedTypeSymbol IPEndPoint;
+        private readonly INamedTypeSymbol CancellationToken;
+        private readonly INamedTypeSymbol[] ImmutableContainerTypes;
+        private readonly INamedTypeSymbol Guid;
+        private readonly INamedTypeSymbol BitVector32;
+        private readonly INamedTypeSymbol CompareInfo;
+        private readonly INamedTypeSymbol CultureInfo;
+        private readonly INamedTypeSymbol Version;
+        private readonly INamedTypeSymbol? Int128;
+        private readonly INamedTypeSymbol? UInt128;
+        private readonly INamedTypeSymbol? Half;
         private INamedTypeSymbol[]? _regularShallowCopyableTypes;
         private INamedTypeSymbol[] RegularShallowCopyableType => _regularShallowCopyableTypes ??= new List<INamedTypeSymbol?>
         {
