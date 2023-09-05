@@ -155,11 +155,12 @@ namespace Orleans.Serialization.Buffers
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void Dispose()
         {
+            // Avoid boxing the struct, for better perf and codegen.
             if (typeof(TBufferWriter).IsValueType)
             {
-                if (Output is IDisposable disposable)
+                if (Output is IDisposable)
                 {
-                    disposable.Dispose();
+                    ((IDisposable)Output).Dispose();
                 }
             }
             else
