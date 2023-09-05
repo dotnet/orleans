@@ -9,6 +9,7 @@ namespace Orleans.Serialization.Buffers.Adaptors
     public struct SpanBufferWriter : IBufferWriter<byte>
     {
         private readonly int _maxLength;
+        private int _bytesWritten;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="SpanBufferWriter"/> struct.
@@ -17,28 +18,28 @@ namespace Orleans.Serialization.Buffers.Adaptors
         internal SpanBufferWriter(Span<byte> buffer)
         {
             _maxLength = buffer.Length;
-            BytesWritten = 0;
+            _bytesWritten = 0;
         }
 
         /// <summary>
         /// Gets the number of bytes written.
         /// </summary>
         /// <value>The number of bytes written.</value>
-        public int BytesWritten { get; private set; }
+        public readonly int BytesWritten => _bytesWritten;
 
         /// <inheritdoc />
-        public void Advance(int count) => BytesWritten += count;
+        public void Advance(int count) => _bytesWritten += count;
 
         /// <inheritdoc />
-        public Memory<byte> GetMemory(int sizeHint = 0) => throw GetException(sizeHint);
+        public readonly Memory<byte> GetMemory(int sizeHint = 0) => throw GetException(sizeHint);
 
         /// <inheritdoc />
-        public Span<byte> GetSpan(int sizeHint = 0) => throw GetException(sizeHint);
+        public readonly Span<byte> GetSpan(int sizeHint = 0) => throw GetException(sizeHint);
 
-        private Exception GetException(int sizeHint)
+        private readonly Exception GetException(int sizeHint)
         {
-            return BytesWritten + sizeHint > _maxLength
-                ? new InvalidOperationException($"Insufficient capacity to perform the requested operation. Buffer size is {_maxLength}. Current length is {BytesWritten} and requested size increase is {sizeHint}")
+            return _bytesWritten + sizeHint > _maxLength
+                ? new InvalidOperationException($"Insufficient capacity to perform the requested operation. Buffer size is {_maxLength}. Current length is {_bytesWritten} and requested size increase is {sizeHint}")
                 : new NotSupportedException("Method is not supported on this instance");
         }
     }

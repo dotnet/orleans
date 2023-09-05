@@ -56,6 +56,8 @@ namespace Orleans.Runtime.Messaging
         /// </summary>
         private Sequence privateWriter;
 
+        private int _committedBytes;
+
         /// <summary>
         /// Initializes a new instance of the <see cref="PrefixingBufferWriter"/> class.
         /// </summary>
@@ -75,7 +77,7 @@ namespace Orleans.Runtime.Messaging
             static void ThrowPrefixSize() => throw new ArgumentOutOfRangeException(nameof(prefixSize));
         }
 
-        public int CommittedBytes { get; private set; }
+        public int CommittedBytes => _committedBytes;
 
         /// <inheritdoc />
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -84,7 +86,7 @@ namespace Orleans.Runtime.Messaging
             if (privateWriter == null)
             {
                 advanced += count;
-                CommittedBytes += count;
+                _committedBytes += count;
             }
             else
             {
@@ -96,7 +98,7 @@ namespace Orleans.Runtime.Messaging
         private void AdvancePrivateWriter(int count)
         {
             privateWriter.Advance(count);
-            CommittedBytes += count;
+            _committedBytes += count;
         }
 
         /// <inheritdoc />
@@ -107,7 +109,7 @@ namespace Orleans.Runtime.Messaging
                 if (prefixMemory.IsEmpty)
                     Initialize(sizeHint);
 
-                var res = realMemory.Slice(advanced);
+                var res = realMemory[advanced..];
                 if (!res.IsEmpty && (uint)sizeHint <= (uint)res.Length)
                     return res;
 
@@ -122,7 +124,7 @@ namespace Orleans.Runtime.Messaging
         {
             if (privateWriter == null)
             {
-                var res = realMemory.Span.Slice(advanced);
+                var res = realMemory.Span[advanced..];
                 if ((uint)sizeHint < (uint)res.Length)
                     return res;
             }
@@ -182,7 +184,7 @@ namespace Orleans.Runtime.Messaging
             realMemory = default;
             innerWriter = null;
             advanced = 0;
-            CommittedBytes = 0;
+            _committedBytes = 0;
         }
 
         public void Dispose()
@@ -198,8 +200,8 @@ namespace Orleans.Runtime.Messaging
         {
             int sizeToRequest = this.expectedPrefixSize + Math.Max(sizeHint, this.payloadSizeHint);
             var memory = this.innerWriter.GetMemory(sizeToRequest);
-            this.prefixMemory = memory.Slice(0, this.expectedPrefixSize);
-            this.realMemory = memory.Slice(this.expectedPrefixSize);
+            this.prefixMemory = memory[..this.expectedPrefixSize];
+            this.realMemory = memory[this.expectedPrefixSize..];
         }
 
         /// <summary>
@@ -350,7 +352,7 @@ namespace Orleans.Runtime.Messaging
                 /// </remarks>
                 internal int End { get; private set; }
 
-                internal Memory<byte> TrailingSlack => this.AvailableMemory.Slice(this.End);
+                internal Memory<byte> TrailingSlack => this.AvailableMemory[this.End..];
 
                 private IMemoryOwner<byte> MemoryOwner;
 
@@ -397,7 +399,7 @@ namespace Orleans.Runtime.Messaging
                     // If we ever support creating these instances on existing arrays, such that
                     // this.Start isn't 0 at the beginning, we'll have to "pin" this.Start and remove
                     // Advance, forcing Sequence<T> itself to track it, the way Pipe does it internally.
-                    this.Memory = AvailableMemory.Slice(0, value);
+                    this.Memory = AvailableMemory[..value];
                     this.End = value;
 
                     static void ThrowNegative() => throw new ArgumentOutOfRangeException(
