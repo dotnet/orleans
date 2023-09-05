@@ -1,11 +1,6 @@
 //#define REREAD_STATE_AFTER_WRITE_FAILED
 
-using System;
-using System.Collections.Generic;
 using System.Diagnostics;
-using System.Linq;
-using System.Threading.Tasks;
-using Orleans;
 using Orleans.Runtime;
 using Orleans.Storage;
 using Orleans.TestingHost;
@@ -15,7 +10,6 @@ using Xunit;
 using Xunit.Abstractions;
 using TesterInternal;
 using TestExtensions;
-using Orleans.Hosting;
 using Orleans.Internal;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -52,11 +46,11 @@ namespace UnitTests.StorageTests
             }
         }
 
-        const string DefaultGrainStateName = "state";
-        const string MockStorageProviderName1 = "test1";
-        const string MockStorageProviderName2 = "test2";
-        const string MockStorageProviderNameLowerCase = "lowercase";
-        const string ErrorInjectorProviderName = "ErrorInjector";
+        private const string DefaultGrainStateName = "state";
+        private const string MockStorageProviderName1 = "test1";
+        private const string MockStorageProviderName2 = "test2";
+        private const string MockStorageProviderNameLowerCase = "lowercase";
+        private const string ErrorInjectorProviderName = "ErrorInjector";
         private readonly ITestOutputHelper output;
 
         protected TestCluster HostedCluster { get; }
@@ -313,12 +307,11 @@ namespace UnitTests.StorageTests
             {
                 IMemoryStorageTestGrain grain = this.HostedCluster.GrainFactory.GetGrain<IMemoryStorageTestGrain>(Guid.NewGuid());
                 int idx = i; // Capture
-                Func<Task<int>> asyncFunc =
-                    async () =>
-                    {
-                        await grain.DoWrite(idx);
-                        return await grain.DoRead();
-                    };
+                async Task<int> asyncFunc()
+                {
+                    await grain.DoWrite(idx);
+                    return await grain.DoRead();
+                }
                 promises[i] = Task.Run(asyncFunc);
             }
             await Task.WhenAll(promises);
@@ -1284,7 +1277,7 @@ namespace UnitTests.StorageTests
             return providerState;
         }
 
-        class ProviderState
+        private class ProviderState
         {
             public MockStorageProvider.StateForTest ProviderStateForTest { get; set; }
             public PersistenceTestGrainState LastStoredGrainState { get; set; }

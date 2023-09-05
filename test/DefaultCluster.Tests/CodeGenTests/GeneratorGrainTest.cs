@@ -1,7 +1,4 @@
-using System;
 using System.Text;
-using System.Threading.Tasks;
-using Orleans;
 using TestExtensions;
 using UnitTests.GrainInterfaces;
 using UnitTests.Grains;
@@ -180,7 +177,7 @@ namespace Tester.CodeGenTests
             Assert.Equal(new[] { typeof(IGrain), typeof(string) }, await grain.GetTypesInferred(default(IGrain), default(string), 0));
             var now = DateTime.Now;
             Assert.Equal(now, await grain.RoundTrip(now));
-            Assert.Equal(default(DateTime), await grain.Default<DateTime>());
+            Assert.Equal(default, await grain.Default<DateTime>());
 
             Assert.Equal(grain, await grain.Constraints(grain));
         }

@@ -1,10 +1,6 @@
-using System;
 using System.Buffers;
 using System.Buffers.Binary;
-using System.Collections.Generic;
 using System.IO.Pipelines;
-using System.Net;
-using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Orleans.CodeGeneration;
@@ -117,7 +113,7 @@ namespace UnitTests.Serialization
 
             Span<byte> lengthFields = stackalloc byte[8];
             BinaryPrimitives.WriteInt32LittleEndian(lengthFields, headerSize);
-            BinaryPrimitives.WriteInt32LittleEndian(lengthFields.Slice(4), bodySize);
+            BinaryPrimitives.WriteInt32LittleEndian(lengthFields[4..], bodySize);
             writer.Write(lengthFields);
             writer.FlushAsync().AsTask().GetAwaiter().GetResult();
 

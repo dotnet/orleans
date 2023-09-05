@@ -1,6 +1,4 @@
-﻿using System.Threading.Tasks;
-
-namespace UnitTests.Grains
+﻿namespace UnitTests.Grains
 {
     public class CodeGenTestPoco
     {

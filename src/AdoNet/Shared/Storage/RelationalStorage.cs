@@ -23,31 +23,29 @@ namespace Orleans.Tests.SqlUtils
     /// A general purpose class to work with a given relational database and ADO.NET provider.
     /// </summary>
     [DebuggerDisplay("InvariantName = {InvariantName}, ConnectionString = {ConnectionString}")]
-    internal class RelationalStorage: IRelationalStorage
+    internal class RelationalStorage : IRelationalStorage
     {
-
         /// <summary>
         /// The invariant name of the connector for this database.
         /// </summary>
-        private readonly string invariantName;
+        private readonly string _invariantName;
 
         /// <summary>
         /// If the ADO.NET provider of this storage supports cancellation or not. This
         /// capability is queried and the result is cached here.
         /// </summary>
-        private readonly bool supportsCommandCancellation;
+        private readonly bool _supportsCommandCancellation;
 
         /// <summary>
         /// If the underlying ADO.NET implementation is natively asynchronous
         /// (the ADO.NET Db*.XXXAsync classes are overridden) or not.
         /// </summary>
-        private readonly bool isSynchronousAdoNetImplementation;
+        private readonly bool _isSynchronousAdoNetImplementation;
 
         /// <summary>
         /// Command interceptor for the given data provider.
         /// </summary>
-        private readonly ICommandInterceptor databaseCommandInterceptor;
-
+        private readonly ICommandInterceptor _databaseCommandInterceptor;
 
         /// <summary>
         /// The invariant name of the connector for this database.
@@ -56,7 +54,7 @@ namespace Orleans.Tests.SqlUtils
         {
             get
             {
-                return invariantName;
+                return _invariantName;
             }
         }
 
@@ -66,7 +64,6 @@ namespace Orleans.Tests.SqlUtils
         /// </summary>
         public string ConnectionString { get; }
 
-
         /// <summary>
         /// Creates an instance of a database of type <see cref="IRelationalStorage"/>.
         /// </summary>
@@ -75,12 +72,12 @@ namespace Orleans.Tests.SqlUtils
         /// <returns></returns>
         public static IRelationalStorage CreateInstance(string invariantName, string connectionString)
         {
-            if(string.IsNullOrWhiteSpace(invariantName))
+            if (string.IsNullOrWhiteSpace(invariantName))
             {
                 throw new ArgumentException("The name of invariant must contain characters", nameof(invariantName));
             }
 
-            if(string.IsNullOrWhiteSpace(connectionString))
+            if (string.IsNullOrWhiteSpace(connectionString))
             {
                 throw new ArgumentException("Connection string must contain characters", nameof(connectionString));
             }
@@ -138,15 +135,15 @@ namespace Orleans.Tests.SqlUtils
         ///}).ConfigureAwait(continueOnCapturedContext: false);
         /// </code>
         /// </example>
-        public async Task<IEnumerable<TResult>> ReadAsync<TResult>(string query, Action<IDbCommand> parameterProvider, Func<IDataRecord, int, CancellationToken, Task<TResult>> selector, CommandBehavior commandBehavior = CommandBehavior.Default, CancellationToken cancellationToken = default(CancellationToken))
+        public async Task<IEnumerable<TResult>> ReadAsync<TResult>(string query, Action<IDbCommand> parameterProvider, Func<IDataRecord, int, CancellationToken, Task<TResult>> selector, CommandBehavior commandBehavior = CommandBehavior.Default, CancellationToken cancellationToken = default)
         {
             //If the query is something else that is not acceptable (e.g. an empty string), there will an appropriate database exception.
-            if(query == null)
+            if (query == null)
             {
                 throw new ArgumentNullException(nameof(query));
             }
 
-            if(selector == null)
+            if (selector == null)
             {
                 throw new ArgumentNullException(nameof(selector));
             }
@@ -176,10 +173,10 @@ namespace Orleans.Tests.SqlUtils
         /// }).ConfigureAwait(continueOnCapturedContext: false);
         /// </code>
         /// </example>
-        public async Task<int> ExecuteAsync(string query, Action<IDbCommand> parameterProvider, CommandBehavior commandBehavior = CommandBehavior.Default, CancellationToken cancellationToken = default(CancellationToken))
+        public async Task<int> ExecuteAsync(string query, Action<IDbCommand> parameterProvider, CommandBehavior commandBehavior = CommandBehavior.Default, CancellationToken cancellationToken = default)
         {
             //If the query is something else that is not acceptable (e.g. an empty string), there will an appropriate database exception.
-            if(query == null)
+            if (query == null)
             {
                 throw new ArgumentNullException(nameof(query));
             }
@@ -195,19 +192,19 @@ namespace Orleans.Tests.SqlUtils
         private RelationalStorage(string invariantName, string connectionString)
         {
             this.ConnectionString = connectionString;
-            this.invariantName = invariantName;
-            supportsCommandCancellation = DbConstantsStore.SupportsCommandCancellation(InvariantName);
-            isSynchronousAdoNetImplementation = DbConstantsStore.IsSynchronousAdoNetImplementation(InvariantName);
-            this.databaseCommandInterceptor = DbConstantsStore.GetDatabaseCommandInterceptor(InvariantName);
+            this._invariantName = invariantName;
+            _supportsCommandCancellation = DbConstantsStore.SupportsCommandCancellation(InvariantName);
+            _isSynchronousAdoNetImplementation = DbConstantsStore.IsSynchronousAdoNetImplementation(InvariantName);
+            this._databaseCommandInterceptor = DbConstantsStore.GetDatabaseCommandInterceptor(InvariantName);
         }
 
         private static async Task<Tuple<IEnumerable<TResult>, int>> SelectAsync<TResult>(DbDataReader reader, Func<IDataReader, int, CancellationToken, Task<TResult>> selector, CancellationToken cancellationToken)
         {
             var results = new List<TResult>();
             int resultSetCount = 0;
-            while(reader.HasRows)
+            while (reader.HasRows)
             {
-                while(await reader.ReadAsync(cancellationToken).ConfigureAwait(continueOnCapturedContext: false))
+                while (await reader.ReadAsync(cancellationToken).ConfigureAwait(continueOnCapturedContext: false))
                 {
                     var obj = await selector(reader, resultSetCount, cancellationToken).ConfigureAwait(false);
                     results.Add(obj);
@@ -223,12 +220,12 @@ namespace Orleans.Tests.SqlUtils
 
         private async Task<Tuple<IEnumerable<TResult>, int>> ExecuteReaderAsync<TResult>(DbCommand command, Func<IDataRecord, int, CancellationToken, Task<TResult>> selector, CommandBehavior commandBehavior, CancellationToken cancellationToken)
         {
-            using(var reader = await command.ExecuteReaderAsync(commandBehavior, cancellationToken).ConfigureAwait(continueOnCapturedContext: false))
+            using (var reader = await command.ExecuteReaderAsync(commandBehavior, cancellationToken).ConfigureAwait(continueOnCapturedContext: false))
             {
-                CancellationTokenRegistration cancellationRegistration = default(CancellationTokenRegistration);
+                CancellationTokenRegistration cancellationRegistration = default;
                 try
                 {
-                    if(cancellationToken.CanBeCanceled && supportsCommandCancellation)
+                    if (cancellationToken.CanBeCanceled && _supportsCommandCancellation)
                     {
                         cancellationRegistration = cancellationToken.Register(CommandCancellation, Tuple.Create(reader, command), useSynchronizationContext: false);
                     }
@@ -253,15 +250,15 @@ namespace Orleans.Tests.SqlUtils
             using (var connection = DbConnectionFactory.CreateConnection(invariantName, ConnectionString))
             {
                 await connection.OpenAsync(cancellationToken).ConfigureAwait(continueOnCapturedContext: false);
-                using(var command = connection.CreateCommand())
+                using (var command = connection.CreateCommand())
                 {
                     parameterProvider?.Invoke(command);
                     command.CommandText = query;
 
-                    databaseCommandInterceptor.Intercept(command);
+                    _databaseCommandInterceptor.Intercept(command);
 
                     Task<Tuple<IEnumerable<TResult>, int>> ret;
-                    if(isSynchronousAdoNetImplementation)
+                    if (_isSynchronousAdoNetImplementation)
                     {
                         ret = Task.Run(() => executor(command, selector, commandBehavior, cancellationToken), cancellationToken);
                     }
@@ -283,7 +280,7 @@ namespace Orleans.Tests.SqlUtils
             //despite the connection already closed. Source: https://msdn.microsoft.com/en-us/library/system.data.sqlclient.sqlcommand.cancel(v=vs.110).aspx.
             //Enforcing this behavior across all providers does not seem to hurt.
             var stateTuple = (Tuple<DbDataReader, DbCommand>)state;
-            if(!stateTuple.Item1.IsClosed)
+            if (!stateTuple.Item1.IsClosed)
             {
                 stateTuple.Item2.Cancel();
             }

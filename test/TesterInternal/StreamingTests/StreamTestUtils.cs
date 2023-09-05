@@ -1,12 +1,8 @@
-using System;
-using System.Threading.Tasks;
-using Orleans;
 using Orleans.Runtime;
 using Orleans.Streams;
 using Orleans.TestingHost;
 using Xunit;
 using Xunit.Abstractions;
-using System.Linq;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -81,7 +77,7 @@ namespace UnitTests.StreamingTests
         {
             // expected == -1 means don't care / don't assert check value.
             string prefix = expected == -1 ? "Not-checked" : actual == expected ? "True" : "FALSE";
-            string fmtMsg = String.Format("--> {0}: ", prefix) + String.Format(msg, args);
+            string fmtMsg = string.Format("--> {0}: ", prefix) + string.Format(msg, args);
             output.WriteLine(fmtMsg);
             if (expected != -1)
             {

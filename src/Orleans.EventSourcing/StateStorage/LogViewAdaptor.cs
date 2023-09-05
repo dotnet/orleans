@@ -33,11 +33,9 @@ namespace Orleans.EventSourcing.StateStorage
 
 
         private const int maxEntriesInNotifications = 200;
-
-
-        readonly IGrainStorage globalGrainStorage;
-        readonly string grainTypeName;        // stores the confirmed state including metadata
-        GrainStateWithMetaDataAndETag<TLogView> GlobalStateCache;
+        private readonly IGrainStorage globalGrainStorage;
+        private readonly string grainTypeName;        // stores the confirmed state including metadata
+        private GrainStateWithMetaDataAndETag<TLogView> GlobalStateCache;
 
         /// <inheritdoc/>
         protected override TLogView LastConfirmedView()
@@ -326,7 +324,7 @@ namespace Orleans.EventSourcing.StateStorage
 
 
 #if DEBUG
-        bool operation_in_progress;
+        private bool operation_in_progress;
 #endif
 
         [Conditional("DEBUG")]

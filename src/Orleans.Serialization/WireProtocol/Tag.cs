@@ -69,7 +69,8 @@ namespace Orleans.Serialization.WireProtocol
         /// Gets or sets the wire type of the data following this tag.
         /// </summary>
         public WireType WireType
-        { readonly get => (WireType)(_tag & WireTypeMask);
+        {
+            readonly get => (WireType)(_tag & WireTypeMask);
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             set => _tag = (_tag & ~(uint)WireTypeMask) | ((uint)value & WireTypeMask);
         }

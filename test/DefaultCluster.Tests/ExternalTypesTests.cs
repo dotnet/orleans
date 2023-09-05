@@ -1,4 +1,3 @@
-using System.Threading.Tasks;
 using TestExtensions;
 using UnitTests.GrainInterfaces;
 using Xunit;

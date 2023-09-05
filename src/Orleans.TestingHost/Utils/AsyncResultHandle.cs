@@ -8,26 +8,20 @@ namespace Orleans.TestingHost.Utils
     /// </summary>
     public class AsyncResultHandle
     {
-        bool continueFlag = false;
-
         /// <summary> Reset the current result handle </summary>
         public virtual void Reset()
         {
             Exception = null;
             Result = null;
             Done = false;
-            continueFlag = false;
+            Continue = false;
         }
 
         /// <summary> Get or set the Done flag </summary>
         public bool Done { get; set; } = false;
 
         /// <summary> Get or set the Continue flag </summary>
-        public bool Continue
-        {
-            get { return continueFlag; }
-            set { continueFlag = value; }
-        }
+        public bool Continue { get; set; }
 
         /// <summary> Get or set the exception of the result handle </summary>
         public Exception Exception { get; set; }
@@ -50,7 +44,7 @@ namespace Orleans.TestingHost.Utils
         /// <returns>Returns <c>true</c> if operation completes before timeout</returns>
         public Task<bool> WaitForContinue(TimeSpan timeout)
         {
-            return WaitFor(timeout, () => continueFlag);
+            return WaitFor(timeout, () => Continue);
         }
 
         /// <summary>

@@ -1,11 +1,8 @@
-using System;
-using System.Threading;
-using System.Threading.Tasks;
 using Orleans.Configuration;
 using Xunit;
 
 namespace Consul.Tests
-{    
+{
     public class ConsulClusteringOptionsTests
     {
         [Fact, TestCategory("BVT"), TestCategory("Consul")]
@@ -26,7 +23,7 @@ namespace Consul.Tests
             Func<IConsulClient> callback = null;
 
             // ensure we check the callback.
-            var shouldThrow = ()=> options.ConfigureConsulClient(callback);
+            void shouldThrow() => options.ConfigureConsulClient(callback);
 
             Assert.Throws<ArgumentNullException>(shouldThrow);
         }
@@ -36,7 +33,7 @@ namespace Consul.Tests
         {
             var fakeConsul = new FakeConsul();
             var options = new ConsulClusteringOptions();
-            Func<IConsulClient> callback = () => fakeConsul;
+            IConsulClient callback() => fakeConsul;
 
             //we can inject the consul
             options.ConfigureConsulClient(callback);

@@ -1,11 +1,5 @@
-using System;
-using System.Collections.Generic;
 using System.Globalization;
-using System.Linq;
-using System.Threading;
-using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
-using Orleans;
 using Orleans.Concurrency;
 using Orleans.Providers;
 using Orleans.Runtime;
@@ -805,7 +799,7 @@ namespace UnitTests.Grains
         public Task<string> Handle(string prevState, Reducer1Action act) => Task.FromResult(prevState + act);
     }
 
-    public class Reducer2 : IReducer<Int32, Reducer2Action>
+    public class Reducer2 : IReducer<int, Reducer2Action>
     {
         public Task<int> Handle(int prevState, Reducer2Action act) => Task.FromResult(prevState + act.ToString().Length);
     }
@@ -865,8 +859,7 @@ namespace UnitTests.Grains
                                 );
             }
 
-
-            Type GetImmediateSubclass(Type subject) {
+            private Type GetImmediateSubclass(Type subject) {
                 if(subject.BaseType == typeof(BasicGrain)) {
                     return subject;
                 }

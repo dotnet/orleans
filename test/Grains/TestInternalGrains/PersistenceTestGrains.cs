@@ -1,15 +1,10 @@
-using System;
-using System.Collections.Generic;
 using System.Diagnostics;
 using System.Globalization;
 using System.Text;
-using System.Threading;
-using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
-using Orleans;
 using Orleans.Concurrency;
 using Orleans.Configuration;
 using Orleans.Runtime;
@@ -25,7 +20,7 @@ namespace UnitTests.Grains
         public static string CaptureRuntimeEnvironment()
         {
             var callStack = Utils.GetStackTrace(1); // Don't include this method in stack trace
-            return String.Format(
+            return string.Format(
                 "   TaskScheduler={0}" + Environment.NewLine
                 + "   RuntimeContext={1}" + Environment.NewLine
                 + "   WorkerPoolThread={2}" + Environment.NewLine

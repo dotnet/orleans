@@ -1,15 +1,7 @@
-using System;
-using System.Collections.Generic;
 using System.Diagnostics;
-using System.Linq;
-using System.Threading;
-using System.Threading.Tasks;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
-using Orleans;
 using Orleans.Configuration;
-using Orleans.Hosting;
-using Orleans.Internal;
 using Orleans.Runtime;
 using Orleans.Runtime.ReminderService;
 using Orleans.TestingHost;
@@ -26,7 +18,7 @@ namespace UnitTests.General
         private readonly TimeSpan failureTimeout = TimeSpan.FromSeconds(30);
         private readonly TimeSpan endWait = TimeSpan.FromMinutes(5);
 
-        enum Fail { First, Random, Last }
+        private enum Fail { First, Random, Last }
         
         protected override void ConfigureTestCluster(TestClusterBuilder builder)
         {
@@ -223,7 +215,7 @@ namespace UnitTests.General
                 if (responsibleSilo.Equals(s))
                     return randomKey;
             }
-            throw new Exception(String.Format("Could not pick a key that silo {0} will be responsible for. Primary.Ring = \n{1}",
+            throw new Exception(string.Format("Could not pick a key that silo {0} will be responsible for. Primary.Ring = \n{1}",
                 responsibleSilo, testHooks.GetConsistentRingProviderDiagnosticInfo().Result));
         }
 

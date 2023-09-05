@@ -1,5 +1,4 @@
 using System;
-using Azure.Core;
 
 #if ORLEANS_CLUSTERING
 namespace Orleans.Clustering.AzureStorage

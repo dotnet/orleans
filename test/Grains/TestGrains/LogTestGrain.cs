@@ -1,8 +1,3 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading;
-using System.Threading.Tasks;
 using Orleans.EventSourcing;
 using UnitTests.GrainInterfaces;
 
@@ -23,7 +18,7 @@ namespace TestGrains
         [Orleans.Id(1)]
         public int B;
         [Orleans.Id(2)]
-        public Dictionary<String, int> Reservations;
+        public Dictionary<string, int> Reservations;
 
         public MyGrainState()
         {

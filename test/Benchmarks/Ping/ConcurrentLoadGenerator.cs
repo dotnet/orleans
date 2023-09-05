@@ -1,7 +1,4 @@
-using System;
-using System.Threading.Tasks;
 using System.Threading.Channels;
-using System.Collections.Generic;
 using System.Diagnostics;
 
 namespace Benchmarks.Ping
@@ -15,20 +12,20 @@ namespace Benchmarks.Ping
             public long EndTimestamp { get; set; }
             public int Successes { get; set; }
             public int Failures { get; set; }
-            public int Completed => this.Successes + this.Failures;
-            public double ElapsedSeconds => (this.EndTimestamp - this.StartTimestamp) / StopwatchTickPerSecond;
-            public double RequestsPerSecond => this.Completed / this.ElapsedSeconds;
+            public readonly int Completed => this.Successes + this.Failures;
+            public readonly double ElapsedSeconds => (this.EndTimestamp - this.StartTimestamp) / StopwatchTickPerSecond;
+            public readonly double RequestsPerSecond => this.Completed / this.ElapsedSeconds;
         }
 
-        private Channel<WorkBlock> completedBlocks;
-        private readonly Func<TState, ValueTask> issueRequest;
-        private readonly Func<int, TState> getStateForWorker;
-        private readonly bool logIntermediateResults;
-        private readonly Task[] tasks;
-        private readonly TState[] states;
-        private readonly int numWorkers;
-        private readonly int blocksPerWorker;
-        private readonly int requestsPerBlock;
+        private Channel<WorkBlock> _completedBlocks;
+        private readonly Func<TState, ValueTask> _issueRequest;
+        private readonly Func<int, TState> _getStateForWorker;
+        private readonly bool _logIntermediateResults;
+        private readonly Task[] _tasks;
+        private readonly TState[] _states;
+        private readonly int _numWorkers;
+        private readonly int _blocksPerWorker;
+        private readonly int _requestsPerBlock;
 
         public ConcurrentLoadGenerator(
             int maxConcurrency,
@@ -38,32 +35,32 @@ namespace Benchmarks.Ping
             Func<int, TState> getStateForWorker,
             bool logIntermediateResults = false)
         {
-            this.numWorkers = maxConcurrency;
-            this.blocksPerWorker = blocksPerWorker;
-            this.requestsPerBlock = requestsPerBlock;
-            this.issueRequest = issueRequest;
-            this.getStateForWorker = getStateForWorker;
-            this.logIntermediateResults = logIntermediateResults;
-            this.tasks = new Task[maxConcurrency];
-            this.states = new TState[maxConcurrency];
+            this._numWorkers = maxConcurrency;
+            this._blocksPerWorker = blocksPerWorker;
+            this._requestsPerBlock = requestsPerBlock;
+            this._issueRequest = issueRequest;
+            this._getStateForWorker = getStateForWorker;
+            this._logIntermediateResults = logIntermediateResults;
+            this._tasks = new Task[maxConcurrency];
+            this._states = new TState[maxConcurrency];
         }
 
         public async Task Warmup()
         {
             this.ResetBetweenRuns();
-            var completedBlockReader = this.completedBlocks.Reader;
+            var completedBlockReader = this._completedBlocks.Reader;
 
-            for (var ree = 0; ree < this.numWorkers; ree++)
+            for (var ree = 0; ree < this._numWorkers; ree++)
             {
-                this.states[ree] = getStateForWorker(ree);
-                this.tasks[ree] = this.RunWorker(this.states[ree], this.requestsPerBlock, 3);
+                this._states[ree] = _getStateForWorker(ree);
+                this._tasks[ree] = this.RunWorker(this._states[ree], this._requestsPerBlock, 3);
             }
 
             // Wait for warmup to complete.
-            await Task.WhenAll(this.tasks);
+            await Task.WhenAll(this._tasks);
 
             // Ignore warmup blocks.
-            while (completedBlockReader.TryRead(out _));
+            while (completedBlockReader.TryRead(out _)) ;
             GC.Collect();
             GC.Collect();
             GC.Collect();
@@ -71,7 +68,7 @@ namespace Benchmarks.Ping
 
         private void ResetBetweenRuns()
         {
-            this.completedBlocks = Channel.CreateUnbounded<WorkBlock>(
+            this._completedBlocks = Channel.CreateUnbounded<WorkBlock>(
                 new UnboundedChannelOptions
                 {
                     SingleReader = true,
@@ -83,17 +80,17 @@ namespace Benchmarks.Ping
         public async Task Run()
         {
             this.ResetBetweenRuns();
-            var completedBlockReader = this.completedBlocks.Reader;
+            var completedBlockReader = this._completedBlocks.Reader;
 
             // Start the run.
-            for (var i = 0; i < this.numWorkers; i++)
+            for (var i = 0; i < this._numWorkers; i++)
             {
-                this.tasks[i] = this.RunWorker(this.states[i], this.requestsPerBlock, this.blocksPerWorker);
+                this._tasks[i] = this.RunWorker(this._states[i], this._requestsPerBlock, this._blocksPerWorker);
             }
 
-            _ = Task.Run(async () => { try { await Task.WhenAll(this.tasks); } catch { } finally { this.completedBlocks.Writer.Complete(); } });
-            var blocks = new List<WorkBlock>(this.numWorkers * this.blocksPerWorker);
-            var blocksPerReport = this.numWorkers * this.blocksPerWorker / 5;
+            _ = Task.Run(async () => { try { await Task.WhenAll(this._tasks); } catch { } finally { this._completedBlocks.Writer.Complete(); } });
+            var blocks = new List<WorkBlock>(this._numWorkers * this._blocksPerWorker);
+            var blocksPerReport = this._numWorkers * this._blocksPerWorker / 5;
             var nextReportBlockCount = blocksPerReport;
             while (true)
             {
@@ -104,14 +101,14 @@ namespace Benchmarks.Ping
                     blocks.Add(block);
                 }
 
-                if (this.logIntermediateResults && blocks.Count >= nextReportBlockCount)
+                if (this._logIntermediateResults && blocks.Count >= nextReportBlockCount)
                 {
                     nextReportBlockCount += blocksPerReport;
                     Console.WriteLine("    " + PrintReport(0));
                 }
             }
 
-            if (this.logIntermediateResults) Console.WriteLine("  Total: " + PrintReport(0));
+            if (this._logIntermediateResults) Console.WriteLine("  Total: " + PrintReport(0));
             else Console.WriteLine(PrintReport(0));
 
             string PrintReport(int statingBlockIndex)
@@ -143,7 +140,7 @@ namespace Benchmarks.Ping
 
         private async Task RunWorker(TState state, int requestsPerBlock, int numBlocks)
         {
-            var completedBlockWriter = this.completedBlocks.Writer;
+            var completedBlockWriter = this._completedBlocks.Writer;
             while (numBlocks > 0)
             {
                 var workBlock = new WorkBlock();
@@ -152,7 +149,7 @@ namespace Benchmarks.Ping
                 {
                     try
                     {
-                        await this.issueRequest(state).ConfigureAwait(false);
+                        await this._issueRequest(state).ConfigureAwait(false);
                         ++workBlock.Successes;
                     }
                     catch

@@ -1,11 +1,5 @@
-using System;
-using System.Collections.Generic;
-using System.Threading;
-using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
-using Orleans;
 using Orleans.Concurrency;
-using Orleans.Runtime;
 using Orleans.Serialization.Invocation;
 using Orleans.Streams;
 
@@ -109,7 +103,7 @@ namespace UnitTests.Grains
             return arg == "reentrant";
         }
 
-        static object UnwrapImmutable(object item) => item is Immutable<object> ? ((Immutable<object>)item).Value : item;
+        private static object UnwrapImmutable(object item) => item is Immutable<object> ? ((Immutable<object>)item).Value : item;
 
         private IMayInterleaveStaticPredicateGrain Self { get; set; }
 
@@ -151,7 +145,7 @@ namespace UnitTests.Grains
             return GetStream().OnNextAsync(item);
         }
 
-        IAsyncStream<string> GetStream() =>
+        private IAsyncStream<string> GetStream() =>
             this.GetStreamProvider("sms").GetStream<string>("test-stream-interleave", Guid.Empty);
 
         public Task SetSelf(IMayInterleaveStaticPredicateGrain self)
@@ -193,7 +187,7 @@ namespace UnitTests.Grains
             return arg == "reentrant";
         }
 
-        static object UnwrapImmutable(object item) => item is Immutable<object> ? ((Immutable<object>)item).Value : item;
+        private static object UnwrapImmutable(object item) => item is Immutable<object> ? ((Immutable<object>)item).Value : item;
 
         private IMayInterleaveInstancedPredicateGrain Self { get; set; }
 
@@ -235,7 +229,7 @@ namespace UnitTests.Grains
             return GetStream().OnNextAsync(item);
         }
 
-        IAsyncStream<string> GetStream() =>
+        private IAsyncStream<string> GetStream() =>
             this.GetStreamProvider("sms").GetStream<string>("test-stream-interleave", Guid.Empty);
 
         public Task SetSelf(IMayInterleaveInstancedPredicateGrain self)

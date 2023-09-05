@@ -1,9 +1,4 @@
-using System;
 using System.Collections.Concurrent;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading;
-using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using NonSilo.Tests.Utilities;
@@ -129,7 +124,7 @@ namespace NonSilo.Tests.Membership
                 levels[level] = this.manager.CurrentStatus;
                 return Task.CompletedTask;
             };
-            Func<CancellationToken, Task> NoOp = ct => Task.CompletedTask;
+            Task NoOp(CancellationToken ct) => Task.CompletedTask;
             foreach (var l in new[] {
                 ServiceLifecycleStage.RuntimeInitialize,
                 ServiceLifecycleStage.AfterRuntimeGrainServices,
@@ -171,7 +166,7 @@ namespace NonSilo.Tests.Membership
                 levels[level] = this.manager.CurrentStatus;
                 return Task.CompletedTask;
             };
-            Func<CancellationToken, Task> NoOp = ct => Task.CompletedTask;
+            Task NoOp(CancellationToken ct) => Task.CompletedTask;
             foreach (var l in new[] {
                 ServiceLifecycleStage.RuntimeInitialize,
                 ServiceLifecycleStage.AfterRuntimeGrainServices,
@@ -271,7 +266,7 @@ namespace NonSilo.Tests.Membership
                 Assert.True(await this.membershipTable.InsertRow(entry, table.Version.Next()));
             }
 
-            Func<SiloHealthMonitor, SiloHealthMonitor.ProbeResult, Task> onProbeResult = (siloHealthMonitor, probeResult) => Task.CompletedTask;
+            Task onProbeResult(SiloHealthMonitor siloHealthMonitor, SiloHealthMonitor.ProbeResult probeResult) => Task.CompletedTask;
 
             var clusterHealthMonitorTestAccessor = (ClusterHealthMonitor.ITestAccessor)this.clusterHealthMonitor;
             clusterHealthMonitorTestAccessor.CreateMonitor = silo => new SiloHealthMonitor(

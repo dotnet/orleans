@@ -1,15 +1,10 @@
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
-using System.Diagnostics.CodeAnalysis;
 using System.Linq.Expressions;
 using System.Text.Json;
-using System.Text.Json.Serialization;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.FSharp.Core;
 using Newtonsoft.Json;
 using Orleans;
-using Orleans.Serialization.UnitTests;
 
 [GenerateSerializer]
 public record Person([property: Id(0)] int Age, [property: Id(1)] string Name)
@@ -68,12 +63,12 @@ public sealed class MyJsonSerializableAttribute : Attribute
 {
 }
 
-interface IMyBase
+internal interface IMyBase
 {
     MyValue BaseValue { get; set; }
 }
 
-interface IMySub : IMyBase
+internal interface IMySub : IMyBase
 {
     MyValue SubValue { get; set; }
 }
@@ -270,13 +265,13 @@ namespace Orleans.Serialization.UnitTests
         public string String { get; }
         public DateTimeOffset DateTimeOffset { get; }
 
-        public override bool Equals(object obj) =>
+        public override readonly bool Equals(object obj) =>
             obj is MyForeignLibraryValueType type
             && Num == type.Num
             && string.Equals(String, type.String, StringComparison.Ordinal)
             && DateTimeOffset.Equals(type.DateTimeOffset);
 
-        public override int GetHashCode() => HashCode.Combine(Num, String, DateTimeOffset);
+        public override readonly int GetHashCode() => HashCode.Combine(Num, String, DateTimeOffset);
     }
 
     [GenerateSerializer]
@@ -314,8 +309,8 @@ namespace Orleans.Serialization.UnitTests
         [Id(2)]
         public int OtherIntValue { get; set; }
 
-        public override bool Equals(object obj) => obj is WrapsMyForeignLibraryValueType type && IntValue == type.IntValue && EqualityComparer<MyForeignLibraryValueType>.Default.Equals(ForeignValue, type.ForeignValue) && OtherIntValue == type.OtherIntValue;
-        public override int GetHashCode() => HashCode.Combine(IntValue, ForeignValue, OtherIntValue);
+        public override readonly bool Equals(object obj) => obj is WrapsMyForeignLibraryValueType type && IntValue == type.IntValue && EqualityComparer<MyForeignLibraryValueType>.Default.Equals(ForeignValue, type.ForeignValue) && OtherIntValue == type.OtherIntValue;
+        public override readonly int GetHashCode() => HashCode.Combine(IntValue, ForeignValue, OtherIntValue);
     }
 
     [GenerateSerializer]
@@ -646,9 +641,9 @@ namespace Orleans.Serialization.UnitTests
         public int IntProperty { get; }
 
         [Id(1)] private readonly int _intField;
-        public int GetIntField() => _intField;
+        public readonly int GetIntField() => _intField;
 
-        public override string ToString() => $"{nameof(_intField)}: {_intField}, {nameof(IntProperty)}: {IntProperty}";
+        public override readonly string ToString() => $"{nameof(_intField)}: {_intField}, {nameof(IntProperty)}: {IntProperty}";
     }
 
     [GenerateSerializer]

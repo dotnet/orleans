@@ -1,8 +1,4 @@
-using System;
-using System.Collections.Generic;
-using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
-using Orleans;
 using Orleans.Runtime;
 using TestExtensions;
 using UnitTests.GrainInterfaces;
@@ -60,7 +56,7 @@ namespace DefaultCluster.Tests
 
         private class MyProducer : IClientAddressableTestProducer
         {
-            int counter = 0;
+            private int counter = 0;
 
             public Task<int> Poll()
             {

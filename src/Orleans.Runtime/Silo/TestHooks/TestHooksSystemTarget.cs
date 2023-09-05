@@ -8,7 +8,6 @@ using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 using Orleans.Runtime.ConsistentRing;
 using Orleans.Storage;
-using Orleans.Hosting;
 using Orleans.Statistics;
 
 namespace Orleans.Runtime.TestHooks

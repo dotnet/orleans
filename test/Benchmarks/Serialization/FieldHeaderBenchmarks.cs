@@ -2,7 +2,6 @@ using BenchmarkDotNet.Attributes;
 using Benchmarks.Utilities;
 using Orleans.Serialization;
 using Orleans.Serialization.Buffers;
-using Orleans.Serialization.Codecs;
 using Orleans.Serialization.Session;
 using Orleans.Serialization.WireProtocol;
 using Microsoft.Extensions.DependencyInjection;
