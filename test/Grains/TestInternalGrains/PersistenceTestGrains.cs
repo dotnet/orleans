@@ -1086,4 +1086,63 @@ namespace UnitTests.Grains
             return WriteStateAsync();
         }
     }
+
+    public sealed class SurrogateStateForTypeWithoutPublicConstructorGrain : IGrainBase, ISurrogateStateForTypeWithoutPublicConstructorGrain<ExternalTypeWithoutPublicConstructor>
+    {
+        private readonly IPersistentState<ExternalTypeWithoutPublicConstructor> _persistence;
+
+        public IGrainContext GrainContext { get; }
+
+        public SurrogateStateForTypeWithoutPublicConstructorGrain(
+            IGrainContext grainContext,
+            [PersistentState("test_state", "OrleansSerializerMemoryStore")] IPersistentState<ExternalTypeWithoutPublicConstructor> persistence)
+        {
+            GrainContext = grainContext;
+            _persistence = persistence;
+        }
+
+        public async Task SetState(ExternalTypeWithoutPublicConstructor state)
+        {
+            _persistence.State = state;
+            await _persistence.WriteStateAsync();
+        }
+
+        public async Task<ExternalTypeWithoutPublicConstructor> GetState()
+        {
+            await _persistence.ReadStateAsync();
+            return _persistence.State;
+        }
+    }
+
+    public sealed class ExternalTypeWithoutPublicConstructor
+    {
+        public int Field { get; set; }
+
+        public static ExternalTypeWithoutPublicConstructor Create(int field)
+            => new(field);
+
+        private ExternalTypeWithoutPublicConstructor(int field)
+        {
+            Field = field;
+        }
+    }
+
+    [GenerateSerializer]
+    public struct ExternalTypeWithoutPublicConstructorSurrogate
+    {
+        [Id(0)] public int Field;
+    }
+
+    [RegisterConverter]
+    public sealed class ExternalTypeWithoutPublicConstructorSurrogateConverter : IConverter<ExternalTypeWithoutPublicConstructor, ExternalTypeWithoutPublicConstructorSurrogate>
+    {
+        public ExternalTypeWithoutPublicConstructor ConvertFromSurrogate(in ExternalTypeWithoutPublicConstructorSurrogate surrogate)
+            => ExternalTypeWithoutPublicConstructor.Create(surrogate.Field);
+
+        public ExternalTypeWithoutPublicConstructorSurrogate ConvertToSurrogate(in ExternalTypeWithoutPublicConstructor value)
+            => new()
+            {
+                Field = value.Field,
+            };
+    }
 }
