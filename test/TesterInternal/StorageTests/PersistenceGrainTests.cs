@@ -1193,8 +1193,8 @@ namespace UnitTests.StorageTests
             ExternalTypeWithoutPublicConstructor instance = ExternalTypeWithoutPublicConstructor.Create(1);
 
             await grain.SetState(instance);
-
             ExternalTypeWithoutPublicConstructor val = await grain.GetState();
+
             Assert.Equal(1, val.Field);
         }
 

@@ -181,8 +181,8 @@ namespace Orleans.Core
         }
 
         private TState CreateInstance()
-            => _activator is null
-                ? Activator.CreateInstance<TState>()
-                : _activator.Create();
+            => _activator is not null
+                ? _activator.Create()
+                : Activator.CreateInstance<TState>();
     }
 }
