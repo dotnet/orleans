@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Runtime.ExceptionServices;
 using System.Text;
@@ -12,8 +13,10 @@ using Orleans.Providers;
 using Orleans.Runtime;
 using Orleans.Serialization.Serializers;
 using Orleans.Storage;
+using Orleans.Streaming;
 using Orleans.Streams.Core;
 using StreamingEvents = Orleans.Streaming.Diagnostics.StreamingEvents;
+using TagList = System.Diagnostics.TagList;
 
 namespace Orleans.Streams
 {
@@ -46,7 +49,8 @@ namespace Orleans.Streams
             {
                 LogDebugFallbackToStorageProvider(ProviderConstants.DEFAULT_PUBSUB_PROVIDER_NAME);
 
-                storage = _serviceProvider.GetRequiredKeyedService<IGrainStorage>(ProviderConstants.DEFAULT_PUBSUB_PROVIDER_NAME);
+                storage = _serviceProvider.GetRequiredKeyedService<IGrainStorage>(
+                    ProviderConstants.DEFAULT_PUBSUB_PROVIDER_NAME);
             }
 
             return new(nameof(PubSubRendezvousGrain), grain.GrainContext, storage);
@@ -69,8 +73,8 @@ namespace Orleans.Streams
     [GenerateSerializer]
     internal sealed class PubSubGrainState
     {
-        [Id(0)]
-        public HashSet<PubSubPublisherState> Producers { get; set; } = new HashSet<PubSubPublisherState>();
+        [Id(0)] public HashSet<PubSubPublisherState> Producers { get; set; } = new HashSet<PubSubPublisherState>();
+
         [Id(1)]
         public HashSet<PubSubSubscriptionState> Consumers { get; set; } = new HashSet<PubSubSubscriptionState>();
     }
@@ -86,7 +90,8 @@ namespace Orleans.Streams
 
         private PubSubGrainState State => _storage.State;
 
-        public PubSubRendezvousGrain(PubSubGrainStateStorageFactory storageFactory, ILogger<PubSubRendezvousGrain> logger)
+        public PubSubRendezvousGrain(PubSubGrainStateStorageFactory storageFactory,
+            ILogger<PubSubRendezvousGrain> logger)
         {
             _storageFactory = storageFactory;
             _logger = logger;
@@ -105,9 +110,16 @@ namespace Orleans.Streams
             return Task.CompletedTask;
         }
 
-        public async Task<ISet<PubSubSubscriptionState>> RegisterProducer(QualifiedStreamId streamId, GrainId streamProducer)
+        public async Task<ISet<PubSubSubscriptionState>> RegisterProducer(QualifiedStreamId streamId,
+            GrainId streamProducer)
         {
-            StreamInstruments.PubSubProducersAdded.Add(1);
+            TagList? tags = null;
+
+            if (StreamInstruments.PubSubProducersAdded.Enabled)
+            {
+                tags = StreamInstrumentsTagUtils.InitializeTags(streamId, streamProducer);
+                StreamInstruments.PubSubProducersAdded.Add(1, tags.Value);
+            }
 
             try
             {
@@ -116,7 +128,12 @@ namespace Orleans.Streams
                 LogPubSubCounts("RegisterProducer {0}", streamProducer);
                 await WriteStateAsync();
                 StreamingEvents.EmitProducerRegistered(streamId.ProviderName, streamId.StreamId, streamProducer, GrainContext.Address.SiloAddress);
-                StreamInstruments.PubSubProducersTotal.Add(1);
+
+                if (StreamInstruments.PubSubProducersTotal.Enabled)
+                {
+                    tags ??= StreamInstrumentsTagUtils.InitializeTags(streamId, streamProducer);
+                    StreamInstruments.PubSubProducersTotal.Add(1, tags.Value);
+                }
             }
             catch (Exception exc)
             {
@@ -126,12 +143,20 @@ namespace Orleans.Streams
                 DeactivateOnIdle();
                 throw;
             }
+
             return State.Consumers.Where(c => !c.IsFaulted).ToSet();
         }
 
         public async Task UnregisterProducer(QualifiedStreamId streamId, GrainId streamProducer)
         {
-            StreamInstruments.PubSubProducersRemoved.Add(1);
+            TagList? tags = null;
+
+            if (StreamInstruments.PubSubProducersRemoved.Enabled)
+            {
+                tags = StreamInstrumentsTagUtils.InitializeTags(streamId, streamProducer);
+                StreamInstruments.PubSubProducersRemoved.Add(1, tags.Value);
+            }
+
             try
             {
                 int numRemoved = State.Producers.RemoveWhere(s => s.Equals(streamId, streamProducer));
@@ -145,7 +170,12 @@ namespace Orleans.Streams
                     await updateStorageTask;
                     StreamingEvents.EmitProducerUnregistered(streamId.ProviderName, streamId.StreamId, streamProducer, GrainContext.Address.SiloAddress);
                 }
-                StreamInstruments.PubSubProducersTotal.Add(-numRemoved);
+
+                if (StreamInstruments.PubSubProducersTotal.Enabled)
+                {
+                    tags ??= StreamInstrumentsTagUtils.InitializeTags(streamId, streamProducer);
+                    StreamInstruments.PubSubProducersTotal.Add(-numRemoved, tags.Value);
+                }
             }
             catch (Exception exc)
             {
@@ -155,6 +185,7 @@ namespace Orleans.Streams
                 DeactivateOnIdle();
                 throw;
             }
+
             if (State.Producers.Count == 0 && State.Consumers.Count == 0)
             {
                 DeactivateOnIdle(); // No producers or consumers left now, so flag ourselves to expedite Deactivation
@@ -167,7 +198,14 @@ namespace Orleans.Streams
             GrainId streamConsumer,
             string filterData)
         {
-            StreamInstruments.PubSubConsumersAdded.Add(1);
+            TagList? tags = null;
+
+            if (StreamInstruments.PubSubConsumersAdded.Enabled)
+            {
+                tags = StreamInstrumentsTagUtils.InitializeTags(streamId, streamConsumer);
+                StreamInstruments.PubSubConsumersAdded.Add(1, tags.Value);
+            }
+
             var pubSubState = State.Consumers.FirstOrDefault(s => s.Equals(subscriptionId));
             if (pubSubState != null && pubSubState.IsFaulted)
                 throw new FaultedSubscriptionException(subscriptionId, streamId);
@@ -185,7 +223,12 @@ namespace Orleans.Streams
                 LogPubSubCounts("RegisterConsumer {0}", streamConsumer);
                 await WriteStateAsync();
                 StreamingEvents.EmitSubscriptionRegistered(streamId.ProviderName, streamId.StreamId, subscriptionId.Guid, streamConsumer, GrainContext.Address.SiloAddress);
-                StreamInstruments.PubSubConsumersTotal.Add(1);
+
+                if (StreamInstruments.PubSubConsumersTotal.Enabled)
+                {
+                    tags ??= StreamInstrumentsTagUtils.InitializeTags(streamId, streamConsumer);
+                    StreamInstruments.PubSubConsumersTotal.Add(1, tags.Value);
+                }
             }
             catch (Exception exc)
             {
@@ -210,7 +253,8 @@ namespace Orleans.Streams
             {
                 foreach (PubSubPublisherState producerState in producers)
                 {
-                    tasks.Add(ExecuteProducerTask(producerState, p => p.AddSubscriber(subscriptionId, streamId, streamConsumer, filterData)));
+                    tasks.Add(ExecuteProducerTask(producerState,
+                        p => p.AddSubscriber(subscriptionId, streamId, streamConsumer, filterData)));
                 }
 
                 Exception? exception = null;
@@ -227,7 +271,12 @@ namespace Orleans.Streams
                 if (State.Producers.Count != initialProducerCount)
                 {
                     await WriteStateAsync();
-                    StreamInstruments.PubSubConsumersTotal.Add(-(initialProducerCount - State.Producers.Count));
+
+                    if (StreamInstruments.PubSubConsumersTotal.Enabled) {
+                        tags ??= StreamInstrumentsTagUtils.InitializeTags(streamId, streamConsumer);
+                        StreamInstruments.PubSubConsumersTotal.Add(
+                            -(initialProducerCount - State.Producers.Count), tags.Value);
+                    }
                 }
 
                 if (exception != null)
@@ -258,7 +307,13 @@ namespace Orleans.Streams
 
         public async Task UnregisterConsumer(GuidId subscriptionId, QualifiedStreamId streamId)
         {
-            StreamInstruments.PubSubConsumersRemoved.Add(1);
+            TagList? tags = null;
+
+            if (StreamInstruments.PubSubConsumersRemoved.Enabled)
+            {
+                tags = StreamInstrumentsTagUtils.InitializeTags(streamId, subscriptionId);
+                StreamInstruments.PubSubConsumersRemoved.Add(1, tags.Value);
+            }
 
             try
             {
@@ -278,9 +333,15 @@ namespace Orleans.Streams
                         await WriteStateAsync();
                         StreamingEvents.EmitSubscriptionUnregistered(streamId.ProviderName, streamId.StreamId, subscriptionId.Guid, GrainContext.Address.SiloAddress);
                     }
+
                     await NotifyProducersOfRemovedSubscription(subscriptionId, streamId);
                 }
-                StreamInstruments.PubSubConsumersTotal.Add(-numRemoved);
+
+                if (StreamInstruments.PubSubConsumersTotal.Enabled)
+                {
+                    tags ??= StreamInstrumentsTagUtils.InitializeTags(streamId, subscriptionId);
+                    StreamInstruments.PubSubConsumersTotal.Add(-numRemoved, tags.Value);
+                }
             }
             catch (Exception exc)
             {
@@ -324,8 +385,10 @@ namespace Orleans.Streams
                     numConsumers = State.Consumers.Count;
 
                 string when = args != null && args.Length != 0 ? string.Format(fmt, args) : fmt;
-                _logger.LogDebug("{When}. Now have total of {ProducerCount} producers and {ConsumerCount} consumers. All Consumers = {Consumers}, All Producers = {Producers}",
-                    when, numProducers, numConsumers, Utils.EnumerableToString(State?.Consumers), Utils.EnumerableToString(State?.Producers));
+                _logger.LogDebug(
+                    "{When}. Now have total of {ProducerCount} producers and {ConsumerCount} consumers. All Consumers = {Consumers}, All Producers = {Producers}",
+                    when, numProducers, numConsumers, Utils.EnumerableToString(State?.Consumers),
+                    Utils.EnumerableToString(State?.Producers));
             }
         }
 
@@ -385,7 +448,6 @@ namespace Orleans.Streams
                                     c.Consumer)).ToList();
                 return Task.FromResult(subscriptions);
             }
-
         }
 
         public async Task FaultSubscription(GuidId subscriptionId)
@@ -395,6 +457,7 @@ namespace Orleans.Streams
             {
                 return;
             }
+
             try
             {
                 pubSubState.Fault();
@@ -422,7 +485,8 @@ namespace Orleans.Streams
 
                 // Notify producers about unregistered consumer.
                 List<Task> tasks = State.Producers
-                    .Select(producerState => ExecuteProducerTask(producerState, p => p.RemoveSubscriber(subscriptionId, streamId)))
+                    .Select(producerState =>
+                        ExecuteProducerTask(producerState, p => p.RemoveSubscriber(subscriptionId, streamId)))
                     .ToList();
                 await Task.WhenAll(tasks);
                 //if producers got removed
@@ -437,15 +501,18 @@ namespace Orleans.Streams
         /// <returns></returns>
         private async Task<bool> TryClearState()
         {
-            if (State.Producers.Count == 0 && State.Consumers.Count == 0) // + we already know that numProducers == 0 from previous if-clause
+            if (State.Producers.Count == 0 &&
+                State.Consumers.Count == 0) // + we already know that numProducers == 0 from previous if-clause
             {
                 await ClearStateAsync(); //State contains no producers or consumers, remove it from storage
                 return true;
             }
+
             return false;
         }
 
-        private async Task ExecuteProducerTask(PubSubPublisherState producer, Func<IStreamProducerExtension, Task> producerTask)
+        private async Task ExecuteProducerTask(PubSubPublisherState producer,
+            Func<IStreamProducerExtension, Task> producerTask)
         {
             try
             {
