@@ -5,7 +5,7 @@ using TagList = System.Diagnostics.TagList;
 
 namespace Orleans.Streaming;
 
-internal static class TelemetryUtils
+internal static class StreamInstrumentsTagUtils
 {
     private const string STREAM_KEY = "stream";
     private const string STREAM_NAMESPACE = "namespace";
