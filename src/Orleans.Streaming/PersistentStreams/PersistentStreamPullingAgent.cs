@@ -11,6 +11,7 @@ using Orleans.Internal;
 using Orleans.Runtime;
 using Orleans.Runtime.Internal;
 using Orleans.Runtime.Scheduler;
+using Orleans.Streaming;
 using StreamingEvents = Orleans.Streaming.Diagnostics.StreamingEvents;
 using Orleans.Streams.Filtering;
 
@@ -483,6 +484,8 @@ namespace Orleans.Streams
             }
 
             var now = _timeProvider.GetUtcNow().UtcDateTime;
+            System.Diagnostics.TagList? tags = null;
+
             // Try to cleanup the pubsub cache at the cadence of 10 times in the configurable StreamInactivityPeriod.
             if ((now - lastTimeCleanedPubSubCache) >= this.options.StreamInactivityPeriod.Divide(StreamInactivityCheckFrequency))
             {
@@ -535,7 +538,11 @@ namespace Orleans.Streams
 
             queueCache?.AddToCache(multiBatch);
             numMessages += multiBatch.Count;
-            _streamInstruments?.PersistentStreamReadMessages.Add(multiBatch.Count);
+            if (_streamInstruments?.PersistentStreamReadMessages.Enabled is true)
+            {
+                tags = StreamInstrumentsTagUtils.InitializeTags(myQueueId, streamProviderName);
+                _streamInstruments.PersistentStreamReadMessages.Add(multiBatch.Count, tags.Value);
+            }
 
             LogTraceGotMessages(multiBatch.Count, new(myQueueId), numMessages);
 
@@ -767,6 +774,7 @@ namespace Orleans.Streams
 
         private async Task RunConsumerCursor(StreamConsumerData consumerData)
         {
+            System.Diagnostics.TagList? tags = null;
             try
             {
                 // double check in case of interleaving
@@ -811,7 +819,13 @@ namespace Orleans.Streams
 
                     try
                     {
-                        _streamInstruments?.PersistentStreamSentMessages.Add(1);
+                        if (_streamInstruments?.PersistentStreamSentMessages.Enabled is true)
+                        {
+                            tags ??= StreamInstrumentsTagUtils.InitializeTags(
+                                consumerData.StreamId, consumerData.SubscriptionId);
+                            _streamInstruments.PersistentStreamSentMessages.Add(1, tags.Value);
+                        }
+
                         if (IsShutdown)
                         {
                             break;
