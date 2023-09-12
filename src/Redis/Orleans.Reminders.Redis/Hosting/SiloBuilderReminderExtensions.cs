@@ -44,6 +44,7 @@ namespace Orleans.Hosting
         /// </returns>
         public static IServiceCollection UseRedisReminderService(this IServiceCollection services, Action<RedisReminderTableOptions> configure)
         {
+            services.AddReminders();
             services.AddSingleton<IReminderTable, RedisReminderTable>();
             services.Configure<RedisReminderTableOptions>(configure);
             services.AddSingleton<IConfigurationValidator, RedisReminderTableOptionsValidator>();
