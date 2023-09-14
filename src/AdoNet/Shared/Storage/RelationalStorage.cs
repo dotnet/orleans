@@ -247,7 +247,7 @@ namespace Orleans.Tests.SqlUtils
             CommandBehavior commandBehavior,
             CancellationToken cancellationToken)
         {
-            using (var connection = DbConnectionFactory.CreateConnection(invariantName, ConnectionString))
+            using (var connection = DbConnectionFactory.CreateConnection(_invariantName, ConnectionString))
             {
                 await connection.OpenAsync(cancellationToken).ConfigureAwait(continueOnCapturedContext: false);
                 using (var command = connection.CreateCommand())
