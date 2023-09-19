@@ -31,15 +31,16 @@ public class GenerateAliasAttributesAnalyzer : DiagnosticAnalyzer
         context.EnableConcurrentExecution();
         context.ConfigureGeneratedCodeAnalysis(GeneratedCodeAnalysisFlags.Analyze);
         context.RegisterSyntaxNodeAction(CheckSyntaxNode,
-            SyntaxKind.InterfaceDeclaration);
-            //SyntaxKind.ClassDeclaration,
-            //SyntaxKind.StructDeclaration,
-            //SyntaxKind.RecordDeclaration,
-            //SyntaxKind.RecordStructDeclaration);
+            SyntaxKind.InterfaceDeclaration,
+            SyntaxKind.ClassDeclaration,
+            SyntaxKind.StructDeclaration,
+            SyntaxKind.RecordDeclaration,
+            SyntaxKind.RecordStructDeclaration);
     }
 
     private void CheckSyntaxNode(SyntaxNodeAnalysisContext context)
     {
+        // Interface types and their methods
         if (context.Node is InterfaceDeclarationSyntax { } interfaceDeclaration)
         {
             if (!context.SemanticModel
@@ -51,7 +52,7 @@ public class GenerateAliasAttributesAnalyzer : DiagnosticAnalyzer
 
             if (!interfaceDeclaration.HasAttribute(Constants.AliasAttributeName))
             {
-                Report(ref context, interfaceDeclaration.GetLocation(), interfaceDeclaration.Identifier.ToString());
+                ReportFor(ref context, interfaceDeclaration.GetLocation(), interfaceDeclaration.Identifier.ToString());
             }
 
             foreach (var methodDeclaration in interfaceDeclaration.Members.OfType<MethodDeclarationSyntax>())
@@ -63,15 +64,31 @@ public class GenerateAliasAttributesAnalyzer : DiagnosticAnalyzer
 
                 if (!methodDeclaration.HasAttribute(Constants.AliasAttributeName))
                 {
-                    Report(ref context, methodDeclaration.GetLocation(), methodDeclaration.Identifier.ToString());
+                    ReportFor(ref context, methodDeclaration.GetLocation(), methodDeclaration.Identifier.ToString());
                 }                
             }
 
             return;
         }
+
+        // Rest of types: class, struct, record
+        if (context.Node is TypeDeclarationSyntax { } typeDeclaration)
+        {
+            if (!typeDeclaration.HasAttribute(Constants.GenerateSerializerAttributeName))
+            {
+                return;
+            }
+
+            if (typeDeclaration.HasAttribute(Constants.AliasAttributeName))
+            {
+                return;
+            }
+
+            ReportFor(ref context, typeDeclaration.GetLocation(), typeDeclaration.Identifier.ToString());
+        }
     }
 
-    private static void Report(ref SyntaxNodeAnalysisContext context, Location location, string typeName)
+    private static void ReportFor(ref SyntaxNodeAnalysisContext context, Location location, string typeName)
     {
         var builder = ImmutableDictionary.CreateBuilder<string, string>();
 
