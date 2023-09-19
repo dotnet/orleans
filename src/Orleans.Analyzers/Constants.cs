@@ -17,8 +17,7 @@ namespace Orleans.Analyzers
         public const string NonSerializedAttribute = "NonSerialized";
         public const string NonSerializedAttributeFullyQualifiedName = "global::System.NonSerializedAttribute";
       
-        public const string AliasAttribute = "Alias";
-        public const string AliasAttributeFullyQualifiedName = "Orleans.AliasAttribute";
-        public const string AliasAttributeFullyQualifiedGlobalName = "global::Orleans.AliasAttribute"; 
+        public const string AliasAttributeName = "Alias";
+        public const string AliasAttributeFullyQualifiedName = "global::Orleans.AliasAttribute"; 
     }
 }
