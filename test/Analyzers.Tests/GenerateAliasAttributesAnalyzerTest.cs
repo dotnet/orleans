@@ -77,19 +77,18 @@ public class GenerateAliasAttributesAnalyzerTest : DiagnosticAnalyzerTestBase<Ge
         return VerifyHasNoDiagnostic(code);
     }
 
-    //[Fact]
-    //public Task Test()
-    //{
-    //    var code = """
-    //                [Alias("I")]
-    //                public interface I : IGrain
-    //                {
-    //                    int MyMethod(int a);
-    //                }
-    //                """;
+    [Fact]
+    public Task Test()
+    {
+        var code = """
+                    public interface I : IGrain
+                    {
+                        Task<int> M1();
+                    }
+                    """;
 
-    //    return VerifyHasDiagnostic(code);
-    //}
+        return VerifyHasDiagnostic(code, 1);
+    }
 
     public static IEnumerable<object[]> GrainInterfaces =>
         new List<object[]>

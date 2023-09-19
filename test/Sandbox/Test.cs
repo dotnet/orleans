@@ -1,16 +1,19 @@
-using Orleans;
-using Orleans.Runtime;
 
-namespace TestNS;
+namespace MyNs;
 
-[Serializable]
-[GenerateSerializer]
+[Orleans.GenerateSerializer]
 public class Test
 {
-    public string A { get; set; } = "";
+    [Id] public string A { get; set; } = "";
 }
 
+[AttributeUsage(AttributeTargets.All)]
+public class IdAttribute : Attribute
+{
 
+}
+
+/*
 [Alias("TestGrain")]
 public interface ITestGrain : IGrainWithStringKey
 {
@@ -23,3 +26,5 @@ public interface ITest
 {
     Task Void();
 }
+*/
+

@@ -42,28 +42,28 @@ public class GenerateAliasAttributesAnalyzer : DiagnosticAnalyzer
     {
         if (context.Node is InterfaceDeclarationSyntax { } interfaceDeclaration)
         {
-            if (!IsGrainInterface(ref context, interfaceDeclaration))
+            if (!context.SemanticModel
+                .GetDeclaredSymbol(interfaceDeclaration, context.CancellationToken)
+                .ExtendsGrainInterface())
             {
                 return;
             }
 
-            var interfaceSymbol = context.SemanticModel.GetDeclaredSymbol(interfaceDeclaration, context.CancellationToken);
-            if (!HasAliasAttribute(ref context, interfaceSymbol))
+            if (!interfaceDeclaration.HasAttribute(Constants.AliasAttributeName))
             {
-                Report(ref context, interfaceDeclaration.GetLocation());
+                Report(ref context, interfaceDeclaration.GetLocation(), interfaceDeclaration.Identifier.ToString());
             }
 
             foreach (var methodDeclaration in interfaceDeclaration.Members.OfType<MethodDeclarationSyntax>())
             {
-                var methodSymbol = context.SemanticModel.GetDeclaredSymbol(methodDeclaration, context.CancellationToken);
-                if (methodSymbol.IsStatic)
+                if (methodDeclaration.IsStatic())
                 {
                     continue;
                 }
 
-                if (!HasAliasAttribute(ref context, methodSymbol))
+                if (!methodDeclaration.HasAttribute(Constants.AliasAttributeName))
                 {
-                    Report(ref context, methodDeclaration.GetLocation());
+                    Report(ref context, methodDeclaration.GetLocation(), methodDeclaration.Identifier.ToString());
                 }                
             }
 
@@ -71,19 +71,15 @@ public class GenerateAliasAttributesAnalyzer : DiagnosticAnalyzer
         }
     }
 
-    private static bool IsGrainInterface(ref SyntaxNodeAnalysisContext context, InterfaceDeclarationSyntax syntax)
-        => context.SemanticModel
-                .GetDeclaredSymbol(syntax, context.CancellationToken)
-                .ExtendsGrainInterface();
-    private static bool HasAliasAttribute(ref SyntaxNodeAnalysisContext context, ISymbol symbol)
+    private static void Report(ref SyntaxNodeAnalysisContext context, Location location, string typeName)
     {
-        var aliasSymbol = context.Compilation.GetTypeByMetadataName(Constants.AliasAttributeFullyQualifiedName);
-        return symbol.GetAttributes().Any(x => SymbolEqualityComparer.Default.Equals(x.AttributeClass, aliasSymbol));
-    }
+        var builder = ImmutableDictionary.CreateBuilder<string, string>();
 
-    private static void Report(ref SyntaxNodeAnalysisContext context, Location location)
-       => context.ReportDiagnostic(Diagnostic.Create(
+        builder.Add("TypeName", typeName);
+
+        context.ReportDiagnostic(Diagnostic.Create(
                        descriptor: Rule,
                        location: location,
-                       messageArgs: new object[] { }));
+                       properties: builder.ToImmutable()));
+    }
 }
