@@ -33,7 +33,8 @@ namespace Orleans.Analyzers
             {
                 if (declaration.TryGetAttribute(Constants.SerializableAttributeName, out var attribute) && !declaration.HasAttribute(Constants.GenerateSerializerAttributeName))
                 {
-                    context.ReportDiagnostic(Diagnostic.Create(Rule, attribute.GetLocation()));
+
+                    context.ReportDiagnostic(Diagnostic.Create(Rule, attribute.GetLocation(), messageArgs: new object[] { declaration.Identifier.ToString() }));
                 }
             }
         }
