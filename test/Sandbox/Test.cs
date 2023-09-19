@@ -1,30 +1,34 @@
+using Orleans;
 
 namespace MyNs;
 
-[Orleans.GenerateSerializer]
-public class Test
+[GenerateSerializer]
+public class TestClass
 {
-    [Id] public string A { get; set; } = "";
+    [Id(0)]
+    public string A { get; set; } = "";
 }
 
-[AttributeUsage(AttributeTargets.All)]
-public class IdAttribute : Attribute
+[GenerateSerializer]
+public struct TestStruct
 {
-
+    public string A;
 }
 
-/*
+[GenerateSerializer]
+public record TestRecord { }
+
+[GenerateSerializer]
+public record struct TestRecordStruct { }
+
 [Alias("TestGrain")]
 public interface ITestGrain : IGrainWithStringKey
 {
-//    [Alias("Void")]
+    [Alias("Void")]
     Task Void();
-    static Task<int> Static() => Task.FromResult(0);
 }
 
-public interface ITest
+public class MyClass
 {
-    Task Void();
-}
-*/
 
+}

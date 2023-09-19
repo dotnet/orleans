@@ -7,7 +7,7 @@ namespace Analyzers.Tests;
 [TestCategory("BVT"), TestCategory("Analyzer")]
 public class GenerateAliasAttributesAnalyzerTest : DiagnosticAnalyzerTestBase<GenerateAliasAttributesAnalyzer>
 {
-    private async Task VerifyHasDiagnostic(string code, int diagnosticsCount)
+    private async Task VerifyHasDiagnostic(string code, int diagnosticsCount = 1)
     {
         var (diagnostics, _) = await GetDiagnosticsAsync(code, Array.Empty<string>());
 
@@ -22,9 +22,11 @@ public class GenerateAliasAttributesAnalyzerTest : DiagnosticAnalyzerTestBase<Ge
 
     private async Task VerifyHasNoDiagnostic(string code)
     {
-        var (diagnostics, _) = await GetDiagnosticsAsync(code, new string[0]);
+        var (diagnostics, _) = await GetDiagnosticsAsync(code, Array.Empty<string>());
         Assert.Empty(diagnostics);
     }
+
+    #region Interfaces & Methods
 
     [Theory]
     [MemberData(nameof(GrainInterfaces))]
@@ -77,19 +79,6 @@ public class GenerateAliasAttributesAnalyzerTest : DiagnosticAnalyzerTestBase<Ge
         return VerifyHasNoDiagnostic(code);
     }
 
-    [Fact]
-    public Task Test()
-    {
-        var code = """
-                    public interface I : IGrain
-                    {
-                        Task<int> M1();
-                    }
-                    """;
-
-        return VerifyHasDiagnostic(code, 1);
-    }
-
     public static IEnumerable<object[]> GrainInterfaces =>
         new List<object[]>
         {
@@ -100,4 +89,60 @@ public class GenerateAliasAttributesAnalyzerTest : DiagnosticAnalyzerTestBase<Ge
             new object[] { "Orleans.IGrainWithIntegerKey" },
             new object[] { "Orleans.IGrainWithIntegerCompoundKey" }
         };
+
+    #endregion
+
+    #region Classes, Structs, Records
+
+    [Fact]
+    public Task ClassWithoutAliasAttribute_AndWithGenerateSerializerAttribute_ShouldTriggerDiagnostic()
+        => VerifyHasDiagnostic("[GenerateSerializer] public class C {}");
+
+    [Fact]
+    public Task StructWithoutAliasAttribute_AndWithGenerateSerializerAttribute_ShouldTriggerDiagnostic()
+       => VerifyHasDiagnostic("[GenerateSerializer] public struct S {}");
+
+    [Fact]
+    public Task RecordClassWithoutAliasAttribute_AndWithGenerateSerializerAttribute_ShouldTriggerDiagnostic()
+       => VerifyHasDiagnostic("[GenerateSerializer] public record R {}");
+
+    [Fact]
+    public Task RecordStructWithoutAliasAttribute_AndWithGenerateSerializerAttribute_ShouldTriggerDiagnostic()
+       => VerifyHasDiagnostic("[GenerateSerializer] public record struct RS {}");
+
+
+    [Fact]
+    public Task ClassWithAliasAttribute_AndWithGenerateSerializerAttribute_ShouldNotTriggerDiagnostic()
+        => VerifyHasNoDiagnostic("[GenerateSerializer, Alias(\"C\")] public class C {}");
+
+    [Fact]
+    public Task StructWithAliasAttribute_AndWithGenerateSerializerAttribute_ShouldNotTriggerDiagnostic()
+       => VerifyHasNoDiagnostic("[GenerateSerializer, Alias(\"S\")] public struct S {}");
+
+    [Fact]
+    public Task RecordClassWithAliasAttribute_AndWithGenerateSerializerAttribute_ShouldNotTriggerDiagnostic()
+       => VerifyHasNoDiagnostic("[GenerateSerializer, Alias(\"R\")] public record R {}");
+
+    [Fact]
+    public Task RecordStructWithAliasAttribute_AndWithGenerateSerializerAttribute_ShouldNotTriggerDiagnostic()
+       => VerifyHasNoDiagnostic("[GenerateSerializer, Alias(\"RS\")] public record struct RS {}");
+
+
+    [Fact]
+    public Task ClassWithoutAliasAttribute_AndWithoutGenerateSerializerAttribute_ShouldNotTriggerDiagnostic()
+        => VerifyHasNoDiagnostic("public class C {}");
+
+    [Fact]
+    public Task StructWithoutAliasAttribute_AndWithoutGenerateSerializerAttribute_ShouldNotTriggerDiagnostic()
+       => VerifyHasNoDiagnostic("public struct S {}");
+
+    [Fact]
+    public Task RecordClassWithoutAliasAttribute_AndWithoutGenerateSerializerAttribute_ShouldNotTriggerDiagnostic()
+       => VerifyHasNoDiagnostic("public record R {}");
+
+    [Fact]
+    public Task RecordStructWithoutAliasAttribute_AndWithoutGenerateSerializerAttribute_ShouldNotTriggerDiagnostic()
+       => VerifyHasNoDiagnostic("public record struct RS {}");
+
+    #endregion
 }
