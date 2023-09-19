@@ -7,12 +7,6 @@ using System.Linq;
 
 namespace Orleans.Analyzers;
 
-//TODO:
-// * Grain Interfaces - x
-// * Interface Methods - x
-// * Grain Classes (ones that inherited from Grain)
-// * Classes, Structs, Enums that have [GenerateSerializer]
-
 [DiagnosticAnalyzer(LanguageNames.CSharp)]
 public class GenerateAliasAttributesAnalyzer : DiagnosticAnalyzer
 {
@@ -52,7 +46,7 @@ public class GenerateAliasAttributesAnalyzer : DiagnosticAnalyzer
 
             if (!interfaceDeclaration.HasAttribute(Constants.AliasAttributeName))
             {
-                ReportFor(ref context, interfaceDeclaration.GetLocation(), interfaceDeclaration.Identifier.ToString());
+                ReportFor(context, interfaceDeclaration.GetLocation(), interfaceDeclaration.Identifier.ToString());
             }
 
             foreach (var methodDeclaration in interfaceDeclaration.Members.OfType<MethodDeclarationSyntax>())
@@ -64,7 +58,7 @@ public class GenerateAliasAttributesAnalyzer : DiagnosticAnalyzer
 
                 if (!methodDeclaration.HasAttribute(Constants.AliasAttributeName))
                 {
-                    ReportFor(ref context, methodDeclaration.GetLocation(), methodDeclaration.Identifier.ToString());
+                    ReportFor(context, methodDeclaration.GetLocation(), methodDeclaration.Identifier.ToString());
                 }                
             }
 
@@ -84,11 +78,11 @@ public class GenerateAliasAttributesAnalyzer : DiagnosticAnalyzer
                 return;
             }
 
-            ReportFor(ref context, typeDeclaration.GetLocation(), typeDeclaration.Identifier.ToString());
+            ReportFor(context, typeDeclaration.GetLocation(), typeDeclaration.Identifier.ToString());
         }
     }
 
-    private static void ReportFor(ref SyntaxNodeAnalysisContext context, Location location, string typeName)
+    private static void ReportFor(SyntaxNodeAnalysisContext context, Location location, string typeName)
     {
         var builder = ImmutableDictionary.CreateBuilder<string, string>();
 
