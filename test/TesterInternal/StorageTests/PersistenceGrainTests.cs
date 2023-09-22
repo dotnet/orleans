@@ -1198,6 +1198,19 @@ namespace UnitTests.StorageTests
             Assert.Equal(1, val.Field);
         }
 
+        [Fact, TestCategory("Functional"), TestCategory("Persistence")]
+        public async Task Persistence_RecordTypeWithoutPublicParameterlessConstructor_Read()
+        {
+            IRecordTypeWithoutPublicParameterlessConstructorGrain<RecordTypeWithoutPublicParameterlessConstructor> grain = HostedCluster.GrainFactory
+                .GetGrain<IRecordTypeWithoutPublicParameterlessConstructorGrain<RecordTypeWithoutPublicParameterlessConstructor>>(Guid.NewGuid());
+            RecordTypeWithoutPublicParameterlessConstructor instance = new RecordTypeWithoutPublicParameterlessConstructor(1);
+
+            await grain.SetState(instance);
+            RecordTypeWithoutPublicParameterlessConstructor val = await grain.GetState();
+
+            Assert.Equal(1, val.Field);
+        }
+
         // ---------- Utility functions ----------
         private void SetStoredValue(string providerName, string providerTypeFullName, string grainType, IGrain grain, string fieldName, int newValue)
         {

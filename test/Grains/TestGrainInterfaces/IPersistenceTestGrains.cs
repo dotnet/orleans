@@ -232,5 +232,12 @@ namespace UnitTests.GrainInterfaces
         Task SetState(T state);
         Task<T> GetState();
     }
+
+    public interface IRecordTypeWithoutPublicParameterlessConstructorGrain<T> : IGrainWithGuidKey
+        where T : class
+    {
+        Task SetState(T state);
+        Task<T> GetState();
+    }
 }
 // ReSharper restore InconsistentNaming

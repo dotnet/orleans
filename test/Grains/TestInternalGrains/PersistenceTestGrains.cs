@@ -1145,4 +1145,38 @@ namespace UnitTests.Grains
                 Field = value.Field,
             };
     }
+    
+
+    public sealed class RecordTypeWithoutPublicParameterlessConstructorGrain : IGrainBase, IRecordTypeWithoutPublicParameterlessConstructorGrain<RecordTypeWithoutPublicParameterlessConstructor>
+    {
+        private readonly IPersistentState<RecordTypeWithoutPublicParameterlessConstructor> _persistence;
+
+        public IGrainContext GrainContext { get; }
+
+        public RecordTypeWithoutPublicParameterlessConstructorGrain(
+            IGrainContext grainContext,
+            [PersistentState("test_state", "OrleansSerializerMemoryStore")] IPersistentState<RecordTypeWithoutPublicParameterlessConstructor> persistence)
+        {
+            GrainContext = grainContext;
+            _persistence = persistence;
+        }
+
+        public async Task SetState(RecordTypeWithoutPublicParameterlessConstructor state)
+        {
+            _persistence.State = state;
+            await _persistence.WriteStateAsync();
+        }
+
+        public async Task<RecordTypeWithoutPublicParameterlessConstructor> GetState()
+        {
+            await _persistence.ReadStateAsync();
+            return _persistence.State;
+        }
+    }
+
+    [GenerateSerializer]
+    public record class RecordTypeWithoutPublicParameterlessConstructor
+    (
+        [property: Id(0)] int Field
+    );
 }
