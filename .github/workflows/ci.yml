@@ -42,6 +42,8 @@ jobs:
     services:
       emulator:
         image: thekevjames/gcloud-pubsub-emulator:latest
+        env:
+          PUBSUB_PROJECT1: "feisty-flow-173313"
         ports:
         - 8681:8681
         options: >-
