@@ -231,6 +231,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Orleans.Persistence.EntityF
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Orleans.Reminders.EntityFrameworkCore", "src\EFCore\Orleans.Reminders.EntityFrameworkCore\Orleans.Reminders.EntityFrameworkCore.csproj", "{084715C6-2A31-452B-8AFF-FAC7E6F70445}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Orleans.GrainDirectory.EntityFrameworkCore", "src\EFCore\Orleans.GrainDirectory.EntityFrameworkCore\Orleans.GrainDirectory.EntityFrameworkCore.csproj", "{D772413C-B6EC-4CBC-8D1E-714176A81F26}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -613,6 +615,10 @@ Global
 		{084715C6-2A31-452B-8AFF-FAC7E6F70445}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{084715C6-2A31-452B-8AFF-FAC7E6F70445}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{084715C6-2A31-452B-8AFF-FAC7E6F70445}.Release|Any CPU.Build.0 = Release|Any CPU
+		{D772413C-B6EC-4CBC-8D1E-714176A81F26}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{D772413C-B6EC-4CBC-8D1E-714176A81F26}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{D772413C-B6EC-4CBC-8D1E-714176A81F26}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{D772413C-B6EC-4CBC-8D1E-714176A81F26}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -726,6 +732,7 @@ Global
 		{3DE92182-011E-4518-AE68-78C6547FFFCF} = {616ECAC3-2EA7-4819-9A05-EF4F4D8DDFA8}
 		{7E395297-508D-4287-A5AF-FBC9F2B25DCA} = {616ECAC3-2EA7-4819-9A05-EF4F4D8DDFA8}
 		{084715C6-2A31-452B-8AFF-FAC7E6F70445} = {616ECAC3-2EA7-4819-9A05-EF4F4D8DDFA8}
+		{D772413C-B6EC-4CBC-8D1E-714176A81F26} = {616ECAC3-2EA7-4819-9A05-EF4F4D8DDFA8}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {7BFB3429-B5BB-4DB1-95B4-67D77A864952}
