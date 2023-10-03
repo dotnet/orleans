@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <PackageId>Microsoft.Orleans.Reminders.EntityFrameworkCore</PackageId>
+    <Title>Microsoft Orleans Entity Framework Core Reminders Provider</Title>
+    <Description>Microsoft Orleans reminders provider backed by Entity Framework Core</Description>
+    <PackageTags>$(PackageTags) Entity Framework Core SQL MySQL PostgreSQL Oracle</PackageTags>
+    <Nullable>enable</Nullable>
+    <TargetFrameworks>$(DefaultTargetFrameworks)</TargetFrameworks>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <AssemblyName>Orleans.Reminders.EntityFrameworkCore</AssemblyName>
+    <RootNamespace>Orleans.Reminders.EntityFrameworkCore</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.EntityFrameworkCore"/>
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="$(SourceRoot)src\Orleans.Runtime\Orleans.Runtime.csproj" />
+    <ProjectReference Include="$(SourceRoot)src\Orleans.Reminders\Orleans.Reminders.csproj" />
+  </ItemGroup>
+
+</Project>
