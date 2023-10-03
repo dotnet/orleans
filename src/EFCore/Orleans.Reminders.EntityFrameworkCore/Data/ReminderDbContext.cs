@@ -15,9 +15,9 @@ public class ReminderDbContext : DbContext
         modelBuilder.Entity<ReminderRecord>(c =>
         {
             c.HasKey(p => new {p.ServiceId, p.GrainId, p.Name});
-            c.Property(p => p.ServiceId).HasMaxLength(150).IsRequired();
-            c.Property(p => p.GrainId).HasMaxLength(150).IsRequired();
-            c.Property(p => p.Name).HasMaxLength(150).IsRequired();
+            c.Property(p => p.ServiceId).IsRequired();
+            c.Property(p => p.GrainId).IsRequired();
+            c.Property(p => p.Name).IsRequired();
             c.Property(p => p.StartAt).IsRequired();
             c.Property(p => p.Period).IsRequired();
             c.Property(p => p.GrainHash).IsRequired();
