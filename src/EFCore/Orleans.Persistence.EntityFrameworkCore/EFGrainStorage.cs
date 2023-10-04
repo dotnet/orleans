@@ -196,3 +196,11 @@ internal class EFGrainStorage<TDbContext> : IGrainStorage, ILifecycleParticipant
     public void Participate(ISiloLifecycle lifecycle) =>
         this._logger.LogInformation("EFCore Grain Storage {Storage} initialized!", this._name);
 }
+
+internal static class EFStorageFactory
+{
+    public static IGrainStorage Create<TDbContext>(IServiceProvider services, string name) where TDbContext : GrainStateDbContext
+    {
+        return ActivatorUtilities.CreateInstance<EFGrainStorage<TDbContext>>(services, name);
+    }
+}
