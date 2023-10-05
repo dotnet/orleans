@@ -9,6 +9,10 @@
     <TargetFrameworks>$(DefaultTargetFrameworks)</TargetFrameworks>
   </PropertyGroup>
 
+  <ItemGroup>
+    <InternalsVisibleTo Include="Orleans.GrainDirectory.EntityFrameworkCore.SqlServer"/>
+  </ItemGroup>
+
   <PropertyGroup>
     <AssemblyName>Orleans.GrainDirectory.EntityFrameworkCore</AssemblyName>
     <RootNamespace>Orleans.GrainDirectory.EntityFrameworkCore</RootNamespace>

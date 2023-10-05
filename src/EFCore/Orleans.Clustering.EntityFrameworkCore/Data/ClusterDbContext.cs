@@ -2,12 +2,12 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Orleans.Clustering.EntityFrameworkCore.Data;
 
-public class ClusterDbContext : DbContext
+public class ClusterDbContext<TDbContext> : DbContext where TDbContext : DbContext
 {
     public DbSet<ClusterRecord> Clusters { get; set; } = default!;
     public DbSet<SiloRecord> Silos { get; set; } = default!;
 
-    public ClusterDbContext(DbContextOptions<ClusterDbContext> options) : base(options)
+    public ClusterDbContext(DbContextOptions<TDbContext> options) : base(options)
     {
     }
 

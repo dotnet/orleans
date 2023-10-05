@@ -12,7 +12,7 @@ using Orleans.GrainDirectory.EntityFrameworkCore.Data;
 
 namespace Orleans.GrainDirectory.EntityFrameworkCore;
 
-public class EFCoreGrainDirectory<TDbContext> : IGrainDirectory, ILifecycleParticipant<ISiloLifecycle> where TDbContext : GrainDirectoryDbContext
+public class EFCoreGrainDirectory<TDbContext> : IGrainDirectory, ILifecycleParticipant<ISiloLifecycle> where TDbContext : GrainDirectoryDbContext<TDbContext>
 {
     private readonly ILogger _logger;
     private readonly IDbContextFactory<TDbContext> _dbContextFactory;

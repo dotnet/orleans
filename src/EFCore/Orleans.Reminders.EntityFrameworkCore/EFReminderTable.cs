@@ -10,7 +10,7 @@ using Orleans.Reminders.EntityFrameworkCore.Data;
 
 namespace Orleans.Reminders.EntityFrameworkCore;
 
-public class EFReminderTable<TDbContext> : IReminderTable where TDbContext : ReminderDbContext
+public class EFReminderTable<TDbContext> : IReminderTable where TDbContext : ReminderDbContext<TDbContext>
 {
     private readonly ILogger _logger;
     private readonly string _serviceId;
@@ -95,7 +95,10 @@ public class EFReminderTable<TDbContext> : IReminderTable where TDbContext : Rem
 
             var record = await ctx.Reminders
                 .AsNoTracking()
-                .SingleOrDefaultAsync(r => r.Name == reminderName && r.GrainId == grainId.ToString())
+                .SingleOrDefaultAsync(r =>
+                    r.ServiceId == this._serviceId &&
+                    r.Name == reminderName &&
+                    r.GrainId == grainId.ToString())
                 .ConfigureAwait(false);
 
             return record is null ? null! : ConvertToEntity(record);

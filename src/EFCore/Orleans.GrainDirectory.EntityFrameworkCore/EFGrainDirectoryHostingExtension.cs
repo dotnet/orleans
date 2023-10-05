@@ -12,13 +12,13 @@ public static class EFGrainDirectoryHostingExtension
 {
     public static ISiloBuilder UseEntityFrameworkCoreGrainDirectoryAsDefault<TDbContext>(
         this ISiloBuilder builder,
-        Action<DbContextOptionsBuilder> configureDatabase) where TDbContext : GrainDirectoryDbContext
+        Action<DbContextOptionsBuilder> configureDatabase) where TDbContext : GrainDirectoryDbContext<TDbContext>
     {
         return builder.ConfigureServices(services => services.AddEntityFrameworkCoreGrainDirectory<TDbContext>(GrainDirectoryAttribute.DEFAULT_GRAIN_DIRECTORY, configureDatabase));
     }
 
     public static ISiloBuilder UseEntityFrameworkCoreGrainDirectoryAsDefault<TDbContext>(
-        this ISiloBuilder builder) where TDbContext : GrainDirectoryDbContext
+        this ISiloBuilder builder) where TDbContext : GrainDirectoryDbContext<TDbContext>
     {
         return builder.ConfigureServices(services => services.AddEntityFrameworkCoreGrainDirectory<TDbContext>(GrainDirectoryAttribute.DEFAULT_GRAIN_DIRECTORY));
     }
@@ -26,14 +26,14 @@ public static class EFGrainDirectoryHostingExtension
     public static ISiloBuilder AddEntityFrameworkCoreGrainDirectory<TDbContext>(
         this ISiloBuilder builder,
         string name,
-        Action<DbContextOptionsBuilder> configureDatabase) where TDbContext : GrainDirectoryDbContext
+        Action<DbContextOptionsBuilder> configureDatabase) where TDbContext : GrainDirectoryDbContext<TDbContext>
     {
         return builder.ConfigureServices(services => services.AddEntityFrameworkCoreGrainDirectory<TDbContext>(name, configureDatabase));
     }
 
     public static ISiloBuilder AddEntityFrameworkCoreGrainDirectory<TDbContext>(
         this ISiloBuilder builder,
-        string name) where TDbContext : GrainDirectoryDbContext
+        string name) where TDbContext : GrainDirectoryDbContext<TDbContext>
     {
         return builder.ConfigureServices(services => services.AddEntityFrameworkCoreGrainDirectory<TDbContext>(name));
     }
@@ -41,7 +41,7 @@ public static class EFGrainDirectoryHostingExtension
     internal static IServiceCollection AddEntityFrameworkCoreGrainDirectory<TDbContext>(
         this IServiceCollection services,
         string name,
-        Action<DbContextOptionsBuilder> configureDatabase) where TDbContext : GrainDirectoryDbContext
+        Action<DbContextOptionsBuilder> configureDatabase) where TDbContext : GrainDirectoryDbContext<TDbContext>
     {
         services
             .AddPooledDbContextFactory<TDbContext>(configureDatabase)
@@ -52,7 +52,7 @@ public static class EFGrainDirectoryHostingExtension
 
     internal static IServiceCollection AddEntityFrameworkCoreGrainDirectory<TDbContext>(
         this IServiceCollection services,
-        string name) where TDbContext : GrainDirectoryDbContext
+        string name) where TDbContext : GrainDirectoryDbContext<TDbContext>
     {
         services
             .AddSingletonNamedService<IGrainDirectory>(name, (sp, _) => ActivatorUtilities.CreateInstance<EFCoreGrainDirectory<TDbContext>>(sp))
