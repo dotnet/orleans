@@ -2,11 +2,11 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Orleans.Reminders.EntityFrameworkCore.Data;
 
-public class ReminderDbContext : DbContext
+public class ReminderDbContext<TDbContext> : DbContext where TDbContext : DbContext
 {
     public DbSet<ReminderRecord> Reminders { get; set; } = default!;
 
-    public ReminderDbContext(DbContextOptions<ReminderDbContext> options) : base(options)
+    public ReminderDbContext(DbContextOptions<TDbContext> options) : base(options)
     {
     }
 

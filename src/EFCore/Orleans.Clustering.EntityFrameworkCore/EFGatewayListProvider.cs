@@ -13,7 +13,7 @@ using Orleans.Clustering.EntityFrameworkCore.Data;
 
 namespace Orleans.Clustering.EntityFrameworkCore;
 
-internal class EFGatewayListProvider<TDbContext> : IGatewayListProvider where TDbContext : ClusterDbContext
+internal class EFGatewayListProvider<TDbContext> : IGatewayListProvider where TDbContext : ClusterDbContext<TDbContext>
 {
     private readonly ILogger _logger;
     private readonly string _clusterId;

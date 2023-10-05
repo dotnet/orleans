@@ -18,7 +18,7 @@ public static class EFReminderHostingExtension
     /// <returns>
     /// The provided <see cref="ISiloBuilder"/>, for chaining.
     /// </returns>
-    public static ISiloBuilder UseEntityFrameworkCoreReminderService<TDbContext>(this ISiloBuilder builder) where TDbContext : ReminderDbContext
+    public static ISiloBuilder UseEntityFrameworkCoreReminderService<TDbContext>(this ISiloBuilder builder) where TDbContext : ReminderDbContext<TDbContext>
     {
         builder.Services.UseEntityFrameworkCoreReminderService<TDbContext>();
         return builder;
@@ -36,7 +36,7 @@ public static class EFReminderHostingExtension
     /// <returns>
     /// The provided <see cref="ISiloBuilder"/>, for chaining.
     /// </returns>
-    public static ISiloBuilder UseEntityFrameworkCoreReminderService<TDbContext>(this ISiloBuilder builder, Action<DbContextOptionsBuilder> configureDatabase) where TDbContext : ReminderDbContext
+    public static ISiloBuilder UseEntityFrameworkCoreReminderService<TDbContext>(this ISiloBuilder builder, Action<DbContextOptionsBuilder> configureDatabase) where TDbContext : ReminderDbContext<TDbContext>
     {
         builder.Services.UseEntityFrameworkCoreReminderService<TDbContext>(configureDatabase);
         return builder;
@@ -54,7 +54,7 @@ public static class EFReminderHostingExtension
     /// <returns>
     /// The provided <see cref="IServiceCollection"/>, for chaining.
     /// </returns>
-    public static IServiceCollection UseEntityFrameworkCoreReminderService<TDbContext>(this IServiceCollection services, Action<DbContextOptionsBuilder> configureDatabase) where TDbContext : ReminderDbContext
+    public static IServiceCollection UseEntityFrameworkCoreReminderService<TDbContext>(this IServiceCollection services, Action<DbContextOptionsBuilder> configureDatabase) where TDbContext : ReminderDbContext<TDbContext>
     {
         return services
             .AddPooledDbContextFactory<TDbContext>(configureDatabase)
@@ -70,7 +70,7 @@ public static class EFReminderHostingExtension
     /// <returns>
     /// The provided <see cref="IServiceCollection"/>, for chaining.
     /// </returns>
-    public static IServiceCollection UseEntityFrameworkCoreReminderService<TDbContext>(this IServiceCollection services) where TDbContext : ReminderDbContext
+    public static IServiceCollection UseEntityFrameworkCoreReminderService<TDbContext>(this IServiceCollection services) where TDbContext : ReminderDbContext<TDbContext>
     {
         services.AddReminders();
         services.AddSingleton<IReminderTable, EFReminderTable<TDbContext>>();

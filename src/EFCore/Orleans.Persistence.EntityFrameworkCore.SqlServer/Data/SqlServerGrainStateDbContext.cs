@@ -1,12 +1,11 @@
 using Microsoft.EntityFrameworkCore;
+using Orleans.Persistence.EntityFrameworkCore.Data;
 
-namespace Orleans.Persistence.EntityFrameworkCore.Data;
+namespace Orleans.Persistence.EntityFrameworkCore.SqlServer.Data;
 
-public class GrainStateDbContext<TDbContext> : DbContext where TDbContext : DbContext
+public class SqlServerGrainStateDbContext : GrainStateDbContext<SqlServerGrainStateDbContext>
 {
-    public DbSet<GrainStateRecord> GrainState { get; set; } = default!;
-
-    public GrainStateDbContext(DbContextOptions<TDbContext> options) : base(options)
+    public SqlServerGrainStateDbContext(DbContextOptions<SqlServerGrainStateDbContext> options) : base(options)
     {
     }
 
@@ -14,7 +13,7 @@ public class GrainStateDbContext<TDbContext> : DbContext where TDbContext : DbCo
     {
         modelBuilder.Entity<GrainStateRecord>(c =>
         {
-            c.HasKey(p => new {p.ServiceId, p.GrainType, p.StateType, p.GrainId});
+            c.HasKey(p => new {p.ServiceId, p.GrainType, p.StateType, p.GrainId}).IsClustered(false).HasName("PK_GrainState");
             c.Property(p => p.ServiceId).HasMaxLength(280).IsRequired();
             c.Property(p => p.GrainType).HasMaxLength(280).IsRequired();
             c.Property(p => p.StateType).HasMaxLength(280).IsRequired();

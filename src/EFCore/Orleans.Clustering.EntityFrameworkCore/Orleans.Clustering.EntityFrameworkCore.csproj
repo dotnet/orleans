@@ -9,6 +9,10 @@
     <TargetFrameworks>$(DefaultTargetFrameworks)</TargetFrameworks>
   </PropertyGroup>
 
+  <ItemGroup>
+    <InternalsVisibleTo Include="Orleans.Clustering.EntityFrameworkCore.SqlServer"/>
+  </ItemGroup>
+
   <PropertyGroup>
     <AssemblyName>Orleans.Clustering.EntityFrameworkCore</AssemblyName>
     <RootNamespace>Orleans.Clustering.EntityFrameworkCore</RootNamespace>
