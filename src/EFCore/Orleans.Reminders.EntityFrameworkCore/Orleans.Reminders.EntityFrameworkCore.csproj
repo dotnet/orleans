@@ -9,6 +9,10 @@
     <TargetFrameworks>$(DefaultTargetFrameworks)</TargetFrameworks>
   </PropertyGroup>
 
+  <ItemGroup>
+    <InternalsVisibleTo Include="Orleans.Reminders.EntityFrameworkCore.SqlServer"/>
+  </ItemGroup>
+
   <PropertyGroup>
     <AssemblyName>Orleans.Reminders.EntityFrameworkCore</AssemblyName>
     <RootNamespace>Orleans.Reminders.EntityFrameworkCore</RootNamespace>

@@ -13,7 +13,7 @@ using Orleans.Persistence.EntityFrameworkCore.Data;
 
 namespace Orleans.Persistence.EntityFrameworkCore;
 
-internal class EFGrainStorage<TDbContext> : IGrainStorage, ILifecycleParticipant<ISiloLifecycle> where TDbContext : GrainStateDbContext
+internal class EFGrainStorage<TDbContext> : IGrainStorage, ILifecycleParticipant<ISiloLifecycle> where TDbContext : GrainStateDbContext<TDbContext>
 {
     private readonly ILogger _logger;
     private readonly string _name;
@@ -199,7 +199,7 @@ internal class EFGrainStorage<TDbContext> : IGrainStorage, ILifecycleParticipant
 
 internal static class EFStorageFactory
 {
-    public static IGrainStorage Create<TDbContext>(IServiceProvider services, string name) where TDbContext : GrainStateDbContext
+    public static IGrainStorage Create<TDbContext>(IServiceProvider services, string name) where TDbContext : GrainStateDbContext<TDbContext>
     {
         return ActivatorUtilities.CreateInstance<EFGrainStorage<TDbContext>>(services, name);
     }
