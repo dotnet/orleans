@@ -24,7 +24,7 @@ public static class EFClusteringExtensions
     /// </returns>
     public static ISiloBuilder UseEntityFrameworkCoreClustering<TDbContext>(
         this ISiloBuilder builder,
-        Action<DbContextOptionsBuilder> configureDatabase) where TDbContext : ClusterDbContext
+        Action<DbContextOptionsBuilder> configureDatabase) where TDbContext : ClusterDbContext<TDbContext>
     {
         return builder
             .ConfigureServices(services =>
@@ -36,7 +36,7 @@ public static class EFClusteringExtensions
 
     /// <summary>
     /// Configures the silo to use Entity Framework Core for clustering.
-    /// This overload expects a <see cref="ClusterDbContext"/> to be registered already.
+    /// This overload expects a <see cref="ClusterDbContext{TDbContext}"/> to be registered already.
     /// </summary>
     /// <param name="builder">
     /// The silo builder.
@@ -45,7 +45,7 @@ public static class EFClusteringExtensions
     /// The provided <see cref="ISiloBuilder"/>.
     /// </returns>
     public static ISiloBuilder UseEntityFrameworkCoreClustering<TDbContext>(
-        this ISiloBuilder builder) where TDbContext : ClusterDbContext
+        this ISiloBuilder builder) where TDbContext : ClusterDbContext<TDbContext>
     {
         return builder
             .ConfigureServices(services =>
@@ -68,7 +68,7 @@ public static class EFClusteringExtensions
     /// </returns>
     public static IClientBuilder UseEntityFrameworkCoreClustering<TDbContext>(
         this IClientBuilder builder,
-        Action<DbContextOptionsBuilder> configureDatabase) where TDbContext : ClusterDbContext
+        Action<DbContextOptionsBuilder> configureDatabase) where TDbContext : ClusterDbContext<TDbContext>
     {
         return builder
             .ConfigureServices(services =>
@@ -80,7 +80,7 @@ public static class EFClusteringExtensions
 
     /// <summary>
     /// Configures the silo to use Entity Framework Core for clustering.
-    /// This overload expects a <see cref="ClusterDbContext"/> to be registered already.
+    /// This overload expects a <see cref="ClusterDbContext{TDbContext}"/> to be registered already.
     /// </summary>
     /// <param name="builder">
     /// The silo builder.
@@ -89,7 +89,7 @@ public static class EFClusteringExtensions
     /// The provided <see cref="ISiloBuilder"/>.
     /// </returns>
     public static IClientBuilder UseEntityFrameworkCoreClustering<TDbContext>(
-        this IClientBuilder builder) where TDbContext : ClusterDbContext
+        this IClientBuilder builder) where TDbContext : ClusterDbContext<TDbContext>
     {
         return builder
             .ConfigureServices(services =>

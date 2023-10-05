@@ -1,0 +1,29 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <PackageId>Microsoft.Orleans.GrainDirectory.EntityFrameworkCore.SqlServer</PackageId>
+    <Title>Microsoft Orleans Entity Framework Core (Sql Server) Grain Directory Provider</Title>
+    <Description>Microsoft Orleans GrainDirectory provider backed by Entity Framework Core for Sql Server</Description>
+    <PackageTags>$(PackageTags) Entity Framework Core SQL MySQL PostgreSQL Oracle</PackageTags>
+    <Nullable>enable</Nullable>
+    <TargetFrameworks>$(DefaultTargetFrameworks)</TargetFrameworks>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <AssemblyName>Orleans.GrainDirectory.EntityFrameworkCore.SqlServer</AssemblyName>
+    <RootNamespace>Orleans.GrainDirectory.EntityFrameworkCore.SqlServer</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer"/>
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers</IncludeAssets>
+    </PackageReference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="$(SourceRoot)src\EFCore\Orleans.GrainDirectory.EntityFrameworkCore\Orleans.GrainDirectory.EntityFrameworkCore.csproj"/>
+  </ItemGroup>
+
+</Project>
