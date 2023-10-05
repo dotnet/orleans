@@ -224,6 +224,9 @@ EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Orleans.Serialization.Protobuf", "src\Serializers\Orleans.Serialization.Protobuf\Orleans.Serialization.Protobuf.csproj", "{A073C0EE-8732-42F9-A22E-D47034E25076}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "EFCore", "EFCore", "{616ECAC3-2EA7-4819-9A05-EF4F4D8DDFA8}"
+	ProjectSection(SolutionItems) = preProject
+		src\EFCore\Readme.md = src\EFCore\Readme.md
+	EndProjectSection
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Orleans.Clustering.EntityFrameworkCore", "src\EFCore\Orleans.Clustering.EntityFrameworkCore\Orleans.Clustering.EntityFrameworkCore.csproj", "{3DE92182-011E-4518-AE68-78C6547FFFCF}"
 EndProject
@@ -232,6 +235,16 @@ EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Orleans.Reminders.EntityFrameworkCore", "src\EFCore\Orleans.Reminders.EntityFrameworkCore\Orleans.Reminders.EntityFrameworkCore.csproj", "{084715C6-2A31-452B-8AFF-FAC7E6F70445}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Orleans.GrainDirectory.EntityFrameworkCore", "src\EFCore\Orleans.GrainDirectory.EntityFrameworkCore\Orleans.GrainDirectory.EntityFrameworkCore.csproj", "{D772413C-B6EC-4CBC-8D1E-714176A81F26}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Tester.EFCore", "test\Extensions\Tester.EFCore\Tester.EFCore.csproj", "{638B4CAA-856E-43CE-9888-A8F021350AE0}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Orleans.Clustering.EntityFrameworkCore.SqlServer", "src\EFCore\Orleans.Clustering.EntityFrameworkCore.SqlServer\Orleans.Clustering.EntityFrameworkCore.SqlServer.csproj", "{C02CCF05-CBA0-4C1C-8622-50BD01928502}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Orleans.GrainDirectory.EntityFrameworkCore.SqlServer", "src\EFCore\Orleans.GrainDirectory.EntityFrameworkCore.SqlServer\Orleans.GrainDirectory.EntityFrameworkCore.SqlServer.csproj", "{54F742D9-B721-4B2D-98F1-B2EDA8E8C70F}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Orleans.Persistence.EntityFrameworkCore.SqlServer", "src\EFCore\Orleans.Persistence.EntityFrameworkCore.SqlServer\Orleans.Persistence.EntityFrameworkCore.SqlServer.csproj", "{95F5EC32-BEFC-4FBA-8BEA-857007AEB9C6}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Orleans.Reminders.EntityFrameworkCore.SqlServer", "src\EFCore\Orleans.Reminders.EntityFrameworkCore.SqlServer\Orleans.Reminders.EntityFrameworkCore.SqlServer.csproj", "{CC8ECC81-4160-47E9-B9D7-E578BAC424F7}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -619,6 +632,26 @@ Global
 		{D772413C-B6EC-4CBC-8D1E-714176A81F26}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{D772413C-B6EC-4CBC-8D1E-714176A81F26}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{D772413C-B6EC-4CBC-8D1E-714176A81F26}.Release|Any CPU.Build.0 = Release|Any CPU
+		{638B4CAA-856E-43CE-9888-A8F021350AE0}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{638B4CAA-856E-43CE-9888-A8F021350AE0}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{638B4CAA-856E-43CE-9888-A8F021350AE0}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{638B4CAA-856E-43CE-9888-A8F021350AE0}.Release|Any CPU.Build.0 = Release|Any CPU
+		{C02CCF05-CBA0-4C1C-8622-50BD01928502}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{C02CCF05-CBA0-4C1C-8622-50BD01928502}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{C02CCF05-CBA0-4C1C-8622-50BD01928502}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{C02CCF05-CBA0-4C1C-8622-50BD01928502}.Release|Any CPU.Build.0 = Release|Any CPU
+		{54F742D9-B721-4B2D-98F1-B2EDA8E8C70F}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{54F742D9-B721-4B2D-98F1-B2EDA8E8C70F}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{54F742D9-B721-4B2D-98F1-B2EDA8E8C70F}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{54F742D9-B721-4B2D-98F1-B2EDA8E8C70F}.Release|Any CPU.Build.0 = Release|Any CPU
+		{95F5EC32-BEFC-4FBA-8BEA-857007AEB9C6}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{95F5EC32-BEFC-4FBA-8BEA-857007AEB9C6}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{95F5EC32-BEFC-4FBA-8BEA-857007AEB9C6}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{95F5EC32-BEFC-4FBA-8BEA-857007AEB9C6}.Release|Any CPU.Build.0 = Release|Any CPU
+		{CC8ECC81-4160-47E9-B9D7-E578BAC424F7}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{CC8ECC81-4160-47E9-B9D7-E578BAC424F7}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{CC8ECC81-4160-47E9-B9D7-E578BAC424F7}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{CC8ECC81-4160-47E9-B9D7-E578BAC424F7}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -733,6 +766,11 @@ Global
 		{7E395297-508D-4287-A5AF-FBC9F2B25DCA} = {616ECAC3-2EA7-4819-9A05-EF4F4D8DDFA8}
 		{084715C6-2A31-452B-8AFF-FAC7E6F70445} = {616ECAC3-2EA7-4819-9A05-EF4F4D8DDFA8}
 		{D772413C-B6EC-4CBC-8D1E-714176A81F26} = {616ECAC3-2EA7-4819-9A05-EF4F4D8DDFA8}
+		{638B4CAA-856E-43CE-9888-A8F021350AE0} = {082D25DB-70CA-48F4-93E0-EC3455F494B8}
+		{C02CCF05-CBA0-4C1C-8622-50BD01928502} = {616ECAC3-2EA7-4819-9A05-EF4F4D8DDFA8}
+		{54F742D9-B721-4B2D-98F1-B2EDA8E8C70F} = {616ECAC3-2EA7-4819-9A05-EF4F4D8DDFA8}
+		{95F5EC32-BEFC-4FBA-8BEA-857007AEB9C6} = {616ECAC3-2EA7-4819-9A05-EF4F4D8DDFA8}
+		{CC8ECC81-4160-47E9-B9D7-E578BAC424F7} = {616ECAC3-2EA7-4819-9A05-EF4F4D8DDFA8}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {7BFB3429-B5BB-4DB1-95B4-67D77A864952}

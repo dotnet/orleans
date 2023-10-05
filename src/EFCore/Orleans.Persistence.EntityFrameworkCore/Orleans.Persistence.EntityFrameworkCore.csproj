@@ -9,6 +9,10 @@
     <TargetFrameworks>$(DefaultTargetFrameworks)</TargetFrameworks>
   </PropertyGroup>
 
+  <ItemGroup>
+    <InternalsVisibleTo Include="Orleans.Persistence.EntityFrameworkCore.SqlServer"/>
+  </ItemGroup>
+
   <PropertyGroup>
     <AssemblyName>Orleans.Persistence.EntityFrameworkCore</AssemblyName>
     <RootNamespace>Orleans.Persistence.EntityFrameworkCore</RootNamespace>

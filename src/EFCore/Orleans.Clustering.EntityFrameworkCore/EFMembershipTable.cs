@@ -12,7 +12,7 @@ using Orleans.Clustering.EntityFrameworkCore.Data;
 
 namespace Orleans.Clustering.EntityFrameworkCore;
 
-internal class EFMembershipTable<TDbContext> : IMembershipTable where TDbContext : ClusterDbContext
+internal class EFMembershipTable<TDbContext> : IMembershipTable where TDbContext : ClusterDbContext<TDbContext>
 {
     private readonly ILogger _logger;
     private readonly string _clusterId;
@@ -260,7 +260,7 @@ internal class EFMembershipTable<TDbContext> : IMembershipTable where TDbContext
 
         if (this._self is not { } selfRow)
         {
-            var record = await ctx.Silos.Include(s => s.ClusterId).AsNoTracking()
+            var record = await ctx.Silos.AsNoTracking()
                 .SingleOrDefaultAsync(s =>
                     s.ClusterId == this._clusterId &&
                     s.Address == entry.SiloAddress.Endpoint.Address.ToString() &&
