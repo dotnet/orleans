@@ -3,7 +3,7 @@ using Orleans.Reminders.EntityFrameworkCore.Data;
 
 namespace Orleans.Reminders.EntityFrameworkCore.SqlServer.Data;
 
-public class SqlServerReminderDbContext : ReminderDbContext<SqlServerReminderDbContext>
+public class SqlServerReminderDbContext : ReminderDbContext<SqlServerReminderDbContext, byte[]>
 {
     public SqlServerReminderDbContext(DbContextOptions<SqlServerReminderDbContext> options) : base(options)
     {
@@ -11,7 +11,7 @@ public class SqlServerReminderDbContext : ReminderDbContext<SqlServerReminderDbC
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
-        modelBuilder.Entity<ReminderRecord>(c =>
+        modelBuilder.Entity<ReminderRecord<byte[]>>(c =>
         {
             c.HasKey(p => new {p.ServiceId, p.GrainId, p.Name}).HasName("PK_Reminders");
             c.Property(p => p.ServiceId).IsRequired();

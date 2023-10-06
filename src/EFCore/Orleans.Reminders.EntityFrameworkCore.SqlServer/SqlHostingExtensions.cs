@@ -77,7 +77,8 @@ public static  class SqlHostingExtensions
     public static IServiceCollection UseEntityFrameworkCoreSqlServerReminderService(this IServiceCollection services)
     {
         services.AddReminders();
-        services.AddSingleton<IReminderTable, EFReminderTable<SqlServerReminderDbContext>>();
+        services.AddSingleton<IEFReminderETagConverter<byte[]>, SqlServerReminderETagConverter>();
+        services.AddSingleton<IReminderTable, EFReminderTable<SqlServerReminderDbContext, byte[]>>();
         return services;
     }
 }

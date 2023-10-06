@@ -3,7 +3,7 @@ using Orleans.Persistence.EntityFrameworkCore.Data;
 
 namespace Orleans.Persistence.EntityFrameworkCore.SqlServer.Data;
 
-public class SqlServerGrainStateDbContext : GrainStateDbContext<SqlServerGrainStateDbContext>
+public class SqlServerGrainStateDbContext : GrainStateDbContext<SqlServerGrainStateDbContext, byte[]>
 {
     public SqlServerGrainStateDbContext(DbContextOptions<SqlServerGrainStateDbContext> options) : base(options)
     {
@@ -11,7 +11,7 @@ public class SqlServerGrainStateDbContext : GrainStateDbContext<SqlServerGrainSt
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
-        modelBuilder.Entity<GrainStateRecord>(c =>
+        modelBuilder.Entity<GrainStateRecord<byte[]>>(c =>
         {
             c.HasKey(p => new {p.ServiceId, p.GrainType, p.StateType, p.GrainId}).IsClustered(false).HasName("PK_GrainState");
             c.Property(p => p.ServiceId).HasMaxLength(280).IsRequired();

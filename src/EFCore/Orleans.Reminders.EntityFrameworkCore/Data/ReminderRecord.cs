@@ -2,7 +2,7 @@ using System;
 
 namespace Orleans.Reminders.EntityFrameworkCore.Data;
 
-public class ReminderRecord
+public class ReminderRecord<TETag>
 {
     public string ServiceId { get; set; } = default!;
     public string GrainId { get; set; } = default!;
@@ -10,5 +10,5 @@ public class ReminderRecord
     public DateTimeOffset StartAt { get; set; }
     public TimeSpan Period { get; set; }
     public uint GrainHash { get; set; }
-    public byte[] ETag { get; set; } = Array.Empty<byte>();
+    public TETag ETag { get; set; } = default!;
 }

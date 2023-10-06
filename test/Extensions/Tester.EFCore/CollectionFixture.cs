@@ -1,5 +1,4 @@
 ﻿using TestExtensions;
-using Xunit;
 
 namespace Tester.EFCore;
 
