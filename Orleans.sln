@@ -246,6 +246,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Orleans.Persistence.EntityF
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Orleans.Reminders.EntityFrameworkCore.SqlServer", "src\EFCore\Orleans.Reminders.EntityFrameworkCore.SqlServer\Orleans.Reminders.EntityFrameworkCore.SqlServer.csproj", "{CC8ECC81-4160-47E9-B9D7-E578BAC424F7}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Orleans.Clustering.EntityFrameworkCore.MySql", "src\EFCore\Orleans.Clustering.EntityFrameworkCore.MySql\Orleans.Clustering.EntityFrameworkCore.MySql.csproj", "{AA369C0C-9941-469E-BD5C-E5E5DB632431}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -652,6 +654,10 @@ Global
 		{CC8ECC81-4160-47E9-B9D7-E578BAC424F7}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{CC8ECC81-4160-47E9-B9D7-E578BAC424F7}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{CC8ECC81-4160-47E9-B9D7-E578BAC424F7}.Release|Any CPU.Build.0 = Release|Any CPU
+		{AA369C0C-9941-469E-BD5C-E5E5DB632431}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{AA369C0C-9941-469E-BD5C-E5E5DB632431}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{AA369C0C-9941-469E-BD5C-E5E5DB632431}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{AA369C0C-9941-469E-BD5C-E5E5DB632431}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -771,6 +777,7 @@ Global
 		{54F742D9-B721-4B2D-98F1-B2EDA8E8C70F} = {616ECAC3-2EA7-4819-9A05-EF4F4D8DDFA8}
 		{95F5EC32-BEFC-4FBA-8BEA-857007AEB9C6} = {616ECAC3-2EA7-4819-9A05-EF4F4D8DDFA8}
 		{CC8ECC81-4160-47E9-B9D7-E578BAC424F7} = {616ECAC3-2EA7-4819-9A05-EF4F4D8DDFA8}
+		{AA369C0C-9941-469E-BD5C-E5E5DB632431} = {616ECAC3-2EA7-4819-9A05-EF4F4D8DDFA8}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {7BFB3429-B5BB-4DB1-95B4-67D77A864952}

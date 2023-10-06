@@ -3,7 +3,7 @@ using Orleans.GrainDirectory.EntityFrameworkCore.Data;
 
 namespace Orleans.GrainDirectory.EntityFrameworkCore.SqlServer.Data;
 
-public class SqlServerGrainDirectoryDbContext : GrainDirectoryDbContext<SqlServerGrainDirectoryDbContext>
+public class SqlServerGrainDirectoryDbContext : GrainDirectoryDbContext<SqlServerGrainDirectoryDbContext, byte[]>
 {
     public SqlServerGrainDirectoryDbContext(DbContextOptions<SqlServerGrainDirectoryDbContext> options) : base(options)
     {
@@ -11,7 +11,7 @@ public class SqlServerGrainDirectoryDbContext : GrainDirectoryDbContext<SqlServe
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
-        modelBuilder.Entity<GrainActivationRecord>(c =>
+        modelBuilder.Entity<GrainActivationRecord<byte[]>>(c =>
         {
             c.HasKey(p => new {p.ClusterId, p.GrainId}).IsClustered(false).HasName("PK_Activations");
             c.Property(p => p.ClusterId).IsRequired();

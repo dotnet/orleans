@@ -12,20 +12,23 @@ using Orleans.GrainDirectory.EntityFrameworkCore.Data;
 
 namespace Orleans.GrainDirectory.EntityFrameworkCore;
 
-public class EFCoreGrainDirectory<TDbContext> : IGrainDirectory, ILifecycleParticipant<ISiloLifecycle> where TDbContext : GrainDirectoryDbContext<TDbContext>
+public class EFCoreGrainDirectory<TDbContext, TETag> : IGrainDirectory, ILifecycleParticipant<ISiloLifecycle> where TDbContext : GrainDirectoryDbContext<TDbContext, TETag>
 {
     private readonly ILogger _logger;
     private readonly IDbContextFactory<TDbContext> _dbContextFactory;
+    private readonly IEFGrainDirectoryETagConverter<TETag> _eTagConverter;
     private readonly string _clusterId;
 
     public EFCoreGrainDirectory(
         ILoggerFactory loggerFactory,
         IDbContextFactory<TDbContext> dbContextFactory,
-        IOptions<ClusterOptions> clusterOptions)
+        IOptions<ClusterOptions> clusterOptions,
+        IEFGrainDirectoryETagConverter<TETag> eTagConverter)
     {
-        this._logger = loggerFactory.CreateLogger<EFCoreGrainDirectory<TDbContext>>();
+        this._logger = loggerFactory.CreateLogger<EFCoreGrainDirectory<TDbContext, TETag>>();
         this._dbContextFactory = dbContextFactory;
         this._clusterId = clusterOptions.Value.ClusterId;
+        this._eTagConverter = eTagConverter;
     }
 
     public Task<GrainAddress?> Register(GrainAddress address) => this.Register(address, null);
@@ -47,14 +50,14 @@ public class EFCoreGrainDirectory<TDbContext> : IGrainDirectory, ILifecycleParti
                         c.GrainId == grainIdStr)
                     .ConfigureAwait(false);
 
-                var previousRecord = this.FromGrainAddress(previousAddress);
+                var previousEntry = this.FromGrainAddress(previousAddress);
 
                 if (record is null)
                 {
                     ctx.Activations.Add(toRegister);
                     await ctx.SaveChangesAsync().ConfigureAwait(false);
                 }
-                else if (record.ActivationId != previousRecord.ActivationId || record.SiloAddress != previousRecord.SiloAddress)
+                else if (record.ActivationId != previousEntry.ActivationId || record.SiloAddress != previousEntry.SiloAddress)
                 {
                     return await Lookup(address.GrainId).ConfigureAwait(false);
                 }
@@ -65,7 +68,7 @@ public class EFCoreGrainDirectory<TDbContext> : IGrainDirectory, ILifecycleParti
                     ctx.Activations.Update(toRegister);
                     await ctx.SaveChangesAsync().ConfigureAwait(false);
 
-                    return address;
+                    return this.ToGrainAddress(toRegister);
                 }
             }
             else
@@ -74,11 +77,10 @@ public class EFCoreGrainDirectory<TDbContext> : IGrainDirectory, ILifecycleParti
                 await ctx.SaveChangesAsync().ConfigureAwait(false);
             }
         }
-        catch (Exception exc)
+        catch
         {
-            this._logger.LogWarning(exc, "Unable to update Grain Directory");
-            WrappedException.CreateAndRethrow(exc);
-            throw;
+            // Possible race condition?
+            return await Lookup(address.GrainId).ConfigureAwait(false);
         }
 
         return await Lookup(address.GrainId).ConfigureAwait(false);
@@ -195,19 +197,19 @@ public class EFCoreGrainDirectory<TDbContext> : IGrainDirectory, ILifecycleParti
 
     public void Participate(ISiloLifecycle lifecycle)
     {
-        lifecycle.Subscribe(nameof(EFCoreGrainDirectory<TDbContext>), ServiceLifecycleStage.RuntimeInitialize, InitializeIfNeeded);
+        lifecycle.Subscribe(nameof(EFCoreGrainDirectory<TDbContext, TETag>), ServiceLifecycleStage.RuntimeInitialize, InitializeIfNeeded);
     }
 
-    public GrainAddress ToGrainAddress(GrainActivationRecord record)
+    public GrainAddress ToGrainAddress(GrainActivationRecord<TETag> record)
     {
         return new GrainAddress {GrainId = GrainId.Parse(record.GrainId), SiloAddress = SiloAddress.FromParsableString(record.SiloAddress), ActivationId = ActivationId.FromParsableString(record.ActivationId), MembershipVersion = new MembershipVersion(record.MembershipVersion)};
     }
 
-    private GrainActivationRecord FromGrainAddress(GrainAddress address)
+    private GrainActivationRecord<TETag> FromGrainAddress(GrainAddress address)
     {
         ArgumentNullException.ThrowIfNull(address.SiloAddress);
 
-        return new GrainActivationRecord
+        return new GrainActivationRecord<TETag>
         {
             ClusterId = this._clusterId,
             GrainId = address.GrainId.ToString(),

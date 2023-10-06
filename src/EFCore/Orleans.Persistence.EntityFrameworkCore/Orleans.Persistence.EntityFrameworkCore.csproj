@@ -11,6 +11,7 @@
 
   <ItemGroup>
     <InternalsVisibleTo Include="Orleans.Persistence.EntityFrameworkCore.SqlServer"/>
+    <InternalsVisibleTo Include="Tester.EFCore"/>
   </ItemGroup>
 
   <PropertyGroup>

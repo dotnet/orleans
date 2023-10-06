@@ -13,27 +13,30 @@ using Orleans.Persistence.EntityFrameworkCore.Data;
 
 namespace Orleans.Persistence.EntityFrameworkCore;
 
-internal class EFGrainStorage<TDbContext> : IGrainStorage, ILifecycleParticipant<ISiloLifecycle> where TDbContext : GrainStateDbContext<TDbContext>
+internal class EFGrainStorage<TDbContext, TETag> : IGrainStorage, ILifecycleParticipant<ISiloLifecycle> where TDbContext : GrainStateDbContext<TDbContext, TETag>
 {
+    private const string ANY_ETAG = "*";
     private readonly ILogger _logger;
     private readonly string _name;
     private readonly string _serviceId;
     private readonly IServiceProvider _serviceProvider;
     private readonly IDbContextFactory<TDbContext> _dbContextFactory;
+    private readonly IEFGrainStorageETagConverter<TETag> _eTagConverter;
 
     public EFGrainStorage(
         string name,
         ILoggerFactory loggerFactory,
         IOptions<ClusterOptions> clusterOptions,
+        IDbContextFactory<TDbContext> dbContextFactory,
+        IEFGrainStorageETagConverter<TETag> eTagConverter,
         IServiceProvider serviceProvider)
     {
         this._serviceProvider = serviceProvider;
         this._name = name;
         this._serviceId = clusterOptions.Value.ServiceId;
-        this._logger = loggerFactory.CreateLogger<EFGrainStorage<TDbContext>>();
-
-        var dbContextFactory = this._serviceProvider.GetService<IDbContextFactory<TDbContext>>();
-        this._dbContextFactory = dbContextFactory ?? throw new OrleansConfigurationException("There are no GrainStateDbContext registered");
+        this._logger = loggerFactory.CreateLogger<EFGrainStorage<TDbContext, TETag>>();
+        this._dbContextFactory = dbContextFactory;
+        this._eTagConverter = eTagConverter;
     }
 
     public async Task ReadStateAsync<T>(string stateName, GrainId grainId, IGrainState<T> grainState)
@@ -63,7 +66,7 @@ internal class EFGrainStorage<TDbContext> : IGrainStorage, ILifecycleParticipant
             grainState.State = !string.IsNullOrEmpty(record.Data) ? JsonSerializer.Deserialize<T>(record.Data)! : Activator.CreateInstance<T>();
 
             grainState.RecordExists = true;
-            grainState.ETag = BitConverter.ToUInt64(record.ETag).ToString();
+            grainState.ETag = this._eTagConverter.FromDbETag(record.ETag);
         }
         catch (Exception ex)
         {
@@ -82,7 +85,7 @@ internal class EFGrainStorage<TDbContext> : IGrainStorage, ILifecycleParticipant
 
         var ctx = this._dbContextFactory.CreateDbContext();
 
-        var record = new GrainStateRecord
+        var record = new GrainStateRecord<TETag>
         {
             ServiceId = this._serviceId,
             GrainType = grainType,
@@ -91,26 +94,43 @@ internal class EFGrainStorage<TDbContext> : IGrainStorage, ILifecycleParticipant
             Data = JsonSerializer.Serialize(grainState.State),
         };
 
-        if (grainState.RecordExists)
+        if (string.IsNullOrWhiteSpace(grainState.ETag))
         {
-            record.ETag = BitConverter.GetBytes(ulong.Parse(grainState.ETag));
-            ctx.GrainState.Update(record);
+            ctx.GrainState.Add(record);
+        }
+        else if (grainState.ETag == ANY_ETAG)
+        {
+            var etag = await ctx.GrainState.AsNoTracking().Where(r =>
+                    r.ServiceId == this._serviceId &&
+                    r.GrainType == grainType &&
+                    r.StateType == stateName &&
+                    r.GrainId == id)
+                .Select(r => r.ETag)
+                .FirstOrDefaultAsync();
+
+            if (etag is not null)
+            {
+                record.ETag = etag;
+            }
+
+            ctx.Update(record);
         }
         else
         {
-            ctx.GrainState.Add(record);
+            record.ETag = this._eTagConverter.ToDbETag(grainState.ETag);
+            ctx.GrainState.Update(record);
         }
 
         try
         {
             await ctx.SaveChangesAsync().ConfigureAwait(false);
-            grainState.ETag = BitConverter.ToUInt64(record.ETag).ToString();
+            grainState.ETag = this._eTagConverter.FromDbETag(record.ETag);
             grainState.RecordExists = true;
         }
         catch (DbUpdateConcurrencyException ex)
         {
             var found = await ctx.GrainState.AsNoTracking().SingleOrDefaultAsync(r => r.StateType == grainType && r.GrainId == id).ConfigureAwait(false);
-            var foundETag = found is not null ? found.ETag.ToString() : "<null>";
+            var foundETag = found is not null ? found.ETag?.ToString() : "<null>";
 
             var isEx = new InconsistentStateException(
                 $"Inconsistent state. Operation: Write | State: {stateName} | Grain: {grainType} | GrainId: {id}",
@@ -118,7 +138,7 @@ internal class EFGrainStorage<TDbContext> : IGrainStorage, ILifecycleParticipant
 
             this._logger.LogError(isEx,
                 "Inconsistent state. Operation: {Operation} | State: {State} | Grain: {GrainType} | GrainId: {GrainId} | Expected ETag: {ExpectedETag} | Actual ETag: {ActualETag} ",
-                "Write", stateName, grainType, id, grainState.ETag, found?.ETag);
+                "Write", stateName, grainType, id, grainState.ETag, foundETag);
 
             throw isEx;
         }
@@ -170,7 +190,7 @@ internal class EFGrainStorage<TDbContext> : IGrainStorage, ILifecycleParticipant
             var found = await ctx.GrainState.AsNoTracking()
                 .SingleOrDefaultAsync(r => r.StateType == stateName && r.GrainId == id).ConfigureAwait(false);
 
-            var foundETag = found is not null ? found.ETag.ToString() : "<null>";
+            var foundETag = found is not null ? found.ETag?.ToString() : "<null>";
 
             var isEx = new InconsistentStateException(
                 $"Inconsistent state. Operation: Clear | State: {stateName} | GrainType: {grainType} | GrainId: {id}",
@@ -178,7 +198,7 @@ internal class EFGrainStorage<TDbContext> : IGrainStorage, ILifecycleParticipant
 
             this._logger.LogError(isEx,
                 "Inconsistent state. Operation: {Operation} | State: {State} | GrainType: {GrainType} | GrainId: {GrainId} | Expected ETag: {ExpectedETag} | Actual ETag: {ActualETag} ",
-                "Clear", stateName, grainType, id, grainState.ETag, found?.ETag);
+                "Clear", stateName, grainType, id, grainState.ETag, foundETag);
 
             throw isEx;
         }
@@ -199,8 +219,8 @@ internal class EFGrainStorage<TDbContext> : IGrainStorage, ILifecycleParticipant
 
 internal static class EFStorageFactory
 {
-    public static IGrainStorage Create<TDbContext>(IServiceProvider services, string name) where TDbContext : GrainStateDbContext<TDbContext>
+    public static IGrainStorage Create<TDbContext, TETag>(IServiceProvider services, string name) where TDbContext : GrainStateDbContext<TDbContext, TETag>
     {
-        return ActivatorUtilities.CreateInstance<EFGrainStorage<TDbContext>>(services, name);
+        return ActivatorUtilities.CreateInstance<EFGrainStorage<TDbContext, TETag>>(services, name);
     }
 }

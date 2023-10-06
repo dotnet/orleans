@@ -22,21 +22,21 @@ public static class EFClusteringExtensions
     /// <returns>
     /// The provided <see cref="ISiloBuilder"/>.
     /// </returns>
-    public static ISiloBuilder UseEntityFrameworkCoreClustering<TDbContext>(
+    public static ISiloBuilder UseEntityFrameworkCoreClustering<TDbContext, TEtag>(
         this ISiloBuilder builder,
-        Action<DbContextOptionsBuilder> configureDatabase) where TDbContext : ClusterDbContext<TDbContext>
+        Action<DbContextOptionsBuilder> configureDatabase) where TDbContext : ClusterDbContext<TDbContext, TEtag>
     {
         return builder
             .ConfigureServices(services =>
             {
                 services.AddPooledDbContextFactory<TDbContext>(configureDatabase);
             })
-            .UseEntityFrameworkCoreClustering<TDbContext>();
+            .UseEntityFrameworkCoreClustering<TDbContext, TEtag>();
     }
 
     /// <summary>
     /// Configures the silo to use Entity Framework Core for clustering.
-    /// This overload expects a <see cref="ClusterDbContext{TDbContext}"/> to be registered already.
+    /// This overload expects a <see cref="ClusterDbContext{TDbContext, TEtag}"/> to be registered already.
     /// </summary>
     /// <param name="builder">
     /// The silo builder.
@@ -44,13 +44,14 @@ public static class EFClusteringExtensions
     /// <returns>
     /// The provided <see cref="ISiloBuilder"/>.
     /// </returns>
-    public static ISiloBuilder UseEntityFrameworkCoreClustering<TDbContext>(
-        this ISiloBuilder builder) where TDbContext : ClusterDbContext<TDbContext>
+    public static ISiloBuilder UseEntityFrameworkCoreClustering<TDbContext, TEtag>(
+        this ISiloBuilder builder) where TDbContext : ClusterDbContext<TDbContext, TEtag>
     {
         return builder
             .ConfigureServices(services =>
             {
-                services.AddSingleton<IMembershipTable, EFMembershipTable<TDbContext>>();
+                services
+                    .AddSingleton<IMembershipTable, EFMembershipTable<TDbContext, TEtag>>();
             });
     }
 
@@ -66,21 +67,21 @@ public static class EFClusteringExtensions
     /// <returns>
     /// The provided <see cref="ISiloBuilder"/>.
     /// </returns>
-    public static IClientBuilder UseEntityFrameworkCoreClustering<TDbContext>(
+    public static IClientBuilder UseEntityFrameworkCoreClustering<TDbContext, TEtag>(
         this IClientBuilder builder,
-        Action<DbContextOptionsBuilder> configureDatabase) where TDbContext : ClusterDbContext<TDbContext>
+        Action<DbContextOptionsBuilder> configureDatabase) where TDbContext : ClusterDbContext<TDbContext, TEtag>
     {
         return builder
             .ConfigureServices(services =>
             {
                 services.AddPooledDbContextFactory<TDbContext>(configureDatabase);
             })
-            .UseEntityFrameworkCoreClustering<TDbContext>();
+            .UseEntityFrameworkCoreClustering<TDbContext, TEtag>();
     }
 
     /// <summary>
     /// Configures the silo to use Entity Framework Core for clustering.
-    /// This overload expects a <see cref="ClusterDbContext{TDbContext}"/> to be registered already.
+    /// This overload expects a <see cref="ClusterDbContext{TDbContext, TEtag}"/> to be registered already.
     /// </summary>
     /// <param name="builder">
     /// The silo builder.
@@ -88,13 +89,13 @@ public static class EFClusteringExtensions
     /// <returns>
     /// The provided <see cref="ISiloBuilder"/>.
     /// </returns>
-    public static IClientBuilder UseEntityFrameworkCoreClustering<TDbContext>(
-        this IClientBuilder builder) where TDbContext : ClusterDbContext<TDbContext>
+    public static IClientBuilder UseEntityFrameworkCoreClustering<TDbContext, TEtag>(
+        this IClientBuilder builder) where TDbContext : ClusterDbContext<TDbContext, TEtag>
     {
         return builder
             .ConfigureServices(services =>
             {
-                services.AddSingleton<IGatewayListProvider, EFGatewayListProvider<TDbContext>>();
+                services.AddSingleton<IGatewayListProvider, EFGatewayListProvider<TDbContext, TEtag>>();
             });
     }
 }
