@@ -12,21 +12,24 @@ using Orleans.Clustering.EntityFrameworkCore.Data;
 
 namespace Orleans.Clustering.EntityFrameworkCore;
 
-internal class EFMembershipTable<TDbContext> : IMembershipTable where TDbContext : ClusterDbContext<TDbContext>
+internal class EFMembershipTable<TDbContext, TETag> : IMembershipTable where TDbContext : ClusterDbContext<TDbContext, TETag>
 {
     private readonly ILogger _logger;
     private readonly string _clusterId;
     private readonly IDbContextFactory<TDbContext> _dbContextFactory;
-    private SiloRecord? _self;
+    private readonly IEFClusterETagConverter<TETag> _etagConverter;
+    private SiloRecord<TETag>? _self;
 
     public EFMembershipTable(
         ILoggerFactory loggerFactory,
         IOptions<ClusterOptions> clusterOptions,
-        IDbContextFactory<TDbContext> dbContextFactory)
+        IDbContextFactory<TDbContext> dbContextFactory,
+        IEFClusterETagConverter<TETag> etagConverter)
     {
-        this._logger = loggerFactory.CreateLogger<EFMembershipTable<TDbContext>>();
+        this._logger = loggerFactory.CreateLogger<EFMembershipTable<TDbContext, TETag>>();
         this._clusterId = clusterOptions.Value.ClusterId;
         this._dbContextFactory = dbContextFactory;
+        this._etagConverter = etagConverter;
     }
 
     public async Task InitializeMembershipTable(bool tryInitTableVersion)
@@ -44,7 +47,7 @@ internal class EFMembershipTable<TDbContext> : IMembershipTable where TDbContext
 
             if (record is not null) return;
 
-            record = new ClusterRecord {Version = 0, Id = this._clusterId, Timestamp = DateTimeOffset.UtcNow};
+            record = new ClusterRecord<TETag> {Version = 0, Id = this._clusterId, Timestamp = DateTimeOffset.UtcNow};
 
             ctx.Clusters.Add(record);
             await ctx.SaveChangesAsync().ConfigureAwait(false);
@@ -97,7 +100,7 @@ internal class EFMembershipTable<TDbContext> : IMembershipTable where TDbContext
             var silos = await ctx.Silos
                 .Where(s =>
                     s.ClusterId == this._clusterId &&
-                    s.Status == SiloStatus.Dead &&
+                    s.Status != SiloStatus.Active &&
                     s.IAmAliveTime < beforeDate)
                 .ToArrayAsync()
                 .ConfigureAwait(false);
@@ -122,7 +125,7 @@ internal class EFMembershipTable<TDbContext> : IMembershipTable where TDbContext
         {
             var ctx = this._dbContextFactory.CreateDbContext();
 
-            var record = await ctx.Silos.Include(s => s.ClusterId).AsNoTracking()
+            var record = await ctx.Silos.Include(s => s.Cluster).AsNoTracking()
                 .SingleOrDefaultAsync(s =>
                     s.ClusterId == this._clusterId &&
                     s.Address == key.Endpoint.Address.ToString() &&
@@ -137,10 +140,10 @@ internal class EFMembershipTable<TDbContext> : IMembershipTable where TDbContext
 
             var version = new TableVersion(
                 record.Cluster.Version,
-                BitConverter.ToUInt64(record.ETag).ToString()
+                this._etagConverter.FromDbETag(record.Cluster.ETag)
             );
 
-            var memEntries = new List<Tuple<MembershipEntry, string>> {Tuple.Create(ConvertRecord(record), BitConverter.ToUInt64(record.ETag).ToString())};
+            var memEntries = new List<Tuple<MembershipEntry, string>> {Tuple.Create(ConvertRecord(record), this._etagConverter.FromDbETag(record.ETag))};
 
             return new MembershipTableData(memEntries, version);
         }
@@ -169,7 +172,7 @@ internal class EFMembershipTable<TDbContext> : IMembershipTable where TDbContext
 
             var version = new TableVersion(
                 clusterRecord.Version,
-                BitConverter.ToUInt64(clusterRecord.ETag).ToString()
+                this._etagConverter.FromDbETag(clusterRecord.ETag)
             );
 
             var memEntries = new List<Tuple<MembershipEntry, string>>();
@@ -178,7 +181,7 @@ internal class EFMembershipTable<TDbContext> : IMembershipTable where TDbContext
                 try
                 {
                     var membershipEntry = ConvertRecord(siloRecord);
-                    memEntries.Add(new Tuple<MembershipEntry, string>(membershipEntry, BitConverter.ToUInt64(siloRecord.ETag).ToString()));
+                    memEntries.Add(new Tuple<MembershipEntry, string>(membershipEntry, this._etagConverter.FromDbETag(siloRecord.ETag)));
                 }
                 catch (Exception exc)
                 {
@@ -210,11 +213,12 @@ internal class EFMembershipTable<TDbContext> : IMembershipTable where TDbContext
 
             ctx.Clusters.Update(clusterRecord);
             ctx.Silos.Add(siloRecord);
-            await ctx.SaveChangesAsync().ConfigureAwait(false);
+            var affected =await ctx.SaveChangesAsync().ConfigureAwait(false);
             return true;
         }
-        catch (DbUpdateConcurrencyException)
+        catch (DbUpdateException exc)
         {
+            this._logger.LogWarning(exc, "Failure inserting entry for cluster {Cluster}", this._clusterId);
             return false;
         }
         catch (Exception exc)
@@ -231,15 +235,14 @@ internal class EFMembershipTable<TDbContext> : IMembershipTable where TDbContext
         {
             var clusterRecord = this.ConvertToRecord(tableVersion);
             var siloRecord = this.ConvertToRecord(entry);
-            siloRecord.ClusterId = clusterRecord.Id;
-            siloRecord.ETag = BitConverter.GetBytes(ulong.Parse(etag));
+            siloRecord.ETag = this._etagConverter.ToDbETag(etag);
 
             var ctx = this._dbContextFactory.CreateDbContext();
 
             ctx.Clusters.Update(clusterRecord);
             ctx.Silos.Update(siloRecord);
 
-            await ctx.SaveChangesAsync().ConfigureAwait(false);
+            var affected = await ctx.SaveChangesAsync().ConfigureAwait(false);
             return true;
         }
         catch (DbUpdateConcurrencyException)
@@ -294,7 +297,7 @@ internal class EFMembershipTable<TDbContext> : IMembershipTable where TDbContext
         }
     }
 
-    private static MembershipEntry ConvertRecord(in SiloRecord record)
+    private static MembershipEntry ConvertRecord(in SiloRecord<TETag> record)
     {
         var entry = new MembershipEntry
         {
@@ -329,9 +332,9 @@ internal class EFMembershipTable<TDbContext> : IMembershipTable where TDbContext
         return entry;
     }
 
-    private SiloRecord ConvertToRecord(in MembershipEntry memEntry)
+    private SiloRecord<TETag> ConvertToRecord(in MembershipEntry memEntry)
     {
-        var record = new SiloRecord
+        var record = new SiloRecord<TETag>
         {
             ClusterId = this._clusterId,
             Address = memEntry.SiloAddress.Endpoint.Address.ToString(),
@@ -359,8 +362,8 @@ internal class EFMembershipTable<TDbContext> : IMembershipTable where TDbContext
         return record;
     }
 
-    private ClusterRecord ConvertToRecord(in TableVersion tableVersion)
+    private ClusterRecord<TETag> ConvertToRecord(in TableVersion tableVersion)
     {
-        return new() {Id = this._clusterId, Version = tableVersion.Version, Timestamp = DateTimeOffset.UtcNow, ETag = BitConverter.GetBytes(ulong.Parse(tableVersion.VersionEtag))};
+        return new() {Id = this._clusterId, Version = tableVersion.Version, Timestamp = DateTimeOffset.UtcNow, ETag = this._etagConverter.ToDbETag(tableVersion.VersionEtag)};
     }
 }

@@ -18,9 +18,9 @@ public static class EFReminderHostingExtension
     /// <returns>
     /// The provided <see cref="ISiloBuilder"/>, for chaining.
     /// </returns>
-    public static ISiloBuilder UseEntityFrameworkCoreReminderService<TDbContext>(this ISiloBuilder builder) where TDbContext : ReminderDbContext<TDbContext>
+    public static ISiloBuilder UseEntityFrameworkCoreReminderService<TDbContext, TETag>(this ISiloBuilder builder) where TDbContext : ReminderDbContext<TDbContext, TETag>
     {
-        builder.Services.UseEntityFrameworkCoreReminderService<TDbContext>();
+        builder.Services.UseEntityFrameworkCoreReminderService<TDbContext, TETag>();
         return builder;
     }
 
@@ -36,9 +36,9 @@ public static class EFReminderHostingExtension
     /// <returns>
     /// The provided <see cref="ISiloBuilder"/>, for chaining.
     /// </returns>
-    public static ISiloBuilder UseEntityFrameworkCoreReminderService<TDbContext>(this ISiloBuilder builder, Action<DbContextOptionsBuilder> configureDatabase) where TDbContext : ReminderDbContext<TDbContext>
+    public static ISiloBuilder UseEntityFrameworkCoreReminderService<TDbContext, TETag>(this ISiloBuilder builder, Action<DbContextOptionsBuilder> configureDatabase) where TDbContext : ReminderDbContext<TDbContext, TETag>
     {
-        builder.Services.UseEntityFrameworkCoreReminderService<TDbContext>(configureDatabase);
+        builder.Services.UseEntityFrameworkCoreReminderService<TDbContext, TETag>(configureDatabase);
         return builder;
     }
 
@@ -54,11 +54,11 @@ public static class EFReminderHostingExtension
     /// <returns>
     /// The provided <see cref="IServiceCollection"/>, for chaining.
     /// </returns>
-    public static IServiceCollection UseEntityFrameworkCoreReminderService<TDbContext>(this IServiceCollection services, Action<DbContextOptionsBuilder> configureDatabase) where TDbContext : ReminderDbContext<TDbContext>
+    public static IServiceCollection UseEntityFrameworkCoreReminderService<TDbContext, TETag>(this IServiceCollection services, Action<DbContextOptionsBuilder> configureDatabase) where TDbContext : ReminderDbContext<TDbContext, TETag>
     {
         return services
             .AddPooledDbContextFactory<TDbContext>(configureDatabase)
-            .UseEntityFrameworkCoreReminderService<TDbContext>();
+            .UseEntityFrameworkCoreReminderService<TDbContext, TETag>();
     }
 
     /// <summary>
@@ -70,10 +70,10 @@ public static class EFReminderHostingExtension
     /// <returns>
     /// The provided <see cref="IServiceCollection"/>, for chaining.
     /// </returns>
-    public static IServiceCollection UseEntityFrameworkCoreReminderService<TDbContext>(this IServiceCollection services) where TDbContext : ReminderDbContext<TDbContext>
+    public static IServiceCollection UseEntityFrameworkCoreReminderService<TDbContext, TETag>(this IServiceCollection services) where TDbContext : ReminderDbContext<TDbContext, TETag>
     {
         services.AddReminders();
-        services.AddSingleton<IReminderTable, EFReminderTable<TDbContext>>();
+        services.AddSingleton<IReminderTable, EFReminderTable<TDbContext, TETag>>();
         return services;
     }
 }

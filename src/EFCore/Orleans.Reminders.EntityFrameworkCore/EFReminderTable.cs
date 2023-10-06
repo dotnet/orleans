@@ -10,20 +10,23 @@ using Orleans.Reminders.EntityFrameworkCore.Data;
 
 namespace Orleans.Reminders.EntityFrameworkCore;
 
-public class EFReminderTable<TDbContext> : IReminderTable where TDbContext : ReminderDbContext<TDbContext>
+public class EFReminderTable<TDbContext, TETag> : IReminderTable where TDbContext : ReminderDbContext<TDbContext, TETag>
 {
     private readonly ILogger _logger;
     private readonly string _serviceId;
     private readonly IDbContextFactory<TDbContext> _dbContextFactory;
+    private readonly IEFReminderETagConverter<TETag> _eTagConverter;
 
     public EFReminderTable(
         ILoggerFactory loggerFactory,
         IOptions<ClusterOptions> clusterOptions,
-        IDbContextFactory<TDbContext> dbContextFactory)
+        IDbContextFactory<TDbContext> dbContextFactory,
+        IEFReminderETagConverter<TETag> eTagConverter)
     {
-        this._logger = loggerFactory.CreateLogger<EFReminderTable<TDbContext>>();
+        this._logger = loggerFactory.CreateLogger<EFReminderTable<TDbContext, TETag>>();
         this._serviceId = clusterOptions.Value.ServiceId;
         this._dbContextFactory = dbContextFactory;
+        this._eTagConverter = eTagConverter;
     }
 
     public Task Init()
@@ -119,11 +122,34 @@ public class EFReminderTable<TDbContext> : IReminderTable where TDbContext : Rem
 
             var ctx = this._dbContextFactory.CreateDbContext();
 
-            ctx.Reminders.Update(record);
+            if (string.IsNullOrWhiteSpace(entry.ETag))
+            {
+                var foundRecord = await ctx.Reminders
+                    .AsNoTracking()
+                    .SingleOrDefaultAsync(r =>
+                        r.ServiceId == this._serviceId &&
+                        r.Name == entry.ReminderName &&
+                        r.GrainId == entry.GrainId.ToString())
+                    .ConfigureAwait(false);
+
+                if (foundRecord is not null)
+                {
+                    record.ETag = foundRecord.ETag;
+                    ctx.Reminders.Update(record);
+                }
+                else
+                {
+                    ctx.Reminders.Add(record);
+                }
+            }
+            else
+            {
+                ctx.Reminders.Update(record);
+            }
 
             await ctx.SaveChangesAsync().ConfigureAwait(false);
 
-            return BitConverter.ToUInt64(record.ETag).ToString();
+            return this._eTagConverter.FromDbETag(record.ETag);
         }
         catch (Exception exc)
         {
@@ -147,7 +173,7 @@ public class EFReminderTable<TDbContext> : IReminderTable where TDbContext : Rem
 
             if (record is null) return true;
 
-            record.ETag = BitConverter.GetBytes(ulong.Parse(eTag));
+            record.ETag = this._eTagConverter.ToDbETag(eTag);
 
             ctx.Reminders.Remove(record);
 
@@ -195,21 +221,27 @@ public class EFReminderTable<TDbContext> : IReminderTable where TDbContext : Rem
         }
     }
 
-    private ReminderRecord ConvertToRecord(ReminderEntry entry)
+    private ReminderRecord<TETag> ConvertToRecord(ReminderEntry entry)
     {
-        return new ReminderRecord
+        var record = new ReminderRecord<TETag>
         {
             ServiceId = this._serviceId,
             GrainHash = entry.GrainId.GetUniformHashCode(),
             GrainId = entry.GrainId.ToString(),
             Name = entry.ReminderName,
             Period = entry.Period,
-            StartAt = entry.StartAt,
-            ETag = BitConverter.GetBytes(ulong.Parse(entry.ETag))
+            StartAt = entry.StartAt
         };
+
+        if (!string.IsNullOrWhiteSpace(entry.ETag))
+        {
+            record.ETag = this._eTagConverter.ToDbETag(entry.ETag);
+        }
+
+        return record;
     }
 
-    private ReminderEntry ConvertToEntity(ReminderRecord record)
+    private ReminderEntry ConvertToEntity(ReminderRecord<TETag> record)
     {
         return new ReminderEntry
         {
@@ -217,7 +249,7 @@ public class EFReminderTable<TDbContext> : IReminderTable where TDbContext : Rem
             ReminderName = record.Name,
             Period = record.Period,
             StartAt = record.StartAt.UtcDateTime,
-            ETag = BitConverter.ToUInt64(record.ETag).ToString()
+            ETag = this._eTagConverter.FromDbETag(record.ETag)
         };
     }
 }

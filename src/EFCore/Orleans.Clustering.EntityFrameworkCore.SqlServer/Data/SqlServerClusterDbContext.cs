@@ -1,6 +1,6 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.Linq;
+using System.Collections.Generic;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.ChangeTracking;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
@@ -8,7 +8,7 @@ using Orleans.Clustering.EntityFrameworkCore.Data;
 
 namespace Orleans.Clustering.EntityFrameworkCore.SqlServer.Data;
 
-public sealed class SqlServerClusterDbContext : ClusterDbContext<SqlServerClusterDbContext>
+public sealed class SqlServerClusterDbContext : ClusterDbContext<SqlServerClusterDbContext, byte[]>
 {
     public SqlServerClusterDbContext(DbContextOptions<SqlServerClusterDbContext> options) : base(options)
     {
@@ -16,7 +16,7 @@ public sealed class SqlServerClusterDbContext : ClusterDbContext<SqlServerCluste
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
-        modelBuilder.Entity<ClusterRecord>(c =>
+        modelBuilder.Entity<ClusterRecord<byte[]>>(c =>
         {
             c.HasKey(p => p.Id).IsClustered(false).HasName("PK_Cluster");
             c.Property(p => p.Timestamp).IsRequired();
@@ -39,7 +39,7 @@ public sealed class SqlServerClusterDbContext : ClusterDbContext<SqlServerCluste
             c => c.Aggregate(0, (a, v) => HashCode.Combine(a, v.GetHashCode())),
             c => new List<string>(c));
 
-        modelBuilder.Entity<SiloRecord>(c =>
+        modelBuilder.Entity<SiloRecord<byte[]>>(c =>
         {
             c.HasKey(p => new {p.ClusterId, p.Address, p.Port, p.Generation}).IsClustered(false).HasName("PK_Silo");
             c.Property(p => p.Address).HasMaxLength(45).IsRequired();

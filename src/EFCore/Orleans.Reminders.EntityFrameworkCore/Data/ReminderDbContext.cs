@@ -2,9 +2,9 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Orleans.Reminders.EntityFrameworkCore.Data;
 
-public class ReminderDbContext<TDbContext> : DbContext where TDbContext : DbContext
+public class ReminderDbContext<TDbContext, TETag> : DbContext where TDbContext : DbContext
 {
-    public DbSet<ReminderRecord> Reminders { get; set; } = default!;
+    public DbSet<ReminderRecord<TETag>> Reminders { get; set; } = default!;
 
     public ReminderDbContext(DbContextOptions<TDbContext> options) : base(options)
     {
@@ -12,7 +12,7 @@ public class ReminderDbContext<TDbContext> : DbContext where TDbContext : DbCont
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
-        modelBuilder.Entity<ReminderRecord>(c =>
+        modelBuilder.Entity<ReminderRecord<TETag>>(c =>
         {
             c.HasKey(p => new {p.ServiceId, p.GrainId, p.Name});
             c.Property(p => p.ServiceId).IsRequired();
