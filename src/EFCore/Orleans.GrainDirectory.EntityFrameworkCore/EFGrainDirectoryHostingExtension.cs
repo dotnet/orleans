@@ -10,52 +10,52 @@ namespace Orleans.GrainDirectory;
 
 public static class EFGrainDirectoryHostingExtension
 {
-    public static ISiloBuilder UseEntityFrameworkCoreGrainDirectoryAsDefault<TDbContext>(
+    public static ISiloBuilder UseEntityFrameworkCoreGrainDirectoryAsDefault<TDbContext, TETag>(
         this ISiloBuilder builder,
-        Action<DbContextOptionsBuilder> configureDatabase) where TDbContext : GrainDirectoryDbContext<TDbContext>
+        Action<DbContextOptionsBuilder> configureDatabase) where TDbContext : GrainDirectoryDbContext<TDbContext, TETag>
     {
-        return builder.ConfigureServices(services => services.AddEntityFrameworkCoreGrainDirectory<TDbContext>(GrainDirectoryAttribute.DEFAULT_GRAIN_DIRECTORY, configureDatabase));
+        return builder.ConfigureServices(services => services.AddEntityFrameworkCoreGrainDirectory<TDbContext, TETag>(GrainDirectoryAttribute.DEFAULT_GRAIN_DIRECTORY, configureDatabase));
     }
 
-    public static ISiloBuilder UseEntityFrameworkCoreGrainDirectoryAsDefault<TDbContext>(
-        this ISiloBuilder builder) where TDbContext : GrainDirectoryDbContext<TDbContext>
+    public static ISiloBuilder UseEntityFrameworkCoreGrainDirectoryAsDefault<TDbContext, TETag>(
+        this ISiloBuilder builder) where TDbContext : GrainDirectoryDbContext<TDbContext, TETag>
     {
-        return builder.ConfigureServices(services => services.AddEntityFrameworkCoreGrainDirectory<TDbContext>(GrainDirectoryAttribute.DEFAULT_GRAIN_DIRECTORY));
+        return builder.ConfigureServices(services => services.AddEntityFrameworkCoreGrainDirectory<TDbContext, TETag>(GrainDirectoryAttribute.DEFAULT_GRAIN_DIRECTORY));
     }
 
-    public static ISiloBuilder AddEntityFrameworkCoreGrainDirectory<TDbContext>(
+    public static ISiloBuilder AddEntityFrameworkCoreGrainDirectory<TDbContext, TETag>(
         this ISiloBuilder builder,
         string name,
-        Action<DbContextOptionsBuilder> configureDatabase) where TDbContext : GrainDirectoryDbContext<TDbContext>
+        Action<DbContextOptionsBuilder> configureDatabase) where TDbContext : GrainDirectoryDbContext<TDbContext, TETag>
     {
-        return builder.ConfigureServices(services => services.AddEntityFrameworkCoreGrainDirectory<TDbContext>(name, configureDatabase));
+        return builder.ConfigureServices(services => services.AddEntityFrameworkCoreGrainDirectory<TDbContext, TETag>(name, configureDatabase));
     }
 
-    public static ISiloBuilder AddEntityFrameworkCoreGrainDirectory<TDbContext>(
+    public static ISiloBuilder AddEntityFrameworkCoreGrainDirectory<TDbContext, TETag>(
         this ISiloBuilder builder,
-        string name) where TDbContext : GrainDirectoryDbContext<TDbContext>
+        string name) where TDbContext : GrainDirectoryDbContext<TDbContext, TETag>
     {
-        return builder.ConfigureServices(services => services.AddEntityFrameworkCoreGrainDirectory<TDbContext>(name));
+        return builder.ConfigureServices(services => services.AddEntityFrameworkCoreGrainDirectory<TDbContext, TETag>(name));
     }
 
-    internal static IServiceCollection AddEntityFrameworkCoreGrainDirectory<TDbContext>(
+    internal static IServiceCollection AddEntityFrameworkCoreGrainDirectory<TDbContext, TETag>(
         this IServiceCollection services,
         string name,
-        Action<DbContextOptionsBuilder> configureDatabase) where TDbContext : GrainDirectoryDbContext<TDbContext>
+        Action<DbContextOptionsBuilder> configureDatabase) where TDbContext : GrainDirectoryDbContext<TDbContext, TETag>
     {
         services
             .AddPooledDbContextFactory<TDbContext>(configureDatabase)
-            .AddEntityFrameworkCoreGrainDirectory<TDbContext>(name);
+            .AddEntityFrameworkCoreGrainDirectory<TDbContext, TETag>(name);
 
         return services;
     }
 
-    internal static IServiceCollection AddEntityFrameworkCoreGrainDirectory<TDbContext>(
+    internal static IServiceCollection AddEntityFrameworkCoreGrainDirectory<TDbContext, TETag>(
         this IServiceCollection services,
-        string name) where TDbContext : GrainDirectoryDbContext<TDbContext>
+        string name) where TDbContext : GrainDirectoryDbContext<TDbContext, TETag>
     {
         services
-            .AddSingletonNamedService<IGrainDirectory>(name, (sp, _) => ActivatorUtilities.CreateInstance<EFCoreGrainDirectory<TDbContext>>(sp))
+            .AddSingletonNamedService<IGrainDirectory>(name, (sp, _) => ActivatorUtilities.CreateInstance<EFCoreGrainDirectory<TDbContext, TETag>>(sp))
             .AddSingletonNamedService<ILifecycleParticipant<ISiloLifecycle>>(name, (s, n) => (ILifecycleParticipant<ISiloLifecycle>)s.GetRequiredServiceByName<IGrainDirectory>(n));
 
         return services;

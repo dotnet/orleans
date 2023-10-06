@@ -38,6 +38,7 @@
     <PackageVersion Include="Microsoft.EntityFrameworkCore" Version="8.0.29" />
     <PackageVersion Include="Microsoft.EntityFrameworkCore.Design" Version="8.0.29" />
     <PackageVersion Include="Microsoft.EntityFrameworkCore.SqlServer" Version="8.0.29" />
+    <PackageVersion Include="MySql.EntityFrameworkCore" Version="8.0.28" />
     <PackageVersion Include="Hyperion" Version="0.12.2" />
     <PackageVersion Include="KubernetesClient" Version="18.0.13" />
     <PackageVersion Include="MessagePack" Version="3.1.7" />

@@ -2,9 +2,9 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Orleans.Persistence.EntityFrameworkCore.Data;
 
-public class GrainStateDbContext<TDbContext> : DbContext where TDbContext : DbContext
+public class GrainStateDbContext<TDbContext, TETag> : DbContext where TDbContext : DbContext
 {
-    public DbSet<GrainStateRecord> GrainState { get; set; } = default!;
+    public DbSet<GrainStateRecord<TETag>> GrainState { get; set; } = default!;
 
     public GrainStateDbContext(DbContextOptions<TDbContext> options) : base(options)
     {
@@ -12,7 +12,7 @@ public class GrainStateDbContext<TDbContext> : DbContext where TDbContext : DbCo
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
-        modelBuilder.Entity<GrainStateRecord>(c =>
+        modelBuilder.Entity<GrainStateRecord<TETag>>(c =>
         {
             c.HasKey(p => new {p.ServiceId, p.GrainType, p.StateType, p.GrainId});
             c.Property(p => p.ServiceId).HasMaxLength(280).IsRequired();

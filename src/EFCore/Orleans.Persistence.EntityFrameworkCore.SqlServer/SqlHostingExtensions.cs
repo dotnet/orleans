@@ -99,8 +99,9 @@ public static class SqlHostingExtensions
         this IServiceCollection services,
         string name)
     {
+        services.AddSingleton<IEFGrainStorageETagConverter<byte[]>, SqlServerGrainStateETagConverter>();
         services.TryAddSingleton(sp => sp.GetServiceByName<IGrainStorage>(ProviderConstants.DEFAULT_STORAGE_PROVIDER_NAME));
-        return services.AddSingletonNamedService(name, EFStorageFactory.Create<SqlServerGrainStateDbContext>)
+        return services.AddSingletonNamedService(name, EFStorageFactory.Create<SqlServerGrainStateDbContext, byte[]>)
             .AddSingletonNamedService(name, (s, n) => (ILifecycleParticipant<ISiloLifecycle>)s.GetRequiredServiceByName<IGrainStorage>(n));
     }
 }

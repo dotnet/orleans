@@ -2,10 +2,10 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Orleans.Clustering.EntityFrameworkCore.Data;
 
-public class ClusterDbContext<TDbContext> : DbContext where TDbContext : DbContext
+public class ClusterDbContext<TDbContext, TETag> : DbContext where TDbContext : DbContext
 {
-    public DbSet<ClusterRecord> Clusters { get; set; } = default!;
-    public DbSet<SiloRecord> Silos { get; set; } = default!;
+    public DbSet<ClusterRecord<TETag>> Clusters { get; set; } = default!;
+    public DbSet<SiloRecord<TETag>> Silos { get; set; } = default!;
 
     public ClusterDbContext(DbContextOptions<TDbContext> options) : base(options)
     {
@@ -13,7 +13,7 @@ public class ClusterDbContext<TDbContext> : DbContext where TDbContext : DbConte
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
-        modelBuilder.Entity<ClusterRecord>(c =>
+        modelBuilder.Entity<ClusterRecord<TETag>>(c =>
         {
             c.HasKey(p => p.Id);
             c.Property(p => p.Timestamp).IsRequired();
@@ -26,7 +26,7 @@ public class ClusterDbContext<TDbContext> : DbContext where TDbContext : DbConte
                 .HasForeignKey(r => r.ClusterId);
         });
 
-        modelBuilder.Entity<SiloRecord>(c =>
+        modelBuilder.Entity<SiloRecord<TETag>>(c =>
         {
             c.HasKey(p => new {p.ClusterId, p.Address, p.Port, p.Generation});
             c.Property(p => p.Address).HasMaxLength(45).IsRequired();
