@@ -2,9 +2,9 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Orleans.GrainDirectory.EntityFrameworkCore.Data;
 
-public class GrainDirectoryDbContext<TDbContext> : DbContext where TDbContext : DbContext
+public class GrainDirectoryDbContext<TDbContext, TETag> : DbContext where TDbContext : DbContext
 {
-    public DbSet<GrainActivationRecord> Activations { get; set; } = default!;
+    public DbSet<GrainActivationRecord<TETag>> Activations { get; set; } = default!;
 
     public GrainDirectoryDbContext(DbContextOptions<TDbContext> options) : base(options)
     {
@@ -12,7 +12,7 @@ public class GrainDirectoryDbContext<TDbContext> : DbContext where TDbContext : 
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
-        modelBuilder.Entity<GrainActivationRecord>(c =>
+        modelBuilder.Entity<GrainActivationRecord<TETag>>(c =>
         {
             c.HasKey(p => new {p.ClusterId, p.GrainId});
             c.Property(p => p.ClusterId).IsRequired();

@@ -4,7 +4,7 @@ using Orleans.Runtime;
 
 namespace Orleans.Clustering.EntityFrameworkCore.Data;
 
-public class SiloRecord
+public class SiloRecord<TETag>
 {
     public string ClusterId { get; set; } = default!;
     public string Address { get; set; } = default!;
@@ -18,6 +18,6 @@ public class SiloRecord
     public List<string> SuspectingSilos { get; set; } = new();
     public DateTimeOffset StartTime { get; set; }
     public DateTimeOffset IAmAliveTime { get; set; }
-    public byte[] ETag { get; set; } = Array.Empty<byte>();
-    public ClusterRecord Cluster { get; set; } = default!;
+    public TETag ETag { get; set; } = default!;
+    public ClusterRecord<TETag> Cluster { get; set; } = default!;
 }

@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Hosting;
 using Orleans.Clustering.EntityFrameworkCore;
+using Orleans.Clustering.EntityFrameworkCore.SqlServer;
 using Orleans.Clustering.EntityFrameworkCore.SqlServer.Data;
 
 namespace Orleans.Clustering;
@@ -30,7 +31,7 @@ public static class SqlServerHostingExtensions
             {
                 services.AddPooledDbContextFactory<SqlServerClusterDbContext>(configureDatabase);
             })
-            .UseEntityFrameworkCoreClustering<SqlServerClusterDbContext>();
+            .UseEntityFrameworkCoreSqlServerClustering();
     }
 
     /// <summary>
@@ -48,8 +49,10 @@ public static class SqlServerHostingExtensions
         return builder
             .ConfigureServices(services =>
             {
-                services.AddSingleton<IMembershipTable, EFMembershipTable<SqlServerClusterDbContext>>();
-            });
+                services
+                    .AddSingleton<IEFClusterETagConverter<byte[]>, SqlServerClusterETagConverter>();
+            })
+            .UseEntityFrameworkCoreClustering<SqlServerClusterDbContext, byte[]>();
     }
 
     /// <summary>
@@ -73,7 +76,7 @@ public static class SqlServerHostingExtensions
             {
                 services.AddPooledDbContextFactory<SqlServerClusterDbContext>(configureDatabase);
             })
-            .UseEntityFrameworkCoreClustering<SqlServerClusterDbContext>();
+            .UseEntityFrameworkCoreSqlServerClustering();
     }
 
     /// <summary>
@@ -89,6 +92,11 @@ public static class SqlServerHostingExtensions
     public static IClientBuilder UseEntityFrameworkCoreSqlServerClustering(
         this IClientBuilder builder)
     {
-        return builder.UseEntityFrameworkCoreClustering<SqlServerClusterDbContext>();
+        return builder
+            .ConfigureServices(services =>
+            {
+                services.AddSingleton<IEFClusterETagConverter<byte[]>, SqlServerClusterETagConverter>();
+            })
+            .UseEntityFrameworkCoreClustering<SqlServerClusterDbContext, byte[]>();
     }
 }
