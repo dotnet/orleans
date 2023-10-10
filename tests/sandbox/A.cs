@@ -9,6 +9,12 @@ namespace A
     {
 
     }
+
+    [Alias("IMyGrain")]
+    public interface IMyGrain1 : IGrainWithStringKey
+    {
+
+    }
 }
 
 namespace B

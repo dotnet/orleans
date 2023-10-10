@@ -160,6 +160,33 @@ namespace Orleans.Analyzers {
         }
         
         /// <summary>
+        ///   Looks up a localized string similar to The [Alias] attribute must be globally unique to identify types or methods.
+        /// </summary>
+        internal static string AliasClashDetectedDescription {
+            get {
+                return ResourceManager.GetString("AliasClashDetectedDescription", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to The [Alias(&quot;{0}&quot;)] is being used in {1} places.
+        /// </summary>
+        internal static string AliasClashDetectedMessageFormat {
+            get {
+                return ResourceManager.GetString("AliasClashDetectedMessageFormat", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to The [Alias] attribute must be globally unique.
+        /// </summary>
+        internal static string AliasClashDetectedTitle {
+            get {
+                return ResourceManager.GetString("AliasClashDetectedTitle", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Looks up a localized string similar to A single type is not allowed to have multiple constructors annotated with the [OrleansConstructor] attribute.
         /// </summary>
         internal static string AtMostOneOrleansConstructorMessageFormat {
