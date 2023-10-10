@@ -22,8 +22,7 @@ public class AliasClashAttributeAnalyzer : DiagnosticAnalyzer
     private static readonly LocalizableString Description = new LocalizableResourceString(nameof(Resources.AliasClashDetectedDescription), Resources.ResourceManager, typeof(Resources));
 
     private static readonly DiagnosticDescriptor Rule = new(RuleId, Title, MessageFormat, Category, DiagnosticSeverity.Error, isEnabledByDefault: true, description: Description);
-
-    private static readonly ConcurrentBag<AliasBag> _aliasBags = new();
+    private static readonly ConcurrentBag<AliasBag> _bags = new();
 
     public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics => ImmutableArray.Create(Rule);
 
@@ -34,35 +33,44 @@ public class AliasClashAttributeAnalyzer : DiagnosticAnalyzer
 
         context.RegisterCompilationStartAction(ctx =>
         {
-            ctx.RegisterSyntaxNodeAction(CheckSyntaxNode,
+            ctx.RegisterSyntaxNodeAction(CheckTypeSyntax,
                 SyntaxKind.InterfaceDeclaration,
                 SyntaxKind.ClassDeclaration,
                 SyntaxKind.StructDeclaration,
                 SyntaxKind.RecordDeclaration,
                 SyntaxKind.RecordStructDeclaration);
+            ctx.RegisterSyntaxNodeAction(CheckMethodSyntax, SyntaxKind.MethodDeclaration);
 
-            ctx.RegisterCompilationEndAction(CheckDuplicates);
+            ctx.RegisterCompilationEndAction(c =>
+            {
+                var bags = GetDuplicateBags(_bags);
+                bags.ForEach(bag => c.ReportDiagnostic(CreateDiagnostic(bags, bag)));
+            });
         });
     }
 
-    private void CheckSyntaxNode(SyntaxNodeAnalysisContext context)
+    private void CheckTypeSyntax(SyntaxNodeAnalysisContext context)
     {
         var typeDeclaration = (TypeDeclarationSyntax)context.Node;
-        var semanticModel = context.SemanticModel;
+        var attributes = GetAliasAttributes(typeDeclaration.AttributeLists);
 
-        var aliasAttributes = typeDeclaration.AttributeLists
-            .SelectMany(attributeList => attributeList.Attributes)
-            .Where(attribute => attribute.IsAttribute(Constants.AliasAttributeName))
-            .ToList();
-
-        foreach (var attribute in aliasAttributes)
+        foreach (var attribute in attributes)
         {
-            var bag = GetBag(attribute, semanticModel);
+            var bag = GetBag(attribute, context.SemanticModel);
             if (bag != default)
             {
-                _aliasBags.Add(bag);
+                _bags.Add(bag);
             }
         }
+    }
+
+    private void CheckMethodSyntax(SyntaxNodeAnalysisContext context)
+    {
+        var methodDeclaration = (MethodDeclarationSyntax)context.Node;
+        var attributes = GetAliasAttributes(methodDeclaration.AttributeLists);
+        var bags = GetDuplicateBags(attributes.Select(attr => GetBag(attr, context.SemanticModel)));
+
+        bags.ForEach(bag => context.ReportDiagnostic(CreateDiagnostic(bags, bag)));
     }
 
     private static AliasBag GetBag(AttributeSyntax attribute, SemanticModel semanticModel)
@@ -78,9 +86,11 @@ public class AliasClashAttributeAnalyzer : DiagnosticAnalyzer
             new(aliasName, argument.GetLocation()) : default;
     }
 
-    private void CheckDuplicates(CompilationAnalysisContext context)
+    private static List<AliasBag> GetDuplicateBags(IEnumerable<AliasBag> aliasBags)
     {
-        var duplicateAliases = _aliasBags
+        List<AliasBag> result = new();
+
+        var duplicateAliases = aliasBags
             .GroupBy(alias => alias.Name)
             .Where(group => group.Count() > 1)
             .Select(group => group.Key)
@@ -88,7 +98,7 @@ public class AliasClashAttributeAnalyzer : DiagnosticAnalyzer
 
         foreach (var alias in duplicateAliases)
         {
-            var bags = _aliasBags
+            var bags = aliasBags
                 .Where(item => item.Name == alias)
                 .ToList();
 
@@ -96,13 +106,24 @@ public class AliasClashAttributeAnalyzer : DiagnosticAnalyzer
             {
                 foreach (var bag in bags)
                 {
-                    context.ReportDiagnostic(Diagnostic.Create(
-                        descriptor: Rule,
-                        location: bag.Location,
-                        messageArgs: new object[] { bag.Name, bags.Count },
-                        properties: null));
+                    result.Add(bag);
                 }
             }
         }
+
+        return result;
     }
+
+    private static List<AttributeSyntax> GetAliasAttributes(SyntaxList<AttributeListSyntax> attributeLists) =>
+       attributeLists
+           .SelectMany(attributeList => attributeList.Attributes)
+           .Where(attribute => attribute.IsAttribute(Constants.AliasAttributeName))
+           .ToList();
+
+    private static Diagnostic CreateDiagnostic(List<AliasBag> bags, AliasBag bag) =>
+       Diagnostic.Create(
+           descriptor: Rule,
+           location: bag.Location,
+           messageArgs: new object[] { bag.Name, bags.Count },
+           properties: null);
 }

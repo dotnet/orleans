@@ -27,7 +27,8 @@ public class AliasClashAttributeAnalyzerTest : DiagnosticAnalyzerTestBase<AliasC
                     [Alias("A")]
                     public interface A : Orleans.IGrainWithStringKey
                     {
-                        
+                        [Alias("B")]
+                        Task Void();
                     }
 
                     [Alias("A")]
