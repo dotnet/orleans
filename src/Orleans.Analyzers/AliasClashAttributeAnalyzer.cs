@@ -51,6 +51,8 @@ public class AliasClashAttributeAnalyzer : DiagnosticAnalyzer
 
     private void CheckTypeSyntax(SyntaxNodeAnalysisContext context)
     {
+        //TODO: check if orleans types and interface
+
         var typeDeclaration = (TypeDeclarationSyntax)context.Node;
         var attributes = GetAliasAttributes(typeDeclaration.AttributeLists);
 
