@@ -1,30 +1,9 @@
-
-
 using Orleans;
 
-namespace A
-{
-    [Alias("A")]
-    public interface IA : IGrainWithStringKey
-    {
-        [Alias("Void")] Task Void(string a);
-        [Alias("Void")] Task Void(long a);
-        [Alias("Int")] Task<int> Int(int a);
-    }
+namespace N1;
 
-    [Alias("B")]
-    public interface IB : IGrainWithStringKey
-    {
-        [Alias("Void")] Task Void(string a);
-        [Alias("Int")] Task<int> Int(int a);
-    }
-}
+[Alias("A")]
+public class A { }
 
-namespace B
-{
-    [Alias("A")]
-    public interface IA : IGrainWithStringKey
-    {
-        [Alias("Int")] Task<int> Int(int a);
-    }
-}
+[Alias("A")]
+public class B { }

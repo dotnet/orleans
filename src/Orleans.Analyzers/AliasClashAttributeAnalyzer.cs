@@ -5,6 +5,7 @@ using Microsoft.CodeAnalysis.Diagnostics;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Collections.Immutable;
+using System.Data;
 using System.Linq;
 
 namespace Orleans.Analyzers;
@@ -14,8 +15,8 @@ public class AliasClashAttributeAnalyzer : DiagnosticAnalyzer
 {
     private readonly record struct AliasBag(string Name, Location Location, SyntaxNode Parent);
 
-    private static readonly ConcurrentBag<AliasBag> TypeBags = new();
-    private static readonly ConcurrentBag<AliasBag> MethodBags = new();
+    private readonly ConcurrentBag<AliasBag> _typeBags = new();
+    private readonly ConcurrentBag<AliasBag> _methodBags = new();
 
     public const string TypesRuleId = "ORLEANS0011";
     public const string MethodsRuleId = "ORLEANS0012";
@@ -70,7 +71,7 @@ public class AliasClashAttributeAnalyzer : DiagnosticAnalyzer
             var bag = GetBag(attribute, context.SemanticModel, methodDeclaration.Parent);
             if (bag != default)
             {
-                MethodBags.Add(bag);
+                _methodBags.Add(bag);
             }
         }
     }
@@ -85,7 +86,7 @@ public class AliasClashAttributeAnalyzer : DiagnosticAnalyzer
             var bag = GetBag(attribute, context.SemanticModel);
             if (bag != default)
             {
-                TypeBags.Add(bag);
+                _typeBags.Add(bag);
             }
         }
     }
@@ -93,7 +94,7 @@ public class AliasClashAttributeAnalyzer : DiagnosticAnalyzer
     private void ReportDuplicates(CompilationAnalysisContext context)
     {
         // types
-        var typeDuplicates = TypeBags
+        var typeDuplicates = _typeBags
             .GroupBy(alias => alias.Name)
             .Where(group => group.Count() > 1)
             .Select(group => group.Key)
@@ -101,7 +102,7 @@ public class AliasClashAttributeAnalyzer : DiagnosticAnalyzer
 
         foreach (var item in typeDuplicates)
         {
-            var bags = TypeBags.Where(x => x.Name == item);
+            var bags = _typeBags.Where(x => x.Name == item);
             if (bags.Count() > 1)
             {
                 foreach (var bag in bags)
@@ -112,7 +113,7 @@ public class AliasClashAttributeAnalyzer : DiagnosticAnalyzer
         }
 
         // methods
-        var methodDuplicates = MethodBags
+        var methodDuplicates = _methodBags
            .GroupBy(alias => new { alias.Parent, alias.Name })
            .Where(group => group.Count() > 1)
            .Select(group => group.Key)
@@ -120,7 +121,7 @@ public class AliasClashAttributeAnalyzer : DiagnosticAnalyzer
 
         foreach (var item in methodDuplicates)
         {
-            var bags = MethodBags.Where(x => x.Name == item.Name && x.Parent == item.Parent);
+            var bags = _methodBags.Where(x => x.Name == item.Name && x.Parent == item.Parent);
             if (bags.Count() > 1)
             {
                 foreach (var bag in bags)
@@ -140,6 +141,11 @@ public class AliasClashAttributeAnalyzer : DiagnosticAnalyzer
         }
 
         var constantValue = semanticModel.GetConstantValue(expression);
+        //var syntaxReference = attribute.ApplicationSyntaxReference;
+
+        //context.ReportDiagnostic(
+        //    Diagnostic.Create(Rule, Location.Create(syntaxReference.SyntaxTree, syntaxReference.Span)));
+
         return constantValue.HasValue && constantValue.Value is string aliasName ?
             new(aliasName, argument.GetLocation(), parent) : default;
     }
@@ -153,6 +159,5 @@ public class AliasClashAttributeAnalyzer : DiagnosticAnalyzer
         Diagnostic.Create(
            descriptor: descriptor,
            location: bag.Location,
-           messageArgs: new object[] { bag.Name },
-           properties: null);
+           messageArgs: new object[] { bag.Name });
 }
