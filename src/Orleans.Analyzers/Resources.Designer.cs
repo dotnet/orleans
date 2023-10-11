@@ -178,7 +178,7 @@ namespace Orleans.Analyzers {
         }
         
         /// <summary>
-        ///   Looks up a localized string similar to The alias &quot;{0}&quot; must be unique to the declaring type.
+        ///   Looks up a localized string similar to The alias &quot;{0}&quot; must be unique to the declaring type &quot;{1}&quot;.
         /// </summary>
         internal static string AliasClashDetectedMessageFormat_Methods {
             get {

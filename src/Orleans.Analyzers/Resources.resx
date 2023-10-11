@@ -169,7 +169,7 @@
     <value>The [Alias] attribute must be unique to the declaring type</value>
   </data>
   <data name="AliasClashDetectedMessageFormat_Methods" xml:space="preserve">
-    <value>The alias "{0}" must be unique to the declaring type</value>
+    <value>The alias "{0}" must be unique to the declaring type "{1}"</value>
   </data>
   <data name="AliasClashDetectedTitle_Methods" xml:space="preserve">
     <value>The [Alias] attribute must be unique to the declaring type</value>

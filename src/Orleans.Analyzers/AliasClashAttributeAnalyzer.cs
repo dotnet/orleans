@@ -2,10 +2,10 @@ using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Diagnostics;
+using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Collections.Immutable;
-using System.Data;
 using System.Linq;
 
 namespace Orleans.Analyzers;
@@ -107,7 +107,10 @@ public class AliasClashAttributeAnalyzer : DiagnosticAnalyzer
             {
                 foreach (var bag in bags)
                 {
-                    context.ReportDiagnostic(CreateDiagnostic(TypesRule, bag));
+                    context.ReportDiagnostic(Diagnostic.Create(
+                       descriptor: TypesRule,
+                       location: bag.Location,
+                       messageArgs: new object[] { bag.Name }));
                 }
             }
         }
@@ -124,9 +127,13 @@ public class AliasClashAttributeAnalyzer : DiagnosticAnalyzer
             var bags = _methodBags.Where(x => x.Name == item.Name && x.Parent == item.Parent);
             if (bags.Count() > 1)
             {
+                var parentName = item.Parent is TypeDeclarationSyntax syntax ? syntax.Identifier.Text : null;
                 foreach (var bag in bags)
                 {
-                    context.ReportDiagnostic(CreateDiagnostic(MethodsRule, bag));
+                    context.ReportDiagnostic(Diagnostic.Create(
+                       descriptor: MethodsRule,
+                       location: bag.Location,
+                       messageArgs: new object[] { bag.Name, parentName }));
                 }
             }
         }
@@ -141,23 +148,12 @@ public class AliasClashAttributeAnalyzer : DiagnosticAnalyzer
         }
 
         var constantValue = semanticModel.GetConstantValue(expression);
-        //var syntaxReference = attribute.ApplicationSyntaxReference;
-
-        //context.ReportDiagnostic(
-        //    Diagnostic.Create(Rule, Location.Create(syntaxReference.SyntaxTree, syntaxReference.Span)));
-
         return constantValue.HasValue && constantValue.Value is string aliasName ?
-            new(aliasName, argument.GetLocation(), parent) : default;
+            new(aliasName, attribute.GetLocation(), parent) : default;
     }
 
     private static IEnumerable<AttributeSyntax> GetAliasAttributes(SyntaxList<AttributeListSyntax> attributeLists) =>
         attributeLists
            .SelectMany(attributeList => attributeList.Attributes)
            .Where(attribute => attribute.IsAttribute(Constants.AliasAttributeName));
-
-    private static Diagnostic CreateDiagnostic(DiagnosticDescriptor descriptor, AliasBag bag) =>
-        Diagnostic.Create(
-           descriptor: descriptor,
-           location: bag.Location,
-           messageArgs: new object[] { bag.Name });
 }
