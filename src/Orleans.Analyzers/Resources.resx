@@ -156,13 +156,22 @@
   <data name="AddAliasMessageFormat" xml:space="preserve">
     <value>Add missing alias attributes</value>
   </data>
-  <data name="AliasClashDetectedDescription" xml:space="preserve">
-    <value>The [Alias] attribute must be globally unique to identify types or methods</value>
-  </data>
-  <data name="AliasClashDetectedMessageFormat" xml:space="preserve">
-    <value>The [Alias("{0}")] is being used in {1} places</value>
-  </data>
-  <data name="AliasClashDetectedTitle" xml:space="preserve">
+  <data name="AliasClashDetectedDescription_Types" xml:space="preserve">
     <value>The [Alias] attribute must be globally unique</value>
+  </data>
+  <data name="AliasClashDetectedMessageFormat_Types" xml:space="preserve">
+    <value>The alias "{0}" must be globally unique</value>
+  </data>
+  <data name="AliasClashDetectedTitle_Types" xml:space="preserve">
+    <value>The [Alias] attribute must be globally unique</value>
+  </data>
+  <data name="AliasClashDetectedDescription_Methods" xml:space="preserve">
+    <value>The [Alias] attribute must be unique to the declaring type</value>
+  </data>
+  <data name="AliasClashDetectedMessageFormat_Methods" xml:space="preserve">
+    <value>The alias "{0}" must be unique to the declaring type</value>
+  </data>
+  <data name="AliasClashDetectedTitle_Methods" xml:space="preserve">
+    <value>The [Alias] attribute must be unique to the declaring type</value>
   </data>
 </root>

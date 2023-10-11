@@ -160,29 +160,56 @@ namespace Orleans.Analyzers {
         }
         
         /// <summary>
-        ///   Looks up a localized string similar to The [Alias] attribute must be globally unique to identify types or methods.
+        ///   Looks up a localized string similar to The [Alias] attribute must be unique to the declaring type.
         /// </summary>
-        internal static string AliasClashDetectedDescription {
+        internal static string AliasClashDetectedDescription_Methods {
             get {
-                return ResourceManager.GetString("AliasClashDetectedDescription", resourceCulture);
-            }
-        }
-        
-        /// <summary>
-        ///   Looks up a localized string similar to The [Alias(&quot;{0}&quot;)] is being used in {1} places.
-        /// </summary>
-        internal static string AliasClashDetectedMessageFormat {
-            get {
-                return ResourceManager.GetString("AliasClashDetectedMessageFormat", resourceCulture);
+                return ResourceManager.GetString("AliasClashDetectedDescription_Methods", resourceCulture);
             }
         }
         
         /// <summary>
         ///   Looks up a localized string similar to The [Alias] attribute must be globally unique.
         /// </summary>
-        internal static string AliasClashDetectedTitle {
+        internal static string AliasClashDetectedDescription_Types {
             get {
-                return ResourceManager.GetString("AliasClashDetectedTitle", resourceCulture);
+                return ResourceManager.GetString("AliasClashDetectedDescription_Types", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to The alias &quot;{0}&quot; must be unique to the declaring type.
+        /// </summary>
+        internal static string AliasClashDetectedMessageFormat_Methods {
+            get {
+                return ResourceManager.GetString("AliasClashDetectedMessageFormat_Methods", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to The alias &quot;{0}&quot; must be globally unique.
+        /// </summary>
+        internal static string AliasClashDetectedMessageFormat_Types {
+            get {
+                return ResourceManager.GetString("AliasClashDetectedMessageFormat_Types", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to The [Alias] attribute must be unique to the declaring type.
+        /// </summary>
+        internal static string AliasClashDetectedTitle_Methods {
+            get {
+                return ResourceManager.GetString("AliasClashDetectedTitle_Methods", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to The [Alias] attribute must be globally unique.
+        /// </summary>
+        internal static string AliasClashDetectedTitle_Types {
+            get {
+                return ResourceManager.GetString("AliasClashDetectedTitle_Types", resourceCulture);
             }
         }
         

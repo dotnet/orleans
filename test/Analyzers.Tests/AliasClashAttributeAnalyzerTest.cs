@@ -1,3 +1,4 @@
+using System.Linq;
 using Microsoft.CodeAnalysis;
 using Orleans.Analyzers;
 using Xunit;
@@ -7,6 +8,8 @@ namespace Analyzers.Tests;
 [TestCategory("BVT"), TestCategory("Analyzer")]
 public class AliasClashAttributeAnalyzerTest : DiagnosticAnalyzerTestBase<AliasClashAttributeAnalyzer>
 {
+    private static readonly List<string> RuleIds = new();
+
     private async Task VerifyHasDiagnostic(string code, int diagnosticsCount)
     {
         var (diagnostics, _) = await GetDiagnosticsAsync(code, Array.Empty<string>());
@@ -14,10 +17,8 @@ public class AliasClashAttributeAnalyzerTest : DiagnosticAnalyzerTestBase<AliasC
         Assert.NotEmpty(diagnostics);
         Assert.Equal(diagnosticsCount, diagnostics.Length);
 
-        var diagnostic = diagnostics.First();
-
-        Assert.Equal(AliasClashAttributeAnalyzer.RuleId, diagnostic.Id);
-        Assert.Equal(DiagnosticSeverity.Error, diagnostic.Severity);
+        Assert.All(diagnostics, diagnostic => RuleIds.Contains(diagnostic.Id));
+        Assert.All(diagnostics, diagnostic => diagnostic.Severity.Equals(DiagnosticSeverity.Error));
     }
 
     [Fact]
@@ -27,14 +28,27 @@ public class AliasClashAttributeAnalyzerTest : DiagnosticAnalyzerTestBase<AliasC
                     [Alias("A")]
                     public interface A : Orleans.IGrainWithStringKey
                     {
-                        [Alias("B")]
-                        Task Void();
+
                     }
 
                     [Alias("A")]
                     public interface B : Orleans.IGrainWithStringKey
                     {
                         
+                    }
+                    """;
+
+        return VerifyHasDiagnostic(code, 2);
+    }
+
+    [Fact]
+    public Task B()
+    {
+        var code = $$"""
+                    public interface A : Orleans.IGrainWithStringKey
+                    {
+                        [Alias("Void")] Task Void(string a);
+                        [Alias("Void")] Task Void(int a);
                     }
                     """;
 
