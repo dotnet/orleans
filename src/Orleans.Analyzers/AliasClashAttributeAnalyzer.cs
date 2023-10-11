@@ -83,7 +83,7 @@ public class AliasClashAttributeAnalyzer : DiagnosticAnalyzer
 
         foreach (var attribute in attributes)
         {
-            var bag = GetBag(attribute, context.SemanticModel);
+            var bag = GetBag(attribute, context.SemanticModel, null);
             if (bag != default)
             {
                 _typeBags.Add(bag);
@@ -97,8 +97,7 @@ public class AliasClashAttributeAnalyzer : DiagnosticAnalyzer
         var typeDuplicates = _typeBags
             .GroupBy(alias => alias.Name)
             .Where(group => group.Count() > 1)
-            .Select(group => group.Key)
-            .ToList();
+            .Select(group => group.Key);
 
         foreach (var item in typeDuplicates)
         {
@@ -119,8 +118,7 @@ public class AliasClashAttributeAnalyzer : DiagnosticAnalyzer
         var methodDuplicates = _methodBags
            .GroupBy(alias => new { alias.Parent, alias.Name })
            .Where(group => group.Count() > 1)
-           .Select(group => group.Key)
-           .ToList();
+           .Select(group => group.Key);
 
         foreach (var item in methodDuplicates)
         {
@@ -139,7 +137,7 @@ public class AliasClashAttributeAnalyzer : DiagnosticAnalyzer
         }
     }
 
-    private static AliasBag GetBag(AttributeSyntax attribute, SemanticModel semanticModel, SyntaxNode parent = null)
+    private static AliasBag GetBag(AttributeSyntax attribute, SemanticModel semanticModel, SyntaxNode parent)
     {
         var argument = attribute.ArgumentList?.Arguments.FirstOrDefault();
         if (argument is null || argument.Expression is not { } expression)
