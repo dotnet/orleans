@@ -161,6 +161,17 @@ public class AliasClashAttributeAnalyzer : DiagnosticAnalyzer
         attributeLists
            .SelectMany(attributeList => attributeList.Attributes)
            .Where(attribute => attribute.IsAttribute(Constants.AliasAttributeName));
+
+    private static bool IsInOrleansNamespace(SyntaxNode node)
+    {
+        var containingNamespace = node.Ancestors().OfType<NamespaceDeclarationSyntax>().FirstOrDefault();
+        if (containingNamespace != null)
+        {
+            var namespaceName = containingNamespace.Name.ToString();
+            return namespaceName.StartsWith("Orleans.");
+        }
+        return false;
+    }
 }
 
 /*

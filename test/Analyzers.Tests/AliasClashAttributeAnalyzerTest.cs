@@ -32,12 +32,15 @@ public class AliasClashAttributeAnalyzerTest : DiagnosticAnalyzerTestBase<AliasC
     public Task SameAlias_SameContainingType_ShouldTriggerMethodsDiagnostic()
     {
         var code = """
+                    namespace Orleans.MyNs
+                    {
                     public interface I
                     {
                         [Alias("A1")] Task Void(string a);
                         [Alias("A1")] Task Void(int a);
                         [Alias("A1")] Task Void(float a);
                         [Alias("A2")] Task Void(long a);
+                    }
                     }
                     """;
 
