@@ -1,7 +1,3 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
 using Azure.Storage.Queues.Models;
 using Microsoft.Extensions.Logging;
 using Orleans.AzureUtils;
@@ -156,7 +152,7 @@ namespace Tester.AzureUtils
 
         private static string PrintQueueMessage(QueueMessage message)
         {
-            return String.Format("QueueMessage: Id = {0}, NextVisibleTime = {1}, DequeueCount = {2}, PopReceipt = {3}, Content = {4}",
+            return string.Format("QueueMessage: Id = {0}, NextVisibleTime = {1}, DequeueCount = {2}, PopReceipt = {3}, Content = {4}",
                     message.MessageId,
                     message.NextVisibleOn.HasValue ? LogFormatter.PrintDate(message.NextVisibleOn.Value.DateTime) : "",
                     message.DequeueCount,
@@ -166,7 +162,7 @@ namespace Tester.AzureUtils
 
         private static string PrintQueueMessage(PeekedMessage message)
         {
-            return String.Format("QueueMessage: Id = {0}, DequeueCount = {1}, Content = {2}",
+            return string.Format("QueueMessage: Id = {0}, DequeueCount = {1}, Content = {2}",
                     message.MessageId,
                     message.DequeueCount,
                     message.MessageText);

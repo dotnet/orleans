@@ -5,8 +5,6 @@ using Azure.Core;
 using Azure.Storage;
 using Azure.Storage.Blobs;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Options;
-using Newtonsoft.Json;
 using Orleans.Persistence.AzureStorage;
 using Orleans.Runtime;
 using Orleans.Storage;

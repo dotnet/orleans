@@ -37,7 +37,7 @@ namespace Orleans.Tests.SqlUtils
 
         private static CachedFactory GetFactory(string invariantName)
         {
-            if (String.IsNullOrWhiteSpace(invariantName))
+            if (string.IsNullOrWhiteSpace(invariantName))
             {
                 throw new ArgumentNullException(nameof(invariantName));
             }
@@ -99,12 +99,12 @@ namespace Orleans.Tests.SqlUtils
 
         public static DbConnection CreateConnection(string invariantName, string connectionString)
         {
-            if (String.IsNullOrWhiteSpace(invariantName))
+            if (string.IsNullOrWhiteSpace(invariantName))
             {
                 throw new ArgumentNullException(nameof(invariantName));
             }
 
-            if (String.IsNullOrWhiteSpace(connectionString))
+            if (string.IsNullOrWhiteSpace(connectionString))
             {
                 throw new ArgumentNullException(nameof(connectionString));
             }

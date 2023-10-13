@@ -1,6 +1,5 @@
 using System;
 using System.Runtime.Serialization;
-using Orleans.Internal;
 using Orleans.Storage;
 
 namespace Orleans.Transactions.TestKit

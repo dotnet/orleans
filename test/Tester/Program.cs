@@ -1,4 +1,3 @@
-using System.Threading.Tasks;
 using Orleans.TestingHost;
 
 namespace Tester

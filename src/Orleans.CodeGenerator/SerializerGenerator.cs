@@ -1,4 +1,3 @@
-using System;
 using System.Collections.Generic;
 using System.Linq;
 using Microsoft.CodeAnalysis;
@@ -335,7 +334,7 @@ namespace Orleans.CodeGenerator
                     VariableDeclaration(
                         PredefinedType(Token(SyntaxKind.UIntKeyword)),
                         SingletonSeparatedList(VariableDeclarator(previousFieldIdVar.Identifier)
-                            .WithInitializer(EqualsValueClause(LiteralExpression(SyntaxKind.NumericLiteralExpression, Literal(0))))))));
+                            .WithInitializer(EqualsValueClause(LiteralExpression(SyntaxKind.NumericLiteralExpression, Literal(0U))))))));
             }
 
             if (type.IncludePrimaryConstructorParameters)
@@ -495,7 +494,7 @@ namespace Orleans.CodeGenerator
                     body.Add(LocalDeclarationStatement(
                         VariableDeclaration(
                             PredefinedType(Token(SyntaxKind.UIntKeyword)),
-                            SingletonSeparatedList(VariableDeclarator(idVar.Identifier, null, EqualsValueClause(LiteralExpression(SyntaxKind.NumericLiteralExpression, Literal(0))))))));
+                            SingletonSeparatedList(VariableDeclarator(idVar.Identifier, null, EqualsValueClause(LiteralExpression(SyntaxKind.NumericLiteralExpression, Literal(0U))))))));
                 }
 
                 // C#: Field header = default;
@@ -512,7 +511,7 @@ namespace Orleans.CodeGenerator
                     body.Add(GetDeserializerLoop(constructorParameterMembers));
                     if (members.Count > 0)
                     {
-                        body.Add(ExpressionStatement(AssignmentExpression(SyntaxKind.SimpleAssignmentExpression, idVar, LiteralExpression(SyntaxKind.NumericLiteralExpression, Literal(0)))));
+                        body.Add(ExpressionStatement(AssignmentExpression(SyntaxKind.SimpleAssignmentExpression, idVar, LiteralExpression(SyntaxKind.NumericLiteralExpression, Literal(0U)))));
                     }
 
                     body.Add(IfStatement(headerVar.Member("IsEndBaseFields"), GetDeserializerLoop(nonCtorMembers)));
@@ -619,7 +618,7 @@ namespace Orleans.CodeGenerator
                     }
 
                     // C#: if (id == <fieldId>) { ... }
-                    var ifStatement = IfStatement(BinaryExpression(SyntaxKind.EqualsExpression, idVar, LiteralExpression(SyntaxKind.NumericLiteralExpression, Literal((int)description.FieldId))),
+                    var ifStatement = IfStatement(BinaryExpression(SyntaxKind.EqualsExpression, idVar, LiteralExpression(SyntaxKind.NumericLiteralExpression, Literal(description.FieldId))),
                         ifBody);
 
                     loopBody.Add(ifStatement);

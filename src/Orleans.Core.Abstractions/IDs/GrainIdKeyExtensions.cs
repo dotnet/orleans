@@ -25,7 +25,7 @@ namespace Orleans.Runtime
             Span<byte> buf = stackalloc byte[sizeof(long) * 2];
             Utf8Formatter.TryFormat(key, buf, out var len, 'X');
             Debug.Assert(len > 0, "Unable to format the provided value as a UTF8 string");
-            return new IdSpan(buf.Slice(0, len).ToArray());
+            return new IdSpan(buf[..len].ToArray());
         }
 
         /// <summary>
@@ -81,7 +81,7 @@ namespace Orleans.Runtime
 
             var extLen = Encoding.UTF8.GetByteCount(keyExtension);
             var buf = new byte[len + 1 + extLen];
-            tmp.Slice(0, len).CopyTo(buf);
+            tmp[..len].CopyTo(buf);
             buf[len] = (byte)'+';
             Encoding.UTF8.GetBytes(keyExtension, 0, keyExtension.Length, buf, len + 1);
 
@@ -180,8 +180,8 @@ namespace Orleans.Runtime
             var keyString = grainId.Key.AsSpan();
             if (keyString.IndexOf((byte)'+') is int index && index >= 0)
             {
-                keyExt = Encoding.UTF8.GetString(keyString.Slice(index + 1));
-                keyString = keyString.Slice(0, index);
+                keyExt = Encoding.UTF8.GetString(keyString[(index + 1)..]);
+                keyString = keyString[..index];
             }
 
             return Utf8Parser.TryParse(keyString, out key, out var len, 'X') && len == keyString.Length;
@@ -203,7 +203,7 @@ namespace Orleans.Runtime
         {
             var keyString = grainId.Key.AsSpan();
             if (keyString.IndexOf((byte)'+') is int index && index >= 0)
-                keyString = keyString.Slice(0, index);
+                keyString = keyString[..index];
 
             return Utf8Parser.TryParse(keyString, out key, out var len, 'X') && len == keyString.Length;
         }
@@ -260,8 +260,8 @@ namespace Orleans.Runtime
             var keyString = grainId.Key.AsSpan();
             if (keyString.Length > 32 && keyString[32] == (byte)'+')
             {
-                keyExt = Encoding.UTF8.GetString(keyString.Slice(33));
-                keyString = keyString.Slice(0, 32);
+                keyExt = Encoding.UTF8.GetString(keyString[33..]);
+                keyString = keyString[..32];
             }
             else if (keyString.Length != 32)
             {
@@ -289,7 +289,7 @@ namespace Orleans.Runtime
             var keyString = grainId.Key.AsSpan();
             if (keyString.Length > 32 && keyString[32] == (byte)'+')
             {
-                keyString = keyString.Slice(0, 32);
+                keyString = keyString[..32];
             }
             else if (keyString.Length != 32)
             {

@@ -5,7 +5,6 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
-using Orleans.Runtime;
 using Orleans.Transactions.Abstractions;
 
 namespace Orleans.Transactions.State
@@ -138,7 +137,7 @@ namespace Orleans.Transactions.State
 
             var result =
                 new TaskCompletionSource<TResult>(TaskCreationOptions.RunContinuationsAsynchronously);
-            Action completion = () =>
+            void completion()
             {
                 try
                 {
@@ -148,7 +147,7 @@ namespace Orleans.Transactions.State
                 {
                     result.TrySetException(exception);
                 }
-            };
+            }
 
             if (group != currentGroup)
             {

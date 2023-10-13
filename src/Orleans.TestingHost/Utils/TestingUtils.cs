@@ -80,20 +80,19 @@ namespace Orleans.TestingHost.Utils
         {
             delayOnFail = delayOnFail ?? TimeSpan.FromSeconds(1);
             var keepGoing = new[] { true };
-            Func<Task> loop =
-                async () =>
+            async Task loop()
+            {
+                bool passed;
+                do
                 {
-                    bool passed;
-                    do
-                    {
-                        // need to wait a bit to before re-checking the condition.
-                        await Task.Delay(delayOnFail.Value);
-                        passed = await predicate(false);
-                    }
-                    while (!passed && keepGoing[0]);
-                    if(!passed)
-                        await predicate(true);
-                };
+                    // need to wait a bit to before re-checking the condition.
+                    await Task.Delay(delayOnFail.Value);
+                    passed = await predicate(false);
+                }
+                while (!passed && keepGoing[0]);
+                if (!passed)
+                    await predicate(true);
+            }
 
             var task = loop();
             try

@@ -45,7 +45,14 @@ namespace Orleans.CodeGenerator
                 .AddMembers(fields);
 
             if (ctor != null)
+            {
                 classDeclaration = classDeclaration.AddMembers(ctor);
+            }
+
+            if (method.ResponseTimeoutTicks.HasValue)
+            {
+                classDeclaration = classDeclaration.AddMembers(GenerateResponseTimeoutPropertyMembers(libraryTypes, method.ResponseTimeoutTicks.Value));
+            }
 
             classDeclaration = AddOptionalMembers(classDeclaration,
                     GenerateGetArgumentCount(method),
@@ -117,6 +124,29 @@ namespace Orleans.CodeGenerator
 
                 return accessibility;
             }
+        }
+
+        private static MemberDeclarationSyntax[] GenerateResponseTimeoutPropertyMembers(LibraryTypes libraryTypes, long value)
+        {
+            var timespanField = FieldDeclaration(
+                        VariableDeclaration(
+                            libraryTypes.TimeSpan.ToTypeSyntax(),
+                            SingletonSeparatedList(VariableDeclarator("_responseTimeoutValue")
+                            .WithInitializer(EqualsValueClause(
+                                InvocationExpression(
+                                    IdentifierName("global::System.TimeSpan").Member("FromTicks"),
+                                    ArgumentList(SeparatedList(new[]
+                                    {
+                                        Argument(LiteralExpression(SyntaxKind.NumericLiteralExpression, Literal(value)))
+                                    }))))))))
+                        .AddModifiers(Token(SyntaxKind.PrivateKeyword), Token(SyntaxKind.StaticKeyword), Token(SyntaxKind.ReadOnlyKeyword));
+
+            var responseTimeoutProperty = MethodDeclaration(NullableType(libraryTypes.TimeSpan.ToTypeSyntax()), "GetDefaultResponseTimeout")
+                .WithExpressionBody(ArrowExpressionClause(IdentifierName("_responseTimeoutValue")))
+                .WithSemicolonToken(Token(SyntaxKind.SemicolonToken))
+                .AddModifiers(Token(SyntaxKind.PublicKeyword), Token(SyntaxKind.OverrideKeyword));
+;
+            return new MemberDeclarationSyntax[] { timespanField, responseTimeoutProperty };
         }
 
         private static ClassDeclarationSyntax AddOptionalMembers(ClassDeclarationSyntax decl, params MemberDeclarationSyntax[] items)

@@ -6,9 +6,6 @@ using System;
 using Xunit;
 using Microsoft.Extensions.Options;
 using System.Runtime.Serialization;
-using System.Linq.Expressions;
-using Xunit.Sdk;
-using System.Data;
 
 namespace Orleans.Serialization.UnitTests
 {

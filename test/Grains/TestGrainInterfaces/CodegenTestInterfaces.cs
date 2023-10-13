@@ -1,8 +1,4 @@
-using System;
 using System.Collections;
-using System.Collections.Generic;
-using System.Threading.Tasks;
-using Orleans;
 
 namespace UnitTests.GrainInterfaces
 {
@@ -178,12 +174,12 @@ namespace UnitTests.GrainInterfaces
             this.ReadonlyField = readonlyField;
         }
 
-        public int GetValueWithPrivateGetter()
+        public readonly int GetValueWithPrivateGetter()
         {
             return this.ValueWithPrivateGetter;
         }
 
-        public int GetPrivateValue()
+        public readonly int GetPrivateValue()
         {
             return this.PrivateValue;
         }
@@ -206,7 +202,7 @@ namespace UnitTests.GrainInterfaces
     public abstract class SomeAbstractClass : ISomeInterface
     {
         [NonSerialized]
-        private int nonSerializedIntField;
+        private int _nonSerializedIntField;
 
         public abstract int Int { get; set; }
 
@@ -242,12 +238,12 @@ namespace UnitTests.GrainInterfaces
         {
             get
             {
-                return this.nonSerializedIntField;
+                return this._nonSerializedIntField;
             }
 
             set
             {
-                this.nonSerializedIntField = value;
+                this._nonSerializedIntField = value;
             }
         }
 
@@ -318,12 +314,12 @@ namespace UnitTests.GrainInterfaces
     [Serializable]
     public class ClassWithNestedPrivateClassInListField
     {
-        private readonly List<NestedPrivateClass> coolBeans = new List<NestedPrivateClass>
+        private readonly List<NestedPrivateClass> _coolBeans = new List<NestedPrivateClass>
         {
             new NestedPrivateClass()
         };
 
-        public IEnumerable CoolBeans => this.coolBeans;
+        public IEnumerable CoolBeans => this._coolBeans;
 
         private class NestedPrivateClass
         {
@@ -339,11 +335,11 @@ namespace UnitTests.GrainInterfaces
     {
 #pragma warning disable IDE0032 // Use auto property
         [Id(0)]
-        private readonly byte[] value;
+        private readonly byte[] _value;
 #pragma warning restore IDE0032 // Use auto property
 
-        public ReadOnlyStructWithReadOnlyArray(byte[] value) => this.value = value;
+        public ReadOnlyStructWithReadOnlyArray(byte[] value) => this._value = value;
 
-        public byte[] Value => this.value;
+        public byte[] Value => this._value;
     }
 }

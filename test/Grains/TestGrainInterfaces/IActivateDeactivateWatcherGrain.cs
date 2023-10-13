@@ -1,6 +1,3 @@
-using System.Threading.Tasks;
-using Orleans;
-
 namespace UnitTests.GrainInterfaces
 {
     public interface IActivateDeactivateWatcherGrain : IGrainWithIntegerKey

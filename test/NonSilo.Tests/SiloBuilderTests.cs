@@ -1,6 +1,4 @@
-using System;
 using System.Net;
-using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Orleans;
@@ -9,7 +7,6 @@ using Orleans.Configuration.Internal;
 using Orleans.Configuration.Validators;
 using Orleans.Hosting;
 using Orleans.Runtime;
-using Orleans.Runtime.MembershipService;
 using Orleans.Statistics;
 using UnitTests.Grains;
 using Xunit;

@@ -1,11 +1,5 @@
-
-using System;
-using System.Collections.Generic;
 using System.Globalization;
-using System.Linq;
-using System.Threading.Tasks;
 using Microsoft.Extensions.Logging.Abstractions;
-using Orleans;
 using Orleans.Providers.Streams.Common;
 using Orleans.Runtime;
 using Orleans.Streams;
@@ -125,7 +119,7 @@ namespace UnitTests.OrleansRuntime.Streams
                     // if this fails with clean block, then requested size is too big
                     if (!currentBuffer.TryGetSegment(size, out segment))
                     {
-                        string errmsg = String.Format(CultureInfo.InvariantCulture,
+                        string errmsg = string.Format(CultureInfo.InvariantCulture,
                             "Message size is too big. MessageSize: {0}", size);
                         throw new ArgumentOutOfRangeException(nameof(queueMessage), errmsg);
                     }

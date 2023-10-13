@@ -1,6 +1,3 @@
-using System;
-using System.Threading.Tasks;
-using Orleans;
 using TestExtensions;
 using UnitTests.GrainInterfaces;
 using Xunit;
@@ -10,10 +7,11 @@ namespace DefaultCluster.Tests.General
     //using ValueUpdateEventArgs = MultifacetGrainClient.ValueUpdateEventArgs;
     public class MultifacetGrainTest : HostedTestClusterEnsureDefaultStarted
     {
-        IMultifacetWriter writer;
-        IMultifacetReader reader;
+        private IMultifacetWriter writer;
+        private IMultifacetReader reader;
+
         //int eventCounter;
-        const int EXPECTED_NUMBER_OF_EVENTS = 4;
+        private const int EXPECTED_NUMBER_OF_EVENTS = 4;
         private readonly TimeSpan timeout = TimeSpan.FromSeconds(5);
 
         public MultifacetGrainTest(DefaultClusterFixture fixture) : base(fixture)

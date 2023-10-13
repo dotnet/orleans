@@ -122,6 +122,11 @@ namespace Orleans.CodeGenerator
                         CustomInitializerMethods.Add((methodName, methodArgument));
                     }
                 }
+
+                if (SymbolEqualityComparer.Default.Equals(methodAttr.AttributeClass, containingType.CodeGenerator.LibraryTypes.ResponseTimeoutAttribute))
+                {
+                    ResponseTimeoutTicks = TimeSpan.Parse((string)methodAttr.ConstructorArguments[0].Value).Ticks;
+                }
             }
 
             bool TryGetNamedArgument(ImmutableArray<KeyValuePair<string, TypedConstant>> arguments, string name, out TypedConstant value)
@@ -160,6 +165,11 @@ namespace Orleans.CodeGenerator
         /// Mapping of method return types to invokable base type. The code generator will create a derived type with the method arguments as fields.
         /// </summary>
         public Dictionary<INamedTypeSymbol, INamedTypeSymbol> InvokableBaseTypes { get; }
+
+        /// <summary>
+        /// Gets the response timeout ticks, if set.
+        /// </summary>
+        public long? ResponseTimeoutTicks { get; private set; }
 
         public override int GetHashCode() => SymbolEqualityComparer.Default.GetHashCode(Method);
     }

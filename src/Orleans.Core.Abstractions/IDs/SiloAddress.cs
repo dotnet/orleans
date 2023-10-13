@@ -137,20 +137,20 @@ namespace Orleans.Runtime
                 size = Encoding.UTF8.GetBytes(addr, buf);
 
                 buf[size++] = (byte)':';
-                var success = Utf8Formatter.TryFormat(Endpoint.Port, buf.Slice(size), out len);
+                var success = Utf8Formatter.TryFormat(Endpoint.Port, buf[size..], out len);
                 Debug.Assert(success);
                 Debug.Assert(len > 0);
                 Debug.Assert(len <= 11);
                 size += len;
 
                 buf[size++] = (byte)SEPARATOR;
-                success = Utf8Formatter.TryFormat(Generation, buf.Slice(size), out len);
+                success = Utf8Formatter.TryFormat(Generation, buf[size..], out len);
                 Debug.Assert(success);
                 Debug.Assert(len > 0);
                 Debug.Assert(len <= 11);
                 size += len;
 
-                utf8 = buf.Slice(0, size).ToArray();
+                utf8 = buf[..size].ToArray();
             }
 
             return utf8;
@@ -193,7 +193,7 @@ namespace Orleans.Runtime
             if (atSign < 0) ThrowInvalidUtf8SiloAddress(addr);
 
             // IPEndpoint is the host, then ':', then the port
-            var endpointSlice = addr.Slice(0, atSign);
+            var endpointSlice = addr[..atSign];
             int lastColon = endpointSlice.LastIndexOf((byte)':');
             if (lastColon < 0) ThrowInvalidUtf8SiloAddress(addr);
 
@@ -205,11 +205,11 @@ namespace Orleans.Runtime
             if (!IPAddress.TryParse(hostString, out var host))
                 ThrowInvalidUtf8SiloAddress(addr);
 
-            var portSlice = endpointSlice.Slice(lastColon + 1);
+            var portSlice = endpointSlice[(lastColon + 1)..];
             if (!Utf8Parser.TryParse(portSlice, out int port, out len) || len < portSlice.Length)
                 ThrowInvalidUtf8SiloAddress(addr);
 
-            var genSlice = addr.Slice(atSign + 1);
+            var genSlice = addr[(atSign + 1)..];
             if (!Utf8Parser.TryParse(genSlice, out int generation, out len) || len < genSlice.Length)
                 ThrowInvalidUtf8SiloAddress(addr);
 
@@ -304,9 +304,9 @@ namespace Orleans.Runtime
             if (address.AddressFamily == AddressFamily.InterNetwork) // IPv4
             {
 #pragma warning disable CS0618 // Type or member is obsolete
-                BinaryPrimitives.WriteInt32LittleEndian(bytes.Slice(12), (int)address.Address);
+                BinaryPrimitives.WriteInt32LittleEndian(bytes[12..], (int)address.Address);
 #pragma warning restore CS0618
-                bytes.Slice(0, 12).Clear();
+                bytes[..12].Clear();
             }
             else // IPv6
             {
@@ -315,16 +315,16 @@ namespace Orleans.Runtime
             }
             var offset = 16;
             // Port
-            BinaryPrimitives.WriteInt32LittleEndian(bytes.Slice(offset), Endpoint.Port);
+            BinaryPrimitives.WriteInt32LittleEndian(bytes[offset..], Endpoint.Port);
             offset += sizeof(int);
             // Generation
-            BinaryPrimitives.WriteInt32LittleEndian(bytes.Slice(offset), Generation);
+            BinaryPrimitives.WriteInt32LittleEndian(bytes[offset..], Generation);
             offset += sizeof(int);
 
             var hashes = new uint[numHashes];
             for (int extraBit = 0; extraBit < numHashes; extraBit++)
             {
-                BinaryPrimitives.WriteInt32LittleEndian(bytes.Slice(offset), extraBit);
+                BinaryPrimitives.WriteInt32LittleEndian(bytes[offset..], extraBit);
                 hashes[extraBit] = StableHash.ComputeHash(bytes);
             }
             return hashes;

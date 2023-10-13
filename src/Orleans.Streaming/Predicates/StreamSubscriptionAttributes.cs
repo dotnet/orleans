@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using Orleans.Metadata;
 using Orleans.Runtime;
 using Orleans.Streams;
@@ -21,7 +22,10 @@ namespace Orleans
         /// Gets the name of the stream identifier mapper.
         /// </summary>
         /// <value>The name of the stream identifier mapper.</value>
-        public string StreamIdMapper { get; }
+        /// <remarks>
+        /// This value is the name used to resolve the <see cref="IStreamIdMapper"/> registered in the dependency injection container.
+        /// </remarks>
+        public string StreamIdMapper { get; init; }
 
         /// <summary>
         /// Used to subscribe to all stream namespaces.
@@ -110,7 +114,7 @@ namespace Orleans
         /// Allows to pass a regular expression to filter stream namespaces to subscribe to.
         /// </summary>
         /// <param name="pattern">The stream namespace regular expression filter.</param>
-        public RegexImplicitStreamSubscriptionAttribute(string pattern)
+        public RegexImplicitStreamSubscriptionAttribute([StringSyntax(StringSyntaxAttribute.Regex)] string pattern)
             : base(new RegexStreamNamespacePredicate(pattern))
         {
         }

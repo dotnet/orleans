@@ -575,6 +575,9 @@ namespace Orleans.Runtime
 
         /// <inheritdoc/>
         public override string ToString() => IRequest.ToString(this);
+
+        /// <inheritdoc/>
+        public virtual TimeSpan? GetDefaultResponseTimeout() => null;
     }
 
     /// <summary>

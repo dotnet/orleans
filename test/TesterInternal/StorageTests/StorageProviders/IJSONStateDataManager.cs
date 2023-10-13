@@ -14,8 +14,6 @@
 //
 //*********************************************************
 
-using System;
-
 namespace Samples.StorageProviders
 {
     /// <summary>

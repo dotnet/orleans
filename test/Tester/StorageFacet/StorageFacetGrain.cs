@@ -1,6 +1,4 @@
-﻿using Orleans;
-using System.Threading.Tasks;
-// Note that for a feature exposed to a grain as a facet, only it's abstractions should be necessary.
+﻿// Note that for a feature exposed to a grain as a facet, only it's abstractions should be necessary.
 using Tester.StorageFacet.Abstractions;
 
 namespace Tester

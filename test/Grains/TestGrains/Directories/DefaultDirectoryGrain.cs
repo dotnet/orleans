@@ -1,5 +1,3 @@
-using System.Threading.Tasks;
-using Orleans;
 using UnitTests.GrainInterfaces.Directories;
 
 namespace UnitTests.Grains.Directories

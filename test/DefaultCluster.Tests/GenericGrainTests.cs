@@ -1,10 +1,4 @@
-using System;
-using System.Collections.Generic;
 using System.Globalization;
-using System.Linq;
-using System.Threading.Tasks;
-using Orleans;
-using Orleans.Internal;
 using Orleans.Runtime;
 using TestExtensions;
 using TestGrainInterfaces;
@@ -808,7 +802,7 @@ namespace DefaultCluster.Tests.General
             {
             }
 
-            static async Task<Type[]> GetConcreteGenArgs(IBasicGrain @this) {
+            private static async Task<Type[]> GetConcreteGenArgs(IBasicGrain @this) {
                 var genArgTypeNames = await @this.ConcreteGenArgTypeNames();
 
                 return genArgTypeNames.Select(n => Type.GetType(n))

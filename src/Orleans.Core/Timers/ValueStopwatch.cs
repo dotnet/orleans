@@ -8,8 +8,8 @@ namespace Orleans.Runtime
     /// </summary>
     internal struct ValueStopwatch
     {
-        private static readonly double TimestampToTicks = TimeSpan.TicksPerSecond / (double) Stopwatch.Frequency;
-        private long value;
+        private static readonly double TimestampToTicks = TimeSpan.TicksPerSecond / (double)Stopwatch.Frequency;
+        private long _value;
 
         /// <summary>
         /// Starts a new instance.
@@ -25,17 +25,17 @@ namespace Orleans.Runtime
         /// </param>
         /// <returns>A new, running stopwatch.</returns>
         public static ValueStopwatch StartNew(TimeSpan elapsed) => new(GetTimestamp() - (long)(elapsed.TotalSeconds * Stopwatch.Frequency));
-        
+
         private ValueStopwatch(long timestamp)
         {
-            this.value = timestamp;
+            this._value = timestamp;
         }
-        
+
         /// <summary>
         /// Returns true if this instance is running or false otherwise.
         /// </summary>
-        public bool IsRunning => this.value > 0;
-        
+        public readonly bool IsRunning => this._value > 0;
+
         /// <summary>
         /// Returns the elapsed time.
         /// </summary>
@@ -44,14 +44,14 @@ namespace Orleans.Runtime
         /// <summary>
         /// Returns the elapsed ticks.
         /// </summary>
-        public long ElapsedTicks
+        public readonly long ElapsedTicks
         {
             get
             {
                 // A positive timestamp value indicates the start time of a running stopwatch,
                 // a negative value indicates the negative total duration of a stopped stopwatch.
-                var timestamp = this.value;
-                
+                var timestamp = this._value;
+
                 long delta;
                 if (this.IsRunning)
                 {
@@ -66,7 +66,7 @@ namespace Orleans.Runtime
                     delta = -timestamp;
                 }
 
-                return (long) (delta * TimestampToTicks);
+                return (long)(delta * TimestampToTicks);
             }
         }
 
@@ -92,15 +92,15 @@ namespace Orleans.Runtime
         /// a negative value indicates the negative total duration of a stopped stopwatch.
         /// </remarks>
         /// <returns>The raw counter value.</returns>
-        public long GetRawTimestamp() => this.value;
+        public readonly long GetRawTimestamp() => this._value;
 
         /// <summary>
         /// Starts the stopwatch.
         /// </summary>
         public void Start()
         {
-            var timestamp = this.value;
-            
+            var timestamp = this._value;
+
             // If already started, do nothing.
             if (this.IsRunning) return;
 
@@ -108,25 +108,25 @@ namespace Orleans.Runtime
             // Add the negative value to the current timestamp to start the stopwatch again.
             var newValue = GetTimestamp() + timestamp;
             if (newValue == 0) newValue = 1;
-            this.value = newValue;
+            this._value = newValue;
         }
 
         /// <summary>
         /// Restarts this stopwatch, beginning from zero time elapsed.
         /// </summary>
-        public void Restart() => this.value = GetTimestamp();
+        public void Restart() => this._value = GetTimestamp();
 
         /// <summary>
         /// Resets this stopwatch into a stopped state with no elapsed duration.
         /// </summary>
-        public void Reset() => this.value = 0;
+        public void Reset() => this._value = 0;
 
         /// <summary>
         /// Stops this stopwatch.
         /// </summary>
         public void Stop()
         {
-            var timestamp = this.value;
+            var timestamp = this._value;
 
             // If already stopped, do nothing.
             if (!this.IsRunning) return;
@@ -134,7 +134,7 @@ namespace Orleans.Runtime
             var end = GetTimestamp();
             var delta = end - timestamp;
 
-            this.value = -delta;
+            this._value = -delta;
         }
     }
 }

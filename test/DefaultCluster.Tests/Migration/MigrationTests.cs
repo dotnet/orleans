@@ -2,7 +2,6 @@ using Orleans.Core.Internal;
 using Orleans.Runtime;
 using Orleans.Runtime.Placement;
 using TestExtensions;
-using TestGrains;
 using Xunit;
 
 namespace DefaultCluster.Tests.General

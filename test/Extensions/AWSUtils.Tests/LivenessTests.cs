@@ -1,8 +1,6 @@
 using AWSUtils.Tests.StorageTests;
 using Microsoft.Extensions.Configuration;
-using Orleans.Hosting;
 using Orleans.TestingHost;
-using System.Threading.Tasks;
 using UnitTests.MembershipTests;
 using Xunit;
 using Xunit.Abstractions;

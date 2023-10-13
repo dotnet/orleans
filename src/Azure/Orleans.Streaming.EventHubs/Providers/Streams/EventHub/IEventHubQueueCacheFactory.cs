@@ -1,5 +1,4 @@
 using Microsoft.Extensions.Logging;
-using Orleans.Runtime;
 using Orleans.Streams;
 
 namespace Orleans.Streaming.EventHubs

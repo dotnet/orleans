@@ -1,10 +1,6 @@
-using System;
-using System.Threading.Tasks;
 using System.Threading.Channels;
-using System.Collections.Generic;
 using System.Diagnostics;
 using Microsoft.Extensions.Logging;
-using System.Threading;
 
 namespace DistributedTests.Client
 {
@@ -20,9 +16,9 @@ namespace DistributedTests.Client
 
         public int BlocksCompleted { get; set; }
 
-        public long RatePerSecond => (long)(Completed / TotalDuration);
+        public readonly long RatePerSecond => (long)(Completed / TotalDuration);
 
-        public override string ToString()
+        public override readonly string ToString()
         {
             if (BlocksCompleted == 0) return "No blocks completed";
             var failureString = Failures == 0 ? string.Empty : $" with {Failures} failures";
@@ -39,21 +35,21 @@ namespace DistributedTests.Client
             public long EndTimestamp { get; set; }
             public int Successes { get; set; }
             public int Failures { get; set; }
-            public int Completed => this.Successes + this.Failures;
-            public double ElapsedSeconds => (this.EndTimestamp - this.StartTimestamp) / StopwatchTickPerSecond;
-            public double RequestsPerSecond => this.Completed / this.ElapsedSeconds;
+            public readonly int Completed => this.Successes + this.Failures;
+            public readonly double ElapsedSeconds => (this.EndTimestamp - this.StartTimestamp) / StopwatchTickPerSecond;
+            public readonly double RequestsPerSecond => this.Completed / this.ElapsedSeconds;
         }
 
-        private Channel<WorkBlock> completedBlocks;
-        private readonly Func<TState, ValueTask> issueRequest;
-        private readonly Func<int, TState> getStateForWorker;
-        private readonly ILogger logger;
-        private readonly bool logIntermediateResults;
-        private readonly Task[] tasks;
-        private readonly TState[] states;
-        private readonly int numWorkers;
-        private readonly int blocksPerWorker;
-        private readonly int requestsPerBlock;
+        private Channel<WorkBlock> _completedBlocks;
+        private readonly Func<TState, ValueTask> _issueRequest;
+        private readonly Func<int, TState> _getStateForWorker;
+        private readonly ILogger _logger;
+        private readonly bool _logIntermediateResults;
+        private readonly Task[] _tasks;
+        private readonly TState[] _states;
+        private readonly int _numWorkers;
+        private readonly int _blocksPerWorker;
+        private readonly int _requestsPerBlock;
 
         public ConcurrentLoadGenerator(
             int numWorkers,
@@ -64,33 +60,33 @@ namespace DistributedTests.Client
             ILogger logger,
             bool logIntermediateResults = false)
         {
-            this.numWorkers = numWorkers;
-            this.blocksPerWorker = blocksPerWorker;
-            this.requestsPerBlock = requestsPerBlock;
-            this.issueRequest = issueRequest;
-            this.getStateForWorker = getStateForWorker;
-            this.logger = logger;
-            this.logIntermediateResults = logIntermediateResults;
-            this.tasks = new Task[numWorkers];
-            this.states = new TState[numWorkers];
+            this._numWorkers = numWorkers;
+            this._blocksPerWorker = blocksPerWorker;
+            this._requestsPerBlock = requestsPerBlock;
+            this._issueRequest = issueRequest;
+            this._getStateForWorker = getStateForWorker;
+            this._logger = logger;
+            this._logIntermediateResults = logIntermediateResults;
+            this._tasks = new Task[numWorkers];
+            this._states = new TState[numWorkers];
         }
 
         public async Task Warmup()
         {
             this.ResetBetweenRuns();
-            var completedBlockReader = this.completedBlocks.Reader;
+            var completedBlockReader = this._completedBlocks.Reader;
 
-            for (var ree = 0; ree < this.numWorkers; ree++)
+            for (var ree = 0; ree < this._numWorkers; ree++)
             {
-                this.states[ree] = getStateForWorker(ree);
-                this.tasks[ree] = this.RunWorker(this.states[ree], this.requestsPerBlock, 3, default);
+                this._states[ree] = _getStateForWorker(ree);
+                this._tasks[ree] = this.RunWorker(this._states[ree], this._requestsPerBlock, 3, default);
             }
 
             // Wait for warmup to complete.
-            await Task.WhenAll(this.tasks);
+            await Task.WhenAll(this._tasks);
 
             // Ignore warmup blocks.
-            while (completedBlockReader.TryRead(out _));
+            while (completedBlockReader.TryRead(out _)) ;
             GC.Collect();
             GC.Collect();
             GC.Collect();
@@ -98,7 +94,7 @@ namespace DistributedTests.Client
 
         private void ResetBetweenRuns()
         {
-            this.completedBlocks = Channel.CreateUnbounded<WorkBlock>(
+            this._completedBlocks = Channel.CreateUnbounded<WorkBlock>(
                 new UnboundedChannelOptions
                 {
                     SingleReader = true,
@@ -110,19 +106,19 @@ namespace DistributedTests.Client
         public async Task<LoadGeneratorReport> Run(CancellationToken ct)
         {
             this.ResetBetweenRuns();
-            var completedBlockReader = this.completedBlocks.Reader;
+            var completedBlockReader = this._completedBlocks.Reader;
 
             // Start the run.
-            for (var i = 0; i < this.numWorkers; i++)
+            for (var i = 0; i < this._numWorkers; i++)
             {
-                this.tasks[i] = this.RunWorker(this.states[i], this.requestsPerBlock, this.blocksPerWorker, ct);
+                this._tasks[i] = this.RunWorker(this._states[i], this._requestsPerBlock, this._blocksPerWorker, ct);
             }
 
-            var completion = Task.WhenAll(this.tasks);
-            _ = Task.Run(async () => { try { await completion; } catch { } finally { this.completedBlocks.Writer.Complete(); } });
+            var completion = Task.WhenAll(this._tasks);
+            _ = Task.Run(async () => { try { await completion; } catch { } finally { this._completedBlocks.Writer.Complete(); } });
             // Do not allocated a list with a too high capacity
-            var blocks = new List<WorkBlock>(this.numWorkers * Math.Min(100, this.blocksPerWorker));
-            var blocksPerReport = this.numWorkers * Math.Min(100, this.blocksPerWorker) / 5;
+            var blocks = new List<WorkBlock>(this._numWorkers * Math.Min(100, this._blocksPerWorker));
+            var blocksPerReport = this._numWorkers * Math.Min(100, this._blocksPerWorker) / 5;
             var nextReportBlockCount = blocksPerReport;
             while (!completion.IsCompleted)
             {
@@ -133,17 +129,17 @@ namespace DistributedTests.Client
                     blocks.Add(block);
                 }
 
-                if (this.logIntermediateResults && blocks.Count >= nextReportBlockCount)
+                if (this._logIntermediateResults && blocks.Count >= nextReportBlockCount)
                 {
                     nextReportBlockCount += blocksPerReport;
-                    logger.LogInformation("    " + BuildReport(0));
+                    _logger.LogInformation("    " + BuildReport(0));
                 }
             }
 
             var finalReport = BuildReport(0);
 
-            if (this.logIntermediateResults) logger.LogInformation("  Total: " + finalReport);
-            else logger.LogInformation(finalReport.ToString());
+            if (this._logIntermediateResults) _logger.LogInformation("  Total: " + finalReport);
+            else _logger.LogInformation(finalReport.ToString());
 
             return finalReport;
 
@@ -182,7 +178,7 @@ namespace DistributedTests.Client
 
         private async Task RunWorker(TState state, int requestsPerBlock, int numBlocks, CancellationToken ct)
         {
-            var completedBlockWriter = this.completedBlocks.Writer;
+            var completedBlockWriter = this._completedBlocks.Writer;
             while (numBlocks > 0 && !ct.IsCancellationRequested)
             {
                 var workBlock = new WorkBlock();
@@ -191,7 +187,7 @@ namespace DistributedTests.Client
                 {
                     try
                     {
-                        await this.issueRequest(state).ConfigureAwait(false);
+                        await this._issueRequest(state).ConfigureAwait(false);
                         ++workBlock.Successes;
                     }
                     catch

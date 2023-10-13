@@ -1,12 +1,6 @@
 using Microsoft.Extensions.Logging;
-using Orleans;
-using Orleans.Runtime;
 using Orleans.Streams;
-using System;
-using System.Collections.Generic;
 using System.Runtime.CompilerServices;
-using System.Threading;
-using System.Threading.Tasks;
 using UnitTests.GrainInterfaces;
 
 namespace UnitTests.Grains.ProgrammaticSubscribe
@@ -137,7 +131,7 @@ namespace UnitTests.Grains.ProgrammaticSubscribe
     public class Apple : IFruit
     {
         [Id(0)]
-        readonly int number;
+        private readonly int number;
 
         public Apple(int number)
         {

@@ -67,14 +67,14 @@ namespace Orleans.Metadata
             var index = name.IndexOf('`');
             if (index > 0)
             {
-                name = name.Substring(0, index);
+                name = name[..index];
             }
 
             // Trim "Grain" suffix
             index = name.LastIndexOf(GrainSuffix);
             if (index > 0 && name.Length - index == GrainSuffix.Length)
             {
-                name = name.Substring(0, index);
+                name = name[..index];
             }
 
             // Append the generic arity, eg typeof(MyListGrain<T>) would eventually become mylist`1

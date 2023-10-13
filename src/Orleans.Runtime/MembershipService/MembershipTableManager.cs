@@ -318,13 +318,13 @@ namespace Orleans.Runtime.MembershipService
             
             try
             {
-                Func<int, Task<bool>> updateMyStatusTask = async counter =>
+                async Task<bool> updateMyStatusTask(int counter)
                 {
                     numCalls++;
                     if (log.IsEnabled(LogLevel.Debug)) log.LogDebug("Going to try to TryUpdateMyStatusGlobalOnce #{Attempt}", counter);
                     return await TryUpdateMyStatusGlobalOnce(status);  // function to retry
-                };
-                
+                }
+
                 if (status == SiloStatus.Dead && this.membershipTableProvider is SystemTargetBasedMembershipTable)
                 {
                     // SystemTarget-based membership may not be accessible at this stage, so allow for one quick attempt to update

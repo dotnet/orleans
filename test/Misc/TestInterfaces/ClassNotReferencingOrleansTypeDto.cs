@@ -1,6 +1,4 @@
-﻿using System;
-
-namespace UnitTests.Dtos
+﻿namespace UnitTests.Dtos
 {
     [Serializable]
     public class ClassNotReferencingOrleansTypeDto

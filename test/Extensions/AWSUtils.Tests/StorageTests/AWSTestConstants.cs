@@ -4,8 +4,6 @@ using Amazon.Runtime;
 using Microsoft.Extensions.Logging.Abstractions;
 using Orleans.AWSUtils.Tests;
 using Orleans.Internal;
-using System;
-using System.Collections.Generic;
 using TestExtensions;
 
 namespace AWSUtils.Tests.StorageTests

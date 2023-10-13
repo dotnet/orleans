@@ -46,7 +46,7 @@ namespace Orleans.Providers.Streams.Common
         /// <returns><see langword="true"/> if the segment was retrieved; otherwise <see langword="false"/>.</returns>
         public bool TryGetSegment(int size, out ArraySegment<byte> value)
         {
-            value = default(ArraySegment<byte>);
+            value = default;
             if (size > this.SizeInByte - count)
             {
                 return false;

@@ -524,6 +524,24 @@ namespace Orleans
     }
 
     /// <summary>
+    /// Specifies the response timeout for the interface method which it is specified on.
+    /// </summary>
+    [AttributeUsage(AttributeTargets.Method)]
+    public sealed class ResponseTimeoutAttribute : Attribute
+    {
+        /// <summary>
+        /// Specifies the response timeout for the interface method which it is specified on.
+        /// </summary>
+        /// <param name="timeout">The response timeout, using <see cref="TimeSpan.Parse(string)"/> syntax.</param>
+        public ResponseTimeoutAttribute(string timeout) => Timeout = TimeSpan.Parse(timeout);
+
+        /// <summary>
+        /// Gets or sets the response timeout for this method.
+        /// </summary>
+        public TimeSpan? Timeout { get; init; }
+    }
+
+    /// <summary>
     /// Functionality for converting between two types.
     /// </summary>
     public interface IConverter<TValue, TSurrogate> where TSurrogate : struct

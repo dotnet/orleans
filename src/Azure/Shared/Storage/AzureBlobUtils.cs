@@ -1,11 +1,6 @@
 using System;
 using System.Linq;
 using System.Text.RegularExpressions;
-using System.Threading.Tasks;
-using Azure;
-using Azure.Core;
-using Azure.Storage;
-using Azure.Storage.Blobs;
 
 #if ORLEANS_PERSISTENCE
 namespace Orleans.Persistence.AzureStorage

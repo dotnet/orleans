@@ -1,5 +1,3 @@
-using System.Threading.Tasks;
-
 namespace UnitTests.Grains
 {
     public class SpecializedSimpleGenericGrain : SimpleGenericGrain<double>

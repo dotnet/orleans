@@ -1,8 +1,4 @@
-﻿using System;
-using System.Threading.Tasks;
-using Orleans;
-
-namespace UnitTests.GrainInterfaces
+﻿namespace UnitTests.GrainInterfaces
 {
     /// <summary>
     /// Consumer grain which passively reacts to subscriptions which was made on behalf of

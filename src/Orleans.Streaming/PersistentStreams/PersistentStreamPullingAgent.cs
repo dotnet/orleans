@@ -4,11 +4,9 @@ using System.Diagnostics.Metrics;
 using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
-using Orleans.Concurrency;
 using Orleans.Configuration;
 using Orleans.Internal;
 using Orleans.Runtime;
-using Orleans.Statistics;
 using Orleans.Streams.Filtering;
 
 namespace Orleans.Streams

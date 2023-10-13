@@ -1,7 +1,5 @@
-using System;
 using Microsoft.Extensions.Logging;
 using Orleans.EventSourcing.CustomStorage;
-using Orleans.Hosting;
 using Orleans.Storage;
 using Orleans.TestingHost;
 using TestExtensions;

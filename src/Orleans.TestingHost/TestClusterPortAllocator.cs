@@ -6,7 +6,6 @@ using System.Linq;
 using System.Net;
 using System.Net.NetworkInformation;
 using System.Threading;
-using Orleans.Internal;
 
 namespace Orleans.TestingHost
 {

@@ -1,6 +1,4 @@
-﻿using System.Threading.Tasks;
-
-namespace Orleans.SqlUtils.StorageProvider.GrainInterfaces
+﻿namespace Orleans.SqlUtils.StorageProvider.GrainInterfaces
 {
     public interface ICustomerGrain : IGrainWithIntegerKey
     {

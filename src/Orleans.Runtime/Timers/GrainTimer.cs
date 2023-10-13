@@ -1,6 +1,4 @@
 using System;
-using System.Diagnostics.CodeAnalysis;
-using System.Reflection;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Orleans.Runtime.Scheduler;
@@ -63,7 +61,7 @@ namespace Orleans.Runtime
         public void Start()
         {
             if (TimerAlreadyStopped)
-                throw new ObjectDisposedException(String.Format("The timer {0} was already disposed.", GetFullName()));
+                throw new ObjectDisposedException(string.Format("The timer {0} was already disposed.", GetFullName()));
 
             timer.Start(dueTime, timerFrequency);
         }

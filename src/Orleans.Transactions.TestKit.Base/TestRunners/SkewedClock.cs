@@ -1,5 +1,4 @@
 using System;
-using Orleans.Internal;
 
 namespace Orleans.Transactions.TestKit
 {

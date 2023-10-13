@@ -1,6 +1,3 @@
-using System;
-using System.Linq;
-using System.Threading.Tasks;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Orleans.Providers.Streams.Generator;
@@ -12,8 +9,6 @@ using TestExtensions;
 using TestGrains;
 using UnitTests.Grains;
 using Xunit;
-using Orleans.Hosting;
-using Orleans;
 
 namespace ServiceBus.Tests.StreamingTests
 {

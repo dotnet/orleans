@@ -92,7 +92,7 @@ namespace Orleans.Transactions
                      info.RecordRead(this.participantId, record.Timestamp);
 
                      // perform the read 
-                     TResult result = default(TResult);
+                     TResult result = default;
                      try
                      {
                          detectReentrancy = true;
@@ -212,7 +212,7 @@ namespace Orleans.Transactions
             ITransactionalStateStorage<TState> storage = storageFactory.Create<TState>(this.config.StorageName, this.config.StateName);
 
             // setup transaction processing pipe
-            Action deactivate = () => grainRuntime.DeactivateOnIdle(context);
+            void deactivate() => grainRuntime.DeactivateOnIdle(context);
             var options = this.context.ActivationServices.GetRequiredService<IOptions<TransactionalStateOptions>>();
             var clock = this.context.ActivationServices.GetRequiredService<IClock>();
             var timerManager = this.context.ActivationServices.GetRequiredService<ITimerManager>();

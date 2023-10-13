@@ -1,9 +1,4 @@
-using System;
-using System.Threading;
-using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
-using Orleans;
-using Orleans.Runtime;
 using Orleans.Streams;
 using UnitTests.GrainInterfaces;
 
@@ -66,7 +61,7 @@ namespace UnitTests.Grains
         public async Task BecomeConsumer(Guid streamId, string providerToUse)
         {
             _logger.LogInformation("Consumer.BecomeConsumer");
-            if (String.IsNullOrEmpty(providerToUse))
+            if (string.IsNullOrEmpty(providerToUse))
             {
                 throw new ArgumentNullException(nameof(providerToUse));
             }

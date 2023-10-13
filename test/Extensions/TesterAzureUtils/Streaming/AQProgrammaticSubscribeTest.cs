@@ -1,10 +1,7 @@
-using System.Threading.Tasks;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
-using Orleans;
 using Orleans.Configuration;
-using Orleans.Hosting;
 using Orleans.Providers.Streams.AzureQueue;
 using Orleans.TestingHost;
 using Tester.StreamingTests;

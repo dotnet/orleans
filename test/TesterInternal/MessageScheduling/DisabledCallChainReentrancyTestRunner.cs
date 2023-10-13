@@ -1,6 +1,3 @@
-using System;
-using Orleans;
-using Orleans.Runtime;
 using TestExtensions;
 using UnitTests.GrainInterfaces;
 using Xunit;

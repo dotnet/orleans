@@ -1,9 +1,5 @@
-using System;
 using System.Diagnostics;
 using System.Net;
-using System.Threading;
-using System.Threading.Tasks;
-using Orleans;
 using Orleans.Runtime;
 using Orleans.TestingHost.Utils;
 using Xunit;
@@ -100,7 +96,7 @@ namespace Tester
             if (baseline > TimeSpan.Zero)
             {
                 double delta = (duration - baseline).TotalMilliseconds / baseline.TotalMilliseconds;
-                timeDeltaStr = String.Format("-- Change = {0}%", 100.0 * delta);
+                timeDeltaStr = string.Format("-- Change = {0}%", 100.0 * delta);
             }
             Console.WriteLine("Time for {0} loops doing {1} = {2} {3} Memory used={4}", numIterations, what, duration, timeDeltaStr, memUsed);
             return duration;

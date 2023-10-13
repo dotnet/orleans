@@ -1,6 +1,3 @@
-using System;
-using Orleans;
-
 namespace UnitTests.DtosRefOrleans
 {
     [Serializable]

@@ -94,7 +94,7 @@ namespace Tester.Redis.Persistence
             var result = await grain.DoRead();
 
             //Assert.NotNull(result);
-            Assert.Equal(default(GrainState), result);
+            Assert.Equal(default, result);
             //Assert.Equal(default(string), result.StringValue);
             //Assert.Equal(default(int), result.IntValue);
             //Assert.Equal(default(DateTime), result.DateTimeValue);

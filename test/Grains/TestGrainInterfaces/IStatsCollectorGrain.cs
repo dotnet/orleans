@@ -1,7 +1,4 @@
-﻿using System.Threading.Tasks;
-using Orleans;
-
-namespace UnitTests.Stats
+﻿namespace UnitTests.Stats
 {
     public interface IStatsCollectorGrain : IGrainWithIntegerKey
     {

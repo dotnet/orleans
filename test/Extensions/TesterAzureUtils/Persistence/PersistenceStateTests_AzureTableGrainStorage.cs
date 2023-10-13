@@ -1,9 +1,7 @@
-using System.Threading.Tasks;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 using Xunit;
 using Xunit.Abstractions;
-using Orleans.Hosting;
 using Orleans.TestingHost;
 
 namespace Tester.AzureUtils.Persistence

@@ -1,6 +1,3 @@
-using System;
-using System.Collections.Generic;
-using System.Threading.Tasks;
 using Orleans.GrainDirectory;
 using Orleans.Runtime;
 using Orleans.Runtime.GrainDirectory;
@@ -87,6 +84,11 @@ namespace UnitTests.Directory
         }
 
         public Task<AddressAndTag> LookupAsync(GrainId grainId, int hopCount = 0)
+        {
+            throw new NotImplementedException();
+        }
+
+        public Task<AddressAndTag> RegisterAsync(GrainAddress address, int hopCount = 0)
         {
             throw new NotImplementedException();
         }

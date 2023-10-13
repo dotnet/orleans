@@ -1,13 +1,7 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
-using Orleans;
 using Orleans.Configuration;
-using Orleans.Hosting;
 using Orleans.Runtime;
 using Orleans.Serialization.TypeSystem;
 using Orleans.TestingHost;
@@ -169,18 +163,17 @@ namespace UnitTests.ActivationsLifeCycleTests
             }
             await Task.WhenAll(tasks0);
             bool[] quit = new bool[]{ false };
-            Func<Task> busyWorker =
-                async () =>
+            async Task busyWorker()
+            {
+                logger.LogInformation("ActivationCollectorShouldNotCollectBusyActivations: busyWorker started");
+                List<Task> tasks1 = new List<Task>();
+                while (!quit[0])
                 {
-                    logger.LogInformation("ActivationCollectorShouldNotCollectBusyActivations: busyWorker started");
-                    List<Task> tasks1 = new List<Task>();
-                    while (!quit[0])
-                    {
-                        foreach (var g in busyGrains)
-                            tasks1.Add(g.Nop());
-                        await Task.WhenAll(tasks1);
-                    }
-                };
+                    foreach (var g in busyGrains)
+                        tasks1.Add(g.Nop());
+                    await Task.WhenAll(tasks1);
+                }
+            }
             Task.Run(busyWorker).Ignore();
 
             logger.LogInformation("ActivationCollectorShouldNotCollectBusyActivations: activating {Count} idle grains.", idleGrainCount);
@@ -232,18 +225,17 @@ namespace UnitTests.ActivationsLifeCycleTests
             }
             await Task.WhenAll(tasks0);
             bool[] quit = new bool[]{ false };
-            Func<Task> busyWorker =
-                async () =>
+            async Task busyWorker()
+            {
+                logger.LogInformation("ManualCollectionShouldNotCollectBusyActivations: busyWorker started");
+                List<Task> tasks1 = new List<Task>();
+                while (!quit[0])
                 {
-                    logger.LogInformation("ManualCollectionShouldNotCollectBusyActivations: busyWorker started");
-                    List<Task> tasks1 = new List<Task>();
-                    while (!quit[0])
-                    {
-                        foreach (var g in busyGrains)
-                            tasks1.Add(g.Nop());
-                        await Task.WhenAll(tasks1);
-                    }
-                };
+                    foreach (var g in busyGrains)
+                        tasks1.Add(g.Nop());
+                    await Task.WhenAll(tasks1);
+                }
+            }
             Task.Run(busyWorker).Ignore();
 
             logger.LogInformation("ManualCollectionShouldNotCollectBusyActivations: activating {Count} idle grains.", idleGrainCount);
@@ -340,18 +332,17 @@ namespace UnitTests.ActivationsLifeCycleTests
             }
             await Task.WhenAll(tasks0);
             bool[] quit = new bool[]{ false };
-            Func<Task> busyWorker =
-                async () =>
+            async Task busyWorker()
+            {
+                logger.LogInformation("ActivationCollectorShouldNotCollectBusyActivationsSpecifiedInPerTypeConfiguration: busyWorker started");
+                List<Task> tasks1 = new List<Task>();
+                while (!quit[0])
                 {
-                    logger.LogInformation("ActivationCollectorShouldNotCollectBusyActivationsSpecifiedInPerTypeConfiguration: busyWorker started");
-                    List<Task> tasks1 = new List<Task>();
-                    while (!quit[0])
-                    {
-                        foreach (var g in busyGrains)
-                            tasks1.Add(g.Nop());
-                        await Task.WhenAll(tasks1);
-                    }
-                };
+                    foreach (var g in busyGrains)
+                        tasks1.Add(g.Nop());
+                    await Task.WhenAll(tasks1);
+                }
+            }
             Task.Run(busyWorker).Ignore();
 
             logger.LogInformation("ActivationCollectorShouldNotCollectBusyActivationsSpecifiedInPerTypeConfiguration: activating {Count} idle grains.", idleGrainCount);
@@ -413,41 +404,39 @@ namespace UnitTests.ActivationsLifeCycleTests
             bool[] quit = new bool[] { false };
             bool[] matched = new bool[grainCount];
             string[] activationIds = new string[grainCount];
-            Func<int, Task> workFunc =
-                async index =>
-                {
-                    // (part of) 4. periodically send a message to each grain...
+            async Task workFunc(int index)
+            {
+                // (part of) 4. periodically send a message to each grain...
 
-                    // take a grain and call Delay to keep it busy.
-                    IStatelessWorkerActivationCollectorTestGrain1 g = grains[index];
-                    await g.Delay(DEFAULT_IDLE_TIMEOUT.Divide(2));
-                    // identify the activation and record whether it matches the activation ID last reported. it probably won't match in the beginning but should always converge on a match as other activations get collected.
-                    string aid = await g.IdentifyActivation();
-                    logger.LogInformation("ActivationCollectorShouldNotCollectBusyStatelessWorkers: identified {Activation}", aid);
-                    matched[index] = aid == activationIds[index];
-                    activationIds[index] = aid;
-                };
-            Func<Task> workerFunc =
-                async () =>
-                {
-                    // (part of) 4. periodically send a message to each grain...
-                    logger.LogInformation("ActivationCollectorShouldNotCollectBusyStatelessWorkers: busyWorker started");
+                // take a grain and call Delay to keep it busy.
+                IStatelessWorkerActivationCollectorTestGrain1 g = grains[index];
+                await g.Delay(DEFAULT_IDLE_TIMEOUT.Divide(2));
+                // identify the activation and record whether it matches the activation ID last reported. it probably won't match in the beginning but should always converge on a match as other activations get collected.
+                string aid = await g.IdentifyActivation();
+                logger.LogInformation("ActivationCollectorShouldNotCollectBusyStatelessWorkers: identified {Activation}", aid);
+                matched[index] = aid == activationIds[index];
+                activationIds[index] = aid;
+            }
+            async Task workerFunc()
+            {
+                // (part of) 4. periodically send a message to each grain...
+                logger.LogInformation("ActivationCollectorShouldNotCollectBusyStatelessWorkers: busyWorker started");
 
-                    List<Task> tasks1 = new List<Task>();
-                    while (!quit[0])
+                List<Task> tasks1 = new List<Task>();
+                while (!quit[0])
+                {
+                    for (int index = 0; index < grains.Count; ++index)
                     {
-                        for (int index = 0; index < grains.Count; ++index)
+                        if (quit[0])
                         {
-                            if (quit[0])
-                            {
-                                break;
-                            }
-
-                            tasks1.Add(workFunc(index));
+                            break;
                         }
-                        await Task.WhenAll(tasks1);
+
+                        tasks1.Add(workFunc(index));
                     }
-                };
+                    await Task.WhenAll(tasks1);
+                }
+            }
 
             // setup (1) ends here.
 

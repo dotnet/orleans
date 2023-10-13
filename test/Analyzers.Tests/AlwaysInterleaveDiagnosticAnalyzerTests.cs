@@ -1,5 +1,3 @@
-using System.Linq;
-using System.Threading.Tasks;
 using Microsoft.CodeAnalysis;
 using Orleans.Analyzers;
 using Xunit;
@@ -52,7 +50,7 @@ public class C : I
             Assert.Equal(AlwaysInterleaveDiagnosticAnalyzer.MessageFormat, diagnostic.GetMessage());
 
             var span = diagnostic.Location.SourceSpan;
-            Assert.Equal("AlwaysInterleave", source.Substring(span.Start, span.End - span.Start));
+            Assert.Equal("AlwaysInterleave", source[span.Start..span.End]);
         }
     }
 }

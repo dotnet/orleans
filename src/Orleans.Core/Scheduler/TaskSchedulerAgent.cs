@@ -37,7 +37,7 @@ namespace Orleans.Runtime
             var typeName = GetType().FullName;
             if (typeName.StartsWith("Orleans.", StringComparison.Ordinal))
             {
-                typeName = typeName.Substring(8);
+                typeName = typeName[8..];
             }
 
             Name = typeName;

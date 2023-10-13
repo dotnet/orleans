@@ -3,7 +3,6 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Options;
 using Orleans.Providers.Streams.AzureQueue;
-using Orleans.Providers.Streams.Common;
 using Orleans.Configuration;
 using Orleans.Streams;
 

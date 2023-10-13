@@ -1,6 +1,4 @@
-﻿
-using System;
-using Orleans.Providers.Streams.Common;
+﻿using Orleans.Providers.Streams.Common;
 using Xunit;
 
 namespace UnitTests.OrleansRuntime.Streams
@@ -60,11 +58,11 @@ namespace UnitTests.OrleansRuntime.Streams
             ArraySegment<byte> segment;
             for (int i = 0; i < TestBlockSize; i++)
             {
-                Assert.True(buffer.TryGetSegment(1, out segment), String.Format("Should be able to get {0}th segement of size 1.", i + 1));
+                Assert.True(buffer.TryGetSegment(1, out segment), string.Format("Should be able to get {0}th segement of size 1.", i + 1));
                 Assert.Equal(i, segment.Offset);
                 Assert.Single(segment);
             }
-            Assert.False(buffer.TryGetSegment(1, out segment), String.Format("Should be able to get {0}th segement of size 1.", TestBlockSize + 1));
+            Assert.False(buffer.TryGetSegment(1, out segment), string.Format("Should be able to get {0}th segement of size 1.", TestBlockSize + 1));
             Assert.Null(segment.Array);
             Assert.Equal(0, segment.Offset);
 #pragma warning disable xUnit2013 // Do not use equality check to check for collection size.

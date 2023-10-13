@@ -89,7 +89,7 @@ namespace Orleans.Providers.Streams.Common
             DeepCopier deepCopier,
             ILogger<PersistentStreamProvider> logger)
         {
-            if (String.IsNullOrEmpty(name)) throw new ArgumentNullException(nameof(name));
+            if (string.IsNullOrEmpty(name)) throw new ArgumentNullException(nameof(name));
             if (runtime == null) throw new ArgumentNullException(nameof(runtime));
             this.pubsubOptions = pubsubOptions ?? throw new ArgumentNullException(nameof(pubsubOptions));
             this.Name = name;

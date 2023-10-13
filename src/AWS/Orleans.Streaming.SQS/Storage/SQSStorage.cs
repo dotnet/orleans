@@ -1,6 +1,5 @@
 using Amazon.Runtime;
 using Amazon.SQS;
-using Orleans.Runtime;
 using System;
 using System.Collections.Generic;
 using System.Linq;

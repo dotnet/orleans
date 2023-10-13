@@ -499,10 +499,10 @@ namespace Orleans.Clustering.DynamoDB
             }
 
             parse.StartTime = !string.IsNullOrEmpty(tableEntry.StartTime) ?
-                LogFormatter.ParseDate(tableEntry.StartTime) : default(DateTime);
+                LogFormatter.ParseDate(tableEntry.StartTime) : default;
 
             parse.IAmAliveTime = !string.IsNullOrEmpty(tableEntry.IAmAliveTime) ?
-                LogFormatter.ParseDate(tableEntry.IAmAliveTime) : default(DateTime);
+                LogFormatter.ParseDate(tableEntry.IAmAliveTime) : default;
 
             var suspectingSilos = new List<SiloAddress>();
             var suspectingTimes = new List<DateTime>();

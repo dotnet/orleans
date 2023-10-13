@@ -30,24 +30,24 @@ namespace Orleans.Transactions.DynamoDB
     /// </summary>
     internal class DynamoDBStorage
     {
-        private readonly string accessKey;
-        private readonly string token;
-        private readonly string profileName;
+        private readonly string _accessKey;
+        private readonly string _token;
+        private readonly string _profileName;
         /// <summary> Secret key for this dynamoDB table </summary>
         protected string secretKey;
-        private readonly string service;
+        private readonly string _service;
         public const int DefaultReadCapacityUnits = 10;
         public const int DefaultWriteCapacityUnits = 5;
-        private readonly ProvisionedThroughput provisionedThroughput;
-        private readonly bool createIfNotExists;
-        private readonly bool updateIfExists;
-        private readonly bool useProvisionedThroughput;
-        private readonly ReadOnlyCollection<TableStatus> updateTableValidTableStatuses = new ReadOnlyCollection<TableStatus>(new List<TableStatus>()
+        private readonly ProvisionedThroughput _provisionedThroughput;
+        private readonly bool _createIfNotExists;
+        private readonly bool _updateIfExists;
+        private readonly bool _useProvisionedThroughput;
+        private readonly ReadOnlyCollection<TableStatus> _updateTableValidTableStatuses = new ReadOnlyCollection<TableStatus>(new List<TableStatus>()
             {
                 TableStatus.CREATING, TableStatus.UPDATING, TableStatus.ACTIVE
             });
-        private AmazonDynamoDBClient ddbClient;
-        private readonly ILogger Logger;
+        private AmazonDynamoDBClient _ddbClient;
+        private readonly ILogger _logger;
 
         /// <summary>
         /// Create a DynamoDBStorage instance
@@ -77,18 +77,18 @@ namespace Orleans.Transactions.DynamoDB
             bool updateIfExists = true)
         {
             if (service == null) throw new ArgumentNullException(nameof(service));
-            this.accessKey = accessKey;
+            this._accessKey = accessKey;
             this.secretKey = secretKey;
-            this.token = token;
-            this.profileName = profileName;
-            this.service = service;
-            this.useProvisionedThroughput = useProvisionedThroughput;
-            this.provisionedThroughput = this.useProvisionedThroughput
+            this._token = token;
+            this._profileName = profileName;
+            this._service = service;
+            this._useProvisionedThroughput = useProvisionedThroughput;
+            this._provisionedThroughput = this._useProvisionedThroughput
                 ? new ProvisionedThroughput(readCapacityUnits, writeCapacityUnits)
                 : null;
-            this.createIfNotExists = createIfNotExists;
-            this.updateIfExists = updateIfExists;
-            Logger = logger;
+            this._createIfNotExists = createIfNotExists;
+            this._updateIfExists = updateIfExists;
+            _logger = logger;
             CreateClient();
         }
 
@@ -103,9 +103,9 @@ namespace Orleans.Transactions.DynamoDB
         /// <returns></returns>
         public async Task InitializeTable(string tableName, List<KeySchemaElement> keys, List<AttributeDefinition> attributes, List<GlobalSecondaryIndex> secondaryIndexes = null, string ttlAttributeName = null)
         {
-            if (!this.createIfNotExists && !this.updateIfExists)
+            if (!this._createIfNotExists && !this._updateIfExists)
             {
-                Logger.LogInformation(
+                _logger.LogInformation(
                     (int)ErrorCode.StorageProviderBase,
                     "The config values for 'createIfNotExists' and 'updateIfExists' are false. The table '{TableName}' will not be created or updated.",
                     tableName);
@@ -121,55 +121,55 @@ namespace Orleans.Transactions.DynamoDB
             }
             catch (Exception exc)
             {
-                Logger.LogError((int)ErrorCode.StorageProviderBase, exc, "Could not initialize connection to storage table {TableName}", tableName);
+                _logger.LogError((int)ErrorCode.StorageProviderBase, exc, "Could not initialize connection to storage table {TableName}", tableName);
                 throw;
             }
         }
 
         private void CreateClient()
         {
-            if (this.service.StartsWith("http://", StringComparison.OrdinalIgnoreCase) ||
-                this.service.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
+            if (this._service.StartsWith("http://", StringComparison.OrdinalIgnoreCase) ||
+                this._service.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
             {
                 // Local DynamoDB instance (for testing)
                 var credentials = new BasicAWSCredentials("dummy", "dummyKey");
-                this.ddbClient = new AmazonDynamoDBClient(credentials, new AmazonDynamoDBConfig { ServiceURL = this.service });
+                this._ddbClient = new AmazonDynamoDBClient(credentials, new AmazonDynamoDBConfig { ServiceURL = this._service });
             }
-            else if (!string.IsNullOrEmpty(this.accessKey) && !string.IsNullOrEmpty(this.secretKey) && !string.IsNullOrEmpty(this.token))
+            else if (!string.IsNullOrEmpty(this._accessKey) && !string.IsNullOrEmpty(this.secretKey) && !string.IsNullOrEmpty(this._token))
             {
                 // AWS DynamoDB instance (auth via explicit credentials and token)
-                var credentials = new SessionAWSCredentials(this.accessKey, this.secretKey, this.token);
-                this.ddbClient = new AmazonDynamoDBClient(credentials, new AmazonDynamoDBConfig {RegionEndpoint = AWSUtils.GetRegionEndpoint(this.service)});
+                var credentials = new SessionAWSCredentials(this._accessKey, this.secretKey, this._token);
+                this._ddbClient = new AmazonDynamoDBClient(credentials, new AmazonDynamoDBConfig {RegionEndpoint = AWSUtils.GetRegionEndpoint(this._service)});
             }
-            else if (!string.IsNullOrEmpty(this.accessKey) && !string.IsNullOrEmpty(this.secretKey))
+            else if (!string.IsNullOrEmpty(this._accessKey) && !string.IsNullOrEmpty(this.secretKey))
             {
                 // AWS DynamoDB instance (auth via explicit credentials)
-                var credentials = new BasicAWSCredentials(this.accessKey, this.secretKey);
-                this.ddbClient = new AmazonDynamoDBClient(credentials, new AmazonDynamoDBConfig { RegionEndpoint = AWSUtils.GetRegionEndpoint(this.service) });
+                var credentials = new BasicAWSCredentials(this._accessKey, this.secretKey);
+                this._ddbClient = new AmazonDynamoDBClient(credentials, new AmazonDynamoDBConfig { RegionEndpoint = AWSUtils.GetRegionEndpoint(this._service) });
             }
-            else if (!string.IsNullOrEmpty(this.profileName))
+            else if (!string.IsNullOrEmpty(this._profileName))
             {
                 // AWS DynamoDB instance (auth via explicit credentials and token found in a named profile)
                 var chain = new CredentialProfileStoreChain();
-                if (chain.TryGetAWSCredentials(this.profileName, out var credentials))
+                if (chain.TryGetAWSCredentials(this._profileName, out var credentials))
                 {
-                    this.ddbClient = new AmazonDynamoDBClient(
+                    this._ddbClient = new AmazonDynamoDBClient(
                         credentials,
                         new AmazonDynamoDBConfig
                         {
-                            RegionEndpoint = AWSUtils.GetRegionEndpoint(this.service)
+                            RegionEndpoint = AWSUtils.GetRegionEndpoint(this._service)
                         });
                 }
                 else
                 {
                     throw new InvalidOperationException(
-                        $"AWS named profile '{this.profileName}' provided, but credentials could not be retrieved");
+                        $"AWS named profile '{this._profileName}' provided, but credentials could not be retrieved");
                 }
             }
             else
             {
                 // AWS DynamoDB instance (implicit auth - EC2 IAM Roles etc)
-                this.ddbClient = new AmazonDynamoDBClient(new AmazonDynamoDBConfig { RegionEndpoint = AWSUtils.GetRegionEndpoint(this.service) });
+                this._ddbClient = new AmazonDynamoDBClient(new AmazonDynamoDBConfig { RegionEndpoint = AWSUtils.GetRegionEndpoint(this._service) });
             }
         }
 
@@ -177,7 +177,7 @@ namespace Orleans.Transactions.DynamoDB
         {
             try
             {
-                var description = await ddbClient.DescribeTableAsync(tableName);
+                var description = await _ddbClient.DescribeTableAsync(tableName);
                 if (description.Table != null)
                     return description.Table;
             }
@@ -190,9 +190,9 @@ namespace Orleans.Transactions.DynamoDB
 
         private async ValueTask CreateTableAsync(string tableName, List<KeySchemaElement> keys, List<AttributeDefinition> attributes, List<GlobalSecondaryIndex> secondaryIndexes = null, string ttlAttributeName = null)
         {
-            if (!createIfNotExists)
+            if (!_createIfNotExists)
             {
-                Logger.LogWarning(
+                _logger.LogWarning(
                     (int)ErrorCode.StorageProviderBase,
                     "The config value 'createIfNotExists' is false. The table '{TableName}' does not exist and it will not get created.",
                     tableName);
@@ -204,17 +204,17 @@ namespace Orleans.Transactions.DynamoDB
                 TableName = tableName,
                 AttributeDefinitions = attributes,
                 KeySchema = keys,
-                BillingMode = this.useProvisionedThroughput ? BillingMode.PROVISIONED : BillingMode.PAY_PER_REQUEST,
-                ProvisionedThroughput = provisionedThroughput
+                BillingMode = this._useProvisionedThroughput ? BillingMode.PROVISIONED : BillingMode.PAY_PER_REQUEST,
+                ProvisionedThroughput = _provisionedThroughput
             };
 
             if (secondaryIndexes != null && secondaryIndexes.Count > 0)
             {
-                if (this.useProvisionedThroughput)
+                if (this._useProvisionedThroughput)
                 {
                     secondaryIndexes.ForEach(i =>
                     {
-                        i.ProvisionedThroughput = provisionedThroughput;
+                        i.ProvisionedThroughput = _provisionedThroughput;
                     });
                 }
 
@@ -225,7 +225,7 @@ namespace Orleans.Transactions.DynamoDB
             {
                 try
                 {
-                    await ddbClient.CreateTableAsync(request);
+                    await _ddbClient.CreateTableAsync(request);
                 }
                 catch (ResourceInUseException)
                 {
@@ -237,20 +237,20 @@ namespace Orleans.Transactions.DynamoDB
             }
             catch (Exception exc)
             {
-                Logger.LogError((int)ErrorCode.StorageProviderBase, exc, "Could not create table {TableName}", tableName);
+                _logger.LogError((int)ErrorCode.StorageProviderBase, exc, "Could not create table {TableName}", tableName);
                 throw;
             }
         }
 
         private async ValueTask UpdateTableAsync(TableDescription tableDescription, List<AttributeDefinition> attributes, List<GlobalSecondaryIndex> secondaryIndexes = null, string ttlAttributeName = null)
         {
-            if (!this.updateIfExists)
+            if (!this._updateIfExists)
             {
-                Logger.LogWarning((int)ErrorCode.StorageProviderBase, "The config value 'updateIfExists' is false. The table structure for table '{TableName}' will not be updated.", tableDescription.TableName);
+                _logger.LogWarning((int)ErrorCode.StorageProviderBase, "The config value 'updateIfExists' is false. The table structure for table '{TableName}' will not be updated.", tableDescription.TableName);
                 return;
             }
 
-            if (!updateTableValidTableStatuses.Contains(tableDescription.TableStatus))
+            if (!_updateTableValidTableStatuses.Contains(tableDescription.TableStatus))
             {
                 throw new InvalidOperationException($"Table {tableDescription.TableName} has a status of {tableDescription.TableStatus} and can't be updated automatically.");
             }
@@ -265,15 +265,15 @@ namespace Orleans.Transactions.DynamoDB
             {
                 TableName = tableDescription.TableName,
                 AttributeDefinitions = attributes,
-                BillingMode = this.useProvisionedThroughput ? BillingMode.PROVISIONED : BillingMode.PAY_PER_REQUEST,
-                ProvisionedThroughput = provisionedThroughput,
-                GlobalSecondaryIndexUpdates = this.useProvisionedThroughput
+                BillingMode = this._useProvisionedThroughput ? BillingMode.PROVISIONED : BillingMode.PAY_PER_REQUEST,
+                ProvisionedThroughput = _provisionedThroughput,
+                GlobalSecondaryIndexUpdates = this._useProvisionedThroughput
                     ? tableDescription.GlobalSecondaryIndexes.Select(gsi => new GlobalSecondaryIndexUpdate
                     {
                         Update = new UpdateGlobalSecondaryIndexAction
                         {
                             IndexName = gsi.IndexName,
-                            ProvisionedThroughput = provisionedThroughput
+                            ProvisionedThroughput = _provisionedThroughput
                         }
                     }).ToList()
                     : null
@@ -283,9 +283,9 @@ namespace Orleans.Transactions.DynamoDB
             {
                 if ((request.ProvisionedThroughput?.ReadCapacityUnits ?? 0) != tableDescription.ProvisionedThroughput?.ReadCapacityUnits        // PROVISIONED Throughput read capacity change
                     || (request.ProvisionedThroughput?.WriteCapacityUnits ?? 0) != tableDescription.ProvisionedThroughput?.WriteCapacityUnits   // PROVISIONED Throughput write capacity change
-                    || (tableDescription.ProvisionedThroughput?.ReadCapacityUnits != 0 && tableDescription.ProvisionedThroughput?.WriteCapacityUnits != 0 && this.useProvisionedThroughput == false /* from PROVISIONED to PAY_PER_REQUEST */))
+                    || (tableDescription.ProvisionedThroughput?.ReadCapacityUnits != 0 && tableDescription.ProvisionedThroughput?.WriteCapacityUnits != 0 && this._useProvisionedThroughput == false /* from PROVISIONED to PAY_PER_REQUEST */))
                 {
-                    await ddbClient.UpdateTableAsync(request);
+                    await _ddbClient.UpdateTableAsync(request);
                     tableDescription = await TableWaitOnStatusAsync(tableDescription.TableName, TableStatus.UPDATING, TableStatus.ACTIVE);
                 }
 
@@ -314,14 +314,14 @@ namespace Orleans.Transactions.DynamoDB
             }
             catch (Exception exc)
             {
-                Logger.LogError((int)ErrorCode.StorageProviderBase, exc, "Could not update table {TableName}", tableDescription.TableName);
+                _logger.LogError((int)ErrorCode.StorageProviderBase, exc, "Could not update table {TableName}", tableDescription.TableName);
                 throw;
             }
         }
 
         private async Task TableCreateSecondaryIndex(string tableName, List<AttributeDefinition> attributes, GlobalSecondaryIndex secondaryIndex)
         {
-            await ddbClient.UpdateTableAsync(new UpdateTableRequest
+            await _ddbClient.UpdateTableAsync(new UpdateTableRequest
             {
                 TableName = tableName,
                 GlobalSecondaryIndexUpdates = new List<GlobalSecondaryIndexUpdate>
@@ -332,7 +332,7 @@ namespace Orleans.Transactions.DynamoDB
                         {
                             IndexName = secondaryIndex.IndexName,
                             Projection = secondaryIndex.Projection,
-                            ProvisionedThroughput = provisionedThroughput,
+                            ProvisionedThroughput = _provisionedThroughput,
                             KeySchema = secondaryIndex.KeySchema
                         }
                     }
@@ -352,7 +352,7 @@ namespace Orleans.Transactions.DynamoDB
 
         private async ValueTask<TableDescription> TableUpdateTtlAsync(TableDescription tableDescription, string ttlAttributeName)
         {
-            var describeTimeToLive = (await ddbClient.DescribeTimeToLiveAsync(tableDescription.TableName)).TimeToLiveDescription;
+            var describeTimeToLive = (await _ddbClient.DescribeTimeToLiveAsync(tableDescription.TableName)).TimeToLiveDescription;
 
             // We can only handle updates to the table TTL from DISABLED to ENABLED.
             // This is because updating the TTL attribute requires (1) disabling the table TTL and (2) re-enabling it with the new TTL attribute.
@@ -360,7 +360,7 @@ namespace Orleans.Transactions.DynamoDB
             // https://docs.aws.amazon.com/amazondynamodb/latest/APIReference/API_UpdateTimeToLive.html
             if (describeTimeToLive.TimeToLiveStatus != TimeToLiveStatus.DISABLED)
             {
-                Logger.LogError((int)ErrorCode.StorageProviderBase, "TTL is not DISABLED. Cannot update table TTL for table {TableName}. Please update manually.", tableDescription.TableName);
+                _logger.LogError((int)ErrorCode.StorageProviderBase, "TTL is not DISABLED. Cannot update table TTL for table {TableName}. Please update manually.", tableDescription.TableName);
                 return tableDescription;
             }
 
@@ -371,7 +371,7 @@ namespace Orleans.Transactions.DynamoDB
 
             try
             {
-                await ddbClient.UpdateTimeToLiveAsync(new UpdateTimeToLiveRequest
+                await _ddbClient.UpdateTimeToLiveAsync(new UpdateTimeToLiveRequest
                 {
                     TableName = tableDescription.TableName,
                     TimeToLiveSpecification = new TimeToLiveSpecification { AttributeName = ttlAttributeName, Enabled = true }
@@ -384,7 +384,7 @@ namespace Orleans.Transactions.DynamoDB
                 // We need to swallow this exception as there is no API exposed to determine if the below issue will occur before calling UpdateTimeToLive(Async)
                 // "Time to live has been modified multiple times within a fixed interval".
                 // We can arrive at this situation if the TTL feature was recently disabled on the target table.
-                Logger.LogError(
+                _logger.LogError(
                     (int)ErrorCode.StorageProviderBase,
                     ddbEx,
                     "Exception occured while updating table {TableName} TTL attribute to {TtlAttributeName}. Please update manually.",
@@ -449,11 +449,11 @@ namespace Orleans.Transactions.DynamoDB
         {
             try
             {
-                return ddbClient.DeleteTableAsync(new DeleteTableRequest { TableName = tableName });
+                return _ddbClient.DeleteTableAsync(new DeleteTableRequest { TableName = tableName });
             }
             catch (Exception exc)
             {
-                Logger.LogError((int)ErrorCode.StorageProviderBase, exc, "Could not delete table {TableName}", tableName);
+                _logger.LogError((int)ErrorCode.StorageProviderBase, exc, "Could not delete table {TableName}", tableName);
                 throw;
             }
         }
@@ -468,7 +468,7 @@ namespace Orleans.Transactions.DynamoDB
         /// <returns></returns>
         public Task PutEntryAsync(string tableName, Dictionary<string, AttributeValue> fields, string conditionExpression = "", Dictionary<string, AttributeValue> conditionValues = null)
         {
-            if (Logger.IsEnabled(LogLevel.Trace)) Logger.LogTrace("Creating {TableName} table entry: {TableEntry}", tableName, Utils.DictionaryToString(fields));
+            if (_logger.IsEnabled(LogLevel.Trace)) _logger.LogTrace("Creating {TableName} table entry: {TableEntry}", tableName, Utils.DictionaryToString(fields));
 
             try
             {
@@ -479,11 +479,11 @@ namespace Orleans.Transactions.DynamoDB
                 if (conditionValues != null && conditionValues.Keys.Count > 0)
                     request.ExpressionAttributeValues = conditionValues;
 
-                return ddbClient.PutItemAsync(request);
+                return _ddbClient.PutItemAsync(request);
             }
             catch (Exception exc)
             {
-                Logger.LogError((int)ErrorCode.StorageProviderBase, exc, "Unable to create item to table {TableName}", tableName);
+                _logger.LogError((int)ErrorCode.StorageProviderBase, exc, "Unable to create item to table {TableName}", tableName);
                 throw;
             }
         }
@@ -504,8 +504,8 @@ namespace Orleans.Transactions.DynamoDB
             string conditionExpression = "", Dictionary<string, AttributeValue> conditionValues = null, string extraExpression = "",
             Dictionary<string, AttributeValue> extraExpressionValues = null)
         {
-            if (Logger.IsEnabled(LogLevel.Trace))
-                Logger.LogTrace(
+            if (_logger.IsEnabled(LogLevel.Trace))
+                _logger.LogTrace(
                     "Upserting entry {Entry} with key(s) {Keys} into table {TableName}",
                     Utils.DictionaryToString(fields),
                     Utils.DictionaryToString(keys),
@@ -526,7 +526,7 @@ namespace Orleans.Transactions.DynamoDB
                 if (!string.IsNullOrWhiteSpace(conditionExpression))
                     request.ConditionExpression = conditionExpression;
 
-                var result = await ddbClient.UpdateItemAsync(request);
+                var result = await _ddbClient.UpdateItemAsync(request);
 
                 foreach (var key in result.Attributes.Keys)
                 {
@@ -542,7 +542,7 @@ namespace Orleans.Transactions.DynamoDB
             }
             catch (Exception exc)
             {
-                Logger.LogWarning(
+                _logger.LogWarning(
                     (int)ErrorCode.StorageProviderBase,
                     exc,
                     "Intermediate error upserting to the table {TableName}",
@@ -604,7 +604,7 @@ namespace Orleans.Transactions.DynamoDB
         /// <returns></returns>
         public Task DeleteEntryAsync(string tableName, Dictionary<string, AttributeValue> keys, string conditionExpression = "", Dictionary<string, AttributeValue> conditionValues = null)
         {
-            if (Logger.IsEnabled(LogLevel.Trace)) Logger.LogTrace("Deleting table {TableName} entry with key(s) {Keys}", tableName, Utils.DictionaryToString(keys));
+            if (_logger.IsEnabled(LogLevel.Trace)) _logger.LogTrace("Deleting table {TableName} entry with key(s) {Keys}", tableName, Utils.DictionaryToString(keys));
 
             try
             {
@@ -620,11 +620,11 @@ namespace Orleans.Transactions.DynamoDB
                 if (conditionValues != null && conditionValues.Keys.Count > 0)
                     request.ExpressionAttributeValues = conditionValues;
 
-                return ddbClient.DeleteItemAsync(request);
+                return _ddbClient.DeleteItemAsync(request);
             }
             catch (Exception exc)
             {
-                Logger.LogWarning(
+                _logger.LogWarning(
                     (int)ErrorCode.StorageProviderBase,
                     exc,
                     "Intermediate error deleting entry from the table {TableName}.",
@@ -641,7 +641,7 @@ namespace Orleans.Transactions.DynamoDB
         /// <returns></returns>
         public Task DeleteEntriesAsync(string tableName, IReadOnlyCollection<Dictionary<string, AttributeValue>> toDelete)
         {
-            if (Logger.IsEnabled(LogLevel.Trace)) Logger.LogTrace("Deleting {TableName} table entries", tableName);
+            if (_logger.IsEnabled(LogLevel.Trace)) _logger.LogTrace("Deleting {TableName} table entries", tableName);
 
             if (toDelete == null) throw new ArgumentNullException(nameof(toDelete));
 
@@ -662,11 +662,11 @@ namespace Orleans.Transactions.DynamoDB
                     batch.Add(writeRequest);
                 }
                 request.RequestItems.Add(tableName, batch);
-                return ddbClient.BatchWriteItemAsync(request);
+                return _ddbClient.BatchWriteItemAsync(request);
             }
             catch (Exception exc)
             {
-                Logger.LogWarning(
+                _logger.LogWarning(
                     (int)ErrorCode.StorageProviderBase,
                     exc,
                     "Intermediate error deleting entries from the table {TableName}.",
@@ -694,7 +694,7 @@ namespace Orleans.Transactions.DynamoDB
                     ConsistentRead = true
                 };
 
-                var response = await ddbClient.GetItemAsync(request);
+                var response = await _ddbClient.GetItemAsync(request);
 
                 if (response.IsItemSet)
                 {
@@ -707,7 +707,7 @@ namespace Orleans.Transactions.DynamoDB
             }
             catch (Exception)
             {
-                if (Logger.IsEnabled(LogLevel.Debug)) Logger.LogDebug("Unable to find table entry for Keys = {Keys}", Utils.DictionaryToString(keys));
+                if (_logger.IsEnabled(LogLevel.Debug)) _logger.LogDebug("Unable to find table entry for Keys = {Keys}", Utils.DictionaryToString(keys));
                 throw;
             }
         }
@@ -745,7 +745,7 @@ namespace Orleans.Transactions.DynamoDB
                     request.IndexName = indexName;
                 }
 
-                var response = await ddbClient.QueryAsync(request);
+                var response = await _ddbClient.QueryAsync(request);
 
                 var resultList = new List<TResult>();
                 foreach (var item in response.Items)
@@ -756,7 +756,7 @@ namespace Orleans.Transactions.DynamoDB
             }
             catch (Exception)
             {
-                if (Logger.IsEnabled(LogLevel.Debug)) Logger.LogDebug("Unable to find table entry for Keys = {Keys}", Utils.DictionaryToString(keys));
+                if (_logger.IsEnabled(LogLevel.Debug)) _logger.LogDebug("Unable to find table entry for Keys = {Keys}", Utils.DictionaryToString(keys));
                 throw;
             }
         }
@@ -832,7 +832,7 @@ namespace Orleans.Transactions.DynamoDB
                         ExclusiveStartKey = exclusiveStartKey
                     };
 
-                    var response = await ddbClient.ScanAsync(request);
+                    var response = await _ddbClient.ScanAsync(request);
 
                     foreach (var item in response.Items)
                     {
@@ -853,7 +853,7 @@ namespace Orleans.Transactions.DynamoDB
             }
             catch (Exception exc)
             {
-                Logger.LogWarning((int)ErrorCode.StorageProviderBase, exc, "Failed to read table {TableName}", tableName);
+                _logger.LogWarning((int)ErrorCode.StorageProviderBase, exc, "Failed to read table {TableName}", tableName);
                 throw new OrleansException($"Failed to read table {tableName}: {exc.Message}", exc);
             }
         }
@@ -866,7 +866,7 @@ namespace Orleans.Transactions.DynamoDB
         /// <returns></returns>
         public Task PutEntriesAsync(string tableName, IReadOnlyCollection<Dictionary<string, AttributeValue>> toCreate)
         {
-            if (Logger.IsEnabled(LogLevel.Trace)) Logger.LogTrace("Put entries {TableName} table", tableName);
+            if (_logger.IsEnabled(LogLevel.Trace)) _logger.LogTrace("Put entries {TableName} table", tableName);
 
             if (toCreate == null) throw new ArgumentNullException(nameof(toCreate));
 
@@ -887,11 +887,11 @@ namespace Orleans.Transactions.DynamoDB
                     batch.Add(writeRequest);
                 }
                 request.RequestItems.Add(tableName, batch);
-                return ddbClient.BatchWriteItemAsync(request);
+                return _ddbClient.BatchWriteItemAsync(request);
             }
             catch (Exception exc)
             {
-                Logger.LogWarning(
+                _logger.LogWarning(
                     (int)ErrorCode.StorageProviderBase,
                     exc,
                     "Intermediate error bulk inserting entries to table {TableName}.",
@@ -924,14 +924,14 @@ namespace Orleans.Transactions.DynamoDB
                     }).ToList()
                 };
 
-                var response = await ddbClient.TransactGetItemsAsync(request);
+                var response = await _ddbClient.TransactGetItemsAsync(request);
 
                 return response.Responses.Where(r => r?.Item?.Count > 0).Select(r => resolver(r.Item));
             }
             catch (Exception)
             {
-                if (Logger.IsEnabled(LogLevel.Debug))
-                    Logger.LogDebug(
+                if (_logger.IsEnabled(LogLevel.Debug))
+                    _logger.LogDebug(
                         "Unable to find table entry for Keys = {Keys}",
                         Utils.EnumerableToString(keys, d => Utils.DictionaryToString(d)));
                 throw;
@@ -973,11 +973,11 @@ namespace Orleans.Transactions.DynamoDB
                     TransactItems = transactItems
                 };
 
-                return ddbClient.TransactWriteItemsAsync(request);
+                return _ddbClient.TransactWriteItemsAsync(request);
             }
             catch (Exception exc)
             {
-                if (Logger.IsEnabled(LogLevel.Debug)) Logger.LogDebug(exc, "Unable to write");
+                if (_logger.IsEnabled(LogLevel.Debug)) _logger.LogDebug(exc, "Unable to write");
                 throw;
             }
         }

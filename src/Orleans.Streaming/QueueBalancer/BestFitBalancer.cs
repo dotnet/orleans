@@ -77,7 +77,7 @@ namespace Orleans.Streams
             {
                 if (!idealDistribution.ContainsKey(bucket))
                 {
-                    throw new ArgumentOutOfRangeException(nameof(activeBuckets), String.Format("Active buckets contain a bucket {0} not in the master list.", bucket));
+                    throw new ArgumentOutOfRangeException(nameof(activeBuckets), string.Format("Active buckets contain a bucket {0} not in the master list.", bucket));
                 }
             }
 

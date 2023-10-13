@@ -1,7 +1,4 @@
-﻿using Orleans;
-using System.Threading.Tasks;
-
-namespace TestGrainInterfaces
+﻿namespace TestGrainInterfaces
 {
     // The grain supports an operation to reserve a seat
     public interface ISeatReservationGrain : IGrainWithIntegerKey

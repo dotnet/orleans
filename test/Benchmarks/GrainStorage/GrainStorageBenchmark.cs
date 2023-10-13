@@ -1,12 +1,7 @@
-using System;
-using System.Threading.Tasks;
 using System.Diagnostics;
-using Orleans.Hosting;
 using Orleans.TestingHost;
 using TestExtensions;
 using BenchmarkGrainInterfaces.GrainStorage;
-using System.Collections.Generic;
-using System.Linq;
 
 namespace Benchmarks.GrainStorage
 {
@@ -101,7 +96,7 @@ namespace Benchmarks.GrainStorage
         {
             Stopwatch sw = Stopwatch.StartNew();
             bool running = true;
-            Func<bool> isRunning = () => running;
+            bool isRunning() => running;
             var runTask = Task.WhenAll(Enumerable.Range(0, concurrent).Select(i => RunAsync(i, isRunning)).ToList());
             Task[] waitTasks = { runTask, Task.Delay(duration) };
             await Task.WhenAny(waitTasks);

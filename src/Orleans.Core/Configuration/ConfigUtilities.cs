@@ -223,7 +223,7 @@ namespace Orleans.Runtime.Configuration
                 "SecretKey=", "SessionToken=",              // DynamoDb
             };
             var mark = "<--SNIP-->";
-            if (String.IsNullOrEmpty(connectionString)) return "null";
+            if (string.IsNullOrEmpty(connectionString)) return "null";
             //if connection string format doesn't contain any secretKey, then return just <--SNIP-->
             if (!secretKeys.Any(key => connectionString.Contains(key))) return mark;
 

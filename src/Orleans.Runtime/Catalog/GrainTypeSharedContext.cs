@@ -83,7 +83,7 @@ namespace Orleans.Runtime
                 }
             }
 
-            if (collectionOptions.ClassSpecificCollectionAge.TryGetValue(grainClass.FullName, out var specified))
+            if (collectionOptions.ClassSpecificCollectionAge.TryGetValue(grainClass.FullName!, out var specified))
             {
                 return specified;
             }

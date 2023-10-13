@@ -1,7 +1,4 @@
-﻿using System.Threading.Tasks;
-using Orleans;
-
-namespace TestGrainInterfaces
+﻿namespace TestGrainInterfaces
 {
     public interface IDoSomething
     {

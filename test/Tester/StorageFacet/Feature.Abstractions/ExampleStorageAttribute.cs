@@ -1,7 +1,4 @@
-﻿using System;
-using Orleans;
-
-namespace Tester.StorageFacet.Abstractions
+﻿namespace Tester.StorageFacet.Abstractions
 {
     [AttributeUsage(AttributeTargets.Parameter)]
     public class ExampleStorageAttribute : Attribute, IFacetMetadata, IExampleStorageConfig

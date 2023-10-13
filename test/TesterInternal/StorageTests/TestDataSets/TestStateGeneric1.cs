@@ -1,8 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-
-
-namespace UnitTests.StorageTests.Relational.TestDataSets
+﻿namespace UnitTests.StorageTests.Relational.TestDataSets
 {
     /// <summary>
     /// A generic state used to test if saving, reading and clearing of the storage functions as expected.

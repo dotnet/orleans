@@ -3,7 +3,6 @@
 using Microsoft.Extensions.Options;
 using Orleans.Runtime;
 using Orleans.Serialization;
-using Orleans.Streams;
 
 namespace Orleans.Streaming.JsonConverters
 {

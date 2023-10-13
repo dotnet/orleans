@@ -116,7 +116,7 @@ namespace Orleans.Tests.SqlUtils
                 //we map these to DbType.Int32
                 if (commandParameter.DbType == DbType.Boolean)
                 {
-                    commandParameter.Value = commandParameter.ToString() == Boolean.TrueString ? 1 : 0;
+                    commandParameter.Value = commandParameter.ToString() == bool.TrueString ? 1 : 0;
                     commandParameter.DbType = DbType.Int32;
                 }
             }

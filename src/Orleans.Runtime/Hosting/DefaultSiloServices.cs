@@ -10,7 +10,6 @@ using Orleans.Metadata;
 using Orleans.Runtime.Messaging;
 using Orleans.Runtime.Placement;
 using Orleans.Runtime.Providers;
-using Orleans.Runtime.Scheduler;
 using Orleans.Runtime.Versions;
 using Orleans.Runtime.Versions.Compatibility;
 using Orleans.Runtime.Versions.Selector;
@@ -62,7 +61,7 @@ namespace Orleans.Hosting
 
             services.AddSingleton<Silo>();
             services.AddHostedService<SiloHostedService>();
-            services.PostConfigure<SiloOptions>(options => options.SiloName ??= $"Silo_{Guid.NewGuid().ToString("N").Substring(0, 5)}");
+            services.PostConfigure<SiloOptions>(options => options.SiloName ??= $"Silo_{Guid.NewGuid().ToString("N")[..5]}");
             services.TryAddSingleton<ILocalSiloDetails, LocalSiloDetails>();
             services.TryAddSingleton<SiloLifecycleSubject>();
             services.TryAddFromExisting<ISiloLifecycleSubject, SiloLifecycleSubject>();
@@ -329,7 +328,7 @@ namespace Orleans.Hosting
                         if (attr != null)
                         {
                             var className = RuntimeTypeNameFormatter.Format(grainClass);
-                            options.ClassSpecificCollectionAge[className] = attr.Amount;
+                            options.ClassSpecificCollectionAge[className] = attr.AgeLimit;
                         }
                     }
                 });

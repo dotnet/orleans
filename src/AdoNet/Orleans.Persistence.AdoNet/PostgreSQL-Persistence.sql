@@ -52,7 +52,7 @@ AS $function$
     -- If the version number explicitly returned is still the same, Orleans interprets it so the update did not succeed
     -- and throws an InconsistentStateException.
     --
-    -- See further information at https://docs.microsoft.com/dotnet/orleans/grains/grain-persistence.
+    -- See further information at https://learn.microsoft.com/dotnet/orleans/grains/grain-persistence.
     IF _GrainStateVersion IS NOT NULL
     THEN
         UPDATE OrleansStorage

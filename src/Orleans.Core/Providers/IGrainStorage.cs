@@ -158,7 +158,7 @@ namespace Orleans.Storage
         /// <inheritdoc/>
         public override string ToString()
         {
-            return String.Format("InconsistentStateException: {0} Expected Etag={1} Received Etag={2} {3}",
+            return string.Format("InconsistentStateException: {0} Expected Etag={1} Received Etag={2} {3}",
                 Message, StoredEtag, CurrentEtag, InnerException);
         }
 

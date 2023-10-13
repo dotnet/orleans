@@ -1,6 +1,3 @@
-using System.Collections.Generic;
-using System.Linq;
-
 namespace Tester.AzureUtils.Streaming
 {
     public static class AzureQueueUtilities

@@ -1,7 +1,4 @@
-﻿using Orleans;
-using System.Threading.Tasks;
-
-namespace UnitTests.GrainInterfaces
+﻿namespace UnitTests.GrainInterfaces
 {
     public interface IFilteredImplicitSubscriptionGrain : IGrainWithGuidKey
     {

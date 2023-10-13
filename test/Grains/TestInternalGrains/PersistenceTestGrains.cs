@@ -1,15 +1,10 @@
-using System;
-using System.Collections.Generic;
 using System.Diagnostics;
 using System.Globalization;
 using System.Text;
-using System.Threading;
-using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
-using Orleans;
 using Orleans.Concurrency;
 using Orleans.Configuration;
 using Orleans.Runtime;
@@ -25,7 +20,7 @@ namespace UnitTests.Grains
         public static string CaptureRuntimeEnvironment()
         {
             var callStack = Utils.GetStackTrace(1); // Don't include this method in stack trace
-            return String.Format(
+            return string.Format(
                 "   TaskScheduler={0}" + Environment.NewLine
                 + "   RuntimeContext={1}" + Environment.NewLine
                 + "   WorkerPoolThread={2}" + Environment.NewLine
@@ -1091,4 +1086,97 @@ namespace UnitTests.Grains
             return WriteStateAsync();
         }
     }
+
+    public sealed class SurrogateStateForTypeWithoutPublicConstructorGrain : IGrainBase, ISurrogateStateForTypeWithoutPublicConstructorGrain<ExternalTypeWithoutPublicConstructor>
+    {
+        private readonly IPersistentState<ExternalTypeWithoutPublicConstructor> _persistence;
+
+        public IGrainContext GrainContext { get; }
+
+        public SurrogateStateForTypeWithoutPublicConstructorGrain(
+            IGrainContext grainContext,
+            [PersistentState("test_state", "OrleansSerializerMemoryStore")] IPersistentState<ExternalTypeWithoutPublicConstructor> persistence)
+        {
+            GrainContext = grainContext;
+            _persistence = persistence;
+        }
+
+        public async Task SetState(ExternalTypeWithoutPublicConstructor state)
+        {
+            _persistence.State = state;
+            await _persistence.WriteStateAsync();
+        }
+
+        public async Task<ExternalTypeWithoutPublicConstructor> GetState()
+        {
+            await _persistence.ReadStateAsync();
+            return _persistence.State;
+        }
+    }
+
+    public sealed class ExternalTypeWithoutPublicConstructor
+    {
+        public int Field { get; set; }
+
+        public static ExternalTypeWithoutPublicConstructor Create(int field)
+            => new(field);
+
+        private ExternalTypeWithoutPublicConstructor(int field)
+        {
+            Field = field;
+        }
+    }
+
+    [GenerateSerializer]
+    public struct ExternalTypeWithoutPublicConstructorSurrogate
+    {
+        [Id(0)] public int Field;
+    }
+
+    [RegisterConverter]
+    public sealed class ExternalTypeWithoutPublicConstructorSurrogateConverter : IConverter<ExternalTypeWithoutPublicConstructor, ExternalTypeWithoutPublicConstructorSurrogate>
+    {
+        public ExternalTypeWithoutPublicConstructor ConvertFromSurrogate(in ExternalTypeWithoutPublicConstructorSurrogate surrogate)
+            => ExternalTypeWithoutPublicConstructor.Create(surrogate.Field);
+
+        public ExternalTypeWithoutPublicConstructorSurrogate ConvertToSurrogate(in ExternalTypeWithoutPublicConstructor value)
+            => new()
+            {
+                Field = value.Field,
+            };
+    }
+    
+
+    public sealed class RecordTypeWithoutPublicParameterlessConstructorGrain : IGrainBase, IRecordTypeWithoutPublicParameterlessConstructorGrain<RecordTypeWithoutPublicParameterlessConstructor>
+    {
+        private readonly IPersistentState<RecordTypeWithoutPublicParameterlessConstructor> _persistence;
+
+        public IGrainContext GrainContext { get; }
+
+        public RecordTypeWithoutPublicParameterlessConstructorGrain(
+            IGrainContext grainContext,
+            [PersistentState("test_state", "OrleansSerializerMemoryStore")] IPersistentState<RecordTypeWithoutPublicParameterlessConstructor> persistence)
+        {
+            GrainContext = grainContext;
+            _persistence = persistence;
+        }
+
+        public async Task SetState(RecordTypeWithoutPublicParameterlessConstructor state)
+        {
+            _persistence.State = state;
+            await _persistence.WriteStateAsync();
+        }
+
+        public async Task<RecordTypeWithoutPublicParameterlessConstructor> GetState()
+        {
+            await _persistence.ReadStateAsync();
+            return _persistence.State;
+        }
+    }
+
+    [GenerateSerializer]
+    public record class RecordTypeWithoutPublicParameterlessConstructor
+    (
+        [property: Id(0)] int Field
+    );
 }

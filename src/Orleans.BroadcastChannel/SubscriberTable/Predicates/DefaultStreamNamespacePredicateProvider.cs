@@ -1,7 +1,5 @@
 using System;
-using Orleans.BroadcastChannel;
 using Orleans.Serialization.TypeSystem;
-using Orleans.Utilities;
 
 namespace Orleans.BroadcastChannel
 {
@@ -19,10 +17,10 @@ namespace Orleans.BroadcastChannel
                     predicate = new AllStreamNamespacesPredicate();
                     return true;
                 case var regex when regex.StartsWith(RegexChannelNamespacePredicate.Prefix, StringComparison.Ordinal):
-                    predicate = new RegexChannelNamespacePredicate(regex.Substring(RegexChannelNamespacePredicate.Prefix.Length));
+                    predicate = new RegexChannelNamespacePredicate(regex[RegexChannelNamespacePredicate.Prefix.Length..]);
                     return true;
                 case var ns when ns.StartsWith(ExactMatchChannelNamespacePredicate.Prefix, StringComparison.Ordinal):
-                    predicate = new ExactMatchChannelNamespacePredicate(ns.Substring(ExactMatchChannelNamespacePredicate.Prefix.Length));
+                    predicate = new ExactMatchChannelNamespacePredicate(ns[ExactMatchChannelNamespacePredicate.Prefix.Length..]);
                     return true;
             }
 
@@ -69,13 +67,13 @@ namespace Orleans.BroadcastChannel
             var index = predicatePattern.IndexOf(':', start);
             if (index < 0)
             {
-                typeName = predicatePattern.Substring(start);
+                typeName = predicatePattern[start..];
                 arg = null;
             }
             else
             {
-                typeName = predicatePattern.Substring(start, index - start);
-                arg = predicatePattern.Substring(index + 1);
+                typeName = predicatePattern[start..index];
+                arg = predicatePattern[(index + 1)..];
             }
 
             var type = Type.GetType(typeName, throwOnError: true);

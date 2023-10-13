@@ -7,7 +7,6 @@ using System.Threading;
 using Microsoft.Extensions.Options;
 using System.Linq;
 using Orleans.Internal;
-using System.Reflection.Metadata;
 
 namespace Orleans.Runtime.MembershipService
 {

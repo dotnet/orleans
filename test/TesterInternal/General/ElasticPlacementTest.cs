@@ -1,12 +1,7 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Net;
 using System.Text;
-using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Orleans.Configuration;
-using Orleans.Hosting;
 using Orleans.Runtime;
 using Orleans.TestingHost;
 using TestExtensions;
@@ -213,7 +208,7 @@ namespace UnitTests.General
         private static void AssertIsInRange(int actual, double expected, int leavy)
         {
             Assert.True(expected - leavy <= actual && actual <= expected + leavy,
-                String.Format("Expecting a value in the range between {0} and {1}, but instead got {2} outside the range.",
+                string.Format("Expecting a value in the range between {0} and {1}, but instead got {2} outside the range.",
                     expected - leavy, expected + leavy, actual));
         }
 

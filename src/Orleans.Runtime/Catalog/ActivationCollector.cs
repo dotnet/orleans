@@ -8,7 +8,6 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 using Orleans.Internal;
-using Orleans.Statistics;
 
 namespace Orleans.Runtime
 {
@@ -97,7 +96,7 @@ namespace Orleans.Runtime
 
                 DateTime ticket = MakeTicketFromTimeSpan(timeout);
 
-                if (default(DateTime) != item.CollectionTicket)
+                if (default != item.CollectionTicket)
                 {
                     throw new InvalidOperationException("Call CancelCollection before calling ScheduleCollection.");
                 }
@@ -118,7 +117,7 @@ namespace Orleans.Runtime
             lock (item)
             {
                 DateTime ticket = item.CollectionTicket;
-                if (default(DateTime) == ticket) return false;
+                if (default == ticket) return false;
                 if (IsExpired(ticket)) return false;
 
                 // first, we attempt to remove the ticket.
@@ -359,7 +358,7 @@ namespace Orleans.Runtime
         {
             if (timeout < quantum)
             {
-                throw new ArgumentException(String.Format("timeout must be at least {0}, but it is {1}", quantum, timeout), nameof(timeout));
+                throw new ArgumentException(string.Format("timeout must be at least {0}, but it is {1}", quantum, timeout), nameof(timeout));
             }
 
             return MakeTicketFromDateTime(DateTime.UtcNow + timeout);
@@ -461,7 +460,7 @@ namespace Orleans.Runtime
             }
         }
 
-        private async Task CollectActivationsImpl(bool scanStale, TimeSpan ageLimit = default(TimeSpan))
+        private async Task CollectActivationsImpl(bool scanStale, TimeSpan ageLimit = default)
         {
             var watch = ValueStopwatch.StartNew();
             var number = Interlocked.Increment(ref collectionNumber);
@@ -513,7 +512,7 @@ namespace Orleans.Runtime
             logger.LogInformation((int)ErrorCode.Catalog_ShutdownActivations_1, "DeactivateActivationsFromCollector: total {Count} to promptly Destroy.", list.Count);
             CatalogInstruments.ActiviationShutdownViaCollection();
 
-            Action<Task> signalCompletion = task => mtcs.SetOneResult();
+            void signalCompletion(Task task) => mtcs.SetOneResult();
             var reason = GetDeactivationReason();
             for (var i = 0; i < list.Count; i++)
             {

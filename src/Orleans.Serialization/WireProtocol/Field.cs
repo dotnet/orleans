@@ -57,7 +57,7 @@ namespace Orleans.Serialization.WireProtocol
             // If the embedded field id delta is valid, return it, otherwise return the extended field id delta.
             // The extended field id might not be valid if this field has the Extended wire type.
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            get
+            readonly get
             {
 #if DEBUG
                 if (!HasFieldId) throw new FieldIdNotPresentException();
@@ -88,7 +88,7 @@ namespace Orleans.Serialization.WireProtocol
         public Type FieldType
         {
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            get
+            readonly get
             {
 #if DEBUG
                 if (!IsSchemaTypeValid)
@@ -116,7 +116,7 @@ namespace Orleans.Serialization.WireProtocol
         /// Gets a value indicating whether this instance has a field identifier.
         /// </summary>
         /// <value><see langword="true" /> if this instance has a field identifier; otherwise, <see langword="false" />.</value>
-        public bool HasFieldId
+        public readonly bool HasFieldId
         {
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             get => !Tag.HasExtendedWireType;
@@ -126,7 +126,7 @@ namespace Orleans.Serialization.WireProtocol
         /// Gets a value indicating whether this instance has an extended field identifier.
         /// </summary>
         /// <value><see langword="true" /> if this instance has an extended field identifier; otherwise, <see langword="false" />.</value>
-        public bool HasExtendedFieldId
+        public readonly bool HasExtendedFieldId
         {
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             get => Tag.HasExtendedFieldId;
@@ -137,8 +137,7 @@ namespace Orleans.Serialization.WireProtocol
         /// </summary>
         /// <value>The wire type.</value>
         public WireType WireType
-        {
-            get => Tag.WireType;
+        { readonly get => Tag.WireType;
             set => Tag.WireType = value;
         }
 
@@ -148,7 +147,7 @@ namespace Orleans.Serialization.WireProtocol
         /// <value>The schema type.</value>
         public SchemaType SchemaType
         {
-            get
+            readonly get
             {
 #if DEBUG
                 if (!IsSchemaTypeValid)
@@ -169,7 +168,7 @@ namespace Orleans.Serialization.WireProtocol
         /// <value>The extended wire type.</value>
         public ExtendedWireType ExtendedWireType
         {
-            get
+            readonly get
             {
 #if DEBUG
                 if (WireType != WireType.Extended)
@@ -186,31 +185,31 @@ namespace Orleans.Serialization.WireProtocol
         /// Gets a value indicating whether this instance has a valid schema type.
         /// </summary>
         /// <value><see langword="true" /> if this instance has a valid schema; otherwise, <see langword="false" />.</value>
-        public bool IsSchemaTypeValid => Tag.IsSchemaTypeValid;
+        public readonly bool IsSchemaTypeValid => Tag.IsSchemaTypeValid;
 
         /// <summary>
         /// Gets a value indicating whether this instance has an extended schema type.
         /// </summary>
         /// <value><see langword="true" /> if this instance has an extended schema type; otherwise, <see langword="false" />.</value>
-        public bool HasExtendedSchemaType => Tag.IsSchemaTypeValid && Tag.SchemaType != SchemaType.Expected;
+        public readonly bool HasExtendedSchemaType => Tag.IsSchemaTypeValid && Tag.SchemaType != SchemaType.Expected;
 
         /// <summary>
         /// Gets a value indicating whether this instance represents the end of base fields in a tag-delimited structure.
         /// </summary>
         /// <value><see langword="true" /> if this instance represents end of base fields in a tag-delimited structure; otherwise, <see langword="false" />.</value>
-        public bool IsEndBaseFields => Tag.IsEndBaseFields;
+        public readonly bool IsEndBaseFields => Tag.IsEndBaseFields;
 
         /// <summary>
         /// Gets a value indicating whether this instance represents the end of a tag-delimited structure.
         /// </summary>
         /// <value><see langword="true" /> if this instance represents end of a tag-delimited structure; otherwise, <see langword="false" />.</value>
-        public bool IsEndObject => Tag.IsEndObject;
+        public readonly bool IsEndObject => Tag.IsEndObject;
 
         /// <summary>
         /// Gets a value indicating whether this instance represents the end of a tag-delimited structure or the end of base fields in a tag-delimited structure.
         /// </summary>
         /// <value><see langword="true" /> if this instance represents the end of a tag-delimited structure or the end of base fields in a tag-delimited structure; otherwise, <see langword="false" />.</value>
-        public bool IsEndBaseOrEndObject
+        public readonly bool IsEndBaseOrEndObject
         {
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             get => Tag.HasExtendedWireType/* && Tag.ExtendedWireType <= ExtendedWireType.EndBaseFields*/;
@@ -219,7 +218,7 @@ namespace Orleans.Serialization.WireProtocol
         /// <summary>
         /// Gets a value indicating whether this instance has a wire type of <see cref="WireType.Reference"/>.
         /// </summary>
-        public bool IsReference => Tag.WireType == WireType.Reference;
+        public readonly bool IsReference => Tag.WireType == WireType.Reference;
 
         /// <summary>
         /// Ensures that the wire type is <see cref="WireType.TagDelimited"/>.
@@ -281,7 +280,7 @@ namespace Orleans.Serialization.WireProtocol
             return builder.ToStringAndClear();
 #else
             var builder = new StringBuilder();
-            builder.Append("[");
+            builder.Append('[');
             builder.Append(WireType);
 
             if (HasFieldId)
@@ -308,7 +307,7 @@ namespace Orleans.Serialization.WireProtocol
                 builder.Append(ExtendedWireType);
             }
 
-            builder.Append("]");
+            builder.Append(']');
             return builder.ToString();
 #endif
         }

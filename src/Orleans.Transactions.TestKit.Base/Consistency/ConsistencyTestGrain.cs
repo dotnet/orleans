@@ -64,7 +64,7 @@ namespace Orleans.Transactions.TestKit.Consistency
             //    throw new UserAbort();
             //}
 
-            var txhash = stack.Substring(0, stack.IndexOf(')')).GetHashCode();
+            var txhash = stack[..stack.IndexOf(')')].GetHashCode();
 
             var whethertoreadorwrite =
                   (options.ReadWrite == ReadWriteDetermination.PerTransaction) ? new Random(options.RandomSeed + txhash)

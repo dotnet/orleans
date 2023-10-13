@@ -410,6 +410,7 @@ namespace Orleans.Runtime.GrainDirectory
             return owner;
         }
 
+        public Task<AddressAndTag> RegisterAsync(GrainAddress address, int hopCount) => RegisterAsync(address, previousAddress: null, hopCount: hopCount);
 
         public async Task<AddressAndTag> RegisterAsync(GrainAddress address, GrainAddress? previousAddress, int hopCount)
         {

@@ -158,6 +158,21 @@ namespace Orleans.CodeGenerator
                     return true;
                 }
 
+                // Types which have required members are not empty constructable for Orleans, at least not yet.
+                var t = Type;
+                while (t != null)
+                {
+                    foreach (var member in t.GetMembers())
+                    {
+                        if (member is IPropertySymbol { IsRequired: true } or IFieldSymbol { IsRequired: true })
+                        {
+                            return false;
+                        }
+                    }
+
+                    t = t.BaseType;
+                }
+
                 foreach (var ctor in Type.Constructors)
                 {
                     if (ctor.Parameters.Length != 0)

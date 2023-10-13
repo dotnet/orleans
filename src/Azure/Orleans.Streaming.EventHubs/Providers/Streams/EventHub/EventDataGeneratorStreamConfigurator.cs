@@ -4,9 +4,7 @@ using Microsoft.Extensions.Options;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Configuration;
 using Orleans.Streaming.EventHubs;
-using Orleans.Providers.Streams.Common;
 using Orleans.Streaming.EventHubs.Testing;
-using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace Orleans.Hosting.Developer
 {

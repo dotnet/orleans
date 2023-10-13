@@ -1,5 +1,3 @@
-using System.Threading.Tasks;
-using Orleans;
 using TestExtensions;
 using TestGrainInterfaces;
 using Xunit;

@@ -1,7 +1,5 @@
-using System.Threading.Tasks;
 using Autofac.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
-using Orleans.Hosting;
 using Orleans.TestingHost;
 using TestExtensions;
 using UnitTests.GrainInterfaces;

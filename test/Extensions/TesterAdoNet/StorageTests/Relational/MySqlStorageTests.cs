@@ -1,7 +1,3 @@
-using System;
-using System.Threading.Tasks;
-using Orleans;
-using Orleans.Runtime;
 using Orleans.Tests.SqlUtils;
 using UnitTests.StorageTests.Relational.TestDataSets;
 using Xunit;

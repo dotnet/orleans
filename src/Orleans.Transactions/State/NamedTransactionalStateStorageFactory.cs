@@ -4,6 +4,7 @@ using Microsoft.Extensions.Logging;
 using Orleans.Runtime;
 using Orleans.Transactions.Abstractions;
 using Orleans.Storage;
+using Orleans.Serialization.Serializers;
 
 namespace Orleans.Transactions
 {
@@ -33,7 +34,13 @@ namespace Orleans.Transactions
             IGrainStorage grainStorage = string.IsNullOrEmpty(storageName)
                 ? currentContext.ActivationServices.GetService<IGrainStorage>()
                 : currentContext.ActivationServices.GetServiceByName<IGrainStorage>(storageName);
-            if (grainStorage != null) return new TransactionalStateStorageProviderWrapper<TState>(grainStorage, stateName, currentContext, this.loggerFactory);
+
+            if (grainStorage != null)
+            {
+                IActivatorProvider activatorProvider = currentContext.ActivationServices.GetRequiredService<IActivatorProvider>();
+                return new TransactionalStateStorageProviderWrapper<TState>(grainStorage, stateName, currentContext, this.loggerFactory, activatorProvider);
+            }
+
             throw (string.IsNullOrEmpty(storageName))
                 ? new InvalidOperationException($"No default {nameof(ITransactionalStateStorageFactory)} nor {nameof(IGrainStorage)} was found while attempting to create transactional state storage.")
                 : new InvalidOperationException($"No {nameof(ITransactionalStateStorageFactory)} nor {nameof(IGrainStorage)} with the name {storageName} was found while attempting to create transactional state storage.");

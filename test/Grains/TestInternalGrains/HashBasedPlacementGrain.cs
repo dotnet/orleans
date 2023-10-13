@@ -1,6 +1,4 @@
-﻿using System.Threading.Tasks;
-using Orleans;
-using Orleans.Placement;
+﻿using Orleans.Placement;
 using Orleans.Runtime;
 using UnitTests.GrainInterfaces;
 

@@ -1,11 +1,9 @@
 using Orleans.Persistence.AdoNet.Storage;
 using Orleans.Providers;
 using Orleans.Runtime;
-using Orleans.Serialization;
 using System;
 using System.Collections.Generic;
 using System.Data;
-using System.Data.Common;
 using System.Diagnostics;
 using System.Globalization;
 using System.Linq;
@@ -513,8 +511,8 @@ namespace Orleans.Storage
                 if (asmNameIndex >= 0)
                 {
                     var asmVersionIndex = input.IndexOf(',', asmNameIndex + 1);
-                    if (asmVersionIndex >= 0) return input.Substring(0, asmVersionIndex);
-                    return input.Substring(0, asmNameIndex);
+                    if (asmVersionIndex >= 0) return input[..asmVersionIndex];
+                    return input[..asmNameIndex];
                 }
 
                 return input;
@@ -540,7 +538,7 @@ namespace Orleans.Storage
                 var arityIndex = input.IndexOf("`", StringComparison.OrdinalIgnoreCase);
                 if (arityIndex != -1)
                 {
-                    return int.Parse(input.AsSpan().Slice(arityIndex + 1));
+                    return int.Parse(input.AsSpan()[(arityIndex + 1)..]);
                 }
 
                 return 0;

@@ -5,7 +5,6 @@ using Azure;
 using Azure.Data.Tables;
 using Azure.Data.Tables.Models;
 using Microsoft.Extensions.Logging;
-using Orleans.Runtime;
 using LogLevel = Microsoft.Extensions.Logging.LogLevel;
 
 //
@@ -149,7 +148,7 @@ namespace Orleans.GrainDirectory.AzureStorage
                 || httpStatusCode == HttpStatusCode.ServiceUnavailable  /* 503 */
                 || httpStatusCode == HttpStatusCode.GatewayTimeout      /* 504 */
                 || (httpStatusCode == HttpStatusCode.InternalServerError /* 500 */
-                    && !String.IsNullOrEmpty(restStatusCode)
+                    && !string.IsNullOrEmpty(restStatusCode)
                     && TableErrorCode.OperationTimedOut.ToString().Equals(restStatusCode, StringComparison.OrdinalIgnoreCase))
             );
         }
@@ -191,7 +190,7 @@ namespace Orleans.GrainDirectory.AzureStorage
 
         internal static void ValidateTableName(string tableName)
         {
-            // Regular expression from documentation: https://docs.microsoft.com/rest/api/storageservices/understanding-the-table-service-data-model#table-names
+            // Regular expression from documentation: https://learn.microsoft.com/rest/api/storageservices/understanding-the-table-service-data-model#table-names
             if (!TableNameRegex().IsMatch(tableName))
             {
                 throw new ArgumentException($"Table name \"{tableName}\" is invalid according to the following rules:"
@@ -248,7 +247,7 @@ namespace Orleans.GrainDirectory.AzureStorage
                             exc,
                             "DataNotFound reading Azure storage table {TableName}:{Retry} HTTP status code={StatusCode} REST status code={RESTStatusCode}",
                             tableName,
-                            iteration == 0 ? String.Empty : (" Repeat=" + iteration),
+                            iteration == 0 ? string.Empty : (" Repeat=" + iteration),
                             httpStatusCode,
                             restStatus);
 

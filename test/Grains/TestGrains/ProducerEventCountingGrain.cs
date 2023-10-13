@@ -1,15 +1,10 @@
-using System;
-using System.Threading;
-using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
-using Orleans;
-using Orleans.Runtime;
 using Orleans.Streams;
 using UnitTests.GrainInterfaces;
 
 namespace UnitTests.Grains
 {
-    class ProducerEventCountingGrain : BaseGrain, IProducerEventCountingGrain
+    internal class ProducerEventCountingGrain : BaseGrain, IProducerEventCountingGrain
     {
         private IAsyncObserver<int> _producer;
         private int _numProducedItems;
@@ -37,7 +32,7 @@ namespace UnitTests.Grains
         public Task BecomeProducer(Guid streamId, string providerToUse)
         {
             _logger.LogInformation("Producer.BecomeProducer");
-            if (String.IsNullOrEmpty(providerToUse))
+            if (string.IsNullOrEmpty(providerToUse))
             {
                 throw new ArgumentNullException(nameof(providerToUse));
             }

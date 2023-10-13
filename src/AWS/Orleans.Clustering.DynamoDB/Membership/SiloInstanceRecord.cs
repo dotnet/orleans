@@ -107,9 +107,9 @@ namespace Orleans.Runtime.MembershipService
                 int idx1 = rowKey.IndexOf(Seperator);
                 int idx2 = rowKey.LastIndexOf(Seperator);
                 ReadOnlySpan<char> rowKeySpan = rowKey.AsSpan();
-                ReadOnlySpan<char> addressStr = rowKeySpan.Slice(0, idx1);
+                ReadOnlySpan<char> addressStr = rowKeySpan[..idx1];
                 ReadOnlySpan<char> portStr = rowKeySpan.Slice(idx1 + 1, idx2 - idx1 - 1);
-                ReadOnlySpan<char> genStr = rowKeySpan.Slice(idx2 + 1);
+                ReadOnlySpan<char> genStr = rowKeySpan[(idx2 + 1)..];
                 IPAddress address = IPAddress.Parse(addressStr);
                 int port = int.Parse(portStr);
                 int generation = int.Parse(genStr);

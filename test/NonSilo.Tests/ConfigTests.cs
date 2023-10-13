@@ -1,4 +1,3 @@
-using System;
 using Orleans.Runtime.Configuration;
 using Xunit;
 using Xunit.Abstractions;

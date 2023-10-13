@@ -1,13 +1,9 @@
-using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.TestingHost;
 using TestExtensions;
 using UnitTests.GrainInterfaces;
 using UnitTests.Grains;
 using Xunit;
-using System.Linq;
-using Orleans.Hosting;
-using System;
 
 namespace DependencyInjection.Tests
 {

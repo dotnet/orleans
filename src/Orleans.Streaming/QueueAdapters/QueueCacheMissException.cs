@@ -68,7 +68,7 @@ namespace Orleans.Streams
         /// <param name="low">The earliest available sequence token.</param>
         /// <param name="high">The latest available sequence token.</param>
         public QueueCacheMissException(string requested, string low, string high)
-            : this(String.Format(CultureInfo.InvariantCulture, MESSAGE_FORMAT, requested, low, high))
+            : this(string.Format(CultureInfo.InvariantCulture, MESSAGE_FORMAT, requested, low, high))
         {
             Requested = requested;
             Low = low;

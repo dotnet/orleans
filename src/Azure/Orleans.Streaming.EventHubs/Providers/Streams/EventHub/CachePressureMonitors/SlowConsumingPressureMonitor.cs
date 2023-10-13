@@ -1,5 +1,4 @@
 using Orleans.Providers.Streams.Common;
-using Orleans.Runtime;
 using System;
 using Microsoft.Extensions.Logging;
 

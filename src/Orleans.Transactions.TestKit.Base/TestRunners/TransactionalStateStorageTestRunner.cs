@@ -65,7 +65,7 @@ namespace Orleans.Transactions.TestKit
             loadresponse = await stateStorage.Load();
             loadresponse.Should().NotBeNull();
             loadresponse.Metadata.Should().NotBeNull();
-            loadresponse.Metadata.TimeStamp.Should().Be(default(DateTime));
+            loadresponse.Metadata.TimeStamp.Should().Be(default);
             loadresponse.Metadata.CommitRecords.Should().BeEmpty();
             loadresponse.ETag.Should().Be(etag1);
             loadresponse.CommittedSequenceId.Should().Be(0);
@@ -106,7 +106,7 @@ namespace Orleans.Transactions.TestKit
             // load again
             loadresponse = await stateStorage.Load();
             loadresponse.Should().NotBeNull();
-            loadresponse.Metadata.TimeStamp.Should().Be(default(DateTime));
+            loadresponse.Metadata.TimeStamp.Should().Be(default);
             loadresponse.Metadata.CommitRecords.Should().BeEmpty();
             loadresponse.ETag.Should().BeNull();
             loadresponse.CommittedSequenceId.Should().Be(0);
@@ -154,7 +154,7 @@ namespace Orleans.Transactions.TestKit
                 SequenceId = seqno,
                 TimeStamp = DateTime.UtcNow,
                 TransactionId = Guid.NewGuid().ToString(),
-                TransactionManager = tm ? default(ParticipantId) : MakeParticipantId(),
+                TransactionManager = tm ? default : MakeParticipantId(),
                 State = new TState()
             };
             result.State = val;
@@ -246,7 +246,7 @@ namespace Orleans.Transactions.TestKit
             loadresponse.CommittedSequenceId.Should().Be(1);
             loadresponse.PendingStates.Count.Should().Be(0);
             AssertTState(loadresponse.CommittedState, expectedState);
-            loadresponse.Metadata.TimeStamp.Should().Be(default(DateTime));
+            loadresponse.Metadata.TimeStamp.Should().Be(default);
             loadresponse.Metadata.CommitRecords.Count.Should().Be(0);
         }
 
@@ -272,7 +272,7 @@ namespace Orleans.Transactions.TestKit
             loadresponse.CommittedSequenceId.Should().Be(0);
             loadresponse.PendingStates.Count.Should().Be(0);
             AssertTState(loadresponse.CommittedState,initialstate);
-            loadresponse.Metadata.TimeStamp.Should().Be(default(DateTime));
+            loadresponse.Metadata.TimeStamp.Should().Be(default);
             loadresponse.Metadata.CommitRecords.Count.Should().Be(0);
         }
 
@@ -349,7 +349,7 @@ namespace Orleans.Transactions.TestKit
             loadresponse.CommittedSequenceId.Should().Be(1);
             loadresponse.PendingStates.Count.Should().Be(0);
             AssertTState(loadresponse.CommittedState,expectedState);
-            loadresponse.Metadata.TimeStamp.Should().Be(default(DateTime));
+            loadresponse.Metadata.TimeStamp.Should().Be(default);
             loadresponse.Metadata.CommitRecords.Count.Should().Be(0);
         }
 
@@ -431,7 +431,7 @@ namespace Orleans.Transactions.TestKit
             loadresponse.CommittedSequenceId.Should().Be(count);
             loadresponse.PendingStates.Count.Should().Be(0);
             AssertTState(loadresponse.CommittedState,expectedStates[count - 1]);
-            loadresponse.Metadata.TimeStamp.Should().Be(default(DateTime));
+            loadresponse.Metadata.TimeStamp.Should().Be(default);
             loadresponse.Metadata.CommitRecords.Count.Should().Be(0);
         }
 
@@ -467,7 +467,7 @@ namespace Orleans.Transactions.TestKit
             loadresponse.CommittedSequenceId.Should().Be(0);
             loadresponse.PendingStates.Count.Should().Be(0);
             AssertTState(loadresponse.CommittedState,initialstate);
-            loadresponse.Metadata.TimeStamp.Should().Be(default(DateTime));
+            loadresponse.Metadata.TimeStamp.Should().Be(default);
             loadresponse.Metadata.CommitRecords.Count.Should().Be(0);
         }
 
@@ -563,7 +563,7 @@ namespace Orleans.Transactions.TestKit
             loadresponse.Metadata.Should().NotBeNull();
             loadresponse.CommittedSequenceId.Should().Be(6);
             AssertTState(loadresponse.CommittedState, expectedState6);
-            loadresponse.Metadata.TimeStamp.Should().Be(default(DateTime));
+            loadresponse.Metadata.TimeStamp.Should().Be(default);
             loadresponse.Metadata.CommitRecords.Count.Should().Be(0);
             loadresponse.PendingStates.Count.Should().Be(2);
             loadresponse.PendingStates[0].SequenceId.Should().Be(7);
@@ -614,7 +614,7 @@ namespace Orleans.Transactions.TestKit
             loadresponse.Metadata.Should().NotBeNull();
             loadresponse.CommittedSequenceId.Should().Be(3);
             AssertTState(loadresponse.CommittedState, expectedState3b);
-            loadresponse.Metadata.TimeStamp.Should().Be(default(DateTime));
+            loadresponse.Metadata.TimeStamp.Should().Be(default);
             loadresponse.Metadata.CommitRecords.Count.Should().Be(0);
             loadresponse.PendingStates.Count.Should().Be(1);
             loadresponse.PendingStates[0].SequenceId.Should().Be(4);

@@ -1499,7 +1499,11 @@ namespace Orleans.Runtime
                         // Set the forwarding address so that messages enqueued on this activation can be forwarded to
                         // the existing activation.
                         ForwardingAddress = result?.SiloAddress;
-                        DeactivationReason = new(DeactivationReasonCode.DuplicateActivation, "This grain has been activated elsewhere.");
+                        if (ForwardingAddress is { } address)
+                        {
+                            DeactivationReason = new(DeactivationReasonCode.DuplicateActivation, $"This grain is active on another host ({address}).");
+                        }
+
                         success = false;
                         CatalogInstruments.ActivationConcurrentRegistrationAttempts.Add(1);
                         if (_shared.Logger.IsEnabled(LogLevel.Debug))
@@ -1510,7 +1514,7 @@ namespace Orleans.Runtime
                             _shared.Logger.LogDebug(
                                 (int)ErrorCode.Catalog_DuplicateActivation,
                                 "Tried to create a duplicate activation {Address}, but we'll use {ForwardingAddress} instead. "
-                                + "GrainInstance Type is {GrainInstanceType}. {PrimaryMessage}"
+                                + "GrainInstance type is {GrainInstanceType}. {PrimaryMessage}"
                                 + "Full activation address is {Address}. We have {WaitingCount} messages to forward.",
                                 Address,
                                 ForwardingAddress,
@@ -1526,19 +1530,23 @@ namespace Orleans.Runtime
                 catch (Exception exception)
                 {
                     registrationException = exception;
+                    _shared.Logger.LogWarning((int)ErrorCode.Runtime_Error_100064, registrationException, "Failed to register grain {Grain} in grain directory", ToString());
                     success = false;
                 }
 
                 if (!success)
                 {
+                    if (DeactivationReason.ReasonCode == DeactivationReasonCode.None)
+                    {
+                        DeactivationReason = new(DeactivationReasonCode.InternalFailure, registrationException, "Failed to register activation in grain directory.");
+                    }
+
                     lock (this)
                     {
                         SetState(ActivationState.Invalid);
                     }
 
                     UnregisterMessageTarget();
-                    DeactivationReason = new(DeactivationReasonCode.InternalFailure, registrationException, "Failed to register activation in grain directory.");
-                    _shared.Logger.LogWarning((int)ErrorCode.Runtime_Error_100064, registrationException, "Failed to register grain {Grain} in grain directory", ToString());
                 }
             }
 

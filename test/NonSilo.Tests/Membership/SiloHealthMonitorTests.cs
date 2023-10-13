@@ -1,10 +1,5 @@
-using System;
-using System.Collections.Generic;
 using System.Collections.Immutable;
-using System.Linq;
-using System.Threading;
 using System.Threading.Channels;
-using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using NonSilo.Tests.Utilities;
@@ -79,7 +74,7 @@ namespace NonSilo.Tests.Membership
             _optionsMonitor.CurrentValue.ReturnsForAnyArgs(info => _clusterMembershipOptions);
 
             _probeResults = Channel.CreateBounded<ProbeResult>(new BoundedChannelOptions(1) { FullMode = BoundedChannelFullMode.Wait });
-            Func<SiloHealthMonitor, ProbeResult, Task> onProbeResult = (mon, res) => _probeResults.Writer.WriteAsync(res).AsTask();
+            Task onProbeResult(SiloHealthMonitor mon, ProbeResult res) => _probeResults.Writer.WriteAsync(res).AsTask();
 
             _membershipSnapshot = Snapshot(
                 1,

@@ -69,7 +69,7 @@ namespace Orleans.Metadata
 
             var i = value.IndexOf('.');
             if (i < 0) throw new ArgumentException(nameof(value));
-            return new MajorMinorVersion(long.Parse(value.Substring(0, i)), long.Parse(value.Substring(i + 1)));
+            return new MajorMinorVersion(long.Parse(value[..i]), long.Parse(value[(i + 1)..]));
         }
 
         /// <inheritdoc />

@@ -1,15 +1,6 @@
-
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading;
-using System.Threading.Tasks;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
-using Orleans;
-using Orleans.Hosting;
 using Orleans.Providers;
-using Orleans.Runtime;
 using Orleans.Streams;
 using Orleans.TestingHost;
 using Orleans.TestingHost.Utils;
@@ -97,7 +88,7 @@ namespace Tester.StreamingTests
             await TestingUtils.WaitUntilAsync(lastTry => CheckCounters(counts.Sum(), lastTry), Timeout);
         }
 
-        Task OnNextAsync(int e, StreamSequenceToken token)
+        private Task OnNextAsync(int e, StreamSequenceToken token)
         {
             Interlocked.Increment(ref this.eventsConsumed);
             return Task.CompletedTask;

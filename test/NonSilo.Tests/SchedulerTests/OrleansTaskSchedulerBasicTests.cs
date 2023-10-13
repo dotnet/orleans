@@ -1,6 +1,3 @@
-using System;
-using System.Threading;
-using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Orleans.Runtime;
 using Orleans.Runtime.Scheduler;
@@ -9,9 +6,7 @@ using Xunit;
 using Xunit.Abstractions;
 using Orleans.TestingHost.Utils;
 using Orleans.Internal;
-using System.Collections.Generic;
 using Orleans;
-using Orleans.Core;
 
 // ReSharper disable ConvertToConstant.Local
 
@@ -102,8 +97,8 @@ namespace UnitTests.SchedulerTests
 
             int n = 0;
             // ReSharper disable AccessToModifiedClosure
-            Action item1 = () => { n = n + 5; };
-            Action item2 = () => { n = n * 3; };
+            void item1() { n = n + 5; }
+            void item2() { n = n * 3; }
             // ReSharper restore AccessToModifiedClosure
             this.rootContext.Scheduler.QueueAction(item1);
             rootContext.Scheduler.QueueAction(item2);
@@ -246,14 +241,14 @@ namespace UnitTests.SchedulerTests
             int n = 0;
             TaskCompletionSource<int> finished = new TaskCompletionSource<int>();
             var numCompleted = new[] {0};
-            Action closure = () =>
+            void closure()
             {
                 LogContext("ClosureWorkItem-task " + Task.CurrentId);
 
                 for (int i = 0; i < 10; i++)
                 {
                     int id = -1;
-                    Action action = () =>
+                    void action()
                     {
                         id = Task.CurrentId.HasValue ? (int)Task.CurrentId : -1;
 
@@ -266,7 +261,7 @@ namespace UnitTests.SchedulerTests
                         this.output.WriteLine("Sub-task " + id + " awake");
                         n = k + 1;
                         // ReSharper restore AccessToModifiedClosure
-                    };
+                    }
                     Task.Factory.StartNew(action).ContinueWith(tsk =>
                     {
                         LogContext("Sub-task " + id + "-ContinueWith");
@@ -278,7 +273,7 @@ namespace UnitTests.SchedulerTests
                         }
                     });
                 }
-            };
+            }
 
             context.Scheduler.QueueAction(closure);
 
@@ -345,22 +340,22 @@ namespace UnitTests.SchedulerTests
             Assert.Equal(value, (string)RequestContext.Get(key));
 
             // Caller RequestContext is protected from clear when work is asynchronous.
-            Func<Task> asyncCheckClearRequestContext = async () =>
+            async Task asyncCheckClearRequestContext()
             {
                 RequestContext.Clear();
                 Assert.Null(RequestContext.Get(key));
                 await Task.Delay(TimeSpan.Zero);
-            };
+            }
             await asyncCheckClearRequestContext();
             Assert.Equal(value, (string)RequestContext.Get(key));
 
             // Caller RequestContext is NOT protected from clear when work is not asynchronous.
-            Func<Task> nonAsyncCheckClearRequestContext = () =>
+            Task nonAsyncCheckClearRequestContext()
             {
                 RequestContext.Clear();
                 Assert.Null(RequestContext.Get(key));
                 return Task.CompletedTask;
-            };
+            }
             await nonAsyncCheckClearRequestContext();
             Assert.Null(RequestContext.Get(key));
         }

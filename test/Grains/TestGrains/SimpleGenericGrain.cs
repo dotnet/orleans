@@ -1,6 +1,3 @@
-using System;
-using System.Threading.Tasks;
-using Orleans;
 using UnitTests.GrainInterfaces;
 
 namespace UnitTests.Grains
@@ -30,7 +27,7 @@ namespace UnitTests.Grains
             // Compare reference to this grain created by the client 
             var thisReference = GrainFactory.GetGrain<ISimpleGenericGrain<TType>>(this.GetPrimaryKeyLong());
             if (!thisReference.Equals(clientReference))
-                throw new Exception(String.Format("Case_3: 2 grain references are different, while should have been the same: gr1={0}, gr2={1}", thisReference, clientReference));
+                throw new Exception(string.Format("Case_3: 2 grain references are different, while should have been the same: gr1={0}, gr2={1}", thisReference, clientReference));
 
             return Task.CompletedTask;
         }

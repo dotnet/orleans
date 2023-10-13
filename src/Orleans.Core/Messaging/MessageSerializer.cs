@@ -64,7 +64,7 @@ namespace Orleans.Runtime.Messaging
             Span<byte> lengthBytes = stackalloc byte[FramingLength];
             input.Slice(input.Start, FramingLength).CopyTo(lengthBytes);
             var headerLength = BinaryPrimitives.ReadInt32LittleEndian(lengthBytes);
-            var bodyLength = BinaryPrimitives.ReadInt32LittleEndian(lengthBytes.Slice(4));
+            var bodyLength = BinaryPrimitives.ReadInt32LittleEndian(lengthBytes[4..]);
 
             // Check lengths
             ThrowIfLengthsInvalid(headerLength, bodyLength);

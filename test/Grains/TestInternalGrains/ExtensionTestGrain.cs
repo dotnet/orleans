@@ -1,6 +1,3 @@
-using System.Threading;
-using System.Threading.Tasks;
-using Orleans;
 using Orleans.Runtime;
 using UnitTests.GrainInterfaces;
 
@@ -50,7 +47,7 @@ namespace UnitTests.Grains
 
         public override Task OnActivateAsync(CancellationToken cancellationToken)
         {
-            ExtensionProperty = default(T);
+            ExtensionProperty = default;
             extender = null;
             return base.OnActivateAsync(cancellationToken);
         }

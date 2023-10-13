@@ -1,15 +1,12 @@
-using System;
-using System.Threading;
-using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
-using Orleans;
 using Orleans.Concurrency;
 using Orleans.Runtime;
 using UnitTests.GrainInterfaces;
 
 namespace UnitTests.Grains
 {
+    [CollectionAgeLimit("00:05:00")]
     public class CollectionTestGrain : Grain, ICollectionTestGrain
     {
         protected readonly IGrainContext _grainContext;

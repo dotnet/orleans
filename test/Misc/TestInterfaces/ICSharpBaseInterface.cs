@@ -1,6 +1,4 @@
-﻿using System.Threading.Tasks;
-
-namespace UnitTests.Interfaces
+﻿namespace UnitTests.Interfaces
 {
     public interface ICSharpBaseInterface
     {

@@ -27,7 +27,7 @@ namespace Orleans.EventSourcing
         /// <summary>
         /// A map from event names to event counts
         /// </summary>
-        public Dictionary<String, long> EventCounters;
+        public Dictionary<string, long> EventCounters;
         /// <summary>
         /// A list of all measured stabilization latencies
         /// </summary>

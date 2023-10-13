@@ -1,8 +1,4 @@
-﻿using System;
-using System.Threading.Tasks;
-using Orleans;
-
-namespace UnitTests.GrainInterfaces
+﻿namespace UnitTests.GrainInterfaces
 {
     public interface ITimerGrain : IGrainWithIntegerKey
     {

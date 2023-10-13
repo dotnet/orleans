@@ -124,7 +124,7 @@ namespace Orleans.Runtime
             var key = _grainId.Key.AsSpan();
             if (key.IndexOf((byte)SegmentSeparator) is int index && index >= 0)
             {
-                var extraIdentifier = key.Slice(index + 1);
+                var extraIdentifier = key[(index + 1)..];
 
                 var buf = new byte[addr.Length + 1 + extraIdentifier.Length];
                 addr.CopyTo(buf.AsSpan());
@@ -147,7 +147,7 @@ namespace Orleans.Runtime
             var key = _grainId.Key.AsSpan();
             if (key.IndexOf((byte)SegmentSeparator) is int index && index >= 0)
             {
-                key = key.Slice(0, index);
+                key = key[..index];
             }
 
             return SiloAddress.FromUtf8String(key);

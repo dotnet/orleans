@@ -1,8 +1,5 @@
-using System;
-using System.Threading.Tasks;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
-using Orleans.Hosting;
 using Orleans.TestingHost;
 using TestExtensions;
 using UnitTests.GrainInterfaces;

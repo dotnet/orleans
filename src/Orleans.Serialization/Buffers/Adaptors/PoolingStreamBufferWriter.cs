@@ -89,7 +89,7 @@ namespace Orleans.Serialization.Buffers.Adaptors
         }
 
         /// <inheritdoc />
-        public void Dispose()
+        public readonly void Dispose()
         {
             if (_buffer is not null)
             {

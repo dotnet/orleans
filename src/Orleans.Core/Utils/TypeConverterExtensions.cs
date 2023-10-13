@@ -31,7 +31,7 @@ namespace Orleans.Utilities
         {
             var span = type.AsSpan();
             var index = span.IndexOf((byte)StartArgument);
-            return index <= 0 ? type : new IdSpan(span.Slice(0, index).ToArray());
+            return index <= 0 ? type : new IdSpan(span[..index].ToArray());
         }
 
         /// <summary>
@@ -41,7 +41,7 @@ namespace Orleans.Utilities
         {
             var typeString = unconstructed.AsSpan();
             var indicatorIndex = typeString.IndexOf((byte)GenericTypeIndicator);
-            var arityString = typeString.Slice(indicatorIndex + 1);
+            var arityString = typeString[(indicatorIndex + 1)..];
             if (indicatorIndex < 0 || arityString.IndexOf((byte)StartArgument) >= 0)
             {
                 throw new InvalidOperationException("Cannot construct an already-constructed type");
@@ -70,7 +70,7 @@ namespace Orleans.Utilities
             var args = typeArguments.Value.AsSpan();
             var index = args.IndexOf((byte)StartArgument);
             if (index <= 0) return grainType; // if no type arguments are provided, then the current logic expects the unconstructed form (but the grain call is going to fail later anyway...)
-            args = args.Slice(index);
+            args = args[index..];
 
             var type = grainType.Value.AsSpan();
             var buf = new byte[type.Length + args.Length];
@@ -91,7 +91,7 @@ namespace Orleans.Utilities
                 return Array.Empty<Type>();
             }
 
-            var safeString = "safer" + Encoding.UTF8.GetString(str.Slice(str.IndexOf((byte)GenericTypeIndicator)));
+            var safeString = "safer" + Encoding.UTF8.GetString(str[str.IndexOf((byte)GenericTypeIndicator)..]);
             var parsed = RuntimeTypeNameParser.Parse(safeString);
             if (!(parsed is ConstructedGenericTypeSpec spec))
             {

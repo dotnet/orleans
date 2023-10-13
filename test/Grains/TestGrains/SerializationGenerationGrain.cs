@@ -1,7 +1,4 @@
-﻿using System;
-using System.Threading.Tasks;
-
-namespace TestGrains
+﻿namespace TestGrains
 {
     using System.Collections.Generic;
     using System.Linq;

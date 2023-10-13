@@ -497,7 +497,7 @@ namespace Orleans.Serialization.Buffers
             }
             else if (IsSpanInput)
             {
-                forked = new Reader<TInput>(_currentSpan.Slice((int)position), Session, position);
+                forked = new Reader<TInput>(_currentSpan[(int)position..], Session, position);
                 if (forked.Position != position || position > int.MaxValue)
                 {
                     ThrowInvalidPosition(position, forked.Position);
@@ -825,7 +825,7 @@ namespace Orleans.Serialization.Buffers
                 var writeSize = Math.Min(dest.Length, _currentSpan.Length - _bufferPos);
                 _currentSpan.Slice(_bufferPos, writeSize).CopyTo(dest);
                 _bufferPos += writeSize;
-                dest = dest.Slice(writeSize);
+                dest = dest[writeSize..];
 
                 if (dest.Length == 0)
                 {

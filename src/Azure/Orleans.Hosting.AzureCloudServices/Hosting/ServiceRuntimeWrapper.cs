@@ -228,7 +228,7 @@ namespace Orleans.Runtime.Host
         private static string ExtractInstanceName(string instanceId, string deploymentId)
         {
             return instanceId.Length > deploymentId.Length && instanceId.StartsWith(deploymentId, StringComparison.Ordinal)
-                ? instanceId.Substring(deploymentId.Length + 1)
+                ? instanceId[(deploymentId.Length + 1)..]
                 : instanceId;
         }
     }

@@ -234,7 +234,7 @@ namespace Orleans
                             // A specified default grain type trumps others.
                             primaryImplementation = GrainType.Create(defaultTypeString);
                         }
-                        else if (string.Equals(interfaceTypeName?.Substring(1), typeName, StringComparison.Ordinal))
+                        else if (string.Equals(interfaceTypeName?[1..], typeName, StringComparison.Ordinal))
                         {
                             // Otherwise, a substring match on the interface name, dropping the 'I', is used.
                             primaryImplementation = id;

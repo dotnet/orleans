@@ -1,8 +1,4 @@
-using System;
-using System.Threading.Tasks;
-using System.Collections.Generic;
 using System.Diagnostics;
-using Orleans;
 using BenchmarkGrainInterfaces.Transaction;
 using Orleans.Transactions;
 
@@ -22,7 +18,7 @@ namespace BenchmarkGrains.Transaction
 
         public async Task<Report> TryGetReport()
         {
-            if (!this.runTask.IsCompleted) return default(Report);
+            if (!this.runTask.IsCompleted) return default;
             return await this.runTask;
         }
 

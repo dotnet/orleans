@@ -1,13 +1,9 @@
-﻿using System;
-using System.Threading;
-using System.Threading.Tasks;
-
-namespace DefaultCluster.Tests
+﻿namespace DefaultCluster.Tests
 {
     internal class LocalErrorGrain
     {
-        int m_a = 0;
-        int m_b = 0;
+        private int m_a = 0;
+        private int m_b = 0;
 
         public LocalErrorGrain() { }
 
@@ -23,12 +19,12 @@ namespace DefaultCluster.Tests
             return Task.CompletedTask;
         }
 
-        public Task<Int32> GetAxB()
+        public Task<int> GetAxB()
         {
             return Task.FromResult(m_a * m_b);
         }
 
-        public async Task<Int32> GetAxBError()
+        public async Task<int> GetAxBError()
         {
             await Task.CompletedTask;
             throw new Exception("GetAxBError-Exception");

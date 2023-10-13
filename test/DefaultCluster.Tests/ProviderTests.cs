@@ -1,8 +1,4 @@
-using System;
-using System.Threading.Tasks;
 using Xunit;
-using Orleans;
-using Orleans.Hosting;
 using Orleans.Runtime;
 using Orleans.TestingHost;
 using TestExtensions;

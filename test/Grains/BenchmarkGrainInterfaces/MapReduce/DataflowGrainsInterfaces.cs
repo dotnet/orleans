@@ -1,8 +1,4 @@
-﻿using System.Collections.Generic;
-using System.Threading.Tasks;
-using Orleans;
-
-namespace BenchmarkGrainInterfaces.MapReduce
+﻿namespace BenchmarkGrainInterfaces.MapReduce
 {
     public interface IDataflowGrain : IGrain
     {

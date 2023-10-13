@@ -1,4 +1,3 @@
-using System;
 using Orleans.Serialization;
 
 namespace UnitTests.GrainInterfaces

@@ -26,11 +26,11 @@ namespace Orleans.Runtime
         }
 
         [Id(0)]
-        public UInt64 N0 { get; private set; }
+        public ulong N0 { get; private set; }
         [Id(1)]
-        public UInt64 N1 { get; private set; }
+        public ulong N1 { get; private set; }
         [Id(2)]
-        public UInt64 TypeCodeData { get; private set; }
+        public ulong TypeCodeData { get; private set; }
         [Id(3)]
         public string KeyExt { get; private set; }
 
@@ -62,14 +62,14 @@ namespace Orleans.Runtime
             input = input.Trim();
             if (input.Length >= minimumValidKeyLength)
             {
-                var n0 = ulong.Parse(input.Slice(0, 16).ToString(), NumberStyles.AllowHexSpecifier);
+                var n0 = ulong.Parse(input[..16].ToString(), NumberStyles.AllowHexSpecifier);
                 var n1 = ulong.Parse(input.Slice(16, 16).ToString(), NumberStyles.AllowHexSpecifier);
                 var typeCodeData = ulong.Parse(input.Slice(32, 16).ToString(), NumberStyles.AllowHexSpecifier);
                 string keyExt = null;
                 if (input.Length > minimumValidKeyLength)
                 {
                     if (input[48] != '+') throw new InvalidDataException("UniqueKey hex string missing + separator.");
-                    keyExt = input.Slice(49).ToString();
+                    keyExt = input[49..].ToString();
                 }
 
                 return NewKey(n0, n1, typeCodeData, keyExt);
@@ -265,7 +265,7 @@ namespace Orleans.Runtime
             if (extBytes != null)
             {
                 BinaryPrimitives.WriteInt32LittleEndian(spanBytes.Slice(offset, sizeof(int)), extBytesLength);
-                extBytes.CopyTo(spanBytes.Slice(offset + sizeof(int)));
+                extBytes.CopyTo(spanBytes[(offset + sizeof(int))..]);
             }
             else
             {
@@ -299,7 +299,7 @@ namespace Orleans.Runtime
                 {
                     var guid = value.ToByteArray().AsSpan();
                     N0 = BinaryPrimitives.ReadUInt64LittleEndian(guid);
-                    N1 = BinaryPrimitives.ReadUInt64LittleEndian(guid.Slice(8));
+                    N1 = BinaryPrimitives.ReadUInt64LittleEndian(guid[8..]);
                 }
             }
         }
@@ -332,7 +332,7 @@ namespace Orleans.Runtime
             return keyString;
         }
 
-        internal static Category GetCategory(UInt64 typeCodeData)
+        internal static Category GetCategory(ulong typeCodeData)
         {
             return (Category)((typeCodeData >> 56) & 0xFF);
         }

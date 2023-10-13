@@ -1,13 +1,10 @@
 using System;
 using System.Net;
-using Microsoft.Extensions.DependencyInjection;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using Orleans.Runtime;
 using Orleans.GrainReferences;
-using Orleans.Serialization.TypeSystem;
 using Microsoft.Extensions.Options;
-using System.Globalization;
 
 namespace Orleans.Serialization
 {
@@ -195,7 +192,7 @@ namespace Orleans.Serialization
             return reader.Value switch
             {
                 long l => new MembershipVersion(l),
-                _ => default(MembershipVersion)
+                _ => default
             };
         }
     }

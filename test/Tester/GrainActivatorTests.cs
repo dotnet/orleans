@@ -1,4 +1,3 @@
-using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using Orleans.Runtime;
@@ -7,7 +6,6 @@ using TestExtensions;
 using UnitTests.GrainInterfaces;
 using UnitTests.Grains;
 using Xunit;
-using Orleans.Hosting;
 using Orleans.Metadata;
 
 namespace UnitTests.General

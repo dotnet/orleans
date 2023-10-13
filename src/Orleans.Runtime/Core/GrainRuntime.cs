@@ -3,12 +3,14 @@ using Microsoft.Extensions.Logging;
 using Orleans.Core;
 using Orleans.Timers;
 using Orleans.Storage;
+using Orleans.Serialization.Serializers;
 
 namespace Orleans.Runtime
 {
     internal class GrainRuntime : IGrainRuntime
     {
         private readonly ILoggerFactory loggerFactory;
+        private readonly IActivatorProvider activatorProvider;
         private readonly IServiceProvider serviceProvider;
         private readonly ITimerRegistry timerRegistry;
         private readonly IGrainFactory grainFactory;
@@ -18,7 +20,8 @@ namespace Orleans.Runtime
             IGrainFactory grainFactory,
             ITimerRegistry timerRegistry,
             IServiceProvider serviceProvider,
-            ILoggerFactory loggerFactory)
+            ILoggerFactory loggerFactory,
+            IActivatorProvider activatorProvider)
         {
             SiloAddress = localSiloDetails.SiloAddress;
             SiloIdentity = SiloAddress.ToString();
@@ -26,6 +29,7 @@ namespace Orleans.Runtime
             this.timerRegistry = timerRegistry;
             this.serviceProvider = serviceProvider;
             this.loggerFactory = loggerFactory;
+            this.activatorProvider = activatorProvider;
         }
 
         public string SiloIdentity { get; }
@@ -81,7 +85,7 @@ namespace Orleans.Runtime
             if (grainContext is null) throw new ArgumentNullException(nameof(grainContext));
             var grainType = grainContext.GrainInstance?.GetType() ?? throw new ArgumentNullException(nameof(IGrainContext.GrainInstance));
             IGrainStorage grainStorage = GrainStorageHelpers.GetGrainStorage(grainType, ServiceProvider);
-            return new StateStorageBridge<TGrainState>("state", grainContext, grainStorage, this.loggerFactory);
+            return new StateStorageBridge<TGrainState>("state", grainContext, grainStorage, this.loggerFactory, this.activatorProvider);
         }
 
         public static void CheckRuntimeContext(IGrainContext context)

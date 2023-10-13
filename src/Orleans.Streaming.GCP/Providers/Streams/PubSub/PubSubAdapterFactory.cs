@@ -4,7 +4,6 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Microsoft.Extensions.Logging;
 using Orleans.Providers.Streams.Common;
-using Orleans.Serialization;
 using Orleans.Streams;
 using Orleans.Configuration;
 using Orleans.Configuration.Overrides;

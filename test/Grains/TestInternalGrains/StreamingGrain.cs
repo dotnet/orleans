@@ -1,11 +1,5 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading;
-using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
-using Orleans;
 using Orleans.Concurrency;
 using Orleans.Providers;
 using Orleans.Runtime;
@@ -32,7 +26,7 @@ namespace UnitTests.Grains
 
         public override string ToString()
         {
-            return String.Format("{0}", Data);
+            return string.Format("{0}", Data);
         }
     }
 
@@ -189,7 +183,7 @@ namespace UnitTests.Grains
 
             _itemsProduced = 0;
             _expectedItemsProduced = 0;
-            _streamId = default(Guid);
+            _streamId = default;
             _providerName = null;
             _cleanedUpFlag = new InterlockedFlag();
             _observerDisposedYet = false;
@@ -250,7 +244,7 @@ namespace UnitTests.Grains
             _expectedItemsProduced += count;
             _logger.LogInformation("ProducerObserver.ProduceSequentialSeries: StreamId={StreamId}, num items to produce={Count}.", _streamId, count);
             for (var i = 1; i <= count; ++i)
-                await ProduceItem(String.Format("sequential#{0}", i));
+                await ProduceItem(string.Format("sequential#{0}", i));
         }
 
         public Task ProduceParallelSeries(int count)
@@ -265,10 +259,10 @@ namespace UnitTests.Grains
             for (var i = 1; i <= count; ++i)
             {
                 int capture = i;
-                Func<Task<bool>> func = async () =>
-                    {
-                        return await ProduceItem($"parallel#{capture}");
-                    };
+                async Task<bool> func()
+                {
+                    return await ProduceItem($"parallel#{capture}");
+                }
                 // Need to call on different threads to force parallel execution.
                 tasks[capture - 1] = Task.Factory.StartNew(func).Unwrap();
             }
@@ -430,7 +424,7 @@ namespace UnitTests.Grains
                 if (_started && !_disposedFlag.IsSet)
                 {
                     --_counter;
-                    bool shouldContinue = await _produceItemFunc(String.Format("periodic#{0}", _counter));
+                    bool shouldContinue = await _produceItemFunc(string.Format("periodic#{0}", _counter));
                     if (!shouldContinue || 0 == _counter)
                         Dispose();
                 }

@@ -213,7 +213,7 @@ namespace Orleans
         /// </summary>
         /// <param name="work">The delegate to invoke when <see cref="BatchWorker.Work"/> is invoked.</param>
         /// <param name="cancellationToken">The cancellation token used to stop the worker.</param>
-        public BatchWorkerFromDelegate(Func<Task> work, CancellationToken cancellationToken = default(CancellationToken))
+        public BatchWorkerFromDelegate(Func<Task> work, CancellationToken cancellationToken = default)
         {
             this.work = work;
             this.CancellationToken = cancellationToken;

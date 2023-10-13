@@ -13,7 +13,6 @@ using Orleans.Metadata;
 using Orleans.Runtime.ConsistentRing;
 using Orleans.Runtime.Internal;
 using Orleans.Runtime.Scheduler;
-using static Orleans.InterfaceToImplementationMappingCache;
 
 namespace Orleans.Runtime.ReminderService
 {

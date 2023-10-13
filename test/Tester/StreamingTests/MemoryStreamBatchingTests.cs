@@ -1,6 +1,4 @@
 using Microsoft.Extensions.Configuration;
-using Orleans;
-using Orleans.Hosting;
 using Orleans.Providers;
 using Orleans.Streams;
 using Orleans.TestingHost;

@@ -1,7 +1,6 @@
 using System;
 using Azure;
 using Azure.Data.Tables;
-using Orleans.Streaming.EventHubs;
 
 namespace Orleans.Streaming.EventHubs
 {

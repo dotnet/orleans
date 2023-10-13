@@ -1,5 +1,4 @@
-﻿using Orleans;
-using UnitTests.FSharpInterfaces;
+﻿using UnitTests.FSharpInterfaces;
 
 namespace UnitTests.GrainInterfaces
 {

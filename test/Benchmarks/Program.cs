@@ -1,17 +1,13 @@
-using System;
-using System.Collections.Generic;
 using System.Diagnostics;
-using System.Linq;
 using BenchmarkDotNet.Running;
 using Benchmarks.MapReduce;
 using Benchmarks.Ping;
 using Benchmarks.Transactions;
 using Benchmarks.GrainStorage;
-using System.Threading;
 
 namespace Benchmarks
 {
-    class Program
+    internal class Program
     {
         private static readonly Dictionary<string, Action<string[]>> _benchmarks = new Dictionary<string, Action<string[]>>
         {

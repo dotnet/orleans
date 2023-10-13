@@ -2,7 +2,6 @@ using System;
 using System.Linq;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
-using Orleans;
 using Orleans.Configuration.Internal;
 using Orleans.Providers;
 using Orleans.Runtime;

@@ -1,6 +1,4 @@
 using Orleans.Providers.Streams.Common;
-using System;
-using System.Threading;
 
 namespace ServiceBus.Tests.MonitorTests
 {

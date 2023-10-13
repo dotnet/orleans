@@ -1,8 +1,6 @@
-using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Runtime;
 using Tester.StorageFacet.Abstractions;
-using Orleans.Hosting;
 
 namespace Tester.StorageFacet.Implementations
 {
