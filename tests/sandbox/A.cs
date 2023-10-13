@@ -3,10 +3,10 @@ using Orleans.Concurrency;
 
 namespace N1;
 
-//[Alias("A")]
+[Alias("A")]
 public class MyClass { }
 
-//[Alias("A")]
+[Alias("A")]
 public class MyClass2
 {
     //[Alias("B")] public static void V(uint a) { }
