@@ -163,6 +163,10 @@ public class AliasClashAttributeAnalyzer : DiagnosticAnalyzer
            .Where(attribute => attribute.IsAttribute(Constants.AliasAttributeName));
 }
 
+/*
+
+// WIP
+
 [ExportCodeFixProvider(LanguageNames.CSharp, Name = nameof(GenerateAliasAttributesCodeFix)), Shared]
 public class AliasClashAttributeCodeFix : CodeFixProvider
 {
@@ -275,3 +279,4 @@ public class AliasClashAttributeCodeFix : CodeFixProvider
         return false;
     }
 }
+*/
