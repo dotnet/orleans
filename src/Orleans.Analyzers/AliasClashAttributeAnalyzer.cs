@@ -1,4 +1,6 @@
 using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CodeActions;
+using Microsoft.CodeAnalysis.CodeFixes;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Diagnostics;
@@ -6,7 +8,12 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Collections.Immutable;
+using System.Composition;
 using System.Linq;
+using System.Threading.Tasks;
+using System.Threading;
+using static Microsoft.CodeAnalysis.CSharp.SyntaxFactory;
+using Microsoft.CodeAnalysis.Simplification;
 
 namespace Orleans.Analyzers;
 
@@ -44,7 +51,7 @@ public class AliasClashAttributeAnalyzer : DiagnosticAnalyzer
     public override void Initialize(AnalysisContext context)
     {
         context.EnableConcurrentExecution();
-        context.ConfigureGeneratedCodeAnalysis(GeneratedCodeAnalysisFlags.Analyze);
+        context.ConfigureGeneratedCodeAnalysis(GeneratedCodeAnalysisFlags.Analyze | GeneratedCodeAnalysisFlags.ReportDiagnostics);
 
         context.RegisterCompilationStartAction(ctx =>
         {
@@ -154,4 +161,117 @@ public class AliasClashAttributeAnalyzer : DiagnosticAnalyzer
         attributeLists
            .SelectMany(attributeList => attributeList.Attributes)
            .Where(attribute => attribute.IsAttribute(Constants.AliasAttributeName));
+}
+
+[ExportCodeFixProvider(LanguageNames.CSharp, Name = nameof(GenerateAliasAttributesCodeFix)), Shared]
+public class AliasClashAttributeCodeFix : CodeFixProvider
+{
+    public override ImmutableArray<string> FixableDiagnosticIds =>
+        ImmutableArray.Create(AliasClashAttributeAnalyzer.TypesRuleId, AliasClashAttributeAnalyzer.MethodsRuleId);
+    public override FixAllProvider GetFixAllProvider() => WellKnownFixAllProviders.BatchFixer;
+
+    public override Task RegisterCodeFixesAsync(CodeFixContext context)
+    {
+        var root = context.Document.GetSyntaxRootAsync(context.CancellationToken).Result;
+        var diagnostic = context.Diagnostics.First();
+        var diagnosticSpan = diagnostic.Location.SourceSpan;
+        var classDeclaration = root.FindToken(diagnosticSpan.Start).Parent
+            .AncestorsAndSelf().OfType<ClassDeclarationSyntax>().First();
+
+        context.RegisterCodeFix(
+            CodeAction.Create(
+                title: "Rename duplicate alias",
+                createChangedSolution: c => RenameDuplicateAlias(context.Document.Project.Solution, classDeclaration, c),
+                equivalenceKey: AliasClashAttributeAnalyzer.TypesRuleId),
+            diagnostic);
+
+        return Task.CompletedTask;
+    }
+
+    private static async Task<Solution> RenameDuplicateAlias(Solution solution, ClassDeclarationSyntax classDeclaration, CancellationToken cancellationToken)
+    {
+        var documentId = solution.GetDocumentIdsWithFilePath(classDeclaration.SyntaxTree.FilePath).FirstOrDefault();
+        if (documentId is null) return solution;
+        var semanticModel = await solution.GetDocument(documentId).GetSemanticModelAsync(cancellationToken);
+        var aliasAttribute = classDeclaration.AttributeLists
+            .SelectMany(list => list.Attributes)
+            .FirstOrDefault(attribute => attribute.IsAttribute(Constants.AliasAttributeName));
+
+        var aliasName = aliasAttribute.ArgumentList.Arguments.First().ToString();
+        var newAliasName = GenerateUniqueAliasName(solution, aliasName);
+
+        #region -----------------
+        //var newAliasAttribute =
+        //    Attribute(
+        //        ParseName(Constants.AliasAttributeFullyQualifiedName))
+        //            .WithArgumentList(
+        //                AttributeArgumentList(
+        //                    SeparatedList(new[]
+        //                    {
+        //                        AttributeArgument(
+        //                            LiteralExpression(
+        //                                SyntaxKind.StringLiteralExpression,
+        //                                Literal(newAliasName)))
+        //                    })));
+        #endregion
+
+        var newAliasAttribute =
+           Attribute(
+               ParseName(Constants.AliasAttributeFullyQualifiedName))
+                   .WithArgumentList(
+                       ParseAttributeArgumentList($"(\"{newAliasName}\")"))
+                           .WithAdditionalAnnotations(Simplifier.Annotation);
+
+        var newClassDeclaration = classDeclaration.ReplaceNode(aliasAttribute, newAliasAttribute);
+        var newRoot = await classDeclaration.SyntaxTree.GetRootAsync(cancellationToken);
+        newRoot = newRoot.ReplaceNode(classDeclaration, newClassDeclaration);
+
+        return solution.WithDocumentSyntaxRoot(documentId, newRoot);
+    }
+
+    private static string GenerateUniqueAliasName(Solution solution, string aliasName)
+    {
+        var suffix = 1;
+        var newAliasName = aliasName;
+
+        while (AliasNameExistsInSolution(solution, newAliasName))
+        {
+            newAliasName = $"{aliasName}{suffix}";
+            suffix++;
+        }
+
+        return newAliasName;
+    }
+
+    private static bool AliasNameExistsInSolution(Solution solution, string aliasName)
+    {
+        foreach (var projectId in solution.ProjectIds)
+        {
+            var project = solution.GetProject(projectId);
+
+            foreach (var documentId in project.DocumentIds)
+            {
+                if (!solution.GetDocument(documentId).TryGetSyntaxRoot(out var root))
+                {
+                    continue;
+                }
+
+                var aliasAttributes = root.DescendantNodes().OfType<AttributeSyntax>()
+                    .Where(attribute => attribute.IsAttribute(Constants.AliasAttributeName));
+
+                foreach (var attribute in aliasAttributes)
+                {
+                    var attributeArgument = attribute.ArgumentList.Arguments.First();
+                    var aliasValue = attributeArgument.Expression.ToString();
+
+                    if (string.Equals(aliasValue, aliasName, StringComparison.Ordinal))
+                    {
+                        return true;
+                    }
+                }
+            }
+        }
+
+        return false;
+    }
 }
