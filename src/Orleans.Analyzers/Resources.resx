@@ -148,30 +148,21 @@
     <value>A single type is not allowed to have multiple constructors annotated with the [OrleansConstructor] attribute</value>
   </data>
   <data name="AddAliasAttributesDescription" xml:space="preserve">
-    <value>Add [Alias] attributes to specify well-known names that can be used to identify types or methods</value>
+    <value>Add [Alias] to specify well-known names that can be used to identify types or methods</value>
   </data>
   <data name="AddAliasAttributesTitle" xml:space="preserve">
-    <value>Add missing alias attributes</value>
+    <value>Add missing [Alias]</value>
   </data>
   <data name="AddAliasMessageFormat" xml:space="preserve">
-    <value>Add missing alias attributes</value>
+    <value>Add missing [Alias]</value>
   </data>
-  <data name="AliasClashDetectedDescription_Types" xml:space="preserve">
-    <value>The [Alias] attribute must be globally unique</value>
-  </data>
-  <data name="AliasClashDetectedMessageFormat_Types" xml:space="preserve">
-    <value>The alias "{0}" must be globally unique</value>
-  </data>
-  <data name="AliasClashDetectedTitle_Types" xml:space="preserve">
-    <value>The [Alias] attribute must be globally unique</value>
-  </data>
-  <data name="AliasClashDetectedDescription_Methods" xml:space="preserve">
+  <data name="AliasClashDetectedDescription" xml:space="preserve">
     <value>The [Alias] attribute must be unique to the declaring type</value>
   </data>
-  <data name="AliasClashDetectedMessageFormat_Methods" xml:space="preserve">
-    <value>The alias "{0}" must be unique to the declaring type "{1}"</value>
+  <data name="AliasClashDetectedMessageFormat" xml:space="preserve">
+    <value>Rename duplicated [Alias]</value>
   </data>
-  <data name="AliasClashDetectedTitle_Methods" xml:space="preserve">
-    <value>The [Alias] attribute must be unique to the declaring type</value>
+  <data name="AliasClashDetectedTitle" xml:space="preserve">
+    <value>Rename duplicated [Alias]</value>
   </data>
 </root>

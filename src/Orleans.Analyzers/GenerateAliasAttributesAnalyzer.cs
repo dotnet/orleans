@@ -89,8 +89,8 @@ public class GenerateAliasAttributesAnalyzer : DiagnosticAnalyzer
         builder.Add("TypeName", typeName);
 
         context.ReportDiagnostic(Diagnostic.Create(
-                       descriptor: Rule,
-                       location: location,
-                       properties: builder.ToImmutable()));
+            descriptor: Rule,
+            location: location,
+            properties: builder.ToImmutable()));
     }
 }

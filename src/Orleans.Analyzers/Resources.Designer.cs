@@ -79,7 +79,7 @@ namespace Orleans.Analyzers {
         }
         
         /// <summary>
-        ///   Looks up a localized string similar to Add [Alias] attributes to specify well-known names that can be used to identify types or methods.
+        ///   Looks up a localized string similar to Add [Alias] to specify well-known names that can be used to identify types or methods.
         /// </summary>
         internal static string AddAliasAttributesDescription {
             get {
@@ -88,7 +88,7 @@ namespace Orleans.Analyzers {
         }
         
         /// <summary>
-        ///   Looks up a localized string similar to Add missing alias attributes.
+        ///   Looks up a localized string similar to Add missing [Alias].
         /// </summary>
         internal static string AddAliasAttributesTitle {
             get {
@@ -97,7 +97,7 @@ namespace Orleans.Analyzers {
         }
         
         /// <summary>
-        ///   Looks up a localized string similar to Add missing alias attributes.
+        ///   Looks up a localized string similar to Add missing [Alias].
         /// </summary>
         internal static string AddAliasMessageFormat {
             get {
@@ -162,54 +162,27 @@ namespace Orleans.Analyzers {
         /// <summary>
         ///   Looks up a localized string similar to The [Alias] attribute must be unique to the declaring type.
         /// </summary>
-        internal static string AliasClashDetectedDescription_Methods {
+        internal static string AliasClashDetectedDescription {
             get {
-                return ResourceManager.GetString("AliasClashDetectedDescription_Methods", resourceCulture);
+                return ResourceManager.GetString("AliasClashDetectedDescription", resourceCulture);
             }
         }
         
         /// <summary>
-        ///   Looks up a localized string similar to The [Alias] attribute must be globally unique.
+        ///   Looks up a localized string similar to Rename duplicated [Alias].
         /// </summary>
-        internal static string AliasClashDetectedDescription_Types {
+        internal static string AliasClashDetectedMessageFormat {
             get {
-                return ResourceManager.GetString("AliasClashDetectedDescription_Types", resourceCulture);
+                return ResourceManager.GetString("AliasClashDetectedMessageFormat", resourceCulture);
             }
         }
         
         /// <summary>
-        ///   Looks up a localized string similar to The alias &quot;{0}&quot; must be unique to the declaring type &quot;{1}&quot;.
+        ///   Looks up a localized string similar to Rename duplicated [Alias].
         /// </summary>
-        internal static string AliasClashDetectedMessageFormat_Methods {
+        internal static string AliasClashDetectedTitle {
             get {
-                return ResourceManager.GetString("AliasClashDetectedMessageFormat_Methods", resourceCulture);
-            }
-        }
-        
-        /// <summary>
-        ///   Looks up a localized string similar to The alias &quot;{0}&quot; must be globally unique.
-        /// </summary>
-        internal static string AliasClashDetectedMessageFormat_Types {
-            get {
-                return ResourceManager.GetString("AliasClashDetectedMessageFormat_Types", resourceCulture);
-            }
-        }
-        
-        /// <summary>
-        ///   Looks up a localized string similar to The [Alias] attribute must be unique to the declaring type.
-        /// </summary>
-        internal static string AliasClashDetectedTitle_Methods {
-            get {
-                return ResourceManager.GetString("AliasClashDetectedTitle_Methods", resourceCulture);
-            }
-        }
-        
-        /// <summary>
-        ///   Looks up a localized string similar to The [Alias] attribute must be globally unique.
-        /// </summary>
-        internal static string AliasClashDetectedTitle_Types {
-            get {
-                return ResourceManager.GetString("AliasClashDetectedTitle_Types", resourceCulture);
+                return ResourceManager.GetString("AliasClashDetectedTitle", resourceCulture);
             }
         }
         
