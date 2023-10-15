@@ -36,20 +36,18 @@ public class AliasClashAttributeAnalyzer : DiagnosticAnalyzer
     private void CheckSyntaxNode(SyntaxNodeAnalysisContext context)
     {
         var interfaceDeclaration = (InterfaceDeclarationSyntax)context.Node;
-        if (!context.SemanticModel
-            .GetDeclaredSymbol(interfaceDeclaration, context.CancellationToken)
-            .ExtendsGrainInterface())
+        if (!interfaceDeclaration.ExtendsGrainInterface(context.SemanticModel))
         {
             return;
         }
 
-        List<AliasBag> bags = new();
+        List<AttributeArgumentBag<string>> bags = new();
         foreach (var methodDeclaration in interfaceDeclaration.Members.OfType<MethodDeclarationSyntax>())
         {
-            var attributes = GetAliasAttributes(methodDeclaration.AttributeLists);
+            var attributes = methodDeclaration.AttributeLists.GetAttributeSyntaxes(Constants.AliasAttributeName);
             foreach (var attribute in attributes)
             {
-                var bag = GetBag(attribute, context.SemanticModel);
+                var bag = attribute.GetArgumentBag<string>(context.SemanticModel);
                 if (bag != default)
                 {
                     bags.Add(bag);
@@ -58,7 +56,7 @@ public class AliasClashAttributeAnalyzer : DiagnosticAnalyzer
         }
 
         var duplicateAliases = bags
-           .GroupBy(alias => alias.Name)
+           .GroupBy(alias => alias.Value)
            .Where(group => group.Count() > 1)
            .Select(group => group.Key);
 
@@ -69,7 +67,7 @@ public class AliasClashAttributeAnalyzer : DiagnosticAnalyzer
 
         foreach (var duplicateAlias in duplicateAliases)
         {
-            var filteredBags = bags.Where(x => x.Name == duplicateAlias);
+            var filteredBags = bags.Where(x => x.Value == duplicateAlias);
             var duplicateCount = filteredBags.Count();
 
             if (duplicateCount > 1)
@@ -94,22 +92,4 @@ public class AliasClashAttributeAnalyzer : DiagnosticAnalyzer
             }
         }
     }
-
-    private static AliasBag GetBag(AttributeSyntax attribute, SemanticModel semanticModel)
-    {
-        var argument = attribute.ArgumentList?.Arguments.FirstOrDefault();
-        if (argument is null || argument.Expression is not { } expression)
-        {
-            return default;
-        }
-
-        var constantValue = semanticModel.GetConstantValue(expression);
-        return constantValue.HasValue && constantValue.Value is string aliasName ?
-            new(aliasName, attribute.GetLocation()) : default;
-    }
-
-    private static IEnumerable<AttributeSyntax> GetAliasAttributes(SyntaxList<AttributeListSyntax> attributeLists) =>
-        attributeLists
-            .SelectMany(attributeList => attributeList.Attributes)
-            .Where(attribute => attribute.IsAttribute(Constants.AliasAttributeName));
 }

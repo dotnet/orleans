@@ -203,5 +203,32 @@ namespace Orleans.Analyzers {
                 return ResourceManager.GetString("AtMostOneOrleansConstructorTitle", resourceCulture);
             }
         }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to The [Id] attribute must be unique to each members of the declaring type.
+        /// </summary>
+        internal static string IdClashDetectedDescription {
+            get {
+                return ResourceManager.GetString("IdClashDetectedDescription", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Substitute duplicated [Id] value with the correct unique identity of this member.
+        /// </summary>
+        internal static string IdClashDetectedMessageFormat {
+            get {
+                return ResourceManager.GetString("IdClashDetectedMessageFormat", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Substitute duplicated [Id] value with the correct unique identity of this member.
+        /// </summary>
+        internal static string IdClashDetectedTitle {
+            get {
+                return ResourceManager.GetString("IdClashDetectedTitle", resourceCulture);
+            }
+        }
     }
 }

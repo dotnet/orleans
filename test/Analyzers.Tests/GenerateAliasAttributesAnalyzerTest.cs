@@ -79,17 +79,6 @@ public class GenerateAliasAttributesAnalyzerTest : DiagnosticAnalyzerTestBase<Ge
         return VerifyHasNoDiagnostic(code);
     }
 
-    //public static IEnumerable<object[]> GrainInterfaces =>
-    //    new List<object[]>
-    //    {
-    //        new object[] { "Orleans.IGrain" },
-    //        new object[] { "Orleans.IGrainWithStringKey" },
-    //        new object[] { "Orleans.IGrainWithGuidKey" },
-    //        new object[] { "Orleans.IGrainWithGuidCompoundKey" },
-    //        new object[] { "Orleans.IGrainWithIntegerKey" },
-    //        new object[] { "Orleans.IGrainWithIntegerCompoundKey" }
-    //    };
-
     #endregion
 
     #region Classes, Structs, Records

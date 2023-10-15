@@ -37,9 +37,7 @@ public class GenerateAliasAttributesAnalyzer : DiagnosticAnalyzer
         // Interface types and their methods
         if (context.Node is InterfaceDeclarationSyntax { } interfaceDeclaration)
         {
-            if (!context.SemanticModel
-                .GetDeclaredSymbol(interfaceDeclaration, context.CancellationToken)
-                .ExtendsGrainInterface())
+            if (!interfaceDeclaration.ExtendsGrainInterface(context.SemanticModel))
             {
                 return;
             }
