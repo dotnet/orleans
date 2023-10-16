@@ -533,7 +533,7 @@ namespace Orleans.Storage
 
     public static class AzureTableGrainStorageFactory
     {
-        public static IGrainStorage Create(IServiceProvider services, string name)
+        public static AzureTableGrainStorage Create(IServiceProvider services, string name)
         {
             var optionsSnapshot = services.GetRequiredService<IOptionsMonitor<AzureTableStorageOptions>>();
             var clusterOptions = services.GetProviderClusterOptions(name);

@@ -1,4 +1,5 @@
 using System;
+using Microsoft.Extensions.DependencyInjection;
 using Orleans.Runtime;
 using Orleans.Streams;
 
@@ -31,7 +32,7 @@ namespace Orleans
                 throw new ArgumentNullException(nameof(name));
             }
 
-            return grain.GrainContext.ActivationServices.GetRequiredServiceByName<IStreamProvider>(name);
+            return grain.GrainContext.ActivationServices.GetRequiredKeyedService<IStreamProvider>(name);
         }
     }
 
@@ -53,7 +54,7 @@ namespace Orleans
                 throw new ArgumentNullException(nameof(name));
             }
 
-            return client.ServiceProvider.GetRequiredServiceByName<IStreamProvider>(name);
+            return client.ServiceProvider.GetRequiredKeyedService<IStreamProvider>(name);
         }
     }
 }

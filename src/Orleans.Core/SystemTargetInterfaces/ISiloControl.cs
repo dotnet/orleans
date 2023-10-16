@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using Orleans.Providers;
 using Orleans.Runtime;
 
 namespace Orleans
@@ -21,7 +22,7 @@ namespace Orleans
 
         Task<int> GetActivationCount();
 
-        Task<object> SendControlCommandToProvider(string providerTypeFullName, string providerName, int command, object arg);
+        Task<object> SendControlCommandToProvider<T>(string providerName, int command, object arg) where T : IControllable;
         Task<List<GrainId>> GetActiveGrains(GrainType grainType);
     }
 }

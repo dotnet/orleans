@@ -174,16 +174,6 @@ namespace Orleans.Runtime
                 participant?.Participate(this.siloLifecycle);
             }
 
-            // register all named lifecycle participants
-            var namedLifecycleParticipantCollection = this.Services.GetService<IKeyedServiceCollection<string,ILifecycleParticipant<ISiloLifecycle>>>();
-            if (namedLifecycleParticipantCollection?.GetServices(Services)?.Select(s => s.GetService(Services)) is { } namedParticipants)
-            {
-                foreach (ILifecycleParticipant<ISiloLifecycle> participant in namedParticipants)
-                {
-                    participant.Participate(this.siloLifecycle);
-                }
-            }
-
             // add self to lifecycle
             this.Participate(this.siloLifecycle);
 

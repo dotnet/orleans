@@ -23,7 +23,7 @@ namespace Orleans.Configuration.Overrides
         private static IOptions<TOptions> GetOverridableOption<TOptions>(this IServiceProvider services, string key)
             where TOptions : class, new()
         {
-            TOptions option = services.GetServiceByName<TOptions>(key);
+            TOptions option = services.GetKeyedService<TOptions>(key);
             return option != null
                 ? Options.Create(option)
                 : services.GetRequiredService<IOptions<TOptions>>();

@@ -347,7 +347,7 @@ namespace Orleans.Storage
 
     public static class AzureBlobGrainStorageFactory
     {
-        public static IGrainStorage Create(IServiceProvider services, string name)
+        public static AzureBlobGrainStorage Create(IServiceProvider services, string name)
         {
             var optionsMonitor = services.GetRequiredService<IOptionsMonitor<AzureBlobStorageOptions>>();
             var options = optionsMonitor.Get(name);

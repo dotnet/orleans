@@ -79,7 +79,7 @@ namespace Orleans.Storage
                 // First, try to get a IGrainStorageSerializer that was registered with 
                 // the same name as the storage provider
                 // If none is found, fallback to system wide default
-                options.GrainStorageSerializer = _serviceProvider.GetServiceByName<IGrainStorageSerializer>(name) ?? _serviceProvider.GetRequiredService<IGrainStorageSerializer>();
+                options.GrainStorageSerializer = _serviceProvider.GetKeyedService<IGrainStorageSerializer>(name) ?? _serviceProvider.GetRequiredService<IGrainStorageSerializer>();
             }
         }
     }

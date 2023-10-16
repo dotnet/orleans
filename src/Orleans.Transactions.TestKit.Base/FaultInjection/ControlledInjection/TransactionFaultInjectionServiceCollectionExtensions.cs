@@ -31,9 +31,9 @@ namespace Orleans.Hosting
         {
             configureOptions?.Invoke(services.AddOptions<AzureTableTransactionalStateOptions>(name));
 
-            services.TryAddSingleton<ITransactionalStateStorageFactory>(sp => sp.GetServiceByName<ITransactionalStateStorageFactory>(ProviderConstants.DEFAULT_STORAGE_PROVIDER_NAME));
-            services.AddSingletonNamedService<ITransactionalStateStorageFactory>(name, FaultInjectionAzureTableTransactionStateStorageFactory.Create);
-            services.AddSingletonNamedService<ILifecycleParticipant<ISiloLifecycle>>(name, (s, n) => (ILifecycleParticipant<ISiloLifecycle>)s.GetRequiredServiceByName<ITransactionalStateStorageFactory>(n));
+            services.TryAddSingleton<ITransactionalStateStorageFactory>(sp => sp.GetKeyedService<ITransactionalStateStorageFactory>(ProviderConstants.DEFAULT_STORAGE_PROVIDER_NAME));
+            services.AddKeyedSingleton<ITransactionalStateStorageFactory>(name, (sp, key) => FaultInjectionAzureTableTransactionStateStorageFactory.Create(sp, key as string));
+            services.AddKeyedSingleton<ILifecycleParticipant<ISiloLifecycle>>(name, (s, n) => (ILifecycleParticipant<ISiloLifecycle>)s.GetRequiredKeyedService<ITransactionalStateStorageFactory>(n));
 
             return services;
         }
