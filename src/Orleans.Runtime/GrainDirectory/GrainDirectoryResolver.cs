@@ -45,7 +45,7 @@ namespace Orleans.Runtime.GrainDirectory
 
         public IGrainDirectory Resolve(GrainType grainType) => this.directoryPerType.GetOrAdd(grainType, this.getGrainDirectoryInternal);
 
-        public bool HasNonDefaultDirectory(GrainType grainType) => !ReferenceEquals(Resolve(grainType), this.DefaultGrainDirectory);
+        public bool IsUsingDhtDirectory(GrainType grainType) => Resolve(grainType) == null;
 
         private IGrainDirectory GetGrainDirectoryPerType(GrainType grainType)
         {

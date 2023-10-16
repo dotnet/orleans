@@ -12,6 +12,8 @@ using TesterInternal;
 using TestExtensions;
 using Orleans.Internal;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
+using Orleans.Configuration;
 
 // ReSharper disable RedundantAssignment
 // ReSharper disable UnusedVariable
@@ -42,6 +44,10 @@ namespace UnitTests.StorageTests
                     hostBuilder.AddTestStorageProvider(MockStorageProviderName2, (sp, name) => ActivatorUtilities.CreateInstance<MockStorageProvider>(sp, name));
                     hostBuilder.AddTestStorageProvider(MockStorageProviderNameLowerCase, (sp, name) => ActivatorUtilities.CreateInstance<MockStorageProvider>(sp, name));
                     hostBuilder.AddTestStorageProvider(ErrorInjectorProviderName, (sp, name) => ActivatorUtilities.CreateInstance<ErrorInjectionStorageProvider>(sp));
+
+                    hostBuilder.Services.AddSingleton<OrleansGrainStorageSerializer>();
+                    hostBuilder.AddMemoryGrainStorage("OrleansSerializerMemoryStore", (OptionsBuilder<MemoryGrainStorageOptions> optionsBuilder) =>
+                        optionsBuilder.Configure<OrleansGrainStorageSerializer>((options, serializer) => options.GrainStorageSerializer = serializer));
                 }
             }
         }
@@ -158,7 +164,7 @@ namespace UnitTests.StorageTests
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Persistence"), TestCategory("Generics")]
-        public async Task Persistence_Grain_Activate_StoredValue_Generic() 
+        public async Task Persistence_Grain_Activate_StoredValue_Generic()
         {
             const string providerName = MockStorageProviderName1;
             Guid guid = Guid.NewGuid();
@@ -248,7 +254,7 @@ namespace UnitTests.StorageTests
             Assert.Equal(1, providerState.ProviderStateForTest.ReadCount); // StorageProvider #Reads
             Assert.Equal(0, providerState.ProviderStateForTest.WriteCount); // StorageProvider #Writes
             SetStoredValue(providerName, typeof(MockStorageProvider).FullName, DefaultGrainStateName, grain, "Field1", 42);
-            
+
             await grain.DoRead();
             providerState = GetStateForStorageProviderInUse(providerName, typeof(MockStorageProvider).FullName);
             Assert.Equal(2, providerState.ProviderStateForTest.ReadCount); // StorageProvider #Reads-2
@@ -256,7 +262,7 @@ namespace UnitTests.StorageTests
 
             Assert.Equal(42, providerState.LastStoredGrainState.Field1); // Store-Field1
         }
-        
+
         [Fact, TestCategory("Functional"), TestCategory("Persistence"), TestCategory("MemoryStore")]
         public async Task MemoryStore_Read_Write()
         {
@@ -620,7 +626,7 @@ namespace UnitTests.StorageTests
 
             Assert.Equal(expectedVal, val); // Returned value
             await SetErrorInjection(providerName, ErrorInjectionPoint.BeforeRead);
-            
+
             await CheckStorageProviderErrors(grain.DoRead);
 
             await SetErrorInjection(providerName, ErrorInjectionPoint.None);
@@ -749,7 +755,7 @@ namespace UnitTests.StorageTests
         {
             var target = this.HostedCluster.GrainFactory.GetGrain<IPersistenceProviderErrorGrain>(Guid.NewGuid());
             var proxy = this.HostedCluster.GrainFactory.GetGrain<IPersistenceProviderErrorProxyGrain>(Guid.NewGuid());
-            
+
             // Record the original activation ids.
             var targetActivationId = await target.GetActivationId();
             var proxyActivationId = await proxy.GetActivationId();
@@ -1179,6 +1185,32 @@ namespace UnitTests.StorageTests
             Assert.Equal(1, val);
         }
 
+        [Fact, TestCategory("Functional"), TestCategory("Persistence")]
+        public async Task SurrogatePersistence_TypeWithoutPublicConstructor_Read()
+        {
+            ISurrogateStateForTypeWithoutPublicConstructorGrain<ExternalTypeWithoutPublicConstructor> grain = HostedCluster.GrainFactory
+                .GetGrain<ISurrogateStateForTypeWithoutPublicConstructorGrain<ExternalTypeWithoutPublicConstructor>>(Guid.NewGuid());
+            ExternalTypeWithoutPublicConstructor instance = ExternalTypeWithoutPublicConstructor.Create(1);
+
+            await grain.SetState(instance);
+            ExternalTypeWithoutPublicConstructor val = await grain.GetState();
+
+            Assert.Equal(1, val.Field);
+        }
+
+        [Fact, TestCategory("Functional"), TestCategory("Persistence")]
+        public async Task Persistence_RecordTypeWithoutPublicParameterlessConstructor_Read()
+        {
+            IRecordTypeWithoutPublicParameterlessConstructorGrain<RecordTypeWithoutPublicParameterlessConstructor> grain = HostedCluster.GrainFactory
+                .GetGrain<IRecordTypeWithoutPublicParameterlessConstructorGrain<RecordTypeWithoutPublicParameterlessConstructor>>(Guid.NewGuid());
+            RecordTypeWithoutPublicParameterlessConstructor instance = new RecordTypeWithoutPublicParameterlessConstructor(1);
+
+            await grain.SetState(instance);
+            RecordTypeWithoutPublicParameterlessConstructor val = await grain.GetState();
+
+            Assert.Equal(1, val.Field);
+        }
+
         // ---------- Utility functions ----------
         private void SetStoredValue(string providerName, string providerTypeFullName, string grainType, IGrain grain, string fieldName, int newValue)
         {
@@ -1273,7 +1305,7 @@ namespace UnitTests.StorageTests
                     return providerState;
                 }
             }
-            
+
             return providerState;
         }
 

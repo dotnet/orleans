@@ -37,13 +37,13 @@ namespace Orleans.Runtime.GrainDirectory
             {
                 result = this._clientGrainLocator ??= _servicesProvider.GetRequiredService<ClientGrainLocator>();
             }
-            else if (this.grainDirectoryResolver.HasNonDefaultDirectory(grainType))
+            else if (this.grainDirectoryResolver.IsUsingDhtDirectory(grainType))
             {
-                result = this.cachedGrainLocator;
+                result = this.dhtGrainLocator;
             }
             else
             {
-                result = this.dhtGrainLocator;
+                result = this.cachedGrainLocator;
             }
 
             return result;

@@ -18,7 +18,6 @@ namespace UnitTests.GrainInterfaces
         Task DoDelete();
     }
 
-
     public interface IPersistenceTestGenericGrain<T> : IPersistenceTestGrain // IGrainWithGuidKey
     { }
     //    Task<bool> CheckStateInit();
@@ -37,7 +36,6 @@ namespace UnitTests.GrainInterfaces
         Task<int> DoRead();
         Task DoDelete();
     }
-    
 
     public interface IGrainStorageTestGrain : IGrainWithGuidKey
     {
@@ -226,6 +224,20 @@ namespace UnitTests.GrainInterfaces
             return i == filterValue;
 
         }
+    }
+
+    public interface ISurrogateStateForTypeWithoutPublicConstructorGrain<T> : IGrainWithGuidKey
+        where T : class
+    {
+        Task SetState(T state);
+        Task<T> GetState();
+    }
+
+    public interface IRecordTypeWithoutPublicParameterlessConstructorGrain<T> : IGrainWithGuidKey
+        where T : class
+    {
+        Task SetState(T state);
+        Task<T> GetState();
     }
 }
 // ReSharper restore InconsistentNaming
