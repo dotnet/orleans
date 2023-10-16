@@ -7,7 +7,7 @@ using static Orleans.Persistence.Cosmos.CosmosIdSanitizer;
 
 namespace Orleans.Persistence.Cosmos;
 
-internal class CosmosGrainStorage : IGrainStorage, ILifecycleParticipant<ISiloLifecycle>
+public class CosmosGrainStorage : IGrainStorage, ILifecycleParticipant<ISiloLifecycle>
 {
     private const string ANY_ETAG = "*";
     private const string KEY_STRING_SEPARATOR = "__";
@@ -401,10 +401,10 @@ internal class CosmosGrainStorage : IGrainStorage, ILifecycleParticipant<ISiloLi
 
 public static class CosmosStorageFactory
 {
-    public static IGrainStorage Create(IServiceProvider services, string name)
+    public static CosmosGrainStorage Create(IServiceProvider services, string name)
     {
         var optionsMonitor = services.GetRequiredService<IOptionsMonitor<CosmosGrainStorageOptions>>();
-        var partitionKeyProvider = services.GetServiceByName<IPartitionKeyProvider>(name)
+        var partitionKeyProvider = services.GetKeyedService<IPartitionKeyProvider>(name)
             ?? services.GetRequiredService<IPartitionKeyProvider>();
         var loggerFactory = services.GetRequiredService<ILoggerFactory>();
         var clusterOptions = services.GetRequiredService<IOptions<ClusterOptions>>();

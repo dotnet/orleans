@@ -69,7 +69,7 @@ namespace Orleans.Runtime.Providers
             var managerId = SystemTargetGrainId.Create(Constants.StreamPullingAgentManagerType, this.siloDetails.SiloAddress, streamProviderName);
             var pubsubOptions = this.ServiceProvider.GetOptionsByName<StreamPubSubOptions>(streamProviderName);
             var pullingAgentOptions = this.ServiceProvider.GetOptionsByName<StreamPullingAgentOptions>(streamProviderName);
-            var filter = this.ServiceProvider.GetServiceByName<IStreamFilter>(streamProviderName) ?? new NoOpStreamFilter();
+            var filter = this.ServiceProvider.GetKeyedService<IStreamFilter>(streamProviderName) ?? new NoOpStreamFilter();
             var manager = new PersistentStreamPullingManager(
                 managerId,
                 streamProviderName,
@@ -97,7 +97,7 @@ namespace Orleans.Runtime.Providers
         {
             try
             {
-                var balancer = this.ServiceProvider.GetServiceByName<IStreamQueueBalancer>(streamProviderName) ??this.ServiceProvider.GetService<IStreamQueueBalancer>();
+                var balancer = this.ServiceProvider.GetKeyedService<IStreamQueueBalancer>(streamProviderName) ??this.ServiceProvider.GetService<IStreamQueueBalancer>();
                 if (balancer == null)
                     throw new ArgumentOutOfRangeException("balancerType", $"Cannot create stream queue balancer for StreamProvider: {streamProviderName}.Please configure your stream provider with a queue balancer.");
                 this.logger.LogInformation(

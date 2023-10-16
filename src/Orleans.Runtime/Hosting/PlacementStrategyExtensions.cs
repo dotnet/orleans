@@ -1,6 +1,7 @@
 using System;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Runtime;
+using Orleans.Runtime.Hosting;
 using Orleans.Runtime.Placement;
 
 namespace Orleans.Hosting
@@ -41,15 +42,15 @@ namespace Orleans.Hosting
             where TStrategy : PlacementStrategy, new()
             where TDirector : class, IPlacementDirector
         {
-            services.AddSingletonNamedService<PlacementStrategy, TStrategy>(typeof(TStrategy).Name);
-            services.AddSingletonKeyedService<Type, IPlacementDirector, TDirector>(typeof(TStrategy));
+            services.AddSingleton(new NamedService<PlacementStrategy>(typeof(TStrategy).Name, new TStrategy()));
+            services.AddKeyedSingleton<IPlacementDirector, TDirector>(typeof(TStrategy));
         }
 
         private static void AddPlacementDirector<TStrategy>(this IServiceCollection services, Func<IServiceProvider, IPlacementDirector> createDirector)
             where TStrategy : PlacementStrategy, new()
         {
-            services.AddSingletonNamedService<PlacementStrategy, TStrategy>(typeof(TStrategy).Name);
-            services.AddSingletonKeyedService<Type, IPlacementDirector>(typeof(TStrategy), (sp, type) => createDirector(sp));
+            services.AddSingleton(new NamedService<PlacementStrategy>(typeof(TStrategy).Name, new TStrategy()));
+            services.AddKeyedSingleton<IPlacementDirector>(typeof(TStrategy), (sp, type) => createDirector(sp));
         }
     }
 }

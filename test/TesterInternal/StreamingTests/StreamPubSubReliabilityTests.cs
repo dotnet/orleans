@@ -32,8 +32,8 @@ namespace UnitTests.StreamingTests
                     .ConfigureServices(services =>
                     {
                         services.AddSingleton<ErrorInjectionStorageProvider>();
-                        services.AddSingletonNamedService<IGrainStorage, ErrorInjectionStorageProvider>(PubSubStoreProviderName);
-                        services.AddSingletonNamedService<IControllable, ErrorInjectionStorageProvider>(PubSubStoreProviderName);
+                        services.AddKeyedSingleton<IGrainStorage, ErrorInjectionStorageProvider>(PubSubStoreProviderName);
+                        services.AddKeyedSingleton<IControllable, ErrorInjectionStorageProvider>(PubSubStoreProviderName);
                     });
             }
         }

@@ -33,8 +33,8 @@ namespace Orleans.Hosting
             services.AddOptions<CustomStorageLogConsistencyOptions>(name)
                     .Configure(options => options.PrimaryCluster = primaryCluster);
             services.ConfigureNamedOptionForLogging<CustomStorageLogConsistencyOptions>(name)
-                .AddSingletonNamedService<ILogViewAdaptorFactory>(name, LogConsistencyProviderFactory.Create)
-                .TryAddSingleton<ILogViewAdaptorFactory>(sp => sp.GetServiceByName<ILogViewAdaptorFactory>(ProviderConstants.DEFAULT_STORAGE_PROVIDER_NAME));
+                .AddKeyedSingleton<ILogViewAdaptorFactory>(name, (sp, key) => LogConsistencyProviderFactory.Create(sp, key as string))
+                .TryAddSingleton<ILogViewAdaptorFactory>(sp => sp.GetKeyedService<ILogViewAdaptorFactory>(ProviderConstants.DEFAULT_STORAGE_PROVIDER_NAME));
         }
     }
 }

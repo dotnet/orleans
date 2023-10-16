@@ -45,7 +45,7 @@ namespace Orleans.Storage
 
     public static class AdoNetGrainStorageFactory
     {
-        public static IGrainStorage Create(IServiceProvider services, string name)
+        public static AdoNetGrainStorage Create(IServiceProvider services, string name)
         {
             var optionsMonitor = services.GetRequiredService<IOptionsMonitor<AdoNetGrainStorageOptions>>();
             var clusterOptions = services.GetProviderClusterOptions(name);

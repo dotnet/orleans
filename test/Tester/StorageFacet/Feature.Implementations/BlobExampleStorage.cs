@@ -49,7 +49,7 @@ namespace Tester.StorageFacet.Implementations
         {
             builder.ConfigureServices(services =>
             {
-                services.AddTransientNamedService<IExampleStorageFactory, BlobExampleStorageFactory>(name);
+                services.AddKeyedTransient<IExampleStorageFactory, BlobExampleStorageFactory>(name);
                 services.AddTransient(typeof(BlobExampleStorage<>));
             });
         }
