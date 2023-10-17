@@ -4,6 +4,7 @@ using Xunit;
 
 namespace Analyzers.Tests;
 
+[TestCategory("BVT"), TestCategory("Analyzer")]
 public class IdClashAttributeAnalyzerTest : DiagnosticAnalyzerTestBase<IdClashAttributeAnalyzer>
 {
     private async Task VerifyHasDiagnostic(string code, int diagnosticsCount)
