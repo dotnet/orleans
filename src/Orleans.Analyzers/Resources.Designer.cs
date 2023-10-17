@@ -230,5 +230,32 @@ namespace Orleans.Analyzers {
                 return ResourceManager.GetString("IdClashDetectedTitle", resourceCulture);
             }
         }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Remove [Alias].
+        /// </summary>
+        internal static string IncorrectAliasUseMessageFormat {
+            get {
+                return ResourceManager.GetString("IncorrectAliasUseMessageFormat", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Remove [Alias].
+        /// </summary>
+        internal static string IncorrectAliasUseTitle {
+            get {
+                return ResourceManager.GetString("IncorrectAliasUseTitle", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to The [Alias] attribute should not be used on grain implementations.
+        /// </summary>
+        internal static string IncorrectAliasUseTitleDescription {
+            get {
+                return ResourceManager.GetString("IncorrectAliasUseTitleDescription", resourceCulture);
+            }
+        }
     }
 }

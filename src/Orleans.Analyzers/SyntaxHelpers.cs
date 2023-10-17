@@ -171,6 +171,41 @@ namespace Orleans.Analyzers
             return false;
         }
 
+        public static bool InheritsGrainClass(this ClassDeclarationSyntax declaration, SemanticModel semanticModel)
+        {
+            var baseTypes = declaration.BaseList?.Types;
+            if (baseTypes is null)
+            {
+                return false;
+            }
+
+            foreach (var baseTypeSyntax in baseTypes)
+            {
+                var baseTypeInfo = semanticModel.GetTypeInfo(baseTypeSyntax.Type);
+                var baseTypeSymbol = baseTypeInfo.Type;
+
+                // Check if its Orleans.Grain
+                if (Constants.GrainBaseFullyQualifiedName.Equals(baseTypeSymbol.ToString(), StringComparison.Ordinal))
+                {
+                    return true;
+                }
+
+                // Check if its Orleans.Grain<TState>
+                if (baseTypeSymbol is INamedTypeSymbol namedType && namedType.IsGenericType)
+                {
+                    foreach (var typeArg in namedType.TypeArguments)
+                    {
+                        if (Constants.GrainBaseFullyQualifiedName.Equals(typeArg.ToString(), StringComparison.Ordinal))
+                        {
+                            return true;
+                        }
+                    }
+                }
+            }
+
+            return false;
+        }
+
         public static AttributeArgumentBag<T> GetArgumentBag<T>(this AttributeSyntax attribute, SemanticModel semanticModel)
         {
             if (attribute is null)
