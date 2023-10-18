@@ -41,7 +41,7 @@ namespace Orleans.Runtime
             _services = services;
             _gatewayManager = gatewayManager;
             this.LocalGrainManifest = clientManifestProvider.ClientManifest;
-            _current = new ClusterManifest(MajorMinorVersion.Zero, ImmutableDictionary<SiloAddress, GrainManifest>.Empty, ImmutableArray.Create(this.LocalGrainManifest));
+            _current = new ClusterManifest(MajorMinorVersion.MinValue, ImmutableDictionary<SiloAddress, GrainManifest>.Empty, ImmutableArray.Create(this.LocalGrainManifest));
             _updates = new AsyncEnumerable<ClusterManifest>(
                 initialValue: _current,
                 updateValidator: (previous, proposed) => previous is null || proposed.Version > previous.Version,

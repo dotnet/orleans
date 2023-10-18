@@ -27,6 +27,7 @@ namespace UnitTests.GrainInterfaces
 
         Task StartTimer();
 
+        [ResponseTimeout("00:00:01")]
         Task DoLongAction(TimeSpan timespan, string str);
     }
 
