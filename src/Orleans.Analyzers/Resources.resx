@@ -174,13 +174,13 @@
   <data name="IdClashDetectedTitle" xml:space="preserve">
     <value>Substitute duplicated [Id] value with the correct unique identity of this member</value>
   </data>
-  <data name="IncorrectAliasUseMessageFormat" xml:space="preserve">
-    <value>Remove [Alias]</value>
+  <data name="IncorrectAttributeUseMessageFormat" xml:space="preserve">
+    <value>Remove attribute [{0}]</value>
   </data>
-  <data name="IncorrectAliasUseTitle" xml:space="preserve">
-    <value>Remove [Alias]</value>
+  <data name="IncorrectAttributeUseTitle" xml:space="preserve">
+    <value>Remove attribute</value>
   </data>
-  <data name="IncorrectAliasUseTitleDescription" xml:space="preserve">
-    <value>The [Alias] attribute should not be used on grain implementations</value>
+  <data name="IncorrectAttributeUseTitleDescription" xml:space="preserve">
+    <value>This attribute should not be used on grain implementations</value>
   </data>
 </root>

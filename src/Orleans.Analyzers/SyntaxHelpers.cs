@@ -181,24 +181,19 @@ namespace Orleans.Analyzers
 
             foreach (var baseTypeSyntax in baseTypes)
             {
-                var baseTypeInfo = semanticModel.GetTypeInfo(baseTypeSyntax.Type);
-                var baseTypeSymbol = baseTypeInfo.Type;
-
-                // Check if its Orleans.Grain
-                if (Constants.GrainBaseFullyQualifiedName.Equals(baseTypeSymbol.ToString(), StringComparison.Ordinal))
+                var baseTypeSymbol = semanticModel.GetTypeInfo(baseTypeSyntax.Type).Type;
+                if (baseTypeSymbol is INamedTypeSymbol currentTypeSymbol)
                 {
-                    return true;
-                }
-
-                // Check if its Orleans.Grain<TState>
-                if (baseTypeSymbol is INamedTypeSymbol namedType && namedType.IsGenericType)
-                {
-                    foreach (var typeArg in namedType.TypeArguments)
+                    if (currentTypeSymbol.IsGenericType &&
+                        currentTypeSymbol.TypeParameters.Length == 1 &&
+                        currentTypeSymbol.BaseType is { } baseBaseTypeSymbol)
                     {
-                        if (Constants.GrainBaseFullyQualifiedName.Equals(typeArg.ToString(), StringComparison.Ordinal))
-                        {
-                            return true;
-                        }
+                        currentTypeSymbol = baseBaseTypeSymbol;
+                    }
+
+                    if (Constants.GrainBaseFullyQualifiedName.Equals(currentTypeSymbol.ToDisplayString(NullableFlowState.None), StringComparison.Ordinal))
+                    {
+                        return true;
                     }
                 }
             }

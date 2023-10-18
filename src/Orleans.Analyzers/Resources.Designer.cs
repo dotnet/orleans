@@ -232,29 +232,29 @@ namespace Orleans.Analyzers {
         }
         
         /// <summary>
-        ///   Looks up a localized string similar to Remove [Alias].
+        ///   Looks up a localized string similar to Remove attribute [{0}].
         /// </summary>
-        internal static string IncorrectAliasUseMessageFormat {
+        internal static string IncorrectAttributeUseMessageFormat {
             get {
-                return ResourceManager.GetString("IncorrectAliasUseMessageFormat", resourceCulture);
+                return ResourceManager.GetString("IncorrectAttributeUseMessageFormat", resourceCulture);
             }
         }
         
         /// <summary>
-        ///   Looks up a localized string similar to Remove [Alias].
+        ///   Looks up a localized string similar to Remove attribute.
         /// </summary>
-        internal static string IncorrectAliasUseTitle {
+        internal static string IncorrectAttributeUseTitle {
             get {
-                return ResourceManager.GetString("IncorrectAliasUseTitle", resourceCulture);
+                return ResourceManager.GetString("IncorrectAttributeUseTitle", resourceCulture);
             }
         }
         
         /// <summary>
-        ///   Looks up a localized string similar to The [Alias] attribute should not be used on grain implementations.
+        ///   Looks up a localized string similar to This attribute should not be used on grain implementations.
         /// </summary>
-        internal static string IncorrectAliasUseTitleDescription {
+        internal static string IncorrectAttributeUseTitleDescription {
             get {
-                return ResourceManager.GetString("IncorrectAliasUseTitleDescription", resourceCulture);
+                return ResourceManager.GetString("IncorrectAttributeUseTitleDescription", resourceCulture);
             }
         }
     }

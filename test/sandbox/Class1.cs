@@ -1,15 +1,19 @@
 using Orleans;
 
-namespace sandbox;
-
-[Alias("IMyGrain")]
-public interface IMyGrain : IGrainWithStringKey
+namespace sandbox
 {
+    public class A
+    {
 
-}
+    }
 
-[Alias("MyGrain")]
-public class MyGrain : Grain
-{
+    public class Class1 : Grain
+    {
 
+    }
+
+    public class Class2 : Grain<A>
+    {
+
+    }
 }
