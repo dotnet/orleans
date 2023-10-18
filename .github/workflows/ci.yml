@@ -23,6 +23,7 @@ jobs:
       uses: actions/setup-dotnet@v3
       with:
         dotnet-version: |
+          3.1.x
           8.0.x
     - name: Build
       run: dotnet build
@@ -54,6 +55,7 @@ jobs:
       uses: actions/setup-dotnet@v3
       with:
         dotnet-version: |
+          3.1.x
           8.0.x
     - name: Test
       run: dotnet test --filter "Category=${{ matrix.provider }}&(Category=BVT|Category=SlowBVT|Category=Functional)" --blame-hang-timeout 10m --logger "trx" -- -parallel none -noshadow
@@ -93,6 +95,7 @@ jobs:
       uses: actions/setup-dotnet@v3
       with:
         dotnet-version: |
+          3.1.x
           8.0.x
     - name: Test
       run: dotnet test --filter "Category=${{ matrix.provider }}&(Category=BVT|Category=SlowBVT|Category=Functional)" --blame-hang-timeout 10m --logger "trx" -- -parallel none -noshadow
@@ -128,6 +131,7 @@ jobs:
       uses: actions/setup-dotnet@v3
       with:
         dotnet-version: |
+          3.1.x
           8.0.x
     - name: Test
       run: dotnet test --filter "Category=${{ matrix.provider }}&(Category=BVT|Category=SlowBVT|Category=Functional)" --blame-hang-timeout 10m --logger "trx" -- -parallel none -noshadow
@@ -167,6 +171,7 @@ jobs:
       uses: actions/setup-dotnet@v3
       with:
         dotnet-version: |
+          3.1.x
           8.0.x
     - name: Test
       run: dotnet test --filter "Category=${{ matrix.provider }}&(Category=BVT|Category=SlowBVT|Category=Functional)" --blame-hang-timeout 10m --logger "trx" -- -parallel none -noshadow
@@ -204,6 +209,7 @@ jobs:
       uses: actions/setup-dotnet@v3
       with:
         dotnet-version: |
+          3.1.x
           8.0.x
     - name: Test
       run: dotnet test --filter "Category=${{ matrix.provider }}&Category=${{ matrix.suite }}" --framework ${{ matrix.framework }} --blame-hang-timeout 10m --logger "trx" -- -parallel none -noshadow
@@ -286,6 +292,7 @@ jobs:
       uses: actions/setup-dotnet@v3
       with:
         dotnet-version: |
+          3.1.x
           8.0.x
     - name: Test
       run: dotnet test --filter "Category=${{ matrix.provider }}&(Category=BVT|Category=SlowBVT|Category=Functional)" --blame-hang-timeout 10m --logger "trx" -- -parallel none -noshadow
@@ -322,6 +329,7 @@ jobs:
       uses: actions/setup-dotnet@v3
       with:
         dotnet-version: |
+          3.1.x
           8.0.x
     - name: Test
       run: dotnet test --filter "Category=${{ matrix.provider }}&(Category=BVT|Category=SlowBVT|Category=Functional)" --blame-hang-timeout 10m --logger "trx" -- -parallel none -noshadow
@@ -359,6 +367,7 @@ jobs:
       uses: actions/setup-dotnet@v3
       with:
         dotnet-version: |
+          3.1.x
           8.0.x
     - name: Test
       run: dotnet test --filter "Category=${{ matrix.provider }}&(Category=BVT|Category=SlowBVT|Category=Functional)" --blame-hang-timeout 10m --logger "trx" -- -parallel none -noshadow
