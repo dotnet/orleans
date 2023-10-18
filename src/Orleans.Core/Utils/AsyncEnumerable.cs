@@ -23,15 +23,16 @@ namespace Orleans.Runtime.Utilities
 
         private readonly object updateLock = new object();
         private readonly Func<T, T, bool> updateValidator;
+        private readonly Action<T> onPublished;
         private Element current;
         
-        public AsyncEnumerable(Func<T, T, bool> updateValidator, T initial)
+        public AsyncEnumerable(T initialValue, Func<T, T, bool> updateValidator, Action<T> onPublished)
         {
             this.updateValidator = updateValidator;
-            this.current = new Element(initial);
+            this.current = new Element(initialValue);
+            this.onPublished = onPublished;
+            onPublished(initialValue);
         }
-
-        public Action<T> OnPublished { get; set; }
 
         public bool TryPublish(T value) => this.TryPublish(new Element(value)) == PublishResult.Success;
         
@@ -65,7 +66,7 @@ namespace Orleans.Runtime.Utilities
 
                 var curr = this.current;
                 Interlocked.Exchange(ref this.current, newItem);
-                if (newItem.IsValid) this.OnPublished?.Invoke(newItem.Value);
+                if (newItem.IsValid) this.onPublished(newItem.Value);
                 curr.SetNext(newItem);
 
                 return PublishResult.Success;
@@ -100,7 +101,10 @@ namespace Orleans.Runtime.Utilities
 
             public AsyncEnumerator(Element initial, CancellationToken cancellation)
             {
-                if (!initial.IsValid) this.current = initial;
+                if (!initial.IsValid)
+                {
+                    this.current = initial;
+                }
                 else
                 {
                     var result = Element.CreateInitial();
@@ -118,16 +122,19 @@ namespace Orleans.Runtime.Utilities
 
             async ValueTask<bool> IAsyncEnumerator<T>.MoveNextAsync()
             {
-                Task<Element> next;
+                if (this.current.IsDisposed)
+                {
+                    return false;
+                }
+
+                Task<Element> next = this.current.NextAsync();
                 if (this.cancellation != default)
                 {
-                    next = this.current.NextAsync();
                     var result = await Task.WhenAny(this.cancellation, next);
-                    if (ReferenceEquals(result, this.cancellation)) return false;
-                }
-                else
-                {
-                    next = this.current.NextAsync();
+                    if (ReferenceEquals(result, this.cancellation))
+                    {
+                        return false;
+                    }
                 }
 
                 this.current = await next;
@@ -185,7 +192,7 @@ namespace Orleans.Runtime.Utilities
 
             public void SetNext(Element next) => this.next.SetResult(next);
 
-            private void ThrowInvalidInstance() => throw new InvalidOperationException("This instance does not have a value set.");
+            private static void ThrowInvalidInstance() => throw new InvalidOperationException("This instance does not have a value set.");
         }
     }
 }

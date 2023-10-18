@@ -43,11 +43,9 @@ namespace Orleans.Runtime
             this.LocalGrainManifest = clientManifestProvider.ClientManifest;
             _current = new ClusterManifest(MajorMinorVersion.Zero, ImmutableDictionary<SiloAddress, GrainManifest>.Empty, ImmutableArray.Create(this.LocalGrainManifest));
             _updates = new AsyncEnumerable<ClusterManifest>(
-                (previous, proposed) => previous is null || proposed.Version == MajorMinorVersion.Zero || proposed.Version > previous.Version,
-                _current)
-            {
-                OnPublished = update => Interlocked.Exchange(ref _current, update)
-            };
+                initialValue: _current,
+                updateValidator: (previous, proposed) => previous is null || proposed.Version > previous.Version,
+                onPublished: update => Interlocked.Exchange(ref _current, update));
         }
 
         /// <inheritdoc />

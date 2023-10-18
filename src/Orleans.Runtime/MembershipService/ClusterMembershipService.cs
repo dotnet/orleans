@@ -25,11 +25,9 @@ namespace Orleans.Runtime
         {
             this.snapshot = membershipTableManager.MembershipTableSnapshot.CreateClusterMembershipSnapshot();
             this.updates = new AsyncEnumerable<ClusterMembershipSnapshot>(
-                (previous, proposed) => proposed.Version == MembershipVersion.MinValue || proposed.Version > previous.Version,
-                this.snapshot)
-            {
-                OnPublished = update => Interlocked.Exchange(ref this.snapshot, update)
-            };
+                initialValue: this.snapshot,
+                updateValidator: (previous, proposed) => proposed.Version > previous.Version,
+                onPublished: update => Interlocked.Exchange(ref this.snapshot, update));
             this.membershipTableManager = membershipTableManager;
             this.log = log;
             this.fatalErrorHandler = fatalErrorHandler;
