@@ -66,6 +66,12 @@ public class GenerateAliasAttributesAnalyzer : DiagnosticAnalyzer
         // Rest of types: class, struct, record
         if (context.Node is TypeDeclarationSyntax { } typeDeclaration)
         {
+            if (typeDeclaration is ClassDeclarationSyntax classDeclaration &&
+                classDeclaration.InheritsGrainClass(context.SemanticModel))
+            {
+                return;
+            }
+
             if (!typeDeclaration.HasAttribute(Constants.GenerateSerializerAttributeName))
             {
                 return;

@@ -15,7 +15,7 @@ public class IncorrectAttributeUseAnalyzerTest : DiagnosticAnalyzerTestBase<Inco
         var diagnostic = diagnostics.First();
 
         Assert.Equal(IncorrectAttributeUseAnalyzer.RuleId, diagnostic.Id);
-        Assert.Equal(DiagnosticSeverity.Warning, diagnostic.Severity);
+        Assert.Equal(DiagnosticSeverity.Error, diagnostic.Severity);
     }
 
     private async Task VerifyHasNoDiagnostic(string code)

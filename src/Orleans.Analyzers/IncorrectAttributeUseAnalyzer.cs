@@ -14,7 +14,7 @@ public class IncorrectAttributeUseAnalyzer : DiagnosticAnalyzer
     private static readonly DiagnosticDescriptor Rule = new(
        id: RuleId,
        category: "Usage",
-       defaultSeverity: DiagnosticSeverity.Warning,
+       defaultSeverity: DiagnosticSeverity.Error,
        isEnabledByDefault: true,
        title: new LocalizableResourceString(nameof(Resources.IncorrectAttributeUseTitle), Resources.ResourceManager, typeof(Resources)),
        messageFormat: new LocalizableResourceString(nameof(Resources.IncorrectAttributeUseMessageFormat), Resources.ResourceManager, typeof(Resources)),
@@ -26,11 +26,7 @@ public class IncorrectAttributeUseAnalyzer : DiagnosticAnalyzer
     {
         context.EnableConcurrentExecution();
         context.ConfigureGeneratedCodeAnalysis(GeneratedCodeAnalysisFlags.Analyze | GeneratedCodeAnalysisFlags.ReportDiagnostics);
-        context.RegisterSyntaxNodeAction(CheckSyntaxNode,
-            SyntaxKind.ClassDeclaration,
-            SyntaxKind.StructDeclaration,
-            SyntaxKind.RecordDeclaration,
-            SyntaxKind.RecordStructDeclaration);
+        context.RegisterSyntaxNodeAction(CheckSyntaxNode, SyntaxKind.ClassDeclaration);
     }
 
     private void CheckSyntaxNode(SyntaxNodeAnalysisContext context)
