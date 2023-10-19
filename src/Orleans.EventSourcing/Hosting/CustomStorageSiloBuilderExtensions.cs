@@ -29,6 +29,7 @@ namespace Orleans.Hosting
 
         internal static void AddCustomStorageBasedLogConsistencyProvider(this IServiceCollection services, string name, string primaryCluster)
         {
+            services.AddLogConsistencyProtocolServicesFactory();
             services.AddOptions<CustomStorageLogConsistencyOptions>(name)
                     .Configure(options => options.PrimaryCluster = primaryCluster);
             services.ConfigureNamedOptionForLogging<CustomStorageLogConsistencyOptions>(name)
