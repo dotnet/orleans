@@ -79,7 +79,7 @@ namespace Orleans
             var span = AlwaysActive
             ? TimeSpan.FromDays(short.MaxValue)
             : TimeSpan.FromDays(Days) + TimeSpan.FromHours(Hours) + TimeSpan.FromMinutes(Minutes);
-            return span <= TimeSpan.Zero
+            return span < MinAgeLimit
                 ? MinAgeLimit
                 : span;
         }
