@@ -106,6 +106,33 @@ namespace NonSilo.Tests
         }
 
         /// <summary>
+        /// ClusterMembershipOptions.NumProbedSilos must be greater than ClusterMembershipOptions.NumVotesForDeathDeclaration.
+        /// </summary>
+        [Fact]
+        public async Task SiloBuilder_ClusterMembershipOptionsValidators()
+        {
+            await Assert.ThrowsAsync<OrleansConfigurationException>(async () =>
+            {
+                await new HostBuilder().UseOrleans((ctx, siloBuilder) =>
+                {
+                    siloBuilder
+                        .UseLocalhostClustering()
+                        .Configure<ClusterMembershipOptions>(options => { options.NumVotesForDeathDeclaration = 10; options.NumProbedSilos = 1; });
+                }).RunConsoleAsync();
+            });
+
+            await Assert.ThrowsAsync<OrleansConfigurationException>(async () =>
+            {
+                await new HostBuilder().UseOrleans((ctx, siloBuilder) =>
+                {
+                    siloBuilder
+                        .UseLocalhostClustering()
+                        .Configure<ClusterMembershipOptions>(options => { options.NumVotesForDeathDeclaration = 0; });
+                }).RunConsoleAsync();
+            });
+        }
+
+        /// <summary>
         /// Ensures <see cref="LoadSheddingValidator"/> fails when LoadSheddingLimit greater than 100.
         /// </summary>
         [Fact]
