@@ -2,6 +2,7 @@ using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Diagnostics;
+using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
@@ -77,6 +78,22 @@ public class AliasClashAttributeAnalyzer : DiagnosticAnalyzer
 
                 foreach (var bag in filteredBags)
                 {
+                    var condition = true;
+                    while (condition)
+                    {
+                        var newAlias = $"{duplicateAlias}{suffix}";
+                        var exists = bags.Any(x => x.Value.Equals(newAlias, StringComparison.Ordinal));
+
+                        if (exists)
+                        {
+                            suffix++;
+                        }
+                        else
+                        {
+                            condition = false;
+                        }
+                    }
+
                     var builder = ImmutableDictionary.CreateBuilder<string, string>();
 
                     builder.Add("AliasName", duplicateAlias);
