@@ -115,7 +115,7 @@ namespace DefaultCluster.Tests.General
         }
 
         [Fact, TestCategory("SlowBVT"), TestCategory("Echo"), TestCategory("Timeout")]
-        public void EchoGrain_Timeout_Result()
+        public async Task EchoGrain_Timeout_Result()
         {
             var grain = this.GrainFactory.GetGrain<IEchoTaskGrain>(Guid.NewGuid());
             
@@ -123,17 +123,22 @@ namespace DefaultCluster.Tests.General
             TimeSpan delay25 = TimeSpan.FromSeconds(25);
             Stopwatch sw = new Stopwatch();
             sw.Start();
-            try
+            await Task.Run(() =>
             {
-                // Note that this method purposely uses Task.Result.
-                int res = grain.BlockingCallTimeoutAsync(delay25).Result;
-                Assert.Fail($"BlockingCallTimeout should not have completed successfully, but returned {res}");
-            }
-            catch (Exception exc)
-            {
-                while (exc is AggregateException) exc = exc.InnerException;
-                Assert.IsAssignableFrom<TimeoutException>(exc);
-            }
+                try
+                {
+                    // Note that this method purposely uses Task.Result.
+#pragma warning disable xUnit1031 // Do not use blocking task operations in test method
+                    var res = grain.BlockingCallTimeoutAsync(delay25).Result;
+#pragma warning restore xUnit1031 // Do not use blocking task operations in test method
+                    Assert.Fail($"BlockingCallTimeout should not have completed successfully, but returned {res}");
+                }
+                catch (Exception exc)
+                {
+                    while (exc is AggregateException) exc = exc.InnerException;
+                    Assert.IsAssignableFrom<TimeoutException>(exc);
+                }
+            });
             sw.Stop();
             Assert.True(TimeIsLonger(sw.Elapsed, delay5), $"Elapsed time out of range: {sw.Elapsed}");
             Assert.True(TimeIsShorter(sw.Elapsed, delay25), $"Elapsed time out of range: {sw.Elapsed}");

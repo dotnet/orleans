@@ -117,7 +117,7 @@ namespace DefaultCluster.Tests
             // there is a race in the test here. If run in debugger, the invocation can actually finish OK
             Stopwatch stopwatch = Stopwatch.StartNew();
 
-            Assert.False(promise.Wait(1000), "The task shouldn't have completed yet.");
+            Assert.False(promise.WaitAsync(1000), "The task shouldn't have completed yet.");
 
             stopwatch.Stop();
             Assert.True(stopwatch.ElapsedMilliseconds >= 900, $"Waited less than 900ms: ({stopwatch.ElapsedMilliseconds}ms)"); // check that we waited at least 0.9 second
