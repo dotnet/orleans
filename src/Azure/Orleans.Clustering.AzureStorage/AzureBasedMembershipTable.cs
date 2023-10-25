@@ -121,7 +121,7 @@ namespace Orleans.Runtime.MembershipService
             {
                 logger.LogWarning((int)TableStorageErrorCode.AzureTable_23,
                     exc,
-                    "Intermediate error inserting entry {Data} tableVersion {TableVersion} to the table {TableName}.", entry.ToString(), tableVersion == null ? "null" : tableVersion.ToString(), tableManager.TableName);
+                    "Intermediate error inserting entry {Data} tableVersion {TableVersion} to the table {TableName}.", entry.ToString(), tableVersion is null ? "null" : tableVersion.ToString(), tableManager.TableName);
                 throw;
             }
         }
@@ -148,7 +148,7 @@ namespace Orleans.Runtime.MembershipService
             {
                 logger.LogWarning((int)TableStorageErrorCode.AzureTable_25,
                     exc,
-                    "Intermediate error updating entry {Data} tableVersion {TableVersion} to the table {TableName}.", entry.ToString(), tableVersion == null ? "null" : tableVersion.ToString(), tableManager.TableName);
+                    "Intermediate error updating entry {Data} tableVersion {TableVersion} to the table {TableName}.", entry.ToString(), tableVersion is null ? "null" : tableVersion.ToString(), tableManager.TableName);
                 throw;
             }
         }

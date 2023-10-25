@@ -1,19 +1,19 @@
 //#define REREAD_STATE_AFTER_WRITE_FAILED
 
 using System.Diagnostics;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
+using Orleans.Configuration;
+using Orleans.Internal;
 using Orleans.Runtime;
 using Orleans.Storage;
 using Orleans.TestingHost;
+using TesterInternal;
+using TestExtensions;
 using UnitTests.GrainInterfaces;
 using UnitTests.Grains;
 using Xunit;
 using Xunit.Abstractions;
-using TesterInternal;
-using TestExtensions;
-using Orleans.Internal;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Options;
-using Orleans.Configuration;
 
 // ReSharper disable RedundantAssignment
 // ReSharper disable UnusedVariable
@@ -1190,12 +1190,13 @@ namespace UnitTests.StorageTests
         {
             ISurrogateStateForTypeWithoutPublicConstructorGrain<ExternalTypeWithoutPublicConstructor> grain = HostedCluster.GrainFactory
                 .GetGrain<ISurrogateStateForTypeWithoutPublicConstructorGrain<ExternalTypeWithoutPublicConstructor>>(Guid.NewGuid());
-            ExternalTypeWithoutPublicConstructor instance = ExternalTypeWithoutPublicConstructor.Create(1);
+            ExternalTypeWithoutPublicConstructor instance = ExternalTypeWithoutPublicConstructor.Create(1, 2);
 
             await grain.SetState(instance);
             ExternalTypeWithoutPublicConstructor val = await grain.GetState();
 
-            Assert.Equal(1, val.Field);
+            Assert.Equal(1, val.Field1);
+            Assert.Equal(2, val.Field2);
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Persistence")]

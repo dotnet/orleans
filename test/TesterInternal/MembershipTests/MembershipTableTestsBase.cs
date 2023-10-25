@@ -286,7 +286,7 @@ namespace UnitTests.MembershipTests
                         "Calling UpdateRow with Entry = {Entry} correct eTag = {ETag} old version={TableVersion}",
                         siloEntry,
                         etagBefore,
-                        tableVersion != null ? tableVersion.ToString() : "null");
+                        tableVersion?.ToString() ?? "null");
                     ok = await membershipTable.UpdateRow(siloEntry, etagBefore, tableVersion);
                     Assert.False(ok, $"row update should have failed - Table Data = {tableData}");
                     tableData = await membershipTable.ReadAll();
@@ -298,7 +298,7 @@ namespace UnitTests.MembershipTests
                     "Calling UpdateRow with Entry = {Entry} correct eTag = {ETag} correct version={TableVersion}",
                     siloEntry,
                     etagBefore,
-                    tableVersion != null ? tableVersion.ToString() : "null");
+                    tableVersion?.ToString() ?? "null");
 
                 ok = await membershipTable.UpdateRow(siloEntry, etagBefore, tableVersion);
 
@@ -308,7 +308,7 @@ namespace UnitTests.MembershipTests
                     "Calling UpdateRow with Entry = {Entry} old eTag = {ETag} old version={TableVersion}",
                     siloEntry,
                     etagBefore,
-                    tableVersion != null ? tableVersion.ToString() : "null");
+                    tableVersion?.ToString() ?? "null");
                 ok = await membershipTable.UpdateRow(siloEntry, etagBefore, tableVersion);
                 Assert.False(ok, $"row update should have failed - Table Data = {tableData}");
 
@@ -326,7 +326,7 @@ namespace UnitTests.MembershipTests
                         "Calling UpdateRow with Entry = {Entry} correct eTag = {ETag} old version={TableVersion}",
                         siloEntry,
                         etagAfter,
-                        tableVersion != null ? tableVersion.ToString() : "null");
+                        tableVersion?.ToString() ?? "null");
 
                     ok = await membershipTable.UpdateRow(siloEntry, etagAfter, tableVersion);
 
@@ -419,6 +419,7 @@ namespace UnitTests.MembershipTests
             // compare that the value is close to what we passed in, but not exactly, as the underlying store can set its own precision settings
             // (ie: in SQL Server this is defined as datetime2(3), so we don't expect precision to account for less than 0.001s values)
             Assert.True((amAliveTime - member.Item1.IAmAliveTime).Duration() < TimeSpan.FromSeconds(2), (amAliveTime - member.Item1.IAmAliveTime).Duration().ToString());
+            Assert.Equal(newTableVersion.Version, tableData.Version.Version);
         }
 
         protected async Task MembershipTable_CleanupDefunctSiloEntries(bool extendedProtocol = true)

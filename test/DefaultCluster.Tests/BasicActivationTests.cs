@@ -1,5 +1,4 @@
 using System.Globalization;
-using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using TestExtensions;
 using UnitTests.GrainInterfaces;
@@ -15,28 +14,25 @@ namespace DefaultCluster.Tests.General
         {
         }
 
-        private TimeSpan GetResponseTimeout() => this.Client.ServiceProvider.GetRequiredService<OutsideRuntimeClient>().GetResponseTimeout();
-        private void SetResponseTimeout(TimeSpan value) => this.Client.ServiceProvider.GetRequiredService<OutsideRuntimeClient>().SetResponseTimeout(value);
-
         [Fact, TestCategory("BVT"), TestCategory("ActivateDeactivate"), TestCategory("GetGrain")]
-        public void BasicActivation_ActivateAndUpdate()
+        public async Task BasicActivation_ActivateAndUpdate()
         {
             long g1Key = GetRandomGrainId();
             long g2Key = GetRandomGrainId();
             ITestGrain g1 = this.GrainFactory.GetGrain<ITestGrain>(g1Key);
             ITestGrain g2 = this.GrainFactory.GetGrain<ITestGrain>(g2Key);
             Assert.Equal(g1Key, g1.GetPrimaryKeyLong());
-            Assert.Equal(g1Key, g1.GetKey().Result);
-            Assert.Equal(g1Key.ToString(), g1.GetLabel().Result);
-            Assert.Equal(g2Key, g2.GetKey().Result);
-            Assert.Equal(g2Key.ToString(), g2.GetLabel().Result);
+            Assert.Equal(g1Key, await g1.GetKey());
+            Assert.Equal(g1Key.ToString(), await g1.GetLabel());
+            Assert.Equal(g2Key, await g2.GetKey());
+            Assert.Equal(g2Key.ToString(), await g2.GetLabel());
 
-            g1.SetLabel("one").Wait();
-            Assert.Equal("one", g1.GetLabel().Result);
-            Assert.Equal(g2Key.ToString(), g2.GetLabel().Result);
+            await g1.SetLabel("one");
+            Assert.Equal("one", await g1.GetLabel());
+            Assert.Equal(g2Key.ToString(), await g2.GetLabel());
 
             ITestGrain g1a = this.GrainFactory.GetGrain<ITestGrain>(g1Key);
-            Assert.Equal("one", g1a.GetLabel().Result);
+            Assert.Equal("one", await g1a.GetLabel());
         }
 
         [Fact, TestCategory("BVT"), TestCategory("ActivateDeactivate"), TestCategory("GetGrain")]
@@ -210,49 +206,35 @@ namespace DefaultCluster.Tests.General
 
         [Fact, TestCategory("SlowBVT"), TestCategory("ActivateDeactivate"),
          TestCategory("Reentrancy")]
-        public void BasicActivation_Reentrant_RecoveryAfterExpiredMessage()
+        public async Task BasicActivation_Reentrant_RecoveryAfterExpiredMessage()
         {
             List<Task> promises = new List<Task>();
-            TimeSpan prevTimeout = this.GetResponseTimeout();
+            TimeSpan timeout = TimeSpan.FromMilliseconds(1000);
+
+            ITestGrain grain = this.GrainFactory.GetGrain<ITestGrain>(GetRandomGrainId());
+            int num = 10;
+            for (long i = 0; i < num; i++)
+            {
+                Task task = grain.DoLongAction(
+                    TimeSpan.FromMilliseconds(timeout.TotalMilliseconds * 3),
+                    "A_" + i);
+                promises.Add(task);
+            }
             try
             {
-                // set short response time and ask to do long operation, to trigger expired msgs in the silo queues.
-                TimeSpan shortTimeout = TimeSpan.FromMilliseconds(1000);
-                this.SetResponseTimeout(shortTimeout);
-
-                ITestGrain grain = this.GrainFactory.GetGrain<ITestGrain>(GetRandomGrainId());
-                int num = 10;
-                for (long i = 0; i < num; i++)
-                {
-                    Task task = grain.DoLongAction(
-                        TimeSpan.FromMilliseconds(shortTimeout.TotalMilliseconds * 3),
-                        "A_" + i);
-                    promises.Add(task);
-                }
-                try
-                {
-                    Task.WhenAll(promises).Wait();
-                }
-                catch (Exception)
-                {
-                    this.Logger.LogInformation("Done with stress iteration.");
-                }
-
-                // wait a bit to make sure expired msgs in the silo is trigered.
-                Thread.Sleep(TimeSpan.FromSeconds(10));
-
-                // set the regular response time back, expect msgs ot succeed.
-                this.SetResponseTimeout(prevTimeout);
-                
-                this.Logger.LogInformation("About to send a next legit request that should succeed.");
-                grain.DoLongAction(TimeSpan.FromMilliseconds(1), "B_" + 0).Wait();
-                this.Logger.LogInformation("The request succeeded.");
+                await Task.WhenAll(promises);
             }
-            finally
+            catch (Exception)
             {
-                // set the regular response time back, expect msgs ot succeed.
-                this.SetResponseTimeout(prevTimeout);
+                this.Logger.LogInformation("Done with stress iteration.");
             }
+
+            // wait a bit to make sure expired msgs in the silo is trigered.
+            await Task.Delay(TimeSpan.FromSeconds(10));
+            
+            this.Logger.LogInformation("About to send a next legit request that should succeed.");
+            await grain.DoLongAction(TimeSpan.FromMilliseconds(1), "B_" + 0);
+            this.Logger.LogInformation("The request succeeded.");
         }
 
         [Fact, TestCategory("BVT"), TestCategory("RequestContext"), TestCategory("GetGrain")]

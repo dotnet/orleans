@@ -434,7 +434,14 @@ namespace Orleans.Serialization.Serializers
 
             if (!_activators.TryGetValue(searchType, out var activatorType))
             {
-                activatorType = typeof(DefaultActivator<>).MakeGenericType(concreteType);
+                if (searchType.IsValueType)
+                {
+                    activatorType = typeof(DefaultValueTypeActivator<>).MakeGenericType(concreteType);
+                }
+                else
+                {
+                    activatorType = typeof(DefaultReferenceTypeActivator<>).MakeGenericType(concreteType);
+                }
             }
             else if (activatorType.IsGenericTypeDefinition)
             {
