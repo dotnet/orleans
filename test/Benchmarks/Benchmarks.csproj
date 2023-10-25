@@ -28,7 +28,10 @@
     <PackageReference Include="SpanJson" />
     <PackageReference Include="Hyperion" />
     <PackageReference Include="Google.Protobuf" />
-    <PackageReference Include="Grpc.Tools" />
+    <PackageReference Include="Grpc.Tools">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
   </ItemGroup>
 
   <ItemGroup>

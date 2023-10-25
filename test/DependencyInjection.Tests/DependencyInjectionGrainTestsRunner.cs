@@ -115,9 +115,9 @@ namespace DependencyInjection.Tests
 
             await Task.WhenAll(calls);
             string expected = await calls[0];
-            foreach (var value in calls)
+            foreach (var callTask in calls)
             {
-                Assert.Equal(expected, await value);
+                Assert.Equal(expected, await callTask);
             }
 
             await grain1.DoDeactivate();

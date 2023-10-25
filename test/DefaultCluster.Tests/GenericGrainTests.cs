@@ -280,11 +280,11 @@ namespace DefaultCluster.Tests.General
             await grain.SetB(b);
 
             Task<string> stringPromise = grain.GetAxB();
-            Assert.Equal(expected, stringPromise.Result);
+            Assert.Equal(expected, await stringPromise);
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Generics")]
-        public void Generic_SimpleGrainControlFlow_Blocking()
+        public async Task Generic_SimpleGrainControlFlow_Blocking()
         {
             var a = Random.Shared.Next(100);
             var b = a + 1;
@@ -293,12 +293,16 @@ namespace DefaultCluster.Tests.General
             var grain =  this.GrainFactory.GetGrain<ISimpleGenericGrain1<int>>(grainId++);
 
             // explicitly use .Wait() and .Result to make sure the client does not deadlock in these cases.
-            grain.SetA(a).Wait();
-
-            grain.SetB(b).Wait();
+            await Task.Run(() =>
+            {
+#pragma warning disable xUnit1031 // Do not use blocking task operations in test method
+                grain.SetA(a).Wait();
+                grain.SetB(b).Wait();
+#pragma warning restore xUnit1031 // Do not use blocking task operations in test method
+            });
 
             Task<string> stringPromise = grain.GetAxB();
-            Assert.Equal(expected, stringPromise.Result);
+            Assert.Equal(expected, await stringPromise);
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Generics")]

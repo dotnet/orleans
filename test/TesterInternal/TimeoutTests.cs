@@ -29,7 +29,7 @@ namespace UnitTests
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Timeout")]
-        public void Timeout_LongMethod()
+        public async Task Timeout_LongMethod()
         {
             bool finished = false;
             var grainName = typeof (ErrorGrain).FullName;
@@ -45,7 +45,8 @@ namespace UnitTests
             stopwatch.Start();
             try
             {
-                finished = promise.Wait(timeout.Multiply(3));
+                await promise.WaitAsync(timeout.Multiply(3));
+                finished = true;
                 Assert.Fail("Should have thrown");
             }
             catch (Exception exc)
@@ -67,7 +68,7 @@ namespace UnitTests
             try
             {
                 stopwatch = new Stopwatch();
-                promise.Wait();
+                await promise;
                 Assert.Fail("Should have thrown");
             }
             catch (Exception exc)

@@ -33,7 +33,7 @@ namespace DefaultCluster.Tests
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Providers")]
-        public void Providers_TestExtensions()
+        public async Task Providers_TestExtensions()
         {
             IExtensionTestGrain grain = this.fixture.GrainFactory.GetGrain<IExtensionTestGrain>(GetRandomGrainId());
             ITestExtension extension = grain.AsReference<ITestExtension>();
@@ -42,7 +42,7 @@ namespace DefaultCluster.Tests
             try
             {
                 var p1 = extension.CheckExtension_1();
-                p1.Wait();
+                await p1;
                 exceptionThrown = false;
             }
             catch (GrainExtensionNotInstalledException)
@@ -72,13 +72,13 @@ namespace DefaultCluster.Tests
             }
 
             var p2 = grain.InstallExtension("test");
-            p2.Wait();
+            await p2;
 
             try
             {
                 var p1 = extension.CheckExtension_1();
-                p1.Wait();
-                Assert.Equal("test", p1.Result);
+                await p1;
+                Assert.Equal("test", await p1);
             }
             catch (Exception exc)
             {
@@ -88,8 +88,8 @@ namespace DefaultCluster.Tests
             try
             {
                 var p1 = extension.CheckExtension_2();
-                p1.Wait();
-                Assert.Equal("23", p1.Result);
+                await p1;
+                Assert.Equal("23", await p1);
             }
             catch (Exception exc)
             {

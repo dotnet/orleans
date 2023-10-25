@@ -61,7 +61,21 @@ namespace UnitTests.General
         {
             IExceptionGrain grain = this.fixture.GrainFactory.GetGrain<IExceptionGrain>(GetRandomGrainId());
 
-            var aggEx = await Assert.ThrowsAsync<AggregateException>(grain.ThrowsInvalidOperationException);
+            // Explicitly using .Wait() instead of await the task to avoid any modification of the inner exception
+            var originalException = await Task.Run(() => {
+                try
+                {
+#pragma warning disable xUnit1031 // Do not use blocking task operations in test method
+                    grain.ThrowsInvalidOperationException().Wait();
+#pragma warning restore xUnit1031 // Do not use blocking task operations in test method
+                    return null;
+                }
+                catch (Exception exception)
+                {
+                    return exception;
+                }
+            });
+            var aggEx = Assert.IsType<AggregateException>(originalException);
 
             var exception = aggEx.InnerException;
             output.WriteLine(exception.ToString());
@@ -161,29 +175,29 @@ namespace UnitTests.General
         }
 
         [Fact(Skip = "Implementation of issue #1378 is still pending"), TestCategory("BVT")]
-        public async void ExceptionPropagationForwardsEntireAggregateException()
+        public async Task ExceptionPropagationForwardsEntireAggregateException()
         {
             IExceptionGrain grain = this.fixture.GrainFactory.GetGrain<IExceptionGrain>(GetRandomGrainId());
             var grainCall = grain.ThrowsMultipleExceptionsAggregatedInFaultedTask();
 
-            var exception = await Task.Run(() =>
+            var originalException = await Task.Run(() =>
             {
                 try
                 {
+#pragma warning disable xUnit1031 // Do not use blocking task operations in test method
                     // use Wait() so that we get the entire AggregateException ('await' would just catch the first inner exception)
                     // Do not use Assert.Throws to avoid any tampering of the AggregateException itself from the test framework
-#pragma warning disable xUnit1031 // Do not use blocking task operations in test method
                     grainCall.Wait();
 #pragma warning restore xUnit1031 // Do not use blocking task operations in test method
                     return null;
                 }
-                catch (AggregateException exception)
+                catch (Exception exception)
                 {
                     return exception;
                 }
             });
+            var exception = Assert.IsType<AggregateException>(originalException);
 
-            Assert.IsType<AggregateException>(exception);
             output.WriteLine(exception.ToString());
 
             // make sure that all exceptions in the task are present, and not just the first one.

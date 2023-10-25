@@ -19,15 +19,14 @@ namespace DefaultCluster.Tests.General
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Cast")]
-        public void RWReferences()
+        public async Task RWReferences()
         {
             writer = this.GrainFactory.GetGrain<IMultifacetWriter>(GetRandomGrainId());
             reader = writer.AsReference<IMultifacetReader>();
             
             int x = 1234;
-            bool ok = writer.SetValue(x).Wait(timeout);
-            if (!ok) throw new TimeoutException();
-            int y = reader.GetValue().Result;
+            await writer.SetValue(x).WaitAsync(timeout);
+            int y = await reader.GetValue();
             Assert.Equal(x, y);
         }
 
@@ -48,8 +47,8 @@ namespace DefaultCluster.Tests.General
             IMultifacetTestGrain grain = this.GrainFactory.GetGrain<IMultifacetTestGrain>(GetRandomGrainId());
             IMultifacetWriter writer = await factory.GetWriter(grain /*"MultifacetFactory"*/);
             IMultifacetReader reader = await factory.GetReader(grain /*"MultifacetFactory"*/);
-            writer.SetValue(5).Wait();
-            int v = reader.GetValue().Result;
+            await writer.SetValue(5);
+            int v = await reader.GetValue();
             Assert.Equal(5, v);
             
         }
@@ -59,12 +58,12 @@ namespace DefaultCluster.Tests.General
         {
             IMultifacetFactoryTestGrain factory = this.GrainFactory.GetGrain<IMultifacetFactoryTestGrain>(GetRandomGrainId());
             IMultifacetTestGrain grain = this.GrainFactory.GetGrain<IMultifacetTestGrain>(GetRandomGrainId());
-            factory.SetReader(grain).Wait();
-            factory.SetWriter(grain).Wait();
+            await factory.SetReader(grain);
+            await factory.SetWriter(grain);
             IMultifacetWriter writer = await factory.GetWriter();
             IMultifacetReader reader = await factory.GetReader();
-            writer.SetValue(10).Wait();
-            int v = reader.GetValue().Result;
+            await writer.SetValue(10);
+            int v = await reader.GetValue();
             Assert.Equal(10, v);
         }
     }

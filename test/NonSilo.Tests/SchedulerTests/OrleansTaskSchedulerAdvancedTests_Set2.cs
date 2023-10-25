@@ -62,7 +62,7 @@ namespace UnitTests.SchedulerTests
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Scheduler")]
-        public void ActivationSched_NewTask_ContinueWith_Wrapped()
+        public async Task ActivationSched_NewTask_ContinueWith_Wrapped()
         {
             var workItemGroup = SchedulingHelper.CreateWorkItemGroupForTesting(context, loggerFactory);
             TaskScheduler scheduler = workItemGroup.TaskScheduler;
@@ -90,8 +90,7 @@ namespace UnitTests.SchedulerTests
                 return t1;
             });
             wrapped.Start(scheduler);
-            bool ok = wrapped.Unwrap().Wait(TimeSpan.FromSeconds(2));
-            Assert.True(ok, "Finished OK");
+            await wrapped.Unwrap().WaitAsync(TimeSpan.FromSeconds(2));
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Scheduler")]
@@ -322,10 +321,12 @@ namespace UnitTests.SchedulerTests
                     this.output.WriteLine("Task-1 Started");
                     Assert.Equal(scheduler, TaskScheduler.Current);
                     int num1 = 1;
+#pragma warning disable xUnit1031 // Do not use blocking task operations in test method
                     while (!pause1.Task.Result) // Infinite busy loop
                     {
                         num1 = Random.Shared.Next();
                     }
+#pragma warning restore xUnit1031 // Do not use blocking task operations in test method
                     this.output.WriteLine("Task-1 Done");
                     return num1;
                 });
@@ -334,10 +335,12 @@ namespace UnitTests.SchedulerTests
                     this.output.WriteLine("Task-2 Started");
                     Assert.Equal(scheduler, TaskScheduler.Current);
                     int num2 = 2;
+#pragma warning disable xUnit1031 // Do not use blocking task operations in test method
                     while (!pause2.Task.Result) // Infinite busy loop
                     {
                         num2 = Random.Shared.Next();
                     }
+#pragma warning restore xUnit1031 // Do not use blocking task operations in test method
                     this.output.WriteLine("Task-2 Done");
                     return num2;
                 });
@@ -625,7 +628,7 @@ namespace UnitTests.SchedulerTests
                     Assert.Fail("Result did not arrive before timeout " + waitCheckTime);
                 }
 
-                bool ok = resultHandles[i].Task.Result;
+                bool ok = await resultHandles[i].Task;
                 
                 try
                 {

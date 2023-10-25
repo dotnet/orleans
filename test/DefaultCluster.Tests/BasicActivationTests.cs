@@ -1,10 +1,9 @@
 using System.Globalization;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using TestExtensions;
 using UnitTests.GrainInterfaces;
 using Xunit;
-
-#pragma warning disable 618
 
 namespace DefaultCluster.Tests.General
 {
@@ -13,6 +12,9 @@ namespace DefaultCluster.Tests.General
         public BasicActivationTests(DefaultClusterFixture fixture) : base(fixture)
         {
         }
+
+        private TimeSpan GetResponseTimeout() => this.Client.ServiceProvider.GetRequiredService<OutsideRuntimeClient>().GetResponseTimeout();
+        private void SetResponseTimeout(TimeSpan value) => this.Client.ServiceProvider.GetRequiredService<OutsideRuntimeClient>().SetResponseTimeout(value);
 
         [Fact, TestCategory("BVT"), TestCategory("ActivateDeactivate"), TestCategory("GetGrain")]
         public async Task BasicActivation_ActivateAndUpdate()
@@ -209,32 +211,46 @@ namespace DefaultCluster.Tests.General
         public async Task BasicActivation_Reentrant_RecoveryAfterExpiredMessage()
         {
             List<Task> promises = new List<Task>();
-            TimeSpan timeout = TimeSpan.FromMilliseconds(1000);
-
-            ITestGrain grain = this.GrainFactory.GetGrain<ITestGrain>(GetRandomGrainId());
-            int num = 10;
-            for (long i = 0; i < num; i++)
-            {
-                Task task = grain.DoLongAction(
-                    TimeSpan.FromMilliseconds(timeout.TotalMilliseconds * 3),
-                    "A_" + i);
-                promises.Add(task);
-            }
+            TimeSpan prevTimeout = this.GetResponseTimeout();
             try
             {
-                await Task.WhenAll(promises);
-            }
-            catch (Exception)
-            {
-                this.Logger.LogInformation("Done with stress iteration.");
-            }
+                // set short response time and ask to do long operation, to trigger expired msgs in the silo queues.
+                TimeSpan shortTimeout = TimeSpan.FromMilliseconds(1000);
+                this.SetResponseTimeout(shortTimeout);
 
-            // wait a bit to make sure expired msgs in the silo is trigered.
-            await Task.Delay(TimeSpan.FromSeconds(10));
-            
-            this.Logger.LogInformation("About to send a next legit request that should succeed.");
-            await grain.DoLongAction(TimeSpan.FromMilliseconds(1), "B_" + 0);
-            this.Logger.LogInformation("The request succeeded.");
+                ITestGrain grain = this.GrainFactory.GetGrain<ITestGrain>(GetRandomGrainId());
+                int num = 10;
+                for (long i = 0; i < num; i++)
+                {
+                    Task task = grain.DoLongAction(
+                        TimeSpan.FromMilliseconds(shortTimeout.TotalMilliseconds * 3),
+                        "A_" + i);
+                    promises.Add(task);
+                }
+                try
+                {
+                    await Task.WhenAll(promises);
+                }
+                catch (Exception)
+                {
+                    this.Logger.LogInformation("Done with stress iteration.");
+                }
+
+                // wait a bit to make sure expired msgs in the silo is trigered.
+                Thread.Sleep(TimeSpan.FromSeconds(10));
+
+                // set the regular response time back, expect msgs ot succeed.
+                this.SetResponseTimeout(prevTimeout);
+                
+                this.Logger.LogInformation("About to send a next legit request that should succeed.");
+                await grain.DoLongAction(TimeSpan.FromMilliseconds(1), "B_" + 0);
+                this.Logger.LogInformation("The request succeeded.");
+            }
+            finally
+            {
+                // set the regular response time back, expect msgs ot succeed.
+                this.SetResponseTimeout(prevTimeout);
+            }
         }
 
         [Fact, TestCategory("BVT"), TestCategory("RequestContext"), TestCategory("GetGrain")]
@@ -249,5 +265,3 @@ namespace DefaultCluster.Tests.General
         }
     }
 }
-
-#pragma warning restore 618
