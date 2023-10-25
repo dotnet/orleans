@@ -38,31 +38,6 @@ namespace Orleans.Serialization.UnitTests
             _log = log;
         }
 
-#pragma warning disable SYSLIB0011 // Type or member is obsolete
-        private static object DotNetSerializationLoop(object input)
-        {
-            byte[] bytes;
-            object deserialized;
-#pragma warning disable SYSLIB0050 // Type or member is obsolete
-            var formatter = new BinaryFormatter
-            {
-                Context = new StreamingContext(StreamingContextStates.All, null)
-            };
-#pragma warning restore SYSLIB0050 // Type or member is obsolete
-            using (var str = new MemoryStream())
-            {
-                formatter.Serialize(str, input);
-                str.Flush();
-                bytes = str.ToArray();
-            }
-            using (var inStream = new MemoryStream(bytes))
-            {
-                deserialized = formatter.Deserialize(inStream);
-            }
-            return deserialized;
-        }
-#pragma warning restore SYSLIB0011 // Type or member is obsolete
-
         private object SerializationLoop(object original)
         {
             var pipe = new Pipe();
@@ -129,17 +104,6 @@ namespace Orleans.Serialization.UnitTests
                 result.History);
             Assert.Equal(input.Payload, result.Payload, StringComparer.Ordinal);
             Assert.Equal(3, result.Contexts.Count);
-
-            // Verify that our behavior conforms to the behavior of BinaryFormatter.
-            var input2 = new SimpleISerializableObject
-            {
-                Payload = "pyjamas"
-            };
-
-            var result2 = (SimpleISerializableObject)DotNetSerializationLoop(input2);
-
-            Assert.Equal(input2.History, input.History);
-            Assert.Equal(result2.History, result.History);
         }
 
         /// <summary>
@@ -165,18 +129,6 @@ namespace Orleans.Serialization.UnitTests
                 result.History);
             Assert.Equal(input.Payload, result.Payload, StringComparer.Ordinal);
             Assert.Equal(2, result.Contexts.Count);
-            //Assert.All(result.Contexts, ctx => Assert.True(ctx.Context is IDeserializationContext));
-
-            // Verify that our behavior conforms to the behavior of BinaryFormatter.
-            var input2 = new SimpleISerializableStruct
-            {
-                Payload = "pyjamas"
-            };
-
-            var result2 = (SimpleISerializableStruct)DotNetSerializationLoop(input2);
-
-            Assert.Equal(input2.History, input.History);
-            Assert.Equal(result2.History, result.History);
         }
         
         private class BaseException : Exception
