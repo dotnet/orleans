@@ -311,8 +311,12 @@ namespace Orleans.Runtime.Messaging
                                     ThreadPool.UnsafeQueueUserWorkItem(handler, preferLocal: true);
                                 }
                             }
-                            catch (Exception exception) when (HandleReceiveMessageFailure(message, exception))
+                            catch (Exception exception)
                             {
+                                if (!HandleReceiveMessageFailure(message, exception))
+                                {
+                                    throw;
+                                }   
                             }
                         } while (requiredBytes == 0);
                     }
@@ -374,8 +378,12 @@ namespace Orleans.Runtime.Messaging
                             message = null;
                         }
                     }
-                    catch (Exception exception) when (HandleSendMessageFailure(message, exception))
+                    catch (Exception exception)
                     {
+                        if (!HandleSendMessageFailure(message, exception))
+                        {
+                            throw;
+                        }
                     }
 
                     var flushResult = await output.FlushAsync();
