@@ -288,7 +288,6 @@ namespace Orleans.Runtime.Messaging
             {
                 var input = this._transport.Input;
                 var requiredBytes = 0;
-                Message message = default;
                 while (true)
                 {
                     var readResult = await input.ReadAsync();
@@ -298,6 +297,7 @@ namespace Orleans.Runtime.Messaging
                     {
                         do
                         {
+                            Message message = default;
                             try
                             {
                                 int headerLength, bodyLength;
@@ -309,7 +309,6 @@ namespace Orleans.Runtime.Messaging
                                     var handler = MessageHandlerPool.Get();
                                     handler.Set(message, this);
                                     ThreadPool.UnsafeQueueUserWorkItem(handler, preferLocal: true);
-                                    message = null;
                                 }
                             }
                             catch (Exception exception) when (this.HandleReceiveMessageFailure(message, exception))
