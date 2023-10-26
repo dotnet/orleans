@@ -311,7 +311,7 @@ namespace Orleans.Runtime.Messaging
                                     ThreadPool.UnsafeQueueUserWorkItem(handler, preferLocal: true);
                                 }
                             }
-                            catch (Exception exception) when (this.HandleReceiveMessageFailure(message, exception))
+                            catch (Exception exception) when (HandleReceiveMessageFailure(message, exception))
                             {
                             }
                         } while (requiredBytes == 0);
@@ -374,9 +374,8 @@ namespace Orleans.Runtime.Messaging
                             message = null;
                         }
                     }
-                    catch (Exception exception) when (message != default)
+                    catch (Exception exception) when (HandleSendMessageFailure(message, exception))
                     {
-                        this.OnMessageSerializationFailure(message, exception);
                     }
 
                     var flushResult = await output.FlushAsync();
@@ -443,7 +442,7 @@ namespace Orleans.Runtime.Messaging
         /// <returns><see langword="true"/> if the exception should not be caught and <see langword="false"/> if it should be caught.</returns>
         private bool HandleReceiveMessageFailure(Message message, Exception exception)
         {
-            this.Log.LogWarning(
+            this.Log.LogError(
                 exception,
                 "Exception reading message {Message} from remote endpoint {Remote} to local endpoint {Local}",
                 message,
@@ -451,7 +450,7 @@ namespace Orleans.Runtime.Messaging
                 this.LocalEndPoint);
 
             // If deserialization completely failed, rethrow the exception so that it can be handled at another level.
-            if (message is null)
+            if (message is null || exception is InvalidMessageFrameException)
             {
                 // Returning false here informs the caller that the exception should not be caught.
                 return false;
@@ -485,16 +484,23 @@ namespace Orleans.Runtime.Messaging
             return true;
         }
 
-        private void OnMessageSerializationFailure(Message message, Exception exception)
+        private bool HandleSendMessageFailure(Message message, Exception exception)
         {
-            // we only get here if we failed to serialize the msg (or any other catastrophic failure).
+            // We get here if we failed to serialize the msg (or any other catastrophic failure).
             // Request msg fails to serialize on the sender, so we just enqueue a rejection msg.
             // Response msg fails to serialize on the responding silo, so we try to send an error response back.
-            this.Log.LogWarning(
-                (int)ErrorCode.Messaging_SerializationError,
+            this.Log.LogError(
                 exception,
-                "Unexpected error serializing message {Message}",
-                message);
+                "Exception sending message {Message} to remote endpoint {Remote} from local endpoint {Local}",
+                message,
+                this.RemoteEndPoint,
+                this.LocalEndPoint);
+
+            if (message is null || exception is InvalidMessageFrameException)
+            {
+                // Returning false here informs the caller that the exception should not be caught.
+                return false;
+            }
 
             MessagingInstruments.OnFailedSentMessage(message);
 
@@ -526,6 +532,8 @@ namespace Orleans.Runtime.Messaging
 
                 MessagingInstruments.OnDroppedSentMessage(message);
             }
+
+            return true;
         }
 
         private sealed class MessageHandlerPoolPolicy : PooledObjectPolicy<MessageHandler>
