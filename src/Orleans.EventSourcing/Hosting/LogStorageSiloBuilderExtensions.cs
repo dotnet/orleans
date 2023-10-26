@@ -5,7 +5,6 @@ using Orleans.EventSourcing;
 using Orleans.Providers;
 using Orleans.Runtime;
 using Orleans.EventSourcing.LogStorage;
-using Orleans.Runtime.LogConsistency;
 
 namespace Orleans.Hosting
 {
@@ -29,11 +28,7 @@ namespace Orleans.Hosting
 
         internal static IServiceCollection AddLogStorageBasedLogConsistencyProvider(this IServiceCollection services, string name)
         {
-            services.TryAddSingleton<Factory<IGrainContext, ILogConsistencyProtocolServices>>(serviceProvider =>
-            {
-                var factory = ActivatorUtilities.CreateFactory(typeof(ProtocolServices), new[] { typeof(IGrainContext) });
-                return arg1 => (ILogConsistencyProtocolServices)factory(serviceProvider, new object[] { arg1 });
-            });
+            services.AddLogConsistencyProtocolServicesFactory();
             services.TryAddSingleton<ILogViewAdaptorFactory>(sp => sp.GetServiceByName<ILogViewAdaptorFactory>(ProviderConstants.DEFAULT_STORAGE_PROVIDER_NAME));
             return services.AddSingletonNamedService<ILogViewAdaptorFactory, LogConsistencyProvider>(name);
         }
