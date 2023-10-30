@@ -13,6 +13,7 @@ internal class CosmosReminderTable : IReminderTable
     private readonly ILogger _logger;
     private readonly IServiceProvider _serviceProvider;
     private readonly Func<ReminderEntity, ReminderEntry> _convertEntityToEntry;
+    private readonly ICosmosOperationExecutor _executor;
     private CosmosClient _client = default!;
     private Container _container = default!;
 
@@ -27,6 +28,7 @@ internal class CosmosReminderTable : IReminderTable
         _options = options.Value;
         _clusterOptions = clusterOptions.Value;
         _convertEntityToEntry = FromEntity;
+        _executor = options.Value.OperationExecutor;
     }
 
     public async Task Init()
@@ -80,9 +82,9 @@ internal class CosmosReminderTable : IReminderTable
         {
             var pk = new PartitionKey(ReminderEntity.ConstructPartitionKey(_clusterOptions.ServiceId, grainId));
             var requestOptions = new QueryRequestOptions { PartitionKey = pk };
-            var response = await ExecuteWithRetries(static async (self, args) =>
+            var response = await _executor.ExecuteOperation(static async args =>
             {
-                var (grainId, requestOptions) = args;
+                var (self, grainId, requestOptions) = args;
                 var query = self._container.GetItemLinqQueryable<ReminderEntity>(requestOptions: requestOptions).ToFeedIterator();
 
                 var reminders = new List<ReminderEntity>();
@@ -101,7 +103,7 @@ internal class CosmosReminderTable : IReminderTable
 
                 return reminders;
             },
-            (grainId, requestOptions)).ConfigureAwait(false);
+            (this, grainId, requestOptions)).ConfigureAwait(false);
 
             return new ReminderTableData(response.Select(_convertEntityToEntry));
         }
@@ -117,9 +119,9 @@ internal class CosmosReminderTable : IReminderTable
     {
         try
         {
-            var response = await ExecuteWithRetries(static async (self, args) =>
+            var response = await _executor.ExecuteOperation(static async args =>
             {
-                var (begin, end) = args;
+                var (self, begin, end) = args;
                 var query = self._container.GetItemLinqQueryable<ReminderEntity>()
                     .Where(entity => entity.ServiceId == self._clusterOptions.ServiceId);
 
@@ -144,7 +146,7 @@ internal class CosmosReminderTable : IReminderTable
 
                 return reminders;
             },
-            (begin, end)).ConfigureAwait(false);
+            (this, begin, end)).ConfigureAwait(false);
 
             return new ReminderTableData(response.Select(_convertEntityToEntry));
         }
@@ -167,11 +169,11 @@ internal class CosmosReminderTable : IReminderTable
         {
             var pk = new PartitionKey(ReminderEntity.ConstructPartitionKey(_clusterOptions.ServiceId, grainId));
             var id = ReminderEntity.ConstructId(grainId, reminderName);
-            var response = await ExecuteWithRetries(async (self, args) =>
+            var response = await _executor.ExecuteOperation(async args =>
             {
                 try
                 {
-                    var (id, pk) = args;
+                    var (self, id, pk) = args;
                     var result = await self._container.ReadItemAsync<ReminderEntity>(id, pk).ConfigureAwait(false);
                     return result.Resource;
                 }
@@ -180,7 +182,7 @@ internal class CosmosReminderTable : IReminderTable
                     return null;
                 }
             },
-            (id, pk)).ConfigureAwait(false);
+            (this, id, pk)).ConfigureAwait(false);
 
             return response != null ? FromEntity(response)! : default!;
         }
@@ -200,13 +202,13 @@ internal class CosmosReminderTable : IReminderTable
             var pk = new PartitionKey(ReminderEntity.ConstructPartitionKey(_clusterOptions.ServiceId, entry.GrainId));
             var options = new ItemRequestOptions { IfMatchEtag = entity.ETag };
 
-            var response = await ExecuteWithRetries(static async (self, args) =>
+            var response = await _executor.ExecuteOperation(static async args =>
             {
-                var (pk, entity, options) = args;
+                var (self, pk, entity, options) = args;
                 var result = await self._container.UpsertItemAsync(entity, pk, options).ConfigureAwait(false);
                 return result.Resource;
             },
-            (pk, entity, options)).ConfigureAwait(false);
+            (this, pk, entity, options)).ConfigureAwait(false);
 
             return response.ETag;
         }
@@ -225,12 +227,12 @@ internal class CosmosReminderTable : IReminderTable
             var id = ReminderEntity.ConstructId(grainId, reminderName);
             var options = new ItemRequestOptions { IfMatchEtag = eTag, };
             var pk = new PartitionKey(ReminderEntity.ConstructPartitionKey(_clusterOptions.ServiceId, grainId));
-            await ExecuteWithRetries(static (self, args) =>
+            await _executor.ExecuteOperation(static args =>
             {
-                var (id, pk, options) = args;
+                var (self, id, pk, options) = args;
                 return self._container.DeleteItemAsync<ReminderEntity>(id, pk, options);
             },
-            (id, pk, options)).ConfigureAwait(false);
+            (this, id, pk, options)).ConfigureAwait(false);
 
             return true;
         }
@@ -255,7 +257,7 @@ internal class CosmosReminderTable : IReminderTable
     {
         try
         {
-            var entities = await ExecuteWithRetries(static async self =>
+            var entities = await _executor.ExecuteOperation(static async self =>
             {
                 var query = self._container.GetItemLinqQueryable<ReminderEntity>()
                     .Where(entity => entity.ServiceId == self._clusterOptions.ServiceId)
@@ -275,18 +277,18 @@ internal class CosmosReminderTable : IReminderTable
                 } while (query.HasMoreResults);
 
                 return reminders;
-            }).ConfigureAwait(false);
+            }, this).ConfigureAwait(false);
 
             var deleteTasks = new List<Task>();
             foreach (var entity in entities)
             {
-                deleteTasks.Add(ExecuteWithRetries(
-                    static (self, args) =>
+                deleteTasks.Add(_executor.ExecuteOperation(
+                    static args =>
                     {
-                        var (id, pk) = args;
+                        var (self, id, pk) = args;
                         return self._container.DeleteItemAsync<ReminderEntity>(id, pk);
                     },
-                    (entity.Id, new PartitionKey(entity.PartitionKey))));
+                    (this, entity.Id, new PartitionKey(entity.PartitionKey))));
             }
             await Task.WhenAll(deleteTasks).ConfigureAwait(false);
         }
@@ -354,50 +356,6 @@ internal class CosmosReminderTable : IReminderTable
             }
 
             await Task.Delay(1000);
-        }
-    }
-
-    private async Task<TResult> ExecuteWithRetries<TResult>(Func<CosmosReminderTable, Task<TResult>> clientFunc)
-    {
-        // From:  https://blogs.msdn.microsoft.com/bigdatasupport/2015/09/02/dealing-with-requestratetoolarge-errors-in-azure-documentdb-and-testing-performance/
-        while (true)
-        {
-            TimeSpan sleepTime;
-            try
-            {
-                return await clientFunc(this).ConfigureAwait(false);
-            }
-            catch (CosmosException dce) when (dce.StatusCode == TooManyRequests)
-            {
-                sleepTime = dce.RetryAfter ?? dce.RetryAfter!.Value;
-            }
-            catch (AggregateException ae) when (ae.InnerException is CosmosException dce && dce.StatusCode == TooManyRequests)
-            {
-                sleepTime = dce.RetryAfter ?? dce.RetryAfter!.Value;
-            }
-            await Task.Delay(sleepTime).ConfigureAwait(false);
-        }
-    }
-
-    private async Task<TResult> ExecuteWithRetries<TArg1, TResult>(Func<CosmosReminderTable, TArg1, Task<TResult>> clientFunc, TArg1 arg1)
-    {
-        // From:  https://blogs.msdn.microsoft.com/bigdatasupport/2015/09/02/dealing-with-requestratetoolarge-errors-in-azure-documentdb-and-testing-performance/
-        while (true)
-        {
-            TimeSpan sleepTime;
-            try
-            {
-                return await clientFunc(this, arg1).ConfigureAwait(false);
-            }
-            catch (CosmosException dce) when (dce.StatusCode == TooManyRequests)
-            {
-                sleepTime = dce.RetryAfter ?? dce.RetryAfter!.Value;
-            }
-            catch (AggregateException ae) when (ae.InnerException is CosmosException dce && dce.StatusCode == TooManyRequests)
-            {
-                sleepTime = dce.RetryAfter ?? dce.RetryAfter!.Value;
-            }
-            await Task.Delay(sleepTime);
         }
     }
 

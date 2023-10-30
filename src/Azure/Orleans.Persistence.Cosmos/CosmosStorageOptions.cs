@@ -9,6 +9,7 @@ public class CosmosGrainStorageOptions : CosmosOptions
 {
     private const string ORLEANS_STORAGE_CONTAINER = "OrleansStorage";
     public const int DEFAULT_INIT_STAGE = ServiceLifecycleStage.ApplicationServices;
+    private const string DEFAULT_PARTITION_KEY_PATH = "/PartitionKey";
 
     /// <summary>
     /// Stage of silo lifecycle where storage should be initialized. Storage must be initialized prior to use.
@@ -26,6 +27,8 @@ public class CosmosGrainStorageOptions : CosmosOptions
     /// The default is to not add any property in the State object.
     /// </summary>
     public List<string> StateFieldsToIndex { get; set; } = new();
+
+    public string PartitionKeyPath { get; set; } = DEFAULT_PARTITION_KEY_PATH;
 
     /// <summary>
     /// Initializes a new <see cref="CosmosGrainStorageOptions"/> instance.
