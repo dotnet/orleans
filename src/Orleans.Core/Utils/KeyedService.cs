@@ -208,6 +208,15 @@ namespace Orleans.Runtime
         /// <summary>
         /// Register a singleton named service
         /// </summary>
+        public static IServiceCollection AddSingletonNamedService<TService>(this IServiceCollection collection, string name, Type implementationType)
+            where TService : class
+        {
+            return collection.AddSingletonKeyedService<string, TService>(name, (sp, name) => (TService)ActivatorUtilities.CreateInstance(sp, implementationType));
+        }
+
+        /// <summary>
+        /// Register a singleton named service
+        /// </summary>
         public static IServiceCollection AddSingletonNamedService<TService, TInstance>(this IServiceCollection collection, string name)
             where TInstance : class, TService
             where TService : class

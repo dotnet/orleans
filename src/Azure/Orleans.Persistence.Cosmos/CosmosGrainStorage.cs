@@ -426,6 +426,16 @@ public static class CosmosStorageFactory
     public static IGrainStorage Create(IServiceProvider services, string name)
     {
         var optionsMonitor = services.GetRequiredService<IOptionsMonitor<CosmosGrainStorageOptions>>();
-        return ActivatorUtilities.CreateInstance<CosmosGrainStorage>(services, name, optionsMonitor.Get(name));
+        var partitionKeyProvider = services.GetServiceByName<IPartitionKeyProvider>(name)
+            ?? services.GetRequiredService<IPartitionKeyProvider>();
+        var loggerFactory = services.GetRequiredService<ILoggerFactory>();
+        var clusterOptions = services.GetRequiredService<IOptions<ClusterOptions>>();
+        return new CosmosGrainStorage(
+            name,
+            optionsMonitor.Get(name),
+            loggerFactory,
+            services,
+            clusterOptions,
+            partitionKeyProvider);
     }
 }
