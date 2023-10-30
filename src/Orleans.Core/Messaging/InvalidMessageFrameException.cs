@@ -6,7 +6,7 @@ using System.Runtime.Serialization;
 namespace Orleans.Runtime.Messaging;
 
 /// <summary>
-/// Indicates that a message frame is invalid, either when sending a messare or receiving a message.
+/// Indicates that a message frame is invalid, either when sending a message or receiving a message.
 /// </summary>
 [GenerateSerializer]
 public sealed class InvalidMessageFrameException : OrleansException
