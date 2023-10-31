@@ -222,7 +222,7 @@ namespace Orleans.Serialization
 
             if (value.GetType() == typeof(Exception))
             {
-                // Exceptions are never written as references. This ensures that reference cycles in exceptions are not possible and is a security precaution. 
+                // Exceptions are never written as references. This ensures that reference cycles in exceptions are not possible and is a security precaution.
                 ReferenceCodec.MarkValueField(writer.Session);
                 writer.WriteStartObject(fieldIdDelta, expectedType, typeof(ExceptionCodec));
                 SerializeException(ref writer, value);
@@ -287,10 +287,15 @@ namespace Orleans.Serialization
             // In order to handle null values.
             if (field.WireType == WireType.Reference)
             {
-                // Discard the result of consuming the reference and always return null.
+                var referencedException = ReferenceCodec.ReadReference<Exception, TInput>(ref reader, field);
+
                 // We do not allow exceptions to participate in reference cycles because cycles involving InnerException are not allowed by .NET
                 // Exceptions must never form cyclic graphs via their well-known properties/fields (eg, InnerException).
-                var _ = ReferenceCodec.ReadReference<Exception, TInput>(ref reader, field);
+                if (referencedException is not null)
+                {
+                    throw new ReferenceFieldNotSupportedException(field.FieldType);
+                }
+
                 return null;
             }
 
@@ -313,7 +318,7 @@ namespace Orleans.Serialization
 
             return DeserializeException(ref reader, field);
         }
-                                
+
         public Exception DeserializeException<TInput>(ref Reader<TInput> reader, Field field)
         {
             field.EnsureWireTypeTagDelimited();
