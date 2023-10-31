@@ -312,7 +312,7 @@ namespace Orleans.Runtime
 
                 CatalogInstruments.NonExistentActivations.Add(1);
 
-                self.directory.InvalidateCacheEntry(grainId);
+                self.grainLocator.InvalidateCache(grainId);
 
                 // Unregister the target activation so we don't keep getting spurious messages.
                 // The time delay (one minute, as of this writing) is to handle the unlikely but possible race where
