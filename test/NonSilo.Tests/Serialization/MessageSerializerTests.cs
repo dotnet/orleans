@@ -65,7 +65,7 @@ namespace UnitTests.Serialization
 
                 var pipe = new Pipe(new PipeOptions(pauseWriterThreshold: 0));
                 var writer = pipe.Writer;
-                Assert.Throws<OrleansException>(() => this.messageSerializer.Write(writer, message));
+                Assert.Throws<InvalidMessageFrameException>(() => this.messageSerializer.Write(writer, message));
             }
             finally
             {
@@ -85,7 +85,7 @@ namespace UnitTests.Serialization
 
             var pipe = new Pipe(new PipeOptions(pauseWriterThreshold: 0));
             var writer = pipe.Writer;
-            Assert.Throws<OrleansException>(() => this.messageSerializer.Write(writer, message));
+            Assert.Throws<InvalidMessageFrameException>(() => this.messageSerializer.Write(writer, message));
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Serialization")]
@@ -119,7 +119,7 @@ namespace UnitTests.Serialization
 
             pipe.Reader.TryRead(out var readResult);
             var reader = readResult.Buffer;
-            Assert.Throws<OrleansException>(() => this.messageSerializer.TryRead(ref reader, out var message));
+            Assert.Throws<InvalidMessageFrameException>(() => this.messageSerializer.TryRead(ref reader, out var message));
         }
 
         private Message RoundTripMessage(Message message)
