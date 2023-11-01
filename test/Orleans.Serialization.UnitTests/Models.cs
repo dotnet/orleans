@@ -2,6 +2,7 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq.Expressions;
+using System.Runtime.Serialization;
 using System.Text.Json;
 using Newtonsoft.Json;
 using Orleans;
@@ -95,7 +96,7 @@ public class MyValue : IEquatable<MyValue>
     }
 
     public override int GetHashCode() => Value;
-} 
+}
 
 [GenerateSerializer]
 [Immutable]
@@ -148,6 +149,62 @@ public class MyUnsealedImmutableSub : MyMutableBase, IMySub
 {
     [Id(0)]
     public MyValue SubValue { get; set; }
+}
+
+[GenerateSerializer]
+[SuppressReferenceTracking]
+public class MySuppressReferenceTrackingValue : MyValue
+{
+    public MySuppressReferenceTrackingValue(int value) : base(value)
+    {
+    }
+}
+
+[GenerateSerializer]
+public class MyCustomException : Exception
+{
+    public MyCustomException() { }
+    public MyCustomException(string message) : base(message) { }
+    public MyCustomException(string message, Exception inner) : base(message, inner) { }
+    public MyCustomException(SerializationInfo info, StreamingContext context) : base(info, context) { }
+
+    [Id(0)]
+    public int CustomInt;
+}
+
+public class MyCustomForeignException : Exception
+{
+    public MyCustomForeignException(int customInt)
+    {
+        CustomInt = customInt;
+    }
+
+    public MyCustomForeignException(SerializationInfo info, StreamingContext context) : base(info, context) { }
+
+    [Id(0)]
+    public int CustomInt;
+}
+
+[GenerateSerializer]
+public struct MyCustomForeignExceptionSurrogate
+{
+    [Id(0)]
+    public int CustomInt { get; set; }
+
+    public MyCustomForeignExceptionSurrogate(int customInt)
+    {
+        CustomInt = customInt;
+    }
+}
+
+[RegisterConverter]
+public sealed class MyCustomForeignExceptionSurrogateConverter : IConverter<MyCustomForeignException, MyCustomForeignExceptionSurrogate>
+{
+    public MyCustomForeignException ConvertFromSurrogate(in MyCustomForeignExceptionSurrogate surrogate) =>
+        new MyCustomForeignException(surrogate.CustomInt);
+
+    public MyCustomForeignExceptionSurrogate ConvertToSurrogate(in MyCustomForeignException value) =>
+        new MyCustomForeignExceptionSurrogate(value.CustomInt);
 }
 
 [GenerateSerializer]

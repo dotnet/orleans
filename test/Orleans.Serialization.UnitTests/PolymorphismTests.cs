@@ -145,41 +145,6 @@ namespace Orleans.Serialization.UnitTests
             Assert.Equal(customException.CustomInt, ceCopy.CustomInt);
         }
 
-        [Fact]
-        public void ThrowsOnDeserialize_ExceptionReference()
-        {
-            Exception source;
-            try
-            {
-                throw new ExceptionWithGeneratedCodec();
-            }
-            catch (Exception e)
-            {
-                source = e;
-            }
-
-            var exceptionWrapper = new ExceptionWrapper(source);
-
-            Assert.Throws<ReferenceFieldNotSupportedException>(() => RoundTripToExpectedType<ExceptionWrapper, ExceptionWrapper>(exceptionWrapper));
-        }
-
-        [GenerateSerializer]
-        public class ExceptionWrapper
-        {
-            [Id(0)]
-            public Exception WrappedExceptionReference1 { get; set; }
-
-            // Forces a reference to the previous serialized value for WrappedExceptionReference1
-            [Id(1)]
-            public Exception WrappedExceptionReference2 { get; set; }
-
-            public ExceptionWrapper(Exception wrappedException)
-            {
-                WrappedExceptionReference1 = wrappedException;
-                WrappedExceptionReference2 = wrappedException;
-            }
-        }
-
         [GenerateSerializer]
         public class ExceptionWithGeneratedCodec : Exception
         {}
