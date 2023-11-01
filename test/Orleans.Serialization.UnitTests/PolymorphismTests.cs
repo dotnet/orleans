@@ -145,10 +145,6 @@ namespace Orleans.Serialization.UnitTests
             Assert.Equal(customException.CustomInt, ceCopy.CustomInt);
         }
 
-        [GenerateSerializer]
-        public class ExceptionWithGeneratedCodec : Exception
-        {}
-
         [Fact]
         public void GeneratedSerializersRoundTripThroughSerializer_Polymorphic()
         {
