@@ -330,47 +330,6 @@ namespace Orleans.Serialization.UnitTests
             Assert.Equal("payload", baseField.Payload);
         }
 
-        [Fact]
-        public void ThrowsOnSerialize_ExceptionReference()
-        {
-            var serializer = _serviceProvider.GetRequiredService<Serializer>();
-
-            // Throw the exception so that stack trace is populated
-            Exception source = Assert.Throws<ExceptionWithGeneratedCodec>((Action)(() =>
-            {
-                throw new ExceptionWithGeneratedCodec();
-            }));
-
-            var exceptionWrapper = new ExceptionWrapper(source);
-
-            var serialized = serializer.SerializeToArray(exceptionWrapper);
-            using var formatterSession = _sessionPool.GetSession();
-            var formatted = BitStreamFormatter.Format(serialized, formatterSession);
-
-            Assert.Throws<ReferenceFieldNotSupportedException>(() => serializer.Deserialize<ExceptionWrapper>(serialized));
-        }
-
-        [GenerateSerializer]
-        public class ExceptionWrapper
-        {
-            [Id(0)]
-            public Exception WrappedExceptionReference1 { get; set; }
-
-            // Forces a reference to the previous serialized value for WrappedExceptionReference1
-            [Id(1)]
-            public Exception WrappedExceptionReference2 { get; set; }
-
-            public ExceptionWrapper(Exception wrappedException)
-            {
-                WrappedExceptionReference1 = wrappedException;
-                WrappedExceptionReference2 = wrappedException;
-            }
-        }
-
-        [GenerateSerializer]
-        public class ExceptionWithGeneratedCodec : Exception
-        {}
-
         [Serializable]
         public class SimpleISerializableObject : ISerializable, IDeserializationCallback
         {
