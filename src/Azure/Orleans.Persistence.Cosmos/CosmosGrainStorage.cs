@@ -210,7 +210,17 @@ internal class CosmosGrainStorage : IGrainStorage, ILifecycleParticipant<ISiloLi
             if (_options.DeleteStateOnClear)
             {
                 if (string.IsNullOrWhiteSpace(grainState.ETag))
-                    return;  //state not written
+                {
+                    await ReadStateAsync<T>(grainType, grainId, grainState);
+                    if (grainState.RecordExists)
+                    {
+                        // State exists but it shouldn't.
+                        throw new CosmosConditionNotSatisfiedException(grainType, grainId, _options.ContainerName, grainState.ETag, "None");
+                    }
+
+                    // State does not exist.
+                    return;
+                }
 
                 await _executor.ExecuteOperation(static args =>
                 {
