@@ -3,6 +3,7 @@ namespace Orleans.Persistence.Cosmos;
 /// <summary>
 /// Creates a partition key for the provided grain.
 /// </summary>
+[Obsolete("Use IDocumentIdProvider instead.")]
 public interface IPartitionKeyProvider
 {
     /// <summary>
@@ -14,7 +15,9 @@ public interface IPartitionKeyProvider
     ValueTask<string> GetPartitionKey(string grainType, GrainId grainId);
 }
 
-internal class DefaultPartitionKeyProvider : IPartitionKeyProvider
+#pragma warning disable CS0618 // Type or member is obsolete
+internal sealed class DefaultPartitionKeyProvider : IPartitionKeyProvider
 {
     public ValueTask<string> GetPartitionKey(string grainType, GrainId grainId) => new(CosmosIdSanitizer.Sanitize(grainType));
 }
+#pragma warning restore CS0618 // Type or member is obsolete
