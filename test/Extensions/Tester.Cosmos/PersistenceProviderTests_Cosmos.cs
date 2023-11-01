@@ -46,10 +46,10 @@ public class PersistenceProviderTests_Cosmos
 
         options.ConfigureTestDefaults();
 
-        var pkProvider = new DefaultPartitionKeyProvider();
         var clusterOptions = Options.Create(new ClusterOptions { ClusterId = _clusterId, ServiceId = _serviceId });
+        var idProvider = new DefaultDocumentIdProvider(clusterOptions);
 
-        var store = ActivatorUtilities.CreateInstance<CosmosGrainStorage>(providerRuntime.ServiceProvider, options, clusterOptions, "TestStorage", pkProvider);
+        var store = ActivatorUtilities.CreateInstance<CosmosGrainStorage>(providerRuntime.ServiceProvider, options, clusterOptions, "TestStorage", idProvider);
         var lifecycle = ActivatorUtilities.CreateInstance<SiloLifecycleSubject>(providerRuntime.ServiceProvider);
         store.Participate(lifecycle);
         await lifecycle.OnStart();
