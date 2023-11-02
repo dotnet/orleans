@@ -41,7 +41,7 @@ namespace Orleans.Runtime.GrainDirectory
             }
         }
 
-        private static readonly Func<GrainAddress, GrainDirectoryCacheEntry, bool> ActivationAddressesMatches = (addr, entry) => addr.Matches(entry.Address);
+        private static readonly Func<GrainAddress, GrainDirectoryCacheEntry, bool> ActivationAddressesMatches = (addr, entry) => GrainAddress.MatchesGrainIdAndSilo(addr, entry.Address);
 
         private readonly LRU<GrainId, GrainDirectoryCacheEntry> cache;
         /// controls the time the new entry is considered "fresh" (unit: ms)
@@ -88,7 +88,7 @@ namespace Orleans.Runtime.GrainDirectory
 
             // Here we do not check whether the found entry is expired.
             // It will be done by the thread managing the cache.
-            // This is to avoid situation where the entry was just expired, but the manager still have not run and have not refereshed it.
+            // This is to avoid situation where the entry was just expired, but the manager still have not run and have not refreshed it.
             if (!cache.TryGetValue(key, out var tmp))
             {
                 result = default;

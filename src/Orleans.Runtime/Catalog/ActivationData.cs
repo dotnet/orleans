@@ -894,8 +894,8 @@ namespace Orleans.Runtime
                                 if (!compatibilityDirector.IsCompatible(message.InterfaceVersion, currentVersion))
                                 {
                                     // Add this activation to cache invalidation headers.
-                                    message.CacheInvalidationHeader ??= new();
-                                    message.CacheInvalidationHeader.Add(new GrainAddress { GrainId = GrainId, SiloAddress = Address.SiloAddress });
+                                    message.CacheInvalidationHeader ??= new List<GrainAddressCacheUpdate>();
+                                    message.CacheInvalidationHeader.Add(new GrainAddressCacheUpdate(new GrainAddress { GrainId = GrainId, SiloAddress = Address.SiloAddress }, validAddress: null));
 
                                     var reason = new DeactivationReason(
                                         DeactivationReasonCode.IncompatibleRequest,
@@ -1302,7 +1302,7 @@ namespace Orleans.Runtime
                         "RejectAllQueuedMessages: {Count} messages from invalid activation {Activation}.",
                         msgs.Count,
                         this);
-                _shared.InternalRuntime.LocalGrainDirectory.InvalidateCacheEntry(Address);
+                _shared.InternalRuntime.GrainLocator.InvalidateCache(Address);
                 _shared.InternalRuntime.MessageCenter.ProcessRequestsToInvalidActivation(
                     msgs,
                     Address,
@@ -1324,7 +1324,7 @@ namespace Orleans.Runtime
                 }
 
                 if (_shared.Logger.IsEnabled(LogLevel.Debug)) _shared.Logger.LogDebug((int)ErrorCode.Catalog_RerouteAllQueuedMessages, "Rerouting {NumMessages} messages from invalid grain activation {Grain}", msgs.Count, this);
-                _shared.InternalRuntime.LocalGrainDirectory.InvalidateCacheEntry(Address);
+                _shared.InternalRuntime.GrainLocator.InvalidateCache(Address);
                 _shared.InternalRuntime.MessageCenter.ProcessRequestsToInvalidActivation(msgs, Address, ForwardingAddress, DeactivationReason.Description, DeactivationException);
             }
         }

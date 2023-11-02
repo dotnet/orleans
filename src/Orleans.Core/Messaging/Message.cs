@@ -32,7 +32,7 @@ namespace Orleans.Runtime
         public ushort _interfaceVersion;
         public GrainInterfaceType _interfaceType;
 
-        public List<GrainAddress> _cacheInvalidationHeader;
+        public List<GrainAddressCacheUpdate> _cacheInvalidationHeader;
 
         public PackedHeaders Headers { get => _headers; set => _headers = value; }
 
@@ -204,7 +204,7 @@ namespace Orleans.Runtime
             _timeToExpiry = default;
         }
 
-        public List<GrainAddress> CacheInvalidationHeader
+        public List<GrainAddressCacheUpdate> CacheInvalidationHeader
         {
             get => _cacheInvalidationHeader;
             set
@@ -245,15 +245,15 @@ namespace Orleans.Runtime
             return Direction != Directions.OneWay && !id.IsSystemTarget();
         }
 
-        internal void AddToCacheInvalidationHeader(GrainAddress address)
+        internal void AddToCacheInvalidationHeader(GrainAddress invalidAddress, GrainAddress validAddress)
         {
-            var list = new List<GrainAddress>();
+            var list = new List<GrainAddressCacheUpdate>();
             if (CacheInvalidationHeader != null)
             {
                 list.AddRange(CacheInvalidationHeader);
             }
 
-            list.Add(address);
+            list.Add(new GrainAddressCacheUpdate(invalidAddress, validAddress));
             CacheInvalidationHeader = list;
         }
 
