@@ -602,7 +602,7 @@ namespace Orleans.Runtime
                     logger.LogDebug(
                         "{GrainServiceType} Grain Service with Id {GrainServiceId} stopped successfully.",
                         grainService.GetType().FullName,
-                        grainService.GetPrimaryKeyLong(out string ignored));
+                        grainService.GetGrainId().ToString());
                 }
             }
         }
