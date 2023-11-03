@@ -14,11 +14,6 @@ namespace Orleans.Providers
         Task Enqueue(MemoryMessageData data);
 
         /// <summary>
-        /// Enqueue an event.
-        /// </summary>
-        Task Enqueue(MemoryMessageData data, int maxEventCount);
-
-        /// <summary>
         /// Dequeue up to maxCount events.
         /// </summary>
         Task<List<MemoryMessageData>> Dequeue(int maxCount);

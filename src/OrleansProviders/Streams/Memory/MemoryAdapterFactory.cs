@@ -10,6 +10,7 @@ using Orleans.Providers.Streams.Common;
 using Orleans.Runtime;
 using Orleans.Streams;
 using OrleansProviders.Options;
+using OrleansProviders.Streams.Memory;
 
 namespace Orleans.Providers
 {
@@ -24,7 +25,6 @@ namespace Orleans.Providers
         private readonly StreamCacheEvictionOptions cacheOptions;
         private readonly StreamStatisticOptions statisticOptions;
         private readonly HashRingStreamQueueMapperOptions queueMapperOptions;
-        private readonly MemoryStreamOptions memoryStreamOptions;
         private readonly IGrainFactory grainFactory;
         private readonly ITelemetryProducer telemetryProducer;
         private readonly ILoggerFactory loggerFactory;
@@ -77,14 +77,13 @@ namespace Orleans.Providers
         /// </summary>
         protected Func<ReceiverMonitorDimensions, ITelemetryProducer, IQueueAdapterReceiverMonitor> ReceiverMonitorFactory;
 
-        public MemoryAdapterFactory(string providerName, StreamCacheEvictionOptions cacheOptions, StreamStatisticOptions statisticOptions, HashRingStreamQueueMapperOptions queueMapperOptions, MemoryStreamOptions memoryStreamOptions,
+        public MemoryAdapterFactory(string providerName, StreamCacheEvictionOptions cacheOptions, StreamStatisticOptions statisticOptions, HashRingStreamQueueMapperOptions queueMapperOptions,
             IServiceProvider serviceProvider, IGrainFactory grainFactory, ITelemetryProducer telemetryProducer, ILoggerFactory loggerFactory)
         {
             this.Name = providerName;
             this.queueMapperOptions = queueMapperOptions ?? throw new ArgumentNullException(nameof(queueMapperOptions));
             this.cacheOptions = cacheOptions ?? throw new ArgumentNullException(nameof(cacheOptions));
             this.statisticOptions = statisticOptions ?? throw new ArgumentException(nameof(statisticOptions));
-            this.memoryStreamOptions = memoryStreamOptions ?? throw new ArgumentNullException(nameof(memoryStreamOptions));
             this.grainFactory = grainFactory ?? throw new ArgumentNullException(nameof(grainFactory));
             this.telemetryProducer = telemetryProducer ?? throw new ArgumentNullException(nameof(telemetryProducer));
             this.loggerFactory = loggerFactory ?? throw new ArgumentNullException(nameof(loggerFactory));
@@ -179,7 +178,7 @@ namespace Orleans.Providers
                 ArraySegment<byte> bodyBytes = serializer.Serialize(new MemoryMessageBody(events.Cast<object>(), requestContext));
                 var messageData = MemoryMessageData.Create(streamGuid, streamNamespace, bodyBytes);
                 IMemoryStreamQueueGrain queueGrain = GetQueueGrain(queueId);
-                await queueGrain.Enqueue(messageData, this.memoryStreamOptions.MaxEventCount);
+                await queueGrain.Enqueue(messageData);
             }
             catch (Exception exc)
             {
@@ -251,11 +250,12 @@ namespace Orleans.Providers
 
         public static MemoryAdapterFactory<TSerializer> Create(IServiceProvider services, string name)
         {
+            services.GetRequiredService<MemoryStreamProviderHashLookup>().SetByName(name);
+
             var cachePurgeOptions = services.GetOptionsByName<StreamCacheEvictionOptions>(name);
             var statisticOptions = services.GetOptionsByName<StreamStatisticOptions>(name);
             var queueMapperOptions = services.GetOptionsByName<HashRingStreamQueueMapperOptions>(name);
-            var memoryStreamOptions = services.GetOptionsByName<MemoryStreamOptions>(name);
-            var factory = ActivatorUtilities.CreateInstance<MemoryAdapterFactory<TSerializer>>(services, name, cachePurgeOptions, statisticOptions, queueMapperOptions, memoryStreamOptions);
+            var factory = ActivatorUtilities.CreateInstance<MemoryAdapterFactory<TSerializer>>(services, name, cachePurgeOptions, statisticOptions, queueMapperOptions);
             factory.Init();
             return factory;
         }
