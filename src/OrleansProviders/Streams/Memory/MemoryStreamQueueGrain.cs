@@ -11,11 +11,6 @@ namespace Orleans.Providers
     /// </summary>
     public class MemoryStreamQueueGrain : Grain, IMemoryStreamQueueGrain
     {
-        public MemoryStreamQueueGrain()
-        {
-
-        }
-
         private readonly Queue<MemoryMessageData> eventQueue = new Queue<MemoryMessageData>();
         private long sequenceNumber = DateTime.UtcNow.Ticks;
 
