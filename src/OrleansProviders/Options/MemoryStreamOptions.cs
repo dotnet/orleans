@@ -1,9 +1,17 @@
-namespace OrleansProviders.Options
-{
-    public class MemoryStreamOptions
-    {
-        public int MaxEventCount { get; set; } = DefaultMaxEventCount;
+namespace OrleansProviders.Options;
 
-        public const int DefaultMaxEventCount = 16384;
-    }
+/// <summary>
+/// Options specific to the Memory Streams provider.
+/// </summary>
+public class MemoryStreamOptions
+{
+    /// <summary>
+    /// The maximum number of messages kept waiting for delivery in an individual in-memory partition.
+    /// </summary>
+    public int MaxEventCount { get; set; } = DefaultMaxEventCount;
+
+    /// <summary>
+    /// The default maximum number of messages kept waiting for delivery in an individual partition.
+    /// </summary>
+    public const int DefaultMaxEventCount = 16384;
 }
