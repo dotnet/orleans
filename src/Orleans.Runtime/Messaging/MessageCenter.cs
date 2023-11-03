@@ -24,7 +24,6 @@ namespace Orleans.Runtime.Messaging
         private readonly SiloAddress _siloAddress;
         private readonly SiloMessagingOptions messagingOptions;
         private readonly PlacementService placementService;
-        private readonly ActivationDirectory activationDirectory;
         private readonly GrainLocator _grainLocator;
         private readonly ILogger log;
         private readonly Catalog catalog;
@@ -43,7 +42,6 @@ namespace Orleans.Runtime.Messaging
             RuntimeMessagingTrace messagingTrace,
             IOptions<SiloMessagingOptions> messagingOptions,
             PlacementService placementService,
-            ActivationDirectory activationDirectory,
             GrainLocator grainLocator)
         {
             this.catalog = catalog;
@@ -52,7 +50,6 @@ namespace Orleans.Runtime.Messaging
             this.connectionManager = senderManager;
             this.messagingTrace = messagingTrace;
             this.placementService = placementService;
-            this.activationDirectory = activationDirectory;
             _grainLocator = grainLocator;
             this.log = logger;
             this.messageFactory = messageFactory;

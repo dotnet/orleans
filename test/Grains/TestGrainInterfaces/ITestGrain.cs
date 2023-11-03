@@ -49,6 +49,8 @@ namespace UnitTests.GrainInterfaces
         Task<string> GetRuntimeInstanceId();
 
         Task<string> GetActivationId();
+
+        Task<SiloAddress> GetSiloAddress();
     }
 
     public interface IOneWayGrain : IGrainWithGuidKey
