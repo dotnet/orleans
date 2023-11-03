@@ -1,4 +1,4 @@
-﻿
+
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
@@ -11,20 +11,21 @@ namespace Orleans.Providers
     /// </summary>
     public class MemoryStreamQueueGrain : Grain, IMemoryStreamQueueGrain
     {
+        public MemoryStreamQueueGrain()
+        {
+
+        }
+
         private readonly Queue<MemoryMessageData> eventQueue = new Queue<MemoryMessageData>();
         private long sequenceNumber = DateTime.UtcNow.Ticks;
-
-        /// <summary>
-        /// max event count. 
-        /// </summary>
-        private int maxEventCount = 16384;
 
         /// <summary>
         /// Enqueues an event data. If the current total count reaches the max limit. throws an exception.
         /// </summary>
         /// <param name="data"></param>
+        /// <param name="maxEventCount"></param>
         /// <returns></returns>
-        public Task Enqueue(MemoryMessageData data)
+        public Task Enqueue(MemoryMessageData data, int maxEventCount)
         {
             if (eventQueue.Count >= maxEventCount)
             {

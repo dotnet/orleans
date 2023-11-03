@@ -1,4 +1,4 @@
-﻿
+
 using System.Collections.Generic;
 using System.Threading.Tasks;
 
@@ -12,7 +12,7 @@ namespace Orleans.Providers
         /// <summary>
         /// Enqueue an event.
         /// </summary>
-        Task Enqueue(MemoryMessageData data);
+        Task Enqueue(MemoryMessageData data, int maxEventCount);
 
         /// <summary>
         /// Dequeue up to maxCount events.

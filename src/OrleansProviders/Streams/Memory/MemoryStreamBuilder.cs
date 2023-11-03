@@ -3,6 +3,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Orleans.ApplicationParts;
 using Orleans.Configuration;
 using Orleans.Providers;
+using OrleansProviders.Options;
 
 namespace Orleans.Hosting
 {
@@ -13,6 +14,11 @@ namespace Orleans.Hosting
         public static void ConfigurePartitioning(this IMemoryStreamConfigurator configurator, int numOfQueues = HashRingStreamQueueMapperOptions.DEFAULT_NUM_QUEUES)
         {
             configurator.Configure<HashRingStreamQueueMapperOptions>(ob => ob.Configure(options => options.TotalQueueCount = numOfQueues));
+        }
+
+        public static void ConfigureMemoryStreams(this IMemoryStreamConfigurator configurator, Action<MemoryStreamOptions> configure)
+        {
+            configurator.Configure<MemoryStreamOptions>(ob => ob.Configure(configure));
         }
     }
 
