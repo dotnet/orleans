@@ -1,4 +1,3 @@
-
 using System.Collections.Generic;
 using System.Threading.Tasks;
 
@@ -9,6 +8,11 @@ namespace Orleans.Providers
     /// </summary>
     public interface IMemoryStreamQueueGrain : IGrainWithGuidKey
     {
+        /// <summary>
+        /// Enqueue an event.
+        /// </summary>
+        Task Enqueue(MemoryMessageData data);
+
         /// <summary>
         /// Enqueue an event.
         /// </summary>

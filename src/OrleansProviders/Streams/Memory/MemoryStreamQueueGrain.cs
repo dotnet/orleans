@@ -1,7 +1,7 @@
-
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using OrleansProviders.Options;
 
 namespace Orleans.Providers
 {
@@ -18,9 +18,18 @@ namespace Orleans.Providers
         /// Enqueues an event data. If the current total count reaches the max limit. throws an exception.
         /// </summary>
         /// <param name="data"></param>
+        /// <returns></returns>
+        public Task Enqueue(MemoryMessageData data) => EnqueueCore(data, MemoryStreamOptions.DefaultMaxEventCount);
+
+        /// <summary>
+        /// Enqueues an event data. If the current total count reaches the max limit. throws an exception.
+        /// </summary>
+        /// <param name="data"></param>
         /// <param name="maxEventCount"></param>
         /// <returns></returns>
-        public Task Enqueue(MemoryMessageData data, int maxEventCount)
+        public Task Enqueue(MemoryMessageData data, int maxEventCount) => EnqueueCore(data, maxEventCount);
+
+        private Task EnqueueCore(MemoryMessageData data, int maxEventCount)
         {
             if (eventQueue.Count >= maxEventCount)
             {
