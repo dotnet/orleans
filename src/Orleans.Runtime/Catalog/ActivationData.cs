@@ -121,7 +121,8 @@ namespace Orleans.Runtime
         }
 
         /// <summary>
-        /// Gets previous directory registration for this grain, if known. This is used to update the grain directory to point to the new registration during activation.
+        /// Gets the previous directory registration for this grain, if known.
+        /// This is used to update the grain directory to point to the new registration during activation.
         /// </summary>
         public GrainAddress PreviousRegistration
         {
