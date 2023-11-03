@@ -172,7 +172,7 @@ namespace DefaultCluster.Tests.TimerTests
 
             if (error != null)
             {
-                Assert.True(false, $"Test {testName} failed with error {error}");
+                Assert.Fail($"Test {testName} failed with error {error}");
             }
         }
     }

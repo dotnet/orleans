@@ -34,6 +34,7 @@ namespace Orleans.Reminders.Redis
         }
 
         /// <inheritdoc />
+        [Obsolete]
         protected RedisRemindersException(
             SerializationInfo info,
             StreamingContext context) : base(info, context)

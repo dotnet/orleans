@@ -6,6 +6,7 @@ using System.Diagnostics;
 using System.Linq;
 using System.Text;
 
+#pragma warning disable RS1035 // Do not use APIs banned for analyzers
 namespace Orleans.CodeGenerator
 {
     [Generator]
@@ -88,3 +89,4 @@ namespace Orleans.CodeGenerator
         }
     }
 }
+#pragma warning restore RS1035 // Do not use APIs banned for analyzers

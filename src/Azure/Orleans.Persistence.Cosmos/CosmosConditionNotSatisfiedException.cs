@@ -93,6 +93,7 @@ public class CosmosConditionNotSatisfiedException : InconsistentStateException
     /// <summary>
     /// Exception thrown when a Cosmos DB exception is thrown due to update conditions not being satisfied.
     /// </summary>
+    [Obsolete]
     protected CosmosConditionNotSatisfiedException(SerializationInfo info, StreamingContext context)
         : base(info, context)
     {
@@ -102,6 +103,7 @@ public class CosmosConditionNotSatisfiedException : InconsistentStateException
     }
 
     /// <inheritdoc />
+    [Obsolete]
     public override void GetObjectData(SerializationInfo info, StreamingContext context)
     {
         if (info == null) throw new ArgumentNullException(nameof(info));

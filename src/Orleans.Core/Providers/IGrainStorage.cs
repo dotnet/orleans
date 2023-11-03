@@ -105,6 +105,7 @@ namespace Orleans.Storage
         /// </summary>
         /// <param name="info">The serialization info.</param>
         /// <param name="context">The context.</param>
+        [Obsolete]
         protected InconsistentStateException(SerializationInfo info, StreamingContext context)
             : base(info, context)
         {
@@ -163,6 +164,7 @@ namespace Orleans.Storage
         }
 
         /// <inheritdoc/>
+        [Obsolete]
         public override void GetObjectData(SerializationInfo info, StreamingContext context)
         {
             if (info == null) throw new ArgumentNullException(nameof(info));

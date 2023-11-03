@@ -115,7 +115,7 @@ namespace DefaultCluster.Tests.General
         }
 
         [Fact, TestCategory("SlowBVT"), TestCategory("Echo"), TestCategory("Timeout")]
-        public void EchoGrain_Timeout_Result()
+        public async Task EchoGrain_Timeout_Result()
         {
             var grain = this.GrainFactory.GetGrain<IEchoTaskGrain>(Guid.NewGuid());
             
@@ -126,7 +126,13 @@ namespace DefaultCluster.Tests.General
             try
             {
                 // Note that this method purposely uses Task.Result.
-                int res = grain.BlockingCallTimeoutAsync(delay25).Result;
+                int res = await Task.Run(() =>
+                {
+#pragma warning disable xUnit1031 // Do not use blocking task operations in test method
+                    return grain.BlockingCallTimeoutAsync(delay25).Result;
+#pragma warning restore xUnit1031 // Do not use blocking task operations in test method
+                });
+
                 Assert.Fail($"BlockingCallTimeout should not have completed successfully, but returned {res}");
             }
             catch (Exception exc)

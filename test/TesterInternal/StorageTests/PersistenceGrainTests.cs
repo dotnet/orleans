@@ -92,25 +92,25 @@ namespace UnitTests.StorageTests
                 ICollection<string> providers = await testHooks.GetStorageProviderNames();
                 Assert.NotNull(providers); // Null provider manager
                 Assert.True(providers.Count > 0, "Some providers loaded");
-                Assert.True(testHooks.HasStorageProvider(MockStorageProviderName1).Result,
+                Assert.True(await testHooks.HasStorageProvider(MockStorageProviderName1),
                     $"provider {MockStorageProviderName1} on silo {silo.Name} should be registered");
-                Assert.True(testHooks.HasStorageProvider(MockStorageProviderName2).Result,
+                Assert.True(await testHooks.HasStorageProvider(MockStorageProviderName2),
                     $"provider {MockStorageProviderName2} on silo {silo.Name} should be registered");
-                Assert.True(testHooks.HasStorageProvider(MockStorageProviderNameLowerCase).Result,
+                Assert.True(await testHooks.HasStorageProvider(MockStorageProviderNameLowerCase),
                     $"provider {MockStorageProviderNameLowerCase} on silo {silo.Name} should be registered");
-                Assert.True(testHooks.HasStorageProvider(ErrorInjectorProviderName).Result,
+                Assert.True(await testHooks.HasStorageProvider(ErrorInjectorProviderName),
                     $"provider {ErrorInjectorProviderName} on silo {silo.Name} should be registered");
             }
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Persistence")]
-        public void Persistence_Silo_StorageProvider_Name_Missing()
+        public async Task Persistence_Silo_StorageProvider_Name_Missing()
         {
             List<SiloHandle> silos = this.HostedCluster.GetActiveSilos().ToList();
             var silo = silos.First();
             const string providerName = "NotPresent";
-            Assert.False(this.HostedCluster.Client.GetTestHooks(silo).HasStorageProvider(providerName).Result,
-                    $"provider {providerName} on silo {silo.Name} should not be registered");
+            Assert.False(await this.HostedCluster.Client.GetTestHooks(silo).HasStorageProvider(providerName),
+                    $"Provider {providerName} on silo {silo.Name} should not be registered");
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Persistence")]
@@ -329,7 +329,7 @@ namespace UnitTests.StorageTests
             for (int i = 0; i < numIterations; i++)
             {
                 int expectedVal = i;
-                Assert.Equal(expectedVal,  promises[i].Result);  //  "Returned value - Read @ #" + i
+                Assert.Equal(expectedVal,  await promises[i]);  //  "Returned value - Read @ #" + i
             }
         }
 
@@ -980,7 +980,7 @@ namespace UnitTests.StorageTests
             for (int i = 0; i < numIterations; i++)
             {
                 int expectedVal = i;
-                Assert.Equal(expectedVal,  promises[i].Result);  //  "Returned value - Read @ #" + i
+                Assert.Equal(expectedVal,  await promises[i]);  //  "Returned value - Read @ #" + i
             }
         }
 
@@ -1251,7 +1251,7 @@ namespace UnitTests.StorageTests
                 {
                     string msg = "StorageProviderInjectedError exception should have been thrown " + at;
                     output.WriteLine("Assertion failed: {0}", msg);
-                    Assert.True(false, msg);
+                    Assert.Fail(msg);
                 }
             }
             catch (Exception e)

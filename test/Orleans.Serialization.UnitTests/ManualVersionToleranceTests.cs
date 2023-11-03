@@ -10,6 +10,7 @@ using System.IO.Pipelines;
 using System.Text;
 using Xunit;
 using Xunit.Abstractions;
+using System.Threading.Tasks;
 
 namespace Orleans.Serialization.UnitTests
 {
@@ -216,41 +217,52 @@ namespace Orleans.Serialization.UnitTests
         }
 
         [Fact]
-        public void ObjectWithNewFieldTest()
+        public async Task ObjectWithNewFieldTest()
         {
             var expected = new ObjectWithNewField("blah", newField: "this field will not be manually serialized -- the binary will not have it!");
-
-            using var writerSession = GetSession();
             var pipe = new Pipe();
-            var writer = Writer.Create(pipe.Writer, writerSession);
 
             // Using manual serializer that ignores ObjectWithNewField.NewField
             // not serializing NewField to simulate a binary that's created from a previous version of the object
             var objectWithNewFieldSerializer = _codecProvider.GetCodec<ObjectWithNewField>();
             var objectWithoutNewFieldSerializer = _codecProvider.GetCodec<ObjectWithoutNewField>();
             _ = Assert.IsType<ConcreteTypeSerializer<ObjectWithNewField, ObjectWithNewFieldTypeSerializer>>(objectWithNewFieldSerializer);
-            objectWithNewFieldSerializer.WriteField(ref writer, 0, typeof(ObjectWithNewField), expected);
-            writer.Commit();
 
-            _log.WriteLine($"Size: {writer.Position} bytes.");
-            _log.WriteLine($"Wrote References:\n{GetWriteReferenceTable(writerSession)}");
+            var (writerPosition, writerCurrentReferenceId) = WriteToPipe();
+            (int WriterPosition, uint CurrentReferenceId) WriteToPipe()
+            {
+                using var writerSession = GetSession();
+                var writer = Writer.Create(pipe.Writer, writerSession);
+                objectWithNewFieldSerializer.WriteField(ref writer, 0, typeof(ObjectWithNewField), expected);
+                writer.Commit();
 
-            _ = pipe.Writer.FlushAsync().AsTask().GetAwaiter().GetResult();
+                _log.WriteLine($"Size: {writer.Position} bytes.");
+                _log.WriteLine($"Wrote References:\n{GetWriteReferenceTable(writerSession)}");
+                return (writer.Position, writer.Session.ReferencedObjects.CurrentReferenceId);
+            }
+
+            _ = await pipe.Writer.FlushAsync();
             pipe.Writer.Complete();
 
             _ = pipe.Reader.TryRead(out var readResult);
             using var readerSession = GetSession();
-            var reader = Reader.Create(readResult.Buffer, readerSession);
-            var initialHeader = reader.ReadFieldHeader();
+            var (actual, readerPosition, readerCurrentReferenceId) = ReadValue();
+            (ObjectWithNewField Value, long ReaderPosition, uint CurrentReferenceId) ReadValue()
+            {
+                var reader = Reader.Create(readResult.Buffer, readerSession);
+                var initialHeader = reader.ReadFieldHeader();
 
-            _log.WriteLine("Header:");
-            _log.WriteLine(initialHeader.ToString());
+                _log.WriteLine("Header:");
+                _log.WriteLine(initialHeader.ToString());
 
-            GetGeneratedSerializer(out objectWithNewFieldSerializer);
-            Assert.IsNotType<ConcreteTypeSerializer<ObjectWithNewField, ObjectWithNewFieldTypeSerializer>>(objectWithNewFieldSerializer);
+                GetGeneratedSerializer(out objectWithNewFieldSerializer);
+                Assert.IsNotType<ConcreteTypeSerializer<ObjectWithNewField, ObjectWithNewFieldTypeSerializer>>(objectWithNewFieldSerializer);
 
-            // using Generated Deserializer, which is capable of deserializing NewField 
-            var actual = objectWithNewFieldSerializer.ReadValue(ref reader, initialHeader);
+                // using Generated Deserializer, which is capable of deserializing NewField 
+                var value = objectWithNewFieldSerializer.ReadValue(ref reader, initialHeader);
+                return (value, reader.Position, reader.Session.ReferencedObjects.CurrentReferenceId);
+            }
+
             pipe.Reader.AdvanceTo(readResult.Buffer.End);
             pipe.Reader.Complete();
 
@@ -261,49 +273,62 @@ namespace Orleans.Serialization.UnitTests
             objectWithoutNewFieldSerializer = _codecProvider.GetCodec<ObjectWithoutNewField>();
             Assert.Null(actual.NewField); // Null, since it should not be in the binary
             Assert.Equal(expected.Version, actual.Version);
-            Assert.Equal(writer.Position, reader.Position);
-            Assert.Equal(writer.Session.ReferencedObjects.CurrentReferenceId, reader.Session.ReferencedObjects.CurrentReferenceId);
+            Assert.Equal(writerPosition, readerPosition);
+            Assert.Equal(writerCurrentReferenceId, readerCurrentReferenceId);
 
-            var references = GetReadReferenceTable(reader.Session);
+            var references = GetReadReferenceTable(readerSession);
             _log.WriteLine($"Read references:\n{references}");
         }
 
         [Fact]
-        public void ObjectWithoutNewFieldTest()
+        public async Task ObjectWithoutNewFieldTest()
         {
             var expected = new ObjectWithoutNewField("blah");
 
             using var writerSession = GetSession();
             var pipe = new Pipe();
-            var writer = Writer.Create(pipe.Writer, writerSession);
 
             var objectWithNewFieldSerializer = _codecProvider.GetCodec<ObjectWithNewField>();
             var objectWithoutNewFieldSerializer = _codecProvider.GetCodec<ObjectWithoutNewField>();
             // Using a manual serializer that writes a new field
             // serializing a new field to simulate a binary that created from a newer version of the object
             _ = Assert.IsType<ConcreteTypeSerializer<ObjectWithoutNewField, ObjectWithoutNewFieldTypeSerializer>>(objectWithoutNewFieldSerializer);
-            objectWithoutNewFieldSerializer.WriteField(ref writer, 0, typeof(ObjectWithoutNewField), expected);
-            writer.Commit();
 
-            _log.WriteLine($"Size: {writer.Position} bytes.");
-            _log.WriteLine($"Wrote References:\n{GetWriteReferenceTable(writerSession)}");
+            var (writerPosition, writerCurrentReferenceId) = WriteToPipe();
+            (int WriterPosition, uint CurrentReferenceId) WriteToPipe()
+            {
+                var writer = Writer.Create(pipe.Writer, writerSession);
+                objectWithoutNewFieldSerializer.WriteField(ref writer, 0, typeof(ObjectWithoutNewField), expected);
+                writer.Commit();
 
-            _ = pipe.Writer.FlushAsync().AsTask().GetAwaiter().GetResult();
+                _log.WriteLine($"Size: {writer.Position} bytes.");
+                _log.WriteLine($"Wrote References:\n{GetWriteReferenceTable(writerSession)}");
+                return (writer.Position, writer.Session.ReferencedObjects.CurrentReferenceId);
+            }
+
+            _ = await pipe.Writer.FlushAsync();
             pipe.Writer.Complete();
 
             _ = pipe.Reader.TryRead(out var readResult);
             using var readerSession = GetSession();
-            var reader = Reader.Create(readResult.Buffer, readerSession);
-            var initialHeader = reader.ReadFieldHeader();
 
-            _log.WriteLine("Header:");
-            _log.WriteLine(initialHeader.ToString());
+            var (actual, readerPosition, readerCurrentReferenceId) = ReadValue();
+            (ObjectWithoutNewField Value, long ReaderPosition, uint CurrentReferenceId) ReadValue()
+            {
+                var reader = Reader.Create(readResult.Buffer, readerSession);
+                var initialHeader = reader.ReadFieldHeader();
 
-            GetGeneratedSerializer(out objectWithoutNewFieldSerializer);
-            Assert.IsNotType<ConcreteTypeSerializer<ObjectWithoutNewField, ObjectWithoutNewFieldTypeSerializer>>(objectWithoutNewFieldSerializer);
+                _log.WriteLine("Header:");
+                _log.WriteLine(initialHeader.ToString());
 
-            // using Generated Deserializer, which is not able to deserialize the new field that was serialized
-            var actual = objectWithoutNewFieldSerializer.ReadValue(ref reader, initialHeader);
+                GetGeneratedSerializer(out objectWithoutNewFieldSerializer);
+                Assert.IsNotType<ConcreteTypeSerializer<ObjectWithoutNewField, ObjectWithoutNewFieldTypeSerializer>>(objectWithoutNewFieldSerializer);
+
+                // using Generated Deserializer, which is not able to deserialize the new field that was serialized
+                var value = objectWithoutNewFieldSerializer.ReadValue(ref reader, initialHeader);
+                return (value, reader.Position, reader.Session.ReferencedObjects.CurrentReferenceId);
+            }
+
             pipe.Reader.AdvanceTo(readResult.Buffer.End);
             pipe.Reader.Complete();
 
@@ -311,10 +336,10 @@ namespace Orleans.Serialization.UnitTests
 
             Assert.Equal(expected.Blah, actual.Blah);
             Assert.Equal(expected.Version, actual.Version);
-            Assert.Equal(writer.Position, reader.Position);
-            Assert.Equal(writer.Session.ReferencedObjects.CurrentReferenceId, reader.Session.ReferencedObjects.CurrentReferenceId);
+            Assert.Equal(writerPosition, readerPosition);
+            Assert.Equal(writerCurrentReferenceId, readerCurrentReferenceId);
 
-            var references = GetReadReferenceTable(reader.Session);
+            var references = GetReadReferenceTable(readerSession);
             _log.WriteLine($"Read references:\n{references}");
         }
 

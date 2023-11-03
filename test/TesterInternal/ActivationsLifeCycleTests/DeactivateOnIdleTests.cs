@@ -259,7 +259,7 @@ namespace UnitTests.ActivationsLifeCycleTests
             }
 
             Assert.True(testCluster.GetActiveSilos().Count() > 1, "This logic requires at least 1 non-primary active silo");
-            Assert.True(false, "Could not find a grain that activates on a non-primary silo, and has the partition be also managed by a non-primary silo");
+            Assert.Fail("Could not find a grain that activates on a non-primary silo, and has the partition be also managed by a non-primary silo");
             return null;
         }
     }
