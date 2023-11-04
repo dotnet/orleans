@@ -144,7 +144,7 @@ namespace Orleans.Utilities
         {
             var now = GetDateTime();
             var defunct = default(List<TIdentity>);
-            foreach (var observer in _observers)
+            foreach (var observer in _observers.ToList())
             {
                 if (observer.Value.LastSeen + ExpirationDuration < now)
                 {
@@ -196,7 +196,7 @@ namespace Orleans.Utilities
         {
             var now = GetDateTime();
             var defunct = default(List<TIdentity>);
-            foreach (var observer in _observers)
+            foreach (var observer in _observers.ToList())
             {
                 if (observer.Value.LastSeen + ExpirationDuration < now)
                 {
@@ -242,7 +242,7 @@ namespace Orleans.Utilities
         {
             var now = GetDateTime();
             var defunct = default(List<TIdentity>);
-            foreach (var observer in _observers)
+            foreach (var observer in _observers.ToList())
             {
                 if (observer.Value.LastSeen + ExpirationDuration < now)
                 {
