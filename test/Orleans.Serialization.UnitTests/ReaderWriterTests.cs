@@ -10,6 +10,8 @@ using System.Collections.Generic;
 using System.IO;
 using Xunit;
 using Xunit.Abstractions;
+using Orleans.Serialization.Codecs;
+using Orleans.Serialization.WireProtocol;
 
 namespace Orleans.Serialization.UnitTests
 {
@@ -209,6 +211,20 @@ namespace Orleans.Serialization.UnitTests
 
         [Fact]
         protected override void ByteRoundTrip() => ByteRoundTripTest();
+
+        [Fact]
+        public void SkipBufferEdge()
+        {
+            byte[] b = new byte[] { 25, 84, 101, 115, 116, 32, 97, 99, 99, 111, 117, 110 };
+            byte[] b2 = new byte[] { 116, 64, 0, 0, 0 };
+
+            var seq = ReadOnlySequenceHelper.CreateReadOnlySequence(b, b2);
+            using SerializerSession session = this.GetSession();
+            var reader = Reader.Create(seq, session);
+            SkipFieldExtension.SkipField(ref reader, new Field(new Tag((byte)WireType.LengthPrefixed)));
+
+            Assert.Equal(64, reader.ReadInt32());
+        }
     }
 
     public abstract class ReaderWriterTestBase<TBuffer, TOutput, TInput> where TOutput : IBufferWriter<byte>
@@ -219,7 +235,7 @@ namespace Orleans.Serialization.UnitTests
 
         private delegate T ReadValue<T>(ref Reader<TInput> reader);
         private delegate void WriteValue<T>(ref Writer<TOutput> writer, T value);
-        
+
         public ReaderWriterTestBase(ITestOutputHelper testOutputHelper)
         {
             var services = new ServiceCollection();
@@ -229,6 +245,7 @@ namespace Orleans.Serialization.UnitTests
             _testOutputHelper = testOutputHelper;
         }
 
+        protected SerializerSession GetSession() => _sessionPool.GetSession();
         protected abstract TBuffer CreateBuffer();
         protected abstract Reader<TInput> CreateReader(TBuffer buffer, SerializerSession session);
         protected abstract Writer<TOutput> CreateWriter(TBuffer buffer, SerializerSession session);
@@ -307,7 +324,7 @@ namespace Orleans.Serialization.UnitTests
             static void Write(ref Writer<TOutput> writer, long expected) => writer.WriteInt64(expected);
 
             Gen.Long.Sample(CreateTestPredicate(Write, Read));
-                
+
         }
 
         protected void Int32RoundTripTest()
@@ -323,7 +340,7 @@ namespace Orleans.Serialization.UnitTests
             static ulong Read(ref Reader<TInput> reader) => reader.ReadUInt64();
             static void Write(ref Writer<TOutput> writer, ulong expected) => writer.WriteUInt64(expected);
 
-            Gen.ULong.Sample(CreateTestPredicate(Write, Read)); 
+            Gen.ULong.Sample(CreateTestPredicate(Write, Read));
         }
 
         protected void UInt32RoundTripTest()
