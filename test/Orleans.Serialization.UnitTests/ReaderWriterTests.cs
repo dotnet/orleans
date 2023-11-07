@@ -12,6 +12,7 @@ using Xunit;
 using Xunit.Abstractions;
 using Orleans.Serialization.Codecs;
 using Orleans.Serialization.WireProtocol;
+using System.Runtime.InteropServices;
 
 namespace Orleans.Serialization.UnitTests
 {
@@ -213,7 +214,7 @@ namespace Orleans.Serialization.UnitTests
         protected override void ByteRoundTrip() => ByteRoundTripTest();
 
         [Fact]
-        public void SkipBufferEdge()
+        public void SkipBufferEdge_ReadOnlySequence()
         {
             byte[] b = new byte[] { 25, 84, 101, 115, 116, 32, 97, 99, 99, 111, 117, 110 };
             byte[] b2 = new byte[] { 116, 64, 0, 0, 0 };
@@ -221,6 +222,36 @@ namespace Orleans.Serialization.UnitTests
             var seq = ReadOnlySequenceHelper.CreateReadOnlySequence(b, b2);
             using SerializerSession session = this.GetSession();
             var reader = Reader.Create(seq, session);
+            SkipFieldExtension.SkipField(ref reader, new Field(new Tag((byte)WireType.LengthPrefixed)));
+
+            Assert.Equal(64, reader.ReadInt32());
+        }
+
+        [Fact]
+        public void SkipBufferEdge_BufferSlice()
+        {
+            byte[] b = new byte[] { 25, 84, 101, 115, 116, 32, 97, 99, 99, 111, 117, 110 };
+            byte[] b2 = new byte[] { 116, 64, 0, 0, 0 };
+
+            var buffer = new PooledBuffer();
+            var buf = buffer.GetMemory(1);
+            Assert.True(MemoryMarshal.TryGetArray<byte>(buf, out var seg));
+            var offset = seg.Array.Length - b.Length;
+            buffer.Write(new byte[offset]);
+            buffer.Write(b);
+            buffer.Write(b2);
+            var slice = buffer.Slice(offset);
+
+            var count = 0;
+            foreach (var _ in slice)
+            {
+                ++count;
+            }
+
+            Assert.Equal(2, count);
+
+            using SerializerSession session = this.GetSession();
+            var reader = Reader.Create(slice, session);
             SkipFieldExtension.SkipField(ref reader, new Field(new Tag((byte)WireType.LengthPrefixed)));
 
             Assert.Equal(64, reader.ReadInt32());
