@@ -28,7 +28,6 @@ namespace Orleans.Serialization.Invocation
     [GenerateSerializer]
     public abstract class UnitTestRequest : UnitTestRequestBase
     {
-        [DebuggerHidden]
         public sealed override ValueTask<Response> Invoke()
         {
             try
@@ -48,7 +47,6 @@ namespace Orleans.Serialization.Invocation
             }
         }
 
-        [DebuggerHidden]
         private static async ValueTask<Response> CompleteInvokeAsync(ValueTask resultTask)
         {
             try
@@ -63,14 +61,12 @@ namespace Orleans.Serialization.Invocation
         }
 
         // Generated
-        [DebuggerHidden]
         protected abstract ValueTask InvokeInner();
     }
 
     [GenerateSerializer]
     public abstract class UnitTestRequest<TResult> : UnitTestRequestBase
     {
-        [DebuggerHidden]
         public sealed override ValueTask<Response> Invoke()
         {
             try
@@ -89,7 +85,6 @@ namespace Orleans.Serialization.Invocation
             }
         }
 
-        [DebuggerHidden]
         private static async ValueTask<Response> CompleteInvokeAsync(ValueTask<TResult> resultTask)
         {
             try
@@ -104,14 +99,12 @@ namespace Orleans.Serialization.Invocation
         }
 
         // Generated
-        [DebuggerHidden]
         protected abstract ValueTask<TResult> InvokeInner();
     }
 
     [GenerateSerializer]
     public abstract class UnitTestTaskRequest<TResult> : UnitTestRequestBase
     {
-        [DebuggerHidden]
         public sealed override ValueTask<Response> Invoke()
         {
             try
@@ -131,7 +124,6 @@ namespace Orleans.Serialization.Invocation
             }
         }
 
-        [DebuggerHidden]
         private static async ValueTask<Response> CompleteInvokeAsync(Task<TResult> resultTask)
         {
             try
@@ -146,14 +138,12 @@ namespace Orleans.Serialization.Invocation
         }
 
         // Generated
-        [DebuggerHidden]
         protected abstract Task<TResult> InvokeInner();
     }
 
     [GenerateSerializer]
     public abstract class UnitTestTaskRequest : UnitTestRequestBase
     {
-        [DebuggerHidden]
         public sealed override ValueTask<Response> Invoke()
         {
             try
@@ -174,7 +164,6 @@ namespace Orleans.Serialization.Invocation
             }
         }
 
-        [DebuggerHidden]
         private static async ValueTask<Response> CompleteInvokeAsync(Task resultTask)
         {
             try
@@ -189,14 +178,12 @@ namespace Orleans.Serialization.Invocation
         }
 
         // Generated
-        [DebuggerHidden]
         protected abstract Task InvokeInner();
     }
 
     [GenerateSerializer]
     public abstract class UnitTestVoidRequest : UnitTestRequestBase
     {
-        [DebuggerHidden]
         public sealed override ValueTask<Response> Invoke()
         {
             try
@@ -211,7 +198,6 @@ namespace Orleans.Serialization.Invocation
         }
 
         // Generated
-        [DebuggerHidden]
         protected abstract void InvokeInner();
     }
 }
