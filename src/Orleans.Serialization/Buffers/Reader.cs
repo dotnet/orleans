@@ -408,7 +408,7 @@ namespace Orleans.Serialization.Buffers
         /// <param name="count">The number of bytes to skip.</param>
         public void Skip(long count)
         {
-            if (IsReadOnlySequenceInput || IsBufferSliceInput)
+            if (IsReadOnlySequenceInput)
             {
                 var end = Position + count;
                 while (Position < end)
