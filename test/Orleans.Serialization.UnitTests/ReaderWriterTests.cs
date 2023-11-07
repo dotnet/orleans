@@ -234,6 +234,9 @@ namespace Orleans.Serialization.UnitTests
             byte[] b2 = new byte[] { 116, 64, 0, 0, 0 };
 
             var buffer = new PooledBuffer();
+
+            // PooledBuffer / BufferSlice is more abstract than ReadOnlySequence, which is why we are relying on 
+            // implementation details.
             var buf = buffer.GetMemory(1);
             Assert.True(MemoryMarshal.TryGetArray<byte>(buf, out var seg));
             var offset = seg.Array.Length - b.Length;
@@ -242,9 +245,19 @@ namespace Orleans.Serialization.UnitTests
             buffer.Write(b2);
             var slice = buffer.Slice(offset);
 
+            // Verify that the slices are what we expect.
             var count = 0;
-            foreach (var _ in slice)
+            foreach (var s in slice)
             {
+                if (count == 0)
+                {
+                    Assert.Equal(b, s.ToArray());
+                }
+                else
+                {
+                    Assert.Equal(b2, s.ToArray());
+                }
+
                 ++count;
             }
 
@@ -255,6 +268,7 @@ namespace Orleans.Serialization.UnitTests
             SkipFieldExtension.SkipField(ref reader, new Field(new Tag((byte)WireType.LengthPrefixed)));
 
             Assert.Equal(64, reader.ReadInt32());
+            buffer.Dispose();
         }
     }
 
