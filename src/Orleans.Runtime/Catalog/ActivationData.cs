@@ -8,6 +8,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Newtonsoft.Json.Linq;
 using Orleans.Configuration;
 using Orleans.Core.Internal;
 using Orleans.GrainDirectory;
@@ -396,12 +397,12 @@ namespace Orleans.Runtime
 
         public void DelayDeactivation(TimeSpan timespan)
         {
-            if (timespan <= TimeSpan.Zero)
+            if (timespan <= TimeSpan.Zero && timespan != Timeout.InfiniteTimeSpan)
             {
                 // reset any current keepAliveUntil
                 ResetKeepAliveRequest();
             }
-            else if (timespan == TimeSpan.MaxValue)
+            else if (timespan == TimeSpan.MaxValue || timespan == Timeout.InfiniteTimeSpan)
             {
                 // otherwise creates negative time.
                 KeepAliveUntil = DateTime.MaxValue;
