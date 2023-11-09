@@ -396,15 +396,15 @@ namespace Orleans.Runtime
 
         public void DelayDeactivation(TimeSpan timespan)
         {
-            if (timespan <= TimeSpan.Zero && timespan != Timeout.InfiniteTimeSpan)
-            {
-                // reset any current keepAliveUntil
-                ResetKeepAliveRequest();
-            }
-            else if (timespan == TimeSpan.MaxValue || timespan == Timeout.InfiniteTimeSpan)
+            if (timespan == TimeSpan.MaxValue || timespan == Timeout.InfiniteTimeSpan)
             {
                 // otherwise creates negative time.
                 KeepAliveUntil = DateTime.MaxValue;
+            }
+            else if (timespan <= TimeSpan.Zero)
+            {
+                // reset any current keepAliveUntil
+                ResetKeepAliveRequest();
             }
             else
             {
