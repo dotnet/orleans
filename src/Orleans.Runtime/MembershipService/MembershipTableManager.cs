@@ -316,18 +316,18 @@ namespace Orleans.Runtime.MembershipService
             
             try
             {
-                async Task<bool> updateMyStatusTask(int counter)
+                async Task<bool> UpdateMyStatusTask(int counter)
                 {
                     numCalls++;
                     if (log.IsEnabled(LogLevel.Debug)) log.LogDebug("Going to try to TryUpdateMyStatusGlobalOnce #{Attempt}", counter);
                     return await TryUpdateMyStatusGlobalOnce(status);  // function to retry
                 }
 
-                if (status == SiloStatus.Dead && this.membershipTableProvider is SystemTargetBasedMembershipTable)
+                if (status.IsTerminating() && this.membershipTableProvider is SystemTargetBasedMembershipTable)
                 {
                     // SystemTarget-based membership may not be accessible at this stage, so allow for one quick attempt to update
                     // the status before continuing regardless of the outcome.
-                    var updateTask = updateMyStatusTask(0);
+                    var updateTask = UpdateMyStatusTask(0);
                     updateTask.Ignore();
                     await Task.WhenAny(Task.Delay(TimeSpan.FromMilliseconds(500)), updateTask);
 
@@ -339,7 +339,7 @@ namespace Orleans.Runtime.MembershipService
                     return;
                 }
 
-                bool ok = await MembershipExecuteWithRetries(updateMyStatusTask, this.clusterMembershipOptions.MaxJoinAttemptTime);
+                bool ok = await MembershipExecuteWithRetries(UpdateMyStatusTask, this.clusterMembershipOptions.MaxJoinAttemptTime);
 
                 if (ok)
                 {
