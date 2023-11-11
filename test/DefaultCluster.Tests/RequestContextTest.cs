@@ -21,6 +21,8 @@ namespace UnitTDefaultCluster.Tests.General
             var infoFromGrain = await grain.GetRequestContext();
             Assert.NotNull(infoFromGrain);
             Assert.True((int)infoFromGrain == 10);
+
+            Assert.Contains("GrainInfo", RequestContext.Keys);
         }
 
         [Fact(Skip = "Was failing before (just masked as a Pass), needs fixing or removing"), TestCategory("RequestContext"), TestCategory("Functional")]
@@ -33,6 +35,8 @@ namespace UnitTDefaultCluster.Tests.General
             var infoFromGrain = RequestContext.Get("GrainInfo");
             Assert.NotNull(infoFromGrain);
             Assert.True((int)infoFromGrain == 15);
+
+            Assert.Contains("GrainInfo", RequestContext.Keys);
         }
     }
 }
