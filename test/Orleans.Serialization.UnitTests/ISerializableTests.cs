@@ -78,7 +78,7 @@ namespace Orleans.Serialization.UnitTests
                 var output = BitStreamFormatter.Format(ref reader);
                 _log.WriteLine(output);
             }
- 
+
             {
                 using var readerSession = _sessionPool.GetSession();
                 var reader = Reader.Create(readResult.Buffer, readerSession);
@@ -176,7 +176,7 @@ namespace Orleans.Serialization.UnitTests
             Assert.Equal(input2.History, input.History);
             Assert.Equal(result2.History, result.History);
         }
-        
+
         private class BaseException : Exception
         {
             public BaseException() { }

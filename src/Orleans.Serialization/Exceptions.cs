@@ -298,6 +298,48 @@ namespace Orleans.Serialization
     }
 
     /// <summary>
+    /// A reference to a value is not supported here.
+    /// </summary>
+    [Serializable]
+    [GenerateSerializer]
+    public sealed class ReferenceFieldNotSupportedException : SerializerException
+    {
+        /// <summary>
+        /// Gets the type of the target reference.
+        /// </summary>
+        /// <value>The type of the target reference.</value>
+        [Id(0)]
+        public Type TargetReferenceType { get; }
+
+        /// <summary>
+        /// Initializes a new instance of the <see cref="ReferenceFieldNotSupportedException"/> class.
+        /// </summary>
+        /// <param name="targetType">Type of the target.</param>
+        public ReferenceFieldNotSupportedException(Type targetType) : base(
+            $"Reference with type {targetType} not allowed here.")
+        {
+            TargetReferenceType = targetType;
+        }
+
+        /// <summary>
+        /// Initializes a new instance of the <see cref="ReferenceFieldNotSupportedException"/> class.
+        /// </summary>
+        /// <param name="info">The <see cref="T:System.Runtime.Serialization.SerializationInfo" /> that holds the serialized object data about the exception being thrown.</param>
+        /// <param name="context">The <see cref="T:System.Runtime.Serialization.StreamingContext" /> that contains contextual information about the source or destination.</param>
+        private ReferenceFieldNotSupportedException(SerializationInfo info, StreamingContext context) : base(info, context)
+        {
+            TargetReferenceType = (Type)info.GetValue(nameof(TargetReferenceType), typeof(Type));
+        }
+
+        /// <inheritdoc/>
+        public override void GetObjectData(SerializationInfo info, StreamingContext context)
+        {
+            base.GetObjectData(info, context);
+            info.AddValue(nameof(TargetReferenceType), TargetReferenceType);
+        }
+    }
+
+    /// <summary>
     /// A well-known type was not known.
     /// </summary>
     [Serializable]

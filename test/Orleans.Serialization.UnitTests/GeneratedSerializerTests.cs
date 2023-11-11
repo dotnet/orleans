@@ -6,6 +6,7 @@ using Orleans.Serialization.Utilities;
 using Microsoft.Extensions.DependencyInjection;
 using Newtonsoft.Json;
 using System;
+using System.Buffers;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO.Pipelines;
@@ -443,6 +444,52 @@ public class GeneratedSerializerTests : IDisposable
             Assert.Equal(original.BaseValue, res3.BaseValue);
             Assert.Equal(original.SubValue, res3.SubValue);
         }
+    }
+
+    [Fact]
+    public void DuplicateReferencesSerializeTargetJustOnce()
+    {
+        var sharedObject = new MyValue(1);
+        var original = new object[] { sharedObject, sharedObject };
+
+        var result = RoundTripThroughCodec(original);
+
+        Assert.Equal(original, result);
+        Assert.Same(result[0], result[1]);
+    }
+
+    [Fact]
+    public void DuplicateReferencesSerializeTargetMultipleTimesWhenSuppressReferenceTrackingEnabled()
+    {
+        var sharedObject = new MySuppressReferenceTrackingValue(1);
+        var original = new object[] { sharedObject, sharedObject };
+
+        var result = RoundTripThroughCodec(original);
+
+        Assert.Equal(original, result);
+        Assert.NotSame(result[0], result[1]);
+    }
+
+    [Fact]
+    public void DuplicateReferencesToAnyExceptionTypesSerializeTargetMultipleTimes()
+    {
+        var sharedException = new MyCustomException("Something bad");
+        var original = new Exception[] { sharedException, sharedException };
+
+        var result = RoundTripThroughCodec(original);
+
+        Assert.NotSame(result[0], result[1]);
+    }
+
+    [Fact]
+    public void DuplicateReferencesToExceptionTypeWithSurrogateSerializeTargetMultipleTimes()
+    {
+        var sharedException = new MyCustomForeignException(1);
+        var original = new Exception[] { sharedException, sharedException };
+
+        var result = RoundTripThroughCodec(original);
+
+        Assert.NotSame(result[0], result[1]);
     }
 
     [Fact]
