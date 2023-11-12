@@ -10,7 +10,7 @@ using static Orleans.CodeGenerator.InvokableGenerator;
 
 namespace Orleans.CodeGenerator
 {
-    internal static class SerializerGenerator
+    internal class SerializerGenerator
     {
         private const string BaseTypeSerializerFieldName = "_baseTypeSerializer";
         private const string ActivatorFieldName = "_activator";
@@ -19,8 +19,16 @@ namespace Orleans.CodeGenerator
         private const string WriteFieldMethodName = "WriteField";
         private const string ReadValueMethodName = "ReadValue";
         private const string CodecFieldTypeFieldName = "_codecFieldType";
+        private readonly CodeGenerator _codeGenerator;
 
-        public static ClassDeclarationSyntax GenerateSerializer(LibraryTypes libraryTypes, ISerializableTypeDescription type)
+        public SerializerGenerator(CodeGenerator codeGenerator)
+        {
+            _codeGenerator = codeGenerator;
+        }
+
+        private LibraryTypes LibraryTypes => _codeGenerator.LibraryTypes;
+
+        public ClassDeclarationSyntax Generate(ISerializableTypeDescription type)
         {
             var simpleClassName = GetSimpleClassName(type);
 
@@ -33,7 +41,7 @@ namespace Orleans.CodeGenerator
                 }
                 else if (member is IFieldDescription or IPropertyDescription)
                 {
-                    members.Add(new SerializableMember(libraryTypes, type, member, members.Count));
+                    members.Add(new SerializableMember(_codeGenerator, member, members.Count));
                 }
                 else if (member is MethodParameterFieldDescription methodParameter)
                 {
@@ -41,9 +49,9 @@ namespace Orleans.CodeGenerator
                 }
             }
 
-            var fieldDescriptions = GetFieldDescriptions(type, members, libraryTypes);
+            var fieldDescriptions = GetFieldDescriptions(type, members);
             var fieldDeclarations = GetFieldDeclarations(fieldDescriptions);
-            var ctor = GenerateConstructor(libraryTypes, simpleClassName, fieldDescriptions);
+            var ctor = GenerateConstructor(simpleClassName, fieldDescriptions);
 
             var accessibility = type.Accessibility switch
             {
@@ -51,7 +59,7 @@ namespace Orleans.CodeGenerator
                 _ => SyntaxKind.InternalKeyword,
             };
 
-            var baseType = (type.IsAbstractType ? libraryTypes.AbstractTypeSerializer : libraryTypes.FieldCodec_1).ToTypeSyntax(type.TypeSyntax);
+            var baseType = (type.IsAbstractType ? LibraryTypes.AbstractTypeSerializer : LibraryTypes.FieldCodec_1).ToTypeSyntax(type.TypeSyntax);
 
             var classDeclaration = ClassDeclaration(simpleClassName)
                 .AddBaseListTypes(SimpleBaseType(baseType))
@@ -64,14 +72,14 @@ namespace Orleans.CodeGenerator
 
             if (type.IsEnumType)
             {
-                var writeMethod = GenerateEnumWriteMethod(type, libraryTypes);
-                var readMethod = GenerateEnumReadMethod(type, libraryTypes);
+                var writeMethod = GenerateEnumWriteMethod(type);
+                var readMethod = GenerateEnumReadMethod(type);
                 classDeclaration = classDeclaration.AddMembers(writeMethod, readMethod);
             }
             else
             {
-                var serializeMethod = GenerateSerializeMethod(type, fieldDescriptions, members, libraryTypes);
-                var deserializeMethod = GenerateDeserializeMethod(type, fieldDescriptions, members, libraryTypes);
+                var serializeMethod = GenerateSerializeMethod(type, fieldDescriptions, members);
+                var deserializeMethod = GenerateDeserializeMethod(type, fieldDescriptions, members);
                 if (type.IsAbstractType)
                 {
                     if (serializeMethod != null) classDeclaration = classDeclaration.AddMembers(serializeMethod);
@@ -79,11 +87,11 @@ namespace Orleans.CodeGenerator
                 }
                 else
                 {
-                    var writeFieldMethod = GenerateCompoundTypeWriteFieldMethod(type, libraryTypes);
-                    var readValueMethod = GenerateCompoundTypeReadValueMethod(type, fieldDescriptions, libraryTypes);
+                    var writeFieldMethod = GenerateCompoundTypeWriteFieldMethod(type);
+                    var readValueMethod = GenerateCompoundTypeReadValueMethod(type, fieldDescriptions);
                     classDeclaration = classDeclaration.AddMembers(serializeMethod, deserializeMethod, writeFieldMethod, readValueMethod);
 
-                    var serializerInterface = type.IsValueType ? libraryTypes.ValueSerializer : type.IsSealedType ? null : libraryTypes.BaseCodec_1;
+                    var serializerInterface = type.IsValueType ? LibraryTypes.ValueSerializer : type.IsSealedType ? null : LibraryTypes.BaseCodec_1;
                     if (serializerInterface != null)
                         classDeclaration = classDeclaration.AddBaseListTypes(SimpleBaseType(serializerInterface.ToTypeSyntax(type.TypeSyntax)));
                 }
@@ -107,7 +115,7 @@ namespace Orleans.CodeGenerator
             _ => CodeGenerator.CodeGeneratorName
         };
 
-        private static MemberDeclarationSyntax[] GetFieldDeclarations(List<GeneratedFieldDescription> fieldDescriptions)
+        private MemberDeclarationSyntax[] GetFieldDeclarations(List<GeneratedFieldDescription> fieldDescriptions)
         {
             return fieldDescriptions.Select(GetFieldDeclaration).ToArray();
 
@@ -141,7 +149,7 @@ namespace Orleans.CodeGenerator
             }
         }
 
-        private static ConstructorDeclarationSyntax GenerateConstructor(LibraryTypes libraryTypes, string simpleClassName, List<GeneratedFieldDescription> fieldDescriptions)
+        private ConstructorDeclarationSyntax GenerateConstructor(string simpleClassName, List<GeneratedFieldDescription> fieldDescriptions)
         {
             var codecProviderAdded = false;
             var parameters = new List<ParameterSyntax>();
@@ -161,7 +169,7 @@ namespace Orleans.CodeGenerator
                     case CodecFieldDescription or BaseCodecFieldDescription when !field.IsInjected:
                         if (!codecProviderAdded)
                         {
-                            parameters.Add(Parameter(Identifier("codecProvider")).WithType(libraryTypes.ICodecProvider.ToTypeSyntax()));
+                            parameters.Add(Parameter(Identifier("codecProvider")).WithType(LibraryTypes.ICodecProvider.ToTypeSyntax()));
                             codecProviderAdded = true;
                         }
 
@@ -187,36 +195,35 @@ namespace Orleans.CodeGenerator
             }
         }
 
-        private static List<GeneratedFieldDescription> GetFieldDescriptions(
+        private List<GeneratedFieldDescription> GetFieldDescriptions(
             ISerializableTypeDescription serializableTypeDescription,
-            List<ISerializableMember> members,
-            LibraryTypes libraryTypes)
+            List<ISerializableMember> members)
         {
             var fields = new List<GeneratedFieldDescription>();
 
             if (!serializableTypeDescription.IsAbstractType)
             {
-                fields.Add(new CodecFieldTypeFieldDescription(libraryTypes.Type.ToTypeSyntax(), CodecFieldTypeFieldName, serializableTypeDescription.TypeSyntax));
+                fields.Add(new CodecFieldTypeFieldDescription(LibraryTypes.Type.ToTypeSyntax(), CodecFieldTypeFieldName, serializableTypeDescription.TypeSyntax));
             }
 
             if (serializableTypeDescription.HasComplexBaseType)
             {
-                fields.Add(GetBaseTypeField(serializableTypeDescription, libraryTypes));
+                fields.Add(GetBaseTypeField(serializableTypeDescription));
             }
 
             if (serializableTypeDescription.UseActivator && !serializableTypeDescription.IsAbstractType)
             {
-                fields.Add(new ActivatorFieldDescription(libraryTypes.IActivator_1.ToTypeSyntax(serializableTypeDescription.TypeSyntax), ActivatorFieldName));
+                fields.Add(new ActivatorFieldDescription(LibraryTypes.IActivator_1.ToTypeSyntax(serializableTypeDescription.TypeSyntax), ActivatorFieldName));
             }
 
             int typeIndex = 0;
             foreach (var member in serializableTypeDescription.Members.Distinct(MemberDescriptionTypeComparer.Default))
             {
                 // Add a codec field for any field in the target which does not have a static codec.
-                if (libraryTypes.StaticCodecs.FindByUnderlyingType(member.Type) is not null)
+                if (LibraryTypes.StaticCodecs.FindByUnderlyingType(member.Type) is not null)
                     continue;
 
-                fields.Add(new TypeFieldDescription(libraryTypes.Type.ToTypeSyntax(), $"_type{typeIndex}", member.TypeSyntax, member.Type));
+                fields.Add(new TypeFieldDescription(LibraryTypes.Type.ToTypeSyntax(), $"_type{typeIndex}", member.TypeSyntax, member.Type));
                 fields.Add(GetCodecDescription(member, typeIndex));
                 typeIndex++;
             }
@@ -246,8 +253,8 @@ namespace Orleans.CodeGenerator
             {
                 var t = member.Type;
                 TypeSyntax codecType = null;
-                if (t.HasAttribute(libraryTypes.GenerateSerializerAttribute)
-                    && (SymbolEqualityComparer.Default.Equals(t.ContainingAssembly, libraryTypes.Compilation.Assembly) || t.ContainingAssembly.HasAttribute(libraryTypes.TypeManifestProviderAttribute))
+                if (t.HasAnyAttribute(LibraryTypes.GenerateSerializerAttributes)
+                    && (SymbolEqualityComparer.Default.Equals(t.ContainingAssembly, LibraryTypes.Compilation.Assembly) || t.ContainingAssembly.HasAttribute(LibraryTypes.TypeManifestProviderAttribute))
                     && t is not INamedTypeSymbol { IsGenericType: true, TypeArguments.Length: 0 })
                 {
                     // Use the concrete generated type and avoid expensive interface dispatch (except for complex nested cases that will fall back to IFieldCodec<TField>)
@@ -265,14 +272,14 @@ namespace Orleans.CodeGenerator
                 }
                 else if (t is IArrayTypeSymbol { IsSZArray: true } array)
                 {
-                    codecType = libraryTypes.ArrayCodec.Construct(array.ElementType).ToTypeSyntax();
+                    codecType = LibraryTypes.ArrayCodec.Construct(array.ElementType).ToTypeSyntax();
                 }
-                else if (libraryTypes.WellKnownCodecs.FindByUnderlyingType(t) is { } codec)
+                else if (LibraryTypes.WellKnownCodecs.FindByUnderlyingType(t) is { } codec)
                 {
                     // The codec is not a static codec and is also not a generic codec.
                     codecType = codec.CodecType.ToTypeSyntax();
                 }
-                else if (t is INamedTypeSymbol { ConstructedFrom: { } unboundFieldType } named && libraryTypes.WellKnownCodecs.FindByUnderlyingType(unboundFieldType) is { } genericCodec)
+                else if (t is INamedTypeSymbol { ConstructedFrom: { } unboundFieldType } named && LibraryTypes.WellKnownCodecs.FindByUnderlyingType(unboundFieldType) is { } genericCodec)
                 {
                     // Construct the generic codec type using the field's type arguments.
                     codecType = genericCodec.CodecType.Construct(named.TypeArguments.ToArray()).ToTypeSyntax();
@@ -280,32 +287,31 @@ namespace Orleans.CodeGenerator
                 else
                 {
                     // Use the IFieldCodec<TField> interface
-                    codecType = libraryTypes.FieldCodec_1.ToTypeSyntax(member.TypeSyntax);
+                    codecType = LibraryTypes.FieldCodec_1.ToTypeSyntax(member.TypeSyntax);
                 }
 
                 return new CodecFieldDescription(codecType, $"_codec{index}", t);
             }
         }
 
-        private static BaseCodecFieldDescription GetBaseTypeField(ISerializableTypeDescription serializableTypeDescription, LibraryTypes libraryTypes)
+        private BaseCodecFieldDescription GetBaseTypeField(ISerializableTypeDescription serializableTypeDescription)
         {
             var baseType = serializableTypeDescription.BaseType;
-            if (baseType.HasAttribute(libraryTypes.GenerateSerializerAttribute)
-                && (SymbolEqualityComparer.Default.Equals(baseType.ContainingAssembly, libraryTypes.Compilation.Assembly) || baseType.ContainingAssembly.HasAttribute(libraryTypes.TypeManifestProviderAttribute))
+            if (baseType.HasAnyAttribute(LibraryTypes.GenerateSerializerAttributes)
+                && (SymbolEqualityComparer.Default.Equals(baseType.ContainingAssembly, LibraryTypes.Compilation.Assembly) || baseType.ContainingAssembly.HasAttribute(LibraryTypes.TypeManifestProviderAttribute))
                 && baseType is not INamedTypeSymbol { IsGenericType: true })
             {
                 // Use the concrete generated type and avoid expensive interface dispatch (except for generic types that will fall back to IBaseCodec<T>)
                 return new(QualifiedName(ParseName(GetGeneratedNamespaceName(baseType)), IdentifierName(GetSimpleClassName(baseType.Name))), true);
             }
 
-            return new(libraryTypes.BaseCodec_1.ToTypeSyntax(serializableTypeDescription.BaseTypeSyntax));
+            return new(LibraryTypes.BaseCodec_1.ToTypeSyntax(serializableTypeDescription.BaseTypeSyntax));
         }
 
-        private static MemberDeclarationSyntax GenerateSerializeMethod(
+        private MemberDeclarationSyntax GenerateSerializeMethod(
             ISerializableTypeDescription type,
             List<GeneratedFieldDescription> serializerFields,
-            List<ISerializableMember> members,
-            LibraryTypes libraryTypes)
+            List<ISerializableMember> members)
         {
             var returnType = PredefinedType(Token(SyntaxKind.VoidKeyword));
 
@@ -339,11 +345,11 @@ namespace Orleans.CodeGenerator
 
             if (type.IncludePrimaryConstructorParameters)
             {
-                AddSerializationMembers(type, serializerFields, members.Where(m => m.IsPrimaryConstructorParameter), libraryTypes, writerParam, instanceParam, previousFieldIdVar, body);
+                AddSerializationMembers(type, serializerFields, members.Where(m => m.IsPrimaryConstructorParameter), writerParam, instanceParam, previousFieldIdVar, body);
                 body.Add(ExpressionStatement(InvocationExpression(writerParam.Member("WriteEndBase"), ArgumentList())));
             }
 
-            AddSerializationMembers(type, serializerFields, members.Where(m => !m.IsPrimaryConstructorParameter), libraryTypes, writerParam, instanceParam, previousFieldIdVar, body);
+            AddSerializationMembers(type, serializerFields, members.Where(m => !m.IsPrimaryConstructorParameter), writerParam, instanceParam, previousFieldIdVar, body);
 
             AddSerializationCallbacks(type, instanceParam, "OnSerialized", body);
 
@@ -352,13 +358,13 @@ namespace Orleans.CodeGenerator
 
             var parameters = new[]
             {
-                Parameter("writer".ToIdentifier()).WithType(libraryTypes.Writer.ToTypeSyntax()).WithModifiers(TokenList(Token(SyntaxKind.RefKeyword))),
+                Parameter("writer".ToIdentifier()).WithType(LibraryTypes.Writer.ToTypeSyntax()).WithModifiers(TokenList(Token(SyntaxKind.RefKeyword))),
                 Parameter("instance".ToIdentifier()).WithType(type.TypeSyntax)
             };
 
             if (type.IsValueType)
             {
-                parameters[1] = parameters[1].WithModifiers(libraryTypes.HasScopedKeyword() ? TokenList(Token(SyntaxKind.ScopedKeyword), Token(SyntaxKind.RefKeyword)) : TokenList(Token(SyntaxKind.RefKeyword)));
+                parameters[1] = parameters[1].WithModifiers(LibraryTypes.HasScopedKeyword() ? TokenList(Token(SyntaxKind.ScopedKeyword), Token(SyntaxKind.RefKeyword)) : TokenList(Token(SyntaxKind.RefKeyword)));
             }
 
             var res = MethodDeclaration(returnType, SerializeMethodName)
@@ -370,12 +376,12 @@ namespace Orleans.CodeGenerator
 
             res = type.IsAbstractType
                 ? res.AddModifiers(Token(SyntaxKind.OverrideKeyword))
-                : res.AddConstraintClauses(TypeParameterConstraintClause("TBufferWriter").AddConstraints(TypeConstraint(libraryTypes.IBufferWriter.ToTypeSyntax(PredefinedType(Token(SyntaxKind.ByteKeyword))))));
+                : res.AddConstraintClauses(TypeParameterConstraintClause("TBufferWriter").AddConstraints(TypeConstraint(LibraryTypes.IBufferWriter.ToTypeSyntax(PredefinedType(Token(SyntaxKind.ByteKeyword))))));
 
             return res;
         }
 
-        private static void AddSerializationMembers(ISerializableTypeDescription type, List<GeneratedFieldDescription> serializerFields, IEnumerable<ISerializableMember> members, LibraryTypes libraryTypes, IdentifierNameSyntax writerParam, IdentifierNameSyntax instanceParam, IdentifierNameSyntax previousFieldIdVar, List<StatementSyntax> body)
+        private void AddSerializationMembers(ISerializableTypeDescription type, List<GeneratedFieldDescription> serializerFields, IEnumerable<ISerializableMember> members, IdentifierNameSyntax writerParam, IdentifierNameSyntax instanceParam, IdentifierNameSyntax previousFieldIdVar, List<StatementSyntax> body)
         {
             uint previousFieldId = 0;
             foreach (var member in members.OrderBy(m => m.Member.FieldId))
@@ -397,7 +403,7 @@ namespace Orleans.CodeGenerator
                 // Codecs can either be static classes or injected into the constructor.
                 // Either way, the member signatures are the same.
                 var memberType = description.Type;
-                var staticCodec = libraryTypes.StaticCodecs.FindByUnderlyingType(memberType);
+                var staticCodec = LibraryTypes.StaticCodecs.FindByUnderlyingType(memberType);
                 ExpressionSyntax codecExpression;
                 if (staticCodec != null)
                 {
@@ -447,11 +453,10 @@ namespace Orleans.CodeGenerator
             }
         }
 
-        private static MemberDeclarationSyntax GenerateDeserializeMethod(
+        private MemberDeclarationSyntax GenerateDeserializeMethod(
             ISerializableTypeDescription type,
             List<GeneratedFieldDescription> serializerFields,
-            List<ISerializableMember> members,
-            LibraryTypes libraryTypes)
+            List<ISerializableMember> members)
         {
             var returnType = PredefinedType(Token(SyntaxKind.VoidKeyword));
 
@@ -500,7 +505,7 @@ namespace Orleans.CodeGenerator
                 // C#: Field header = default;
                 body.Add(LocalDeclarationStatement(
                     VariableDeclaration(
-                        libraryTypes.Field.ToTypeSyntax(),
+                        LibraryTypes.Field.ToTypeSyntax(),
                         SingletonSeparatedList(VariableDeclarator(headerVar.Identifier, null, EqualsValueClause(LiteralExpression(SyntaxKind.DefaultLiteralExpression)))))));
 
                 emptyBodyCount = 2;
@@ -530,13 +535,13 @@ namespace Orleans.CodeGenerator
             var genericParam = ParseTypeName("TReaderInput");
             var parameters = new[]
             {
-                Parameter(readerParam.Identifier).WithType(libraryTypes.Reader.ToTypeSyntax(genericParam)).WithModifiers(TokenList(Token(SyntaxKind.RefKeyword))),
+                Parameter(readerParam.Identifier).WithType(LibraryTypes.Reader.ToTypeSyntax(genericParam)).WithModifiers(TokenList(Token(SyntaxKind.RefKeyword))),
                 Parameter(instanceParam.Identifier).WithType(type.TypeSyntax)
             };
 
             if (type.IsValueType)
             {
-                parameters[1] = parameters[1].WithModifiers(libraryTypes.HasScopedKeyword() ? TokenList(Token(SyntaxKind.ScopedKeyword), Token(SyntaxKind.RefKeyword)) : TokenList(Token(SyntaxKind.RefKeyword)));
+                parameters[1] = parameters[1].WithModifiers(LibraryTypes.HasScopedKeyword() ? TokenList(Token(SyntaxKind.ScopedKeyword), Token(SyntaxKind.RefKeyword)) : TokenList(Token(SyntaxKind.RefKeyword)));
             }
 
             var res = MethodDeclaration(returnType, DeserializeMethodName)
@@ -586,7 +591,7 @@ namespace Orleans.CodeGenerator
                     // Codecs can either be static classes or injected into the constructor.
                     // Either way, the member signatures are the same.
                     ExpressionSyntax codecExpression;
-                    if (libraryTypes.StaticCodecs.FindByUnderlyingType(description.Type) is { } staticCodec)
+                    if (LibraryTypes.StaticCodecs.FindByUnderlyingType(description.Type) is { } staticCodec)
                     {
                         codecExpression = staticCodec.CodecType.ToNameSyntax();
                     }
@@ -641,7 +646,7 @@ namespace Orleans.CodeGenerator
             }
         }
 
-        private static void AddSerializationCallbacks(ISerializableTypeDescription type, IdentifierNameSyntax instanceParam, string callbackMethodName, List<StatementSyntax> body)
+        private void AddSerializationCallbacks(ISerializableTypeDescription type, IdentifierNameSyntax instanceParam, string callbackMethodName, List<StatementSyntax> body)
         {
             for (var hookIndex = 0; hookIndex < type.SerializationHooks.Count; ++hookIndex)
             {
@@ -664,9 +669,8 @@ namespace Orleans.CodeGenerator
             }
         }
 
-        private static MemberDeclarationSyntax GenerateCompoundTypeWriteFieldMethod(
-            ISerializableTypeDescription type,
-            LibraryTypes libraryTypes)
+        private MemberDeclarationSyntax GenerateCompoundTypeWriteFieldMethod(
+            ISerializableTypeDescription type)
         {
             var returnType = PredefinedType(Token(SyntaxKind.VoidKeyword));
 
@@ -786,9 +790,9 @@ namespace Orleans.CodeGenerator
 
             var parameters = new[]
             {
-                Parameter("writer".ToIdentifier()).WithType(libraryTypes.Writer.ToTypeSyntax()).WithModifiers(TokenList(Token(SyntaxKind.RefKeyword))),
+                Parameter("writer".ToIdentifier()).WithType(LibraryTypes.Writer.ToTypeSyntax()).WithModifiers(TokenList(Token(SyntaxKind.RefKeyword))),
                 Parameter("fieldIdDelta".ToIdentifier()).WithType(PredefinedType(Token(SyntaxKind.UIntKeyword))),
-                Parameter("expectedType".ToIdentifier()).WithType(libraryTypes.Type.ToTypeSyntax()),
+                Parameter("expectedType".ToIdentifier()).WithType(LibraryTypes.Type.ToTypeSyntax()),
                 Parameter("value".ToIdentifier()).WithType(type.TypeSyntax)
             };
 
@@ -796,15 +800,14 @@ namespace Orleans.CodeGenerator
                 .AddModifiers(Token(SyntaxKind.PublicKeyword))
                 .AddParameterListParameters(parameters)
                 .AddTypeParameterListParameters(TypeParameter("TBufferWriter"))
-                .AddConstraintClauses(TypeParameterConstraintClause("TBufferWriter").AddConstraints(TypeConstraint(libraryTypes.IBufferWriter.ToTypeSyntax(PredefinedType(Token(SyntaxKind.ByteKeyword))))))
+                .AddConstraintClauses(TypeParameterConstraintClause("TBufferWriter").AddConstraints(TypeConstraint(LibraryTypes.IBufferWriter.ToTypeSyntax(PredefinedType(Token(SyntaxKind.ByteKeyword))))))
                 .AddAttributeLists(AttributeList(SingletonSeparatedList(CodeGenerator.GetMethodImplAttributeSyntax())))
                 .AddBodyStatements(body.ToArray());
         }
 
-        private static MemberDeclarationSyntax GenerateCompoundTypeReadValueMethod(
+        private MemberDeclarationSyntax GenerateCompoundTypeReadValueMethod(
             ISerializableTypeDescription type,
-            List<GeneratedFieldDescription> serializerFields,
-            LibraryTypes libraryTypes)
+            List<GeneratedFieldDescription> serializerFields)
         {
             var readerParam = "reader".ToIdentifierName();
             var fieldParam = "field".ToIdentifierName();
@@ -836,7 +839,7 @@ namespace Orleans.CodeGenerator
             ExpressionSyntax createValueExpression = type.UseActivator switch
             {
                 true => InvocationExpression(serializerFields.OfType<ActivatorFieldDescription>().Single().FieldName.ToIdentifierName().Member("Create")),
-                false => type.GetObjectCreationExpression(libraryTypes)
+                false => type.GetObjectCreationExpression()
             };
 
             // C#: var result = _activator.Create();
@@ -886,7 +889,7 @@ namespace Orleans.CodeGenerator
                 body.Add(
                     LocalDeclarationStatement(
                         VariableDeclaration(
-                            libraryTypes.Type.ToTypeSyntax(),
+                            LibraryTypes.Type.ToTypeSyntax(),
                             SingletonSeparatedList(VariableDeclarator(valueTypeField.Identifier)
                                 .WithInitializer(EqualsValueClause(fieldParam.Member("FieldType")))))));
                 body.Add(
@@ -905,8 +908,8 @@ namespace Orleans.CodeGenerator
 
             var parameters = new[]
             {
-                Parameter(readerParam.Identifier).WithType(libraryTypes.Reader.ToTypeSyntax(readerInputTypeParam)).WithModifiers(TokenList(Token(SyntaxKind.RefKeyword))),
-                Parameter(fieldParam.Identifier).WithType(libraryTypes.Field.ToTypeSyntax())
+                Parameter(readerParam.Identifier).WithType(LibraryTypes.Reader.ToTypeSyntax(readerInputTypeParam)).WithModifiers(TokenList(Token(SyntaxKind.RefKeyword))),
+                Parameter(fieldParam.Identifier).WithType(LibraryTypes.Field.ToTypeSyntax())
             };
 
             return MethodDeclaration(type.TypeSyntax, ReadValueMethodName)
@@ -917,9 +920,8 @@ namespace Orleans.CodeGenerator
                 .AddBodyStatements(body.ToArray());
         }
 
-        private static MemberDeclarationSyntax GenerateEnumWriteMethod(
-            ISerializableTypeDescription type,
-            LibraryTypes libraryTypes)
+        private MemberDeclarationSyntax GenerateEnumWriteMethod(
+            ISerializableTypeDescription type)
         {
             var returnType = PredefinedType(Token(SyntaxKind.VoidKeyword));
 
@@ -932,7 +934,7 @@ namespace Orleans.CodeGenerator
 
             // Codecs can either be static classes or injected into the constructor.
             // Either way, the member signatures are the same.
-            var staticCodec = libraryTypes.StaticCodecs.FindByUnderlyingType(type.BaseType);
+            var staticCodec = LibraryTypes.StaticCodecs.FindByUnderlyingType(type.BaseType);
             var codecExpression = staticCodec.CodecType.ToNameSyntax();
 
             body.Add(
@@ -952,9 +954,9 @@ namespace Orleans.CodeGenerator
 
             var parameters = new[]
             {
-                Parameter("writer".ToIdentifier()).WithType(libraryTypes.Writer.ToTypeSyntax()).WithModifiers(TokenList(Token(SyntaxKind.RefKeyword))),
+                Parameter("writer".ToIdentifier()).WithType(LibraryTypes.Writer.ToTypeSyntax()).WithModifiers(TokenList(Token(SyntaxKind.RefKeyword))),
                 Parameter("fieldIdDelta".ToIdentifier()).WithType(PredefinedType(Token(SyntaxKind.UIntKeyword))),
-                Parameter("expectedType".ToIdentifier()).WithType(libraryTypes.Type.ToTypeSyntax()),
+                Parameter("expectedType".ToIdentifier()).WithType(LibraryTypes.Type.ToTypeSyntax()),
                 Parameter("value".ToIdentifier()).WithType(type.TypeSyntax)
             };
 
@@ -962,19 +964,18 @@ namespace Orleans.CodeGenerator
                 .AddModifiers(Token(SyntaxKind.PublicKeyword))
                 .AddParameterListParameters(parameters)
                 .AddTypeParameterListParameters(TypeParameter("TBufferWriter"))
-                .AddConstraintClauses(TypeParameterConstraintClause("TBufferWriter").AddConstraints(TypeConstraint(libraryTypes.IBufferWriter.ToTypeSyntax(PredefinedType(Token(SyntaxKind.ByteKeyword))))))
+                .AddConstraintClauses(TypeParameterConstraintClause("TBufferWriter").AddConstraints(TypeConstraint(LibraryTypes.IBufferWriter.ToTypeSyntax(PredefinedType(Token(SyntaxKind.ByteKeyword))))))
                 .AddAttributeLists(AttributeList(SingletonSeparatedList(CodeGenerator.GetMethodImplAttributeSyntax())))
                 .AddBodyStatements(body.ToArray());
         }
 
-        private static MemberDeclarationSyntax GenerateEnumReadMethod(
-            ISerializableTypeDescription type,
-            LibraryTypes libraryTypes)
+        private MemberDeclarationSyntax GenerateEnumReadMethod(
+            ISerializableTypeDescription type)
         {
             var readerParam = "reader".ToIdentifierName();
             var fieldParam = "field".ToIdentifierName();
 
-            var staticCodec = libraryTypes.StaticCodecs.FindByUnderlyingType(type.BaseType);
+            var staticCodec = LibraryTypes.StaticCodecs.FindByUnderlyingType(type.BaseType);
             ExpressionSyntax codecExpression = staticCodec.CodecType.ToNameSyntax();
             ExpressionSyntax readValueExpression = InvocationExpression(
                 codecExpression.Member("ReadValue"),
@@ -989,8 +990,8 @@ namespace Orleans.CodeGenerator
             var genericParam = ParseTypeName("TReaderInput");
             var parameters = new[]
             {
-                Parameter(readerParam.Identifier).WithType(libraryTypes.Reader.ToTypeSyntax(genericParam)).WithModifiers(TokenList(Token(SyntaxKind.RefKeyword))),
-                Parameter(fieldParam.Identifier).WithType(libraryTypes.Field.ToTypeSyntax())
+                Parameter(readerParam.Identifier).WithType(LibraryTypes.Reader.ToTypeSyntax(genericParam)).WithModifiers(TokenList(Token(SyntaxKind.RefKeyword))),
+                Parameter(fieldParam.Identifier).WithType(LibraryTypes.Field.ToTypeSyntax())
             };
 
             return MethodDeclaration(type.TypeSyntax, ReadValueMethodName)
@@ -1132,7 +1133,7 @@ namespace Orleans.CodeGenerator
             IMemberDescription ISerializableMember.Member => _member;
             public MethodParameterFieldDescription Member => _member;
 
-            private LibraryTypes LibraryTypes => _member.Method.ContainingInterface.CodeGenerator.LibraryTypes;
+            private LibraryTypes LibraryTypes => _member.CodeGenerator.LibraryTypes;
 
             public bool IsShallowCopyable => LibraryTypes.IsShallowCopyable(_member.Parameter.Type) || _member.Parameter.HasAnyAttribute(LibraryTypes.ImmutableAttributes);
 
@@ -1172,25 +1173,29 @@ namespace Orleans.CodeGenerator
         /// </summary>
         internal class SerializableMember : ISerializableMember
         {
-            private readonly SemanticModel _model;
-            private readonly LibraryTypes _libraryTypes;
-            private IPropertySymbol _property;
             private readonly IMemberDescription _member;
+            private readonly CodeGenerator _codeGenerator;
+            private IPropertySymbol _property;
 
             /// <summary>
             /// The ordinal assigned to this field.
             /// </summary>
             private readonly int _ordinal;
 
-            public SerializableMember(LibraryTypes libraryTypes, ISerializableTypeDescription type, IMemberDescription member, int ordinal)
+            public SerializableMember(CodeGenerator codeGenerator, IMemberDescription member, int ordinal)
             {
-                _libraryTypes = libraryTypes;
-                _model = type.SemanticModel;
+                _codeGenerator = codeGenerator;
                 _ordinal = ordinal;
                 _member = member;
             }
 
-            public bool IsShallowCopyable => _libraryTypes.IsShallowCopyable(_member.Type) || (Property is { } prop && prop.HasAnyAttribute(_libraryTypes.ImmutableAttributes)) || _member.Symbol.HasAnyAttribute(_libraryTypes.ImmutableAttributes);
+            private Compilation Compilation => _codeGenerator.Compilation;
+            private LibraryTypes LibraryTypes => _codeGenerator.LibraryTypes;
+
+            public bool IsShallowCopyable =>
+                LibraryTypes.IsShallowCopyable(_member.Type)
+                || Property is { } prop && prop.HasAnyAttribute(LibraryTypes.ImmutableAttributes)
+                || _member.Symbol.HasAnyAttribute(LibraryTypes.ImmutableAttributes);
 
             public bool IsValueType => Type.IsValueType;
 
@@ -1225,7 +1230,7 @@ namespace Orleans.CodeGenerator
             /// <summary>
             /// Gets a value indicating whether or not this member represents an accessible field.
             /// </summary>
-            private bool IsGettableField => Field is { } field && _model.IsAccessible(0, field) && !IsObsolete;
+            private bool IsGettableField => Field is { } field && _codeGenerator.Compilation.IsSymbolAccessibleWithin(field, Compilation.Assembly) && !IsObsolete;
 
             /// <summary>
             /// Gets a value indicating whether or not this member represents an accessible, mutable field.
@@ -1235,12 +1240,12 @@ namespace Orleans.CodeGenerator
             /// <summary>
             /// Gets a value indicating whether or not this member represents a property with an accessible, non-obsolete getter.
             /// </summary>
-            private bool IsGettableProperty => Property?.GetMethod is { } getMethod && _model.IsAccessible(0, getMethod) && !IsObsolete;
+            private bool IsGettableProperty => Property?.GetMethod is { } getMethod && Compilation.IsSymbolAccessibleWithin(getMethod, Compilation.Assembly) && !IsObsolete;
 
             /// <summary>
             /// Gets a value indicating whether or not this member represents a property with an accessible, non-obsolete setter.
             /// </summary>
-            private bool IsSettableProperty => Property?.SetMethod is { } setMethod && _model.IsAccessible(0, setMethod) && !setMethod.IsInitOnly && !IsObsolete;
+            private bool IsSettableProperty => Property?.SetMethod is { } setMethod && Compilation.IsSymbolAccessibleWithin(setMethod, Compilation.Assembly) && !setMethod.IsInitOnly && !IsObsolete;
 
             /// <summary>
             /// Gets syntax representing the type of this field.
@@ -1258,8 +1263,8 @@ namespace Orleans.CodeGenerator
             /// <summary>
             /// Gets a value indicating whether or not this field is obsolete.
             /// </summary>
-            private bool IsObsolete => Member.Symbol.HasAttribute(_libraryTypes.ObsoleteAttribute) ||
-                                       Property != null && Property.HasAttribute(_libraryTypes.ObsoleteAttribute);
+            private bool IsObsolete => Member.Symbol.HasAttribute(LibraryTypes.ObsoleteAttribute) ||
+                                       Property != null && Property.HasAttribute(LibraryTypes.ObsoleteAttribute);
 
             public bool IsPrimaryConstructorParameter => _member.IsPrimaryConstructorParameter;
 
@@ -1352,13 +1357,13 @@ namespace Orleans.CodeGenerator
             public FieldAccessorDescription GetGetterFieldDescription()
             {
                 if (IsGettableField || IsGettableProperty) return null;
-                return GetFieldAccessor(ContainingType, TypeSyntax, MemberName, GetterFieldName, _libraryTypes, false);
+                return GetFieldAccessor(ContainingType, TypeSyntax, MemberName, GetterFieldName, LibraryTypes, false);
             }
 
             public FieldAccessorDescription GetSetterFieldDescription()
             {
                 if (IsSettableField || IsSettableProperty) return null;
-                return GetFieldAccessor(ContainingType, TypeSyntax, MemberName, SetterFieldName, _libraryTypes, true);
+                return GetFieldAccessor(ContainingType, TypeSyntax, MemberName, SetterFieldName, LibraryTypes, true);
             }
 
             public static FieldAccessorDescription GetFieldAccessor(INamedTypeSymbol containingType, TypeSyntax fieldType, string fieldName, string accessorName, LibraryTypes library, bool setter)

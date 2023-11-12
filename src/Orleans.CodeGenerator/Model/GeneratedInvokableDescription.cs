@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -7,36 +8,46 @@ using static Microsoft.CodeAnalysis.CSharp.SyntaxFactory;
 
 namespace Orleans.CodeGenerator
 {
-    internal sealed class GeneratedInvokerDescription : ISerializableTypeDescription
+    [DebuggerDisplay("{MethodDescription}")]
+    internal sealed class GeneratedInvokableDescription : ISerializableTypeDescription
     {
-        private readonly MethodDescription _methodDescription;
         private TypeSyntax _openTypeSyntax;
         private TypeSyntax _typeSyntax;
         private TypeSyntax _baseTypeSyntax;
 
-        public GeneratedInvokerDescription(
-            InvokableInterfaceDescription interfaceDescription,
-            MethodDescription methodDescription,
+        public GeneratedInvokableDescription(
+            InvokableMethodDescription methodDescription,
             Accessibility accessibility,
             string generatedClassName,
+            string generatedNamespaceName,
             List<IMemberDescription> members,
             List<INamedTypeSymbol> serializationHooks,
             INamedTypeSymbol baseType,
             List<TypeSyntax> constructorArguments,
-            CompoundTypeAliasComponent[] compoundTypeAliasArguments,
-            string returnValueInitializerMethod)
+            List<CompoundTypeAliasComponent[]> compoundTypeAliases,
+            string returnValueInitializerMethod,
+            ClassDeclarationSyntax classDeclarationSyntax)
         {
-            InterfaceDescription = interfaceDescription;
-            _methodDescription = methodDescription;
+            if (methodDescription.AllTypeParameters.Count == 0)
+            {
+                MetadataName = $"{generatedNamespaceName}.{generatedClassName}";
+            }
+            else
+            {
+                MetadataName = $"{generatedNamespaceName}.{generatedClassName}`{methodDescription.AllTypeParameters.Count}";
+            }
+
             BaseType = baseType;
             Name = generatedClassName;
+            GeneratedNamespace = generatedNamespaceName;
             Members = members;
-
+            MethodDescription = methodDescription;
             Accessibility = accessibility;
             SerializationHooks = serializationHooks;
             ActivatorConstructorParameters = constructorArguments;
-            CompoundTypeAliasArguments = compoundTypeAliasArguments;
+            CompoundTypeAliases = compoundTypeAliases;
             ReturnValueInitializerMethod = returnValueInitializerMethod;
+            ClassDeclarationSyntax = classDeclarationSyntax;
         }
 
         public Accessibility Accessibility { get; }
@@ -45,9 +56,9 @@ namespace Orleans.CodeGenerator
         public bool HasComplexBaseType => BaseType is { SpecialType: not SpecialType.System_Object };
         public bool IncludePrimaryConstructorParameters => false;
         public INamedTypeSymbol BaseType { get; }
-        public TypeSyntax BaseTypeSyntax => _baseTypeSyntax ??= BaseType.ToTypeSyntax(_methodDescription.TypeParameterSubstitutions);
+        public TypeSyntax BaseTypeSyntax => _baseTypeSyntax ??= BaseType.ToTypeSyntax(MethodDescription.TypeParameterSubstitutions);
         public string Namespace => GeneratedNamespace;
-        public string GeneratedNamespace => InterfaceDescription.GeneratedNamespace;
+        public string GeneratedNamespace { get; }
         public string Name { get; }
         public bool IsValueType => false;
         public bool IsSealedType => true;
@@ -55,13 +66,12 @@ namespace Orleans.CodeGenerator
         public bool IsEnumType => false;
         public bool IsGenericType => TypeParameters.Count > 0;
         public List<IMemberDescription> Members { get; }
-        public InvokableInterfaceDescription InterfaceDescription { get; }
-        public SemanticModel SemanticModel => InterfaceDescription.SemanticModel;
+        public Compilation Compilation => MethodDescription.CodeGenerator.Compilation;
         public bool IsEmptyConstructable => ActivatorConstructorParameters is not { Count: > 0 };
         public bool UseActivator => ActivatorConstructorParameters is { Count: > 0 };
         public bool TrackReferences => false;
         public bool OmitDefaultMemberValues => false;
-        public List<(string Name, ITypeParameterSymbol Parameter)> TypeParameters => _methodDescription.AllTypeParameters;
+        public List<(string Name, ITypeParameterSymbol Parameter)> TypeParameters => MethodDescription.AllTypeParameters;
         public List<INamedTypeSymbol> SerializationHooks { get; }
         public bool IsShallowCopyable => false;
         public bool IsUnsealedImmutable => false;
@@ -69,18 +79,23 @@ namespace Orleans.CodeGenerator
         public bool IsExceptionType => false;
         public List<TypeSyntax> ActivatorConstructorParameters { get; }
         public bool HasActivatorConstructor => UseActivator;
-        public CompoundTypeAliasComponent[] CompoundTypeAliasArguments {get;}
+        public List<CompoundTypeAliasComponent[]> CompoundTypeAliases {get;}
+        public ClassDeclarationSyntax ClassDeclarationSyntax { get; }
         public string ReturnValueInitializerMethod { get; }
 
-        public ExpressionSyntax GetObjectCreationExpression(LibraryTypes libraryTypes) => ObjectCreationExpression(TypeSyntax, ArgumentList(), null);
+        public InvokableMethodDescription MethodDescription { get; }
+        public string MetadataName { get; }
+
+        public ExpressionSyntax GetObjectCreationExpression() => ObjectCreationExpression(TypeSyntax, ArgumentList(), null);
 
         private TypeSyntax CreateTypeSyntax()
         {
-            var simpleName = InvokableGenerator.GetSimpleClassName(InterfaceDescription, _methodDescription);
+            var simpleName = InvokableGenerator.GetSimpleClassName(MethodDescription);
+            var subs = MethodDescription.TypeParameterSubstitutions;
             return (TypeParameters, Namespace) switch
             {
-                ({ Count: > 0 }, { Length: > 0 }) => QualifiedName(ParseName(Namespace), GenericName(Identifier(simpleName), TypeArgumentList(SeparatedList<TypeSyntax>(TypeParameters.Select(p => IdentifierName(p.Name)))))),
-                ({ Count: > 0 }, _) => GenericName(Identifier(simpleName), TypeArgumentList(SeparatedList<TypeSyntax>(TypeParameters.Select(p => IdentifierName(p.Name))))),
+                ({ Count: > 0 }, { Length: > 0 }) => QualifiedName(ParseName(Namespace), GenericName(Identifier(simpleName), TypeArgumentList(SeparatedList<TypeSyntax>(TypeParameters.Select(p => IdentifierName(subs[p.Parameter])))))),
+                ({ Count: > 0 }, _) => GenericName(Identifier(simpleName), TypeArgumentList(SeparatedList<TypeSyntax>(TypeParameters.Select(p => IdentifierName(subs[p.Parameter]))))),
                 (_, { Length: > 0 }) => QualifiedName(ParseName(Namespace), IdentifierName(simpleName)),
                 _ => IdentifierName(simpleName),
             };
@@ -88,7 +103,7 @@ namespace Orleans.CodeGenerator
 
         private TypeSyntax CreateOpenTypeSyntax()
         {
-            var simpleName = InvokableGenerator.GetSimpleClassName(InterfaceDescription, _methodDescription);
+            var simpleName = InvokableGenerator.GetSimpleClassName(MethodDescription);
             return (TypeParameters, Namespace) switch
             {
                 ({ Count: > 0 }, { Length: > 0 }) => QualifiedName(ParseName(Namespace), GenericName(Identifier(simpleName), TypeArgumentList(SeparatedList<TypeSyntax>(TypeParameters.Select(p => OmittedTypeArgument()))))),

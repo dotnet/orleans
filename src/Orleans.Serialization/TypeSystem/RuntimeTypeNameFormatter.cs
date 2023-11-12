@@ -2,6 +2,7 @@
 using System;
 using System.Collections.Concurrent;
 using System.Diagnostics.CodeAnalysis;
+using System.Linq;
 using System.Reflection;
 using System.Text;
 
@@ -51,7 +52,7 @@ public static class RuntimeTypeNameFormatter
 
     private static void Format(StringBuilder builder, Type type, bool isElementType, bool allowAliases = true)
     {
-        if (allowAliases && type.GetCustomAttribute<CompoundTypeAliasAttribute>() is { } compoundAlias)
+        if (allowAliases && type.GetCustomAttributes<CompoundTypeAliasAttribute>().FirstOrDefault() is { } compoundAlias)
         {
             AddCompoundTypeAlias(builder, type, compoundAlias.Components);
             AddGenericParameters(builder, type);

@@ -67,8 +67,12 @@ namespace Orleans.CodeGenerator
                 var sourceText = SourceText.From(sourceString, Encoding.UTF8);
                 context.AddSource($"{context.Compilation.AssemblyName ?? "assembly"}.orleans.g.cs", sourceText);
             }
-            catch (Exception exception) when (HandleException(context, exception))
+            catch (Exception exception)
             {
+                if (!HandleException(context, exception))
+                {
+                    throw;
+                }
             }
 
             static bool HandleException(GeneratorExecutionContext context, Exception exception)
@@ -80,6 +84,8 @@ namespace Orleans.CodeGenerator
                 }
 
                 context.ReportDiagnostic(UnhandledCodeGenerationExceptionDiagnostic.CreateDiagnostic(exception));
+                Console.WriteLine(exception);
+                Console.WriteLine(exception.StackTrace);
                 return false;
             }
         }
