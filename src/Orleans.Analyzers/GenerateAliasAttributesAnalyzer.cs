@@ -2,8 +2,11 @@ using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Diagnostics;
+using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
+using System.Net.NetworkInformation;
+using System.Text;
 
 namespace Orleans.Analyzers;
 
@@ -46,7 +49,12 @@ public class GenerateAliasAttributesAnalyzer : DiagnosticAnalyzer
 
             if (!interfaceDeclaration.HasAttribute(Constants.AliasAttributeName))
             {
-                ReportFor(context, interfaceDeclaration.GetLocation(), interfaceDeclaration.Identifier.ToString());
+                ReportFor(
+                    context,
+                    interfaceDeclaration.GetLocation(),
+                    interfaceDeclaration.Identifier.ToString(),
+                    GetArity(interfaceDeclaration),
+                    GetNamespaceAndNesting(interfaceDeclaration));
             }
 
             foreach (var methodDeclaration in interfaceDeclaration.Members.OfType<MethodDeclarationSyntax>())
@@ -58,7 +66,7 @@ public class GenerateAliasAttributesAnalyzer : DiagnosticAnalyzer
 
                 if (!methodDeclaration.HasAttribute(Constants.AliasAttributeName))
                 {
-                    ReportFor(context, methodDeclaration.GetLocation(), methodDeclaration.Identifier.ToString());
+                    ReportFor(context, methodDeclaration.GetLocation(), methodDeclaration.Identifier.ToString(), arity: 0, namespaceAndNesting: null);
                 }                
             }
 
@@ -78,15 +86,67 @@ public class GenerateAliasAttributesAnalyzer : DiagnosticAnalyzer
                 return;
             }
 
-            ReportFor(context, typeDeclaration.GetLocation(), typeDeclaration.Identifier.ToString());
+            ReportFor(
+                context,
+                typeDeclaration.GetLocation(),
+                typeDeclaration.Identifier.ToString(),
+                GetArity(typeDeclaration),
+                GetNamespaceAndNesting(typeDeclaration));
         }
     }
 
-    private static void ReportFor(SyntaxNodeAnalysisContext context, Location location, string typeName)
+    private static int GetArity(TypeDeclarationSyntax typeDeclarationSyntax)
+    {
+        var node = typeDeclarationSyntax;
+        int arity = 0;
+        while (node is TypeDeclarationSyntax type)
+        {
+            arity += type.Arity;
+            node = type.Parent as TypeDeclarationSyntax;
+        }
+
+        return arity;
+    }
+
+    private static string GetNamespaceAndNesting(TypeDeclarationSyntax typeDeclarationSyntax)
+    {
+        SyntaxNode node = typeDeclarationSyntax.Parent;
+        StringBuilder sb = new();
+        Stack<string> segments = new();
+        while (node is not null)
+        {
+            if (node is TypeDeclarationSyntax type)
+            {
+                segments.Push(type.Identifier.ToString());
+            }
+            else if (node is NamespaceDeclarationSyntax ns)
+            {
+                segments.Push(ns.Name.ToString());
+            }
+
+            node = node.Parent;
+        }
+
+        foreach (var segment in segments)
+        {
+            if (sb.Length > 0)
+            {
+                sb.Append('.');
+            }
+
+            sb.Append(segment);
+        }
+
+        return sb.ToString();
+    }
+
+    private static void ReportFor(SyntaxNodeAnalysisContext context, Location location, string typeName, int arity, string namespaceAndNesting)
     {
         var builder = ImmutableDictionary.CreateBuilder<string, string>();
 
         builder.Add("TypeName", typeName);
+        builder.Add("NamespaceAndNesting", namespaceAndNesting);
+        builder.Add("Arity", arity.ToString(System.Globalization.CultureInfo.InvariantCulture));
 
         context.ReportDiagnostic(Diagnostic.Create(
                        descriptor: Rule,
