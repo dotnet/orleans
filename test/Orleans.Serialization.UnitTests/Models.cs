@@ -628,6 +628,7 @@ namespace Orleans.Serialization.UnitTests
     }
 
     [GenerateSerializer]
+    [Alias("GenericPocoWithConstraint`2")]
     public class GenericPocoWithConstraint<TClass, TStruct>
         : GenericPoco<TStruct> where TClass : List<int>, new() where TStruct : struct
     {
@@ -636,6 +637,21 @@ namespace Orleans.Serialization.UnitTests
 
         [Id(999)]
         public TStruct ValueField { get; set; }
+    }
+
+    public sealed class Outer<T>
+    {
+        [GenerateSerializer]
+        [Alias("Orleans.Serialization.UnitTests.Outer.InnerNonGen`1")]
+        public class InnerNonGen
+        {
+        }
+
+        [GenerateSerializer]
+        [Alias("Orleans.Serialization.UnitTests.Outer.InnerGen`2")]
+        public class InnerGen<U>
+        {
+        }
     }
 
     [GenerateSerializer]

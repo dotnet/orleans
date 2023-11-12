@@ -279,6 +279,20 @@ public class GeneratedSerializerTests : IDisposable
     }
 
     [Fact]
+    public void GenericArityAliasTest()
+    {
+        {
+            var original = new Outer<int>.InnerGen<string>();
+            RoundTripThroughUntypedSerializer(original, out var formattedBitStream);
+        }
+
+        {
+            var original = new Outer<int>.InnerNonGen();
+            RoundTripThroughUntypedSerializer(original, out var formattedBitStream);
+        }
+    }
+
+    [Fact]
     public void ArraysAreSupported()
     {
         var original = new[] { "a", "bb", "ccc" };
