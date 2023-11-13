@@ -5,7 +5,6 @@ using Microsoft.CodeAnalysis.Diagnostics;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
-using System.Net.NetworkInformation;
 using System.Text;
 
 namespace Orleans.Analyzers;
