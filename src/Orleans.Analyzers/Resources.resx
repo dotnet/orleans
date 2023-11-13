@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <root>
   <!-- 
     Microsoft ResX Schema 
@@ -148,7 +148,7 @@
     <value>A single type is not allowed to have multiple constructors annotated with the [OrleansConstructor] attribute</value>
   </data>
   <data name="AddAliasAttributesDescription" xml:space="preserve">
-    <value>Add [Alias] attributes to specify well-known names that can be used to identify types or methods</value>
+    <value>Add [Alias] attributes to specify well-known names that can be used to identify types or methods.</value>
   </data>
   <data name="AddAliasAttributesTitle" xml:space="preserve">
     <value>Add missing alias attributes</value>
