@@ -166,6 +166,9 @@ public class MyCustomException : Exception
     public MyCustomException() { }
     public MyCustomException(string message) : base(message) { }
     public MyCustomException(string message, Exception inner) : base(message, inner) { }
+#if NET8_0_OR_GREATER
+    [Obsolete]
+#endif
     public MyCustomException(SerializationInfo info, StreamingContext context) : base(info, context) { }
 
     [Id(0)]
@@ -179,6 +182,9 @@ public class MyCustomForeignException : Exception
         CustomInt = customInt;
     }
 
+#if NET8_0_OR_GREATER
+    [Obsolete]
+#endif
     public MyCustomForeignException(SerializationInfo info, StreamingContext context) : base(info, context) { }
 
     [Id(0)]
