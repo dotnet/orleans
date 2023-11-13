@@ -1,9 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
-using Microsoft.Extensions.Options;
 using OrleansProviders.Options;
-using OrleansProviders.Streams.Memory;
 
 namespace Orleans.Providers
 {
@@ -13,45 +11,25 @@ namespace Orleans.Providers
     /// </summary>
     public class MemoryStreamQueueGrain : Grain, IMemoryStreamQueueGrain
     {
-        private readonly MemoryStreamProviderHashLookup hashLookup;
-        private readonly IOptionsSnapshot<MemoryStreamOptions> options;
         private readonly Queue<MemoryMessageData> eventQueue = new Queue<MemoryMessageData>();
         private long sequenceNumber = DateTime.UtcNow.Ticks;
-
-        public MemoryStreamQueueGrain(MemoryStreamProviderHashLookup hashLookup, IOptionsSnapshot<MemoryStreamOptions> options)
-        {
-            this.hashLookup = hashLookup;
-            this.options = options;
-        }
-
-        public override Task OnActivateAsync()
-        {
-            // discover the owning stream provider name from the first four bytes of the key
-            var key = this.GetPrimaryKey();
-            var bytes = key.ToByteArray();
-            var hash = BitConverter.ToInt32(bytes, 0);
-            var name = this.hashLookup.GetByHash(hash);
-
-            // get the options for the owning stream provider name
-            var options = this.options.Get(name);
-
-            // keep what is needed
-            maxEventCount = options.MaxEventCount;
-
-            return base.OnActivateAsync();
-        }
-
-        /// <summary>
-        /// max event count. 
-        /// </summary>
-        private int maxEventCount = 16384;
 
         /// <summary>
         /// Enqueues an event data. If the current total count reaches the max limit. throws an exception.
         /// </summary>
         /// <param name="data"></param>
         /// <returns></returns>
-        public Task Enqueue(MemoryMessageData data)
+        public Task Enqueue(MemoryMessageData data) => EnqueueCore(data, MemoryStreamOptions.DefaultMaxEventCount);
+
+        /// <summary>
+        /// Enqueues an event data. If the current total count reaches the max limit. throws an exception.
+        /// </summary>
+        /// <param name="data"></param>
+        /// <param name="maxEventCount"></param>
+        /// <returns></returns>
+        public Task Enqueue(MemoryMessageData data, int maxEventCount) => EnqueueCore(data, maxEventCount);
+
+        private Task EnqueueCore(MemoryMessageData data, int maxEventCount)
         {
             if (eventQueue.Count >= maxEventCount)
             {

@@ -1,11 +1,9 @@
 using System;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.DependencyInjection.Extensions;
 using Orleans.ApplicationParts;
 using Orleans.Configuration;
 using Orleans.Providers;
 using OrleansProviders.Options;
-using OrleansProviders.Streams.Memory;
 
 namespace Orleans.Hosting
 {
@@ -33,11 +31,7 @@ namespace Orleans.Hosting
             string name, Action<Action<IServiceCollection>> configureServicesDelegate, Action<Action<IApplicationPartManager>> configureAppPartsDelegate)
             : base(name, configureServicesDelegate, MemoryAdapterFactory<TSerializer>.Create)
         {
-            this.ConfigureDelegate(services =>
-            {
-                services.ConfigureNamedOptionForLogging<HashRingStreamQueueMapperOptions>(name);
-                services.TryAddSingleton<MemoryStreamProviderHashLookup>();
-            });
+            this.ConfigureDelegate(services => services.ConfigureNamedOptionForLogging<HashRingStreamQueueMapperOptions>(name));
             configureAppPartsDelegate(parts => parts.AddFrameworkPart(typeof(MemoryAdapterFactory<>).Assembly));
         }
     }
