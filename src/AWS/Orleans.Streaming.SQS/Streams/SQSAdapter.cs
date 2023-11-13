@@ -4,16 +4,17 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using Amazon.SQS.Model;
 using Microsoft.Extensions.Logging;
 using Orleans.Runtime;
-using Orleans.Serialization;
+using Orleans.Streaming.SQS.Streams;
 
 namespace OrleansAWSUtils.Streams
 {
     internal class SQSAdapter : IQueueAdapter
     {
         protected readonly string ServiceId;
-        private readonly Serializer<SQSBatchContainer> serializer;
+        private readonly ISQSDataAdapter dataAdapter;
         protected readonly string DataConnectionString;
         private readonly IConsistentRingStreamQueueMapper streamQueueMapper;
         protected readonly ConcurrentDictionary<QueueId, SQSStorage> Queues = new ConcurrentDictionary<QueueId, SQSStorage>();
@@ -23,12 +24,12 @@ namespace OrleansAWSUtils.Streams
 
         public StreamProviderDirection Direction { get { return StreamProviderDirection.ReadWrite; } }
 
-        public SQSAdapter(Serializer<SQSBatchContainer> serializer, IConsistentRingStreamQueueMapper streamQueueMapper, ILoggerFactory loggerFactory, string dataConnectionString, string serviceId, string providerName)
+        public SQSAdapter(ISQSDataAdapter dataAdapter, IConsistentRingStreamQueueMapper streamQueueMapper, ILoggerFactory loggerFactory, string dataConnectionString, string serviceId, string providerName)
         {
             if (string.IsNullOrEmpty(dataConnectionString)) throw new ArgumentNullException(nameof(dataConnectionString));
             if (string.IsNullOrEmpty(serviceId)) throw new ArgumentNullException(nameof(serviceId));
             this.loggerFactory = loggerFactory;
-            this.serializer = serializer;
+            this.dataAdapter = dataAdapter;
             DataConnectionString = dataConnectionString;
             this.ServiceId = serviceId;
             Name = providerName;
@@ -37,7 +38,7 @@ namespace OrleansAWSUtils.Streams
 
         public IQueueAdapterReceiver CreateReceiver(QueueId queueId)
         {
-            return SQSAdapterReceiver.Create(this.serializer, this.loggerFactory, queueId, DataConnectionString, this.ServiceId);
+            return SQSAdapterReceiver.Create(this.dataAdapter, this.loggerFactory, queueId, DataConnectionString, this.ServiceId);
         }
 
         public async Task QueueMessageBatchAsync<T>(StreamId streamId, IEnumerable<T> events, StreamSequenceToken token, Dictionary<string, object> requestContext)
@@ -54,8 +55,18 @@ namespace OrleansAWSUtils.Streams
                 await tmpQueue.InitQueueAsync();
                 queue = Queues.GetOrAdd(queueId, tmpQueue);
             }
-            var msg = SQSBatchContainer.ToSQSMessage(this.serializer, streamId, events, requestContext);
-            await queue.AddMessage(msg);
+
+            var sqsMessage = dataAdapter.ToQueueMessage(streamId, events, token, requestContext);
+            var sqsRequest = new SendMessageRequest(string.Empty, sqsMessage.Body);
+            foreach (var attr in sqsMessage.Attributes)
+            {
+                sqsRequest.MessageAttributes.Add(attr.Key, new MessageAttributeValue
+                {
+                    DataType = "String",
+                    StringValue = attr.Value
+                });
+            }
+            await queue.AddMessage(sqsRequest);
         }
     }
 }
