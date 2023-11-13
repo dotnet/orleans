@@ -1,4 +1,3 @@
-using Amazon.SQS.Model;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using Orleans.Providers.Streams.Common;
@@ -14,7 +13,7 @@ namespace OrleansAWSUtils.Streams
 {
     [Serializable]
     [Orleans.GenerateSerializer]
-    internal class SQSBatchContainer : IBatchContainer
+    public class SQSBatchContainer : IBatchContainer
     {
         [JsonProperty]
         [Orleans.Id(0)]
@@ -42,7 +41,7 @@ namespace OrleansAWSUtils.Streams
         }
 
         [JsonConstructor]
-        private SQSBatchContainer(
+        public SQSBatchContainer(
             StreamId streamId,
             List<object> events,
             Dictionary<string, object> requestContext,
@@ -52,7 +51,7 @@ namespace OrleansAWSUtils.Streams
             this.sequenceToken = sequenceToken;
         }
 
-        private SQSBatchContainer(StreamId streamId, List<object> events, Dictionary<string, object> requestContext)
+        public SQSBatchContainer(StreamId streamId, List<object> events, Dictionary<string, object> requestContext)
         {
             if (events == null) throw new ArgumentNullException(nameof(events), "Message contains no events");
 
@@ -66,7 +65,7 @@ namespace OrleansAWSUtils.Streams
             return events.OfType<T>().Select((e, i) => Tuple.Create<T, StreamSequenceToken>(e, sequenceToken.CreateSequenceTokenForEvent(i)));
         }
 
-        internal static SendMessageRequest ToSQSMessage<T>(
+        internal static SQSMessage ToSQSMessage<T>(
             Serializer<SQSBatchContainer> serializer,
             StreamId streamId,
             IEnumerable<T> events,
@@ -78,18 +77,18 @@ namespace OrleansAWSUtils.Streams
             {
                 { "payload", JToken.FromObject(rawBytes) }
             };
-            return new SendMessageRequest
+            return new SQSMessage
             {
-                MessageBody = payload.ToString()
+                Body = payload.ToString()
             };
         }
 
-        internal static SQSBatchContainer FromSQSMessage(Serializer<SQSBatchContainer> serializer, SQSMessage msg, long sequenceId)
+        internal static SQSBatchContainer FromSQSMessage(Serializer<SQSBatchContainer> serializer, SQSMessage msg, long sequenceNumber)
         {
             var json = JObject.Parse(msg.Body);
             var sqsBatch = serializer.Deserialize(json["payload"].ToObject<byte[]>());
             sqsBatch.Message = msg;
-            sqsBatch.sequenceToken = new EventSequenceTokenV2(sequenceId);
+            sqsBatch.sequenceToken = new EventSequenceTokenV2(sequenceNumber);
             return sqsBatch;
         }
 
