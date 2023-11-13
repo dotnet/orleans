@@ -18,7 +18,7 @@ public class GenerateAliasAttributesAnalyzer : DiagnosticAnalyzer
     private static readonly LocalizableString MessageFormat = new LocalizableResourceString(nameof(Resources.AddAliasMessageFormat), Resources.ResourceManager, typeof(Resources));
     private static readonly LocalizableString Description = new LocalizableResourceString(nameof(Resources.AddAliasAttributesDescription), Resources.ResourceManager, typeof(Resources));
 
-    private static readonly DiagnosticDescriptor Rule = new(RuleId, Title, MessageFormat, Category, DiagnosticSeverity.Info, isEnabledByDefault: true, description: Description);
+    private static readonly DiagnosticDescriptor Rule = new DiagnosticDescriptor(RuleId, Title, MessageFormat, Category, DiagnosticSeverity.Info, isEnabledByDefault: true, description: Description);
 
     public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics => ImmutableArray.Create(Rule);
 
@@ -66,7 +66,7 @@ public class GenerateAliasAttributesAnalyzer : DiagnosticAnalyzer
                 if (!methodDeclaration.HasAttribute(Constants.AliasAttributeName))
                 {
                     ReportFor(context, methodDeclaration.GetLocation(), methodDeclaration.Identifier.ToString(), arity: 0, namespaceAndNesting: null);
-                }                
+                }
             }
 
             return;
