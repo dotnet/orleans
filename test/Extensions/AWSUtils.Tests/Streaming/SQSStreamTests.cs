@@ -40,20 +40,31 @@ namespace AWSUtils.Tests.Streaming
                      {
                          options.ConnectionString = AWSTestConstants.SqsConnectionString;
                      })
-                    .AddDynamoDBGrainStorage("DynamoDBStore", options =>
-                    {
-                        options.Service = AWSTestConstants.DynamoDbService;
-                        options.SecretKey = AWSTestConstants.DynamoDbSecretKey;
-                        options.AccessKey = AWSTestConstants.DynamoDbAccessKey;
-                        options.DeleteStateOnClear = true;
-                    })
-                    .AddDynamoDBGrainStorage("PubSubStore", options =>
-                    {
-                        options.Service = AWSTestConstants.DynamoDbService;
-                        options.SecretKey = AWSTestConstants.DynamoDbSecretKey;
-                        options.AccessKey = AWSTestConstants.DynamoDbAccessKey;
-                    })
                     .AddMemoryGrainStorage("MemoryStore", op=>op.NumStorageGrains = 1);
+
+                if (!string.IsNullOrEmpty(AWSTestConstants.DynamoDbService))
+                {
+                    hostBuilder
+                        .AddDynamoDBGrainStorage("DynamoDBStore", options =>
+                        {
+                            options.Service = AWSTestConstants.DynamoDbService;
+                            options.SecretKey = AWSTestConstants.DynamoDbSecretKey;
+                            options.AccessKey = AWSTestConstants.DynamoDbAccessKey;
+                            options.DeleteStateOnClear = true;
+                        })
+                        .AddDynamoDBGrainStorage("PubSubStore", options =>
+                        {
+                            options.Service = AWSTestConstants.DynamoDbService;
+                            options.SecretKey = AWSTestConstants.DynamoDbSecretKey;
+                            options.AccessKey = AWSTestConstants.DynamoDbAccessKey;
+                        });
+                }
+                else
+                {
+                    hostBuilder
+                        .AddMemoryGrainStorage("DynamoDBStore")
+                        .AddMemoryGrainStorage("PubSubStore");
+                }
             }
         }
 
