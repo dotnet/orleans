@@ -3,6 +3,7 @@ using Amazon.SQS;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Net;
 using System.Threading.Tasks;
 using Amazon.SQS.Model;
 using Microsoft.Extensions.Logging;
@@ -23,10 +24,12 @@ namespace OrleansAWSUtils.Storage
         public const int MAX_NUMBER_OF_MESSAGE_TO_PEEK = 10;
         private const string AccessKeyPropertyName = "AccessKey";
         private const string SecretKeyPropertyName = "SecretKey";
+        private const string SessionTokenPropertyName = "SessionToken";
         private const string ServicePropertyName = "Service";
         private readonly ILogger Logger;
         private string accessKey;
         private string secretKey;
+        private string sessionToken;
         private string service;
         private string queueUrl;
         private AmazonSQSClient sqsClient;
@@ -78,6 +81,14 @@ namespace OrleansAWSUtils.Storage
                 if (value.Length == 2 && !string.IsNullOrWhiteSpace(value[1]))
                     accessKey = value[1];
             }
+
+            var sessionTokenConfig = parameters.Where(p => p.Contains(SessionTokenPropertyName)).FirstOrDefault();
+            if (!string.IsNullOrWhiteSpace(sessionTokenConfig))
+            {
+                var value = sessionTokenConfig.Split(new[] { '=' }, StringSplitOptions.RemoveEmptyEntries);
+                if (value.Length == 2 && !string.IsNullOrWhiteSpace(value[1]))
+                    sessionToken = value[1];
+            }
         }
 
         private void CreateClient()
@@ -88,6 +99,12 @@ namespace OrleansAWSUtils.Storage
                 // Local SQS instance (for testing)
                 var credentials = new BasicAWSCredentials("dummy", "dummyKey");
                 sqsClient = new AmazonSQSClient(credentials, new AmazonSQSConfig { ServiceURL = service });
+            }
+            else if (!string.IsNullOrEmpty(accessKey) && !string.IsNullOrEmpty(secretKey) && !string.IsNullOrEmpty(sessionToken))
+            {
+                // AWS SQS instance (auth via explicit credentials)
+                var credentials = new SessionAWSCredentials(accessKey, secretKey, sessionToken);
+                sqsClient = new AmazonSQSClient(credentials, new AmazonSQSConfig { RegionEndpoint = AWSUtils.GetRegionEndpoint(service) });
             }
             else if (!string.IsNullOrEmpty(accessKey) && !string.IsNullOrEmpty(secretKey))
             {
@@ -169,7 +186,11 @@ namespace OrleansAWSUtils.Storage
                     throw new InvalidOperationException("Queue not initialized");
 
                 message.QueueUrl = queueUrl;
-                await sqsClient.SendMessageAsync(message);
+                var response = await sqsClient.SendMessageAsync(message);
+                if (response.HttpStatusCode != HttpStatusCode.OK)
+                {
+                    throw new Exception("Failed to send message into SQS. ");
+                }
             }
             catch (Exception exc)
             {
