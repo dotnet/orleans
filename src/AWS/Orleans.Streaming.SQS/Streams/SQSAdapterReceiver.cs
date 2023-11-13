@@ -6,7 +6,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
-using Orleans.Serialization;
+using Orleans.Streaming.SQS.Streams;
 using SQSMessage = Amazon.SQS.Model.Message;
 
 namespace OrleansAWSUtils.Streams
@@ -17,25 +17,24 @@ namespace OrleansAWSUtils.Streams
     internal class SQSAdapterReceiver : IQueueAdapterReceiver
     {
         private SQSStorage queue;
-        private long lastReadMessage;
         private Task outstandingTask;
+        private long lastReadMessage = -1;
         private readonly ILogger logger;
-        private readonly Serializer<SQSBatchContainer> serializer;
-
+        private readonly ISQSDataAdapter dataAdapter;
 
         public QueueId Id { get; private set; }
 
-        public static IQueueAdapterReceiver Create(Serializer<SQSBatchContainer> serializer, ILoggerFactory loggerFactory, QueueId queueId, string dataConnectionString, string serviceId)
+        public static IQueueAdapterReceiver Create(ISQSDataAdapter dataAdapter, ILoggerFactory loggerFactory, QueueId queueId, string dataConnectionString, string serviceId)
         {
             if (queueId.IsDefault) throw new ArgumentNullException(nameof(queueId));
             if (string.IsNullOrEmpty(dataConnectionString)) throw new ArgumentNullException(nameof(dataConnectionString));
             if (string.IsNullOrEmpty(serviceId)) throw new ArgumentNullException(nameof(serviceId));
 
             var queue = new SQSStorage(loggerFactory, queueId.ToString(), dataConnectionString, serviceId);
-            return new SQSAdapterReceiver(serializer, loggerFactory, queueId, queue);
+            return new SQSAdapterReceiver(dataAdapter, loggerFactory, queueId, queue);
         }
 
-        private SQSAdapterReceiver(Serializer<SQSBatchContainer> serializer, ILoggerFactory loggerFactory, QueueId queueId, SQSStorage queue)
+        private SQSAdapterReceiver(ISQSDataAdapter dataAdapter, ILoggerFactory loggerFactory, QueueId queueId, SQSStorage queue)
         {
             if (queueId.IsDefault) throw new ArgumentNullException(nameof(queueId));
             if (queue == null) throw new ArgumentNullException(nameof(queue));
@@ -43,7 +42,7 @@ namespace OrleansAWSUtils.Streams
             Id = queueId;
             this.queue = queue;
             logger = loggerFactory.CreateLogger<SQSAdapterReceiver>();
-            this.serializer = serializer;
+            this.dataAdapter = dataAdapter;
         }
 
         public Task Initialize(TimeSpan timeout)
@@ -84,9 +83,7 @@ namespace OrleansAWSUtils.Streams
                 outstandingTask = task;
                 IEnumerable<SQSMessage> messages = await task;
 
-                List<IBatchContainer> messageBatch = messages
-                    .Select(msg => (IBatchContainer)SQSBatchContainer.FromSQSMessage(this.serializer, msg, lastReadMessage++)).ToList();
-
+                List<IBatchContainer> messageBatch = messages.Select(x => dataAdapter.GetBatchContainer(x, ref lastReadMessage)).ToList();
                 return messageBatch;
             }
             finally
