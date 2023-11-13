@@ -25,6 +25,7 @@ namespace AWSUtils.Tests.Streaming
         private const int NumMessagesPerBatch = 20;
         private readonly string clusterId;
         public static readonly string SQS_STREAM_PROVIDER_NAME = "SQSAdapterTests";
+        private readonly TimeSpan QueuePollRate = TimeSpan.FromSeconds(1);
 
         public SQSAdapterTests(ITestOutputHelper output, TestEnvironmentFixture fixture)
         {
@@ -59,7 +60,9 @@ namespace AWSUtils.Tests.Streaming
             {
                 ConnectionString = AWSTestConstants.SqsConnectionString,
             };
-            var adapterFactory = new SQSAdapterFactory(SQS_STREAM_PROVIDER_NAME, options, new HashRingStreamQueueMapperOptions(), new SimpleQueueCacheOptions(), Options.Create(new ClusterOptions()), null, null);
+            var clusterOptions = new ClusterOptions { ServiceId = this.clusterId };
+            var serializer = fixture.Serializer;
+            var adapterFactory = new SQSAdapterFactory(SQS_STREAM_PROVIDER_NAME, options, new HashRingStreamQueueMapperOptions(), new SimpleQueueCacheOptions(), Options.Create(clusterOptions), serializer, NullLoggerFactory.Instance);
             adapterFactory.Init();
             await SendAndReceiveFromQueueAdapter(adapterFactory);
         }
@@ -90,13 +93,14 @@ namespace AWSUtils.Tests.Streaming
                 QueueId queueId = receiverKvp.Key;
                 var receiver = receiverKvp.Value;
                 var qCache = caches[queueId];
-                Task task = Task.Factory.StartNew(() =>
+                Task task = Task.Factory.StartNew(async () =>
                 {
                     while (receivedBatches < NumBatches)
                     {
-                        var messages = receiver.GetQueueMessagesAsync(SQSStorage.MAX_NUMBER_OF_MESSAGE_TO_PEEK).Result.ToArray();
+                        var messages = (await receiver.GetQueueMessagesAsync(SQSStorage.MAX_NUMBER_OF_MESSAGE_TO_PEAK)).ToArray();
                         if (!messages.Any())
                         {
+                            await Task.Delay(QueuePollRate);
                             continue;
                         }
                         foreach (var message in messages.Cast<SQSBatchContainer>())
@@ -129,6 +133,9 @@ namespace AWSUtils.Tests.Streaming
                     adapter.QueueMessageBatchAsync(StreamId.Create(streamId.ToString(), streamId),
                         events.Take(NumMessagesPerBatch).ToArray(), null, RequestContextExtensions.Export(this.fixture.DeepCopier)).Wait())));
             await Task.WhenAll(work);
+
+            // Wait for everything to be consumed.
+            await Task.Delay(QueuePollRate * 2);
 
             // Make sure we got back everything we sent
             Assert.Equal(NumBatches, receivedBatches);
