@@ -294,16 +294,14 @@ namespace DefaultCluster.Tests.General
             var grain = this.GrainFactory.GetGrain<ISimpleGenericGrain1<int>>(grainId++);
 
             // explicitly use .Wait() and .Result to make sure the client does not deadlock in these cases.
-            await Task.Run(() =>
-            {
 #pragma warning disable xUnit1031 // Do not use blocking task operations in test method
-                grain.SetA(a).Wait();
-                grain.SetB(b).Wait();
-#pragma warning restore xUnit1031 // Do not use blocking task operations in test method
-            });
+            grain.SetA(a).Wait();
+
+            grain.SetB(b).Wait();
 
             Task<string> stringPromise = grain.GetAxB();
-            Assert.Equal(expected, await stringPromise);
+            Assert.Equal(expected, stringPromise.Result);
+#pragma warning restore xUnit1031 // Do not use blocking task operations in test method
         }
 
         [Fact]
