@@ -213,7 +213,17 @@ namespace OrleansAWSUtils.Storage
                 if (count < 1)
                     throw new ArgumentOutOfRangeException(nameof(count));
 
-                var request = new ReceiveMessageRequest { QueueUrl = queueUrl, MaxNumberOfMessages = count <= MAX_NUMBER_OF_MESSAGE_TO_PEEK ? count : MAX_NUMBER_OF_MESSAGE_TO_PEEK };
+                var request = new ReceiveMessageRequest
+                {
+                    QueueUrl = queueUrl,
+                    MaxNumberOfMessages = count <= MAX_NUMBER_OF_MESSAGE_TO_PEAK ? count : MAX_NUMBER_OF_MESSAGE_TO_PEAK,
+                    // TODO: Move this list to Configuration
+                    AttributeNames = new List<string> { "All" },
+                    // TODO: Move this list to Configuration
+                    MessageAttributeNames = new List<string> { "All" },
+                    // TODO: Move this wait time to Configuration
+                    WaitTimeSeconds = 20
+                };
                 var response = await sqsClient.ReceiveMessageAsync(request);
                 return response.Messages;
             }
