@@ -147,7 +147,13 @@
   <data name="AtMostOneOrleansConstructorMessageFormat" xml:space="preserve">
     <value>A single type is not allowed to have multiple constructors annotated with the [OrleansConstructor] attribute</value>
   </data>
-  <data name="AbstractOrStaticMembersCannotBeSerializedDescription" xml:space="preserve">
-    <value>Members which are static or abstract cannot be serialized. Remove the [Id(...)] attribute from this member.</value>
+  <data name="AddAliasAttributesDescription" xml:space="preserve">
+    <value>Add [Alias] attributes to specify well-known names that can be used to identify types or methods</value>
+  </data>
+  <data name="AddAliasAttributesTitle" xml:space="preserve">
+    <value>Add missing alias attributes</value>
+  </data>
+  <data name="AddAliasMessageFormat" xml:space="preserve">
+    <value>Add missing alias attributes</value>
   </data>
 </root>

@@ -88,7 +88,34 @@ namespace Orleans.Analyzers {
         }
         
         /// <summary>
-        ///   Looks up a localized string similar to Add the [GenerateSerializer] attribute to serializable types in your application..
+        ///   Looks up a localized string similar to Add [Alias] attributes to specify well-known names that can be used to identify types or methods.
+        /// </summary>
+        internal static string AddAliasAttributesDescription {
+            get {
+                return ResourceManager.GetString("AddAliasAttributesDescription", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Add missing alias attributes.
+        /// </summary>
+        internal static string AddAliasAttributesTitle {
+            get {
+                return ResourceManager.GetString("AddAliasAttributesTitle", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Add missing alias attributes.
+        /// </summary>
+        internal static string AddAliasMessageFormat {
+            get {
+                return ResourceManager.GetString("AddAliasMessageFormat", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Add the [GenerateSerializer] attribute to serializable types in your application.
         /// </summary>
         internal static string AddGenerateSerializerAttributeDescription {
             get {

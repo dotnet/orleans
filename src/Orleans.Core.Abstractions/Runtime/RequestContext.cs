@@ -160,6 +160,16 @@ namespace Orleans.Runtime
             }
         }
 
+        /// <summary>
+        /// Gets the collection of keys for the values currently in the request context.
+        /// </summary>
+        public static IEnumerable<string> Keys => CallContextData.Value.Values.Keys;
+
+        /// <summary>
+        /// Gets the collection of entries currently in the request context.
+        /// </summary>
+        public static IEnumerable<KeyValuePair<string, object>> Entries => CallContextData.Value.Values;
+
         internal readonly struct ContextProperties
         {
             public Dictionary<string, object> Values { get; init; }
