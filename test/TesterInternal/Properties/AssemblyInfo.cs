@@ -5,6 +5,7 @@ using System.Runtime.CompilerServices;
 
 [assembly: InternalsVisibleTo("Tester.AzureUtils")]
 [assembly: InternalsVisibleTo("Tester.Cosmos")]
+[assembly: InternalsVisibleTo("Tester.EFCore")]
 [assembly: InternalsVisibleTo("Tester.AdoNet")]
 [assembly: InternalsVisibleTo("Tester.Redis")]
 [assembly: InternalsVisibleTo("AWSUtils.Tests")]

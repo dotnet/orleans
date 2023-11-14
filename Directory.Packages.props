@@ -20,6 +20,9 @@
     <PackageVersion Include="System.Net.NameResolution" Version="4.3.0" />
     <PackageVersion Include="System.Collections.Immutable" Version="7.0.0" />
     <!-- Microsoft packages -->
+    <PackageVersion Include="Microsoft.EntityFrameworkCore" Version="7.0.11" />
+    <PackageVersion Include="Microsoft.EntityFrameworkCore.SqlServer" Version="7.0.11" />
+    <PackageVersion Include="Microsoft.EntityFrameworkCore.Design" Version="7.0.11" />
     <PackageVersion Include="Microsoft.Azure.Cosmos" Version="3.34.0" />
     <PackageVersion Include="Microsoft.Build" Version="17.3.2" />
     <PackageVersion Include="Microsoft.CSharp" Version="4.7.0" />
@@ -51,6 +54,7 @@
     <PackageVersion Include="Azure.Storage.Blobs" Version="12.14.0" />
     <PackageVersion Include="Azure.Storage.Queues" Version="12.12.0" />
     <!-- 3rd party packages -->
+    <PackageVersion Include="MySql.EntityFrameworkCore" Version="7.0.5" />
     <PackageVersion Include="AWSSDK.DynamoDBv2" Version="3.7.5.16" />
     <PackageVersion Include="AWSSDK.SQS" Version="3.7.2.119" />
     <PackageVersion Include="Consul" Version="1.6.10.7" />

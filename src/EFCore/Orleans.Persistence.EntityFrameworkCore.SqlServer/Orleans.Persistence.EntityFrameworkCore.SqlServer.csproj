@@ -1,0 +1,33 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <PackageId>Microsoft.Orleans.Persistence.EntityFrameworkCore.SqlServer</PackageId>
+    <Title>Microsoft Orleans Entity Framework Core (Sql Server) Persistence Provider</Title>
+    <Description>Microsoft Orleans Persistence provider backed by Entity Framework Core for Sql Server</Description>
+    <PackageTags>$(PackageTags) Entity Framework Core SQL MySQL PostgreSQL Oracle</PackageTags>
+    <Nullable>enable</Nullable>
+    <TargetFrameworks>$(DefaultTargetFrameworks)</TargetFrameworks>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <AssemblyName>Orleans.Persistence.EntityFrameworkCore.SqlServer</AssemblyName>
+    <RootNamespace>Orleans.Persistence.EntityFrameworkCore.SqlServer</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Tester.EFCore"/>
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer"/>
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers</IncludeAssets>
+    </PackageReference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="$(SourceRoot)src\EFCore\Orleans.Persistence.EntityFrameworkCore\Orleans.Persistence.EntityFrameworkCore.csproj"/>
+  </ItemGroup>
+
+</Project>

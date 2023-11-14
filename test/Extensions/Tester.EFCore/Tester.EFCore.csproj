@@ -1,0 +1,28 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFrameworks>$(TestTargetFrameworks)</TargetFrameworks>
+    <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Azure.Identity" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="System.Diagnostics.PerformanceCounter" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\src\EFCore\Orleans.Clustering.EntityFrameworkCore.MySql\Orleans.Clustering.EntityFrameworkCore.MySql.csproj" />
+    <ProjectReference Include="..\..\..\src\EFCore\Orleans.Clustering.EntityFrameworkCore.SqlServer\Orleans.Clustering.EntityFrameworkCore.SqlServer.csproj" />
+    <ProjectReference Include="..\..\..\src\EFCore\Orleans.GrainDirectory.EntityFrameworkCore.SqlServer\Orleans.GrainDirectory.EntityFrameworkCore.SqlServer.csproj" />
+    <ProjectReference Include="..\..\..\src\EFCore\Orleans.Persistence.EntityFrameworkCore.SqlServer\Orleans.Persistence.EntityFrameworkCore.SqlServer.csproj" />
+    <ProjectReference Include="..\..\..\src\EFCore\Orleans.Reminders.EntityFrameworkCore.SqlServer\Orleans.Reminders.EntityFrameworkCore.SqlServer.csproj" />
+    <ProjectReference Include="..\..\..\src\EFCore\Orleans.Reminders.EntityFrameworkCore\Orleans.Reminders.EntityFrameworkCore.csproj" />
+    <ProjectReference Include="..\..\..\src\EFCore\Orleans.Clustering.EntityFrameworkCore\Orleans.Clustering.EntityFrameworkCore.csproj" />
+    <ProjectReference Include="..\..\..\src\EFCore\Orleans.Persistence.EntityFrameworkCore\Orleans.Persistence.EntityFrameworkCore.csproj" />
+    <ProjectReference Include="..\..\..\src\EFCore\Orleans.GrainDirectory.EntityFrameworkCore\Orleans.GrainDirectory.EntityFrameworkCore.csproj" />
+    <ProjectReference Include="$(SourceRoot)test\Tester\Tester.csproj" />
+    <ProjectReference Include="$(SourceRoot)test\TesterInternal\TesterInternal.csproj" />
+  </ItemGroup>
+
+</Project>
