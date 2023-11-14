@@ -64,6 +64,7 @@ namespace AWSUtils.Tests.Streaming
             var options = new SqsOptions
             {
                 ConnectionString = AWSTestConstants.SqsConnectionString,
+                ReceiveMessageAttributes = new[] { "StreamId" }.ToList()
             };
             var clusterOptions = new ClusterOptions { ServiceId = this.clusterId };
             var dataAdapter = new StringOrIntSqlDataAdapter(fixture.Serializer);
@@ -217,9 +218,9 @@ namespace AWSUtils.Tests.Streaming
 
             public override IBatchContainer GetBatchContainer(Message sqsMessage, ref long sequenceNumber)
             {
+                // Example extracts the StreamId as an attribute instead of it being serialized in the body.
                 if (!sqsMessage.MessageAttributes.TryGetValue("StreamId", out var streamIdStr))
                     throw new DataException("SQS Message did not contain a StreamId attribute.");
-
                 var streamId = StreamId.Parse(Encoding.UTF8.GetBytes(streamIdStr.StringValue));
 
                 // Contrived example sends strings as quoted, and longs as unquoted.
@@ -241,6 +242,7 @@ namespace AWSUtils.Tests.Streaming
                 var serializedData = string.Join(Environment.NewLine,
                     events.Select(x => x is string ? $"\"{x}\"" : x.ToString()));
 
+                // Example includes the StreamId as an attribute.
                 return new Message
                 {
                     Attributes = new()

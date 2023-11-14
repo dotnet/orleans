@@ -6,6 +6,7 @@ using System.Collections.Generic;
 using System.Threading.Tasks;
 using Amazon.SQS.Model;
 using Microsoft.Extensions.Logging;
+using Orleans.Configuration;
 using Orleans.Runtime;
 using Orleans.Streaming.SQS.Streams;
 
@@ -15,7 +16,7 @@ namespace OrleansAWSUtils.Streams
     {
         protected readonly string ServiceId;
         private readonly ISQSDataAdapter dataAdapter;
-        protected readonly string DataConnectionString;
+        protected SqsOptions sqsOptions;
         private readonly IConsistentRingStreamQueueMapper streamQueueMapper;
         protected readonly ConcurrentDictionary<QueueId, SQSStorage> Queues = new ConcurrentDictionary<QueueId, SQSStorage>();
         private readonly ILoggerFactory loggerFactory;
@@ -24,13 +25,13 @@ namespace OrleansAWSUtils.Streams
 
         public StreamProviderDirection Direction { get { return StreamProviderDirection.ReadWrite; } }
 
-        public SQSAdapter(ISQSDataAdapter dataAdapter, IConsistentRingStreamQueueMapper streamQueueMapper, ILoggerFactory loggerFactory, string dataConnectionString, string serviceId, string providerName)
+        public SQSAdapter(ISQSDataAdapter dataAdapter, IConsistentRingStreamQueueMapper streamQueueMapper, ILoggerFactory loggerFactory, SqsOptions sqsOptions, string serviceId, string providerName)
         {
-            if (string.IsNullOrEmpty(dataConnectionString)) throw new ArgumentNullException(nameof(dataConnectionString));
+            if (sqsOptions is null) throw new ArgumentNullException(nameof(sqsOptions));
             if (string.IsNullOrEmpty(serviceId)) throw new ArgumentNullException(nameof(serviceId));
             this.loggerFactory = loggerFactory;
+            this.sqsOptions = sqsOptions;
             this.dataAdapter = dataAdapter;
-            DataConnectionString = dataConnectionString;
             this.ServiceId = serviceId;
             Name = providerName;
             this.streamQueueMapper = streamQueueMapper;
@@ -38,7 +39,7 @@ namespace OrleansAWSUtils.Streams
 
         public IQueueAdapterReceiver CreateReceiver(QueueId queueId)
         {
-            return SQSAdapterReceiver.Create(this.dataAdapter, this.loggerFactory, queueId, DataConnectionString, this.ServiceId);
+            return SQSAdapterReceiver.Create(this.dataAdapter, this.loggerFactory, queueId, sqsOptions, this.ServiceId);
         }
 
         public async Task QueueMessageBatchAsync<T>(StreamId streamId, IEnumerable<T> events, StreamSequenceToken token, Dictionary<string, object> requestContext)
@@ -51,7 +52,7 @@ namespace OrleansAWSUtils.Streams
             SQSStorage queue;
             if (!Queues.TryGetValue(queueId, out queue))
             {
-                var tmpQueue = new SQSStorage(this.loggerFactory, queueId.ToString(), DataConnectionString, this.ServiceId);
+                var tmpQueue = new SQSStorage(this.loggerFactory, queueId.ToString(), sqsOptions, this.ServiceId);
                 await tmpQueue.InitQueueAsync();
                 queue = Queues.GetOrAdd(queueId, tmpQueue);
             }
