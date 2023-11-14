@@ -6,6 +6,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
+using Orleans.Configuration;
 using Orleans.Streaming.SQS.Streams;
 using SQSMessage = Amazon.SQS.Model.Message;
 
@@ -24,13 +25,13 @@ namespace OrleansAWSUtils.Streams
 
         public QueueId Id { get; private set; }
 
-        public static IQueueAdapterReceiver Create(ISQSDataAdapter dataAdapter, ILoggerFactory loggerFactory, QueueId queueId, string dataConnectionString, string serviceId)
+        public static IQueueAdapterReceiver Create(ISQSDataAdapter dataAdapter, ILoggerFactory loggerFactory, QueueId queueId, SqsOptions sqsOptions, string serviceId)
         {
             if (queueId.IsDefault) throw new ArgumentNullException(nameof(queueId));
-            if (string.IsNullOrEmpty(dataConnectionString)) throw new ArgumentNullException(nameof(dataConnectionString));
+            if (sqsOptions is null) throw new ArgumentNullException(nameof(sqsOptions));
             if (string.IsNullOrEmpty(serviceId)) throw new ArgumentNullException(nameof(serviceId));
 
-            var queue = new SQSStorage(loggerFactory, queueId.ToString(), dataConnectionString, serviceId);
+            var queue = new SQSStorage(loggerFactory, queueId.ToString(), sqsOptions, serviceId);
             return new SQSAdapterReceiver(dataAdapter, loggerFactory, queueId, queue);
         }
 

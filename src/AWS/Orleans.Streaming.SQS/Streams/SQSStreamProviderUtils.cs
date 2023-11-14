@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
@@ -24,10 +24,12 @@ namespace OrleansAWSUtils.Streams
                 var queueMapper = new HashRingBasedStreamQueueMapper(new HashRingStreamQueueMapperOptions(), providerName);
                 List<QueueId> allQueues = queueMapper.GetAllQueues().ToList();
 
+                var sqsOptions = new SqsOptions { ConnectionString = storageConnectionString };
+
                 var deleteTasks = new List<Task>();
                 foreach (var queueId in allQueues)
                 {
-                    var manager = new SQSStorage(loggerFactory, queueId.ToString(), storageConnectionString, clusterId);
+                    var manager = new SQSStorage(loggerFactory, queueId.ToString(), sqsOptions, clusterId);
                     manager.InitQueueAsync().Wait();
                     deleteTasks.Add(manager.DeleteQueue());
                 }
