@@ -17,6 +17,7 @@ namespace Orleans.Transactions
 
         public OrleansTransactionException(string message, Exception innerException) : base(message, innerException) { }
 
+        [Obsolete]
         protected OrleansTransactionException(SerializationInfo info, StreamingContext context)
             : base(info, context)
         {
@@ -35,6 +36,7 @@ namespace Orleans.Transactions
         {
         }
 
+        [Obsolete]
         private OrleansTransactionsDisabledException(SerializationInfo info, StreamingContext context)
             : base(info, context)
         {
@@ -53,6 +55,7 @@ namespace Orleans.Transactions
         {
         }
 
+        [Obsolete]
         private OrleansStartTransactionFailedException(SerializationInfo info, StreamingContext context)
             : base(info, context)
         {
@@ -98,12 +101,14 @@ namespace Orleans.Transactions
             this.TransactionId = transactionId;
         }
 
+        [Obsolete]
         private OrleansTransactionInDoubtException(SerializationInfo info, StreamingContext context)
             : base(info, context)
         {
             this.TransactionId = info.GetString(nameof(this.TransactionId));
         }
 
+        [Obsolete]
         public override void GetObjectData(SerializationInfo info, StreamingContext context)
         {
             base.GetObjectData(info, context);
@@ -140,12 +145,14 @@ namespace Orleans.Transactions
             TransactionId = transactionId;
         }
 
+        [Obsolete]
         protected OrleansTransactionAbortedException(SerializationInfo info, StreamingContext context)
             : base(info, context)
         {
             this.TransactionId = info.GetString(nameof(this.TransactionId));
         }
 
+        [Obsolete]
         public override void GetObjectData(SerializationInfo info, StreamingContext context)
         {
             base.GetObjectData(info, context);
@@ -179,12 +186,14 @@ namespace Orleans.Transactions
         {
         }
 
+        [Obsolete]
         private OrleansCascadingAbortException(SerializationInfo info, StreamingContext context)
             : base(info, context)
         {
             this.DependentTransactionId = info.GetString(nameof(this.DependentTransactionId));
         }
 
+        [Obsolete]
         public override void GetObjectData(SerializationInfo info, StreamingContext context)
         {
             base.GetObjectData(info, context);
@@ -206,6 +215,7 @@ namespace Orleans.Transactions
         {
         }
 
+        [Obsolete]
         private OrleansOrphanCallException(SerializationInfo info, StreamingContext context)
             : base(info, context)
         {
@@ -224,6 +234,7 @@ namespace Orleans.Transactions
         {
         }
 
+        [Obsolete]
         private OrleansReadOnlyViolatedException(SerializationInfo info, StreamingContext context)
             : base(info, context)
         {
@@ -238,6 +249,7 @@ namespace Orleans.Transactions
         {
         }
 
+        [Obsolete]
         private OrleansTransactionServiceNotAvailableException(SerializationInfo info, StreamingContext context)
             : base(info, context)
         {
@@ -261,6 +273,7 @@ namespace Orleans.Transactions
         {
         }
 
+        [Obsolete]
         private OrleansBrokenTransactionLockException(SerializationInfo info, StreamingContext context)
             : base(info, context)
         {
@@ -279,6 +292,7 @@ namespace Orleans.Transactions
         {
         }
 
+        [Obsolete]
         private OrleansTransactionLockUpgradeException(SerializationInfo info, StreamingContext context)
             : base(info, context)
         {
@@ -297,6 +311,7 @@ namespace Orleans.Transactions
         {
         }
 
+        [Obsolete]
         private OrleansTransactionPrepareTimeoutException(SerializationInfo info, StreamingContext context)
             : base(info, context)
         {
@@ -321,6 +336,7 @@ namespace Orleans.Transactions
         {
         }
 
+        [Obsolete]
         protected OrleansTransactionTransientFailureException(SerializationInfo info, StreamingContext context)
             : base(info, context)
         {

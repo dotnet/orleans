@@ -255,7 +255,7 @@ namespace UnitTests.StreamingTests
             actualSubscriptions = await consumer.GetAllSubscriptions(streamGuid, streamNamespace, streamProviderName);
 
             // validate
-            Assert.Equal(0, actualSubscriptions.Count);
+            Assert.Empty(actualSubscriptions);
         }
 
         public async Task TwoIntermitentStreamTest(Guid streamGuid)

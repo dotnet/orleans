@@ -158,7 +158,7 @@ namespace DefaultCluster.Tests.ActivationsLifeCycleTests
 
                 await grain.ThrowSomething();
 
-                Assert.True(false, "Expected ThrowSomething call to fail as unable to Activate grain");
+                Assert.Fail("Expected ThrowSomething call to fail as unable to Activate grain");
             }
             catch (ApplicationException exc)
             {
@@ -176,7 +176,7 @@ namespace DefaultCluster.Tests.ActivationsLifeCycleTests
 
                 long key = await grain.GetKey();
 
-                Assert.True(false, "Expected ThrowSomething call to fail as unable to Activate grain, but returned " + key);
+                Assert.Fail("Expected ThrowSomething call to fail as unable to Activate grain, but returned " + key);
             }
             catch (ApplicationException exc)
             {
@@ -194,7 +194,7 @@ namespace DefaultCluster.Tests.ActivationsLifeCycleTests
 
                 await grain.ForwardCall(this.GrainFactory.GetGrain<IBadActivateDeactivateTestGrain>(id));
 
-                Assert.True(false, "Expected ThrowSomething call to fail as unable to Activate grain");
+                Assert.Fail("Expected ThrowSomething call to fail as unable to Activate grain");
             }
             catch (ApplicationException exc)
             {
@@ -212,7 +212,7 @@ namespace DefaultCluster.Tests.ActivationsLifeCycleTests
 
                 await grain.DoSomething();
 
-                Assert.True(false, "Expected ThrowSomething call to fail as unable to Activate grain");
+                Assert.Fail("Expected ThrowSomething call to fail as unable to Activate grain");
             }
             catch (TimeoutException te)
             {
@@ -260,7 +260,7 @@ namespace DefaultCluster.Tests.ActivationsLifeCycleTests
             try
             {
                 string activation = await grain.DoSomething();
-                Assert.True(false, "Should have thrown.");
+                Assert.Fail("Should have thrown.");
             }
             catch(InvalidOperationException exc)
             {

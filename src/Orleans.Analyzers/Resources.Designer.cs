@@ -133,7 +133,7 @@ namespace Orleans.Analyzers {
         }
         
         /// <summary>
-        ///   Looks up a localized string similar to Add attributes to properties and fields to direct serializer generation.
+        ///   Looks up a localized string similar to Add attributes to properties and fields to direct serializer generation..
         /// </summary>
         internal static string AddSerializationAttributesDescription {
             get {

@@ -52,6 +52,7 @@ namespace Orleans.Runtime
         /// <param name="context">
         /// The context.
         /// </param>
+        [Obsolete]
         private GrainExtensionNotInstalledException(SerializationInfo info, StreamingContext context)
             : base(info, context)
         {

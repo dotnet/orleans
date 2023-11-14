@@ -100,7 +100,7 @@ namespace UnitTests.MembershipTests
 
             var data = await membershipTable.ReadAll();
             Assert.NotNull(data);
-            Assert.Equal(0, data.Members.Count);
+            Assert.Empty(data.Members);
 
             var version = data.Version;
             foreach (var membershipEntry in membershipEntries)
@@ -129,7 +129,7 @@ namespace UnitTests.MembershipTests
 
             logger.LogInformation("Membership.ReadAll returned TableVersion={TableVersion} Data={Data}", data.Version, data);
 
-            Assert.Equal(0, data.Members.Count);
+            Assert.Empty(data.Members);
             Assert.NotNull(data.Version.VersionEtag);
             Assert.Equal(0, data.Version.Version);
         }
@@ -140,7 +140,7 @@ namespace UnitTests.MembershipTests
 
             var data = await membershipTable.ReadAll();
             Assert.NotNull(data);
-            Assert.Equal(0, data.Members.Count);
+            Assert.Empty(data.Members);
 
             TableVersion nextTableVersion = data.Version.Next();
 
@@ -152,7 +152,7 @@ namespace UnitTests.MembershipTests
             if (extendedProtocol)
                 Assert.Equal(1, data.Version.Version);
 
-            Assert.Equal(1, data.Members.Count);
+            Assert.Single(data.Members);
         }
 
         protected async Task MembershipTable_ReadRow_Insert_Read(bool extendedProtocol = true)
@@ -161,7 +161,7 @@ namespace UnitTests.MembershipTests
 
             logger.LogInformation("Membership.ReadAll returned TableVersion={TableVersion} Data={Data}", data.Version, data);
 
-            Assert.Equal(0, data.Members.Count);
+            Assert.Empty(data.Members);
 
             TableVersion newTableVersion = data.Version.Next();
 
@@ -191,7 +191,7 @@ namespace UnitTests.MembershipTests
 
             data = await membershipTable.ReadAll();
 
-            Assert.Equal(1, data.Members.Count);
+            Assert.Single(data.Members);
 
             data = await membershipTable.ReadRow(newEntry.SiloAddress);
             if (extendedProtocol)
@@ -199,7 +199,7 @@ namespace UnitTests.MembershipTests
 
             logger.LogInformation("Membership.ReadAll returned TableVersion={TableVersion} Data={Data}", data.Version, data);
 
-            Assert.Equal(1, data.Members.Count);
+            Assert.Single(data.Members);
             Assert.NotNull(data.Version.VersionEtag);
             if (extendedProtocol)
             {
@@ -219,7 +219,7 @@ namespace UnitTests.MembershipTests
             MembershipTableData data = await membershipTable.ReadAll();
             logger.LogInformation("Membership.ReadAll returned TableVersion={TableVersion} Data={Data}", data.Version, data);
 
-            Assert.Equal(0, data.Members.Count);
+            Assert.Empty(data.Members);
 
             TableVersion newTableVersion = data.Version.Next();
 
@@ -231,7 +231,7 @@ namespace UnitTests.MembershipTests
             data = await membershipTable.ReadAll();
             logger.LogInformation("Membership.ReadAll returned TableVersion={TableVersion} Data={Data}", data.Version, data);
 
-            Assert.Equal(1, data.Members.Count);
+            Assert.Single(data.Members);
             Assert.NotNull(data.Version.VersionEtag);
 
             if (extendedProtocol)
@@ -254,7 +254,7 @@ namespace UnitTests.MembershipTests
             Assert.NotNull(tableData.Version);
 
             Assert.Equal(0, tableData.Version.Version);
-            Assert.Equal(0, tableData.Members.Count);
+            Assert.Empty(tableData.Members);
 
             for (int i = 1; i < 10; i++)
             {
@@ -390,7 +390,7 @@ namespace UnitTests.MembershipTests
             if (extendedProtocol)
                 Assert.Equal(20, tableData.Version.Version);
 
-            Assert.Equal(1, tableData.Members.Count);
+            Assert.Single(tableData.Members);
         }
 
         protected async Task MembershipTable_UpdateIAmAlive(bool extendedProtocol = true)
@@ -427,7 +427,7 @@ namespace UnitTests.MembershipTests
             MembershipTableData data = await membershipTable.ReadAll();
             logger.LogInformation("Membership.ReadAll returned TableVersion={TableVersion} Data={Data}", data.Version, data);
 
-            Assert.Equal(0, data.Members.Count);
+            Assert.Empty(data.Members);
 
             TableVersion newTableVersion = data.Version.Next();
 
@@ -467,7 +467,7 @@ namespace UnitTests.MembershipTests
             data = await membershipTable.ReadAll();
             logger.LogInformation("Membership.ReadAll returned TableVersion={TableVersion} Data={Data}", data.Version, data);
 
-            Assert.Equal(1, data.Members.Count);
+            Assert.Single(data.Members);
         }
 
         // Utility methods

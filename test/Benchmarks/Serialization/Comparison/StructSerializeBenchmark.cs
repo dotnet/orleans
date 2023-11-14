@@ -52,7 +52,6 @@ namespace Benchmarks.Comparison
             SystemTextJsonWriter = new Utf8JsonWriter(SystemTextJsonOutput);
         }
 
-        [Fact]
         [Benchmark(Baseline = true)]
         public long Orleans()
         {

@@ -54,6 +54,7 @@ namespace UnitTests.StorageTests
             }
         }
 
+        [Obsolete]
         protected StorageProviderInjectedError(SerializationInfo info, StreamingContext context)
             : base(info, context)
         {
