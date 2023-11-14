@@ -10,6 +10,7 @@ using Microsoft.Extensions.Logging;
 using Orleans.Streaming.SQS;
 using SQSMessage = Amazon.SQS.Model.Message;
 using Orleans;
+using Orleans.Configuration;
 
 namespace OrleansAWSUtils.Storage
 {
@@ -26,6 +27,7 @@ namespace OrleansAWSUtils.Storage
         private const string SecretKeyPropertyName = "SecretKey";
         private const string SessionTokenPropertyName = "SessionToken";
         private const string ServicePropertyName = "Service";
+        private readonly SqsOptions sqsOptions;
         private readonly ILogger Logger;
         private string accessKey;
         private string secretKey;
@@ -44,19 +46,23 @@ namespace OrleansAWSUtils.Storage
         /// </summary>
         /// <param name="loggerFactory">logger factory to use</param>
         /// <param name="queueName">The name of the queue</param>
-        /// <param name="connectionString">The connection string</param>
+        /// <param name="sqsOptions">The options for the SQS connection</param>
         /// <param name="serviceId">The service ID</param>
-        public SQSStorage(ILoggerFactory loggerFactory, string queueName, string connectionString, string serviceId = "")
+        public SQSStorage(ILoggerFactory loggerFactory, string queueName, SqsOptions sqsOptions, string serviceId = "")
         {
+            if (sqsOptions is null) throw new ArgumentNullException(nameof(sqsOptions));
+            this.sqsOptions = sqsOptions;
             QueueName = string.IsNullOrWhiteSpace(serviceId) ? queueName : $"{serviceId}-{queueName}";
-            ParseDataConnectionString(connectionString);
+            ParseDataConnectionString(sqsOptions.ConnectionString);
             Logger = loggerFactory.CreateLogger<SQSStorage>();
             CreateClient();
         }
 
         private void ParseDataConnectionString(string dataConnectionString)
         {
-            var parameters = dataConnectionString.Split(';', StringSplitOptions.RemoveEmptyEntries);
+            if(string.IsNullOrEmpty(dataConnectionString)) throw new ArgumentNullException(nameof(dataConnectionString));
+
+            var parameters = dataConnectionString.Split(new[] { ';' }, StringSplitOptions.RemoveEmptyEntries);
 
             var serviceConfig = parameters.FirstOrDefault(p => p.Contains(ServicePropertyName));
             if (!string.IsNullOrWhiteSpace(serviceConfig))
@@ -217,13 +223,13 @@ namespace OrleansAWSUtils.Storage
                 {
                     QueueUrl = queueUrl,
                     MaxNumberOfMessages = count <= MAX_NUMBER_OF_MESSAGE_TO_PEAK ? count : MAX_NUMBER_OF_MESSAGE_TO_PEAK,
-                    // TODO: Move this list to Configuration
-                    AttributeNames = new List<string> { "All" },
-                    // TODO: Move this list to Configuration
-                    MessageAttributeNames = new List<string> { "All" },
-                    // TODO: Move this wait time to Configuration
-                    WaitTimeSeconds = 20
+                    AttributeNames = sqsOptions.ReceiveAttributes,
+                    MessageAttributeNames = sqsOptions.ReceiveMessageAttributes,
                 };
+
+                if (sqsOptions.ReceiveWaitTimeSeconds.HasValue)
+                    request.WaitTimeSeconds = sqsOptions.ReceiveWaitTimeSeconds.Value;
+
                 var response = await sqsClient.ReceiveMessageAsync(request);
                 return response.Messages;
             }
