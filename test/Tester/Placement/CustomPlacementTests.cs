@@ -36,8 +36,7 @@ namespace Tester.CustomPlacementTests
 
             private static void ConfigureServices(IServiceCollection services)
             {
-                services.AddKeyedSingleton<PlacementStrategy, TestCustomPlacementStrategy>(nameof(TestCustomPlacementStrategy));
-                services.AddKeyedSingleton<IPlacementDirector, TestPlacementStrategyFixedSiloDirector>(typeof(TestCustomPlacementStrategy));
+                services.AddPlacementDirector<TestCustomPlacementStrategy, TestPlacementStrategyFixedSiloDirector>();
             }
         }
 
