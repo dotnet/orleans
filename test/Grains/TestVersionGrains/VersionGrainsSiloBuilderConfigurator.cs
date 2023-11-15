@@ -31,8 +31,7 @@ namespace TestVersionGrains
 
         private void ConfigureServices(IServiceCollection services)
         {
-            services.AddKeyedSingleton<PlacementStrategy, VersionAwarePlacementStrategy>(nameof(VersionAwarePlacementStrategy));
-            services.AddKeyedSingleton<IPlacementDirector, VersionAwarePlacementDirector>(typeof(VersionAwarePlacementStrategy));
+            services.AddPlacementDirector<VersionAwarePlacementStrategy, VersionAwarePlacementDirector>();
         }
     }
 }
