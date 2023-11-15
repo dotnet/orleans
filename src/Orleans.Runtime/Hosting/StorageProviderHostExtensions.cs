@@ -14,6 +14,15 @@ namespace Orleans.Runtime.Hosting
 {
     public static class StorageProviderExtensions
     {
+        /// <summary>
+        /// Add a grain storage provider implementation to the silo. If the provider type implements <see cref="ILifecycleParticipant{ISiloLifecycle}"/>
+        /// it will automatically participate to the silo lifecycle.
+        /// </summary>
+        /// <typeparam name="T">The concrete implementation type of the grain storage provider.</typeparam>
+        /// <param name="collection">The service collection.</param>
+        /// <param name="name">The name of the storage to add.</param>
+        /// <param name="implementationFactory">Factory to build the storage provider.</param>
+        /// <returns>The service provider.</returns>
         public static IServiceCollection AddGrainStorage<T>(this IServiceCollection collection, string name, Func<IServiceProvider, string, T> implementationFactory)
             where T : IGrainStorage
         {
