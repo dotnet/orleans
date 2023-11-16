@@ -3,6 +3,7 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using Orleans.Storage;
 using Orleans.Providers;
 using Orleans.Persistence.Cosmos;
+using Orleans.Configuration.Internal;
 
 namespace Orleans.Hosting;
 
@@ -12,65 +13,65 @@ namespace Orleans.Hosting;
 public static class HostingExtensions
 {
     /// <summary>
-    /// Configure silo to use Azure Cosmos DB storage as the default grain storage using a custom Partition Key Provider.
+    /// Configure silo to use Azure Cosmos DB storage as the default grain storage using a custom document id provider.
     /// </summary>
-    /// <typeparam name="TPartitionKeyProvider">The custom partition key provider type.</typeparam>
+    /// <typeparam name="TDocumentIdProvider">The document id provider.</typeparam>
     /// <param name="builder">The silo builder.</param>
     /// <param name="configureOptions">The delegate used to configure the provider.</param>
-    public static ISiloBuilder AddCosmosGrainStorageAsDefault<TPartitionKeyProvider>(
+    public static ISiloBuilder AddCosmosGrainStorageAsDefault<TDocumentIdProvider>(
         this ISiloBuilder builder,
-        Action<CosmosGrainStorageOptions> configureOptions) where TPartitionKeyProvider : class, IPartitionKeyProvider
+        Action<CosmosGrainStorageOptions> configureOptions) where TDocumentIdProvider : class, IDocumentIdProvider
     {
-        return builder.AddCosmosGrainStorage<TPartitionKeyProvider>(ProviderConstants.DEFAULT_STORAGE_PROVIDER_NAME, configureOptions);
+        return builder.AddCosmosGrainStorage<TDocumentIdProvider>(ProviderConstants.DEFAULT_STORAGE_PROVIDER_NAME, configureOptions);
     }
 
     /// <summary>
-    /// Configure silo to use Azure Cosmos DB storage for grain storage using a custom Partition Key Provider.
+    /// Configure silo to use Azure Cosmos DB storage for grain storage using a custom document id provider.
     /// </summary>
-    /// <typeparam name="TPartitionKeyProvider">The custom partition key provider type.</typeparam>
+    /// <typeparam name="TDocumentIdProvider">The document id provider.</typeparam>
     /// <param name="builder">The silo builder.</param>
     /// <param name="name">The storage provider name.</param>
     /// <param name="configureOptions">The delegate used to configure the provider.</param>
-    public static ISiloBuilder AddCosmosGrainStorage<TPartitionKeyProvider>(
+    public static ISiloBuilder AddCosmosGrainStorage<TDocumentIdProvider>(
         this ISiloBuilder builder,
         string name,
-        Action<CosmosGrainStorageOptions> configureOptions) where TPartitionKeyProvider : class, IPartitionKeyProvider
+        Action<CosmosGrainStorageOptions> configureOptions) where TDocumentIdProvider : class, IDocumentIdProvider
     {
-        builder.Services.AddSingletonNamedService<IPartitionKeyProvider, TPartitionKeyProvider>(name);
+        builder.Services.AddSingletonNamedService<IDocumentIdProvider, TDocumentIdProvider>(name);
         builder.Services.AddCosmosGrainStorage(name, configureOptions);
         return builder;
     }
 
     /// <summary>
-    /// Configure silo to use Azure Cosmos DB storage as the default grain storage using a custom Partition Key Provider.
+    /// Configure silo to use Azure Cosmos DB storage as the default grain storage using a custom document id provider.
     /// </summary>
     /// <param name="builder">The silo builder.</param>
     /// <param name="configureOptions">The delegate used to configure the provider.</param>
-    /// <param name="customPartitionKeyProviderType">The custom partition key provider type.</param>
+    /// <param name="customDocumentIdProviderType">The document id provider.</param>
     public static ISiloBuilder AddCosmosGrainStorageAsDefault(
         this ISiloBuilder builder,
         Action<CosmosGrainStorageOptions> configureOptions,
-        Type customPartitionKeyProviderType)
+        Type customDocumentIdProviderType)
     {
-        return builder.AddCosmosGrainStorage(ProviderConstants.DEFAULT_STORAGE_PROVIDER_NAME, configureOptions, customPartitionKeyProviderType);
+        return builder.AddCosmosGrainStorage(ProviderConstants.DEFAULT_STORAGE_PROVIDER_NAME, configureOptions, customDocumentIdProviderType);
     }
 
     /// <summary>
-    /// Configure silo to use Azure Cosmos DB storage for grain storage using a custom Partition Key Provider.
+    /// Configure silo to use Azure Cosmos DB storage for grain storage using a custom document id provider.
     /// </summary>
     /// <param name="builder">The silo builder.</param>
     /// <param name="name">The storage provider name.</param>
     /// <param name="configureOptions">The delegate used to configure the provider.</param>
-    /// <param name="customPartitionKeyProviderType">The custom partition key provider type.</param>
+    /// <param name="customDocumentIdProviderType">The document id provider.</param>
     public static ISiloBuilder AddCosmosGrainStorage(
         this ISiloBuilder builder,
         string name,
         Action<CosmosGrainStorageOptions> configureOptions,
-        Type customPartitionKeyProviderType)
+        Type customDocumentIdProviderType)
     {
-        if (customPartitionKeyProviderType != null)
+        if (customDocumentIdProviderType != null)
         {
-            builder.Services.TryAddSingleton(typeof(IPartitionKeyProvider), customPartitionKeyProviderType);
+            builder.Services.TryAddSingleton(typeof(IDocumentIdProvider), customDocumentIdProviderType);
         }
 
         builder.Services.AddCosmosGrainStorage(name, configureOptions);
@@ -105,51 +106,51 @@ public static class HostingExtensions
     }
 
     /// <summary>
-    /// Configure silo to use Azure Cosmos DB storage as the default grain storage using a custom Partition Key Provider.
+    /// Configure silo to use Azure Cosmos DB storage as the default grain storage using a custom document id provider.
     /// </summary>
-    /// <typeparam name="TPartitionKeyProvider">The custom partition key provider type.</typeparam>
+    /// <typeparam name="TDocumentIdProvider">The document id provider.</typeparam>
     /// <param name="builder">The silo builder.</param>
     /// <param name="configureOptions">The delegate used to configure the provider.</param>
-    public static ISiloBuilder AddCosmosGrainStorageAsDefault<TPartitionKeyProvider>(
+    public static ISiloBuilder AddCosmosGrainStorageAsDefault<TDocumentIdProvider>(
         this ISiloBuilder builder,
-        Action<OptionsBuilder<CosmosGrainStorageOptions>>? configureOptions = null) where TPartitionKeyProvider : class, IPartitionKeyProvider
+        Action<OptionsBuilder<CosmosGrainStorageOptions>>? configureOptions = null) where TDocumentIdProvider : class, IDocumentIdProvider
     {
-        return builder.AddCosmosGrainStorage<TPartitionKeyProvider>(ProviderConstants.DEFAULT_STORAGE_PROVIDER_NAME, configureOptions);
+        return builder.AddCosmosGrainStorage<TDocumentIdProvider>(ProviderConstants.DEFAULT_STORAGE_PROVIDER_NAME, configureOptions);
     }
 
     /// <summary>
-    /// Configure silo to use Azure Cosmos DB storage for grain storage using a custom Partition Key Provider.
+    /// Configure silo to use Azure Cosmos DB storage for grain storage using a custom document id provider.
     /// </summary>
-    /// <typeparam name="TPartitionKeyProvider">The custom partition key provider type.</typeparam>
+    /// <typeparam name="TDocumentIdProvider">The document id provider.</typeparam>
     /// <param name="builder">The silo builder.</param>
     /// <param name="name">The storage provider name.</param>
     /// <param name="configureOptions">The delegate used to configure the provider.</param>
-    public static ISiloBuilder AddCosmosGrainStorage<TPartitionKeyProvider>(
+    public static ISiloBuilder AddCosmosGrainStorage<TDocumentIdProvider>(
         this ISiloBuilder builder,
         string name,
-        Action<OptionsBuilder<CosmosGrainStorageOptions>>? configureOptions = null) where TPartitionKeyProvider : class, IPartitionKeyProvider
+        Action<OptionsBuilder<CosmosGrainStorageOptions>>? configureOptions = null) where TDocumentIdProvider : class, IDocumentIdProvider
     {
-        builder.Services.AddSingletonNamedService<IPartitionKeyProvider, TPartitionKeyProvider>(name);
+        builder.Services.AddSingletonNamedService<IDocumentIdProvider, TDocumentIdProvider>(name);
         builder.Services.AddCosmosGrainStorage(name, configureOptions);
         return builder;
     }
 
     /// <summary>
-    /// Configure silo to use Azure Cosmos DB storage as the default grain storage using a custom Partition Key Provider.
+    /// Configure silo to use Azure Cosmos DB storage as the default grain storage using a custom document id provider.
     /// </summary>
     /// <param name="builder">The silo builder.</param>
-    /// <param name="customPartitionKeyProviderType">The custom partition key provider type.</param>
+    /// <param name="customDocumentIdProviderType">The document id provider.</param>
     /// <param name="configureOptions">The delegate used to configure the provider.</param>
     public static ISiloBuilder AddCosmosGrainStorageAsDefault(
         this ISiloBuilder builder,
-        Type customPartitionKeyProviderType,
+        Type customDocumentIdProviderType,
         Action<OptionsBuilder<CosmosGrainStorageOptions>>? configureOptions = null)
     {
-        return builder.AddCosmosGrainStorage(ProviderConstants.DEFAULT_STORAGE_PROVIDER_NAME, customPartitionKeyProviderType, configureOptions);
+        return builder.AddCosmosGrainStorage(ProviderConstants.DEFAULT_STORAGE_PROVIDER_NAME, customDocumentIdProviderType, configureOptions);
     }
 
     /// <summary>
-    /// Configure silo to use Azure Cosmos DB storage for grain storage using a custom Partition Key Provider.
+    /// Configure silo to use Azure Cosmos DB storage for grain storage using a custom document id provider.
     /// </summary>
     /// <param name="builder">The silo builder.</param>
     /// <param name="name">The storage provider name.</param>
@@ -157,12 +158,12 @@ public static class HostingExtensions
     public static ISiloBuilder AddCosmosGrainStorage(
         this ISiloBuilder builder,
         string name,
-        Type customPartitionKeyProviderType,
+        Type customDocumentIdProviderType,
         Action<OptionsBuilder<CosmosGrainStorageOptions>>? configureOptions = null)
     {
-        if (customPartitionKeyProviderType != null)
+        if (customDocumentIdProviderType != null)
         {
-            builder.Services.AddSingletonNamedService<IPartitionKeyProvider>(name, customPartitionKeyProviderType);
+            builder.Services.AddSingletonNamedService<IDocumentIdProvider>(name, customDocumentIdProviderType);
         }
 
         builder.Services.AddCosmosGrainStorage(name, configureOptions);
@@ -252,7 +253,8 @@ public static class HostingExtensions
                 name));
         services.ConfigureNamedOptionForLogging<CosmosGrainStorageOptions>(name);
         services.TryAddSingleton(sp => sp.GetServiceByName<IGrainStorage>(ProviderConstants.DEFAULT_STORAGE_PROVIDER_NAME));
-        services.TryAddSingleton<IPartitionKeyProvider, DefaultPartitionKeyProvider>();
+        services.TryAddSingleton<DefaultDocumentIdProvider>();
+        services.TryAddFromExisting<IDocumentIdProvider, DefaultDocumentIdProvider>();
         return services.AddSingletonNamedService(name, CosmosStorageFactory.Create)
             .AddSingletonNamedService(name, (s, n) => (ILifecycleParticipant<ISiloLifecycle>)s.GetRequiredServiceByName<IGrainStorage>(n));
     }
