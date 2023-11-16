@@ -1,3 +1,4 @@
+using System;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Orleans.Metadata;
@@ -19,8 +20,13 @@ namespace Orleans.Runtime
             _clusterManifestProvider = clusterManifestProvider;
         }
 
-        public ValueTask<ClusterManifest> GetClusterManifest() => new ValueTask<ClusterManifest>(_clusterManifestProvider.Current);
+        public ValueTask<GetClusterManifestResult> GetClusterManifest(MajorMinorVersion version)
+        {
+            return new ValueTask<GetClusterManifestResult>(_clusterManifestProvider.GetCurrent(version));
+        } 
 
         public ValueTask<GrainManifest> GetSiloManifest() => new ValueTask<GrainManifest>(_siloManifest);
     }
+
+   
 }

@@ -512,6 +512,31 @@ namespace UnitTests.Directory
                 await Task.Delay(100);
                 yield break;
             }
+
+            public GetClusterManifestResult GetCurrent(MajorMinorVersion version)
+            {
+                if (Current == null)
+                {
+                    return new GetClusterManifestResult()
+                    {
+                        IsVersionChange = true,
+                        ClusterManifest = Current
+                    };
+                }
+                if (Current.Version == version)
+                {
+                    return new GetClusterManifestResult()
+                    {
+                        IsVersionChange = false,
+                        ClusterManifest = new ClusterManifest(MajorMinorVersion.Zero, ImmutableDictionary<SiloAddress, GrainManifest>.Empty, ImmutableArray<GrainManifest>.Empty)
+                    };
+                }
+                return new GetClusterManifestResult()
+                {
+                    IsVersionChange = true,
+                    ClusterManifest = Current
+                };
+            }
         }
     }
 }

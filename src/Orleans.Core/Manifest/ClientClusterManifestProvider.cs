@@ -57,6 +57,31 @@ namespace Orleans.Runtime
         /// <inheritdoc />
         public GrainManifest LocalGrainManifest { get; }
 
+        public GetClusterManifestResult GetCurrent(MajorMinorVersion version)
+        {
+            if (Current == null)
+            {
+                return new GetClusterManifestResult()
+                {
+                    IsVersionChange = true,
+                    ClusterManifest = Current
+                };
+            }
+            if (Current.Version == version)
+            {
+                return new GetClusterManifestResult()
+                {
+                    IsVersionChange = false,
+                    ClusterManifest = new ClusterManifest(MajorMinorVersion.Zero, ImmutableDictionary<SiloAddress, GrainManifest>.Empty, ImmutableArray<GrainManifest>.Empty)
+                };
+            }
+            return new GetClusterManifestResult()
+            {
+                IsVersionChange = true,
+                ClusterManifest = Current
+            };
+        }
+
         /// <summary>
         /// Starts this service.
         /// </summary>
@@ -79,15 +104,21 @@ namespace Orleans.Runtime
                     try
                     {
                         var provider = grainFactory.GetGrain<IClusterManifestSystemTarget>(SystemTargetGrainId.Create(Constants.ManifestProviderType, gateway).GrainId);
-                        var refreshTask = provider.GetClusterManifest().AsTask();
+                        var refreshTask = provider.GetClusterManifest(_current.Version).AsTask();
                         var task = await Task.WhenAny(cancellationTask, refreshTask).ConfigureAwait(false);
 
                         if (ReferenceEquals(task, cancellationTask))
                         {
                             return;
                         }
+                        var resultClusterManifestResult = await refreshTask;
+                        if (!resultClusterManifestResult.IsVersionChange)
+                        {
+                            await Task.WhenAny(cancellationTask, Task.Delay(_typeManagementOptions.TypeMapRefreshInterval));
+                            continue;
+                        }
 
-                        if (!_updates.TryPublish(await refreshTask))
+                        if (!_updates.TryPublish(resultClusterManifestResult.ClusterManifest))
                         {
                             await Task.Delay(StandardExtensions.Min(_typeManagementOptions.TypeMapRefreshInterval, TimeSpan.FromMilliseconds(500)));
                             continue;
