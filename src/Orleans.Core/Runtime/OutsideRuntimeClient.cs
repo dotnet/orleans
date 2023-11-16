@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Concurrent;
-using System.Net;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
@@ -11,7 +10,6 @@ using Orleans.CodeGeneration;
 using Orleans.Configuration;
 using Orleans.Messaging;
 using Orleans.Runtime;
-using Orleans.Runtime.Configuration;
 using Orleans.Serialization;
 using Orleans.Serialization.Invocation;
 
@@ -30,12 +28,11 @@ namespace Orleans
         private bool disposed;
 
         private readonly MessagingTrace messagingTrace;
-        private readonly ClientGrainId clientId;
 
         public IInternalGrainFactory InternalGrainFactory { get; private set; }
 
         private MessageFactory messageFactory;
-        private IPAddress localAddress;
+        private readonly LocalClientDetails _localClientDetails;
         private readonly ILoggerFactory loggerFactory;
 
         private readonly SharedCallbackData sharedCallbackData;
@@ -59,16 +56,17 @@ namespace Orleans
         [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Reliability", "CA2000:Dispose objects before losing scope",
             Justification = "MessageCenter is IDisposable but cannot call Dispose yet as it lives past the end of this method call.")]
         public OutsideRuntimeClient(
+            LocalClientDetails localClientDetails,
             ILoggerFactory loggerFactory,
             IOptions<ClientMessagingOptions> clientMessagingOptions,
             MessagingTrace messagingTrace,
             IServiceProvider serviceProvider)
         {
             this.ServiceProvider = serviceProvider;
+            _localClientDetails = localClientDetails;
             this.loggerFactory = loggerFactory;
             this.messagingTrace = messagingTrace;
             this.logger = loggerFactory.CreateLogger<OutsideRuntimeClient>();
-            this.clientId = ClientGrainId.Create();
             callbacks = new ConcurrentDictionary<CorrelationId, CallbackData>();
             this.clientMessagingOptions = clientMessagingOptions.Value;
 
@@ -113,10 +111,8 @@ namespace Orleans
 
                 this.GrainReferenceRuntime = this.ServiceProvider.GetRequiredService<IGrainReferenceRuntime>();
 
-                this.localAddress = this.clientMessagingOptions.LocalAddress ?? ConfigUtilities.GetLocalIPAddress(this.clientMessagingOptions.PreferredFamily, this.clientMessagingOptions.NetworkInterfaceName);
-
                 // Client init / sign-on message
-                logger.LogInformation((int)ErrorCode.ClientStarting, "Starting Orleans client with runtime version \"{RuntimeVersion}\", local address {LocalAddress} and client id {ClientId}", RuntimeVersion.Current, localAddress, clientId);
+                logger.LogInformation((int)ErrorCode.ClientStarting, "Starting Orleans client with runtime version \"{RuntimeVersion}\", local address {LocalAddress} and client id {ClientId}", RuntimeVersion.Current, _localClientDetails.ClientAddress, _localClientDetails.ClientId);
 
                 if (TestOnlyThrowExceptionDuringInit)
                 {
@@ -141,7 +137,7 @@ namespace Orleans
             // This helps to avoid any issues (such as deadlocks) caused by executing with the client's synchronization context/scheduler.
             await Task.Run(() => this.StartInternal(cancellationToken)).ConfigureAwait(false);
 
-            logger.LogInformation((int)ErrorCode.ProxyClient_StartDone, "Started client with address {ActivationAddress} and id {ClientId}", CurrentActivationAddress.ToString(), clientId);
+            logger.LogInformation((int)ErrorCode.ProxyClient_StartDone, "Started client with address {ActivationAddress} and id {ClientId}", CurrentActivationAddress.ToString(), _localClientDetails.ClientId);
         }
 
         // used for testing to (carefully!) allow two clients in the same process
@@ -155,14 +151,13 @@ namespace Orleans
                 retryFilter,
                 cancellationToken);
 
-            var generation = -SiloAddress.AllocateNewGeneration(); // Client generations are negative
-            MessageCenter = ActivatorUtilities.CreateInstance<ClientMessageCenter>(this.ServiceProvider, localAddress, generation, clientId);
+            MessageCenter = ActivatorUtilities.CreateInstance<ClientMessageCenter>(this.ServiceProvider);
             MessageCenter.RegisterLocalMessageHandler(this.HandleMessage);
             await ExecuteWithRetries(
                 async () => await MessageCenter.StartAsync(cancellationToken),
                 retryFilter,
                 cancellationToken);
-            CurrentActivationAddress = GrainAddress.NewActivationAddress(MessageCenter.MyAddress, clientId.GrainId);
+            CurrentActivationAddress = GrainAddress.NewActivationAddress(MessageCenter.MyAddress, _localClientDetails.ClientId.GrainId);
 
             this.gatewayObserver = new ClientGatewayObserver(gatewayManager);
             this.InternalGrainFactory.CreateObjectReference<IClientGatewayObserver>(this.gatewayObserver);
@@ -350,8 +345,8 @@ namespace Orleans
                 throw new ArgumentException("Argument must not be a grain class.", nameof(obj));
 
             var observerId = obj is ClientObserver clientObserver
-                ? clientObserver.GetObserverGrainId(this.clientId)
-                : ObserverGrainId.Create(this.clientId);
+                ? clientObserver.GetObserverGrainId(_localClientDetails.ClientId)
+                : ObserverGrainId.Create(_localClientDetails.ClientId);
             var reference = this.InternalGrainFactory.GetGrain(observerId.GrainId);
 
             if (!localObjects.TryRegister(obj, observerId))

@@ -499,8 +499,7 @@ namespace UnitTests.Directory
         {
             public ClusterManifest Current => new ClusterManifest(
                 MajorMinorVersion.Zero,
-                ImmutableDictionary<SiloAddress, GrainManifest>.Empty,
-                ImmutableArray.Create(new GrainManifest(ImmutableDictionary<GrainType, GrainProperties>.Empty, ImmutableDictionary<GrainInterfaceType, GrainInterfaceProperties>.Empty)));
+                ImmutableDictionary<SiloAddress, GrainManifest>.Empty);
 
             public IAsyncEnumerable<ClusterManifest> Updates => this.GetUpdates();
 
