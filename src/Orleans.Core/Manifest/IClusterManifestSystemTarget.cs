@@ -1,4 +1,3 @@
-using System;
 using System.Threading.Tasks;
 using Orleans.Metadata;
 
@@ -13,15 +12,12 @@ namespace Orleans.Runtime
         /// Gets the current cluster manifest.
         /// </summary>
         /// <returns>The current cluster manifest.</returns>
-        ValueTask<GetClusterManifestResult> GetClusterManifest(MajorMinorVersion version);
-    }
+        ValueTask<ClusterManifest> GetClusterManifest();
 
-    [Serializable, GenerateSerializer, Immutable]
-    public class GetClusterManifestResult
-    {
-        [Id(0)]
-        public bool IsVersionChange { get; set; }
-        [Id(1)]
-        public ClusterManifest ClusterManifest { get; set; }
+        /// <summary>
+        /// Gets the current cluster manifest if it is newer than the provided <paramref name="version"/>.
+        /// </summary>
+        /// <returns>The current cluster manifest, or <see langword="null"/> if it is not newer than the provided version.</returns>
+        ValueTask<ClusterManifest> GetClusterManifestIfNewer(MajorMinorVersion version);
     }
 }

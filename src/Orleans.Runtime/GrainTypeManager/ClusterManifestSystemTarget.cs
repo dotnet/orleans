@@ -20,13 +20,20 @@ namespace Orleans.Runtime
             _clusterManifestProvider = clusterManifestProvider;
         }
 
-        public ValueTask<GetClusterManifestResult> GetClusterManifest(MajorMinorVersion version)
+        public ValueTask<ClusterManifest> GetClusterManifest() => new(_clusterManifestProvider.Current);
+        public ValueTask<ClusterManifest> GetClusterManifestIfNewer(MajorMinorVersion version)
         {
-            return new ValueTask<GetClusterManifestResult>(_clusterManifestProvider.GetCurrent(version));
-        } 
+            var result = _clusterManifestProvider.Current;
+
+            // Only return an updated manifest if it is newer than the provided version.
+            if (result.Version <= version)
+            {
+                return new ValueTask<ClusterManifest>(default(ClusterManifest));
+            }
+
+            return new ValueTask<ClusterManifest>(result);
+        }
 
         public ValueTask<GrainManifest> GetSiloManifest() => new ValueTask<GrainManifest>(_siloManifest);
     }
-
-   
 }

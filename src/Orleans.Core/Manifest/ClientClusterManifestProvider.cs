@@ -44,7 +44,7 @@ namespace Orleans.Runtime
             _current = new ClusterManifest(MajorMinorVersion.MinValue, ImmutableDictionary<SiloAddress, GrainManifest>.Empty, ImmutableArray.Create(this.LocalGrainManifest));
             _updates = new AsyncEnumerable<ClusterManifest>(
                 initialValue: _current,
-                updateValidator: (previous, proposed) => previous is null || proposed.Version > previous.Version,
+                updateValidator: (previous, proposed) => proposed.Version > previous.Version,
                 onPublished: update => Interlocked.Exchange(ref _current, update));
         }
 
@@ -56,31 +56,6 @@ namespace Orleans.Runtime
 
         /// <inheritdoc />
         public GrainManifest LocalGrainManifest { get; }
-
-        public GetClusterManifestResult GetCurrent(MajorMinorVersion version)
-        {
-            if (Current == null)
-            {
-                return new GetClusterManifestResult()
-                {
-                    IsVersionChange = true,
-                    ClusterManifest = Current
-                };
-            }
-            if (Current.Version == version)
-            {
-                return new GetClusterManifestResult()
-                {
-                    IsVersionChange = false,
-                    ClusterManifest = new ClusterManifest(MajorMinorVersion.Zero, ImmutableDictionary<SiloAddress, GrainManifest>.Empty, ImmutableArray<GrainManifest>.Empty)
-                };
-            }
-            return new GetClusterManifestResult()
-            {
-                IsVersionChange = true,
-                ClusterManifest = Current
-            };
-        }
 
         /// <summary>
         /// Starts this service.
@@ -104,21 +79,23 @@ namespace Orleans.Runtime
                     try
                     {
                         var provider = grainFactory.GetGrain<IClusterManifestSystemTarget>(SystemTargetGrainId.Create(Constants.ManifestProviderType, gateway).GrainId);
-                        var refreshTask = provider.GetClusterManifest(_current.Version).AsTask();
+                        var refreshTask = provider.GetClusterManifestIfNewer(_current.Version).AsTask();
                         var task = await Task.WhenAny(cancellationTask, refreshTask).ConfigureAwait(false);
 
                         if (ReferenceEquals(task, cancellationTask))
                         {
                             return;
                         }
-                        var resultClusterManifestResult = await refreshTask;
-                        if (!resultClusterManifestResult.IsVersionChange)
+
+                        var updatedManifest = await refreshTask;
+                        if (updatedManifest is null)
                         {
+                            // There was no newer cluster manifest, so wait for the next refresh interval and try again.
                             await Task.WhenAny(cancellationTask, Task.Delay(_typeManagementOptions.TypeMapRefreshInterval));
                             continue;
                         }
 
-                        if (!_updates.TryPublish(resultClusterManifestResult.ClusterManifest))
+                        if (!_updates.TryPublish(updatedManifest))
                         {
                             await Task.Delay(StandardExtensions.Min(_typeManagementOptions.TypeMapRefreshInterval, TimeSpan.FromMilliseconds(500)));
                             continue;

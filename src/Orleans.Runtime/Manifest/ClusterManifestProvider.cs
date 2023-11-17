@@ -93,31 +93,6 @@ namespace Orleans.Runtime.Metadata
             }
         }
 
-        public GetClusterManifestResult GetCurrent(MajorMinorVersion version)
-        {
-            if (Current == null)
-            {
-                return new GetClusterManifestResult()
-                {
-                    IsVersionChange = true,
-                    ClusterManifest = Current
-                };
-            }
-            if (Current.Version == version)
-            {
-                return new GetClusterManifestResult()
-                {
-                    IsVersionChange = false,
-                    ClusterManifest = new ClusterManifest(MajorMinorVersion.Zero, ImmutableDictionary<SiloAddress, GrainManifest>.Empty, ImmutableArray<GrainManifest>.Empty)
-                };
-            }
-            return new GetClusterManifestResult()
-            {
-                IsVersionChange = true,
-                ClusterManifest = Current
-            };
-        }
-
         private async Task<bool> UpdateManifest(ClusterMembershipSnapshot clusterMembership)
         {
             var existingManifest = _current;
