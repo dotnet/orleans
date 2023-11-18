@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Threading;
@@ -28,6 +29,7 @@ namespace Orleans.Runtime
         private readonly CancellationTokenSource _cancellation = new CancellationTokenSource();
         private ClusterManifest _current;
         private Task _runTask;
+        private ConcurrentDictionary<SiloAddress, MajorMinorVersion> siloAddressVersionMap = new ConcurrentDictionary<SiloAddress, MajorMinorVersion>();
 
         public ClientClusterManifestProvider(
             IServiceProvider services,
@@ -79,7 +81,12 @@ namespace Orleans.Runtime
                     try
                     {
                         var provider = grainFactory.GetGrain<IClusterManifestSystemTarget>(SystemTargetGrainId.Create(Constants.ManifestProviderType, gateway).GrainId);
-                        var refreshTask = provider.GetClusterManifestIfNewer(_current.Version).AsTask();
+                        var currentVersion = _current.Version;
+                        if (siloAddressVersionMap.ContainsKey(gateway))
+                        {
+                            siloAddressVersionMap.TryGetValue(gateway, out currentVersion);
+                        }
+                        var refreshTask = provider.GetClusterManifestIfNewer(currentVersion).AsTask();
                         var task = await Task.WhenAny(cancellationTask, refreshTask).ConfigureAwait(false);
 
                         if (ReferenceEquals(task, cancellationTask))
@@ -94,6 +101,7 @@ namespace Orleans.Runtime
                             await Task.WhenAny(cancellationTask, Task.Delay(_typeManagementOptions.TypeMapRefreshInterval));
                             continue;
                         }
+                        siloAddressVersionMap[gateway] = updatedManifest.Version;
 
                         if (!_updates.TryPublish(updatedManifest))
                         {
