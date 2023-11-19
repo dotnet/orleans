@@ -71,6 +71,7 @@ namespace TestExtensions
         {
             builder.AddInMemoryCollection(new Dictionary<string, string>
             {
+                { nameof(RedisConnectionString), "127.0.0.1:6379" },
                 { nameof(ZooKeeperConnectionString), "127.0.0.1:2181" }
             });
             if (!TryAddJsonFileFromEnvironmentVariable(builder, "ORLEANS_SECRETFILE"))
