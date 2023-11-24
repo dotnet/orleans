@@ -69,7 +69,9 @@ namespace Orleans.Runtime
                 key,
                 static (key, state) =>
                 {
-                    var (_, outerState, addFunc, generation) = state;
+                    var (self, outerState, addFunc, generation) = state;
+                    Interlocked.Increment(ref self.count);
+                    self.AdjustSize();
                     return new TimestampedValue(addFunc(outerState, key), generation);
                 },
                 static (key, existing, state) =>
@@ -81,15 +83,7 @@ namespace Orleans.Runtime
                 },
                 (Self: this, State: state, AddFunc: addFunc, Generation: generation));
 
-            var result = storedValue.Value;
-
-            if (storedValue.Generation == generation)
-            {
-                Interlocked.Increment(ref count);
-                AdjustSize();
-            }
-
-            return result;
+            return storedValue.Value;
         }
 
         public TValue AddOrUpdate<TState>(TKey key, Func<TState, TKey, TValue> addFunc, TState state)
@@ -99,25 +93,19 @@ namespace Orleans.Runtime
                 key,
                 static (key, state) =>
                 {
-                    var (outerState, addFunc, generation) = state;
+                    var (self, outerState, addFunc, generation) = state;
+                    Interlocked.Increment(ref self.count);
+                    self.AdjustSize();
                     return new TimestampedValue(addFunc(outerState, key), generation);
                 },
                 static (key, existing, state) =>
                 {
-                    var (outerState, addFunc, generation) = state;
+                    var (_, outerState, addFunc, generation) = state;
                     return new TimestampedValue(addFunc(outerState, key), generation);
                 },
-                (State: state, AddFunc: addFunc, Generation: generation));
+                (Self: this, State: state, AddFunc: addFunc, Generation: generation));
 
-            var result = storedValue.Value;
-
-            if (storedValue.Generation == generation)
-            {
-                Interlocked.Increment(ref count);
-                AdjustSize();
-            }
-
-            return result;
+            return storedValue.Value;
         }
 
         public void Add(TKey key, TValue value)
