@@ -23,7 +23,7 @@ namespace Orleans.Hosting
 
             services.TryAddSingleton<ITransactionalStateStorageFactory>(sp => sp.GetKeyedService<ITransactionalStateStorageFactory>(ProviderConstants.DEFAULT_STORAGE_PROVIDER_NAME));
             services.AddKeyedSingleton<ITransactionalStateStorageFactory>(name, (sp, key) => AzureTableTransactionalStateStorageFactory.Create(sp, key as string));
-            services.AddKeyedSingleton<ILifecycleParticipant<ISiloLifecycle>>(name, (s, n) => (ILifecycleParticipant<ISiloLifecycle>)s.GetRequiredKeyedService<ITransactionalStateStorageFactory>(n));
+            services.AddSingleton<ILifecycleParticipant<ISiloLifecycle>>(s => (ILifecycleParticipant<ISiloLifecycle>)s.GetRequiredKeyedService<ITransactionalStateStorageFactory>(name));
 
             return services;
         }
