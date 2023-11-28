@@ -252,7 +252,6 @@ public static class HostingExtensions
                 sp.GetService<IOptionsMonitor<CosmosGrainStorageOptions>>()!.Get(name),
                 name));
         services.ConfigureNamedOptionForLogging<CosmosGrainStorageOptions>(name);
-        services.TryAddSingleton(sp => sp.GetRequiredKeyedService<IGrainStorage>(ProviderConstants.DEFAULT_STORAGE_PROVIDER_NAME));
         services.TryAddSingleton<IPartitionKeyProvider, DefaultPartitionKeyProvider>();
         return services.AddGrainStorage(name, CosmosStorageFactory.Create);
     }
