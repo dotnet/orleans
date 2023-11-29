@@ -34,7 +34,7 @@ namespace Orleans.CodeGenerator
             var fields = GetFieldDeclarations(invokableMethodInfo, fieldDescriptions);
             var (ctor, ctorArgs) = GenerateConstructor(generatedClassName, invokableMethodInfo, baseClassType);
             var accessibility = GetAccessibility(method);
-            var compoundTypeAliases = GetCompoundTypeAliasAttributeArguments(invokableMethodInfo);
+            var compoundTypeAliases = GetCompoundTypeAliasAttributeArguments(invokableMethodInfo, invokableMethodInfo.Key);
 
             List<INamedTypeSymbol> serializationHooks = new();
             if (baseClassType.GetAttributes(LibraryTypes.SerializationCallbacksAttribute, out var hookAttributes))
@@ -208,38 +208,35 @@ namespace Orleans.CodeGenerator
             return Attribute(LibraryTypes.CompoundTypeAliasAttribute.ToNameSyntax()).AddArgumentListArguments(args);
         }
 
-        internal static List<CompoundTypeAliasComponent[]> GetCompoundTypeAliasAttributeArguments(InvokableMethodDescription methodDescription)
+        internal static List<CompoundTypeAliasComponent[]> GetCompoundTypeAliasAttributeArguments(InvokableMethodDescription methodDescription, InvokableMethodId invokableId)
         {
             var result = new List<CompoundTypeAliasComponent[]>(2);
-            var proxyBaseComponents = methodDescription.Key.ProxyBase.CompositeAliasComponents;
+            var containingInterface = methodDescription.ContainingInterface;
             if (methodDescription.HasAlias)
             {
-                var alias = new CompoundTypeAliasComponent[1 + proxyBaseComponents.Length + 2];
-                alias[0] = new("inv");
-                for (var i = 0; i < proxyBaseComponents.Length; i++)
-                {
-                    alias[i + 1] = proxyBaseComponents[i];
-                }
-
-                alias[1 + proxyBaseComponents.Length] = new(methodDescription.ContainingInterface);
-                alias[1 + proxyBaseComponents.Length + 1] = new(methodDescription.MethodId);
-                result.Add(alias);
+                result.Add(GetCompoundTypeAliasComponents(invokableId, containingInterface, methodDescription.MethodId));
             }
 
-            {
-                var alias = new CompoundTypeAliasComponent[1 + proxyBaseComponents.Length + 2];
-                alias[0] = new("inv");
-                for (var i = 0; i < proxyBaseComponents.Length; i++)
-                {
-                    alias[i + 1] = proxyBaseComponents[i];
-                }
-
-                alias[1 + proxyBaseComponents.Length] = new(methodDescription.ContainingInterface);
-                alias[1 + proxyBaseComponents.Length + 1] = new(methodDescription.GeneratedMethodId);
-                result.Add(alias);
-            }
-
+            result.Add(GetCompoundTypeAliasComponents(invokableId, containingInterface, methodDescription.GeneratedMethodId));
             return result;
+        }
+
+        public static CompoundTypeAliasComponent[] GetCompoundTypeAliasComponents(
+            InvokableMethodId invokableId,
+            INamedTypeSymbol containingInterface,
+            string methodId)
+        {
+            var proxyBaseComponents = invokableId.ProxyBase.CompositeAliasComponents;
+            var alias = new CompoundTypeAliasComponent[1 + proxyBaseComponents.Length + 2];
+            alias[0] = new("inv");
+            for (var i = 0; i < proxyBaseComponents.Length; i++)
+            {
+                alias[i + 1] = proxyBaseComponents[i];
+            }
+
+            alias[1 + proxyBaseComponents.Length] = new(containingInterface);
+            alias[1 + proxyBaseComponents.Length + 1] = new(methodId);
+            return alias;
         }
 
         private INamedTypeSymbol GetBaseClassType(InvokableMethodDescription method)
@@ -582,7 +579,7 @@ namespace Orleans.CodeGenerator
             var genericArity = method.AllTypeParameters.Count;
             var typeArgs = genericArity > 0 ? "_" + genericArity : string.Empty;
             var proxyKey = method.ProxyBase.Key.GeneratedClassNameComponent;
-            return $"Invokable_{method.Method.ContainingType.Name}_{proxyKey}_{method.GeneratedMethodId}{typeArgs}";
+            return $"Invokable_{method.ContainingInterface.Name}_{proxyKey}_{method.GeneratedMethodId}{typeArgs}";
         }
 
         private MemberDeclarationSyntax[] GetFieldDeclarations(

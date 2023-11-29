@@ -10,11 +10,6 @@ namespace Orleans.CodeGenerator
     {
         public InvokableMethodId(InvokableMethodProxyBase proxyBaseInfo, IMethodSymbol method)
         {
-            if (!SymbolEqualityComparer.Default.Equals(method, method.OriginalDefinition))
-            {
-                throw new ArgumentException("Method must be an original definition", nameof(method));
-            }
-
             ProxyBase = proxyBaseInfo;
             Method = method;
         }
@@ -29,11 +24,9 @@ namespace Orleans.CodeGenerator
         /// </summary>
         public IMethodSymbol Method { get; }
 
-        public bool Equals(InvokableMethodId other)
-        {
-            return ProxyBase.Equals(other.ProxyBase)
-                && SymbolEqualityComparer.Default.Equals(Method, other.Method); 
-        }
+        public bool Equals(InvokableMethodId other) =>
+            ProxyBase.Equals(other.ProxyBase)
+            && SymbolEqualityComparer.Default.Equals(Method, other.Method);
 
         public override bool Equals(object obj) => obj is InvokableMethodId imd && Equals(imd);
         public override int GetHashCode() => ProxyBase.GetHashCode() * 17 ^ SymbolEqualityComparer.Default.GetHashCode(Method);

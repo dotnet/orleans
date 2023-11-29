@@ -14,11 +14,12 @@ namespace Orleans.CodeGenerator
     /// </summary>
     internal sealed class InvokableMethodDescription : IEquatable<InvokableMethodDescription>
     {
-        public static InvokableMethodDescription Create(InvokableMethodId method) => new(method);
+        public static InvokableMethodDescription Create(InvokableMethodId method, INamedTypeSymbol containingType = null) => new(method, containingType);
 
-        private InvokableMethodDescription(InvokableMethodId invokableId)
+        private InvokableMethodDescription(InvokableMethodId invokableId, INamedTypeSymbol containingType)
         {
             Key = invokableId;
+            ContainingInterface = containingType ?? invokableId.Method.ContainingType;
             GeneratedMethodId = CodeGenerator.CreateHashedMethodId(Method);
             MethodId = CodeGenerator.GetId(Method)?.ToString(CultureInfo.InvariantCulture) ?? CodeGenerator.GetAlias(Method) ?? GeneratedMethodId;
 
@@ -98,7 +99,7 @@ namespace Orleans.CodeGenerator
             MethodTypeParameters = new List<(string Name, ITypeParameterSymbol Parameter)>();
 
             var names = new HashSet<string>(StringComparer.Ordinal);
-            foreach (var typeParameter in Method.ContainingType.GetAllTypeParameters())
+            foreach (var typeParameter in ContainingInterface.GetAllTypeParameters())
             {
                 var tpName = GetTypeParameterName(names, typeParameter);
                 AllTypeParameters.Add((tpName, typeParameter));
@@ -203,7 +204,7 @@ namespace Orleans.CodeGenerator
         /// <summary>
         /// Gets the interface which this type is contained in.
         /// </summary>
-        public INamedTypeSymbol ContainingInterface => Method.ContainingType;
+        public INamedTypeSymbol ContainingInterface { get; }
 
         public bool Equals(InvokableMethodDescription other) => Key.Equals(other.Key);
         public override bool Equals(object obj) => obj is InvokableMethodDescription imd && Equals(imd);

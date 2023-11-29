@@ -23,6 +23,7 @@ namespace Orleans.CodeGenerator
         public List<string> ImmutableAttributes { get; } = new() { "Orleans.ImmutableAttribute" };
         public List<string> ConstructorAttributes { get; } = new() { "Orleans.OrleansConstructorAttribute", "Microsoft.Extensions.DependencyInjection.ActivatorUtilitiesConstructorAttribute" };
         public GenerateFieldIds GenerateFieldIds { get; set; }
+        public bool GenerateCompatibilityInvokers { get; set; }
     }
 
     public class CodeGenerator
@@ -643,7 +644,7 @@ namespace Orleans.CodeGenerator
             return result;
         }
 
-        internal ProxyInterfaceDescription GetInvokableInterfaceDescription(INamedTypeSymbol proxyBaseType, INamedTypeSymbol interfaceType)
+        private ProxyInterfaceDescription GetInvokableInterfaceDescription(INamedTypeSymbol proxyBaseType, INamedTypeSymbol interfaceType)
         {
             var originalInterface = interfaceType.OriginalDefinition;
             if (MetadataModel.InvokableInterfaces.TryGetValue(originalInterface, out var description))
@@ -668,62 +669,56 @@ namespace Orleans.CodeGenerator
             return description;
         }
 
-        internal InvokableMethodDescription GetInvokableMethod(InvokableMethodId invokableId)
-        {
-            if (!_invokableMethodDescriptions.TryGetValue(invokableId, out var result))
-            {
-                result = _invokableMethodDescriptions[invokableId] = InvokableMethodDescription.Create(invokableId);
-            }
-
-            return result;
-        }
-
-        internal GeneratedInvokableDescription GetGeneratedInvokable(InvokableMethodId invokableId)
-        {
-            // Get or generate an invokable for the original method definition.
-            if (MetadataModel.GeneratedInvokables.TryGetValue(invokableId, out var result))
-            {
-                return result;
-            }
-
-            var methodDescription = GetInvokableMethod(invokableId);
-            result = MetadataModel.GeneratedInvokables[invokableId] = InvokableGenerator.Generate(methodDescription);
-
-            if (Compilation.GetTypeByMetadataName(result.MetadataName) == null)
-            {
-                // Emit the generated code on-demand.
-                AddMember(result.GeneratedNamespace, result.ClassDeclarationSyntax);
-
-                // Ensure the type will have a serializer generated for it.
-                MetadataModel.SerializableTypes.Add(result);
-
-                foreach (var alias in result.CompoundTypeAliases)
-                {
-                    MetadataModel.CompoundTypeAliases.Add(alias, result.OpenTypeSyntax);
-                }
-            }
-
-            return result;
-        }
-
         internal ProxyMethodDescription GetProxyMethodDescription(INamedTypeSymbol interfaceType, IMethodSymbol method, bool hasCollision)
-        {
-            var invokableId = GetInvokableMethodId(interfaceType, method);
-            return GetInterfaceMethodDescription(interfaceType, method, invokableId, hasCollision);
-        }
-
-        internal ProxyMethodDescription GetInterfaceMethodDescription(INamedTypeSymbol interfaceType, IMethodSymbol method, InvokableMethodId invokableId, bool hasCollision)
-        {
-            var interfaceDescription = GetInvokableInterfaceDescription(invokableId.ProxyBase.ProxyBaseType, interfaceType);
-            var generatedInvokable = GetGeneratedInvokable(invokableId);
-            return ProxyMethodDescription.Create(interfaceDescription, generatedInvokable, method, hasCollision);
-        }
-
-        internal InvokableMethodId GetInvokableMethodId(INamedTypeSymbol interfaceType, IMethodSymbol method)
         {
             var originalMethod = method.OriginalDefinition;
             var proxyBaseInfo = GetProxyBase(interfaceType);
-            return new InvokableMethodId(proxyBaseInfo, originalMethod);
+            var invokableId = new InvokableMethodId(proxyBaseInfo, originalMethod);
+            var interfaceDescription = GetInvokableInterfaceDescription(invokableId.ProxyBase.ProxyBaseType, interfaceType);
+
+            // Get or generate an invokable for the original method definition.
+            if (!MetadataModel.GeneratedInvokables.TryGetValue(invokableId, out var generatedInvokable))
+            {
+                if (!_invokableMethodDescriptions.TryGetValue(invokableId, out var methodDescription))
+                {
+                    methodDescription = _invokableMethodDescriptions[invokableId] = InvokableMethodDescription.Create(invokableId);
+                }
+
+                generatedInvokable = MetadataModel.GeneratedInvokables[invokableId] = InvokableGenerator.Generate(methodDescription);
+
+                if (Compilation.GetTypeByMetadataName(generatedInvokable.MetadataName) == null)
+                {
+                    // Emit the generated code on-demand.
+                    AddMember(generatedInvokable.GeneratedNamespace, generatedInvokable.ClassDeclarationSyntax);
+
+                    // Ensure the type will have a serializer generated for it.
+                    MetadataModel.SerializableTypes.Add(generatedInvokable);
+
+                    foreach (var alias in generatedInvokable.CompoundTypeAliases)
+                    {
+                        MetadataModel.CompoundTypeAliases.Add(alias, generatedInvokable.OpenTypeSyntax);
+                    }
+                }
+            }
+
+            var proxyMethodDescription = ProxyMethodDescription.Create(interfaceDescription, generatedInvokable, method, hasCollision);
+
+            // For backwards compatibility, generate invokers for the specific implementation types as well, where they differ.
+            if (Options.GenerateCompatibilityInvokers && !SymbolEqualityComparer.Default.Equals(method.OriginalDefinition.ContainingType, interfaceType))
+            {
+                var compatInvokableId = new InvokableMethodId(proxyBaseInfo, method);
+                var compatMethodDescription = InvokableMethodDescription.Create(compatInvokableId, interfaceType);
+                var compatInvokable = InvokableGenerator.Generate(compatMethodDescription);
+                AddMember(compatInvokable.GeneratedNamespace, compatInvokable.ClassDeclarationSyntax);
+                var alias =
+                    InvokableGenerator.GetCompoundTypeAliasComponents(
+                        compatInvokableId,
+                        interfaceType,
+                        compatMethodDescription.GeneratedMethodId);
+                MetadataModel.CompoundTypeAliases.Add(alias, compatInvokable.OpenTypeSyntax);
+            }
+
+            return proxyMethodDescription;
         }
     }
 }

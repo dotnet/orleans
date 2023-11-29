@@ -79,7 +79,7 @@ namespace Orleans.CodeGenerator
         public bool IsExceptionType => false;
         public List<TypeSyntax> ActivatorConstructorParameters { get; }
         public bool HasActivatorConstructor => UseActivator;
-        public List<CompoundTypeAliasComponent[]> CompoundTypeAliases {get;}
+        public List<CompoundTypeAliasComponent[]> CompoundTypeAliases { get; }
         public ClassDeclarationSyntax ClassDeclarationSyntax { get; }
         public string ReturnValueInitializerMethod { get; }
 

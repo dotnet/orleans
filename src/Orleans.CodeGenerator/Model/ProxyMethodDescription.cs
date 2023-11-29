@@ -156,8 +156,6 @@ namespace Orleans.CodeGenerator
             public bool IsExceptionType => _invokableDescription.IsExceptionType;
             public List<TypeSyntax> ActivatorConstructorParameters => _invokableDescription.ActivatorConstructorParameters;
             public bool HasActivatorConstructor => UseActivator;
-            public List<CompoundTypeAliasComponent[]> CompoundTypeAliases => _invokableDescription.CompoundTypeAliases;
-            public ClassDeclarationSyntax ClassDeclarationSyntax => _invokableDescription.ClassDeclarationSyntax;
             public string ReturnValueInitializerMethod => _invokableDescription.ReturnValueInitializerMethod;
 
             public InvokableMethodDescription MethodDescription => _invokableDescription.MethodDescription;

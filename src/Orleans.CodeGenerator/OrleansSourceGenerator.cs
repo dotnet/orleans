@@ -58,7 +58,15 @@ namespace Orleans.CodeGenerator
                 if (context.AnalyzerConfigOptions.GlobalOptions.TryGetValue("build_property.orleans_generatefieldids", out var generateFieldIds) && generateFieldIds is { Length: > 0 })
                 {
                     if (Enum.TryParse(generateFieldIds, out GenerateFieldIds fieldIdOption))
+                    {
                         options.GenerateFieldIds = fieldIdOption;
+                    }
+                }
+
+                if (context.AnalyzerConfigOptions.GlobalOptions.TryGetValue("build_property.orleansgeneratecompatibilityinvokers", out var generateCompatInvokersValue)
+                    && bool.TryParse(generateCompatInvokersValue, out var genCompatInvokers))
+                {
+                    options.GenerateCompatibilityInvokers = genCompatInvokers;
                 }
 
                 var codeGenerator = new CodeGenerator(context.Compilation, options);
