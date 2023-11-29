@@ -2,6 +2,7 @@
 using System;
 using System.Collections.Concurrent;
 using System.Diagnostics.CodeAnalysis;
+using System.Globalization;
 using System.Linq;
 using System.Reflection;
 using System.Text;
@@ -50,9 +51,39 @@ public static class RuntimeTypeNameFormatter
         return builder.ToString();
     }
 
+    private static CompoundTypeAliasAttribute? GetCompoundTypeAlias(Type type)
+    {
+        var candidateValue = ulong.MaxValue;
+        CompoundTypeAliasAttribute? candidate = null;
+        foreach (var alias in type.GetCustomAttributes<CompoundTypeAliasAttribute>())
+        {
+            if (alias.Components[^1] is string str && ulong.TryParse(str, NumberStyles.HexNumber, CultureInfo.InvariantCulture, out var result))
+            {
+                // For numeric aliases, arbitrarily pick the one with the lowest value.
+                if (candidate is null)
+                {
+                    candidate = alias;
+                    candidateValue = result;
+                }
+                else if (result < candidateValue)
+                {
+                    candidate = alias;
+                    candidateValue = result;
+                }
+            }
+            else
+            {
+                // If the value is not numeric, then prefer this alias over any numeric ones.
+                return alias;
+            }
+        }
+
+        return candidate;
+    }
+
     private static void Format(StringBuilder builder, Type type, bool isElementType, bool allowAliases = true)
     {
-        if (allowAliases && type.GetCustomAttributes<CompoundTypeAliasAttribute>().FirstOrDefault() is { } compoundAlias)
+        if (allowAliases && GetCompoundTypeAlias(type) is { } compoundAlias)
         {
             AddCompoundTypeAlias(builder, type, compoundAlias.Components);
             AddGenericParameters(builder, type);
