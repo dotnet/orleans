@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 using Orleans.Versions.Compatibility;
@@ -18,7 +19,7 @@ namespace Orleans.Runtime.Versions.Compatibility
         public CompatibilityDirectorManager(IServiceProvider serviceProvider, IOptions<GrainVersioningOptions> options)
         {
             this.serviceProvider = serviceProvider;
-            this.strategyFromConfig = serviceProvider.GetRequiredServiceByName<CompatibilityStrategy>(options.Value.DefaultCompatibilityStrategy);
+            this.strategyFromConfig = serviceProvider.GetRequiredKeyedService<CompatibilityStrategy>(options.Value.DefaultCompatibilityStrategy);
             this.compatibilityDirectors = new Dictionary<GrainInterfaceType, ICompatibilityDirector>();
             Default = ResolveVersionDirector(serviceProvider, this.strategyFromConfig);
         }
@@ -53,7 +54,7 @@ namespace Orleans.Runtime.Versions.Compatibility
             CompatibilityStrategy compatibilityStrategy)
         {
             var strategyType = compatibilityStrategy.GetType();
-            return serviceProvider.GetRequiredServiceByKey<Type,ICompatibilityDirector>(strategyType);
+            return serviceProvider.GetRequiredKeyedService<ICompatibilityDirector>(strategyType);
         }
     }
 }

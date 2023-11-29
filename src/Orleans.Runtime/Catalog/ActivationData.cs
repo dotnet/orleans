@@ -226,7 +226,7 @@ namespace Orleans.Runtime
             var result = GetComponent<TComponent>();
             if (result is null && typeof(IGrainExtension).IsAssignableFrom(typeof(TComponent)))
             {
-                var implementation = ActivationServices.GetServiceByKey<Type, IGrainExtension>(typeof(TComponent));
+                var implementation = ActivationServices.GetKeyedService<IGrainExtension>(typeof(TComponent));
                 if (implementation is not TComponent typedResult)
                 {
                     throw new GrainExtensionNotInstalledException($"No extension of type {typeof(TComponent)} is installed on this instance and no implementations are registered for automated install");
@@ -787,7 +787,7 @@ namespace Orleans.Runtime
                 return result;
             }
 
-            var implementation = ActivationServices.GetServiceByKey<Type, IGrainExtension>(typeof(TExtensionInterface));
+            var implementation = ActivationServices.GetKeyedService<IGrainExtension>(typeof(TExtensionInterface));
             if (!(implementation is TExtensionInterface typedResult))
             {
                 throw new GrainExtensionNotInstalledException($"No extension of type {typeof(TExtensionInterface)} is installed on this instance and no implementations are registered for automated install");

@@ -5,6 +5,7 @@ using System.Linq;
 using Orleans.Metadata;
 using System.Collections.Immutable;
 using System.Collections.Concurrent;
+using Orleans.Runtime.Hosting;
 
 namespace Orleans.Runtime.Placement
 {
@@ -16,9 +17,8 @@ namespace Orleans.Runtime.Placement
         private readonly ConcurrentDictionary<GrainType, PlacementStrategy> _resolvedStrategies = new();
         private readonly Func<GrainType, PlacementStrategy> _getStrategyInternal;
         private readonly IPlacementStrategyResolver[] _resolvers;
-        private readonly IServiceProvider _services;
         private readonly GrainPropertiesResolver _grainPropertiesResolver;
-        private readonly ImmutableDictionary<string, Type> _strategies;
+        private readonly ImmutableDictionary<string, PlacementStrategy> _strategies;
         private readonly PlacementStrategy _defaultPlacementStrategy;
 
         /// <summary>
@@ -31,18 +31,16 @@ namespace Orleans.Runtime.Placement
         {
             _getStrategyInternal = GetPlacementStrategyInternal;
             _resolvers = resolvers.ToArray();
-            _services = services;
             _grainPropertiesResolver = grainPropertiesResolver;
             _defaultPlacementStrategy = services.GetService<PlacementStrategy>();
             _strategies = GetAllStrategies(services);
 
-            static ImmutableDictionary<string, Type> GetAllStrategies(IServiceProvider services)
+            static ImmutableDictionary<string, PlacementStrategy> GetAllStrategies(IServiceProvider services)
             {
-                var directors = services.GetRequiredService<IKeyedServiceCollection<Type, IPlacementDirector>>();
-                var builder = ImmutableDictionary.CreateBuilder<string, Type>();
-                foreach (var service in directors.GetServices(services))
+                var builder = ImmutableDictionary.CreateBuilder<string, PlacementStrategy>();
+                foreach (var service in services.GetServices<NamedService<PlacementStrategy>>())
                 {
-                    builder[service.Key.Name] = service.Key;
+                    builder[service.Name] = service.Service;
                 }
 
                 return builder.ToImmutable();
@@ -70,9 +68,8 @@ namespace Orleans.Runtime.Placement
                 && properties.Properties.TryGetValue(WellKnownGrainTypeProperties.PlacementStrategy, out var placementStrategyId)
                 && !string.IsNullOrWhiteSpace(placementStrategyId))
             {
-                if (_strategies.TryGetValue(placementStrategyId, out var strategyType))
+                if (_strategies.TryGetValue(placementStrategyId, out strategy))
                 {
-                    strategy = (PlacementStrategy)_services.GetService(strategyType);
                     strategy.Initialize(properties);
                     return true;
                 }

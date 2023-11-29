@@ -1,4 +1,6 @@
 using System;
+using System.Collections.Generic;
+using Microsoft.Extensions.DependencyInjection;
 using Orleans.Runtime;
 using Orleans.Streams;
 
@@ -31,7 +33,15 @@ namespace Orleans
                 throw new ArgumentNullException(nameof(name));
             }
 
-            return grain.GrainContext.ActivationServices.GetRequiredServiceByName<IStreamProvider>(name);
+            try
+            {
+                return grain.GrainContext.ActivationServices.GetRequiredKeyedService<IStreamProvider>(name);
+            }
+            catch (InvalidOperationException ex)
+            {
+                // We used to throw KeyNotFoundException before, keep it like this for backward compatibility
+                throw new KeyNotFoundException($"Stream provider '{name}' not found", ex);
+            }
         }
     }
 
@@ -53,7 +63,15 @@ namespace Orleans
                 throw new ArgumentNullException(nameof(name));
             }
 
-            return client.ServiceProvider.GetRequiredServiceByName<IStreamProvider>(name);
+            try
+            {
+                return client.ServiceProvider.GetRequiredKeyedService<IStreamProvider>(name);
+            }
+            catch (InvalidOperationException ex)
+            {
+                // We used to throw KeyNotFoundException before, keep it like this for backward compatibility
+                throw new KeyNotFoundException($"Stream provider '{name}' not found", ex);
+            }
         }
     }
 }

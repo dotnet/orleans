@@ -102,7 +102,7 @@ namespace Orleans.Providers.Streams.Generator
                 this.BlockPoolMonitorFactory = (dimensions) => new DefaultBlockPoolMonitor(dimensions);
             if (this.ReceiverMonitorFactory == null)
                 this.ReceiverMonitorFactory = (dimensions) => new DefaultQueueAdapterReceiverMonitor(dimensions);
-            generatorConfig = this.serviceProvider.GetServiceByName<IStreamGeneratorConfig>(this.Name);
+            generatorConfig = this.serviceProvider.GetKeyedService<IStreamGeneratorConfig>(this.Name);
             if(generatorConfig == null)
             {
                 this.logger.LogInformation("No generator configuration found for stream provider {StreamProvider}.  Inactive until provided with configuration by command.", this.Name);

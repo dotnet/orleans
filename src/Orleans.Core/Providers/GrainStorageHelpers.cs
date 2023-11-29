@@ -26,7 +26,7 @@ namespace Orleans.Storage
             var attrs = grainType.GetCustomAttributes(typeof(StorageProviderAttribute), true);
             var attr = attrs.Length > 0 ? (StorageProviderAttribute)attrs[0] : null;
             var storageProvider = attr != null
-                ? services.GetServiceByName<IGrainStorage>(attr.ProviderName)
+                ? services.GetKeyedService<IGrainStorage>(attr.ProviderName)
                 : services.GetService<IGrainStorage>();
             if (storageProvider == null)
             {

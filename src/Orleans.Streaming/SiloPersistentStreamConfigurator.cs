@@ -34,7 +34,7 @@ namespace Orleans.Hosting
             var pubsubOptions = services.GetOptionsByName<StreamPubSubOptions>(this.streamProviderName);
             if (pubsubOptions.PubSubType == StreamPubSubType.ExplicitGrainBasedAndImplicit || pubsubOptions.PubSubType == StreamPubSubType.ExplicitGrainBasedOnly)
             {
-                var pubsubStore = services.GetServiceByName<IGrainStorage>(this.streamProviderName) ?? services.GetServiceByName<IGrainStorage>(ProviderConstants.DEFAULT_PUBSUB_PROVIDER_NAME);
+                var pubsubStore = services.GetKeyedService<IGrainStorage>(this.streamProviderName) ?? services.GetKeyedService<IGrainStorage>(ProviderConstants.DEFAULT_PUBSUB_PROVIDER_NAME);
                 if (pubsubStore == null)
                     throw new OrleansConfigurationException(
                         $" Streams with pubsub type {StreamPubSubType.ExplicitGrainBasedAndImplicit} and {StreamPubSubType.ExplicitGrainBasedOnly} requires a grain storage named " +
@@ -70,8 +70,8 @@ namespace Orleans.Hosting
         {
             this.ConfigureDelegate(services => services.AddSiloStreaming());
             this.ConfigureComponent(PersistentStreamProvider.Create);
-            this.ConfigureComponent((s, n) => s.GetServiceByName<IStreamProvider>(n) as IControllable);
-            this.ConfigureComponent(PersistentStreamProvider.ParticipateIn<ISiloLifecycle>);
+            this.ConfigureComponent((s,n) => s.GetRequiredKeyedService<IStreamProvider>(n) as IControllable);
+            this.ConfigureDelegate(services => services.AddSingleton(sp => PersistentStreamProvider.ParticipateIn<ISiloLifecycle>(sp, this.Name)));
             this.ConfigureComponent(adapterFactory);
             this.ConfigureComponent(PersistentStreamStorageConfigurationValidator.Create);
         }

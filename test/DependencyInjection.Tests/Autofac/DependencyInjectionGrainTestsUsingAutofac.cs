@@ -7,6 +7,8 @@ using Xunit;
 
 namespace DependencyInjection.Tests.Autofac
 {
+// Autofac doesn't support keyed service yet
+#if false
     [TestCategory("DI"), TestCategory("Functional")]
     public class DependencyInjectionGrainTestsUsingAutofac : DependencyInjectionGrainTestRunner, IClassFixture<DependencyInjectionGrainTestsUsingAutofac.Fixture>
     {
@@ -77,4 +79,5 @@ namespace DependencyInjection.Tests.Autofac
             await grain.IncrementA();
         }
     }
+#endif
 }

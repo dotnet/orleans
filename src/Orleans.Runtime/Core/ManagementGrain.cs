@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Orleans.Concurrency;
 using Orleans.Metadata;
+using Orleans.Providers;
 using Orleans.Runtime.GrainDirectory;
 using Orleans.Runtime.MembershipService;
 using Orleans.Versions;
@@ -215,10 +216,10 @@ namespace Orleans.Runtime.Management
             return sum;
         }
 
-        public Task<object[]> SendControlCommandToProvider(string providerTypeFullName, string providerName, int command, object arg)
+        public Task<object[]> SendControlCommandToProvider<T>(string providerName, int command, object arg) where T : IControllable
         {
-            return ExecutePerSiloCall(isc => isc.SendControlCommandToProvider(providerTypeFullName, providerName, command, arg),
-                $"SendControlCommandToProvider of type {providerTypeFullName} and name {providerName} command {command}.");
+            return ExecutePerSiloCall(isc => isc.SendControlCommandToProvider<T>(providerName, command, arg),
+                $"SendControlCommandToProvider of type {typeof(T).FullName} and name {providerName} command {command}.");
         }
 
         public ValueTask<SiloAddress> GetActivationAddress(IAddressable reference)
