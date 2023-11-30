@@ -238,6 +238,13 @@ namespace Orleans.Runtime.Versions
             foreach (var entry in clusterManifest.Silos)
             {
                 var silo = entry.Key;
+
+                // Since clients are not eligible for placement, we exclude them here.
+                if (silo.IsClient)
+                {
+                    continue;
+                }
+
                 var manifest = entry.Value;
                 foreach (var grainInterface in manifest.Interfaces)
                 {

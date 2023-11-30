@@ -1,7 +1,7 @@
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Collections.Immutable;
+using System.Diagnostics;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
@@ -24,15 +24,16 @@ namespace Orleans.Runtime
         private readonly ILogger<ClientClusterManifestProvider> _logger;
         private readonly TypeManagementOptions _typeManagementOptions;
         private readonly IServiceProvider _services;
+        private readonly LocalClientDetails _localClientDetails;
         private readonly GatewayManager _gatewayManager;
         private readonly AsyncEnumerable<ClusterManifest> _updates;
         private readonly CancellationTokenSource _cancellation = new CancellationTokenSource();
         private ClusterManifest _current;
         private Task _runTask;
-        private ConcurrentDictionary<SiloAddress, MajorMinorVersion> siloAddressVersionMap = new ConcurrentDictionary<SiloAddress, MajorMinorVersion>();
 
         public ClientClusterManifestProvider(
             IServiceProvider services,
+            LocalClientDetails localClientDetails,
             GatewayManager gatewayManager,
             ILogger<ClientClusterManifestProvider> logger,
             ClientManifestProvider clientManifestProvider,
@@ -41,9 +42,15 @@ namespace Orleans.Runtime
             _logger = logger;
             _typeManagementOptions = typeManagementOptions.Value;
             _services = services;
+            _localClientDetails = localClientDetails;
             _gatewayManager = gatewayManager;
             this.LocalGrainManifest = clientManifestProvider.ClientManifest;
-            _current = new ClusterManifest(MajorMinorVersion.MinValue, ImmutableDictionary<SiloAddress, GrainManifest>.Empty, ImmutableArray.Create(this.LocalGrainManifest));
+
+            // Create a fake manifest for the very first generation, which only includes the local client's manifest.
+            var builder = ImmutableDictionary.CreateBuilder<SiloAddress, GrainManifest>();
+            builder.Add(_localClientDetails.ClientAddress, LocalGrainManifest);
+            _current = new ClusterManifest(MajorMinorVersion.MinValue, builder.ToImmutable());
+
             _updates = new AsyncEnumerable<ClusterManifest>(
                 initialValue: _current,
                 updateValidator: (previous, proposed) => proposed.Version > previous.Version,
@@ -75,18 +82,38 @@ namespace Orleans.Runtime
             {
                 var grainFactory = _services.GetRequiredService<IInternalGrainFactory>();
                 var cancellationTask = _cancellation.Token.WhenCancelled();
+                SiloAddress gateway = null;
+                IClusterManifestSystemTarget provider = null;
+                var minorVersion = 0;
+                var gatewayVersion = _current.Version;
+                var mergeUntilMajorVersion = _current.Version.Major;
                 while (!_cancellation.IsCancellationRequested)
                 {
-                    var gateway = _gatewayManager.GetLiveGateway();
+                    // Select a new gateway if the current one is not available.
+                    if (gateway is null || !_gatewayManager.IsGatewayAvailable(gateway))
+                    {
+                        if (gateway is not null)
+                        {
+                            // Merge manifests until the major version advances.
+                            mergeUntilMajorVersion = gatewayVersion.Major + 1;
+                        }
+
+                        gateway = _gatewayManager.GetLiveGateway();
+                        provider = grainFactory.GetGrain<IClusterManifestSystemTarget>(SystemTargetGrainId.Create(Constants.ManifestProviderType, gateway).GrainId);
+
+                        // Accept any cluster manifest version from the new gateway as long as it at least matches the current major version.
+                        // The major version corresponds to the (monotonically increasing) cluster membership version.
+                        // Since the minor version is not global, we need to reset it to the lowest possible value.
+                        // This means that it is possible to receive the an older or equivalent cluster manifest when the gateway changes.
+                        // That hiccup is addressed by merging the newly received manifest with the current one until the major version advances.
+                        gatewayVersion = new MajorMinorVersion(_current.Version.Major, long.MinValue);
+                    }
+
+                    Debug.Assert(provider is not null);
+
                     try
                     {
-                        var provider = grainFactory.GetGrain<IClusterManifestSystemTarget>(SystemTargetGrainId.Create(Constants.ManifestProviderType, gateway).GrainId);
-                        var currentVersion = _current.Version;
-                        if (siloAddressVersionMap.ContainsKey(gateway))
-                        {
-                            siloAddressVersionMap.TryGetValue(gateway, out currentVersion);
-                        }
-                        var refreshTask = provider.GetClusterManifestIfNewer(currentVersion).AsTask();
+                        var refreshTask = provider.GetClusterManifestIfNewer(gatewayVersion).AsTask();
                         var task = await Task.WhenAny(cancellationTask, refreshTask).ConfigureAwait(false);
 
                         if (ReferenceEquals(task, cancellationTask))
@@ -94,15 +121,36 @@ namespace Orleans.Runtime
                             return;
                         }
 
-                        var updatedManifest = await refreshTask;
-                        if (updatedManifest is null)
+                        var gatewayManifest = await refreshTask;
+                        if (gatewayManifest is null)
                         {
                             // There was no newer cluster manifest, so wait for the next refresh interval and try again.
                             await Task.WhenAny(cancellationTask, Task.Delay(_typeManagementOptions.TypeMapRefreshInterval));
                             continue;
                         }
-                        siloAddressVersionMap[gateway] = updatedManifest.Version;
 
+                        gatewayVersion = gatewayManifest.Version;
+
+                        // If the client switched to a new gateway, we need to merge the manifests.
+                        ImmutableDictionary<SiloAddress, GrainManifest> siloManifests;
+                        if (mergeUntilMajorVersion > gatewayManifest.Version.Major)
+                        {
+                            // Merge manifests until the major version advances.
+                            var mergedSilos = _current.Silos.ToBuilder();
+                            mergedSilos.Add(_localClientDetails.ClientAddress, LocalGrainManifest);
+                            foreach (var kvp in gatewayManifest.Silos)
+                            {
+                                mergedSilos[kvp.Key] = kvp.Value;
+                            }
+
+                            siloManifests = mergedSilos.ToImmutable();
+                        }
+                        else
+                        {
+                            siloManifests = gatewayManifest.Silos.Add(_localClientDetails.ClientAddress, LocalGrainManifest);
+                        }
+
+                        var updatedManifest = new ClusterManifest(new MajorMinorVersion(gatewayVersion.Major, ++minorVersion), gatewayManifest.Silos);
                         if (!_updates.TryPublish(updatedManifest))
                         {
                             await Task.Delay(StandardExtensions.Min(_typeManagementOptions.TypeMapRefreshInterval, TimeSpan.FromMilliseconds(500)));
