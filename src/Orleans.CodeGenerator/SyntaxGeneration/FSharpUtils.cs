@@ -24,7 +24,16 @@ namespace Orleans.CodeGenerator
                 return false;
             }
 
-            if (!baseType.GetAttributes(compilationAttributeType, out var compilationAttributes) || compilationAttributes.Length == 0)
+            INamedTypeSymbol sumTypeCandidate;
+            if (symbol.GetAttributes(compilationAttributeType, out var compilationAttributes) && compilationAttributes.Length > 0)
+            {
+                sumTypeCandidate = symbol;
+            }
+            else if (baseType.GetAttributes(compilationAttributeType, out compilationAttributes) && compilationAttributes.Length > 0)
+            {
+                sumTypeCandidate = baseType;
+            }
+            else
             {
                 return false;
             }
@@ -52,7 +61,7 @@ namespace Orleans.CodeGenerator
                 return false;
             }
 
-            sumType = baseType;
+            sumType = sumTypeCandidate;
             return true;
         }
 
