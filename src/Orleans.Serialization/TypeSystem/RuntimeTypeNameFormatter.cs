@@ -60,12 +60,7 @@ public static class RuntimeTypeNameFormatter
             if (alias.Components[^1] is string str && ulong.TryParse(str, NumberStyles.HexNumber, CultureInfo.InvariantCulture, out var result))
             {
                 // For numeric aliases, arbitrarily pick the one with the lowest value.
-                if (candidate is null)
-                {
-                    candidate = alias;
-                    candidateValue = result;
-                }
-                else if (result < candidateValue)
+                if (candidate is null || result < candidateValue)
                 {
                     candidate = alias;
                     candidateValue = result;
