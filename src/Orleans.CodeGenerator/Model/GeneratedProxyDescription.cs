@@ -7,16 +7,27 @@ namespace Orleans.CodeGenerator
 {
     internal class GeneratedProxyDescription
     {
-        public GeneratedProxyDescription(InvokableInterfaceDescription interfaceDescription)
+        public GeneratedProxyDescription(ProxyInterfaceDescription interfaceDescription, string generatedClassName)
         {
             InterfaceDescription = interfaceDescription;
+            GeneratedClassName = generatedClassName;
             TypeSyntax = GetProxyTypeName(interfaceDescription);
+            if (InterfaceDescription.TypeParameters.Count == 0)
+            {
+                MetadataName = $"{InterfaceDescription.GeneratedNamespace}.{GeneratedClassName}";
+            }
+            else
+            {
+                MetadataName =  $"{InterfaceDescription.GeneratedNamespace}.{GeneratedClassName}`{InterfaceDescription.TypeParameters.Count}";
+            }
         }
 
         public TypeSyntax TypeSyntax { get; }
-        public InvokableInterfaceDescription InterfaceDescription { get; }
+        public ProxyInterfaceDescription InterfaceDescription { get; }
+        public string GeneratedClassName { get; }
+        public string MetadataName { get; }
 
-        private static TypeSyntax GetProxyTypeName(InvokableInterfaceDescription interfaceDescription)
+        private static TypeSyntax GetProxyTypeName(ProxyInterfaceDescription interfaceDescription)
         {
             var interfaceType = interfaceDescription.InterfaceType;
             var genericArity = interfaceType.GetAllTypeParameters().Count();

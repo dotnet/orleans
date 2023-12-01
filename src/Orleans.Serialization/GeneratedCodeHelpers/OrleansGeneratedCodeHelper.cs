@@ -305,10 +305,14 @@ namespace Orleans.Serialization.GeneratedCodeHelpers
             public T DeepCopy(T original, CopyContext context)
             {
                 if (original is null)
+                {
                     return null;
+                }
 
-                if (original.GetType() as object != _fieldType as object)
+                if (original.GetType() != _fieldType)
+                {
                     return context.DeepCopy(original);
+                }
 
                 var result = _activator.Create();
                 DeepCopy(original, result, context);

@@ -27,8 +27,10 @@ namespace UnitTests.GrainInterfaces
         Task<string> ThrowIfGreaterThanZero(int value);
     }
 
+    [Alias("UnitTests.GrainInterfaces.IGenericMethodInterceptionGrain`1")]
     public interface IGenericMethodInterceptionGrain<in T> : IGrainWithIntegerKey, IMethodFromAnotherInterface
     {
+        [Alias("GetInputAsString")]
         Task<string> GetInputAsString(T input);
     }
 
@@ -37,9 +39,17 @@ namespace UnitTests.GrainInterfaces
         Task<string> SayHello();
     }
     
+
+    [Alias("UnitTests.GrainInterfaces.ITrickyMethodInterceptionGrain")]
     public interface ITrickyMethodInterceptionGrain : IGenericMethodInterceptionGrain<string>, IGenericMethodInterceptionGrain<bool>
     {
+        [Alias("GetBestNumber")]
         Task<int> GetBestNumber();
+    }
+
+    [Alias("UnitTests.GrainInterfaces.ITrickierMethodInterceptionGrain")]
+    public interface ITrickierMethodInterceptionGrain : IGenericMethodInterceptionGrain<List<int>>, IGenericMethodInterceptionGrain<List<bool>>
+    {
     }
 
     public static class GrainCallFilterTestConstants
