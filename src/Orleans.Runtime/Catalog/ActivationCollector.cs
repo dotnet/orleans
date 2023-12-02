@@ -85,7 +85,7 @@ namespace Orleans.Runtime
         /// <param name="timeout">
         /// The current idle collection time for the grain.
         /// </param>
-        public void ScheduleCollection(ICollectibleGrainContext item, TimeSpan timeout)
+        public void ScheduleCollection(ICollectibleGrainContext item, TimeSpan timeout, DateTime now)
         {
             lock (item)
             {
@@ -94,7 +94,7 @@ namespace Orleans.Runtime
                     return;
                 }
 
-                DateTime ticket = MakeTicketFromTimeSpan(timeout);
+                DateTime ticket = MakeTicketFromTimeSpan(timeout, now);
 
                 if (default != item.CollectionTicket)
                 {
@@ -154,7 +154,7 @@ namespace Orleans.Runtime
             if (IsExpired(item.CollectionTicket)) return false;
 
             DateTime oldTicket = item.CollectionTicket;
-            DateTime newTicket = MakeTicketFromTimeSpan(timeout);
+            DateTime newTicket = MakeTicketFromTimeSpan(timeout, DateTime.UtcNow);
             // if the ticket value doesn't change, then the source and destination bucket are the same and there's nothing to do.
             if (newTicket.Equals(oldTicket)) return true;
 
@@ -239,11 +239,11 @@ namespace Orleans.Runtime
                         {
                             var keepAliveDuration = activation.KeepAliveUntil - now;
                             var timeout = TimeSpan.FromTicks(Math.Max(keepAliveDuration.Ticks, activation.CollectionAgeLimit.Ticks));
-                            ScheduleCollection(activation, timeout);
+                            ScheduleCollection(activation, timeout, now);
                         }
                         else if (!activation.IsInactive || !activation.IsStale())
                         {
-                            ScheduleCollection(activation, activation.CollectionAgeLimit);
+                            ScheduleCollection(activation, activation.CollectionAgeLimit, now);
                         }
                         else
                         {
@@ -354,14 +354,14 @@ namespace Orleans.Runtime
             return ticket;
         }
 
-        private DateTime MakeTicketFromTimeSpan(TimeSpan timeout)
+        private DateTime MakeTicketFromTimeSpan(TimeSpan timeout, DateTime now)
         {
             if (timeout < quantum)
             {
                 throw new ArgumentException(string.Format("timeout must be at least {0}, but it is {1}", quantum, timeout), nameof(timeout));
             }
 
-            return MakeTicketFromDateTime(DateTime.UtcNow + timeout);
+            return MakeTicketFromDateTime(now + timeout);
         }
 
         private void Add(ICollectibleGrainContext item, DateTime ticket)
@@ -379,7 +379,7 @@ namespace Orleans.Runtime
             {
                 if (activation.CollectionTicket == default)
                 {
-                    ScheduleCollection(activation, activation.CollectionAgeLimit);
+                    ScheduleCollection(activation, activation.CollectionAgeLimit, DateTime.UtcNow);
                 }
                 else
                 {
