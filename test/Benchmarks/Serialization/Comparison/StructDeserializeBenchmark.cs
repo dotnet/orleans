@@ -83,7 +83,6 @@ namespace Benchmarks.Comparison
                    result.MyProperty8 +
                    result.MyProperty9;
 
-        [Fact]
         [Benchmark(Baseline = true)]
         public int Orleans()
         {

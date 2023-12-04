@@ -1,43 +1,37 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using System.Threading;
 using System.Threading.Tasks;
-using Orleans.Internal;
 
 namespace Orleans.Runtime.Utilities
 {
     internal static class AsyncEnumerable
     {
-        internal static readonly object InitialValue = new object();
-        internal static readonly object DisposedValue = new object();
+        internal static readonly object InitialValue = new();
+        internal static readonly object DisposedValue = new();
     }
 
     internal sealed class AsyncEnumerable<T> : IAsyncEnumerable<T>
     {
-        private enum PublishResult
-        {
-            Success,
-            InvalidUpdate,
-            Disposed
-        }
-
-        private readonly object updateLock = new object();
-        private readonly Func<T, T, bool> updateValidator;
-        private Element current;
+        private readonly object _updateLock = new();
+        private readonly Func<T, T, bool> _updateValidator;
+        private readonly Action<T> _onPublished;
+        private Element _current;
         
-        public AsyncEnumerable(Func<T, T, bool> updateValidator, T initial)
+        public AsyncEnumerable(T initialValue, Func<T, T, bool> updateValidator, Action<T> onPublished)
         {
-            this.updateValidator = updateValidator;
-            this.current = new Element(initial);
+            _updateValidator = updateValidator;
+            _current = new Element(initialValue);
+            _onPublished = onPublished;
+            onPublished(initialValue);
         }
 
-        public Action<T> OnPublished { get; set; }
-
-        public bool TryPublish(T value) => this.TryPublish(new Element(value)) == PublishResult.Success;
+        public bool TryPublish(T value) => TryPublish(new Element(value)) == PublishResult.Success;
         
         public void Publish(T value)
         {
-            switch (this.TryPublish(new Element(value)))
+            switch (TryPublish(new Element(value)))
             {
                 case PublishResult.Success:
                     return;
@@ -52,20 +46,20 @@ namespace Orleans.Runtime.Utilities
 
         private PublishResult TryPublish(Element newItem)
         {
-            if (this.current.IsDisposed) return PublishResult.Disposed;
+            if (_current.IsDisposed) return PublishResult.Disposed;
 
-            lock (this.updateLock)
+            lock (_updateLock)
             {
-                if (this.current.IsDisposed) return PublishResult.Disposed;
+                if (_current.IsDisposed) return PublishResult.Disposed;
 
-                if (this.current.IsValid && newItem.IsValid && !this.updateValidator(this.current.Value, newItem.Value))
+                if (_current.IsValid && newItem.IsValid && !_updateValidator(_current.Value, newItem.Value))
                 {
                     return PublishResult.InvalidUpdate;
                 }
 
-                var curr = this.current;
-                Interlocked.Exchange(ref this.current, newItem);
-                if (newItem.IsValid) this.OnPublished?.Invoke(newItem.Value);
+                var curr = _current;
+                Interlocked.Exchange(ref _current, newItem);
+                if (newItem.IsValid) _onPublished(newItem.Value);
                 curr.SetNext(newItem);
 
                 return PublishResult.Success;
@@ -74,81 +68,100 @@ namespace Orleans.Runtime.Utilities
 
         public void Dispose()
         {
-            if (this.current.IsDisposed) return;
+            if (_current.IsDisposed) return;
 
-            lock (this.updateLock)
+            lock (_updateLock)
             {
-                if (this.current.IsDisposed) return;
+                if (_current.IsDisposed) return;
 
-                this.TryPublish(Element.CreateDisposed());
+                TryPublish(Element.CreateDisposed());
             }
         }
 
-        private void ThrowInvalidUpdate() => throw new ArgumentException("The value was not valid");
+        [DoesNotReturn]
+        private static void ThrowInvalidUpdate() => throw new ArgumentException("The value was not valid.");
 
-        private void ThrowDisposed() => throw new ObjectDisposedException("This instance has been disposed");
+        [DoesNotReturn]
+        private static void ThrowDisposed() => throw new ObjectDisposedException("This instance has been disposed.");
 
-        public IAsyncEnumerator<T> GetAsyncEnumerator(CancellationToken cancellationToken = default)
+        public IAsyncEnumerator<T> GetAsyncEnumerator(CancellationToken cancellationToken = default) => new AsyncEnumerator(_current, cancellationToken);
+
+        private enum PublishResult
         {
-            return new AsyncEnumerator(this.current, cancellationToken);
+            Success,
+            InvalidUpdate,
+            Disposed
         }
 
         private sealed class AsyncEnumerator : IAsyncEnumerator<T>
         {
-            private readonly Task cancellation;
-            private Element current;
+            private readonly TaskCompletionSource _cancellation = new(TaskCreationOptions.RunContinuationsAsynchronously);
+            private readonly CancellationTokenRegistration _registration;
+            private Element _current;
 
             public AsyncEnumerator(Element initial, CancellationToken cancellation)
             {
-                if (!initial.IsValid) this.current = initial;
+                if (!initial.IsValid)
+                {
+                    _current = initial;
+                }
                 else
                 {
                     var result = Element.CreateInitial();
                     result.SetNext(initial);
-                    this.current = result;
+                    _current = result;
                 }
 
-                if (cancellation != default)
+                if (cancellation.CanBeCanceled)
                 {
-                    this.cancellation = cancellation.WhenCancelled();
+                    _registration = cancellation.Register(() => _cancellation.TrySetResult());
                 }
             }
 
-            T IAsyncEnumerator<T>.Current => this.current.Value;
+            T IAsyncEnumerator<T>.Current => _current.Value;
 
             async ValueTask<bool> IAsyncEnumerator<T>.MoveNextAsync()
             {
-                Task<Element> next;
-                if (this.cancellation != default)
+                if (_current.IsDisposed || _cancellation.Task.IsCompleted)
                 {
-                    next = this.current.NextAsync();
-                    var result = await Task.WhenAny(this.cancellation, next);
-                    if (ReferenceEquals(result, this.cancellation)) return false;
-                }
-                else
-                {
-                    next = this.current.NextAsync();
+                    return false;
                 }
 
-                this.current = await next;
-                return this.current.IsValid;
+                var next = _current.NextAsync();
+                var cancellationTask = _cancellation.Task;
+                var result = await Task.WhenAny(cancellationTask, next);
+                if (ReferenceEquals(result, cancellationTask))
+                {
+                    return false;
+                }
+
+                _current = await next;
+                return _current.IsValid;
             }
 
-            ValueTask IAsyncDisposable.DisposeAsync() => default;
+            async ValueTask IAsyncDisposable.DisposeAsync()
+            {
+                _cancellation.TrySetResult();
+                await _registration.DisposeAsync();
+            }
         }
 
         private sealed class Element
         {
-            private readonly TaskCompletionSource<Element> next;
-            private readonly object value;
+            private readonly TaskCompletionSource<Element> _next;
+            private readonly object _value;
 
-            public Element(T value)
+            public Element(T value) : this(value, new TaskCompletionSource<Element>(TaskCreationOptions.RunContinuationsAsynchronously))
             {
-                this.value = value;
-                this.next = new TaskCompletionSource<Element>(TaskCreationOptions.RunContinuationsAsynchronously);
             }
 
-            public static Element CreateInitial() => new Element(
+            private Element(object value, TaskCompletionSource<Element> next)
+            {
+                _value = value;
+                _next = next;
+            }
+
+            public static Element CreateInitial() => new(
                 AsyncEnumerable.InitialValue,
                 new TaskCompletionSource<Element>(TaskCreationOptions.RunContinuationsAsynchronously));
 
@@ -159,33 +172,27 @@ namespace Orleans.Runtime.Utilities
                 return new Element(AsyncEnumerable.DisposedValue, tcs);
             }
 
-            private Element(object value, TaskCompletionSource<Element> next)
-            {
-                this.value = value;
-                this.next = next;
-            }
-
-            public bool IsValid => !this.IsInitial && !this.IsDisposed;
+            public bool IsValid => !IsInitial && !IsDisposed;
 
             public T Value
             {
                 get
                 {
-                    if (this.IsInitial) ThrowInvalidInstance();
+                    if (IsInitial) ThrowInvalidInstance();
                     ObjectDisposedException.ThrowIf(IsDisposed, this);
-                    if (this.value is T typedValue) return typedValue;
+                    if (_value is T typedValue) return typedValue;
                     return default;
                 }
             }
 
-            public bool IsInitial => ReferenceEquals(this.value, AsyncEnumerable.InitialValue);
-            public bool IsDisposed => ReferenceEquals(this.value, AsyncEnumerable.DisposedValue);
+            public bool IsInitial => ReferenceEquals(_value, AsyncEnumerable.InitialValue);
+            public bool IsDisposed => ReferenceEquals(_value, AsyncEnumerable.DisposedValue);
 
-            public Task<Element> NextAsync() => this.next.Task;
+            public Task<Element> NextAsync() => _next.Task;
 
-            public void SetNext(Element next) => this.next.SetResult(next);
+            public void SetNext(Element next) => _next.SetResult(next);
 
-            private void ThrowInvalidInstance() => throw new InvalidOperationException("This instance does not have a value set.");
+            private static void ThrowInvalidInstance() => throw new InvalidOperationException("This instance does not have a value set.");
         }
     }
 }

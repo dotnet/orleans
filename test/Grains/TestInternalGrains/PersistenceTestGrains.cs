@@ -9,9 +9,9 @@ using Orleans.Concurrency;
 using Orleans.Configuration;
 using Orleans.Runtime;
 using Orleans.Serialization;
+using Orleans.Storage;
 using UnitTests.GrainInterfaces;
 using Xunit;
-using Orleans.Storage;
 
 namespace UnitTests.Grains
 {
@@ -1086,4 +1086,101 @@ namespace UnitTests.Grains
             return WriteStateAsync();
         }
     }
+
+    public sealed class SurrogateStateForTypeWithoutPublicConstructorGrain : IGrainBase, ISurrogateStateForTypeWithoutPublicConstructorGrain<ExternalTypeWithoutPublicConstructor>
+    {
+        private readonly IPersistentState<ExternalTypeWithoutPublicConstructor> _persistence;
+
+        public IGrainContext GrainContext { get; }
+
+        public SurrogateStateForTypeWithoutPublicConstructorGrain(
+            IGrainContext grainContext,
+            [PersistentState("test_state", "OrleansSerializerMemoryStore")] IPersistentState<ExternalTypeWithoutPublicConstructor> persistence)
+        {
+            GrainContext = grainContext;
+            _persistence = persistence;
+        }
+
+        public async Task SetState(ExternalTypeWithoutPublicConstructor state)
+        {
+            _persistence.State = state;
+            await _persistence.WriteStateAsync();
+        }
+
+        public async Task<ExternalTypeWithoutPublicConstructor> GetState()
+        {
+            await _persistence.ReadStateAsync();
+            return _persistence.State;
+        }
+    }
+
+    public sealed class ExternalTypeWithoutPublicConstructor
+    {
+        public int Field1 { get; set; }
+        public int Field2 { get; set; }
+
+        public static ExternalTypeWithoutPublicConstructor Create(int field1, int field2)
+            => new(field1, field2);
+
+        private ExternalTypeWithoutPublicConstructor(int field1, int field2)
+        {
+            Field1 = field1;
+            Field2 = field2;
+        }
+    }
+
+    [GenerateSerializer]
+    public struct ExternalTypeWithoutPublicConstructorSurrogate
+    {
+        [Id(0)] public int Field1;
+        [Id(1)] public required int Field2;
+    }
+
+    [RegisterConverter]
+    public sealed class ExternalTypeWithoutPublicConstructorSurrogateConverter : IConverter<ExternalTypeWithoutPublicConstructor, ExternalTypeWithoutPublicConstructorSurrogate>
+    {
+        public ExternalTypeWithoutPublicConstructor ConvertFromSurrogate(in ExternalTypeWithoutPublicConstructorSurrogate surrogate)
+            => ExternalTypeWithoutPublicConstructor.Create(surrogate.Field1, surrogate.Field2);
+
+        public ExternalTypeWithoutPublicConstructorSurrogate ConvertToSurrogate(in ExternalTypeWithoutPublicConstructor value)
+            => new()
+            {
+                Field1 = value.Field1,
+                Field2 = value.Field2,
+            };
+    }
+    
+
+    public sealed class RecordTypeWithoutPublicParameterlessConstructorGrain : IGrainBase, IRecordTypeWithoutPublicParameterlessConstructorGrain<RecordTypeWithoutPublicParameterlessConstructor>
+    {
+        private readonly IPersistentState<RecordTypeWithoutPublicParameterlessConstructor> _persistence;
+
+        public IGrainContext GrainContext { get; }
+
+        public RecordTypeWithoutPublicParameterlessConstructorGrain(
+            IGrainContext grainContext,
+            [PersistentState("test_state", "OrleansSerializerMemoryStore")] IPersistentState<RecordTypeWithoutPublicParameterlessConstructor> persistence)
+        {
+            GrainContext = grainContext;
+            _persistence = persistence;
+        }
+
+        public async Task SetState(RecordTypeWithoutPublicParameterlessConstructor state)
+        {
+            _persistence.State = state;
+            await _persistence.WriteStateAsync();
+        }
+
+        public async Task<RecordTypeWithoutPublicParameterlessConstructor> GetState()
+        {
+            await _persistence.ReadStateAsync();
+            return _persistence.State;
+        }
+    }
+
+    [GenerateSerializer]
+    public record class RecordTypeWithoutPublicParameterlessConstructor
+    (
+        [property: Id(0)] int Field
+    );
 }

@@ -67,7 +67,7 @@ namespace Orleans.Transactions.Azure.Tests
             }
             catch (Exception exc)
             {
-                logger.LogError("Error creating CloudTableCreationClient.", exc);
+                logger.LogError(exc, "Error creating CloudTableCreationClient");
                 throw;
             }
         }

@@ -200,9 +200,9 @@ namespace Orleans.Runtime
             {
                 if (message.CacheInvalidationHeader != null)
                 {
-                    foreach (GrainAddress address in message.CacheInvalidationHeader)
+                    foreach (var update in message.CacheInvalidationHeader)
                     {
-                        GrainLocator.InvalidateCache(address);
+                        GrainLocator.UpdateCache(update);
                     }
                 }
 
@@ -392,7 +392,7 @@ namespace Orleans.Runtime
                         if (message.CacheInvalidationHeader is null)
                         {
                             // Remove from local directory cache. Note that SendingGrain is the original target, since message is the rejection response.
-                            // If CacheInvalidationHeader is present, we already did this. Otherwise, we left this code for backward compatability.
+                            // If CacheInvalidationHeader is present, we already did this. Otherwise, we left this code for backward compatibility.
                             // It should be retired as we move to use CacheMgmtHeader in all relevant places.
                             this.GrainLocator.InvalidateCache(message.SendingGrain);
                         }

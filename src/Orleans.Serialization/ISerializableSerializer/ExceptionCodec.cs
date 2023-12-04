@@ -26,7 +26,9 @@ namespace Orleans.Serialization
     public sealed class ExceptionCodec : IFieldCodec<Exception>, IBaseCodec<Exception>, IGeneralizedCodec, IGeneralizedBaseCodec, IBaseCopier<Exception>
     {
         private readonly StreamingContext _streamingContext;
+#pragma warning disable SYSLIB0050 // Type or member is obsolete
         private readonly FormatterConverter _formatterConverter;
+#pragma warning restore SYSLIB0050 // Type or member is obsolete
         private readonly Action<object, SerializationInfo, StreamingContext> _baseExceptionConstructor;
         private readonly TypeConverter _typeConverter;
         private readonly IFieldCodec<Dictionary<object, object>> _dictionaryCodec;
@@ -49,8 +51,10 @@ namespace Orleans.Serialization
             IDeepCopier<Exception> exceptionCopier,
             IOptions<ExceptionSerializationOptions> exceptionSerializationOptions)
         {
+#pragma warning disable SYSLIB0050 // Type or member is obsolete
             _streamingContext = new StreamingContext(StreamingContextStates.All);
             _formatterConverter = new FormatterConverter();
+#pragma warning restore SYSLIB0050 // Type or member is obsolete
             _baseExceptionConstructor = new SerializationConstructorFactory().GetSerializationConstructorDelegate(typeof(Exception));
             _typeConverter = typeConverter;
             _dictionaryCodec = dictionaryCodec;
@@ -110,8 +114,12 @@ namespace Orleans.Serialization
         /// <returns>A populated <see cref="SerializationInfo"/> value.</returns>
         public SerializationInfo GetObjectData(Exception value)
         {
+#pragma warning disable SYSLIB0050 // Type or member is obsolete
             var info = new SerializationInfo(value.GetType(), _formatterConverter);
+#pragma warning disable SYSLIB0051 // Type or member is obsolete
             value.GetObjectData(info, _streamingContext);
+#pragma warning restore SYSLIB0051 // Type or member is obsolete
+#pragma warning restore SYSLIB0050 // Type or member is obsolete
             return info;
         }
 
@@ -126,7 +134,9 @@ namespace Orleans.Serialization
         /// <param name="data">The data.</param>
         public void SetBaseProperties(Exception value, string message, string stackTrace, Exception innerException, int hResult, Dictionary<object, object> data)
         {
+#pragma warning disable SYSLIB0050 // Type or member is obsolete
             var info = new SerializationInfo(typeof(Exception), _formatterConverter);
+#pragma warning restore SYSLIB0050 // Type or member is obsolete
             info.AddValue("Message", message, typeof(string));
             info.AddValue("StackTraceString", null, typeof(string));
             info.AddValue("InnerException", innerException, typeof(Exception));
@@ -222,7 +232,7 @@ namespace Orleans.Serialization
 
             if (value.GetType() == typeof(Exception))
             {
-                // Exceptions are never written as references. This ensures that reference cycles in exceptions are not possible and is a security precaution. 
+                // Exceptions are never written as references. This ensures that reference cycles in exceptions are not possible and is a security precaution.
                 ReferenceCodec.MarkValueField(writer.Session);
                 writer.WriteStartObject(fieldIdDelta, expectedType, typeof(ExceptionCodec));
                 SerializeException(ref writer, value);
@@ -287,10 +297,15 @@ namespace Orleans.Serialization
             // In order to handle null values.
             if (field.WireType == WireType.Reference)
             {
-                // Discard the result of consuming the reference and always return null.
+                var referencedException = ReferenceCodec.ReadReference<Exception, TInput>(ref reader, field);
+
                 // We do not allow exceptions to participate in reference cycles because cycles involving InnerException are not allowed by .NET
                 // Exceptions must never form cyclic graphs via their well-known properties/fields (eg, InnerException).
-                var _ = ReferenceCodec.ReadReference<Exception, TInput>(ref reader, field);
+                if (referencedException is not null)
+                {
+                    throw new ReferenceFieldNotSupportedException(field.FieldType);
+                }
+
                 return null;
             }
 
@@ -313,7 +328,7 @@ namespace Orleans.Serialization
 
             return DeserializeException(ref reader, field);
         }
-                                
+
         public Exception DeserializeException<TInput>(ref Reader<TInput> reader, Field field)
         {
             field.EnsureWireTypeTagDelimited();

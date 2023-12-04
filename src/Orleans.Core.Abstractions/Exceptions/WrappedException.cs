@@ -39,6 +39,7 @@ namespace Orleans.Runtime
         /// </param>
         /// <exception cref="SerializationException">The class name is <see langword="null" /> or <see cref="P:System.Exception.HResult" /> is zero (0).</exception>
         /// <exception cref="ArgumentNullException"><paramref name="info" /> is <see langword="null" />.</exception>
+        [Obsolete]
         protected WrappedException(SerializationInfo info, StreamingContext context)
             : base(info, context)
         {
@@ -52,6 +53,7 @@ namespace Orleans.Runtime
         public string OriginalExceptionType { get; set; }
 
         /// <inheritdoc/>
+        [Obsolete]
         public override void GetObjectData(SerializationInfo info, StreamingContext context)
         {
             base.GetObjectData(info, context);

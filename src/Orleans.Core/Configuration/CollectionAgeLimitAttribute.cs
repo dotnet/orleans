@@ -35,22 +35,22 @@ namespace Orleans
         /// <summary>
         /// Gets or sets the number of days to delay collecting an idle activation for.
         /// </summary>
-        public double Days { private get; init; } 
+        public double Days { get; set; } 
 
         /// <summary>
         /// Gets or sets the number of hours to delay collecting an idle activation for.
         /// </summary>
-        public double Hours { private get; init; } 
+        public double Hours { get; set; } 
 
         /// <summary>
         /// Gets or sets the number of minutes to delay collecting an idle activation for.
         /// </summary>
-        public double Minutes { private get; init; } 
+        public double Minutes { get; set; } 
 
         /// <summary>
         /// Gets or sets a value indicating whether this grain should never be collected by the idle activation collector.
         /// </summary>
-        public bool AlwaysActive { private get; init; }
+        public bool AlwaysActive { get; set; }
 
         /// <summary>
         /// Gets the idle activation collection age.
@@ -79,7 +79,7 @@ namespace Orleans
             var span = AlwaysActive
             ? TimeSpan.FromDays(short.MaxValue)
             : TimeSpan.FromDays(Days) + TimeSpan.FromHours(Hours) + TimeSpan.FromMinutes(Minutes);
-            return span <= TimeSpan.Zero
+            return span < MinAgeLimit
                 ? MinAgeLimit
                 : span;
         }

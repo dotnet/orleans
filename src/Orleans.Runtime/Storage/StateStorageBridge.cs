@@ -5,6 +5,8 @@ using System.Runtime.ExceptionServices;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Orleans.Runtime;
+using Orleans.Serialization.Activators;
+using Orleans.Serialization.Serializers;
 using Orleans.Storage;
 
 namespace Orleans.Core
@@ -21,6 +23,7 @@ namespace Orleans.Core
         private readonly IGrainContext _grainContext;
         private readonly IGrainStorage _store;
         private readonly ILogger _logger;
+        private readonly IActivator<TState> _activator;
         private GrainState<TState>? _grainState;
 
         /// <inheritdoc/>
@@ -39,7 +42,7 @@ namespace Orleans.Core
             }
         }
 
-        private GrainState<TState> GrainState => _grainState ??= new GrainState<TState>(Activator.CreateInstance<TState>());
+        private GrainState<TState> GrainState => _grainState ??= new GrainState<TState>(_activator.Create());
         internal bool IsStateInitialized => _grainState != null;
 
         /// <inheritdoc/>
@@ -48,17 +51,19 @@ namespace Orleans.Core
         /// <inheritdoc/>
         public bool RecordExists => GrainState.RecordExists;
 
-        public StateStorageBridge(string name, IGrainContext grainContext, IGrainStorage store, ILoggerFactory loggerFactory)
+        public StateStorageBridge(string name, IGrainContext grainContext, IGrainStorage store, ILoggerFactory loggerFactory, IActivatorProvider activatorProvider)
         {
             ArgumentNullException.ThrowIfNull(name);
             ArgumentNullException.ThrowIfNull(grainContext);
             ArgumentNullException.ThrowIfNull(store);
             ArgumentNullException.ThrowIfNull(loggerFactory);
+            ArgumentNullException.ThrowIfNull(activatorProvider);
 
             _logger = loggerFactory.CreateLogger(store.GetType());
             _name = name;
             _grainContext = grainContext;
             _store = store;
+            _activator = activatorProvider.GetActivator<TState>();
         }
 
         /// <inheritdoc />
@@ -110,7 +115,7 @@ namespace Orleans.Core
                 sw.Stop();
 
                 // Reset the in-memory copy of the state
-                GrainState.State = Activator.CreateInstance<TState>();
+                GrainState.State = _activator.Create();
 
                 // Update counters
                 StorageInstruments.OnStorageDelete(sw.Elapsed);

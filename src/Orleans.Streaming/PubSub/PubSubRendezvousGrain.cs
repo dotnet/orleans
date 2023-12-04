@@ -6,10 +6,12 @@ using System.Runtime.ExceptionServices;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Orleans.Core;
 using Orleans.Providers;
 using Orleans.Runtime;
+using Orleans.Serialization.Serializers;
 using Orleans.Storage;
 using Orleans.Streaming;
 using Orleans.Streams.Core;
@@ -60,7 +62,8 @@ namespace Orleans.Streams
                     .DEFAULT_PUBSUB_PROVIDER_NAME);
             }
 
-            return new(nameof(PubSubRendezvousGrain), grain.GrainContext, storage, _loggerFactory);
+            var activatorProvider = _serviceProvider.GetRequiredService<IActivatorProvider>();
+            return new(nameof(PubSubRendezvousGrain), grain.GrainContext, storage, _loggerFactory, activatorProvider);
         }
     }
 

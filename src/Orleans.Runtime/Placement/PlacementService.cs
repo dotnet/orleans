@@ -164,24 +164,31 @@ namespace Orleans.Runtime.Placement
             // Verify that the result from the cache has not been invalidated by the message being addressed.
             return message.CacheInvalidationHeader switch
             {
-                { Count: > 0 } invalidAddresses => CachedAddressIsValidCore(message, cachedAddress, invalidAddresses),
+                { Count: > 0 } cacheUpdates => CachedAddressIsValidCore(message, cachedAddress, cacheUpdates),
                 _ => true
             };
 
             [MethodImpl(MethodImplOptions.NoInlining)]
-            bool CachedAddressIsValidCore(Message message, GrainAddress cachedAddress, List<GrainAddress> invalidAddresses)
+            bool CachedAddressIsValidCore(Message message, GrainAddress cachedAddress, List<GrainAddressCacheUpdate> cacheUpdates)
             {
                 var resultIsValid = true;
                 if (_logger.IsEnabled(LogLevel.Debug))
                 {
-                    _logger.LogDebug("Invalidating {Count} cached entries for message {Message}", invalidAddresses.Count, message);
+                    _logger.LogDebug("Invalidating {Count} cached entries for message {Message}", cacheUpdates.Count, message);
                 }
 
-                foreach (var address in invalidAddresses)
+                foreach (var update in cacheUpdates)
                 {
-                    // Invalidate the cache entries while we are examining them.
-                    _grainLocator.InvalidateCache(address);
-                    if (cachedAddress.Matches(address))
+                    // Invalidate/update cache entries while we are examining them.
+                    var invalidAddress = update.InvalidGrainAddress;
+                    var validAddress = update.ValidGrainAddress;
+                    _grainLocator.UpdateCache(update);
+
+                    if (cachedAddress.Matches(validAddress))
+                    {
+                        resultIsValid = true;
+                    }
+                    else if (cachedAddress.Matches(invalidAddress))
                     {
                         resultIsValid = false;
                     }
@@ -371,7 +378,7 @@ namespace Orleans.Runtime.Placement
                 }
 
                 _placementService._grainLocator.InvalidateCache(targetGrain);
-                _placementService._grainLocator.CachePlacementDecision(targetGrain, siloAddress);
+                _placementService._grainLocator.UpdateCache(targetGrain, siloAddress);
                 return siloAddress;
             }
 

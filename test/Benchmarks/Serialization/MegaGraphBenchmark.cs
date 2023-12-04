@@ -43,7 +43,6 @@ namespace Benchmarks
             Input = result.Buffer.ToArray();
         }
 
-        [Fact]
         [Benchmark]
         public object Deserialize()
         {
@@ -52,7 +51,6 @@ namespace Benchmarks
             return instance;
         }
 
-        [Fact]
         [Benchmark]
         public int Serialize()
         {

@@ -27,6 +27,7 @@ namespace UnitTests.GrainInterfaces
 
         Task StartTimer();
 
+        [ResponseTimeout("00:00:01")]
         Task DoLongAction(TimeSpan timespan, string str);
     }
 
@@ -48,6 +49,8 @@ namespace UnitTests.GrainInterfaces
         Task<string> GetRuntimeInstanceId();
 
         Task<string> GetActivationId();
+
+        Task<SiloAddress> GetSiloAddress();
     }
 
     public interface IOneWayGrain : IGrainWithGuidKey
