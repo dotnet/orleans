@@ -36,8 +36,8 @@ namespace UnitTests.Streaming
                         .ConfigureServices(services =>
                         {
                             services.AddSingleton<ErrorInjectionStorageProvider>();
-                            services.AddSingletonNamedService<IGrainStorage, ErrorInjectionStorageProvider>("ErrorInjector");
-                            services.AddSingletonNamedService<IControllable, ErrorInjectionStorageProvider>("ErrorInjector");
+                            services.AddKeyedSingleton<IGrainStorage, ErrorInjectionStorageProvider>("ErrorInjector");
+                            services.AddKeyedSingleton<IControllable, ErrorInjectionStorageProvider>("ErrorInjector");
                         });
                 }
             }

@@ -91,7 +91,7 @@ namespace Orleans.Hosting
             services.TryAddSingleton<IGrainRuntime, GrainRuntime>();
             services.TryAddSingleton<IGrainCancellationTokenRuntime, GrainCancellationTokenRuntime>();
             services.AddTransient<CancellationSourcesExtension>();
-            services.AddTransientKeyedService<Type, IGrainExtension>(typeof(ICancellationSourcesExtension), (sp, _) => sp.GetRequiredService<CancellationSourcesExtension>());
+            services.AddKeyedTransient<IGrainExtension>(typeof(ICancellationSourcesExtension), (sp, _) => sp.GetRequiredService<CancellationSourcesExtension>());
             services.TryAddSingleton<GrainFactory>(sp => sp.GetService<InsideRuntimeClient>().ConcreteGrainFactory);
             services.TryAddSingleton<GrainInterfaceTypeToGrainTypeResolver>();
             services.TryAddFromExisting<IGrainFactory, GrainFactory>();
@@ -213,24 +213,24 @@ namespace Orleans.Hosting
                 services.AddFromExisting<IVersionStore, GrainVersionStore>();
             }
             services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, GrainVersionStore>();
-            services.AddSingletonNamedService<VersionSelectorStrategy, AllCompatibleVersions>(nameof(AllCompatibleVersions));
-            services.AddSingletonNamedService<VersionSelectorStrategy, LatestVersion>(nameof(LatestVersion));
-            services.AddSingletonNamedService<VersionSelectorStrategy, MinimumVersion>(nameof(MinimumVersion));
+            services.AddKeyedSingleton<VersionSelectorStrategy, AllCompatibleVersions>(nameof(AllCompatibleVersions));
+            services.AddKeyedSingleton<VersionSelectorStrategy, LatestVersion>(nameof(LatestVersion));
+            services.AddKeyedSingleton<VersionSelectorStrategy, MinimumVersion>(nameof(MinimumVersion));
             // Versions selectors
-            services.AddSingletonKeyedService<Type, IVersionSelector, MinimumVersionSelector>(typeof(MinimumVersion));
-            services.AddSingletonKeyedService<Type, IVersionSelector, LatestVersionSelector>(typeof(LatestVersion));
-            services.AddSingletonKeyedService<Type, IVersionSelector, AllCompatibleVersionsSelector>(typeof(AllCompatibleVersions));
+            services.AddKeyedSingleton<IVersionSelector, MinimumVersionSelector>(typeof(MinimumVersion));
+            services.AddKeyedSingleton<IVersionSelector, LatestVersionSelector>(typeof(LatestVersion));
+            services.AddKeyedSingleton<IVersionSelector, AllCompatibleVersionsSelector>(typeof(AllCompatibleVersions));
 
             // Compatibility
             services.TryAddSingleton<CompatibilityDirectorManager>();
             // Compatability strategy
-            services.AddSingletonNamedService<CompatibilityStrategy, AllVersionsCompatible>(nameof(AllVersionsCompatible));
-            services.AddSingletonNamedService<CompatibilityStrategy, BackwardCompatible>(nameof(BackwardCompatible));
-            services.AddSingletonNamedService<CompatibilityStrategy, StrictVersionCompatible>(nameof(StrictVersionCompatible));
+            services.AddKeyedSingleton<CompatibilityStrategy, AllVersionsCompatible>(nameof(AllVersionsCompatible));
+            services.AddKeyedSingleton<CompatibilityStrategy, BackwardCompatible>(nameof(BackwardCompatible));
+            services.AddKeyedSingleton<CompatibilityStrategy, StrictVersionCompatible>(nameof(StrictVersionCompatible));
             // Compatability directors
-            services.AddSingletonKeyedService<Type, ICompatibilityDirector, BackwardCompatilityDirector>(typeof(BackwardCompatible));
-            services.AddSingletonKeyedService<Type, ICompatibilityDirector, AllVersionsCompatibilityDirector>(typeof(AllVersionsCompatible));
-            services.AddSingletonKeyedService<Type, ICompatibilityDirector, StrictVersionCompatibilityDirector>(typeof(StrictVersionCompatible));
+            services.AddKeyedSingleton<ICompatibilityDirector, BackwardCompatilityDirector>(typeof(BackwardCompatible));
+            services.AddKeyedSingleton<ICompatibilityDirector, AllVersionsCompatibilityDirector>(typeof(AllVersionsCompatible));
+            services.AddKeyedSingleton<ICompatibilityDirector, StrictVersionCompatibilityDirector>(typeof(StrictVersionCompatible));
 
             services.TryAddSingleton<Factory<IGrainRuntime>>(sp => () => sp.GetRequiredService<IGrainRuntime>());
 
@@ -263,8 +263,6 @@ namespace Orleans.Hosting
 
                     return new ConsistentRingProvider(siloDetails.SiloAddress, loggerFactory);
                 });
-
-            services.TryAddSingleton(typeof(IKeyedServiceCollection<,>), typeof(KeyedServiceCollection<,>));
 
             services.AddSingleton<IConfigureOptions<GrainTypeOptions>, DefaultGrainTypeOptionsProvider>();
             services.AddSingleton<IPostConfigureOptions<EndpointOptions>, EndpointOptionsProvider>();
@@ -347,7 +345,7 @@ namespace Orleans.Hosting
 
             // IAsyncEnumerable support
             services.AddScoped<IAsyncEnumerableGrainExtension, AsyncEnumerableGrainExtension>();
-            services.AddTransientKeyedService<Type, IGrainExtension>(
+            services.AddKeyedTransient<IGrainExtension>(
                 typeof(IAsyncEnumerableGrainExtension),
                 (sp, _) => sp.GetRequiredService<IAsyncEnumerableGrainExtension>());
 
@@ -358,13 +356,13 @@ namespace Orleans.Hosting
             services.AddSingleton<ILifecycleParticipant<ISiloLifecycle>, ConnectionManagerLifecycleAdapter<ISiloLifecycle>>();
             services.AddSingleton<ILifecycleParticipant<ISiloLifecycle>, SiloConnectionMaintainer>();
 
-            services.AddSingletonKeyedService<object, IConnectionFactory>(
+            services.AddKeyedSingleton<IConnectionFactory>(
                 SiloConnectionFactory.ServicesKey,
                 (sp, key) => ActivatorUtilities.CreateInstance<SocketConnectionFactory>(sp));
-            services.AddSingletonKeyedService<object, IConnectionListenerFactory>(
+            services.AddKeyedSingleton<IConnectionListenerFactory>(
                 SiloConnectionListener.ServicesKey,
                 (sp, key) => ActivatorUtilities.CreateInstance<SocketConnectionListenerFactory>(sp));
-            services.AddSingletonKeyedService<object, IConnectionListenerFactory>(
+            services.AddKeyedSingleton<IConnectionListenerFactory>(
                 GatewayConnectionListener.ServicesKey,
                 (sp, key) => ActivatorUtilities.CreateInstance<SocketConnectionListenerFactory>(sp));
 

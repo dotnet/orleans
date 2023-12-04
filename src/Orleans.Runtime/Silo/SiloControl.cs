@@ -27,6 +27,7 @@ namespace Orleans.Runtime
         private readonly CachedVersionSelectorManager cachedVersionSelectorManager;
         private readonly CompatibilityDirectorManager compatibilityDirectorManager;
         private readonly VersionSelectorManager selectorManager;
+        private readonly IServiceProvider services;
         private readonly ActivationCollector _activationCollector;
         private readonly ActivationDirectory activationDirectory;
 
@@ -38,7 +39,6 @@ namespace Orleans.Runtime
 
         private readonly IOptions<LoadSheddingOptions> loadSheddingOptions;
         private readonly GrainCountStatistics _grainCountStatistics;
-        private readonly Dictionary<Tuple<string,string>, IControllable> controllables;
 
         public SiloControl(
             ILocalSiloDetails localSiloDetails,
@@ -67,6 +67,7 @@ namespace Orleans.Runtime
             this.cachedVersionSelectorManager = cachedVersionSelectorManager;
             this.compatibilityDirectorManager = compatibilityDirectorManager;
             this.selectorManager = selectorManager;
+            this.services = services;
             _activationCollector = activationCollector;
             this.activationDirectory = activationDirectory;
             this.activationWorkingSet = activationWorkingSet;
@@ -74,17 +75,6 @@ namespace Orleans.Runtime
             this.hostEnvironmentStatistics = hostEnvironmentStatistics;
             this.loadSheddingOptions = loadSheddingOptions;
             _grainCountStatistics = grainCountStatistics;
-            this.controllables = new Dictionary<Tuple<string, string>, IControllable>();
-            IEnumerable<IKeyedServiceCollection<string, IControllable>> namedIControllableCollections = services.GetServices<IKeyedServiceCollection<string, IControllable>>();
-            foreach (IKeyedService<string, IControllable> keyedService in namedIControllableCollections.SelectMany(c => c.GetServices(services)))
-            {
-                IControllable controllable = keyedService.GetService(services);
-                if(controllable != null)
-                {
-                    this.controllables.Add(Tuple.Create(controllable.GetType().FullName, keyedService.Key), controllable);
-                }
-            }
-
         }
 
         public Task Ping(string message)
@@ -157,17 +147,22 @@ namespace Orleans.Runtime
             return Task.FromResult(this.catalog.ActivationCount);
         }
 
-        public Task<object> SendControlCommandToProvider(string providerTypeFullName, string providerName, int command, object arg)
+        public Task<object> SendControlCommandToProvider<T>(string providerName, int command, object arg) where T : IControllable
         {
-            IControllable controllable;
-            if(!this.controllables.TryGetValue(Tuple.Create(providerTypeFullName, providerName), out controllable))
+            var t = services
+                    .GetKeyedServices<IControllable>(providerName);
+            var controllable = services
+                    .GetKeyedServices<IControllable>(providerName)
+                    .FirstOrDefault(svc => svc.GetType() == typeof(T));
+
+            if (controllable == null)
             {
                 logger.LogError(
                     (int)ErrorCode.Provider_ProviderNotFound,
                     "Could not find a controllable service for type {ProviderTypeFullName} and name {ProviderName}.",
-                    providerTypeFullName,
+                    typeof(IControllable).FullName,
                     providerName);
-                throw new ArgumentException($"Could not find a controllable service for type {providerTypeFullName} and name {providerName}.");
+                throw new ArgumentException($"Could not find a controllable service for type {typeof(IControllable).FullName} and name {providerName}.");
             }
 
             return controllable.ExecuteCommand(command, arg);

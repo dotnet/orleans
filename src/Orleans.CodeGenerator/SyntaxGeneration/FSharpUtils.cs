@@ -24,7 +24,16 @@ namespace Orleans.CodeGenerator
                 return false;
             }
 
-            if (!baseType.GetAttributes(compilationAttributeType, out var compilationAttributes) || compilationAttributes.Length == 0)
+            INamedTypeSymbol sumTypeCandidate;
+            if (symbol.GetAttributes(compilationAttributeType, out var compilationAttributes) && compilationAttributes.Length > 0)
+            {
+                sumTypeCandidate = symbol;
+            }
+            else if (baseType.GetAttributes(compilationAttributeType, out compilationAttributes) && compilationAttributes.Length > 0)
+            {
+                sumTypeCandidate = baseType;
+            }
+            else
             {
                 return false;
             }
@@ -52,7 +61,7 @@ namespace Orleans.CodeGenerator
                 return false;
             }
 
-            sumType = baseType;
+            sumType = sumTypeCandidate;
             return true;
         }
 
@@ -98,7 +107,7 @@ namespace Orleans.CodeGenerator
 
         public class FSharpUnionCaseTypeDescription : SerializableTypeDescription
         {
-            public FSharpUnionCaseTypeDescription(SemanticModel semanticModel, INamedTypeSymbol type, LibraryTypes libraryTypes) : base(semanticModel, type, false, GetUnionCaseDataMembers(libraryTypes, type), libraryTypes)
+            public FSharpUnionCaseTypeDescription(Compilation compilation, INamedTypeSymbol type, LibraryTypes libraryTypes) : base(compilation, type, false, GetUnionCaseDataMembers(libraryTypes, type), libraryTypes)
             {
             }
 
@@ -236,7 +245,7 @@ namespace Orleans.CodeGenerator
 
         public class FSharpRecordTypeDescription : SerializableTypeDescription
         {
-            public FSharpRecordTypeDescription(SemanticModel semanticModel, INamedTypeSymbol type, LibraryTypes libraryTypes) : base(semanticModel, type, false, GetRecordDataMembers(libraryTypes, type), libraryTypes)
+            public FSharpRecordTypeDescription(Compilation compilation, INamedTypeSymbol type, LibraryTypes libraryTypes) : base(compilation, type, false, GetRecordDataMembers(libraryTypes, type), libraryTypes)
             {
             }
 

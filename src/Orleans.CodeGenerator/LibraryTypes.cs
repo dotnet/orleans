@@ -12,7 +12,10 @@ namespace Orleans.CodeGenerator
 {
     internal sealed class LibraryTypes
     {
+        private readonly ConcurrentDictionary<ITypeSymbol, bool> _shallowCopyableTypes = new(SymbolEqualityComparer.Default);
+
         public static LibraryTypes FromCompilation(Compilation compilation, CodeGeneratorOptions options) => new LibraryTypes(compilation, options);
+
         private LibraryTypes(Compilation compilation, CodeGeneratorOptions options)
         {
             Compilation = compilation;
@@ -181,6 +184,7 @@ namespace Orleans.CodeGenerator
                 };
 
             LanguageVersion = (compilation.SyntaxTrees.FirstOrDefault()?.Options as CSharpParseOptions)?.LanguageVersion;
+            GenerateSerializerAttributes = options.GenerateSerializerAttributes.Select(compilation.GetTypeByMetadataName).ToArray();
 
             INamedTypeSymbol Type(string metadataName)
             {
@@ -309,7 +313,7 @@ namespace Orleans.CodeGenerator
 
         public LanguageVersion? LanguageVersion { get; private set; }
 
-        private readonly ConcurrentDictionary<ITypeSymbol, bool> _shallowCopyableTypes = new(SymbolEqualityComparer.Default);
+        public INamedTypeSymbol?[] GenerateSerializerAttributes { get; }
 
         public bool IsShallowCopyable(ITypeSymbol type)
         {

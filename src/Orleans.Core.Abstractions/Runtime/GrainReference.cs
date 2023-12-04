@@ -684,7 +684,6 @@ namespace Orleans.Runtime
             try
             {
                 var resultTask = InvokeInner();
-                var status = resultTask.Status;
                 if (resultTask.IsCompleted)
                 {
                     return new ValueTask<Response>(Response.FromResult(resultTask.GetAwaiter().GetResult()));
@@ -730,7 +729,6 @@ namespace Orleans.Runtime
             try
             {
                 var resultTask = InvokeInner();
-                var status = resultTask.Status;
                 if (resultTask.IsCompleted)
                 {
                     resultTask.GetAwaiter().GetResult();

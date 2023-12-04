@@ -9,7 +9,6 @@ namespace Orleans.Runtime.TestHooks
         Task<SiloAddress> GetConsistentRingPrimaryTargetSilo(uint key);
         Task<string> GetConsistentRingProviderDiagnosticInfo();
         Task<string> GetServiceId();
-        Task<ICollection<string>> GetStorageProviderNames();
         Task<bool> HasStorageProvider(string providerName);
         Task<bool> HasStreamProvider(string providerName);
         Task<int> UnregisterGrainForTesting(GrainId grain);

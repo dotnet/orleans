@@ -43,16 +43,6 @@ namespace Orleans
                 participant?.Participate(_clusterClientLifecycle);
             }
 
-            // register all named lifecycle participants
-            var namedLifecycleParticipantCollection = ServiceProvider.GetService<IKeyedServiceCollection<string, ILifecycleParticipant<IClusterClientLifecycle>>>();
-            if (namedLifecycleParticipantCollection?.GetServices(ServiceProvider)?.Select(s => s.GetService(ServiceProvider)) is { } namedParticipants)
-            {
-                foreach (var participant in namedParticipants)
-                {
-                    participant.Participate(_clusterClientLifecycle);
-                }
-            }
-
             static void ValidateSystemConfiguration(IServiceProvider serviceProvider)
             {
                 var validators = serviceProvider.GetServices<IConfigurationValidator>();

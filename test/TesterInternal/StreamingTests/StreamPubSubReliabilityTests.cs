@@ -2,6 +2,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Providers;
 using Orleans.Runtime;
+using Orleans.Runtime.Hosting;
 using Orleans.Storage;
 using Orleans.TestingHost;
 using TestExtensions;
@@ -32,8 +33,8 @@ namespace UnitTests.StreamingTests
                     .ConfigureServices(services =>
                     {
                         services.AddSingleton<ErrorInjectionStorageProvider>();
-                        services.AddSingletonNamedService<IGrainStorage, ErrorInjectionStorageProvider>(PubSubStoreProviderName);
-                        services.AddSingletonNamedService<IControllable, ErrorInjectionStorageProvider>(PubSubStoreProviderName);
+                        services.AddGrainStorage(PubSubStoreProviderName, (sp, name) => sp.GetRequiredService<ErrorInjectionStorageProvider>());
+                        services.AddKeyedSingleton<IControllable>(PubSubStoreProviderName, (sp, key) => sp.GetRequiredService<ErrorInjectionStorageProvider>());
                     });
             }
         }

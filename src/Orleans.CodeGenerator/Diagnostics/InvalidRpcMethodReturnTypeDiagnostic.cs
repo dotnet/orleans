@@ -15,7 +15,7 @@ public static class InvalidRpcMethodReturnTypeDiagnostic
 
     public static Diagnostic CreateDiagnostic(Location location, string returnType, string methodIdentifier, string supportedReturnTypeList) => Diagnostic.Create(Rule, location, returnType, methodIdentifier, supportedReturnTypeList);
 
-    internal static Diagnostic CreateDiagnostic(MethodDescription methodDescription)
+    internal static Diagnostic CreateDiagnostic(InvokableMethodDescription methodDescription)
     {
         var methodReturnType = methodDescription.Method.ReturnType;
         var diagnostic = CreateDiagnostic(

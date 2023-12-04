@@ -3,6 +3,7 @@
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using Microsoft.Extensions.DependencyInjection;
 using Orleans.Runtime;
 using Orleans.Serialization;
 
@@ -178,7 +179,7 @@ namespace Orleans.Streams
 
         private IInternalStreamProvider? GetStreamProvider()
         {
-            return this.runtimeClient?.ServiceProvider.GetRequiredServiceByName<IStreamProvider>(streamId.ProviderName) as IInternalStreamProvider;
+            return this.runtimeClient?.ServiceProvider.GetRequiredKeyedService<IStreamProvider>(streamId.ProviderName) as IInternalStreamProvider;
         }
 
         public int CompareTo(IAsyncStream<T>? other)

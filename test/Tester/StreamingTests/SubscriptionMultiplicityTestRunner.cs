@@ -308,7 +308,7 @@ namespace UnitTests.StreamingTests
             var producer = this.testCluster.GrainFactory.GetGrain<ISampleStreaming_ProducerGrain>(Guid.NewGuid());
             int eventCount = 0;
 
-            var provider = this.testCluster.Client.ServiceProvider.GetServiceByName<IStreamProvider>(streamProviderName);
+            var provider = this.testCluster.Client.ServiceProvider.GetKeyedService<IStreamProvider>(streamProviderName);
             var stream = provider.GetStream<int>(streamNamespace, streamGuid);
             var handle = await stream.SubscribeAsync((e,t) =>
             {

@@ -58,7 +58,7 @@ namespace DistributedTests.Server.Configurator
                         options.Duration = parameters.Duration;
                     });
                 })
-                .ConfigureServices(services => services.AddSingletonNamedService<IStreamGeneratorConfig>(StreamingConstants.StreamingProvider, (s, n) => generatorOptions))
+                .ConfigureServices(services => services.AddKeyedSingleton<IStreamGeneratorConfig>(StreamingConstants.StreamingProvider, (s, n) => generatorOptions))
                 .AddPersistentStreams(
                     StreamingConstants.StreamingProvider,
                     GeneratorAdapterFactory.Create,

@@ -194,7 +194,7 @@ namespace Orleans.Storage
         /// <param name="services">The services.</param>
         /// <param name="name">The name.</param>
         /// <returns>The storage.</returns>
-        public static IGrainStorage Create(IServiceProvider services, string name)
+        public static MemoryGrainStorage Create(IServiceProvider services, string name)
         {
             return ActivatorUtilities.CreateInstance<MemoryGrainStorage>(services,
                 services.GetRequiredService<IOptionsMonitor<MemoryGrainStorageOptions>>().Get(name), name);

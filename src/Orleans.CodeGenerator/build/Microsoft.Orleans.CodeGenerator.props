@@ -9,6 +9,7 @@
     <CompilerVisibleProperty Include="Orleans_AliasAttributes" />
     <CompilerVisibleProperty Include="Orleans_GenerateSerializerAttributes" />
     <CompilerVisibleProperty Include="Orleans_ConstructorAttributes" />
+    <CompilerVisibleProperty Include="OrleansGenerateCompatibilityInvokers" />
   </ItemGroup>
 
   <PropertyGroup>

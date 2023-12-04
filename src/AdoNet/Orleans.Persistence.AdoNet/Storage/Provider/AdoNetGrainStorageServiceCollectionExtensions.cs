@@ -6,6 +6,7 @@ using Orleans.Configuration;
 using Orleans.Hosting;
 using Orleans.Providers;
 using Orleans.Runtime;
+using Orleans.Runtime.Hosting;
 using Orleans.Storage;
 
 namespace Orleans.Hosting
@@ -59,14 +60,9 @@ namespace Orleans.Hosting
         {
             configureOptions?.Invoke(services.AddOptions<AdoNetGrainStorageOptions>(name));
             services.ConfigureNamedOptionForLogging<AdoNetGrainStorageOptions>(name);
-            if (string.Equals(name, ProviderConstants.DEFAULT_STORAGE_PROVIDER_NAME, StringComparison.Ordinal))
-            {
-                services.TryAddSingleton(sp => sp.GetServiceByName<IGrainStorage>(ProviderConstants.DEFAULT_STORAGE_PROVIDER_NAME));
-            }
             services.AddTransient<IPostConfigureOptions<AdoNetGrainStorageOptions>, DefaultStorageProviderSerializerOptionsConfigurator<AdoNetGrainStorageOptions>>();
             services.AddTransient<IConfigurationValidator>(sp => new AdoNetGrainStorageOptionsValidator(sp.GetRequiredService<IOptionsMonitor<AdoNetGrainStorageOptions>>().Get(name), name));
-            return services.AddSingletonNamedService<IGrainStorage>(name, AdoNetGrainStorageFactory.Create)
-                           .AddSingletonNamedService<ILifecycleParticipant<ISiloLifecycle>>(name, (s, n) => (ILifecycleParticipant<ISiloLifecycle>)s.GetRequiredServiceByName<IGrainStorage>(n));
+            return services.AddGrainStorage(name, AdoNetGrainStorageFactory.Create);
         }
     } 
 }

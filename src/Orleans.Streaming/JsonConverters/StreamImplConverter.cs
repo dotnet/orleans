@@ -2,6 +2,7 @@
 
 using System;
 using System.Runtime.Serialization;
+using Microsoft.Extensions.DependencyInjection;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using Orleans.Runtime;
@@ -35,7 +36,7 @@ namespace Orleans.Streaming.JsonConverters
 
                 if (streamId.HasValue && isRewindable.HasValue && !string.IsNullOrWhiteSpace(providerName))
                 {
-                    var provider = _runtimeClient.ServiceProvider.GetRequiredServiceByName<IStreamProvider>(providerName) as IInternalStreamProvider;
+                    var provider = _runtimeClient.ServiceProvider.GetRequiredKeyedService<IStreamProvider>(providerName) as IInternalStreamProvider;
                     return Activator.CreateInstance(fullType, new QualifiedStreamId(providerName, streamId.Value), provider, isRewindable.Value, _runtimeClient);
                 }
             }
