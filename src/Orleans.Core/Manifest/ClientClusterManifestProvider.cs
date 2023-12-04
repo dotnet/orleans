@@ -85,28 +85,23 @@ namespace Orleans.Runtime
                 SiloAddress gateway = null;
                 IClusterManifestSystemTarget provider = null;
                 var minorVersion = 0;
-                var gatewayVersion = _current.Version;
-                var mergeUntilMajorVersion = _current.Version.Major;
+                var gatewayVersion = MajorMinorVersion.MinValue;
+                var updateIncludesAllActiveServers = false;
                 while (!_cancellation.IsCancellationRequested)
                 {
                     // Select a new gateway if the current one is not available.
+                    // This could be caused by a temporary issue or a permanent gateway failure.
                     if (gateway is null || !_gatewayManager.IsGatewayAvailable(gateway))
                     {
-                        if (gateway is not null)
-                        {
-                            // Merge manifests until the major version advances.
-                            mergeUntilMajorVersion = gatewayVersion.Major + 1;
-                        }
-
                         gateway = _gatewayManager.GetLiveGateway();
                         provider = grainFactory.GetGrain<IClusterManifestSystemTarget>(SystemTargetGrainId.Create(Constants.ManifestProviderType, gateway).GrainId);
 
-                        // Accept any cluster manifest version from the new gateway as long as it at least matches the current major version.
-                        // The major version corresponds to the (monotonically increasing) cluster membership version.
-                        // Since the minor version is not global, we need to reset it to the lowest possible value.
+                        // Accept any cluster manifest version from the new gateway.
+                        // Since the minor version of the manifest is specific to each gateway, we reset it to the lowest possible value.
                         // This means that it is possible to receive the an older or equivalent cluster manifest when the gateway changes.
-                        // That hiccup is addressed by merging the newly received manifest with the current one until the major version advances.
-                        gatewayVersion = new MajorMinorVersion(_current.Version.Major, long.MinValue);
+                        // That hiccup is addressed by resetting the expected manifest version and merging incomplete manifests until a complete
+                        // manifest is received.
+                        gatewayVersion = MajorMinorVersion.MinValue;
                     }
 
                     Debug.Assert(provider is not null);
@@ -121,7 +116,8 @@ namespace Orleans.Runtime
                             return;
                         }
 
-                        var gatewayManifest = await refreshTask;
+                        var updateResult = await refreshTask;
+                        var gatewayManifest = updateResult.Manifest;
                         if (gatewayManifest is null)
                         {
                             // There was no newer cluster manifest, so wait for the next refresh interval and try again.
@@ -129,13 +125,16 @@ namespace Orleans.Runtime
                             continue;
                         }
 
+                        // Do not receive further updates from this gateway until the manifest version has increased.
                         gatewayVersion = gatewayManifest.Version;
+                        updateIncludesAllActiveServers = updateResult.IncludesAllActiveServers;
 
-                        // If the client switched to a new gateway, we need to merge the manifests.
+                        // If the manifest does not contain all active servers, merge with the existing manifest until it does.
+                        // This prevents reversed progress at the expense of including potentially defunct silos.
                         ImmutableDictionary<SiloAddress, GrainManifest> siloManifests;
-                        if (mergeUntilMajorVersion > gatewayManifest.Version.Major)
+                        if (!updateIncludesAllActiveServers)
                         {
-                            // Merge manifests until the major version advances.
+                            // Merge manifests until the manifest contains all active servers.
                             var mergedSilos = _current.Silos.ToBuilder();
                             mergedSilos.Add(_localClientDetails.ClientAddress, LocalGrainManifest);
                             foreach (var kvp in gatewayManifest.Silos)
@@ -170,6 +169,9 @@ namespace Orleans.Runtime
                     {
                         _logger.LogWarning(exception, "Error trying to get cluster manifest from gateway {Gateway}", gateway);
                         await Task.Delay(StandardExtensions.Min(_typeManagementOptions.TypeMapRefreshInterval, TimeSpan.FromSeconds(5)));
+
+                        // Reset the gateway so that another will be selected on the next iteration.
+                        gateway = null;
                     }
                 }
             }
