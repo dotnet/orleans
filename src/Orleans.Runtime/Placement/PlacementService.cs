@@ -215,7 +215,7 @@ namespace Orleans.Runtime.Placement
         private class PlacementWorker
         {
             private readonly Dictionary<GrainId, GrainPlacementWorkItem> _inProgress = new();
-            private readonly SingleWaiterAutoResetEvent _workSignal = new();
+            private readonly SingleWaiterAutoResetEvent _workSignal = new() { RunContinuationsAsynchronously = true };
             private readonly ILogger _logger;
 #pragma warning disable IDE0052 // Remove unread private members. Justification: retained for debugging purposes
             private readonly Task _processLoopTask;
