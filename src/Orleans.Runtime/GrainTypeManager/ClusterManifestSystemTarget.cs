@@ -14,8 +14,8 @@ namespace Orleans.Runtime
         private readonly IClusterMembershipService _clusterMembershipService;
         private readonly IClusterManifestProvider _clusterManifestProvider;
         private readonly ClusterManifestUpdate _noUpdate = default;
-        private MembershipVersion _activeServersMembershipVersion;
-        private bool _containsAllActiveServers;
+        private MembershipVersion _cachedMembershipVersion;
+        private ClusterManifestUpdate _cachedUpdate;
 
         public ClusterManifestSystemTarget(
             IClusterMembershipService clusterMembershipService,
@@ -30,12 +30,12 @@ namespace Orleans.Runtime
         }
 
         public ValueTask<ClusterManifest> GetClusterManifest() => new(_clusterManifestProvider.Current);
-        public ValueTask<ClusterManifestUpdate> GetClusterManifestIfNewer(MajorMinorVersion version)
+        public ValueTask<ClusterManifestUpdate> GetClusterManifestUpdate(MajorMinorVersion version)
         {
-            var result = _clusterManifestProvider.Current;
+            var manifest = _clusterManifestProvider.Current;
 
             // Only return an updated manifest if it is newer than the provided version.
-            if (result.Version <= version)
+            if (manifest.Version <= version)
             {
                 return new (_noUpdate);
             }
@@ -43,24 +43,27 @@ namespace Orleans.Runtime
             // Maintain a cache of whether the current manifest contains all active servers so that it
             // does not need to be recomputed each time.
             var membershipSnapshot = _clusterMembershipService.CurrentSnapshot;
-            if (membershipSnapshot.Version > _activeServersMembershipVersion)
+            if (_cachedUpdate is null
+                || membershipSnapshot.Version > _cachedMembershipVersion
+                || manifest.Version > _cachedUpdate.Version)
             {
-                _containsAllActiveServers = true;
+                var includesAllActiveServers = true;
                 foreach (var server in membershipSnapshot.Members)
                 {
                     if (server.Value.Status == SiloStatus.Active)
                     {
-                        if (!result.Silos.ContainsKey(server.Key))
+                        if (!manifest.Silos.ContainsKey(server.Key))
                         {
-                            _containsAllActiveServers = false;
+                            includesAllActiveServers = false;
                         }
                     }
                 }
 
-                _activeServersMembershipVersion = membershipSnapshot.Version;
+                _cachedUpdate = new ClusterManifestUpdate(manifest.Version, manifest.Silos, includesAllActiveServers);
+                _cachedMembershipVersion = membershipSnapshot.Version;
             }
 
-            return new (new ClusterManifestUpdate(result, _containsAllActiveServers));
+            return new (_cachedUpdate);
         }
 
         public ValueTask<GrainManifest> GetSiloManifest() => new(_siloManifest);

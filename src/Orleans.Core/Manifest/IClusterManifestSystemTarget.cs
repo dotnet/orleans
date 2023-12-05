@@ -1,3 +1,5 @@
+using System.Collections.Generic;
+using System.Collections.Immutable;
 using System.Threading.Tasks;
 using Orleans.Metadata;
 
@@ -15,25 +17,44 @@ namespace Orleans.Runtime
         ValueTask<ClusterManifest> GetClusterManifest();
 
         /// <summary>
-        /// Gets the current cluster manifest if it is newer than the provided <paramref name="version"/>.
+        /// Gets an updated cluster manifest if newer than the provided <paramref name="previousVersion"/>.
         /// </summary>
         /// <returns>The current cluster manifest, or <see langword="null"/> if it is not newer than the provided version.</returns>
-        ValueTask<ClusterManifestUpdate> GetClusterManifestIfNewer(MajorMinorVersion version);
+        ValueTask<ClusterManifestUpdate> GetClusterManifestUpdate(MajorMinorVersion previousVersion);
     }
 
+    /// <summary>
+    /// Represents an update to the cluster manifest.
+    /// </summary>
     [GenerateSerializer, Immutable]
-    public readonly struct ClusterManifestUpdate
+    public class ClusterManifestUpdate
     {
-        public ClusterManifestUpdate(ClusterManifest manifest, bool includesAllActiveServers)
+        public ClusterManifestUpdate(
+            MajorMinorVersion manifestVersion,
+            ImmutableDictionary<SiloAddress, GrainManifest> siloManifests,
+            bool includesAllActiveServers)
         {
-            Manifest = manifest;
+            Version = manifestVersion;
+            SiloManifests = siloManifests;
             IncludesAllActiveServers = includesAllActiveServers;
         }
 
+        /// <summary>
+        /// Gets the version of this instance.
+        /// </summary>
         [Id(0)]
-        public ClusterManifest Manifest { get; }
+        public MajorMinorVersion Version { get; }
 
+        /// <summary>
+        /// Gets the manifests for each silo in the cluster.
+        /// </summary>
         [Id(1)]
+        public ImmutableDictionary<SiloAddress, GrainManifest> SiloManifests { get; }
+
+        /// <summary>
+        /// Gets a value indicating whether this update includes all active servers.
+        /// </summary>
+        [Id(2)]
         public bool IncludesAllActiveServers { get; } 
     }
 }

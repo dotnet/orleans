@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Diagnostics;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
@@ -108,7 +109,7 @@ namespace Orleans.Runtime
 
                     try
                     {
-                        var refreshTask = provider.GetClusterManifestIfNewer(gatewayVersion).AsTask();
+                        var refreshTask = GetClusterManifestUpdate(provider, gatewayVersion);
                         var task = await Task.WhenAny(cancellationTask, refreshTask).ConfigureAwait(false);
 
                         if (ReferenceEquals(task, cancellationTask))
@@ -117,17 +118,15 @@ namespace Orleans.Runtime
                         }
 
                         var updateResult = await refreshTask;
-                        var gatewayManifest = updateResult.Manifest;
-                        if (gatewayManifest is null)
+                        updateIncludesAllActiveServers = updateResult.IncludesAllActiveServers;
+                        if (updateResult is null)
                         {
                             // There was no newer cluster manifest, so wait for the next refresh interval and try again.
                             await Task.WhenAny(cancellationTask, Task.Delay(_typeManagementOptions.TypeMapRefreshInterval));
                             continue;
                         }
 
-                        // Do not receive further updates from this gateway until the manifest version has increased.
-                        gatewayVersion = gatewayManifest.Version;
-                        updateIncludesAllActiveServers = updateResult.IncludesAllActiveServers;
+                        gatewayVersion = updateResult.Version;
 
                         // If the manifest does not contain all active servers, merge with the existing manifest until it does.
                         // This prevents reversed progress at the expense of including potentially defunct silos.
@@ -137,7 +136,7 @@ namespace Orleans.Runtime
                             // Merge manifests until the manifest contains all active servers.
                             var mergedSilos = _current.Silos.ToBuilder();
                             mergedSilos.Add(_localClientDetails.ClientAddress, LocalGrainManifest);
-                            foreach (var kvp in gatewayManifest.Silos)
+                            foreach (var kvp in updateResult.SiloManifests)
                             {
                                 mergedSilos[kvp.Key] = kvp.Value;
                             }
@@ -146,10 +145,10 @@ namespace Orleans.Runtime
                         }
                         else
                         {
-                            siloManifests = gatewayManifest.Silos.Add(_localClientDetails.ClientAddress, LocalGrainManifest);
+                            siloManifests = updateResult.SiloManifests.Add(_localClientDetails.ClientAddress, LocalGrainManifest);
                         }
 
-                        var updatedManifest = new ClusterManifest(new MajorMinorVersion(gatewayVersion.Major, ++minorVersion), gatewayManifest.Silos);
+                        var updatedManifest = new ClusterManifest(new MajorMinorVersion(gatewayVersion.Major, ++minorVersion), siloManifests);
                         if (!_updates.TryPublish(updatedManifest))
                         {
                             await Task.Delay(StandardExtensions.Min(_typeManagementOptions.TypeMapRefreshInterval, TimeSpan.FromMilliseconds(500)));
@@ -184,6 +183,22 @@ namespace Orleans.Runtime
                     _logger.LogDebug("Stopped refreshing cluster manifest");
                 }
             }
+        }
+
+        private async Task<ClusterManifestUpdate> GetClusterManifestUpdate(IClusterManifestSystemTarget provider, MajorMinorVersion previousVersion)
+        {
+            try
+            {
+                return await provider.GetClusterManifestUpdate(previousVersion);
+            }
+            catch (Exception exception)
+            {
+                _logger.LogWarning(exception, "Failed to fetch cluster manifest update from {Provider}.", provider);
+            }
+
+            var manifest = await provider.GetClusterManifest();
+            var result = new ClusterManifestUpdate(manifest.Version, manifest.Silos, includesAllActiveServers: true);
+            return result;
         }
 
         /// <inheritdoc />

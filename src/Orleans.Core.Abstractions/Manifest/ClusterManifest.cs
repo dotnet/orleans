@@ -10,9 +10,6 @@ namespace Orleans.Metadata
     [Serializable, GenerateSerializer, Immutable]
     public sealed class ClusterManifest
     {
-        [NonSerialized]
-        private ImmutableArray<GrainManifest>? _allGrainManifests;
-
         /// <summary>
         /// Initializes a new instance of the <see cref="ClusterManifest"/> class.
         /// </summary>
@@ -26,8 +23,9 @@ namespace Orleans.Metadata
             MajorMinorVersion version,
             ImmutableDictionary<SiloAddress, GrainManifest> silos)
         {
-            this.Version = version;
-            this.Silos = silos;
+            Version = version;
+            Silos = silos;
+            AllGrainManifests = silos.Values.ToImmutableArray();
         }
 
         /// <summary>
@@ -45,6 +43,7 @@ namespace Orleans.Metadata
         /// <summary>
         /// Gets all grain manifests.
         /// </summary>
-        public ImmutableArray<GrainManifest> AllGrainManifests => _allGrainManifests ??= Silos.Values.ToImmutableArray();
+        [Id(2)]
+        public ImmutableArray<GrainManifest> AllGrainManifests { get; }
     }
 }
