@@ -21,6 +21,7 @@ namespace Orleans.TestingHost
         /// </summary>
         /// <param name="info">The <see cref="T:System.Runtime.Serialization.SerializationInfo" /> that holds the serialized object data about the exception being thrown.</param>
         /// <param name="context">The <see cref="T:System.Runtime.Serialization.StreamingContext" /> that contains contextual information about the source or destination.</param>
+        [Obsolete]
         private RandomlyInjectedStorageException(SerializationInfo info, StreamingContext context)
             : base(info, context)
         {
@@ -44,6 +45,7 @@ namespace Orleans.TestingHost
         /// </summary>
         /// <param name="info">The serialization info.</param>
         /// <param name="context">The context.</param>
+        [Obsolete]
         private RandomlyInjectedInconsistentStateException(SerializationInfo info, StreamingContext context)
             : base(info, context)
         {

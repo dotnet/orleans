@@ -9,9 +9,9 @@ using Orleans.Concurrency;
 using Orleans.Configuration;
 using Orleans.Runtime;
 using Orleans.Serialization;
+using Orleans.Storage;
 using UnitTests.GrainInterfaces;
 using Xunit;
-using Orleans.Storage;
 
 namespace UnitTests.Grains
 {
@@ -1116,33 +1116,37 @@ namespace UnitTests.Grains
 
     public sealed class ExternalTypeWithoutPublicConstructor
     {
-        public int Field { get; set; }
+        public int Field1 { get; set; }
+        public int Field2 { get; set; }
 
-        public static ExternalTypeWithoutPublicConstructor Create(int field)
-            => new(field);
+        public static ExternalTypeWithoutPublicConstructor Create(int field1, int field2)
+            => new(field1, field2);
 
-        private ExternalTypeWithoutPublicConstructor(int field)
+        private ExternalTypeWithoutPublicConstructor(int field1, int field2)
         {
-            Field = field;
+            Field1 = field1;
+            Field2 = field2;
         }
     }
 
     [GenerateSerializer]
     public struct ExternalTypeWithoutPublicConstructorSurrogate
     {
-        [Id(0)] public int Field;
+        [Id(0)] public int Field1;
+        [Id(1)] public required int Field2;
     }
 
     [RegisterConverter]
     public sealed class ExternalTypeWithoutPublicConstructorSurrogateConverter : IConverter<ExternalTypeWithoutPublicConstructor, ExternalTypeWithoutPublicConstructorSurrogate>
     {
         public ExternalTypeWithoutPublicConstructor ConvertFromSurrogate(in ExternalTypeWithoutPublicConstructorSurrogate surrogate)
-            => ExternalTypeWithoutPublicConstructor.Create(surrogate.Field);
+            => ExternalTypeWithoutPublicConstructor.Create(surrogate.Field1, surrogate.Field2);
 
         public ExternalTypeWithoutPublicConstructorSurrogate ConvertToSurrogate(in ExternalTypeWithoutPublicConstructor value)
             => new()
             {
-                Field = value.Field,
+                Field1 = value.Field1,
+                Field2 = value.Field2,
             };
     }
     

@@ -163,7 +163,7 @@ namespace UnitTests.General
                 Task.Factory.StartNew(() => this.HostedCluster.StopSiloAsync(failures[0])),
                 this.HostedCluster.StartAdditionalSilosAsync(1).ContinueWith(t => joins = t.GetAwaiter().GetResult())
             };
-            Task.WaitAll(tasks, endWait);
+            await Task.WhenAll(tasks).WaitAsync(endWait);
 
             await this.HostedCluster.WaitForLivenessToStabilizeAsync();
 
@@ -192,7 +192,7 @@ namespace UnitTests.General
                 Task.Factory.StartNew(() => this.HostedCluster.StopSiloAsync(fail)),
                 this.HostedCluster.StartAdditionalSilosAsync(1).ContinueWith(t => joins = t.GetAwaiter().GetResult())
             };
-            Task.WaitAll(tasks, endWait);
+            await Task.WhenAll(tasks).WaitAsync(endWait);
 
             await this.HostedCluster.WaitForLivenessToStabilizeAsync();
 

@@ -104,8 +104,13 @@ namespace Orleans.Hosting
         {
             configurator.ConfigureDelegate(services =>
             {
-                services.AddSingletonNamedService(configurator.Name, factory);
+                services.AddKeyedSingleton<TComponent>(configurator.Name, (sp, key) => factory(sp, key as string));
             });
+        }
+
+        public static void ConfigureLifecycle<T>(this INamedServiceConfigurator configurator) where T : ILifecycleSubject
+        {
+
         }
     }
 }

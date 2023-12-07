@@ -1,4 +1,6 @@
 using System;
+using System.Diagnostics.CodeAnalysis;
+using System.Runtime.InteropServices;
 using Orleans.Serialization.TypeSystem;
 using Orleans.Utilities;
 
@@ -14,15 +16,22 @@ namespace Orleans.Runtime
         /// Initializes a new instance of the <see cref="GenericGrainType"/> struct.
         /// </summary>
         /// <param name="grainType">The underlying grain type.</param>
-        private GenericGrainType(GrainType grainType)
+        /// <param name="arity">The generic arity of the grain type.</param>
+        private GenericGrainType(GrainType grainType, int arity)
         {
             GrainType = grainType;
+            Arity = arity;
         }
 
         /// <summary>
         /// The underlying grain type.
         /// </summary>
         public GrainType GrainType { get; }
+
+        /// <summary>
+        /// The generic arity of the grain type.
+        /// </summary>
+        public int Arity { get; }
 
         /// <summary>
         /// Returns <see langword="true" /> if this instance contains concrete type parameters.
@@ -34,9 +43,10 @@ namespace Orleans.Runtime
         /// </summary>
         public static bool TryParse(GrainType grainType, out GenericGrainType result)
         {
-            if (TypeConverterExtensions.IsGenericType(grainType.Value))
+            var arity = TypeConverterExtensions.GetGenericTypeArity(grainType.Value);
+            if (arity > 0)
             {
-                result = new GenericGrainType(grainType);
+                result = new GenericGrainType(grainType, arity);
                 return true;
             }
 
@@ -50,7 +60,7 @@ namespace Orleans.Runtime
         public GenericGrainType GetUnconstructedGrainType()
         {
             var generic = TypeConverterExtensions.GetDeconstructed(GrainType.Value);
-            return new GenericGrainType(new GrainType(generic));
+            return new GenericGrainType(new GrainType(generic), Arity);
         }
 
         /// <summary>
@@ -58,13 +68,21 @@ namespace Orleans.Runtime
         /// </summary>
         public GenericGrainType Construct(TypeConverter formatter, params Type[] typeArguments)
         {
+            if (Arity != typeArguments.Length)
+            {
+                ThrowIncorrectArgumentLength(typeArguments);
+            }
+
             var constructed = formatter.GetConstructed(this.GrainType.Value, typeArguments);
-            return new GenericGrainType(new GrainType(constructed));
+            return new GenericGrainType(new GrainType(constructed), Arity);
         }
+
         /// <summary>
-        /// Returns the type arguments which this instance was constructed with.
+        /// Gets the type arguments using the provided type converter.
         /// </summary>
-        public Type[] GetArguments(TypeConverter formatter) => formatter.GetArguments(this.GrainType.Value);
+        /// <param name="converter">The type converter</param>
+        /// <returns>The type arguments.</returns>
+        public Type[] GetArguments(TypeConverter converter) => converter.GetArguments(this.GrainType.Value);
 
         /// <inheritdoc/>
         public override string ToString() => this.GrainType.ToString();
@@ -77,5 +95,8 @@ namespace Orleans.Runtime
 
         /// <inheritdoc/>
         public override int GetHashCode() => this.GrainType.GetHashCode();
+
+        [DoesNotReturn]
+        private void ThrowIncorrectArgumentLength(Type[] typeArguments) => throw new ArgumentException($"Incorrect number of type arguments, {typeArguments.Length}, to construct a generic grain type with arity {Arity}.", nameof(typeArguments));
     }
 }

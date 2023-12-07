@@ -34,6 +34,7 @@ namespace Orleans.Streams
         /// </summary>
         /// <param name="info">The serialization info.</param>
         /// <param name="context">The context.</param>
+        [Obsolete]
         protected DataNotAvailableException(SerializationInfo info, StreamingContext context)
             : base(info, context)
         {
@@ -70,6 +71,7 @@ namespace Orleans.Streams
         /// </summary>
         /// <param name="info">The serialization info.</param>
         /// <param name="context">The context.</param>
+        [Obsolete]
         private CacheFullException(SerializationInfo info, StreamingContext context)
             : base(info, context)
         {

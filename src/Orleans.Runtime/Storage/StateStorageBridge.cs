@@ -23,7 +23,7 @@ namespace Orleans.Core
         private readonly IGrainContext _grainContext;
         private readonly IGrainStorage _store;
         private readonly ILogger _logger;
-        private readonly IActivator<TState>? _activator;
+        private readonly IActivator<TState> _activator;
         private GrainState<TState>? _grainState;
 
         /// <inheritdoc/>
@@ -42,7 +42,7 @@ namespace Orleans.Core
             }
         }
 
-        private GrainState<TState> GrainState => _grainState ??= new GrainState<TState>(CreateInstance());
+        private GrainState<TState> GrainState => _grainState ??= new GrainState<TState>(_activator.Create());
         internal bool IsStateInitialized => _grainState != null;
 
         /// <inheritdoc/>
@@ -63,11 +63,7 @@ namespace Orleans.Core
             _name = name;
             _grainContext = grainContext;
             _store = store;
-
-            if (!typeof(TState).IsValueType)
-            {
-                _activator = activatorProvider.GetActivator<TState>();
-            }
+            _activator = activatorProvider.GetActivator<TState>();
         }
 
         /// <inheritdoc />
@@ -119,7 +115,7 @@ namespace Orleans.Core
                 sw.Stop();
 
                 // Reset the in-memory copy of the state
-                GrainState.State = CreateInstance();
+                GrainState.State = _activator.Create();
 
                 // Update counters
                 StorageInstruments.OnStorageDelete(sw.Elapsed);
@@ -179,10 +175,5 @@ namespace Orleans.Core
 
             ExceptionDispatchInfo.Throw(exception);
         }
-
-        private TState CreateInstance()
-            => _activator is not null
-                ? _activator.Create()
-                : Activator.CreateInstance<TState>();
     }
 }

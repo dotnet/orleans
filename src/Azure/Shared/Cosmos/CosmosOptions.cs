@@ -1,3 +1,4 @@
+using System.Net;
 using Azure;
 using Azure.Core;
 
@@ -21,7 +22,7 @@ namespace Orleans.GrainDirectory.Cosmos;
 public abstract class CosmosOptions
 {
     /// <summary>
-    /// Tries to create the database and container used for clustering if it does not exist.
+    /// Tries to create the database and container used for clustering if it does not exist. Defaults to <see langword="false"/>.
     /// </summary>
     public bool IsResourceCreationEnabled { get; set; }
 
@@ -32,7 +33,7 @@ public abstract class CosmosOptions
     public int? DatabaseThroughput { get; set; }
 
     /// <summary>
-    /// The name of the database to use for clustering information.
+    /// The name of the database to use for clustering information. Defaults to <c>Orleans</c>.
     /// </summary>
     public string DatabaseName { get; set; } = "Orleans";
 
@@ -54,9 +55,14 @@ public abstract class CosmosOptions
     public bool CleanResourcesOnInitialization { get; set; }
 
     /// <summary>
-    /// The options passed to the Cosmos DB client, or <see langword="null"/> to use default options.
+    /// The options passed to the Cosmos DB client.
     /// </summary>
-    public CosmosClientOptions? ClientOptions { get; set; }
+    public CosmosClientOptions ClientOptions { get; set; } = new();
+
+    /// <summary>
+    /// The operation executor used to execute operations using the Cosmos DB client.
+    /// </summary>
+    public ICosmosOperationExecutor OperationExecutor { get; set; } = DefaultCosmosOperationExecutor.Instance;
 
     /// <summary>
     /// Configures the Cosmos DB client.
@@ -114,4 +120,48 @@ public abstract class CosmosOptions
     /// Factory method for creating a <see cref="CosmosClient"/>.
     /// </summary>
     internal Func<IServiceProvider, ValueTask<CosmosClient>> CreateClient { get; private set; } = null!;
+}
+
+/// <summary>
+/// Functionality for executing operations using the Cosmos DB client.
+/// </summary>
+public interface ICosmosOperationExecutor
+{
+    /// <summary>
+    /// Executes the provided Cosmos DB operation.
+    /// </summary>
+    /// <typeparam name="TArg">The function argument.</typeparam>
+    /// <typeparam name="TResult">The result value.</typeparam>
+    /// <param name="func">The delegate to execute.</param>
+    /// <param name="arg">The argument to pass to delegate invocations.</param>
+    /// <returns>The result of invoking the delegate.</returns>
+    Task<TResult> ExecuteOperation<TArg, TResult>(Func<TArg, Task<TResult>> func, TArg arg);
+}
+
+internal sealed class DefaultCosmosOperationExecutor : ICosmosOperationExecutor
+{
+    public static readonly DefaultCosmosOperationExecutor Instance = new();
+    private const HttpStatusCode TOO_MANY_REQUESTS = (HttpStatusCode)429;
+    public async Task<TResult> ExecuteOperation<TArg, TResult>(Func<TArg, Task<TResult>> func, TArg arg)
+    {
+        // From:  https://blogs.msdn.microsoft.com/bigdatasupport/2015/09/02/dealing-with-requestratetoolarge-errors-in-azure-documentdb-and-testing-performance/
+        while (true)
+        {
+            TimeSpan sleepTime;
+            try
+            {
+                return await func(arg).ConfigureAwait(false);
+            }
+            catch (CosmosException dce) when (dce.StatusCode == TOO_MANY_REQUESTS)
+            {
+                sleepTime = dce.RetryAfter ?? TimeSpan.Zero;
+            }
+            catch (AggregateException ae) when (ae.InnerException is CosmosException dce && dce.StatusCode == TOO_MANY_REQUESTS)
+            {
+                sleepTime = dce.RetryAfter ?? TimeSpan.Zero;
+            }
+
+            await Task.Delay(sleepTime);
+        }
+    }
 }

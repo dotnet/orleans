@@ -12,6 +12,7 @@
   <ItemGroup>
     <PackageReference Include="CsCheck" />
     <PackageReference Include="xunit" />
+    <PackageReference Include="xunit.extensibility.core" />
     <PackageReference Include="xunit.runner.visualstudio" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" />
     <PackageReference Include="Newtonsoft.Json" />

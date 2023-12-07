@@ -86,7 +86,7 @@ namespace Orleans
 
             if (GenericGrainType.TryParse(result, out var genericGrainType) && !genericGrainType.IsConstructed)
             {
-                result = genericGrainType.GrainType.GetConstructed(genericInterface.Value);
+                result = genericGrainType.GetConstructed(genericInterface);
             }
 
             return result;
@@ -149,7 +149,7 @@ namespace Orleans
                         }
                         else
                         {
-                            result = genericGrainType.GrainType.GetConstructed(genericInterface.Value);
+                            result = genericGrainType.GetConstructed(genericInterface);
                         }
                     }
                     else

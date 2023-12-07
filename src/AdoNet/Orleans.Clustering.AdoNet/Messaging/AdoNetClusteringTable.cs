@@ -100,7 +100,7 @@ namespace Orleans.Runtime.MembershipService
                 if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug("AdoNetClusteringTable.InsertRow aborted due to null check. MembershipEntry is null.");
                 throw new ArgumentNullException(nameof(entry));
             }
-            if (tableVersion == null)
+            if (tableVersion is null)
             {
                 if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug("AdoNetClusteringTable.InsertRow aborted due to null check. TableVersion is null ");
                 throw new ArgumentNullException(nameof(tableVersion));
@@ -132,7 +132,7 @@ namespace Orleans.Runtime.MembershipService
                 if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug("AdoNetClusteringTable.UpdateRow aborted due to null check. MembershipEntry is null.");
                 throw new ArgumentNullException(nameof(entry));
             }
-            if (tableVersion == null)
+            if (tableVersion is null)
             {
                 if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug("AdoNetClusteringTable.UpdateRow aborted due to null check. TableVersion is null");
                 throw new ArgumentNullException(nameof(tableVersion));

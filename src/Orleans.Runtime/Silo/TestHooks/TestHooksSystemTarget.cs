@@ -71,18 +71,12 @@ namespace Orleans.Runtime.TestHooks
 
         public Task<bool> HasStorageProvider(string providerName)
         {
-            return Task.FromResult(this.serviceProvider.GetServiceByName<IGrainStorage>(providerName) != null);
+            return Task.FromResult(this.serviceProvider.GetKeyedService<IGrainStorage>(providerName) != null);
         }
 
         public Task<bool> HasStreamProvider(string providerName)
         {
-            return Task.FromResult(this.serviceProvider.GetServiceByName<IGrainStorage>(providerName) != null);
-        }
-
-        public Task<ICollection<string>> GetStorageProviderNames()
-        {
-            var storageProviderCollection = this.serviceProvider.GetRequiredService<IKeyedServiceCollection<string, IGrainStorage>>();
-            return Task.FromResult<ICollection<string>>(storageProviderCollection.GetServices(this.serviceProvider).Select(keyedService => keyedService.Key).ToArray());
+            return Task.FromResult(this.serviceProvider.GetKeyedService<IGrainStorage>(providerName) != null);
         }
 
         public Task<int> UnregisterGrainForTesting(GrainId grain) => Task.FromResult(this.serviceProvider.GetRequiredService<Catalog>().UnregisterGrainForTesting(grain));

@@ -8,9 +8,9 @@ namespace Orleans.CodeGenerator
     internal class MetadataModel
     {
         public List<ISerializableTypeDescription> SerializableTypes { get; } = new(1024);
-        public List<InvokableInterfaceDescription> InvokableInterfaces { get; } = new(1024);
+        public Dictionary<INamedTypeSymbol, ProxyInterfaceDescription> InvokableInterfaces { get; } = new(SymbolEqualityComparer.Default);
         public List<INamedTypeSymbol> InvokableInterfaceImplementations { get; } = new(1024);
-        public Dictionary<MethodDescription, GeneratedInvokerDescription> GeneratedInvokables { get; } = new();
+        public Dictionary<InvokableMethodId, GeneratedInvokableDescription> GeneratedInvokables { get; } = new();
         public List<GeneratedProxyDescription> GeneratedProxies { get; } = new(1024);
         public List<ISerializableTypeDescription> ActivatableTypes { get; } = new(1024);
         public List<INamedTypeSymbol> DetectedSerializers { get; } = new();
@@ -22,6 +22,7 @@ namespace Orleans.CodeGenerator
         public CompoundTypeAliasTree CompoundTypeAliases { get; } = CompoundTypeAliasTree.Create();
         public List<(TypeSyntax Type, uint Id)> WellKnownTypeIds { get; } = new(1024);
         public HashSet<string> ApplicationParts { get; } = new();
+        internal Dictionary<INamedTypeSymbol, Dictionary<INamedTypeSymbol, INamedTypeSymbol>> ProxyBaseTypeInvokableBaseTypes { get; } = new (SymbolEqualityComparer.Default);
     }
 
     /// <summary>
@@ -133,7 +134,7 @@ namespace Orleans.CodeGenerator
             {
                 if (value is not null && existing.Value is not null)
                 {
-                    throw new ArgumentException("A key with this value already exists");
+                    throw new ArgumentException($"A key with the value '{key}' already exists. Existing value: '{existing.Value}', new value: '{value}'");
                 }
 
                 existing.Value = value;
@@ -180,6 +181,8 @@ namespace Orleans.CodeGenerator
             public bool Equals(CompoundTypeAliasComponent x, CompoundTypeAliasComponent y) => x.Equals(y);
             public int GetHashCode(CompoundTypeAliasComponent obj) => obj.GetHashCode();
         }
+
+        public override string ToString() => _value.RawValue?.ToString();
     }
 
     internal readonly struct Either<T, U> where T : class where U : class

@@ -15,12 +15,12 @@ namespace Orleans.CodeGenerator
         private INamedTypeSymbol _baseType;
         private TypeSyntax _baseTypeSyntax;
 
-        public SerializableTypeDescription(SemanticModel semanticModel, INamedTypeSymbol type, bool supportsPrimaryConstructorParameters, IEnumerable<IMemberDescription> members, LibraryTypes libraryTypes)
+        public SerializableTypeDescription(Compilation compilation, INamedTypeSymbol type, bool supportsPrimaryConstructorParameters, IEnumerable<IMemberDescription> members, LibraryTypes libraryTypes)
         {
             Type = type;
             IncludePrimaryConstructorParameters = supportsPrimaryConstructorParameters;
             Members = members.ToList();
-            SemanticModel = semanticModel;
+            Compilation = compilation;
             _libraryTypes = libraryTypes;
 
             var t = type;
@@ -146,7 +146,7 @@ namespace Orleans.CodeGenerator
         public List<(string Name, ITypeParameterSymbol Parameter)> TypeParameters { get; }
 
         public List<IMemberDescription> Members { get; }
-        public SemanticModel SemanticModel { get; }
+        public Compilation Compilation { get; }
         public List<TypeSyntax> ActivatorConstructorParameters { get; }
 
         public bool IsEmptyConstructable
@@ -195,7 +195,7 @@ namespace Orleans.CodeGenerator
 
         public bool UseActivator => Type.HasAttribute(_libraryTypes.UseActivatorAttribute) || !IsEmptyConstructable || HasActivatorConstructor;
 
-        public bool TrackReferences => !IsValueType && !Type.HasAttribute(_libraryTypes.SuppressReferenceTrackingAttribute);
+        public bool TrackReferences => !IsValueType && !IsExceptionType && !Type.HasAttribute(_libraryTypes.SuppressReferenceTrackingAttribute);
         public bool OmitDefaultMemberValues => Type.HasAttribute(_libraryTypes.OmitDefaultMemberValuesAttribute);
 
         public List<INamedTypeSymbol> SerializationHooks { get; }
@@ -208,7 +208,7 @@ namespace Orleans.CodeGenerator
 
         public bool IsExceptionType => Type.HasBaseType(_libraryTypes.Exception);
 
-        public ExpressionSyntax GetObjectCreationExpression(LibraryTypes libraryTypes)
+        public ExpressionSyntax GetObjectCreationExpression()
         {
             if (IsValueType)
             {
@@ -241,7 +241,7 @@ namespace Orleans.CodeGenerator
             {
                 return CastExpression(
                     TypeSyntax,
-                    InvocationExpression(libraryTypes.RuntimeHelpers.ToTypeSyntax().Member("GetUninitializedObject"))
+                    InvocationExpression(_libraryTypes.RuntimeHelpers.ToTypeSyntax().Member("GetUninitializedObject"))
                         .AddArgumentListArguments(
                             Argument(TypeOfExpression(TypeSyntax))));
             }

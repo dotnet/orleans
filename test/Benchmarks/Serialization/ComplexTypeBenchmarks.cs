@@ -107,7 +107,6 @@ namespace Benchmarks
             _structCopier.Copy(_structValue); 
         }
 
-        [Fact]
         [Benchmark]
         public SimpleStruct OrleansStructRoundTrip()
         {
@@ -137,7 +136,6 @@ namespace Benchmarks
         }
         */
 
-        [Fact]
         //[Benchmark]
         public object OrleansClassRoundTrip()
         {
@@ -171,7 +169,6 @@ namespace Benchmarks
         }
         */
 
-        [Fact]
         //[Benchmark]
         public object OrleansSerialize()
         {
@@ -182,7 +179,6 @@ namespace Benchmarks
             return _session;
         }
 
-        [Fact]
         //[Benchmark]
         public object OrleansDeserialize()
         {
@@ -191,7 +187,6 @@ namespace Benchmarks
             return _serializer.Deserialize(ref reader);
         }
 
-        [Fact]
         //[Benchmark]
         public int OrleansReadEachByte()
         {

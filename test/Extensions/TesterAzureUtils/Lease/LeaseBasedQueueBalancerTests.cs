@@ -94,7 +94,7 @@ namespace Tester.AzureUtils.Lease
             bool pass;
             try
             {
-                object[] agentStarted = await mgmtGrain.SendControlCommandToProvider(typeof(PersistentStreamProvider).FullName, StreamProviderName, (int)PersistentStreamProviderCommand.GetNumberRunningAgents);
+                object[] agentStarted = await mgmtGrain.SendControlCommandToProvider<PersistentStreamProvider>(StreamProviderName, (int)PersistentStreamProviderCommand.GetNumberRunningAgents, null);
                 int[] counts = agentStarted.Select(startedAgentInEachSilo => Convert.ToInt32(startedAgentInEachSilo)).ToArray();
                 int sum = counts.Sum();
                 pass = totalQueueCount == sum &&

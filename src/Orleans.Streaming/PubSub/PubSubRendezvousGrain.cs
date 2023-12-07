@@ -46,7 +46,7 @@ namespace Orleans.Streams
                 _logger.LogDebug("Trying to find storage provider {ProviderName}", providerName);
             }
 
-            var storage = _serviceProvider.GetServiceByName<IGrainStorage>(providerName);
+            var storage = _serviceProvider.GetKeyedService<IGrainStorage>(providerName);
             if (storage == null)
             {
                 if (_logger.IsEnabled(LogLevel.Debug))
@@ -54,7 +54,7 @@ namespace Orleans.Streams
                     _logger.LogDebug("Fallback to storage provider {ProviderName}", ProviderConstants.DEFAULT_PUBSUB_PROVIDER_NAME);
                 }
 
-                storage = _serviceProvider.GetRequiredServiceByName<IGrainStorage>(ProviderConstants.DEFAULT_PUBSUB_PROVIDER_NAME);
+                storage = _serviceProvider.GetRequiredKeyedService<IGrainStorage>(ProviderConstants.DEFAULT_PUBSUB_PROVIDER_NAME);
             }
 
             var activatorProvider = _serviceProvider.GetRequiredService<IActivatorProvider>();

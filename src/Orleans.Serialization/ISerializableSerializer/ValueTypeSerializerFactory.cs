@@ -12,7 +12,9 @@ namespace Orleans.Serialization
         private readonly SerializationCallbacksFactory _callbacksFactory;
         private readonly SerializationEntryCodec _entrySerializer;
         private readonly StreamingContext _streamingContext;
+#pragma warning disable SYSLIB0050 // Type or member is obsolete
         private readonly IFormatterConverter _formatterConverter;
+#pragma warning restore SYSLIB0050 // Type or member is obsolete
         private readonly Func<Type, ValueTypeSerializer> _createSerializerDelegate;
 
         private readonly ConcurrentDictionary<Type, ValueTypeSerializer> _serializers = new();
@@ -26,7 +28,9 @@ namespace Orleans.Serialization
             SerializationEntryCodec entrySerializer,
             SerializationConstructorFactory constructorFactory,
             SerializationCallbacksFactory callbacksFactory,
+#pragma warning disable SYSLIB0050 // Type or member is obsolete
             IFormatterConverter formatterConverter,
+#pragma warning restore SYSLIB0050 // Type or member is obsolete
             StreamingContext streamingContext)
         {
             _constructorFactory = constructorFactory;

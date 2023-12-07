@@ -366,7 +366,7 @@ namespace Orleans.Runtime
                     return result;
                 }
 
-                var implementation = this.ActivationServices.GetServiceByKey<Type, IGrainExtension>(typeof(TExtensionInterface));
+                var implementation = this.ActivationServices.GetKeyedService<IGrainExtension>(typeof(TExtensionInterface));
                 if (implementation is null)
                 {
                     throw new GrainExtensionNotInstalledException($"No extension of type {typeof(TExtensionInterface)} is installed on this instance and no implementations are registered for automated install");

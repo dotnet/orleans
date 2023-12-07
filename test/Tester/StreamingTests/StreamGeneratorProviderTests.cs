@@ -1,3 +1,4 @@
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Orleans.Configuration;
 using Orleans.Providers.Streams.Generator;
@@ -40,7 +41,7 @@ namespace UnitTests.StreamingTests
                 {
                     hostBuilder
                         .ConfigureLogging(logging => logging.AddDebug())
-                        .ConfigureServices(services => services.AddSingletonNamedService<IStreamGeneratorConfig>(StreamProviderName, (s, n) => GeneratorConfig))
+                        .ConfigureServices(services => services.AddKeyedSingleton<IStreamGeneratorConfig>(StreamProviderName, (s, n) => GeneratorConfig))
                         .AddPersistentStreams(
                             StreamProviderName,
                             GeneratorAdapterFactory.Create,

@@ -3,10 +3,27 @@ namespace UnitTests.FSharpTypes
 open Orleans
 
 [<Immutable; GenerateSerializer>]
-type SingleCaseDU = 
-    | SingleCaseDU of int 
-    | OtherCase of string
-    static member ofInt i = SingleCaseDU i
+type SingleCaseDU =
+    | Case1 of int
+    static member ofInt i = Case1 i
+
+[<Immutable; GenerateSerializer>]
+type DoubleCaseDU =
+    | Case1 of string
+    | Case2 of int
+
+[<Immutable; GenerateSerializer>]
+type TripleCaseDU =
+    | Case1 of string
+    | Case2 of int
+    | Case3 of char
+
+[<Immutable; GenerateSerializer>]
+type QuadrupleCaseDU =
+    | Case1 of string
+    | Case2 of int
+    | Case3 of char
+    | Case4 of byte
 
 [<Immutable; GenerateSerializer>]
 type Record = {  [<Id(1u)>] A: SingleCaseDU } with

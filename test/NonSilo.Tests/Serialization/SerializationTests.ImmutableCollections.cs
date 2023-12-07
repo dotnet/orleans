@@ -43,7 +43,7 @@ namespace UnitTests.Serialization
         {
             var input = default(ImmutableArray<int>);
             var output = this.fixture.Serializer.RoundTripSerializationForTesting(input);
-            Assert.Equal(input, output);
+            Assert.Equal(input.IsDefault, output.IsDefault);
         }
 
         [Fact, TestCategory("BVT"), TestCategory("ImmutableCollections"), TestCategory("Serialization")]

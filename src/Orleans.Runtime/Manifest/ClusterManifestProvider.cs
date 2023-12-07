@@ -42,11 +42,9 @@ namespace Orleans.Runtime.Metadata
                 ImmutableDictionary.CreateRange(new[] { new KeyValuePair<SiloAddress, GrainManifest>(localSiloDetails.SiloAddress, this.LocalGrainManifest) }),
                 ImmutableArray.Create(this.LocalGrainManifest));
             _updates = new AsyncEnumerable<ClusterManifest>(
-                (previous, proposed) => previous.Version <= MajorMinorVersion.Zero || proposed.Version > previous.Version,
-                _current)
-            {
-                OnPublished = update => Interlocked.Exchange(ref _current, update)
-            };
+                initialValue: _current,
+                updateValidator: (previous, proposed) => proposed.Version > previous.Version,
+                onPublished: update => Interlocked.Exchange(ref _current, update));
         }
 
         public ClusterManifest Current => _current;

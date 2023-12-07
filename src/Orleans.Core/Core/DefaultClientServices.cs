@@ -87,7 +87,6 @@ namespace Orleans
             services.AddTransient<IOptions<MessagingOptions>>(static sp => sp.GetRequiredService<IOptions<ClientMessagingOptions>>());
 
             services.AddSingleton<IConfigureOptions<GrainTypeOptions>, DefaultGrainTypeOptionsProvider>();
-            services.TryAddSingleton(typeof(IKeyedServiceCollection<,>), typeof(KeyedServiceCollection<,>));
 
             // Add default option formatter if none is configured, for options which are required to be configured
             services.ConfigureFormatter<ClusterOptions>();
@@ -109,7 +108,7 @@ namespace Orleans
             services.TryAddSingleton<ConnectionPreambleHelper>();
             services.AddSingleton<ILifecycleParticipant<IClusterClientLifecycle>, ConnectionManagerLifecycleAdapter<IClusterClientLifecycle>>();
 
-            services.AddSingletonKeyedService<object, IConnectionFactory>(
+            services.AddKeyedSingleton<IConnectionFactory>(
                 ClientOutboundConnectionFactory.ServicesKey,
                 (sp, key) => ActivatorUtilities.CreateInstance<SocketConnectionFactory>(sp));
 

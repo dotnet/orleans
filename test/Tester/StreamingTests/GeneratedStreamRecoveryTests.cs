@@ -85,7 +85,7 @@ namespace UnitTests.StreamingTests
             };
 
             var mgmt = this.fixture.GrainFactory.GetGrain<IManagementGrain>(0);
-            object[] results = await mgmt.SendControlCommandToProvider(StreamProviderTypeName, Fixture.StreamProviderName, (int)StreamGeneratorCommand.Configure, generatorConfig);
+            object[] results = await mgmt.SendControlCommandToProvider<PersistentStreamProvider>(Fixture.StreamProviderName, (int)StreamGeneratorCommand.Configure, generatorConfig);
             Assert.Equal(2, results.Length);
             bool[] bResults = results.Cast<bool>().ToArray();
             foreach (var result in bResults)

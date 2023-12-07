@@ -79,7 +79,7 @@ namespace ServiceBus.Tests.SlowConsumingTests
             //configure data generator for stream and start producing
             var mgmtGrain = this.fixture.GrainFactory.GetGrain<IManagementGrain>(0);
             var randomStreamPlacementArg = new EventDataGeneratorAdapterFactory.StreamRandomPlacementArg(streamId, this.seed.Next(100));
-            await mgmtGrain.SendControlCommandToProvider(typeof(PersistentStreamProvider).FullName, StreamProviderName,
+            await mgmtGrain.SendControlCommandToProvider<PersistentStreamProvider>(StreamProviderName,
                 (int)EventDataGeneratorAdapterFactory.Commands.Randomly_Place_Stream_To_Queue, randomStreamPlacementArg);
             //since there's an extreme slow consumer, so the back pressure algorithm should be triggered
             await TestingUtils.WaitUntilAsync(lastTry => AssertCacheBackPressureTriggered(true, lastTry), timeout);
@@ -93,7 +93,7 @@ namespace ServiceBus.Tests.SlowConsumingTests
 
             //clean up test
             await StopHealthyConsumerGrainComing(healthyConsumers);
-            await mgmtGrain.SendControlCommandToProvider(typeof(PersistentStreamProvider).FullName, StreamProviderName,
+            await mgmtGrain.SendControlCommandToProvider<PersistentStreamProvider>(StreamProviderName,
                 (int)EventDataGeneratorAdapterFactory.Commands.Stop_Producing_On_Stream, streamId);
         }
 
@@ -139,7 +139,7 @@ namespace ServiceBus.Tests.SlowConsumingTests
         private async Task<bool> IsBackPressureTriggered()
         {
             IManagementGrain mgmtGrain = this.fixture.HostedCluster.GrainFactory.GetGrain<IManagementGrain>(0);
-            object[] replies = await mgmtGrain.SendControlCommandToProvider(typeof(PersistentStreamProvider).FullName,
+            object[] replies = await mgmtGrain.SendControlCommandToProvider<PersistentStreamProvider>(
                              StreamProviderName, EHStreamProviderWithCreatedCacheListAdapterFactory.IsCacheBackPressureTriggeredCommand, null);
             foreach (var re in replies)
             {

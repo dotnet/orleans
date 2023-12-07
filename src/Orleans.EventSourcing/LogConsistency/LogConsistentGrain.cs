@@ -93,7 +93,7 @@ namespace Orleans.EventSourcing
             var attr = this.GetType().GetCustomAttributes<LogConsistencyProviderAttribute>(true).FirstOrDefault();
 
             ILogViewAdaptorFactory defaultFactory = attr != null
-                ? this.ServiceProvider.GetServiceByName<ILogViewAdaptorFactory>(attr.ProviderName)
+                ? this.ServiceProvider.GetKeyedService<ILogViewAdaptorFactory>(attr.ProviderName)
                 : this.ServiceProvider.GetService<ILogViewAdaptorFactory>();
             if (attr != null && defaultFactory == null)
             {

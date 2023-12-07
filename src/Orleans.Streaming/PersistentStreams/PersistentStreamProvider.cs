@@ -103,7 +103,7 @@ namespace Orleans.Providers.Streams.Common
         private async Task Init(CancellationToken token) 
         {
             if(!this.stateManager.PresetState(ProviderState.Initialized)) return;
-            this.adapterFactory = this.runtime.ServiceProvider.GetRequiredServiceByName<IQueueAdapterFactory>(this.Name);
+            this.adapterFactory = this.runtime.ServiceProvider.GetRequiredKeyedService<IQueueAdapterFactory>(this.Name);
             this.queueAdapter = await adapterFactory.CreateAdapter();
 
             if (this.pubsubOptions.PubSubType == StreamPubSubType.ExplicitGrainBasedAndImplicit 
@@ -222,7 +222,7 @@ namespace Orleans.Providers.Streams.Common
         public static ILifecycleParticipant<TLifecycle> ParticipateIn<TLifecycle>(IServiceProvider serviceProvider, string name)
             where TLifecycle : ILifecycleObservable
         {
-            var provider = (PersistentStreamProvider)serviceProvider.GetRequiredServiceByName<IStreamProvider>(name);
+            var provider = (PersistentStreamProvider)serviceProvider.GetRequiredKeyedService<IStreamProvider>(name);
             return provider.ParticipateIn<TLifecycle>();
         }
     }

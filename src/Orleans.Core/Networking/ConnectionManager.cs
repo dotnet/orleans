@@ -325,7 +325,7 @@ namespace Orleans.Runtime.Messaging
             ThreadPool.UnsafeQueueUserWorkItem(state =>
             {
                 var (t, address, connection) = ((ConnectionManager, SiloAddress, Connection))state;
-                _ = t.RunConnectionAsync(address, connection);
+                t.RunConnectionAsync(address, connection).Ignore();
             }, (this, address, connection));
         }
 

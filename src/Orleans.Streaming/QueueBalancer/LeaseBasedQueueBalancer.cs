@@ -74,7 +74,7 @@ namespace Orleans.Streams
         public static IStreamQueueBalancer Create(IServiceProvider services, string name)
         {
             var options = services.GetOptionsByName<LeaseBasedQueueBalancerOptions>(name);
-            var leaseProvider = services.GetServiceByName<ILeaseProvider>(name)
+            var leaseProvider = services.GetKeyedService<ILeaseProvider>(name)
                 ?? services.GetRequiredService<ILeaseProvider>();
             return ActivatorUtilities.CreateInstance<LeaseBasedQueueBalancer>(services, name, options, leaseProvider);
         }

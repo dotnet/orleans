@@ -39,6 +39,7 @@ namespace Orleans.Streams
         /// </summary>
         /// <param name="info">The serialization info.</param>
         /// <param name="context">The context.</param>
+        [Obsolete]
         private ProviderStartException(SerializationInfo info, StreamingContext context)
             : base(info, context)
         { }

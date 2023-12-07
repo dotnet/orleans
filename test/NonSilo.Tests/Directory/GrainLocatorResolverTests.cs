@@ -12,6 +12,7 @@ using Orleans.GrainDirectory;
 using Orleans.Hosting;
 using Orleans.Runtime;
 using Orleans.Runtime.GrainDirectory;
+using Orleans.Runtime.Hosting;
 using TestExtensions;
 using UnitTests.Grains.Directories;
 using Xunit;
@@ -35,7 +36,7 @@ namespace NonSilo.Tests.Directory
             {
                 siloBuilder
                     .ConfigureServices(svc => svc.AddSingleton(Substitute.For<DhtGrainLocator>(null, null)))
-                    .ConfigureServices(svc => svc.AddSingletonNamedService(CustomDirectoryGrain.DIRECTORY, (sp, nameof) => this.customDirectory))
+                    .ConfigureServices(svc => svc.AddGrainDirectory(CustomDirectoryGrain.DIRECTORY, (sp, nameof) => this.customDirectory))
                     .ConfigureLogging(builder => builder.AddProvider(new XunitLoggerProvider(output)))
                     .UseLocalhostClustering();
             });

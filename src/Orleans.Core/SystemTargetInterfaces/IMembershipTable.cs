@@ -109,7 +109,7 @@ namespace Orleans
     }
 
     [Serializable, GenerateSerializer, Immutable]
-    public sealed class TableVersion : ISpanFormattable
+    public sealed class TableVersion : ISpanFormattable, IEquatable<TableVersion>
     {
         /// <summary>
         /// The version part of this TableVersion. Monotonically increasing number.
@@ -129,16 +129,19 @@ namespace Orleans
             VersionEtag = eTag;
         }
 
-        public TableVersion Next()
-        {
-            return new TableVersion(Version + 1, VersionEtag);
-        }
+        public TableVersion Next() => new (Version + 1, VersionEtag);
 
         public override string ToString() => $"<{Version}, {VersionEtag}>";
         string IFormattable.ToString(string format, IFormatProvider formatProvider) => ToString();
 
         bool ISpanFormattable.TryFormat(Span<char> destination, out int charsWritten, ReadOnlySpan<char> format, IFormatProvider provider)
             => destination.TryWrite($"<{Version}, {VersionEtag}>", out charsWritten);
+
+        public override bool Equals(object obj) => Equals(obj as TableVersion);
+        public override int GetHashCode() => HashCode.Combine(Version, VersionEtag);
+        public bool Equals(TableVersion other) => other is not null && Version == other.Version && VersionEtag == other.VersionEtag;
+        public static bool operator ==(TableVersion left, TableVersion right) => EqualityComparer<TableVersion>.Default.Equals(left, right);
+        public static bool operator !=(TableVersion left, TableVersion right) => !(left == right);
     }
 
     [Serializable]

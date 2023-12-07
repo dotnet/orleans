@@ -21,7 +21,7 @@ namespace Orleans.Runtime
         public IPersistentState<TState> Create<TState>(IGrainContext context, IPersistentStateConfiguration cfg)
         {
             var storageProvider = !string.IsNullOrWhiteSpace(cfg.StorageName)
-                ? context.ActivationServices.GetServiceByName<IGrainStorage>(cfg.StorageName)
+                ? context.ActivationServices.GetKeyedService<IGrainStorage>(cfg.StorageName)
                 : context.ActivationServices.GetService<IGrainStorage>();
             if (storageProvider == null)
             {

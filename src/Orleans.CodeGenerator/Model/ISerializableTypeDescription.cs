@@ -22,13 +22,13 @@ namespace Orleans.CodeGenerator
         bool IsGenericType { get; }
         List<(string Name, ITypeParameterSymbol Parameter)> TypeParameters { get; }
         List<IMemberDescription> Members { get; }
-        SemanticModel SemanticModel { get; }
+        Compilation Compilation { get; }
         bool UseActivator { get; }
         bool IsEmptyConstructable { get; }
         bool HasActivatorConstructor { get; }
         bool TrackReferences { get; }
         bool OmitDefaultMemberValues { get; }
-        ExpressionSyntax GetObjectCreationExpression(LibraryTypes libraryTypes);
+        ExpressionSyntax GetObjectCreationExpression();
         List<INamedTypeSymbol> SerializationHooks { get; }
         bool IsShallowCopyable { get; }
         bool IsUnsealedImmutable { get; }

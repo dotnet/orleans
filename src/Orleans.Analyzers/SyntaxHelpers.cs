@@ -144,5 +144,19 @@ namespace Orleans.Analyzers
             return isFieldOrAutoProperty;
         }
 
+        public static bool ExtendsGrainInterface(this INamedTypeSymbol symbol)
+        {
+            if (symbol.TypeKind != TypeKind.Interface) return false;
+
+            foreach (var interfaceSymbol in symbol.AllInterfaces)
+            {
+                if (Constants.IAddressibleFullyQualifiedName.Equals(interfaceSymbol.ToDisplayString(NullableFlowState.None), StringComparison.Ordinal))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
     }
 }

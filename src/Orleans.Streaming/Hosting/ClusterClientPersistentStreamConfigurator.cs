@@ -1,4 +1,5 @@
 using System;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 using Orleans.Providers.Streams.Common;
@@ -64,7 +65,7 @@ namespace Orleans.Hosting
         {
             clientBuilder.AddStreaming();
             this.ConfigureComponent(PersistentStreamProvider.Create);
-            this.ConfigureComponent(PersistentStreamProvider.ParticipateIn<IClusterClientLifecycle>);
+            this.ConfigureDelegate(services => services.AddSingleton(sp => PersistentStreamProvider.ParticipateIn<IClusterClientLifecycle>(sp, this.Name)));
             this.ConfigureComponent(adapterFactory);
         }
     }

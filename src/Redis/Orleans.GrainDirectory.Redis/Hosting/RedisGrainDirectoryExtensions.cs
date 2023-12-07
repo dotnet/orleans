@@ -5,6 +5,7 @@ using Orleans.Configuration;
 using Orleans.GrainDirectory;
 using Orleans.GrainDirectory.Redis;
 using Orleans.Runtime;
+using Orleans.Runtime.Hosting;
 
 namespace Orleans.Hosting
 {
@@ -64,8 +65,7 @@ namespace Orleans.Hosting
             services
                 .AddTransient<IConfigurationValidator>(sp => new RedisGrainDirectoryOptionsValidator(sp.GetRequiredService<IOptionsMonitor<RedisGrainDirectoryOptions>>().Get(name), name))
                 .ConfigureNamedOptionForLogging<RedisGrainDirectoryOptions>(name)
-                .AddSingletonNamedService<IGrainDirectory>(name, (sp, name) => ActivatorUtilities.CreateInstance<RedisGrainDirectory>(sp, sp.GetOptionsByName<RedisGrainDirectoryOptions>(name)))
-                .AddSingletonNamedService<ILifecycleParticipant<ISiloLifecycle>>(name, (s, n) => (ILifecycleParticipant<ISiloLifecycle>)s.GetRequiredServiceByName<IGrainDirectory>(n));
+                .AddGrainDirectory(name, (sp, key) => ActivatorUtilities.CreateInstance<RedisGrainDirectory>(sp, sp.GetOptionsByName<RedisGrainDirectoryOptions>(key)));
 
             return services;
         }

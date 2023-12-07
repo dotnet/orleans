@@ -24,7 +24,7 @@ namespace Orleans.Runtime.Messaging
             IOptions<ClusterOptions> clusterOptions,
             ConnectionCommon connectionShared,
             ConnectionPreambleHelper connectionPreambleHelper)
-            : base(connectionShared.ServiceProvider.GetRequiredServiceByKey<object, IConnectionFactory>(ServicesKey), connectionShared.ServiceProvider, connectionOptions)
+            : base(connectionShared.ServiceProvider.GetRequiredKeyedService<IConnectionFactory>(ServicesKey), connectionShared.ServiceProvider, connectionOptions)
         {
             this.connectionShared = connectionShared;
             this.clientConnectionOptions = clientConnectionOptions.Value;

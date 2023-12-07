@@ -38,29 +38,6 @@ namespace Orleans.Serialization.UnitTests
             _log = log;
         }
 
-#pragma warning disable SYSLIB0011 // Type or member is obsolete
-        private static object DotNetSerializationLoop(object input)
-        {
-            byte[] bytes;
-            object deserialized;
-            var formatter = new BinaryFormatter
-            {
-                Context = new StreamingContext(StreamingContextStates.All, null)
-            };
-            using (var str = new MemoryStream())
-            {
-                formatter.Serialize(str, input);
-                str.Flush();
-                bytes = str.ToArray();
-            }
-            using (var inStream = new MemoryStream(bytes))
-            {
-                deserialized = formatter.Deserialize(inStream);
-            }
-            return deserialized;
-        }
-#pragma warning restore SYSLIB0011 // Type or member is obsolete
-
         private object SerializationLoop(object original)
         {
             var pipe = new Pipe();
@@ -78,7 +55,7 @@ namespace Orleans.Serialization.UnitTests
                 var output = BitStreamFormatter.Format(ref reader);
                 _log.WriteLine(output);
             }
- 
+
             {
                 using var readerSession = _sessionPool.GetSession();
                 var reader = Reader.Create(readResult.Buffer, readerSession);
@@ -127,17 +104,6 @@ namespace Orleans.Serialization.UnitTests
                 result.History);
             Assert.Equal(input.Payload, result.Payload, StringComparer.Ordinal);
             Assert.Equal(3, result.Contexts.Count);
-
-            // Verify that our behavior conforms to the behavior of BinaryFormatter.
-            var input2 = new SimpleISerializableObject
-            {
-                Payload = "pyjamas"
-            };
-
-            var result2 = (SimpleISerializableObject)DotNetSerializationLoop(input2);
-
-            Assert.Equal(input2.History, input.History);
-            Assert.Equal(result2.History, result.History);
         }
 
         /// <summary>
@@ -163,26 +129,16 @@ namespace Orleans.Serialization.UnitTests
                 result.History);
             Assert.Equal(input.Payload, result.Payload, StringComparer.Ordinal);
             Assert.Equal(2, result.Contexts.Count);
-            //Assert.All(result.Contexts, ctx => Assert.True(ctx.Context is IDeserializationContext));
-
-            // Verify that our behavior conforms to the behavior of BinaryFormatter.
-            var input2 = new SimpleISerializableStruct
-            {
-                Payload = "pyjamas"
-            };
-
-            var result2 = (SimpleISerializableStruct)DotNetSerializationLoop(input2);
-
-            Assert.Equal(input2.History, input.History);
-            Assert.Equal(result2.History, result.History);
         }
-        
+
         private class BaseException : Exception
         {
             public BaseException() { }
 
             public BaseException(string message, Exception innerException) : base(message, innerException) { }
-
+#if NET8_0_OR_GREATER
+            [Obsolete]
+#endif
             protected BaseException(SerializationInfo info, StreamingContext context) : base(info, context)
             {
                 BaseField = (SimpleISerializableObject)info.GetValue("BaseField", typeof(SimpleISerializableObject));
@@ -190,6 +146,9 @@ namespace Orleans.Serialization.UnitTests
 
             public SimpleISerializableObject BaseField { get; set; }
 
+#if NET8_0_OR_GREATER
+            [Obsolete]
+#endif
             public override void GetObjectData(SerializationInfo info, StreamingContext context)
             {
                 base.GetObjectData(info, context);
@@ -205,12 +164,18 @@ namespace Orleans.Serialization.UnitTests
 
             public UnserializableConformingException(string message, Exception innerException) : base(message, innerException) { }
 
+#if NET8_0_OR_GREATER
+            [Obsolete]
+#endif
             protected UnserializableConformingException(SerializationInfo info, StreamingContext context) : base(info, context)
             {
                 SubClassField = info.GetString("SubClassField");
                 SomeObject = info.GetValue("SomeObject", typeof(object));
             }
 
+#if NET8_0_OR_GREATER
+            [Obsolete]
+#endif
             public override void GetObjectData(SerializationInfo info, StreamingContext context)
             {
                 base.GetObjectData(info, context);

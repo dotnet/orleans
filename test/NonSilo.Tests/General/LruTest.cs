@@ -23,6 +23,9 @@ namespace UnitTests
             
             target.Add("2", "two");
             Assert.Equal(2, target.Count);  // "Count wrong after adding two items"
+
+            target.AddOrUpdate("2", "two");
+            Assert.Equal(2, target.Count);  // "Count wrong after updating existing item"
         }
 
         [Fact, TestCategory("BVT"), TestCategory("LRU")]

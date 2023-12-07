@@ -61,7 +61,7 @@ namespace Orleans.Runtime.GrainDirectory
 
         private static void ThrowNotClientGrainId(GrainId grainId) => throw new InvalidOperationException($"{grainId} is not a client id");
 
-        public void CachePlacementDecision(GrainId grainId, SiloAddress siloAddress) { }
+        public void UpdateCache(GrainId grainId, SiloAddress siloAddress) { }
 
         public void InvalidateCache(GrainId grainId) { }
 

@@ -78,6 +78,7 @@ namespace Orleans.Networking.Shared
 
         public SocketConnectionException(string message, Exception innerException) : base(message, innerException) { }
 
+        [Obsolete]
         public SocketConnectionException(SerializationInfo info, StreamingContext context)
             : base(info, context)
         {

@@ -62,6 +62,11 @@ namespace Orleans.Runtime
                 && (_activationId.IsDefault || other._activationId.IsDefault || _activationId.Equals(other._activationId));
         }
 
+        internal static bool MatchesGrainIdAndSilo(GrainAddress address, GrainAddress other)
+        {
+            return other is not null && address.GrainId.Equals(other.GrainId) && (address.SiloAddress?.Equals(other.SiloAddress) ?? other.SiloAddress is null);
+        }
+
         public override int GetHashCode() => HashCode.Combine(SiloAddress, _grainId, _activationId);
 
         public override string ToString() => $"[{nameof(GrainAddress)} GrainId {_grainId}, ActivationId: {_activationId}, SiloAddress: {SiloAddress}]";

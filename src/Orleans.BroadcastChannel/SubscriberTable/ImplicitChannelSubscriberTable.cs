@@ -5,6 +5,7 @@ using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
 using System.Runtime.InteropServices;
+using Microsoft.Extensions.DependencyInjection;
 using Orleans.Metadata;
 using Orleans.Runtime;
 
@@ -90,7 +91,7 @@ namespace Orleans.BroadcastChannel.SubscriberTable
                            $"Channel binding for grain type {binding.GrainType} is missing a \"{WellKnownGrainTypeProperties.ChannelIdMapperKey}\" value");
                     }
 
-                    var channelIdMapper = _serviceProvider.GetServiceByName<IChannelIdMapper>(string.IsNullOrWhiteSpace(mapperName) ? DefaultChannelIdMapper.Name : mapperName);
+                    var channelIdMapper = _serviceProvider.GetKeyedService<IChannelIdMapper>(string.IsNullOrWhiteSpace(mapperName) ? DefaultChannelIdMapper.Name : mapperName);
                     var subscriber = new BroadcastChannelSubscriber(binding, channelIdMapper);
                     newPredicates.Add(new BroadcastChannelSubscriberPredicate(subscriber, predicate));
                 }

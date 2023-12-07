@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Runtime.Serialization;
 using System.Threading.Tasks;
 
@@ -17,6 +17,7 @@ namespace Orleans.Transactions.TestKit.Consistency
     {
         public UserAbort() : base("User aborted transaction") { }
 
+        [Obsolete]
         protected UserAbort(SerializationInfo info, StreamingContext context)
             : base(info, context)
         {

@@ -152,6 +152,7 @@ namespace UnitTests.Grains
         }
     }
 
+    [GrainType("guid-test-grain")]
     internal class GuidTestGrain : Grain, IGuidTestGrain
     {
         private readonly string _id = Guid.NewGuid().ToString();
@@ -200,6 +201,8 @@ namespace UnitTests.Grains
         {
             return Task.FromResult(_id);
         }
+
+        public Task<SiloAddress> GetSiloAddress() => Task.FromResult(ServiceProvider.GetRequiredService<ILocalSiloDetails>().SiloAddress);
     }
 
     internal class OneWayGrain : Grain, IOneWayGrain, ISimpleGrainObserver

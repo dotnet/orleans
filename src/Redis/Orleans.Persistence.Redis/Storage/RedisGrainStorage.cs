@@ -19,7 +19,7 @@ namespace Orleans.Persistence
     /// <summary>
     /// Redis-based grain storage provider
     /// </summary>
-    internal class RedisGrainStorage : IGrainStorage, ILifecycleParticipant<ISiloLifecycle>
+    public class RedisGrainStorage : IGrainStorage, ILifecycleParticipant<ISiloLifecycle>
     {
         private readonly string _serviceId;
         private readonly RedisValue _ttl;

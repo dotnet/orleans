@@ -23,7 +23,9 @@ namespace Orleans.Serialization
         private readonly SerializationCallbacksFactory _serializationCallbacks;
         private readonly Func<Type, Action<object, SerializationInfo, StreamingContext>> _createConstructorDelegate;
         private readonly ConcurrentDictionary<Type, Action<object, SerializationInfo, StreamingContext>> _constructors = new();
+#pragma warning disable SYSLIB0050 // Type or member is obsolete
         private readonly IFormatterConverter _formatterConverter;
+#pragma warning restore SYSLIB0050 // Type or member is obsolete
         private readonly StreamingContext _streamingContext;
         private readonly SerializationEntryCodec _entrySerializer;
         private readonly TypeConverter _typeConverter;
@@ -35,11 +37,15 @@ namespace Orleans.Serialization
         /// <param name="typeResolver">The type resolver.</param>
         public DotNetSerializableCodec(TypeConverter typeResolver)
         {
+#pragma warning disable SYSLIB0050 // Type or member is obsolete
             _streamingContext = new StreamingContext(StreamingContextStates.All);
+#pragma warning restore SYSLIB0050 // Type or member is obsolete
             _typeConverter = typeResolver;
             _entrySerializer = new SerializationEntryCodec();
             _serializationCallbacks = new SerializationCallbacksFactory();
+#pragma warning disable SYSLIB0050 // Type or member is obsolete
             _formatterConverter = new FormatterConverter();
+#pragma warning restore SYSLIB0050 // Type or member is obsolete
             var constructorFactory = new SerializationConstructorFactory();
             _createConstructorDelegate = constructorFactory.GetSerializationConstructorDelegate;
 
@@ -124,7 +130,9 @@ namespace Orleans.Serialization
         {
             var callbacks = _serializationCallbacks.GetReferenceTypeCallbacks(type);
 
+#pragma warning disable SYSLIB0050 // Type or member is obsolete
             var info = new SerializationInfo(type, _formatterConverter);
+#pragma warning restore SYSLIB0050 // Type or member is obsolete
             var result = RuntimeHelpers.GetUninitializedObject(type);
             ReferenceCodec.RecordObject(reader.Session, result, placeholderReferenceId);
             callbacks.OnDeserializing?.Invoke(result, _streamingContext);
@@ -171,7 +179,9 @@ namespace Orleans.Serialization
         private void WriteObject<TBufferWriter>(ref Writer<TBufferWriter> writer, Type type, object value) where TBufferWriter : IBufferWriter<byte>
         {
             var callbacks = _serializationCallbacks.GetReferenceTypeCallbacks(type);
+#pragma warning disable SYSLIB0050 // Type or member is obsolete
             var info = new SerializationInfo(type, _formatterConverter);
+#pragma warning restore SYSLIB0050 // Type or member is obsolete
 
             // Serialize the type name according to the value populated in the SerializationInfo.
             if (value is Exception)
@@ -186,7 +196,9 @@ namespace Orleans.Serialization
             }
 
             callbacks.OnSerializing?.Invoke(value, _streamingContext);
+#pragma warning disable SYSLIB0050 // Type or member is obsolete
             ((ISerializable)value).GetObjectData(info, _streamingContext);
+#pragma warning restore SYSLIB0050 // Type or member is obsolete
 
             var first = true;
             foreach (var field in info)

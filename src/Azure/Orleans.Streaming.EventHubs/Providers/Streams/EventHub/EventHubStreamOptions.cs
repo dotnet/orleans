@@ -1,6 +1,7 @@
 using Azure;
 using Azure.Core;
 using Azure.Messaging.EventHubs;
+using Microsoft.Extensions.DependencyInjection;
 using Orleans.Runtime;
 using Orleans.Streams;
 using System;
@@ -200,7 +201,7 @@ namespace Orleans.Configuration
         }
         public void ValidateConfiguration()
         {
-            var checkpointerFactory = services.GetServiceByName<IStreamQueueCheckpointerFactory>(this.name);
+            var checkpointerFactory = services.GetKeyedService<IStreamQueueCheckpointerFactory>(this.name);
             if (checkpointerFactory == null)
                 throw new OrleansConfigurationException($"No IStreamQueueCheckpointer is configured with PersistentStreamProvider {this.name}. Please configure one.");
         }

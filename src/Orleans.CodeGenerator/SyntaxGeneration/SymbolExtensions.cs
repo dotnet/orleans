@@ -28,6 +28,38 @@ namespace Orleans.CodeGenerator.SyntaxGeneration
             public bool IncludeNamespace { get; set; } = true;
         }
 
+        public static bool HasAttribute(this INamedTypeSymbol symbol, INamedTypeSymbol attributeType, bool inherited) => GetAttribute(symbol, attributeType, inherited) is not null;
+
+        public static AttributeData? GetAttribute(this INamedTypeSymbol symbol, INamedTypeSymbol attributeType, bool inherited)
+        {
+            var s = symbol;
+            if (s.GetAttribute(attributeType) is { } attribute)
+            {
+                return attribute;
+            }
+
+            if (inherited)
+            {
+                foreach (var iface in symbol.AllInterfaces)
+                {
+                    if (iface.GetAttribute(attributeType) is { } iattr)
+                    {
+                        return iattr;
+                    }
+                }
+
+                while ((s = s.BaseType) != null)
+                {
+                    if (s.GetAttribute(attributeType) is { } attr)
+                    {
+                        return attr;
+                    }
+                }
+            }
+
+            return null;
+        }
+
         public static TypeSyntax ToTypeSyntax(this ITypeSymbol typeSymbol)
         {
             if (typeSymbol.SpecialType == SpecialType.System_Void)
@@ -70,7 +102,7 @@ namespace Orleans.CodeGenerator.SyntaxGeneration
             return ToDisplayName(typeSymbol, new DisplayNameOptions { Substitutions = substitutions, IncludeGlobalSpecifier = includeGlobalSpecifier, IncludeNamespace = includeNamespace });
         }
 
-        public static string ToDisplayName(this ITypeSymbol typeSymbol, DisplayNameOptions options) 
+        public static string ToDisplayName(this ITypeSymbol typeSymbol, DisplayNameOptions options)
         {
             if (typeSymbol.SpecialType == SpecialType.System_Void)
             {
@@ -336,6 +368,50 @@ namespace Orleans.CodeGenerator.SyntaxGeneration
             return attributes != null && attributes.Length > 0;
         }
 
+        /// <summary>
+        /// Gets all attributes which are assignable to the specified attribute type.
+        /// </summary>
+        public static bool GetAttributes(this INamedTypeSymbol symbol, INamedTypeSymbol attributeType, out AttributeData[]? attributes, bool inherited = false)
+        {
+            var result = default(List<AttributeData>);
+            AddSymbolAttributes(symbol, attributeType, ref result);
+
+            if (inherited)
+            {
+                foreach (var iface in symbol.AllInterfaces)
+                {
+                    AddSymbolAttributes(iface, attributeType, ref result);
+                }
+
+                var s = symbol;
+                while ((s = s.BaseType) != null)
+                {
+                    AddSymbolAttributes(s, attributeType, ref result);
+                }
+            }
+
+            attributes = result?.ToArray();
+            return attributes != null && attributes.Length > 0;
+
+            static void AddSymbolAttributes(ISymbol symbol, INamedTypeSymbol attributeType, ref List<AttributeData>? result)
+            {
+                foreach (var attr in symbol.GetAttributes())
+                {
+                    if (attr.AttributeClass is { } attrClass && !attrClass.HasBaseType(attributeType))
+                    {
+                        continue;
+                    }
+
+                    if (result is null)
+                    {
+                        result = new List<AttributeData>();
+                    }
+
+                    result.Add(attr);
+                }
+            }
+        }
+
         public static IEnumerable<TSymbol> GetAllMembers<TSymbol>(this ITypeSymbol type, string name) where TSymbol : ISymbol
         {
             foreach (var member in type.GetAllMembers<TSymbol>())
@@ -447,6 +523,22 @@ namespace Orleans.CodeGenerator.SyntaxGeneration
             }
 
             foreach (var tp in symbol.TypeParameters)
+            {
+                yield return tp;
+            }
+        }
+
+        public static IEnumerable<ITypeSymbol> GetAllTypeArguments(this INamedTypeSymbol symbol)
+        {
+            if (symbol.ContainingType is { } containingType && containingType.IsGenericType)
+            {
+                foreach (var containingTypeParameter in containingType.GetAllTypeArguments())
+                {
+                    yield return containingTypeParameter;
+                }
+            }
+
+            foreach (var tp in symbol.TypeArguments)
             {
                 yield return tp;
             }

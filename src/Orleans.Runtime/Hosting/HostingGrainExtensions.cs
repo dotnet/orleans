@@ -1,4 +1,5 @@
 using System;
+using Microsoft.Extensions.DependencyInjection;
 using Orleans.Runtime;
 
 namespace Orleans.Hosting
@@ -17,7 +18,7 @@ namespace Orleans.Hosting
             where TExtensionInterface : class, IGrainExtension
             where TExtension : class, TExtensionInterface
         {
-            return builder.ConfigureServices(services => services.AddTransientKeyedService<Type, IGrainExtension, TExtension>(typeof(TExtensionInterface)));
+            return builder.ConfigureServices(services => services.AddKeyedTransient<IGrainExtension, TExtension>(typeof(TExtensionInterface)));
         }
     }
 }

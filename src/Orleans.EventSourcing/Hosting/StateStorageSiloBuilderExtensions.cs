@@ -28,8 +28,9 @@ namespace Orleans.Hosting
 
         internal static IServiceCollection AddStateStorageBasedLogConsistencyProvider(this IServiceCollection services, string name)
         {
-            services.TryAddSingleton<ILogViewAdaptorFactory>(sp => sp.GetServiceByName<ILogViewAdaptorFactory>(ProviderConstants.DEFAULT_STORAGE_PROVIDER_NAME));
-            return services.AddSingletonNamedService<ILogViewAdaptorFactory, LogConsistencyProvider>(name);
+            services.AddLogConsistencyProtocolServicesFactory();
+            services.TryAddSingleton<ILogViewAdaptorFactory>(sp => sp.GetKeyedService<ILogViewAdaptorFactory>(ProviderConstants.DEFAULT_STORAGE_PROVIDER_NAME));
+            return services.AddKeyedSingleton<ILogViewAdaptorFactory, LogConsistencyProvider>(name);
         }
     }
 }

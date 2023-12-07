@@ -24,8 +24,7 @@ namespace Orleans.Runtime.Messaging
         private readonly SiloAddress _siloAddress;
         private readonly SiloMessagingOptions messagingOptions;
         private readonly PlacementService placementService;
-        private readonly ActivationDirectory activationDirectory;
-        private readonly ILocalGrainDirectory localGrainDirectory;
+        private readonly GrainLocator _grainLocator;
         private readonly ILogger log;
         private readonly Catalog catalog;
         private bool stopped;
@@ -43,8 +42,7 @@ namespace Orleans.Runtime.Messaging
             RuntimeMessagingTrace messagingTrace,
             IOptions<SiloMessagingOptions> messagingOptions,
             PlacementService placementService,
-            ILocalGrainDirectory localGrainDirectory,
-            ActivationDirectory activationDirectory)
+            GrainLocator grainLocator)
         {
             this.catalog = catalog;
             this.messagingOptions = messagingOptions.Value;
@@ -52,8 +50,7 @@ namespace Orleans.Runtime.Messaging
             this.connectionManager = senderManager;
             this.messagingTrace = messagingTrace;
             this.placementService = placementService;
-            this.localGrainDirectory = localGrainDirectory;
-            this.activationDirectory = activationDirectory;
+            _grainLocator = grainLocator;
             this.log = logger;
             this.messageFactory = messageFactory;
             this._siloAddress = siloDetails.SiloAddress;
@@ -273,11 +270,21 @@ namespace Orleans.Runtime.Messaging
         {
             if (rejectMessages)
             {
+                GrainAddress validAddress = forwardingAddress switch
+                {
+                    null => null,
+                    _ => new()
+                    {
+                        GrainId = oldAddress.GrainId,
+                        SiloAddress = forwardingAddress,
+                    }
+                };
+
                 foreach (var message in messages)
                 {
                     if (oldAddress != null)
                     {
-                        message.AddToCacheInvalidationHeader(oldAddress);
+                        message.AddToCacheInvalidationHeader(oldAddress, validAddress: validAddress);
                     }
 
                     RejectMessage(message, Message.RejectionTypes.Transient, exc, failedOperation);
@@ -286,9 +293,19 @@ namespace Orleans.Runtime.Messaging
             else
             {
                 this.messagingTrace.OnDispatcherForwardingMultiple(messages.Count, oldAddress, forwardingAddress, failedOperation, exc);
+                GrainAddress destination = forwardingAddress switch
+                {
+                    null => null,
+                    _ => new()
+                    {
+                        GrainId = oldAddress.GrainId,
+                        SiloAddress = forwardingAddress,
+                    }
+                };
+
                 foreach (var message in messages)
                 {
-                    TryForwardRequest(message, oldAddress, forwardingAddress, failedOperation, exc);
+                    TryForwardRequest(message, oldAddress, destination, failedOperation, exc);
                 }
             }
         }
@@ -304,7 +321,7 @@ namespace Orleans.Runtime.Messaging
             // Just use this opportunity to invalidate local Cache Entry as well.
             if (oldAddress != null)
             {
-                this.localGrainDirectory.InvalidateCacheEntry(oldAddress);
+                _grainLocator.InvalidateCache(oldAddress);
             }
 
             // IMPORTANT: do not do anything on activation context anymore, since this activation is invalid already.
@@ -314,20 +331,30 @@ namespace Orleans.Runtime.Messaging
             }
             else
             {
-                this.TryForwardRequest(message, oldAddress, forwardingAddress, failedOperation, exc);
+                GrainAddress destination = forwardingAddress switch
+                {
+                    null => null,
+                    _ => new()
+                    {
+                        GrainId = oldAddress.GrainId,
+                        SiloAddress = forwardingAddress,
+                    }
+                };
+                this.TryForwardRequest(message, oldAddress, destination, failedOperation, exc);
             }
         }
 
-        internal void TryForwardRequest(Message message, GrainAddress oldAddress, SiloAddress forwardingAddress, string failedOperation = null, Exception exc = null)
+        internal void TryForwardRequest(Message message, GrainAddress oldAddress, GrainAddress destination, string failedOperation = null, Exception exc = null)
         {
             bool forwardingSucceeded = false;
+            var forwardingAddress = destination?.SiloAddress;
             try
             {
                 this.messagingTrace.OnDispatcherForwarding(message, oldAddress, forwardingAddress, failedOperation, exc);
 
                 if (oldAddress != null)
                 {
-                    message.AddToCacheInvalidationHeader(oldAddress);
+                    message.AddToCacheInvalidationHeader(oldAddress, validAddress: destination);
                 }
 
                 forwardingSucceeded = this.TryForwardMessage(message, forwardingAddress);

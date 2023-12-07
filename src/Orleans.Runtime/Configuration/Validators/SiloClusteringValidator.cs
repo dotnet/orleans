@@ -1,6 +1,8 @@
 using System;
 
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
+using Orleans.Configuration;
 using Orleans.Configuration.Validators;
 
 namespace Orleans.Runtime.Configuration
@@ -24,6 +26,20 @@ namespace Orleans.Runtime.Configuration
             if (clusteringTableProvider == null)
             {
                 throw new OrleansConfigurationException(ClientClusteringValidator.ClusteringNotConfigured);
+            }
+
+            var clusterMembershipOptions = this.serviceProvider.GetRequiredService<IOptions<ClusterMembershipOptions>>().Value;
+            if (clusterMembershipOptions.LivenessEnabled)
+            {
+                if (clusterMembershipOptions.NumVotesForDeathDeclaration > clusterMembershipOptions.NumProbedSilos)
+                {
+                    throw new OrleansConfigurationException($"{nameof(ClusterMembershipOptions)}.{nameof(ClusterMembershipOptions.NumVotesForDeathDeclaration)} ({clusterMembershipOptions.NumVotesForDeathDeclaration}) must be less than or equal to {nameof(ClusterMembershipOptions)}.{nameof(ClusterMembershipOptions.NumProbedSilos)} ({clusterMembershipOptions.NumProbedSilos}).");
+                }
+
+                if (clusterMembershipOptions.NumVotesForDeathDeclaration <= 0)
+                {
+                    throw new OrleansConfigurationException($"{nameof(ClusterMembershipOptions)}.{nameof(ClusterMembershipOptions.NumVotesForDeathDeclaration)} ({clusterMembershipOptions.NumVotesForDeathDeclaration}) must be greater than 0.");
+                }
             }
         }
     }

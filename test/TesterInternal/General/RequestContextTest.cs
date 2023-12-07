@@ -250,7 +250,7 @@ namespace UnitTests.General
 
             IRequestContextTestGrain grain = this.fixture.GrainFactory.GetGrain<IRequestContextTestGrain>(GetRandomGrainId());
 
-            Guid result = grain.E2EActivityId().Result;
+            Guid result = await grain.E2EActivityId();
             Assert.Equal(nullActivityId,  result);  // "E2E ActivityId should not exist"
 
             RequestContextTestUtils.SetActivityId(nullActivityId);

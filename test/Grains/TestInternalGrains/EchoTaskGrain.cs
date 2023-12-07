@@ -20,6 +20,7 @@ namespace UnitTests.Grains
     }
 
     [StorageProvider(ProviderName = "MemoryStore")]
+    [CollectionAgeLimit(Days = 1)] // Added to test the attribute itself.
     public class EchoGrain : Grain<EchoTaskGrainState>, IEchoGrain
     {
         private readonly ILogger logger;
@@ -58,6 +59,7 @@ namespace UnitTests.Grains
     }
 
     [StorageProvider(ProviderName = "MemoryStore")]
+    [CollectionAgeLimit("01:00:00")] // Added to test the attribute itself.
     internal class EchoTaskGrain : Grain<EchoTaskGrainState>, IEchoTaskGrain, IDebuggerHelperTestGrain
     {
         private readonly IInternalGrainFactory internalGrainFactory;

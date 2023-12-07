@@ -131,7 +131,7 @@ namespace DefaultCluster.Tests.General
                 Assert.IsAssignableFrom<OrleansException>(baseException);
                 if (!baseException.Message.StartsWith("Cannot subscribe already subscribed observer"))
                 {
-                    Assert.True(false, "Unexpected exception message: " + baseException);
+                    Assert.Fail("Unexpected exception message: " + baseException);
                 }
             }
 

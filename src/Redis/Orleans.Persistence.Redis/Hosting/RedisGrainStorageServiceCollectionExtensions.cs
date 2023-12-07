@@ -7,6 +7,7 @@ using Orleans.Hosting;
 using Orleans.Persistence;
 using Orleans.Providers;
 using Orleans.Runtime;
+using Orleans.Runtime.Hosting;
 using Orleans.Storage;
 
 namespace Orleans.Hosting
@@ -50,13 +51,7 @@ namespace Orleans.Hosting
             services.AddTransient<IConfigurationValidator>(sp => new RedisStorageOptionsValidator(sp.GetRequiredService<IOptionsMonitor<RedisStorageOptions>>().Get(name), name));
             services.AddTransient<IPostConfigureOptions<RedisStorageOptions>, DefaultStorageProviderSerializerOptionsConfigurator<RedisStorageOptions>>();
             services.ConfigureNamedOptionForLogging<RedisStorageOptions>(name);
-            if (string.Equals(name, ProviderConstants.DEFAULT_STORAGE_PROVIDER_NAME, StringComparison.Ordinal))
-            {
-                services.TryAddSingleton(sp => sp.GetServiceByName<IGrainStorage>(ProviderConstants.DEFAULT_STORAGE_PROVIDER_NAME));
-            }
-            services.AddSingletonNamedService<IGrainStorage>(name, RedisGrainStorageFactory.Create)
-                .AddSingletonNamedService<ILifecycleParticipant<ISiloLifecycle>>(name, (s, n) => (ILifecycleParticipant<ISiloLifecycle>)s.GetRequiredServiceByName<IGrainStorage>(n));
-            return services;
+            return services.AddGrainStorage(name, RedisGrainStorageFactory.Create);
         }
     }
 }

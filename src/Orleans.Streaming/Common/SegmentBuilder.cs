@@ -35,7 +35,7 @@ namespace Orleans.Providers.Streams.Common
             }
 
             var length = bytes.Length;
-            MemoryMarshal.Write(segment.AsSpan(writerOffset), ref length);
+            MemoryMarshal.Write(segment.AsSpan(writerOffset), in length);
             writerOffset += sizeof(int);
 
             if (bytes.Length > 0)
@@ -60,7 +60,7 @@ namespace Orleans.Providers.Streams.Common
             if (str == null)
             {
                 var length = -1;
-                MemoryMarshal.Write(segment.AsSpan(writerOffset), ref length);
+                MemoryMarshal.Write(segment.AsSpan(writerOffset), in length);
                 writerOffset += sizeof(int);
             }
             else

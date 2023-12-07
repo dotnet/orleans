@@ -28,7 +28,7 @@ namespace UnitTests
             }
             catch (Exception exc)
             {
-                Assert.True(false, string.Format("Unexpected exception {0}: {1}", exc.Message, exc.StackTrace));
+                Assert.Fail(string.Format("Unexpected exception {0}: {1}", exc.Message, exc.StackTrace));
             }
             if (performDeadlockDetection)
             {
@@ -53,7 +53,7 @@ namespace UnitTests
             }
             catch (Exception exc)
             {
-                Assert.True(false, string.Format("Unexpected exception {0}: {1}", exc.Message, exc.StackTrace));
+                Assert.Fail(string.Format("Unexpected exception {0}: {1}", exc.Message, exc.StackTrace));
             }
             if (performDeadlockDetection)
             {
@@ -78,7 +78,7 @@ namespace UnitTests
             }
             catch (Exception exc)
             {
-                Assert.True(false, string.Format("Unexpected exception {0}: {1}", exc.Message, exc.StackTrace));
+                Assert.Fail(string.Format("Unexpected exception {0}: {1}", exc.Message, exc.StackTrace));
             }
             if (performDeadlockDetection)
             {
@@ -103,7 +103,7 @@ namespace UnitTests
             }
             catch (Exception exc)
             {
-                Assert.True(false, $"Unexpected exception {exc.Message}: {exc.StackTrace}");
+                Assert.Fail($"Unexpected exception {exc.Message}: {exc.StackTrace}");
             }
             if (performDeadlockDetection)
             {

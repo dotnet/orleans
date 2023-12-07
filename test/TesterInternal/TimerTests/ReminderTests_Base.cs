@@ -66,7 +66,7 @@ namespace UnitTests.TimerTests
             {
                 // First handle should now be out of date once the seconf handle to the same reminder was obtained
                 await grain.StopReminder(r1);
-                Assert.True(false, "Removed reminder1, which shouldn't be possible.");
+                Assert.Fail("Removed reminder1, which shouldn't be possible.");
             }
             catch (Exception exc)
             {

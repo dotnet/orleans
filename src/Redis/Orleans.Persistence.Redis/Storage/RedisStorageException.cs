@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Runtime.Serialization;
 
 namespace Orleans.Persistence.Redis
@@ -34,6 +34,7 @@ namespace Orleans.Persistence.Redis
         }
 
         /// <inheritdoc />
+        [Obsolete]
         protected RedisStorageException(
             SerializationInfo info,
             StreamingContext context) : base(info, context)

@@ -2,35 +2,43 @@ using Orleans.CodeGenerator.SyntaxGeneration;
 using Microsoft.CodeAnalysis;
 using System;
 using System.Collections.Generic;
-using System.Globalization;
 using Orleans.CodeGenerator.Diagnostics;
 using System.Linq;
+using System.Diagnostics;
 
 namespace Orleans.CodeGenerator
 {
-    internal class InvokableInterfaceDescription
+    [DebuggerDisplay("{InterfaceType} (proxy base {ProxyBaseType})")]
+    internal class ProxyInterfaceDescription : IEquatable<ProxyInterfaceDescription>
     {
-        public InvokableInterfaceDescription(
-            CodeGenerator generator,
-            SemanticModel semanticModel,
-            INamedTypeSymbol interfaceType,
-            string name,
+        private static readonly char[] FilteredNameChars = new char[] { '`', '.' };
+        private List<ProxyMethodDescription> _methods;
+
+        public ProxyInterfaceDescription(
+            CodeGenerator codeGenerator,
             INamedTypeSymbol proxyBaseType,
-            bool isExtension,
-            Dictionary<INamedTypeSymbol, INamedTypeSymbol> invokableBaseTypes)
+            INamedTypeSymbol interfaceType)
         {
-            ValidateBaseClass(generator.LibraryTypes, proxyBaseType);
-            CodeGenerator = generator;
-            SemanticModel = semanticModel;
+            ValidateBaseClass(codeGenerator.LibraryTypes, proxyBaseType);
+
+            var prop = interfaceType.GetAllMembers<IPropertySymbol>().FirstOrDefault();
+            if (prop is { })
+            {
+                throw new OrleansGeneratorDiagnosticAnalysisException(RpcInterfacePropertyDiagnostic.CreateDiagnostic(interfaceType, prop));
+            }
+
+            CodeGenerator = codeGenerator;
             InterfaceType = interfaceType;
+            Name = codeGenerator.GetAlias(interfaceType) ?? interfaceType.Name;
             ProxyBaseType = proxyBaseType;
-            IsExtension = isExtension;
-            Name = name;
 
             // If the name is a user-defined name which specified a generic arity, strip the arity backtick now
-            if (Name.Contains("`"))
+            if (Name.IndexOfAny(FilteredNameChars) >= 0)
             {
-                Name = Name.Replace('`', '_');
+                foreach (var c in FilteredNameChars)
+                {
+                    Name = Name.Replace(c, '_');
+                }
             }
 
             GeneratedNamespace = InterfaceType.GetNamespaceAndNesting() switch
@@ -48,9 +56,6 @@ namespace Orleans.CodeGenerator
                 TypeParameters.Add((tpName, tp));
             }
 
-            InvokableBaseTypes = invokableBaseTypes;
-            Methods = GetMethods(interfaceType);
-
             static string GetTypeParameterName(HashSet<string> names, ITypeParameterSymbol tp)
             {
                 var count = 0;
@@ -67,7 +72,7 @@ namespace Orleans.CodeGenerator
 
         public CodeGenerator CodeGenerator { get; }
 
-        private List<MethodDescription> GetMethods(INamedTypeSymbol symbol)
+        private List<ProxyMethodDescription> GetMethods(INamedTypeSymbol symbol)
         {
 #pragma warning disable RS1024 // Symbols should be compared for equality
             var methods = new Dictionary<IMethodSymbol, bool>(MethodSignatureComparer.Default);
@@ -86,19 +91,16 @@ namespace Orleans.CodeGenerator
                 }
             }
 
-            var res = new List<MethodDescription>();
+            var res = new List<ProxyMethodDescription>();
             foreach (var pair in methods)
             {
-                var method = pair.Key;
-                var methodId = CodeGenerator.GetId(method)?.ToString(CultureInfo.InvariantCulture)
-                    ?? CodeGenerator.GetAlias(method)
-                    ?? CodeGenerator.CreateHashedMethodId(method);
-                res.Add(new(this, method, methodId, hasCollision: pair.Value));
+                var methodDescription = CodeGenerator.GetProxyMethodDescription(symbol, method: pair.Key, hasCollision: pair.Value);
+                res.Add(methodDescription);
             }
 
             return res;
 
-            IEnumerable<INamedTypeSymbol> GetAllInterfaces(INamedTypeSymbol s)
+            static IEnumerable<INamedTypeSymbol> GetAllInterfaces(INamedTypeSymbol s)
             {
                 if (s.TypeKind == TypeKind.Interface)
                 {
@@ -115,13 +117,11 @@ namespace Orleans.CodeGenerator
 
         public string Name { get; }
         public INamedTypeSymbol InterfaceType { get; }
-        public List<MethodDescription> Methods { get; }
-        public INamedTypeSymbol ProxyBaseType { get; }
-        public bool IsExtension { get; }
+        public List<ProxyMethodDescription> Methods => _methods ??= GetMethods(InterfaceType); 
         public SemanticModel SemanticModel { get; }
         public string GeneratedNamespace { get; }
         public List<(string Name, ITypeParameterSymbol Parameter)> TypeParameters { get; }
-        public Dictionary<INamedTypeSymbol, INamedTypeSymbol> InvokableBaseTypes { get; }
+        public INamedTypeSymbol ProxyBaseType { get; }
 
         private static void ValidateBaseClass(LibraryTypes l, INamedTypeSymbol baseClass)
         {
@@ -276,112 +276,9 @@ namespace Orleans.CodeGenerator
             }
         }
 
-        private sealed class MethodSignatureComparer : IEqualityComparer<IMethodSymbol>, IComparer<IMethodSymbol>
-        {
-            public static MethodSignatureComparer Default { get; } = new();
-
-            private MethodSignatureComparer()
-            {
-            }
-
-            public bool Equals(IMethodSymbol x, IMethodSymbol y)
-            {
-                if (!string.Equals(x.Name, y.Name, StringComparison.Ordinal))
-                {
-                    return false;
-                }
-
-                if (x.TypeArguments.Length != y.TypeArguments.Length)
-                {
-                    return false;
-                }
-
-                for (var i = 0; i < x.TypeArguments.Length; i++)
-                {
-                    if (!SymbolEqualityComparer.Default.Equals(x.TypeArguments[i], y.TypeArguments[i]))
-                    {
-                        return false;
-                    }
-                }
-
-                if (x.Parameters.Length != y.Parameters.Length)
-                {
-                    return false;
-                }
-
-                for (var i = 0; i < x.Parameters.Length; i++)
-                {
-                    if (!SymbolEqualityComparer.Default.Equals(x.Parameters[i].Type, y.Parameters[i].Type))
-                    {
-                        return false;
-                    }
-                }
-
-                return true;
-            }
-
-            public int GetHashCode(IMethodSymbol obj)
-            {
-                int hashCode = -499943048;
-                hashCode = hashCode * -1521134295 + StringComparer.Ordinal.GetHashCode(obj.Name);
-
-                foreach (var arg in obj.TypeArguments)
-                {
-                    hashCode = hashCode * -1521134295 + SymbolEqualityComparer.Default.GetHashCode(arg);
-                }
-
-                foreach (var parameter in obj.Parameters)
-                {
-                    hashCode = hashCode * -1521134295 + SymbolEqualityComparer.Default.GetHashCode(parameter.Type);
-                }
-
-                return hashCode;
-            }
-
-            public int Compare(IMethodSymbol x, IMethodSymbol y)
-            {
-                var result = StringComparer.Ordinal.Compare(x.Name, y.Name);
-                if (result != 0)
-                {
-                    return result;
-                }
-
-                result = x.TypeArguments.Length.CompareTo(y.TypeArguments.Length);
-                if (result != 0)
-                {
-                    return result;
-                }
-
-                for (var i = 0; i < x.TypeArguments.Length; i++)
-                {
-                    var xh = SymbolEqualityComparer.Default.GetHashCode(x.TypeArguments[i]);
-                    var yh = SymbolEqualityComparer.Default.GetHashCode(y.TypeArguments[i]);
-                    result = xh.CompareTo(yh);
-                    if (result != 0)
-                    {
-                        return result;
-                    }
-                }
-
-                result = x.Parameters.Length.CompareTo(y.Parameters.Length);
-                if (result != 0)
-                {
-                    return result;
-                }
-
-                for (var i = 0; i < x.Parameters.Length; i++)
-                {
-                    var xh = SymbolEqualityComparer.Default.GetHashCode(x.Parameters[i].Type);
-                    var yh = SymbolEqualityComparer.Default.GetHashCode(y.Parameters[i].Type);
-                    result = xh.CompareTo(yh);
-                    if (result != 0)
-                    {
-                        return result;
-                    }
-                }
-
-                return 0;
-            }
-        }
+        public bool Equals(ProxyInterfaceDescription other) => SymbolEqualityComparer.Default.Equals(InterfaceType, other.InterfaceType) && SymbolEqualityComparer.Default.Equals(ProxyBaseType, other.ProxyBaseType);
+        public override bool Equals(object obj) => obj is ProxyInterfaceDescription other && Equals(other);
+        public override int GetHashCode() => SymbolEqualityComparer.Default.GetHashCode(InterfaceType) * 17 ^ SymbolEqualityComparer.Default.GetHashCode(ProxyBaseType);
+        public override string ToString() => $"Type: {InterfaceType}, ProxyBaseType: {ProxyBaseType}";
     }
 }

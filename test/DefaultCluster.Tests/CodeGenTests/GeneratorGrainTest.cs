@@ -210,8 +210,8 @@ namespace Tester.CodeGenTests
         public async Task GrainWithValueTaskMethod()
         {
             var grain = this.GrainFactory.GetGrain<IGrainWithGenericMethods>(Guid.NewGuid());
-            Assert.Equal(1, await grain.ValueTaskMethod(true).ConfigureAwait(false));
-            Assert.Equal(2, await grain.ValueTaskMethod(false).ConfigureAwait(false));
+            Assert.Equal(1, await grain.ValueTaskMethod(true));
+            Assert.Equal(2, await grain.ValueTaskMethod(false));
         }
 
         private class ObserverWithGenericMethods : IGrainObserverWithGenericMethods

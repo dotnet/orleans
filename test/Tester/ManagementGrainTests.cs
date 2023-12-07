@@ -48,7 +48,7 @@ namespace UnitTests.Management
             }
 
             var numberOfActiveSilos = 1 + HostedCluster.SecondarySilos.Count; // Primary + secondaries
-            Dictionary<SiloAddress, SiloStatus> siloStatuses = mgmtGrain.GetHosts(true).Result;
+            Dictionary<SiloAddress, SiloStatus> siloStatuses = await mgmtGrain.GetHosts(true);
             Assert.NotNull(siloStatuses);
             Assert.Equal(numberOfActiveSilos, siloStatuses.Count);
         }
@@ -63,7 +63,7 @@ namespace UnitTests.Management
             }
 
             var numberOfActiveSilos = 1 + HostedCluster.SecondarySilos.Count; // Primary + secondaries
-            var siloStatuses = mgmtGrain.GetDetailedHosts(true).Result;
+            var siloStatuses = await mgmtGrain.GetDetailedHosts(true);
             Assert.NotNull(siloStatuses);
             Assert.Equal(numberOfActiveSilos, siloStatuses.Length);
         }
@@ -81,18 +81,18 @@ namespace UnitTests.Management
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Management")]
-        public void GetSimpleGrainStatistics_ActivationCounts()
+        public async Task GetSimpleGrainStatistics_ActivationCounts()
         {
-            RunGetStatisticsTest<ISimpleGrain, SimpleGrain>(g => g.GetA().Wait());
+            await RunGetStatisticsTest<ISimpleGrain, SimpleGrain>(g => g.GetA());
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Management")]
-        public void GetTestGrainStatistics_ActivationCounts()
+        public async Task GetTestGrainStatistics_ActivationCounts()
         {
-            RunGetStatisticsTest<ITestGrain, TestGrain>(g => g.GetKey().Wait());
+            await RunGetStatisticsTest<ITestGrain, TestGrain>(g => g.GetKey());
         }
 
-        private void RunGetStatisticsTest<TGrainInterface, TGrain>(Action<TGrainInterface> callGrainMethodAction)
+        private async Task RunGetStatisticsTest<TGrainInterface, TGrain>(Func<TGrainInterface, Task> callGrainMethodAction)
             where TGrainInterface : IGrainWithIntegerKey
             where TGrain : TGrainInterface
         {
@@ -103,7 +103,7 @@ namespace UnitTests.Management
             int initialStatisticsCount = stats.Count(s => s.GrainType == grainType);
             int initialActivationsCount = stats.Where(s => s.GrainType == grainType).Sum(s => s.ActivationCount);
             var grain1 = this.fixture.Client.GetGrain<TGrainInterface>(Random.Shared.Next());
-            callGrainMethodAction(grain1); // Call grain method
+            await callGrainMethodAction(grain1); // Call grain method
             stats = this.GetSimpleGrainStatisticsRunner("After Invoke");
             Assert.True(stats.Count(s => s.GrainType == grainType) >= initialStatisticsCount, "Activation counter now exists for grain: " + grainType);
             int expectedActivationsCount = initialActivationsCount + 1;

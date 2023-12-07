@@ -190,7 +190,7 @@ namespace Orleans.Providers
         private Guid GenerateDeterministicGuid(QueueId queueId)
         {
             Span<byte> bytes = stackalloc byte[16];
-            MemoryMarshal.Write(bytes, ref Unsafe.AsRef(in _nameHash));
+            MemoryMarshal.Write(bytes, in _nameHash);
             BinaryPrimitives.WriteUInt32LittleEndian(bytes[8..], queueId.GetUniformHashCode());
             BinaryPrimitives.WriteUInt32LittleEndian(bytes[12..], queueId.GetNumericId());
             return new(bytes);

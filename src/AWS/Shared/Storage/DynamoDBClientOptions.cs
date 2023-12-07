@@ -23,7 +23,7 @@ namespace Orleans.Reminders.DynamoDB
         public string SecretKey { get; set; }
 
         /// <summary>
-        /// DynamoDB Service name
+        /// DynamoDB region name, such as "us-west-2"
         /// </summary>
         public string Service { get; set; }
 

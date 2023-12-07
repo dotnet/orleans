@@ -95,7 +95,8 @@ namespace Orleans.Metadata
                 && !type.ContainsGenericParameters
                 && !genericGrainType.IsConstructed)
             {
-                grainType = genericGrainType.Construct(_typeConverter, type.GetGenericArguments()).GrainType;
+                var typeArguments = type.GetGenericArguments();
+                grainType = genericGrainType.Construct(_typeConverter, typeArguments).GrainType;
             }
 
             return grainType;

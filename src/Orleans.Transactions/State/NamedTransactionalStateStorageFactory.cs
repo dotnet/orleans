@@ -27,13 +27,13 @@ namespace Orleans.Transactions
             // Try to get ITransactionalStateStorage from factory
             ITransactionalStateStorageFactory factory = string.IsNullOrEmpty(storageName)
                 ? currentContext.ActivationServices.GetService<ITransactionalStateStorageFactory>()
-                : currentContext.ActivationServices.GetServiceByName<ITransactionalStateStorageFactory>(storageName);
+                : currentContext.ActivationServices.GetKeyedService<ITransactionalStateStorageFactory>(storageName);
             if (factory != null) return factory.Create<TState>(stateName, currentContext);
 
             // Else try to get storage provider and wrap it
             IGrainStorage grainStorage = string.IsNullOrEmpty(storageName)
                 ? currentContext.ActivationServices.GetService<IGrainStorage>()
-                : currentContext.ActivationServices.GetServiceByName<IGrainStorage>(storageName);
+                : currentContext.ActivationServices.GetKeyedService<IGrainStorage>(storageName);
 
             if (grainStorage != null)
             {

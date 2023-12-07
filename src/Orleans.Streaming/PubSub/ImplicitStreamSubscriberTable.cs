@@ -5,6 +5,7 @@ using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
 using System.Runtime.InteropServices;
+using Microsoft.Extensions.DependencyInjection;
 using Orleans.Metadata;
 using Orleans.Runtime;
 
@@ -90,7 +91,7 @@ namespace Orleans.Streams
                            $"Stream binding for grain type {binding.GrainType} is missing a \"{WellKnownGrainTypeProperties.StreamIdMapperKey}\" value");
                     }
 
-                    var streamIdMapper = _serviceProvider.GetServiceByName<IStreamIdMapper>(string.IsNullOrWhiteSpace(mapperName) ? DefaultStreamIdMapper.Name : mapperName);
+                    var streamIdMapper = _serviceProvider.GetKeyedService<IStreamIdMapper>(string.IsNullOrWhiteSpace(mapperName) ? DefaultStreamIdMapper.Name : mapperName);
                     var subscriber = new StreamSubscriber(binding, streamIdMapper);
                     newPredicates.Add(new StreamSubscriberPredicate(subscriber, predicate));
                 }

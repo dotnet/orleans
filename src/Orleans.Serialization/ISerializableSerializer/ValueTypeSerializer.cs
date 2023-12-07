@@ -28,7 +28,9 @@ namespace Orleans.Serialization
         private readonly ValueConstructor _constructor;
         private readonly SerializationCallbacksFactory.SerializationCallbacks<SerializationCallback> _callbacks;
 
+#pragma warning disable SYSLIB0050 // Type or member is obsolete
         private readonly IFormatterConverter _formatterConverter;
+#pragma warning restore SYSLIB0050 // Type or member is obsolete
         private readonly StreamingContext _streamingContext;
         private readonly SerializationEntryCodec _entrySerializer;
 
@@ -38,7 +40,9 @@ namespace Orleans.Serialization
             SerializationCallbacksFactory.SerializationCallbacks<SerializationCallback> callbacks,
             SerializationEntryCodec entrySerializer,
             StreamingContext streamingContext,
+#pragma warning disable SYSLIB0050 // Type or member is obsolete
             IFormatterConverter formatterConverter)
+#pragma warning restore SYSLIB0050 // Type or member is obsolete
         {
             _constructor = constructor;
             _callbacks = callbacks;
@@ -53,8 +57,12 @@ namespace Orleans.Serialization
             var item = (T)value;
             _callbacks.OnSerializing?.Invoke(ref item, _streamingContext);
 
+#pragma warning disable SYSLIB0050 // Type or member is obsolete
             var info = new SerializationInfo(Type, _formatterConverter);
+#pragma warning restore SYSLIB0050 // Type or member is obsolete
+#pragma warning disable SYSLIB0050 // Type or member is obsolete
             ((ISerializable)value).GetObjectData(info, _streamingContext);
+#pragma warning restore SYSLIB0050 // Type or member is obsolete
 
             TypeSerializerCodec.WriteField(ref writer, 0, info.ObjectType);
 
@@ -81,7 +89,9 @@ namespace Orleans.Serialization
         [SecurityCritical]
         public override object ReadValue<TInput>(ref Reader<TInput> reader, Type type)
         {
+#pragma warning disable SYSLIB0050 // Type or member is obsolete
             var info = new SerializationInfo(Type, _formatterConverter);
+#pragma warning restore SYSLIB0050 // Type or member is obsolete
             T result = default;
 
             _callbacks.OnDeserializing?.Invoke(ref result, _streamingContext);

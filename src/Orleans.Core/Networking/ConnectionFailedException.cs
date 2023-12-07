@@ -37,6 +37,7 @@ namespace Orleans.Runtime.Messaging
         /// </summary>
         /// <param name="info">The serialization info.</param>
         /// <param name="context">The context.</param>
+        [Obsolete]
         protected ConnectionFailedException(SerializationInfo info, StreamingContext context) : base(info, context)
         {
         }

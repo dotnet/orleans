@@ -5,6 +5,7 @@ using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 using Orleans.Providers;
 using Orleans.Runtime;
+using Orleans.Runtime.Hosting;
 using Orleans.Storage;
 
 namespace Orleans.Hosting
@@ -63,11 +64,7 @@ namespace Orleans.Hosting
                     configureOptions?.Invoke(services.AddOptions<MemoryGrainStorageOptions>(name));
                     services.AddTransient<IPostConfigureOptions<MemoryGrainStorageOptions>, DefaultStorageProviderSerializerOptionsConfigurator<MemoryGrainStorageOptions>>();
                     services.ConfigureNamedOptionForLogging<MemoryGrainStorageOptions>(name);
-                    if (string.Equals(name, ProviderConstants.DEFAULT_STORAGE_PROVIDER_NAME, StringComparison.Ordinal))
-                    {
-                        services.TryAddSingleton(sp => sp.GetServiceByName<IGrainStorage>(ProviderConstants.DEFAULT_STORAGE_PROVIDER_NAME));
-                    }
-                    services.AddSingletonNamedService<IGrainStorage>(name, MemoryGrainStorageFactory.Create);
+                    services.AddGrainStorage(name, MemoryGrainStorageFactory.Create);
                 });
         }
     }

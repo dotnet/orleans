@@ -99,15 +99,15 @@ namespace Orleans.Runtime
                 key,
                 static (key, state) =>
                 {
-                    var (outerState, addFunc, generation) = state;
+                    var (_, outerState, addFunc, generation) = state;
                     return new TimestampedValue(addFunc(outerState, key), generation);
                 },
                 static (key, existing, state) =>
                 {
-                    var (outerState, addFunc, generation) = state;
-                    return new TimestampedValue(addFunc(outerState, key), generation);
+                    var (self, outerState, addFunc, generation) = state;
+                    return new TimestampedValue(addFunc(outerState, key), self.GetNewGeneration());
                 },
-                (State: state, AddFunc: addFunc, Generation: generation));
+                (Self: this, State: state, AddFunc: addFunc, Generation: generation));
 
             var result = storedValue.Value;
 

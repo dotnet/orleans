@@ -2,7 +2,7 @@
   <PropertyGroup>
     <RootNamespace>Benchmarks</RootNamespace>
     <AssemblyName>Benchmarks</AssemblyName>
-    <TargetFramework>net7.0</TargetFramework>
+    <TargetFramework>net8.0</TargetFramework>
     <OutputType>Exe</OutputType>
     <DebugSymbols>true</DebugSymbols>
     <ServerGarbageCollection>true</ServerGarbageCollection>
@@ -28,7 +28,10 @@
     <PackageReference Include="SpanJson" />
     <PackageReference Include="Hyperion" />
     <PackageReference Include="Google.Protobuf" />
-    <PackageReference Include="Grpc.Tools" />
+    <PackageReference Include="Grpc.Tools">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
   </ItemGroup>
 
   <ItemGroup>

@@ -22,7 +22,12 @@ namespace Orleans.Metadata
         /// <summary>
         /// Gets the zero value.
         /// </summary>
-        public static MajorMinorVersion Zero => new MajorMinorVersion(0, 0);
+        public static MajorMinorVersion Zero => new(0, 0);
+
+        /// <summary>
+        /// Gets the minimum value.
+        /// </summary>
+        public static MajorMinorVersion MinValue => new(long.MinValue, long.MinValue);
 
         /// <summary>
         /// Gets the most significant version component.

@@ -2,7 +2,7 @@
   <PropertyGroup>
     <RootNamespace>UnitTests.GrainInterfaces</RootNamespace>
     <TargetFramework>$(MinTestTargetFramework)</TargetFramework>
-    <OrleansBuildTimeCodeGen>msbuild</OrleansBuildTimeCodeGen>
+    <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
   </PropertyGroup>
 
   <ItemGroup>

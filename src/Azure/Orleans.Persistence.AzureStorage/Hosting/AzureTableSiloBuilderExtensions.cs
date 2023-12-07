@@ -5,6 +5,7 @@ using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 using Orleans.Providers;
 using Orleans.Runtime;
+using Orleans.Runtime.Hosting;
 using Orleans.Storage;
 
 namespace Orleans.Hosting
@@ -52,12 +53,8 @@ namespace Orleans.Hosting
             services.AddTransient<IConfigurationValidator>(sp => new AzureTableGrainStorageOptionsValidator(sp.GetRequiredService<IOptionsMonitor<AzureTableStorageOptions>>().Get(name), name));
             services.AddTransient<IPostConfigureOptions<AzureTableStorageOptions>, DefaultStorageProviderSerializerOptionsConfigurator<AzureTableStorageOptions>>();
             services.ConfigureNamedOptionForLogging<AzureTableStorageOptions>(name);
-            if (string.Equals(name, ProviderConstants.DEFAULT_STORAGE_PROVIDER_NAME, StringComparison.Ordinal))
-            {
-                services.TryAddSingleton(sp => sp.GetServiceByName<IGrainStorage>(ProviderConstants.DEFAULT_STORAGE_PROVIDER_NAME));
-            }
-            return services.AddSingletonNamedService<IGrainStorage>(name, AzureTableGrainStorageFactory.Create)
-                           .AddSingletonNamedService<ILifecycleParticipant<ISiloLifecycle>>(name, (s, n) => (ILifecycleParticipant<ISiloLifecycle>)s.GetRequiredServiceByName<IGrainStorage>(n));
+            return services.AddGrainStorage(name, AzureTableGrainStorageFactory.Create);
+
         }
     }
 }

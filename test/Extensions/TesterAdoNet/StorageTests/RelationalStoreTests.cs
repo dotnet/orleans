@@ -109,7 +109,7 @@ namespace UnitTests.StorageTests.AdoNet
                     var task = sut.Storage.ReadAsync<int>(sut.CancellationTestQuery, tokenSource.Token);
                     if(!task.Wait(timeoutLimit.Add(TimeSpan.FromSeconds(2))))
                     {
-                        Assert.True(false, string.Format("Timeout limit {0} ms exceeded.", timeoutLimit.TotalMilliseconds));
+                        Assert.Fail(string.Format("Timeout limit {0} ms exceeded.", timeoutLimit.TotalMilliseconds));
                     }
                 }
                 catch(Exception ex)

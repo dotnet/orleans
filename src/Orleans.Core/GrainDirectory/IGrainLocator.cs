@@ -33,11 +33,11 @@ namespace Orleans.GrainDirectory
         ValueTask<GrainAddress?> Lookup(GrainId grainId);
 
         /// <summary>
-        /// Records a grain placement decision.
+        /// Updates the cache with a grain placement decision or known activation address.
         /// </summary>
-        /// <param name="grainId">The newly placed grain.</param>
-        /// <param name="siloAddress">The placement result.</param>
-        void CachePlacementDecision(GrainId grainId, SiloAddress siloAddress);
+        /// <param name="grainId">The grain identifier.</param>
+        /// <param name="siloAddress">The silo which may host the grain.</param>
+        void UpdateCache(GrainId grainId, SiloAddress siloAddress);
 
         /// <summary>
         /// Invalidates any lookup cache entry associated with the provided grain id.

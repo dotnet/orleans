@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Runtime.Serialization;
@@ -17,6 +17,9 @@ namespace Orleans.Serialization
         }
 
         /// <inheritdoc />
+#if NET8_0_OR_GREATER
+        [Obsolete]
+#endif
         public UnavailableExceptionFallbackException(SerializationInfo info, StreamingContext context) : base(info, context)
         {
             foreach (var pair in info)

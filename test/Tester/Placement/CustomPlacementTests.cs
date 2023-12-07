@@ -36,8 +36,7 @@ namespace Tester.CustomPlacementTests
 
             private static void ConfigureServices(IServiceCollection services)
             {
-                services.AddSingletonNamedService<PlacementStrategy, TestCustomPlacementStrategy>(nameof(TestCustomPlacementStrategy));
-                services.AddSingletonKeyedService<Type, IPlacementDirector, TestPlacementStrategyFixedSiloDirector>(typeof(TestCustomPlacementStrategy));
+                services.AddPlacementDirector<TestCustomPlacementStrategy, TestPlacementStrategyFixedSiloDirector>();
             }
         }
 
@@ -65,12 +64,12 @@ namespace Tester.CustomPlacementTests
 
             await Task.WhenAll(tasks);
 
-            var silo = tasks[0].Result;
+            var silo = await tasks[0];
             Assert.Equal(silos[silos.Length-2], silo);
 
             for (int i = 1; i < nGrains; i++)
             {
-                Assert.Equal(silo, tasks[i].Result);
+                Assert.Equal(silo, await tasks[i]);
             }
         }
 
@@ -92,7 +91,7 @@ namespace Tester.CustomPlacementTests
 
             for (int i = 1; i < nGrains; i++)
             {
-                Assert.NotEqual(excludedSilo, tasks[i].Result);
+                Assert.NotEqual(excludedSilo, await tasks[i]);
             }
         }
 
@@ -116,7 +115,7 @@ namespace Tester.CustomPlacementTests
 
             for (int i = 1; i < nGrains; i++)
             {
-                Assert.Equal(silos[targetSilo], tasks[i].Result);
+                Assert.Equal(silos[targetSilo], await tasks[i]);
             }
         }
 
@@ -140,7 +139,7 @@ namespace Tester.CustomPlacementTests
             for (int i = 0; i < nGrains; i++)
             {
                 var hash = (int) (grains[i].GetUniformHashCode() & 0x7fffffff);
-                Assert.Equal(siloAddresses[hash % silos.Length], tasks[i].Result);
+                Assert.Equal(siloAddresses[hash % silos.Length], await tasks[i]);
             }
         }
     }

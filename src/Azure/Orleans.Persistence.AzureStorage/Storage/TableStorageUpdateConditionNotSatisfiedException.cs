@@ -98,6 +98,7 @@ namespace Orleans.Storage
         /// <summary>
         /// Exception thrown when an azure table storage exception is thrown due to update conditions not being satisfied.
         /// </summary>
+        [Obsolete]
         protected TableStorageUpdateConditionNotSatisfiedException(SerializationInfo info, StreamingContext context)
             : base(info, context)
         {
@@ -106,7 +107,8 @@ namespace Orleans.Storage
             this.TableName = info.GetString("TableName");
         }
 
-        /// <inheritdoc />
+        /// <inheritdoc />   
+        [Obsolete]
         public override void GetObjectData(SerializationInfo info, StreamingContext context)
         {
             if (info == null) throw new ArgumentNullException(nameof(info));

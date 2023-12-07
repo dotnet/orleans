@@ -7,20 +7,19 @@ using static Orleans.Persistence.Cosmos.CosmosIdSanitizer;
 
 namespace Orleans.Persistence.Cosmos;
 
-internal class CosmosGrainStorage : IGrainStorage, ILifecycleParticipant<ISiloLifecycle>
+public class CosmosGrainStorage : IGrainStorage, ILifecycleParticipant<ISiloLifecycle>
 {
     private const string ANY_ETAG = "*";
     private const string KEY_STRING_SEPARATOR = "__";
-    private const string DEFAULT_PARTITION_KEY_PATH = "/PartitionKey";
     private const string GRAINTYPE_PARTITION_KEY_PATH = "/GrainType";
-    private const HttpStatusCode TOO_MANY_REQUESTS = (HttpStatusCode)429;
     private readonly ILogger _logger;
     private readonly CosmosGrainStorageOptions _options;
     private readonly string _name;
     private readonly IServiceProvider _serviceProvider;
     private readonly string _serviceId;
-    private string _partitionKeyPath = DEFAULT_PARTITION_KEY_PATH;
+    private string _partitionKeyPath;
     private readonly IPartitionKeyProvider _partitionKeyProvider;
+    private readonly ICosmosOperationExecutor _executor;
     private CosmosClient _client = default!;
     private Container _container = default!;
 
@@ -39,6 +38,8 @@ internal class CosmosGrainStorage : IGrainStorage, ILifecycleParticipant<ISiloLi
         _serviceProvider = serviceProvider;
         _serviceId = clusterOptions.Value.ServiceId;
         _partitionKeyProvider = partitionKeyProvider;
+        _executor = options.OperationExecutor;
+        _partitionKeyPath = _options.PartitionKeyPath;
     }
 
     public async Task ReadStateAsync<T>(string grainType, GrainId grainId, IGrainState<T> grainState)
@@ -60,12 +61,12 @@ internal class CosmosGrainStorage : IGrainStorage, ILifecycleParticipant<ISiloLi
         try
         {
             var pk = new PartitionKey(partitionKey);
-            var entity = await ExecuteWithRetries(static (self, args) =>
+            var entity = await _executor.ExecuteOperation(static args =>
             {
-                var (id, pk) = args;
+                var (self, id, pk) = args;
                 return self._container.ReadItemAsync<GrainStateEntity<T>>(id, pk);
             },
-            (id, pk)).ConfigureAwait(false);
+            (this, id, pk)).ConfigureAwait(false);
 
             if (entity.Resource.State != null)
             {
@@ -136,38 +137,38 @@ internal class CosmosGrainStorage : IGrainStorage, ILifecycleParticipant<ISiloLi
             var pk = new PartitionKey(partitionKey);
             if (string.IsNullOrWhiteSpace(grainState.ETag))
             {
-                response = await ExecuteWithRetries(
-                    static (self, args) =>
+                response = await _executor.ExecuteOperation(
+                    static args =>
                     {
-                        var (entity, pk) = args;
+                        var (self, entity, pk) = args;
                         return self._container.CreateItemAsync(entity, pk);
                     },
-                    (entity, pk)).ConfigureAwait(false);
+                    (this, entity, pk)).ConfigureAwait(false);
 
                 grainState.ETag = response.Resource.ETag;
             }
             else if (grainState.ETag == ANY_ETAG)
             {
                 var requestOptions = new ItemRequestOptions { IfMatchEtag = grainState.ETag };
-                response = await ExecuteWithRetries(
-                    static (self, args) =>
+                response = await _executor.ExecuteOperation(
+                    static args =>
                     {
-                        var (entity, pk, requestOptions) = args;
+                        var (self, entity, pk, requestOptions) = args;
                         return self._container.UpsertItemAsync(entity, pk, requestOptions);
                     },
-                    (entity, pk, requestOptions)).ConfigureAwait(false);
+                    (this, entity, pk, requestOptions)).ConfigureAwait(false);
                 grainState.ETag = response.Resource.ETag;
             }
             else
             {
                 var requestOptions = new ItemRequestOptions { IfMatchEtag = grainState.ETag };
-                response = await ExecuteWithRetries(
-                    static (self, args) =>
+                response = await _executor.ExecuteOperation(
+                    static args =>
                     {
-                        var (entity, pk, requestOptions) = args;
+                        var (self, entity, pk, requestOptions) = args;
                         return self._container.ReplaceItemAsync(entity, entity.Id, pk, requestOptions);
                     },
-                    (entity, pk, requestOptions)).ConfigureAwait(false);
+                    (this, entity, pk, requestOptions)).ConfigureAwait(false);
                 grainState.ETag = response.Resource.ETag;
             }
 
@@ -209,14 +210,24 @@ internal class CosmosGrainStorage : IGrainStorage, ILifecycleParticipant<ISiloLi
             if (_options.DeleteStateOnClear)
             {
                 if (string.IsNullOrWhiteSpace(grainState.ETag))
-                    return;  //state not written
-
-                await ExecuteWithRetries(static (self, args) =>
                 {
-                    var (id, pk, requestOptions) = args;
+                    await ReadStateAsync<T>(grainType, grainId, grainState);
+                    if (grainState.RecordExists)
+                    {
+                        // State exists but the current activation has not observed state creation. Therefore, we have inconsistent state and should throw to give the grain a chance to deactivate and recover.
+                        throw new CosmosConditionNotSatisfiedException(grainType, grainId, _options.ContainerName, grainState.ETag, "None");
+                    }
+
+                    // State does not exist.
+                    return;
+                }
+
+                await _executor.ExecuteOperation(static args =>
+                {
+                    var (self, id, pk, requestOptions) = args;
                     return self._container.DeleteItemAsync<GrainStateEntity<T>>(id, pk, requestOptions);
                 },
-                (id, pk, requestOptions));
+                (this, id, pk, requestOptions));
 
                 grainState.ETag = null;
                 grainState.RecordExists = false;
@@ -232,9 +243,9 @@ internal class CosmosGrainStorage : IGrainStorage, ILifecycleParticipant<ISiloLi
                     PartitionKey = partitionKey
                 };
 
-                var response = await ExecuteWithRetries(static (self, args) =>
+                var response = await _executor.ExecuteOperation(static args =>
                 {
-                    var (grainState, entity, pk, requestOptions) = args;
+                    var (self, grainState, entity, pk, requestOptions) = args;
                     return grainState.ETag switch
                     {
                         null or { Length: 0 } => self._container.CreateItemAsync(entity, pk),
@@ -242,7 +253,7 @@ internal class CosmosGrainStorage : IGrainStorage, ILifecycleParticipant<ISiloLi
                         _ => self._container.ReplaceItemAsync(entity, entity.Id, pk, requestOptions),
                     };
                 },
-                (grainState, entity, pk, requestOptions)).ConfigureAwait(false);
+                (this, grainState, entity, pk, requestOptions)).ConfigureAwait(false);
 
                 grainState.ETag = response.Resource.ETag;
                 grainState.RecordExists = true;
@@ -343,7 +354,7 @@ internal class CosmosGrainStorage : IGrainStorage, ILifecycleParticipant<ISiloLi
         var dbResponse = await _client.CreateDatabaseIfNotExistsAsync(_options.DatabaseName, _options.DatabaseThroughput);
         var db = dbResponse.Database;
 
-        var stateContainer = new ContainerProperties(_options.ContainerName, DEFAULT_PARTITION_KEY_PATH);
+        var stateContainer = new ContainerProperties(_options.ContainerName, _options.PartitionKeyPath);
         stateContainer.IndexingPolicy.IndexingMode = IndexingMode.Consistent;
         stateContainer.IndexingPolicy.IncludedPaths.Add(new IncludedPath { Path = "/*" });
         stateContainer.IndexingPolicy.ExcludedPaths.Add(new ExcludedPath { Path = "/\"State\"/*" });
@@ -396,36 +407,23 @@ internal class CosmosGrainStorage : IGrainStorage, ILifecycleParticipant<ISiloLi
             throw;
         }
     }
-
-    private async Task<TResult> ExecuteWithRetries<TArg1, TResult>(Func<CosmosGrainStorage, TArg1, Task<TResult>> clientFunc, TArg1 arg1)
-    {
-        // From:  https://blogs.msdn.microsoft.com/bigdatasupport/2015/09/02/dealing-with-requestratetoolarge-errors-in-azure-documentdb-and-testing-performance/
-        while (true)
-        {
-            TimeSpan sleepTime;
-            try
-            {
-                return await clientFunc(this, arg1).ConfigureAwait(false);
-            }
-            catch (CosmosException dce) when (dce.StatusCode == TOO_MANY_REQUESTS)
-            {
-                sleepTime = dce.RetryAfter ?? TimeSpan.Zero;
-            }
-            catch (AggregateException ae) when (ae.InnerException is CosmosException dce && dce.StatusCode == TOO_MANY_REQUESTS)
-            {
-                sleepTime = dce.RetryAfter ?? TimeSpan.Zero;
-            }
-
-            await Task.Delay(sleepTime);
-        }
-    }
 }
 
 public static class CosmosStorageFactory
 {
-    public static IGrainStorage Create(IServiceProvider services, string name)
+    public static CosmosGrainStorage Create(IServiceProvider services, string name)
     {
         var optionsMonitor = services.GetRequiredService<IOptionsMonitor<CosmosGrainStorageOptions>>();
-        return ActivatorUtilities.CreateInstance<CosmosGrainStorage>(services, name, optionsMonitor.Get(name));
+        var partitionKeyProvider = services.GetKeyedService<IPartitionKeyProvider>(name)
+            ?? services.GetRequiredService<IPartitionKeyProvider>();
+        var loggerFactory = services.GetRequiredService<ILoggerFactory>();
+        var clusterOptions = services.GetRequiredService<IOptions<ClusterOptions>>();
+        return new CosmosGrainStorage(
+            name,
+            optionsMonitor.Get(name),
+            loggerFactory,
+            services,
+            clusterOptions,
+            partitionKeyProvider);
     }
 }

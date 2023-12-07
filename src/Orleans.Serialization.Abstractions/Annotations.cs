@@ -309,7 +309,8 @@ namespace Orleans
         | AttributeTargets.Interface
         | AttributeTargets.Struct
         | AttributeTargets.Enum
-        | AttributeTargets.Method)]
+        | AttributeTargets.Method,
+        AllowMultiple = true)]
     public sealed class AliasAttribute : Attribute
     {
         /// <summary>
@@ -341,7 +342,8 @@ namespace Orleans
         AttributeTargets.Class
         | AttributeTargets.Interface
         | AttributeTargets.Struct
-        | AttributeTargets.Enum)]
+        | AttributeTargets.Enum,
+        AllowMultiple = true)]
     public sealed class CompoundTypeAliasAttribute : Attribute
     {
         /// <summary>

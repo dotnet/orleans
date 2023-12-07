@@ -130,7 +130,7 @@ namespace Orleans.Runtime.Messaging
                 // Invalidate the remote caller's activation cache entry.
                 if (msg.TargetSilo != null)
                 {
-                    rejection.AddToCacheInvalidationHeader(new GrainAddress { GrainId = msg.TargetGrain, SiloAddress = msg.TargetSilo });
+                    rejection.AddToCacheInvalidationHeader(new GrainAddress { GrainId = msg.TargetGrain, SiloAddress = msg.TargetSilo }, validAddress: null);
                 }
 
                 this.Send(rejection);

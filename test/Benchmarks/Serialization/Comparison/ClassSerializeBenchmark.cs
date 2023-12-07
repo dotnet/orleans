@@ -59,7 +59,6 @@ namespace Benchmarks.Comparison
             ProtoSegmentBuffer = new ClassSingleSegmentBuffer(Data);
         }
 
-        [Fact]
         [Benchmark(Baseline = true)]
         public long Orleans()
         {

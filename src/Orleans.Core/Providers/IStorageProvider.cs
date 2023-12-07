@@ -19,6 +19,7 @@ namespace Orleans.Storage
             : base(msg, exc)
         { }
 
+        [Obsolete]
         private BadProviderConfigException(SerializationInfo info, StreamingContext context)
             : base(info, context)
         { }
