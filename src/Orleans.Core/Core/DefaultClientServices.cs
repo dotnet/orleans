@@ -169,24 +169,37 @@ namespace Orleans
             services.Configure<ClusterOptions>(cfg);
             services.Configure<ClientMessagingOptions>(cfg.GetSection("Messaging"));
             services.Configure<GatewayOptions>(cfg.GetSection("Gateway"));
-            var root = new RootConfiguration();
-            cfg.Bind(root);
-            if (root.Clustering is { } clustering)
+            if (cfg.GetSection("Clustering") is { } clustering && clustering.Exists())
             {
                 ConfigureProvider(builder, knownProviderTypes, "Clustering", name: null, clustering);
             }
 
-            static void ConfigureProvider(IClientBuilder builder, Dictionary<(string Kind, string Name), Type> knownProviderTypes, string kind, string? name, IConfigurationSection configurationSection)
+            if (cfg.GetSection("BroadcastChannel") is { } broadcastChannel && broadcastChannel.Exists())
             {
-                if (configurationSection["ProviderType"] is { Length: > 0 } providerType)
+                foreach (var section in broadcastChannel.GetChildren())
                 {
-                    var provider = GetRequiredProvider(knownProviderTypes, kind, providerType);
-                    provider.Configure(builder, name, configurationSection);
+                    ConfigureProvider(builder, knownProviderTypes, "BroadcastChannel", name: section.Key, section);
                 }
-                else
+            }
+
+            if (cfg.GetSection("Streaming") is { } streaming && streaming.Exists())
+            {
+                foreach (var section in streaming.GetChildren())
                 {
-                    throw new OrleansConfigurationException($"Configuration section for provider with path '{configurationSection.Path}' has no ProviderType property");
+                    ConfigureProvider(builder, knownProviderTypes, "Streaming", name: section.Key, section);
                 }
+            }
+
+            static void ConfigureProvider(
+                IClientBuilder builder,
+                Dictionary<(string Kind, string Name), Type> knownProviderTypes,
+                string kind,
+                string? name,
+                IConfigurationSection configurationSection)
+            {
+                var providerType = configurationSection["ProviderType"] ?? "Default";
+                var provider = GetRequiredProvider(knownProviderTypes, kind, providerType);
+                provider.Configure(builder, name, configurationSection);
             }
 
             static IProviderBuilder<IClientBuilder> GetRequiredProvider(Dictionary<(string Kind, string Name), Type> knownProviderTypes, string kind, string name)

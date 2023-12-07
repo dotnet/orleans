@@ -408,6 +408,11 @@ namespace Orleans.Hosting
             var cfg = builder.Configuration.GetSection("Orleans");
             var knownProviderTypes = GetRegisteredProviders();
 
+            if (cfg["Name"] is { Length: > 0 } name)
+            {
+                services.Configure<SiloOptions>(siloOptions => siloOptions.SiloName = name);
+            }
+
             services.Configure<ClusterOptions>(cfg);
             services.Configure<SiloMessagingOptions>(cfg.GetSection("Messaging"));
             if (cfg.GetSection("Endpoints") is { } ep && ep.Exists())
@@ -415,37 +420,45 @@ namespace Orleans.Hosting
                 services.Configure<EndpointOptions>(o => o.Bind(ep));
             }
 
-            var root = new RootConfiguration();
-            cfg.Bind(root);
-            if (root.Clustering is { } clustering)
+            if (cfg.GetSection("Clustering") is { } clustering && clustering.Exists())
             {
                 ConfigureProvider(builder, knownProviderTypes, "Clustering", name: null, clustering);
             }
 
-            if (root.Reminders is { } reminders)
+            if (cfg.GetSection("Reminders") is { } reminders && reminders.Exists())
             {
                 ConfigureProvider(builder, knownProviderTypes, "Reminders", name: null, reminders);
             }
 
-            if (root.GrainStorage is { Count: > 0 } grainStorageProviders)
+            if (cfg.GetSection("GrainStorage") is { } grainStorage && grainStorage.Exists())
             {
-                foreach (var (grainStorageName, grainStorageSection) in grainStorageProviders)
+                foreach (var child in grainStorage.GetChildren())
                 {
-                    ConfigureProvider(builder, knownProviderTypes, "GrainStorage", name: grainStorageName, grainStorageSection);
+                    ConfigureProvider(builder, knownProviderTypes, "GrainStorage", name: child.Key, child);
+                }
+            }
+
+            if (cfg.GetSection("BroadcastChannel") is { } broadcastChannel && broadcastChannel.Exists())
+            {
+                foreach (var section in broadcastChannel.GetChildren())
+                {
+                    ConfigureProvider(builder, knownProviderTypes, "BroadcastChannel", name: section.Key, section);
+                }
+            }
+
+            if (cfg.GetSection("Streaming") is { } streaming && streaming.Exists())
+            {
+                foreach (var section in streaming.GetChildren())
+                {
+                    ConfigureProvider(builder, knownProviderTypes, "Streaming", name: section.Key, section);
                 }
             }
 
             static void ConfigureProvider(ISiloBuilder builder, Dictionary<(string Kind, string Name), Type> knownProviderTypes, string kind, string? name, IConfigurationSection configurationSection)
             {
-                if (configurationSection["ProviderType"] is { Length: > 0 } providerType)
-                {
-                    var provider = GetRequiredProvider(knownProviderTypes, kind, providerType);
-                    provider.Configure(builder, name, configurationSection);
-                }
-                else
-                {
-                    throw new OrleansConfigurationException($"Configuration section for provider with path '{configurationSection.Path}' has no ProviderType property");
-                }
+                var providerType = configurationSection["ProviderType"] ?? "Default";
+                var provider = GetRequiredProvider(knownProviderTypes, kind, providerType);
+                provider.Configure(builder, name, configurationSection);
             }
 
             static IProviderBuilder<ISiloBuilder> GetRequiredProvider(Dictionary<(string Kind, string Name), Type> knownProviderTypes, string kind, string name)
@@ -476,13 +489,6 @@ namespace Orleans.Hosting
 
                 return result;
             }
-        }
-
-        internal partial class RootConfiguration
-        {
-            public Dictionary<string, IConfigurationSection>? GrainStorage { get; set; }
-            public IConfigurationSection? Clustering { get; set; }
-            public IConfigurationSection? Reminders { get; set; }
         }
 
         private class AllowOrleansTypes : ITypeNameFilter

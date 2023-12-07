@@ -34,7 +34,7 @@ namespace Orleans.TestingHost
         /// <returns>A new silo.</returns>
         public static IHost CreateSiloHost(string hostName, IConfiguration configuration, Action<IHostBuilder> postConfigureHostBuilder = null)
         {
-            string siloName = configuration[nameof(TestSiloSpecificOptions.SiloName)] ?? hostName;
+            string siloName = configuration["Name"] ?? hostName;
 
             var hostBuilder = new HostBuilder();
             hostBuilder.UseEnvironment(Environments.Development);
@@ -44,8 +44,6 @@ namespace Orleans.TestingHost
             hostBuilder.UseOrleans((ctx, siloBuilder) =>
             {
                 siloBuilder.Services
-                    .Configure<ClusterOptions>(configuration)
-                    .Configure<SiloOptions>(options => options.SiloName = siloName)
                     .Configure<HostOptions>(options => options.ShutdownTimeout = TimeSpan.FromSeconds(30));
             });
 
@@ -56,9 +54,8 @@ namespace Orleans.TestingHost
                 services.AddSingleton<TestHooksHostEnvironmentStatistics>();
                 services.AddFromExisting<IHostEnvironmentStatistics, TestHooksHostEnvironmentStatistics>();
                 services.AddSingleton<TestHooksSystemTarget>();
-                ConfigureListeningPorts(context.Configuration, services);
 
-                TryConfigureClusterMembership(context.Configuration, services);
+                //TryConfigureClusterMembership(context.Configuration, services);
                 TryConfigureFileLogging(configuration, services, siloName);
 
                 if (Debugger.IsAttached)
@@ -88,17 +85,14 @@ namespace Orleans.TestingHost
             hostBuilder.Properties["Configuration"] = configuration;
             hostBuilder.ConfigureHostConfiguration(cb => cb.AddConfiguration(configuration));
 
-            hostBuilder.UseOrleansClient(clientBuilder =>
-            {
-                clientBuilder.Configure<ClusterOptions>(configuration);
-            });
+            hostBuilder.UseOrleansClient();
 
             ConfigureClientAppServices(configuration, hostBuilder);
 
             hostBuilder
                 .ConfigureServices(services =>
                 {
-                    TryConfigureClientMembership(configuration, services);
+                    //TryConfigureClientMembership(configuration, services);
                     TryConfigureFileLogging(configuration, services, hostName);
                 });
 
@@ -141,24 +135,6 @@ namespace Orleans.TestingHost
             var enumerated = JsonConvert.DeserializeObject<KeyValuePair<string, string>[]>(serializedSources, settings);
             builder.AddInMemoryCollection(enumerated);
             return builder.Build();
-        }
-
-        private static void ConfigureListeningPorts(IConfiguration configuration, IServiceCollection services)
-        {
-            int siloPort = int.Parse(configuration[nameof(TestSiloSpecificOptions.SiloPort)]);
-            int gatewayPort = int.Parse(configuration[nameof(TestSiloSpecificOptions.GatewayPort)]);
-
-            services.Configure<EndpointOptions>(options =>
-            {
-                options.AdvertisedIPAddress = IPAddress.Loopback;
-                options.SiloPort = siloPort;
-                options.GatewayPort = gatewayPort;
-                options.SiloListeningEndpoint = new IPEndPoint(IPAddress.Loopback, siloPort);
-                if (gatewayPort != 0)
-                {
-                    options.GatewayListeningEndpoint = new IPEndPoint(IPAddress.Loopback, gatewayPort);
-                }
-            });
         }
 
         private static void ConfigureAppServices(IConfiguration configuration, IHostBuilder hostBuilder)
@@ -207,7 +183,7 @@ namespace Orleans.TestingHost
             // If the test involves a custom membership oracle and no membership table, special care will be required
             if (useTestClusterMembership && services.All(svc => svc.ServiceType != typeof(IMembershipTable)))
             {
-                var primarySiloEndPoint = new IPEndPoint(IPAddress.Loopback, int.Parse(configuration[nameof(TestSiloSpecificOptions.PrimarySiloPort)]));
+                var primarySiloEndPoint = new IPEndPoint(IPAddress.Loopback, int.Parse(configuration[nameof(TestSiloSpecificOptions.PrimarySiloEndPoint)]));
 
                 services.Configure<DevelopmentClusterMembershipOptions>(options => options.PrimarySiloEndpoint = primarySiloEndPoint);
                 services
@@ -238,10 +214,8 @@ namespace Orleans.TestingHost
                         options.Gateways = new List<Uri> { new IPEndPoint(IPAddress.Loopback, baseGatewayPort).ToGatewayUri() };
                     }
                 };
-                if (configureOptions != null)
-                {
-                    services.Configure(configureOptions);
-                }
+
+                services.Configure(configureOptions);
 
                 services.AddSingleton<IGatewayListProvider, StaticGatewayListProvider>()
                     .ConfigureFormatter<StaticGatewayListProviderOptions>();

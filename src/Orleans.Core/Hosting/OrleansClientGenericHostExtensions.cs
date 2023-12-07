@@ -18,6 +18,18 @@ namespace Microsoft.Extensions.Hosting
         /// Configures the host app builder to host an Orleans client.
         /// </summary>
         /// <param name="hostAppBuilder">The host app builder.</param>
+        /// <returns>The host builder.</returns>
+        /// <remarks>
+        /// Calling this method multiple times on the same <see cref="IClientBuilder"/> instance will result in one client being configured.
+        /// Note that this method shouldn't be used in conjunction with HostApplicationBuilder.UseOrleans, since UseOrleans includes a client automatically.
+        /// </remarks>
+        /// <exception cref="ArgumentNullException"><paramref name="hostAppBuilder"/> was null.</exception>
+        public static HostApplicationBuilder UseOrleansClient(this HostApplicationBuilder hostAppBuilder) => UseOrleansClient(hostAppBuilder, _ => { });
+
+        /// <summary>
+        /// Configures the host app builder to host an Orleans client.
+        /// </summary>
+        /// <param name="hostAppBuilder">The host app builder.</param>
         /// <param name="configureDelegate">The delegate used to configure the client.</param>
         /// <returns>The host builder.</returns>
         /// <remarks>
@@ -37,6 +49,18 @@ namespace Microsoft.Extensions.Hosting
 
             return hostAppBuilder;
         }
+
+        /// <summary>
+        /// Configures the host builder to host an Orleans client.
+        /// </summary>
+        /// <param name="hostBuilder">The host builder.</param>
+        /// <returns>The host builder.</returns>
+        /// <remarks>
+        /// Calling this method multiple times on the same <see cref="IClientBuilder"/> instance will result in one client being configured.
+        /// Note that this method should not be used in conjunction with IHostBuilder.UseOrleans, since UseOrleans includes a client automatically.
+        /// </remarks>
+        /// <exception cref="ArgumentNullException"><paramref name="hostBuilder"/> was null.</exception>
+        public static IHostBuilder UseOrleansClient(this IHostBuilder hostBuilder) => hostBuilder.UseOrleansClient((_, _) => { });
 
         /// <summary>
         /// Configures the host builder to host an Orleans client.

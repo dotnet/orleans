@@ -7,7 +7,7 @@ using Orleans.Configuration;
 namespace Orleans.Messaging
 {
     /// <summary>
-    /// <see cref="IGatewayListProvider"/> implmementation which returns a static list, configured via <see cref="StaticGatewayListProviderOptions"/>.
+    /// <see cref="IGatewayListProvider"/> implementation which returns a static list, configured via <see cref="StaticGatewayListProviderOptions"/>.
     /// </summary>
     public class StaticGatewayListProvider : IGatewayListProvider
     {

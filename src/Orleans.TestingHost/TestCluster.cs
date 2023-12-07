@@ -16,6 +16,7 @@ using Microsoft.Extensions.Options;
 using Microsoft.Extensions.Hosting;
 using Orleans.TestingHost.InMemoryTransport;
 using Orleans.TestingHost.UnixSocketTransport;
+using System.Net;
 
 namespace Orleans.TestingHost
 {
@@ -569,6 +570,29 @@ namespace Orleans.TestingHost
             {
                 configurationBuilder.Add(source);
             }
+            if (options.UseTestClusterMembership)
+            {
+                var gateways = new List<IPEndPoint>();
+                if (options.GatewayPerSilo)
+                {
+                    gateways.AddRange(Enumerable.Range(options.BaseGatewayPort, options.InitialSilosCount).Select(port => new IPEndPoint(IPAddress.Loopback, port)));
+                }
+                else
+                {
+                    gateways.Add(new IPEndPoint(IPAddress.Loopback, options.BaseGatewayPort));
+                }
+
+                var clustering = new Dictionary<string, string>();
+                var i = 0;
+                foreach (var v in gateways)
+                {
+                    clustering[$"Orleans:Clustering:Gateways:{i++}"] = v.ToString();
+                }
+
+                clustering["Orleans:Clustering:ProviderType"] = "Static";
+                configurationBuilder.AddInMemoryCollection(clustering);
+            }
+
             var configuration = configurationBuilder.Build();
 
             this.ClientHost = TestClusterHostFactory.CreateClusterClient(
