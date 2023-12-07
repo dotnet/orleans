@@ -1,5 +1,6 @@
 using System;
 using System.Linq;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Hosting;
 using Orleans.Runtime;
@@ -18,6 +19,9 @@ namespace Microsoft.Extensions.Hosting
         /// </summary>
         /// <param name="hostAppBuilder">The host app builder.</param>
         /// <returns>The host builder.</returns>
+        /// <remarks>
+        /// Calling this method multiple times on the same <see cref="HostApplicationBuilder"/> instance will result in one silo being configured.
+        /// </remarks>
         public static HostApplicationBuilder UseOrleans(
             this HostApplicationBuilder hostAppBuilder) =>
             hostAppBuilder.UseOrleans(_ => { });
@@ -39,7 +43,7 @@ namespace Microsoft.Extensions.Hosting
             ArgumentNullException.ThrowIfNull(hostAppBuilder);
             ArgumentNullException.ThrowIfNull(configureDelegate);
 
-            hostAppBuilder.Services.AddOrleans(configureDelegate);
+            configureDelegate(AddOrleansCore(hostAppBuilder.Services, hostAppBuilder.Configuration));
 
             return hostAppBuilder;
         }
@@ -82,7 +86,7 @@ namespace Microsoft.Extensions.Hosting
 
             hostBuilder.Properties["HasOrleansSiloBuilder"] = "true";
 
-            return hostBuilder.ConfigureServices((context, services) => configureDelegate(context, AddOrleans(services)));
+            return hostBuilder.ConfigureServices((context, services) => configureDelegate(context, AddOrleansCore(services, context.Configuration)));
         }
 
         /// <summary>
@@ -101,22 +105,22 @@ namespace Microsoft.Extensions.Hosting
         {
             ArgumentNullException.ThrowIfNull(configureDelegate);
 
-            var builder = AddOrleans(services);
+            var builder = AddOrleansCore(services, null);
 
             configureDelegate(builder);
 
             return services;
         }
 
-        private static ISiloBuilder AddOrleans(IServiceCollection services)
+        private static ISiloBuilder AddOrleansCore(IServiceCollection services, IConfiguration configuration)
         {
             ISiloBuilder builder = default;
+            configuration ??= new ConfigurationBuilder().Build();
             foreach (var descriptor in services.Where(d => d.ServiceType.Equals(MarkerType)))
             {
                 var marker = (OrleansBuilderMarker)descriptor.ImplementationInstance;
                 builder = marker.BuilderInstance switch
                 {
-
                     ISiloBuilder existingBuilder => existingBuilder,
                     _ => throw GetOrleansClientAddedException()
                 };
@@ -124,7 +128,7 @@ namespace Microsoft.Extensions.Hosting
 
             if (builder is null)
             {
-                builder = new SiloBuilder(services);
+                builder = new SiloBuilder(services, configuration);
                 services.AddSingleton(new OrleansBuilderMarker(builder));
             }
 

@@ -1,3 +1,4 @@
+#nullable enable
 using Orleans.Configuration;
 using Microsoft.AspNetCore.Connections;
 using Microsoft.Extensions.DependencyInjection;
@@ -19,6 +20,12 @@ using Orleans.Serialization.Serializers;
 using Orleans.Serialization.Cloning;
 using Microsoft.Extensions.Hosting;
 using System.Runtime.InteropServices;
+using System.Collections.Generic;
+using Orleans.Serialization.Internal;
+using System;
+using Orleans.Hosting;
+using System.Reflection;
+using Microsoft.Extensions.Configuration;
 
 namespace Orleans
 {
@@ -32,9 +39,10 @@ namespace Orleans
         /// <summary>
         /// Configures the default services for a client.
         /// </summary>
-        /// <param name="services">The service collection.</param>
-        public static void AddDefaultServices(IServiceCollection services)
+        /// <param name="builder">The client builder.</param>
+        public static void AddDefaultServices(IClientBuilder builder)
         {
+            var services = builder.Services;
             if (services.Contains(ServiceDescriptor))
             {
                 return;
@@ -148,6 +156,72 @@ namespace Orleans
             services.AddSingleton<IGrainInterfacePropertiesProvider, TypeNameGrainPropertiesProvider>();
             services.AddSingleton<IGrainPropertiesProvider, TypeNameGrainPropertiesProvider>();
             services.AddSingleton<IGrainPropertiesProvider, ImplementedInterfaceProvider>();
+
+            ApplyConfiguration(builder);
+        }
+
+        private static void ApplyConfiguration(IClientBuilder builder)
+        {
+            var services = builder.Services;
+            var cfg = builder.Configuration.GetSection("Orleans");
+            var knownProviderTypes = GetRegisteredProviders();
+
+            services.Configure<ClusterOptions>(cfg);
+            services.Configure<ClientMessagingOptions>(cfg.GetSection("Messaging"));
+            services.Configure<GatewayOptions>(cfg.GetSection("Gateway"));
+            var root = new RootConfiguration();
+            cfg.Bind(root);
+            if (root.Clustering is { } clustering)
+            {
+                ConfigureProvider(builder, knownProviderTypes, "Clustering", name: null, clustering);
+            }
+
+            static void ConfigureProvider(IClientBuilder builder, Dictionary<(string Kind, string Name), Type> knownProviderTypes, string kind, string? name, IConfigurationSection configurationSection)
+            {
+                if (configurationSection["ProviderType"] is { Length: > 0 } providerType)
+                {
+                    var provider = GetRequiredProvider(knownProviderTypes, kind, providerType);
+                    provider.Configure(builder, name, configurationSection);
+                }
+                else
+                {
+                    throw new OrleansConfigurationException($"Configuration section for provider with path '{configurationSection.Path}' has no ProviderType property");
+                }
+            }
+
+            static IProviderBuilder<IClientBuilder> GetRequiredProvider(Dictionary<(string Kind, string Name), Type> knownProviderTypes, string kind, string name)
+            {
+                if (knownProviderTypes.TryGetValue((kind, name), out var type))
+                {
+                    var instance = Activator.CreateInstance(type);
+                    return instance as IProviderBuilder<IClientBuilder>
+                        ?? throw new InvalidOperationException($"{kind} provider, '{name}', of type {type}, does not implement {typeof(IProviderBuilder<IClientBuilder>)}.");
+                }
+
+                throw new InvalidOperationException($"Could not find {kind} provider named '{name}'. This can indicate that either the 'Microsoft.Orleans.Sdk' package the provider's package are not referenced by your application.");
+            }
+
+            static Dictionary<(string Kind, string Name), Type> GetRegisteredProviders()
+            {
+                var result = new Dictionary<(string, string), Type>();
+                foreach (var asm in ReferencedAssemblyProvider.GetRelevantAssemblies())
+                {
+                    foreach (var attr in asm.GetCustomAttributes<RegisterProviderAttribute>())
+                    {
+                        if (string.Equals(attr.Target, "Client"))
+                        {
+                            result[(attr.Kind, attr.Name)] = attr.Type;
+                        }
+                    }
+                }
+
+                return result;
+            }
+        }
+
+        internal partial class RootConfiguration
+        {
+            public IConfigurationSection? Clustering { get; set; }
         }
 
         /// <summary>

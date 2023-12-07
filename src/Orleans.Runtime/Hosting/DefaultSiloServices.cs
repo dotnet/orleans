@@ -1,3 +1,4 @@
+#nullable enable
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Orleans.Configuration;
@@ -38,6 +39,9 @@ using Orleans.Serialization.TypeSystem;
 using Orleans.Serialization.Serializers;
 using Orleans.Serialization.Cloning;
 using System.Runtime.InteropServices;
+using System.Collections.Generic;
+using Microsoft.Extensions.Configuration;
+using Orleans.Serialization.Internal;
 
 namespace Orleans.Hosting
 {
@@ -45,8 +49,9 @@ namespace Orleans.Hosting
     {
         private static readonly ServiceDescriptor ServiceDescriptor = new(typeof(ServicesAdded), new ServicesAdded());
 
-        internal static void AddDefaultServices(IServiceCollection services)
+        internal static void AddDefaultServices(ISiloBuilder builder)
         {
+            var services = builder.Services;
             if (services.Contains(ServiceDescriptor))
             {
                 return;
@@ -92,7 +97,7 @@ namespace Orleans.Hosting
             services.TryAddSingleton<IGrainCancellationTokenRuntime, GrainCancellationTokenRuntime>();
             services.AddTransient<CancellationSourcesExtension>();
             services.AddKeyedTransient<IGrainExtension>(typeof(ICancellationSourcesExtension), (sp, _) => sp.GetRequiredService<CancellationSourcesExtension>());
-            services.TryAddSingleton<GrainFactory>(sp => sp.GetService<InsideRuntimeClient>().ConcreteGrainFactory);
+            services.TryAddSingleton<GrainFactory>(sp => sp.GetRequiredService<InsideRuntimeClient>().ConcreteGrainFactory);
             services.TryAddSingleton<GrainInterfaceTypeToGrainTypeResolver>();
             services.TryAddFromExisting<IGrainFactory, GrainFactory>();
             services.TryAddFromExisting<IInternalGrainFactory, GrainFactory>();
@@ -393,6 +398,91 @@ namespace Orleans.Hosting
             services.AddSingleton<MigrationContext.SerializationHooks>();
             services.AddSingleton<ActivationMigrationManager>();
             services.AddFromExisting<IActivationMigrationManager, ActivationMigrationManager>();
+
+            ApplyConfiguration(builder);
+        }
+
+        private static void ApplyConfiguration(ISiloBuilder builder)
+        {
+            var services = builder.Services;
+            var cfg = builder.Configuration.GetSection("Orleans");
+            var knownProviderTypes = GetRegisteredProviders();
+
+            services.Configure<ClusterOptions>(cfg);
+            services.Configure<SiloMessagingOptions>(cfg.GetSection("Messaging"));
+            if (cfg.GetSection("Endpoints") is { } ep && ep.Exists())
+            {
+                services.Configure<EndpointOptions>(o => o.Bind(ep));
+            }
+
+            var root = new RootConfiguration();
+            cfg.Bind(root);
+            if (root.Clustering is { } clustering)
+            {
+                ConfigureProvider(builder, knownProviderTypes, "Clustering", name: null, clustering);
+            }
+
+            if (root.Reminders is { } reminders)
+            {
+                ConfigureProvider(builder, knownProviderTypes, "Reminders", name: null, reminders);
+            }
+
+            if (root.GrainStorage is { Count: > 0 } grainStorageProviders)
+            {
+                foreach (var (grainStorageName, grainStorageSection) in grainStorageProviders)
+                {
+                    ConfigureProvider(builder, knownProviderTypes, "GrainStorage", name: grainStorageName, grainStorageSection);
+                }
+            }
+
+            static void ConfigureProvider(ISiloBuilder builder, Dictionary<(string Kind, string Name), Type> knownProviderTypes, string kind, string? name, IConfigurationSection configurationSection)
+            {
+                if (configurationSection["ProviderType"] is { Length: > 0 } providerType)
+                {
+                    var provider = GetRequiredProvider(knownProviderTypes, kind, providerType);
+                    provider.Configure(builder, name, configurationSection);
+                }
+                else
+                {
+                    throw new OrleansConfigurationException($"Configuration section for provider with path '{configurationSection.Path}' has no ProviderType property");
+                }
+            }
+
+            static IProviderBuilder<ISiloBuilder> GetRequiredProvider(Dictionary<(string Kind, string Name), Type> knownProviderTypes, string kind, string name)
+            {
+                if (knownProviderTypes.TryGetValue((kind, name), out var type))
+                {
+                    var instance = Activator.CreateInstance(type);
+                    return instance as IProviderBuilder<ISiloBuilder>
+                        ?? throw new InvalidOperationException($"{kind} provider, '{name}', of type {type}, does not implement {typeof(IProviderBuilder<ISiloBuilder>)}.");
+                }
+
+                throw new InvalidOperationException($"Could not find {kind} provider named '{name}'. This can indicate that either the 'Microsoft.Orleans.Sdk' or the provider's package are not referenced by your application.");
+            }
+
+            static Dictionary<(string Kind, string Name), Type> GetRegisteredProviders()
+            {
+                var result = new Dictionary<(string, string), Type>();
+                foreach (var asm in ReferencedAssemblyProvider.GetRelevantAssemblies())
+                {
+                    foreach (var attr in asm.GetCustomAttributes<RegisterProviderAttribute>())
+                    {
+                        if (string.Equals(attr.Target, "Silo"))
+                        {
+                            result[(attr.Kind, attr.Name)] = attr.Type;
+                        }
+                    }
+                }
+
+                return result;
+            }
+        }
+
+        internal partial class RootConfiguration
+        {
+            public Dictionary<string, IConfigurationSection>? GrainStorage { get; set; }
+            public IConfigurationSection? Clustering { get; set; }
+            public IConfigurationSection? Reminders { get; set; }
         }
 
         private class AllowOrleansTypes : ITypeNameFilter

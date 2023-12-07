@@ -43,7 +43,7 @@ namespace Orleans.TestingHost
 
             hostBuilder.UseOrleans((ctx, siloBuilder) =>
             {
-                siloBuilder
+                siloBuilder.Services
                     .Configure<ClusterOptions>(configuration)
                     .Configure<SiloOptions>(options => options.SiloName = siloName)
                     .Configure<HostOptions>(options => options.ShutdownTimeout = TimeSpan.FromSeconds(30));

@@ -188,7 +188,7 @@ namespace UnitTests.MembershipTests
         {
             public void Configure(IConfiguration configuration, IClientBuilder clientBuilder)
             {
-                clientBuilder.Configure<GatewayOptions>(options => options.PreferedGatewayIndex = 1);
+                clientBuilder.Configure<GatewayOptions>(options => options.PreferredGatewayIndex = 1);
             }
         }
 

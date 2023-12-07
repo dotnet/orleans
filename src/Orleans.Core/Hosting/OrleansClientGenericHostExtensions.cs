@@ -1,5 +1,6 @@
 using System;
 using System.Linq;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Hosting;
 using Orleans.Runtime;
@@ -32,7 +33,7 @@ namespace Microsoft.Extensions.Hosting
             ArgumentNullException.ThrowIfNull(hostAppBuilder);
             ArgumentNullException.ThrowIfNull(configureDelegate);
 
-            hostAppBuilder.Services.AddOrleansClient(configureDelegate);
+            hostAppBuilder.Services.AddOrleansClient(hostAppBuilder.Configuration, configureDelegate);
 
             return hostAppBuilder;
         }
@@ -76,7 +77,7 @@ namespace Microsoft.Extensions.Hosting
 
             hostBuilder.Properties["HasOrleansClientBuilder"] = "true";
 
-            return hostBuilder.ConfigureServices((ctx, services) => configureDelegate(ctx, AddOrleansClient(services)));
+            return hostBuilder.ConfigureServices((ctx, services) => configureDelegate(ctx, AddOrleansClient(services, ctx.Configuration)));
         }
 
         /// <summary>
@@ -95,14 +96,36 @@ namespace Microsoft.Extensions.Hosting
         {
             ArgumentNullException.ThrowIfNull(configureDelegate);
 
-            var clientBuilder = AddOrleansClient(services);
-
+            var clientBuilder = AddOrleansClient(services, configuration: null);
             configureDelegate(clientBuilder);
             return services;
         }
 
-        private static IClientBuilder AddOrleansClient(IServiceCollection services)
+        /// <summary>
+        /// Configures the service collection to host an Orleans client.
+        /// </summary>
+        /// <param name="services">The service collection.</param>
+        /// <param name="configuration">The configuration.</param>
+        /// <param name="configureDelegate">The delegate used to configure the client.</param>
+        /// <returns>The service collection.</returns>
+        /// <remarks>
+        /// Calling this method multiple times on the same <see cref="IClientBuilder"/> instance will result in one client being configured.
+        /// However, the effects of <paramref name="configureDelegate"/> will be applied once for each call.
+        /// Note that this method should not be used in conjunction with UseOrleans, since UseOrleans includes a client automatically.
+        /// </remarks>
+        /// <exception cref="ArgumentNullException"><paramref name="services"/> was null or <paramref name="configureDelegate"/> was null.</exception>
+        public static IServiceCollection AddOrleansClient(this IServiceCollection services, IConfiguration configuration, Action<IClientBuilder> configureDelegate)
         {
+            ArgumentNullException.ThrowIfNull(configureDelegate);
+
+            var clientBuilder = AddOrleansClient(services, configuration: configuration);
+            configureDelegate(clientBuilder);
+            return services;
+        }
+
+        private static IClientBuilder AddOrleansClient(IServiceCollection services, IConfiguration configuration)
+        {
+            configuration ??= new ConfigurationBuilder().Build();
             IClientBuilder clientBuilder = default;
             foreach (var descriptor in services.Where(d => d.ServiceType.Equals(MarkerType)))
             {
@@ -116,7 +139,7 @@ namespace Microsoft.Extensions.Hosting
 
             if (clientBuilder is null)
             {
-                clientBuilder = new ClientBuilder(services);
+                clientBuilder = new ClientBuilder(services, configuration);
                 services.AddSingleton(new OrleansBuilderMarker(clientBuilder));
             }
 
