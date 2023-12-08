@@ -107,7 +107,7 @@ namespace Orleans.GrainDirectory.AzureStorage
         {
             if (CreateClient is null)
             {
-                throw new OrleansConfigurationException($"No credentials specified. Use the {GetType().Name}.{nameof(AzureStorageOperationOptions.ConfigureTableServiceClient)} method to configure the Azure Table Service client.");
+                throw new OrleansConfigurationException($"No credentials specified. Use the {GetType().Name}.{nameof(ConfigureTableServiceClient)} method to configure the Azure Table Service client.");
             }
 
             try

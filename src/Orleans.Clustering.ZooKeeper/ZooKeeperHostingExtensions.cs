@@ -7,6 +7,7 @@ using Orleans.Configuration;
 
 namespace Orleans.Hosting
 {
+
     public static class ZooKeeperHostingExtensions
     {
         /// <summary>

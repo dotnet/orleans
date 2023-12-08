@@ -420,39 +420,12 @@ namespace Orleans.Hosting
                 services.Configure<EndpointOptions>(o => o.Bind(ep));
             }
 
-            if (cfg.GetSection("Clustering") is { } clustering && clustering.Exists())
-            {
-                ConfigureProvider(builder, knownProviderTypes, "Clustering", name: null, clustering);
-            }
-
-            if (cfg.GetSection("Reminders") is { } reminders && reminders.Exists())
-            {
-                ConfigureProvider(builder, knownProviderTypes, "Reminders", name: null, reminders);
-            }
-
-            if (cfg.GetSection("GrainStorage") is { } grainStorage && grainStorage.Exists())
-            {
-                foreach (var child in grainStorage.GetChildren())
-                {
-                    ConfigureProvider(builder, knownProviderTypes, "GrainStorage", name: child.Key, child);
-                }
-            }
-
-            if (cfg.GetSection("BroadcastChannel") is { } broadcastChannel && broadcastChannel.Exists())
-            {
-                foreach (var section in broadcastChannel.GetChildren())
-                {
-                    ConfigureProvider(builder, knownProviderTypes, "BroadcastChannel", name: section.Key, section);
-                }
-            }
-
-            if (cfg.GetSection("Streaming") is { } streaming && streaming.Exists())
-            {
-                foreach (var section in streaming.GetChildren())
-                {
-                    ConfigureProvider(builder, knownProviderTypes, "Streaming", name: section.Key, section);
-                }
-            }
+            ApplySubsection(builder, cfg, knownProviderTypes, "Clustering");
+            ApplySubsection(builder, cfg, knownProviderTypes, "Reminders");
+            ApplyNamedSubsections(builder, cfg, knownProviderTypes, "BroadcastChannel");
+            ApplyNamedSubsections(builder, cfg, knownProviderTypes, "Streaming");
+            ApplyNamedSubsections(builder, cfg, knownProviderTypes, "GrainStorage");
+            ApplyNamedSubsections(builder, cfg, knownProviderTypes, "GrainDirectory");
 
             static void ConfigureProvider(ISiloBuilder builder, Dictionary<(string Kind, string Name), Type> knownProviderTypes, string kind, string? name, IConfigurationSection configurationSection)
             {
@@ -488,6 +461,25 @@ namespace Orleans.Hosting
                 }
 
                 return result;
+            }
+
+            static void ApplySubsection(ISiloBuilder builder, IConfigurationSection cfg, Dictionary<(string Kind, string Name), Type> knownProviderTypes, string sectionName)
+            {
+                if (cfg.GetSection(sectionName) is { } section && section.Exists())
+                {
+                    ConfigureProvider(builder, knownProviderTypes, sectionName, name: null, section);
+                }
+            }
+
+            static void ApplyNamedSubsections(ISiloBuilder builder, IConfigurationSection cfg, Dictionary<(string Kind, string Name), Type> knownProviderTypes, string sectionName)
+            {
+                if (cfg.GetSection(sectionName) is { } section && section.Exists())
+                {
+                    foreach (var child in section.GetChildren())
+                    {
+                        ConfigureProvider(builder, knownProviderTypes, sectionName, name: child.Key, child);
+                    }
+                }
             }
         }
 

@@ -1,5 +1,5 @@
 var builder = Host.CreateApplicationBuilder(args);
-builder.UseOrleans();
+builder.UseOrleansClient();
 using var app = builder.Build();
 
 await app.StartAsync();
@@ -13,14 +13,3 @@ for (var i = 0; i < 10; i++)
 }
 
 await app.WaitForShutdownAsync();
-
-public interface ICounterGrain : IGrainWithStringKey
-{
-    ValueTask<int> Increment();
-}
-
-public class CounterGrain : Grain, ICounterGrain
-{
-    private int _count;
-    public ValueTask<int> Increment() => new(++_count);
-}
