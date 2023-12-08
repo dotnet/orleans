@@ -4,8 +4,13 @@ using Azure.Data.Tables;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
+using Orleans;
 using Orleans.Clustering.AzureStorage;
+using Orleans.Hosting;
 using Orleans.Providers;
+
+[assembly: RegisterProvider("AzureTableStorage", "Clustering", "Silo", typeof(AzureTableStorageClusteringProviderBuilder))]
+[assembly: RegisterProvider("AzureTableStorage", "Clustering", "Client", typeof(AzureTableStorageClusteringProviderBuilder))]
 
 namespace Orleans.Hosting;
 
@@ -16,12 +21,17 @@ internal sealed class AzureTableStorageClusteringProviderBuilder : IProviderBuil
         builder.UseAzureStorageClustering((OptionsBuilder<AzureStorageClusteringOptions> optionsBuilder) =>
             optionsBuilder.Configure<IServiceProvider>((options, services) =>
             {
+                var tableName = configurationSection["TableName"];
+                if (!string.IsNullOrEmpty(tableName))
+                {
+                    options.TableName = tableName; 
+                }
+
                 var serviceKey = configurationSection["ServiceKey"];
                 if (!string.IsNullOrEmpty(serviceKey))
                 {
                     // Get a client by name.
-                    var client = services.GetKeyedService<TableServiceClient>(serviceKey);
-                    options.ConfigureTableServiceClient(() => Task.FromResult(client));
+                    options.TableServiceClient = services.GetRequiredKeyedService<TableServiceClient>(serviceKey);
                 }
                 else
                 {
@@ -36,11 +46,45 @@ internal sealed class AzureTableStorageClusteringProviderBuilder : IProviderBuil
 
                     if (!string.IsNullOrEmpty(connectionString))
                     {
-                        options.ConfigureTableServiceClient(connectionString);
+                        options.TableServiceClient = new TableServiceClient(connectionString);
                     }
                 }
             }));
     }
 
-    public void Configure(IClientBuilder builder, string name, IConfigurationSection configurationSection) => throw new System.NotImplementedException();
+    public void Configure(IClientBuilder builder, string name, IConfigurationSection configurationSection)
+    {
+        builder.UseAzureStorageClustering((OptionsBuilder<AzureStorageGatewayOptions> optionsBuilder) =>
+            optionsBuilder.Configure<IServiceProvider>((options, services) =>
+            {
+                var tableName = configurationSection["TableName"];
+                if (!string.IsNullOrEmpty(tableName))
+                {
+                    options.TableName = tableName; 
+                }
+
+                var serviceKey = configurationSection["ServiceKey"];
+                if (!string.IsNullOrEmpty(serviceKey))
+                {
+                    // Get a client by name.
+                    options.TableServiceClient = services.GetRequiredKeyedService<TableServiceClient>(serviceKey);
+                }
+                else
+                {
+                    // Construct a connection multiplexer from a connection string.
+                    var connectionName = configurationSection["ConnectionName"];
+                    var connectionString = configurationSection["ConnectionString"];
+                    if (!string.IsNullOrEmpty(connectionName) && string.IsNullOrEmpty(connectionString))
+                    {
+                        var rootConfiguration = services.GetRequiredService<IConfiguration>();
+                        connectionString = rootConfiguration.GetConnectionString(connectionName);
+                    }
+
+                    if (!string.IsNullOrEmpty(connectionString))
+                    {
+                        options.TableServiceClient = new TableServiceClient(connectionString);
+                    }
+                }
+            }));
+    }
 }

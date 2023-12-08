@@ -23,7 +23,7 @@ namespace Tester.Forwarding
                     {
                         options.DeactivationTimeout = DeactivationTimeout;
                     })
-                    .UseAzureStorageClustering(options => options.ConfigureTableServiceClient(TestDefaultConfiguration.DataConnectionString))
+                    .UseAzureStorageClustering(options => options.TableServiceClient = new(TestDefaultConfiguration.DataConnectionString))
                     .ConfigureServices(services => services.AddSingleton<PlacementStrategy, ActivationCountBasedPlacement>())
                     .Configure<ClusterMembershipOptions>(options =>
                     {
