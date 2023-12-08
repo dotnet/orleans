@@ -8,6 +8,7 @@ using Orleans.Persistence;
 using System;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
+using Orleans.Storage;
 
 [assembly: RegisterProvider("Redis", "GrainStorage", "Silo", typeof(RedisGrainStorageProviderBuilder))]
 
@@ -43,6 +44,12 @@ internal sealed class RedisGrainStorageProviderBuilder : IProviderBuilder<ISiloB
                     {
                         options.ConfigurationOptions = ConfigurationOptions.Parse(connectionString);
                     }
+                }
+
+                var serializerKey = configurationSection["SerializerKey"];
+                if (!string.IsNullOrEmpty(serializerKey))
+                {
+                    options.GrainStorageSerializer = services.GetRequiredKeyedService<IGrainStorageSerializer>(serializerKey);
                 }
             });
         });

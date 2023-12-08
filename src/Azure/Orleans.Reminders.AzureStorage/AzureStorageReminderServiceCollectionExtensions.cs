@@ -68,7 +68,17 @@ namespace Orleans.Hosting
         /// </returns>
         public static IServiceCollection UseAzureTableReminderService(this IServiceCollection services, string connectionString)
         {
-            services.UseAzureTableReminderService(options => options.TableServiceClient = new(connectionString));
+            services.UseAzureTableReminderService(options =>
+            {
+                if (Uri.TryCreate(connectionString, UriKind.Absolute, out var uri))
+                {
+                    options.TableServiceClient = new(uri);
+                }
+                else
+                {
+                    options.TableServiceClient = new(connectionString);
+                }
+            });
             return services;
         }
     }

@@ -46,7 +46,14 @@ internal sealed class AzureTableStorageGrainStorageProviderBuilder : IProviderBu
 
                     if (!string.IsNullOrEmpty(connectionString))
                     {
-                        options.TableServiceClient = new TableServiceClient(connectionString);
+                        if (Uri.TryCreate(connectionString, UriKind.Absolute, out var uri))
+                        {
+                            options.TableServiceClient = new(uri);
+                        }
+                        else
+                        {
+                            options.TableServiceClient = new(connectionString);
+                        }
                     }
                 }
             }));

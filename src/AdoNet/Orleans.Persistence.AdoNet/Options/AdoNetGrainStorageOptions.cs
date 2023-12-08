@@ -5,7 +5,7 @@ using Orleans.Storage;
 namespace Orleans.Configuration
 {
     /// <summary>
-    /// Options for AdonetGrainStorage
+    /// Options for ADO.NET grain storage.
     /// </summary>
     public class AdoNetGrainStorageOptions : IStorageProviderSerializerOptions
     {
@@ -28,6 +28,7 @@ namespace Orleans.Configuration
         /// The default ADO.NET invariant used for storage if none is given. 
         /// </summary>
         public const string DEFAULT_ADONET_INVARIANT = AdoNetInvariants.InvariantNameSqlServer;
+
         /// <summary>
         /// The invariant name for storage.
         /// </summary>

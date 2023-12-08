@@ -8,6 +8,7 @@ using Orleans;
 using Orleans.Configuration;
 using Orleans.Hosting;
 using Orleans.Providers;
+using Orleans.Storage;
 
 [assembly: RegisterProvider("AzureTableStorage", "GrainStorage", "Silo", typeof(AzureTableStorageGrainStorageProviderBuilder))]
 
@@ -45,8 +46,21 @@ internal sealed class AzureTableStorageGrainStorageProviderBuilder : IProviderBu
 
                     if (!string.IsNullOrEmpty(connectionString))
                     {
-                        options.TableServiceClient = new TableServiceClient(connectionString);
+                        if (Uri.TryCreate(connectionString, UriKind.Absolute, out var uri))
+                        {
+                            options.TableServiceClient = new TableServiceClient(uri);
+                        }
+                        else
+                        {
+                            options.TableServiceClient = new TableServiceClient(connectionString);
+                        }
                     }
+                }
+
+                var serializerKey = configurationSection["SerializerKey"];
+                if (!string.IsNullOrEmpty(serializerKey))
+                {
+                    options.GrainStorageSerializer = services.GetRequiredKeyedService<IGrainStorageSerializer>(serializerKey);
                 }
             }));
     }

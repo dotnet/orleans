@@ -7,6 +7,7 @@ using Orleans;
 using Orleans.Configuration;
 using Orleans.Hosting;
 using Orleans.Providers;
+using Orleans.Storage;
 
 [assembly: RegisterProvider("AzureBlobStorage", "GrainStorage", "Silo", typeof(AzureBlobStorageGrainStorageProviderBuilder))]
 namespace Orleans.Hosting;
@@ -43,8 +44,21 @@ internal sealed class AzureBlobStorageGrainStorageProviderBuilder : IProviderBui
 
                     if (!string.IsNullOrEmpty(connectionString))
                     {
-                        options.BlobServiceClient = new BlobServiceClient(connectionString);
+                        if (Uri.TryCreate(connectionString, UriKind.Absolute, out var uri))
+                        {
+                            options.BlobServiceClient = new(uri);
+                        }
+                        else
+                        {
+                            options.BlobServiceClient = new(connectionString);
+                        }
                     }
+                }
+
+                var serializerKey = configurationSection["SerializerKey"];
+                if (!string.IsNullOrEmpty(serializerKey))
+                {
+                    options.GrainStorageSerializer = services.GetRequiredKeyedService<IGrainStorageSerializer>(serializerKey);
                 }
             }));
     }
