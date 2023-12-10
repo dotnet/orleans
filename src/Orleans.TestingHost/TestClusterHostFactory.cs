@@ -123,7 +123,7 @@ namespace Orleans.TestingHost
         /// Deserializes a configuration string.
         /// </summary>
         /// <param name="serializedSources">The serialized sources.</param>
-        /// <returns>The deserialzied configuration.</returns>
+        /// <returns>The deserialized configuration.</returns>
         public static IConfiguration DeserializeConfiguration(string serializedSources)
         {
             var settings = new JsonSerializerSettings

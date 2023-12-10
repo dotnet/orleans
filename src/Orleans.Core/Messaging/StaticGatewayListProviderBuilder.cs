@@ -5,6 +5,7 @@ using Orleans;
 using Orleans.Hosting;
 using Orleans.Providers;
 
+[assembly: RegisterProvider("Development", "Clustering", "Client", typeof(StaticGatewayListProviderBuilder))]
 [assembly: RegisterProvider("Static", "Clustering", "Client", typeof(StaticGatewayListProviderBuilder))]
 
 namespace Orleans.Providers;

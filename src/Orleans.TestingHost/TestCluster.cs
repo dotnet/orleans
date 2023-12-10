@@ -589,7 +589,7 @@ namespace Orleans.TestingHost
                     clustering[$"Orleans:Clustering:Gateways:{i++}"] = v.ToString();
                 }
 
-                clustering["Orleans:Clustering:ProviderType"] = "Static";
+                clustering["Orleans:Clustering:ProviderType"] = "Development";
                 configurationBuilder.AddInMemoryCollection(clustering);
             }
 

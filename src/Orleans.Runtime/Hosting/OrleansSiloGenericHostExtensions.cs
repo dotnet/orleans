@@ -20,11 +20,45 @@ namespace Microsoft.Extensions.Hosting
         /// <param name="hostAppBuilder">The host app builder.</param>
         /// <returns>The host builder.</returns>
         /// <remarks>
+        /// Calling this method multiple times on the same <see cref="IHostApplicationBuilder"/> instance will result in one silo being configured.
+        /// </remarks>
+        public static IHostApplicationBuilder UseOrleans(
+            this IHostApplicationBuilder hostAppBuilder)
+            => hostAppBuilder.UseOrleans(_ => { });
+
+        /// <summary>
+        /// Configures the host app builder to host an Orleans silo.
+        /// </summary>
+        /// <param name="hostAppBuilder">The host app builder.</param>
+        /// <returns>The host builder.</returns>
+        /// <remarks>
         /// Calling this method multiple times on the same <see cref="HostApplicationBuilder"/> instance will result in one silo being configured.
         /// </remarks>
         public static HostApplicationBuilder UseOrleans(
-            this HostApplicationBuilder hostAppBuilder) =>
-            hostAppBuilder.UseOrleans(_ => { });
+            this HostApplicationBuilder hostAppBuilder)
+            => hostAppBuilder.UseOrleans(_ => { });
+
+        /// <summary>
+        /// Configures the host builder to host an Orleans silo.
+        /// </summary>
+        /// <param name="hostAppBuilder">The host app builder.</param>
+        /// <param name="configureDelegate">The delegate used to configure the silo.</param>
+        /// <returns>The host builder.</returns>
+        /// <remarks>
+        /// Calling this method multiple times on the same <see cref="IHostApplicationBuilder"/> instance will result in one silo being configured.
+        /// However, the effects of <paramref name="configureDelegate"/> will be applied once for each call.
+        /// </remarks>
+        public static IHostApplicationBuilder UseOrleans(
+            this IHostApplicationBuilder hostAppBuilder,
+            Action<ISiloBuilder> configureDelegate)
+        {
+            ArgumentNullException.ThrowIfNull(hostAppBuilder);
+            ArgumentNullException.ThrowIfNull(configureDelegate);
+
+            configureDelegate(AddOrleansCore(hostAppBuilder.Services, hostAppBuilder.Configuration));
+
+            return hostAppBuilder;
+        }
 
         /// <summary>
         /// Configures the host builder to host an Orleans silo.

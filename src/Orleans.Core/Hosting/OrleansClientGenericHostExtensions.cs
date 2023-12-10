@@ -24,7 +24,8 @@ namespace Microsoft.Extensions.Hosting
         /// Note that this method shouldn't be used in conjunction with HostApplicationBuilder.UseOrleans, since UseOrleans includes a client automatically.
         /// </remarks>
         /// <exception cref="ArgumentNullException"><paramref name="hostAppBuilder"/> was null.</exception>
-        public static HostApplicationBuilder UseOrleansClient(this HostApplicationBuilder hostAppBuilder) => UseOrleansClient(hostAppBuilder, _ => { });
+        public static HostApplicationBuilder UseOrleansClient(this HostApplicationBuilder hostAppBuilder)
+            => UseOrleansClient(hostAppBuilder, _ => { });
 
         /// <summary>
         /// Configures the host app builder to host an Orleans client.
@@ -40,6 +41,43 @@ namespace Microsoft.Extensions.Hosting
         /// <exception cref="ArgumentNullException"><paramref name="hostAppBuilder"/> was null or <paramref name="configureDelegate"/> was null.</exception>
         public static HostApplicationBuilder UseOrleansClient(
             this HostApplicationBuilder hostAppBuilder,
+            Action<IClientBuilder> configureDelegate)
+        {
+            ArgumentNullException.ThrowIfNull(hostAppBuilder);
+            ArgumentNullException.ThrowIfNull(configureDelegate);
+
+            hostAppBuilder.Services.AddOrleansClient(hostAppBuilder.Configuration, configureDelegate);
+
+            return hostAppBuilder;
+        }
+
+        /// Configures the host app builder to host an Orleans client.
+        /// <summary>
+        /// </summary>
+        /// <param name="hostAppBuilder">The host app builder.</param>
+        /// <returns>The host builder.</returns>
+        /// <remarks>
+        /// Calling this method multiple times on the same <see cref="IClientBuilder"/> instance will result in one client being configured.
+        /// Note that this method shouldn't be used in conjunction with IHostApplicationBuilder.UseOrleans, since UseOrleans includes a client automatically.
+        /// </remarks>
+        /// <exception cref="ArgumentNullException"><paramref name="hostAppBuilder"/> was null.</exception>
+        public static IHostApplicationBuilder UseOrleansClient(this IHostApplicationBuilder hostAppBuilder)
+            => UseOrleansClient(hostAppBuilder, _ => { });
+
+        /// <summary>
+        /// Configures the host app builder to host an Orleans client.
+        /// </summary>
+        /// <param name="hostAppBuilder">The host app builder.</param>
+        /// <param name="configureDelegate">The delegate used to configure the client.</param>
+        /// <returns>The host builder.</returns>
+        /// <remarks>
+        /// Calling this method multiple times on the same <see cref="IClientBuilder"/> instance will result in one client being configured.
+        /// However, the effects of <paramref name="configureDelegate"/> will be applied once for each call.
+        /// Note that this method shouldn't be used in conjunction with IHostApplicationBuilder.UseOrleans, since UseOrleans includes a client automatically.
+        /// </remarks>
+        /// <exception cref="ArgumentNullException"><paramref name="hostAppBuilder"/> was null or <paramref name="configureDelegate"/> was null.</exception>
+        public static IHostApplicationBuilder UseOrleansClient(
+            this IHostApplicationBuilder hostAppBuilder,
             Action<IClientBuilder> configureDelegate)
         {
             ArgumentNullException.ThrowIfNull(hostAppBuilder);
