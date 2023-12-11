@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 using Orleans.Runtime;
 using Orleans.Serialization.TypeSystem;
@@ -39,14 +40,12 @@ namespace Tester.HeterogeneousSilosTests
                 {
                     services.Configure<SiloMessagingOptions>(options => options.AssumeHomogenousSilosForTesting = false);
                     services.Configure<TypeManagementOptions>(options => options.TypeMapRefreshInterval = RefreshInterval);
-                    services.Configure<GrainTypeOptions>(options =>
+                    services.AddOptions<GrainTypeOptions>().Configure((GrainTypeOptions options, IOptions<SiloOptions> siloOptions) =>
                     {
                         var cfg = hostBuilder.GetConfiguration();
-                        var siloOptions = new TestSiloSpecificOptions();
-                        cfg.Bind(siloOptions);
 
-                        // The blacklist is only intended for the primary silo in these tests.
-                        if (string.Equals(siloOptions.SiloName, Silo.PrimarySiloName))
+                        // The blocklist is only intended for the primary silo in these tests.
+                        if (string.Equals(siloOptions.Value.SiloName, Silo.PrimarySiloName))
                         {
                             var typeNames = cfg["BlockedGrainTypes"].Split('|').ToList();
                             foreach (var typeName in typeNames)
