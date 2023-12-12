@@ -2028,6 +2028,48 @@ namespace Orleans.Serialization.UnitTests
         protected override Collection<int>[] TestValues => new[] { null, new Collection<int>(), CreateValue(), CreateValue(), CreateValue() };
     }
 
+    public class StackCodecTests : FieldCodecTester<Stack<int>, StackCodec<int>>
+    {
+        public StackCodecTests(ITestOutputHelper output) : base(output)
+        {
+        }
+
+        protected override Stack<int> CreateValue()
+        {
+            var result = new Stack<int>();
+            for (var i = 0; i < Random.Next(17) + 5; i++)
+            {
+                result.Push(Random.Next());
+            }
+
+            return result;
+        }
+
+        protected override bool Equals(Stack<int> left, Stack<int> right) => object.ReferenceEquals(left, right) || left.SequenceEqual(right);
+        protected override Stack<int>[] TestValues => new[] { null, new Stack<int>(), CreateValue(), CreateValue(), CreateValue() };
+    }
+
+    public class StackCopierTests : CopierTester<Stack<int>, StackCopier<int>>
+    {
+        public StackCopierTests(ITestOutputHelper output) : base(output)
+        {
+        }
+
+        protected override Stack<int> CreateValue()
+        {
+            var result = new Stack<int>();
+            for (var i = 0; i < Random.Next(17) + 5; i++)
+            {
+                result.Push(Random.Next());
+            }
+
+            return result;
+        }
+
+        protected override bool Equals(Stack<int> left, Stack<int> right) => object.ReferenceEquals(left, right) || left.SequenceEqual(right);
+        protected override Stack<int>[] TestValues => new[] { null, new Stack<int>(), CreateValue(), CreateValue(), CreateValue() };
+    }
+
     public class QueueCodecTests : FieldCodecTester<Queue<int>, QueueCodec<int>>
     {
         public QueueCodecTests(ITestOutputHelper output) : base(output)
