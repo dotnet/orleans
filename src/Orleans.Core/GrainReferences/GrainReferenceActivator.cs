@@ -4,6 +4,8 @@ using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using System.Reflection;
 using System.Reflection.Emit;
+using System.Threading;
+using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Orleans.CodeGeneration;
@@ -13,6 +15,7 @@ using Orleans.Runtime.Versions;
 using Orleans.Serialization;
 using Orleans.Serialization.Cloning;
 using Orleans.Serialization.Configuration;
+using Orleans.Serialization.Invocation;
 using Orleans.Serialization.Serializers;
 using Orleans.Serialization.TypeSystem;
 
@@ -90,6 +93,128 @@ namespace Orleans.GrainReferences
                 }
 
                 return entry;
+            }
+        }
+    }
+
+    /// <summary>
+    /// Creates grain references that do not have their definitive type.
+    /// </summary>
+    internal class StubGrainReferenceActivatorProvider : IGrainReferenceActivatorProvider
+    {
+        private readonly CopyContextPool _copyContextPool;
+        private readonly CodecProvider _codecProvider;
+        private readonly GrainVersionManifest _versionManifest;
+        private readonly RpcProvider _rpcProvider;
+        private readonly IServiceProvider _serviceProvider;
+
+        public StubGrainReferenceActivatorProvider(
+            GrainVersionManifest manifest,
+            RpcProvider rpcProvider,
+            CodecProvider codecProvider,
+            CopyContextPool copyContextPool,
+            IServiceProvider serviceProvider)
+        {
+            _versionManifest = manifest;
+            _rpcProvider = rpcProvider;
+            _codecProvider = codecProvider;
+            _copyContextPool = copyContextPool;
+            _serviceProvider = serviceProvider;
+        }
+
+        public bool TryGet(GrainType grainType, GrainInterfaceType interfaceType, out IGrainReferenceActivator activator)
+        {
+            if (!grainType.IsStubGrain())
+            {
+                activator = default;
+                return false;
+            }
+
+            _rpcProvider.TryGet(interfaceType, out var proxyType);
+
+            var interfaceVersion = _versionManifest.GetLocalVersion(interfaceType);
+            var shared = new GrainReferenceShared(
+                grainType,
+                interfaceType,
+                interfaceVersion,
+                new StubGrainReferenceRuntime(proxyType),
+                InvokeMethodOptions.None,
+                _codecProvider,
+                _copyContextPool,
+                _serviceProvider);
+            activator = new GrainReferenceActivator(proxyType, shared);
+            return true;
+        }
+
+        /// <summary>
+        /// Creates grain references for a given grain type and grain interface type.
+        /// </summary>
+        private sealed class GrainReferenceActivator : IGrainReferenceActivator
+        {
+            private readonly GrainReferenceShared _shared;
+            private readonly Func<GrainReferenceShared, IdSpan, GrainReference> _create;
+
+            /// <summary>
+            /// Initializes a new instance of the <see cref="GrainReferenceActivator"/> class.
+            /// </summary>
+            /// <param name="referenceType">The generated proxy object type.</param>
+            /// <param name="shared">The functionality shared between all grain references for a specified grain type and grain interface type.</param>
+            public GrainReferenceActivator(Type referenceType, GrainReferenceShared shared)
+            {
+                _shared = shared;
+
+                var ctor = referenceType.GetConstructor(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic, new[] { typeof(GrainReferenceShared), typeof(IdSpan) })
+                    ?? throw new SerializerException("Invalid proxy type: " + referenceType);
+
+                var method = new DynamicMethod(referenceType.Name, typeof(GrainReference), new[] { typeof(object), typeof(GrainReferenceShared), typeof(IdSpan) });
+                var il = method.GetILGenerator();
+                // arg0 is unused for better delegate performance (avoids argument shuffling thunk)
+                il.Emit(OpCodes.Ldarg_1);
+                il.Emit(OpCodes.Ldarg_2);
+                il.Emit(OpCodes.Newobj, ctor);
+                il.Emit(OpCodes.Ret);
+                _create = method.CreateDelegate<Func<GrainReferenceShared, IdSpan, GrainReference>>();
+            }
+
+            public GrainReference CreateReference(GrainId grainId) => _create(_shared, grainId.Key);
+        }
+
+        private sealed class StubGrainReferenceRuntime : IGrainReferenceRuntime
+        {
+            private Type _proxyType;
+
+            public StubGrainReferenceRuntime(Type proxyType)
+            {
+                _proxyType = proxyType;
+            }
+
+            public object Cast(IAddressable grain, Type grainInterface)
+            {
+                if (grain is GrainReference && grainInterface.IsAssignableFrom(grain.GetType()))
+                {
+                    return grain;
+                }
+                throw new NotImplementedException();
+            }
+
+            public void InvokeMethod(GrainReference reference, IInvokable request, InvokeMethodOptions options) => throw new NotImplementedException();
+
+            public async ValueTask<T> InvokeMethodAsync<T>(GrainReference reference, IInvokable request, InvokeMethodOptions options)
+            {
+                var factory = reference.Shared.ServiceProvider.GetRequiredService<GrainFactory>();
+                _ = GrainTypePrefix.TryGetCrainClassPrefix(reference.GrainId.Type, out var grainClassPrefix);
+                var grain = (GrainReference) await factory.GetGrainAsync(reference.InterfaceType, reference.GrainId.Key, grainClassPrefix, new CancellationTokenSource(TimeSpan.FromSeconds(30)).Token); // TODO track request timeout?
+                reference.Shared = grain.Shared;
+                return await reference.Shared.Runtime.InvokeMethodAsync<T>(reference, request, options);
+            }
+
+            public async ValueTask InvokeMethodAsync(GrainReference reference, IInvokable request, InvokeMethodOptions options)
+            {
+                var factory = reference.Shared.ServiceProvider.GetRequiredService<GrainFactory>();
+                _ = GrainTypePrefix.TryGetCrainClassPrefix(reference.GrainId.Type, out var grainClassPrefix);
+                var grain = (GrainReference) await factory.GetGrainAsync(reference.InterfaceType, reference.GrainId.Key, grainClassPrefix, new CancellationTokenSource(TimeSpan.FromSeconds(30)).Token); // TODO track request timeout?
+                reference.Shared = grain.Shared;
+                await reference.Shared.Runtime.InvokeMethodAsync(reference, request, options);
             }
         }
     }
@@ -316,7 +441,7 @@ namespace Orleans.GrainReferences
         /// <inheritdoc />
         public bool TryGet(GrainType grainType, GrainInterfaceType interfaceType, out IGrainReferenceActivator activator)
         {
-            if (!_rpcProvider.TryGet(interfaceType, out var proxyType))
+            if (grainType.IsStubGrain() || !_rpcProvider.TryGet(interfaceType, out var proxyType))
             {
                 activator = default;
                 return false;

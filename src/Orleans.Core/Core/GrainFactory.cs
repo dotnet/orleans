@@ -1,5 +1,8 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
+using System.Threading;
+using System.Threading.Tasks;
 using Orleans.GrainReferences;
 using Orleans.Metadata;
 using Orleans.Runtime;
@@ -204,13 +207,66 @@ namespace Orleans
             var grainInterfaceType = this.interfaceTypeResolver.GetGrainInterfaceType(interfaceType);
 
             GrainType grainType;
-            if (!string.IsNullOrWhiteSpace(grainClassNamePrefix))
+            try
             {
-                grainType = this.interfaceTypeToGrainTypeResolver.GetGrainType(grainInterfaceType, grainClassNamePrefix);
+                if (!string.IsNullOrWhiteSpace(grainClassNamePrefix))
+                {
+                    grainType = this.interfaceTypeToGrainTypeResolver.GetGrainType(grainInterfaceType, grainClassNamePrefix);
+                }
+                else
+                {
+                    grainType = this.interfaceTypeToGrainTypeResolver.GetGrainType(grainInterfaceType);
+                }
             }
-            else
+            catch (ArgumentException)
             {
-                grainType = this.interfaceTypeToGrainTypeResolver.GetGrainType(grainInterfaceType);
+                // Not found in the type map. Maybe it's not available yet ? (heterogeneous case)
+                    grainType = GrainTypePrefix.CreateStubGrainType(grainClassNamePrefix);
+            }
+
+            var grainId = GrainId.Create(grainType, grainKey);
+            var grain = this.referenceActivator.CreateReference(grainId, grainInterfaceType);
+            return grain;
+        }
+
+        internal async ValueTask<IAddressable> GetGrainAsync(GrainInterfaceType grainInterfaceType, IdSpan grainKey, string grainClassNamePrefix, CancellationToken ct)
+        {
+            GrainType grainType;
+            Exception lastException = null;
+            do
+            {
+                try
+                {
+                    if (!string.IsNullOrWhiteSpace(grainClassNamePrefix))
+                    {
+                        grainType = this.interfaceTypeToGrainTypeResolver.GetGrainType(grainInterfaceType, grainClassNamePrefix);
+                    }
+                    else
+                    {
+                        grainType = this.interfaceTypeToGrainTypeResolver.GetGrainType(grainInterfaceType);
+                    }
+                }
+                catch (ArgumentException ex)
+                {
+                    // Not found in the type map. Maybe it's not available yet ? (heterogeneous case)
+                    grainType = GrainTypePrefix.CreateStubGrainType(grainClassNamePrefix);
+                    lastException = ex;
+                }
+                try
+                {
+                    await Task.Delay(1_000, ct);
+                }
+                catch (TaskCanceledException)
+                {
+                    break;
+                }
+            }
+            while (grainType.IsStubGrain() || ct.IsCancellationRequested);
+
+            if (grainType.IsStubGrain())
+            {
+                Debug.Assert(lastException != null);
+                throw lastException;
             }
 
             var grainId = GrainId.Create(grainType, grainKey);
