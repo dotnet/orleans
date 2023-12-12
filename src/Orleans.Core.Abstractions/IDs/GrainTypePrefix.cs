@@ -59,6 +59,16 @@ namespace Orleans.Runtime
         public static readonly ReadOnlyMemory<byte> LegacyGrainPrefixBytes = Encoding.UTF8.GetBytes(LegacyGrainPrefix);
 
         /// <summary>
+        /// The prefix for stub grain (grain without definitive type).
+        /// </summary>
+        public const string StubGrainPrefix = SystemPrefix + "grain.stub.";
+
+        /// <summary>
+        /// A span representation of <see cref="StubGrainPrefix"/>
+        /// </summary>
+        public static readonly ReadOnlyMemory<byte> StubGrainPrefixBytes = Encoding.UTF8.GetBytes(StubGrainPrefix);
+
+        /// <summary>
         /// Returns <see langword="true"/> if the type is a client, <see langword="false"/> if not.
         /// </summary>
         /// <param name="type">The grain type.</param>
@@ -99,5 +109,36 @@ namespace Orleans.Runtime
         /// <param name="id">The grain id.</param>
         /// <returns><see langword="true"/> if the type is a system target, <see langword="false"/> if not.</returns>
         public static bool IsSystemTarget(this in GrainId id) => id.Type.IsSystemTarget();
+
+        /// <summary>
+        /// Returns  <see langword="true"/> if the grain is a stub grain.
+        /// </summary>
+        /// <param name="type">The grain type.</param>
+        /// <returns><see langword="true"/> if the type is a stub type , <see langword="false"/> if not.</returns>
+        public static bool IsStubGrain(this in GrainType type) => type.AsSpan().StartsWith(StubGrainPrefixBytes.Span);
+
+        /// <summary>
+        /// Create a stub grain type.
+        /// </summary>
+        /// <param name="grainClassPrefix">The prefix of the class to be used.</param>
+        /// <returns>The grain type.</returns>
+        public static GrainType CreateStubGrainType(string grainClassPrefix)
+        {
+            return string.IsNullOrWhiteSpace(grainClassPrefix)
+                ? new GrainType(StubGrainPrefixBytes.ToArray())
+                : GrainType.Create(string.Concat(StubGrainPrefix, grainClassPrefix));
+        }
+
+        public static bool TryGetCrainClassPrefix(GrainType grainType, out string grainClassPrefix)
+        {
+            if (!IsStubGrain(grainType))
+            {
+                grainClassPrefix = default;
+                return false;
+            }
+
+            grainClassPrefix = Encoding.UTF8.GetString(grainType.AsSpan().Slice(StubGrainPrefixBytes.Length));
+            return true;
+        }
     }
 }
