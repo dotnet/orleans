@@ -159,6 +159,11 @@ public class MessagePackCodec : IGeneralizedCodec, IGeneralizedCopier, ITypeFilt
             return true;
         }
 
+        if (CommonCodecTypeFilter.IsAbstractOrFrameworkType(type))
+        {
+            return false;
+        }
+
         foreach (var selector in _serializableTypeSelectors)
         {
             if (selector.IsSupportedType(type))
@@ -205,6 +210,11 @@ public class MessagePackCodec : IGeneralizedCodec, IGeneralizedCopier, ITypeFilt
     /// <inheritdoc/>
     bool IGeneralizedCopier.IsSupportedType(Type type)
     {
+        if (CommonCodecTypeFilter.IsAbstractOrFrameworkType(type))
+        {
+            return false;
+        }
+
         foreach (var selector in _copyableTypeSelectors)
         {
             if (selector.IsSupportedType(type))
