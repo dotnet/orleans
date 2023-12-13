@@ -101,6 +101,22 @@ namespace Orleans.Serialization.Codecs
     }
 
     /// <summary>
+    /// Copier for <see cref="ValueTuple"/>.
+    /// </summary>
+    [RegisterCopier]
+    public sealed class ValueTupleCopier : IDeepCopier<ValueTuple>, IOptionalDeepCopier
+    {
+        /// <inheritdoc />
+        public bool IsShallowCopyable() => true;
+
+        /// <inheritdoc />
+        object IDeepCopier.DeepCopy(object input, CopyContext context) => input;
+
+        /// <inheritdoc />
+        public ValueTuple DeepCopy(ValueTuple input, CopyContext context) => input;
+    }
+
+    /// <summary>
     /// Copier for <see cref="ValueTuple{T}"/>.
     /// </summary>
     /// <typeparam name="T">The element type.</typeparam>
@@ -115,6 +131,7 @@ namespace Orleans.Serialization.Codecs
         /// <param name="copier">The copier.</param>
         public ValueTupleCopier(IDeepCopier<T> copier) => _copier = OrleansGeneratedCodeHelper.GetOptionalCopier(copier);
 
+        /// <inheritdoc />
         public bool IsShallowCopyable() => _copier is null;
 
         object IDeepCopier.DeepCopy(object input, CopyContext context) => IsShallowCopyable() ? input : DeepCopy((ValueTuple<T>)input, context);

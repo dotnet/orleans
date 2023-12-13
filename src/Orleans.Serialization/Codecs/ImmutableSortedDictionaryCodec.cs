@@ -31,7 +31,7 @@ namespace Orleans.Serialization.Codecs
         {
             surrogate.Values = new(value);
             surrogate.KeyComparer = value.KeyComparer != Comparer<TKey>.Default ? value.KeyComparer : null;
-            surrogate.ValueComparer = value.ValueComparer != EqualityComparer<TKey>.Default ? value.ValueComparer : null;
+            surrogate.ValueComparer = value.ValueComparer != EqualityComparer<TValue>.Default ? value.ValueComparer : null;
         }
     }
 
@@ -56,6 +56,10 @@ namespace Orleans.Serialization.Codecs
         /// <value>The key comparer.</value>
         [Id(1)]
         public IComparer<TKey> KeyComparer;
+
+        /// <summary>
+        /// Gets or sets the value comparer.
+        /// </summary>
         [Id(2)]
         public IEqualityComparer<TValue> ValueComparer;
     }
