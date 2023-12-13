@@ -9,6 +9,8 @@
     <ProjectReference Include="$(SourceRoot)test\Tester\Tester.csproj" />
     <ProjectReference Include="$(SourceRoot)src\Orleans.Serialization.NewtonsoftJson\Orleans.Serialization.NewtonsoftJson.csproj" />
     <ProjectReference Include="$(SourceRoot)test\Misc\TestInternalDtosRefOrleans\TestInternalDtosRefOrleans.csproj" />
+    <ProjectReference Include="..\..\src\Orleans.Serialization.SystemTextJson\Orleans.Serialization.SystemTextJson.csproj" />
+    <ProjectReference Include="..\..\src\Serializers\Orleans.Serialization.Protobuf\Orleans.Serialization.Protobuf.csproj" />
   </ItemGroup>
 
   <ItemGroup>

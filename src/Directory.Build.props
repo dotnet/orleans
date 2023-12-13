@@ -28,4 +28,9 @@
     <SourceLinkCreate>true</SourceLinkCreate>
     <SourceLinkOriginUrl>https://github.com/dotnet/orleans</SourceLinkOriginUrl>
   </PropertyGroup>
+
+  <ItemGroup>
+    <AssemblyAttribute Include="Orleans.Metadata.FrameworkPartAttribute" />
+  </ItemGroup>
+
 </Project>

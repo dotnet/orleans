@@ -62,4 +62,8 @@
     </EmbeddedResource>
   </ItemGroup>
 
+  <ItemGroup>
+    <AssemblyAttribute Remove="Orleans.Metadata.FrameworkPartAttribute"/>
+  </ItemGroup>
+
 </Project>
