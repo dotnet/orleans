@@ -44,6 +44,7 @@ namespace Orleans.Serialization.TestKit
         protected IServiceProvider ServiceProvider => _serviceProvider;
 
         protected virtual bool IsImmutable => false;
+        protected virtual bool IsPooled => false;
 
         protected virtual void Configure(ISerializerBuilder builder)
         {
@@ -83,7 +84,7 @@ namespace Orleans.Serialization.TestKit
         [Fact]
         public void ReferencesAreAddedToCopyContext()
         {
-            if (typeof(TValue).IsValueType)
+            if (typeof(TValue).IsValueType || IsPooled)
             {
                 return;
             }
