@@ -189,16 +189,18 @@ namespace Orleans.Runtime
         {
             try
             {
+                // First, attempt to call the new API, which provides more information.
                 return await provider.GetClusterManifestUpdate(previousVersion);
             }
             catch (Exception exception)
             {
                 _logger.LogWarning(exception, "Failed to fetch cluster manifest update from {Provider}.", provider);
-            }
 
-            var manifest = await provider.GetClusterManifest();
-            var result = new ClusterManifestUpdate(manifest.Version, manifest.Silos, includesAllActiveServers: true);
-            return result;
+                // If the provider does not support the new API, fall back to the old one.
+                var manifest = await provider.GetClusterManifest();
+                var result = new ClusterManifestUpdate(manifest.Version, manifest.Silos, includesAllActiveServers: true);
+                return result;
+            }
         }
 
         /// <inheritdoc />
