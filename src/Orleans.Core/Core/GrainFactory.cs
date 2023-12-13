@@ -206,24 +206,24 @@ namespace Orleans
         {
             var grainInterfaceType = this.interfaceTypeResolver.GetGrainInterfaceType(interfaceType);
 
-            GrainType grainType;
+            bool success;
+            GrainType grainType = default;
             try
             {
-                if (!string.IsNullOrWhiteSpace(grainClassNamePrefix))
-                {
-                    grainType = this.interfaceTypeToGrainTypeResolver.GetGrainType(grainInterfaceType, grainClassNamePrefix);
-                }
-                else
-                {
-                    grainType = this.interfaceTypeToGrainTypeResolver.GetGrainType(grainInterfaceType);
-                }
+                success = interfaceTypeToGrainTypeResolver.TryGetGrainType(grainInterfaceType, grainClassNamePrefix, out grainType);
             }
             catch (ArgumentException)
             {
-                // Not found in the type map. Maybe it's not available yet ? (heterogeneous case)
-                    grainType = GrainTypePrefix.CreateStubGrainType(grainClassNamePrefix);
+                success = false;
             }
 
+            if (!success)
+            {
+                // Not found in the type map. Maybe it's not available yet ? (heterogeneous case)
+                grainType = GrainTypePrefix.CreateStubGrainType(grainClassNamePrefix);
+            }
+
+            Debug.Assert(!grainType.IsDefault);
             var grainId = GrainId.Create(grainType, grainKey);
             var grain = this.referenceActivator.CreateReference(grainId, grainInterfaceType);
             return grain;
