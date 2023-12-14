@@ -229,51 +229,6 @@ namespace Orleans
             return grain;
         }
 
-        internal async ValueTask<IAddressable> GetGrainAsync(GrainInterfaceType grainInterfaceType, IdSpan grainKey, string grainClassNamePrefix, CancellationToken cancellationToken)
-        {
-            GrainType grainType;
-            Exception lastException = null;
-            do
-            {
-                try
-                {
-                    if (!string.IsNullOrWhiteSpace(grainClassNamePrefix))
-                    {
-                        grainType = this.interfaceTypeToGrainTypeResolver.GetGrainType(grainInterfaceType, grainClassNamePrefix);
-                    }
-                    else
-                    {
-                        grainType = this.interfaceTypeToGrainTypeResolver.GetGrainType(grainInterfaceType);
-                    }
-                }
-                catch (ArgumentException ex)
-                {
-                    // Not found in the type map. Maybe it's not available yet ? (heterogeneous case)
-                    grainType = GrainTypePrefix.CreateStubGrainType(grainClassNamePrefix);
-                    lastException = ex;
-                }
-                try
-                {
-                    await Task.Delay(1_000, cancellationToken);
-                }
-                catch (TaskCanceledException)
-                {
-                    break;
-                }
-            }
-            while (grainType.IsStubGrain() || cancellationToken.IsCancellationRequested);
-
-            if (grainType.IsStubGrain())
-            {
-                Debug.Assert(lastException != null);
-                throw lastException;
-            }
-
-            var grainId = GrainId.Create(grainType, grainKey);
-            var grain = this.referenceActivator.CreateReference(grainId, grainInterfaceType);
-            return grain;
-        }
-
         /// <summary>
         /// Creates a grain reference.
         /// </summary>

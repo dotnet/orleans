@@ -220,7 +220,7 @@ namespace Orleans.GrainReferences
                 _ = GrainTypePrefix.TryGetCrainClassPrefix(reference.GrainId.Type, out var grainClassPrefix);
                 var timeout = request.GetDefaultResponseTimeout() ?? _runtimeClient.GetResponseTimeout();
                 using var cancellation = new CancellationTokenSource(timeout, _timeProvider);
-                var clusterManifestUpdates = _clusterManifestProvider.Updates.WithCancellation(cancellation.Token).GetAsyncEnumerator();
+                await using var clusterManifestUpdates = _clusterManifestProvider.Updates.WithCancellation(cancellation.Token).GetAsyncEnumerator();
                 GrainType grainType;
                 while (!_interfaceTypeToGrainTypeResolver.TryGetGrainType(reference.InterfaceType, grainClassPrefix, out grainType))
                 {
