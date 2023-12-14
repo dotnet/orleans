@@ -56,6 +56,7 @@ namespace Orleans.Hosting
 
             services.AddOptions();
 
+            services.TryAddSingleton<TimeProvider>(TimeProvider.System);
             services.TryAddSingleton(typeof(IOptionFormatter<>), typeof(DefaultOptionsFormatter<>));
             services.TryAddSingleton(typeof(IOptionFormatterResolver<>), typeof(DefaultOptionsFormatterResolver<>));
 

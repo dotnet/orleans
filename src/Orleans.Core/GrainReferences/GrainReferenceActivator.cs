@@ -107,19 +107,23 @@ namespace Orleans.GrainReferences
         private readonly GrainVersionManifest _versionManifest;
         private readonly RpcProvider _rpcProvider;
         private readonly IServiceProvider _serviceProvider;
+        private readonly StubGrainReferenceRuntime _stubRuntime;
 
         public StubGrainReferenceActivatorProvider(
             GrainVersionManifest manifest,
+            IRuntimeClient runtimeClient,
             RpcProvider rpcProvider,
             CodecProvider codecProvider,
             CopyContextPool copyContextPool,
-            IServiceProvider serviceProvider)
+            IServiceProvider serviceProvider,
+            TimeProvider timeProvider)
         {
             _versionManifest = manifest;
             _rpcProvider = rpcProvider;
             _codecProvider = codecProvider;
             _copyContextPool = copyContextPool;
             _serviceProvider = serviceProvider;
+            _stubRuntime = new StubGrainReferenceRuntime(runtimeClient, timeProvider);
         }
 
         public bool TryGet(GrainType grainType, GrainInterfaceType interfaceType, out IGrainReferenceActivator activator)
@@ -137,7 +141,7 @@ namespace Orleans.GrainReferences
                 grainType,
                 interfaceType,
                 interfaceVersion,
-                new StubGrainReferenceRuntime(proxyType),
+                _stubRuntime,
                 InvokeMethodOptions.None,
                 _codecProvider,
                 _copyContextPool,
@@ -166,7 +170,7 @@ namespace Orleans.GrainReferences
                 var ctor = referenceType.GetConstructor(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic, new[] { typeof(GrainReferenceShared), typeof(IdSpan) })
                     ?? throw new SerializerException("Invalid proxy type: " + referenceType);
 
-                var method = new DynamicMethod(referenceType.Name, typeof(GrainReference), new[] { typeof(object), typeof(GrainReferenceShared), typeof(IdSpan) });
+                var method = new DynamicMethod(referenceType.Name, typeof(GrainReference), [typeof(object), typeof(GrainReferenceShared), typeof(IdSpan)]);
                 var il = method.GetILGenerator();
                 // arg0 is unused for better delegate performance (avoids argument shuffling thunk)
                 il.Emit(OpCodes.Ldarg_1);
@@ -179,31 +183,31 @@ namespace Orleans.GrainReferences
             public GrainReference CreateReference(GrainId grainId) => _create(_shared, grainId.Key);
         }
 
-        private sealed class StubGrainReferenceRuntime : IGrainReferenceRuntime
+        private sealed class StubGrainReferenceRuntime(IRuntimeClient runtimeClient, TimeProvider timeProvider) : IGrainReferenceRuntime
         {
-            private Type _proxyType;
+            private readonly IRuntimeClient _runtimeClient = runtimeClient;
+            private readonly TimeProvider _timeProvider = timeProvider;
 
-            public StubGrainReferenceRuntime(Type proxyType)
-            {
-                _proxyType = proxyType;
-            }
+            public object Cast(IAddressable grain, Type grainInterface) => _runtimeClient.GrainReferenceRuntime.Cast(grain, grainInterface);
 
-            public object Cast(IAddressable grain, Type grainInterface)
-            {
-                if (grain is GrainReference && grainInterface.IsAssignableFrom(grain.GetType()))
-                {
-                    return grain;
-                }
-                throw new NotImplementedException();
-            }
-
-            public void InvokeMethod(GrainReference reference, IInvokable request, InvokeMethodOptions options) => throw new NotImplementedException();
+            public void InvokeMethod(GrainReference reference, IInvokable request, InvokeMethodOptions options) => InvokeMethodAsync(reference, request, options).AsTask().Ignore();
 
             public async ValueTask<T> InvokeMethodAsync<T>(GrainReference reference, IInvokable request, InvokeMethodOptions options)
             {
                 var factory = reference.Shared.ServiceProvider.GetRequiredService<GrainFactory>();
                 _ = GrainTypePrefix.TryGetCrainClassPrefix(reference.GrainId.Type, out var grainClassPrefix);
-                var grain = (GrainReference) await factory.GetGrainAsync(reference.InterfaceType, reference.GrainId.Key, grainClassPrefix, new CancellationTokenSource(TimeSpan.FromSeconds(30)).Token); // TODO track request timeout?
+                var timeout = request.GetDefaultResponseTimeout() ?? _runtimeClient.GetResponseTimeout();
+                var cancellation = new CancellationTokenSource(timeout, _timeProvider);
+                GrainReference grain;
+                try
+                {
+                    grain = (GrainReference)await factory.GetGrainAsync(reference.InterfaceType, reference.GrainId.Key, grainClassPrefix, cancellation.Token);
+                }
+                finally
+                {
+                    cancellation.Dispose();
+                }
+
                 reference.Shared = grain.Shared;
                 return await reference.Shared.Runtime.InvokeMethodAsync<T>(reference, request, options);
             }
@@ -212,7 +216,18 @@ namespace Orleans.GrainReferences
             {
                 var factory = reference.Shared.ServiceProvider.GetRequiredService<GrainFactory>();
                 _ = GrainTypePrefix.TryGetCrainClassPrefix(reference.GrainId.Type, out var grainClassPrefix);
-                var grain = (GrainReference) await factory.GetGrainAsync(reference.InterfaceType, reference.GrainId.Key, grainClassPrefix, new CancellationTokenSource(TimeSpan.FromSeconds(30)).Token); // TODO track request timeout?
+                var timeout = request.GetDefaultResponseTimeout() ?? _runtimeClient.GetResponseTimeout();
+                var cancellation = new CancellationTokenSource(timeout, _timeProvider);
+                GrainReference grain;
+                try
+                {
+                    grain = (GrainReference)await factory.GetGrainAsync(reference.InterfaceType, reference.GrainId.Key, grainClassPrefix, cancellation.Token);
+                }
+                finally
+                {
+                    cancellation.Dispose();
+                }
+
                 reference.Shared = grain.Shared;
                 await reference.Shared.Runtime.InvokeMethodAsync(reference, request, options);
             }

@@ -19,6 +19,7 @@ using Orleans.Serialization.Serializers;
 using Orleans.Serialization.Cloning;
 using Microsoft.Extensions.Hosting;
 using System.Runtime.InteropServices;
+using System;
 
 namespace Orleans
 {
@@ -41,6 +42,8 @@ namespace Orleans
             }
 
             services.Add(ServiceDescriptor);
+
+            services.TryAddSingleton<TimeProvider>(TimeProvider.System);
 
             // Options logging
             services.TryAddSingleton(typeof(IOptionFormatter<>), typeof(DefaultOptionsFormatter<>));
