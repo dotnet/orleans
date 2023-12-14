@@ -116,6 +116,7 @@ namespace Orleans.GrainReferences
             CodecProvider codecProvider,
             CopyContextPool copyContextPool,
             IServiceProvider serviceProvider,
+            GrainFactory grainFactory,
             TimeProvider timeProvider)
         {
             _versionManifest = manifest;
@@ -123,7 +124,7 @@ namespace Orleans.GrainReferences
             _codecProvider = codecProvider;
             _copyContextPool = copyContextPool;
             _serviceProvider = serviceProvider;
-            _stubRuntime = new StubGrainReferenceRuntime(runtimeClient, timeProvider);
+            _stubRuntime = new StubGrainReferenceRuntime(runtimeClient, grainFactory, timeProvider);
         }
 
         public bool TryGet(GrainType grainType, GrainInterfaceType interfaceType, out IGrainReferenceActivator activator)
@@ -183,9 +184,10 @@ namespace Orleans.GrainReferences
             public GrainReference CreateReference(GrainId grainId) => _create(_shared, grainId.Key);
         }
 
-        private sealed class StubGrainReferenceRuntime(IRuntimeClient runtimeClient, TimeProvider timeProvider) : IGrainReferenceRuntime
+        private sealed class StubGrainReferenceRuntime(IRuntimeClient runtimeClient, GrainFactory grainFactory, TimeProvider timeProvider) : IGrainReferenceRuntime
         {
             private readonly IRuntimeClient _runtimeClient = runtimeClient;
+            private readonly GrainFactory _grainFactory = grainFactory;
             private readonly TimeProvider _timeProvider = timeProvider;
 
             public object Cast(IAddressable grain, Type grainInterface) => _runtimeClient.GrainReferenceRuntime.Cast(grain, grainInterface);
@@ -194,34 +196,25 @@ namespace Orleans.GrainReferences
 
             public async ValueTask<T> InvokeMethodAsync<T>(GrainReference reference, IInvokable request, InvokeMethodOptions options)
             {
-                var factory = reference.Shared.ServiceProvider.GetRequiredService<GrainFactory>();
-                _ = GrainTypePrefix.TryGetCrainClassPrefix(reference.GrainId.Type, out var grainClassPrefix);
-                var timeout = request.GetDefaultResponseTimeout() ?? _runtimeClient.GetResponseTimeout();
-                var cancellation = new CancellationTokenSource(timeout, _timeProvider);
-                GrainReference grain;
-                try
-                {
-                    grain = (GrainReference)await factory.GetGrainAsync(reference.InterfaceType, reference.GrainId.Key, grainClassPrefix, cancellation.Token);
-                }
-                finally
-                {
-                    cancellation.Dispose();
-                }
-
-                reference.Shared = grain.Shared;
+                await ResolveGrainType(reference, request);
                 return await reference.Shared.Runtime.InvokeMethodAsync<T>(reference, request, options);
             }
 
             public async ValueTask InvokeMethodAsync(GrainReference reference, IInvokable request, InvokeMethodOptions options)
             {
-                var factory = reference.Shared.ServiceProvider.GetRequiredService<GrainFactory>();
+                await ResolveGrainType(reference, request);
+                await reference.Shared.Runtime.InvokeMethodAsync(reference, request, options);
+            }
+
+            private async Task ResolveGrainType(GrainReference reference, IInvokable request)
+            {
                 _ = GrainTypePrefix.TryGetCrainClassPrefix(reference.GrainId.Type, out var grainClassPrefix);
                 var timeout = request.GetDefaultResponseTimeout() ?? _runtimeClient.GetResponseTimeout();
                 var cancellation = new CancellationTokenSource(timeout, _timeProvider);
                 GrainReference grain;
                 try
                 {
-                    grain = (GrainReference)await factory.GetGrainAsync(reference.InterfaceType, reference.GrainId.Key, grainClassPrefix, cancellation.Token);
+                    grain = (GrainReference)await _grainFactory.GetGrainAsync(reference.InterfaceType, reference.GrainId.Key, grainClassPrefix, cancellation.Token);
                 }
                 finally
                 {
@@ -229,7 +222,6 @@ namespace Orleans.GrainReferences
                 }
 
                 reference.Shared = grain.Shared;
-                await reference.Shared.Runtime.InvokeMethodAsync(reference, request, options);
             }
         }
     }

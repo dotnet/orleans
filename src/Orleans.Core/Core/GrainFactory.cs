@@ -229,7 +229,7 @@ namespace Orleans
             return grain;
         }
 
-        internal async ValueTask<IAddressable> GetGrainAsync(GrainInterfaceType grainInterfaceType, IdSpan grainKey, string grainClassNamePrefix, CancellationToken ct)
+        internal async ValueTask<IAddressable> GetGrainAsync(GrainInterfaceType grainInterfaceType, IdSpan grainKey, string grainClassNamePrefix, CancellationToken cancellationToken)
         {
             GrainType grainType;
             Exception lastException = null;
@@ -254,14 +254,14 @@ namespace Orleans
                 }
                 try
                 {
-                    await Task.Delay(1_000, ct);
+                    await Task.Delay(1_000, cancellationToken);
                 }
                 catch (TaskCanceledException)
                 {
                     break;
                 }
             }
-            while (grainType.IsStubGrain() || ct.IsCancellationRequested);
+            while (grainType.IsStubGrain() || cancellationToken.IsCancellationRequested);
 
             if (grainType.IsStubGrain())
             {
