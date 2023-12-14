@@ -123,7 +123,8 @@ namespace Orleans.GrainReferences
             CodecProvider codecProvider,
             CopyContextPool copyContextPool,
             IServiceProvider serviceProvider,
-            GrainFactory grainFactory,
+            GrainInterfaceTypeToGrainTypeResolver grainTypeResolver,
+            IClusterManifestProvider clusterManifestProvider,
             TimeProvider timeProvider)
         {
             _versionManifest = manifest;
@@ -131,7 +132,7 @@ namespace Orleans.GrainReferences
             _codecProvider = codecProvider;
             _copyContextPool = copyContextPool;
             _serviceProvider = serviceProvider;
-            _stubRuntime = new StubGrainReferenceRuntime(runtimeClient, grainFactory, timeProvider);
+            _stubRuntime = new StubGrainReferenceRuntime(runtimeClient, grainTypeResolver, clusterManifestProvider, timeProvider);
         }
 
         public bool TryGet(GrainType grainType, GrainInterfaceType interfaceType, out IGrainReferenceActivator activator)
@@ -193,13 +194,12 @@ namespace Orleans.GrainReferences
 
         private sealed class StubGrainReferenceRuntime(
             IRuntimeClient runtimeClient,
-            GrainFactory grainFactory,
             GrainInterfaceTypeToGrainTypeResolver interfaceTypeToGrainTypeResolver,
             IClusterManifestProvider clusterManifestProvider,
             TimeProvider timeProvider) : IGrainReferenceRuntime
         {
             private readonly IRuntimeClient _runtimeClient = runtimeClient;
-            private readonly GrainFactory _grainFactory = grainFactory;
+            private readonly IGrainFactory _grainFactory = runtimeClient.InternalGrainFactory;
             private readonly GrainInterfaceTypeToGrainTypeResolver _interfaceTypeToGrainTypeResolver = interfaceTypeToGrainTypeResolver;
             private readonly IClusterManifestProvider _clusterManifestProvider = clusterManifestProvider;
             private readonly TimeProvider _timeProvider = timeProvider;
