@@ -87,6 +87,8 @@ namespace Tester.HeterogeneousSilosTests
             //Assert.Contains("Could not find an implementation for interface", exception.Message);
 
             var grain = this.cluster.GrainFactory.GetGrain<ITestGrain>(0);
+            Assert.True(grain.GetGrainId().Type.IsStubGrain());
+
             //await grain.GetKey();
 
             // Should not fail
