@@ -87,7 +87,8 @@ namespace Tester.HeterogeneousSilosTests
         {
             SetupAndDeployCluster(typeof(RandomPlacement), typeof(TestGrain));
 
-            _ = this.cluster!.GrainFactory!.GetGrain<ITestGrain>(0);
+            var grain = this.cluster!.GrainFactory!.GetGrain<ITestGrain>(0);
+            Assert.True(grain.GetGrainId().Type.IsStubGrain());
 
             // Should not fail
             this.cluster!.GrainFactory!.GetGrain<ISimpleGrainWithAsyncMethods>(0);
