@@ -117,15 +117,14 @@ namespace Orleans.Runtime
                             return;
                         }
 
-                        var updateResult = await refreshTask;
-                        updateIncludesAllActiveServers = updateResult.IncludesAllActiveServers;
+                        var updateResult = await refreshTask;                        
                         if (updateResult is null)
                         {
                             // There was no newer cluster manifest, so wait for the next refresh interval and try again.
                             await Task.WhenAny(cancellationTask, Task.Delay(_typeManagementOptions.TypeMapRefreshInterval));
                             continue;
                         }
-
+                        updateIncludesAllActiveServers = updateResult.IncludesAllActiveServers;
                         gatewayVersion = updateResult.Version;
 
                         // If the manifest does not contain all active servers, merge with the existing manifest until it does.
