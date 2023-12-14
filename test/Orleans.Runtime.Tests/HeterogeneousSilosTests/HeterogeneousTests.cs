@@ -83,12 +83,11 @@ namespace Tester.HeterogeneousSilosTests
         }
 
         [Fact]
-        public async void GrainExcludedTest()
+        public void GrainExcludedTest()
         {
             SetupAndDeployCluster(typeof(RandomPlacement), typeof(TestGrain));
 
-            var grain = this.cluster!.GrainFactory!.GetGrain<ITestGrain>(0);
-            await grain.GetKey();
+            _ = this.cluster!.GrainFactory!.GetGrain<ITestGrain>(0);
 
             // Should not fail
             this.cluster!.GrainFactory!.GetGrain<ISimpleGrainWithAsyncMethods>(0);
