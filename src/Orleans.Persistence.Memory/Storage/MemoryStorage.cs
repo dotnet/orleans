@@ -11,7 +11,6 @@ using Orleans.Storage.Internal;
 
 namespace Orleans.Storage
 {
-
     /// <summary>
     /// This is a simple in-memory grain implementation of a storage provider.
     /// </summary>
@@ -21,16 +20,6 @@ namespace Orleans.Storage
     ///  because [by-design] it does not provide any resilience 
     ///  or long-term persistence capabilities.
     /// </remarks>
-    /// <example>
-    /// Example configuration for this storage provider in OrleansConfiguration.xml file:
-    /// <code>
-    /// &lt;OrleansConfiguration xmlns="urn:orleans">
-    ///   &lt;Globals>
-    ///     &lt;StorageProviders>
-    ///       &lt;Provider Type="Orleans.Storage.MemoryStorage" Name="MemoryStore" />
-    ///   &lt;/StorageProviders>
-    /// </code>
-    /// </example>
     [DebuggerDisplay("MemoryStore:{" + nameof(name) + "}")]
     public class MemoryGrainStorage : IGrainStorage, IDisposable
     {
@@ -55,8 +44,11 @@ namespace Orleans.Storage
             this.logger = logger;
             this.storageSerializer = options.GrainStorageSerializer ?? defaultGrainStorageSerializer;
 
-            //Init
-            logger.LogInformation("Init: Name={Name} NumStorageGrains={NumStorageGrains}", name, options.NumStorageGrains);
+
+            if (logger.IsEnabled(LogLevel.Debug))
+            {
+                logger.LogDebug("Init: Name={Name} NumStorageGrains={NumStorageGrains}", name, options.NumStorageGrains);
+            }
 
             storageGrains = new Lazy<IMemoryStorageGrain>[options.NumStorageGrains];
             for (int i = 0; i < storageGrains.Length; i++)
@@ -141,7 +133,6 @@ namespace Orleans.Storage
         /// <param name="data">The serialized stored data</param>
         internal T ConvertFromStorageFormat<T>(ReadOnlyMemory<byte> data)
         {
-
             T dataValue = default;
             try
             {
