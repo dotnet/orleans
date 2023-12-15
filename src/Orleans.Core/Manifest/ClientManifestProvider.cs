@@ -13,15 +13,12 @@ namespace Orleans.Runtime
     internal class ClientManifestProvider
     {
         public ClientManifestProvider(
-            IEnumerable<IGrainPropertiesProvider> grainPropertiesProviders,
             IEnumerable<IGrainInterfacePropertiesProvider> grainInterfacePropertiesProviders,
             IOptions<GrainTypeOptions> grainTypeOptions,
-            GrainTypeResolver grainTypeResolver,
             GrainInterfaceTypeResolver interfaceTypeResolver)
         {
-            var grainProperties = CreateGrainManifest(grainPropertiesProviders, grainTypeOptions, grainTypeResolver);
             var interfaces = CreateInterfaceManifest(grainInterfacePropertiesProviders, grainTypeOptions, interfaceTypeResolver);
-            this.ClientManifest = new GrainManifest(grainProperties, interfaces);
+            this.ClientManifest = new GrainManifest(ImmutableDictionary<GrainType, GrainProperties>.Empty, interfaces);
         }
 
         /// <summary>
@@ -56,35 +53,6 @@ namespace Orleans.Runtime
             }
 
             return builder.ToImmutable();
-        }
-
-        private static ImmutableDictionary<GrainType, GrainProperties> CreateGrainManifest(
-            IEnumerable<IGrainPropertiesProvider> grainMetadataProviders,
-            IOptions<GrainTypeOptions> grainTypeOptions,
-            GrainTypeResolver grainTypeProvider)
-        {
-            var propertiesMap = ImmutableDictionary.CreateBuilder<GrainType, GrainProperties>();
-            foreach (var grainClass in grainTypeOptions.Value.Classes)
-            {
-                var grainType = grainTypeProvider.GetGrainType((Type)grainClass);
-                var properties = new Dictionary<string, string>();
-                foreach (var provider in grainMetadataProviders)
-                {
-                    provider.Populate((Type)grainClass, grainType, properties);
-                }
-
-                var result = new GrainProperties(properties.ToImmutableDictionary());
-                if (propertiesMap.TryGetValue(grainType, out var grainProperty))
-                {
-                    throw new InvalidOperationException($"An entry with the key {grainType} is already present."
-                        + $"\nExisting: {grainProperty.ToDetailedString()}\nTrying to add: {result.ToDetailedString()}"
-                        + "\nConsider using the [GrainType(\"name\")] attribute to give these classes unique names.");
-                }
-
-                propertiesMap.Add(grainType, result);
-            }
-
-            return propertiesMap.ToImmutable();
         }
     }
 }

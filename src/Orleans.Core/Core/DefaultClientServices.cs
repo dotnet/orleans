@@ -61,6 +61,7 @@ namespace Orleans
             services.TryAddSingleton<IAppEnvironmentStatistics, AppEnvironmentStatistics>();
             services.AddLogging();
             services.TryAddSingleton<GrainBindingsResolver>();
+            services.TryAddSingleton<LocalClientDetails>();
             services.TryAddSingleton<OutsideRuntimeClient>();
             services.TryAddSingleton<ClientGrainContext>();
             services.AddFromExisting<IGrainContextAccessor, ClientGrainContext>();
