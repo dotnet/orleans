@@ -498,18 +498,22 @@ namespace Orleans.Runtime
 
         private Task OnRuntimeInitializeStart(CancellationToken tc)
         {
-            var stopWatch = Stopwatch.StartNew();
+            var stopWatch = ValueStopwatch.StartNew();
             var timerLogger = this.loggerFactory.CreateLogger<SafeTimer>();
             var minTicks = Math.Min(this.messagingOptions.ResponseTimeout.Ticks, TimeSpan.FromSeconds(1).Ticks);
             var period = TimeSpan.FromTicks(minTicks);
             this.callbackTimer = new SafeTimer(timerLogger, this.OnCallbackExpiryTick, null, period, period);
             this.disposables.Add(this.callbackTimer);
 
-            stopWatch.Stop();
-            this.logger.LogInformation(
-                (int)ErrorCode.SiloStartPerfMeasure,
-                "Start InsideRuntimeClient took {ElapsedMs} milliseconds",
-                stopWatch.ElapsedMilliseconds);
+            if (logger.IsEnabled(LogLevel.Debug))
+            {
+                stopWatch.Stop();
+                this.logger.LogInformation(
+                    (int)ErrorCode.SiloStartPerfMeasure,
+                    "Start InsideRuntimeClient took {ElapsedMs} milliseconds",
+                    stopWatch.Elapsed.TotalMilliseconds);
+            }
+
             return Task.CompletedTask;
         }
 

@@ -91,7 +91,11 @@ namespace Orleans.Runtime.GrainDirectory
 
         public void Start()
         {
-            log.LogInformation("Start");
+            if (log.IsEnabled(LogLevel.Debug))
+            {
+                log.LogDebug("Start");
+            }
+
             Running = true;
             if (maintainer != null)
             {
