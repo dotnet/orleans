@@ -44,7 +44,7 @@ namespace Orleans.Messaging
         internal static readonly TimeSpan MINIMUM_INTERCONNECT_DELAY = TimeSpan.FromMilliseconds(100);   // wait one tenth of a second between connect attempts
         internal const int CONNECT_RETRY_COUNT = 2;                                                      // Retry twice before giving up on a gateway server
 
-        internal ClientGrainId ClientId { get; private set; }
+        internal ClientGrainId ClientId => _localClientDetails.ClientId;
         public IRuntimeClient RuntimeClient { get; }
         internal bool Running { get; private set; }
 
@@ -58,17 +58,16 @@ namespace Orleans.Messaging
         // false, then a new gateway is selected using the gateway manager, and a new connection established if necessary.
         private readonly WeakReference<ClientOutboundConnection>[] grainBuckets;
         private readonly ILogger logger;
-        public SiloAddress MyAddress { get; private set; }
+        public SiloAddress MyAddress => _localClientDetails.ClientAddress;
         private int numberOfConnectedGateways = 0;
         private readonly MessageFactory messageFactory;
         private readonly IClusterConnectionStatusListener connectionStatusListener;
         private readonly ConnectionManager connectionManager;
+        private readonly LocalClientDetails _localClientDetails;
 
         public ClientMessageCenter(
             IOptions<ClientMessagingOptions> clientMessagingOptions,
-            IPAddress localAddress,
-            int gen,
-            ClientGrainId clientId,
+            LocalClientDetails localClientDetails,
             IRuntimeClient runtimeClient,
             MessageFactory messageFactory,
             IClusterConnectionStatusListener connectionStatusListener,
@@ -77,8 +76,7 @@ namespace Orleans.Messaging
             GatewayManager gatewayManager)
         {
             this.connectionManager = connectionManager;
-            MyAddress = SiloAddress.New(localAddress, 0, gen);
-            ClientId = clientId;
+            _localClientDetails = localClientDetails;
             this.RuntimeClient = runtimeClient;
             this.messageFactory = messageFactory;
             this.connectionStatusListener = connectionStatusListener;

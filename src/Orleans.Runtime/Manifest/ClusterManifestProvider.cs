@@ -39,8 +39,7 @@ namespace Orleans.Runtime.Metadata
             this.LocalGrainManifest = siloManifestProvider.SiloManifest;
             _current = new ClusterManifest(
                 MajorMinorVersion.Zero,
-                ImmutableDictionary.CreateRange(new[] { new KeyValuePair<SiloAddress, GrainManifest>(localSiloDetails.SiloAddress, this.LocalGrainManifest) }),
-                ImmutableArray.Create(this.LocalGrainManifest));
+                ImmutableDictionary.CreateRange(new[] { new KeyValuePair<SiloAddress, GrainManifest>(localSiloDetails.SiloAddress, this.LocalGrainManifest) }));
             _updates = new AsyncEnumerable<ClusterManifest>(
                 initialValue: _current,
                 updateValidator: (previous, proposed) => proposed.Version > previous.Version,
@@ -182,7 +181,7 @@ namespace Orleans.Runtime.Metadata
             var version = new MajorMinorVersion(clusterMembership.Version.Value, existingManifest.Version.Minor + 1);
             if (modified)
             {
-                return _updates.TryPublish(new ClusterManifest(version, builder.ToImmutable(), builder.Values.ToImmutableArray())) && fetchSuccess;
+                return _updates.TryPublish(new ClusterManifest(version, builder.ToImmutable())) && fetchSuccess;
             }
 
             return fetchSuccess;
