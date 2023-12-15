@@ -291,7 +291,7 @@ namespace Orleans.CodeGenerator
                 if (CopierGenerator.GenerateCopier(type, MetadataModel.DefaultCopiers) is { } copier)
                     AddMember(ns, copier);
 
-                if (!type.IsEnumType && (!type.IsValueType && type.IsEmptyConstructable && !type.UseActivator && type is not GeneratedInvokableDescription || type.HasActivatorConstructor))
+                if (!type.IsAbstractType && !type.IsEnumType && (!type.IsValueType && type.IsEmptyConstructable && !type.UseActivator && type is not GeneratedInvokableDescription || type.HasActivatorConstructor))
                 {
                     MetadataModel.ActivatableTypes.Add(type);
 
