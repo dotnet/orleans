@@ -1,8 +1,8 @@
+#nullable enable
 using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Diagnostics;
-using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
@@ -30,7 +30,7 @@ namespace Orleans.Runtime
         private readonly AsyncEnumerable<ClusterManifest> _updates;
         private readonly CancellationTokenSource _cancellation = new CancellationTokenSource();
         private ClusterManifest _current;
-        private Task _runTask;
+        private Task? _runTask;
 
         public ClientClusterManifestProvider(
             IServiceProvider services,
@@ -45,7 +45,7 @@ namespace Orleans.Runtime
             _services = services;
             _localClientDetails = localClientDetails;
             _gatewayManager = gatewayManager;
-            this.LocalGrainManifest = clientManifestProvider.ClientManifest;
+            LocalGrainManifest = clientManifestProvider.ClientManifest;
 
             // Create a fake manifest for the very first generation, which only includes the local client's manifest.
             var builder = ImmutableDictionary.CreateBuilder<SiloAddress, GrainManifest>();
@@ -83,11 +83,10 @@ namespace Orleans.Runtime
             {
                 var grainFactory = _services.GetRequiredService<IInternalGrainFactory>();
                 var cancellationTask = _cancellation.Token.WhenCancelled();
-                SiloAddress gateway = null;
-                IClusterManifestSystemTarget provider = null;
+                SiloAddress? gateway = null;
+                IClusterManifestSystemTarget? provider = null;
                 var minorVersion = 0;
                 var gatewayVersion = MajorMinorVersion.MinValue;
-                var updateIncludesAllActiveServers = false;
                 while (!_cancellation.IsCancellationRequested)
                 {
                     // Select a new gateway if the current one is not available.
@@ -124,13 +123,13 @@ namespace Orleans.Runtime
                             await Task.WhenAny(cancellationTask, Task.Delay(_typeManagementOptions.TypeMapRefreshInterval));
                             continue;
                         }
-                        updateIncludesAllActiveServers = updateResult.IncludesAllActiveServers;
+
                         gatewayVersion = updateResult.Version;
 
                         // If the manifest does not contain all active servers, merge with the existing manifest until it does.
                         // This prevents reversed progress at the expense of including potentially defunct silos.
                         ImmutableDictionary<SiloAddress, GrainManifest> siloManifests;
-                        if (!updateIncludesAllActiveServers)
+                        if (!updateResult.IncludesAllActiveServers)
                         {
                             // Merge manifests until the manifest contains all active servers.
                             var mergedSilos = _current.Silos.ToBuilder();
