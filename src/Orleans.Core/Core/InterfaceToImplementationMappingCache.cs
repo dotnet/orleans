@@ -28,7 +28,7 @@ namespace Orleans
             }
 
             /// <summary>
-            /// Gets the grain implmentation <see cref="MethodInfo"/>.
+            /// Gets the grain implementation <see cref="MethodInfo"/>.
             /// </summary>
             public MethodInfo ImplementationMethod { get; }
 
