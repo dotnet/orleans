@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+#nullable enable
 using System.Collections.Immutable;
 using System.Threading.Tasks;
 using Orleans.Metadata;
@@ -20,7 +20,7 @@ namespace Orleans.Runtime
         /// Gets an updated cluster manifest if newer than the provided <paramref name="previousVersion"/>.
         /// </summary>
         /// <returns>The current cluster manifest, or <see langword="null"/> if it is not newer than the provided version.</returns>
-        ValueTask<ClusterManifestUpdate> GetClusterManifestUpdate(MajorMinorVersion previousVersion);
+        ValueTask<ClusterManifestUpdate?> GetClusterManifestUpdate(MajorMinorVersion previousVersion);
     }
 
     /// <summary>
