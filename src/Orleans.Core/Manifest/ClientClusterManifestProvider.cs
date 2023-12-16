@@ -116,7 +116,14 @@ namespace Orleans.Runtime
                             return;
                         }
 
-                        var updateResult = await refreshTask;                        
+                        var updateResult = await refreshTask;
+                        if (updateResult is null)
+                        {
+                            // There was no newer cluster manifest, so wait for the next refresh interval and try again.
+                            await Task.WhenAny(cancellationTask, Task.Delay(_typeManagementOptions.TypeMapRefreshInterval));
+                            continue;
+                        }
+
                         gatewayVersion = updateResult.Version;
 
                         // If the manifest does not contain all active servers, merge with the existing manifest until it does.
@@ -176,11 +183,12 @@ namespace Orleans.Runtime
             }
         }
 
-        private async Task<ClusterManifestUpdate> GetClusterManifestUpdate(IClusterManifestSystemTarget provider, MajorMinorVersion previousVersion)
+        private async Task<ClusterManifestUpdate?> GetClusterManifestUpdate(IClusterManifestSystemTarget provider, MajorMinorVersion previousVersion)
         {
             try
             {
                 // First, attempt to call the new API, which provides more information.
+                // This returns null if there is no newer cluster manifest.
                 return await provider.GetClusterManifestUpdate(previousVersion);
             }
             catch (Exception exception)
