@@ -13,7 +13,7 @@ namespace Orleans.Runtime
         /// Gets the current cluster manifest.
         /// </summary>
         ClusterManifest Current { get; }
-
+       
         /// <summary>
         /// Gets the stream of cluster manifest updates.
         /// </summary>
