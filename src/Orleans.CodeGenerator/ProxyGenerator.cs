@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -59,7 +60,58 @@ namespace Orleans.CodeGenerator
             return (classDeclaration, new GeneratedProxyDescription(interfaceDescription, generatedClassName));
         }
 
-        public static string GetSimpleClassName(ProxyInterfaceDescription interfaceDescription) => $"Proxy_{interfaceDescription.Name}";
+        public static string GetSimpleClassName(ProxyInterfaceDescription interfaceDescription)
+            => SantizeName($"Proxy_{interfaceDescription.Name}");
+        
+        private static string SantizeName(string value)
+        {
+            var result = new StringBuilder(value.Length);
+            for (var i = 0; i < value.Length; i++)
+            {
+                switch (value[i])
+                {
+                    case '-':
+                    case ' ':
+                    case '@':
+                    case '#':
+                    case '$':
+                    case '%':
+                    case '^':
+                    case '&':
+                    case '*':
+                    case '(':
+                    case ')':
+                    case '[':
+                    case ']':
+                    case '{':
+                    case '}':
+                    case ';':
+                    case ':':
+                    case '"':
+                    case '\'':
+                    case ',':
+                    case '.':
+                    case '<':
+                    case '>':
+                    case '/':
+                    case '?':
+                    case '\\':
+                    case '|':
+                    case '+':
+                    case '=':
+                    case '`':
+                    case '~':
+                    case '!':
+                        result.Append('_');
+                        break;
+                    default:
+                        result.Append(value[i]);
+                        break;
+                }
+            }
+
+            return result.ToString();
+        }
 
         private List<GeneratedFieldDescription> GetFieldDescriptions(
             ProxyInterfaceDescription interfaceDescription)
