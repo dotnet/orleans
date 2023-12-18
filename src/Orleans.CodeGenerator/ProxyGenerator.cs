@@ -61,58 +61,8 @@ namespace Orleans.CodeGenerator
         }
 
         public static string GetSimpleClassName(ProxyInterfaceDescription interfaceDescription)
-            => SantizeName($"Proxy_{interfaceDescription.Name}");
+            => $"Proxy_{SyntaxGeneration.Identifier.SanitizeIdentifierName(interfaceDescription.Name)}";
         
-        private static string SantizeName(string value)
-        {
-            var result = new StringBuilder(value.Length);
-            for (var i = 0; i < value.Length; i++)
-            {
-                switch (value[i])
-                {
-                    case '-':
-                    case ' ':
-                    case '@':
-                    case '#':
-                    case '$':
-                    case '%':
-                    case '^':
-                    case '&':
-                    case '*':
-                    case '(':
-                    case ')':
-                    case '[':
-                    case ']':
-                    case '{':
-                    case '}':
-                    case ';':
-                    case ':':
-                    case '"':
-                    case '\'':
-                    case ',':
-                    case '.':
-                    case '<':
-                    case '>':
-                    case '/':
-                    case '?':
-                    case '\\':
-                    case '|':
-                    case '+':
-                    case '=':
-                    case '`':
-                    case '~':
-                    case '!':
-                        result.Append('_');
-                        break;
-                    default:
-                        result.Append(value[i]);
-                        break;
-                }
-            }
-
-            return result.ToString();
-        }
-
         private List<GeneratedFieldDescription> GetFieldDescriptions(
             ProxyInterfaceDescription interfaceDescription)
         {
