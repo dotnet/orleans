@@ -2,9 +2,6 @@ using Orleans.CodeGenerator.SyntaxGeneration;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using System.Linq;
 using static Microsoft.CodeAnalysis.CSharp.SyntaxFactory;
-using System.Collections.Generic;
-using System;
-using System.Text;
 
 namespace Orleans.CodeGenerator
 {
@@ -35,7 +32,6 @@ namespace Orleans.CodeGenerator
             var interfaceType = interfaceDescription.InterfaceType;
             var genericArity = interfaceType.GetAllTypeParameters().Count();
             var name = ProxyGenerator.GetSimpleClassName(interfaceDescription);
-
             if (genericArity > 0)
             {
                 name += $"<{new string(',', genericArity - 1)}>";
