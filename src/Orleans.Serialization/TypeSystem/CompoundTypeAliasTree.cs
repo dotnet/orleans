@@ -93,7 +93,15 @@ public class CompoundTypeAliasTree
         {
             if (value is not null && existing.Value is { } type && type != value)
             {
-                throw new ArgumentException("A key with this value already exists");
+                // When the same grain interface is used across multiple assemblies which dont have cross references,
+                // code-gen will generate code for both because it works in isolation, yet at startup they are combined.
+
+                // In this case, if the key is present, and the value is the same as the one being added,
+                // and due to them being logically the same, we can just return the existing CompoundTypeAliasTree.
+
+                // Basically the "fastest" adds it, and the other just consumes it.
+
+                return existing;
             }
 
             existing.Value = value;
