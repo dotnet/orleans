@@ -93,14 +93,13 @@ public class CompoundTypeAliasTree
         {
             if (value is not null && existing.Value is { } type && type != value)
             {
-                // When the same grain interface is used across multiple assemblies which dont have cross references,
+                // When the same grain interface is used across multiple assemblies which don't have cross references,
                 // code-gen will generate code for both because it works in isolation, yet at startup they are combined.
 
                 // In this case, if the key is present, and the value is the same as the one being added,
                 // and due to them being logically the same, we can just return the existing CompoundTypeAliasTree.
 
-                // Basically the "fastest" adds it, and the other just consumes it.
-
+                // The first one is allowed to win in this case.
                 return existing;
             }
 
