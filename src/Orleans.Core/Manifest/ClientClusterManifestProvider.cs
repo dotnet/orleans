@@ -94,6 +94,11 @@ namespace Orleans.Runtime
                     if (gateway is null || !_gatewayManager.IsGatewayAvailable(gateway))
                     {
                         gateway = _gatewayManager.GetLiveGateway();
+                        if (gateway is null)
+                        {
+                            continue;
+                        }
+
                         provider = grainFactory.GetGrain<IClusterManifestSystemTarget>(SystemTargetGrainId.Create(Constants.ManifestProviderType, gateway).GrainId);
 
                         // Accept any cluster manifest version from the new gateway.
