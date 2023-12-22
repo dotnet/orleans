@@ -56,6 +56,6 @@ namespace Orleans.Streams
         /// </summary>
         /// <param name="ex">An Exception that describes the error that occurred on the stream.</param>
         /// <returns>A Task that is completed when the close has been accepted.</returns>
-        Task OnErrorAsync(Exception ex) => throw ex;
+        Task OnErrorAsync(Exception ex);
     }
 }
