@@ -19,7 +19,7 @@ namespace Orleans
         Task<bool> ShouldRetryConnectionAttempt(Exception exception, CancellationToken cancellationToken);
     }
 
-    internal sealed class DefaultClientConnectRetryFilter : IClientConnectionRetryFilter
+    internal sealed class LinearBackoffClientConnectionRetryFilter : IClientConnectionRetryFilter
     {
         private int _retryCount = 0;
 
