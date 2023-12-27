@@ -1,3 +1,4 @@
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Xunit;
 using Orleans.TestingHost;
@@ -8,6 +9,8 @@ using Tester;
 using Orleans.Configuration;
 using Azure.Data.Tables;
 using Azure.Identity;
+using OrleansEventSourcing.CustomStorage;
+using TestGrains;
 
 namespace Tests.GeoClusterTests
 {
@@ -50,7 +53,9 @@ namespace Tests.GeoClusterTests
                         {
                             options.TableServiceClient = GetTableServiceClient();
                         }))
-                        .AddMemoryGrainStorage("MemoryStore"); 
+                        .AddMemoryGrainStorage("MemoryStore");
+
+                    hostBuilder.Services.AddSingleton<ICustomStorageFactory, LogTestGrainSeparateCustomStorage.SeparateCustomStorageFactory>();
                 }
 
                 private static TableServiceClient GetTableServiceClient()
@@ -61,7 +66,7 @@ namespace Tests.GeoClusterTests
                 }
             }
         }
-        
+
         public BasicLogTestGrainTests(Fixture fixture)
         {
             this.fixture = fixture;
@@ -94,6 +99,11 @@ namespace Tests.GeoClusterTests
         {
             await DoBasicLogTestGrainTest("TestGrains.LogTestGrainCustomStorage");
         }
+        [Fact]
+        public async Task SeparateCustomStorage()
+        {
+            await DoBasicLogTestGrainTest("TestGrains.LogTestGrainSeparateCustomStorage");
+        }
 
         private int GetRandom()
         {
@@ -109,7 +119,7 @@ namespace Tests.GeoClusterTests
 
         private async Task ThreeCheckers(string grainClass, int phases)
         {
-            // Global 
+            // Global
             async Task checker1()
             {
                 int x = GetRandom();
