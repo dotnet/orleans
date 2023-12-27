@@ -3,11 +3,12 @@ using Orleans.Configuration;
 using System;
 using Microsoft.Extensions.Options;
 using Microsoft.Extensions.DependencyInjection;
+using OrleansEventSourcing.CustomStorage;
 
 namespace Orleans.EventSourcing.CustomStorage
 {
     /// <summary>
-    /// A log-consistency provider that relies on grain-specific custom code for 
+    /// A log-consistency provider that relies on grain-specific custom code for
     /// reading states from storage, and appending deltas to storage.
     /// Grains that wish to use this provider must implement the <see cref="ICustomStorageInterface{TState, TDelta}"/>
     /// interface, to define how state is read and how deltas are written.
@@ -17,6 +18,7 @@ namespace Orleans.EventSourcing.CustomStorage
     public class LogConsistencyProvider : ILogViewAdaptorFactory
     {
         private readonly CustomStorageLogConsistencyOptions options;
+        private readonly IServiceProvider serviceProvider;
 
         /// <summary>
         /// Gets the cluster identifier passed to each custom-storage adaptor.
@@ -30,9 +32,11 @@ namespace Orleans.EventSourcing.CustomStorage
         /// Initializes a new instance of the <see cref="LogConsistencyProvider"/> class.
         /// </summary>
         /// <param name="options">The provider configuration.</param>
-        public LogConsistencyProvider(CustomStorageLogConsistencyOptions options)
+        /// <param name="serviceProvider">The service provider used to resolve custom storage implementations.</param>
+        public LogConsistencyProvider(CustomStorageLogConsistencyOptions options, IServiceProvider serviceProvider)
         {
             this.options = options;
+            this.serviceProvider = serviceProvider;
         }
 
         /// <inheritdoc/>
@@ -40,7 +44,8 @@ namespace Orleans.EventSourcing.CustomStorage
             where TView : class, new()
             where TEntry : class
         {
-            return new CustomStorageAdaptor<TView, TEntry>(hostGrain, initialState, services, PrimaryCluster);
+            var customStorage = CustomStorageHelpers.GetCustomStorage<TView, TEntry>(hostGrain, services.GrainId, serviceProvider);
+            return new CustomStorageAdaptor<TView, TEntry>(hostGrain, initialState, services, PrimaryCluster, customStorage);
         }
     }
 
