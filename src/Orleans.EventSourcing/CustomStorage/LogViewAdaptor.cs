@@ -4,13 +4,12 @@ using System.Diagnostics;
 using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
-using Orleans.Storage;
 using Orleans.EventSourcing.Common;
 
 namespace Orleans.EventSourcing.CustomStorage
 {
     /// <summary>
-    /// A log consistency adaptor that uses the user-provided storage interface <see cref="ICustomStorageInterface{T,E}"/>. 
+    /// A log consistency adaptor that uses the user-provided storage interface <see cref="ICustomStorageInterface{T,E}"/>.
     /// This interface must be implemented by any grain that uses this log view adaptor.
     /// </summary>
     /// <typeparam name="TLogView">log view type</typeparam>
@@ -23,15 +22,15 @@ namespace Orleans.EventSourcing.CustomStorage
         /// Initialize a new instance of CustomStorageAdaptor class
         /// </summary>
         public CustomStorageAdaptor(ILogViewAdaptorHost<TLogView, TLogEntry> host, TLogView initialState,
-            ILogConsistencyProtocolServices services, string primaryCluster)
+            ILogConsistencyProtocolServices services, string primaryCluster, ICustomStorageInterface<TLogView, TLogEntry> customStorage)
             : base(host, initialState, services)
         {
-            if (!(host is ICustomStorageInterface<TLogView, TLogEntry>))
-                throw new BadProviderConfigException("Must implement ICustomStorageInterface<TLogView,TLogEntry> for CustomStorageLogView provider");
+            this.customStorage = customStorage;
             this.primaryCluster = primaryCluster;
         }
 
         private readonly string primaryCluster;
+        private readonly ICustomStorageInterface<TLogView, TLogEntry> customStorage;
 
         private TLogView cached;
         private int version;
@@ -114,7 +113,7 @@ namespace Orleans.EventSourcing.CustomStorage
                 try
                 {
                     // read from storage
-                    var result = await ((ICustomStorageInterface<TLogView, TLogEntry>)Host).ReadStateFromStorage();
+                    var result = await customStorage.ReadStateFromStorage();
                     version = result.Key;
                     cached = result.Value;
 
@@ -152,7 +151,7 @@ namespace Orleans.EventSourcing.CustomStorage
 
             try
             {
-                writesuccessful = await ((ICustomStorageInterface<TLogView,TLogEntry>) Host).ApplyUpdatesToStorage(updates, version);
+                writesuccessful = await customStorage.ApplyUpdatesToStorage(updates, version);
 
                 LastPrimaryIssue.Resolve(Host, Services);
             }
@@ -197,7 +196,7 @@ namespace Orleans.EventSourcing.CustomStorage
 
                     try
                     {
-                        var result = await ((ICustomStorageInterface<TLogView, TLogEntry>)Host).ReadStateFromStorage();
+                        var result = await customStorage.ReadStateFromStorage();
                         version = result.Key;
                         cached = result.Value;
 
@@ -223,6 +222,12 @@ namespace Orleans.EventSourcing.CustomStorage
             exit_operation("WriteAsync");
 
             return writesuccessful ? updates.Count : 0;
+        }
+
+        /// <inheritdoc/>
+        public override Task<IReadOnlyList<TLogEntry>> RetrieveLogSegment(int fromVersion, int toVersion)
+        {
+            return customStorage.RetrieveLogSegment(fromVersion, toVersion);
         }
 
         /// <summary>
@@ -279,7 +284,7 @@ namespace Orleans.EventSourcing.CustomStorage
                 return string.Format("v{0} ({1} updates)", Version, Updates.Count);
             }
         }
-   
+
         private readonly SortedList<long, UpdateNotificationMessage> notifications = new SortedList<long,UpdateNotificationMessage>();
 
         /// <inheritdoc/>
@@ -309,7 +314,7 @@ namespace Orleans.EventSourcing.CustomStorage
                 var updatenotification = notifications.ElementAt(0).Value;
                 notifications.RemoveAt(0);
 
-                // Apply all operations in pending 
+                // Apply all operations in pending
                 foreach (var u in updatenotification.Updates)
                     try
                     {
@@ -328,7 +333,7 @@ namespace Orleans.EventSourcing.CustomStorage
             Services.Log(LogLevel.Trace, "unprocessed notifications in queue: {0}", notifications.Count);
 
             base.ProcessNotifications();
-        
+
         }
 
         [Conditional("DEBUG")]

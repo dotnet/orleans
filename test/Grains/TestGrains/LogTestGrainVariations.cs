@@ -1,5 +1,8 @@
+using Orleans.EventSourcing.CustomStorage;
 using Orleans.Providers;
+using Orleans.Runtime;
 using Orleans.Serialization;
+using OrleansEventSourcing.CustomStorage;
 using UnitTests.GrainInterfaces;
 
 namespace TestGrains
@@ -48,7 +51,7 @@ namespace TestGrains
             }
             return storagegrain;
         }
- 
+
 
         public Task<bool> ApplyUpdatesToStorage(IReadOnlyList<object> updates, int expectedversion)
         {
@@ -120,5 +123,79 @@ namespace TestGrains
         }
     }
 
+    // use the explicitly specified "CustomStorage" log-consistency provider with a separate ICustomStorageInterface implementation
+    [LogConsistencyProvider(ProviderName = "CustomStorage")]
+    public class LogTestGrainSeparateCustomStorage : LogTestGrain
+    {
+        public class SeparateCustomStorageFactory : ICustomStorageFactory
+        {
+            private readonly DeepCopier deepCopier;
+
+            public SeparateCustomStorageFactory(DeepCopier deepCopier)
+            {
+                this.deepCopier = deepCopier;
+            }
+
+            public ICustomStorageInterface<TState, TDelta> CreateCustomStorage<TState, TDelta>(GrainId grainId)
+                where TState : class, new()
+                where TDelta : class
+            {
+                return new SeparateCustomStorage<TState, TDelta>(deepCopier);
+            }
+        }
+
+        public class SeparateCustomStorage<TState, TDelta> : ICustomStorageInterface<TState, TDelta>
+            where TState : class, new()
+            where TDelta : class
+        {
+            private readonly DeepCopier copier;
+
+            // we use fake in-memory state as the storage
+            private TState state;
+            private int version;
+
+            public SeparateCustomStorage(DeepCopier copier)
+            {
+                this.copier = copier;
+            }
+
+            public Task<KeyValuePair<int, TState>> ReadStateFromStorage()
+            {
+                if (state == null)
+                {
+                    state = new TState();
+                    version = 0;
+                }
+                return Task.FromResult(new KeyValuePair<int, TState>(version, this.copier.Copy(state)));
+            }
+
+            public Task<bool> ApplyUpdatesToStorage(IReadOnlyList<TDelta> updates, int expectedversion)
+            {
+                if (state == null)
+                {
+                    state = new TState();
+                    version = 0;
+                }
+
+                if (expectedversion != version)
+                    return Task.FromResult(false);
+
+                foreach (var u in updates)
+                {
+                    this.TransitionState(state, u);
+                    version++;
+                }
+
+                return Task.FromResult(true);
+            }
+
+            protected virtual void TransitionState(TState state, object @event)
+            {
+                dynamic s = state;
+                dynamic e = @event;
+                s.Apply(e);
+            }
+        }
+    }
 
 }
