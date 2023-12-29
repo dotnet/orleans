@@ -193,7 +193,7 @@ SELECT
 WHERE NOT EXISTS 
 ( 
     SELECT 1 
-	FROM OrleansQuery oqt
+    FROM OrleansQuery oqt
     WHERE oqt.[QueryKey] = 'WriteToStorageKey'
 );
 
@@ -225,7 +225,7 @@ SELECT
 WHERE NOT EXISTS 
 ( 
     SELECT 1 
-	FROM OrleansQuery oqt
+    FROM OrleansQuery oqt
     WHERE oqt.[QueryKey] = 'ClearStorageKey'
 );
 
@@ -256,6 +256,6 @@ SELECT
 WHERE NOT EXISTS 
 ( 
     SELECT 1 
-	FROM OrleansQuery oqt
+    FROM OrleansQuery oqt
     WHERE oqt.[QueryKey] = 'ReadFromStorageKey'
 );
