@@ -206,7 +206,8 @@ WHERE NOT EXISTS
 
 INSERT INTO OrleansQuery(QueryKey, QueryText)
 SELECT
-	'MembershipReadRowKey','
+	'MembershipReadRowKey',
+    '
 		SELECT
 			v.DeploymentId,
 			m.Address,
