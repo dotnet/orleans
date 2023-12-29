@@ -171,7 +171,7 @@ SELECT
 	'DELETE FROM OrleansRemindersTable
 	WHERE
 		ServiceId = @ServiceId AND @ServiceId IS NOT NULL;
-	');
+	'
 WHERE NOT EXISTS 
 ( 
     SELECT 1 
