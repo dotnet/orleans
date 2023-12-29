@@ -1,4 +1,5 @@
 -- For each deployment, there will be only one (active) membership version table version column which will be updated periodically.
+IF OBJECT_ID(N'[OrleansMembershipVersionTable]', 'U') IS NULL
 CREATE TABLE OrleansMembershipVersionTable
 (
 	DeploymentId NVARCHAR(150) NOT NULL,
@@ -9,6 +10,7 @@ CREATE TABLE OrleansMembershipVersionTable
 );
 
 -- Every silo instance has a row in the membership table.
+IF OBJECT_ID(N'[OrleansMembershipTable]', 'U') IS NULL
 CREATE TABLE OrleansMembershipTable
 (
 	DeploymentId NVARCHAR(150) NOT NULL,
