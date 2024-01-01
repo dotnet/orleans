@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Threading.Tasks;
 
 namespace Orleans.EventSourcing.Common
@@ -74,7 +74,7 @@ namespace Orleans.EventSourcing.Common
         /// delays if there was an issue in last attempt, for the duration specified by the retry delay
         /// </summary>
         /// <returns></returns>
-        public async Task DelayBeforeRetry()
+        public async readonly Task DelayBeforeRetry()
         {
             if (Issue == null)
                 return;
@@ -83,7 +83,7 @@ namespace Orleans.EventSourcing.Common
         }
 
         /// <inheritdoc/>
-        public override string ToString()
+        public override readonly string ToString()
         {
             if (Issue == null)
                 return "";

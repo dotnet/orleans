@@ -1,12 +1,9 @@
 using System;
-using System.Collections.Generic;
-using System.Text;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Orleans.BroadcastChannel;
 using Orleans.BroadcastChannel.SubscriberTable;
 using Orleans.Configuration;
-using Orleans.Hosting;
 using Orleans.Runtime;
 
 namespace Orleans.Hosting
@@ -70,7 +67,7 @@ namespace Orleans.Hosting
         /// <param name="this">The client.</param>
         /// <param name="name">The name of the provider</param>
         public static IBroadcastChannelProvider GetBroadcastChannelProvider(this IClusterClient @this, string name)
-            => @this.ServiceProvider.GetRequiredServiceByName<IBroadcastChannelProvider>(name);
+            => @this.ServiceProvider.GetRequiredKeyedService<IBroadcastChannelProvider>(name);
 
         private static void AddBroadcastChannel(this IServiceCollection services, string name, Action<OptionsBuilder<BroadcastChannelOptions>> configureOptions)
         {
@@ -80,8 +77,8 @@ namespace Orleans.Hosting
                 .AddSingleton<ImplicitChannelSubscriberTable>()
                 .AddSingleton<IChannelNamespacePredicateProvider, DefaultChannelNamespacePredicateProvider>()
                 .AddSingleton<IChannelNamespacePredicateProvider, ConstructorChannelNamespacePredicateProvider>()
-                .AddSingletonKeyedService<string, IChannelIdMapper, DefaultChannelIdMapper>(DefaultChannelIdMapper.Name)
-                .AddSingletonNamedService(name, BroadcastChannelProvider.Create);
+                .AddKeyedSingleton<IChannelIdMapper, DefaultChannelIdMapper>(DefaultChannelIdMapper.Name)
+                .AddKeyedSingleton(name, (sp, key) => BroadcastChannelProvider.Create(sp, key as string));
         }
     }
 }

@@ -33,6 +33,7 @@ namespace Orleans.Runtime
         /// </summary>
         /// <param name="info">The serialization info.</param>
         /// <param name="context">The context.</param>
+        [Obsolete]
         private GrainReferenceNotBoundException(SerializationInfo info, StreamingContext context)
             : base(info, context)
         {

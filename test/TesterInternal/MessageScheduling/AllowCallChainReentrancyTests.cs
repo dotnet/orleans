@@ -1,5 +1,3 @@
-using System;
-using System.Threading.Tasks;
 using TestExtensions;
 using Xunit;
 using Xunit.Abstractions;

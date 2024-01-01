@@ -6,7 +6,6 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Orleans.Configuration;
-using Orleans.Internal;
 using Orleans.Providers.Streams.Common;
 using Orleans.Runtime;
 using Orleans.Streams;
@@ -103,7 +102,7 @@ namespace Orleans.Providers.Streams.Generator
                 this.BlockPoolMonitorFactory = (dimensions) => new DefaultBlockPoolMonitor(dimensions);
             if (this.ReceiverMonitorFactory == null)
                 this.ReceiverMonitorFactory = (dimensions) => new DefaultQueueAdapterReceiverMonitor(dimensions);
-            generatorConfig = this.serviceProvider.GetServiceByName<IStreamGeneratorConfig>(this.Name);
+            generatorConfig = this.serviceProvider.GetKeyedService<IStreamGeneratorConfig>(this.Name);
             if(generatorConfig == null)
             {
                 this.logger.LogInformation("No generator configuration found for stream provider {StreamProvider}.  Inactive until provided with configuration by command.", this.Name);
@@ -190,7 +189,7 @@ namespace Orleans.Providers.Streams.Generator
 
         private class Receiver : IQueueAdapterReceiver
         {
-            const int MaxDelayMs = 20;
+            private const int MaxDelayMs = 20;
             private readonly IQueueAdapterReceiverMonitor receiverMonitor;
             public IStreamGenerator QueueGenerator { private get; set; }
 

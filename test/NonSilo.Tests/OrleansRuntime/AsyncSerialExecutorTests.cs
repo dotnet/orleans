@@ -1,7 +1,4 @@
-using System;
 using System.Collections.Concurrent;
-using System.Collections.Generic;
-using System.Threading.Tasks;
 using Orleans;
 using Orleans.Internal;
 using Xunit;
@@ -69,17 +66,17 @@ namespace UnitTests.OrleansRuntime
 
         private async Task Operation(int opNumber)
         {
-            if (operationsInProgress > 0) Assert.True(false, $"1: Operation {opNumber} found {operationsInProgress} operationsInProgress.");
+            if (operationsInProgress > 0) Assert.Fail($"1: Operation {opNumber} found {operationsInProgress} operationsInProgress.");
             operationsInProgress++;
             var delay = RandomTimeSpan.Next(TimeSpan.FromSeconds(2));
 
             output.WriteLine("Task {0} Staring", opNumber);
             await Task.Delay(delay);
-            if (operationsInProgress != 1) Assert.True(false, $"2: Operation {opNumber} found {operationsInProgress} operationsInProgress.");
+            if (operationsInProgress != 1) Assert.Fail($"2: Operation {opNumber} found {operationsInProgress} operationsInProgress.");
 
             output.WriteLine("Task {0} after first delay", opNumber);
             await Task.Delay(delay);
-            if (operationsInProgress != 1) Assert.True(false, $"3: Operation {opNumber} found {operationsInProgress} operationsInProgress.");
+            if (operationsInProgress != 1) Assert.Fail($"3: Operation {opNumber} found {operationsInProgress} operationsInProgress.");
 
             operationsInProgress--;
             output.WriteLine("Task {0} Done", opNumber);

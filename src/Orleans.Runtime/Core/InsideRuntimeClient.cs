@@ -35,7 +35,6 @@ namespace Orleans.Runtime
         private SafeTimer callbackTimer;
 
         private GrainLocator grainLocator;
-        private Catalog catalog;
         private MessageCenter messageCenter;
         private List<IIncomingGrainCallFilter> grainCallFilters;
         private readonly DeepCopier _deepCopier;
@@ -96,8 +95,6 @@ namespace Orleans.Runtime
 
         public GrainFactory ConcreteGrainFactory { get; }
 
-        private Catalog Catalog => this.catalog ?? (this.catalog = this.ServiceProvider.GetRequiredService<Catalog>());
-
         private GrainLocator GrainLocator
             => this.grainLocator ?? (this.grainLocator = this.ServiceProvider.GetRequiredService<GrainLocator>());
 
@@ -151,7 +148,7 @@ namespace Orleans.Runtime
 
             if (message.IsExpirableMessage(this.messagingOptions.DropExpiredMessages))
             {
-                message.TimeToLive = sharedData.ResponseTimeout;
+                message.TimeToLive = request.GetDefaultResponseTimeout() ?? sharedData.ResponseTimeout;
             }
 
             var oneWay = (options & InvokeMethodOptions.OneWay) != 0;
@@ -200,9 +197,9 @@ namespace Orleans.Runtime
             {
                 if (message.CacheInvalidationHeader != null)
                 {
-                    foreach (GrainAddress address in message.CacheInvalidationHeader)
+                    foreach (var update in message.CacheInvalidationHeader)
                     {
-                        GrainLocator.InvalidateCache(address);
+                        GrainLocator.UpdateCache(update);
                     }
                 }
 
@@ -392,7 +389,7 @@ namespace Orleans.Runtime
                         if (message.CacheInvalidationHeader is null)
                         {
                             // Remove from local directory cache. Note that SendingGrain is the original target, since message is the rejection response.
-                            // If CacheInvalidationHeader is present, we already did this. Otherwise, we left this code for backward compatability.
+                            // If CacheInvalidationHeader is present, we already did this. Otherwise, we left this code for backward compatibility.
                             // It should be retired as we move to use CacheMgmtHeader in all relevant places.
                             this.GrainLocator.InvalidateCache(message.SendingGrain);
                         }
@@ -498,18 +495,22 @@ namespace Orleans.Runtime
 
         private Task OnRuntimeInitializeStart(CancellationToken tc)
         {
-            var stopWatch = Stopwatch.StartNew();
+            var stopWatch = ValueStopwatch.StartNew();
             var timerLogger = this.loggerFactory.CreateLogger<SafeTimer>();
             var minTicks = Math.Min(this.messagingOptions.ResponseTimeout.Ticks, TimeSpan.FromSeconds(1).Ticks);
             var period = TimeSpan.FromTicks(minTicks);
             this.callbackTimer = new SafeTimer(timerLogger, this.OnCallbackExpiryTick, null, period, period);
             this.disposables.Add(this.callbackTimer);
 
-            stopWatch.Stop();
-            this.logger.LogInformation(
-                (int)ErrorCode.SiloStartPerfMeasure,
-                "Start InsideRuntimeClient took {ElapsedMs} milliseconds",
-                stopWatch.ElapsedMilliseconds);
+            if (logger.IsEnabled(LogLevel.Debug))
+            {
+                stopWatch.Stop();
+                this.logger.LogInformation(
+                    (int)ErrorCode.SiloStartPerfMeasure,
+                    "Start InsideRuntimeClient took {ElapsedMs} milliseconds",
+                    stopWatch.Elapsed.TotalMilliseconds);
+            }
+
             return Task.CompletedTask;
         }
 
@@ -532,12 +533,11 @@ namespace Orleans.Runtime
         private void OnCallbackExpiryTick(object state)
         {
             var currentStopwatchTicks = ValueStopwatch.GetTimestamp();
-            var responseTimeout = this.messagingOptions.ResponseTimeout;
             foreach (var pair in callbacks)
             {
                 var callback = pair.Value;
                 if (callback.IsCompleted) continue;
-                if (callback.IsExpired(currentStopwatchTicks)) callback.OnTimeout(responseTimeout);
+                if (callback.IsExpired(currentStopwatchTicks)) callback.OnTimeout();
             }
         }
     }

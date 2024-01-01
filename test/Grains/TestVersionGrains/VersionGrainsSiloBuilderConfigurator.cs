@@ -1,8 +1,6 @@
-using System;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Orleans.Configuration;
-using Orleans.Hosting;
 using Orleans.Runtime;
 using Orleans.Runtime.Placement;
 using Orleans.TestingHost;
@@ -33,8 +31,7 @@ namespace TestVersionGrains
 
         private void ConfigureServices(IServiceCollection services)
         {
-            services.AddSingletonNamedService<PlacementStrategy, VersionAwarePlacementStrategy>(nameof(VersionAwarePlacementStrategy));
-            services.AddSingletonKeyedService<Type, IPlacementDirector, VersionAwarePlacementDirector>(typeof(VersionAwarePlacementStrategy));
+            services.AddPlacementDirector<VersionAwarePlacementStrategy, VersionAwarePlacementDirector>();
         }
     }
 }

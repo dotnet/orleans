@@ -13,7 +13,7 @@
 
   <PropertyGroup>
     <CompatibilityTargetFrameworks>netstandard2.0</CompatibilityTargetFrameworks>
-    <DefaultTargetFrameworks>net7.0</DefaultTargetFrameworks>
+    <DefaultTargetFrameworks>net8.0</DefaultTargetFrameworks>
   </PropertyGroup>
 
   <PropertyGroup>
@@ -28,4 +28,9 @@
     <SourceLinkCreate>true</SourceLinkCreate>
     <SourceLinkOriginUrl>https://github.com/dotnet/orleans</SourceLinkOriginUrl>
   </PropertyGroup>
+
+  <ItemGroup>
+    <AssemblyAttribute Include="Orleans.Metadata.FrameworkPartAttribute" />
+  </ItemGroup>
+
 </Project>

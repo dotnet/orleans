@@ -1,8 +1,4 @@
-using System;
-using System.Threading.Tasks;
 using Xunit;
-using Orleans;
-using Orleans.Hosting;
 using Orleans.Runtime;
 using Orleans.TestingHost;
 using TestExtensions;
@@ -37,7 +33,7 @@ namespace DefaultCluster.Tests
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Providers")]
-        public void Providers_TestExtensions()
+        public async Task Providers_TestExtensions()
         {
             IExtensionTestGrain grain = this.fixture.GrainFactory.GetGrain<IExtensionTestGrain>(GetRandomGrainId());
             ITestExtension extension = grain.AsReference<ITestExtension>();
@@ -46,7 +42,7 @@ namespace DefaultCluster.Tests
             try
             {
                 var p1 = extension.CheckExtension_1();
-                p1.Wait();
+                await p1;
                 exceptionThrown = false;
             }
             catch (GrainExtensionNotInstalledException)
@@ -62,42 +58,42 @@ namespace DefaultCluster.Tests
                 }
                 else
                 {
-                    Assert.True(false, "Incorrect exception thrown when an unimplemented method is invoked: " + baseEx);
+                    Assert.Fail("Incorrect exception thrown when an unimplemented method is invoked: " + baseEx);
                 }
             }
             catch (Exception ex1)
             {
-                Assert.True(false, "Incorrect exception thrown when an unimplemented method is invoked: " + ex1);
+                Assert.Fail("Incorrect exception thrown when an unimplemented method is invoked: " + ex1);
             }
 
             if (!exceptionThrown)
             {
-                Assert.True(false, "Expected exception not thrown when no extension configured");
+                Assert.Fail("Expected exception not thrown when no extension configured");
             }
 
             var p2 = grain.InstallExtension("test");
-            p2.Wait();
+            await p2;
 
             try
             {
                 var p1 = extension.CheckExtension_1();
-                p1.Wait();
-                Assert.Equal("test", p1.Result);
+                await p1;
+                Assert.Equal("test", await p1);
             }
             catch (Exception exc)
             {
-                Assert.True(false, "Unexpected exception thrown when extension is configured. Exc = " + exc);
+                Assert.Fail("Unexpected exception thrown when extension is configured. Exc = " + exc);
             }
 
             try
             {
                 var p1 = extension.CheckExtension_2();
-                p1.Wait();
-                Assert.Equal("23", p1.Result);
+                await p1;
+                Assert.Equal("23", await p1);
             }
             catch (Exception exc)
             {
-                Assert.True(false, "Unexpected exception thrown when extension is configured. Exc = " + exc);
+                Assert.Fail("Unexpected exception thrown when extension is configured. Exc = " + exc);
             }
         }
 
@@ -113,7 +109,7 @@ namespace DefaultCluster.Tests
             }
             catch (Exception ex)
             {
-                Assert.True(false, "No exception should have been thrown. Ex: " + ex.Message);
+                Assert.Fail("No exception should have been thrown. Ex: " + ex.Message);
             }
 
             Assert.True(true);
@@ -129,7 +125,7 @@ namespace DefaultCluster.Tests
                 var res = await extension.CheckExtension_1();
             }
             catch(Exception ex) {
-                Assert.True(false, "No exception should have been thrown. Ex: " + ex.Message);
+                Assert.Fail("No exception should have been thrown. Ex: " + ex.Message);
             }
 
             Assert.True(true);

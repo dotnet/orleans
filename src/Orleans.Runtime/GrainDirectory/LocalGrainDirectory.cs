@@ -91,7 +91,11 @@ namespace Orleans.Runtime.GrainDirectory
 
         public void Start()
         {
-            log.LogInformation("Start");
+            if (log.IsEnabled(LogLevel.Debug))
+            {
+                log.LogDebug("Start");
+            }
+
             Running = true;
             if (maintainer != null)
             {
@@ -410,6 +414,7 @@ namespace Orleans.Runtime.GrainDirectory
             return owner;
         }
 
+        public Task<AddressAndTag> RegisterAsync(GrainAddress address, int hopCount) => RegisterAsync(address, previousAddress: null, hopCount: hopCount);
 
         public async Task<AddressAndTag> RegisterAsync(GrainAddress address, GrainAddress? previousAddress, int hopCount)
         {
@@ -816,7 +821,7 @@ namespace Orleans.Runtime.GrainDirectory
             return this.directoryMembership.MembershipCache.Contains(silo);
         }
 
-        public void CachePlacementDecision(GrainId grainId, SiloAddress siloAddress) => this.DirectoryCache.AddOrUpdate(new GrainAddress { GrainId = grainId, SiloAddress = siloAddress }, 0);
+        public void AddOrUpdateCacheEntry(GrainId grainId, SiloAddress siloAddress) => this.DirectoryCache.AddOrUpdate(new GrainAddress { GrainId = grainId, SiloAddress = siloAddress }, 0);
         public bool TryCachedLookup(GrainId grainId, [NotNullWhen(true)] out GrainAddress? address) => (address = GetLocalCacheData(grainId)) is not null;
 
         private class DirectoryMembership

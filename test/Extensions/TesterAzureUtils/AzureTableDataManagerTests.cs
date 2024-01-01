@@ -1,6 +1,4 @@
-using System;
 using System.Net;
-using System.Threading.Tasks;
 using Azure;
 using Azure.Data.Tables.Models;
 using Orleans.Clustering.AzureStorage;
@@ -38,7 +36,7 @@ namespace Tester.AzureUtils
                 var data2 = data.Clone();
                 data2.StringData = "NewData";
                 await manager.CreateTableEntryAsync(data2);
-                Assert.True(false, "Should have thrown RequestFailedException.");
+                Assert.Fail("Should have thrown RequestFailedException.");
             }
             catch (RequestFailedException exc)
             {
@@ -76,7 +74,7 @@ namespace Tester.AzureUtils
             try
             {
                 await manager.UpdateTableEntryAsync(data, AzureTableUtils.ANY_ETAG);
-                Assert.True(false, "Should have thrown RequestFailedException.");
+                Assert.Fail("Should have thrown RequestFailedException.");
             }
             catch (RequestFailedException exc)
             {
@@ -107,7 +105,7 @@ namespace Tester.AzureUtils
             try
             {
                 string eTag3 = await manager.UpdateTableEntryAsync(data3.Clone(), eTag1);
-                Assert.True(false, "Should have thrown RequestFailedException.");
+                Assert.Fail("Should have thrown RequestFailedException.");
             }
             catch (RequestFailedException exc)
             {
@@ -127,7 +125,7 @@ namespace Tester.AzureUtils
             try
             {
                 await manager.DeleteTableEntryAsync(data, AzureTableUtils.ANY_ETAG);
-                Assert.True(false, "Should have thrown RequestFailedException.");
+                Assert.Fail("Should have thrown RequestFailedException.");
             }
             catch (RequestFailedException exc)
             {
@@ -143,7 +141,7 @@ namespace Tester.AzureUtils
             try
             {
                 await manager.DeleteTableEntryAsync(data, eTag1);
-                Assert.True(false, "Should have thrown RequestFailedException.");
+                Assert.Fail("Should have thrown RequestFailedException.");
             }
             catch (RequestFailedException exc)
             {
@@ -165,7 +163,7 @@ namespace Tester.AzureUtils
             try
             {
                 await manager.MergeTableEntryAsync(data, AzureTableUtils.ANY_ETAG);
-                Assert.True(false, "Should have thrown RequestFailedException.");
+                Assert.Fail("Should have thrown RequestFailedException.");
             }
             catch (RequestFailedException exc)
             {
@@ -185,7 +183,7 @@ namespace Tester.AzureUtils
             try
             {
                 await manager.MergeTableEntryAsync(data, eTag1);
-                Assert.True(false, "Should have thrown RequestFailedException.");
+                Assert.Fail("Should have thrown RequestFailedException.");
             }
             catch (RequestFailedException exc)
             {
@@ -235,7 +233,7 @@ namespace Tester.AzureUtils
             try
             {
                 await manager.InsertTwoTableEntriesConditionallyAsync(data1.Clone(), data2.Clone(), tuple.Item2);
-                Assert.True(false, "Should have thrown RequestFailedException.");
+                Assert.Fail("Should have thrown RequestFailedException.");
             }
             catch (RequestFailedException exc)
             {
@@ -250,7 +248,7 @@ namespace Tester.AzureUtils
             try
             {
                 await manager.InsertTwoTableEntriesConditionallyAsync(data1.Clone(), data2.Clone(), AzureTableUtils.ANY_ETAG);
-                Assert.True(false, "Should have thrown RequestFailedException.");
+                Assert.Fail("Should have thrown RequestFailedException.");
             }
             catch (RequestFailedException exc)
             {
@@ -273,7 +271,7 @@ namespace Tester.AzureUtils
             try
             {
                 await manager.UpdateTwoTableEntriesConditionallyAsync(data1, AzureTableUtils.ANY_ETAG, data2, AzureTableUtils.ANY_ETAG);
-                Assert.True(false, "Update should have failed since the data has not been created yet");
+                Assert.Fail("Update should have failed since the data has not been created yet");
             }
             catch (RequestFailedException exc)
             {
@@ -292,7 +290,7 @@ namespace Tester.AzureUtils
             try
             {
                 await manager.UpdateTwoTableEntriesConditionallyAsync(data1, tuple1.Item1, data2, tuple1.Item2);
-                Assert.True(false, "Should have thrown RequestFailedException.");
+                Assert.Fail("Should have thrown RequestFailedException.");
             }
             catch (RequestFailedException exc)
             {

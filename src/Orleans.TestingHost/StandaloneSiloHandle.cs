@@ -82,11 +82,11 @@ namespace Orleans.TestingHost
                     {
                         if (e.Data.StartsWith(StandaloneSiloHost.SiloAddressLog, StringComparison.Ordinal))
                         {
-                            SiloAddress = Orleans.Runtime.SiloAddress.FromParsableString(e.Data.Substring(StandaloneSiloHost.SiloAddressLog.Length));
+                            SiloAddress = Orleans.Runtime.SiloAddress.FromParsableString(e.Data[StandaloneSiloHost.SiloAddressLog.Length..]);
                         }
                         else if (e.Data.StartsWith(StandaloneSiloHost.GatewayAddressLog, StringComparison.Ordinal))
                         {
-                            GatewayAddress = Orleans.Runtime.SiloAddress.FromParsableString(e.Data.Substring(StandaloneSiloHost.GatewayAddressLog.Length));
+                            GatewayAddress = Orleans.Runtime.SiloAddress.FromParsableString(e.Data[StandaloneSiloHost.GatewayAddressLog.Length..]);
                         }
                         else if (e.Data.StartsWith(StandaloneSiloHost.StartedLog, StringComparison.Ordinal))
                         {

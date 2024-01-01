@@ -1,7 +1,5 @@
-using System;
-using System.Threading.Tasks;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
-using Orleans;
 using Orleans.Runtime;
 using Orleans.Streams.Filtering;
 using TestExtensions;
@@ -70,7 +68,7 @@ namespace Tester.StreamingTests.Filtering
     {
         protected readonly BaseTestClusterFixture fixture;
         private IClusterClient clusterClient => this.fixture.Client;
-        private CustomStreamFilter streamFilter => this.fixture.HostedCluster.ServiceProvider.GetServiceByName<IStreamFilter>(ProviderName) as CustomStreamFilter;
+        private CustomStreamFilter streamFilter => this.fixture.HostedCluster.ServiceProvider.GetKeyedService<IStreamFilter>(ProviderName) as CustomStreamFilter;
 
         protected ILogger logger => fixture.Logger;
 

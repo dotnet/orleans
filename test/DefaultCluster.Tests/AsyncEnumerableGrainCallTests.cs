@@ -1,10 +1,11 @@
-using System.Diagnostics;
 using Microsoft.Extensions.Logging;
 using Orleans.Internal;
 using Orleans.Runtime;
 using TestExtensions;
 using UnitTests.GrainInterfaces;
 using Xunit;
+
+namespace DefaultCluster.Tests;
 
 /// <summary>
 /// Tests support for grain methods which return <see cref="IAsyncEnumerable{T}"/>.

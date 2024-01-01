@@ -1,6 +1,4 @@
-using System;
 using System.Globalization;
-using System.Threading.Tasks;
 using Orleans.Internal;
 using Orleans.Runtime;
 using Xunit;
@@ -23,7 +21,7 @@ namespace NonSilo.Tests
         }
 
         [Fact, TestCategory("Functional"), TestCategory("AsynchronyPrimitives")]
-        public void Async_AsyncExecutorWithRetriesTest_1()
+        public async Task Async_AsyncExecutorWithRetriesTest_1()
         {
             int counter = 0;
             Func<int, Task<int>> myFunc = ((int funcCounter) =>
@@ -44,24 +42,24 @@ namespace NonSilo.Tests
             });
 
             Task<int> promise = AsyncExecutorWithRetries.ExecuteWithRetries(myFunc, 10, 10, null, errorFilter);
-            int value = promise.Result;
+            int value = await promise;
             this.output.WriteLine("Value is {0}.", value);
             counter = 0;
             try
             {
                 promise = AsyncExecutorWithRetries.ExecuteWithRetries(myFunc, 3, 3, null, errorFilter);
-                value = promise.Result;
+                value = await promise;
                 this.output.WriteLine("Value is {0}.", value);
             }
             catch (Exception)
             {
                 return;
             }
-            Assert.True(false,"Should have thrown");
+            Assert.Fail("Should have thrown");
         }
 
         [Fact, TestCategory("Functional"), TestCategory("AsynchronyPrimitives")]
-        public void Async_AsyncExecutorWithRetriesTest_2()
+        public async Task Async_AsyncExecutorWithRetriesTest_2()
         {
             int counter = 0;
             const int countLimit = 5;
@@ -78,7 +76,7 @@ namespace NonSilo.Tests
             int maxRetries = 10;
             int expectedRetries = countLimit;
             Task<int> promise = AsyncExecutorWithRetries.ExecuteWithRetries(myFunc, maxRetries, maxRetries, successFilter, null, Constants.INFINITE_TIMESPAN);
-            int value = promise.Result;
+            int value = await promise;
             this.output.WriteLine("Value={0} Counter={1} ExpectedRetries={2}", value, counter, expectedRetries);
             Assert.Equal(expectedRetries, value); // "Returned value"
             Assert.Equal(counter, value); // "Counter == Returned value"
@@ -87,14 +85,14 @@ namespace NonSilo.Tests
             maxRetries = 3;
             expectedRetries = maxRetries;
             promise = AsyncExecutorWithRetries.ExecuteWithRetries(myFunc, maxRetries, maxRetries, successFilter, null);
-            value = promise.Result;
+            value = await promise;
             this.output.WriteLine("Value={0} Counter={1} ExpectedRetries={2}", value, counter, expectedRetries);
             Assert.Equal(expectedRetries, value); // "Returned value"
             Assert.Equal(counter, value); // "Counter == Returned value"
         }
 
         [Fact, TestCategory("Functional"), TestCategory("AsynchronyPrimitives")]
-        public void Async_AsyncExecutorWithRetriesTest_4()
+        public async Task Async_AsyncExecutorWithRetriesTest_4()
         {
             int counter = 0;
             int lastIteration = 0;
@@ -108,7 +106,7 @@ namespace NonSilo.Tests
             Func<Exception, int, bool> errorFilter = ((Exception exc, int i) =>
             {
                 Assert.Equal(lastIteration, i);
-                Assert.True(false, "Should not be called");
+                Assert.Fail("Should not be called");
                 return true;
             });
 
@@ -117,17 +115,17 @@ namespace NonSilo.Tests
                 myFunc, 
                 maxRetries, 
                 errorFilter,
-                default(TimeSpan),
+                default,
                 new FixedBackoff(TimeSpan.FromSeconds(1)));
 
-            int value = promise.Result;
+            int value = await promise;
             this.output.WriteLine("Value={0} Counter={1} ExpectedRetries={2}", value, counter, 0);
             Assert.Equal(counter, value);
             Assert.Equal(1, counter);
         }
 
         [Fact, TestCategory("Functional"), TestCategory("AsynchronyPrimitives")]
-        public void Async_AsyncExecutorWithRetriesTest_5()
+        public async Task Async_AsyncExecutorWithRetriesTest_5()
         {
             int counter = 0;
             int lastIteration = 0;
@@ -156,12 +154,12 @@ namespace NonSilo.Tests
                 myFunc,
                 maxRetries,
                 errorFilter,
-                default(TimeSpan),
+                default,
                 new FixedBackoff(TimeSpan.FromSeconds(1)));
             try
             {
-                int value = promise.Result;
-                Assert.True(false,"Should have thrown");
+                int value = await promise;
+                Assert.Fail("Should have thrown");
             }
             catch (Exception exc)
             {

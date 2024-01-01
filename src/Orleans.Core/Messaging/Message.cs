@@ -32,7 +32,7 @@ namespace Orleans.Runtime
         public ushort _interfaceVersion;
         public GrainInterfaceType _interfaceType;
 
-        public List<GrainAddress> _cacheInvalidationHeader;
+        public List<GrainAddressCacheUpdate> _cacheInvalidationHeader;
 
         public PackedHeaders Headers { get => _headers; set => _headers = value; }
 
@@ -204,7 +204,7 @@ namespace Orleans.Runtime
             _timeToExpiry = default;
         }
 
-        public List<GrainAddress> CacheInvalidationHeader
+        public List<GrainAddressCacheUpdate> CacheInvalidationHeader
         {
             get => _cacheInvalidationHeader;
             set
@@ -244,16 +244,16 @@ namespace Orleans.Runtime
             // don't set expiration for one way, system target and system grain messages.
             return Direction != Directions.OneWay && !id.IsSystemTarget();
         }
-        
-        internal void AddToCacheInvalidationHeader(GrainAddress address)
+
+        internal void AddToCacheInvalidationHeader(GrainAddress invalidAddress, GrainAddress validAddress)
         {
-            var list = new List<GrainAddress>();
+            var list = new List<GrainAddressCacheUpdate>();
             if (CacheInvalidationHeader != null)
             {
                 list.AddRange(CacheInvalidationHeader);
             }
 
-            list.Add(address);
+            list.Add(new GrainAddressCacheUpdate(invalidAddress, validAddress));
             CacheInvalidationHeader = list;
         }
 
@@ -364,23 +364,23 @@ grow:
 
             public int ForwardCount
             {
-                get => (int)(_fields >> ForwardCountShift);
+                readonly get => (int)(_fields >> ForwardCountShift);
                 set => _fields = (_fields & ~ForwardCountMask) | (uint)value << ForwardCountShift;
             }
 
             public Directions Direction
             {
-                get => (Directions)((_fields & DirectionMask) >> DirectionShift);
+                readonly get => (Directions)((_fields & DirectionMask) >> DirectionShift);
                 set => _fields = (_fields & ~DirectionMask) | (uint)value << DirectionShift;
             }
 
             public ResponseTypes ResponseType
             {
-                get => (ResponseTypes)((_fields & ResponseTypeMask) >> ResponseTypeShift);
+                readonly get => (ResponseTypes)((_fields & ResponseTypeMask) >> ResponseTypeShift);
                 set => _fields = (_fields & ~ResponseTypeMask) | (uint)value << ResponseTypeShift;
             }
 
-            public bool HasFlag(MessageFlags flag) => (_fields & (uint)flag) != 0;
+            public readonly bool HasFlag(MessageFlags flag) => (_fields & (uint)flag) != 0;
 
             public void SetFlag(MessageFlags flag, bool value) => _fields = value switch
             {

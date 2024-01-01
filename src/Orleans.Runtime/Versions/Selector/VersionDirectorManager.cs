@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 using Orleans.Versions.Selector;
@@ -17,7 +18,7 @@ namespace Orleans.Runtime.Versions.Selector
         public VersionSelectorManager(IServiceProvider serviceProvider, IOptions<GrainVersioningOptions> options)
         {
             this.serviceProvider = serviceProvider;
-            this.strategyFromConfig = serviceProvider.GetRequiredServiceByName<VersionSelectorStrategy>(options.Value.DefaultVersionSelectorStrategy);
+            this.strategyFromConfig = serviceProvider.GetRequiredKeyedService<VersionSelectorStrategy>(options.Value.DefaultVersionSelectorStrategy);
             Default = ResolveVersionSelector(serviceProvider, this.strategyFromConfig);
             versionSelectors = new Dictionary<GrainInterfaceType, IVersionSelector>();
         }
@@ -52,7 +53,7 @@ namespace Orleans.Runtime.Versions.Selector
         private static IVersionSelector ResolveVersionSelector(IServiceProvider serviceProvider, VersionSelectorStrategy strategy)
         {
             var policyType = strategy.GetType();
-            return serviceProvider.GetRequiredServiceByKey<Type, IVersionSelector>(policyType);
+            return serviceProvider.GetRequiredKeyedService<IVersionSelector>(policyType);
         }
     }
 }

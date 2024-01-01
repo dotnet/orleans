@@ -1,6 +1,3 @@
-using System;
-using System.Threading.Tasks;
-using Orleans;
 using Orleans.Runtime;
 
 namespace UnitTests.GrainInterfaces
@@ -27,9 +24,13 @@ namespace UnitTests.GrainInterfaces
         Task<string> EchoAsync(string data);
         Task<string> EchoErrorAsync(string data);
 
+        [ResponseTimeout("00:00:05")]
         Task<int> BlockingCallTimeoutAsync(TimeSpan delay);
 
+        Task<int> BlockingCallTimeoutNoResponseTimeoutOverrideAsync(TimeSpan delay);
+
         Task PingAsync();
+
         Task PingLocalSiloAsync();
         Task PingRemoteSiloAsync(SiloAddress siloAddress);
         Task PingOtherSiloAsync();

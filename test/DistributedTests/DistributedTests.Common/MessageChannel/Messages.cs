@@ -1,5 +1,3 @@
-using System;
-
 namespace DistributedTests.Common.MessageChannel
 {
     public class ServerMessage

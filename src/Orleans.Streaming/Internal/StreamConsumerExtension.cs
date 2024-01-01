@@ -93,7 +93,7 @@ namespace Orleans.Streams
             if (logger.IsEnabled(LogLevel.Trace))
             {
                 var itemString = item.ToString();
-                itemString = (itemString.Length > MAXIMUM_ITEM_STRING_LOG_LENGTH) ? itemString.Substring(0, MAXIMUM_ITEM_STRING_LOG_LENGTH) + "..." : itemString;
+                itemString = (itemString.Length > MAXIMUM_ITEM_STRING_LOG_LENGTH) ? itemString[..MAXIMUM_ITEM_STRING_LOG_LENGTH] + "..." : itemString;
                 logger.LogTrace("DeliverItem {Item} for subscription {Subscription}", itemString, subscriptionId);
             }
             IStreamSubscriptionHandle observer;
@@ -103,7 +103,7 @@ namespace Orleans.Streams
             }
             else if(this.streamSubscriptionObserver != null)
             {
-                var streamProvider = this.providerRuntime.ServiceProvider.GetServiceByName<IStreamProvider>(streamId.ProviderName);
+                var streamProvider = this.providerRuntime.ServiceProvider.GetKeyedService<IStreamProvider>(streamId.ProviderName);
                 if(streamProvider != null)
                 {
                     var subscriptionHandlerFactory = new StreamSubscriptionHandlerFactory(streamProvider, streamId, streamId.ProviderName, subscriptionId);
@@ -124,7 +124,7 @@ namespace Orleans.Streams
 
             // We got an item when we don't think we're the subscriber. This is a normal race condition.
             // We can drop the item on the floor, or pass it to the rendezvous, or ...
-            return default(StreamHandshakeToken);
+            return default;
         }
 
         public async Task<StreamHandshakeToken> DeliverBatch(GuidId subscriptionId, QualifiedStreamId streamId, IBatchContainer batch, StreamHandshakeToken handshakeToken)
@@ -138,7 +138,7 @@ namespace Orleans.Streams
             }
             else if(this.streamSubscriptionObserver != null)
             {
-                var streamProvider = this.providerRuntime.ServiceProvider.GetServiceByName<IStreamProvider>(streamId.ProviderName);
+                var streamProvider = this.providerRuntime.ServiceProvider.GetKeyedService<IStreamProvider>(streamId.ProviderName);
                 if (streamProvider != null)
                 {
                     var subscriptionHandlerFactory = new StreamSubscriptionHandlerFactory(streamProvider, streamId, streamId.ProviderName, subscriptionId);
@@ -159,7 +159,7 @@ namespace Orleans.Streams
 
             // We got an item when we don't think we're the subscriber. This is a normal race condition.
             // We can drop the item on the floor, or pass it to the rendezvous, or ...
-            return default(StreamHandshakeToken);
+            return default;
         }
 
         public Task CompleteStream(GuidId subscriptionId)

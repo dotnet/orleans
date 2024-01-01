@@ -1,13 +1,10 @@
-using System;
-using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
-using Orleans;
 using Orleans.Serialization;
 using UnitTests.GrainInterfaces;
 
 namespace UnitTests.Grains
 {
-    class SerializerPresenceTestGrain : Grain, ISerializerPresenceTest
+    internal class SerializerPresenceTestGrain : Grain, ISerializerPresenceTest
     {
         public Task<bool> SerializerExistsForType(Type t)
         {

@@ -27,7 +27,7 @@ namespace Orleans.Runtime.Messaging
         private const int MessageSizeHint = 4096;
         private readonly Dictionary<Type, ResponseCodec> _rawResponseCodecs = new();
         private readonly CodecProvider _codecProvider;
-        private readonly IFieldCodec<GrainAddress> _activationAddressCodec;
+        private readonly IFieldCodec<GrainAddressCacheUpdate> _activationAddressCodec;
         private readonly CachingSiloAddressCodec _readerSiloAddressCodec = new();
         private readonly CachingSiloAddressCodec _writerSiloAddressCodec = new();
         private readonly CachingIdSpanCodec _idSpanCodec = new();
@@ -49,7 +49,7 @@ namespace Orleans.Runtime.Messaging
             _maxBodyLength = options.MaxMessageBodySize;
             _codecProvider = sessionPool.CodecProvider;
             _requestContextCodec = OrleansGeneratedCodeHelper.GetService<DictionaryCodec<string, object>>(this, sessionPool.CodecProvider);
-            _activationAddressCodec = OrleansGeneratedCodeHelper.GetService<IFieldCodec<GrainAddress>>(this, sessionPool.CodecProvider);
+            _activationAddressCodec = OrleansGeneratedCodeHelper.GetService<IFieldCodec<GrainAddressCacheUpdate>>(this, sessionPool.CodecProvider);
             _bufferWriter = new(FramingLength, MessageSizeHint, memoryPool.Pool);
         }
 
@@ -64,7 +64,7 @@ namespace Orleans.Runtime.Messaging
             Span<byte> lengthBytes = stackalloc byte[FramingLength];
             input.Slice(input.Start, FramingLength).CopyTo(lengthBytes);
             var headerLength = BinaryPrimitives.ReadInt32LittleEndian(lengthBytes);
-            var bodyLength = BinaryPrimitives.ReadInt32LittleEndian(lengthBytes.Slice(4));
+            var bodyLength = BinaryPrimitives.ReadInt32LittleEndian(lengthBytes[4..]);
 
             // Check lengths
             ThrowIfLengthsInvalid(headerLength, bodyLength);
@@ -189,6 +189,7 @@ namespace Orleans.Runtime.Messaging
                 }
 
                 var bodyLength = bufferWriter.CommittedBytes - headerLength;
+
                 // Before completing, check lengths
                 ThrowIfLengthsInvalid(headerLength, bodyLength);
 
@@ -217,8 +218,8 @@ namespace Orleans.Runtime.Messaging
             if ((uint)bodyLength > (uint)_maxBodyLength) ThrowInvalidBodyLength(bodyLength);
         }
 
-        private void ThrowInvalidHeaderLength(int headerLength) => throw new OrleansException($"Invalid header size: {headerLength} (max configured value is {_maxHeaderLength}, see {nameof(MessagingOptions.MaxMessageHeaderSize)})");
-        private void ThrowInvalidBodyLength(int bodyLength) => throw new OrleansException($"Invalid body size: {bodyLength} (max configured value is {_maxBodyLength}, see {nameof(MessagingOptions.MaxMessageBodySize)})");
+        private void ThrowInvalidHeaderLength(int headerLength) => throw new InvalidMessageFrameException($"Invalid header size: {headerLength} (max configured value is {_maxHeaderLength}, see {nameof(MessagingOptions.MaxMessageHeaderSize)})");
+        private void ThrowInvalidBodyLength(int bodyLength) => throw new InvalidMessageFrameException($"Invalid body size: {bodyLength} (max configured value is {_maxBodyLength}, see {nameof(MessagingOptions.MaxMessageBodySize)})");
 
         private void Serialize<TBufferWriter>(ref Writer<TBufferWriter> writer, Message value, PackedHeaders headers) where TBufferWriter : IBufferWriter<byte>
         {
@@ -299,12 +300,12 @@ namespace Orleans.Runtime.Messaging
             }
         }
 
-        private List<GrainAddress> ReadCacheInvalidationHeaders<TInput>(ref Reader<TInput> reader)
+        internal List<GrainAddressCacheUpdate> ReadCacheInvalidationHeaders<TInput>(ref Reader<TInput> reader)
         {
             var n = (int)reader.ReadVarUInt32();
             if (n > 0)
             {
-                var list = new List<GrainAddress>(n);
+                var list = new List<GrainAddressCacheUpdate>(n);
                 for (int i = 0; i < n; i++)
                 {
                     list.Add(_activationAddressCodec.ReadValue(ref reader, reader.ReadFieldHeader()));
@@ -313,15 +314,15 @@ namespace Orleans.Runtime.Messaging
                 return list;
             }
 
-            return new List<GrainAddress>();
+            return new List<GrainAddressCacheUpdate>();
         }
 
-        private void WriteCacheInvalidationHeaders<TBufferWriter>(ref Writer<TBufferWriter> writer, List<GrainAddress> value) where TBufferWriter : IBufferWriter<byte>
+        internal void WriteCacheInvalidationHeaders<TBufferWriter>(ref Writer<TBufferWriter> writer, List<GrainAddressCacheUpdate> value) where TBufferWriter : IBufferWriter<byte>
         {
             writer.WriteVarUInt32((uint)value.Count);
             foreach (var entry in value)
             {
-                _activationAddressCodec.WriteField(ref writer, 0, typeof(GrainAddress), entry);
+                _activationAddressCodec.WriteField(ref writer, 0, typeof(GrainAddressCacheUpdate), entry);
             }
         }
 

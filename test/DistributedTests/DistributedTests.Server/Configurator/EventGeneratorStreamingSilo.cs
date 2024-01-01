@@ -1,10 +1,7 @@
-using System;
-using System.Collections.Generic;
 using System.CommandLine;
 using DistributedTests.GrainInterfaces;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Configuration;
-using Orleans.Hosting;
 using Orleans.Providers.Streams.Common;
 using Orleans.Providers.Streams.Generator;
 using Orleans.Runtime;
@@ -61,7 +58,7 @@ namespace DistributedTests.Server.Configurator
                         options.Duration = parameters.Duration;
                     });
                 })
-                .ConfigureServices(services => services.AddSingletonNamedService<IStreamGeneratorConfig>(StreamingConstants.StreamingProvider, (s, n) => generatorOptions))
+                .ConfigureServices(services => services.AddKeyedSingleton<IStreamGeneratorConfig>(StreamingConstants.StreamingProvider, (s, n) => generatorOptions))
                 .AddPersistentStreams(
                     StreamingConstants.StreamingProvider,
                     GeneratorAdapterFactory.Create,

@@ -153,6 +153,7 @@ namespace Orleans.Transactions.TestKit
 
         public AddAndThrowException(string message, Exception innerException) : base(message, innerException) { }
 
+        [Obsolete]
         protected AddAndThrowException(SerializationInfo info, StreamingContext context)
             : base(info, context)
         {

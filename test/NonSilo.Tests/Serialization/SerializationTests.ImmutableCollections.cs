@@ -1,4 +1,3 @@
-using System.Collections.Generic;
 using System.Collections.Immutable;
 using TestExtensions;
 using Xunit;
@@ -15,7 +14,7 @@ namespace UnitTests.Serialization
             this.fixture = fixture;
         }
 
-        void RoundTripCollectionSerializationTest<T>(IEnumerable<T> input)
+        private void RoundTripCollectionSerializationTest<T>(IEnumerable<T> input)
         {
             var output = this.fixture.Serializer.RoundTripSerializationForTesting(input);
             Assert.Equal(input,output);
@@ -44,7 +43,7 @@ namespace UnitTests.Serialization
         {
             var input = default(ImmutableArray<int>);
             var output = this.fixture.Serializer.RoundTripSerializationForTesting(input);
-            Assert.Equal(input, output);
+            Assert.Equal(input.IsDefault, output.IsDefault);
         }
 
         [Fact, TestCategory("BVT"), TestCategory("ImmutableCollections"), TestCategory("Serialization")]

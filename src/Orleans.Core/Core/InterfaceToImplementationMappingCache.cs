@@ -6,7 +6,6 @@ using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using System.Reflection;
 using Orleans.CodeGeneration;
-using Orleans.Utilities;
 
 namespace Orleans
 {
@@ -29,7 +28,7 @@ namespace Orleans
             }
 
             /// <summary>
-            /// Gets the grain implmentation <see cref="MethodInfo"/>.
+            /// Gets the grain implementation <see cref="MethodInfo"/>.
             /// </summary>
             public MethodInfo ImplementationMethod { get; }
 

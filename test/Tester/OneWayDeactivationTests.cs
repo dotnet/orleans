@@ -1,12 +1,9 @@
-using System;
-using System.Linq;
-using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
-using Orleans;
 using Orleans.Configuration;
 using Orleans.Configuration.Internal;
-using Orleans.Hosting;
+using Orleans.Runtime;
 using Orleans.Runtime.GrainDirectory;
+using Orleans.Runtime.Placement;
 using Orleans.TestingHost;
 using TestExtensions;
 using UnitTests.GrainInterfaces;
@@ -58,6 +55,7 @@ namespace UnitTests.General
             IOneWayGrain grainToCallFrom;
             while (true)
             {
+                RequestContext.Set(IPlacementDirector.PlacementHintKey, _fixture.HostedCluster.Primary.SiloAddress);
                 grainToCallFrom = _fixture.Client.GetGrain<IOneWayGrain>(Guid.NewGuid());
                 var grainHost = await grainToCallFrom.GetSiloAddress();
                 if (grainHost.Equals(_fixture.HostedCluster.Primary.SiloAddress))
@@ -67,6 +65,7 @@ namespace UnitTests.General
             }
 
             // Activate the grain & record its address.
+            RequestContext.Remove(IPlacementDirector.PlacementHintKey);
             var grainToDeactivate = await grainToCallFrom.GetOtherGrain();
             var initialActivationId = await grainToDeactivate.GetActivationId();
             var grainId = grainToDeactivate.GetGrainId();
@@ -80,23 +79,14 @@ namespace UnitTests.General
             Assert.Equal(1, count);
             Assert.NotEqual(initialActivationId, finalActivationId);
 
-            // Test that cache was invalidated, but only if the ActivationAddress has changed.
+            // Test that cache was updated.
             // We don't know what the whole activation address should be, but we do know
-            // that some entry should be successfully removed for the provided grain id.
+            // that some entry should be successfully updated for the provided grain id.
             var newActivationAddress = directoryCache.Operations
                 .OfType<TestDirectoryCache.CacheOperation.AddOrUpdate>()
                 .Last(op => op.Value.GrainId.Equals(grainId))
                 .Value;
-
-            var invalidationOp = directoryCache.Operations
-                .OfType<TestDirectoryCache.CacheOperation.RemoveActivation>()
-                .FirstOrDefault(op => op.Key.Equals(activationAddress) && op.Result);
-
-            if (!newActivationAddress.Equals(activationAddress) && invalidationOp is null)
-            {
-                var ops = string.Join(", ", directoryCache.Operations.Select(op => op.ToString()));
-                Assert.True(invalidationOp is not null, $"Should have processed a cache invalidation for the target activation {activationAddress}. Cache ops: {ops}");
-            }
+            Assert.NotNull(newActivationAddress);
 
             directoryCache.Operations.Clear();
         }

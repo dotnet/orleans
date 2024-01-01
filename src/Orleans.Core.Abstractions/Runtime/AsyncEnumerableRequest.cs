@@ -4,7 +4,6 @@ using System.Diagnostics;
 using System.Runtime.Serialization;
 using System.Threading;
 using System.Threading.Tasks;
-using System.Xml.Schema;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Orleans.Concurrency;
@@ -319,6 +318,7 @@ public sealed class EnumerationAbortedException : Exception
     /// <summary>
     /// Initializes a new instance of the <see cref="EnumerationAbortedException"/> class.
     /// </summary>
+    [Obsolete]
     protected EnumerationAbortedException(SerializationInfo info, StreamingContext context) : base(info, context)
     {
     }

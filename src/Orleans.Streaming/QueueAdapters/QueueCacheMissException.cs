@@ -68,7 +68,7 @@ namespace Orleans.Streams
         /// <param name="low">The earliest available sequence token.</param>
         /// <param name="high">The latest available sequence token.</param>
         public QueueCacheMissException(string requested, string low, string high)
-            : this(String.Format(CultureInfo.InvariantCulture, MESSAGE_FORMAT, requested, low, high))
+            : this(string.Format(CultureInfo.InvariantCulture, MESSAGE_FORMAT, requested, low, high))
         {
             Requested = requested;
             Low = low;
@@ -80,6 +80,7 @@ namespace Orleans.Streams
         /// </summary>
         /// <param name="info">The serialization info.</param>
         /// <param name="context">The context.</param>
+        [Obsolete]
         private QueueCacheMissException(SerializationInfo info, StreamingContext context)
             : base(info, context)
         {
@@ -89,6 +90,7 @@ namespace Orleans.Streams
         }
 
         /// <inheritdoc/>
+        [Obsolete]
         public override void GetObjectData(SerializationInfo info, StreamingContext context)
         {
             info.AddValue("Requested", Requested);

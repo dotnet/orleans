@@ -2,8 +2,10 @@ using System;
 using System.Buffers;
 using System.Collections.Generic;
 using System.Linq;
+using System.Reflection;
 using System.Text.Json;
 using Microsoft.Extensions.Options;
+using Orleans.Metadata;
 using Orleans.Serialization.Buffers;
 using Orleans.Serialization.Buffers.Adaptors;
 using Orleans.Serialization.Cloning;
@@ -158,6 +160,11 @@ public class JsonCodec : IGeneralizedCodec, IGeneralizedCopier, ITypeFilter
             return true;
         }
 
+        if (CommonCodecTypeFilter.IsAbstractOrFrameworkType(type))
+        {
+            return false;
+        }
+
         foreach (var selector in _serializableTypeSelectors)
         {
             if (selector.IsSupportedType(type))
@@ -204,6 +211,11 @@ public class JsonCodec : IGeneralizedCodec, IGeneralizedCopier, ITypeFilter
     /// <inheritdoc/>
     bool IGeneralizedCopier.IsSupportedType(Type type)
     {
+        if (CommonCodecTypeFilter.IsAbstractOrFrameworkType(type))
+        {
+            return false;
+        }
+
         foreach (var selector in _copyableTypeSelectors)
         {
             if (selector.IsSupportedType(type))

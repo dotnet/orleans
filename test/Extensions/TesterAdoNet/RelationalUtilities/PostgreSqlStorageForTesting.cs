@@ -1,12 +1,10 @@
-using System;
-using System.Collections.Generic;
 using Orleans.Tests.SqlUtils;
 using TestExtensions;
 using UnitTests.General;
 
 namespace Tester.RelationalUtilities
 {
-    class PostgreSqlStorageForTesting : RelationalStorageForTesting
+    internal class PostgreSqlStorageForTesting : RelationalStorageForTesting
     {
         protected override string ProviderMoniker => "PostgreSQL";
 

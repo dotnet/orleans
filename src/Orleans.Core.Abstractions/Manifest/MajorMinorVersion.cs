@@ -22,7 +22,12 @@ namespace Orleans.Metadata
         /// <summary>
         /// Gets the zero value.
         /// </summary>
-        public static MajorMinorVersion Zero => new MajorMinorVersion(0, 0);
+        public static MajorMinorVersion Zero => new(0, 0);
+
+        /// <summary>
+        /// Gets the minimum value.
+        /// </summary>
+        public static MajorMinorVersion MinValue => new(long.MinValue, long.MinValue);
 
         /// <summary>
         /// Gets the most significant version component.
@@ -69,7 +74,7 @@ namespace Orleans.Metadata
 
             var i = value.IndexOf('.');
             if (i < 0) throw new ArgumentException(nameof(value));
-            return new MajorMinorVersion(long.Parse(value.Substring(0, i)), long.Parse(value.Substring(i + 1)));
+            return new MajorMinorVersion(long.Parse(value[..i]), long.Parse(value[(i + 1)..]));
         }
 
         /// <inheritdoc />

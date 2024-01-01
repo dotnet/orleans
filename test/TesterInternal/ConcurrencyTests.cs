@@ -1,5 +1,3 @@
-using System.Collections.Generic;
-using System.Threading.Tasks;
 using TestExtensions;
 using UnitTests.GrainInterfaces;
 using Xunit;
@@ -26,7 +24,7 @@ namespace UnitTests.ConcurrencyTests
         public async Task ConcurrencyTest_ReadOnly()
         {
             IConcurrentGrain first = this.fixture.GrainFactory.GetGrain<IConcurrentGrain>(GetRandomGrainId());
-            first.Initialize(0).Wait();
+            await first.Initialize(0);
 
             List<Task> promises = new List<Task>();
             for (int i = 0; i < 5; i++)
@@ -38,7 +36,7 @@ namespace UnitTests.ConcurrencyTests
         }
 
         [Fact, TestCategory("Functional"), TestCategory("ReadOnly"), TestCategory("AsynchronyPrimitives")]
-        public void ConcurrencyTest_ModifyReturnList()
+        public async Task ConcurrencyTest_ModifyReturnList()
         {
             IConcurrentGrain grain = this.fixture.GrainFactory.GetGrain<IConcurrentGrain>(GetRandomGrainId());
 
@@ -48,7 +46,7 @@ namespace UnitTests.ConcurrencyTests
                 for (int j = 0; j < ll.Length; j++)
                     ll[j] = grain.ModifyReturnList_Test();
 
-                Task.WhenAll(ll).Wait();
+                await Task.WhenAll(ll);
             }
         }
     }

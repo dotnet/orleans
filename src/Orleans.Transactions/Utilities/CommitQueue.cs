@@ -10,69 +10,69 @@ namespace Orleans.Transactions
     internal struct CommitQueue<T>
     {
         private const int DefaultCapacity = 8;
-        private TransactionRecord<T>[] buffer;
-        private int pos;
+        private TransactionRecord<T>[] _buffer;
+        private int _pos;
 
         public int Count { get; private set; }
 
         // Indexer to provide read/write access to the file.
-        public TransactionRecord<T> this[int index]
+        public readonly TransactionRecord<T> this[int index]
         {
             get
             {
                 if (index < 0 || index > (Count - 1))
                     throw new ArgumentOutOfRangeException(nameof(index));
 
-                return buffer[(pos + index) % buffer.Length];
+                return _buffer[(_pos + index) % _buffer.Length];
             }
         }
 
-        public IEnumerable<TransactionRecord<T>> Elements
+        public readonly IEnumerable<TransactionRecord<T>> Elements
         {
             get
             {
-                if (buffer != null)
+                if (_buffer != null)
                 {
                     for (int i = 0; i < Count; i++)
-                        yield return buffer[(pos + i) % buffer.Length];
+                        yield return _buffer[(_pos + i) % _buffer.Length];
                 }
             }
         }
 
-        public TransactionRecord<T> First => buffer[pos];
+        public readonly TransactionRecord<T> First => _buffer[_pos];
 
-        public TransactionRecord<T> Last => buffer[(pos + Count - 1) % buffer.Length];
+        public readonly TransactionRecord<T> Last => _buffer[(_pos + Count - 1) % _buffer.Length];
 
         public void Add(TransactionRecord<T> entry)
         {
             // ensure we have room
-            if (buffer == null)
+            if (_buffer == null)
             {
-                buffer = new TransactionRecord<T>[DefaultCapacity];
+                _buffer = new TransactionRecord<T>[DefaultCapacity];
             }
-            else if (Count == buffer.Length)
+            else if (Count == _buffer.Length)
             {
-                var newbuffer = new TransactionRecord<T>[buffer.Length * 2];
-                Array.Copy(buffer, pos, newbuffer, 0, buffer.Length - pos);
-                Array.Copy(buffer, 0, newbuffer, buffer.Length - pos, pos);
-                buffer = newbuffer;
-                pos = 0;
+                var newBuffer = new TransactionRecord<T>[_buffer.Length * 2];
+                Array.Copy(_buffer, _pos, newBuffer, 0, _buffer.Length - _pos);
+                Array.Copy(_buffer, 0, newBuffer, _buffer.Length - _pos, _pos);
+                _buffer = newBuffer;
+                _pos = 0;
             }
 
-            if (Count > 0 && buffer[(pos + Count - 1) % buffer.Length].Timestamp > entry.Timestamp)
-                throw new ArgumentException($"elements must be added in timestamp order, but {entry.Timestamp:o} is before {buffer[(pos + Count - 1) % buffer.Length].Timestamp:o}", nameof(entry));
+            if (Count > 0 && _buffer[(_pos + Count - 1) % _buffer.Length].Timestamp > entry.Timestamp)
+                throw new ArgumentException($"elements must be added in timestamp order, but {entry.Timestamp:o} is before {_buffer[(_pos + Count - 1) % _buffer.Length].Timestamp:o}", nameof(entry));
 
             // add the element
-            buffer[(pos + Count) % buffer.Length] = entry;
+            _buffer[(_pos + Count) % _buffer.Length] = entry;
             Count++;
         }
 
         public void Clear()
         {
             for (int i = 0; i < Count; i++)
-                buffer[(pos + i) % buffer.Length] = null;
+                _buffer[(_pos + i) % _buffer.Length] = null;
             Count = 0;
-            pos = 0;
+            _pos = 0;
         }
 
         public void RemoveFromFront(int howMany)
@@ -82,33 +82,33 @@ namespace Orleans.Transactions
                 throw new ArgumentException("Value must be greater than zero", nameof(howMany));
             }
 
-            if (buffer == null || howMany > Count)
+            if (_buffer == null || howMany > Count)
             {
                 throw new ArgumentException("cannot remove more elements than are in the queue", nameof(howMany));
             }
 
             // clear entries so they can ge GCd
             for (int i = 0; i < howMany; i++)
-                buffer[(pos + i) % buffer.Length] = null;
+                _buffer[(_pos + i) % _buffer.Length] = null;
 
-            pos = (pos + howMany) % buffer.Length;
+            _pos = (_pos + howMany) % _buffer.Length;
 
             Count -= howMany;
         }
 
         public void RemoveFromBack(int howMany)
         {
-            if (howMany > 0 && (buffer == null || howMany > Count))
+            if (howMany > 0 && (_buffer == null || howMany > Count))
                 throw new ArgumentException("cannot remove more elements than are in the queue", nameof(howMany));
 
             // clear entries so they can ge GCd
             for (int i = 0; i < howMany; i++)
-                buffer[(pos + Count - i - 1) % buffer.Length] = null;
+                _buffer[(_pos + Count - i - 1) % _buffer.Length] = null;
 
             Count -= howMany;
         }
 
-        public int Find(Guid TransactionId, DateTime key)
+        public readonly int Find(Guid TransactionId, DateTime key)
         {
             // do a binary search
             int left = 0;
@@ -116,7 +116,7 @@ namespace Orleans.Transactions
             while (left < right)
             {
                 int mid = (left + right) / 2;
-                var record = buffer[(pos + mid) % buffer.Length];
+                var record = _buffer[(_pos + mid) % _buffer.Length];
                 if (record.Timestamp < key)
                 {
                     left = mid + 1;
@@ -136,7 +136,7 @@ namespace Orleans.Transactions
                     // search to the left
                     for (int j = mid - 1; j >= left; j--)
                     {
-                        record = buffer[(pos + j) % buffer.Length];
+                        record = _buffer[(_pos + j) % _buffer.Length];
                         if (record.TransactionId == TransactionId)
                             return j;
                         if (record.Timestamp != key)
@@ -145,7 +145,7 @@ namespace Orleans.Transactions
                     // search to the right
                     for (int j = mid + 1; j < right; j++)
                     {
-                        record = buffer[(pos + j) % buffer.Length];
+                        record = _buffer[(_pos + j) % _buffer.Length];
                         if (record.TransactionId == TransactionId)
                             return j;
                         if (record.Timestamp != key)

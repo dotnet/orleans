@@ -1,16 +1,14 @@
-using System;
-using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Net;
-using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using NSubstitute;
-using Orleans;
+using NSubstitute.ReceivedExtensions;
 using Orleans.GrainDirectory;
 using Orleans.Metadata;
 using Orleans.Runtime;
 using Orleans.Runtime.GrainDirectory;
+using Orleans.Runtime.Hosting;
 using TestExtensions;
 using Xunit;
 using Xunit.Abstractions;
@@ -35,8 +33,7 @@ namespace UnitTests.Directory
 
             this.grainDirectory = Substitute.For<IGrainDirectory>();
             var services = new ServiceCollection()
-                .AddSingleton(typeof(IKeyedServiceCollection<,>), typeof(KeyedServiceCollection<,>))
-                .AddSingletonKeyedService(GrainDirectoryAttribute.DEFAULT_GRAIN_DIRECTORY, (sp, name) => this.grainDirectory)
+                .AddGrainDirectory(GrainDirectoryAttribute.DEFAULT_GRAIN_DIRECTORY, (sp, name) => this.grainDirectory)
                 .BuildServiceProvider();
 
             this.grainDirectoryResolver = new GrainDirectoryResolver(
@@ -363,6 +360,115 @@ namespace UnitTests.Directory
             Assert.False(this.grainLocator.TryLookupInCache(expectedAddr.GrainId, out _));
         }
 
+        [Fact]
+        public async Task UnregisterRemovesFromCacheFirst()
+        {            
+            var expectedSilo = GenerateSiloAddress();
+
+            // Setup membership service
+            this.mockMembershipService.UpdateSiloStatus(expectedSilo, SiloStatus.Active, "exp");
+            await this.lifecycle.OnStart();
+            await WaitUntilClusterChangePropagated();
+
+            var expectedAddr = GenerateGrainAddress(expectedSilo);
+
+            // Give up control then Run forever
+            this.grainDirectory.Unregister(expectedAddr).Returns(async (t) => { await Task.Yield();  while (true) { } });
+
+            this.grainDirectory.Register(expectedAddr, previousAddress: null).Returns(expectedAddr);
+
+            // Register to populate cache
+            await this.grainLocator.Register(expectedAddr, previousAddress: null);
+
+            // Unregister and check if cache was cleaned
+            _ = this.grainLocator.Unregister(expectedAddr, UnregistrationCause.Force);
+            Assert.False(this.grainLocator.TryLookupInCache(expectedAddr.GrainId, out _));
+        }
+
+        [Fact]
+        public async Task UnregisterRacesWithLookupSameId()
+        {
+            var expectedSilo = GenerateSiloAddress();
+
+            // Setup membership service
+            this.mockMembershipService.UpdateSiloStatus(expectedSilo, SiloStatus.Active, "exp");
+            await this.lifecycle.OnStart();
+            await WaitUntilClusterChangePropagated();
+
+            var expectedAddr = GenerateGrainAddress(expectedSilo);
+
+            ManualResetEvent mre = new ManualResetEvent(false);
+
+            // Give up control then Run forever
+            this.grainDirectory.Unregister(expectedAddr).Returns(async (t) =>
+            {
+                await Task.Yield();
+                mre.WaitOne();
+            });
+
+            this.grainDirectory.Register(expectedAddr, previousAddress: null).Returns(expectedAddr);
+
+            // Register to populate cache
+            await this.grainLocator.Register(expectedAddr, previousAddress: null);
+
+            // Unregister and check if cache was cleaned
+            Task t = this.grainLocator.Unregister(expectedAddr, UnregistrationCause.Force);
+            Assert.False(this.grainLocator.TryLookupInCache(expectedAddr.GrainId, out _));
+
+            // Add back to cache simulating a race from lookup
+            await this.grainLocator.Register(expectedAddr, previousAddress: null);
+            Assert.True(this.grainLocator.TryLookupInCache(expectedAddr.GrainId, out _));
+
+            // Ensure when Unregister finishes if the race occured on the same id that it was removed
+            mre.Set();
+            await t;
+            Assert.False(this.grainLocator.TryLookupInCache(expectedAddr.GrainId, out _));
+        }
+
+        [Fact]
+        public async Task UnregisterRacesWithLookupDifferentId()
+        {
+            var expectedSilo = GenerateSiloAddress();
+            var secondSilo = GenerateSiloAddress();
+
+            // Setup membership service
+            this.mockMembershipService.UpdateSiloStatus(expectedSilo, SiloStatus.Active, "exp");
+            this.mockMembershipService.UpdateSiloStatus(secondSilo, SiloStatus.Active, "exp");
+            await this.lifecycle.OnStart();
+            await WaitUntilClusterChangePropagated();
+
+            var expectedAddr = GenerateGrainAddress(expectedSilo);
+            var secondAddr = GenerateGrainAddress(secondSilo);
+
+            ManualResetEvent mre = new ManualResetEvent(false);
+
+            // Give up control then Run forever
+            this.grainDirectory.Unregister(expectedAddr).Returns(async (t) =>
+            {
+                await Task.Yield();
+                mre.WaitOne();
+            });
+
+            this.grainDirectory.Register(expectedAddr, previousAddress: null).Returns(expectedAddr);
+            this.grainDirectory.Register(secondAddr, previousAddress: null).Returns(secondAddr);
+
+            // Register to populate cache
+            await this.grainLocator.Register(expectedAddr, previousAddress: null);
+
+            // Unregister and check if cache was cleaned
+            Task t = this.grainLocator.Unregister(expectedAddr, UnregistrationCause.Force);
+            Assert.False(this.grainLocator.TryLookupInCache(expectedAddr.GrainId, out _));
+
+            // Add back to cache simulating a race from lookup
+            await this.grainLocator.Register(secondAddr, previousAddress: null);
+            Assert.True(this.grainLocator.TryLookupInCache(secondAddr.GrainId, out _));
+
+            // Ensure when Unregister finishes if the race occured on the same id that it was removed
+            mre.Set();
+            await t;
+            Assert.True(this.grainLocator.TryLookupInCache(secondAddr.GrainId, out _));
+        }
+
         private GrainAddress GenerateGrainAddress(SiloAddress siloAddress = null)
         {
             return new GrainAddress
@@ -393,8 +499,7 @@ namespace UnitTests.Directory
         {
             public ClusterManifest Current => new ClusterManifest(
                 MajorMinorVersion.Zero,
-                ImmutableDictionary<SiloAddress, GrainManifest>.Empty,
-                ImmutableArray.Create(new GrainManifest(ImmutableDictionary<GrainType, GrainProperties>.Empty, ImmutableDictionary<GrainInterfaceType, GrainInterfaceProperties>.Empty)));
+                ImmutableDictionary<SiloAddress, GrainManifest>.Empty);
 
             public IAsyncEnumerable<ClusterManifest> Updates => this.GetUpdates();
 

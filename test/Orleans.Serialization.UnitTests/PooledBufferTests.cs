@@ -45,7 +45,7 @@ namespace Orleans.Serialization.UnitTests
             foreach (var span in buffer.Slice())
             {
                 span.CopyTo(spansArraySpan);
-                spansArraySpan = spansArraySpan.Slice(span.Length);
+                spansArraySpan = spansArraySpan[span.Length..];
             }
             Assert.Equal(randomData, spansArray);
 

@@ -1,7 +1,4 @@
-using System;
 using System.Runtime.Serialization;
-using System.Threading.Tasks;
-using Orleans;
 using Orleans.Providers;
 using Orleans.Runtime;
 using Microsoft.Extensions.Logging;
@@ -57,6 +54,7 @@ namespace UnitTests.StorageTests
             }
         }
 
+        [Obsolete]
         protected StorageProviderInjectedError(SerializationInfo info, StreamingContext context)
             : base(info, context)
         {
@@ -87,8 +85,7 @@ namespace UnitTests.StorageTests
         public static async Task SetErrorInjection(string providerName, ErrorInjectionBehavior errorInjectionBehavior, IGrainFactory grainFactory)
         {
             IManagementGrain mgmtGrain = grainFactory.GetGrain<IManagementGrain>(0);
-            await mgmtGrain.SendControlCommandToProvider(
-                typeof(ErrorInjectionStorageProvider).FullName,
+            await mgmtGrain.SendControlCommandToProvider<ErrorInjectionStorageProvider>(
                 providerName, 
                 (int)Commands.SetErrorInjection,
                 errorInjectionBehavior);

@@ -1,10 +1,6 @@
-using System;
 using System.Collections.Concurrent;
-using System.Collections.Generic;
 using System.Collections.Immutable;
-using System.Linq;
 using System.Threading.Channels;
-using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
@@ -73,7 +69,7 @@ namespace NonSilo.Tests.Directory
             _clusterMembershipService.UpdateSiloStatus(_localSilo, SiloStatus.Active, "local-silo");
 
             _grainFactory = Substitute.For<IInternalGrainFactory>();
-            _grainFactory.GetSystemTarget<IRemoteClientDirectory>(default(GrainType), default(SiloAddress))
+            _grainFactory.GetSystemTarget<IRemoteClientDirectory>(default, default)
                 .ReturnsForAnyArgs(info => _remoteDirectories.GetOrAdd(info.ArgAt<SiloAddress>(1), k => Substitute.For<IRemoteClientDirectory>()));
 
             _directory = new ClientDirectory(
@@ -267,7 +263,9 @@ namespace NonSilo.Tests.Directory
         [Fact]
         public async Task PublishChangesSuccessTests()
         {
+#pragma warning disable xUnit1031 // Do not use blocking task operations in test method
             _testAccessor.SchedulePublishUpdate = () => _testAccessor.PublishUpdates().GetAwaiter().GetResult();
+#pragma warning restore xUnit1031 // Do not use blocking task operations in test method
 
             var remoteClientId = Client("remote1");
             var remoteClientId2 = Client("remote2");

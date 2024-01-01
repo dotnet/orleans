@@ -103,18 +103,21 @@ namespace Orleans.Runtime.GrainDirectory
             }
 
             // Cache update
-            this.cache.AddOrUpdate(result, (int) result.MembershipVersion.Value);
+            this.cache.AddOrUpdate(result, (int)result.MembershipVersion.Value);
 
             return result;
         }
 
         public async Task Unregister(GrainAddress address, UnregistrationCause cause)
         {
-            try
-            {
-                await GetGrainDirectory(address.GrainId.Type).Unregister(address);
-            }
-            finally
+            // Remove from local cache first so we don't return it anymore
+            this.cache.Remove(address);
+
+            // Remove from grain directory which may take significantly longer
+            await GetGrainDirectory(address.GrainId.Type).Unregister(address);
+
+            // There is the potential for a lookup to race with the Unregister and add the bad entry back to the cache.
+            if (this.cache.LookUp(address.GrainId, out var entry, out _) && entry.Equals(address))
             {
                 this.cache.Remove(address);
             }
@@ -189,7 +192,7 @@ namespace Orleans.Runtime.GrainDirectory
 
         private static void ThrowUnsupportedGrainType(GrainId grainId) => throw new InvalidOperationException($"Unsupported grain type for grain {grainId}");
 
-        public void CachePlacementDecision(GrainId grainId, SiloAddress siloAddress) => cache.AddOrUpdate(new GrainAddress { GrainId = grainId, SiloAddress = siloAddress }, 0);
+        public void UpdateCache(GrainId grainId, SiloAddress siloAddress) => cache.AddOrUpdate(new GrainAddress { GrainId = grainId, SiloAddress = siloAddress }, 0);
         public void InvalidateCache(GrainId grainId) => cache.Remove(grainId);
         public void InvalidateCache(GrainAddress address) => cache.Remove(address);
         public bool TryLookupInCache(GrainId grainId, out GrainAddress address)

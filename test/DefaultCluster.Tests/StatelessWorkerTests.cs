@@ -1,8 +1,4 @@
-using System;
-using System.Collections.Generic;
 using System.Diagnostics;
-using System.Linq;
-using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
@@ -69,9 +65,11 @@ namespace DefaultCluster.Tests.General
             var statsTasks = new List<Task<Tuple<Guid, string, List<Tuple<DateTime, DateTime>>>>>();
             for (int i = 0; i < numberOfCalls; i++)
                 statsTasks.Add(grain.GetCallStats());  // gather stats
-            await Task.WhenAll(promises);
+            await Task.WhenAll(statsTasks);
 
+#pragma warning disable xUnit1031 // Do not use blocking task operations in test method
             var responsesPerSilo = statsTasks.Select(t => t.Result).GroupBy(s => s.Item2);
+#pragma warning restore xUnit1031 // Do not use blocking task operations in test method
             foreach (var siloGroup in responsesPerSilo)
             {
                 var silo = siloGroup.Key;

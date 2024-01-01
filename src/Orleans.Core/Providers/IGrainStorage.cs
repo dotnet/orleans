@@ -105,6 +105,7 @@ namespace Orleans.Storage
         /// </summary>
         /// <param name="info">The serialization info.</param>
         /// <param name="context">The context.</param>
+        [Obsolete]
         protected InconsistentStateException(SerializationInfo info, StreamingContext context)
             : base(info, context)
         {
@@ -158,11 +159,12 @@ namespace Orleans.Storage
         /// <inheritdoc/>
         public override string ToString()
         {
-            return String.Format("InconsistentStateException: {0} Expected Etag={1} Received Etag={2} {3}",
+            return string.Format("InconsistentStateException: {0} Expected Etag={1} Received Etag={2} {3}",
                 Message, StoredEtag, CurrentEtag, InnerException);
         }
 
         /// <inheritdoc/>
+        [Obsolete]
         public override void GetObjectData(SerializationInfo info, StreamingContext context)
         {
             if (info == null) throw new ArgumentNullException(nameof(info));

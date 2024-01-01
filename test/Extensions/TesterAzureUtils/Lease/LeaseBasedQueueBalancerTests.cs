@@ -1,16 +1,11 @@
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using Orleans;
 using Orleans.Configuration;
-using Orleans.Hosting;
 using Orleans.Providers;
 using Orleans.Providers.Streams.Common;
 using Orleans.Runtime;
 using Orleans.TestingHost;
 using Orleans.TestingHost.Utils;
-using System;
-using System.Linq;
-using System.Threading.Tasks;
 using TestExtensions;
 using Xunit;
 
@@ -99,7 +94,7 @@ namespace Tester.AzureUtils.Lease
             bool pass;
             try
             {
-                object[] agentStarted = await mgmtGrain.SendControlCommandToProvider(typeof(PersistentStreamProvider).FullName, StreamProviderName, (int)PersistentStreamProviderCommand.GetNumberRunningAgents);
+                object[] agentStarted = await mgmtGrain.SendControlCommandToProvider<PersistentStreamProvider>(StreamProviderName, (int)PersistentStreamProviderCommand.GetNumberRunningAgents, null);
                 int[] counts = agentStarted.Select(startedAgentInEachSilo => Convert.ToInt32(startedAgentInEachSilo)).ToArray();
                 int sum = counts.Sum();
                 pass = totalQueueCount == sum &&

@@ -309,7 +309,8 @@ namespace Orleans
         | AttributeTargets.Interface
         | AttributeTargets.Struct
         | AttributeTargets.Enum
-        | AttributeTargets.Method)]
+        | AttributeTargets.Method,
+        AllowMultiple = true)]
     public sealed class AliasAttribute : Attribute
     {
         /// <summary>
@@ -341,7 +342,8 @@ namespace Orleans
         AttributeTargets.Class
         | AttributeTargets.Interface
         | AttributeTargets.Struct
-        | AttributeTargets.Enum)]
+        | AttributeTargets.Enum,
+        AllowMultiple = true)]
     public sealed class CompoundTypeAliasAttribute : Attribute
     {
         /// <summary>
@@ -521,6 +523,24 @@ namespace Orleans
         /// </summary>
         /// <value>The type.</value>
         public Type Type { get; }
+    }
+
+    /// <summary>
+    /// Specifies the response timeout for the interface method which it is specified on.
+    /// </summary>
+    [AttributeUsage(AttributeTargets.Method)]
+    public sealed class ResponseTimeoutAttribute : Attribute
+    {
+        /// <summary>
+        /// Specifies the response timeout for the interface method which it is specified on.
+        /// </summary>
+        /// <param name="timeout">The response timeout, using <see cref="TimeSpan.Parse(string)"/> syntax.</param>
+        public ResponseTimeoutAttribute(string timeout) => Timeout = TimeSpan.Parse(timeout);
+
+        /// <summary>
+        /// Gets or sets the response timeout for this method.
+        /// </summary>
+        public TimeSpan? Timeout { get; init; }
     }
 
     /// <summary>

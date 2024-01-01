@@ -1,9 +1,4 @@
-using System;
-using System.Linq;
-using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
-using Orleans;
-using Orleans.Hosting;
 using Orleans.TestingHost;
 using TestExtensions;
 using UnitTests.GrainInterfaces;
@@ -84,7 +79,7 @@ namespace UnitTests.CancellationTests
                     try
                     {
                         await task;
-                        Assert.True(false, "Expected TaskCancelledException, but message completed");
+                        Assert.Fail("Expected TaskCancelledException, but message completed");
                     }
                     catch (TaskCanceledException) { }
                 })
@@ -103,7 +98,7 @@ namespace UnitTests.CancellationTests
             }
             catch (Exception ex)
             {
-                Assert.True(false, "Expected no exception, but got: " + ex.Message);
+                Assert.Fail("Expected no exception, but got: " + ex.Message);
             }
         }
 
@@ -158,7 +153,7 @@ namespace UnitTests.CancellationTests
                 return;
             }
 
-            Assert.True(false, "No exception was thrown");
+            Assert.Fail("No exception was thrown");
         }
 
         [Theory, TestCategory("BVT"), TestCategory("Cancellation")]

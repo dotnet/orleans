@@ -55,11 +55,11 @@ namespace Orleans.Runtime
         private readonly InternalSystemStatus value;
         private SystemStatus(InternalSystemStatus name) { this.value = name; }
 
-        /// <see cref="Object.ToString"/>
+        /// <see cref="object.ToString"/>
         public override string ToString() { return this.value.ToString(); }
-        /// <see cref="Object.GetHashCode"/>
+        /// <see cref="object.GetHashCode"/>
         public override int GetHashCode() { return this.value.GetHashCode(); }
-        /// <see cref="Object.Equals(Object)"/>
+        /// <see cref="object.Equals(object)"/>
         public override bool Equals(object obj) { var ss = obj as SystemStatus; return ss != null && this.Equals(ss); }
         /// <see cref="IEquatable{T}.Equals(T)"/>
         public bool Equals(SystemStatus other) { return (other != null) && this.value.Equals(other.value); }

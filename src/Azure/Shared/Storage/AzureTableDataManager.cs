@@ -38,7 +38,7 @@ namespace Orleans.GrainDirectory.AzureStorage
     /// Utility class to encapsulate row-based access to Azure table storage.
     /// </summary>
     /// <typeparam name="T">Table data entry used by this table / manager.</typeparam>
-    internal class AzureTableDataManager<T> where T : class, ITableEntity, new()
+    internal class AzureTableDataManager<T> where T : class, ITableEntity
     {
         private readonly AzureStorageOperationOptions options;
 
@@ -394,7 +394,7 @@ namespace Orleans.GrainDirectory.AzureStorage
             const string operation = "ReadSingleTableEntryAsync";
             var startTime = DateTime.UtcNow;
             if (Logger.IsEnabled(LogLevel.Trace)) Logger.LogTrace("{Operation} table {TableName} partitionKey {PartitionKey} rowKey {RowKey}", operation, TableName, partitionKey, rowKey);
-            T retrievedResult = default(T);
+            T retrievedResult = default;
 
             try
             {
@@ -510,7 +510,7 @@ namespace Orleans.GrainDirectory.AzureStorage
 
                 try
                 {
-                    Func<Task<List<(T Entity, string ETag)>>> executeQueryHandleContinuations = async () =>
+                    async Task<List<(T Entity, string ETag)>> executeQueryHandleContinuations()
                     {
                         var list = new List<(T, string)>();
                         var results = Table.QueryAsync<T>(filter);
@@ -520,7 +520,7 @@ namespace Orleans.GrainDirectory.AzureStorage
                         }
 
                         return list;
-                    };
+                    }
 
 #if !ORLEANS_TRANSACTIONS
                     IBackoffProvider backoff = new FixedBackoff(this.StoragePolicyOptions.PauseBetweenOperationRetries);

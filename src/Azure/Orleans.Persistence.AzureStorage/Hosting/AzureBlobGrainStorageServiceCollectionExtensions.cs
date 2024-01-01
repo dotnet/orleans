@@ -2,11 +2,11 @@ using System;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Options;
-using Orleans;
 using Orleans.Configuration;
 using Orleans.Hosting;
 using Orleans.Providers;
 using Orleans.Runtime;
+using Orleans.Runtime.Hosting;
 using Orleans.Storage;
 
 namespace Orleans.Hosting
@@ -50,12 +50,7 @@ namespace Orleans.Hosting
             services.AddTransient<IConfigurationValidator>(sp => new AzureBlobStorageOptionsValidator(sp.GetRequiredService<IOptionsMonitor<AzureBlobStorageOptions>>().Get(name), name));
             services.AddTransient<IPostConfigureOptions<AzureBlobStorageOptions>, DefaultStorageProviderSerializerOptionsConfigurator<AzureBlobStorageOptions>>();
             services.ConfigureNamedOptionForLogging<AzureBlobStorageOptions>(name);
-            if (string.Equals(name, ProviderConstants.DEFAULT_STORAGE_PROVIDER_NAME, StringComparison.Ordinal))
-            {
-                services.TryAddSingleton(sp => sp.GetServiceByName<IGrainStorage>(ProviderConstants.DEFAULT_STORAGE_PROVIDER_NAME));
-            }
-            return services.AddSingletonNamedService<IGrainStorage>(name, AzureBlobGrainStorageFactory.Create)
-                           .AddSingletonNamedService<ILifecycleParticipant<ISiloLifecycle>>(name, (s, n) => (ILifecycleParticipant<ISiloLifecycle>)s.GetRequiredServiceByName<IGrainStorage>(n));
+            return services.AddGrainStorage(name, AzureBlobGrainStorageFactory.Create);
         }
     }
 }

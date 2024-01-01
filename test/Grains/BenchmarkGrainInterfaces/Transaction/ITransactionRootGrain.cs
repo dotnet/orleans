@@ -1,8 +1,4 @@
-﻿using Orleans;
-using System.Collections.Generic;
-using System.Threading.Tasks;
-
-namespace BenchmarkGrainInterfaces.Transaction
+﻿namespace BenchmarkGrainInterfaces.Transaction
 {
     public interface ITransactionRootGrain : IGrainWithGuidKey
     {

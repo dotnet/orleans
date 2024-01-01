@@ -6,7 +6,7 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 using Orleans.Providers;
-using Orleans;
+using Orleans.Runtime.Hosting;
 
 namespace Orleans.Hosting
 {
@@ -49,13 +49,7 @@ namespace Orleans.Hosting
             services.AddTransient<IConfigurationValidator>(sp => new DynamoDBGrainStorageOptionsValidator(sp.GetRequiredService<IOptionsMonitor<DynamoDBStorageOptions>>().Get(name), name));
             services.ConfigureNamedOptionForLogging<DynamoDBStorageOptions>(name);
             services.AddTransient<IPostConfigureOptions<DynamoDBStorageOptions>, DefaultStorageProviderSerializerOptionsConfigurator<DynamoDBStorageOptions>>();
-            if (string.Equals(name, ProviderConstants.DEFAULT_STORAGE_PROVIDER_NAME, StringComparison.Ordinal))
-            {
-                services.TryAddSingleton(sp => sp.GetServiceByName<IGrainStorage>(ProviderConstants.DEFAULT_STORAGE_PROVIDER_NAME));
-            }
-
-            return services.AddSingletonNamedService(name, DynamoDBGrainStorageFactory.Create)
-                           .AddSingletonNamedService(name, (s, n) => (ILifecycleParticipant<ISiloLifecycle>)s.GetRequiredServiceByName<IGrainStorage>(n));
+            return services.AddGrainStorage(name, DynamoDBGrainStorageFactory.Create);
         }
     }
 }

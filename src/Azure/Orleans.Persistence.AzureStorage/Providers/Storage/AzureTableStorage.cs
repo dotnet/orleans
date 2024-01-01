@@ -11,14 +11,11 @@ using Azure.Data.Tables;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using Newtonsoft.Json;
 using Orleans.Configuration;
 using Orleans.Configuration.Overrides;
 using Orleans.Persistence.AzureStorage;
 using Orleans.Providers.Azure;
 using Orleans.Runtime;
-using Orleans.Runtime.Configuration;
-using Orleans.Serialization;
 using LogLevel = Microsoft.Extensions.Logging.LogLevel;
 
 namespace Orleans.Storage
@@ -536,7 +533,7 @@ namespace Orleans.Storage
 
     public static class AzureTableGrainStorageFactory
     {
-        public static IGrainStorage Create(IServiceProvider services, string name)
+        public static AzureTableGrainStorage Create(IServiceProvider services, string name)
         {
             var optionsSnapshot = services.GetRequiredService<IOptionsMonitor<AzureTableStorageOptions>>();
             var clusterOptions = services.GetProviderClusterOptions(name);

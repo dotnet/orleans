@@ -1,11 +1,4 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Net;
-using System.Threading;
-using System.Threading.Tasks;
-using Microsoft.Extensions.DependencyInjection;
-using Orleans;
 using Orleans.Messaging;
 using Orleans.Runtime;
 using Orleans.TestingHost.Utils;
@@ -107,7 +100,7 @@ namespace UnitTests.MembershipTests
 
             var data = await membershipTable.ReadAll();
             Assert.NotNull(data);
-            Assert.Equal(0, data.Members.Count);
+            Assert.Empty(data.Members);
 
             var version = data.Version;
             foreach (var membershipEntry in membershipEntries)
@@ -136,7 +129,7 @@ namespace UnitTests.MembershipTests
 
             logger.LogInformation("Membership.ReadAll returned TableVersion={TableVersion} Data={Data}", data.Version, data);
 
-            Assert.Equal(0, data.Members.Count);
+            Assert.Empty(data.Members);
             Assert.NotNull(data.Version.VersionEtag);
             Assert.Equal(0, data.Version.Version);
         }
@@ -147,7 +140,7 @@ namespace UnitTests.MembershipTests
 
             var data = await membershipTable.ReadAll();
             Assert.NotNull(data);
-            Assert.Equal(0, data.Members.Count);
+            Assert.Empty(data.Members);
 
             TableVersion nextTableVersion = data.Version.Next();
 
@@ -159,7 +152,7 @@ namespace UnitTests.MembershipTests
             if (extendedProtocol)
                 Assert.Equal(1, data.Version.Version);
 
-            Assert.Equal(1, data.Members.Count);
+            Assert.Single(data.Members);
         }
 
         protected async Task MembershipTable_ReadRow_Insert_Read(bool extendedProtocol = true)
@@ -168,7 +161,7 @@ namespace UnitTests.MembershipTests
 
             logger.LogInformation("Membership.ReadAll returned TableVersion={TableVersion} Data={Data}", data.Version, data);
 
-            Assert.Equal(0, data.Members.Count);
+            Assert.Empty(data.Members);
 
             TableVersion newTableVersion = data.Version.Next();
 
@@ -198,7 +191,7 @@ namespace UnitTests.MembershipTests
 
             data = await membershipTable.ReadAll();
 
-            Assert.Equal(1, data.Members.Count);
+            Assert.Single(data.Members);
 
             data = await membershipTable.ReadRow(newEntry.SiloAddress);
             if (extendedProtocol)
@@ -206,7 +199,7 @@ namespace UnitTests.MembershipTests
 
             logger.LogInformation("Membership.ReadAll returned TableVersion={TableVersion} Data={Data}", data.Version, data);
 
-            Assert.Equal(1, data.Members.Count);
+            Assert.Single(data.Members);
             Assert.NotNull(data.Version.VersionEtag);
             if (extendedProtocol)
             {
@@ -226,7 +219,7 @@ namespace UnitTests.MembershipTests
             MembershipTableData data = await membershipTable.ReadAll();
             logger.LogInformation("Membership.ReadAll returned TableVersion={TableVersion} Data={Data}", data.Version, data);
 
-            Assert.Equal(0, data.Members.Count);
+            Assert.Empty(data.Members);
 
             TableVersion newTableVersion = data.Version.Next();
 
@@ -238,7 +231,7 @@ namespace UnitTests.MembershipTests
             data = await membershipTable.ReadAll();
             logger.LogInformation("Membership.ReadAll returned TableVersion={TableVersion} Data={Data}", data.Version, data);
 
-            Assert.Equal(1, data.Members.Count);
+            Assert.Single(data.Members);
             Assert.NotNull(data.Version.VersionEtag);
 
             if (extendedProtocol)
@@ -261,7 +254,7 @@ namespace UnitTests.MembershipTests
             Assert.NotNull(tableData.Version);
 
             Assert.Equal(0, tableData.Version.Version);
-            Assert.Equal(0, tableData.Members.Count);
+            Assert.Empty(tableData.Members);
 
             for (int i = 1; i < 10; i++)
             {
@@ -293,7 +286,7 @@ namespace UnitTests.MembershipTests
                         "Calling UpdateRow with Entry = {Entry} correct eTag = {ETag} old version={TableVersion}",
                         siloEntry,
                         etagBefore,
-                        tableVersion != null ? tableVersion.ToString() : "null");
+                        tableVersion?.ToString() ?? "null");
                     ok = await membershipTable.UpdateRow(siloEntry, etagBefore, tableVersion);
                     Assert.False(ok, $"row update should have failed - Table Data = {tableData}");
                     tableData = await membershipTable.ReadAll();
@@ -305,7 +298,7 @@ namespace UnitTests.MembershipTests
                     "Calling UpdateRow with Entry = {Entry} correct eTag = {ETag} correct version={TableVersion}",
                     siloEntry,
                     etagBefore,
-                    tableVersion != null ? tableVersion.ToString() : "null");
+                    tableVersion?.ToString() ?? "null");
 
                 ok = await membershipTable.UpdateRow(siloEntry, etagBefore, tableVersion);
 
@@ -315,7 +308,7 @@ namespace UnitTests.MembershipTests
                     "Calling UpdateRow with Entry = {Entry} old eTag = {ETag} old version={TableVersion}",
                     siloEntry,
                     etagBefore,
-                    tableVersion != null ? tableVersion.ToString() : "null");
+                    tableVersion?.ToString() ?? "null");
                 ok = await membershipTable.UpdateRow(siloEntry, etagBefore, tableVersion);
                 Assert.False(ok, $"row update should have failed - Table Data = {tableData}");
 
@@ -333,7 +326,7 @@ namespace UnitTests.MembershipTests
                         "Calling UpdateRow with Entry = {Entry} correct eTag = {ETag} old version={TableVersion}",
                         siloEntry,
                         etagAfter,
-                        tableVersion != null ? tableVersion.ToString() : "null");
+                        tableVersion?.ToString() ?? "null");
 
                     ok = await membershipTable.UpdateRow(siloEntry, etagAfter, tableVersion);
 
@@ -397,7 +390,7 @@ namespace UnitTests.MembershipTests
             if (extendedProtocol)
                 Assert.Equal(20, tableData.Version.Version);
 
-            Assert.Equal(1, tableData.Members.Count);
+            Assert.Single(tableData.Members);
         }
 
         protected async Task MembershipTable_UpdateIAmAlive(bool extendedProtocol = true)
@@ -426,6 +419,7 @@ namespace UnitTests.MembershipTests
             // compare that the value is close to what we passed in, but not exactly, as the underlying store can set its own precision settings
             // (ie: in SQL Server this is defined as datetime2(3), so we don't expect precision to account for less than 0.001s values)
             Assert.True((amAliveTime - member.Item1.IAmAliveTime).Duration() < TimeSpan.FromSeconds(2), (amAliveTime - member.Item1.IAmAliveTime).Duration().ToString());
+            Assert.Equal(newTableVersion.Version, tableData.Version.Version);
         }
 
         protected async Task MembershipTable_CleanupDefunctSiloEntries(bool extendedProtocol = true)
@@ -433,7 +427,7 @@ namespace UnitTests.MembershipTests
             MembershipTableData data = await membershipTable.ReadAll();
             logger.LogInformation("Membership.ReadAll returned TableVersion={TableVersion} Data={Data}", data.Version, data);
 
-            Assert.Equal(0, data.Members.Count);
+            Assert.Empty(data.Members);
 
             TableVersion newTableVersion = data.Version.Next();
 
@@ -473,7 +467,7 @@ namespace UnitTests.MembershipTests
             data = await membershipTable.ReadAll();
             logger.LogInformation("Membership.ReadAll returned TableVersion={TableVersion} Data={Data}", data.Version, data);
 
-            Assert.Equal(1, data.Members.Count);
+            Assert.Single(data.Members);
         }
 
         // Utility methods

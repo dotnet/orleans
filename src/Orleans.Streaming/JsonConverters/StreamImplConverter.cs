@@ -1,13 +1,11 @@
 #nullable enable
 
 using System;
-using System.Collections.Generic;
 using System.Runtime.Serialization;
-using Microsoft.Extensions.Options;
+using Microsoft.Extensions.DependencyInjection;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using Orleans.Runtime;
-using Orleans.Storage;
 using Orleans.Streams;
 
 namespace Orleans.Streaming.JsonConverters
@@ -38,7 +36,7 @@ namespace Orleans.Streaming.JsonConverters
 
                 if (streamId.HasValue && isRewindable.HasValue && !string.IsNullOrWhiteSpace(providerName))
                 {
-                    var provider = _runtimeClient.ServiceProvider.GetRequiredServiceByName<IStreamProvider>(providerName) as IInternalStreamProvider;
+                    var provider = _runtimeClient.ServiceProvider.GetRequiredKeyedService<IStreamProvider>(providerName) as IInternalStreamProvider;
                     return Activator.CreateInstance(fullType, new QualifiedStreamId(providerName, streamId.Value), provider, isRewindable.Value, _runtimeClient);
                 }
             }

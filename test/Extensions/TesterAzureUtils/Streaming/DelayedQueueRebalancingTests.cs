@@ -1,14 +1,8 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
-using Orleans;
 using Orleans.Configuration;
-using Orleans.Hosting;
 using Orleans.Providers.Streams.AzureQueue;
 using Orleans.Providers.Streams.Common;
 using Orleans.Runtime;
@@ -107,7 +101,7 @@ namespace Tester.AzureUtils.Streaming
         {
             var mgmt = this.GrainFactory.GetGrain<IManagementGrain>(0);
 
-            object[] results = await mgmt.SendControlCommandToProvider(adapterType, adapterName, (int)PersistentStreamProviderCommand.GetNumberRunningAgents);
+            object[] results = await mgmt.SendControlCommandToProvider<PersistentStreamProvider>(adapterName, (int)PersistentStreamProviderCommand.GetNumberRunningAgents, null);
             Assert.Equal(numExpectedSilos, results.Length);
 
             // Convert.ToInt32 is used because of different behavior of the fallback serializers: binary formatter and Json.Net.

@@ -1,5 +1,3 @@
-using System;
-using System.Threading.Tasks;
 using Orleans.Providers.Streams.Common;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -8,7 +6,6 @@ using Orleans.Streaming.EventHubs;
 using Orleans.Streaming.EventHubs.Testing;
 using Orleans.Configuration;
 using ServiceBus.Tests.MonitorTests;
-using Orleans;
 using Orleans.Statistics;
 
 namespace ServiceBus.Tests.TestStreamProviders
@@ -53,7 +50,7 @@ namespace ServiceBus.Tests.TestStreamProviders
             var cacheOptions = services.GetOptionsByName<EventHubStreamCachePressureOptions>(name);
             var statisticOptions = services.GetOptionsByName<StreamStatisticOptions>(name);
             var evictionOptions = services.GetOptionsByName<StreamCacheEvictionOptions>(name);
-            IEventHubDataAdapter dataAdapter = services.GetServiceByName<IEventHubDataAdapter>(name)
+            IEventHubDataAdapter dataAdapter = services.GetKeyedService<IEventHubDataAdapter>(name)
                 ?? services.GetService<IEventHubDataAdapter>()
                 ?? ActivatorUtilities.CreateInstance<EventHubDataAdapter>(services);
             var factory = ActivatorUtilities.CreateInstance<EHStreamProviderForMonitorTestsAdapterFactory>(services, name, generatorOptions, ehOptions, receiverOptions, cacheOptions, 
@@ -79,8 +76,8 @@ namespace ServiceBus.Tests.TestStreamProviders
             var loggerFactory = this.serviceProvider.GetRequiredService<ILoggerFactory>();
             var eventHubPath = this.ehOptions.EventHubName;
             var sharedDimensions = new EventHubMonitorAggregationDimensions(eventHubPath);
-            Func<EventHubCacheMonitorDimensions, ILoggerFactory, ICacheMonitor> cacheMonitorFactory = (dimensions, logger) => this.cacheMonitorForTesting;
-            Func<EventHubBlockPoolMonitorDimensions, ILoggerFactory, IBlockPoolMonitor> blockPoolMonitorFactory = (dimensions, logger) => this.blockPoolMonitorForTesting;
+            ICacheMonitor cacheMonitorFactory(EventHubCacheMonitorDimensions dimensions, ILoggerFactory logger) => this.cacheMonitorForTesting;
+            IBlockPoolMonitor blockPoolMonitorFactory(EventHubBlockPoolMonitorDimensions dimensions, ILoggerFactory logger) => this.blockPoolMonitorForTesting;
             return new CacheFactoryForMonitorTesting(
                 this.cachePressureInjectionMonitor,
                 this.cacheOptions,

@@ -3,7 +3,7 @@ using System.Runtime.CompilerServices;
 namespace Orleans.Serialization.WireProtocol
 {
     /// <summary>
-    /// <see langword="abstract" />Tag is the
+    /// A serialization tag, which is always exactly a single byte. This acts as a part of the field header for all serialized fields.
     /// </summary>
     /// <remarks>
     /// The typical form for a tag byte is <c>[W W W] [S S] [F F F]</c>, where each is a bit.
@@ -52,14 +52,14 @@ namespace Orleans.Serialization.WireProtocol
         internal Tag(uint tag) => _tag = tag;
 
         /// <summary>
-        /// Performs an implicit conversion from <see cref="System.Byte"/> to <see cref="Tag"/>.
+        /// Performs an implicit conversion from <see cref="byte"/> to <see cref="Tag"/>.
         /// </summary>
         /// <param name="tag">The tag.</param>
         /// <returns>The result of the conversion.</returns>
-        public static implicit operator Tag(byte tag) => new Tag(tag);
+        public static implicit operator Tag(byte tag) => new(tag);
 
         /// <summary>
-        /// Performs an implicit conversion from <see cref="Tag"/> to <see cref="System.Byte"/>.
+        /// Performs an implicit conversion from <see cref="Tag"/> to <see cref="byte"/>.
         /// </summary>
         /// <param name="tag">The tag.</param>
         /// <returns>The result of the conversion.</returns>
@@ -70,7 +70,7 @@ namespace Orleans.Serialization.WireProtocol
         /// </summary>
         public WireType WireType
         {
-            get => (WireType)(_tag & WireTypeMask);
+            readonly get => (WireType)(_tag & WireTypeMask);
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             set => _tag = (_tag & ~(uint)WireTypeMask) | ((uint)value & WireTypeMask);
         }
@@ -79,7 +79,7 @@ namespace Orleans.Serialization.WireProtocol
         /// Gets a value indicating whether this instance has an extended wire type.
         /// </summary>
         /// <value><see langword="true" /> if this instance has an extended wire type; otherwise, <see langword="false" />.</value>
-        public bool HasExtendedWireType
+        public readonly bool HasExtendedWireType
         {
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             get => _tag >= (byte)WireType.Extended; //(this.tag & (byte) WireType.Extended) == (byte) WireType.Extended;
@@ -91,15 +91,15 @@ namespace Orleans.Serialization.WireProtocol
         public ExtendedWireType ExtendedWireType
         {
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            get => (ExtendedWireType)(_tag & ExtendedWireTypeMask);
+            readonly get => (ExtendedWireType)(_tag & ExtendedWireTypeMask);
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             set => _tag = (_tag & ~(uint)ExtendedWireTypeMask) | ((uint)value & ExtendedWireTypeMask);
         }
 
-        internal bool IsEndBaseFields => _tag == ((byte)WireType.Extended | (byte)ExtendedWireType.EndBaseFields);
+        internal readonly bool IsEndBaseFields => _tag == ((byte)WireType.Extended | (byte)ExtendedWireType.EndBaseFields);
 
-        internal bool IsEndObject => _tag == ((byte)WireType.Extended | (byte)ExtendedWireType.EndTagDelimited);
+        internal readonly bool IsEndObject => _tag == ((byte)WireType.Extended | (byte)ExtendedWireType.EndTagDelimited);
 
         /// <summary>
         /// Gets or sets the schema type.
@@ -107,7 +107,7 @@ namespace Orleans.Serialization.WireProtocol
         public SchemaType SchemaType
         {
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            get => (SchemaType)(_tag & SchemaTypeMask);
+            readonly get => (SchemaType)(_tag & SchemaTypeMask);
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             set => _tag = (_tag & ~(uint)SchemaTypeMask) | ((uint)value & SchemaTypeMask);
@@ -117,7 +117,7 @@ namespace Orleans.Serialization.WireProtocol
         /// Gets a value indicating whether the <see cref="SchemaType" /> property is valid.
         /// </summary>
         /// <value><see langword="true"/> if the <see cref="SchemaType"/> is valid, <see langword="false"/> otherwise.</value>
-        public bool IsSchemaTypeValid
+        public readonly bool IsSchemaTypeValid
         {
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             get => !HasExtendedWireType; //(this.tag & (byte) WireType.Extended) != (byte) WireType.Extended;
@@ -132,7 +132,7 @@ namespace Orleans.Serialization.WireProtocol
         public uint FieldIdDelta
         {
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            get => _tag & FieldIdMask;
+            readonly get => _tag & FieldIdMask;
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             set => _tag = (_tag & ~(uint)FieldIdMask) | (value & FieldIdMask);
@@ -154,7 +154,7 @@ namespace Orleans.Serialization.WireProtocol
         /// If all bits are set in the field id portion of the tag, this field id is not valid and this tag must be followed by a field id.
         /// Therefore, field ids 0-6 can be represented without additional bytes.
         /// </remarks>
-        public bool IsFieldIdValid
+        public readonly bool IsFieldIdValid
         {
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             get => (_tag & FieldIdCompleteMask) != FieldIdCompleteMask && !HasExtendedWireType;
@@ -163,7 +163,7 @@ namespace Orleans.Serialization.WireProtocol
         /// <summary>
         /// Gets a value indicating whether the tag is followed by an extended field id.
         /// </summary>
-        public bool HasExtendedFieldId
+        public readonly bool HasExtendedFieldId
         {
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             get => (_tag & FieldIdCompleteMask) == FieldIdCompleteMask && !HasExtendedWireType;

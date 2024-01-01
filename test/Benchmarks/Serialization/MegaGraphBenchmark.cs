@@ -2,14 +2,11 @@ using BenchmarkDotNet.Attributes;
 using Benchmarks.Utilities;
 using Orleans.Serialization;
 using Orleans.Serialization.Buffers;
-using Orleans.Serialization.Buffers.Adaptors;
 using Orleans.Serialization.Session;
 using Microsoft.Extensions.DependencyInjection;
 using System.Buffers;
-using System.Collections.Generic;
 using System.Globalization;
 using System.IO.Pipelines;
-using System.Linq;
 using Xunit;
 using SerializerSession = Orleans.Serialization.Session.SerializerSession;
 
@@ -46,7 +43,6 @@ namespace Benchmarks
             Input = result.Buffer.ToArray();
         }
 
-        [Fact]
         [Benchmark]
         public object Deserialize()
         {
@@ -55,7 +51,6 @@ namespace Benchmarks
             return instance;
         }
 
-        [Fact]
         [Benchmark]
         public int Serialize()
         {

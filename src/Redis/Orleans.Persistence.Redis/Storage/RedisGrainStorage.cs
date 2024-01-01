@@ -19,7 +19,7 @@ namespace Orleans.Persistence
     /// <summary>
     /// Redis-based grain storage provider
     /// </summary>
-    internal class RedisGrainStorage : IGrainStorage, ILifecycleParticipant<ISiloLifecycle>
+    public class RedisGrainStorage : IGrainStorage, ILifecycleParticipant<ISiloLifecycle>
     {
         private readonly string _serviceId;
         private readonly RedisValue _ttl;
@@ -166,7 +166,7 @@ namespace Orleans.Persistence
 
             try
             {
-                var payload = new RedisValue(_grainStorageSerializer.Serialize<T>(grainState.State).ToString());
+                RedisValue payload = _grainStorageSerializer.Serialize<T>(grainState.State).ToMemory();
                 var keys = new RedisKey[] { key };
                 var args = new RedisValue[] { etag, newEtag, payload, _ttl };
                 var response = await _db.ScriptEvaluateAsync(WriteScript, keys, args).ConfigureAwait(false);

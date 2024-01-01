@@ -1,17 +1,11 @@
 //#define REREAD_STATE_AFTER_WRITE_FAILED
 
 
-using System;
-using System.Collections.Generic;
 using System.Diagnostics;
-using System.Linq;
-using System.Threading.Tasks;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Xunit;
 using Xunit.Abstractions;
-using Orleans;
-using Orleans.Hosting;
 using Orleans.TestingHost;
 using TestExtensions;
 using TestExtensions.Runners;
@@ -169,9 +163,8 @@ namespace Tester.AzureUtils.Persistence
             List<SiloHandle> silos = this.HostedCluster.GetActiveSilos().ToList();
             foreach (var silo in silos)
             {
-                var testHooks = this.HostedCluster.Client.GetTestHooks(silo);
-                List<string> providers = (await testHooks.GetStorageProviderNames()).ToList();
-                Assert.True(providers.Contains(providerName), $"No storage provider found: {providerName}");
+                var isPresent = await this.HostedCluster.Client.GetTestHooks(silo).HasStorageProvider(providerName);
+                Assert.True(isPresent, $"No storage provider found: {providerName}");
             }
         }
 
@@ -217,7 +210,7 @@ namespace Tester.AzureUtils.Persistence
 
                 if (elapsed > target.Multiply(2.0 * timingFactor))
                 {
-                    Assert.True(false, msg);
+                    Assert.Fail(msg);
                 }
                 else
                 {

@@ -80,6 +80,7 @@ namespace Orleans.Providers
 
         public ProviderStateException(string message, Exception innerException) : base(message, innerException) { }
 
+        [Obsolete]
         private ProviderStateException(SerializationInfo info, StreamingContext context)
             : base(info, context)
         {

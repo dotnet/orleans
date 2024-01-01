@@ -46,7 +46,7 @@ namespace Orleans.Statistics
         public LinuxEnvironmentStatistics(ILoggerFactory loggerFactory)
         {
             _logger = loggerFactory.CreateLogger<LinuxEnvironmentStatistics>();
-            _totalPhysicalMemoryCounter = Instruments.Meter.CreateObservableCounter<long>(InstrumentNames.RUNTIME_MEMORY_TOTAL_PHSYSICAL_MEMORY_MB, () => (long)(TotalPhysicalMemory / KB / KB), unit: "MB");
+            _totalPhysicalMemoryCounter = Instruments.Meter.CreateObservableCounter<long>(InstrumentNames.RUNTIME_MEMORY_TOTAL_PHYSICAL_MEMORY_MB, () => (long)(TotalPhysicalMemory / KB / KB), unit: "MB");
             _availableMemoryCounter = Instruments.Meter.CreateObservableCounter<long>(InstrumentNames.RUNTIME_MEMORY_AVAILABLE_MEMORY_MB, () => (long)(AvailableMemory / KB / KB), unit: "MB");
         }
 

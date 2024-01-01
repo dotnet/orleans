@@ -1,7 +1,4 @@
-﻿using System;
-using System.Threading.Tasks;
-using Orleans;
-using UnitTests.GrainInterfaces;
+﻿using UnitTests.GrainInterfaces;
 
 namespace UnitTests.Grains
 {
@@ -27,7 +24,7 @@ namespace UnitTests.Grains
 
         public Task<bool> StringIsNullOrEmpty()
         {
-            return Task.FromResult(String.IsNullOrEmpty(myGrainString));
+            return Task.FromResult(string.IsNullOrEmpty(myGrainString));
         }
 
         public Task<MemberVariables> GetMemberVariables()

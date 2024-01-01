@@ -1,17 +1,10 @@
-using System;
-using System.Collections.Generic;
 using System.Diagnostics;
-using System.Linq;
-using System.Threading;
-using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
-using Orleans;
 using Orleans.Providers;
 using Orleans.Runtime;
 using Orleans.Serialization;
 using Orleans.Storage;
 using Microsoft.Extensions.Logging;
-using Orleans.Hosting;
 
 namespace UnitTests.StorageTests
 {
@@ -26,16 +19,16 @@ namespace UnitTests.StorageTests
         {
             return builder.ConfigureServices(services =>
             {
-                services.AddSingletonNamedService<IGrainStorage>(name, (sp, n) => createInstance(sp, n));
+                services.AddKeyedSingleton<IGrainStorage>(name, (sp, n) => createInstance(sp, n as string));
 
                 if (typeof(ILifecycleParticipant<ISiloLifecycle>).IsAssignableFrom(typeof(T)))
                 {
-                    services.AddSingletonNamedService(name, (svc, n) => (ILifecycleParticipant<ISiloLifecycle>)svc.GetRequiredServiceByName<IGrainStorage>(name));
+                    services.AddKeyedSingleton(name, (svc, n) => (ILifecycleParticipant<ISiloLifecycle>)svc.GetRequiredKeyedService<IGrainStorage>(name));
                 }
 
                 if (typeof(IControllable).IsAssignableFrom(typeof(T)))
                 {
-                    services.AddSingletonNamedService(name, (svc, n) => (IControllable)svc.GetRequiredServiceByName<IGrainStorage>(name));
+                    services.AddKeyedSingleton(name, (svc, n) => (IControllable)svc.GetRequiredKeyedService<IGrainStorage>(name));
                 }
             });
         }

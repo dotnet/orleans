@@ -1,4 +1,5 @@
 #nullable enable
+using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Threading.Tasks;
 using Orleans.GrainDirectory;
@@ -29,8 +30,21 @@ namespace Orleans.Runtime.GrainDirectory
 
         public void InvalidateCache(GrainAddress address) => GetGrainLocator(address.GrainId.Type).InvalidateCache(address);
 
-        public void CachePlacementDecision(GrainId grainId, SiloAddress siloAddress) => GetGrainLocator(grainId.Type).CachePlacementDecision(grainId, siloAddress);
-
         private IGrainLocator GetGrainLocator(GrainType grainType) => _grainLocatorResolver.GetGrainLocator(grainType);
+
+        public void UpdateCache(GrainId grainId, SiloAddress siloAddress) => GetGrainLocator(grainId.Type).UpdateCache(grainId, siloAddress);
+
+        public void UpdateCache(GrainAddressCacheUpdate update)
+        {
+            if (update.ValidGrainAddress is { } validAddress)
+            {
+                Debug.Assert(validAddress.SiloAddress is not null);
+                UpdateCache(validAddress.GrainId, validAddress.SiloAddress);
+            }
+            else
+            {
+                InvalidateCache(update.InvalidGrainAddress);
+            }
+        }
     }
 }

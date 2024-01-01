@@ -61,7 +61,7 @@ namespace Orleans.Streaming.EventHubs.Testing
 
         private IEventHubReceiver EHGeneratorReceiverFactory(EventHubPartitionSettings settings, string offset, ILogger logger)
         {
-            var streamGeneratorFactory = this.serviceProvider.GetServiceByName<Func<StreamId, IStreamDataGenerator<EventData>>>(this.Name)
+            var streamGeneratorFactory = this.serviceProvider.GetKeyedService<Func<StreamId, IStreamDataGenerator<EventData>>>(this.Name)
                 ?? SimpleStreamEventDataGenerator.CreateFactory(this.serviceProvider);
             var generator = new EventHubPartitionDataGenerator(this.ehGeneratorOptions, streamGeneratorFactory, logger);
             return new EventHubPartitionGeneratorReceiver(generator);
@@ -183,7 +183,7 @@ namespace Orleans.Streaming.EventHubs.Testing
             var cacheOptions = services.GetOptionsByName<EventHubStreamCachePressureOptions>(name);
             var statisticOptions = services.GetOptionsByName<StreamStatisticOptions>(name);
             var evictionOptions = services.GetOptionsByName<StreamCacheEvictionOptions>(name);
-            IEventHubDataAdapter dataAdapter = services.GetServiceByName<IEventHubDataAdapter>(name)
+            IEventHubDataAdapter dataAdapter = services.GetKeyedService<IEventHubDataAdapter>(name)
                 ?? services.GetService<IEventHubDataAdapter>()
                 ?? ActivatorUtilities.CreateInstance<EventHubDataAdapter>(services);
             var factory = ActivatorUtilities.CreateInstance<EventDataGeneratorAdapterFactory>(services, name, generatorOptions, ehOptions, receiverOptions, cacheOptions, 

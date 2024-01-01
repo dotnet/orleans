@@ -3,10 +3,10 @@ using System.Net;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Connections;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
-using Orleans.Hosting;
 
 namespace Orleans.Runtime.Messaging
 {
@@ -35,7 +35,7 @@ namespace Orleans.Runtime.Messaging
             ConnectionCommon connectionShared,
             ConnectionPreambleHelper connectionPreambleHelper,
             ILogger<GatewayConnectionListener> logger)
-            : base(serviceProvider.GetRequiredServiceByKey<object, IConnectionListenerFactory>(ServicesKey), connectionOptions, connectionManager, connectionShared)
+            : base(serviceProvider.GetRequiredKeyedService<IConnectionListenerFactory>(ServicesKey), connectionOptions, connectionManager, connectionShared)
         {
             this.siloConnectionOptions = siloConnectionOptions.Value;
             this.overloadDetector = overloadDetector;

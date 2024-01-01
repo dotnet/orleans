@@ -1,22 +1,11 @@
-using System;
-using System.Collections.Concurrent;
-using System.Collections.Generic;
 using System.Collections.ObjectModel;
-using System.Linq;
-using System.Runtime.Serialization;
-using System.Threading.Tasks;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.DependencyInjection.Extensions;
-using Orleans;
 using Orleans.Concurrency;
-using Orleans.Configuration;
 using Orleans.GrainDirectory;
 using Orleans.Runtime;
 using Orleans.Serialization;
 using Orleans.Serialization.TypeSystem;
 using Orleans.Streaming.EventHubs;
 using Orleans.Streams;
-using Orleans.Utilities;
 using TestExtensions;
 using TestGrainInterfaces;
 using UnitTests.GrainInterfaces;
@@ -63,7 +52,7 @@ namespace UnitTests.Serialization
                 $"Should be able to serialize internal type {nameof(EventHubSequenceTokenV2)}.");
         }
 
-        [Fact(Skip = "See https://github.com/dotnet/orleans/issues/3531"), TestCategory("BVT"), TestCategory("CodeGen")]
+        [Fact, TestCategory("BVT"), TestCategory("CodeGen")]
         public void ValueTupleTypesHasSerializer()
         {
             Assert.True(

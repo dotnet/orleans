@@ -95,6 +95,7 @@ namespace Orleans
             /// </summary>
             /// <param name="info">The serialization info.</param>
             /// <param name="context">The context.</param>
+            [Obsolete]
             public ReminderException(SerializationInfo info, StreamingContext context)
                 : base(info, context)
             {
