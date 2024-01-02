@@ -42,7 +42,7 @@
     <SourceLinkOriginUrl>https://github.com/dotnet/orleans</SourceLinkOriginUrl>
   </PropertyGroup>
 
-  <ItemGroup>
+  <ItemGroup Condition="'$(IsOrleansFrameworkPart)' != 'false'">
     <AssemblyAttribute Include="Orleans.Metadata.FrameworkPartAttribute" />
   </ItemGroup>
 

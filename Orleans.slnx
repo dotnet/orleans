@@ -27,6 +27,13 @@
     <Project Path="playground/DashboardCohosted/DashboardCohosted.csproj" />
     <Project Path="playground/DashboardSeparateHost/DashboardSeparateHost.csproj" />
   </Folder>
+  <Folder Name="/playground/PaymentWorkflowApp/">
+    <Project Path="playground/PaymentWorkflowApp/PaymentWorkflowApp.csproj" />
+  </Folder>
+  <Folder Name="/playground/WorkflowsApp/">
+    <Project Path="playground/WorkflowsApp/WorkflowsApp.AppHost/WorkflowsApp.AppHost.csproj" />
+    <Project Path="playground/WorkflowsApp/WorkflowsApp.Service/WorkflowsApp.Service.csproj" />
+  </Folder>
   <Folder Name="/Solution Items/">
     <File Path=".editorconfig" />
     <File Path="Directory.Build.props" />
@@ -41,14 +48,16 @@
     <Project Path="src/Orleans.CodeGenerator/Orleans.CodeGenerator.csproj" />
     <Project Path="src/Orleans.Core.Abstractions/Orleans.Core.Abstractions.csproj" />
     <Project Path="src/Orleans.Core/Orleans.Core.csproj" />
+    <Project Path="src/Orleans.DurableJobs/Orleans.DurableJobs.csproj" Id="ab4cc723-b3cf-4c32-be4c-1a180a49797c" />
+    <Project Path="src/Orleans.DurableTasks/Orleans.DurableTasks.csproj" />
     <Project Path="src/Orleans.EventSourcing/Orleans.EventSourcing.csproj" />
     <Project Path="src/Orleans.Journaling/Orleans.Journaling.csproj" />
     <Project Path="src/Orleans.Persistence.Memory/Orleans.Persistence.Memory.csproj" />
     <Project Path="src/Orleans.Persistence.TestKit/Orleans.Persistence.TestKit.csproj" />
     <Project Path="src/Orleans.Reminders/Orleans.Reminders.csproj" />
+    <Project Path="src/Orleans.Reminders.Abstractions/Orleans.Reminders.Abstractions.csproj" />
     <Project Path="src/Orleans.Reminders.TestKit/Orleans.Reminders.TestKit.csproj" />
     <Project Path="src/Orleans.Runtime/Orleans.Runtime.csproj" />
-    <Project Path="src/Orleans.DurableJobs/Orleans.DurableJobs.csproj" Id="ab4cc723-b3cf-4c32-be4c-1a180a49797c" />
     <Project Path="src/Orleans.Sdk/Orleans.Sdk.csproj" />
     <Project Path="src/Orleans.Serialization.Abstractions/Orleans.Serialization.Abstractions.csproj" />
     <Project Path="src/Orleans.Serialization.FSharp/Orleans.Serialization.FSharp.csproj" />
@@ -59,8 +68,10 @@
     <Project Path="src/Orleans.Serialization/Orleans.Serialization.csproj" />
     <Project Path="src/Orleans.Server/Orleans.Server.csproj" />
     <Project Path="src/Orleans.Streaming/Orleans.Streaming.csproj" />
+    <Project Path="src/Orleans.Streaming.Abstractions/Orleans.Streaming.Abstractions.csproj" />
     <Project Path="src/Orleans.TestingHost/Orleans.TestingHost.csproj" />
     <Project Path="src/Serializers/Orleans.Serialization.Protobuf/Orleans.Serialization.Protobuf.csproj" />
+    <Project Path="src/System.Distributed.DurableTasks/System.Distributed.DurableTasks.csproj" />
   </Folder>
   <Folder Name="/src/Dashboard/">
     <Project Path="src/Dashboard/Orleans.Dashboard.Abstractions/Orleans.Dashboard.Abstractions.csproj" />
@@ -134,6 +145,7 @@
     <Project Path="test/Orleans.Core.Tests/Orleans.Core.Tests.csproj" />
     <Project Path="test/Orleans.CodeGenerator.Tests/Orleans.CodeGenerator.Tests.csproj" />
     <Project Path="test/Orleans.Connections.Security.Tests/Orleans.Connections.Security.Tests.csproj" />
+    <Project Path="test/Orleans.DurableTasks.Tests/Orleans.DurableTasks.Tests.csproj" />
     <Project Path="test/Orleans.Journaling.Tests/Orleans.Journaling.Tests.csproj" />
     <Project Path="test/Orleans.Journaling.Json.Tests/Orleans.Journaling.Json.Tests.csproj" />
     <Project Path="test/Orleans.Serialization.FSharp.Tests/Orleans.Serialization.FSharp.Tests.fsproj" />

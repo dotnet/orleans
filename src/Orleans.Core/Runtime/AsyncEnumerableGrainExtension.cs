@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Runtime.CompilerServices;
@@ -367,6 +367,9 @@ internal sealed partial class AsyncEnumerableGrainExtension : IAsyncEnumerableGr
             {
                 await value.DisposeAsync().AsTask().WaitAsync(cts.Token).SuppressThrowing();
             }
+        }
+        catch (NotSupportedException)
+        {
         }
         catch (Exception exception)
         {

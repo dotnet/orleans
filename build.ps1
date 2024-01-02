@@ -27,7 +27,7 @@ $Platform = $null
 $BuildProperties = "/p:Configuration=$env:BuildConfiguration";
 
  # Set DateTime suffix for debug builds
- if ($env:BuildConfiguration -eq "Debug")
+ if ($true)
  {
     $dateSuffix = Get-Date -Format "yyyyMMddHHmm"
     $BuildProperties = $BuildProperties + " /p:VersionDateSuffix=$dateSuffix"
