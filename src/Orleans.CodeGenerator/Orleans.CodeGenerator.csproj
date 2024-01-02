@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <PackageId>Microsoft.Orleans.CodeGenerator</PackageId>
@@ -14,6 +14,7 @@
     <NeutralLanguage>en-US</NeutralLanguage>
     <EnforceExtendedAnalyzerRules>true</EnforceExtendedAnalyzerRules>
     <IsRoslynComponent>true</IsRoslynComponent>
+    <RootNamespace>Orleans.CodeGenerator</RootNamespace>
   </PropertyGroup>
 
   <ItemGroup>
@@ -69,7 +70,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <AssemblyAttribute Remove="Orleans.Metadata.FrameworkPartAttribute"/>
+    <AssemblyAttribute Remove="Orleans.Metadata.FrameworkPartAttribute" />
   </ItemGroup>
 
   <ItemGroup>
