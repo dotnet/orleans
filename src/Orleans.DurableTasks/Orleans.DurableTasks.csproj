@@ -1,0 +1,29 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFrameworks>$(DefaultTargetFrameworks)</TargetFrameworks>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <WarningLevel>3</WarningLevel>
+    <AnalysisLevel>preview</AnalysisLevel>
+    <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
+    <EmitCompilerGeneratedFiles>true</EmitCompilerGeneratedFiles>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Orleans.DurableTasks.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Hosting" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Orleans.Core.Abstractions\Orleans.Core.Abstractions.csproj" />
+    <ProjectReference Include="..\Orleans.Serialization\Orleans.Serialization.csproj" />
+    <ProjectReference Include="..\Orleans.Transactions\Orleans.Transactions.csproj" />
+    <ProjectReference Include="..\Orleans.Server\Orleans.Server.csproj" />
+    <ProjectReference Include="..\System.Distributed.DurableTasks\System.Distributed.DurableTasks.csproj" />
+  </ItemGroup>
+
+</Project>
