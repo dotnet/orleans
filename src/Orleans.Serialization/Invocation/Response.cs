@@ -49,6 +49,11 @@ namespace Orleans.Serialization.Invocation
         public abstract object? Result { get; set; }
 
         /// <summary>
+        /// Gets a value indicating whether this response is terminal.
+        /// </summary>
+        public abstract bool IsFinal { get; }
+
+        /// <summary>
         /// Gets the result type when the response represents a simple typed result.
         /// </summary>
         /// <returns>The result type, or <see langword="null"/> when the response does not represent a simple typed result.</returns>
@@ -67,7 +72,6 @@ namespace Orleans.Serialization.Invocation
         [return: System.Diagnostics.CodeAnalysis.MaybeNull]
         public abstract T GetResult<T>();
 
-        /// <inheritdoc />
         public abstract void Dispose();
 
         /// <inheritdoc />
@@ -90,6 +94,9 @@ namespace Orleans.Serialization.Invocation
 
         /// <inheritdoc/>
         public override Exception? Exception { get => null; set => throw new InvalidOperationException($"Type {nameof(CompletedResponse)} is read-only"); }
+
+        /// <inheritdoc/>
+        public override bool IsFinal => true;
 
         /// <inheritdoc/>
         [return: System.Diagnostics.CodeAnalysis.MaybeNull]
@@ -133,6 +140,9 @@ namespace Orleans.Serialization.Invocation
         /// <inheritdoc/>
         [Id(0)]
         public override Exception? Exception { get; set; }
+
+        /// <inheritdoc/>
+        public override bool IsFinal => true;
 
         /// <inheritdoc/>
         [return: System.Diagnostics.CodeAnalysis.MaybeNull]
@@ -184,6 +194,12 @@ namespace Orleans.Serialization.Invocation
         }
 
         /// <inheritdoc/>
+<<<<<<< HEAD
+||||||| parent of dfd09f9c81 (feat(durable-tasks): add durable execution prototype)
+=======
+        public override bool IsFinal => true;
+
+>>>>>>> dfd09f9c81 (feat(durable-tasks): add durable execution prototype)
         public override Type GetSimpleResultType() => typeof(TResult);
 
         /// <inheritdoc/>

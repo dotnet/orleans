@@ -1,4 +1,4 @@
-namespace Orleans;
+﻿namespace Orleans;
 
 /// <summary>
 /// This enum provides options for controlling the field id generation logic.

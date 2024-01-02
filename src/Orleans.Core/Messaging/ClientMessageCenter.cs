@@ -334,7 +334,8 @@ namespace Orleans.Messaging
                 }
                 catch (Exception exception) when (directGatewayMessage)
                 {
-                    RejectMessage(message, $"Target silo {message.TargetSilo} is unavailable", exception);
+                    var rejectionException = new SiloUnavailableException($"Target silo {message.TargetSilo} is unavailable", exception);
+                    RejectMessage(message, rejectionException.Message, rejectionException);
                     return null;
                 }
                 finally

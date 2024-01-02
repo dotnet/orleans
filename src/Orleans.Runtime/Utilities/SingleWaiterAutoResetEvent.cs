@@ -5,13 +5,13 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Threading.Tasks.Sources;
 
-namespace Orleans.Runtime
+namespace Orleans.Runtime.Internal
 {
     /// <summary>
     /// Represents a synchronization event that, when signaled, resets automatically after releasing a single waiter.
     /// This type supports concurrent signalers but only a single waiter.
     /// </summary>
-    internal sealed class SingleWaiterAutoResetEvent : IValueTaskSource
+    public sealed class SingleWaiterAutoResetEvent : IValueTaskSource
     {
         // Signaled indicates that the event has been signaled and not yet reset.
         private const uint SignaledFlag = 1;
