@@ -8,6 +8,7 @@
     <PackageVersion Include="Aspire.Azure.Storage.Blobs" Version="13.0.0" />
     <PackageVersion Include="Aspire.Azure.Storage.Queues" Version="13.0.0" />
     <PackageVersion Include="Aspire.Hosting.AppHost" Version="13.1.1" />
+    <PackageVersion Include="Aspire.Hosting.Azure" Version="13.1.1" />
     <PackageVersion Include="Aspire.Hosting.Orleans" Version="13.1.1" />
     <PackageVersion Include="Aspire.Hosting.Redis" Version="13.1.1" />
     <PackageVersion Include="Aspire.StackExchange.Redis" Version="13.1.1" />
@@ -19,7 +20,7 @@
     <PackageVersion Include="Azure.Data.Tables" Version="12.11.0" />
     <PackageVersion Include="Azure.Identity" Version="1.17.1" />
     <PackageVersion Include="Azure.Messaging.EventHubs" Version="5.12.2" />
-    <PackageVersion Include="Azure.Security.KeyVault.Secrets" Version="4.5.0" />
+    <PackageVersion Include="Azure.Security.KeyVault.Secrets" Version="4.7.0" />
     <PackageVersion Include="Azure.Storage.Blobs" Version="12.27.0" />
     <PackageVersion Include="Azure.Storage.Queues" Version="12.25.0" />
     <PackageVersion Include="BenchmarkDotNet.Diagnostics.Windows" Version="0.13.12" />
@@ -119,6 +120,7 @@
     <PackageVersion Include="xunit" Version="2.9.3" />
     <PackageVersion Include="ZeroFormatter" Version="1.6.4" />
     <PackageVersion Include="ZooKeeperNetEx" Version="3.4.12.4" />
+    <PackageVersion Include="LiteDB" Version="5.0.20" />
   </ItemGroup>
   <!-- Updates for later TFMs -->
   <ItemGroup Condition=" '$(TargetFramework)' == 'net10.0' ">

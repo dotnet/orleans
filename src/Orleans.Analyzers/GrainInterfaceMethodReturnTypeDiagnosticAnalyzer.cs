@@ -12,7 +12,7 @@ namespace Orleans.Analyzers
     {
         public const string DiagnosticId = "ORLEANS0009";
         public const string Title = "Grain interfaces methods must return a compatible type";
-        public const string MessageFormat = $"Grain interfaces methods must return a compatible type, such as Task, Task<T>, ValueTask, ValueTask<T>, or void";
+        public const string MessageFormat = $"Grain interfaces methods must return a compatible type, such as Task, Task<T>, ValueTask, ValueTask<T>, DurableTask, DurableTask<T>, or void";
         public const string Category = "Usage";
 
         private static readonly DiagnosticDescriptor Rule = new DiagnosticDescriptor(DiagnosticId, Title, MessageFormat, Category, DiagnosticSeverity.Error, isEnabledByDefault: true);
@@ -37,6 +37,8 @@ namespace Orleans.Analyzers
                 AddIfNotNull(builder, context.Compilation.GetTypeByMetadataName("System.Threading.Tasks.ValueTask"));
                 AddIfNotNull(builder, context.Compilation.GetTypeByMetadataName("System.Threading.Tasks.ValueTask`1"));
                 AddIfNotNull(builder, context.Compilation.GetTypeByMetadataName("System.Collections.Generic.IAsyncEnumerable`1"));
+                AddIfNotNull(builder, context.Compilation.GetTypeByMetadataName("System.Distributed.DurableTasks.DurableTask"));
+                AddIfNotNull(builder, context.Compilation.GetTypeByMetadataName("System.Distributed.DurableTasks.DurableTask`1"));
                 AddIfNotNull(builder, context.Compilation.GetSpecialType(SpecialType.System_Void));
 
                 context.RegisterSymbolAction(context => AnalyzeMethod(context, baseInterface, builder.ToImmutable()), SymbolKind.Method);

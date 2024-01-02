@@ -1,3 +1,4 @@
+﻿using System;
 using Microsoft.Extensions.Options;
 
 namespace Orleans.Serialization.Configuration
@@ -19,7 +20,14 @@ namespace Orleans.Serialization.Configuration
         {
             if (options.TypeManifestProviders.Add(Key))
             {
-                ConfigureInner(options);
+                try
+                {
+                    ConfigureInner(options);
+                }
+                catch (Exception exception)
+                {
+                    throw new InvalidOperationException($"Error configuring Orleans.Serialization for '{Key}'. See InnerException for details.", exception);
+                }
             }
         }
 

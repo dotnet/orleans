@@ -12,6 +12,7 @@ using Orleans.Configuration;
 using Orleans.Configuration.Internal;
 using Orleans.Configuration.Validators;
 using Orleans.Core;
+using Orleans.DurableTasks;
 using Orleans.GrainReferences;
 using Orleans.Metadata;
 using Orleans.Networking.Shared;
@@ -444,6 +445,9 @@ namespace Orleans.Hosting
             services.AddSingleton<GrainCallCancellationManager>();
             services.AddFromExisting<IGrainCallCancellationManager, GrainCallCancellationManager>();
             services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, GrainCallCancellationManager>();
+
+            // DurableTasks
+            services.TryAddSingleton<DurableTaskRequestShared>();
 
             ApplyConfiguration(builder);
         }
