@@ -149,16 +149,12 @@ namespace TestGrains
             }
 
             public ICustomStorageInterface<TState, TDelta> CreateCustomStorage<TState, TDelta>(GrainId grainId)
-                where TState : class, new()
-                where TDelta : class
             {
                 return new SeparateCustomStorage<TState, TDelta>(deepCopier);
             }
         }
 
         public class SeparateCustomStorage<TState, TDelta> : ICustomStorageInterface<TState, TDelta>
-            where TState : class, new()
-            where TDelta : class
         {
             private readonly DeepCopier copier;
 
@@ -175,7 +171,7 @@ namespace TestGrains
             {
                 if (state == null)
                 {
-                    state = new TState();
+                    state = Activator.CreateInstance<TState>();
                     version = 0;
                 }
                 return Task.FromResult(new KeyValuePair<int, TState>(version, this.copier.Copy(state)!));
@@ -185,7 +181,7 @@ namespace TestGrains
             {
                 if (state == null)
                 {
-                    state = new TState();
+                    state = Activator.CreateInstance<TState>();
                     version = 0;
                 }
 
