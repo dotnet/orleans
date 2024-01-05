@@ -6,10 +6,11 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
+using System.Threading;
 
 namespace Orleans.Providers.GCP.Streams.PubSub
 {
-    internal class PubSubAdapter<TDataAdapter> : IQueueAdapter
+    internal class PubSubAdapter<TDataAdapter> : IQueueAdapter, IAsyncDisposable
         where TDataAdapter : IPubSubDataAdapter
     {
         protected readonly string ServiceId;
@@ -73,6 +74,14 @@ namespace Orleans.Providers.GCP.Streams.PubSub
 
             var msg = _dataAdapter.ToPubSubMessage(streamId, events, requestContext);
             await pubSub.PublishMessages(new[] { msg });
+        }
+
+        public async ValueTask DisposeAsync()
+        {
+            foreach(var pubSub in Subscriptions.Values)
+            {
+                await pubSub.ShutdownAsync(CancellationToken.None);
+            }
         }
     }
 }

@@ -6,13 +6,14 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
+using System.Threading;
 namespace Orleans.Providers.GCP.Streams.PubSub
 {
     /// <summary>
     /// Utility class to encapsulate access to Google PubSub APIs.
     /// </summary>
     /// <remarks> Used by Google PubSub streaming provider.</remarks>
-    public class PubSubDataManager
+    public class PubSubDataManager : IAsyncDisposable
     {
         public const int MAX_PULLED_MESSAGES = 1000;
 
@@ -50,19 +51,20 @@ namespace Orleans.Providers.GCP.Streams.PubSub
 
         public async Task Initialize()
         {
+            var useEmulator = Environment.GetEnvironmentVariable("PUBSUB_EMULATOR_HOST") != null;
+            var detection = useEmulator ? EmulatorDetection.EmulatorOnly : EmulatorDetection.ProductionOnly;
+            
             try
             {
                 _publisherService = await new PublisherServiceApiClientBuilder
                 {
-                    EmulatorDetection = EmulatorDetection.EmulatorOrProduction,
-                    Endpoint = _customEndpoint
+                    EmulatorDetection = detection,
                 }.BuildAsync();
 
                 _publisher = await new PublisherClientBuilder
                 {
                     TopicName = TopicName,
-                    EmulatorDetection = EmulatorDetection.EmulatorOrProduction,
-                    Endpoint = _customEndpoint,
+                    EmulatorDetection = detection,
                 }.BuildAsync();
             }
             catch (Exception e)
@@ -93,14 +95,12 @@ namespace Orleans.Providers.GCP.Streams.PubSub
             {
                 _subscriberService = await new SubscriberServiceApiClientBuilder 
                 {
-                    EmulatorDetection = EmulatorDetection.EmulatorOrProduction,
-                    Endpoint = _customEndpoint,
+                    EmulatorDetection = detection,
                 }.BuildAsync();
 
                 _subscriber = await new SubscriberServiceApiClientBuilder
                 {
-                    EmulatorDetection = EmulatorDetection.EmulatorOrProduction,
-                    Endpoint = _customEndpoint,
+                    EmulatorDetection = detection,
                 }.BuildAsync();
                 
                 _subscription = await _subscriberService.CreateSubscriptionAsync(SubscriptionName, TopicName, pushConfig: null,
@@ -218,6 +218,17 @@ namespace Orleans.Providers.GCP.Streams.PubSub
             throw new AggregateException(
                 $"Error doing {operation} for Google Project {TopicName.ProjectId} at PubSub Topic {TopicName.TopicId} {Environment.NewLine}Exception = {exc}",
                 exc);
+        }
+
+        public async ValueTask ShutdownAsync(CancellationToken hardShutdown)
+        {
+            await _publisher.ShutdownAsync(hardShutdown);
+        }
+
+        public async ValueTask DisposeAsync() 
+        {
+            var hardToken = new CancellationTokenSource(500);
+            await ShutdownAsync(hardToken.Token);
         }
     }
 }

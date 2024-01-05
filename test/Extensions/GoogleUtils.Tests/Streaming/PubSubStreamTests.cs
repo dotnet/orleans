@@ -39,6 +39,7 @@ namespace GoogleUtils.Tests.Streaming
                     .AddPubSubStreams<PubSubDataAdapter>(PUBSUB_STREAM_PROVIDER_NAME, b=>
                         b.ConfigurePubSub(ob=>ob.Configure(options =>
                         {
+                            options.CustomEndpoint = GoogleTestUtils.EmulatorAddress;
                             options.ProjectId = GoogleTestUtils.ProjectId;
                             options.TopicId = GoogleTestUtils.TopicId;
                             options.Deadline = TimeSpan.FromSeconds(600);
@@ -54,6 +55,7 @@ namespace GoogleUtils.Tests.Streaming
                     .AddPubSubStreams<PubSubDataAdapter>(PUBSUB_STREAM_PROVIDER_NAME, b=>
                         b.ConfigurePubSub(ob=>ob.Configure(options =>
                         {
+                            options.CustomEndpoint = GoogleTestUtils.EmulatorAddress;
                             options.ProjectId = GoogleTestUtils.ProjectId;
                             options.TopicId = GoogleTestUtils.TopicId;
                             options.Deadline = TimeSpan.FromSeconds(600);

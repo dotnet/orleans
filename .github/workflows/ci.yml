@@ -41,16 +41,10 @@ jobs:
         provider: ["GCP"]
     services:
       emulator:
-        image: thekevjames/gcloud-pubsub-emulator:latest
-        env:
-          PUBSUB_PROJECT1: "feisty-flow-173313,GPSTestUtilsTopicId:GPSTestUtilsTopicId-subscription"
+        image: gcr.io/google.com/cloudsdktool/google-cloud-cli:emulators
         ports:
-        - 8681:8681
-        options: >-
-          --health-cmd "wget 127.0.0.1:8681"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
+        - 8085:8085
+        options: --entrypoint gcloud beta emulators pubsub start --project=feisty-flow-173313 --host-port=0.0.0.0:8085
     steps:
     - uses: actions/checkout@v2
     - name: Setup .NET
@@ -62,7 +56,8 @@ jobs:
     - name: Test
       run: dotnet test --filter "Category=${{ matrix.provider }}&(Category=BVT|Category=SlowBVT|Category=Functional)" --blame-hang-timeout 10m --logger "trx" -- -parallel none -noshadow
       env:
-        PUBSUB_EMULATOR_HOST: http://localhost:8681
+        PUBSUB_EMULATOR_HOST: localhost:8085
+        PUBSUB_PROJECT_ID: feisty-flow-173313
     - name: Archive Test Results
       if: always()
       uses: actions/upload-artifact@v3
