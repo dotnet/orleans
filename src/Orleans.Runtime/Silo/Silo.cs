@@ -14,9 +14,7 @@ using Orleans.Runtime.Messaging;
 using Orleans.Runtime.Scheduler;
 using Orleans.Services;
 using Orleans.Configuration;
-using Orleans.Serialization;
 using Orleans.Internal;
-using Orleans.Hosting;
 
 namespace Orleans.Runtime
 {
@@ -176,16 +174,6 @@ namespace Orleans.Runtime
                 participant?.Participate(this.siloLifecycle);
             }
 
-            // register all named lifecycle participants
-            var namedLifecycleParticipantCollection = this.Services.GetService<IKeyedServiceCollection<string,ILifecycleParticipant<ISiloLifecycle>>>();
-            if (namedLifecycleParticipantCollection?.GetServices(Services)?.Select(s => s.GetService(Services)) is { } namedParticipants)
-            {
-                foreach (ILifecycleParticipant<ISiloLifecycle> participant in namedParticipants)
-                {
-                    participant.Participate(this.siloLifecycle);
-                }
-            }
-
             // add self to lifecycle
             this.Participate(this.siloLifecycle);
 
@@ -256,7 +244,7 @@ namespace Orleans.Runtime
             lock (lockable)
             {
                 if (!this.SystemStatus.Equals(SystemStatus.Created))
-                    throw new InvalidOperationException(String.Format("Calling Silo.Start() on a silo which is not in the Created state. This silo is in the {0} state.", this.SystemStatus));
+                    throw new InvalidOperationException(string.Format("Calling Silo.Start() on a silo which is not in the Created state. This silo is in the {0} state.", this.SystemStatus));
 
                 this.SystemStatus = SystemStatus.Starting;
             }
@@ -614,7 +602,7 @@ namespace Orleans.Runtime
                     logger.LogDebug(
                         "{GrainServiceType} Grain Service with Id {GrainServiceId} stopped successfully.",
                         grainService.GetType().FullName,
-                        grainService.GetPrimaryKeyLong(out string ignored));
+                        grainService.GetGrainId().ToString());
                 }
             }
         }

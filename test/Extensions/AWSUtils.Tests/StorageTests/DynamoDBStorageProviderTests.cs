@@ -1,10 +1,6 @@
-using System;
-using System.Collections.Generic;
 using System.Diagnostics;
-using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
-using Orleans;
 using Orleans.Configuration;
 using Orleans.Providers;
 using Orleans.Runtime;
@@ -267,9 +263,9 @@ namespace AWSUtils.Tests.StorageTests
             TimeSpan readTime = sw.Elapsed;
             this.output.WriteLine("{0} - Write time = {1} Read time = {2}", store.GetType().FullName, writeTime, readTime);
             Assert.NotNull(storedGrainState.State);
-            Assert.Equal(default(string), storedGrainState.State.A);
-            Assert.Equal(default(int), storedGrainState.State.B);
-            Assert.Equal(default(long), storedGrainState.State.C);
+            Assert.Equal(default, storedGrainState.State.A);
+            Assert.Equal(default, storedGrainState.State.B);
+            Assert.Equal(default, storedGrainState.State.C);
 
             return storedGrainState;
         }

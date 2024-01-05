@@ -266,13 +266,13 @@ namespace Orleans.Serialization.Buffers
         private readonly static bool IsReadOnlySequenceInput = typeof(TInput) == typeof(ReadOnlySequenceInput);
         private readonly static bool IsReaderInput = typeof(ReaderInput).IsAssignableFrom(typeof(TInput));
         private readonly static bool IsBufferSliceInput = typeof(TInput) == typeof(BufferSliceReaderInput);
-        
+
         private ReadOnlySpan<byte> _currentSpan;
         private int _bufferPos;
         private int _bufferSize;
         private readonly long _sequenceOffset;
         private TInput _input;
-        
+
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         internal Reader(TInput input, SerializerSession session, long globalOffset)
         {
@@ -318,7 +318,7 @@ namespace Orleans.Serialization.Buffers
             if (IsSpanInput)
             {
                 _input = default;
-                _currentSpan = input; 
+                _currentSpan = input;
                 _bufferPos = 0;
                 _bufferSize = _currentSpan.Length;
                 _sequenceOffset = globalOffset;
@@ -408,13 +408,13 @@ namespace Orleans.Serialization.Buffers
         /// <param name="count">The number of bytes to skip.</param>
         public void Skip(long count)
         {
-            if (IsReadOnlySequenceInput || IsBufferSliceInput)
+            if (IsReadOnlySequenceInput)
             {
-                var previousBuffersSize = Unsafe.As<TInput, ReadOnlySequenceInput>(ref _input).PreviousBuffersSize;
                 var end = Position + count;
                 while (Position < end)
                 {
-                    if (Position + _bufferSize >= end)
+                    var previousBuffersSize = Unsafe.As<TInput, ReadOnlySequenceInput>(ref _input).PreviousBuffersSize;
+                    if (end - previousBuffersSize <= _bufferSize)
                     {
                         _bufferPos = (int)(end - previousBuffersSize);
                     }
@@ -426,11 +426,11 @@ namespace Orleans.Serialization.Buffers
             }
             else if (IsBufferSliceInput)
             {
-                var previousBuffersSize = Unsafe.As<TInput, BufferSliceReaderInput>(ref _input).PreviousBuffersSize;
                 var end = Position + count;
                 while (Position < end)
                 {
-                    if (Position + _bufferSize >= end)
+                    var previousBuffersSize = Unsafe.As<TInput, BufferSliceReaderInput>(ref _input).PreviousBuffersSize;
+                    if (end - previousBuffersSize <= _bufferSize)
                     {
                         _bufferPos = (int)(end - previousBuffersSize);
                     }
@@ -497,7 +497,7 @@ namespace Orleans.Serialization.Buffers
             }
             else if (IsSpanInput)
             {
-                forked = new Reader<TInput>(_currentSpan.Slice((int)position), Session, position);
+                forked = new Reader<TInput>(_currentSpan[(int)position..], Session, position);
                 if (forked.Position != position || position > int.MaxValue)
                 {
                     ThrowInvalidPosition(position, forked.Position);
@@ -517,13 +517,13 @@ namespace Orleans.Serialization.Buffers
             {
                 throw new NotSupportedException($"Type {typeof(TInput)} is not supported");
             }
-            
+
             static void ThrowInvalidPosition(long expectedPosition, long actualPosition)
             {
                 throw new InvalidOperationException($"Expected to arrive at position {expectedPosition} after ForkFrom, but resulting position is {actualPosition}");
             }
         }
-        
+
         /// <summary>
         /// Resumes the reader from the specified position after forked readers are no longer in use.
         /// </summary>
@@ -825,7 +825,7 @@ namespace Orleans.Serialization.Buffers
                 var writeSize = Math.Min(dest.Length, _currentSpan.Length - _bufferPos);
                 _currentSpan.Slice(_bufferPos, writeSize).CopyTo(dest);
                 _bufferPos += writeSize;
-                dest = dest.Slice(writeSize);
+                dest = dest[writeSize..];
 
                 if (dest.Length == 0)
                 {

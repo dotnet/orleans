@@ -2,7 +2,6 @@ using System;
 using System.Linq;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
-using Orleans;
 using Orleans.Configuration.Internal;
 using Orleans.Providers;
 using Orleans.Runtime;
@@ -38,8 +37,8 @@ namespace Orleans.Hosting
             services.AddSingleton<IConfigureGrainContext, StreamConsumerGrainContextAction>();
             services.AddSingleton<IStreamNamespacePredicateProvider, DefaultStreamNamespacePredicateProvider>();
             services.AddSingleton<IStreamNamespacePredicateProvider, ConstructorStreamNamespacePredicateProvider>();
-            services.AddSingletonKeyedService<string, IStreamIdMapper, DefaultStreamIdMapper>(DefaultStreamIdMapper.Name);
-            services.AddTransientKeyedService<Type, IGrainExtension>(typeof(IStreamConsumerExtension), (sp, _) =>
+            services.AddKeyedSingleton<IStreamIdMapper, DefaultStreamIdMapper>(DefaultStreamIdMapper.Name);
+            services.AddKeyedTransient<IGrainExtension>(typeof(IStreamConsumerExtension), (sp, _) =>
             {
                 var runtime = sp.GetRequiredService<IStreamProviderRuntime>();
                 var grainContextAccessor = sp.GetRequiredService<IGrainContextAccessor>();
@@ -71,7 +70,7 @@ namespace Orleans.Hosting
             services.AddSingleton<ImplicitStreamSubscriberTable>();
             services.AddSingleton<IStreamNamespacePredicateProvider, DefaultStreamNamespacePredicateProvider>();
             services.AddSingleton<IStreamNamespacePredicateProvider, ConstructorStreamNamespacePredicateProvider>();
-            services.AddSingletonKeyedService<string, IStreamIdMapper, DefaultStreamIdMapper>(DefaultStreamIdMapper.Name);
+            services.AddKeyedSingleton<IStreamIdMapper, DefaultStreamIdMapper>(DefaultStreamIdMapper.Name);
             services.AddFromExisting<ILifecycleParticipant<IClusterClientLifecycle>, ClientStreamingProviderRuntime>();
             services.AddSingleton<IPostConfigureOptions<OrleansJsonSerializerOptions>, StreamingConverterConfigurator>();
         }
@@ -85,7 +84,7 @@ namespace Orleans.Hosting
         /// <returns>The service collection.</returns>
         public static IServiceCollection AddStreamFilter<T>(this IServiceCollection services, string name) where T : class, IStreamFilter
         {
-            return services.AddSingletonNamedService<IStreamFilter, T>(name);
+            return services.AddKeyedSingleton<IStreamFilter, T>(name);
         }
     }
 }

@@ -1,5 +1,4 @@
-﻿using System.Collections.Generic;
-using System.Net;
+﻿using System.Net;
 using Amazon.DynamoDBv2.Model;
 using Orleans.Runtime;
 using Orleans.Runtime.MembershipService;

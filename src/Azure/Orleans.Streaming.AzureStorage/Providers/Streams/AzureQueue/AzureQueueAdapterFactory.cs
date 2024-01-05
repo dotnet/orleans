@@ -2,9 +2,7 @@ using System;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
 using Orleans.Configuration;
-using Orleans.Configuration.Overrides;
 using Orleans.Providers.Streams.Common;
 using Orleans.Runtime;
 using Orleans.Streams;
@@ -86,7 +84,7 @@ namespace Orleans.Providers.Streams.AzureQueue
         {
             var azureQueueOptions = services.GetOptionsByName<AzureQueueOptions>(name);
             var cacheOptions = services.GetOptionsByName<SimpleQueueCacheOptions>(name);
-            var dataAdapter = services.GetServiceByName<IQueueDataAdapter<string, IBatchContainer>>(name)
+            var dataAdapter = services.GetKeyedService<IQueueDataAdapter<string, IBatchContainer>>(name)
                 ?? services.GetService<IQueueDataAdapter<string, IBatchContainer>>();
             var factory = ActivatorUtilities.CreateInstance<AzureQueueAdapterFactory>(services, name, azureQueueOptions, cacheOptions, dataAdapter);
             factory.Init();

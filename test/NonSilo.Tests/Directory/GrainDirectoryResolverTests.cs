@@ -1,5 +1,3 @@
-using System;
-using System.Linq;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -8,6 +6,7 @@ using Orleans;
 using Orleans.GrainDirectory;
 using Orleans.Hosting;
 using Orleans.Runtime;
+using Orleans.Runtime.Hosting;
 using Orleans.Runtime.GrainDirectory;
 using TestExtensions;
 using UnitTests.GrainInterfaces.Directories;
@@ -34,9 +33,9 @@ namespace NonSilo.Tests.Directory
             hostBuilder.UseOrleans((ctx, siloBuilder) =>
             {
                 siloBuilder
-                    .ConfigureServices(svc => svc.AddSingletonNamedService(CustomDirectoryGrain.DIRECTORY, (sp, nameof) => this.azureDirectory))
-                    .ConfigureServices(svc => svc.AddSingletonNamedService("OtherDirectory", (sp, nameof) => this.otherDirectory))
-                    .ConfigureServices(svc => svc.AddSingletonNamedService("AgainAnotherDirectory", (sp, nameof) => this.againAnotherDirectory))
+                    .AddGrainDirectory(CustomDirectoryGrain.DIRECTORY, (sp, nameof) => this.azureDirectory)
+                    .AddGrainDirectory("OtherDirectory", (sp, nameof) => this.otherDirectory)
+                    .AddGrainDirectory("AgainAnotherDirectory", (sp, nameof) => this.againAnotherDirectory)
                     .ConfigureLogging(builder => builder.AddProvider(new XunitLoggerProvider(output)))
                     .UseLocalhostClustering();
             });

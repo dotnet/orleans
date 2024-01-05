@@ -10,16 +10,17 @@ namespace Orleans.Streams
     internal sealed class PubSubPublisherState : IEquatable<PubSubPublisherState>
     {
         // IMPORTANT!!!!!
-        // These fields have to be public non-readonly for JSonSerialization to work!
+        // These fields have to be public non-readonly for JsonSerialization to work!
         // Implement ISerializable if changing any of them to readonly
         [JsonProperty]
         [Id(0)]
         public QualifiedStreamId Stream;
+
         [JsonProperty]
         [Id(1)]
         public GrainId Producer; // the field needs to be of a public type, otherwise we will not generate an Orleans serializer for that class.
 
-        // This constructor has to be public for JSonSerialization to work!
+        // This constructor has to be public for JsonSerialization to work!
         // Implement ISerializable if changing it to non-public
         public PubSubPublisherState(QualifiedStreamId streamId, GrainId streamProducer)
         {

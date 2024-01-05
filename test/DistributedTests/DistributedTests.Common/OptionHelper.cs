@@ -1,4 +1,3 @@
-using System;
 using System.CommandLine;
 using System.CommandLine.Parsing;
 

@@ -4,6 +4,7 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Orleans.Core;
+using Orleans.Serialization.Serializers;
 using Orleans.Serialization.TypeSystem;
 using Orleans.Storage;
 
@@ -20,7 +21,7 @@ namespace Orleans.Runtime
         public IPersistentState<TState> Create<TState>(IGrainContext context, IPersistentStateConfiguration cfg)
         {
             var storageProvider = !string.IsNullOrWhiteSpace(cfg.StorageName)
-                ? context.ActivationServices.GetServiceByName<IGrainStorage>(cfg.StorageName)
+                ? context.ActivationServices.GetKeyedService<IGrainStorage>(cfg.StorageName)
                 : context.ActivationServices.GetService<IGrainStorage>();
             if (storageProvider == null)
             {
@@ -55,7 +56,7 @@ namespace Orleans.Runtime
 
     internal sealed class PersistentState<TState> : StateStorageBridge<TState>, IPersistentState<TState>, ILifecycleObserver
     {
-        public PersistentState(string stateName, IGrainContext context, IGrainStorage storageProvider) : base(stateName, context, storageProvider, context.ActivationServices.GetRequiredService<ILoggerFactory>())
+        public PersistentState(string stateName, IGrainContext context, IGrainStorage storageProvider) : base(stateName, context, storageProvider, context.ActivationServices.GetRequiredService<ILoggerFactory>(), context.ActivationServices.GetRequiredService<IActivatorProvider>())
         {
             var lifecycle = context.ObservableLifecycle;
             lifecycle.Subscribe(RuntimeTypeNameFormatter.Format(GetType()), GrainLifecycleStage.SetupState, this);

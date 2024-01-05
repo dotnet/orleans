@@ -1,6 +1,6 @@
 using Google.Protobuf;
+using Orleans.Metadata;
 using Orleans.Serialization.Buffers;
-using Orleans.Serialization.Buffers.Adaptors;
 using Orleans.Serialization.Cloning;
 using Orleans.Serialization.Codecs;
 using Orleans.Serialization.Serializers;
@@ -9,6 +9,7 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
+using System.Reflection;
 
 namespace Orleans.Serialization;
 
@@ -69,6 +70,11 @@ public sealed class ProtobufCodec : IGeneralizedCodec, IGeneralizedCopier, IType
             return true;
         }
 
+        if (CommonCodecTypeFilter.IsAbstractOrFrameworkType(type))
+        {
+            return false;
+        }
+
         foreach (var selector in _serializableTypeSelectors)
         {
             if (selector.IsSupportedType(type))
@@ -83,6 +89,11 @@ public sealed class ProtobufCodec : IGeneralizedCodec, IGeneralizedCopier, IType
     /// <inheritdoc/>
     bool IGeneralizedCopier.IsSupportedType(Type type)
     {
+        if (CommonCodecTypeFilter.IsAbstractOrFrameworkType(type))
+        {
+            return false;
+        }
+
         foreach (var selector in _copyableTypeSelectors)
         {
             if (selector.IsSupportedType(type))

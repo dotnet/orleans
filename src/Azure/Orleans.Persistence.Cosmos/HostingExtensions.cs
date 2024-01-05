@@ -3,6 +3,7 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using Orleans.Storage;
 using Orleans.Providers;
 using Orleans.Persistence.Cosmos;
+using Orleans.Runtime.Hosting;
 
 namespace Orleans.Hosting;
 
@@ -36,7 +37,7 @@ public static class HostingExtensions
         string name,
         Action<CosmosGrainStorageOptions> configureOptions) where TPartitionKeyProvider : class, IPartitionKeyProvider
     {
-        builder.Services.TryAddSingleton<IPartitionKeyProvider, TPartitionKeyProvider>();
+        builder.Services.AddKeyedSingleton<IPartitionKeyProvider, TPartitionKeyProvider>(name);
         builder.Services.AddCosmosGrainStorage(name, configureOptions);
         return builder;
     }
@@ -129,7 +130,7 @@ public static class HostingExtensions
         string name,
         Action<OptionsBuilder<CosmosGrainStorageOptions>>? configureOptions = null) where TPartitionKeyProvider : class, IPartitionKeyProvider
     {
-        builder.Services.TryAddSingleton<IPartitionKeyProvider, TPartitionKeyProvider>();
+        builder.Services.AddKeyedSingleton<IPartitionKeyProvider, TPartitionKeyProvider>(name);
         builder.Services.AddCosmosGrainStorage(name, configureOptions);
         return builder;
     }
@@ -162,7 +163,7 @@ public static class HostingExtensions
     {
         if (customPartitionKeyProviderType != null)
         {
-            builder.Services.TryAddSingleton(typeof(IPartitionKeyProvider), customPartitionKeyProviderType);
+            builder.Services.AddKeyedSingleton(typeof(IPartitionKeyProvider), name, customPartitionKeyProviderType);
         }
 
         builder.Services.AddCosmosGrainStorage(name, configureOptions);
@@ -251,9 +252,7 @@ public static class HostingExtensions
                 sp.GetService<IOptionsMonitor<CosmosGrainStorageOptions>>()!.Get(name),
                 name));
         services.ConfigureNamedOptionForLogging<CosmosGrainStorageOptions>(name);
-        services.TryAddSingleton(sp => sp.GetServiceByName<IGrainStorage>(ProviderConstants.DEFAULT_STORAGE_PROVIDER_NAME));
         services.TryAddSingleton<IPartitionKeyProvider, DefaultPartitionKeyProvider>();
-        return services.AddSingletonNamedService(name, CosmosStorageFactory.Create)
-            .AddSingletonNamedService(name, (s, n) => (ILifecycleParticipant<ISiloLifecycle>)s.GetRequiredServiceByName<IGrainStorage>(n));
+        return services.AddGrainStorage(name, CosmosStorageFactory.Create);
     }
 }

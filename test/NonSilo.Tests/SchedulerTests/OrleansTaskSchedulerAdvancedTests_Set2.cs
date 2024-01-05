@@ -1,7 +1,4 @@
-using System;
 using System.Diagnostics;
-using System.Threading;
-using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Orleans;
 using Orleans.Internal;
@@ -65,7 +62,7 @@ namespace UnitTests.SchedulerTests
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Scheduler")]
-        public void ActivationSched_NewTask_ContinueWith_Wrapped()
+        public async Task ActivationSched_NewTask_ContinueWith_Wrapped()
         {
             var workItemGroup = SchedulingHelper.CreateWorkItemGroupForTesting(context, loggerFactory);
             TaskScheduler scheduler = workItemGroup.TaskScheduler;
@@ -93,8 +90,7 @@ namespace UnitTests.SchedulerTests
                 return t1;
             });
             wrapped.Start(scheduler);
-            bool ok = wrapped.Unwrap().Wait(TimeSpan.FromSeconds(2));
-            Assert.True(ok, "Finished OK");
+            await wrapped.Unwrap().WaitAsync(TimeSpan.FromSeconds(2));
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Scheduler")]
@@ -107,7 +103,7 @@ namespace UnitTests.SchedulerTests
 
             int n = 0;
 
-            Action action = () =>
+            void action()
             {
                 LogContext("WorkItem-task " + Task.CurrentId);
 
@@ -134,7 +130,7 @@ namespace UnitTests.SchedulerTests
                         this.output.WriteLine("Sub-task " + id + " Done");
                     });
                 }
-            };
+            }
 
             Task t = new Task(action);
 
@@ -182,7 +178,7 @@ namespace UnitTests.SchedulerTests
             }
             catch (TimeoutException)
             {
-                Assert.True(false, "Result did not arrive before timeout " + timeoutLimit);
+                Assert.Fail("Result did not arrive before timeout " + timeoutLimit);
             }
 
             Assert.True(n != 0, "Work items did not get executed");
@@ -233,7 +229,7 @@ namespace UnitTests.SchedulerTests
             }
             catch (TimeoutException)
             {
-                Assert.True(false, "Result did not arrive before timeout " + timeoutLimit);
+                Assert.Fail("Result did not arrive before timeout " + timeoutLimit);
             }
 
             pause1.Set();
@@ -290,7 +286,7 @@ namespace UnitTests.SchedulerTests
             }
             catch (TimeoutException)
             {
-                Assert.True(false, "Result did not arrive before timeout " + timeoutLimit);
+                Assert.Fail("Result did not arrive before timeout " + timeoutLimit);
             }
 
             Assert.NotNull(join);
@@ -325,10 +321,12 @@ namespace UnitTests.SchedulerTests
                     this.output.WriteLine("Task-1 Started");
                     Assert.Equal(scheduler, TaskScheduler.Current);
                     int num1 = 1;
+#pragma warning disable xUnit1031 // Do not use blocking task operations in test method
                     while (!pause1.Task.Result) // Infinite busy loop
                     {
                         num1 = Random.Shared.Next();
                     }
+#pragma warning restore xUnit1031 // Do not use blocking task operations in test method
                     this.output.WriteLine("Task-1 Done");
                     return num1;
                 });
@@ -337,10 +335,12 @@ namespace UnitTests.SchedulerTests
                     this.output.WriteLine("Task-2 Started");
                     Assert.Equal(scheduler, TaskScheduler.Current);
                     int num2 = 2;
+#pragma warning disable xUnit1031 // Do not use blocking task operations in test method
                     while (!pause2.Task.Result) // Infinite busy loop
                     {
                         num2 = Random.Shared.Next();
                     }
+#pragma warning restore xUnit1031 // Do not use blocking task operations in test method
                     this.output.WriteLine("Task-2 Done");
                     return num2;
                 });
@@ -358,7 +358,7 @@ namespace UnitTests.SchedulerTests
             }
             catch (TimeoutException)
             {
-                Assert.True(false, "Result did not arrive before timeout " + timeoutLimit);
+                Assert.Fail("Result did not arrive before timeout " + timeoutLimit);
             }
 
             Assert.NotNull(join); // Joined promise assigned
@@ -421,7 +421,7 @@ namespace UnitTests.SchedulerTests
             }
             catch (TimeoutException)
             {
-                Assert.True(false, "Result did not arrive before timeout " + timeoutLimit);
+                Assert.Fail("Result did not arrive before timeout " + timeoutLimit);
             }
 
             pause1.Set();
@@ -487,7 +487,7 @@ namespace UnitTests.SchedulerTests
             }
             catch (TimeoutException)
             {
-                Assert.True(false, "Result did not arrive before timeout " + timeoutLimit);
+                Assert.Fail("Result did not arrive before timeout " + timeoutLimit);
             }
 
             pause1.Set();
@@ -625,10 +625,10 @@ namespace UnitTests.SchedulerTests
                 }
                 catch (TimeoutException)
                 {
-                    Assert.True(false, "Result did not arrive before timeout " + waitCheckTime);
+                    Assert.Fail("Result did not arrive before timeout " + waitCheckTime);
                 }
 
-                bool ok = resultHandles[i].Task.Result;
+                bool ok = await resultHandles[i].Task;
                 
                 try
                 {
@@ -637,7 +637,7 @@ namespace UnitTests.SchedulerTests
                 }
                 catch (TimeoutException)
                 {
-                    Assert.True(false, $"Task chain end {i} should complete very shortly after after its resultHandle");
+                    Assert.Fail($"Task chain end {i} should complete very shortly after after its resultHandle");
                 }
 
                 Assert.True(taskChainEnds[i].IsCompleted, "Task chain " + i + " should be completed");
@@ -705,7 +705,7 @@ namespace UnitTests.SchedulerTests
                 
                 Task t1 = grain.Test1();
 
-                Action wrappedDoneAction = () => { wrappedDone.SetResult(true); };
+                void wrappedDoneAction() { wrappedDone.SetResult(true); }
 
                 if (bounceToThreadPool)
                 {
@@ -731,7 +731,7 @@ namespace UnitTests.SchedulerTests
             }
             catch (TimeoutException)
             {
-                Assert.True(false, "Result did not arrive before timeout " + timeoutLimit);
+                Assert.Fail("Result did not arrive before timeout " + timeoutLimit);
             }
             bool done = wrapperDone.Task.Result;
 
@@ -747,7 +747,7 @@ namespace UnitTests.SchedulerTests
             }
             catch (TimeoutException)
             {
-                Assert.True(false, "Result did not arrive before timeout " + timeoutLimit);
+                Assert.Fail("Result did not arrive before timeout " + timeoutLimit);
             }
             done = wrappedDone.Task.Result;
             Assert.True(done, "Wrapped Task should be finished");

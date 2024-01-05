@@ -26,6 +26,9 @@ namespace Orleans.Serialization
         /// <param name="info">The serialization information.</param>
         /// <param name="context">The context.</param>
         [SecurityCritical]
+#if NET8_0_OR_GREATER
+        [Obsolete]
+#endif
         protected SerializationConstructorNotFoundException(SerializationInfo info, StreamingContext context) : base(info, context)
         {
         }

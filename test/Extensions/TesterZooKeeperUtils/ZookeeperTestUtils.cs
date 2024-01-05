@@ -1,6 +1,4 @@
 using org.apache.zookeeper;
-using System;
-using System.Threading.Tasks;
 using TestExtensions;
 using Xunit;
 

@@ -1,9 +1,4 @@
-using System;
-using System.Linq;
-using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
-using Orleans;
-using Orleans.Hosting;
 using Orleans.Providers.Streams.Common;
 using Orleans.Runtime;
 using Orleans.Streams;
@@ -71,7 +66,7 @@ namespace UnitTests.StreamingTests
             _fixture.Logger.LogInformation("************************ ControllableAdapterEchoTest *********************************");
             var mgmt = _fixture.GrainFactory.GetGrain<IManagementGrain>(0);
 
-            object[] results = await mgmt.SendControlCommandToProvider(_fixture.StreamProviderTypeName, Fixture.StreamProviderName, (int)command, echoArg);
+            object[] results = await mgmt.SendControlCommandToProvider<PersistentStreamProvider>(Fixture.StreamProviderName, (int)command, echoArg);
             Assert.Equal(2, results.Length);
             Tuple<ControllableTestStreamProviderCommands, object>[] echos = results.Cast<Tuple<ControllableTestStreamProviderCommands, object>>().ToArray();
             foreach (var echo in echos)

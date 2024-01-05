@@ -7,7 +7,6 @@ using Microsoft.Extensions.Logging;
 using Orleans.AzureUtils;
 using Orleans.AzureUtils.Utilities;
 using Orleans.Configuration;
-using Orleans.Runtime;
 using Orleans.Streams;
 
 namespace Orleans.Providers.Streams.AzureQueue

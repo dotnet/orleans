@@ -13,9 +13,9 @@ public static class UnixSocketConnectionExtensions
     {
         siloBuilder.ConfigureServices(services =>
         {
-            services.AddSingletonKeyedService<object, IConnectionFactory>(SiloConnectionFactory.ServicesKey, CreateUnixSocketConnectionFactory());
-            services.AddSingletonKeyedService<object, IConnectionListenerFactory>(SiloConnectionListener.ServicesKey, CreateUnixSocketConnectionListenerFactory());
-            services.AddSingletonKeyedService<object, IConnectionListenerFactory>(GatewayConnectionListener.ServicesKey, CreateUnixSocketConnectionListenerFactory());
+            services.AddKeyedSingleton<object, IConnectionFactory>(SiloConnectionFactory.ServicesKey, CreateUnixSocketConnectionFactory());
+            services.AddKeyedSingleton<object, IConnectionListenerFactory>(SiloConnectionListener.ServicesKey, CreateUnixSocketConnectionListenerFactory());
+            services.AddKeyedSingleton<object, IConnectionListenerFactory>(GatewayConnectionListener.ServicesKey, CreateUnixSocketConnectionListenerFactory());
         });
 
         return siloBuilder;
@@ -25,7 +25,7 @@ public static class UnixSocketConnectionExtensions
     {
         clientBuilder.ConfigureServices(services =>
         {
-            services.AddSingletonKeyedService<object, IConnectionFactory>(ClientOutboundConnectionFactory.ServicesKey, CreateUnixSocketConnectionFactory());
+            services.AddKeyedSingleton<object, IConnectionFactory>(ClientOutboundConnectionFactory.ServicesKey, CreateUnixSocketConnectionFactory());
         });
 
         return clientBuilder;

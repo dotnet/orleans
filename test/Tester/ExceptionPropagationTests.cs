@@ -1,6 +1,3 @@
-using Orleans;
-using System;
-using System.Threading.Tasks;
 using TestExtensions;
 
 using UnitTests.GrainInterfaces;
@@ -60,13 +57,25 @@ namespace UnitTests.General
         }
 
         [Fact, TestCategory("BVT")]
-        public void ExceptionContainsOriginalStackTrace()
+        public async Task ExceptionContainsOriginalStackTrace()
         {
             IExceptionGrain grain = this.fixture.GrainFactory.GetGrain<IExceptionGrain>(GetRandomGrainId());
 
             // Explicitly using .Wait() instead of await the task to avoid any modification of the inner exception
-            var aggEx = Assert.Throws<AggregateException>(
-                () => grain.ThrowsInvalidOperationException().Wait());
+            var originalException = await Task.Run(() => {
+                try
+                {
+#pragma warning disable xUnit1031 // Do not use blocking task operations in test method
+                    grain.ThrowsInvalidOperationException().Wait();
+#pragma warning restore xUnit1031 // Do not use blocking task operations in test method
+                    return null;
+                }
+                catch (Exception exception)
+                {
+                    return exception;
+                }
+            });
+            var aggEx = Assert.IsType<AggregateException>(originalException);
 
             var exception = aggEx.InnerException;
             output.WriteLine(exception.ToString());
@@ -83,7 +92,7 @@ namespace UnitTests.General
             {
                 // Use await to force the exception to be rethrown and validate that the remote stack trace is still present
                 await grain.ThrowsInvalidOperationException();
-                Assert.True(false, "should have thrown");
+                Assert.Fail("should have thrown");
             }
             catch (InvalidOperationException exception)
             {
@@ -166,29 +175,37 @@ namespace UnitTests.General
         }
 
         [Fact(Skip = "Implementation of issue #1378 is still pending"), TestCategory("BVT")]
-        public void ExceptionPropagationForwardsEntireAggregateException()
+        public async Task ExceptionPropagationForwardsEntireAggregateException()
         {
             IExceptionGrain grain = this.fixture.GrainFactory.GetGrain<IExceptionGrain>(GetRandomGrainId());
             var grainCall = grain.ThrowsMultipleExceptionsAggregatedInFaultedTask();
 
-            try
+            var originalException = await Task.Run(() =>
             {
-                // use Wait() so that we get the entire AggregateException ('await' would just catch the first inner exception)
-                // Do not use Assert.Throws to avoid any tampering of the AggregateException itself from the test framework
-                grainCall.Wait();
-                Assert.True(false, "Expected AggregateException");
-            }
-            catch (AggregateException exception)
-            {
-                output.WriteLine(exception.ToString());
+                try
+                {
+#pragma warning disable xUnit1031 // Do not use blocking task operations in test method
+                    // use Wait() so that we get the entire AggregateException ('await' would just catch the first inner exception)
+                    // Do not use Assert.Throws to avoid any tampering of the AggregateException itself from the test framework
+                    grainCall.Wait();
+#pragma warning restore xUnit1031 // Do not use blocking task operations in test method
+                    return null;
+                }
+                catch (Exception exception)
+                {
+                    return exception;
+                }
+            });
+            var exception = Assert.IsType<AggregateException>(originalException);
 
-                // make sure that all exceptions in the task are present, and not just the first one.
-                Assert.Equal(2, exception.InnerExceptions.Count);
-                var firstEx = Assert.IsAssignableFrom<InvalidOperationException>(exception.InnerExceptions[0]);
-                Assert.Equal("Test exception 1", firstEx.Message);
-                var secondEx = Assert.IsAssignableFrom<InvalidOperationException>(exception.InnerExceptions[1]);
-                Assert.Equal("Test exception 2", secondEx.Message);
-            }
+            output.WriteLine(exception.ToString());
+
+            // make sure that all exceptions in the task are present, and not just the first one.
+            Assert.Equal(2, exception.InnerExceptions.Count);
+            var firstEx = Assert.IsAssignableFrom<InvalidOperationException>(exception.InnerExceptions[0]);
+            Assert.Equal("Test exception 1", firstEx.Message);
+            var secondEx = Assert.IsAssignableFrom<InvalidOperationException>(exception.InnerExceptions[1]);
+            Assert.Equal("Test exception 2", secondEx.Message);
         }
 
         [Fact, TestCategory("BVT")]

@@ -1,4 +1,3 @@
-using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
@@ -6,13 +5,9 @@ using Orleans.Runtime.MembershipService;
 using Xunit;
 using NSubstitute;
 using Orleans.Runtime;
-using System;
 using Orleans;
 using Xunit.Abstractions;
-using System.Linq;
 using TestExtensions;
-using System.Collections.Generic;
-using System.Threading;
 using System.Collections.Concurrent;
 using NonSilo.Tests.Utilities;
 
@@ -234,7 +229,7 @@ namespace NonSilo.Tests.Membership
 
             Assert.NotNull(manager.MembershipTableUpdates);
             var membershipUpdates = manager.MembershipTableUpdates.GetAsyncEnumerator();
-            Assert.True(membershipUpdates.MoveNextAsync().Result);
+            Assert.True(await membershipUpdates.MoveNextAsync());
             var firstSnapshot = membershipUpdates.Current;
             Assert.Equal(firstSnapshot.Version, manager.MembershipTableSnapshot.Version);
             Assert.Empty(membershipTable.Calls);
@@ -254,7 +249,7 @@ namespace NonSilo.Tests.Membership
             
             // During initialization, a first read from the table will be performed, transitioning
             // membership to a valid version.Assert.True(membershipUpdates.MoveNextAsync().Result);
-            Assert.True(membershipUpdates.MoveNextAsync().Result);
+            Assert.True(await membershipUpdates.MoveNextAsync());
             var update1 = membershipUpdates.Current;
 
             // Transition to joining.
@@ -263,8 +258,8 @@ namespace NonSilo.Tests.Membership
             Assert.Equal(SiloStatus.Joining, manager.CurrentStatus);
             Assert.Equal(SiloStatus.Joining, snapshot.Entries[localSilo].Status);
 
-            Assert.True(membershipUpdates.MoveNextAsync().Result);
-            Assert.True(membershipUpdates.MoveNextAsync().Result);
+            Assert.True(await membershipUpdates.MoveNextAsync());
+            Assert.True(await membershipUpdates.MoveNextAsync());
             Assert.Equal(membershipUpdates.Current.Version, manager.MembershipTableSnapshot.Version);
 
             // The predecessor should have been marked dead during startup.

@@ -3,9 +3,9 @@ using System.Net;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Connections;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
-using Orleans.Hosting;
 
 namespace Orleans.Runtime.Messaging
 {
@@ -32,7 +32,7 @@ namespace Orleans.Runtime.Messaging
             ConnectionCommon connectionShared,
             ProbeRequestMonitor probeRequestMonitor,
             ConnectionPreambleHelper connectionPreambleHelper)
-            : base(serviceProvider.GetRequiredServiceByKey<object, IConnectionListenerFactory>(ServicesKey), connectionOptions, connectionManager, connectionShared)
+            : base(serviceProvider.GetRequiredKeyedService<IConnectionListenerFactory>(ServicesKey), connectionOptions, connectionManager, connectionShared)
         {
             this.siloConnectionOptions = siloConnectionOptions.Value;
             this.messageCenter = messageCenter;
@@ -49,7 +49,7 @@ namespace Orleans.Runtime.Messaging
         protected override Connection CreateConnection(ConnectionContext context)
         {
             return new SiloConnection(
-                default(SiloAddress),
+                default,
                 context,
                 this.ConnectionDelegate,
                 this.messageCenter,

@@ -34,6 +34,7 @@ namespace Orleans.Runtime.MembershipService
         /// </summary>
         /// <param name="info">The serialization info.</param>
         /// <param name="context">The context.</param>
+        [Obsolete]
         private OrleansClusterConnectivityCheckFailedException(SerializationInfo info, StreamingContext context)
             : base(info, context)
         {

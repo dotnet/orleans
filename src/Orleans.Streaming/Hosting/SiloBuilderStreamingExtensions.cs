@@ -1,13 +1,5 @@
 using System;
-using System.Linq;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Options;
-using Orleans.Configuration;
-using Orleans.Configuration.Internal;
-using Orleans.Runtime;
-using Orleans.Runtime.Providers;
 using Orleans.Streams;
-using Orleans.Streams.Core;
 using Orleans.Streams.Filtering;
 
 namespace Orleans.Hosting

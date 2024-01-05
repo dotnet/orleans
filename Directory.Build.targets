@@ -4,38 +4,8 @@
     <InformationalVersion>$(Version). Commit Hash: $(GitHeadSha)</InformationalVersion>
   </PropertyGroup>
 
-  <!-- Begin Orleans: Without these lines the project won't build properly -->
-  <!-- Set path to code generator -->
-  <PropertyGroup>
-    <OrleansGenerateCodeDependsOn Condition=" '$(OrleansBuildTimeCodeGen)' == 'msbuild' ">$(OrleansGenerateCodeDependsOn)</OrleansGenerateCodeDependsOn>
-  </PropertyGroup>
-
-  <PropertyGroup Condition=" '$(OrleansBuildTimeCodeGen)' == 'msbuild' ">
-    <DotNetHost Condition="'$(DotNetHost)' == ''">dotnet</DotNetHost>
-    <Asm>Orleans.CodeGenerator.MSBuild.Bootstrap</Asm>
-    <OrleansCodeGenCoreAssembly>$(MSBuildThisFileDirectory)src/BootstrapBuild/$(Asm)/bin/$(Configuration)/publish/net7.0/$(Asm).dll</OrleansCodeGenCoreAssembly>
-    <OrleansCodeGenTasksAssembly>$(MSBuildThisFileDirectory)src/BootstrapBuild/$(Asm)/bin/$(Configuration)/publish/net7.0/Orleans.CodeGenerator.MSBuild.Tasks.dll</OrleansCodeGenTasksAssembly>
-    <OrleansBootstrapBuildProject>$(MSBuildThisFileDirectory)src/BootstrapBuild/Orleans.CodeGenerator.MSBuild.Bootstrap/Orleans.CodeGenerator.MSBuild.Bootstrap.csproj</OrleansBootstrapBuildProject>
-  </PropertyGroup>
-
-  <ItemGroup>
-    <ProjectReference Include="$(OrleansBootstrapBuildProject)" Condition=" '$(OrleansBuildTimeCodeGen)' == 'msbuild' ">
-      <Project>{CB36EF45-6E90-443F-AEE4-394677068147}</Project>
-      <Name>Orleans.CodeGenerator.MSBuild.Bootstrap</Name>
-      <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
-      <AssetTargetFallback>net7.0</AssetTargetFallback>
-      <Visible>false</Visible>
-      <!-- Workaround. See: https://github.com/dotnet/sdk/issues/939#issuecomment-284641613 -->
-      <!-- This causes the 'Dependency' node in VS to show a warning icon. See https://github.com/dotnet/project-system/issues/2928 -->
-      <SkipGetTargetFrameworkProperties>true</SkipGetTargetFrameworkProperties>
-      <UndefineProperties>TargetFramework;RuntimeIdentifier;TargetFrameworks;RuntimeIdentifiers</UndefineProperties>
-      <!-- /Workaround -->
-    </ProjectReference>
-  </ItemGroup>
-
   <Import Condition=" '$(OrleansBuildTimeCodeGen)' == 'true' " Project="$(MSBuildThisFileDirectory)src/Orleans.CodeGenerator/build/Microsoft.Orleans.CodeGenerator.props" />
-  <Import Condition=" '$(OrleansBuildTimeCodeGen)' == 'msbuild' " Project="$(MSBuildThisFileDirectory)src/Orleans.CodeGenerator.MSBuild/build/Microsoft.Orleans.CodeGenerator.MSBuild.targets" />
-  <Import Condition=" '$(OrleansBuildTimeCodeGen)' == 'true' or '$(OrleansBuildTimeCodeGen)' == 'msbuild' " Project="$(MSBuildThisFileDirectory)src/Orleans.Sdk/build/Microsoft.Orleans.Sdk.targets" />
+  <Import Condition=" '$(OrleansBuildTimeCodeGen)' == 'true' " Project="$(MSBuildThisFileDirectory)src/Orleans.Sdk/build/Microsoft.Orleans.Sdk.targets" />
   <ItemGroup>
     <!-- Enable code generator -->
     <ProjectReference
@@ -50,7 +20,7 @@
       UndefineProperties="TargetFramework"
       SkipGetTargetFrameworkProperties="true"
       OutputItemType="Analyzer"
-      Condition=" '$(OrleansBuildTimeCodeGen)' == 'true' or '$(OrleansBuildTimeCodeGen)' == 'msbuild' "/>
+      Condition=" '$(OrleansBuildTimeCodeGen)' == 'true' "/>
   </ItemGroup>
 
 </Project>

@@ -5,6 +5,7 @@ using System.Linq;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.GrainDirectory;
 using Orleans.Metadata;
+using Orleans.Runtime.Hosting;
 
 namespace Orleans.Runtime.GrainDirectory
 {
@@ -25,11 +26,10 @@ namespace Orleans.Runtime.GrainDirectory
             this.resolvers = resolvers.ToArray();
 
             // Load all registered directories
-            var services = serviceProvider.GetService<IKeyedServiceCollection<string, IGrainDirectory>>()?.GetServices(serviceProvider)
-                ?? Enumerable.Empty<IKeyedService<string, IGrainDirectory>>();
+            var services = serviceProvider.GetGrainDirectories();
             foreach (var svc in services)
             {
-                this.directoryPerName.Add(svc.Key, svc.GetService(serviceProvider));
+                this.directoryPerName.Add(svc.Name, svc.Service);
             }
 
             this.directoryPerName.TryGetValue(GrainDirectoryAttribute.DEFAULT_GRAIN_DIRECTORY, out var defaultDirectory);
@@ -39,13 +39,11 @@ namespace Orleans.Runtime.GrainDirectory
 
         public IReadOnlyCollection<IGrainDirectory> Directories => this.directoryPerName.Values;
 
-        public static bool HasAnyRegisteredGrainDirectory(IServiceCollection services) => services.Any(svc => svc.ServiceType == typeof(IKeyedService<string, IGrainDirectory>));
-
         public IGrainDirectory DefaultGrainDirectory { get; }
 
         public IGrainDirectory Resolve(GrainType grainType) => this.directoryPerType.GetOrAdd(grainType, this.getGrainDirectoryInternal);
 
-        public bool HasNonDefaultDirectory(GrainType grainType) => !ReferenceEquals(Resolve(grainType), this.DefaultGrainDirectory);
+        public bool IsUsingDhtDirectory(GrainType grainType) => Resolve(grainType) == null;
 
         private IGrainDirectory GetGrainDirectoryPerType(GrainType grainType)
         {

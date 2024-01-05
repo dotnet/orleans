@@ -1,8 +1,3 @@
-using System;
-using System.Collections.Generic;
-using System.Threading;
-using System.Threading.Tasks;
-using Orleans;
 using Orleans.Runtime;
 using Orleans.TestingHost;
 using TestExtensions;
@@ -10,9 +5,7 @@ using UnitTests.GrainInterfaces;
 using UnitTests.TestHelper;
 using Xunit;
 using Xunit.Abstractions;
-using System.Linq;
 using Orleans.Internal;
-using Orleans.Hosting;
 using Orleans.Configuration;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -266,7 +259,7 @@ namespace UnitTests.ActivationsLifeCycleTests
             }
 
             Assert.True(testCluster.GetActiveSilos().Count() > 1, "This logic requires at least 1 non-primary active silo");
-            Assert.True(false, "Could not find a grain that activates on a non-primary silo, and has the partition be also managed by a non-primary silo");
+            Assert.Fail("Could not find a grain that activates on a non-primary silo, and has the partition be also managed by a non-primary silo");
             return null;
         }
     }

@@ -1,6 +1,5 @@
 using System;
 using System.Runtime.Serialization;
-using Orleans.Internal;
 using Orleans.Storage;
 
 namespace Orleans.Transactions.TestKit
@@ -44,6 +43,7 @@ namespace Orleans.Transactions.TestKit
         {
             public RandomlyInjectedStorageException() : base("injected fault") { }
 
+            [Obsolete]
             protected RandomlyInjectedStorageException(SerializationInfo info, StreamingContext context)
                 : base(info, context)
             {
@@ -56,6 +56,7 @@ namespace Orleans.Transactions.TestKit
         {
             public RandomlyInjectedInconsistentStateException() : base("injected fault") { }
 
+            [Obsolete]
             protected RandomlyInjectedInconsistentStateException(SerializationInfo info, StreamingContext context)
                 : base(info, context)
             {

@@ -1,6 +1,4 @@
-using System;
 using System.Diagnostics;
-using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Runtime;
 using TestExtensions;
@@ -31,7 +29,7 @@ namespace UnitTests
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Timeout")]
-        public void Timeout_LongMethod()
+        public async Task Timeout_LongMethod()
         {
             bool finished = false;
             var grainName = typeof (ErrorGrain).FullName;
@@ -47,8 +45,9 @@ namespace UnitTests
             stopwatch.Start();
             try
             {
-                finished = promise.Wait(timeout.Multiply(3));
-                Assert.True(false, "Should have thrown");
+                await promise.WaitAsync(timeout.Multiply(3));
+                finished = true;
+                Assert.Fail("Should have thrown");
             }
             catch (Exception exc)
             {
@@ -56,7 +55,7 @@ namespace UnitTests
                 Exception baseExc = exc.GetBaseException();
                 if (!(baseExc is TimeoutException))
                 {
-                    Assert.True(false, "Should not have got here " + exc);
+                    Assert.Fail("Should not have got here " + exc);
                 }
             }
             output.WriteLine("Waited for " + stopwatch.Elapsed);
@@ -69,8 +68,8 @@ namespace UnitTests
             try
             {
                 stopwatch = new Stopwatch();
-                promise.Wait();
-                Assert.True(false, "Should have thrown");
+                await promise;
+                Assert.Fail("Should have thrown");
             }
             catch (Exception exc)
             {
@@ -78,7 +77,7 @@ namespace UnitTests
                 Exception baseExc = exc.GetBaseException();
                 if (!(baseExc is TimeoutException))
                 {
-                    Assert.True(false, "Should not have got here " + exc);
+                    Assert.Fail("Should not have got here " + exc);
                 }
             }
             Assert.True(stopwatch.Elapsed <= timeout.Multiply(0.1), "Waited longer than " + timeout.Multiply(0.1) + ". Waited " + stopwatch.Elapsed);

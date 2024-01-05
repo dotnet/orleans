@@ -1,11 +1,8 @@
-using System;
-using System.Threading.Tasks;
-using Orleans;
 using UnitTests.GrainInterfaces;
 
 namespace UnitTests.Grains
 {
-    class ConcreteGrainWithGenericInterfaceOfIntFloat : Grain, IGenericGrain<int, float>
+    internal class ConcreteGrainWithGenericInterfaceOfIntFloat : Grain, IGenericGrain<int, float>
     {
         protected int T { get; set; }
 
@@ -21,7 +18,7 @@ namespace UnitTests.Grains
         }
     }
 
-    class ConcreteGrainWithGenericInterfaceOfFloatString : Grain, IGenericGrain<float, string>
+    internal class ConcreteGrainWithGenericInterfaceOfFloatString : Grain, IGenericGrain<float, string>
     {
         protected float T { get; set; }
 
@@ -37,7 +34,7 @@ namespace UnitTests.Grains
         }
     }
 
-    class ConcreteGrainWith2GenericInterfaces : Grain, IGenericGrain<int, string>, ISimpleGenericGrain<int>
+    internal class ConcreteGrainWith2GenericInterfaces : Grain, IGenericGrain<int, string>, ISimpleGenericGrain<int>
     {
         // IGenericGrain<int, string> methods:
 

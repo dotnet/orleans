@@ -1,11 +1,5 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading;
-using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
-using Orleans;
 using Orleans.Runtime;
 using Orleans.Runtime.GrainDirectory;
 using UnitTests.GrainInterfaces;
@@ -158,6 +152,7 @@ namespace UnitTests.Grains
         }
     }
 
+    [GrainType("guid-test-grain")]
     internal class GuidTestGrain : Grain, IGuidTestGrain
     {
         private readonly string _id = Guid.NewGuid().ToString();
@@ -206,6 +201,8 @@ namespace UnitTests.Grains
         {
             return Task.FromResult(_id);
         }
+
+        public Task<SiloAddress> GetSiloAddress() => Task.FromResult(ServiceProvider.GetRequiredService<ILocalSiloDetails>().SiloAddress);
     }
 
     internal class OneWayGrain : Grain, IOneWayGrain, ISimpleGrainObserver

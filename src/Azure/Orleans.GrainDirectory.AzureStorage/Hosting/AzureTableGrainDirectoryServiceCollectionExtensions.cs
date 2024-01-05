@@ -1,11 +1,11 @@
 using System;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
-using Orleans;
 using Orleans.Configuration;
 using Orleans.GrainDirectory;
 using Orleans.GrainDirectory.AzureStorage;
 using Orleans.Runtime;
+using Orleans.Runtime.Hosting;
 
 namespace Orleans.Hosting
 {
@@ -23,8 +23,7 @@ namespace Orleans.Hosting
             services
                 .AddTransient<IConfigurationValidator>(sp => new AzureTableGrainDirectoryOptionsValidator(sp.GetRequiredService<IOptionsMonitor<AzureTableGrainDirectoryOptions>>().Get(name), name))
                 .ConfigureNamedOptionForLogging<AzureTableGrainDirectoryOptions>(name)
-                .AddSingletonNamedService<IGrainDirectory>(name, (sp, name) => ActivatorUtilities.CreateInstance<AzureTableGrainDirectory>(sp, sp.GetOptionsByName<AzureTableGrainDirectoryOptions>(name)))
-                .AddSingletonNamedService<ILifecycleParticipant<ISiloLifecycle>>(name, (s, n) => (ILifecycleParticipant<ISiloLifecycle>)s.GetRequiredServiceByName<IGrainDirectory>(n));
+                .AddGrainDirectory(name, (sp, name) => ActivatorUtilities.CreateInstance<AzureTableGrainDirectory>(sp, sp.GetOptionsByName<AzureTableGrainDirectoryOptions>(name)));
 
             return services;
         }

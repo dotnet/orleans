@@ -1,4 +1,3 @@
-using System;
 using System.Collections.Generic;
 using System.Linq;
 using Microsoft.CodeAnalysis;
@@ -11,21 +10,28 @@ using static Orleans.CodeGenerator.SerializerGenerator;
 
 namespace Orleans.CodeGenerator
 {
-    internal static class CopierGenerator
+    internal class CopierGenerator
     {
         private const string BaseTypeCopierFieldName = "_baseTypeCopier";
         private const string ActivatorFieldName = "_activator";
         private const string DeepCopyMethodName = "DeepCopy";
+        private readonly CodeGenerator _codeGenerator;
 
-        public static ClassDeclarationSyntax GenerateCopier(
-            LibraryTypes libraryTypes,
+        public CopierGenerator(CodeGenerator codeGenerator)
+        {
+            _codeGenerator = codeGenerator;
+        }
+
+        private LibraryTypes LibraryTypes => _codeGenerator.LibraryTypes;
+
+        public ClassDeclarationSyntax GenerateCopier(
             ISerializableTypeDescription type,
             Dictionary<ISerializableTypeDescription, TypeSyntax> defaultCopiers)
         {
             var isShallowCopyable = type.IsShallowCopyable;
             if (isShallowCopyable && !type.IsGenericType)
             {
-                defaultCopiers.Add(type, libraryTypes.ShallowCopier.ToTypeSyntax(type.TypeSyntax));
+                defaultCopiers.Add(type, LibraryTypes.ShallowCopier.ToTypeSyntax(type.TypeSyntax));
                 return null;
             }
 
@@ -40,7 +46,7 @@ namespace Orleans.CodeGenerator
                 }
                 else if (member is IFieldDescription or IPropertyDescription)
                 {
-                    members.Add(new SerializableMember(libraryTypes, type, member, members.Count));
+                    members.Add(new SerializableMember(_codeGenerator, member, members.Count));
                 }
                 else if (member is MethodParameterFieldDescription methodParameter)
                 {
@@ -56,8 +62,8 @@ namespace Orleans.CodeGenerator
 
             var isExceptionType = type.IsExceptionType && type.SerializationHooks.Count == 0;
 
-            var baseType = isExceptionType ? QualifiedName(IdentifierName("OrleansGeneratedCodeHelper"), GenericName(Identifier("ExceptionCopier"), TypeArgumentList(SeparatedList(new[] { type.TypeSyntax, type.BaseType.ToTypeSyntax() }))))
-                : (isShallowCopyable ? libraryTypes.ShallowCopier : libraryTypes.DeepCopier_1).ToTypeSyntax(type.TypeSyntax);
+            var baseType = isExceptionType ? QualifiedName(AliasQualifiedName("global", IdentifierName("Orleans.Serialization.GeneratedCodeHelpers.OrleansGeneratedCodeHelper")), GenericName(Identifier("ExceptionCopier"), TypeArgumentList(SeparatedList(new[] { type.TypeSyntax, type.BaseType.ToTypeSyntax() }))))
+                : (isShallowCopyable ? LibraryTypes.ShallowCopier : LibraryTypes.DeepCopier_1).ToTypeSyntax(type.TypeSyntax);
 
             var classDeclaration = ClassDeclaration(simpleClassName)
                 .AddBaseListTypes(SimpleBaseType(baseType))
@@ -66,15 +72,15 @@ namespace Orleans.CodeGenerator
 
             if (!isShallowCopyable)
             {
-                var fieldDescriptions = GetFieldDescriptions(type, members, libraryTypes, isExceptionType, out var onlyDeepFields);
+                var fieldDescriptions = GetFieldDescriptions(type, members, isExceptionType, out var onlyDeepFields);
                 var fieldDeclarations = GetFieldDeclarations(fieldDescriptions);
-                var ctor = GenerateConstructor(libraryTypes, simpleClassName, fieldDescriptions, isExceptionType);
+                var ctor = GenerateConstructor(simpleClassName, fieldDescriptions, isExceptionType);
 
                 classDeclaration = classDeclaration.AddMembers(fieldDeclarations);
 
                 if (!isExceptionType)
                 {
-                    var copyMethod = GenerateMemberwiseDeepCopyMethod(type, fieldDescriptions, members, libraryTypes, onlyDeepFields);
+                    var copyMethod = GenerateMemberwiseDeepCopyMethod(type, fieldDescriptions, members, onlyDeepFields);
                     classDeclaration = classDeclaration.AddMembers(copyMethod);
                 }
 
@@ -83,11 +89,11 @@ namespace Orleans.CodeGenerator
 
                 if (isExceptionType || !type.IsSealedType)
                 {
-                    if (GenerateBaseCopierDeepCopyMethod(type, fieldDescriptions, members, libraryTypes, isExceptionType) is { } baseCopier)
+                    if (GenerateBaseCopierDeepCopyMethod(type, fieldDescriptions, members, isExceptionType) is { } baseCopier)
                         classDeclaration = classDeclaration.AddMembers(baseCopier);
 
                     if (!isExceptionType)
-                        classDeclaration = classDeclaration.AddBaseListTypes(SimpleBaseType(libraryTypes.BaseCopier_1.ToTypeSyntax(type.TypeSyntax)));
+                        classDeclaration = classDeclaration.AddBaseListTypes(SimpleBaseType(LibraryTypes.BaseCopier_1.ToTypeSyntax(type.TypeSyntax)));
                 }
             }
 
@@ -103,13 +109,7 @@ namespace Orleans.CodeGenerator
 
         public static string GetSimpleClassName(string name) => $"Copier_{name}";
 
-        public static string GetGeneratedNamespaceName(ITypeSymbol type) => type.GetNamespaceAndNesting() switch
-        {
-            { Length: > 0 } ns => $"{CodeGenerator.CodeGeneratorName}.{ns}",
-            _ => CodeGenerator.CodeGeneratorName
-        };
-
-        private static MemberDeclarationSyntax[] GetFieldDeclarations(List<GeneratedFieldDescription> fieldDescriptions)
+        private MemberDeclarationSyntax[] GetFieldDeclarations(List<GeneratedFieldDescription> fieldDescriptions)
         {
             return fieldDescriptions.Select(GetFieldDeclaration).ToArray();
 
@@ -129,7 +129,7 @@ namespace Orleans.CodeGenerator
             }
         }
 
-        private static ConstructorDeclarationSyntax GenerateConstructor(LibraryTypes libraryTypes, string simpleClassName, List<GeneratedFieldDescription> fieldDescriptions, bool isExceptionType)
+        private ConstructorDeclarationSyntax GenerateConstructor(string simpleClassName, List<GeneratedFieldDescription> fieldDescriptions, bool isExceptionType)
         {
             var codecProviderAdded = false;
             var parameters = new List<ParameterSyntax>();
@@ -137,7 +137,7 @@ namespace Orleans.CodeGenerator
 
             if (isExceptionType)
             {
-                parameters.Add(Parameter(Identifier("codecProvider")).WithType(libraryTypes.ICodecProvider.ToTypeSyntax()));
+                parameters.Add(Parameter(Identifier("codecProvider")).WithType(LibraryTypes.ICodecProvider.ToTypeSyntax()));
                 codecProviderAdded = true;
             }
 
@@ -156,7 +156,7 @@ namespace Orleans.CodeGenerator
                     case CopierFieldDescription or BaseCopierFieldDescription when !field.IsInjected:
                         if (!codecProviderAdded)
                         {
-                            parameters.Add(Parameter(Identifier("codecProvider")).WithType(libraryTypes.ICodecProvider.ToTypeSyntax()));
+                            parameters.Add(Parameter(Identifier("codecProvider")).WithType(LibraryTypes.ICodecProvider.ToTypeSyntax()));
                             codecProviderAdded = true;
                         }
 
@@ -183,10 +183,9 @@ namespace Orleans.CodeGenerator
             }
         }
 
-        private static List<GeneratedFieldDescription> GetFieldDescriptions(
+        private List<GeneratedFieldDescription> GetFieldDescriptions(
             ISerializableTypeDescription serializableTypeDescription,
             List<ISerializableMember> members,
-            LibraryTypes libraryTypes,
             bool isExceptionType,
             out bool onlyDeepFields)
         {
@@ -197,7 +196,7 @@ namespace Orleans.CodeGenerator
 
             if (!isExceptionType && serializableTypeDescription.HasComplexBaseType)
             {
-                fields.Add(GetBaseTypeField(serializableTypeDescription, libraryTypes));
+                fields.Add(GetBaseTypeField(serializableTypeDescription));
             }
 
             if (!serializableTypeDescription.IsImmutable)
@@ -205,11 +204,11 @@ namespace Orleans.CodeGenerator
                 if (!isExceptionType && serializableTypeDescription.UseActivator && !serializableTypeDescription.IsAbstractType)
                 {
                     onlyDeepFields = false;
-                    fields.Add(new ActivatorFieldDescription(libraryTypes.IActivator_1.ToTypeSyntax(serializableTypeDescription.TypeSyntax), ActivatorFieldName));
+                    fields.Add(new ActivatorFieldDescription(LibraryTypes.IActivator_1.ToTypeSyntax(serializableTypeDescription.TypeSyntax), ActivatorFieldName));
                 }
 
                 // Add a copier field for any field in the target which does not have a static copier.
-                GetCopierFieldDescriptions(serializableTypeDescription.Members, libraryTypes, fields);
+                GetCopierFieldDescriptions(serializableTypeDescription.Members, fields);
             }
 
             foreach (var member in members)
@@ -236,21 +235,21 @@ namespace Orleans.CodeGenerator
             return fields;
         }
 
-        private static BaseCopierFieldDescription GetBaseTypeField(ISerializableTypeDescription serializableTypeDescription, LibraryTypes libraryTypes)
+        private BaseCopierFieldDescription GetBaseTypeField(ISerializableTypeDescription serializableTypeDescription)
         {
             var baseType = serializableTypeDescription.BaseType;
-            if (baseType.HasAttribute(libraryTypes.GenerateSerializerAttribute)
-                && (SymbolEqualityComparer.Default.Equals(baseType.ContainingAssembly, libraryTypes.Compilation.Assembly) || baseType.ContainingAssembly.HasAttribute(libraryTypes.TypeManifestProviderAttribute))
+            if (baseType.HasAnyAttribute(LibraryTypes.GenerateSerializerAttributes)
+                && (SymbolEqualityComparer.Default.Equals(baseType.ContainingAssembly, LibraryTypes.Compilation.Assembly) || baseType.ContainingAssembly.HasAttribute(LibraryTypes.TypeManifestProviderAttribute))
                 && baseType is not INamedTypeSymbol { IsGenericType: true })
             {
                 // Use the concrete generated type and avoid expensive interface dispatch (except for generic types that will fall back to IBaseCopier<T>)
                 return new(QualifiedName(ParseName(GetGeneratedNamespaceName(baseType)), IdentifierName(GetSimpleClassName(baseType.Name))), true);
             }
 
-            return new(libraryTypes.BaseCopier_1.ToTypeSyntax(serializableTypeDescription.BaseTypeSyntax));
+            return new(LibraryTypes.BaseCopier_1.ToTypeSyntax(serializableTypeDescription.BaseTypeSyntax));
         }
 
-        public static void GetCopierFieldDescriptions(IEnumerable<IMemberDescription> members, LibraryTypes libraryTypes, List<GeneratedFieldDescription> fields)
+        public void GetCopierFieldDescriptions(IEnumerable<IMemberDescription> members, List<GeneratedFieldDescription> fields)
         {
             var fieldIndex = 0;
             var uniqueTypes = new HashSet<IMemberDescription>(MemberDescriptionTypeComparer.Default);
@@ -258,22 +257,22 @@ namespace Orleans.CodeGenerator
             {
                 var t = member.Type;
 
-                if (libraryTypes.IsShallowCopyable(t))
+                if (LibraryTypes.IsShallowCopyable(t))
                     continue;
 
-                foreach (var c in libraryTypes.StaticCopiers)
+                foreach (var c in LibraryTypes.StaticCopiers)
                     if (SymbolEqualityComparer.Default.Equals(c.UnderlyingType, t))
                         goto skip;
 
-                if (member.Symbol.HasAnyAttribute(libraryTypes.ImmutableAttributes))
+                if (member.Symbol.HasAnyAttribute(LibraryTypes.ImmutableAttributes))
                     continue;
 
                 if (!uniqueTypes.Add(member))
                     continue;
 
                 TypeSyntax copierType;
-                if (t.HasAttribute(libraryTypes.GenerateSerializerAttribute)
-                    && (SymbolEqualityComparer.Default.Equals(t.ContainingAssembly, libraryTypes.Compilation.Assembly) || t.ContainingAssembly.HasAttribute(libraryTypes.TypeManifestProviderAttribute))
+                if (t.HasAnyAttribute(LibraryTypes.GenerateSerializerAttributes)
+                    && (SymbolEqualityComparer.Default.Equals(t.ContainingAssembly, LibraryTypes.Compilation.Assembly) || t.ContainingAssembly.HasAttribute(LibraryTypes.TypeManifestProviderAttribute))
                     && t is not INamedTypeSymbol { IsGenericType: true, TypeArguments.Length: 0 })
                 {
                     // Use the concrete generated type and avoid expensive interface dispatch (except for complex nested cases that will fall back to IDeepCopier<T>)
@@ -291,14 +290,14 @@ namespace Orleans.CodeGenerator
                 }
                 else if (t is IArrayTypeSymbol { IsSZArray: true } array)
                 {
-                    copierType = libraryTypes.ArrayCopier.Construct(array.ElementType).ToTypeSyntax();
+                    copierType = LibraryTypes.ArrayCopier.Construct(array.ElementType).ToTypeSyntax();
                 }
-                else if (libraryTypes.WellKnownCopiers.FindByUnderlyingType(t) is { } copier)
+                else if (LibraryTypes.WellKnownCopiers.FindByUnderlyingType(t) is { } copier)
                 {
                     // The copier is not a static copier and is also not a generic copiers.
                     copierType = copier.CopierType.ToTypeSyntax();
                 }
-                else if (t is INamedTypeSymbol { ConstructedFrom: ISymbol unboundFieldType } named && libraryTypes.WellKnownCopiers.FindByUnderlyingType(unboundFieldType) is { } genericCopier)
+                else if (t is INamedTypeSymbol { ConstructedFrom: ISymbol unboundFieldType } named && LibraryTypes.WellKnownCopiers.FindByUnderlyingType(unboundFieldType) is { } genericCopier)
                 {
                     // Construct the generic copier type using the field's type arguments.
                     copierType = genericCopier.CopierType.Construct(named.TypeArguments.ToArray()).ToTypeSyntax();
@@ -306,7 +305,7 @@ namespace Orleans.CodeGenerator
                 else
                 {
                     // Use the IDeepCopier<T> interface
-                    copierType = libraryTypes.DeepCopier_1.ToTypeSyntax(member.TypeSyntax);
+                    copierType = LibraryTypes.DeepCopier_1.ToTypeSyntax(member.TypeSyntax);
                 }
 
                 fields.Add(new CopierFieldDescription(copierType, $"_copier{fieldIndex++}", t));
@@ -314,11 +313,10 @@ skip:;
             }
         }
 
-        private static MemberDeclarationSyntax GenerateMemberwiseDeepCopyMethod(
+        private MemberDeclarationSyntax GenerateMemberwiseDeepCopyMethod(
             ISerializableTypeDescription type,
             List<GeneratedFieldDescription> copierFields,
             List<ISerializableMember> members,
-            LibraryTypes libraryTypes,
             bool onlyDeepFields)
         {
             var returnType = type.TypeSyntax;
@@ -383,7 +381,7 @@ skip:;
                         SingletonSeparatedList(VariableDeclarator(
                             resultVar.Identifier,
                             argumentList: null,
-                            initializer: EqualsValueClause(GetCreateValueExpression(type, copierFields, libraryTypes)))))));
+                            initializer: EqualsValueClause(GetCreateValueExpression(type, copierFields)))))));
 
                 if (type.TrackReferences)
                 {
@@ -427,7 +425,7 @@ skip:;
                     VariableDeclaration(
                         IdentifierName("var"),
                         SingletonSeparatedList(VariableDeclarator(resultVar.Identifier)
-                        .WithInitializer(EqualsValueClause(GetCreateValueExpression(type, copierFields, libraryTypes)))))));
+                        .WithInitializer(EqualsValueClause(GetCreateValueExpression(type, copierFields)))))));
             }
             else
             {
@@ -436,14 +434,14 @@ skip:;
 
             if (!membersCopied)
             {
-                GenerateMemberwiseCopy(type, copierFields, members, libraryTypes, originalParam, contextParam, resultVar, body, onlyDeepFields);
+                GenerateMemberwiseCopy(type, copierFields, members, originalParam, contextParam, resultVar, body, onlyDeepFields);
                 body.Add(ReturnStatement(resultVar));
             }
 
             var parameters = new[]
             {
                 Parameter(originalParam.Identifier).WithType(type.TypeSyntax),
-                Parameter(contextParam.Identifier).WithType(libraryTypes.CopyContext.ToTypeSyntax())
+                Parameter(contextParam.Identifier).WithType(LibraryTypes.CopyContext.ToTypeSyntax())
             };
 
             return MethodDeclaration(returnType, DeepCopyMethodName)
@@ -453,20 +451,19 @@ skip:;
                 .AddBodyStatements(body.ToArray());
         }
 
-        private static ExpressionSyntax GetCreateValueExpression(ISerializableTypeDescription type, List<GeneratedFieldDescription> copierFields, LibraryTypes libraryTypes)
+        private ExpressionSyntax GetCreateValueExpression(ISerializableTypeDescription type, List<GeneratedFieldDescription> copierFields)
         {
             return type.UseActivator switch
             {
                 true => InvocationExpression(copierFields.Find(f => f is ActivatorFieldDescription).FieldName.ToIdentifierName().Member("Create")),
-                false => type.GetObjectCreationExpression(libraryTypes)
+                false => type.GetObjectCreationExpression()
             };
         }
 
-        private static MemberDeclarationSyntax GenerateBaseCopierDeepCopyMethod(
+        private MemberDeclarationSyntax GenerateBaseCopierDeepCopyMethod(
             ISerializableTypeDescription type,
             List<GeneratedFieldDescription> copierFields,
             List<ISerializableMember> members,
-            LibraryTypes libraryTypes,
             bool isExceptionType)
         {
             var inputParam = "input".ToIdentifierName();
@@ -492,7 +489,14 @@ skip:;
 
             var emptyBodyCount = body.Count;
 
-            GenerateMemberwiseCopy(type, copierFields, members, libraryTypes, inputParam, contextParam, resultParam, body);
+            GenerateMemberwiseCopy(
+                type,
+                copierFields,
+                members,
+                inputParam,
+                contextParam,
+                resultParam,
+                body);
 
             if (isExceptionType && body.Count == emptyBodyCount)
                 return null;
@@ -501,7 +505,7 @@ skip:;
             {
                 Parameter(inputParam.Identifier).WithType(type.TypeSyntax),
                 Parameter(resultParam.Identifier).WithType(type.TypeSyntax),
-                Parameter(contextParam.Identifier).WithType(libraryTypes.CopyContext.ToTypeSyntax())
+                Parameter(contextParam.Identifier).WithType(LibraryTypes.CopyContext.ToTypeSyntax())
             };
 
             var method = MethodDeclaration(PredefinedType(Token(SyntaxKind.VoidKeyword)), DeepCopyMethodName)
@@ -516,11 +520,10 @@ skip:;
             return method;
         }
 
-        private static void GenerateMemberwiseCopy(
+        private void GenerateMemberwiseCopy(
             ISerializableTypeDescription type,
             List<GeneratedFieldDescription> copierFields,
             List<ISerializableMember> members,
-            LibraryTypes libraryTypes,
             IdentifierNameSyntax sourceVar,
             IdentifierNameSyntax contextVar,
             IdentifierNameSyntax destinationVar,
@@ -530,7 +533,7 @@ skip:;
             AddSerializationCallbacks(type, sourceVar, destinationVar, "OnCopying", body);
 
             var copiers = type.IsUnsealedImmutable ? null : copierFields.OfType<ICopierDescription>()
-                    .Concat(libraryTypes.StaticCopiers)
+                    .Concat(LibraryTypes.StaticCopiers)
                     .ToList();
 
             var orderedMembers = members.OrderBy(m => m.Member.FieldId);
@@ -540,7 +543,6 @@ skip:;
 
                 var getValueExpression = GenerateMemberCopy(
                     copierFields,
-                    libraryTypes,
                     inputValue: member.GetGetter(sourceVar),
                     contextVar,
                     copiers,
@@ -552,9 +554,8 @@ skip:;
             AddSerializationCallbacks(type, sourceVar, destinationVar, "OnCopied", body);
         }
 
-        public static ExpressionSyntax GenerateMemberCopy(
+        public ExpressionSyntax GenerateMemberCopy(
             List<GeneratedFieldDescription> copierFields,
-            LibraryTypes libraryTypes,
             ExpressionSyntax inputValue,
             ExpressionSyntax copyContextVar,
             List<ICopierDescription> copiers,
@@ -580,7 +581,7 @@ skip:;
             else
             {
                 ExpressionSyntax copierExpression;
-                var staticCopier = libraryTypes.StaticCopiers.FindByUnderlyingType(memberType);
+                var staticCopier = LibraryTypes.StaticCopiers.FindByUnderlyingType(memberType);
                 if (staticCopier != null)
                 {
                     copierExpression = staticCopier.CopierType.ToNameSyntax();
@@ -604,7 +605,7 @@ skip:;
             return getValueExpression;
         }
 
-        private static void AddSerializationCallbacks(ISerializableTypeDescription type, IdentifierNameSyntax originalInstance, IdentifierNameSyntax resultInstance, string callbackMethodName, List<StatementSyntax> body)
+        private void AddSerializationCallbacks(ISerializableTypeDescription type, IdentifierNameSyntax originalInstance, IdentifierNameSyntax resultInstance, string callbackMethodName, List<StatementSyntax> body)
         {
             var serializationHooks = type.SerializationHooks;
             for (var hookIndex = 0; hookIndex < serializationHooks.Count; ++hookIndex)

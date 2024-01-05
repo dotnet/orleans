@@ -1,14 +1,5 @@
-using System;
-using System.Diagnostics;
-using System.Threading;
-using System.Threading.Tasks;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
-using Orleans;
-using Orleans.CodeGeneration;
-using Orleans.Configuration;
-using Orleans.Hosting;
 using Orleans.Runtime;
 using Orleans.TestingHost;
 using Tester;
@@ -259,7 +250,7 @@ namespace UnitTests.General
 
             IRequestContextTestGrain grain = this.fixture.GrainFactory.GetGrain<IRequestContextTestGrain>(GetRandomGrainId());
 
-            Guid result = grain.E2EActivityId().Result;
+            Guid result = await grain.E2EActivityId();
             Assert.Equal(nullActivityId,  result);  // "E2E ActivityId should not exist"
 
             RequestContextTestUtils.SetActivityId(nullActivityId);
@@ -318,8 +309,8 @@ namespace UnitTests.General
     internal class RequestContextGrainObserver : ISimpleGrainObserver
     {
         private readonly ITestOutputHelper output;
-        readonly Action<int, int, object> action;
-        readonly object result;
+        private readonly Action<int, int, object> action;
+        private readonly object result;
 
         public RequestContextGrainObserver(ITestOutputHelper output, Action<int, int, object> action, object result)
         {
@@ -353,7 +344,7 @@ namespace UnitTests.General
             for (int i = 0; i < numTasks; i++)
             {
                 var closureInt = i;
-                Func<Task> func = async () => { await ContextTester(closureInt); };
+                async Task func() { await ContextTester(closureInt); }
                 tasks[i] = Task.Run(func);
             }
 
@@ -400,7 +391,7 @@ namespace UnitTests.General
             for (int i = 0; i < numTasks; i++)
             {
                 var closureInt = i;
-                Func<Task> func = async () => { await ContextTester(closureInt); };
+                async Task func() { await ContextTester(closureInt); }
                 tasks[i] = Task.Run(func);
             }
 

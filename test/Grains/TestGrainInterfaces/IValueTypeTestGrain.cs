@@ -1,8 +1,4 @@
-using System;
-using System.Collections.Generic;
-using System.Text.Json.Serialization;
-using System.Threading.Tasks;
-using Orleans;
+using System.Diagnostics.CodeAnalysis;
 using Orleans.Concurrency;
 using ProtoBuf;
 
@@ -24,7 +20,7 @@ namespace UnitTests.GrainInterfaces
 
     [Serializable]
     [GenerateSerializer]
-    public enum TestEnum : byte 
+    public enum TestEnum : byte
     {
         First,
         Second,
@@ -42,15 +38,15 @@ namespace UnitTests.GrainInterfaces
         Enemy3
     }
 
-[GenerateSerializer]
-public class ClassWithEnumTestData
-{
-    [Id(0)]
-    public TestEnum EnumValue { get; set; }
+    [GenerateSerializer]
+    public class ClassWithEnumTestData
+    {
+        [Id(0)]
+        public TestEnum EnumValue { get; set; }
 
-    [Id(1)]
-    public CampaignEnemyTestType Enemy { get; set; }
-}
+        [Id(1)]
+        public CampaignEnemyTestType Enemy { get; set; }
+    }
 
     [ProtoContract]
     [Serializable]
@@ -111,7 +107,6 @@ public class ClassWithEnumTestData
         {
             return stringIntDict[name];
         }
-
 
         // This class is not actually used anywhere. It is here to test that the serializer generator properly handles
         // nested generic classes. If it doesn't, then the generated serializer for this class will fail to compile.
@@ -217,5 +212,32 @@ public class ClassWithEnumTestData
     {
         [Id(1), Immutable] public byte[] Immutable;
         [Id(2)] public byte[] Mutable;
+    }
+
+    [Serializable]
+    [GenerateSerializer]
+    public struct DefaultActivatorValueTypeWithRequiredField
+    {
+        [Id(0)] public required int Value;
+
+        [SetsRequiredMembers]
+        public DefaultActivatorValueTypeWithRequiredField(int value)
+        {
+            Value = value;
+        }
+    }
+
+    [UseActivator]
+    [Serializable]
+    [GenerateSerializer]
+    public struct DefaultActivatorValueTypeWithUseActivator
+    {
+        [Id(0)] public int Value;
+
+        [SetsRequiredMembers]
+        public DefaultActivatorValueTypeWithUseActivator()
+        {
+            Value = 4;
+        }
     }
 }

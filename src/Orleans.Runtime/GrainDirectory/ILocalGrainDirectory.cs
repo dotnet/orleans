@@ -61,10 +61,10 @@ namespace Orleans.Runtime.GrainDirectory
         void InvalidateCacheEntry(GrainId grainId);
 
         /// <summary>
-        /// Adds a cache entry for the given activation addrss.
+        /// Adds or updates a cache entry for the given activation address.
         /// This method is intended to be called whenever a placement decision is made.
         /// </summary>
-        void CachePlacementDecision(GrainId grainId, SiloAddress siloAddress);
+        void AddOrUpdateCacheEntry(GrainId grainId, SiloAddress siloAddress);
 
         /// <summary>
         /// For testing purposes only.

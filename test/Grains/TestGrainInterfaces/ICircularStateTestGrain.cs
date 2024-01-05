@@ -1,9 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Threading.Tasks;
-using Orleans;
-
-namespace TestGrainInterfaces
+﻿namespace TestGrainInterfaces
 {
     public interface ICircularStateTestGrain : IGrainWithGuidCompoundKey
     {

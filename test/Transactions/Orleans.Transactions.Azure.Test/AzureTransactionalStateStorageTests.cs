@@ -1,10 +1,6 @@
-using System;
-using System.Threading.Tasks;
-using Azure.Core.Pipeline;
 using Azure.Data.Tables;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
-using Orleans.Runtime;
 using Orleans.Transactions.Abstractions;
 using Orleans.Transactions.AzureStorage;
 using Orleans.Transactions.AzureStorage.Tests;
@@ -71,7 +67,7 @@ namespace Orleans.Transactions.Azure.Tests
             }
             catch (Exception exc)
             {
-                logger.LogError("Error creating CloudTableCreationClient.", exc);
+                logger.LogError(exc, "Error creating CloudTableCreationClient");
                 throw;
             }
         }

@@ -1,4 +1,3 @@
-using System;
 using Orleans.Configuration;
 using Microsoft.AspNetCore.Connections;
 using Microsoft.Extensions.DependencyInjection;
@@ -16,7 +15,6 @@ using Orleans.Runtime.Messaging;
 using Orleans.Runtime.Versions;
 using Orleans.Serialization;
 using Orleans.Statistics;
-using Orleans.Serialization.TypeSystem;
 using Orleans.Serialization.Serializers;
 using Orleans.Serialization.Cloning;
 using Microsoft.Extensions.Hosting;
@@ -63,6 +61,7 @@ namespace Orleans
             services.TryAddSingleton<IAppEnvironmentStatistics, AppEnvironmentStatistics>();
             services.AddLogging();
             services.TryAddSingleton<GrainBindingsResolver>();
+            services.TryAddSingleton<LocalClientDetails>();
             services.TryAddSingleton<OutsideRuntimeClient>();
             services.TryAddSingleton<ClientGrainContext>();
             services.AddFromExisting<IGrainContextAccessor, ClientGrainContext>();
@@ -89,7 +88,6 @@ namespace Orleans
             services.AddTransient<IOptions<MessagingOptions>>(static sp => sp.GetRequiredService<IOptions<ClientMessagingOptions>>());
 
             services.AddSingleton<IConfigureOptions<GrainTypeOptions>, DefaultGrainTypeOptionsProvider>();
-            services.TryAddSingleton(typeof(IKeyedServiceCollection<,>), typeof(KeyedServiceCollection<,>));
 
             // Add default option formatter if none is configured, for options which are required to be configured
             services.ConfigureFormatter<ClusterOptions>();
@@ -111,7 +109,7 @@ namespace Orleans
             services.TryAddSingleton<ConnectionPreambleHelper>();
             services.AddSingleton<ILifecycleParticipant<IClusterClientLifecycle>, ConnectionManagerLifecycleAdapter<IClusterClientLifecycle>>();
 
-            services.AddSingletonKeyedService<object, IConnectionFactory>(
+            services.AddKeyedSingleton<IConnectionFactory>(
                 ClientOutboundConnectionFactory.ServicesKey,
                 (sp, key) => ActivatorUtilities.CreateInstance<SocketConnectionFactory>(sp));
 

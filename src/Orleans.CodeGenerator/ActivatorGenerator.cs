@@ -6,8 +6,10 @@ using System.Collections.Generic;
 
 namespace Orleans.CodeGenerator
 {
-    internal static class ActivatorGenerator
+    internal class ActivatorGenerator
     {
+        private readonly CodeGenerator _codeGenerator;
+
         private struct ConstructorArgument
         {
             public TypeSyntax Type { get; set; }
@@ -15,11 +17,16 @@ namespace Orleans.CodeGenerator
             public string ParameterName { get; set; }
         }
 
-        public static ClassDeclarationSyntax GenerateActivator(LibraryTypes libraryTypes, ISerializableTypeDescription type)
+        public ActivatorGenerator(CodeGenerator codeGenerator)
+        {
+            _codeGenerator = codeGenerator;
+        }
+
+        public ClassDeclarationSyntax GenerateActivator(ISerializableTypeDescription type)
         {
             var simpleClassName = GetSimpleClassName(type);
 
-            var baseInterface = libraryTypes.IActivator_1.ToTypeSyntax(type.TypeSyntax);
+            var baseInterface = _codeGenerator.LibraryTypes.IActivator_1.ToTypeSyntax(type.TypeSyntax);
 
             var orderedFields = new List<ConstructorArgument>();
             var index = 0;
@@ -45,7 +52,7 @@ namespace Orleans.CodeGenerator
             if (orderedFields.Count > 0)
                 members.Add(GenerateConstructor(simpleClassName, orderedFields));
 
-            members.Add(GenerateCreateMethod(libraryTypes, type, orderedFields));
+            members.Add(GenerateCreateMethod(type, orderedFields));
 
             var classDeclaration = ClassDeclaration(simpleClassName)
                 .AddBaseListTypes(SimpleBaseType(baseInterface))
@@ -63,7 +70,7 @@ namespace Orleans.CodeGenerator
 
         public static string GetSimpleClassName(ISerializableTypeDescription serializableType) => $"Activator_{serializableType.Name}";
 
-        private static ConstructorDeclarationSyntax GenerateConstructor(
+        private ConstructorDeclarationSyntax GenerateConstructor(
             string simpleClassName,
             List<ConstructorArgument> orderedFields)
         {
@@ -95,7 +102,7 @@ namespace Orleans.CodeGenerator
             }
         }
 
-        private static MemberDeclarationSyntax GenerateCreateMethod(LibraryTypes libraryTypes, ISerializableTypeDescription type, List<ConstructorArgument> orderedFields)
+        private MemberDeclarationSyntax GenerateCreateMethod(ISerializableTypeDescription type, List<ConstructorArgument> orderedFields)
         {
             ExpressionSyntax createObject;
             if (type.ActivatorConstructorParameters is { Count: > 0 })
@@ -110,7 +117,7 @@ namespace Orleans.CodeGenerator
             }
             else
             {
-                createObject = type.GetObjectCreationExpression(libraryTypes);
+                createObject = type.GetObjectCreationExpression();
             }
 
             return MethodDeclaration(type.TypeSyntax, "Create")

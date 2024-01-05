@@ -1,5 +1,6 @@
 using System;
 using System.Buffers.Text;
+using System.Diagnostics.CodeAnalysis;
 using System.Text;
 using Orleans.Runtime;
 using Orleans.Serialization.TypeSystem;
@@ -20,6 +21,36 @@ namespace Orleans.Utilities
         public static bool IsGenericType(IdSpan type) => type.AsSpan().IndexOf((byte)GenericTypeIndicator) >= 0;
 
         /// <summary>
+        /// Returns the generic arity of the specified grain type.
+        /// </summary>
+        public static int GetGenericTypeArity(IdSpan type)
+        {
+            var typeSpan = type.AsSpan();
+            var startIndex = typeSpan.IndexOf((byte)GenericTypeIndicator) + 1;
+            if (startIndex <= 0 || startIndex >= typeSpan.Length)
+            {
+                return 0;
+            }
+
+            int endIndex;
+            for (endIndex = startIndex; endIndex < typeSpan.Length; endIndex++)
+            {
+                var c = typeSpan[endIndex];
+                if (c is < ((byte)'0') or > ((byte)'9'))
+                {
+                    break;
+                }
+            }
+
+            if (endIndex > startIndex && Utf8Parser.TryParse(typeSpan[startIndex..endIndex], out int arity, out _))
+            {
+                return arity;
+            }
+
+            throw new InvalidOperationException($"Unable to parse arity from type \"{type}\"");
+        }
+
+        /// <summary>
         /// Returns true if the provided type string is a constructed generic type.
         /// </summary>
         public static bool IsConstructed(IdSpan type) => type.AsSpan().IndexOf((byte)StartArgument) > 0;
@@ -31,7 +62,7 @@ namespace Orleans.Utilities
         {
             var span = type.AsSpan();
             var index = span.IndexOf((byte)StartArgument);
-            return index <= 0 ? type : new IdSpan(span.Slice(0, index).ToArray());
+            return index <= 0 ? type : new IdSpan(span[..index].ToArray());
         }
 
         /// <summary>
@@ -41,7 +72,7 @@ namespace Orleans.Utilities
         {
             var typeString = unconstructed.AsSpan();
             var indicatorIndex = typeString.IndexOf((byte)GenericTypeIndicator);
-            var arityString = typeString.Slice(indicatorIndex + 1);
+            var arityString = typeString[(indicatorIndex + 1)..];
             if (indicatorIndex < 0 || arityString.IndexOf((byte)StartArgument) >= 0)
             {
                 throw new InvalidOperationException("Cannot construct an already-constructed type");
@@ -65,12 +96,19 @@ namespace Orleans.Utilities
         /// <summary>
         /// Returns the constructed form of the provided generic grain type using the type arguments from the provided constructed interface type.
         /// </summary>
-        public static GrainType GetConstructed(this GrainType grainType, GrainInterfaceType typeArguments)
+        public static GrainType GetConstructed(this GenericGrainType genericGrainType, GenericGrainInterfaceType genericGrainInterfaceType)
         {
+            if (genericGrainType.Arity != genericGrainInterfaceType.Arity)
+            {
+                ThrowGenericArityMismatch(genericGrainType, genericGrainInterfaceType);
+            }
+
+            var grainType = genericGrainType.GrainType;
+            var typeArguments = genericGrainInterfaceType.Value;
             var args = typeArguments.Value.AsSpan();
             var index = args.IndexOf((byte)StartArgument);
             if (index <= 0) return grainType; // if no type arguments are provided, then the current logic expects the unconstructed form (but the grain call is going to fail later anyway...)
-            args = args.Slice(index);
+            args = args[index..];
 
             var type = grainType.Value.AsSpan();
             var buf = new byte[type.Length + args.Length];
@@ -91,7 +129,7 @@ namespace Orleans.Utilities
                 return Array.Empty<Type>();
             }
 
-            var safeString = "safer" + Encoding.UTF8.GetString(str.Slice(str.IndexOf((byte)GenericTypeIndicator)));
+            var safeString = "safer" + Encoding.UTF8.GetString(str[str.IndexOf((byte)GenericTypeIndicator)..]);
             var parsed = RuntimeTypeNameParser.Parse(safeString);
             if (!(parsed is ConstructedGenericTypeSpec spec))
             {
@@ -112,5 +150,9 @@ namespace Orleans.Utilities
 
             return result;
         }
+
+        [DoesNotReturn]
+        private static void ThrowGenericArityMismatch(GenericGrainType genericGrainType, GenericGrainInterfaceType genericInterfaceType)
+            => throw new ArgumentException($"Cannot construct generic grain \"{genericGrainType.GrainType}\" using arguments from generic interface \"{genericInterfaceType}\" because the generic arities are not equal: {genericGrainType.Arity} is not equal to {genericInterfaceType.Arity}.");
     }
 }

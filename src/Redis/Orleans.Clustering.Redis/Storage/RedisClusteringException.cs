@@ -1,5 +1,4 @@
-﻿using System;
-using System.Runtime.CompilerServices;
+using System;
 using System.Runtime.Serialization;
 
 namespace Orleans.Clustering.Redis
@@ -20,6 +19,7 @@ namespace Orleans.Clustering.Redis
         public RedisClusteringException(string message, Exception innerException) : base(message, innerException) { }
 
         /// <inheritdoc/>
+        [Obsolete]
         protected RedisClusteringException(SerializationInfo info, StreamingContext context) : base(info, context) { }
     }
 }

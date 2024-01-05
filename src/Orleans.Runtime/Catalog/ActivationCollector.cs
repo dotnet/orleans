@@ -8,7 +8,6 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 using Orleans.Internal;
-using Orleans.Statistics;
 
 namespace Orleans.Runtime
 {
@@ -86,7 +85,7 @@ namespace Orleans.Runtime
         /// <param name="timeout">
         /// The current idle collection time for the grain.
         /// </param>
-        public void ScheduleCollection(ICollectibleGrainContext item, TimeSpan timeout)
+        public void ScheduleCollection(ICollectibleGrainContext item, TimeSpan timeout, DateTime now)
         {
             lock (item)
             {
@@ -95,9 +94,9 @@ namespace Orleans.Runtime
                     return;
                 }
 
-                DateTime ticket = MakeTicketFromTimeSpan(timeout);
+                DateTime ticket = MakeTicketFromTimeSpan(timeout, now);
 
-                if (default(DateTime) != item.CollectionTicket)
+                if (default != item.CollectionTicket)
                 {
                     throw new InvalidOperationException("Call CancelCollection before calling ScheduleCollection.");
                 }
@@ -118,7 +117,7 @@ namespace Orleans.Runtime
             lock (item)
             {
                 DateTime ticket = item.CollectionTicket;
-                if (default(DateTime) == ticket) return false;
+                if (default == ticket) return false;
                 if (IsExpired(ticket)) return false;
 
                 // first, we attempt to remove the ticket.
@@ -155,7 +154,7 @@ namespace Orleans.Runtime
             if (IsExpired(item.CollectionTicket)) return false;
 
             DateTime oldTicket = item.CollectionTicket;
-            DateTime newTicket = MakeTicketFromTimeSpan(timeout);
+            DateTime newTicket = MakeTicketFromTimeSpan(timeout, DateTime.UtcNow);
             // if the ticket value doesn't change, then the source and destination bucket are the same and there's nothing to do.
             if (newTicket.Equals(oldTicket)) return true;
 
@@ -240,11 +239,11 @@ namespace Orleans.Runtime
                         {
                             var keepAliveDuration = activation.KeepAliveUntil - now;
                             var timeout = TimeSpan.FromTicks(Math.Max(keepAliveDuration.Ticks, activation.CollectionAgeLimit.Ticks));
-                            ScheduleCollection(activation, timeout);
+                            ScheduleCollection(activation, timeout, now);
                         }
                         else if (!activation.IsInactive || !activation.IsStale())
                         {
-                            ScheduleCollection(activation, activation.CollectionAgeLimit);
+                            ScheduleCollection(activation, activation.CollectionAgeLimit, now);
                         }
                         else
                         {
@@ -355,14 +354,14 @@ namespace Orleans.Runtime
             return ticket;
         }
 
-        private DateTime MakeTicketFromTimeSpan(TimeSpan timeout)
+        private DateTime MakeTicketFromTimeSpan(TimeSpan timeout, DateTime now)
         {
             if (timeout < quantum)
             {
-                throw new ArgumentException(String.Format("timeout must be at least {0}, but it is {1}", quantum, timeout), nameof(timeout));
+                throw new ArgumentException(string.Format("timeout must be at least {0}, but it is {1}", quantum, timeout), nameof(timeout));
             }
 
-            return MakeTicketFromDateTime(DateTime.UtcNow + timeout);
+            return MakeTicketFromDateTime(now + timeout);
         }
 
         private void Add(ICollectibleGrainContext item, DateTime ticket)
@@ -380,7 +379,7 @@ namespace Orleans.Runtime
             {
                 if (activation.CollectionTicket == default)
                 {
-                    ScheduleCollection(activation, activation.CollectionAgeLimit);
+                    ScheduleCollection(activation, activation.CollectionAgeLimit, DateTime.UtcNow);
                 }
                 else
                 {
@@ -461,7 +460,7 @@ namespace Orleans.Runtime
             }
         }
 
-        private async Task CollectActivationsImpl(bool scanStale, TimeSpan ageLimit = default(TimeSpan))
+        private async Task CollectActivationsImpl(bool scanStale, TimeSpan ageLimit = default)
         {
             var watch = ValueStopwatch.StartNew();
             var number = Interlocked.Increment(ref collectionNumber);
@@ -513,7 +512,7 @@ namespace Orleans.Runtime
             logger.LogInformation((int)ErrorCode.Catalog_ShutdownActivations_1, "DeactivateActivationsFromCollector: total {Count} to promptly Destroy.", list.Count);
             CatalogInstruments.ActiviationShutdownViaCollection();
 
-            Action<Task> signalCompletion = task => mtcs.SetOneResult();
+            void signalCompletion(Task task) => mtcs.SetOneResult();
             var reason = GetDeactivationReason();
             for (var i = 0; i < list.Count; i++)
             {

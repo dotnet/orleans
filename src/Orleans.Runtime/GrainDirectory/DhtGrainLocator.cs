@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Threading.Channels;
 using System.Threading.Tasks;
@@ -40,7 +39,7 @@ namespace Orleans.Runtime.GrainDirectory
             {
                 UnregistrationCause.Force => _forceWorker,
                 UnregistrationCause.NonexistentActivation => _neaWorker,
-                _ => throw new ArgumentOutOfRangeException($"Unregistration cause {cause} is unknown and is not supported. This is a bug."),
+                _ => throw new ArgumentOutOfRangeException($"Deregistration cause {cause} is unknown and is not supported. This is a bug."),
             };
 
             return worker.Unregister(address);
@@ -71,7 +70,7 @@ namespace Orleans.Runtime.GrainDirectory
         public static DhtGrainLocator FromLocalGrainDirectory(LocalGrainDirectory localGrainDirectory)
             => new(localGrainDirectory, localGrainDirectory.RemoteGrainDirectory);
 
-        public void CachePlacementDecision(GrainId grainId, SiloAddress siloAddress) => _localGrainDirectory.CachePlacementDecision(grainId, siloAddress);
+        public void UpdateCache(GrainId grainId, SiloAddress siloAddress) => _localGrainDirectory.AddOrUpdateCacheEntry(grainId, siloAddress);
         public void InvalidateCache(GrainId grainId) => _localGrainDirectory.InvalidateCacheEntry(grainId);
         public void InvalidateCache(GrainAddress address) => _localGrainDirectory.InvalidateCacheEntry(address);
         public bool TryLookupInCache(GrainId grainId, out GrainAddress address) => _localGrainDirectory.TryCachedLookup(grainId, out address);

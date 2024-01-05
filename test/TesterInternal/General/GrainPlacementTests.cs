@@ -1,11 +1,5 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Net;
-using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
-using Orleans;
-using Orleans.Hosting;
 using Orleans.Runtime;
 using Orleans.TestingHost;
 using TestExtensions;
@@ -64,12 +58,16 @@ namespace UnitTests.General
                 Select(
                     n =>
                         this.GrainFactory.GetGrain<IRandomPlacementTestGrain>(Guid.NewGuid()));
-            var places = grains.Select(g => g.GetRuntimeInstanceId().Result);
-            var placesAsArray = places as string[] ?? places.ToArray();
+            List<string> places = new();
+            foreach (var grain in grains)
+            {
+                places.Add(await grain.GetRuntimeInstanceId());
+            }
+
             // consider: it seems like we should check that we get close to a 50/50 split for placement.
-            var groups = placesAsArray.GroupBy(s => s);
+            var groups = places.GroupBy(s => s);
             Assert.True(groups.Count() > 1,
-                "Grains should be on different silos, but they are on " + Utils.EnumerableToString(placesAsArray.ToArray())); // will randomly fail one in a million times if RNG is good :-)
+                "Grains should be on different silos, but they are on " + Utils.EnumerableToString(places)); // will randomly fail one in a million times if RNG is good :-)
         }
 
         //[Fact, TestCategory("Placement"), TestCategory("Functional")]
@@ -108,14 +106,23 @@ namespace UnitTests.General
                     Select(
                         n =>
                             this.GrainFactory.GetGrain<IRandomPlacementTestGrain>(Guid.NewGuid())).ToList();
-            var randomGrainPlaces = randomGrains.Select(g => g.GetRuntimeInstanceId().Result).ToList();
+            var randomGrainPlaces = new List<string>();
+            foreach (var grain in randomGrains)
+            {
+                randomGrainPlaces.Add(await grain.GetRuntimeInstanceId());
+            }
 
-            var preferLocalGrainKeys =
-                randomGrains.
-                    Select(
-                        (IRandomPlacementTestGrain g) =>
-                            g.StartPreferLocalGrain(g.GetPrimaryKey()).Result).ToList();
-            var preferLocalGrainPlaces = preferLocalGrainKeys.Select(key => this.GrainFactory.GetGrain<IPreferLocalPlacementTestGrain>(key).GetRuntimeInstanceId().Result).ToList();
+            var preferLocalGrainKeys = new List<Guid>();
+            foreach (var grain in randomGrains)
+            {
+                preferLocalGrainKeys.Add(await grain.StartPreferLocalGrain(grain.GetPrimaryKey()));
+            }
+
+            var preferLocalGrainPlaces = new List<string>();
+            foreach (var key in preferLocalGrainKeys)
+            {
+                preferLocalGrainPlaces.Add(await this.GrainFactory.GetGrain<IPreferLocalPlacementTestGrain>(key).GetRuntimeInstanceId());
+            }
 
             // check that every "prefer local grain" was placed on the same silo with its requesting random grain
             foreach(int key in Enumerable.Range(0, numGrains))

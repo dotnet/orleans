@@ -2,7 +2,6 @@
 using System;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
-using Orleans;
 using Orleans.Configuration;
 using Orleans.Hosting;
 using Orleans.Runtime;
@@ -52,8 +51,8 @@ namespace Orleans.Hosting
             configureFaultInjectionOptions?.Invoke(services.AddOptions<FaultInjectionGrainStorageOptions>(name));
             services.ConfigureNamedOptionForLogging<MemoryGrainStorageOptions>(name);
             services.ConfigureNamedOptionForLogging<FaultInjectionGrainStorageOptions>(name);
-            services.AddSingletonNamedService<IGrainStorage>(name, (svc, n) => FaultInjectionGrainStorageFactory.Create(svc, n, MemoryGrainStorageFactory.Create))
-                .AddSingletonNamedService<ILifecycleParticipant<ISiloLifecycle>>(name, (s, n) => (ILifecycleParticipant<ISiloLifecycle>)s.GetRequiredServiceByName<IGrainStorage>(n));
+            services.AddKeyedSingleton<IGrainStorage>(name, (svc, n) => FaultInjectionGrainStorageFactory.Create(svc, n as string, MemoryGrainStorageFactory.Create))
+                .AddKeyedSingleton<ILifecycleParticipant<ISiloLifecycle>>(name, (s, n) => (ILifecycleParticipant<ISiloLifecycle>)s.GetRequiredKeyedService<IGrainStorage>(n));
             return services;
         }
     }

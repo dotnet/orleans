@@ -1,6 +1,3 @@
-using System;
-using System.Collections.Generic;
-using System.Threading.Tasks;
 using Orleans.GrainDirectory;
 using Orleans.Runtime;
 using Orleans.Runtime.GrainDirectory;
@@ -91,6 +88,11 @@ namespace UnitTests.Directory
             throw new NotImplementedException();
         }
 
+        public Task<AddressAndTag> RegisterAsync(GrainAddress address, int hopCount = 0)
+        {
+            throw new NotImplementedException();
+        }
+
         public Task<AddressAndTag> RegisterAsync(GrainAddress address, GrainAddress previousAddress, int hopCount = 0)
         {
             throw new NotImplementedException();
@@ -116,7 +118,7 @@ namespace UnitTests.Directory
             throw new NotImplementedException();
         }
 
-        public void CachePlacementDecision(GrainId grainId, SiloAddress siloAddress) => throw new NotImplementedException();
+        public void AddOrUpdateCacheEntry(GrainId grainId, SiloAddress siloAddress) => throw new NotImplementedException();
 
         public void InvalidateCacheEntry(GrainId grainId) => throw new NotImplementedException();
         public bool TryCachedLookup(GrainId grainId, out GrainAddress address) => throw new NotImplementedException();

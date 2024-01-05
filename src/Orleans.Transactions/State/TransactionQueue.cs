@@ -9,7 +9,6 @@ using Orleans.Transactions.Abstractions;
 using Orleans.Storage;
 using Orleans.Configuration;
 using Orleans.Timers.Internal;
-using System.Runtime.CompilerServices;
 
 namespace Orleans.Transactions.State
 {
@@ -166,7 +165,7 @@ namespace Orleans.Transactions.State
             }
             catch (Exception exception)
             {
-                logger.LogError(exception, $"Transaction abort due to internal error in {nameof(EnqueueCommit)}", exception);
+                logger.LogError(exception, $"Transaction abort due to internal error in {nameof(EnqueueCommit)}");
                 await NotifyOfAbort(record, TransactionalStatus.UnknownException, exception);
             }
         }

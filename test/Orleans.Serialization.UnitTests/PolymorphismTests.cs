@@ -6,9 +6,6 @@ using System;
 using Xunit;
 using Microsoft.Extensions.Options;
 using System.Runtime.Serialization;
-using System.Linq.Expressions;
-using Xunit.Sdk;
-using System.Data;
 
 namespace Orleans.Serialization.UnitTests
 {
@@ -19,6 +16,10 @@ namespace Orleans.Serialization.UnitTests
         public CustomException() { }
         public CustomException(string message) : base(message) { }
         public CustomException(string message, Exception inner) : base(message, inner) { }
+
+#if NET8_0_OR_GREATER
+        [Obsolete]
+#endif
         public CustomException(SerializationInfo info, StreamingContext context) : base(info, context) { }
 
         [Id(0)]

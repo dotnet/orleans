@@ -30,7 +30,7 @@ namespace Orleans.Serialization.Codecs
             }
             else
             {
-                var result = new SortedList<TKey, TValue>(surrogate.Comparer);
+                var result = new SortedList<TKey, TValue>(surrogate.Values.Count, surrogate.Comparer);
                 foreach (var kvp in surrogate.Values)
                 {
                     result.Add(kvp.Key, kvp.Value);

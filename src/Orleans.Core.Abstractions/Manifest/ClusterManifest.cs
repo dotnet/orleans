@@ -19,17 +19,13 @@ namespace Orleans.Metadata
         /// <param name="silos">
         /// The silo manifests.
         /// </param>
-        /// <param name="allGrainManifests">
-        /// All grain manifests.
-        /// </param>
         public ClusterManifest(
             MajorMinorVersion version,
-            ImmutableDictionary<SiloAddress, GrainManifest> silos,
-            ImmutableArray<GrainManifest> allGrainManifests)
+            ImmutableDictionary<SiloAddress, GrainManifest> silos)
         {
-            this.Version = version;
-            this.Silos = silos;
-            this.AllGrainManifests = allGrainManifests;
+            Version = version;
+            Silos = silos;
+            AllGrainManifests = silos.Values.ToImmutableArray();
         }
 
         /// <summary>

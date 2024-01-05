@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <root>
   <!-- 
     Microsoft ResX Schema 
@@ -124,7 +124,7 @@
     <value>Members which are static or abstract cannot be serialized</value>
   </data>
   <data name="AddGenerateSerializerAttributeDescription" xml:space="preserve">
-    <value>Add the [GenerateSerializer] attribute to serializable types in your application</value>
+    <value>Add the [GenerateSerializer] attribute to serializable types in your application.</value>
   </data>
   <data name="AddGenerateSerializerAttributeMessageFormat" xml:space="preserve">
     <value>The type "{0}" has the [Serializable] attribute but not the [GenerateSerializer] attribute</value>
@@ -133,7 +133,7 @@
     <value>Add the [GenerateSerializer] attribute</value>
   </data>
   <data name="AddSerializationAttributesDescription" xml:space="preserve">
-    <value>Add attributes to properties and fields to direct serializer generation</value>
+    <value>Add attributes to properties and fields to direct serializer generation.</value>
   </data>
   <data name="AddSerializationAttributesMessageFormat" xml:space="preserve">
     <value>Add missing serialization attributes</value>
@@ -146,5 +146,14 @@
   </data>
   <data name="AtMostOneOrleansConstructorMessageFormat" xml:space="preserve">
     <value>A single type is not allowed to have multiple constructors annotated with the [OrleansConstructor] attribute</value>
+  </data>
+  <data name="AddAliasAttributesDescription" xml:space="preserve">
+    <value>Add [Alias] attributes to specify well-known names that can be used to identify types or methods.</value>
+  </data>
+  <data name="AddAliasAttributesTitle" xml:space="preserve">
+    <value>Add missing alias attributes</value>
+  </data>
+  <data name="AddAliasMessageFormat" xml:space="preserve">
+    <value>Add missing alias attributes</value>
   </data>
 </root>

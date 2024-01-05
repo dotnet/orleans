@@ -329,7 +329,7 @@ public static class RuntimeTypeNameParser
 
         public readonly ReadOnlySpan<char> Remaining => Input[Index..];
 
-        public bool TryPeek(out char c)
+        public readonly bool TryPeek(out char c)
         {
             if (Index < Input.Length)
             {
@@ -341,14 +341,14 @@ public static class RuntimeTypeNameParser
             return false;
         }
 
-        public bool TryPeek(out char c, out char d)
+        public readonly bool TryPeek(out char c, out char d)
         {
             var result = TryPeek(out c);
             result &= TryPeek(Index + 1, out d);
             return result;
         }
 
-        public bool TryPeek(int index, out char c)
+        public readonly bool TryPeek(int index, out char c)
         {
             if (index < Input.Length)
             {
@@ -400,7 +400,7 @@ public static class RuntimeTypeNameParser
 
         private static void ThrowEndOfInput() => throw new InvalidOperationException("Tried to read past the end of the input");
 
-        public override string ToString()
+        public override readonly string ToString()
         {
             var result = new StringBuilder();
             var i = 0;

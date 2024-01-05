@@ -1,9 +1,7 @@
 using Orleans.Streams;
-using System;
-using System.Threading.Tasks;
-using Orleans;
 using Orleans.Runtime;
 using Orleans.Streams.PubSub;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace UnitTests.Grains.ProgrammaticSubscribe
 {
@@ -16,7 +14,7 @@ namespace UnitTests.Grains.ProgrammaticSubscribe
     {
         public Task<bool> CanGetSubscriptionManager(string providerName)
         {
-            return Task.FromResult(this.ServiceProvider.GetServiceByName<IStreamProvider>(providerName).TryGetStreamSubscriptionManager(out _));
+            return Task.FromResult(this.ServiceProvider.GetKeyedService<IStreamProvider>(providerName).TryGetStreamSubscriptionManager(out _));
         }
     }
 

@@ -1,13 +1,9 @@
-using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.TestingHost;
 using TestExtensions;
 using UnitTests.GrainInterfaces;
 using UnitTests.Grains;
 using Xunit;
-using System.Linq;
-using Orleans.Hosting;
-using System;
 
 namespace DependencyInjection.Tests
 {
@@ -54,7 +50,7 @@ namespace DependencyInjection.Tests
         [Fact]
         public async Task CanGetGrainWithInjectedGrainFactory()
         {
-            // please don't inject your implemetation of IGrainFactory to DI container in Startup Class, 
+            // please don't inject your implementation of IGrainFactory to DI container in Startup Class, 
             // since we are currently not supporting replacing IGrainFactory 
             IDIGrainWithInjectedServices grain = this.fixture.GrainFactory.GetGrain<IDIGrainWithInjectedServices>(GetRandomGrainId());
             _ = await grain.GetGrainFactoryId();
@@ -118,10 +114,10 @@ namespace DependencyInjection.Tests
                     .ToList();
 
             await Task.WhenAll(calls);
-            string expected = calls[0].Result;
-            foreach (var value in calls.Select(x => x.Result))
+            string expected = await calls[0];
+            foreach (var callTask in calls)
             {
-                Assert.Equal(expected, value);
+                Assert.Equal(expected, await callTask);
             }
 
             await grain1.DoDeactivate();

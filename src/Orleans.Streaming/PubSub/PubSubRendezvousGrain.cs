@@ -5,10 +5,12 @@ using System.Runtime.ExceptionServices;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Orleans.Core;
 using Orleans.Providers;
 using Orleans.Runtime;
+using Orleans.Serialization.Serializers;
 using Orleans.Storage;
 using Orleans.Streams.Core;
 
@@ -44,7 +46,7 @@ namespace Orleans.Streams
                 _logger.LogDebug("Trying to find storage provider {ProviderName}", providerName);
             }
 
-            var storage = _serviceProvider.GetServiceByName<IGrainStorage>(providerName);
+            var storage = _serviceProvider.GetKeyedService<IGrainStorage>(providerName);
             if (storage == null)
             {
                 if (_logger.IsEnabled(LogLevel.Debug))
@@ -52,10 +54,11 @@ namespace Orleans.Streams
                     _logger.LogDebug("Fallback to storage provider {ProviderName}", ProviderConstants.DEFAULT_PUBSUB_PROVIDER_NAME);
                 }
 
-                storage = _serviceProvider.GetRequiredServiceByName<IGrainStorage>(ProviderConstants.DEFAULT_PUBSUB_PROVIDER_NAME);
+                storage = _serviceProvider.GetRequiredKeyedService<IGrainStorage>(ProviderConstants.DEFAULT_PUBSUB_PROVIDER_NAME);
             }
 
-            return new(nameof(PubSubRendezvousGrain), grain.GrainContext, storage, _loggerFactory);
+            var activatorProvider = _serviceProvider.GetRequiredService<IActivatorProvider>();
+            return new(nameof(PubSubRendezvousGrain), grain.GrainContext, storage, _loggerFactory, activatorProvider);
         }
     }
 

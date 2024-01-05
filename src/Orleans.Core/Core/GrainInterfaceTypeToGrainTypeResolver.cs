@@ -86,7 +86,7 @@ namespace Orleans
 
             if (GenericGrainType.TryParse(result, out var genericGrainType) && !genericGrainType.IsConstructed)
             {
-                result = genericGrainType.GrainType.GetConstructed(genericInterface.Value);
+                result = genericGrainType.GetConstructed(genericInterface);
             }
 
             return result;
@@ -149,7 +149,7 @@ namespace Orleans
                         }
                         else
                         {
-                            result = genericGrainType.GrainType.GetConstructed(genericInterface.Value);
+                            result = genericGrainType.GetConstructed(genericInterface);
                         }
                     }
                     else
@@ -234,7 +234,7 @@ namespace Orleans
                             // A specified default grain type trumps others.
                             primaryImplementation = GrainType.Create(defaultTypeString);
                         }
-                        else if (string.Equals(interfaceTypeName?.Substring(1), typeName, StringComparison.Ordinal))
+                        else if (string.Equals(interfaceTypeName?[1..], typeName, StringComparison.Ordinal))
                         {
                             // Otherwise, a substring match on the interface name, dropping the 'I', is used.
                             primaryImplementation = id;

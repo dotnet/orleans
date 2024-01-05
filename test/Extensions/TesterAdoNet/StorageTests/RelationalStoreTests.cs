@@ -1,11 +1,5 @@
-using System;
 using System.Data;
 using System.Data.Common;
-using System.IO;
-using System.Linq;
-using System.Threading;
-using System.Threading.Tasks;
-using Orleans.Internal;
 using Orleans.Tests.SqlUtils;
 using UnitTests.General;
 using Xunit;
@@ -115,7 +109,7 @@ namespace UnitTests.StorageTests.AdoNet
                     var task = sut.Storage.ReadAsync<int>(sut.CancellationTestQuery, tokenSource.Token);
                     if(!task.Wait(timeoutLimit.Add(TimeSpan.FromSeconds(2))))
                     {
-                        Assert.True(false, string.Format("Timeout limit {0} ms exceeded.", timeoutLimit.TotalMilliseconds));
+                        Assert.Fail(string.Format("Timeout limit {0} ms exceeded.", timeoutLimit.TotalMilliseconds));
                     }
                 }
                 catch(Exception ex)

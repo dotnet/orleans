@@ -6,7 +6,6 @@ using Orleans.Serialization.Buffers;
 using Orleans.Serialization.Session;
 using Microsoft.Extensions.DependencyInjection;
 using Newtonsoft.Json;
-using System.IO;
 using Xunit;
 using SerializerSession = Orleans.Serialization.Session.SerializerSession;
 using Utf8JsonNS = Utf8Json;
@@ -84,7 +83,6 @@ namespace Benchmarks.Comparison
                    result.MyProperty8 +
                    result.MyProperty9;
 
-        [Fact]
         [Benchmark(Baseline = true)]
         public int Orleans()
         {

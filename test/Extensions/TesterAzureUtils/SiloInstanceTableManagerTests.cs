@@ -1,8 +1,5 @@
-using System;
 using System.Globalization;
-using System.Linq;
 using System.Net;
-using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Orleans.AzureUtils;
 using Orleans.Runtime;
@@ -201,12 +198,12 @@ namespace Tester.AzureUtils
             RegisterSiloInstance();
 
             var gateways = await manager.FindAllGatewayProxyEndpoints();
-            Assert.Equal(0,  gateways.Count);  // "Number of gateways before Silo.Activate"
+            Assert.Empty(gateways);  // "Number of gateways before Silo.Activate"
 
             await manager.ActivateSiloInstance(myEntry);
 
             gateways = await manager.FindAllGatewayProxyEndpoints();
-            Assert.Equal(1,  gateways.Count);  // "Number of gateways after Silo.Activate"
+            Assert.Single(gateways);  // "Number of gateways after Silo.Activate"
 
             Uri myGateway = gateways.First();
             Assert.Equal(myEntry.Address,  myGateway.Host.ToString());  // "Gateway address"

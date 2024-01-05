@@ -1,4 +1,3 @@
-using System;
 using System.Buffers;
 using System.Diagnostics.Contracts;
 using System.Text;
@@ -19,21 +18,21 @@ namespace Benchmarks.Utilities
         public void Advance(int bytes) => _written += bytes;
 
         [Pure]
-        public Memory<byte> GetMemory(int sizeHint = 0) => _buffer.AsMemory(_written);
+        public readonly Memory<byte> GetMemory(int sizeHint = 0) => _buffer.AsMemory(_written);
 
         [Pure]
-        public Span<byte> GetSpan(int sizeHint) => _buffer.AsSpan(_written);
+        public readonly Span<byte> GetSpan(int sizeHint) => _buffer.AsSpan(_written);
 
-        public byte[] ToArray() => _buffer.AsSpan(0, _written).ToArray();
+        public readonly byte[] ToArray() => _buffer.AsSpan(0, _written).ToArray();
 
         public void Reset() => _written = 0;
 
         [Pure]
-        public int Length => _written;
+        public readonly int Length => _written;
 
         [Pure]
-        public ReadOnlySpan<byte> GetReadOnlySpan() => new(_buffer, 0, _written);
+        public readonly ReadOnlySpan<byte> GetReadOnlySpan() => new(_buffer, 0, _written);
 
-        public override string ToString() => Encoding.UTF8.GetString(_buffer.AsSpan(0, _written).ToArray());
+        public override readonly string ToString() => Encoding.UTF8.GetString(_buffer.AsSpan(0, _written).ToArray());
     }
 }

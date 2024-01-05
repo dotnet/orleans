@@ -1,6 +1,3 @@
-using System.Threading.Tasks;
-using Orleans;
-
 namespace UnitTests.GrainInterfaces
 {
     public interface ISimpleDIGrain : IGrainWithIntegerKey
@@ -12,7 +9,7 @@ namespace UnitTests.GrainInterfaces
 
     public interface IDIGrainWithInjectedServices : ISimpleDIGrain
     {
-        Task<long> GetGrainFactoryId();
+        Task<int> GetGrainFactoryId();
         Task<string> GetInjectedSingletonServiceValue();
         Task<string> GetInjectedScopedServiceValue();
         Task AssertCanResolveSameServiceInstances();

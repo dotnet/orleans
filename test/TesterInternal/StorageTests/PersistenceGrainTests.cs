@@ -1,23 +1,20 @@
 //#define REREAD_STATE_AFTER_WRITE_FAILED
 
-using System;
-using System.Collections.Generic;
 using System.Diagnostics;
-using System.Linq;
-using System.Threading.Tasks;
-using Orleans;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
+using Orleans.Configuration;
+using Orleans.Internal;
+using Orleans.Providers;
 using Orleans.Runtime;
 using Orleans.Storage;
 using Orleans.TestingHost;
+using TesterInternal;
+using TestExtensions;
 using UnitTests.GrainInterfaces;
 using UnitTests.Grains;
 using Xunit;
 using Xunit.Abstractions;
-using TesterInternal;
-using TestExtensions;
-using Orleans.Hosting;
-using Orleans.Internal;
-using Microsoft.Extensions.DependencyInjection;
 
 // ReSharper disable RedundantAssignment
 // ReSharper disable UnusedVariable
@@ -48,15 +45,19 @@ namespace UnitTests.StorageTests
                     hostBuilder.AddTestStorageProvider(MockStorageProviderName2, (sp, name) => ActivatorUtilities.CreateInstance<MockStorageProvider>(sp, name));
                     hostBuilder.AddTestStorageProvider(MockStorageProviderNameLowerCase, (sp, name) => ActivatorUtilities.CreateInstance<MockStorageProvider>(sp, name));
                     hostBuilder.AddTestStorageProvider(ErrorInjectorProviderName, (sp, name) => ActivatorUtilities.CreateInstance<ErrorInjectionStorageProvider>(sp));
+
+                    hostBuilder.Services.AddSingleton<OrleansGrainStorageSerializer>();
+                    hostBuilder.AddMemoryGrainStorage("OrleansSerializerMemoryStore", (OptionsBuilder<MemoryGrainStorageOptions> optionsBuilder) =>
+                        optionsBuilder.Configure<OrleansGrainStorageSerializer>((options, serializer) => options.GrainStorageSerializer = serializer));
                 }
             }
         }
 
-        const string DefaultGrainStateName = "state";
-        const string MockStorageProviderName1 = "test1";
-        const string MockStorageProviderName2 = "test2";
-        const string MockStorageProviderNameLowerCase = "lowercase";
-        const string ErrorInjectorProviderName = "ErrorInjector";
+        private const string DefaultGrainStateName = "state";
+        private const string MockStorageProviderName1 = "test1";
+        private const string MockStorageProviderName2 = "test2";
+        private const string MockStorageProviderNameLowerCase = "lowercase";
+        private const string ErrorInjectorProviderName = "ErrorInjector";
         private readonly ITestOutputHelper output;
 
         protected TestCluster HostedCluster { get; }
@@ -83,34 +84,13 @@ namespace UnitTests.StorageTests
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Persistence")]
-        public async Task Persistence_Silo_StorageProvidersLoaded()
-        {
-            List<SiloHandle> silos = this.HostedCluster.GetActiveSilos().ToList();
-            foreach (var silo in silos)
-            {
-                var testHooks = this.HostedCluster.Client.GetTestHooks(silo);
-                ICollection<string> providers = await testHooks.GetStorageProviderNames();
-                Assert.NotNull(providers); // Null provider manager
-                Assert.True(providers.Count > 0, "Some providers loaded");
-                Assert.True(testHooks.HasStorageProvider(MockStorageProviderName1).Result,
-                    $"provider {MockStorageProviderName1} on silo {silo.Name} should be registered");
-                Assert.True(testHooks.HasStorageProvider(MockStorageProviderName2).Result,
-                    $"provider {MockStorageProviderName2} on silo {silo.Name} should be registered");
-                Assert.True(testHooks.HasStorageProvider(MockStorageProviderNameLowerCase).Result,
-                    $"provider {MockStorageProviderNameLowerCase} on silo {silo.Name} should be registered");
-                Assert.True(testHooks.HasStorageProvider(ErrorInjectorProviderName).Result,
-                    $"provider {ErrorInjectorProviderName} on silo {silo.Name} should be registered");
-            }
-        }
-
-        [Fact, TestCategory("Functional"), TestCategory("Persistence")]
-        public void Persistence_Silo_StorageProvider_Name_Missing()
+        public async Task Persistence_Silo_StorageProvider_Name_Missing()
         {
             List<SiloHandle> silos = this.HostedCluster.GetActiveSilos().ToList();
             var silo = silos.First();
             const string providerName = "NotPresent";
-            Assert.False(this.HostedCluster.Client.GetTestHooks(silo).HasStorageProvider(providerName).Result,
-                    $"provider {providerName} on silo {silo.Name} should not be registered");
+            Assert.False(await this.HostedCluster.Client.GetTestHooks(silo).HasStorageProvider(providerName),
+                    $"Provider {providerName} on silo {silo.Name} should not be registered");
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Persistence")]
@@ -140,7 +120,7 @@ namespace UnitTests.StorageTests
 
             //request InitCount on providers on all silos in this cluster
             IManagementGrain mgmtGrain = this.HostedCluster.GrainFactory.GetGrain<IManagementGrain>(0);
-            object[] replies = await mgmtGrain.SendControlCommandToProvider(typeof(MockStorageProvider).FullName,
+            object[] replies = await mgmtGrain.SendControlCommandToProvider<MockStorageProvider>(
                MockStorageProviderName1, (int)MockStorageProvider.Commands.InitCount, null);
 
             Assert.Contains(1, replies); // StorageProvider #Init
@@ -157,14 +137,14 @@ namespace UnitTests.StorageTests
 
             // Store initial value in storage
             int initialValue = 567;
-            SetStoredValue(providerName, typeof(MockStorageProvider).FullName, DefaultGrainStateName, grain, "Field1", initialValue);
+            SetStoredValue<MockStorageProvider>(providerName, DefaultGrainStateName, grain, "Field1", initialValue);
 
             int readValue = await grain.GetValue();
             Assert.Equal(initialValue, readValue); // Read previously stored value
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Persistence"), TestCategory("Generics")]
-        public async Task Persistence_Grain_Activate_StoredValue_Generic() 
+        public async Task Persistence_Grain_Activate_StoredValue_Generic()
         {
             const string providerName = MockStorageProviderName1;
             Guid guid = Guid.NewGuid();
@@ -174,7 +154,7 @@ namespace UnitTests.StorageTests
 
             // Store initial value in storage
             int initialValue = 567;
-            SetStoredValue(providerName, typeof(MockStorageProvider).FullName, DefaultGrainStateName, grain, "Field1", initialValue);
+            SetStoredValue<MockStorageProvider>(providerName, DefaultGrainStateName, grain, "Field1", initialValue);
 
             int readValue = await grain.GetValue();
             Assert.Equal(initialValue, readValue); // Read previously stored value
@@ -192,7 +172,7 @@ namespace UnitTests.StorageTests
 
             // Store initial value in storage
             int initialValue = 567;
-            SetStoredValue(providerName, typeof(ErrorInjectionStorageProvider).FullName, grainType, grain, "Field1", initialValue);
+            SetStoredValue<ErrorInjectionStorageProvider>(providerName, grainType, grain, "Field1", initialValue);
 
             await SetErrorInjection(providerName, ErrorInjectionPoint.BeforeRead);
 
@@ -208,7 +188,7 @@ namespace UnitTests.StorageTests
             IPersistenceTestGrain grain = this.HostedCluster.GrainFactory.GetGrain<IPersistenceTestGrain>(id);
 
             await grain.DoSomething();
-            var providerState = GetStateForStorageProviderInUse(providerName, typeof(MockStorageProvider).FullName);
+            var providerState = GetStateForStorageProviderInUse<MockStorageProvider>(providerName);
 
             Assert.Equal(1, providerState.ProviderStateForTest.ReadCount); // StorageProvider #Reads
             Assert.Equal(0, providerState.ProviderStateForTest.WriteCount); // StorageProvider #Writes
@@ -223,7 +203,7 @@ namespace UnitTests.StorageTests
 
             await grain.DoWrite(1);
 
-            var providerState = GetStateForStorageProviderInUse(providerName, typeof(MockStorageProvider).FullName);
+            var providerState = GetStateForStorageProviderInUse<MockStorageProvider>(providerName);
 
             Assert.Equal(1, providerState.ProviderStateForTest.ReadCount); // StorageProvider #Reads
             Assert.Equal(1, providerState.ProviderStateForTest.WriteCount); // StorageProvider #Writes
@@ -231,7 +211,7 @@ namespace UnitTests.StorageTests
             Assert.Equal(1, providerState.LastStoredGrainState.Field1); // Store-Field1
 
             await grain.DoWrite(2);
-            providerState = GetStateForStorageProviderInUse(providerName, typeof(MockStorageProvider).FullName);
+            providerState = GetStateForStorageProviderInUse<MockStorageProvider>(providerName);
             Assert.Equal(1, providerState.ProviderStateForTest.ReadCount); // StorageProvider #Reads
             Assert.Equal(2, providerState.ProviderStateForTest.WriteCount); // StorageProvider #Writes
 
@@ -249,20 +229,20 @@ namespace UnitTests.StorageTests
 
             await grain.DoSomething();
 
-            var providerState = GetStateForStorageProviderInUse(providerName, typeof(MockStorageProvider).FullName);
+            var providerState = GetStateForStorageProviderInUse<MockStorageProvider>(providerName);
 
             Assert.Equal(1, providerState.ProviderStateForTest.ReadCount); // StorageProvider #Reads
             Assert.Equal(0, providerState.ProviderStateForTest.WriteCount); // StorageProvider #Writes
-            SetStoredValue(providerName, typeof(MockStorageProvider).FullName, DefaultGrainStateName, grain, "Field1", 42);
-            
+            SetStoredValue<MockStorageProvider>(providerName, DefaultGrainStateName, grain, "Field1", 42);
+
             await grain.DoRead();
-            providerState = GetStateForStorageProviderInUse(providerName, typeof(MockStorageProvider).FullName);
+            providerState = GetStateForStorageProviderInUse<MockStorageProvider>(providerName);
             Assert.Equal(2, providerState.ProviderStateForTest.ReadCount); // StorageProvider #Reads-2
             Assert.Equal(0, providerState.ProviderStateForTest.WriteCount); // StorageProvider #Writes-2
 
             Assert.Equal(42, providerState.LastStoredGrainState.Field1); // Store-Field1
         }
-        
+
         [Fact, TestCategory("Functional"), TestCategory("Persistence"), TestCategory("MemoryStore")]
         public async Task MemoryStore_Read_Write()
         {
@@ -313,12 +293,11 @@ namespace UnitTests.StorageTests
             {
                 IMemoryStorageTestGrain grain = this.HostedCluster.GrainFactory.GetGrain<IMemoryStorageTestGrain>(Guid.NewGuid());
                 int idx = i; // Capture
-                Func<Task<int>> asyncFunc =
-                    async () =>
-                    {
-                        await grain.DoWrite(idx);
-                        return await grain.DoRead();
-                    };
+                async Task<int> asyncFunc()
+                {
+                    await grain.DoWrite(idx);
+                    return await grain.DoRead();
+                }
                 promises[i] = Task.Run(asyncFunc);
             }
             await Task.WhenAll(promises);
@@ -330,7 +309,7 @@ namespace UnitTests.StorageTests
             for (int i = 0; i < numIterations; i++)
             {
                 int expectedVal = i;
-                Assert.Equal(expectedVal,  promises[i].Result);  //  "Returned value - Read @ #" + i
+                Assert.Equal(expectedVal,  await promises[i]);  //  "Returned value - Read @ #" + i
             }
         }
 
@@ -343,7 +322,7 @@ namespace UnitTests.StorageTests
 
             await grain.DoWrite(1);
 
-            var providerState = GetStateForStorageProviderInUse(providerName, typeof(MockStorageProvider).FullName);
+            var providerState = GetStateForStorageProviderInUse<MockStorageProvider>(providerName);
 
             Assert.Equal(1, providerState.ProviderStateForTest.ReadCount); // StorageProvider #Reads
             Assert.Equal(1, providerState.ProviderStateForTest.WriteCount); // StorageProvider #Writes
@@ -351,7 +330,7 @@ namespace UnitTests.StorageTests
             Assert.Equal(1, providerState.LastStoredGrainState.Field1); // Store-Field1
 
             await grain.DoWrite(2);
-            providerState = GetStateForStorageProviderInUse(providerName, typeof(MockStorageProvider).FullName);
+            providerState = GetStateForStorageProviderInUse<MockStorageProvider>(providerName);
             Assert.Equal(1, providerState.ProviderStateForTest.ReadCount); // StorageProvider #Reads
             Assert.Equal(2, providerState.ProviderStateForTest.WriteCount); // StorageProvider #Writes
 
@@ -367,24 +346,24 @@ namespace UnitTests.StorageTests
 
             await grain.DoWrite(1);
 
-            var providerState = GetStateForStorageProviderInUse(providerName, typeof(MockStorageProvider).FullName);
+            var providerState = GetStateForStorageProviderInUse<MockStorageProvider>(providerName);
 
             int initialReadCount = providerState.ProviderStateForTest.ReadCount;
             int initialWriteCount = providerState.ProviderStateForTest.WriteCount;
             int initialDeleteCount = providerState.ProviderStateForTest.DeleteCount;
 
             await grain.DoDelete();
-            providerState = GetStateForStorageProviderInUse(providerName, typeof(MockStorageProvider).FullName);
+            providerState = GetStateForStorageProviderInUse<MockStorageProvider>(providerName);
             Assert.Equal(initialDeleteCount + 1, providerState.ProviderStateForTest.DeleteCount); // StorageProvider #Deletes
             Assert.Null(providerState.LastStoredGrainState); // Store-AfterDelete-Empty
 
             int val = await grain.GetValue(); // Returns current in-memory null data without re-read.
-            providerState = GetStateForStorageProviderInUse(providerName, typeof(MockStorageProvider).FullName); // update state
+            providerState = GetStateForStorageProviderInUse<MockStorageProvider>(providerName); // update state
             Assert.Equal(0, val); // Value after Delete
             Assert.Equal(initialReadCount, providerState.ProviderStateForTest.ReadCount); // StorageProvider #Reads
 
             await grain.DoWrite(2);
-            providerState = GetStateForStorageProviderInUse(providerName, typeof(MockStorageProvider).FullName); // update state
+            providerState = GetStateForStorageProviderInUse<MockStorageProvider>(providerName); // update state
             Assert.Equal(initialReadCount, providerState.ProviderStateForTest.ReadCount); // StorageProvider #Reads
             Assert.Equal(initialWriteCount + 1, providerState.ProviderStateForTest.WriteCount); // StorageProvider #Writes
 
@@ -399,7 +378,7 @@ namespace UnitTests.StorageTests
             IPersistenceErrorGrain grain = this.HostedCluster.GrainFactory.GetGrain<IPersistenceErrorGrain>(id);
             _ = await grain.GetValue();
 
-            var providerState = GetStateForStorageProviderInUse(providerName, typeof(MockStorageProvider).FullName);
+            var providerState = GetStateForStorageProviderInUse<MockStorageProvider>(providerName);
 
             Assert.Equal(1, providerState.ProviderStateForTest.ReadCount); // StorageProvider #Reads
             Assert.Equal(0, providerState.ProviderStateForTest.WriteCount); // StorageProvider #Writes
@@ -425,7 +404,7 @@ namespace UnitTests.StorageTests
                 }
             }
 
-            providerState = GetStateForStorageProviderInUse(providerName, typeof(MockStorageProvider).FullName);
+            providerState = GetStateForStorageProviderInUse<MockStorageProvider>(providerName);
             Assert.Equal(1, providerState.ProviderStateForTest.ReadCount); // StorageProvider #Reads-2
             Assert.Equal(0, providerState.ProviderStateForTest.WriteCount); // StorageProvider #Writes-2
 
@@ -449,7 +428,7 @@ namespace UnitTests.StorageTests
                     throw e;
                 }
             }
-            providerState = GetStateForStorageProviderInUse(providerName, typeof(MockStorageProvider).FullName);
+            providerState = GetStateForStorageProviderInUse<MockStorageProvider>(providerName);
             Assert.Equal(2, providerState.ProviderStateForTest.ReadCount); // StorageProvider #Reads-2
             Assert.Equal(0, providerState.ProviderStateForTest.WriteCount); // StorageProvider #Writes-2
         }
@@ -463,7 +442,7 @@ namespace UnitTests.StorageTests
 
             await grain.DoWrite(1);
 
-            var providerState = GetStateForStorageProviderInUse(providerName, typeof(MockStorageProvider).FullName);
+            var providerState = GetStateForStorageProviderInUse<MockStorageProvider>(providerName);
 
             Assert.Equal(1, providerState.ProviderStateForTest.ReadCount); // StorageProvider #Reads
             Assert.Equal(1, providerState.ProviderStateForTest.WriteCount); // StorageProvider #Writes
@@ -471,7 +450,7 @@ namespace UnitTests.StorageTests
             Assert.Equal(1, providerState.LastStoredGrainState.Field1); // Store-Field1
 
             await grain.DoWrite(2);
-            providerState = GetStateForStorageProviderInUse(providerName, typeof(MockStorageProvider).FullName);
+            providerState = GetStateForStorageProviderInUse<MockStorageProvider>(providerName);
             Assert.Equal(1, providerState.ProviderStateForTest.ReadCount); // StorageProvider #Reads
             Assert.Equal(2, providerState.ProviderStateForTest.WriteCount); // StorageProvider #Writes
 
@@ -496,7 +475,7 @@ namespace UnitTests.StorageTests
                     throw;
                 }
             }
-            providerState = GetStateForStorageProviderInUse(providerName, typeof(MockStorageProvider).FullName); // update provider state
+            providerState = GetStateForStorageProviderInUse<MockStorageProvider>(providerName); // update provider state
             Assert.Equal(1, providerState.ProviderStateForTest.ReadCount); // StorageProvider #Reads
             Assert.Equal(2, providerState.ProviderStateForTest.WriteCount); // StorageProvider #Writes
 
@@ -521,7 +500,7 @@ namespace UnitTests.StorageTests
                     throw;
                 }
             }
-            providerState = GetStateForStorageProviderInUse(providerName, typeof(MockStorageProvider).FullName);
+            providerState = GetStateForStorageProviderInUse<MockStorageProvider>(providerName);
             Assert.Equal(1, providerState.ProviderStateForTest.ReadCount); // StorageProvider #Reads
             Assert.Equal(3, providerState.ProviderStateForTest.WriteCount); // StorageProvider #Writes
 
@@ -538,22 +517,22 @@ namespace UnitTests.StorageTests
             IPersistenceErrorGrain grain = this.HostedCluster.GrainFactory.GetGrain<IPersistenceErrorGrain>(guid);
             _ = await grain.GetValue();
 
-            var providerState = GetStateForStorageProviderInUse(providerName, typeof(MockStorageProvider).FullName);
+            var providerState = GetStateForStorageProviderInUse<MockStorageProvider>(providerName);
 
             Assert.Equal(1, providerState.ProviderStateForTest.ReadCount); // StorageProvider #Reads
             Assert.Equal(0, providerState.ProviderStateForTest.WriteCount); // StorageProvider #Writes
 
-            SetStoredValue(providerName, typeof(MockStorageProvider).FullName, DefaultGrainStateName, grain, "Field1", 42);
+            SetStoredValue<MockStorageProvider>(providerName, DefaultGrainStateName, grain, "Field1", 42);
 
             await grain.DoRead();
-            providerState = GetStateForStorageProviderInUse(providerName, typeof(MockStorageProvider).FullName);
+            providerState = GetStateForStorageProviderInUse<MockStorageProvider>(providerName);
             Assert.Equal(2, providerState.ProviderStateForTest.ReadCount); // StorageProvider #Reads-2
             Assert.Equal(0, providerState.ProviderStateForTest.WriteCount); // StorageProvider #Writes-2
 
             Assert.Equal(42, providerState.LastStoredGrainState.Field1); // Store-Field1
 
             await grain.DoWrite(43);
-            providerState = GetStateForStorageProviderInUse(providerName, typeof(MockStorageProvider).FullName);
+            providerState = GetStateForStorageProviderInUse<MockStorageProvider>(providerName);
             Assert.Equal(2, providerState.ProviderStateForTest.ReadCount); // StorageProvider #Reads-2
             Assert.Equal(1, providerState.ProviderStateForTest.WriteCount); // StorageProvider #Writes-2
 
@@ -578,7 +557,7 @@ namespace UnitTests.StorageTests
                     throw;
                 }
             }
-            providerState = GetStateForStorageProviderInUse(providerName, typeof(MockStorageProvider).FullName);
+            providerState = GetStateForStorageProviderInUse<MockStorageProvider>(providerName);
             Assert.Equal(2, providerState.ProviderStateForTest.ReadCount); // StorageProvider #Reads-2
             Assert.Equal(1, providerState.ProviderStateForTest.WriteCount); // StorageProvider #Writes-2
 
@@ -603,7 +582,7 @@ namespace UnitTests.StorageTests
                     throw;
                 }
             }
-            providerState = GetStateForStorageProviderInUse(providerName, typeof(MockStorageProvider).FullName);
+            providerState = GetStateForStorageProviderInUse<MockStorageProvider>(providerName);
             Assert.Equal(3, providerState.ProviderStateForTest.ReadCount); // StorageProvider #Reads-2
             Assert.Equal(1, providerState.ProviderStateForTest.WriteCount); // StorageProvider #Writes-2
 
@@ -622,12 +601,12 @@ namespace UnitTests.StorageTests
             int expectedVal = 42;
 
             await SetErrorInjection(providerName, ErrorInjectionPoint.None);
-            SetStoredValue(providerName, typeof(ErrorInjectionStorageProvider).FullName, DefaultGrainStateName, grain, "Field1", expectedVal);
+            SetStoredValue<ErrorInjectionStorageProvider>(providerName, DefaultGrainStateName, grain, "Field1", expectedVal);
             val = await grain.DoRead();
 
             Assert.Equal(expectedVal, val); // Returned value
             await SetErrorInjection(providerName, ErrorInjectionPoint.BeforeRead);
-            
+
             await CheckStorageProviderErrors(grain.DoRead);
 
             await SetErrorInjection(providerName, ErrorInjectionPoint.None);
@@ -648,7 +627,7 @@ namespace UnitTests.StorageTests
             int expectedVal = 52;
 
             await SetErrorInjection(providerName, ErrorInjectionPoint.None);
-            SetStoredValue(providerName, typeof(ErrorInjectionStorageProvider).FullName, DefaultGrainStateName, grain, "Field1", expectedVal);
+            SetStoredValue<ErrorInjectionStorageProvider>(providerName, DefaultGrainStateName, grain, "Field1", expectedVal);
 
             val = await grain.DoRead();
 
@@ -662,7 +641,7 @@ namespace UnitTests.StorageTests
 
             int newVal = 53;
             await SetErrorInjection(providerName, ErrorInjectionPoint.None);
-            SetStoredValue(providerName, typeof(ErrorInjectionStorageProvider).FullName, DefaultGrainStateName, grain, "Field1", newVal);
+            SetStoredValue<ErrorInjectionStorageProvider>(providerName, DefaultGrainStateName, grain, "Field1", newVal);
 
             val = await grain.GetValue();
             Assert.Equal(expectedVal, val); // Returned value
@@ -685,7 +664,7 @@ namespace UnitTests.StorageTests
 
             int expectedVal = 62;
             await grain.DoWrite(expectedVal);
-            var providerState = GetStateForStorageProviderInUse(providerName, typeof(ErrorInjectionStorageProvider).FullName);
+            var providerState = GetStateForStorageProviderInUse<ErrorInjectionStorageProvider>(providerName);
             Assert.Equal(expectedVal, providerState.LastStoredGrainState.Field1); // Store-Field1
 
             const int attemptedVal3 = 63;
@@ -693,13 +672,13 @@ namespace UnitTests.StorageTests
             await CheckStorageProviderErrors(() => grain.DoWrite(attemptedVal3));
 
             // Stored value unchanged
-            providerState = GetStateForStorageProviderInUse(providerName, typeof(ErrorInjectionStorageProvider).FullName);
+            providerState = GetStateForStorageProviderInUse<ErrorInjectionStorageProvider>(providerName);
             Assert.Equal(expectedVal, providerState.LastStoredGrainState.Field1); // Store-Field1
 
             await SetErrorInjection(providerName, ErrorInjectionPoint.None);
             val = await grain.GetValue();
             // Stored value unchanged
-            providerState = GetStateForStorageProviderInUse(providerName, typeof(ErrorInjectionStorageProvider).FullName);
+            providerState = GetStateForStorageProviderInUse<ErrorInjectionStorageProvider>(providerName);
             Assert.Equal(expectedVal, providerState.LastStoredGrainState.Field1); // Store-Field1
 #if REREAD_STATE_AFTER_WRITE_FAILED
             Assert.Equal(expectedVal, val); // Last value written successfully
@@ -720,7 +699,7 @@ namespace UnitTests.StorageTests
             int expectedVal = 62;
             var originalActivationId = await grain.GetActivationId();
             await grain.DoWrite(expectedVal);
-            var providerState = GetStateForStorageProviderInUse(providerName, typeof(ErrorInjectionStorageProvider).FullName);
+            var providerState = GetStateForStorageProviderInUse<ErrorInjectionStorageProvider>(providerName);
             Assert.Equal(expectedVal, providerState.LastStoredGrainState.Field1); // Store-Field1
 
             const int attemptedVal3 = 63;
@@ -732,14 +711,14 @@ namespace UnitTests.StorageTests
             await CheckStorageProviderErrors(() => grain.DoWrite(attemptedVal3), typeof(InconsistentStateException));
 
             // Stored value unchanged
-            providerState = GetStateForStorageProviderInUse(providerName, typeof(ErrorInjectionStorageProvider).FullName);
+            providerState = GetStateForStorageProviderInUse<ErrorInjectionStorageProvider>(providerName);
             Assert.Equal(expectedVal, providerState.LastStoredGrainState.Field1); // Store-Field1
             Assert.NotEqual(originalActivationId, await grain.GetActivationId());
 
             await SetErrorInjection(providerName, ErrorInjectionPoint.None);
             val = await grain.GetValue();
             // Stored value unchanged
-            providerState = GetStateForStorageProviderInUse(providerName, typeof(ErrorInjectionStorageProvider).FullName);
+            providerState = GetStateForStorageProviderInUse<ErrorInjectionStorageProvider>(providerName);
             Assert.Equal(expectedVal, providerState.LastStoredGrainState.Field1); // Store-Field1
 
             // The value should not have changed.
@@ -756,7 +735,7 @@ namespace UnitTests.StorageTests
         {
             var target = this.HostedCluster.GrainFactory.GetGrain<IPersistenceProviderErrorGrain>(Guid.NewGuid());
             var proxy = this.HostedCluster.GrainFactory.GetGrain<IPersistenceProviderErrorProxyGrain>(Guid.NewGuid());
-            
+
             // Record the original activation ids.
             var targetActivationId = await target.GetActivationId();
             var proxyActivationId = await proxy.GetActivationId();
@@ -787,7 +766,7 @@ namespace UnitTests.StorageTests
 
             int expectedVal = 82;
             await grain.DoWrite(expectedVal);
-            var providerState = GetStateForStorageProviderInUse(providerName, typeof(ErrorInjectionStorageProvider).FullName);
+            var providerState = GetStateForStorageProviderInUse<ErrorInjectionStorageProvider>(providerName);
             Assert.Equal(expectedVal, providerState.LastStoredGrainState.Field1); // Store-Field1
 
             const int attemptedVal4 = 83;
@@ -796,7 +775,7 @@ namespace UnitTests.StorageTests
 
             // Stored value has changed
             expectedVal = attemptedVal4;
-            providerState = GetStateForStorageProviderInUse(providerName, typeof(ErrorInjectionStorageProvider).FullName);
+            providerState = GetStateForStorageProviderInUse<ErrorInjectionStorageProvider>(providerName);
             Assert.Equal(expectedVal, providerState.LastStoredGrainState.Field1); // Store-Field1
             await SetErrorInjection(providerName, ErrorInjectionPoint.None);
             val = await grain.GetValue();
@@ -813,13 +792,13 @@ namespace UnitTests.StorageTests
 
             var val = await grain.GetValue();
             int expectedVal = 72;
-            SetStoredValue(providerName, typeof(ErrorInjectionStorageProvider).FullName, DefaultGrainStateName, grain, "Field1", expectedVal);
+            SetStoredValue<ErrorInjectionStorageProvider>(providerName, DefaultGrainStateName, grain, "Field1", expectedVal);
             val = await grain.DoRead();
             Assert.Equal(expectedVal, val); // Returned value
 
             expectedVal = 73;
             await grain.DoWrite(expectedVal);
-            var providerState = GetStateForStorageProviderInUse(providerName, typeof(ErrorInjectionStorageProvider).FullName);
+            var providerState = GetStateForStorageProviderInUse<ErrorInjectionStorageProvider>(providerName);
             Assert.Equal(expectedVal, providerState.LastStoredGrainState.Field1); // Store-Field1
 
             await SetErrorInjection(providerName, ErrorInjectionPoint.BeforeRead);
@@ -841,17 +820,17 @@ namespace UnitTests.StorageTests
             var val = await grain.GetValue();
 
             int expectedVal = 92;
-            SetStoredValue(providerName, typeof(ErrorInjectionStorageProvider).FullName, DefaultGrainStateName, grain, "Field1", expectedVal);
+            SetStoredValue<ErrorInjectionStorageProvider>(providerName, DefaultGrainStateName, grain, "Field1", expectedVal);
             val = await grain.DoRead();
             Assert.Equal(expectedVal, val); // Returned value
 
             expectedVal = 93;
             await grain.DoWrite(expectedVal);
-            var providerState = GetStateForStorageProviderInUse(providerName, typeof(ErrorInjectionStorageProvider).FullName);
+            var providerState = GetStateForStorageProviderInUse<ErrorInjectionStorageProvider>(providerName);
             Assert.Equal(expectedVal, providerState.LastStoredGrainState.Field1); // Store-Field1
 
             expectedVal = 94;
-            SetStoredValue(providerName, typeof(ErrorInjectionStorageProvider).FullName, DefaultGrainStateName, grain, "Field1", expectedVal);
+            SetStoredValue<ErrorInjectionStorageProvider>(providerName, DefaultGrainStateName, grain, "Field1", expectedVal);
             await SetErrorInjection(providerName, ErrorInjectionPoint.AfterRead);
             await CheckStorageProviderErrors(grain.DoRead);
 
@@ -871,7 +850,7 @@ namespace UnitTests.StorageTests
             int expectedVal = 42;
 
             await SetErrorInjection(providerName, ErrorInjectionPoint.None);
-            SetStoredValue(providerName, typeof(ErrorInjectionStorageProvider).FullName, DefaultGrainStateName, grain, "Field1", expectedVal);
+            SetStoredValue<ErrorInjectionStorageProvider>(providerName, DefaultGrainStateName, grain, "Field1", expectedVal);
 
             var val = await grain.DoRead(false);
 
@@ -879,14 +858,14 @@ namespace UnitTests.StorageTests
 
             int newVal = expectedVal + 1;
 
-            SetStoredValue(providerName, typeof(ErrorInjectionStorageProvider).FullName, DefaultGrainStateName, grain, "Field1", newVal);
+            SetStoredValue<ErrorInjectionStorageProvider>(providerName, DefaultGrainStateName, grain, "Field1", newVal);
             await SetErrorInjection(providerName, ErrorInjectionPoint.BeforeRead);
             val = await grain.DoRead(true);
             Assert.Equal(expectedVal, val); // Returned value
             await SetErrorInjection(providerName, ErrorInjectionPoint.None);
             expectedVal = newVal;
 
-            SetStoredValue(providerName, typeof(ErrorInjectionStorageProvider).FullName, DefaultGrainStateName, grain, "Field1", newVal);
+            SetStoredValue<ErrorInjectionStorageProvider>(providerName, DefaultGrainStateName, grain, "Field1", newVal);
             val = await grain.DoRead(false);
             Assert.Equal(expectedVal, val); // Returned value
         }
@@ -902,7 +881,7 @@ namespace UnitTests.StorageTests
             int expectedVal = 42;
 
             await SetErrorInjection(providerName, ErrorInjectionPoint.None);
-            SetStoredValue(providerName, typeof(ErrorInjectionStorageProvider).FullName, DefaultGrainStateName, grain, "Field1", expectedVal);
+            SetStoredValue<ErrorInjectionStorageProvider>(providerName, DefaultGrainStateName, grain, "Field1", expectedVal);
 
             var val = await grain.DoRead(false);
 
@@ -934,7 +913,7 @@ namespace UnitTests.StorageTests
             int expectedVal = 42;
 
             await SetErrorInjection(providerName, ErrorInjectionPoint.None);
-            SetStoredValue(providerName, typeof(ErrorInjectionStorageProvider).FullName, DefaultGrainStateName, grain, "Field1", expectedVal);
+            SetStoredValue<ErrorInjectionStorageProvider>(providerName, DefaultGrainStateName, grain, "Field1", expectedVal);
             val = await grain.DoRead(false);
 
             Assert.Equal(expectedVal, val); // Returned value after read
@@ -945,7 +924,7 @@ namespace UnitTests.StorageTests
 
             val = await grain.GetValue();
             // Stored value unchanged
-            var providerState = GetStateForStorageProviderInUse(providerName, typeof(ErrorInjectionStorageProvider).FullName);
+            var providerState = GetStateForStorageProviderInUse<ErrorInjectionStorageProvider>(providerName);
             Assert.Equal(expectedVal, providerState.LastStoredGrainState.Field1); // Store-Field1
 #if REREAD_STATE_AFTER_WRITE_FAILED
             Assert.Equal(expectedVal, val); // After failed write: Last value written successfully
@@ -973,7 +952,7 @@ namespace UnitTests.StorageTests
                 Guid guid = grain.GetPrimaryKey();
                 _ = guid.ToString("N");
 
-                SetStoredValue(MockStorageProviderName1, typeof(MockStorageProvider).FullName, DefaultGrainStateName, grain, "Field1", expectedVal); // Update state data behind grain
+                SetStoredValue<MockStorageProvider>(MockStorageProviderName1, DefaultGrainStateName, grain, "Field1", expectedVal); // Update state data behind grain
                 promises[i] = grain.DoRead();
             }
             await Task.WhenAll(promises);
@@ -981,7 +960,7 @@ namespace UnitTests.StorageTests
             for (int i = 0; i < numIterations; i++)
             {
                 int expectedVal = i;
-                Assert.Equal(expectedVal,  promises[i].Result);  //  "Returned value - Read @ #" + i
+                Assert.Equal(expectedVal,  await promises[i]);  //  "Returned value - Read @ #" + i
             }
         }
 
@@ -1186,8 +1165,35 @@ namespace UnitTests.StorageTests
             Assert.Equal(1, val);
         }
 
+        [Fact, TestCategory("Functional"), TestCategory("Persistence")]
+        public async Task SurrogatePersistence_TypeWithoutPublicConstructor_Read()
+        {
+            ISurrogateStateForTypeWithoutPublicConstructorGrain<ExternalTypeWithoutPublicConstructor> grain = HostedCluster.GrainFactory
+                .GetGrain<ISurrogateStateForTypeWithoutPublicConstructorGrain<ExternalTypeWithoutPublicConstructor>>(Guid.NewGuid());
+            ExternalTypeWithoutPublicConstructor instance = ExternalTypeWithoutPublicConstructor.Create(1, 2);
+
+            await grain.SetState(instance);
+            ExternalTypeWithoutPublicConstructor val = await grain.GetState();
+
+            Assert.Equal(1, val.Field1);
+            Assert.Equal(2, val.Field2);
+        }
+
+        [Fact, TestCategory("Functional"), TestCategory("Persistence")]
+        public async Task Persistence_RecordTypeWithoutPublicParameterlessConstructor_Read()
+        {
+            IRecordTypeWithoutPublicParameterlessConstructorGrain<RecordTypeWithoutPublicParameterlessConstructor> grain = HostedCluster.GrainFactory
+                .GetGrain<IRecordTypeWithoutPublicParameterlessConstructorGrain<RecordTypeWithoutPublicParameterlessConstructor>>(Guid.NewGuid());
+            RecordTypeWithoutPublicParameterlessConstructor instance = new RecordTypeWithoutPublicParameterlessConstructor(1);
+
+            await grain.SetState(instance);
+            RecordTypeWithoutPublicParameterlessConstructor val = await grain.GetState();
+
+            Assert.Equal(1, val.Field);
+        }
+
         // ---------- Utility functions ----------
-        private void SetStoredValue(string providerName, string providerTypeFullName, string grainType, IGrain grain, string fieldName, int newValue)
+        private void SetStoredValue<T>(string providerName, string grainType, IGrain grain, string fieldName, int newValue) where T : IControllable
         {
             IManagementGrain mgmtGrain = this.HostedCluster.GrainFactory.GetGrain<IManagementGrain>(0);
             // set up SetVal func args
@@ -1199,7 +1205,7 @@ namespace UnitTests.StorageTests
                 GrainId = grain.GetGrainId(),
                 StateType = typeof(PersistenceTestGrainState)
             };
-            mgmtGrain.SendControlCommandToProvider(providerTypeFullName,
+            mgmtGrain.SendControlCommandToProvider<T>(
                 providerName, (int)MockStorageProvider.Commands.SetValue, args).Wait();
         }
 
@@ -1225,7 +1231,7 @@ namespace UnitTests.StorageTests
                 {
                     string msg = "StorageProviderInjectedError exception should have been thrown " + at;
                     output.WriteLine("Assertion failed: {0}", msg);
-                    Assert.True(false, msg);
+                    Assert.Fail(msg);
                 }
             }
             catch (Exception e)
@@ -1261,13 +1267,13 @@ namespace UnitTests.StorageTests
             return false;
         }
 
-        private ProviderState GetStateForStorageProviderInUse(string providerName, string providerTypeFullName, bool okNull = false)
+        private ProviderState GetStateForStorageProviderInUse<T>(string providerName, bool okNull = false) where T : IControllable
         {
             ProviderState providerState = new ProviderState();
             IManagementGrain mgmtGrain = this.HostedCluster.GrainFactory.GetGrain<IManagementGrain>(0);
-            object[] replies = mgmtGrain.SendControlCommandToProvider(providerTypeFullName,
+            object[] replies = mgmtGrain.SendControlCommandToProvider<T>(
                providerName, (int)MockStorageProvider.Commands.GetProvideState, null).Result;
-            object[] replies2 = mgmtGrain.SendControlCommandToProvider(providerTypeFullName,
+            object[] replies2 = mgmtGrain.SendControlCommandToProvider<T>(
                               providerName, (int)MockStorageProvider.Commands.GetLastState, null).Result;
             for(int i = 0; i < replies.Length; i++)
             {
@@ -1280,11 +1286,11 @@ namespace UnitTests.StorageTests
                     return providerState;
                 }
             }
-            
+
             return providerState;
         }
 
-        class ProviderState
+        private class ProviderState
         {
             public MockStorageProvider.StateForTest ProviderStateForTest { get; set; }
             public PersistenceTestGrainState LastStoredGrainState { get; set; }
@@ -1299,7 +1305,7 @@ namespace UnitTests.StorageTests
                 {
                     if (!this.HostedCluster.Client.GetTestHooks(siloHandle).HasStorageProvider(providerName).Result) continue;
                     IManagementGrain mgmtGrain = this.HostedCluster.GrainFactory.GetGrain<IManagementGrain>(0);
-                    _ = mgmtGrain.SendControlCommandToProvider(typeof(MockStorageProvider).FullName,
+                    _ = mgmtGrain.SendControlCommandToProvider<MockStorageProvider>(
                        providerName, (int)MockStorageProvider.Commands.ResetHistory, null).Result;
                 }
             }

@@ -1,6 +1,6 @@
+#nullable enable
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
@@ -21,11 +21,11 @@ namespace Orleans.GrainDirectory.AzureStorage
 
         internal class GrainDirectoryEntity : ITableEntity
         {
-            public string SiloAddress { get; set; }
-            public string ActivationId { get; set; }
-            public long MembershipVersion { get; set; }
-            public string PartitionKey { get; set; }
-            public string RowKey { get; set; }
+            public required string SiloAddress { get; set; }
+            public required string ActivationId { get; set; }
+            public required long MembershipVersion { get; set; }
+            public required string PartitionKey { get; set; }
+            public required string RowKey { get; set; }
             public DateTimeOffset? Timestamp { get; set; }
             public ETag ETag { get; set; }
 
@@ -42,6 +42,8 @@ namespace Orleans.GrainDirectory.AzureStorage
 
             public static GrainDirectoryEntity FromGrainAddress(string clusterId, GrainAddress address)
             {
+                ArgumentNullException.ThrowIfNull(address.SiloAddress);
+
                 return new GrainDirectoryEntity
                 {
                     PartitionKey = clusterId,
@@ -68,7 +70,7 @@ namespace Orleans.GrainDirectory.AzureStorage
             this.clusterId = clusterOptions.Value.ClusterId;
         }
 
-        public async Task<GrainAddress> Lookup(GrainId grainId)
+        public async Task<GrainAddress?> Lookup(GrainId grainId)
         {
             var result = await this.tableDataManager.ReadSingleTableEntryAsync(this.clusterId, GrainDirectoryEntity.GrainIdToRowKey(grainId));
 
@@ -80,9 +82,9 @@ namespace Orleans.GrainDirectory.AzureStorage
             return result.Item1.ToGrainAddress();
         }
 
-        public Task<GrainAddress> Register(GrainAddress address) => Register(address, null);
+        public Task<GrainAddress?> Register(GrainAddress address) => Register(address, null);
 
-        public async Task<GrainAddress> Register(GrainAddress address, GrainAddress previousAddress)
+        public async Task<GrainAddress?> Register(GrainAddress address, GrainAddress? previousAddress)
         {
             (bool isSuccess, string eTag) result;
             if (previousAddress is not null)

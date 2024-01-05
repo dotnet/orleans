@@ -1,5 +1,5 @@
-using System;
 using System.Net;
+using System.Text.Json;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans;
 using Orleans.GrainReferences;
@@ -17,8 +17,9 @@ namespace UnitTests.General
         private readonly TestEnvironmentFixture environment;
         private static Random random => Random.Shared;
 
-        class A { }
-        class B : A { }
+        private class A { }
+
+        private class B : A { }
         
         public IdentifierTests(ITestOutputHelper output, TestEnvironmentFixture fixture)
         {
@@ -97,45 +98,56 @@ namespace UnitTests.General
             }
         }
 
-        [Fact, TestCategory("SlowBVT"), TestCategory("Identifiers")]
-        public void GrainId_ToFromPrintableString()
+        [Theory, TestCategory("SlowBVT"), TestCategory("Identifiers")]
+        [MemberData(nameof(TestGrainIds))]
+        public void GrainId_ToFromPrintableString(GrainId grainId)
         {
-            Guid guid = Guid.NewGuid();
-            GrainId grainId = GrainId.Create(GrainType.Create("test"), GrainIdKeyExtensions.CreateGuidKey(guid));
-            GrainId roundTripped = RoundTripGrainIdToParsable(grainId);
-            Assert.Equal(grainId, roundTripped); // GrainId.ToPrintableString -- Guid key
+            string str = grainId.ToString();
+            var roundTripped = GrainId.Parse(str);
 
-            string extKey = "Guid-ExtKey-1";
-            guid = Guid.NewGuid();
-            grainId = GrainId.Create(GrainType.Create("test"), GrainIdKeyExtensions.CreateGuidKey(guid, extKey));
-            roundTripped = RoundTripGrainIdToParsable(grainId);
-            Assert.Equal(grainId, roundTripped); // GrainId.ToPrintableString -- Guid key + Extended Key
-
-            grainId = GrainId.Create(GrainType.Create("test"), GrainIdKeyExtensions.CreateGuidKey(guid, (string)null));
-            roundTripped = RoundTripGrainIdToParsable(grainId);
-            Assert.Equal(grainId, roundTripped); // GrainId.ToPrintableString -- Guid key + null Extended Key
-
-            long key = random.Next();
-            grainId = GrainId.Create(GrainType.Create("test"), GrainIdKeyExtensions.CreateIntegerKey(key));
-            roundTripped = RoundTripGrainIdToParsable(grainId);
-            Assert.Equal(grainId, roundTripped); // GrainId.ToPrintableString -- Int64 key
-
-            extKey = "Long-ExtKey-2";
-            key = random.Next();
-            grainId = GrainId.Create(GrainType.Create("test"), GrainIdKeyExtensions.CreateIntegerKey(key, extKey));
-            roundTripped = RoundTripGrainIdToParsable(grainId);
-            Assert.Equal(grainId, roundTripped); // GrainId.ToPrintableString -- Int64 key + Extended Key
-
-            key = UniqueKey.NewKey(key).PrimaryKeyToLong();
-            grainId = GrainId.Create(GrainType.Create("test"), GrainIdKeyExtensions.CreateIntegerKey(key, extKey));
-            roundTripped = RoundTripGrainIdToParsable(grainId);
-            Assert.Equal(grainId, roundTripped); // GrainId.ToPrintableString -- Int64 key + null Extended Key
+            Assert.Equal(grainId, roundTripped);
         }
 
-        private GrainId RoundTripGrainIdToParsable(GrainId input)
+        [Theory, TestCategory("SlowBVT"), TestCategory("Identifiers")]
+        [MemberData(nameof(TestGrainIds))]
+        public void GrainId_TryParseFromPrintableString(GrainId grainId)
         {
-            string str = input.ToString();
-            return GrainId.Parse(str);
+            string str = grainId.ToString();
+            var success = GrainId.TryParse(str, out var roundTripped);
+
+            Assert.True(success);
+            Assert.Equal(grainId, roundTripped);
+        }
+
+        [Theory, TestCategory("SlowBVT"), TestCategory("Identifiers")]
+        [MemberData(nameof(TestGrainIds))]
+        public void GrainId_RoundTripJsonConverter(GrainId grainId)
+        {
+            var serialized = JsonSerializer.Serialize(grainId);
+            var deserialized = JsonSerializer.Deserialize<GrainId>(serialized);
+
+            Assert.Equal(grainId, deserialized);
+        }
+
+        public static TheoryData<GrainId> TestGrainIds
+        {
+            get
+            {
+                var td = new TheoryData<GrainId>();
+                var grainType = GrainType.Create("test");
+                var guid = Guid.NewGuid();
+                var integer = Random.Shared.NextInt64();
+
+                td.Add(GrainId.Create(grainType, GrainIdKeyExtensions.CreateGuidKey(guid)));
+                td.Add(GrainId.Create(grainType, GrainIdKeyExtensions.CreateGuidKey(guid, "Guid-ExtKey-1")));
+                td.Add(GrainId.Create(grainType, GrainIdKeyExtensions.CreateGuidKey(guid, (string)null)));
+                td.Add(GrainId.Create(grainType, GrainIdKeyExtensions.CreateIntegerKey(integer)));
+                td.Add(GrainId.Create(grainType, GrainIdKeyExtensions.CreateIntegerKey(integer, "Long-ExtKey-2")));
+                td.Add(GrainId.Create(grainType, GrainIdKeyExtensions.CreateIntegerKey(integer, (string)null)));
+                td.Add(GrainId.Create(grainType, GrainIdKeyExtensions.CreateIntegerKey(UniqueKey.NewKey(integer).PrimaryKeyToLong(), "Long-ExtKey-2")));
+
+                return td;
+            }
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Identifiers")]

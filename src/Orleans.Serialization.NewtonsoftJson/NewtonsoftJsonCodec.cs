@@ -1,9 +1,12 @@
 using System;
+using System.CodeDom.Compiler;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Reflection;
 using Microsoft.Extensions.Options;
 using Newtonsoft.Json;
+using Orleans.Metadata;
 using Orleans.Serialization.Buffers;
 using Orleans.Serialization.Buffers.Adaptors;
 using Orleans.Serialization.Cloning;
@@ -124,6 +127,11 @@ public class NewtonsoftJsonCodec : IGeneralizedCodec, IGeneralizedCopier, ITypeF
             return true;
         }
 
+        if (CommonCodecTypeFilter.IsAbstractOrFrameworkType(type))
+        {
+            return false;
+        }
+
         foreach (var selector in _serializableTypeSelectors)
         {
             if (selector.IsSupportedType(type))
@@ -173,6 +181,11 @@ public class NewtonsoftJsonCodec : IGeneralizedCodec, IGeneralizedCopier, ITypeF
     /// <inheritdoc/>
     bool IGeneralizedCopier.IsSupportedType(Type type)
     {
+        if (CommonCodecTypeFilter.IsAbstractOrFrameworkType(type))
+        {
+            return false;
+        }
+
         foreach (var selector in _copyableTypeSelectors)
         {
             if (selector.IsSupportedType(type))

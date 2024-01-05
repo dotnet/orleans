@@ -1,9 +1,6 @@
 
 using System;
-using System.Collections.Generic;
-using System.Diagnostics.Tracing;
 using Orleans.Configuration;
-using Orleans.Runtime;
 using Orleans.Statistics;
 
 namespace Orleans.Streams

@@ -5,7 +5,6 @@ using Orleans.Serialization;
 using Orleans.Serialization.Session;
 using Microsoft.Extensions.DependencyInjection;
 using Newtonsoft.Json;
-using System.IO;
 using System.Text;
 using System.Text.Json;
 using Xunit;
@@ -53,7 +52,6 @@ namespace Benchmarks.Comparison
             SystemTextJsonWriter = new Utf8JsonWriter(SystemTextJsonOutput);
         }
 
-        [Fact]
         [Benchmark(Baseline = true)]
         public long Orleans()
         {

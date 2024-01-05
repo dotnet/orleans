@@ -1,12 +1,9 @@
-using System;
 using System.Runtime.Serialization;
-using System.Threading.Tasks;
-using Orleans;
 using UnitTests.GrainInterfaces;
 using Orleans.Runtime;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
-using System.Threading;
+using System.Runtime.CompilerServices;
 
 namespace UnitTests.Grains
 {
@@ -15,8 +12,7 @@ namespace UnitTests.Grains
         private readonly IInjectedService injectedService;
         private readonly IInjectedScopedService injectedScopedService;
         private readonly IGrainFactory injectedGrainFactory;
-        private readonly long grainFactoryId;
-        public static readonly ObjectIDGenerator ObjectIdGenerator = new ObjectIDGenerator();
+        private readonly int grainFactoryId;
         private readonly IGrainContextAccessor grainContextAccessor;
         private IGrainContext originalGrainContext;
 
@@ -25,10 +21,8 @@ namespace UnitTests.Grains
             this.injectedService = injectedService;
             this.injectedGrainFactory = injectedGrainFactory;
             this.injectedScopedService = injectedScopedService;
-            // get the object Id for injected GrainFactory, 
-            // object Id will be the same if the underlying object is the same,
-            // this is one way to prove that this GrainFactory is injected from DI
-            this.grainFactoryId = ObjectIdGenerator.GetId(this.injectedGrainFactory, out _);
+
+            this.grainFactoryId = RuntimeHelpers.GetHashCode(this.injectedGrainFactory);
             this.grainContextAccessor = grainContextAccessor;
         }
 
@@ -58,7 +52,7 @@ namespace UnitTests.Grains
             return Task.FromResult(this.injectedScopedService.GetInstanceValue());
         }
 
-        public Task<long> GetGrainFactoryId()
+        public Task<int> GetGrainFactoryId()
         {
             return Task.FromResult(this.grainFactoryId);
         }

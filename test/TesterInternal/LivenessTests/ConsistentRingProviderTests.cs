@@ -1,6 +1,3 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
 using Microsoft.Extensions.Logging.Abstractions;
 using Orleans.Configuration;
 using Orleans.Runtime;
@@ -92,7 +89,7 @@ namespace UnitTests.LivenessTests
 
             Dictionary<SiloAddress, List<int>> queueHistogram = GetQueueHistogram(allAgentRanges, (int)NUM_QUEUES);
             string str = Utils.EnumerableToString(sortedSiloRanges,
-                tuple => String.Format("Silo {0} -> Range {1:0.000}%, {2} queues: {3}", 
+                tuple => string.Format("Silo {0} -> Range {1:0.000}%, {2} queues: {3}", 
                     tuple.Item1,
                     tuple.Item2.RangePercentage(),
                     queueHistogram[tuple.Item1].Sum(),

@@ -120,6 +120,23 @@ namespace Orleans.Runtime
             }
         }
 
+        /// <summary>
+        /// Gets the previous directory registration for this grain, if known.
+        /// This is used to update the grain directory to point to the new registration during activation.
+        /// </summary>
+        public GrainAddress PreviousRegistration
+        {
+            get => _extras?.PreviousRegistration;
+            set
+            {
+                lock (this)
+                {
+                    _extras ??= new();
+                    _extras.PreviousRegistration = value;
+                }
+            }
+        }
+
         private Exception DeactivationException => _extras?.DeactivationReason.Exception;
 
         private DeactivationReason DeactivationReason
@@ -209,7 +226,7 @@ namespace Orleans.Runtime
             var result = GetComponent<TComponent>();
             if (result is null && typeof(IGrainExtension).IsAssignableFrom(typeof(TComponent)))
             {
-                var implementation = ActivationServices.GetServiceByKey<Type, IGrainExtension>(typeof(TComponent));
+                var implementation = ActivationServices.GetKeyedService<IGrainExtension>(typeof(TComponent));
                 if (implementation is not TComponent typedResult)
                 {
                     throw new GrainExtensionNotInstalledException($"No extension of type {typeof(TComponent)} is installed on this instance and no implementations are registered for automated install");
@@ -379,15 +396,15 @@ namespace Orleans.Runtime
 
         public void DelayDeactivation(TimeSpan timespan)
         {
-            if (timespan <= TimeSpan.Zero)
-            {
-                // reset any current keepAliveUntil
-                ResetKeepAliveRequest();
-            }
-            else if (timespan == TimeSpan.MaxValue)
+            if (timespan == TimeSpan.MaxValue || timespan == Timeout.InfiniteTimeSpan)
             {
                 // otherwise creates negative time.
                 KeepAliveUntil = DateTime.MaxValue;
+            }
+            else if (timespan <= TimeSpan.Zero)
+            {
+                // reset any current keepAliveUntil
+                ResetKeepAliveRequest();
             }
             else
             {
@@ -770,7 +787,7 @@ namespace Orleans.Runtime
                 return result;
             }
 
-            var implementation = ActivationServices.GetServiceByKey<Type, IGrainExtension>(typeof(TExtensionInterface));
+            var implementation = ActivationServices.GetKeyedService<IGrainExtension>(typeof(TExtensionInterface));
             if (!(implementation is TExtensionInterface typedResult))
             {
                 throw new GrainExtensionNotInstalledException($"No extension of type {typeof(TExtensionInterface)} is installed on this instance and no implementations are registered for automated install");
@@ -894,8 +911,8 @@ namespace Orleans.Runtime
                                 if (!compatibilityDirector.IsCompatible(message.InterfaceVersion, currentVersion))
                                 {
                                     // Add this activation to cache invalidation headers.
-                                    message.CacheInvalidationHeader ??= new();
-                                    message.CacheInvalidationHeader.Add(new GrainAddress { GrainId = GrainId, SiloAddress = Address.SiloAddress });
+                                    message.CacheInvalidationHeader ??= new List<GrainAddressCacheUpdate>();
+                                    message.CacheInvalidationHeader.Add(new GrainAddressCacheUpdate(Address, validAddress: null));
 
                                     var reason = new DeactivationReason(
                                         DeactivationReasonCode.IncompatibleRequest,
@@ -1016,7 +1033,7 @@ namespace Orleans.Runtime
                 {
                     try
                     {
-                        return canInterleave.MayInterleave(incoming);
+                        return canInterleave.MayInterleave(GrainInstance, incoming);
                     }
                     catch (Exception exception)
                     {
@@ -1082,7 +1099,7 @@ namespace Orleans.Runtime
                     if (context.TryGetValue(GrainAddressMigrationContextKey, out GrainAddress previousRegistration) && previousRegistration is not null)
                     {
                         // Propagate the previous registration, so that the new activation can atomically replace it with its new address.
-                        (_extras ??= new()).PreviousRegistration = previousRegistration;
+                        PreviousRegistration = previousRegistration;
                         if (_shared.Logger.IsEnabled(LogLevel.Debug))
                         {
                             _shared.Logger.LogDebug("Previous activation address was {PreviousRegistration}", previousRegistration);
@@ -1302,7 +1319,7 @@ namespace Orleans.Runtime
                         "RejectAllQueuedMessages: {Count} messages from invalid activation {Activation}.",
                         msgs.Count,
                         this);
-                _shared.InternalRuntime.LocalGrainDirectory.InvalidateCacheEntry(Address);
+                _shared.InternalRuntime.GrainLocator.InvalidateCache(Address);
                 _shared.InternalRuntime.MessageCenter.ProcessRequestsToInvalidActivation(
                     msgs,
                     Address,
@@ -1324,7 +1341,7 @@ namespace Orleans.Runtime
                 }
 
                 if (_shared.Logger.IsEnabled(LogLevel.Debug)) _shared.Logger.LogDebug((int)ErrorCode.Catalog_RerouteAllQueuedMessages, "Rerouting {NumMessages} messages from invalid grain activation {Grain}", msgs.Count, this);
-                _shared.InternalRuntime.LocalGrainDirectory.InvalidateCacheEntry(Address);
+                _shared.InternalRuntime.GrainLocator.InvalidateCache(Address);
                 _shared.InternalRuntime.MessageCenter.ProcessRequestsToInvalidActivation(msgs, Address, ForwardingAddress, DeactivationReason.Description, DeactivationException);
             }
         }
@@ -1487,38 +1504,66 @@ namespace Orleans.Runtime
             else
             {
                 Exception registrationException;
+                var previousRegistration = PreviousRegistration;
                 try
                 {
-                    var result = await _shared.InternalRuntime.GrainLocator.Register(Address, _extras?.PreviousRegistration);
-                    if (Address.Matches(result))
+                    while (true)
                     {
-                        success = true;
-                    }
-                    else
-                    {
-                        // Set the forwarding address so that messages enqueued on this activation can be forwarded to
-                        // the existing activation.
-                        ForwardingAddress = result?.SiloAddress;
-                        DeactivationReason = new(DeactivationReasonCode.DuplicateActivation, "This grain has been activated elsewhere.");
-                        success = false;
-                        CatalogInstruments.ActivationConcurrentRegistrationAttempts.Add(1);
-                        if (_shared.Logger.IsEnabled(LogLevel.Debug))
+                        var result = await _shared.InternalRuntime.GrainLocator.Register(Address, previousRegistration);
+                        if (Address.Matches(result))
                         {
-                            // If this was a duplicate, it's not an error, just a race.
-                            // Forward on all of the pending messages, and then forget about this activation.
-                            var primary = _shared.InternalRuntime.LocalGrainDirectory.GetPrimaryForGrain(GrainId);
-                            _shared.Logger.LogDebug(
-                                (int)ErrorCode.Catalog_DuplicateActivation,
-                                "Tried to create a duplicate activation {Address}, but we'll use {ForwardingAddress} instead. "
-                                + "GrainInstance Type is {GrainInstanceType}. {PrimaryMessage}"
-                                + "Full activation address is {Address}. We have {WaitingCount} messages to forward.",
-                                Address,
-                                ForwardingAddress,
-                                GrainInstance?.GetType(),
-                                primary != null ? "Primary Directory partition for this grain is " + primary + ". " : string.Empty,
-                                Address.ToFullString(),
-                                WaitingCount);
+                            success = true;
                         }
+                        else if (result?.SiloAddress is { } registeredSilo && registeredSilo.Equals(Address.SiloAddress))
+                        {
+                            if (_shared.Logger.IsEnabled(LogLevel.Debug))
+                            {
+                                _shared.Logger.LogDebug(
+                                    "The grain directory has an existing entry pointing to a different activation of this grain on this silo, {PreviousRegistration}."
+                                    + " This may indicate that the previous activation was deactivated but the directory was not successfully updated."
+                                    + " The directory will be updated to point to this activation.",
+                                    previousRegistration);
+                            }
+
+                            // Attempt to register this activation again, using the registration of the previous instance of this grain,
+                            // which is registered to this silo. That activation must be a defunct predecessor of this activation,
+                            // since the catalog only allows one activation of a given grain at a time.
+                            // This could occur if the previous activation failed to unregister itself from the grain directory.
+                            previousRegistration = result;
+                            continue;
+                        }
+                        else
+                        {
+                            // Set the forwarding address so that messages enqueued on this activation can be forwarded to
+                            // the existing activation.
+                            ForwardingAddress = result?.SiloAddress;
+                            if (ForwardingAddress is { } address)
+                            {
+                                DeactivationReason = new(DeactivationReasonCode.DuplicateActivation, $"This grain is active on another host ({address}).");
+                            }
+
+                            success = false;
+                            CatalogInstruments.ActivationConcurrentRegistrationAttempts.Add(1);
+                            if (_shared.Logger.IsEnabled(LogLevel.Debug))
+                            {
+                                // If this was a duplicate, it's not an error, just a race.
+                                // Forward on all of the pending messages, and then forget about this activation.
+                                var primary = _shared.InternalRuntime.LocalGrainDirectory.GetPrimaryForGrain(GrainId);
+                                _shared.Logger.LogDebug(
+                                    (int)ErrorCode.Catalog_DuplicateActivation,
+                                    "Tried to create a duplicate activation {Address}, but we'll use {ForwardingAddress} instead. "
+                                    + "GrainInstance type is {GrainInstanceType}. {PrimaryMessage}"
+                                    + "Full activation address is {Address}. We have {WaitingCount} messages to forward.",
+                                    Address,
+                                    ForwardingAddress,
+                                    GrainInstance?.GetType(),
+                                    primary != null ? "Primary Directory partition for this grain is " + primary + ". " : string.Empty,
+                                    Address.ToFullString(),
+                                    WaitingCount);
+                            }
+                        }
+
+                        break;
                     }
 
                     registrationException = null;
@@ -1526,19 +1571,23 @@ namespace Orleans.Runtime
                 catch (Exception exception)
                 {
                     registrationException = exception;
+                    _shared.Logger.LogWarning((int)ErrorCode.Runtime_Error_100064, registrationException, "Failed to register grain {Grain} in grain directory", ToString());
                     success = false;
                 }
 
                 if (!success)
                 {
+                    if (DeactivationReason.ReasonCode == DeactivationReasonCode.None)
+                    {
+                        DeactivationReason = new(DeactivationReasonCode.InternalFailure, registrationException, "Failed to register activation in grain directory.");
+                    }
+
                     lock (this)
                     {
                         SetState(ActivationState.Invalid);
                     }
 
                     UnregisterMessageTarget();
-                    DeactivationReason = new(DeactivationReasonCode.InternalFailure, registrationException, "Failed to register activation in grain directory.");
-                    _shared.Logger.LogWarning((int)ErrorCode.Runtime_Error_100064, registrationException, "Failed to register grain {Grain} in grain directory", ToString());
                 }
             }
 

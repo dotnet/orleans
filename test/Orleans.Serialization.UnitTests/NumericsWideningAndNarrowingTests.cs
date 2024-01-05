@@ -108,7 +108,7 @@ public class NumericsWideningAndNarrowingTests
         var values = new List<N>
         {
             N.MinValue,
-            default(N),
+            default,
             N.MaxValue / two,
             N.MaxValue,
         };
@@ -127,7 +127,7 @@ public class NumericsWideningAndNarrowingTests
         var values = (new N[]
         {
             N.MinValue,
-            default(N),
+            default,
             N.MaxValue / two,
             N.MaxValue,
         }).Select(W.CreateTruncating).ToList();
@@ -165,7 +165,7 @@ public class NumericsWideningAndNarrowingTests
         {
             N.MinValue + buffer,
             N.MinValue / two,
-            default(N),
+            default,
             N.MaxValue / two,
             N.MaxValue - buffer,
         };
@@ -186,7 +186,7 @@ public class NumericsWideningAndNarrowingTests
         {
             N.MinValue + buffer,
             N.MinValue / two,
-            default(N),
+            default,
             N.MaxValue / two,
             N.MaxValue - buffer,
         }.Select(W.CreateTruncating).ToList();
@@ -354,7 +354,7 @@ public class NumericsWideningAndNarrowingTests
         var values = new List<N>
         {
             n.MinValue,
-            default(N),
+            default,
             n.Divide(n.MaxValue, two),
             n.MaxValue,
         };
@@ -371,7 +371,7 @@ public class NumericsWideningAndNarrowingTests
         var values = (new N[]
         {
             n.MinValue,
-            default(N),
+            default,
             n.Divide(n.MaxValue, two),
             n.MaxValue,
         }).Select(w.CreateTruncating).ToList();
@@ -405,7 +405,7 @@ public class NumericsWideningAndNarrowingTests
         {
             n.Add(n.MinValue, buffer),
             n.Divide(n.MinValue, two),
-            default(N),
+            default,
             n.Divide(n.MaxValue, two),
             n.Subtract(n.MaxValue, buffer),
         };
@@ -424,7 +424,7 @@ public class NumericsWideningAndNarrowingTests
         {
             n.Add(n.MinValue, buffer),
             n.Divide(n.MinValue, two),
-            default(N),
+            default,
             n.Divide(n.MaxValue, two),
             n.Subtract(n.MaxValue, buffer),
         }.Select(w.CreateTruncating).ToList();

@@ -1,10 +1,5 @@
-using System;
 using System.Runtime.CompilerServices;
-using System.Threading;
-using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
-using Orleans;
-using Orleans.Runtime;
 using UnitTests.GrainInterfaces;
 using Xunit;
 
@@ -247,37 +242,36 @@ namespace UnitTests.Grains
                     });
             // we want to use Task.ContinueWith with an async lambda, an explicitly typed variable is required to avoid
             // writing code that doesn't do what i think it is doing.
-            Func<Task> asyncCont =
-                async () =>
+            async Task asyncCont()
+            {
+                Assert.NotNull(TaskScheduler.Current);
+                Assert.NotEqual(TaskScheduler.Current, TaskScheduler.Default);
+                logger.LogInformation("Started-OnActivateAsync");
+
+                Assert.True(doingActivate, "Doing Activate 1");
+                Assert.False(doingDeactivate, "Not doing Deactivate");
+
+                try
                 {
-                    Assert.NotNull(TaskScheduler.Current);
-                    Assert.NotEqual(TaskScheduler.Current, TaskScheduler.Default);
-                    logger.LogInformation("Started-OnActivateAsync");
+                    logger.LogInformation("Calling RecordActivateCall");
+                    await watcher.RecordActivateCall(RuntimeHelpers.GetHashCode(this).ToString("X"));
+                    logger.LogInformation("Returned from calling RecordActivateCall");
+                }
+                catch (Exception exc)
+                {
+                    logger.LogError(exc, "RecordActivateCall failed");
+                    Assert.True(false, "RecordActivateCall failed with error " + exc);
+                }
 
-                    Assert.True(doingActivate, "Doing Activate 1");
-                    Assert.False(doingDeactivate, "Not doing Deactivate");
+                Assert.True(doingActivate, "Doing Activate 2");
+                Assert.False(doingDeactivate, "Not doing Deactivate");
 
-                    try
-                    {
-                        logger.LogInformation("Calling RecordActivateCall");
-                        await watcher.RecordActivateCall(RuntimeHelpers.GetHashCode(this).ToString("X"));
-                        logger.LogInformation("Returned from calling RecordActivateCall");
-                    }
-                    catch (Exception exc)
-                    {
-                        logger.LogError(exc, "RecordActivateCall failed");
-                        Assert.True(false, "RecordActivateCall failed with error " + exc);
-                    }
+                await Task.Delay(TimeSpan.FromSeconds(1));
 
-                    Assert.True(doingActivate, "Doing Activate 2");
-                    Assert.False(doingDeactivate, "Not doing Deactivate");
+                doingActivate = false;
 
-                    await Task.Delay(TimeSpan.FromSeconds(1));
-
-                    doingActivate = false;
-
-                    logger.LogInformation("Finished-OnActivateAsync");
-                };
+                logger.LogInformation("Finished-OnActivateAsync");
+            }
             var awaitMe = startMe.ContinueWith(_ => asyncCont()).Unwrap();
             startMe.Start();
             await awaitMe;

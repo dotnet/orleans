@@ -1,10 +1,6 @@
-﻿using System;
-using System.Threading.Tasks;
-using System.Linq;
-using TestGrainInterfaces;
+﻿using TestGrainInterfaces;
 using Xunit;
 using Xunit.Abstractions;
-using System.Collections.Generic;
 using Xunit.Sdk;
 
 namespace Tester.EventSourcingTests
@@ -94,7 +90,7 @@ namespace Tester.EventSourcingTests
 
     }
 
-    class RunThisFirstAttribute : Attribute
+    internal class RunThisFirstAttribute : Attribute
     {
     }
 

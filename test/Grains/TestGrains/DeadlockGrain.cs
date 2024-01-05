@@ -1,12 +1,6 @@
 #nullable enable
 
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Runtime.CompilerServices;
-using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
-using Orleans;
 using Orleans.Concurrency;
 using Orleans.Runtime;
 using UnitTests.GrainInterfaces;
@@ -43,7 +37,7 @@ namespace UnitTests.Grains
     {
         private readonly ILogger logger;
         public DeadlockNonReentrantGrain(ILoggerFactory loggerFactory) => this.logger = loggerFactory.CreateLogger(this.Id);
-        private string Id { get { return String.Format("DeadlockNonReentrantGrain {0}", base.IdentityString); } }
+        private string Id { get { return string.Format("DeadlockNonReentrantGrain {0}", base.IdentityString); } }
 
         public async Task CallNext_1(List<(long GrainId, bool Blocking)> callChain, int currCallIndex)
         {

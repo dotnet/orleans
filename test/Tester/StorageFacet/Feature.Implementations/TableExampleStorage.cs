@@ -1,10 +1,6 @@
-using System.Threading;
-using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
-using Orleans;
 using Orleans.Runtime;
 using Tester.StorageFacet.Abstractions;
-using Orleans.Hosting;
 
 namespace Tester.StorageFacet.Implementations
 {
@@ -67,7 +63,7 @@ namespace Tester.StorageFacet.Implementations
         {
             builder.ConfigureServices(services =>
             {
-                services.AddTransientNamedService<IExampleStorageFactory, TableExampleStorageFactory>(name);
+                services.AddKeyedTransient<IExampleStorageFactory, TableExampleStorageFactory>(name);
                 services.AddTransient(typeof(TableExampleStorage<>));
             });
         }

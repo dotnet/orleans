@@ -1,5 +1,4 @@
-﻿using System;
-using Microsoft.Extensions.DependencyInjection;
+﻿using Microsoft.Extensions.DependencyInjection;
 using Orleans.Runtime;
 using Tester.StorageFacet.Abstractions;
 
@@ -18,7 +17,7 @@ namespace Tester.StorageFacet.Infrastructure
         {
             IExampleStorageFactory factory = string.IsNullOrEmpty(name)
                 ? this.services.GetService<IExampleStorageFactory>()
-                : this.services.GetServiceByName<IExampleStorageFactory>(name);
+                : this.services.GetKeyedService<IExampleStorageFactory>(name);
             if (factory != null) return factory.Create<TState>(cfg);
             throw new InvalidOperationException($"Storage feature with name {name} not found.");
         }

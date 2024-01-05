@@ -1,9 +1,5 @@
-using System;
-using System.Threading.Tasks;
 using Newtonsoft.Json;
-using Orleans;
 using Orleans.Concurrency;
-using Orleans.Internal;
 using Orleans.Runtime;
 using Orleans.Serialization;
 using Orleans.Storage;
@@ -56,35 +52,22 @@ namespace DefaultCluster.Tests.General
             Assert.False(ref2.Equals(ref1));
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("AsynchronyPrimitives")]
-        public void TaskCompletionSource_Resolve()
-        {
-            string str = "Hello TaskCompletionSource";
-            TaskCompletionSource<string> tcs = new TaskCompletionSource<string>();
-            Task task = tcs.Task;
-            Assert.False(task.IsCompleted, "TCS.Task not yet completed");
-            tcs.SetResult(str);
-            Assert.True(task.IsCompleted, "TCS.Task is now completed");
-            Assert.False(task.IsFaulted, "TCS.Task should not be in faulted state: " + task.Exception);
-            Assert.Equal(str, tcs.Task.Result);
-        }
-
         [Fact]
-        public void GrainReference_Pass_this()
+        public async Task GrainReference_Pass_this()
         {
             IChainedGrain g1 = this.GrainFactory.GetGrain<IChainedGrain>(GetRandomGrainId());
             IChainedGrain g2 = this.GrainFactory.GetGrain<IChainedGrain>(GetRandomGrainId());
 
-            g1.PassThis(g2).Wait();
+            await g1.PassThis(g2);
         }
 
         [Fact]
-        public void GrainReference_Pass_this_Nested()
+        public async Task GrainReference_Pass_this_Nested()
         {
             IChainedGrain g1 = this.GrainFactory.GetGrain<IChainedGrain>(GetRandomGrainId());
             IChainedGrain g2 = this.GrainFactory.GetGrain<IChainedGrain>(GetRandomGrainId());
 
-            g1.PassThisNested(new ChainGrainHolder { Next = g2 }).Wait();
+            await g1.PassThisNested(new ChainGrainHolder { Next = g2 });
         }
 
         [Fact]

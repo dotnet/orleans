@@ -1,7 +1,5 @@
-using System;
-using System.Linq;
-using System.Threading.Tasks;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Orleans.Providers.Streams.Generator;
 using Orleans.Runtime;
@@ -12,8 +10,6 @@ using TestExtensions;
 using TestGrains;
 using UnitTests.Grains;
 using Xunit;
-using Orleans.Hosting;
-using Orleans;
 
 namespace ServiceBus.Tests.StreamingTests
 {
@@ -100,7 +96,7 @@ namespace ServiceBus.Tests.StreamingTests
 
         private async Task GenerateEvents(string streamNamespace, int streamCount, int eventsInStream)
         {
-            IStreamProvider streamProvider = this.fixture.HostedCluster.ServiceProvider.GetServiceByName<IStreamProvider>(StreamProviderName);
+            IStreamProvider streamProvider = this.fixture.HostedCluster.ServiceProvider.GetKeyedService<IStreamProvider>(StreamProviderName);
             IAsyncStream<GeneratedEvent>[] producers =
                 Enumerable.Range(0, streamCount)
                     .Select(i => streamProvider.GetStream<GeneratedEvent>(streamNamespace, Guid.NewGuid()))
