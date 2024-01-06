@@ -44,7 +44,7 @@ jobs:
         image: gcr.io/google.com/cloudsdktool/google-cloud-cli:emulators
         ports:
         - 8085:8085
-        options: --entrypoint gcloud beta emulators pubsub start --project=feisty-flow-173313 --host-port=0.0.0.0:8085
+        options: --entrypoint "gcloud beta emulators pubsub start --project=feisty-flow-173313 --host-port=0.0.0.0:8085"
     steps:
     - uses: actions/checkout@v2
     - name: Setup .NET
