@@ -21,6 +21,9 @@ ORLEANS0007  | Usage   | Error  |
 ORLEANS0008  | Usage   | Error  | Grain interfaces cannot have properties
 ORLEANS0009  | Usage   | Error  | Grain interface methods must return a compatible type
 ORLEANS0010  | Usage   | Info   | Add missing [Alias] attribute
+ORLEANS0011  | Usage   | Error  | The [Alias] attribute must be unique to the declaring type
+ORLEANS0012  | Usage   | Error  | The [Id] attribute must be unique to each members of the declaring type
+ORLEANS0013  | Usage   | Error  | This attribute should not be used on grain implementations
 
 ### Removed Rules
 
