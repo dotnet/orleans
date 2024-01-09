@@ -99,4 +99,16 @@ namespace Orleans.Placement
             base(SiloRoleBasedPlacement.Singleton)
         { }
     }
+
+    /// <summary>
+    /// Marks a grain class as using the <see cref="ResourceOptimizedPlacement"/> policy.
+    /// </summary>
+    /// <inheritdoc cref="ResourceOptimizedPlacement"/>
+    [AttributeUsage(AttributeTargets.Class, AllowMultiple = false)]
+    public sealed class ResourceOptimizedPlacementAttribute : PlacementAttribute
+    {
+        public ResourceOptimizedPlacementAttribute() :
+            base(ResourceOptimizedPlacement.Singleton)
+        { }
+    }
 }
