@@ -25,7 +25,7 @@ public class GenerateAliasAttributesAnalyzer : DiagnosticAnalyzer
     public override void Initialize(AnalysisContext context)
     {
         context.EnableConcurrentExecution();
-        context.ConfigureGeneratedCodeAnalysis(GeneratedCodeAnalysisFlags.Analyze);
+        context.ConfigureGeneratedCodeAnalysis(GeneratedCodeAnalysisFlags.Analyze | GeneratedCodeAnalysisFlags.ReportDiagnostics);
         context.RegisterSyntaxNodeAction(CheckSyntaxNode,
             SyntaxKind.InterfaceDeclaration,
             SyntaxKind.ClassDeclaration,
@@ -39,9 +39,7 @@ public class GenerateAliasAttributesAnalyzer : DiagnosticAnalyzer
         // Interface types and their methods
         if (context.Node is InterfaceDeclarationSyntax { } interfaceDeclaration)
         {
-            if (!context.SemanticModel
-                .GetDeclaredSymbol(interfaceDeclaration, context.CancellationToken)
-                .ExtendsGrainInterface())
+            if (!interfaceDeclaration.ExtendsGrainInterface(context.SemanticModel))
             {
                 return;
             }
@@ -75,6 +73,12 @@ public class GenerateAliasAttributesAnalyzer : DiagnosticAnalyzer
         // Rest of types: class, struct, record
         if (context.Node is TypeDeclarationSyntax { } typeDeclaration)
         {
+            if (typeDeclaration is ClassDeclarationSyntax classDeclaration &&
+                classDeclaration.InheritsGrainClass(context.SemanticModel))
+            {
+                return;
+            }
+
             if (!typeDeclaration.HasAttribute(Constants.GenerateSerializerAttributeName))
             {
                 return;
@@ -148,8 +152,8 @@ public class GenerateAliasAttributesAnalyzer : DiagnosticAnalyzer
         builder.Add("Arity", arity.ToString(System.Globalization.CultureInfo.InvariantCulture));
 
         context.ReportDiagnostic(Diagnostic.Create(
-                       descriptor: Rule,
-                       location: location,
-                       properties: builder.ToImmutable()));
+            descriptor: Rule,
+            location: location,
+            properties: builder.ToImmutable()));
     }
 }

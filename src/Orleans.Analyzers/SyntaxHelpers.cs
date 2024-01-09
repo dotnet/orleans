@@ -2,11 +2,14 @@ using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using static Microsoft.CodeAnalysis.CSharp.SyntaxFactory;
 
 namespace Orleans.Analyzers
 {
+    internal readonly record struct AttributeArgumentBag<T>(T Value, Location Location);
+
     internal static class SyntaxHelpers
     {
         public static bool TryGetTypeName(this AttributeSyntax attributeSyntax, out string typeName)
@@ -144,9 +147,18 @@ namespace Orleans.Analyzers
             return isFieldOrAutoProperty;
         }
 
-        public static bool ExtendsGrainInterface(this INamedTypeSymbol symbol)
+        public static bool ExtendsGrainInterface(this InterfaceDeclarationSyntax interfaceDeclaration, SemanticModel semanticModel)
         {
-            if (symbol.TypeKind != TypeKind.Interface) return false;
+            if (interfaceDeclaration is null)
+            {
+                return false;
+            }
+
+            var symbol = semanticModel.GetDeclaredSymbol(interfaceDeclaration);
+            if (symbol is null || symbol.TypeKind != TypeKind.Interface)
+            {
+                return false;
+            }
 
             foreach (var interfaceSymbol in symbol.AllInterfaces)
             {
@@ -158,5 +170,58 @@ namespace Orleans.Analyzers
 
             return false;
         }
+
+        public static bool InheritsGrainClass(this ClassDeclarationSyntax declaration, SemanticModel semanticModel)
+        {
+            var baseTypes = declaration.BaseList?.Types;
+            if (baseTypes is null)
+            {
+                return false;
+            }
+
+            foreach (var baseTypeSyntax in baseTypes)
+            {
+                var baseTypeSymbol = semanticModel.GetTypeInfo(baseTypeSyntax.Type).Type;
+                if (baseTypeSymbol is INamedTypeSymbol currentTypeSymbol)
+                {
+                    if (currentTypeSymbol.IsGenericType &&
+                        currentTypeSymbol.TypeParameters.Length == 1 &&
+                        currentTypeSymbol.BaseType is { } baseBaseTypeSymbol)
+                    {
+                        currentTypeSymbol = baseBaseTypeSymbol;
+                    }
+
+                    if (Constants.GrainBaseFullyQualifiedName.Equals(currentTypeSymbol.ToDisplayString(NullableFlowState.None), StringComparison.Ordinal))
+                    {
+                        return true;
+                    }
+                }
+            }
+
+            return false;
+        }
+
+        public static AttributeArgumentBag<T> GetArgumentBag<T>(this AttributeSyntax attribute, SemanticModel semanticModel)
+        {
+            if (attribute is null)
+            {
+                return default;
+            }
+
+            var argument = attribute.ArgumentList?.Arguments.FirstOrDefault();
+            if (argument is null || argument.Expression is not { } expression)
+            {
+                return default;
+            }
+
+            var constantValue = semanticModel.GetConstantValue(expression);
+            return constantValue.HasValue && constantValue.Value is T value ?
+                new(value, attribute.GetLocation()) : default;
+        }
+
+        public static IEnumerable<AttributeSyntax> GetAttributeSyntaxes(this SyntaxList<AttributeListSyntax> attributeLists, string attributeName) =>
+            attributeLists
+                .SelectMany(attributeList => attributeList.Attributes)
+                .Where(attribute => attribute.IsAttribute(attributeName));
     }
 }
