@@ -10,14 +10,20 @@ using Orleans.Streaming.AzureStorage;
 
 namespace Orleans.Configuration
 {
+    /// <summary>
+    /// Options for configuring a lease provider backed by Azure Blob Storage leases.
+    /// </summary>
     public class AzureBlobLeaseProviderOptions
     {
+        private BlobServiceClient _blobServiceClient;
+
         public string BlobContainerName { get; set; } = DefaultBlobContainerName;
         public const string DefaultBlobContainerName = "Leases";
 
         /// <summary>
         /// Options to be used when configuring the blob storage client, or <see langword="null"/> to use the default options.
         /// </summary>
+        [Obsolete($"Set the {nameof(BlobServiceClient)} property directly.")]
         public BlobClientOptions ClientOptions { get; set; }
 
         /// <summary>
@@ -26,26 +32,40 @@ namespace Orleans.Configuration
         internal Func<Task<BlobServiceClient>> CreateClient { get; private set; }
 
         /// <summary>
+        /// Gets or sets the client used to access the Azure Blob Service.
+        /// </summary>
+        public BlobServiceClient BlobServiceClient
+        {
+            get => _blobServiceClient;
+            set
+            {
+                _blobServiceClient = value;
+                CreateClient = () => Task.FromResult(value);
+            }
+        }
+
+        /// <summary>
         /// Configures the <see cref="BlobServiceClient"/> using a connection string.
         /// </summary>
+        [Obsolete($"Set the {nameof(BlobServiceClient)} property directly.")]
         public void ConfigureBlobServiceClient(string connectionString)
         {
-            if (string.IsNullOrWhiteSpace(connectionString)) throw new ArgumentNullException(nameof(connectionString));
-            CreateClient = () => Task.FromResult(new BlobServiceClient(connectionString, ClientOptions));
+            BlobServiceClient = new BlobServiceClient(connectionString, ClientOptions);
         }
 
         /// <summary>
         /// Configures the <see cref="BlobServiceClient"/> using an authenticated service URI.
         /// </summary>
+        [Obsolete($"Set the {nameof(BlobServiceClient)} property directly.")]
         public void ConfigureBlobServiceClient(Uri serviceUri)
         {
-            if (serviceUri is null) throw new ArgumentNullException(nameof(serviceUri));
-            CreateClient = () => Task.FromResult(new BlobServiceClient(serviceUri, ClientOptions));
+            BlobServiceClient = new BlobServiceClient(serviceUri, ClientOptions);
         }
 
         /// <summary>
         /// Configures the <see cref="BlobServiceClient"/> using the provided callback.
         /// </summary>
+        [Obsolete($"Set the {nameof(BlobServiceClient)} property directly.")]
         public void ConfigureBlobServiceClient(Func<Task<BlobServiceClient>> createClientCallback)
         {
             CreateClient = createClientCallback ?? throw new ArgumentNullException(nameof(createClientCallback));
@@ -54,31 +74,28 @@ namespace Orleans.Configuration
         /// <summary>
         /// Configures the <see cref="BlobServiceClient"/> using an authenticated service URI and a <see cref="Azure.Core.TokenCredential"/>.
         /// </summary>
+        [Obsolete($"Set the {nameof(BlobServiceClient)} property directly.")]
         public void ConfigureBlobServiceClient(Uri serviceUri, TokenCredential tokenCredential)
         {
-            if (serviceUri is null) throw new ArgumentNullException(nameof(serviceUri));
-            if (tokenCredential is null) throw new ArgumentNullException(nameof(tokenCredential));
-            CreateClient = () => Task.FromResult(new BlobServiceClient(serviceUri, tokenCredential, ClientOptions));
+            BlobServiceClient = new BlobServiceClient(serviceUri, tokenCredential, ClientOptions);
         }
 
         /// <summary>
         /// Configures the <see cref="BlobServiceClient"/> using an authenticated service URI and a <see cref="Azure.AzureSasCredential"/>.
         /// </summary>
+        [Obsolete($"Set the {nameof(BlobServiceClient)} property directly.")]
         public void ConfigureBlobServiceClient(Uri serviceUri, AzureSasCredential azureSasCredential)
         {
-            if (serviceUri is null) throw new ArgumentNullException(nameof(serviceUri));
-            if (azureSasCredential is null) throw new ArgumentNullException(nameof(azureSasCredential));
-            CreateClient = () => Task.FromResult(new BlobServiceClient(serviceUri, azureSasCredential, ClientOptions));
+            BlobServiceClient = new BlobServiceClient(serviceUri, azureSasCredential, ClientOptions);
         }
 
         /// <summary>
         /// Configures the <see cref="BlobServiceClient"/> using an authenticated service URI and a <see cref="StorageSharedKeyCredential"/>.
         /// </summary>
+        [Obsolete($"Set the {nameof(BlobServiceClient)} property directly.")]
         public void ConfigureBlobServiceClient(Uri serviceUri, StorageSharedKeyCredential sharedKeyCredential)
         {
-            if (serviceUri is null) throw new ArgumentNullException(nameof(serviceUri));
-            if (sharedKeyCredential is null) throw new ArgumentNullException(nameof(sharedKeyCredential));
-            CreateClient = () => Task.FromResult(new BlobServiceClient(serviceUri, sharedKeyCredential, ClientOptions));
+            BlobServiceClient = new BlobServiceClient(serviceUri, sharedKeyCredential, ClientOptions);
         }
     }
 

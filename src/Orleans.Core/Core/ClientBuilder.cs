@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Orleans.Hosting
@@ -13,13 +14,17 @@ namespace Orleans.Hosting
         /// <param name="services">
         /// The service collection.
         /// </param>
-        public ClientBuilder(IServiceCollection services)
+        public ClientBuilder(IServiceCollection services, IConfiguration configuration)
         {
             Services = services;
-            DefaultClientServices.AddDefaultServices(services);
+            Configuration = configuration;
+            DefaultClientServices.AddDefaultServices(this);
         }
 
         /// <inheritdoc/>
         public IServiceCollection Services { get; }
+
+        /// <inheritdoc/>
+        public IConfiguration Configuration { get; }
     }
 }

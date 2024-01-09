@@ -1,4 +1,5 @@
 using System;
+using System.Diagnostics.CodeAnalysis;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Orleans
@@ -359,6 +360,44 @@ namespace Orleans
         /// Gets the alias components.
         /// </summary>
         public object[] Components { get; }
+    }
+
+    /// <summary>
+    /// When applied to a type, indicates that the type is a provider and that it should be automatically registered.
+    /// </summary>
+    /// <param name="name">The provider name, for example, <c>"AzureTableStorage"</c>.</param>
+    /// <param name="kind">The kind of provider, for example, <c>"Clustering"</c>, <c>"Reminders"</c>.</param>
+    /// <param name="target">The intended target of the provider, for example, <c>"Server"</c>, <c>"Client"</c>.</param>
+    /// <seealso cref="System.Attribute" />
+    [AttributeUsage(AttributeTargets.Assembly, AllowMultiple = true)]
+    public sealed class RegisterProviderAttribute(
+        string name,
+        string kind,
+        string target,
+#if NET5_0_OR_GREATER
+        [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicMethods)]
+#endif
+        Type type) : Attribute
+    {
+        /// <summary>
+        /// Gets the provider name, for example, <c>"AzureTableStorage"</c>.
+        /// </summary>
+        public string Name { get; } = name;
+
+        /// <summary>
+        /// Gets the kind of the provider, for example, <c>"Clustering"</c>, <c>"Reminders"</c>.
+        /// </summary>
+        public string Kind { get; } = kind;
+
+        /// <summary>
+        /// Gets the type used to configure the provider, for example, <c>"Server"</c>, <c>"Client"</c>.
+        /// </summary>
+        public string Target { get; } = target;
+
+        /// <summary>
+        /// Gets the type used to configure the provider.
+        /// </summary>
+        public Type Type { get; } = type;
     }
 
     /// <summary>

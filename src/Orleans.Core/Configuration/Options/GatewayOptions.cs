@@ -23,6 +23,6 @@ namespace Orleans.Configuration
         /// </summary>
         /// <remarks>Set this value to its default value, <c>-1</c>, to disable this functionality.</remarks>
         /// <value>No gateway is preferred by default.</value>
-        public int PreferedGatewayIndex { get; set; } = DEFAULT_PREFERED_GATEWAY_INDEX;
+        public int PreferredGatewayIndex { get; set; } = DEFAULT_PREFERED_GATEWAY_INDEX;
     }
 }

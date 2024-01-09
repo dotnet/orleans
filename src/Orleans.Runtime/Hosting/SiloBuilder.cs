@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Orleans.Hosting
@@ -7,13 +8,14 @@ namespace Orleans.Hosting
     /// </summary>
     internal class SiloBuilder : ISiloBuilder
     {
-        public SiloBuilder(IServiceCollection services)
+        public SiloBuilder(IServiceCollection services, IConfiguration configuration)
         {
-            DefaultSiloServices.AddDefaultServices(services);
             Services = services;
+            Configuration = configuration;
+            DefaultSiloServices.AddDefaultServices(this);
         }
 
-        /// <inheritdoc/>
         public IServiceCollection Services { get; }
+        public IConfiguration Configuration { get; }
     }
 }

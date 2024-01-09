@@ -4,7 +4,6 @@ using Microsoft.Extensions.Options;
 using Orleans.BroadcastChannel;
 using Orleans.BroadcastChannel.SubscriberTable;
 using Orleans.Configuration;
-using Orleans.Runtime;
 
 namespace Orleans.Hosting
 {
@@ -82,3 +81,4 @@ namespace Orleans.Hosting
         }
     }
 }
+

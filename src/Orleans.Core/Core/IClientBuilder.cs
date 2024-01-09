@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Orleans.Hosting
@@ -11,5 +12,10 @@ namespace Orleans.Hosting
         /// Gets the services collection.
         /// </summary>
         IServiceCollection Services { get; }
+
+        /// <summary>
+        /// Gets the configuration.
+        /// </summary>
+        IConfiguration Configuration { get; }
     }
 }

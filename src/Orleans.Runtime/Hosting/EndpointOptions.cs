@@ -1,5 +1,5 @@
 using System.Net;
-
+using Microsoft.Extensions.Configuration;
 using Orleans.Runtime;
 
 namespace Orleans.Configuration
@@ -97,5 +97,33 @@ namespace Orleans.Configuration
         internal IPEndPoint GetListeningSiloEndpoint() => SiloListeningEndpoint ?? GetPublicSiloEndpoint();
 
         internal IPEndPoint GetListeningProxyEndpoint() => GatewayListeningEndpoint ?? GetPublicProxyEndpoint();
+
+        internal void Bind(IConfiguration cfg)
+        {
+            if (int.TryParse(cfg[nameof(GatewayPort)], out var gwPort))
+            {
+                GatewayPort = gwPort;
+            }
+
+            if (int.TryParse(cfg[nameof(SiloPort)], out var siloPort))
+            {
+                SiloPort = siloPort;
+            }
+
+            if (IPAddress.TryParse(cfg[nameof(AdvertisedIPAddress)], out var aip))
+            {
+                AdvertisedIPAddress = aip;
+            }
+
+            if (IPEndPoint.TryParse(cfg[nameof(SiloListeningEndpoint)], out var sle))
+            {
+                SiloListeningEndpoint = sle;
+            }
+
+            if (IPEndPoint.TryParse(cfg[nameof(GatewayListeningEndpoint)], out var gle))
+            {
+                GatewayListeningEndpoint = gle;
+            }
+        }
     }
 }

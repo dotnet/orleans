@@ -159,6 +159,10 @@ namespace Orleans.TestingHost
             var finalOptions = new TestClusterOptions();
             configuration.Bind(finalOptions);
 
+            // Since the ClusterId & ServiceId properties are nested under the 'Orleans' section in the config,
+            // we bind the 'Orleans' section here to bind them to the options.
+            configuration.GetSection("Orleans").Bind(finalOptions);
+
             var configSources = new ReadOnlyCollection<IConfigurationSource>(configBuilder.Sources);
             var testCluster = new TestCluster(finalOptions, configSources, portAllocator);
             if (CreateSiloAsync != null) testCluster.CreateSiloAsync = CreateSiloAsync;

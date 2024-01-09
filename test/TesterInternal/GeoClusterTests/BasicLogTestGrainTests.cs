@@ -35,11 +35,11 @@ namespace Tests.GeoClusterTests
                         .AddCustomStorageBasedLogConsistencyProvider("CustomStoragePrimaryCluster", "A")
                         .AddAzureTableGrainStorageAsDefault(builder => builder.Configure<IOptions<ClusterOptions>>((options, silo) =>
                         {
-                            options.ConfigureTableServiceClient(TestDefaultConfiguration.DataConnectionString);
+                            options.TableServiceClient = new(TestDefaultConfiguration.DataConnectionString);
                         }))
                         .AddAzureTableGrainStorage("AzureStore", builder => builder.Configure<IOptions<ClusterOptions>>((options, silo) =>
                         {
-                            options.ConfigureTableServiceClient(TestDefaultConfiguration.DataConnectionString);
+                            options.TableServiceClient = new(TestDefaultConfiguration.DataConnectionString);
                         }))
                         .AddMemoryGrainStorage("MemoryStore"); 
                 }

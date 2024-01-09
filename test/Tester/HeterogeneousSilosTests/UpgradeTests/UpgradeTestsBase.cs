@@ -287,7 +287,7 @@ namespace Tester.HeterogeneousSilosTests.UpgradeTests
         {
             public void Configure(IConfiguration configuration, IClientBuilder clientBuilder)
             {
-                clientBuilder.Configure<GatewayOptions>(options => options.PreferedGatewayIndex = 0);
+                clientBuilder.Configure<GatewayOptions>(options => options.PreferredGatewayIndex = 0);
             }
         }
     }

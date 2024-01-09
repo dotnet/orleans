@@ -36,7 +36,7 @@ namespace ServiceBus.Tests.Streaming
                             }));
                             b.UseAzureTableCheckpointer(ob => ob.Configure(options =>
                             {
-                                options.ConfigureTableServiceClient(TestDefaultConfiguration.DataConnectionString);
+                                options.TableServiceClient = new(TestDefaultConfiguration.DataConnectionString);
                                 options.PersistInterval = TimeSpan.FromSeconds(1);
                             }));
                             b.UseDynamicClusterConfigDeploymentBalancer();
