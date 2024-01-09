@@ -45,7 +45,7 @@ public class IdClashAttributeAnalyzer : DiagnosticAnalyzer
             return;
         }
 
-        List<AttributeArgumentBag<int>> bags = new();
+        List<AttributeArgumentBag<int>> bags = [];
         foreach (var memberDeclaration in typeDeclaration.Members.OfType<MemberDeclarationSyntax>())
         {
             var attributes = memberDeclaration.AttributeLists.GetAttributeSyntaxes(Constants.IdAttributeName);
@@ -78,9 +78,14 @@ public class IdClashAttributeAnalyzer : DiagnosticAnalyzer
             {
                 foreach (var bag in filteredBags)
                 {
+                    var builder = ImmutableDictionary.CreateBuilder<string, string>();
+
+                    builder.Add("IdValue", bag.Value.ToString());
+
                     context.ReportDiagnostic(Diagnostic.Create(
                        descriptor: Rule,
-                       location: bag.Location));
+                       location: bag.Location,
+                       properties: builder.ToImmutable()));
                 }
             }
         }
