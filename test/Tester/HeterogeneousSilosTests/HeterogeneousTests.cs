@@ -83,8 +83,13 @@ namespace Tester.HeterogeneousSilosTests
             SetupAndDeployCluster(typeof(RandomPlacement), typeof(TestGrain));
 
             // Should fail
-            var exception = Assert.Throws<ArgumentException>(() => this.cluster.GrainFactory.GetGrain<ITestGrain>(0));
-            Assert.Contains("Could not find an implementation for interface", exception.Message);
+            //var exception = Assert.Throws<ArgumentException>(() => this.cluster.GrainFactory.GetGrain<ITestGrain>(0));
+            //Assert.Contains("Could not find an implementation for interface", exception.Message);
+
+            var grain = this.cluster.GrainFactory.GetGrain<ITestGrain>(0);
+            Assert.True(grain.GetGrainId().Type.IsStubGrain());
+
+            //await grain.GetKey();
 
             // Should not fail
             this.cluster.GrainFactory.GetGrain<ISimpleGrainWithAsyncMethods>(0);

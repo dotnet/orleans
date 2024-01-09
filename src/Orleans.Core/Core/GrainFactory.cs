@@ -1,5 +1,8 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
+using System.Threading;
+using System.Threading.Tasks;
 using Orleans.GrainReferences;
 using Orleans.Metadata;
 using Orleans.Runtime;
@@ -203,16 +206,24 @@ namespace Orleans
         {
             var grainInterfaceType = this.interfaceTypeResolver.GetGrainInterfaceType(interfaceType);
 
-            GrainType grainType;
-            if (!string.IsNullOrWhiteSpace(grainClassNamePrefix))
+            bool success;
+            GrainType grainType = default;
+            try
             {
-                grainType = this.interfaceTypeToGrainTypeResolver.GetGrainType(grainInterfaceType, grainClassNamePrefix);
+                success = interfaceTypeToGrainTypeResolver.TryGetGrainType(grainInterfaceType, grainClassNamePrefix, out grainType);
             }
-            else
+            catch (ArgumentException)
             {
-                grainType = this.interfaceTypeToGrainTypeResolver.GetGrainType(grainInterfaceType);
+                success = false;
             }
 
+            if (!success)
+            {
+                // Not found in the type map. Maybe it's not available yet ? (heterogeneous case)
+                grainType = GrainTypePrefix.CreateStubGrainType(grainClassNamePrefix);
+            }
+
+            Debug.Assert(!grainType.IsDefault);
             var grainId = GrainId.Create(grainType, grainKey);
             var grain = this.referenceActivator.CreateReference(grainId, grainInterfaceType);
             return grain;
