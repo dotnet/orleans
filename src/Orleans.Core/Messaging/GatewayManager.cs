@@ -152,7 +152,9 @@ namespace Orleans.Messaging
         /// is in the same order every time.
         /// </summary>
         /// <returns></returns>
-        public SiloAddress GetLiveGateway()
+        #nullable enable
+        public SiloAddress? GetLiveGateway()
+        #nullable disable
         {
             List<SiloAddress> live = GetLiveGateways();
             int count = live.Count;
@@ -168,6 +170,7 @@ namespace Orleans.Messaging
             // If we drop through, then all of the known gateways are presumed dead
             return null;
         }
+       
 
         public List<SiloAddress> GetLiveGateways()
         {
