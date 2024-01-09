@@ -169,10 +169,10 @@
     <value>The [Id] attribute must be unique to each members of the declaring type.</value>
   </data>
   <data name="IdClashDetectedMessageFormat" xml:space="preserve">
-    <value>Substitute duplicated [Id] value with the correct unique identity of this member</value>
+    <value>Change duplicated [Id]</value>
   </data>
   <data name="IdClashDetectedTitle" xml:space="preserve">
-    <value>Substitute duplicated [Id] value with the correct unique identity of this member</value>
+    <value>Change duplicated [Id]</value>
   </data>
   <data name="IncorrectAttributeUseMessageFormat" xml:space="preserve">
     <value>Remove attribute [{0}]</value>

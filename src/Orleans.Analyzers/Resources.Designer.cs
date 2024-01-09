@@ -214,7 +214,7 @@ namespace Orleans.Analyzers {
         }
         
         /// <summary>
-        ///   Looks up a localized string similar to Substitute duplicated [Id] value with the correct unique identity of this member.
+        ///   Looks up a localized string similar to Change duplicated [Id].
         /// </summary>
         internal static string IdClashDetectedMessageFormat {
             get {
@@ -223,7 +223,7 @@ namespace Orleans.Analyzers {
         }
         
         /// <summary>
-        ///   Looks up a localized string similar to Substitute duplicated [Id] value with the correct unique identity of this member.
+        ///   Looks up a localized string similar to Change duplicated [Id].
         /// </summary>
         internal static string IdClashDetectedTitle {
             get {
