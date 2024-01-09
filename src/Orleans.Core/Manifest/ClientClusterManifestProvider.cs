@@ -96,6 +96,7 @@ namespace Orleans.Runtime
                         gateway = _gatewayManager.GetLiveGateway();
                         if (gateway is null)
                         {
+                            await Task.Delay(StandardExtensions.Min(_typeManagementOptions.TypeMapRefreshInterval, TimeSpan.FromMilliseconds(500)));
                             continue;
                         }
 
