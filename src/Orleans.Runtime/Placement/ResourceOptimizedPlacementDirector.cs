@@ -58,6 +58,7 @@ internal sealed class ResourceOptimizedPlacementDirector : IPlacementDirector, I
         }
 
         var bestCandidate = GetBestSiloCandidate(compatibleSilos);
+
         if (IsLocalSiloPreferable(context, compatibleSilos, bestCandidate.Value))
         {
             return _cachedLocalSilo ??= Task.FromResult(context.LocalSilo);
@@ -91,23 +92,28 @@ internal sealed class ResourceOptimizedPlacementDirector : IPlacementDirector, I
             chooseFromSilos.Add(pickedSilo.Key, score);
         }
 
-        return chooseFromSilos.OrderByDescending(kv => kv.Value).First();
+        var orderedByLowestScore = chooseFromSilos.OrderBy(kv => kv.Value);
+
+        // there could be more than 1 silo that has the same score, we pick 1 of them randomly so that we dont continuously pick the first one.
+        var lowestScore = orderedByLowestScore.First().Value;
+        var shortListedSilos = orderedByLowestScore.TakeWhile(p => p.Value == lowestScore).ToList();
+        var winningSilo = shortListedSilos[Random.Shared.Next(shortListedSilos.Count)];
+
+        return winningSilo;
     }
 
     float CalculateScore(ResourceStatistics stats)
     {
         float normalizedCpuUsage = stats.CpuUsage.HasValue ? stats.CpuUsage.Value / 100f : 0f;
 
-        if (stats.TotalPhysicalMemory.HasValue)
+        if (stats.TotalPhysicalMemory is { } physicalMemory && physicalMemory > 0)
         {
-            float normalizedAvailableMemory = stats.AvailableMemory.HasValue ? stats.AvailableMemory.Value / stats.TotalPhysicalMemory.Value : 0f;
-            float normalizedMemoryUsage = stats.MemoryUsage.HasValue ? stats.MemoryUsage.Value / stats.TotalPhysicalMemory.Value : 0f;
-            float normalizedTotalPhysicalMemory = stats.TotalPhysicalMemory.HasValue ? stats.TotalPhysicalMemory.Value / (1024 * 1024 * 1024) : 0f;
+            float normalizedMemoryUsage = stats.MemoryUsage.HasValue ? stats.MemoryUsage.Value / physicalMemory : 0f;
+            float normalizedAvailableMemory = stats.AvailableMemory.HasValue ? stats.AvailableMemory.Value / physicalMemory : 0f;
 
             return _options.CpuUsageWeight * normalizedCpuUsage +
-                   _options.AvailableMemoryWeight * normalizedAvailableMemory +
                    _options.MemoryUsageWeight * normalizedMemoryUsage +
-                   _options.TotalPhysicalMemoryWeight * normalizedTotalPhysicalMemory;
+                   _options.AvailableMemoryWeight * normalizedAvailableMemory;
         }
 
         return _options.CpuUsageWeight * normalizedCpuUsage;
@@ -115,8 +121,7 @@ internal sealed class ResourceOptimizedPlacementDirector : IPlacementDirector, I
 
     bool IsLocalSiloPreferable(IPlacementContext context, SiloAddress[] compatibleSilos, float bestCandidateScore)
     {
-        if (context.LocalSiloStatus != SiloStatus.Active ||
-           !compatibleSilos.Contains(context.LocalSilo))
+        if (context.LocalSiloStatus != SiloStatus.Active || !compatibleSilos.Contains(context.LocalSilo))
         {
             return false;
         }
@@ -124,9 +129,12 @@ internal sealed class ResourceOptimizedPlacementDirector : IPlacementDirector, I
         if (siloStatistics.TryGetValue(context.LocalSilo, out var localStats))
         {
             float localScore = CalculateScore(localStats);
+
+            float scoreDiff = Math.Abs(localScore - bestCandidateScore);
+
             float localScoreMargin = localScore * _options.LocalSiloPreferenceMargin;
 
-            if (localScore + localScoreMargin >= bestCandidateScore)
+            if (localScore - localScoreMargin <= bestCandidateScore)
             {
                 return true;
             }
