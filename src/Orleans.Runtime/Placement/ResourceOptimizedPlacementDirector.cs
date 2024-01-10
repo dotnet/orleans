@@ -102,6 +102,9 @@ internal sealed class ResourceOptimizedPlacementDirector : IPlacementDirector, I
         return winningSilo;
     }
 
+    /// <summary>
+    /// Always returns a value [0-1]
+    /// </summary>
     float CalculateScore(ResourceStatistics stats)
     {
         float normalizedCpuUsage = stats.CpuUsage.HasValue ? stats.CpuUsage.Value / 100f : 0f;
@@ -129,12 +132,9 @@ internal sealed class ResourceOptimizedPlacementDirector : IPlacementDirector, I
         if (siloStatistics.TryGetValue(context.LocalSilo, out var localStats))
         {
             float localScore = CalculateScore(localStats);
-
             float scoreDiff = Math.Abs(localScore - bestCandidateScore);
 
-            float localScoreMargin = localScore * _options.LocalSiloPreferenceMargin;
-
-            if (localScore - localScoreMargin <= bestCandidateScore)
+            if (_options.LocalSiloPreferenceMargin >= scoreDiff)
             {
                 return true;
             }
