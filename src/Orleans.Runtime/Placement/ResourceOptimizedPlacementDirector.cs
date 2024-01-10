@@ -11,15 +11,10 @@ namespace Orleans.Runtime.Placement;
 
 internal sealed class ResourceOptimizedPlacementDirector : IPlacementDirector, ISiloStatisticsChangeListener
 {
-    readonly record struct ResourceStatistics(
-       float? CpuUsage,
-       float? AvailableMemory,
-       long? MemoryUsage,
-       long? TotalPhysicalMemory,
-       bool IsOverloaded);
+    readonly record struct ResourceStatistics(float? CpuUsage, float? AvailableMemory, long? MemoryUsage, long? TotalPhysicalMemory);
 
     Task<SiloAddress> _cachedLocalSilo;
-    readonly SiloAddress _localAddress;
+
     readonly ILocalSiloDetails _localSiloDetails;
     readonly ResourceOptimizedPlacementOptions _options;
     readonly ConcurrentDictionary<SiloAddress, ResourceStatistics> siloStatistics = [];
@@ -62,18 +57,21 @@ internal sealed class ResourceOptimizedPlacementDirector : IPlacementDirector, I
             return Task.FromResult(compatibleSilos[Random.Shared.Next(compatibleSilos.Length)]);
         }
 
-        var selectedSilo = GetSiloWithHighestScore(compatibleSilos);
+        var bestCandidate = GetBestSiloCandidate(compatibleSilos);
+        if (IsLocalSiloPreferable(context, compatibleSilos, bestCandidate.Value))
+        {
+            return _cachedLocalSilo ??= Task.FromResult(context.LocalSilo);
+        }
 
-
-        return Task.FromResult(selectedSilo);
+        return Task.FromResult(bestCandidate.Key);
     }
 
-    SiloAddress GetSiloWithHighestScore(SiloAddress[] compatibleSilos)
+    KeyValuePair<SiloAddress, float> GetBestSiloCandidate(SiloAddress[] compatibleSilos)
     {
         List<KeyValuePair<SiloAddress, ResourceStatistics>> relevantSilos = [];
         foreach (var silo in compatibleSilos)
         {
-            if (siloStatistics.TryGetValue(silo, out var stats) && !stats.IsOverloaded)
+            if (siloStatistics.TryGetValue(silo, out var stats))
             {
                 relevantSilos.Add(new(silo, stats));
             }
@@ -93,7 +91,7 @@ internal sealed class ResourceOptimizedPlacementDirector : IPlacementDirector, I
             chooseFromSilos.Add(pickedSilo.Key, score);
         }
 
-        return chooseFromSilos.OrderByDescending(kv => kv.Value).FirstOrDefault().Key;
+        return chooseFromSilos.OrderByDescending(kv => kv.Value).First();
     }
 
     float CalculateScore(ResourceStatistics stats)
@@ -115,6 +113,28 @@ internal sealed class ResourceOptimizedPlacementDirector : IPlacementDirector, I
         return _options.CpuUsageWeight * normalizedCpuUsage;
     }
 
+    bool IsLocalSiloPreferable(IPlacementContext context, SiloAddress[] compatibleSilos, float bestCandidateScore)
+    {
+        if (context.LocalSiloStatus != SiloStatus.Active ||
+           !compatibleSilos.Contains(context.LocalSilo))
+        {
+            return false;
+        }
+
+        if (siloStatistics.TryGetValue(context.LocalSilo, out var localStats))
+        {
+            float localScore = CalculateScore(localStats);
+            float localScoreMargin = localScore * _options.LocalSiloPreferenceMargin;
+
+            if (localScore + localScoreMargin >= bestCandidateScore)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     public void RemoveSilo(SiloAddress address)
          => siloStatistics.TryRemove(address, out _);
 
@@ -125,8 +145,7 @@ internal sealed class ResourceOptimizedPlacementDirector : IPlacementDirector, I
                 statistics.CpuUsage,
                 statistics.AvailableMemory,
                 statistics.MemoryUsage,
-                statistics.TotalPhysicalMemory,
-                statistics.IsOverloaded),
+                statistics.TotalPhysicalMemory),
             updateValueFactory: (_, _) =>
             {
                 float estimatedCpuUsage = _cpuUsageFilter.Filter(statistics.CpuUsage);
@@ -137,10 +156,10 @@ internal sealed class ResourceOptimizedPlacementDirector : IPlacementDirector, I
                     estimatedCpuUsage,
                     estimatedAvailableMemory,
                     estimatedMemoryUsage,
-                    statistics.TotalPhysicalMemory,
-                    statistics.IsOverloaded);
+                    statistics.TotalPhysicalMemory);
             });
 
+    // details: https://www.ledjonbehluli.com/posts/orleans_resource_placement_kalman/
     sealed class DualModeKalmanFilter<T> where T : unmanaged, INumber<T>
     {
         readonly KalmanFilter _slowFilter = new(T.Zero);
@@ -165,15 +184,9 @@ internal sealed class ResourceOptimizedPlacementDirector : IPlacementDirector, I
             {
                 if (_regime == FilterRegime.Slow)
                 {
-                    // since we now got a measurement we can use it to set the filter's 'estimate',
-                    // in addition we set the 'error covariance' to 0, indicating we want to fully
-                    // trust the measurement (now the new 'estimate') to reach the actual signal asap.
-                    _fastFilter.SetState(_measurement, T.Zero);
-
-                    // ensure we recalculate since we changed the 'error covariance'
-                    fastEstimate = _fastFilter.Filter(_measurement);
-
                     _regime = FilterRegime.Fast;
+                    _fastFilter.SetState(_measurement, T.Zero);
+                    fastEstimate = _fastFilter.Filter(_measurement);
                 }
 
                 return fastEstimate;
@@ -182,16 +195,9 @@ internal sealed class ResourceOptimizedPlacementDirector : IPlacementDirector, I
             {
                 if (_regime == FilterRegime.Fast)
                 {
-                    // since the slow filter will accumulate the changes, we want to reset its state
-                    // so that it aligns with the current peak of the fast filter so we get a slower
-                    // decay that is always aligned with the latest fast filter state and not the overall
-                    // accumulated state of the whole signal over its lifetime.
-                    _slowFilter.SetState(_fastFilter.PriorEstimate, _fastFilter.PriorErrorCovariance);
-
-                    // ensure we recalculate since we changed both the 'estimate' and 'error covariance'
-                    slowEstimate = _slowFilter.Filter(_measurement);
-
                     _regime = FilterRegime.Slow;
+                    _slowFilter.SetState(_fastFilter.PriorEstimate, _fastFilter.PriorErrorCovariance);
+                    slowEstimate = _slowFilter.Filter(_measurement);
                 }
 
                 return slowEstimate;
@@ -213,49 +219,8 @@ internal sealed class ResourceOptimizedPlacementDirector : IPlacementDirector, I
 
             public T Filter(T measurement)
             {
-                #region Prediction Step
-
-                #region Formula
-                // ^x_k = A * x_k-1 + B * u_k
-                #endregion
-
-                #region Simplification
-                // ^x_k = x_k-1
-                #endregion
-
-                #region Explanation
-                // As every resource statistics is a single entity in our case, we have a 1-dimensional signal problem, so every entity in our model is a scalar, not a matrix.
-                // uk is the control signal which incorporate external information about how the system is expected to behave between measurements. We have no idea how the CPU usage is going to behave between measurements, therefor we have no control signal, so uk = 0.
-                // B is the control input matrix, but since uk = 0 this means we don't need to bother with it.
-                // A is the state transition matrix, and we established that we have a 1-dimensional signal problem, so this is now a scalar. Same as with uk, we have no idea how the CPU usage is going to transition, therefor A = 1.
-                // We just established that A = 1, and since A is a unitary scalar, this means AT which is the transpose of A, is AT = 1.
-                #endregion
-
                 T estimate = PriorEstimate;
                 T errorCovariance = PriorErrorCovariance + _processNoiseCovariance;
-
-                #endregion
-
-                #region Correction Step
-
-                #region Formulas
-                //  * K_k = (P_k * H_T) / (H * P_k * H_T + R)
-                //  * ^x_k = x_k + K_k * (z_k - H * x_k)
-                //  * ^P_k = (I - K_k * H) * P_k;
-                #endregion
-
-                #region Simplifications
-                //  * K_k = P_k / (P_k + 1);
-                //  * ^x_k = x_k + K_k * (z_k - x_k)
-                //  * ^P_k = (1 - K_k) * P_k;
-                #endregion
-
-                #region Explanation
-                // Same as with the prediction, we deal only with scalars, not matrices.
-                // H is the observation matrix, which acts as a bridge between the internal model A, and the external measurements R. We can set H = 1, which indicates that the measurements directly correspond to the state variables without any transformations or scaling factors.
-                // Since H = 1, it follows that HT = 1.
-                // R is the measurement covariance matrix, which represents the influence of the measurements relative to the predicted state. We set this value to R = 1, which indicates that all measurements are assumed to have the same level of uncertainty, and there is no correlation between different measurements.
-                #endregion
 
                 T gain = errorCovariance / (errorCovariance + T.One);
                 T newEstimate = estimate + gain * (measurement - estimate);
@@ -263,8 +228,6 @@ internal sealed class ResourceOptimizedPlacementDirector : IPlacementDirector, I
 
                 PriorEstimate = newEstimate;
                 PriorErrorCovariance = newErrorCovariance;
-
-                #endregion
 
                 return newEstimate;
             }
