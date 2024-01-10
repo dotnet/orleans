@@ -42,6 +42,7 @@ using System.Runtime.InteropServices;
 using System.Collections.Generic;
 using Microsoft.Extensions.Configuration;
 using Orleans.Serialization.Internal;
+using Orleans.Runtime.Configuration.Options;
 
 namespace Orleans.Hosting
 {
@@ -190,6 +191,7 @@ namespace Orleans.Hosting
 
             // Placement
             services.AddSingleton<IConfigurationValidator, ActivationCountBasedPlacementOptionsValidator>();
+            services.AddSingleton<IConfigurationValidator, ResourceOptimizedPlacementOptionsValidator>();
             services.AddSingleton<PlacementService>();
             services.AddSingleton<PlacementStrategyResolver>();
             services.AddSingleton<PlacementDirectorResolver>();
@@ -207,6 +209,7 @@ namespace Orleans.Hosting
             services.AddPlacementDirector<HashBasedPlacement, HashBasedPlacementDirector>();
             services.AddPlacementDirector<ClientObserversPlacement, ClientObserversPlacementDirector>();
             services.AddPlacementDirector<SiloRoleBasedPlacement, SiloRoleBasedPlacementDirector>();
+            services.AddPlacementDirector<ResourceOptimizedPlacement, ResourceOptimizedPlacementDirector>();
 
             // Versioning
             services.TryAddSingleton<VersionSelectorManager>();
@@ -298,6 +301,7 @@ namespace Orleans.Hosting
             services.ConfigureFormatter<ClusterMembershipOptions>();
             services.ConfigureFormatter<GrainDirectoryOptions>();
             services.ConfigureFormatter<ActivationCountBasedPlacementOptions>();
+            services.ConfigureFormatter<ResourceOptimizedPlacementOptions>();
             services.ConfigureFormatter<GrainCollectionOptions>();
             services.ConfigureFormatter<GrainVersioningOptions>();
             services.ConfigureFormatter<ConsistentRingOptions>();
