@@ -123,9 +123,9 @@ public class GenerateAliasAttributesAnalyzer : DiagnosticAnalyzer
             {
                 segments.Push(type.Identifier.ToString());
             }
-            else if (node is NamespaceDeclarationSyntax or FileScopedNamespaceDeclarationSyntax)
+            else if (node is BaseNamespaceDeclarationSyntax ns)
             {
-                segments.Push(((BaseNamespaceDeclarationSyntax)node).Name.ToString());
+                segments.Push(ns.Name.ToString());
             }
 
             node = node.Parent;
