@@ -116,15 +116,16 @@ public class GenerateAliasAttributesAnalyzer : DiagnosticAnalyzer
         SyntaxNode node = typeDeclarationSyntax.Parent;
         StringBuilder sb = new();
         Stack<string> segments = new();
+
         while (node is not null)
         {
             if (node is TypeDeclarationSyntax type)
             {
                 segments.Push(type.Identifier.ToString());
             }
-            else if (node is NamespaceDeclarationSyntax ns)
+            else if (node is NamespaceDeclarationSyntax or FileScopedNamespaceDeclarationSyntax)
             {
-                segments.Push(ns.Name.ToString());
+                segments.Push(((BaseNamespaceDeclarationSyntax)node).Name.ToString());
             }
 
             node = node.Parent;
