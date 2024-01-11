@@ -8,7 +8,7 @@ namespace UnitTests.General
 {
     public class PlacementOptionsTest : OrleansTestingBase, IClassFixture<LoadSheddingTest.Fixture>
     {
-        [Fact, TestCategory("Placement"), TestCategory("Functional")]
+        [Fact, TestCategory("PlacementOptions"), TestCategory("Functional")]
         public void ConstantsShouldNotChange()
         {
             Assert.Equal(0.4f, ResourceOptimizedPlacementOptions.DEFAULT_CPU_USAGE_WEIGHT);
@@ -17,7 +17,7 @@ namespace UnitTests.General
             Assert.Equal(0.1f, ResourceOptimizedPlacementOptions.DEFAULT_PHYSICAL_MEMORY_WEIGHT);
         }
 
-        [Theory, TestCategory("Placement"), TestCategory("Functional")]
+        [Theory, TestCategory("PlacementOptions"), TestCategory("Functional")]
         [InlineData(-0.1f, 0.4f, 0.2f, 0.1f, 0.05f)]
         [InlineData(0.3f, 1.1f, 0.2f, 0.1f, 0.05f)]
         [InlineData(0.3f, 0.4f, -0.1f, 0.1f, 0.05f)]
@@ -38,7 +38,7 @@ namespace UnitTests.General
             Assert.Throws<OrleansConfigurationException>(validator.ValidateConfiguration);
         }
 
-        [Fact, TestCategory("Placement"), TestCategory("Functional")]
+        [Fact, TestCategory("PlacementOptions"), TestCategory("Functional")]
         public void SumGreaterThanOneShouldThrow()
         {
             var options = Options.Create(new ResourceOptimizedPlacementOptions
@@ -53,7 +53,7 @@ namespace UnitTests.General
             Assert.Throws<OrleansConfigurationException>(validator.ValidateConfiguration);
         }
 
-        [Fact, TestCategory("Placement"), TestCategory("Functional")]
+        [Fact, TestCategory("PlacementOptions"), TestCategory("Functional")]
         public void SumLessThanOneShouldThrow()
         {
             var options = Options.Create(new ResourceOptimizedPlacementOptions
