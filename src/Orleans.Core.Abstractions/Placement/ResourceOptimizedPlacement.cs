@@ -12,7 +12,7 @@ namespace Orleans.Runtime;
 /// This contributes to avoiding resource saturation on the silos and especially newly joined silos.</para>
 /// <para><i>This placement strategy is configured by adding the <see cref="Placement.ResourceOptimizedPlacementAttribute"/> attribute to a grain.</i></para>
 /// </remarks>
-internal sealed class ResourceOptimizedPlacement : PlacementStrategy
+public sealed class ResourceOptimizedPlacement : PlacementStrategy
 {
     internal static readonly ResourceOptimizedPlacement Singleton = new();
 }
