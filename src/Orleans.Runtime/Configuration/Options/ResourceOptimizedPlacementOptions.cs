@@ -101,6 +101,11 @@ internal sealed class ResourceOptimizedPlacementOptionsValidator
             ThrowOutOfRange(nameof(ResourceOptimizedPlacementOptions.AvailableMemoryWeight));
         }
 
+        if (_options.PhysicalMemoryWeight < 0f || _options.PhysicalMemoryWeight > 1f)
+        {
+            ThrowOutOfRange(nameof(ResourceOptimizedPlacementOptions.PhysicalMemoryWeight));
+        }
+
         if (_options.LocalSiloPreferenceMargin < 0f || _options.LocalSiloPreferenceMargin > 1f)
         {
             ThrowOutOfRange(nameof(ResourceOptimizedPlacementOptions.LocalSiloPreferenceMargin));
@@ -108,10 +113,10 @@ internal sealed class ResourceOptimizedPlacementOptionsValidator
 
         if (Truncate(_options.CpuUsageWeight) +
             Truncate(_options.MemoryUsageWeight) +
-            Truncate(_options.AvailableMemoryWeight) != 1)
+            Truncate(_options.AvailableMemoryWeight +
+            Truncate(_options.PhysicalMemoryWeight)) != 1)
         {
-            throw new OrleansConfigurationException(
-                $"The total sum across all the weights of {nameof(ResourceOptimizedPlacementOptions)} must equal 1");
+            throw new OrleansConfigurationException($"The total sum across all the weights of {nameof(ResourceOptimizedPlacementOptions)} must equal 1");
         }
 
         static void ThrowOutOfRange(string propertyName)
