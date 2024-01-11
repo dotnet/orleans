@@ -23,6 +23,11 @@ internal sealed class ResourceOptimizedPlacementDirector : IPlacementDirector, I
     readonly DualModeKalmanFilter<float> _availableMemoryFilter = new();
     readonly DualModeKalmanFilter<long> _memoryUsageFilter = new();
 
+    /// <summary>
+    /// 1 / (1024 * 1024)
+    /// </summary>
+    const float physicalMemoryScalingFactor = 0.00000095367431640625f;
+
     public ResourceOptimizedPlacementDirector(
         ILocalSiloDetails localSiloDetails,
         DeploymentLoadPublisher deploymentLoadPublisher,
@@ -102,26 +107,6 @@ internal sealed class ResourceOptimizedPlacementDirector : IPlacementDirector, I
         return winningSilo;
     }
 
-    /// <summary>
-    /// Always returns a value [0-1]
-    /// </summary>
-    float CalculateScore(ResourceStatistics stats)
-    {
-        float normalizedCpuUsage = stats.CpuUsage.HasValue ? stats.CpuUsage.Value / 100f : 0f;
-
-        if (stats.TotalPhysicalMemory is { } physicalMemory && physicalMemory > 0)
-        {
-            float normalizedMemoryUsage = stats.MemoryUsage.HasValue ? stats.MemoryUsage.Value / physicalMemory : 0f;
-            float normalizedAvailableMemory = stats.AvailableMemory.HasValue ? stats.AvailableMemory.Value / physicalMemory : 0f;
-
-            return _options.CpuUsageWeight * normalizedCpuUsage +
-                   _options.MemoryUsageWeight * normalizedMemoryUsage +
-                   _options.AvailableMemoryWeight * normalizedAvailableMemory;
-        }
-
-        return _options.CpuUsageWeight * normalizedCpuUsage;
-    }
-
     bool IsLocalSiloPreferable(IPlacementContext context, SiloAddress[] compatibleSilos, float bestCandidateScore)
     {
         if (context.LocalSiloStatus != SiloStatus.Active || !compatibleSilos.Contains(context.LocalSilo))
@@ -141,6 +126,35 @@ internal sealed class ResourceOptimizedPlacementDirector : IPlacementDirector, I
         }
 
         return false;
+    }
+
+    /// <summary>
+    /// Always returns a value [0-1]
+    /// </summary>
+    /// <returns>
+    /// score = cpu_weight * (cpu_usage / 100) +
+    ///         mem_usage_weight * (mem_usage / physical_mem) +
+    ///         mem_avail_weight * [1 - (mem_avail / physical_mem)]
+    ///         physical_mem_weight * (1 / (1024 * 1024 * physical_mem)
+    /// </returns>
+    /// <remarks>physical_mem is represented in [MB] to keep the result within [0-1] in cases of silos having physical_mem less than [1GB]</remarks>
+    float CalculateScore(ResourceStatistics stats)
+    {
+        float normalizedCpuUsage = stats.CpuUsage.HasValue ? stats.CpuUsage.Value / 100f : 0f;
+
+        if (stats.TotalPhysicalMemory is { } physicalMemory && physicalMemory > 0)
+        {
+            float normalizedMemoryUsage = stats.MemoryUsage.HasValue ? stats.MemoryUsage.Value / physicalMemory : 0f;
+            float normalizedAvailableMemory = 1 - (stats.AvailableMemory.HasValue ? stats.AvailableMemory.Value / physicalMemory : 0f);
+            float normalizedPhysicalMemory = physicalMemoryScalingFactor * physicalMemory;
+
+            return _options.CpuUsageWeight * normalizedCpuUsage +
+                   _options.MemoryUsageWeight * normalizedMemoryUsage +
+                   _options.AvailableMemoryWeight * normalizedAvailableMemory +
+                   _options.AvailableMemoryWeight * normalizedPhysicalMemory;
+        }
+
+        return _options.CpuUsageWeight * normalizedCpuUsage;
     }
 
     public void RemoveSilo(SiloAddress address)
