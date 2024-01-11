@@ -15,7 +15,6 @@ internal sealed class ResourceOptimizedPlacementDirector : IPlacementDirector, I
 
     Task<SiloAddress> _cachedLocalSilo;
 
-    readonly ILocalSiloDetails _localSiloDetails;
     readonly ResourceOptimizedPlacementOptions _options;
     readonly ConcurrentDictionary<SiloAddress, ResourceStatistics> siloStatistics = [];
 
@@ -29,11 +28,9 @@ internal sealed class ResourceOptimizedPlacementDirector : IPlacementDirector, I
     const float physicalMemoryScalingFactor = 0.00000095367431640625f;
 
     public ResourceOptimizedPlacementDirector(
-        ILocalSiloDetails localSiloDetails,
         DeploymentLoadPublisher deploymentLoadPublisher,
         IOptions<ResourceOptimizedPlacementOptions> options)
     {
-        _localSiloDetails = localSiloDetails;
         _options = options.Value;
         deploymentLoadPublisher?.SubscribeToStatisticsChangeEvents(this);
     }
