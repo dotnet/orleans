@@ -11,7 +11,7 @@ namespace Orleans.Runtime.Placement;
 
 internal sealed class ResourceOptimizedPlacementDirector : IPlacementDirector, ISiloStatisticsChangeListener
 {
-    readonly record struct ResourceStatistics(float? CpuUsage, float? AvailableMemory, long? MemoryUsage, long? TotalPhysicalMemory);
+    readonly record struct ResourceStatistics(float? CpuUsage, float? AvailableMemory, long? MemoryUsage, long? TotalPhysicalMemory, bool IsOverloaded);
 
     Task<SiloAddress> _cachedLocalSilo;
 
@@ -74,7 +74,7 @@ internal sealed class ResourceOptimizedPlacementDirector : IPlacementDirector, I
         List<KeyValuePair<SiloAddress, ResourceStatistics>> relevantSilos = [];
         foreach (var silo in compatibleSilos)
         {
-            if (siloStatistics.TryGetValue(silo, out var stats))
+            if (siloStatistics.TryGetValue(silo, out var stats) && !stats.IsOverloaded)
             {
                 relevantSilos.Add(new(silo, stats));
             }
@@ -164,7 +164,8 @@ internal sealed class ResourceOptimizedPlacementDirector : IPlacementDirector, I
                 statistics.CpuUsage,
                 statistics.AvailableMemory,
                 statistics.MemoryUsage,
-                statistics.TotalPhysicalMemory),
+                statistics.TotalPhysicalMemory,
+                statistics.IsOverloaded),
             updateValueFactory: (_, _) =>
             {
                 float estimatedCpuUsage = _cpuUsageFilter.Filter(statistics.CpuUsage);
@@ -175,7 +176,8 @@ internal sealed class ResourceOptimizedPlacementDirector : IPlacementDirector, I
                     estimatedCpuUsage,
                     estimatedAvailableMemory,
                     estimatedMemoryUsage,
-                    statistics.TotalPhysicalMemory);
+                    statistics.TotalPhysicalMemory,
+                    statistics.IsOverloaded);
             });
 
     // details: https://www.ledjonbehluli.com/posts/orleans_resource_placement_kalman/
