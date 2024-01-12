@@ -2,6 +2,7 @@ using System;
 using System.Buffers;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Numerics;
 using System.Runtime.CompilerServices;
@@ -110,9 +111,10 @@ internal sealed class ResourceOptimizedPlacementDirector : IPlacementDirector, I
     private KeyValuePair<SiloAddress, float> GetBestSiloCandidate_V2(SiloAddress[] compatibleSilos)
     {
         KeyValuePair<int, float> pick;
-
         int compatibleSilosCount = compatibleSilos.Length;
-        if (compatibleSilosCount * Unsafe.SizeOf<KeyValuePair<int, ResourceStatistics>>() <= OneKiloByte)  // it is good practice not to allocate more than 1 kilobyte of memory on the stack
+
+        // It is good practice not to allocate more than 1 kilobyte of memory on the stack
+        if (compatibleSilosCount * Unsafe.SizeOf<KeyValuePair<int, ResourceStatistics>>() <= OneKiloByte)
         {
             pick = MakePick(stackalloc KeyValuePair<int, ResourceStatistics>[compatibleSilosCount]);
         }
@@ -123,44 +125,35 @@ internal sealed class ResourceOptimizedPlacementDirector : IPlacementDirector, I
             ArrayPool<KeyValuePair<int, ResourceStatistics>>.Shared.Return(relevantSilos);
         }
 
-        foreach (var silo in compatibleSilos)
-        {
-            if (silo.GetConsistentHashCode() == pick.Key)
-            {
-                return new KeyValuePair<SiloAddress, float>(silo, pick.Value);
-            }
-        }
-
-        // It should never come to this point, unless 'GetConsistentHashCode' isnt consistent, which if its the case,
-        // this code can act as a 'tester' for that. This would be exceptional, so its better to stop the program.
-        throw new InvalidOperationException("No hash code from the list of compatible silos matched the picked silo's hash code.");
+        return new KeyValuePair<SiloAddress, float>(compatibleSilos[pick.Key], pick.Value);
 
         KeyValuePair<int, float> MakePick(Span<KeyValuePair<int, ResourceStatistics>> relevantSilos)
         {
             int relevantSilosCount = 0;
-            foreach (var silo in compatibleSilos)
+            for (var i = 0; i < compatibleSilos.Length; ++i)
             {
+                var silo = compatibleSilos[i];
                 if (_siloStatistics.TryGetValue(silo, out var stats) && !stats.IsOverloaded)
                 {
-                    relevantSilos[relevantSilosCount++] = new(silo.GetConsistentHashCode(), stats);
+                    relevantSilos[relevantSilosCount++] = new(i, stats);
                 }
             }
 
-            int chooseFrom = (int)Math.Ceiling(Math.Sqrt(relevantSilosCount));
-            var chooseFromSilos = Random.Shared.GetItems<KeyValuePair<int, ResourceStatistics>>(relevantSilos, chooseFrom).AsSpan();
+            int candidateCount = (int)Math.Ceiling(Math.Sqrt(relevantSilosCount));
+            ShufflePrefix(relevantSilos, candidateCount);
+            var candidates = relevantSilos[0..candidateCount];
 
             int cursor = 0;
             int addressHashCode = 0;
             float lowestScore = 1;
 
-            while (cursor < chooseFrom)
+            foreach (var silo in candidates)
             {
-                var silo = chooseFromSilos[cursor];
-
                 float siloScore = CalculateScore(silo.Value);
-                // its very unlikley, but there could be more than 1 silo that has the same score,
+
+                // It's very unlikely, but there could be more than 1 silo that has the same score,
                 // so we apply some jittering to avoid pick the first one in the short-list.
-                float scoreJitter = Random.Shared.NextSingle() / 100_000;
+                float scoreJitter = Random.Shared.NextSingle() / 100_000f;
 
                 if (siloScore + scoreJitter < lowestScore)
                 {
@@ -172,6 +165,22 @@ internal sealed class ResourceOptimizedPlacementDirector : IPlacementDirector, I
             }
 
             return new(addressHashCode, lowestScore);
+        }
+
+        // Variant of the Modern Fisher-Yates shuffle which stops after shuffling the first `prefixLength` elements,
+        // which are the only elements we are interested in.
+        // See: https://en.wikipedia.org/wiki/Fisher%E2%80%93Yates_shuffle
+        static void ShufflePrefix(Span<KeyValuePair<int, ResourceStatistics>> values, int prefixLength)
+        {
+            var max = values.Length;
+            for (var i = 0; i < prefixLength; i++)
+            {
+                var chosen = Random.Shared.Next(i, max);
+                if (chosen != i)
+                {
+                    (values[chosen], values[i]) = (values[i], values[chosen]);
+                }
+            }
         }
     }
 
