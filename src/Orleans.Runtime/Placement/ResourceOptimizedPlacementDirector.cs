@@ -13,19 +13,19 @@ internal sealed class ResourceOptimizedPlacementDirector : IPlacementDirector, I
 {
     readonly record struct ResourceStatistics(float? CpuUsage, float? AvailableMemory, long? MemoryUsage, long? TotalPhysicalMemory, bool IsOverloaded);
 
-    Task<SiloAddress> _cachedLocalSilo;
-
-    readonly ResourceOptimizedPlacementOptions _options;
-    readonly ConcurrentDictionary<SiloAddress, ResourceStatistics> siloStatistics = [];
-
-    readonly DualModeKalmanFilter<float> _cpuUsageFilter = new();
-    readonly DualModeKalmanFilter<float> _availableMemoryFilter = new();
-    readonly DualModeKalmanFilter<long> _memoryUsageFilter = new();
-
     /// <summary>
     /// 1 / (1024 * 1024)
     /// </summary>
-    const float physicalMemoryScalingFactor = 0.00000095367431640625f;
+    private const float PhysicalMemoryScalingFactor = 0.00000095367431640625f;
+    
+    private readonly ResourceOptimizedPlacementOptions _options;
+    private readonly ConcurrentDictionary<SiloAddress, ResourceStatistics> siloStatistics = [];
+
+    private readonly DualModeKalmanFilter<float> _cpuUsageFilter = new();
+    private readonly DualModeKalmanFilter<float> _availableMemoryFilter = new();
+    private readonly DualModeKalmanFilter<long> _memoryUsageFilter = new();
+
+    private Task<SiloAddress> _cachedLocalSilo;
 
     public ResourceOptimizedPlacementDirector(
         DeploymentLoadPublisher deploymentLoadPublisher,
@@ -69,7 +69,7 @@ internal sealed class ResourceOptimizedPlacementDirector : IPlacementDirector, I
         return Task.FromResult(bestCandidate.Key);
     }
 
-    KeyValuePair<SiloAddress, float> GetBestSiloCandidate(SiloAddress[] compatibleSilos)
+    private KeyValuePair<SiloAddress, float> GetBestSiloCandidate(SiloAddress[] compatibleSilos)
     {
         List<KeyValuePair<SiloAddress, ResourceStatistics>> relevantSilos = [];
         foreach (var silo in compatibleSilos)
@@ -104,7 +104,7 @@ internal sealed class ResourceOptimizedPlacementDirector : IPlacementDirector, I
         return winningSilo;
     }
 
-    bool IsLocalSiloPreferable(IPlacementContext context, SiloAddress[] compatibleSilos, float bestCandidateScore)
+    private bool IsLocalSiloPreferable(IPlacementContext context, SiloAddress[] compatibleSilos, float bestCandidateScore)
     {
         if (context.LocalSiloStatus != SiloStatus.Active || !compatibleSilos.Contains(context.LocalSilo))
         {
@@ -135,7 +135,7 @@ internal sealed class ResourceOptimizedPlacementDirector : IPlacementDirector, I
     ///         physical_mem_weight * (1 / (1024 * 1024 * physical_mem)
     /// </returns>
     /// <remarks>physical_mem is represented in [MB] to keep the result within [0-1] in cases of silos having physical_mem less than [1GB]</remarks>
-    float CalculateScore(ResourceStatistics stats)
+    private float CalculateScore(ResourceStatistics stats)
     {
         float normalizedCpuUsage = stats.CpuUsage.HasValue ? stats.CpuUsage.Value / 100f : 0f;
 
@@ -143,7 +143,7 @@ internal sealed class ResourceOptimizedPlacementDirector : IPlacementDirector, I
         {
             float normalizedMemoryUsage = stats.MemoryUsage.HasValue ? stats.MemoryUsage.Value / physicalMemory : 0f;
             float normalizedAvailableMemory = 1 - (stats.AvailableMemory.HasValue ? stats.AvailableMemory.Value / physicalMemory : 0f);
-            float normalizedPhysicalMemory = physicalMemoryScalingFactor * physicalMemory;
+            float normalizedPhysicalMemory = PhysicalMemoryScalingFactor * physicalMemory;
 
             return _options.CpuUsageWeight * normalizedCpuUsage +
                    _options.MemoryUsageWeight * normalizedMemoryUsage +
@@ -181,14 +181,14 @@ internal sealed class ResourceOptimizedPlacementDirector : IPlacementDirector, I
             });
 
     // details: https://www.ledjonbehluli.com/posts/orleans_resource_placement_kalman/
-    sealed class DualModeKalmanFilter<T> where T : unmanaged, INumber<T>
+    private sealed class DualModeKalmanFilter<T> where T : unmanaged, INumber<T>
     {
-        readonly KalmanFilter _slowFilter = new(T.Zero);
-        readonly KalmanFilter _fastFilter = new(T.CreateChecked(0.01));
+        private readonly KalmanFilter _slowFilter = new(T.Zero);
+        private readonly KalmanFilter _fastFilter = new(T.CreateChecked(0.01));
         
-        FilterRegime _regime = FilterRegime.Slow;
+        private FilterRegime _regime = FilterRegime.Slow;
 
-        enum FilterRegime
+        private enum FilterRegime
         {
             Slow,
             Fast
@@ -225,9 +225,9 @@ internal sealed class ResourceOptimizedPlacementDirector : IPlacementDirector, I
             }
         }
 
-        sealed class KalmanFilter(T processNoiseCovariance)
+        private sealed class KalmanFilter(T processNoiseCovariance)
         {
-            readonly T _processNoiseCovariance = processNoiseCovariance;
+            private readonly T _processNoiseCovariance = processNoiseCovariance;
 
             public T PriorEstimate { get; private set; } = T.Zero;
             public T PriorErrorCovariance { get; private set; } = T.One;

@@ -16,6 +16,7 @@ public sealed class ResourceOptimizedPlacementOptions
     /// <para>Valid range is [0.00-1.00]</para>
     /// </i></remarks>
     public float CpuUsageWeight { get; set; } = DEFAULT_CPU_USAGE_WEIGHT;
+
     /// <summary>
     /// The default value of <see cref="CpuUsageWeight"/>.
     /// </summary>
@@ -29,6 +30,7 @@ public sealed class ResourceOptimizedPlacementOptions
     /// <para>Valid range is [0.00-1.00]</para>
     /// </i></remarks>
     public float MemoryUsageWeight { get; set; } = DEFAULT_MEMORY_USAGE_WEIGHT;
+
     /// <summary>
     /// The default value of <see cref="MemoryUsageWeight"/>.
     /// </summary>
@@ -42,6 +44,7 @@ public sealed class ResourceOptimizedPlacementOptions
     /// <para>Valid range is [0.00-1.00]</para>
     /// </i></remarks>
     public float AvailableMemoryWeight { get; set; } = DEFAULT_AVAILABLE_MEMORY_WEIGHT;
+
     /// <summary>
     /// The default value of <see cref="AvailableMemoryWeight"/>.
     /// </summary>
@@ -56,6 +59,7 @@ public sealed class ResourceOptimizedPlacementOptions
     /// <para>Valid range is [0.00-1.00]</para>
     /// </i></remarks>
     public float PhysicalMemoryWeight { get; set; } = DEFAULT_PHYSICAL_MEMORY_WEIGHT;
+
     /// <summary>
     /// The default value of <see cref="PhysicalMemoryWeight"/>.
     /// </summary>
@@ -73,6 +77,7 @@ public sealed class ResourceOptimizedPlacementOptions
     /// <para>Valid range is [0.00-1.00]</para>
     /// </i></remarks>
     public float LocalSiloPreferenceMargin { get; set; }
+
     /// <summary>
     /// The default value of <see cref="LocalSiloPreferenceMargin"/>.
     /// </summary>
