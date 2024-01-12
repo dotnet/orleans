@@ -6,6 +6,7 @@ using System.Diagnostics;
 using System.Linq;
 using System.Numerics;
 using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Options;
 using Orleans.Runtime.Configuration.Options;
@@ -72,9 +73,13 @@ internal sealed class ResourceOptimizedPlacementDirector : IPlacementDirector, I
         List<KeyValuePair<SiloAddress, ResourceStatistics>> relevantSilos = [];
         foreach (var silo in compatibleSilos)
         {
-            if (_siloStatistics.TryGetValue(silo, out var stats) && !stats.Value.IsOverloaded)
+            if (_siloStatistics.TryGetValue(silo, out var stats))
             {
-                relevantSilos.Add(new(silo, stats.Value));
+                var filteredValue = stats.Value;
+                if (!filteredValue.IsOverloaded)
+                {
+                    relevantSilos.Add(new(silo, filteredValue));
+                }
             }
         }
 
@@ -128,9 +133,13 @@ internal sealed class ResourceOptimizedPlacementDirector : IPlacementDirector, I
             for (var i = 0; i < compatibleSilos.Length; ++i)
             {
                 var silo = compatibleSilos[i];
-                if (_siloStatistics.TryGetValue(silo, out var stats) && !stats.Value.IsOverloaded)
+                if (_siloStatistics.TryGetValue(silo, out var stats))
                 {
-                    relevantSilos[relevantSilosCount++] = new(i, stats.Value);
+                    var filteredStats = stats.Value;
+                    if (!filteredStats.IsOverloaded)
+                    {
+                        relevantSilos[relevantSilosCount++] = new(i, filteredStats);
+                    }
                 }
             }
 
@@ -254,25 +263,26 @@ internal sealed class ResourceOptimizedPlacementDirector : IPlacementDirector, I
         private readonly DualModeKalmanFilter<float> _availableMemoryFilter = new();
         private readonly DualModeKalmanFilter<long> _memoryUsageFilter = new();
 
-        public ResourceStatistics Value { get; private set; }
-            = new(statistics.CpuUsage, statistics.AvailableMemory, statistics.MemoryUsage, statistics.TotalPhysicalMemory, statistics.IsOverloaded);
+        private float? _cpuUsage = statistics.CpuUsage;
+        private float? _availableMemory = statistics.AvailableMemory;
+        private long? _memoryUsage = statistics.MemoryUsage;
+        private long? _totalPhysicalMemory = statistics.TotalPhysicalMemory;
+        private bool _isOverloaded = statistics.IsOverloaded;
+
+        public ResourceStatistics Value => new(_cpuUsage, _availableMemory, _memoryUsage, _totalPhysicalMemory, _isOverloaded);
 
         public void Update(SiloRuntimeStatistics statistics)
         {
-            Value = new(
-                CpuUsage: _cpuUsageFilter.Filter(statistics.CpuUsage),
-                AvailableMemory: _availableMemoryFilter.Filter(statistics.AvailableMemory),
-                MemoryUsage: _memoryUsageFilter.Filter(statistics.MemoryUsage),
-                TotalPhysicalMemory: statistics.TotalPhysicalMemory,
-                IsOverloaded: statistics.IsOverloaded);
+            _cpuUsage = _cpuUsageFilter.Filter(statistics.CpuUsage);
+            _availableMemory = _availableMemoryFilter.Filter(statistics.AvailableMemory);
+            _memoryUsage = _memoryUsageFilter.Filter(statistics.MemoryUsage);
+            _totalPhysicalMemory = statistics.TotalPhysicalMemory;
+            _isOverloaded = statistics.IsOverloaded;
         }
     }
 
-
     private sealed class DualModeKalmanFilter<T> where T : unmanaged, INumber<T>
     {
-        private static T SlowFilterProcessNoiseCovariance => T.Zero;
-        private static T FastFilterProcessNoiseCovariance => T.CreateChecked(0.01);
         private KalmanFilter _slowFilter = new();
         private KalmanFilter _fastFilter = new();
         
@@ -288,8 +298,11 @@ internal sealed class ResourceOptimizedPlacementDirector : IPlacementDirector, I
         {
             T _measurement = measurement ?? T.Zero;
 
-            T slowEstimate = _slowFilter.Filter(_measurement, SlowFilterProcessNoiseCovariance);
-            T fastEstimate = _fastFilter.Filter(_measurement, FastFilterProcessNoiseCovariance);
+            T slowCovariance = T.Zero;
+            T fastCovariance = T.CreateChecked(0.01);
+
+            T slowEstimate = _slowFilter.Filter(_measurement, slowCovariance);
+            T fastEstimate = _fastFilter.Filter(_measurement, fastCovariance);
 
             if (_measurement > slowEstimate)
             {
@@ -297,7 +310,7 @@ internal sealed class ResourceOptimizedPlacementDirector : IPlacementDirector, I
                 {
                     _regime = FilterRegime.Fast;
                     _fastFilter.SetState(_measurement, T.Zero);
-                    fastEstimate = _fastFilter.Filter(_measurement, FastFilterProcessNoiseCovariance);
+                    fastEstimate = _fastFilter.Filter(_measurement, fastCovariance);
                 }
 
                 return fastEstimate;
@@ -308,7 +321,7 @@ internal sealed class ResourceOptimizedPlacementDirector : IPlacementDirector, I
                 {
                     _regime = FilterRegime.Slow;
                     _slowFilter.SetState(_fastFilter.PriorEstimate, _fastFilter.PriorErrorCovariance);
-                    slowEstimate = _slowFilter.Filter(_measurement, SlowFilterProcessNoiseCovariance);
+                    slowEstimate = _slowFilter.Filter(_measurement, slowCovariance);
                 }
 
                 return slowEstimate;
