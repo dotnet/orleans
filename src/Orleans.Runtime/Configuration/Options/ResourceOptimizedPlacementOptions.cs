@@ -73,7 +73,7 @@ public sealed class ResourceOptimizedPlacementOptions
     /// </list>
     /// </summary>
     /// <remarks><i>
-    /// <para>Do favor a lower value for this e.g: 1-5 [%]</para>
+    /// <para>Do favor a lower value for this e.g: 0.01-0.05</para>
     /// <para>Valid range is [0.00-1.00]</para>
     /// </i></remarks>
     public float LocalSiloPreferenceMargin { get; set; }
