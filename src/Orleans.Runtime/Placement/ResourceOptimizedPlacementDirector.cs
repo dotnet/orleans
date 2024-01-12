@@ -15,8 +15,6 @@ namespace Orleans.Runtime.Placement;
 // details: https://www.ledjonbehluli.com/posts/orleans_resource_placement_kalman/
 internal sealed class ResourceOptimizedPlacementDirector : IPlacementDirector, ISiloStatisticsChangeListener
 {
-    private readonly record struct ResourceStatistics(float? CpuUsage, float? AvailableMemory, long? MemoryUsage, long? TotalPhysicalMemory, bool IsOverloaded);
-
     /// <summary>
     /// 1 / (1024 * 1024)
     /// </summary>
@@ -24,11 +22,7 @@ internal sealed class ResourceOptimizedPlacementDirector : IPlacementDirector, I
     private const int OneKiloByte = 1024;
 
     private readonly ResourceOptimizedPlacementOptions _options;
-    private readonly ConcurrentDictionary<SiloAddress, ResourceStatistics> _siloStatistics = [];
-
-    private readonly DualModeKalmanFilter<float> _cpuUsageFilter = new();
-    private readonly DualModeKalmanFilter<float> _availableMemoryFilter = new();
-    private readonly DualModeKalmanFilter<long> _memoryUsageFilter = new();
+    private readonly ConcurrentDictionary<SiloAddress, FilteredSiloStatistics> _siloStatistics = [];
 
     private Task<SiloAddress> _cachedLocalSilo;
 
@@ -78,9 +72,9 @@ internal sealed class ResourceOptimizedPlacementDirector : IPlacementDirector, I
         List<KeyValuePair<SiloAddress, ResourceStatistics>> relevantSilos = [];
         foreach (var silo in compatibleSilos)
         {
-            if (_siloStatistics.TryGetValue(silo, out var stats) && !stats.IsOverloaded)
+            if (_siloStatistics.TryGetValue(silo, out var stats) && !stats.Value.IsOverloaded)
             {
-                relevantSilos.Add(new(silo, stats));
+                relevantSilos.Add(new(silo, stats.Value));
             }
         }
 
@@ -134,9 +128,9 @@ internal sealed class ResourceOptimizedPlacementDirector : IPlacementDirector, I
             for (var i = 0; i < compatibleSilos.Length; ++i)
             {
                 var silo = compatibleSilos[i];
-                if (_siloStatistics.TryGetValue(silo, out var stats) && !stats.IsOverloaded)
+                if (_siloStatistics.TryGetValue(silo, out var stats) && !stats.Value.IsOverloaded)
                 {
-                    relevantSilos[relevantSilosCount++] = new(i, stats);
+                    relevantSilos[relevantSilosCount++] = new(i, stats.Value);
                 }
             }
 
@@ -197,7 +191,7 @@ internal sealed class ResourceOptimizedPlacementDirector : IPlacementDirector, I
 
         if (_siloStatistics.TryGetValue(context.LocalSilo, out var localStats))
         {
-            float localScore = CalculateScore(localStats);
+            float localScore = CalculateScore(localStats.Value);
             float scoreDiff = Math.Abs(localScore - bestCandidateScore);
 
             if (_options.LocalSiloPreferenceMargin >= scoreDiff)
@@ -243,31 +237,44 @@ internal sealed class ResourceOptimizedPlacementDirector : IPlacementDirector, I
 
     public void SiloStatisticsChangeNotification(SiloAddress address, SiloRuntimeStatistics statistics)
         => _siloStatistics.AddOrUpdate(
-            key: address,
-            addValue: new ResourceStatistics(
-                statistics.CpuUsage,
-                statistics.AvailableMemory,
-                statistics.MemoryUsage,
-                statistics.TotalPhysicalMemory,
-                statistics.IsOverloaded),
-            updateValueFactory: (_, _) =>
+            address,
+            addValueFactory: static (_, statistics) => new (statistics),
+            updateValueFactory: static (_, existing, statistics) =>
             {
-                float estimatedCpuUsage = _cpuUsageFilter.Filter(statistics.CpuUsage);
-                float estimatedAvailableMemory = _availableMemoryFilter.Filter(statistics.AvailableMemory);
-                long estimatedMemoryUsage = _memoryUsageFilter.Filter(statistics.MemoryUsage);
+                existing.Update(statistics);
+                return existing;
+            },
+            statistics);
 
-                return new ResourceStatistics(
-                    estimatedCpuUsage,
-                    estimatedAvailableMemory,
-                    estimatedMemoryUsage,
-                    statistics.TotalPhysicalMemory,
-                    statistics.IsOverloaded);
-            });
+    private readonly record struct ResourceStatistics(float? CpuUsage, float? AvailableMemory, long? MemoryUsage, long? TotalPhysicalMemory, bool IsOverloaded);
+
+    private sealed class FilteredSiloStatistics(SiloRuntimeStatistics statistics)
+    {
+        private readonly DualModeKalmanFilter<float> _cpuUsageFilter = new();
+        private readonly DualModeKalmanFilter<float> _availableMemoryFilter = new();
+        private readonly DualModeKalmanFilter<long> _memoryUsageFilter = new();
+
+        public ResourceStatistics Value { get; private set; }
+            = new(statistics.CpuUsage, statistics.AvailableMemory, statistics.MemoryUsage, statistics.TotalPhysicalMemory, statistics.IsOverloaded);
+
+        public void Update(SiloRuntimeStatistics statistics)
+        {
+            Value = new(
+                CpuUsage: _cpuUsageFilter.Filter(statistics.CpuUsage),
+                AvailableMemory: _availableMemoryFilter.Filter(statistics.AvailableMemory),
+                MemoryUsage: _memoryUsageFilter.Filter(statistics.MemoryUsage),
+                TotalPhysicalMemory: statistics.TotalPhysicalMemory,
+                IsOverloaded: statistics.IsOverloaded);
+        }
+    }
+
 
     private sealed class DualModeKalmanFilter<T> where T : unmanaged, INumber<T>
     {
-        private readonly KalmanFilter _slowFilter = new(T.Zero);
-        private readonly KalmanFilter _fastFilter = new(T.CreateChecked(0.01));
+        private static T SlowFilterProcessNoiseCovariance => T.Zero;
+        private static T FastFilterProcessNoiseCovariance => T.CreateChecked(0.01);
+        private KalmanFilter _slowFilter = new();
+        private KalmanFilter _fastFilter = new();
         
         private FilterRegime _regime = FilterRegime.Slow;
 
@@ -281,8 +288,8 @@ internal sealed class ResourceOptimizedPlacementDirector : IPlacementDirector, I
         {
             T _measurement = measurement ?? T.Zero;
 
-            T slowEstimate = _slowFilter.Filter(_measurement);
-            T fastEstimate = _fastFilter.Filter(_measurement);
+            T slowEstimate = _slowFilter.Filter(_measurement, SlowFilterProcessNoiseCovariance);
+            T fastEstimate = _fastFilter.Filter(_measurement, FastFilterProcessNoiseCovariance);
 
             if (_measurement > slowEstimate)
             {
@@ -290,7 +297,7 @@ internal sealed class ResourceOptimizedPlacementDirector : IPlacementDirector, I
                 {
                     _regime = FilterRegime.Fast;
                     _fastFilter.SetState(_measurement, T.Zero);
-                    fastEstimate = _fastFilter.Filter(_measurement);
+                    fastEstimate = _fastFilter.Filter(_measurement, FastFilterProcessNoiseCovariance);
                 }
 
                 return fastEstimate;
@@ -301,17 +308,15 @@ internal sealed class ResourceOptimizedPlacementDirector : IPlacementDirector, I
                 {
                     _regime = FilterRegime.Slow;
                     _slowFilter.SetState(_fastFilter.PriorEstimate, _fastFilter.PriorErrorCovariance);
-                    slowEstimate = _slowFilter.Filter(_measurement);
+                    slowEstimate = _slowFilter.Filter(_measurement, SlowFilterProcessNoiseCovariance);
                 }
 
                 return slowEstimate;
             }
         }
 
-        private sealed class KalmanFilter(T processNoiseCovariance)
+        private struct KalmanFilter()
         {
-            private readonly T _processNoiseCovariance = processNoiseCovariance;
-
             public T PriorEstimate { get; private set; } = T.Zero;
             public T PriorErrorCovariance { get; private set; } = T.One;
 
@@ -321,10 +326,10 @@ internal sealed class ResourceOptimizedPlacementDirector : IPlacementDirector, I
                 PriorErrorCovariance = errorCovariance;
             }
 
-            public T Filter(T measurement)
+            public T Filter(T measurement, T processNoiseCovariance)
             {
                 T estimate = PriorEstimate;
-                T errorCovariance = PriorErrorCovariance + _processNoiseCovariance;
+                T errorCovariance = PriorErrorCovariance + processNoiseCovariance;
 
                 T gain = errorCovariance / (errorCovariance + T.One);
                 T newEstimate = estimate + gain * (measurement - estimate);
