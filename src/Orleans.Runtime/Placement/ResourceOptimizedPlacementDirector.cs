@@ -12,7 +12,7 @@ using Orleans.Runtime.Configuration.Options;
 
 namespace Orleans.Runtime.Placement;
 
-// details: https://www.ledjonbehluli.com/posts/orleans_resource_placement_kalman/
+// See: https://www.ledjonbehluli.com/posts/orleans_resource_placement_kalman/
 internal sealed class ResourceOptimizedPlacementDirector : IPlacementDirector, ISiloStatisticsChangeListener
 {
     /// <summary>
