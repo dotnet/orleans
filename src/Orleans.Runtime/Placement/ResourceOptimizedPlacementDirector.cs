@@ -9,6 +9,7 @@ using Orleans.Runtime.Configuration.Options;
 
 namespace Orleans.Runtime.Placement;
 
+// details: https://www.ledjonbehluli.com/posts/orleans_resource_placement_kalman/
 internal sealed class ResourceOptimizedPlacementDirector : IPlacementDirector, ISiloStatisticsChangeListener
 {
     readonly record struct ResourceStatistics(float? CpuUsage, float? AvailableMemory, long? MemoryUsage, long? TotalPhysicalMemory, bool IsOverloaded);
@@ -180,7 +181,6 @@ internal sealed class ResourceOptimizedPlacementDirector : IPlacementDirector, I
                     statistics.IsOverloaded);
             });
 
-    // details: https://www.ledjonbehluli.com/posts/orleans_resource_placement_kalman/
     private sealed class DualModeKalmanFilter<T> where T : unmanaged, INumber<T>
     {
         private readonly KalmanFilter _slowFilter = new(T.Zero);
