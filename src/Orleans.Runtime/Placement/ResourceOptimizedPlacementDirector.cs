@@ -281,6 +281,9 @@ internal sealed class ResourceOptimizedPlacementDirector : IPlacementDirector, I
         }
     }
 
+    // The rational behind using a dual-mode KF, is that we want the input signal to follow a trajectory that
+    // decays with a slower rate than the origianl one, but also tracks the signal in case of signal increases
+    // (which represent potential of overloading). Both are important, but they are inversely correlated to each other.
     private sealed class DualModeKalmanFilter<T> where T : unmanaged, INumber<T>
     {
         private KalmanFilter _slowFilter = new();
