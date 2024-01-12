@@ -69,45 +69,6 @@ internal sealed class ResourceOptimizedPlacementDirector : IPlacementDirector, I
 
     private KeyValuePair<SiloAddress, float> GetBestSiloCandidate(SiloAddress[] compatibleSilos)
     {
-        List<KeyValuePair<SiloAddress, ResourceStatistics>> relevantSilos = [];
-        foreach (var silo in compatibleSilos)
-        {
-            if (_siloStatistics.TryGetValue(silo, out var stats))
-            {
-                var filteredValue = stats.Value;
-                if (!filteredValue.IsOverloaded)
-                {
-                    relevantSilos.Add(new(silo, filteredValue));
-                }
-            }
-        }
-
-        int chooseFrom = (int)Math.Ceiling(Math.Sqrt(relevantSilos.Count));
-        Dictionary<SiloAddress, float> chooseFromSilos = [];
-
-        while (chooseFromSilos.Count < chooseFrom)
-        {
-            int index = Random.Shared.Next(relevantSilos.Count);
-            var pickedSilo = relevantSilos[index];
-
-            relevantSilos.RemoveAt(index);
-
-            float score = CalculateScore(pickedSilo.Value);
-            chooseFromSilos.Add(pickedSilo.Key, score);
-        }
-
-        var orderedByLowestScore = chooseFromSilos.OrderBy(kv => kv.Value);
-
-        // there could be more than 1 silo that has the same score, we pick 1 of them randomly so that we dont continuously pick the first one.
-        var lowestScore = orderedByLowestScore.First().Value;
-        var shortListedSilos = orderedByLowestScore.TakeWhile(p => p.Value == lowestScore).ToList();
-        var winningSilo = shortListedSilos[Random.Shared.Next(shortListedSilos.Count)];
-
-        return winningSilo;
-    }
-
-    private KeyValuePair<SiloAddress, float> GetBestSiloCandidate_V2(SiloAddress[] compatibleSilos)
-    {
         (int Index, float Score) pick;
         int compatibleSilosCount = compatibleSilos.Length;
 
