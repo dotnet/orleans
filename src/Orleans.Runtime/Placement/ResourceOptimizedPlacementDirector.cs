@@ -127,7 +127,7 @@ internal sealed class ResourceOptimizedPlacementDirector : IPlacementDirector, I
 
         return new KeyValuePair<SiloAddress, float>(compatibleSilos[pick.Index], pick.Score);
 
-        (int, float) MakePick(Span<(int SiloIndex, ResourceStatistics SiloStatistics)> relevantSilos)
+        (int, float) MakePick(Span<(int, ResourceStatistics)> relevantSilos)
         {
             // Get all compatible silos
             int relevantSilosCount = 0;
@@ -150,28 +150,23 @@ internal sealed class ResourceOptimizedPlacementDirector : IPlacementDirector, I
             ShufflePrefix(relevantSilos, candidateCount);
             var candidates = relevantSilos[0..candidateCount];
 
-            int cursor = 0;
-            int siloIndex = 0;
-            float lowestScore = 1;
+            (int Index, float Score) pick = (0, 1f);
 
-            foreach (var silo in candidates)
+            foreach (var (index, statistics) in candidates)
             {
-                float siloScore = CalculateScore(silo.SiloStatistics);
+                float score = CalculateScore(statistics);
 
                 // It's very unlikely, but there could be more than 1 silo that has the same score,
                 // so we apply some jittering to avoid pick the first one in the short-list.
                 float scoreJitter = Random.Shared.NextSingle() / 100_000f;
 
-                if (siloScore + scoreJitter < lowestScore)
+                if (score + scoreJitter < pick.Score)
                 {
-                    lowestScore = siloScore;
-                    siloIndex = silo.SiloIndex;
+                    pick = (index, score);
                 }
-
-                cursor++;
             }
 
-            return new(siloIndex, lowestScore);
+            return pick;
         }
 
         // Variant of the Modern Fisher-Yates shuffle which stops after shuffling the first `prefixLength` elements,
