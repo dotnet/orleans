@@ -128,7 +128,7 @@ internal sealed class ResourceOptimizedPlacementDirector : IPlacementDirector, I
 
         (int, float) MakePick(Span<(int, ResourceStatistics)> relevantSilos)
         {
-            // Get all compatible silos
+            // Get all compatible silos which aren't overloaded
             int relevantSilosCount = 0;
             for (var i = 0; i < compatibleSilos.Length; ++i)
             {
