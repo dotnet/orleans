@@ -2,9 +2,11 @@ using System;
 using System.Buffers;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Numerics;
 using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Options;
 using Orleans.Runtime.Configuration.Options;
@@ -14,8 +16,6 @@ namespace Orleans.Runtime.Placement;
 // details: https://www.ledjonbehluli.com/posts/orleans_resource_placement_kalman/
 internal sealed class ResourceOptimizedPlacementDirector : IPlacementDirector, ISiloStatisticsChangeListener
 {
-    readonly record struct ResourceStatistics(float? CpuUsage, float? AvailableMemory, long? MemoryUsage, long? TotalPhysicalMemory, bool IsOverloaded);
-
     /// <summary>
     /// 1 / (1024 * 1024)
     /// </summary>
@@ -23,11 +23,7 @@ internal sealed class ResourceOptimizedPlacementDirector : IPlacementDirector, I
     private const int OneKiloByte = 1024;
 
     private readonly ResourceOptimizedPlacementOptions _options;
-    private readonly ConcurrentDictionary<SiloAddress, ResourceStatistics> _siloStatistics = [];
-
-    private readonly DualModeKalmanFilter<float> _cpuUsageFilter = new();
-    private readonly DualModeKalmanFilter<float> _availableMemoryFilter = new();
-    private readonly DualModeKalmanFilter<long> _memoryUsageFilter = new();
+    private readonly ConcurrentDictionary<SiloAddress, FilteredSiloStatistics> _siloStatistics = [];
 
     private Task<SiloAddress> _cachedLocalSilo;
 
@@ -77,9 +73,13 @@ internal sealed class ResourceOptimizedPlacementDirector : IPlacementDirector, I
         List<KeyValuePair<SiloAddress, ResourceStatistics>> relevantSilos = [];
         foreach (var silo in compatibleSilos)
         {
-            if (_siloStatistics.TryGetValue(silo, out var stats) && !stats.IsOverloaded)
+            if (_siloStatistics.TryGetValue(silo, out var stats))
             {
-                relevantSilos.Add(new(silo, stats));
+                var filteredValue = stats.Value;
+                if (!filteredValue.IsOverloaded)
+                {
+                    relevantSilos.Add(new(silo, filteredValue));
+                }
             }
         }
 
@@ -109,69 +109,85 @@ internal sealed class ResourceOptimizedPlacementDirector : IPlacementDirector, I
 
     private KeyValuePair<SiloAddress, float> GetBestSiloCandidate_V2(SiloAddress[] compatibleSilos)
     {
-        KeyValuePair<int, float> pick;
-
+        (int Index, float Score) pick;
         int compatibleSilosCount = compatibleSilos.Length;
-        if (compatibleSilosCount * Unsafe.SizeOf<KeyValuePair<int, ResourceStatistics>>() <= OneKiloByte)  // it is good practice not to allocate more than 1 kilobyte of memory on the stack
+
+        // It is good practice not to allocate more than 1 kilobyte of memory on the stack
+        if (compatibleSilosCount * Unsafe.SizeOf<(int, ResourceStatistics)>() <= OneKiloByte)
         {
-            pick = MakePick(stackalloc KeyValuePair<int, ResourceStatistics>[compatibleSilosCount]);
+            pick = MakePick(stackalloc (int, ResourceStatistics)[compatibleSilosCount]);
         }
         else
         {
-            var relevantSilos = ArrayPool<KeyValuePair<int, ResourceStatistics>>.Shared.Rent(compatibleSilosCount);
+            var relevantSilos = ArrayPool<(int, ResourceStatistics)>.Shared.Rent(compatibleSilosCount);
             pick = MakePick(relevantSilos.AsSpan());
-            ArrayPool<KeyValuePair<int, ResourceStatistics>>.Shared.Return(relevantSilos);
+            ArrayPool<(int, ResourceStatistics)>.Shared.Return(relevantSilos);
         }
 
-        foreach (var silo in compatibleSilos)
-        {
-            if (silo.GetConsistentHashCode() == pick.Key)
-            {
-                return new KeyValuePair<SiloAddress, float>(silo, pick.Value);
-            }
-        }
+        return new KeyValuePair<SiloAddress, float>(compatibleSilos[pick.Index], pick.Score);
 
-        // It should never come to this point, unless 'GetConsistentHashCode' isnt consistent, which if its the case,
-        // this code can act as a 'tester' for that. This would be exceptional, so its better to stop the program.
-        throw new InvalidOperationException("No hash code from the list of compatible silos matched the picked silo's hash code.");
-
-        KeyValuePair<int, float> MakePick(Span<KeyValuePair<int, ResourceStatistics>> relevantSilos)
+        (int, float) MakePick(Span<(int, ResourceStatistics)> relevantSilos)
         {
+            // Get all compatible silos
             int relevantSilosCount = 0;
-            foreach (var silo in compatibleSilos)
+            for (var i = 0; i < compatibleSilos.Length; ++i)
             {
-                if (_siloStatistics.TryGetValue(silo, out var stats) && !stats.IsOverloaded)
+                var silo = compatibleSilos[i];
+                if (_siloStatistics.TryGetValue(silo, out var stats))
                 {
-                    relevantSilos[relevantSilosCount++] = new(silo.GetConsistentHashCode(), stats);
+                    var filteredStats = stats.Value;
+                    if (!filteredStats.IsOverloaded)
+                    {
+                        relevantSilos[relevantSilosCount++] = new(i, filteredStats);
+                    }
                 }
             }
 
-            int chooseFrom = (int)Math.Ceiling(Math.Sqrt(relevantSilosCount));
-            var chooseFromSilos = Random.Shared.GetItems<KeyValuePair<int, ResourceStatistics>>(relevantSilos, chooseFrom).AsSpan();
+            // Limit to the number of candidates added.
+            relevantSilos = relevantSilos[0..relevantSilosCount];
+            Debug.Assert(relevantSilos.Length == relevantSilosCount);
 
-            int cursor = 0;
-            int addressHashCode = 0;
-            float lowestScore = 1;
+            // Pick K silos from the list of compatible silos, where K is equal to the square root of the number of silos.
+            // Eg, from 10 silos, we choose from 4.
+            int candidateCount = (int)Math.Ceiling(Math.Sqrt(relevantSilosCount));
+            ShufflePrefix(relevantSilos, candidateCount);
+            var candidates = relevantSilos[0..candidateCount];
 
-            while (cursor < chooseFrom)
+            (int Index, float Score) pick = (0, 1f);
+
+            foreach (var (index, statistics) in candidates)
             {
-                var silo = chooseFromSilos[cursor];
+                float score = CalculateScore(statistics);
 
-                float siloScore = CalculateScore(silo.Value);
-                // its very unlikley, but there could be more than 1 silo that has the same score,
+                // It's very unlikely, but there could be more than 1 silo that has the same score,
                 // so we apply some jittering to avoid pick the first one in the short-list.
-                float scoreJitter = Random.Shared.NextSingle() / 100_000;
+                float scoreJitter = Random.Shared.NextSingle() / 100_000f;
 
-                if (siloScore + scoreJitter < lowestScore)
+                if (score + scoreJitter < pick.Score)
                 {
-                    lowestScore = siloScore;
-                    addressHashCode = silo.Key;
+                    pick = (index, score);
                 }
-
-                cursor++;
             }
 
-            return new(addressHashCode, lowestScore);
+            return pick;
+        }
+
+        // Variant of the Modern Fisher-Yates shuffle which stops after shuffling the first `prefixLength` elements,
+        // which are the only elements we are interested in.
+        // See: https://en.wikipedia.org/wiki/Fisher%E2%80%93Yates_shuffle
+        static void ShufflePrefix(Span<(int SiloIndex, ResourceStatistics SiloStatistics)> values, int prefixLength)
+        {
+            Debug.Assert(prefixLength >= 0);
+            Debug.Assert(prefixLength <= values.Length);
+            var max = values.Length;
+            for (var i = 0; i < prefixLength; i++)
+            {
+                var chosen = Random.Shared.Next(i, max);
+                if (chosen != i)
+                {
+                    (values[chosen], values[i]) = (values[i], values[chosen]);
+                }
+            }
         }
     }
 
@@ -184,7 +200,7 @@ internal sealed class ResourceOptimizedPlacementDirector : IPlacementDirector, I
 
         if (_siloStatistics.TryGetValue(context.LocalSilo, out var localStats))
         {
-            float localScore = CalculateScore(localStats);
+            float localScore = CalculateScore(localStats.Value);
             float scoreDiff = Math.Abs(localScore - bestCandidateScore);
 
             if (_options.LocalSiloPreferenceMargin >= scoreDiff)
@@ -230,31 +246,45 @@ internal sealed class ResourceOptimizedPlacementDirector : IPlacementDirector, I
 
     public void SiloStatisticsChangeNotification(SiloAddress address, SiloRuntimeStatistics statistics)
         => _siloStatistics.AddOrUpdate(
-            key: address,
-            addValue: new ResourceStatistics(
-                statistics.CpuUsage,
-                statistics.AvailableMemory,
-                statistics.MemoryUsage,
-                statistics.TotalPhysicalMemory,
-                statistics.IsOverloaded),
-            updateValueFactory: (_, _) =>
+            address,
+            addValueFactory: static (_, statistics) => new (statistics),
+            updateValueFactory: static (_, existing, statistics) =>
             {
-                float estimatedCpuUsage = _cpuUsageFilter.Filter(statistics.CpuUsage);
-                float estimatedAvailableMemory = _availableMemoryFilter.Filter(statistics.AvailableMemory);
-                long estimatedMemoryUsage = _memoryUsageFilter.Filter(statistics.MemoryUsage);
+                existing.Update(statistics);
+                return existing;
+            },
+            statistics);
 
-                return new ResourceStatistics(
-                    estimatedCpuUsage,
-                    estimatedAvailableMemory,
-                    estimatedMemoryUsage,
-                    statistics.TotalPhysicalMemory,
-                    statistics.IsOverloaded);
-            });
+    private readonly record struct ResourceStatistics(float? CpuUsage, float? AvailableMemory, long? MemoryUsage, long? TotalPhysicalMemory, bool IsOverloaded);
+
+    private sealed class FilteredSiloStatistics(SiloRuntimeStatistics statistics)
+    {
+        private readonly DualModeKalmanFilter<float> _cpuUsageFilter = new();
+        private readonly DualModeKalmanFilter<float> _availableMemoryFilter = new();
+        private readonly DualModeKalmanFilter<long> _memoryUsageFilter = new();
+
+        private float? _cpuUsage = statistics.CpuUsage;
+        private float? _availableMemory = statistics.AvailableMemory;
+        private long? _memoryUsage = statistics.MemoryUsage;
+        private long? _totalPhysicalMemory = statistics.TotalPhysicalMemory;
+        private bool _isOverloaded = statistics.IsOverloaded;
+
+        public ResourceStatistics Value => new(_cpuUsage, _availableMemory, _memoryUsage, _totalPhysicalMemory, _isOverloaded);
+
+        public void Update(SiloRuntimeStatistics statistics)
+        {
+            _cpuUsage = _cpuUsageFilter.Filter(statistics.CpuUsage);
+            _availableMemory = _availableMemoryFilter.Filter(statistics.AvailableMemory);
+            _memoryUsage = _memoryUsageFilter.Filter(statistics.MemoryUsage);
+            _totalPhysicalMemory = statistics.TotalPhysicalMemory;
+            _isOverloaded = statistics.IsOverloaded;
+        }
+    }
 
     private sealed class DualModeKalmanFilter<T> where T : unmanaged, INumber<T>
     {
-        private readonly KalmanFilter _slowFilter = new(T.Zero);
-        private readonly KalmanFilter _fastFilter = new(T.CreateChecked(0.01));
+        private KalmanFilter _slowFilter = new();
+        private KalmanFilter _fastFilter = new();
         
         private FilterRegime _regime = FilterRegime.Slow;
 
@@ -268,8 +298,11 @@ internal sealed class ResourceOptimizedPlacementDirector : IPlacementDirector, I
         {
             T _measurement = measurement ?? T.Zero;
 
-            T slowEstimate = _slowFilter.Filter(_measurement);
-            T fastEstimate = _fastFilter.Filter(_measurement);
+            T slowCovariance = T.Zero;
+            T fastCovariance = T.CreateChecked(0.01);
+
+            T slowEstimate = _slowFilter.Filter(_measurement, slowCovariance);
+            T fastEstimate = _fastFilter.Filter(_measurement, fastCovariance);
 
             if (_measurement > slowEstimate)
             {
@@ -277,7 +310,7 @@ internal sealed class ResourceOptimizedPlacementDirector : IPlacementDirector, I
                 {
                     _regime = FilterRegime.Fast;
                     _fastFilter.SetState(_measurement, T.Zero);
-                    fastEstimate = _fastFilter.Filter(_measurement);
+                    fastEstimate = _fastFilter.Filter(_measurement, fastCovariance);
                 }
 
                 return fastEstimate;
@@ -288,17 +321,15 @@ internal sealed class ResourceOptimizedPlacementDirector : IPlacementDirector, I
                 {
                     _regime = FilterRegime.Slow;
                     _slowFilter.SetState(_fastFilter.PriorEstimate, _fastFilter.PriorErrorCovariance);
-                    slowEstimate = _slowFilter.Filter(_measurement);
+                    slowEstimate = _slowFilter.Filter(_measurement, slowCovariance);
                 }
 
                 return slowEstimate;
             }
         }
 
-        private sealed class KalmanFilter(T processNoiseCovariance)
+        private struct KalmanFilter()
         {
-            private readonly T _processNoiseCovariance = processNoiseCovariance;
-
             public T PriorEstimate { get; private set; } = T.Zero;
             public T PriorErrorCovariance { get; private set; } = T.One;
 
@@ -308,10 +339,10 @@ internal sealed class ResourceOptimizedPlacementDirector : IPlacementDirector, I
                 PriorErrorCovariance = errorCovariance;
             }
 
-            public T Filter(T measurement)
+            public T Filter(T measurement, T processNoiseCovariance)
             {
                 T estimate = PriorEstimate;
-                T errorCovariance = PriorErrorCovariance + _processNoiseCovariance;
+                T errorCovariance = PriorErrorCovariance + processNoiseCovariance;
 
                 T gain = errorCovariance / (errorCovariance + T.One);
                 T newEstimate = estimate + gain * (measurement - estimate);
