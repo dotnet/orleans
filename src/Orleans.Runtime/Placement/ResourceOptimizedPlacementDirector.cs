@@ -234,7 +234,7 @@ internal sealed class ResourceOptimizedPlacementDirector : IPlacementDirector, I
             return _options.CpuUsageWeight * normalizedCpuUsage +
                    _options.MemoryUsageWeight * normalizedMemoryUsage +
                    _options.AvailableMemoryWeight * normalizedAvailableMemory +
-                   _options.AvailableMemoryWeight * normalizedPhysicalMemory;
+                   _options.PhysicalMemoryWeight * normalizedPhysicalMemory;
         }
 
         return _options.CpuUsageWeight * normalizedCpuUsage;
