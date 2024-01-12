@@ -6,7 +6,6 @@ using System.Diagnostics;
 using System.Linq;
 using System.Numerics;
 using System.Runtime.CompilerServices;
-using System.Runtime.InteropServices;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Options;
 using Orleans.Runtime.Configuration.Options;
@@ -20,7 +19,7 @@ internal sealed class ResourceOptimizedPlacementDirector : IPlacementDirector, I
     /// 1 / (1024 * 1024)
     /// </summary>
     private const float PhysicalMemoryScalingFactor = 0.00000095367431640625f;
-    private const int OneKiloByte = 1024;
+    private const int FourKiloByte = 4096;
 
     private readonly ResourceOptimizedPlacementOptions _options;
     private readonly ConcurrentDictionary<SiloAddress, FilteredSiloStatistics> _siloStatistics = [];
@@ -113,7 +112,7 @@ internal sealed class ResourceOptimizedPlacementDirector : IPlacementDirector, I
         int compatibleSilosCount = compatibleSilos.Length;
 
         // It is good practice not to allocate more than 1 kilobyte of memory on the stack
-        if (compatibleSilosCount * Unsafe.SizeOf<(int, ResourceStatistics)>() <= OneKiloByte)
+        if (compatibleSilosCount * Unsafe.SizeOf<(int, ResourceStatistics)>() <= FourKiloByte)
         {
             pick = MakePick(stackalloc (int, ResourceStatistics)[compatibleSilosCount]);
         }
@@ -261,7 +260,7 @@ internal sealed class ResourceOptimizedPlacementDirector : IPlacementDirector, I
     {
         private readonly DualModeKalmanFilter<float> _cpuUsageFilter = new();
         private readonly DualModeKalmanFilter<float> _availableMemoryFilter = new();
-        private readonly DualModeKalmanFilter<long> _memoryUsageFilter = new();
+        private readonly DualModeKalmanFilter<double> _memoryUsageFilter = new();
 
         private float? _cpuUsage = statistics.CpuUsage;
         private float? _availableMemory = statistics.AvailableMemory;
@@ -275,7 +274,7 @@ internal sealed class ResourceOptimizedPlacementDirector : IPlacementDirector, I
         {
             _cpuUsage = _cpuUsageFilter.Filter(statistics.CpuUsage);
             _availableMemory = _availableMemoryFilter.Filter(statistics.AvailableMemory);
-            _memoryUsage = _memoryUsageFilter.Filter(statistics.MemoryUsage);
+            _memoryUsage = (long)_memoryUsageFilter.Filter((double)statistics.MemoryUsage);
             _totalPhysicalMemory = statistics.TotalPhysicalMemory;
             _isOverloaded = statistics.IsOverloaded;
         }
