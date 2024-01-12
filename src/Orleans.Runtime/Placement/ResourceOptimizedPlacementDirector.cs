@@ -110,25 +110,26 @@ internal sealed class ResourceOptimizedPlacementDirector : IPlacementDirector, I
 
     private KeyValuePair<SiloAddress, float> GetBestSiloCandidate_V2(SiloAddress[] compatibleSilos)
     {
-        KeyValuePair<int, float> pick;
+        (int Index, float Score) pick;
         int compatibleSilosCount = compatibleSilos.Length;
 
         // It is good practice not to allocate more than 1 kilobyte of memory on the stack
-        if (compatibleSilosCount * Unsafe.SizeOf<KeyValuePair<int, ResourceStatistics>>() <= OneKiloByte)
+        if (compatibleSilosCount * Unsafe.SizeOf<(int, ResourceStatistics)>() <= OneKiloByte)
         {
-            pick = MakePick(stackalloc KeyValuePair<int, ResourceStatistics>[compatibleSilosCount]);
+            pick = MakePick(stackalloc (int, ResourceStatistics)[compatibleSilosCount]);
         }
         else
         {
-            var relevantSilos = ArrayPool<KeyValuePair<int, ResourceStatistics>>.Shared.Rent(compatibleSilosCount);
+            var relevantSilos = ArrayPool<(int, ResourceStatistics)>.Shared.Rent(compatibleSilosCount);
             pick = MakePick(relevantSilos.AsSpan());
-            ArrayPool<KeyValuePair<int, ResourceStatistics>>.Shared.Return(relevantSilos);
+            ArrayPool<(int, ResourceStatistics)>.Shared.Return(relevantSilos);
         }
 
-        return new KeyValuePair<SiloAddress, float>(compatibleSilos[pick.Key], pick.Value);
+        return new KeyValuePair<SiloAddress, float>(compatibleSilos[pick.Index], pick.Score);
 
-        KeyValuePair<int, float> MakePick(Span<KeyValuePair<int, ResourceStatistics>> relevantSilos)
+        (int, float) MakePick(Span<(int SiloIndex, ResourceStatistics SiloStatistics)> relevantSilos)
         {
+            // Get all compatible silos
             int relevantSilosCount = 0;
             for (var i = 0; i < compatibleSilos.Length; ++i)
             {
@@ -139,17 +140,23 @@ internal sealed class ResourceOptimizedPlacementDirector : IPlacementDirector, I
                 }
             }
 
+            // Limit to the number of candidates added.
+            relevantSilos = relevantSilos[0..relevantSilosCount];
+            Debug.Assert(relevantSilos.Length == relevantSilosCount);
+
+            // Pick K silos from the list of compatible silos, where K is equal to the square root of the number of silos.
+            // Eg, from 10 silos, we choose from 4.
             int candidateCount = (int)Math.Ceiling(Math.Sqrt(relevantSilosCount));
             ShufflePrefix(relevantSilos, candidateCount);
             var candidates = relevantSilos[0..candidateCount];
 
             int cursor = 0;
-            int addressHashCode = 0;
+            int siloIndex = 0;
             float lowestScore = 1;
 
             foreach (var silo in candidates)
             {
-                float siloScore = CalculateScore(silo.Value);
+                float siloScore = CalculateScore(silo.SiloStatistics);
 
                 // It's very unlikely, but there could be more than 1 silo that has the same score,
                 // so we apply some jittering to avoid pick the first one in the short-list.
@@ -158,20 +165,22 @@ internal sealed class ResourceOptimizedPlacementDirector : IPlacementDirector, I
                 if (siloScore + scoreJitter < lowestScore)
                 {
                     lowestScore = siloScore;
-                    addressHashCode = silo.Key;
+                    siloIndex = silo.SiloIndex;
                 }
 
                 cursor++;
             }
 
-            return new(addressHashCode, lowestScore);
+            return new(siloIndex, lowestScore);
         }
 
         // Variant of the Modern Fisher-Yates shuffle which stops after shuffling the first `prefixLength` elements,
         // which are the only elements we are interested in.
         // See: https://en.wikipedia.org/wiki/Fisher%E2%80%93Yates_shuffle
-        static void ShufflePrefix(Span<KeyValuePair<int, ResourceStatistics>> values, int prefixLength)
+        static void ShufflePrefix(Span<(int SiloIndex, ResourceStatistics SiloStatistics)> values, int prefixLength)
         {
+            Debug.Assert(prefixLength >= 0);
+            Debug.Assert(prefixLength <= values.Length);
             var max = values.Length;
             for (var i = 0; i < prefixLength; i++)
             {
