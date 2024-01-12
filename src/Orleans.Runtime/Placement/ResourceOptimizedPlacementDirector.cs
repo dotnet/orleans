@@ -4,7 +4,6 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
-using System.Numerics;
 using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Options;
@@ -207,7 +206,7 @@ internal sealed class ResourceOptimizedPlacementDirector : IPlacementDirector, I
     public void SiloStatisticsChangeNotification(SiloAddress address, SiloRuntimeStatistics statistics)
         => _siloStatistics.AddOrUpdate(
             address,
-            addValueFactory: static (_, statistics) => new (statistics),
+            addValueFactory: static (_, statistics) => new(statistics),
             updateValueFactory: static (_, existing, statistics) =>
             {
                 existing.Update(statistics);
@@ -219,9 +218,9 @@ internal sealed class ResourceOptimizedPlacementDirector : IPlacementDirector, I
 
     private sealed class FilteredSiloStatistics(SiloRuntimeStatistics statistics)
     {
-        private readonly DualModeKalmanFilter<float> _cpuUsageFilter = new();
-        private readonly DualModeKalmanFilter<float> _availableMemoryFilter = new();
-        private readonly DualModeKalmanFilter<double> _memoryUsageFilter = new();
+        private readonly DualModeKalmanFilter _cpuUsageFilter = new();
+        private readonly DualModeKalmanFilter _availableMemoryFilter = new();
+        private readonly DualModeKalmanFilter _memoryUsageFilter = new();
 
         private float? _cpuUsage = statistics.CpuUsage;
         private float? _availableMemory = statistics.AvailableMemory;
@@ -235,7 +234,7 @@ internal sealed class ResourceOptimizedPlacementDirector : IPlacementDirector, I
         {
             _cpuUsage = _cpuUsageFilter.Filter(statistics.CpuUsage);
             _availableMemory = _availableMemoryFilter.Filter(statistics.AvailableMemory);
-            _memoryUsage = (long)_memoryUsageFilter.Filter((double)statistics.MemoryUsage);
+            _memoryUsage = (long)_memoryUsageFilter.Filter((float)statistics.MemoryUsage);
             _totalPhysicalMemory = statistics.TotalPhysicalMemory;
             _isOverloaded = statistics.IsOverloaded;
         }
@@ -244,11 +243,14 @@ internal sealed class ResourceOptimizedPlacementDirector : IPlacementDirector, I
     // The rational behind using a dual-mode KF, is that we want the input signal to follow a trajectory that
     // decays with a slower rate than the origianl one, but also tracks the signal in case of signal increases
     // (which represent potential of overloading). Both are important, but they are inversely correlated to each other.
-    private sealed class DualModeKalmanFilter<T> where T : unmanaged, INumber<T>
+    private sealed class DualModeKalmanFilter
     {
+        private const float SlowProcessNoiseCovariance = 0f;
+        private const float FastProcessNoiseCovariance = 0.01f;
+
         private KalmanFilter _slowFilter = new();
         private KalmanFilter _fastFilter = new();
-        
+
         private FilterRegime _regime = FilterRegime.Slow;
 
         private enum FilterRegime
@@ -257,23 +259,20 @@ internal sealed class ResourceOptimizedPlacementDirector : IPlacementDirector, I
             Fast
         }
 
-        public T Filter(T? measurement)
+        public float Filter(float? measurement)
         {
-            T _measurement = measurement ?? T.Zero;
+            float _measurement = measurement ?? 0f;
 
-            T slowCovariance = T.Zero;
-            T fastCovariance = T.CreateChecked(0.01);
-
-            T slowEstimate = _slowFilter.Filter(_measurement, slowCovariance);
-            T fastEstimate = _fastFilter.Filter(_measurement, fastCovariance);
+            float slowEstimate = _slowFilter.Filter(_measurement, SlowProcessNoiseCovariance);
+            float fastEstimate = _fastFilter.Filter(_measurement, FastProcessNoiseCovariance);
 
             if (_measurement > slowEstimate)
             {
                 if (_regime == FilterRegime.Slow)
                 {
                     _regime = FilterRegime.Fast;
-                    _fastFilter.SetState(_measurement, T.Zero);
-                    fastEstimate = _fastFilter.Filter(_measurement, fastCovariance);
+                    _fastFilter.SetState(_measurement, 0f);
+                    fastEstimate = _fastFilter.Filter(_measurement, FastProcessNoiseCovariance);
                 }
 
                 return fastEstimate;
@@ -284,7 +283,7 @@ internal sealed class ResourceOptimizedPlacementDirector : IPlacementDirector, I
                 {
                     _regime = FilterRegime.Slow;
                     _slowFilter.SetState(_fastFilter.PriorEstimate, _fastFilter.PriorErrorCovariance);
-                    slowEstimate = _slowFilter.Filter(_measurement, slowCovariance);
+                    slowEstimate = _slowFilter.Filter(_measurement, SlowProcessNoiseCovariance);
                 }
 
                 return slowEstimate;
@@ -293,23 +292,23 @@ internal sealed class ResourceOptimizedPlacementDirector : IPlacementDirector, I
 
         private struct KalmanFilter()
         {
-            public T PriorEstimate { get; private set; } = T.Zero;
-            public T PriorErrorCovariance { get; private set; } = T.One;
+            public float PriorEstimate { get; private set; } = 0f;
+            public float PriorErrorCovariance { get; private set; } = 1f;
 
-            public void SetState(T estimate, T errorCovariance)
+            public void SetState(float estimate, float errorCovariance)
             {
                 PriorEstimate = estimate;
                 PriorErrorCovariance = errorCovariance;
             }
 
-            public T Filter(T measurement, T processNoiseCovariance)
+            public float Filter(float measurement, float processNoiseCovariance)
             {
-                T estimate = PriorEstimate;
-                T errorCovariance = PriorErrorCovariance + processNoiseCovariance;
+                float estimate = PriorEstimate;
+                float errorCovariance = PriorErrorCovariance + processNoiseCovariance;
 
-                T gain = errorCovariance / (errorCovariance + T.One);
-                T newEstimate = estimate + gain * (measurement - estimate);
-                T newErrorCovariance = (T.One - gain) * errorCovariance;
+                float gain = errorCovariance / (errorCovariance + 1f);
+                float newEstimate = estimate + gain * (measurement - estimate);
+                float newErrorCovariance = (1f - gain) * errorCovariance;
 
                 PriorEstimate = newEstimate;
                 PriorErrorCovariance = newErrorCovariance;
