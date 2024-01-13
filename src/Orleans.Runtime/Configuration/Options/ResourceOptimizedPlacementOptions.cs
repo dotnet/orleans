@@ -116,6 +116,15 @@ internal sealed class ResourceOptimizedPlacementOptionsValidator
             ThrowOutOfRange(nameof(ResourceOptimizedPlacementOptions.LocalSiloPreferenceMargin));
         }
 
+        if (_options.CpuUsageWeight +
+            _options.MemoryUsageWeight +
+            _options.AvailableMemoryWeight +
+            _options.PhysicalMemoryWeight == 0f)
+        {
+            throw new OrleansConfigurationException(
+                $"The sum of all the weights in {nameof(ResourceOptimizedPlacementOptions)} must be a value greater than 0");
+        }
+
         static void ThrowOutOfRange(string propertyName)
             => throw new OrleansConfigurationException($"{propertyName} must be inclusive between [0-1]");
     }
