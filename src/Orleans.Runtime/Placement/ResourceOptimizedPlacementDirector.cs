@@ -20,7 +20,8 @@ internal sealed class ResourceOptimizedPlacementDirector : IPlacementDirector, I
     private const float PhysicalMemoryScalingFactor = 0.00000095367431640625f;
     private const int FourKiloByte = 4096;
 
-    private readonly ResourceOptimizedPlacementOptions _options;
+    private readonly NormalizedWeights _options;
+    private readonly float _localSiloPreferenceMargin;
     private readonly ConcurrentDictionary<SiloAddress, FilteredSiloStatistics> _siloStatistics = [];
 
     private Task<SiloAddress> _cachedLocalSilo;
@@ -29,8 +30,19 @@ internal sealed class ResourceOptimizedPlacementDirector : IPlacementDirector, I
         DeploymentLoadPublisher deploymentLoadPublisher,
         IOptions<ResourceOptimizedPlacementOptions> options)
     {
-        _options = options.Value;
-        deploymentLoadPublisher?.SubscribeToStatisticsChangeEvents(this);
+        _options = NormalizeWeights(options.Value);
+        deploymentLoadPublisher.SubscribeToStatisticsChangeEvents(this);
+    }
+
+    private static NormalizedWeights NormalizeWeights(ResourceOptimizedPlacementOptions input)
+    {
+        var totalWeight = input.CpuUsageWeight + input.MemoryUsageWeight + input.PhysicalMemoryWeight + input.AvailableMemoryWeight;
+
+        return new (
+            CpuUsageWeight: input.CpuUsageWeight / totalWeight,
+            MemoryUsageWeight: input.MemoryUsageWeight / totalWeight,
+            PhysicalMemoryWeight: input.PhysicalMemoryWeight / totalWeight,
+            AvailableMemoryWeight: input.AvailableMemoryWeight / totalWeight);
     }
 
     public Task<SiloAddress> OnAddActivation(PlacementStrategy strategy, PlacementTarget target, IPlacementContext context)
@@ -157,18 +169,19 @@ internal sealed class ResourceOptimizedPlacementDirector : IPlacementDirector, I
             return false;
         }
 
-        if (_siloStatistics.TryGetValue(context.LocalSilo, out var localStats))
+        if (!_siloStatistics.TryGetValue(context.LocalSilo, out var local))
         {
-            float localScore = CalculateScore(localStats.Value);
-            float scoreDiff = Math.Abs(localScore - bestCandidateScore);
-
-            if (_options.LocalSiloPreferenceMargin >= scoreDiff)
-            {
-                return true;
-            }
+            return false;
         }
 
-        return false;
+        var statistics = local.Value;
+        if (statistics.IsOverloaded)
+        {
+            return false;
+        }
+
+        var localSiloScore = CalculateScore(statistics);
+        return localSiloScore - _localSiloPreferenceMargin <= bestCandidateScore;
     }
 
     /// <summary>
@@ -240,8 +253,8 @@ internal sealed class ResourceOptimizedPlacementDirector : IPlacementDirector, I
         }
     }
 
-    // The rational behind using a dual-mode KF, is that we want the input signal to follow a trajectory that
-    // decays with a slower rate than the origianl one, but also tracks the signal in case of signal increases
+    // The rationale behind using a dual-mode KF, is that we want the input signal to follow a trajectory that
+    // decays with a slower rate than the original one, but also tracks the signal in case of signal increases
     // (which represent potential of overloading). Both are important, but they are inversely correlated to each other.
     private sealed class DualModeKalmanFilter
     {
@@ -317,4 +330,6 @@ internal sealed class ResourceOptimizedPlacementDirector : IPlacementDirector, I
             }
         }
     }
+
+    private readonly record struct NormalizedWeights(float CpuUsageWeight, float MemoryUsageWeight, float AvailableMemoryWeight, float PhysicalMemoryWeight);
 }
