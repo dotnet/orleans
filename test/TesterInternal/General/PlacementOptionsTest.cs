@@ -11,19 +11,19 @@ namespace UnitTests.General
         [Fact, TestCategory("PlacementOptions"), TestCategory("Functional")]
         public void ConstantsShouldNotChange()
         {
-            Assert.Equal(0.4f, ResourceOptimizedPlacementOptions.DEFAULT_CPU_USAGE_WEIGHT);
-            Assert.Equal(0.3f, ResourceOptimizedPlacementOptions.DEFAULT_MEMORY_USAGE_WEIGHT);
-            Assert.Equal(0.2f, ResourceOptimizedPlacementOptions.DEFAULT_AVAILABLE_MEMORY_WEIGHT);
-            Assert.Equal(0.1f, ResourceOptimizedPlacementOptions.DEFAULT_PHYSICAL_MEMORY_WEIGHT);
+            Assert.Equal(40, ResourceOptimizedPlacementOptions.DEFAULT_CPU_USAGE_WEIGHT);
+            Assert.Equal(30, ResourceOptimizedPlacementOptions.DEFAULT_MEMORY_USAGE_WEIGHT);
+            Assert.Equal(20, ResourceOptimizedPlacementOptions.DEFAULT_AVAILABLE_MEMORY_WEIGHT);
+            Assert.Equal(10, ResourceOptimizedPlacementOptions.DEFAULT_PHYSICAL_MEMORY_WEIGHT);
         }
 
         [Theory, TestCategory("PlacementOptions"), TestCategory("Functional")]
-        [InlineData(-0.1f, 0.4f, 0.2f, 0.1f, 0.05f)]
-        [InlineData(0.3f, 1.1f, 0.2f, 0.1f, 0.05f)]
-        [InlineData(0.3f, 0.4f, -0.1f, 0.1f, 0.05f)]
-        [InlineData(0.3f, 0.4f, 0.2f, 1.1f, 0.05f)]
-        [InlineData(0.3f, 0.4f, 0.2f, 0.1f, -0.05f)]
-        public void InvalidWeightsShouldThrow(float cpuUsage, float memUsage, float memAvailable, float memPhysical, float prefMargin)
+        [InlineData(-10, 40, 0.2, 0.1, 5)]
+        [InlineData(30, -11, 20, 10, 5)]
+        [InlineData(30, 40, -10, 10, 5)]
+        [InlineData(30, 40, 20, 10, -5)]
+        [InlineData(30, 40, 20, 10, 101)]
+        public void InvalidWeightsShouldThrow(int cpuUsage, int memUsage, int memAvailable, int memPhysical, int prefMargin)
         {
             var options = Options.Create(new ResourceOptimizedPlacementOptions
             {
@@ -32,36 +32,6 @@ namespace UnitTests.General
                 AvailableMemoryWeight = memAvailable,
                 PhysicalMemoryWeight = memPhysical,
                 LocalSiloPreferenceMargin = prefMargin
-            });
-
-            var validator = new ResourceOptimizedPlacementOptionsValidator(options);
-            Assert.Throws<OrleansConfigurationException>(validator.ValidateConfiguration);
-        }
-
-        [Fact, TestCategory("PlacementOptions"), TestCategory("Functional")]
-        public void SumGreaterThanOneShouldThrow()
-        {
-            var options = Options.Create(new ResourceOptimizedPlacementOptions
-            {
-                CpuUsageWeight = 0.3f,
-                MemoryUsageWeight = 0.4f,
-                AvailableMemoryWeight = 0.2f,
-                PhysicalMemoryWeight = 0.21f // sum > 1
-            });
-
-            var validator = new ResourceOptimizedPlacementOptionsValidator(options);
-            Assert.Throws<OrleansConfigurationException>(validator.ValidateConfiguration);
-        }
-
-        [Fact, TestCategory("PlacementOptions"), TestCategory("Functional")]
-        public void SumLessThanOneShouldThrow()
-        {
-            var options = Options.Create(new ResourceOptimizedPlacementOptions
-            {
-                CpuUsageWeight = 0.3f,
-                MemoryUsageWeight = 0.4f,
-                AvailableMemoryWeight = 0.2f,
-                PhysicalMemoryWeight = 0.19f // sum < 1
             });
 
             var validator = new ResourceOptimizedPlacementOptionsValidator(options);

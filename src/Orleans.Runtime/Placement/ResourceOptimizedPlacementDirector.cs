@@ -31,19 +31,20 @@ internal sealed class ResourceOptimizedPlacementDirector : IPlacementDirector, I
         IOptions<ResourceOptimizedPlacementOptions> options)
     {
         _weights = NormalizeWeights(options.Value);
-        _localSiloPreferenceMargin = options.Value.LocalSiloPreferenceMargin;
+        _localSiloPreferenceMargin = (float)options.Value.LocalSiloPreferenceMargin / 100;
         deploymentLoadPublisher.SubscribeToStatisticsChangeEvents(this);
     }
 
     private static NormalizedWeights NormalizeWeights(ResourceOptimizedPlacementOptions input)
     {
-        var totalWeight = input.CpuUsageWeight + input.MemoryUsageWeight + input.PhysicalMemoryWeight + input.AvailableMemoryWeight;
+        int totalWeight = input.CpuUsageWeight + input.MemoryUsageWeight + input.PhysicalMemoryWeight + input.AvailableMemoryWeight;
     
-        return new (
-            CpuUsageWeight: input.CpuUsageWeight / totalWeight,
-            MemoryUsageWeight: input.MemoryUsageWeight / totalWeight,
-            PhysicalMemoryWeight: input.PhysicalMemoryWeight / totalWeight,
-            AvailableMemoryWeight: input.AvailableMemoryWeight / totalWeight);
+        return totalWeight == 0 ? new(0f, 0f, 0f, 0f) :
+            new (
+                CpuUsageWeight: (float)input.CpuUsageWeight / totalWeight,
+                MemoryUsageWeight: (float)input.MemoryUsageWeight / totalWeight,
+                PhysicalMemoryWeight: (float)input.PhysicalMemoryWeight / totalWeight,
+                AvailableMemoryWeight: (float)input.AvailableMemoryWeight / totalWeight);
     }
 
     public Task<SiloAddress> OnAddActivation(PlacementStrategy strategy, PlacementTarget target, IPlacementContext context)
