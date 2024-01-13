@@ -20,7 +20,7 @@ internal sealed class ResourceOptimizedPlacementDirector : IPlacementDirector, I
     private const float PhysicalMemoryScalingFactor = 0.00000095367431640625f;
     private const int FourKiloByte = 4096;
 
-    private readonly NormalizedWeights _options;
+    private readonly NormalizedWeights _weights;
     private readonly float _localSiloPreferenceMargin;
     private readonly ConcurrentDictionary<SiloAddress, FilteredSiloStatistics> _siloStatistics = [];
 
@@ -30,14 +30,15 @@ internal sealed class ResourceOptimizedPlacementDirector : IPlacementDirector, I
         DeploymentLoadPublisher deploymentLoadPublisher,
         IOptions<ResourceOptimizedPlacementOptions> options)
     {
-        _options = NormalizeWeights(options.Value);
+        _weights = NormalizeWeights(options.Value);
+        _localSiloPreferenceMargin = options.Value.LocalSiloPreferenceMargin;
         deploymentLoadPublisher.SubscribeToStatisticsChangeEvents(this);
     }
 
     private static NormalizedWeights NormalizeWeights(ResourceOptimizedPlacementOptions input)
     {
         var totalWeight = input.CpuUsageWeight + input.MemoryUsageWeight + input.PhysicalMemoryWeight + input.AvailableMemoryWeight;
-
+    
         return new (
             CpuUsageWeight: input.CpuUsageWeight / totalWeight,
             MemoryUsageWeight: input.MemoryUsageWeight / totalWeight,
@@ -83,7 +84,9 @@ internal sealed class ResourceOptimizedPlacementDirector : IPlacementDirector, I
         (int Index, float Score) pick;
         int compatibleSilosCount = compatibleSilos.Length;
 
-        // It is good practice not to allocate more than 1 kilobyte of memory on the stack
+        // It is good practice not to allocate more than 1[KB] on the stack
+        // but the size of (int, ResourceStatistics) = 64 in (64-bit architecture), by increasing
+        // the limit to 4[KB] we can stackalloc for up to 4096 / 64 = 64 silos in a cluster.
         if (compatibleSilosCount * Unsafe.SizeOf<(int, ResourceStatistics)>() <= FourKiloByte)
         {
             pick = MakePick(stackalloc (int, ResourceStatistics)[compatibleSilosCount]);
@@ -204,13 +207,13 @@ internal sealed class ResourceOptimizedPlacementDirector : IPlacementDirector, I
             float normalizedAvailableMemory = 1 - (stats.AvailableMemory.HasValue ? stats.AvailableMemory.Value / physicalMemory : 0f);
             float normalizedPhysicalMemory = PhysicalMemoryScalingFactor * physicalMemory;
 
-            return _options.CpuUsageWeight * normalizedCpuUsage +
-                   _options.MemoryUsageWeight * normalizedMemoryUsage +
-                   _options.AvailableMemoryWeight * normalizedAvailableMemory +
-                   _options.PhysicalMemoryWeight * normalizedPhysicalMemory;
+            return _weights.CpuUsageWeight * normalizedCpuUsage +
+                   _weights.MemoryUsageWeight * normalizedMemoryUsage +
+                   _weights.AvailableMemoryWeight * normalizedAvailableMemory +
+                   _weights.PhysicalMemoryWeight * normalizedPhysicalMemory;
         }
 
-        return _options.CpuUsageWeight * normalizedCpuUsage;
+        return _weights.CpuUsageWeight * normalizedCpuUsage;
     }
 
     public void RemoveSilo(SiloAddress address)
@@ -228,6 +231,7 @@ internal sealed class ResourceOptimizedPlacementDirector : IPlacementDirector, I
             statistics);
 
     private readonly record struct ResourceStatistics(float? CpuUsage, float? AvailableMemory, long? MemoryUsage, long? TotalPhysicalMemory, bool IsOverloaded);
+    private readonly record struct NormalizedWeights(float CpuUsageWeight, float MemoryUsageWeight, float AvailableMemoryWeight, float PhysicalMemoryWeight);
 
     private sealed class FilteredSiloStatistics(SiloRuntimeStatistics statistics)
     {
@@ -330,6 +334,4 @@ internal sealed class ResourceOptimizedPlacementDirector : IPlacementDirector, I
             }
         }
     }
-
-    private readonly record struct NormalizedWeights(float CpuUsageWeight, float MemoryUsageWeight, float AvailableMemoryWeight, float PhysicalMemoryWeight);
 }
