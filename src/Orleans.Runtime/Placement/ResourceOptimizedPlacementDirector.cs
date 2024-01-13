@@ -151,8 +151,8 @@ internal sealed class ResourceOptimizedPlacementDirector : IPlacementDirector, I
         // See: https://en.wikipedia.org/wiki/Fisher%E2%80%93Yates_shuffle
         static void ShufflePrefix(Span<(int SiloIndex, ResourceStatistics SiloStatistics)> values, int prefixLength)
         {
-            Debug.Assert(prefixLength >= 0);
-            Debug.Assert(prefixLength <= values.Length);
+            Debug.Assert(prefixLength >= 0 && prefixLength <= values.Length);
+
             var max = values.Length;
             for (var i = 0; i < prefixLength; i++)
             {
@@ -200,6 +200,7 @@ internal sealed class ResourceOptimizedPlacementDirector : IPlacementDirector, I
     private float CalculateScore(ResourceStatistics stats)
     {
         float normalizedCpuUsage = stats.CpuUsage.HasValue ? stats.CpuUsage.Value / 100f : 0f;
+        float score = _weights.CpuUsageWeight * normalizedCpuUsage;
 
         if (stats.TotalPhysicalMemory is { } physicalMemory && physicalMemory > 0)
         {
@@ -207,13 +208,14 @@ internal sealed class ResourceOptimizedPlacementDirector : IPlacementDirector, I
             float normalizedAvailableMemory = 1 - (stats.AvailableMemory.HasValue ? stats.AvailableMemory.Value / physicalMemory : 0f);
             float normalizedPhysicalMemory = PhysicalMemoryScalingFactor * physicalMemory;
 
-            return _weights.CpuUsageWeight * normalizedCpuUsage +
-                   _weights.MemoryUsageWeight * normalizedMemoryUsage +
-                   _weights.AvailableMemoryWeight * normalizedAvailableMemory +
-                   _weights.PhysicalMemoryWeight * normalizedPhysicalMemory;
+            score += _weights.MemoryUsageWeight * normalizedMemoryUsage +
+                     _weights.AvailableMemoryWeight * normalizedAvailableMemory +
+                     _weights.PhysicalMemoryWeight * normalizedPhysicalMemory;
         }
 
-        return _weights.CpuUsageWeight * normalizedCpuUsage;
+        Debug.Assert(score >= 0f && score <= 1f);
+
+        return score;
     }
 
     public void RemoveSilo(SiloAddress address)
