@@ -5,6 +5,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Options;
 using Orleans.Runtime.Configuration.Options;
@@ -86,8 +87,8 @@ internal sealed class ResourceOptimizedPlacementDirector : IPlacementDirector, I
         int compatibleSilosCount = compatibleSilos.Length;
 
         // It is good practice not to allocate more than 1[KB] on the stack
-        // but the size of (int, ResourceStatistics) = 64 in (64-bit architecture), by increasing
-        // the limit to 4[KB] we can stackalloc for up to 4096 / 64 = 64 silos in a cluster.
+        // but the size of ValueTuple<int, ResourceStatistics> = 32 bytes, by increasing
+        // the limit to 4[KB] we can stackalloc for up to 4096 / 32 = 128 silos in a cluster.
         if (compatibleSilosCount * Unsafe.SizeOf<(int, ResourceStatistics)>() <= FourKiloByte)
         {
             pick = MakePick(stackalloc (int, ResourceStatistics)[compatibleSilosCount]);
@@ -200,13 +201,15 @@ internal sealed class ResourceOptimizedPlacementDirector : IPlacementDirector, I
     /// <remarks>physical_mem is represented in [MB] to keep the result within [0-1] in cases of silos having physical_mem less than [1GB]</remarks>
     private float CalculateScore(ResourceStatistics stats)
     {
-        float normalizedCpuUsage = stats.CpuUsage.HasValue ? stats.CpuUsage.Value / 100f : 0f;
+        float normalizedCpuUsage = stats.CpuUsage / 100f;
         float score = _weights.CpuUsageWeight * normalizedCpuUsage;
 
-        if (stats.TotalPhysicalMemory is { } physicalMemory && physicalMemory > 0)
+        if (stats.TotalPhysicalMemory > 0)
         {
-            float normalizedMemoryUsage = stats.MemoryUsage.HasValue ? stats.MemoryUsage.Value / physicalMemory : 0f;
-            float normalizedAvailableMemory = 1 - (stats.AvailableMemory.HasValue ? stats.AvailableMemory.Value / physicalMemory : 0f);
+            long physicalMemory = stats.TotalPhysicalMemory; // cache locally
+
+            float normalizedMemoryUsage = stats.MemoryUsage / physicalMemory;
+            float normalizedAvailableMemory = 1 - stats.AvailableMemory / physicalMemory;
             float normalizedPhysicalMemory = PhysicalMemoryScalingFactor * physicalMemory;
 
             score += _weights.MemoryUsageWeight * normalizedMemoryUsage +
@@ -233,7 +236,14 @@ internal sealed class ResourceOptimizedPlacementDirector : IPlacementDirector, I
             },
             statistics);
 
-    private readonly record struct ResourceStatistics(float? CpuUsage, float? AvailableMemory, long? MemoryUsage, long? TotalPhysicalMemory, bool IsOverloaded);
+    // This struct has a total of 32 bytes: 4 (float) + 4 (float) + 8 (long) + 8 (long) + 1 (bool) + 7 (padding)
+    // Padding is added becuase by default it gets aligned by the largest element of the struct (our 'long'), so 1 + 7 = 8.
+    // As this will be created very frequenty, we shave off the extra 7 bytes, bringing its size down to 25 bytes.
+    // It will help increase the number of ValueTuple<int, ResourceStatistics> (see inside 'MakePick') that can be stack allocated.
+    [StructLayout(LayoutKind.Sequential, Pack = 1)]
+    private readonly record struct ResourceStatistics(float CpuUsage, float AvailableMemory, long MemoryUsage, long TotalPhysicalMemory, bool IsOverloaded);
+
+    // No need to touch 'NormalizedWeights' as its created only once and is the same for all silos in the cluster.
     private readonly record struct NormalizedWeights(float CpuUsageWeight, float MemoryUsageWeight, float AvailableMemoryWeight, float PhysicalMemoryWeight);
 
     private sealed class FilteredSiloStatistics(SiloRuntimeStatistics statistics)
@@ -242,10 +252,10 @@ internal sealed class ResourceOptimizedPlacementDirector : IPlacementDirector, I
         private readonly DualModeKalmanFilter _availableMemoryFilter = new();
         private readonly DualModeKalmanFilter _memoryUsageFilter = new();
 
-        private float? _cpuUsage = statistics.CpuUsage;
-        private float? _availableMemory = statistics.AvailableMemory;
-        private long? _memoryUsage = statistics.MemoryUsage;
-        private long? _totalPhysicalMemory = statistics.TotalPhysicalMemory;
+        private float _cpuUsage = statistics.CpuUsage ?? 0;
+        private float _availableMemory = statistics.AvailableMemory ?? 0;
+        private long _memoryUsage = statistics.MemoryUsage ?? 0;
+        private long _totalPhysicalMemory = statistics.TotalPhysicalMemory ?? 0;
         private bool _isOverloaded = statistics.IsOverloaded;
 
         public ResourceStatistics Value => new(_cpuUsage, _availableMemory, _memoryUsage, _totalPhysicalMemory, _isOverloaded);
@@ -255,7 +265,7 @@ internal sealed class ResourceOptimizedPlacementDirector : IPlacementDirector, I
             _cpuUsage = _cpuUsageFilter.Filter(statistics.CpuUsage);
             _availableMemory = _availableMemoryFilter.Filter(statistics.AvailableMemory);
             _memoryUsage = (long)_memoryUsageFilter.Filter((float)statistics.MemoryUsage);
-            _totalPhysicalMemory = statistics.TotalPhysicalMemory;
+            _totalPhysicalMemory = statistics.TotalPhysicalMemory ?? 0;
             _isOverloaded = statistics.IsOverloaded;
         }
     }
