@@ -133,7 +133,7 @@ internal sealed class ResourceOptimizedPlacementDirector : IPlacementDirector, I
 
             foreach (var (index, statistics) in candidates)
             {
-                float score = CalculateScore(statistics);
+                float score = CalculateScore(in statistics);
 
                 // It's very unlikely, but there could be more than 1 silo that has the same score,
                 // so we apply some jittering to avoid pick the first one in the short-list.
@@ -185,7 +185,7 @@ internal sealed class ResourceOptimizedPlacementDirector : IPlacementDirector, I
             return false;
         }
 
-        var localSiloScore = CalculateScore(statistics);
+        var localSiloScore = CalculateScore(in statistics);
         return localSiloScore - _localSiloPreferenceMargin <= bestCandidateScore;
     }
 
@@ -199,7 +199,7 @@ internal sealed class ResourceOptimizedPlacementDirector : IPlacementDirector, I
     ///         physical_mem_weight * (1 / (1024 * 1024 * physical_mem)
     /// </returns>
     /// <remarks>physical_mem is represented in [MB] to keep the result within [0-1] in cases of silos having physical_mem less than [1GB]</remarks>
-    private float CalculateScore(ResourceStatistics stats)
+    private float CalculateScore(in ResourceStatistics stats) // as size of ResourceStatistics > IntPtr, we pass it by reference to avoid potential defensive copying
     {
         float normalizedCpuUsage = stats.CpuUsage / 100f;
         float score = _weights.CpuUsageWeight * normalizedCpuUsage;
