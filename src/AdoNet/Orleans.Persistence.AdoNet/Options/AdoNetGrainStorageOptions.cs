@@ -36,6 +36,11 @@ namespace Orleans.Configuration
 
         /// <inheritdoc/>
         public IGrainStorageSerializer GrainStorageSerializer { get; set; }
+
+        /// <summary>
+        /// Delete record row from db when state is cleared.
+        /// </summary>
+        public bool DeleteStateOnClear { get; set; } = false;
     }
 
     /// <summary>
