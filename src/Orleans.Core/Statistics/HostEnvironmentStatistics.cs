@@ -35,15 +35,16 @@ internal sealed class HostEnvironmentStatistics : IHostEnvironmentStatistics, IL
         get
         {
             var memoryInfo = GC.GetGCMemoryInfo();
+            var generationInfo = memoryInfo.GenerationInfo;
 
-            Debug.Assert(memoryInfo.GenerationInfo.Length == 5);
+            Debug.Assert(generationInfo.Length == 5);
 
             double fragmentedMemory =
-                 0.45d * memoryInfo.GenerationInfo[0].FragmentationAfterBytes + // Gen0: small and short-lived objects, making fragmented space more usable
-                 0.60d * memoryInfo.GenerationInfo[1].FragmentationAfterBytes + // Gen1: objects here can vary in size and lifetime, making fragmented space less usable
-                 0.85d * memoryInfo.GenerationInfo[2].FragmentationAfterBytes + // Gen2: long-lived objects and less frequent collection, making fragmented space a lot less usable
-                 0.95d * memoryInfo.GenerationInfo[3].FragmentationAfterBytes + // LOH:  very challenging ton reclaim fragmented space
-                         memoryInfo.GenerationInfo[4].FragmentationAfterBytes;  // POH:  pinned objects cannot be moved, effectively rendering fragmented space unusable
+                 0.45d * generationInfo[0].FragmentationAfterBytes + // Gen0: small and short-lived objects, making fragmented space more usable
+                 0.60d * generationInfo[1].FragmentationAfterBytes + // Gen1: objects here can vary in size and lifetime, making fragmented space less usable
+                 0.85d * generationInfo[2].FragmentationAfterBytes + // Gen2: long-lived objects and less frequent collection, making fragmented space a lot less usable
+                 0.95d * generationInfo[3].FragmentationAfterBytes + // LOH:  very challenging to reclaim fragmented space
+                         generationInfo[4].FragmentationAfterBytes;  // POH:  pinned objects cannot be moved, effectively rendering fragmented space unusable
 
             var availableMemory = Math.Max(0, memoryInfo.HighMemoryLoadThresholdBytes - (memoryInfo.MemoryLoadBytes - (long)fragmentedMemory));
             return availableMemory;
