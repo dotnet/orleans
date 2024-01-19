@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Diagnostics.Metrics;
 using System.Diagnostics.Tracing;
 using System.Threading;
@@ -33,16 +34,18 @@ internal sealed class HostEnvironmentStatistics : IHostEnvironmentStatistics, IL
     {
         get
         {
-            var MemoryInfo = GC.GetGCMemoryInfo();
+            var memoryInfo = GC.GetGCMemoryInfo();
+
+            Debug.Assert(memoryInfo.GenerationInfo.Length == 5);
 
             double fragmentedMemory =
-                 0.45d * MemoryInfo.GenerationInfo[0].FragmentationAfterBytes + // Gen0: small and short-lived objects, making fragmented space more usable
-                 0.60d * MemoryInfo.GenerationInfo[1].FragmentationAfterBytes + // Gen1: objects here can vary in size and lifetime, making fragmented space less usable
-                 0.85d * MemoryInfo.GenerationInfo[2].FragmentationAfterBytes + // Gen2: long-lived objects and less frequent collection, making fragmented space a lot less usable
-                 0.95d * MemoryInfo.GenerationInfo[3].FragmentationAfterBytes + // LOH:  very challenging ton reclaim fragmented space
-                         MemoryInfo.GenerationInfo[4].FragmentationAfterBytes;  // POH:  pinned objects cannot be moved, effectively rendering fragmented space unusable
+                 0.45d * memoryInfo.GenerationInfo[0].FragmentationAfterBytes + // Gen0: small and short-lived objects, making fragmented space more usable
+                 0.60d * memoryInfo.GenerationInfo[1].FragmentationAfterBytes + // Gen1: objects here can vary in size and lifetime, making fragmented space less usable
+                 0.85d * memoryInfo.GenerationInfo[2].FragmentationAfterBytes + // Gen2: long-lived objects and less frequent collection, making fragmented space a lot less usable
+                 0.95d * memoryInfo.GenerationInfo[3].FragmentationAfterBytes + // LOH:  very challenging ton reclaim fragmented space
+                         memoryInfo.GenerationInfo[4].FragmentationAfterBytes;  // POH:  pinned objects cannot be moved, effectively rendering fragmented space unusable
 
-            var availableMemory = Math.Max(0, MemoryInfo.HighMemoryLoadThresholdBytes - (MemoryInfo.MemoryLoadBytes - (long)fragmentedMemory));
+            var availableMemory = Math.Max(0, memoryInfo.HighMemoryLoadThresholdBytes - (memoryInfo.MemoryLoadBytes - (long)fragmentedMemory));
             return availableMemory;
         }
     }

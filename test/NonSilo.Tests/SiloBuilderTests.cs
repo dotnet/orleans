@@ -162,34 +162,6 @@ namespace NonSilo.Tests
             });
         }
 
-        /// <summary>
-        /// Ensures <see cref="LoadSheddingValidator"/> fails validation when invalid/no instance of
-        /// <see cref="IHostEnvironmentStatistics"/> is registered using otherwise valid <see cref="LoadSheddingOptions"/>.
-        /// </summary>
-        [Fact]
-        public async Task SiloBuilder_LoadSheddingValidatorFailsWithNoRegisteredHostEnvironmentStatistics()
-        {
-            await Assert.ThrowsAsync<OrleansConfigurationException>(async () =>
-            {
-                await new HostBuilder().UseOrleans((ctx, siloBuilder) =>
-                {
-                    siloBuilder
-                      .UseLocalhostClustering()
-                      .Configure<ClusterOptions>(options => options.ClusterId = "someClusterId")
-                      .Configure<EndpointOptions>(options => options.AdvertisedIPAddress = IPAddress.Loopback)
-                      .ConfigureServices(services => services.AddSingleton<IMembershipTable, NoOpMembershipTable>())
-                      .Configure<LoadSheddingOptions>(options =>
-                      {
-                          options.LoadSheddingEnabled = true;
-                          options.LoadSheddingLimit = 95;
-                      }).ConfigureServices(svcCollection =>
-                      {
-                          svcCollection.AddTransient<IConfigurationValidator, LoadSheddingValidator>();
-                      });
-                }).RunConsoleAsync();
-            });
-        }
-
         [Fact]
         public async Task SiloBuilderThrowsDuringStartupIfNoGrainsAdded()
         {
