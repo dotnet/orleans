@@ -57,8 +57,10 @@ namespace Orleans
             services.AddFromExisting<ILifecycleParticipant<IClusterClientLifecycle>, ClientOptionsLogger>();
 
             // Statistics
-            services.RegisterEnvironmentStatisticsServices<IClusterClientLifecycle>();
             services.TryAddSingleton<IAppEnvironmentStatistics, AppEnvironmentStatistics>();
+            services.AddSingleton<HostEnvironmentStatistics>();
+            services.AddFromExisting<IHostEnvironmentStatistics, HostEnvironmentStatistics>();
+            services.AddSingleton<ILifecycleParticipant<IClusterClientLifecycle>, HostEnvironmentStatisticsLifecycleAdapter<IClusterClientLifecycle>>();
 
             services.AddLogging();
             services.TryAddSingleton<GrainBindingsResolver>();

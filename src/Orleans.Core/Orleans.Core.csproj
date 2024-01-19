@@ -28,7 +28,6 @@
     <PackageReference Include="Microsoft.Extensions.Hosting" />
     <PackageReference Include="Newtonsoft.Json" />
     <PackageReference Include="System.Memory.Data" />
-    <PackageReference Include="System.Diagnostics.PerformanceCounter" />
   </ItemGroup>
 
 </Project>

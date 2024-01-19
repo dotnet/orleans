@@ -75,8 +75,10 @@ namespace Orleans.Hosting
             services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, SiloOptionsLogger>();
 
             // Statistics
-            services.RegisterEnvironmentStatisticsServices<ISiloLifecycle>();
             services.TryAddSingleton<IAppEnvironmentStatistics, AppEnvironmentStatistics>();
+            services.AddSingleton<HostEnvironmentStatistics>();
+            services.AddFromExisting<IHostEnvironmentStatistics, HostEnvironmentStatistics>();
+            services.AddSingleton<ILifecycleParticipant<ISiloLifecycle>, HostEnvironmentStatisticsLifecycleAdapter<ISiloLifecycle>>();
 
             services.TryAddSingleton<OverloadDetector>();
 
