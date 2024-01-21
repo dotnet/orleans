@@ -16,7 +16,7 @@ internal class LoadSheddingValidator(IOptions<LoadSheddingOptions> loadSheddingO
 {
     private readonly LoadSheddingOptions _loadSheddingOptions = loadSheddingOptions.Value;
 
-    internal const string InvalidLoadSheddingLimit = "LoadSheddingLimit cannot exceed 100%.";
+    internal const string InvalidLimit = "Limit cannot exceed 100%.";
 
     /// <inheritdoc />
     public void ValidateConfiguration()
@@ -29,7 +29,12 @@ internal class LoadSheddingValidator(IOptions<LoadSheddingOptions> loadSheddingO
 
         if (_loadSheddingOptions.LoadSheddingLimit > 100)
         {
-            throw new OrleansConfigurationException(InvalidLoadSheddingLimit);
+            throw new OrleansConfigurationException(InvalidLimit);
+        }
+
+        if (_loadSheddingOptions.MemoryLoadLimit > 100)
+        {
+            throw new OrleansConfigurationException(InvalidLimit);
         }
     }
 }

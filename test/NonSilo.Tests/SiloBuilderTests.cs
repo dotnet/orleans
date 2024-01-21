@@ -154,8 +154,8 @@ namespace NonSilo.Tests
                         })
                         .ConfigureServices(svcCollection =>
                         {
-                            svcCollection.AddSingleton<FakeSiloStatisticsProvider>();
-                            svcCollection.AddFromExisting<IEnvironmentStatistics, FakeSiloStatisticsProvider>();
+                            svcCollection.AddSingleton<FakeEnvironmentStatistics>();
+                            svcCollection.AddFromExisting<IEnvironmentStatistics, FakeEnvironmentStatistics>();
                             svcCollection.AddTransient<IConfigurationValidator, LoadSheddingValidator>();
                         });
                 }).RunConsoleAsync();
@@ -214,7 +214,7 @@ namespace NonSilo.Tests
             });
         }
 
-        private class FakeSiloStatisticsProvider : IEnvironmentStatistics
+        private class FakeEnvironmentStatistics : IEnvironmentStatistics
         {
             public float? CpuUsagePercentage => 0;
 

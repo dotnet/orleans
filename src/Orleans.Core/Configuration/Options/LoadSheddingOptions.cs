@@ -9,6 +9,10 @@ namespace Orleans.Configuration
         /// The default value for <see cref="LoadSheddingLimit"/>.
         /// </summary>
         internal const int DefaultLoadSheddingLimit = 95;
+        /// <summary>
+        /// The default value for <see cref="MemoryLoadLimit"/>.
+        /// </summary>
+        internal const int DefaultMemoryLoadLimit = 90;
 
         /// <summary>
         /// Gets or sets a value indicating whether load shedding in the client gateway and stream providers is enabled.
@@ -22,9 +26,19 @@ namespace Orleans.Configuration
         /// Note that this value is in %, so valid values range from 1 to 100, and a reasonable value is
         /// typically between 80 and 95.
         /// This value is ignored if load shedding is disabled, which is the default.
-        /// If load shedding is enabled and this attribute does not appear, then the default limit is 95%.
+        /// If load shedding is enabled and this attribute does not appear, then the default limit is <see cref="DefaultLoadSheddingLimit"/>%.
         /// </summary>
         /// <value>Load shedding begins at a CPU utilization of 95% by default.</value>
         public int LoadSheddingLimit { get; set; } = DefaultLoadSheddingLimit;
+
+        /// <summary>
+        /// Gets or sets the memory utilization, expressed as a value between <c>0</c> and <c>100</c>, at which load shedding begins.
+        /// Note that this value is in %, so valid values range from 1 to 100, and a reasonable value is
+        /// typically between 80 and 95.
+        /// This value is ignored if load shedding is disabled, which is the default.
+        /// If load shedding is enabled and this attribute does not appear, then the default limit is <see cref="DefaultMemoryLoadLimit"/>%.
+        /// </summary>
+        /// <value>Load shedding begins at a CPU utilization of 95% by default.</value>
+        public int MemoryLoadLimit { get; set; } = DefaultMemoryLoadLimit;
     }
 }

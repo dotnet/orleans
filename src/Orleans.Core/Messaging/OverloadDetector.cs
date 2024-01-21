@@ -3,7 +3,7 @@ using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 using Orleans.Statistics;
 
-namespace Orleans.Runtime.Messaging
+namespace Orleans.Core.Messaging
 {
     /// <summary>
     /// Determines whether or not the process is overloaded.

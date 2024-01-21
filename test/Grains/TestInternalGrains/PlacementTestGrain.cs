@@ -19,13 +19,13 @@ namespace UnitTests.Grains
 
         private readonly OverloadDetector overloadDetector;
 
-        private readonly TestHooksSiloStatisticsProvider hostEnvironmentStatistics;
+        private readonly TestHooksEnvironmentStatistics hostEnvironmentStatistics;
         private readonly IGrainContext _grainContext;
         private readonly LoadSheddingOptions loadSheddingOptions;
 
         public PlacementTestGrainBase(
             OverloadDetector overloadDetector,
-            TestHooksSiloStatisticsProvider hostEnvironmentStatistics,
+            TestHooksEnvironmentStatistics hostEnvironmentStatistics,
             IOptions<LoadSheddingOptions> loadSheddingOptions,
             IGrainContext grainContext)
         {
@@ -135,7 +135,7 @@ namespace UnitTests.Grains
     {
         public RandomPlacementTestGrain(
             OverloadDetector overloadDetector,
-            TestHooksSiloStatisticsProvider hostEnvironmentStatistics,
+            TestHooksEnvironmentStatistics hostEnvironmentStatistics,
             IOptions<LoadSheddingOptions> loadSheddingOptions,
             IGrainContext grainContext)
             : base(overloadDetector, hostEnvironmentStatistics, loadSheddingOptions, grainContext)
@@ -148,7 +148,7 @@ namespace UnitTests.Grains
     {
         public PreferLocalPlacementTestGrain(
             OverloadDetector overloadDetector,
-            TestHooksSiloStatisticsProvider hostEnvironmentStatistics,
+            TestHooksEnvironmentStatistics hostEnvironmentStatistics,
             IOptions<LoadSheddingOptions> loadSheddingOptions,
             IGrainContext grainContext)
             : base(overloadDetector, hostEnvironmentStatistics, loadSheddingOptions, grainContext)
@@ -161,7 +161,7 @@ namespace UnitTests.Grains
     {
         public LocalPlacementTestGrain(
             OverloadDetector overloadDetector,
-            TestHooksSiloStatisticsProvider hostEnvironmentStatistics,
+            TestHooksEnvironmentStatistics hostEnvironmentStatistics,
             IOptions<LoadSheddingOptions> loadSheddingOptions,
             IGrainContext grainContext)
             : base(overloadDetector, hostEnvironmentStatistics, loadSheddingOptions, grainContext)
@@ -174,7 +174,7 @@ namespace UnitTests.Grains
     {
         public ActivationCountBasedPlacementTestGrain(
             OverloadDetector overloadDetector,
-            TestHooksSiloStatisticsProvider hostEnvironmentStatistics,
+            TestHooksEnvironmentStatistics hostEnvironmentStatistics,
             IOptions<LoadSheddingOptions> loadSheddingOptions,
             IGrainContext grainContext)
             : base(overloadDetector, hostEnvironmentStatistics, loadSheddingOptions, grainContext)

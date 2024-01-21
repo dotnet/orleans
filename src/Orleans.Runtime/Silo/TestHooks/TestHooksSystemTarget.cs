@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.DependencyInjection;
@@ -15,7 +14,7 @@ namespace Orleans.Runtime.TestHooks
     /// <summary>
     /// A fake, test-only implementation of <see cref="IEnvironmentStatistics"/>.
     /// </summary>
-    internal class TestHooksSiloStatisticsProvider : IEnvironmentStatistics
+    internal class TestHooksEnvironmentStatistics : IEnvironmentStatistics
     {
         /// <inheritdoc />
         public long? MaximumAvailableMemoryBytes { get; set; }
@@ -37,7 +36,7 @@ namespace Orleans.Runtime.TestHooks
         private readonly IServiceProvider serviceProvider;
         private readonly ISiloStatusOracle siloStatusOracle;
 
-        private readonly TestHooksSiloStatisticsProvider environmentStatistics;
+        private readonly TestHooksEnvironmentStatistics environmentStatistics;
 
         private readonly LoadSheddingOptions loadSheddingOptions;
 
@@ -48,7 +47,7 @@ namespace Orleans.Runtime.TestHooks
             ILocalSiloDetails siloDetails,
             ILoggerFactory loggerFactory,
             ISiloStatusOracle siloStatusOracle,
-            TestHooksSiloStatisticsProvider environmentStatistics,
+            TestHooksEnvironmentStatistics environmentStatistics,
             IOptions<LoadSheddingOptions> loadSheddingOptions)
             : base(Constants.TestHooksSystemTargetType, siloDetails.SiloAddress, loggerFactory)
         {
