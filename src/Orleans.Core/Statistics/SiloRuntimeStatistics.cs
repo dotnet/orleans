@@ -24,28 +24,34 @@ namespace Orleans.Runtime
         public int RecentlyUsedActivationCount { get; }
 
         /// <summary>
-        /// The CPU utilization.
+        /// Gets the system CPU usage.
         /// </summary>
+        /// <remarks>Ranges from 0.0-100.0.</remarks>
         [Id(2)]
-        public float? CpuUsage { get; }
+        public float? CpuUsagePercentage { get; }
 
         /// <summary>
-        /// The amount of memory available in the silo [bytes].
+        /// Gets the currently available memory for allocations to the process.
         /// </summary>
+        /// <remarks>
+        /// Includes the currently available memory of the process, and the system.
+        /// </remarks>
         [Id(3)]
-        public float? AvailableMemory { get; }
+        public float? AvailableMemoryBytes { get; }
 
         /// <summary>
-        /// The used memory size.
+        /// Gets the currently occupied memory by the process.
         /// </summary>
+        /// <remarks>Includes fragmented memory.</remarks>
         [Id(4)]
-        public long? MemoryUsage { get; }
+        public long? MemoryUsageBytes { get; }
 
         /// <summary>
-        /// The total physical memory available [bytes].
+        /// Gets the maximum possible memory of the system.
         /// </summary>
+        /// <remarks>Represents the physical memory, unless a lower-bound (typically in containers) has been specified.</remarks>
         [Id(5)]
-        public long? TotalPhysicalMemory { get; }
+        public long? MaximumAvailableMemoryBytes { get; }
 
         /// <summary>
         /// Is this silo overloaded.
@@ -80,20 +86,20 @@ namespace Orleans.Runtime
         {
             ActivationCount = activationCount;
             RecentlyUsedActivationCount = recentlyUsedActivationCount;
-            CpuUsage = environmentStatistics.CpuUsagePercentage;
-            AvailableMemory = environmentStatistics.AvailableMemoryBytes;
-            MemoryUsage = environmentStatistics.MemoryUsageBytes;
-            IsOverloaded = loadSheddingOptions.Value.LoadSheddingEnabled && (this.CpuUsage ?? 0) > loadSheddingOptions.Value.LoadSheddingLimit;
+            CpuUsagePercentage = environmentStatistics.CpuUsagePercentage;
+            AvailableMemoryBytes = environmentStatistics.AvailableMemoryBytes;
+            MemoryUsageBytes = environmentStatistics.MemoryUsageBytes;
+            IsOverloaded = loadSheddingOptions.Value.LoadSheddingEnabled && (this.CpuUsagePercentage ?? 0) > loadSheddingOptions.Value.LoadSheddingLimit;
             ClientCount = SiloRuntimeMetricsListener.ConnectedClientCount;
-            TotalPhysicalMemory = environmentStatistics.MaximumAvailableMemoryBytes;
+            MaximumAvailableMemoryBytes = environmentStatistics.MaximumAvailableMemoryBytes;
             ReceivedMessages = SiloRuntimeMetricsListener.MessageReceivedTotal;
             SentMessages = SiloRuntimeMetricsListener.MessageSentTotal;
             DateTime = dateTime;
         }
 
         public override string ToString() => @$"SiloRuntimeStatistics: ActivationCount={ActivationCount} RecentlyUsedActivationCount={RecentlyUsedActivationCount
-            } CpuUsage={CpuUsage?.ToString() ?? "<unset>"} AvailableMemory={AvailableMemory} MemoryUsage={MemoryUsage} IsOverloaded={IsOverloaded
-            } ClientCount={ClientCount} TotalPhysicalMemory={TotalPhysicalMemory} DateTime={DateTime}";
+            } CpuUsage={CpuUsagePercentage?.ToString() ?? "<unset>"} AvailableMemory={AvailableMemoryBytes} MemoryUsage={MemoryUsageBytes} IsOverloaded={IsOverloaded
+            } ClientCount={ClientCount} MaximumAvailableMemory={MaximumAvailableMemoryBytes} DateTime={DateTime}";
     }
 
     /// <summary>

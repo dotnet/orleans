@@ -252,20 +252,20 @@ internal sealed class ResourceOptimizedPlacementDirector : IPlacementDirector, I
         private readonly DualModeKalmanFilter _availableMemoryFilter = new();
         private readonly DualModeKalmanFilter _memoryUsageFilter = new();
 
-        private float _cpuUsage = statistics.CpuUsage ?? 0;
-        private float _availableMemory = statistics.AvailableMemory ?? 0;
-        private long _memoryUsage = statistics.MemoryUsage ?? 0;
-        private long _totalPhysicalMemory = statistics.TotalPhysicalMemory ?? 0;
+        private float _cpuUsage = statistics.CpuUsagePercentage ?? 0;
+        private float _availableMemory = statistics.AvailableMemoryBytes ?? 0;
+        private long _memoryUsage = statistics.MemoryUsageBytes ?? 0;
+        private long _totalPhysicalMemory = statistics.MaximumAvailableMemoryBytes ?? 0;
         private bool _isOverloaded = statistics.IsOverloaded;
 
         public ResourceStatistics Value => new(_cpuUsage, _availableMemory, _memoryUsage, _totalPhysicalMemory, _isOverloaded);
 
         public void Update(SiloRuntimeStatistics statistics)
         {
-            _cpuUsage = _cpuUsageFilter.Filter(statistics.CpuUsage);
-            _availableMemory = _availableMemoryFilter.Filter(statistics.AvailableMemory);
-            _memoryUsage = (long)_memoryUsageFilter.Filter((float)statistics.MemoryUsage);
-            _totalPhysicalMemory = statistics.TotalPhysicalMemory ?? 0;
+            _cpuUsage = _cpuUsageFilter.Filter(statistics.CpuUsagePercentage);
+            _availableMemory = _availableMemoryFilter.Filter(statistics.AvailableMemoryBytes);
+            _memoryUsage = (long)_memoryUsageFilter.Filter((float)statistics.MemoryUsageBytes);
+            _totalPhysicalMemory = statistics.MaximumAvailableMemoryBytes ?? 0;
             _isOverloaded = statistics.IsOverloaded;
         }
     }
