@@ -57,10 +57,12 @@ namespace Orleans
             services.AddFromExisting<ILifecycleParticipant<IClusterClientLifecycle>, ClientOptionsLogger>();
 
             // Statistics
-            services.TryAddSingleton<IAppEnvironmentStatistics, AppEnvironmentStatistics>();
-            services.AddSingleton<HostEnvironmentStatistics>();
-            services.AddFromExisting<IHostEnvironmentStatistics, HostEnvironmentStatistics>();
-            services.AddSingleton<ILifecycleParticipant<IClusterClientLifecycle>, HostEnvironmentStatisticsLifecycleAdapter<IClusterClientLifecycle>>();
+            services.AddSingleton<EnvironmentStatistics>();
+#pragma warning disable 612, 618
+            services.AddSingleton<OldEnvironmentStatistics>();
+#pragma warning restore 612, 618
+            services.AddFromExisting<IEnvironmentStatistics, EnvironmentStatistics>();
+            services.AddSingleton<ILifecycleParticipant<IClusterClientLifecycle>, SiloStatisticsProviderLifecycleAdapter<IClusterClientLifecycle>>();
 
             services.AddLogging();
             services.TryAddSingleton<GrainBindingsResolver>();

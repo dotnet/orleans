@@ -1,6 +1,3 @@
-
-using Orleans.Statistics;
-
 namespace Orleans.Configuration
 {
     /// <summary>
@@ -16,7 +13,6 @@ namespace Orleans.Configuration
         /// <summary>
         /// Gets or sets a value indicating whether load shedding in the client gateway and stream providers is enabled.
         /// The default value is <see langword="false"/>, meaning that load shedding is disabled.
-        /// In addition to enabling this option, a valid <see cref="IHostEnvironmentStatistics"/> implementation must be registered on gateway hosts to enable this functionality.
         /// </summary>
         /// <value>Load shedding is disabled by default.</value>
         public bool LoadSheddingEnabled { get; set; }

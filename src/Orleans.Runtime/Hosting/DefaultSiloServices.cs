@@ -75,10 +75,12 @@ namespace Orleans.Hosting
             services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, SiloOptionsLogger>();
 
             // Statistics
-            services.TryAddSingleton<IAppEnvironmentStatistics, AppEnvironmentStatistics>();
-            services.AddSingleton<HostEnvironmentStatistics>();
-            services.AddFromExisting<IHostEnvironmentStatistics, HostEnvironmentStatistics>();
-            services.AddSingleton<ILifecycleParticipant<ISiloLifecycle>, HostEnvironmentStatisticsLifecycleAdapter<ISiloLifecycle>>();
+            services.AddSingleton<EnvironmentStatistics>();
+#pragma warning disable 612, 618
+            services.AddSingleton<OldEnvironmentStatistics>();
+#pragma warning restore 612, 618
+            services.AddFromExisting<IEnvironmentStatistics, EnvironmentStatistics>();
+            services.AddSingleton<ILifecycleParticipant<ISiloLifecycle>, SiloStatisticsProviderLifecycleAdapter<ISiloLifecycle>>();
 
             services.TryAddSingleton<OverloadDetector>();
 

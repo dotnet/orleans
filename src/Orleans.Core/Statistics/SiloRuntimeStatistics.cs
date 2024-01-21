@@ -74,19 +74,18 @@ namespace Orleans.Runtime
         internal SiloRuntimeStatistics(
             int activationCount,
             int recentlyUsedActivationCount,
-            IAppEnvironmentStatistics appEnvironmentStatistics,
-            IHostEnvironmentStatistics hostEnvironmentStatistics,
+            IEnvironmentStatistics environmentStatistics,
             IOptions<LoadSheddingOptions> loadSheddingOptions,
             DateTime dateTime)
         {
             ActivationCount = activationCount;
             RecentlyUsedActivationCount = recentlyUsedActivationCount;
-            CpuUsage = hostEnvironmentStatistics.CpuUsage;
-            AvailableMemory = hostEnvironmentStatistics.AvailableMemory;
-            MemoryUsage = appEnvironmentStatistics.MemoryUsage;
+            CpuUsage = environmentStatistics.CpuUsagePercentage;
+            AvailableMemory = environmentStatistics.AvailableMemoryBytes;
+            MemoryUsage = environmentStatistics.MemoryUsageBytes;
             IsOverloaded = loadSheddingOptions.Value.LoadSheddingEnabled && (this.CpuUsage ?? 0) > loadSheddingOptions.Value.LoadSheddingLimit;
             ClientCount = SiloRuntimeMetricsListener.ConnectedClientCount;
-            TotalPhysicalMemory = hostEnvironmentStatistics.TotalPhysicalMemory;
+            TotalPhysicalMemory = environmentStatistics.MaximumAvailableMemoryBytes;
             ReceivedMessages = SiloRuntimeMetricsListener.MessageReceivedTotal;
             SentMessages = SiloRuntimeMetricsListener.MessageSentTotal;
             DateTime = dateTime;

@@ -32,8 +32,8 @@ namespace Orleans.Streaming.EventHubs.Testing
             IEventHubDataAdapter dataAdapter,
             IServiceProvider serviceProvider,
             ILoggerFactory loggerFactory,
-            IHostEnvironmentStatistics hostEnvironmentStatistics)
-            : base(name, ehOptions, receiverOptions, cacheOptions, evictionOptions, statisticOptions, dataAdapter, serviceProvider, loggerFactory, hostEnvironmentStatistics)
+            IEnvironmentStatistics environmentStatistics)
+            : base(name, ehOptions, receiverOptions, cacheOptions, evictionOptions, statisticOptions, dataAdapter, serviceProvider, loggerFactory, environmentStatistics)
         {
             this.ehGeneratorOptions = options;
         }

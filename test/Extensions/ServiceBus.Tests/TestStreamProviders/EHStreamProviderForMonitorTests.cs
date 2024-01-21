@@ -33,8 +33,8 @@ namespace ServiceBus.Tests.TestStreamProviders
             IEventHubDataAdapter dataAdapter,
             IServiceProvider serviceProvider,
             ILoggerFactory loggerFactory,
-            IHostEnvironmentStatistics hostEnvironmentStatistics)
-            : base(name, options, ehOptions, receiverOptions, cacheOptions, streamCacheEvictionOptions, statisticOptions, dataAdapter, serviceProvider, loggerFactory, hostEnvironmentStatistics)
+            IEnvironmentStatistics environmentStatistics)
+            : base(name, options, ehOptions, receiverOptions, cacheOptions, streamCacheEvictionOptions, statisticOptions, dataAdapter, serviceProvider, loggerFactory, environmentStatistics)
         {
             this.cacheOptions = cacheOptions;
             this.staticticOptions = statisticOptions;

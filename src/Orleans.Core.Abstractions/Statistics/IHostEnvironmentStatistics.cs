@@ -1,8 +1,12 @@
+using System;
+
 namespace Orleans.Statistics
 {
+
     /// <summary>
     /// Functionality for accessing statistics relating to the hosting environment.
     /// </summary>
+    [Obsolete($"This functionality will be removed, use {nameof(IEnvironmentStatistics)} instead.", error: true)]
     public interface IHostEnvironmentStatistics
     {
         /// <summary>

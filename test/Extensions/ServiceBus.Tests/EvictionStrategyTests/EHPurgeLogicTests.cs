@@ -25,7 +25,7 @@ namespace ServiceBus.Tests.EvictionStrategyTests
         private readonly ObjectPool<FixedSizeBuffer> bufferPool;
         private readonly TimeSpan timeOut = TimeSpan.FromSeconds(30);
         private readonly EventHubPartitionSettings ehSettings;
-        private NoOpHostEnvironmentStatistics _hostEnvironmentStatistics;
+        private NoOpSiloStatisticsProvider _hostEnvironmentStatistics;
         private ConcurrentBag<EventHubQueueCacheForTesting> cacheList;
         private List<EHEvictionStrategyForTesting> evictionStrategyList;
 
@@ -188,7 +188,7 @@ namespace ServiceBus.Tests.EvictionStrategyTests
 
         private void InitForTesting()
         {
-            _hostEnvironmentStatistics = new NoOpHostEnvironmentStatistics();
+            _hostEnvironmentStatistics = new NoOpSiloStatisticsProvider();
             this.cacheList = new ConcurrentBag<EventHubQueueCacheForTesting>();
             this.evictionStrategyList = new List<EHEvictionStrategyForTesting>();
             var monitorDimensions = new EventHubReceiverMonitorDimensions
@@ -263,13 +263,12 @@ namespace ServiceBus.Tests.EvictionStrategyTests
             return cache;
         }
 
-        private class NoOpHostEnvironmentStatistics : IHostEnvironmentStatistics
+        private class NoOpSiloStatisticsProvider : IEnvironmentStatistics
         {
-            public long? TotalPhysicalMemory => null;
-
-            public float? CpuUsage => null;
-
-            public long? AvailableMemory => null;
+            public float? CpuUsagePercentage => null;
+            public long? MemoryUsageBytes => null;
+            public long? AvailableMemoryBytes => null;
+            public long? MaximumAvailableMemoryBytes => null;
         }
     }
 }

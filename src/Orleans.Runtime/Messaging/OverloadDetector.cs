@@ -9,12 +9,12 @@ namespace Orleans.Runtime.Messaging
     /// </summary>
     internal class OverloadDetector
     {
-        private readonly IHostEnvironmentStatistics hostEnvironmentStatistics;
+        private readonly IEnvironmentStatistics environmentStatistics;
         private readonly float limit;
 
-        public OverloadDetector(IHostEnvironmentStatistics hostEnvironmentStatistics, IOptions<LoadSheddingOptions> loadSheddingOptions)
+        public OverloadDetector(IEnvironmentStatistics environmentStatistics, IOptions<LoadSheddingOptions> loadSheddingOptions)
         {
-            this.hostEnvironmentStatistics = hostEnvironmentStatistics;
+            this.environmentStatistics = environmentStatistics;
             this.Enabled = loadSheddingOptions.Value.LoadSheddingEnabled;
             this.limit = loadSheddingOptions.Value.LoadSheddingLimit;
         }
@@ -27,6 +27,6 @@ namespace Orleans.Runtime.Messaging
         /// <summary>
         /// Returns <see langword="true"/> if this process is overloaded, <see langword="false"/> otherwise.
         /// </summary>
-        public bool Overloaded => this.Enabled && (this.hostEnvironmentStatistics.CpuUsage ?? 0) > this.limit;
+        public bool Overloaded => this.Enabled && (this.environmentStatistics.CpuUsagePercentage ?? 0) > this.limit;
     }
 }
