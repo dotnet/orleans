@@ -65,7 +65,7 @@ namespace Orleans.Runtime.Messaging
             }
 
             // Are we overloaded?
-            if (this.overloadDetector.Overloaded)
+            if (this.overloadDetector.IsOverloaded)
             {
                 MessagingInstruments.OnRejectedMessage(msg);
                 Message rejection = this.MessageFactory.CreateRejectionResponse(msg, Message.RejectionTypes.GatewayTooBusy, "Shedding load");

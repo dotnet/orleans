@@ -1,6 +1,6 @@
-using System;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
+using Orleans.Core.Messaging;
 using Orleans.Statistics;
 
 namespace Orleans.Runtime.Messaging
@@ -10,15 +10,15 @@ namespace Orleans.Runtime.Messaging
     /// </summary>
     internal class OverloadDetector
     {
-        private readonly float cpuLimit;
-        private readonly float memoryLimit;
         private readonly IEnvironmentStatistics _environmentStatistics;
-        
+        private readonly LoadSheddingOptions _options;
+
         public OverloadDetector(IEnvironmentStatistics environmentStatistics, IOptions<LoadSheddingOptions> loadSheddingOptions)
         {
             _environmentStatistics = environmentStatistics;
-            cpuLimit = loadSheddingOptions.Value.LoadSheddingLimit;
-            memoryLimit = loadSheddingOptions.Value.MemoryLoadLimit;
+            _options = loadSheddingOptions.Value;
+
+            Enabled = _options.LoadSheddingEnabled;
         }
 
         /// <summary>
@@ -29,12 +29,6 @@ namespace Orleans.Runtime.Messaging
         /// <summary>
         /// Returns <see langword="true"/> if this process is overloaded, <see langword="false"/> otherwise.
         /// </summary>
-        public bool Overloaded => Enabled && (IsMemoryPressure() || _environmentStatistics.CpuUsagePercentage > cpuLimit);
-        
-        private bool IsMemoryPressure()
-        {
-            var info = GC.GetGCMemoryInfo();
-            return info.MemoryLoadBytes >= memoryLimit * Math.Min(info.TotalAvailableMemoryBytes, info.HighMemoryLoadThresholdBytes);
-        }
+        public bool IsOverloaded => Enabled && OverloadDetectionLogic.Determine(_environmentStatistics, _options);
     }
 }

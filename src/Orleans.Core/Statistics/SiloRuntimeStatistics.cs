@@ -1,6 +1,7 @@
 using System;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
+using Orleans.Core.Messaging;
 using Orleans.Statistics;
 
 namespace Orleans.Runtime
@@ -89,7 +90,7 @@ namespace Orleans.Runtime
             CpuUsagePercentage = environmentStatistics.CpuUsagePercentage;
             AvailableMemoryBytes = environmentStatistics.AvailableMemoryBytes;
             MemoryUsageBytes = environmentStatistics.MemoryUsageBytes;
-            IsOverloaded = loadSheddingOptions.Value.LoadSheddingEnabled && (this.CpuUsagePercentage ?? 0) > loadSheddingOptions.Value.LoadSheddingLimit;
+            IsOverloaded = loadSheddingOptions.Value.LoadSheddingEnabled && OverloadDetectionLogic.Determine(environmentStatistics, loadSheddingOptions.Value);
             ClientCount = SiloRuntimeMetricsListener.ConnectedClientCount;
             MaximumAvailableMemoryBytes = environmentStatistics.MaximumAvailableMemoryBytes;
             ReceivedMessages = SiloRuntimeMetricsListener.MessageReceivedTotal;
