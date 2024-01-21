@@ -15,7 +15,7 @@ internal static class OverloadDetectionLogic
         var info = GC.GetGCMemoryInfo();
 
         bool isMemoryOverloaded = info.MemoryLoadBytes >= options.MemoryLoadLimit * Math.Min(info.TotalAvailableMemoryBytes, info.HighMemoryLoadThresholdBytes);
-        bool isCpuOverloaded = statistics.CpuUsagePercentage > options.LoadSheddingLimit;
+        bool isCpuOverloaded = (statistics.CpuUsagePercentage ?? 0) > options.LoadSheddingLimit;
 
         return isMemoryOverloaded || isCpuOverloaded;
     }
