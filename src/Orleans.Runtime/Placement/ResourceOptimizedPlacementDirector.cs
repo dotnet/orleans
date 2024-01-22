@@ -18,7 +18,7 @@ internal sealed class ResourceOptimizedPlacementDirector : IPlacementDirector, I
     /// <summary>
     /// 1 / (1024 * 1024)
     /// </summary>
-    private const float PhysicalMemoryScalingFactor = 0.00000095367431640625f;
+    private const float MaxAvailableMemoryScalingFactor = 0.00000095367431640625f;
     private const int FourKiloByte = 4096;
 
     private readonly NormalizedWeights _weights;
@@ -44,7 +44,7 @@ internal sealed class ResourceOptimizedPlacementDirector : IPlacementDirector, I
             new (
                 CpuUsageWeight: (float)input.CpuUsageWeight / totalWeight,
                 MemoryUsageWeight: (float)input.MemoryUsageWeight / totalWeight,
-                PhysicalMemoryWeight: (float)input.PhysicalMemoryWeight / totalWeight,
+                MaxAvailableMemory: (float)input.PhysicalMemoryWeight / totalWeight,
                 AvailableMemoryWeight: (float)input.AvailableMemoryWeight / totalWeight);
     }
 
@@ -210,11 +210,11 @@ internal sealed class ResourceOptimizedPlacementDirector : IPlacementDirector, I
 
             float normalizedMemoryUsage = stats.MemoryUsage / maxAvailableMemory;
             float normalizedAvailableMemory = Math.Max(0, 1 - stats.AvailableMemory / maxAvailableMemory);
-            float normalizedPhysicalMemory = PhysicalMemoryScalingFactor * maxAvailableMemory;
+            float normalizedMaxAvailableMemory = MaxAvailableMemoryScalingFactor * maxAvailableMemory;
 
             score += _weights.MemoryUsageWeight * normalizedMemoryUsage +
                      _weights.AvailableMemoryWeight * normalizedAvailableMemory +
-                     _weights.PhysicalMemoryWeight * normalizedPhysicalMemory;
+                     _weights.MaxAvailableMemory * normalizedMaxAvailableMemory;
         }
 
         Debug.Assert(score >= 0f && score <= 1f);
@@ -244,7 +244,7 @@ internal sealed class ResourceOptimizedPlacementDirector : IPlacementDirector, I
     private readonly record struct ResourceStatistics(float CpuUsage, float AvailableMemory, long MemoryUsage, long MaxAvailableMemory, bool IsOverloaded);
 
     // No need to touch 'NormalizedWeights' as its created only once and is the same for all silos in the cluster.
-    private readonly record struct NormalizedWeights(float CpuUsageWeight, float MemoryUsageWeight, float AvailableMemoryWeight, float PhysicalMemoryWeight);
+    private readonly record struct NormalizedWeights(float CpuUsageWeight, float MemoryUsageWeight, float AvailableMemoryWeight, float MaxAvailableMemory);
 
     private sealed class FilteredSiloStatistics(SiloRuntimeStatistics statistics)
     {
