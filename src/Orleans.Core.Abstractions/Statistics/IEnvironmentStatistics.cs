@@ -1,33 +1,49 @@
+using System.Runtime.InteropServices;
+
 namespace Orleans.Statistics;
 
-/// <summary>
-/// Provides functionality for accessing statistics of the silo environment.
-/// </summary>
 public interface IEnvironmentStatistics
 {
     /// <summary>
-    /// Gets the system CPU usage.
+    /// Gets the hardware statistics of the silo environment.
+    /// </summary>
+    HardwareStatistics GetHardwareStatistics();
+}
+
+[StructLayout(LayoutKind.Sequential, Pack = 1)]
+public readonly struct HardwareStatistics
+{
+    /// <summary>
+    /// The system CPU usage.
     /// </summary>
     /// <remarks>Ranges from 0.0-100.0.</remarks>
-    float CpuUsagePercentage { get; }
+    public readonly float CpuUsagePercentage;
 
     /// <summary>
-    /// Gets the currently occupied memory by the process.
+    /// The currently occupied memory by the process.
     /// </summary>
     /// <remarks>Includes fragmented memory.</remarks>
-    long MemoryUsageBytes { get; }
+    public readonly long MemoryUsageBytes;
 
     /// <summary>
-    /// Gets the currently available memory for allocations to the process.
+    /// The currently available memory for allocations to the process.
     /// </summary>
     /// <remarks>
     /// Includes the currently available memory of the process, and the system.
     /// </remarks>
-    long AvailableMemoryBytes { get; }
+    public readonly long AvailableMemoryBytes;
 
     /// <summary>
-    /// Gets the maximum possible memory of the system.
+    /// The maximum possible memory of the system.
     /// </summary>
     /// <remarks>Represents the physical memory, unless a lower-bound (typically in containers) has been specified.</remarks>
-    long MaximumAvailableMemoryBytes { get; }
+    public readonly long MaximumAvailableMemoryBytes;
+
+    internal HardwareStatistics(float cpuUsagePercentage, long memoryUsageBytes, long availableMemoryBytes, long maximumAvailableMemoryBytes)
+    {
+        CpuUsagePercentage = cpuUsagePercentage;
+        MemoryUsageBytes = memoryUsageBytes;
+        AvailableMemoryBytes = availableMemoryBytes;
+        MaximumAvailableMemoryBytes = maximumAvailableMemoryBytes;
+    }
 }

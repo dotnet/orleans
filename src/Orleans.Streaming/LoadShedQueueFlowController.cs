@@ -56,7 +56,7 @@ namespace Orleans.Streams
         /// <inheritdoc/>
         public int GetMaxAddCount()
         {
-            return options.LoadSheddingEnabled && environmentStatistics.CpuUsagePercentage > loadSheddingLimit ? 0 : int.MaxValue;
+            return options.LoadSheddingEnabled && environmentStatistics.GetHardwareStatistics().CpuUsagePercentage > loadSheddingLimit ? 0 : int.MaxValue;
         }
     }
 }

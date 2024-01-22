@@ -8,7 +8,7 @@ using Orleans.Placement;
 using Orleans.Runtime;
 using Orleans.Runtime.Messaging;
 using Orleans.Runtime.TestHooks;
-
+using Orleans.Statistics;
 using UnitTests.GrainInterfaces;
 
 namespace UnitTests.Grains
@@ -19,7 +19,7 @@ namespace UnitTests.Grains
 
         private readonly OverloadDetector overloadDetector;
 
-        private readonly TestHooksEnvironmentStatistics hostEnvironmentStatistics;
+        private readonly TestHooksEnvironmentStatistics environmentStatistics;
         private readonly IGrainContext _grainContext;
         private readonly LoadSheddingOptions loadSheddingOptions;
 
@@ -31,7 +31,7 @@ namespace UnitTests.Grains
         {
             _grainContext = grainContext;
             this.overloadDetector = overloadDetector;
-            this.hostEnvironmentStatistics = hostEnvironmentStatistics;
+            this.environmentStatistics = hostEnvironmentStatistics;
             this.loadSheddingOptions = loadSheddingOptions.Value;
         }
 
@@ -102,25 +102,29 @@ namespace UnitTests.Grains
 
         public Task LatchOverloaded()
         {
-            this.hostEnvironmentStatistics.CpuUsagePercentage = this.loadSheddingOptions.LoadSheddingLimit + 1;
+            var stats = environmentStatistics.GetHardwareStatistics();
+            environmentStatistics.SetHardwareStatistics(new(loadSheddingOptions.LoadSheddingLimit + 1, stats.MemoryUsageBytes, stats.AvailableMemoryBytes, stats.MaximumAvailableMemoryBytes));
             return PropigateStatisticsToCluster(GrainFactory);
         }
 
         public Task UnlatchOverloaded()
         {
-            this.hostEnvironmentStatistics.CpuUsagePercentage = 0;
+            var stats = environmentStatistics.GetHardwareStatistics();
+            environmentStatistics.SetHardwareStatistics(new(0, stats.MemoryUsageBytes, stats.AvailableMemoryBytes, stats.MaximumAvailableMemoryBytes));
             return PropigateStatisticsToCluster(GrainFactory);
         }
 
         public Task LatchCpuUsage(float value)
         {
-            this.hostEnvironmentStatistics.CpuUsagePercentage = value;
+            var stats = environmentStatistics.GetHardwareStatistics();
+            environmentStatistics.SetHardwareStatistics(new(value, stats.MemoryUsageBytes, stats.AvailableMemoryBytes, stats.MaximumAvailableMemoryBytes));
             return PropigateStatisticsToCluster(GrainFactory);
         }
 
         public Task UnlatchCpuUsage()
         {
-            this.hostEnvironmentStatistics.CpuUsagePercentage = 0;
+            var stats = environmentStatistics.GetHardwareStatistics();
+            environmentStatistics.SetHardwareStatistics(new(0, stats.MemoryUsageBytes, stats.AvailableMemoryBytes, stats.MaximumAvailableMemoryBytes));
             return PropigateStatisticsToCluster(GrainFactory);
         }
 

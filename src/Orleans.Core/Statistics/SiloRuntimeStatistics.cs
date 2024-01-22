@@ -111,23 +111,25 @@ namespace Orleans.Runtime
         {
             ActivationCount = activationCount;
             RecentlyUsedActivationCount = recentlyUsedActivationCount;
-
-#pragma warning disable 618
-            CpuUsage = environmentStatistics.CpuUsagePercentage;
-            MemoryUsage = environmentStatistics.MemoryUsageBytes;
-            AvailableMemory = environmentStatistics.AvailableMemoryBytes;
-            TotalPhysicalMemory = environmentStatistics.MaximumAvailableMemoryBytes;
-#pragma warning restore 618
-
             IsOverloaded = loadSheddingOptions.Value.LoadSheddingEnabled && OverloadDetectionLogic.IsOverloaded(environmentStatistics, loadSheddingOptions.Value);
             ClientCount = SiloRuntimeMetricsListener.ConnectedClientCount;      
             ReceivedMessages = SiloRuntimeMetricsListener.MessageReceivedTotal;
             SentMessages = SiloRuntimeMetricsListener.MessageSentTotal;
             DateTime = dateTime;
-            CpuUsagePercentage = environmentStatistics.CpuUsagePercentage;
-            AvailableMemoryBytes = environmentStatistics.AvailableMemoryBytes;
-            MemoryUsageBytes = environmentStatistics.MemoryUsageBytes;
-            MaximumAvailableMemoryBytes = environmentStatistics.MaximumAvailableMemoryBytes;
+
+            var hardwareStatistics = environmentStatistics.GetHardwareStatistics();
+
+            CpuUsagePercentage = hardwareStatistics.CpuUsagePercentage;
+            AvailableMemoryBytes = hardwareStatistics.AvailableMemoryBytes;
+            MemoryUsageBytes = hardwareStatistics.MemoryUsageBytes;
+            MaximumAvailableMemoryBytes = hardwareStatistics.MaximumAvailableMemoryBytes;
+
+#pragma warning disable 618
+            CpuUsage = CpuUsagePercentage;
+            MemoryUsage = MemoryUsageBytes;
+            AvailableMemory = AvailableMemoryBytes;
+            TotalPhysicalMemory = MaximumAvailableMemoryBytes;
+#pragma warning restore 618
         }
 
         public override string ToString() => @$"SiloRuntimeStatistics: ActivationCount={ActivationCount} RecentlyUsedActivationCount={RecentlyUsedActivationCount

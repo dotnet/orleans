@@ -252,10 +252,10 @@ internal sealed class ResourceOptimizedPlacementDirector : IPlacementDirector, I
         private readonly DualModeKalmanFilter _availableMemoryFilter = new();
         private readonly DualModeKalmanFilter _memoryUsageFilter = new();
 
-        private float _cpuUsage = statistics.CpuUsagePercentage ?? 0;
-        private float _availableMemory = statistics.AvailableMemoryBytes ?? 0;
-        private long _memoryUsage = statistics.MemoryUsageBytes ?? 0;
-        private long _maxAvailableMemory = statistics.MaximumAvailableMemoryBytes ?? 0;
+        private float _cpuUsage = statistics.CpuUsagePercentage;
+        private float _availableMemory = statistics.AvailableMemoryBytes;
+        private long _memoryUsage = statistics.MemoryUsageBytes;
+        private long _maxAvailableMemory = statistics.MaximumAvailableMemoryBytes;
         private bool _isOverloaded = statistics.IsOverloaded;
 
         public ResourceStatistics Value => new(_cpuUsage, _availableMemory, _memoryUsage, _maxAvailableMemory, _isOverloaded);
@@ -264,8 +264,8 @@ internal sealed class ResourceOptimizedPlacementDirector : IPlacementDirector, I
         {
             _cpuUsage = _cpuUsageFilter.Filter(statistics.CpuUsagePercentage);
             _availableMemory = _availableMemoryFilter.Filter(statistics.AvailableMemoryBytes);
-            _memoryUsage = (long)_memoryUsageFilter.Filter((float)statistics.MemoryUsageBytes);
-            _maxAvailableMemory = statistics.MaximumAvailableMemoryBytes ?? 0;
+            _memoryUsage = (long)_memoryUsageFilter.Filter(statistics.MemoryUsageBytes);
+            _maxAvailableMemory = statistics.MaximumAvailableMemoryBytes;
             _isOverloaded = statistics.IsOverloaded;
         }
     }

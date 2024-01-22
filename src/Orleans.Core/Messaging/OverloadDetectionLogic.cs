@@ -16,7 +16,7 @@ internal static class OverloadDetectionLogic
         var maximumMemoryLimit = Math.Min(info.TotalAvailableMemoryBytes, info.HighMemoryLoadThresholdBytes);
 
         bool isMemoryOverloaded = info.MemoryLoadBytes >= maximumMemoryLimit * options.MemoryLoadLimit / 100.0d;
-        bool isCpuOverloaded = statistics.CpuUsagePercentage > options.LoadSheddingLimit;
+        bool isCpuOverloaded = statistics.GetHardwareStatistics().CpuUsagePercentage > options.LoadSheddingLimit;
 
         return isMemoryOverloaded || isCpuOverloaded;
     }

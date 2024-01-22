@@ -16,16 +16,10 @@ namespace Orleans.Runtime.TestHooks
     /// </summary>
     internal class TestHooksEnvironmentStatistics : IEnvironmentStatistics
     {
-        /// <inheritdoc />
-        public long MaximumAvailableMemoryBytes { get; set; }
+        private HardwareStatistics? _currentStats = null;
 
-        /// <inheritdoc />
-        public float CpuUsagePercentage { get; set; }
-
-        /// <inheritdoc />
-        public long AvailableMemoryBytes { get; set; }
-
-        public long MemoryUsageBytes { get; set; }
+        public HardwareStatistics GetHardwareStatistics() => _currentStats ?? new();
+        public void SetHardwareStatistics(HardwareStatistics stats) => _currentStats = stats;
     }
 
     /// <summary>
@@ -100,16 +94,20 @@ namespace Orleans.Runtime.TestHooks
 
         private void LatchCpuUsage(float cpuUsage, TimeSpan latchPeriod)
         {
-            var previousValue = this.environmentStatistics.CpuUsagePercentage;
-            this.environmentStatistics.CpuUsagePercentage = cpuUsage;
+            var previousStats = environmentStatistics.GetHardwareStatistics();
+
+            environmentStatistics.SetHardwareStatistics(
+                new(cpuUsage, previousStats.MemoryUsageBytes, previousStats.AvailableMemoryBytes, previousStats.MaximumAvailableMemoryBytes));
+
             Task.Delay(latchPeriod).ContinueWith(t =>
                 {
-                    var currentCpuUsage = this.environmentStatistics.CpuUsagePercentage;
+                    var currentStats = environmentStatistics.GetHardwareStatistics();
 
                     // ReSharper disable once CompareOfFloatsByEqualityOperator
-                    if (currentCpuUsage == cpuUsage)
+                    if (currentStats.CpuUsagePercentage == cpuUsage)
                     {
-                        this.environmentStatistics.CpuUsagePercentage = previousValue;
+                        environmentStatistics.SetHardwareStatistics(
+                            new(previousStats.CpuUsagePercentage, currentStats.MemoryUsageBytes, currentStats.AvailableMemoryBytes, currentStats.MaximumAvailableMemoryBytes));
                     }
                 }).Ignore();
         }

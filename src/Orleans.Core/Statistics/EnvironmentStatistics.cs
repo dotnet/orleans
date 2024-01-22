@@ -20,46 +20,37 @@ internal sealed class EnvironmentStatistics : IEnvironmentStatistics, IDisposabl
     [SuppressMessage("CodeQuality", "IDE0052:Remove unread private members", Justification = "Used for memory-dump debugging.")]
     private readonly ObservableCounter<long> _maximumAvailableMemoryCounter;
 
-    /// <inheritdoc />
-    public float CpuUsagePercentage => (float)_eventCounterListener.CpuUsage;
-
-    /// <inheritdoc />
-    public long MemoryUsageBytes => GC.GetTotalMemory(false) + GC.GetGCMemoryInfo().FragmentedBytes;
-    
-    /// <inheritdoc />
-    public long AvailableMemoryBytes
-    {
-        get
-        {
-            var info = GC.GetGCMemoryInfo();
-
-            var committedOfLimit = info.TotalAvailableMemoryBytes - info.TotalCommittedBytes;
-            var unusedLoad = info.HighMemoryLoadThresholdBytes - info.MemoryLoadBytes;
-            var systemAvailable = Math.Max(0, Math.Min(committedOfLimit, unusedLoad));
-            var processAvailable = info.TotalCommittedBytes - info.HeapSizeBytes;
-
-            return systemAvailable + processAvailable;
-        }
-    }
-
-    /// <inheritdoc />
-    public long MaximumAvailableMemoryBytes
-    {
-        get
-        {
-            var info = GC.GetGCMemoryInfo();
-            var physicalMemory = Math.Min(info.TotalAvailableMemoryBytes, info.HighMemoryLoadThresholdBytes);
-
-            return physicalMemory;
-        }
-    }
+    private long _availableMemoryBytes;
+    private long _maximumAvailableMemoryBytes;
 
     public EnvironmentStatistics()
     {
         GC.Collect(0, GCCollectionMode.Forced, true); // we make sure the GC structure wont be empty, also performing a blocking GC guarantees immediate collection.
 
-        _availableMemoryCounter = Instruments.Meter.CreateObservableCounter(InstrumentNames.RUNTIME_MEMORY_AVAILABLE_MEMORY_MB, () => (long)(AvailableMemoryBytes / OneKiloByte / OneKiloByte), unit: "MB");
-        _maximumAvailableMemoryCounter = Instruments.Meter.CreateObservableCounter(InstrumentNames.RUNTIME_MEMORY_TOTAL_PHYSICAL_MEMORY_MB, () => (long)(MaximumAvailableMemoryBytes / OneKiloByte / OneKiloByte), unit: "MB");
+        _availableMemoryCounter = Instruments.Meter.CreateObservableCounter(InstrumentNames.RUNTIME_MEMORY_AVAILABLE_MEMORY_MB, () => (long)(_availableMemoryBytes / OneKiloByte / OneKiloByte), unit: "MB");
+        _maximumAvailableMemoryCounter = Instruments.Meter.CreateObservableCounter(InstrumentNames.RUNTIME_MEMORY_TOTAL_PHYSICAL_MEMORY_MB, () => (long)(_maximumAvailableMemoryBytes / OneKiloByte / OneKiloByte), unit: "MB");
+    }
+
+    /// <inheritdoc />
+    public HardwareStatistics GetHardwareStatistics()
+    {
+        var memoryInfo = GC.GetGCMemoryInfo();
+
+        var cpuUsage = (float)_eventCounterListener.CpuUsage;
+        var memoryUsage = GC.GetTotalMemory(false) + memoryInfo.FragmentedBytes;
+
+        var committedOfLimit = memoryInfo.TotalAvailableMemoryBytes - memoryInfo.TotalCommittedBytes;
+        var unusedLoad = memoryInfo.HighMemoryLoadThresholdBytes - memoryInfo.MemoryLoadBytes;
+        var systemAvailable = Math.Max(0, Math.Min(committedOfLimit, unusedLoad));
+        var processAvailable = memoryInfo.TotalCommittedBytes - memoryInfo.HeapSizeBytes;
+        var availableMemory = systemAvailable + processAvailable;
+
+        var maximumAvailableMemory = Math.Min(memoryInfo.TotalAvailableMemoryBytes, memoryInfo.HighMemoryLoadThresholdBytes);
+
+        _availableMemoryBytes = availableMemory;
+        _maximumAvailableMemoryBytes = maximumAvailableMemory;
+
+        return new(cpuUsage, memoryUsage, availableMemory, maximumAvailableMemory);
     }
 
     public void Dispose() => _eventCounterListener.Dispose();
