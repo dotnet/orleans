@@ -21,7 +21,7 @@ namespace Orleans.Runtime
         private readonly IInternalGrainFactory _grainFactory;
         private readonly ActivationDirectory _activationDirectory;
         private readonly IActivationWorkingSet _activationWorkingSet;
-        private readonly IEnvironmentStatistics _environmentStatistics;
+        private readonly IEnvironmentStatisticsProvider _environmentStatisticsProvider;
         private readonly IOptions<LoadSheddingOptions> _loadSheddingOptions;
         private readonly ConcurrentDictionary<SiloAddress, SiloRuntimeStatistics> _periodicStats;
         private readonly TimeSpan _statisticsRefreshTime;
@@ -43,7 +43,7 @@ namespace Orleans.Runtime
             ILoggerFactory loggerFactory,
             ActivationDirectory activationDirectory,
             IActivationWorkingSet activationWorkingSet,
-            IEnvironmentStatistics environmentStatistics,
+            IEnvironmentStatisticsProvider environmentStatisticsProvider,
             IOptions<LoadSheddingOptions> loadSheddingOptions)
             : base(Constants.DeploymentLoadPublisherSystemTargetType, siloDetails.SiloAddress, loggerFactory)
         {
@@ -53,7 +53,7 @@ namespace Orleans.Runtime
             _grainFactory = grainFactory;
             _activationDirectory = activationDirectory;
             _activationWorkingSet = activationWorkingSet;
-            _environmentStatistics = environmentStatistics;
+            _environmentStatisticsProvider = environmentStatisticsProvider;
             _loadSheddingOptions = loadSheddingOptions;
             _statisticsRefreshTime = options.Value.DeploymentLoadPublisherRefreshTime;
             _periodicStats = new ConcurrentDictionary<SiloAddress, SiloRuntimeStatistics>();

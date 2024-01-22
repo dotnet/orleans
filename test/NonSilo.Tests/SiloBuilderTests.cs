@@ -154,8 +154,8 @@ namespace NonSilo.Tests
                         })
                         .ConfigureServices(svcCollection =>
                         {
-                            svcCollection.AddSingleton<FakeEnvironmentStatistics>();
-                            svcCollection.AddFromExisting<IEnvironmentStatistics, FakeEnvironmentStatistics>();
+                            svcCollection.AddSingleton<FakeEnvironmentStatisticsProvider>();
+                            svcCollection.AddFromExisting<IEnvironmentStatisticsProvider, FakeEnvironmentStatisticsProvider>();
                             svcCollection.AddTransient<IConfigurationValidator, LoadSheddingValidator>();
                         });
                 }).RunConsoleAsync();
@@ -214,9 +214,9 @@ namespace NonSilo.Tests
             });
         }
 
-        private class FakeEnvironmentStatistics : IEnvironmentStatistics
+        private class FakeEnvironmentStatisticsProvider : IEnvironmentStatisticsProvider
         {
-            public HardwareStatistics GetHardwareStatistics() => new();
+            public EnvironmentStatistics GetEnvironmentStatistics() => new();
         }
 
         private class MyService

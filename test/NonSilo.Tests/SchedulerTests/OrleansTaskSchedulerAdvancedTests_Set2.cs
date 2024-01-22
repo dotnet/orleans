@@ -20,14 +20,14 @@ namespace UnitTests.SchedulerTests
         private readonly ITestOutputHelper output;
         private readonly UnitTestSchedulingContext context;
 
-        private readonly IEnvironmentStatistics environmentStatistics;
+        private readonly IEnvironmentStatisticsProvider environmentStatisticsProvider;
         private readonly ILoggerFactory loggerFactory;
         public OrleansTaskSchedulerAdvancedTests_Set2(ITestOutputHelper output)
         {
             this.output = output;
             this.loggerFactory = OrleansTaskSchedulerBasicTests.InitSchedulerLogging();
             this.context = new UnitTestSchedulingContext();
-            this.environmentStatistics = new TestHooksEnvironmentStatistics();
+            this.environmentStatistics = new TestHooksEnvironmentStatisticsProvider();
         }
         
         public void Dispose()

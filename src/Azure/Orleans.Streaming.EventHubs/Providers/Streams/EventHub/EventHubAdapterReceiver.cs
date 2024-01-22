@@ -45,7 +45,7 @@ namespace Orleans.Streaming.EventHubs
         private readonly ILogger logger;
         private readonly IQueueAdapterReceiverMonitor monitor;
         private readonly LoadSheddingOptions loadSheddingOptions;
-        private readonly IEnvironmentStatistics environmentStatistics;
+        private readonly IEnvironmentStatisticsProvider environmentStatisticsProvider;
         private IEventHubQueueCache cache;
 
         private IEventHubReceiver receiver;
@@ -72,7 +72,7 @@ namespace Orleans.Streaming.EventHubs
             ILoggerFactory loggerFactory,
             IQueueAdapterReceiverMonitor monitor,
             LoadSheddingOptions loadSheddingOptions,
-            IEnvironmentStatistics environmentStatistics,
+            IEnvironmentStatisticsProvider environmentStatisticsProvider,
             Func<EventHubPartitionSettings, string, ILogger, IEventHubReceiver> eventHubReceiverFactory = null)
         {
             this.settings = settings ?? throw new ArgumentNullException(nameof(settings));

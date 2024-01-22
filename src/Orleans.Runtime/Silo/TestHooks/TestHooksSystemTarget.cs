@@ -12,14 +12,14 @@ using Orleans.Statistics;
 namespace Orleans.Runtime.TestHooks
 {
     /// <summary>
-    /// A fake, test-only implementation of <see cref="IEnvironmentStatistics"/>.
+    /// A fake, test-only implementation of <see cref="IEnvironmentStatisticsProvider"/>.
     /// </summary>
-    internal class TestHooksEnvironmentStatistics : IEnvironmentStatistics
+    internal class TestHooksEnvironmentStatisticsProvider : IEnvironmentStatisticsProvider
     {
-        private HardwareStatistics? _currentStats = null;
+        private EnvironmentStatistics? _currentStats = null;
 
-        public HardwareStatistics GetHardwareStatistics() => _currentStats ?? new();
-        public void SetHardwareStatistics(HardwareStatistics stats) => _currentStats = stats;
+        public EnvironmentStatistics GetEnvironmentStatistics() => _currentStats ?? new();
+        public void SetHardwareStatistics(EnvironmentStatistics stats) => _currentStats = stats;
     }
 
     /// <summary>
@@ -30,7 +30,7 @@ namespace Orleans.Runtime.TestHooks
         private readonly IServiceProvider serviceProvider;
         private readonly ISiloStatusOracle siloStatusOracle;
 
-        private readonly TestHooksEnvironmentStatistics environmentStatistics;
+        private readonly TestHooksEnvironmentStatisticsProvider environmentStatistics;
 
         private readonly LoadSheddingOptions loadSheddingOptions;
 
@@ -41,7 +41,7 @@ namespace Orleans.Runtime.TestHooks
             ILocalSiloDetails siloDetails,
             ILoggerFactory loggerFactory,
             ISiloStatusOracle siloStatusOracle,
-            TestHooksEnvironmentStatistics environmentStatistics,
+            TestHooksEnvironmentStatisticsProvider environmentStatistics,
             IOptions<LoadSheddingOptions> loadSheddingOptions)
             : base(Constants.TestHooksSystemTargetType, siloDetails.SiloAddress, loggerFactory)
         {
@@ -94,14 +94,14 @@ namespace Orleans.Runtime.TestHooks
 
         private void LatchCpuUsage(float cpuUsage, TimeSpan latchPeriod)
         {
-            var previousStats = environmentStatistics.GetHardwareStatistics();
+            var previousStats = environmentStatistics.GetEnvironmentStatistics();
 
             environmentStatistics.SetHardwareStatistics(
                 new(cpuUsage, previousStats.MemoryUsageBytes, previousStats.AvailableMemoryBytes, previousStats.MaximumAvailableMemoryBytes));
 
             Task.Delay(latchPeriod).ContinueWith(t =>
                 {
-                    var currentStats = environmentStatistics.GetHardwareStatistics();
+                    var currentStats = environmentStatistics.GetEnvironmentStatistics();
 
                     // ReSharper disable once CompareOfFloatsByEqualityOperator
                     if (currentStats.CpuUsagePercentage == cpuUsage)

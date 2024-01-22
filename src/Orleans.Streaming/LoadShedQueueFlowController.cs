@@ -13,7 +13,7 @@ namespace Orleans.Streams
     {
         private readonly LoadSheddingOptions options;
         private readonly double loadSheddingLimit;
-        private readonly IEnvironmentStatistics environmentStatistics;
+        private readonly IEnvironmentStatisticsProvider environmentStatisticsProvider;
 
         /// <summary>
         /// Creates a flow controller triggered when the CPU reaches a percentage of the cluster load shedding limit.
@@ -24,7 +24,7 @@ namespace Orleans.Streams
         /// <param name="percentOfSiloSheddingLimit">Percentage of load shed limit which triggers a reduction of queue read rate.</param>
         /// <param name="environmentStatistics">The silo environment statistics.</param>
         /// <returns>The flow controller.</returns>
-        public static IQueueFlowController CreateAsPercentOfLoadSheddingLimit(LoadSheddingOptions options, IEnvironmentStatistics environmentStatistics, int percentOfSiloSheddingLimit = LoadSheddingOptions.DefaultLoadSheddingLimit)
+        public static IQueueFlowController CreateAsPercentOfLoadSheddingLimit(LoadSheddingOptions options, IEnvironmentStatisticsProvider environmentStatisticsProvider, int percentOfSiloSheddingLimit = LoadSheddingOptions.DefaultLoadSheddingLimit)
         {
             if (percentOfSiloSheddingLimit < 0.0 || percentOfSiloSheddingLimit > 100.0) throw new ArgumentOutOfRangeException(nameof(percentOfSiloSheddingLimit), "Percent value must be between 0-100");
             // Start shedding before silo reaches shedding limit.
@@ -39,13 +39,13 @@ namespace Orleans.Streams
         /// <param name="options">The silo statistics options.</param>
         /// <param name="environmentStatistics">The silo environment statistics.</param>
         /// <returns>The flow controller.</returns>
-        public static IQueueFlowController CreateAsPercentageOfCPU(int loadSheddingLimit, LoadSheddingOptions options, IEnvironmentStatistics environmentStatistics)
+        public static IQueueFlowController CreateAsPercentageOfCPU(int loadSheddingLimit, LoadSheddingOptions options, IEnvironmentStatisticsProvider environmentStatisticsProvider)
         {
             if (loadSheddingLimit < 0 || loadSheddingLimit > 100) throw new ArgumentOutOfRangeException(nameof(loadSheddingLimit), "Value must be between 0-100");
             return new LoadShedQueueFlowController(loadSheddingLimit, options, environmentStatistics);
         }
 
-        private LoadShedQueueFlowController(int loadSheddingLimit, LoadSheddingOptions options, IEnvironmentStatistics environmentStatistics)
+        private LoadShedQueueFlowController(int loadSheddingLimit, LoadSheddingOptions options, IEnvironmentStatisticsProvider environmentStatisticsProvider)
         {
             this.options = options;
             if (loadSheddingLimit < 0 || loadSheddingLimit > 100) throw new ArgumentOutOfRangeException(nameof(loadSheddingLimit), "Value must be between 0-100");

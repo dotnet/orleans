@@ -21,7 +21,7 @@ namespace Orleans.Streaming.EventHubs
     public class EventHubAdapterFactory : IQueueAdapterFactory, IQueueAdapter, IQueueAdapterCache
     {
         private readonly ILoggerFactory loggerFactory;
-        private readonly IEnvironmentStatistics environmentStatistics;
+        private readonly IEnvironmentStatisticsProvider environmentStatisticsProvider;
 
         /// <summary>
         /// Data adapter
@@ -112,7 +112,7 @@ namespace Orleans.Streaming.EventHubs
             IEventHubDataAdapter dataAdapter,
             IServiceProvider serviceProvider,
             ILoggerFactory loggerFactory,
-            IEnvironmentStatistics environmentStatistics)
+            IEnvironmentStatisticsProvider environmentStatisticsProvider)
         {
             this.Name = name;
             this.cacheEvictionOptions = cacheEvictionOptions ?? throw new ArgumentNullException(nameof(cacheEvictionOptions));

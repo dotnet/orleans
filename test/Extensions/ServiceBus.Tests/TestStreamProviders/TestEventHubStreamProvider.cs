@@ -19,7 +19,7 @@ namespace ServiceBus.Tests.TestStreamProviders.EventHub
             StreamStatisticOptions statisticOptions,
             IEventHubDataAdapter dataAdapter,
             IServiceProvider serviceProvider,
-            IEnvironmentStatistics environmentStatistics,
+            IEnvironmentStatisticsProvider environmentStatisticsProvider,
             ILoggerFactory loggerFactory)
             : base(name, ehOptions, receiverOptions, cacheOptions, evictionOptions, statisticOptions, dataAdapter, serviceProvider, loggerFactory, environmentStatistics)
         {

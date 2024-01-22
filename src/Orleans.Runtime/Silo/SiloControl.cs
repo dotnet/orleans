@@ -33,7 +33,7 @@ namespace Orleans.Runtime
 
         private readonly IActivationWorkingSet activationWorkingSet;
 
-        private readonly IEnvironmentStatistics environmentStatistics;
+        private readonly IEnvironmentStatisticsProvider environmentStatisticsProvider;
 
         private readonly IOptions<LoadSheddingOptions> loadSheddingOptions;
         private readonly GrainCountStatistics _grainCountStatistics;
@@ -51,7 +51,7 @@ namespace Orleans.Runtime
             ActivationCollector activationCollector,
             ActivationDirectory activationDirectory,
             IActivationWorkingSet activationWorkingSet,
-            IEnvironmentStatistics environmentStatistics,
+            IEnvironmentStatisticsProvider environmentStatisticsProvider,
             IOptions<LoadSheddingOptions> loadSheddingOptions,
             GrainCountStatistics grainCountStatistics)
             : base(Constants.SiloControlType, localSiloDetails.SiloAddress, loggerFactory)

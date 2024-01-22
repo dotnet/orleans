@@ -105,24 +105,25 @@ namespace Orleans.Runtime
         internal SiloRuntimeStatistics(
             int activationCount,
             int recentlyUsedActivationCount,
-            IEnvironmentStatistics environmentStatistics,
+            IEnvironmentStatisticsProvider environmentStatisticsProvider,
             IOptions<LoadSheddingOptions> loadSheddingOptions,
             DateTime dateTime)
         {
             ActivationCount = activationCount;
             RecentlyUsedActivationCount = recentlyUsedActivationCount;
-            IsOverloaded = loadSheddingOptions.Value.LoadSheddingEnabled && OverloadDetectionLogic.IsOverloaded(environmentStatistics, loadSheddingOptions.Value);
             ClientCount = SiloRuntimeMetricsListener.ConnectedClientCount;      
             ReceivedMessages = SiloRuntimeMetricsListener.MessageReceivedTotal;
             SentMessages = SiloRuntimeMetricsListener.MessageSentTotal;
             DateTime = dateTime;
 
-            var hardwareStatistics = environmentStatistics.GetHardwareStatistics();
+            var statistics = environmentStatisticsProvider.GetEnvironmentStatistics();
 
-            CpuUsagePercentage = hardwareStatistics.CpuUsagePercentage;
-            AvailableMemoryBytes = hardwareStatistics.AvailableMemoryBytes;
-            MemoryUsageBytes = hardwareStatistics.MemoryUsageBytes;
-            MaximumAvailableMemoryBytes = hardwareStatistics.MaximumAvailableMemoryBytes;
+            CpuUsagePercentage = statistics.CpuUsagePercentage;
+            AvailableMemoryBytes = statistics.AvailableMemoryBytes;
+            MemoryUsageBytes = statistics.MemoryUsageBytes;
+            MaximumAvailableMemoryBytes = statistics.MaximumAvailableMemoryBytes;
+
+            IsOverloaded = loadSheddingOptions.Value.LoadSheddingEnabled && OverloadDetectionLogic.IsOverloaded(in statistics, loadSheddingOptions.Value);
 
 #pragma warning disable 618
             CpuUsage = CpuUsagePercentage;

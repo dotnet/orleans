@@ -2,16 +2,16 @@ using System.Runtime.InteropServices;
 
 namespace Orleans.Statistics;
 
-public interface IEnvironmentStatistics
+public interface IEnvironmentStatisticsProvider
 {
     /// <summary>
-    /// Gets the hardware statistics of the silo environment.
+    /// Gets the statistics of the silo environment.
     /// </summary>
-    HardwareStatistics GetHardwareStatistics();
+    EnvironmentStatistics GetEnvironmentStatistics();
 }
 
 [StructLayout(LayoutKind.Sequential, Pack = 1)]
-public readonly struct HardwareStatistics
+public readonly struct EnvironmentStatistics
 {
     /// <summary>
     /// The system CPU usage.
@@ -39,7 +39,7 @@ public readonly struct HardwareStatistics
     /// <remarks>Represents the physical memory, unless a lower-bound (typically in containers) has been specified.</remarks>
     public readonly long MaximumAvailableMemoryBytes;
 
-    internal HardwareStatistics(float cpuUsagePercentage, long memoryUsageBytes, long availableMemoryBytes, long maximumAvailableMemoryBytes)
+    internal EnvironmentStatistics(float cpuUsagePercentage, long memoryUsageBytes, long availableMemoryBytes, long maximumAvailableMemoryBytes)
     {
         CpuUsagePercentage = cpuUsagePercentage;
         MemoryUsageBytes = memoryUsageBytes;

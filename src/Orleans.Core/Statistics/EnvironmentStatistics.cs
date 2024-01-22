@@ -8,7 +8,7 @@ using Orleans.Runtime;
 namespace Orleans.Statistics;
 
 #nullable enable
-internal sealed class EnvironmentStatistics : IEnvironmentStatistics, IDisposable
+internal sealed class EnvironmentStatisticsProvider : IEnvironmentStatisticsProvider, IDisposable
 {
     private const float OneKiloByte = 1024f;
 
@@ -23,7 +23,7 @@ internal sealed class EnvironmentStatistics : IEnvironmentStatistics, IDisposabl
     private long _availableMemoryBytes;
     private long _maximumAvailableMemoryBytes;
 
-    public EnvironmentStatistics()
+    public EnvironmentStatisticsProvider()
     {
         GC.Collect(0, GCCollectionMode.Forced, true); // we make sure the GC structure wont be empty, also performing a blocking GC guarantees immediate collection.
 
@@ -32,7 +32,7 @@ internal sealed class EnvironmentStatistics : IEnvironmentStatistics, IDisposabl
     }
 
     /// <inheritdoc />
-    public HardwareStatistics GetHardwareStatistics()
+    public EnvironmentStatistics GetEnvironmentStatistics()
     {
         var memoryInfo = GC.GetGCMemoryInfo();
 
