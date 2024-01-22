@@ -90,7 +90,7 @@ namespace Orleans.Runtime
             CpuUsagePercentage = environmentStatistics.CpuUsagePercentage;
             AvailableMemoryBytes = environmentStatistics.AvailableMemoryBytes;
             MemoryUsageBytes = environmentStatistics.MemoryUsageBytes;
-            IsOverloaded = loadSheddingOptions.Value.LoadSheddingEnabled && OverloadDetectionLogic.Determine(environmentStatistics, loadSheddingOptions.Value);
+            IsOverloaded = loadSheddingOptions.Value.LoadSheddingEnabled && OverloadDetectionLogic.IsOverloaded(environmentStatistics, loadSheddingOptions.Value);
             ClientCount = SiloRuntimeMetricsListener.ConnectedClientCount;
             MaximumAvailableMemoryBytes = environmentStatistics.MaximumAvailableMemoryBytes;
             ReceivedMessages = SiloRuntimeMetricsListener.MessageReceivedTotal;

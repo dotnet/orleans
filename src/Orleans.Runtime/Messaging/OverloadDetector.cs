@@ -29,6 +29,6 @@ namespace Orleans.Runtime.Messaging
         /// <summary>
         /// Returns <see langword="true"/> if this process is overloaded, <see langword="false"/> otherwise.
         /// </summary>
-        public bool IsOverloaded => Enabled && OverloadDetectionLogic.Determine(_environmentStatistics, _options);
+        public bool IsOverloaded => Enabled && OverloadDetectionLogic.IsOverloaded(_environmentStatistics, _options);
     }
 }
