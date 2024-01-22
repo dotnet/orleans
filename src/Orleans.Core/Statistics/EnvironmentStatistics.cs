@@ -16,6 +16,7 @@ internal sealed class EnvironmentStatistics : IEnvironmentStatistics, IDisposabl
 
     [SuppressMessage("CodeQuality", "IDE0052:Remove unread private members", Justification = "Used for memory-dump debugging.")]
     private readonly ObservableCounter<long> _availableMemoryCounter;
+
     [SuppressMessage("CodeQuality", "IDE0052:Remove unread private members", Justification = "Used for memory-dump debugging.")]
     private readonly ObservableCounter<long> _maximumAvailableMemoryCounter;
 
@@ -23,10 +24,10 @@ internal sealed class EnvironmentStatistics : IEnvironmentStatistics, IDisposabl
     public float? CpuUsagePercentage => _eventCounterListener.CpuUsage.HasValue ? (float)_eventCounterListener.CpuUsage : null;
 
     /// <inheritdoc />
-    public long? MemoryUsageBytes => GC.GetTotalMemory(false) + GC.GetGCMemoryInfo().FragmentedBytes;
+    public long MemoryUsageBytes => GC.GetTotalMemory(false) + GC.GetGCMemoryInfo().FragmentedBytes;
     
     /// <inheritdoc />
-    public long? AvailableMemoryBytes
+    public long AvailableMemoryBytes
     {
         get
         {
@@ -42,7 +43,7 @@ internal sealed class EnvironmentStatistics : IEnvironmentStatistics, IDisposabl
     }
 
     /// <inheritdoc />
-    public long? MaximumAvailableMemoryBytes
+    public long MaximumAvailableMemoryBytes
     {
         get
         {
@@ -57,8 +58,8 @@ internal sealed class EnvironmentStatistics : IEnvironmentStatistics, IDisposabl
     {
         GC.Collect(0, GCCollectionMode.Forced, true); // we make sure the GC structure wont be empty, also performing a blocking GC guarantees immediate collection.
 
-        _availableMemoryCounter = Instruments.Meter.CreateObservableCounter(InstrumentNames.RUNTIME_MEMORY_AVAILABLE_MEMORY_MB, () => (long)(AvailableMemoryBytes ?? 0 / OneKiloByte / OneKiloByte), unit: "MB");
-        _maximumAvailableMemoryCounter = Instruments.Meter.CreateObservableCounter(InstrumentNames.RUNTIME_MEMORY_TOTAL_PHYSICAL_MEMORY_MB, () => (long)(MaximumAvailableMemoryBytes ?? 0 / OneKiloByte / OneKiloByte), unit: "MB");
+        _availableMemoryCounter = Instruments.Meter.CreateObservableCounter(InstrumentNames.RUNTIME_MEMORY_AVAILABLE_MEMORY_MB, () => (long)(AvailableMemoryBytes / OneKiloByte / OneKiloByte), unit: "MB");
+        _maximumAvailableMemoryCounter = Instruments.Meter.CreateObservableCounter(InstrumentNames.RUNTIME_MEMORY_TOTAL_PHYSICAL_MEMORY_MB, () => (long)(MaximumAvailableMemoryBytes / OneKiloByte / OneKiloByte), unit: "MB");
     }
 
     public void Dispose() => _eventCounterListener.Dispose();
@@ -78,19 +79,18 @@ internal sealed class EnvironmentStatistics : IEnvironmentStatistics, IDisposabl
 
         protected override void OnEventWritten(EventWrittenEventArgs eventData)
         {
-            if (eventData.EventName!.Equals("EventCounters"))
+            if ("EventCounters".Equals(eventData.EventName) && eventData.Payload is { } payload)
             {
-                for (int i = 0; i < eventData.Payload!.Count; i++)
+                for (var i = 0; i < payload.Count; i++)
                 {
-                    if (eventData.Payload![i] is IDictionary<string, object> eventPayload)
+                    if (payload[i] is IDictionary<string, object?> eventPayload
+                        && eventPayload.TryGetValue("Name", out var name)
+                        && "cpu-usage".Equals(name)
+                        && eventPayload.TryGetValue("Mean", out var mean)
+                        && mean is double value)
                     {
-                        if (eventPayload.TryGetValue("Name", out var name) && "cpu-usage".Equals(name))
-                        {
-                            if (eventPayload.TryGetValue("Mean", out var mean))
-                            {
-                                CpuUsage = (double)mean;
-                            }
-                        }
+                        CpuUsage = value;
+                        break;
                     }
                 }
             }

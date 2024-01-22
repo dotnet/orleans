@@ -15,7 +15,7 @@ public interface IEnvironmentStatistics
     /// Gets the currently occupied memory by the process.
     /// </summary>
     /// <remarks>Includes fragmented memory.</remarks>
-    long? MemoryUsageBytes { get; }
+    long MemoryUsageBytes { get; }
 
     /// <summary>
     /// Gets the currently available memory for allocations to the process.
@@ -23,11 +23,11 @@ public interface IEnvironmentStatistics
     /// <remarks>
     /// Includes the currently available memory of the process, and the system.
     /// </remarks>
-    long? AvailableMemoryBytes { get; }
+    long AvailableMemoryBytes { get; }
 
     /// <summary>
     /// Gets the maximum possible memory of the system.
     /// </summary>
     /// <remarks>Represents the physical memory, unless a lower-bound (typically in containers) has been specified.</remarks>
-    long? MaximumAvailableMemoryBytes { get; }
+    long MaximumAvailableMemoryBytes { get; }
 }
