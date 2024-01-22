@@ -82,7 +82,7 @@ namespace Orleans.Streaming.EventHubs
             this.logger = this.loggerFactory.CreateLogger<EventHubAdapterReceiver>();
             this.monitor = monitor ?? throw new ArgumentNullException(nameof(monitor));
             this.loadSheddingOptions = loadSheddingOptions ?? throw new ArgumentNullException(nameof(loadSheddingOptions));
-            this.environmentStatistics = environmentStatistics;
+            this.environmentStatisticsProvider = environmentStatisticsProvider;
             this.eventHubReceiverFactory = eventHubReceiverFactory == null ? EventHubAdapterReceiver.CreateReceiver : eventHubReceiverFactory;
         }
 
@@ -113,7 +113,7 @@ namespace Orleans.Streaming.EventHubs
                     this.cache = null;
                 }
                 this.cache = this.cacheFactory(this.settings.Partition, this.checkpointer, this.loggerFactory);
-                this.flowController = new AggregatedQueueFlowController(MaxMessagesPerRead) { this.cache, LoadShedQueueFlowController.CreateAsPercentOfLoadSheddingLimit(this.loadSheddingOptions, environmentStatistics) };
+                this.flowController = new AggregatedQueueFlowController(MaxMessagesPerRead) { this.cache, LoadShedQueueFlowController.CreateAsPercentOfLoadSheddingLimit(this.loadSheddingOptions, environmentStatisticsProvider) };
                 string offset = await this.checkpointer.Load();
                 this.receiver = this.eventHubReceiverFactory(this.settings, offset, this.logger);
                 watch.Stop();

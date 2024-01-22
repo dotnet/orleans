@@ -29,7 +29,7 @@ namespace ServiceBus.Tests.TestStreamProviders
             IServiceProvider serviceProvider,
             ILoggerFactory loggerFactory,
             IEnvironmentStatisticsProvider environmentStatisticsProvider)
-            : base(name, options, ehOptions, receiverOptions, cacheOptions, evictionOptions, statisticOptions, dataAdatper, serviceProvider, loggerFactory, environmentStatistics)
+            : base(name, options, ehOptions, receiverOptions, cacheOptions, evictionOptions, statisticOptions, dataAdatper, serviceProvider, loggerFactory, environmentStatisticsProvider)
 
         {
             this.createdCaches = new ConcurrentBag<QueueCacheForTesting>();

@@ -123,7 +123,7 @@ namespace Orleans.Streaming.EventHubs
             this.receiverOptions = receiverOptions?? throw new ArgumentNullException(nameof(receiverOptions));
             this.serviceProvider = serviceProvider ?? throw new ArgumentNullException(nameof(serviceProvider));
             this.loggerFactory = loggerFactory ?? throw new ArgumentNullException(nameof(loggerFactory));
-            this.environmentStatistics = environmentStatistics;
+            this.environmentStatisticsProvider = environmentStatisticsProvider;
         }
 
         public virtual void Init()
@@ -288,7 +288,7 @@ namespace Orleans.Streaming.EventHubs
                 this.loggerFactory,
                 this.ReceiverMonitorFactory(receiverMonitorDimensions, this.loggerFactory),
                 this.serviceProvider.GetRequiredService<IOptions<LoadSheddingOptions>>().Value,
-                environmentStatistics,
+                this.environmentStatisticsProvider,
                 this.EventHubReceiverFactory);
         }
 

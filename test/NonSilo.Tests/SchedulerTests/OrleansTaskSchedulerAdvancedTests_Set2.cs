@@ -27,7 +27,7 @@ namespace UnitTests.SchedulerTests
             this.output = output;
             this.loggerFactory = OrleansTaskSchedulerBasicTests.InitSchedulerLogging();
             this.context = new UnitTestSchedulingContext();
-            this.environmentStatistics = new TestHooksEnvironmentStatisticsProvider();
+            this.environmentStatisticsProvider = new TestHooksEnvironmentStatisticsProvider();
         }
         
         public void Dispose()

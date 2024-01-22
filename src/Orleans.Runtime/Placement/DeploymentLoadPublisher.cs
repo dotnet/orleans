@@ -103,7 +103,7 @@ namespace Orleans.Runtime
                 var myStats = new SiloRuntimeStatistics(
                     _activationDirectory.Count,
                     _activationWorkingSet.Count,
-                    _environmentStatistics,
+                    _environmentStatisticsProvider,
                     _loadSheddingOptions,
                     new DateTime(ticks, DateTimeKind.Utc));
 

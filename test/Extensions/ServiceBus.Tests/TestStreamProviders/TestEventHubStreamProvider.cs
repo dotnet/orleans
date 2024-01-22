@@ -21,7 +21,7 @@ namespace ServiceBus.Tests.TestStreamProviders.EventHub
             IServiceProvider serviceProvider,
             IEnvironmentStatisticsProvider environmentStatisticsProvider,
             ILoggerFactory loggerFactory)
-            : base(name, ehOptions, receiverOptions, cacheOptions, evictionOptions, statisticOptions, dataAdapter, serviceProvider, loggerFactory, environmentStatistics)
+            : base(name, ehOptions, receiverOptions, cacheOptions, evictionOptions, statisticOptions, dataAdapter, serviceProvider, loggerFactory, environmentStatisticsProvider)
         {
             StreamFailureHandlerFactory = qid => TestAzureTableStorageStreamFailureHandler.Create(this.serviceProvider.GetRequiredService<Serializer<StreamSequenceToken>>());
         }

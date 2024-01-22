@@ -37,7 +37,7 @@ namespace Orleans.Runtime.Messaging
                     return false;
             
                 var stats = _environmentStatisticsProvider.GetEnvironmentStatistics();
-                return OverloadDetectionLogic.IsOverloaded(in stats, _options);
+                return OverloadDetectionLogic.IsOverloaded(ref stats, _options);
             }
         }
     }

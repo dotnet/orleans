@@ -123,7 +123,7 @@ namespace Orleans.Runtime
             MemoryUsageBytes = statistics.MemoryUsageBytes;
             MaximumAvailableMemoryBytes = statistics.MaximumAvailableMemoryBytes;
 
-            IsOverloaded = loadSheddingOptions.Value.LoadSheddingEnabled && OverloadDetectionLogic.IsOverloaded(in statistics, loadSheddingOptions.Value);
+            IsOverloaded = loadSheddingOptions.Value.LoadSheddingEnabled && OverloadDetectionLogic.IsOverloaded(ref statistics, loadSheddingOptions.Value);
 
 #pragma warning disable 618
             CpuUsage = CpuUsagePercentage;

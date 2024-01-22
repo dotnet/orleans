@@ -68,7 +68,7 @@ namespace Orleans.Runtime
             _activationCollector = activationCollector;
             this.activationDirectory = activationDirectory;
             this.activationWorkingSet = activationWorkingSet;
-            this.environmentStatistics = environmentStatistics;
+            this.environmentStatisticsProvider = environmentStatisticsProvider;
             this.loadSheddingOptions = loadSheddingOptions;
             _grainCountStatistics = grainCountStatistics;
         }
@@ -106,7 +106,7 @@ namespace Orleans.Runtime
             var stats = new SiloRuntimeStatistics(
                 activationCount,
                 activationWorkingSet.Count,
-                this.environmentStatistics,
+                this.environmentStatisticsProvider,
                 this.loadSheddingOptions,
                 DateTime.UtcNow);
             return Task.FromResult(stats);
