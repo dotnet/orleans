@@ -9,7 +9,7 @@ public interface IEnvironmentStatistics
     /// Gets the system CPU usage.
     /// </summary>
     /// <remarks>Ranges from 0.0-100.0.</remarks>
-    float? CpuUsagePercentage { get; }
+    float CpuUsagePercentage { get; }
 
     /// <summary>
     /// Gets the currently occupied memory by the process.

@@ -216,13 +216,13 @@ namespace NonSilo.Tests
 
         private class FakeEnvironmentStatistics : IEnvironmentStatistics
         {
-            public float? CpuUsagePercentage => 0;
+            public float CpuUsagePercentage => 0;
 
-            public long? MemoryUsageBytes => 0;
+            public long MemoryUsageBytes => 0;
 
-            public long? AvailableMemoryBytes => 0;
+            public long AvailableMemoryBytes => 0;
 
-            public long? MaximumAvailableMemoryBytes => 0;
+            public long MaximumAvailableMemoryBytes => 0;
         }
 
         private class MyService

@@ -108,7 +108,7 @@ namespace UnitTests.Grains
 
         public Task UnlatchOverloaded()
         {
-            this.hostEnvironmentStatistics.CpuUsagePercentage = null;
+            this.hostEnvironmentStatistics.CpuUsagePercentage = 0;
             return PropigateStatisticsToCluster(GrainFactory);
         }
 
@@ -120,7 +120,7 @@ namespace UnitTests.Grains
 
         public Task UnlatchCpuUsage()
         {
-            this.hostEnvironmentStatistics.CpuUsagePercentage = null;
+            this.hostEnvironmentStatistics.CpuUsagePercentage = 0;
             return PropigateStatisticsToCluster(GrainFactory);
         }
 

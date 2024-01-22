@@ -21,7 +21,7 @@ internal sealed class EnvironmentStatistics : IEnvironmentStatistics, IDisposabl
     private readonly ObservableCounter<long> _maximumAvailableMemoryCounter;
 
     /// <inheritdoc />
-    public float? CpuUsagePercentage => _eventCounterListener.CpuUsage.HasValue ? (float)_eventCounterListener.CpuUsage : null;
+    public float CpuUsagePercentage => (float)_eventCounterListener.CpuUsage;
 
     /// <inheritdoc />
     public long MemoryUsageBytes => GC.GetTotalMemory(false) + GC.GetGCMemoryInfo().FragmentedBytes;
@@ -66,7 +66,7 @@ internal sealed class EnvironmentStatistics : IEnvironmentStatistics, IDisposabl
 
     private sealed class EventCounterListener : EventListener
     {
-        public double? CpuUsage { get; private set; }
+        public double CpuUsage { get; private set; } = 0d;
 
         protected override void OnEventSourceCreated(EventSource source)
         {

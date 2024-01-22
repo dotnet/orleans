@@ -265,10 +265,10 @@ namespace ServiceBus.Tests.EvictionStrategyTests
 
         private class NoOpEnvironmentStatistics : IEnvironmentStatistics
         {
-            public float? CpuUsagePercentage => null;
-            public long? MemoryUsageBytes => null;
-            public long? AvailableMemoryBytes => null;
-            public long? MaximumAvailableMemoryBytes => null;
+            public float CpuUsagePercentage => null;
+            public long MemoryUsageBytes => null;
+            public long AvailableMemoryBytes => null;
+            public long MaximumAvailableMemoryBytes => null;
         }
     }
 }

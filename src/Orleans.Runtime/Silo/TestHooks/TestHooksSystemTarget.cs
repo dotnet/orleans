@@ -17,15 +17,15 @@ namespace Orleans.Runtime.TestHooks
     internal class TestHooksEnvironmentStatistics : IEnvironmentStatistics
     {
         /// <inheritdoc />
-        public long? MaximumAvailableMemoryBytes { get; set; }
+        public long MaximumAvailableMemoryBytes { get; set; }
 
         /// <inheritdoc />
-        public float? CpuUsagePercentage { get; set; }
+        public float CpuUsagePercentage { get; set; }
 
         /// <inheritdoc />
-        public long? AvailableMemoryBytes { get; set; }
+        public long AvailableMemoryBytes { get; set; }
 
-        public long? MemoryUsageBytes { get; set; }
+        public long MemoryUsageBytes { get; set; }
     }
 
     /// <summary>
@@ -98,7 +98,7 @@ namespace Orleans.Runtime.TestHooks
 
         public Task<Dictionary<SiloAddress, SiloStatus>> GetApproximateSiloStatuses() => Task.FromResult(this.siloStatusOracle.GetApproximateSiloStatuses());
 
-        private void LatchCpuUsage(float? cpuUsage, TimeSpan latchPeriod)
+        private void LatchCpuUsage(float cpuUsage, TimeSpan latchPeriod)
         {
             var previousValue = this.environmentStatistics.CpuUsagePercentage;
             this.environmentStatistics.CpuUsagePercentage = cpuUsage;
