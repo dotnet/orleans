@@ -27,25 +27,25 @@ namespace Orleans.Runtime
         /// <summary>
         /// The CPU utilization.
         /// </summary>
-        [Id(2), Obsolete($"The will be removed, use {nameof(EnvironmentStatistics.CpuUsagePercentage)}", error: false)]
+        [Id(2), Obsolete($"The will be removed, use {nameof(EnvironmentStatistics)}.{nameof(EnvironmentStatistics.CpuUsagePercentage)} instead.", error: false)]
         public float? CpuUsage { get; }
 
         /// <summary>
         /// The amount of memory available in the silo [bytes].
         /// </summary>
-        [Id(3), Obsolete($"The will be removed, use {nameof(EnvironmentStatistics.AvailableMemoryBytes)}", error: false)]
+        [Id(3), Obsolete($"The will be removed, use {nameof(EnvironmentStatistics)}.{nameof(EnvironmentStatistics.AvailableMemoryBytes)} instead.", error: false)]
         public float? AvailableMemory { get; }
 
         /// <summary>
         /// The used memory size.
         /// </summary>
-        [Id(4), Obsolete($"The will be removed, use {nameof(EnvironmentStatistics.MemoryUsageBytes)}", error: false)]
+        [Id(4), Obsolete($"The will be removed, use {nameof(EnvironmentStatistics)}.{nameof(EnvironmentStatistics.MemoryUsageBytes)} instead.", error: false)]
         public long? MemoryUsage { get; }
 
         /// <summary>
         /// The total physical memory available [bytes].
         /// </summary>
-        [Id(5), Obsolete($"The will be removed, use {nameof(EnvironmentStatistics.MaximumAvailableMemoryBytes)}", error: false)]
+        [Id(5), Obsolete($"The will be removed, use {nameof(EnvironmentStatistics)}.{nameof(EnvironmentStatistics.MaximumAvailableMemoryBytes)} instead.", error: false)]
         public long? TotalPhysicalMemory { get; }
 
         /// <summary>

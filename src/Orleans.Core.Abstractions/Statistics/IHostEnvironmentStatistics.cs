@@ -6,7 +6,7 @@ namespace Orleans.Statistics
     /// <summary>
     /// Functionality for accessing statistics relating to the hosting environment.
     /// </summary>
-    [Obsolete($"This functionality will be removed, use {nameof(IEnvironmentStatisticsProvider.GetEnvironmentStatistics)} instead.")]
+    [Obsolete($"This functionality will be removed, use {nameof(IEnvironmentStatisticsProvider)}.{nameof(IEnvironmentStatisticsProvider.GetEnvironmentStatistics)} instead.")]
     public interface IHostEnvironmentStatistics
     {
         /// <summary>
