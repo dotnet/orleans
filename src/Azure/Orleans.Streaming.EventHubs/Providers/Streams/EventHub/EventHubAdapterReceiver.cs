@@ -45,7 +45,7 @@ namespace Orleans.Streaming.EventHubs
         private readonly ILogger logger;
         private readonly IQueueAdapterReceiverMonitor monitor;
         private readonly LoadSheddingOptions loadSheddingOptions;
-        private readonly IHostEnvironmentStatistics _hostEnvironmentStatistics;
+        private readonly IEnvironmentStatisticsProvider environmentStatisticsProvider;
         private IEventHubQueueCache cache;
 
         private IEventHubReceiver receiver;
@@ -72,7 +72,7 @@ namespace Orleans.Streaming.EventHubs
             ILoggerFactory loggerFactory,
             IQueueAdapterReceiverMonitor monitor,
             LoadSheddingOptions loadSheddingOptions,
-            IHostEnvironmentStatistics hostEnvironmentStatistics,
+            IEnvironmentStatisticsProvider environmentStatisticsProvider,
             Func<EventHubPartitionSettings, string, ILogger, IEventHubReceiver> eventHubReceiverFactory = null)
         {
             this.settings = settings ?? throw new ArgumentNullException(nameof(settings));
@@ -82,7 +82,7 @@ namespace Orleans.Streaming.EventHubs
             this.logger = this.loggerFactory.CreateLogger<EventHubAdapterReceiver>();
             this.monitor = monitor ?? throw new ArgumentNullException(nameof(monitor));
             this.loadSheddingOptions = loadSheddingOptions ?? throw new ArgumentNullException(nameof(loadSheddingOptions));
-            _hostEnvironmentStatistics = hostEnvironmentStatistics;
+            this.environmentStatisticsProvider = environmentStatisticsProvider;
             this.eventHubReceiverFactory = eventHubReceiverFactory == null ? EventHubAdapterReceiver.CreateReceiver : eventHubReceiverFactory;
         }
 
@@ -113,7 +113,7 @@ namespace Orleans.Streaming.EventHubs
                     this.cache = null;
                 }
                 this.cache = this.cacheFactory(this.settings.Partition, this.checkpointer, this.loggerFactory);
-                this.flowController = new AggregatedQueueFlowController(MaxMessagesPerRead) { this.cache, LoadShedQueueFlowController.CreateAsPercentOfLoadSheddingLimit(this.loadSheddingOptions, _hostEnvironmentStatistics) };
+                this.flowController = new AggregatedQueueFlowController(MaxMessagesPerRead) { this.cache, LoadShedQueueFlowController.CreateAsPercentOfLoadSheddingLimit(this.loadSheddingOptions, environmentStatisticsProvider) };
                 string offset = await this.checkpointer.Load();
                 this.receiver = this.eventHubReceiverFactory(this.settings, offset, this.logger);
                 watch.Stop();

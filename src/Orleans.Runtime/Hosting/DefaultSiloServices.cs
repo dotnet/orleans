@@ -38,7 +38,6 @@ using Orleans.Storage;
 using Orleans.Serialization.TypeSystem;
 using Orleans.Serialization.Serializers;
 using Orleans.Serialization.Cloning;
-using System.Runtime.InteropServices;
 using System.Collections.Generic;
 using Microsoft.Extensions.Configuration;
 using Orleans.Serialization.Internal;
@@ -75,16 +74,14 @@ namespace Orleans.Hosting
             services.AddSingleton<SiloOptionsLogger>();
             services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, SiloOptionsLogger>();
 
-            if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
-            {
-                LinuxEnvironmentStatisticsServices.RegisterServices<ISiloLifecycle>(services);
-            }
-            else
-            {
-                services.TryAddSingleton<IHostEnvironmentStatistics, NoOpHostEnvironmentStatistics>();
-            }
+            // Statistics
+            services.AddSingleton<IEnvironmentStatisticsProvider, EnvironmentStatisticsProvider>();
+#pragma warning disable 618
+            services.AddSingleton<OldEnvironmentStatistics>();
+            services.AddFromExisting<IAppEnvironmentStatistics, OldEnvironmentStatistics>();
+            services.AddFromExisting<IHostEnvironmentStatistics, OldEnvironmentStatistics>();
+#pragma warning restore 618
 
-            services.TryAddSingleton<IAppEnvironmentStatistics, AppEnvironmentStatistics>();
             services.TryAddSingleton<OverloadDetector>();
 
             services.TryAddSingleton<FallbackSystemTarget>();

@@ -1,57 +1,38 @@
 using Microsoft.Extensions.Options;
 using Orleans.Runtime;
-using Orleans.Statistics;
 
-namespace Orleans.Configuration.Validators
+namespace Orleans.Configuration.Validators;
+
+/// <summary>
+/// Validates <see cref="LoadSheddingOptions"/> configuration.
+/// </summary>
+/// <remarks>
+/// Initializes a new instance of the <see cref="LoadSheddingValidator"/> class.
+/// </remarks>
+/// <param name="loadSheddingOptions">
+/// The load shedding options.
+/// </param>
+internal class LoadSheddingValidator(IOptions<LoadSheddingOptions> loadSheddingOptions) : IConfigurationValidator
 {
-    /// <summary>
-    /// Validates <see cref="LoadSheddingOptions"/> configuration.
-    /// </summary>
-    internal class LoadSheddingValidator : IConfigurationValidator
+    private readonly LoadSheddingOptions _loadSheddingOptions = loadSheddingOptions.Value;
+
+    /// <inheritdoc />
+    public void ValidateConfiguration()
     {
-        private readonly LoadSheddingOptions _loadSheddingOptions;
-        private readonly IHostEnvironmentStatistics _hostEnvironmentStatistics;
-
-        internal const string InvalidLoadSheddingLimit = "LoadSheddingLimit cannot exceed 100%.";
-        internal const string HostEnvironmentStatisticsNotConfigured = "A valid implementation of IHostEnvironmentStatistics is required for LoadShedding.";
-
-        /// <summary>
-        /// Initializes a new instance of the <see cref="LoadSheddingValidator"/> class.
-        /// </summary>
-        /// <param name="loadSheddingOptions">
-        /// The load shedding options.
-        /// </param>
-        /// <param name="hostEnvironmentStatistics">
-        /// The host environment statistics.
-        /// </param>
-        public LoadSheddingValidator(
-            IOptions<LoadSheddingOptions> loadSheddingOptions,
-            IHostEnvironmentStatistics hostEnvironmentStatistics
-        )
+        // When Load Shedding is disabled, don't validate configuration.
+        if (!_loadSheddingOptions.LoadSheddingEnabled)
         {
-            _loadSheddingOptions = loadSheddingOptions.Value;
-            _hostEnvironmentStatistics = hostEnvironmentStatistics;
+            return;
         }
 
-        /// <inheritdoc />
-        public void ValidateConfiguration()
+        if (_loadSheddingOptions.CpuThreshold > 100 || _loadSheddingOptions.CpuThreshold <= 0)
         {
-            // When Load Shedding is disabled, don't validate configuration.
-            if (!_loadSheddingOptions.LoadSheddingEnabled)
-            {
-                return;
-            }
+            throw new OrleansConfigurationException($"Limit '{nameof(LoadSheddingOptions)}.{nameof(LoadSheddingOptions.CpuThreshold)}' must be greater than 0% and less than or equal to 100%.");
+        }
 
-            if (_loadSheddingOptions.LoadSheddingLimit > 100)
-            {
-                throw new OrleansConfigurationException(InvalidLoadSheddingLimit);
-            }
-
-            // With a provided LoadSheddingOptions, ensure there is a valid (non default) registered implementation of IHostEnvironmentStatistics.
-            if (_hostEnvironmentStatistics == null || _hostEnvironmentStatistics.GetType() == typeof(NoOpHostEnvironmentStatistics))
-            {
-                throw new OrleansConfigurationException(HostEnvironmentStatisticsNotConfigured);
-            }
+        if (_loadSheddingOptions.MemoryThreshold > 100 || _loadSheddingOptions.MemoryThreshold <= 0)
+        {
+            throw new OrleansConfigurationException($"Limit '{nameof(LoadSheddingOptions)}.{nameof(LoadSheddingOptions.MemoryThreshold)}' must be greater than 0% and less than or equal to 100%.");
         }
     }
 }

@@ -39,7 +39,7 @@ namespace Orleans.Runtime.Placement
             deploymentLoadPublisher?.SubscribeToStatisticsChangeEvents(this);
         }
 
-        private static bool IsSiloOverloaded(SiloRuntimeStatistics stats) => stats.IsOverloaded || (stats.CpuUsage ?? 0) >= 100;
+        private static bool IsSiloOverloaded(SiloRuntimeStatistics stats) => stats.IsOverloaded || stats.EnvironmentStatistics.CpuUsagePercentage >= 100;
 
         private SiloAddress SelectSiloPowerOfK(SiloAddress[] silos)
         {

@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.DependencyInjection;
@@ -13,18 +12,14 @@ using Orleans.Statistics;
 namespace Orleans.Runtime.TestHooks
 {
     /// <summary>
-    /// A fake, test-only implementation of <see cref="IHostEnvironmentStatistics"/>.
+    /// A fake, test-only implementation of <see cref="IEnvironmentStatisticsProvider"/>.
     /// </summary>
-    internal class TestHooksHostEnvironmentStatistics : IHostEnvironmentStatistics
+    internal class TestHooksEnvironmentStatisticsProvider : IEnvironmentStatisticsProvider
     {
-        /// <inheritdoc />
-        public long? TotalPhysicalMemory { get; set; }
+        private EnvironmentStatistics? _currentStats = null;
 
-        /// <inheritdoc />
-        public float? CpuUsage { get; set; }
-
-        /// <inheritdoc />
-        public long? AvailableMemory { get; set; }
+        public EnvironmentStatistics GetEnvironmentStatistics() => _currentStats ?? new();
+        public void SetHardwareStatistics(EnvironmentStatistics stats) => _currentStats = stats;
     }
 
     /// <summary>
@@ -35,7 +30,7 @@ namespace Orleans.Runtime.TestHooks
         private readonly IServiceProvider serviceProvider;
         private readonly ISiloStatusOracle siloStatusOracle;
 
-        private readonly TestHooksHostEnvironmentStatistics hostEnvironmentStatistics;
+        private readonly TestHooksEnvironmentStatisticsProvider environmentStatistics;
 
         private readonly LoadSheddingOptions loadSheddingOptions;
 
@@ -46,13 +41,13 @@ namespace Orleans.Runtime.TestHooks
             ILocalSiloDetails siloDetails,
             ILoggerFactory loggerFactory,
             ISiloStatusOracle siloStatusOracle,
-            TestHooksHostEnvironmentStatistics hostEnvironmentStatistics,
+            TestHooksEnvironmentStatisticsProvider environmentStatistics,
             IOptions<LoadSheddingOptions> loadSheddingOptions)
             : base(Constants.TestHooksSystemTargetType, siloDetails.SiloAddress, loggerFactory)
         {
             this.serviceProvider = serviceProvider;
             this.siloStatusOracle = siloStatusOracle;
-            this.hostEnvironmentStatistics = hostEnvironmentStatistics;
+            this.environmentStatistics = environmentStatistics;
             this.loadSheddingOptions = loadSheddingOptions.Value;
             this.consistentRingProvider = this.serviceProvider.GetRequiredService<IConsistentRingProvider>();
         }
@@ -85,11 +80,11 @@ namespace Orleans.Runtime.TestHooks
         {
             if (overloaded)
             {
-                this.LatchCpuUsage(this.loadSheddingOptions.LoadSheddingLimit + 1, latchPeriod);
+                this.LatchCpuUsage(this.loadSheddingOptions.CpuThreshold + 1, latchPeriod);
             }
             else
             {
-                this.LatchCpuUsage(this.loadSheddingOptions.LoadSheddingLimit - 1, latchPeriod);
+                this.LatchCpuUsage(this.loadSheddingOptions.CpuThreshold - 1, latchPeriod);
             }
 
             return Task.CompletedTask;
@@ -97,18 +92,22 @@ namespace Orleans.Runtime.TestHooks
 
         public Task<Dictionary<SiloAddress, SiloStatus>> GetApproximateSiloStatuses() => Task.FromResult(this.siloStatusOracle.GetApproximateSiloStatuses());
 
-        private void LatchCpuUsage(float? cpuUsage, TimeSpan latchPeriod)
+        private void LatchCpuUsage(float cpuUsage, TimeSpan latchPeriod)
         {
-            var previousValue = this.hostEnvironmentStatistics.CpuUsage;
-            this.hostEnvironmentStatistics.CpuUsage = cpuUsage;
+            var previousStats = environmentStatistics.GetEnvironmentStatistics();
+
+            environmentStatistics.SetHardwareStatistics(
+                new(cpuUsage, previousStats.MemoryUsageBytes, previousStats.AvailableMemoryBytes, previousStats.MaximumAvailableMemoryBytes));
+
             Task.Delay(latchPeriod).ContinueWith(t =>
                 {
-                    var currentCpuUsage = this.hostEnvironmentStatistics.CpuUsage;
+                    var currentStats = environmentStatistics.GetEnvironmentStatistics();
 
                     // ReSharper disable once CompareOfFloatsByEqualityOperator
-                    if (currentCpuUsage == cpuUsage)
+                    if (currentStats.CpuUsagePercentage == cpuUsage)
                     {
-                        this.hostEnvironmentStatistics.CpuUsage = previousValue;
+                        environmentStatistics.SetHardwareStatistics(
+                            new(previousStats.CpuUsagePercentage, currentStats.MemoryUsageBytes, currentStats.AvailableMemoryBytes, currentStats.MaximumAvailableMemoryBytes));
                     }
                 }).Ignore();
         }
