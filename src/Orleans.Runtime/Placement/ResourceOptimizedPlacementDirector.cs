@@ -236,7 +236,7 @@ internal sealed class ResourceOptimizedPlacementDirector : IPlacementDirector, I
             },
             statistics);
 
-    // This struct has a total of 32 bytes: 4 (float) + 4 (float) + 8 (long) + 8 (long) + 1 (bool) + 7 (padding)
+    // This struct has a total of 32 bytes: 4 (float) + 8 (long) + 4 (float) + 8 (long) + 1 (bool) + 7 (padding)
     // Padding is added because by default it gets aligned by the largest element of the struct (our 'long'), so 1 + 7 = 8.
     // As this will be created very frequently, we shave off the extra 7 bytes, bringing its size down to 25 bytes.
     // It will help increase the number of ValueTuple<int, ResourceStatistics> (see inside 'MakePick') that can be stack allocated.
