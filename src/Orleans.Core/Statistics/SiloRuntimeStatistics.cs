@@ -27,25 +27,25 @@ namespace Orleans.Runtime
         /// <summary>
         /// The CPU utilization.
         /// </summary>
-        [Id(2), Obsolete($"The will be removed, use {nameof(CpuUsagePercentage)}", error: false)]
+        [Id(2), Obsolete($"The will be removed, use {nameof(EnvironmentStatistics.CpuUsagePercentage)}", error: false)]
         public float? CpuUsage { get; }
 
         /// <summary>
         /// The amount of memory available in the silo [bytes].
         /// </summary>
-        [Id(3), Obsolete($"The will be removed, use {nameof(AvailableMemoryBytes)}", error: false)]
+        [Id(3), Obsolete($"The will be removed, use {nameof(EnvironmentStatistics.AvailableMemoryBytes)}", error: false)]
         public float? AvailableMemory { get; }
 
         /// <summary>
         /// The used memory size.
         /// </summary>
-        [Id(4), Obsolete($"The will be removed, use {nameof(MemoryUsageBytes)}", error: false)]
+        [Id(4), Obsolete($"The will be removed, use {nameof(EnvironmentStatistics.MemoryUsageBytes)}", error: false)]
         public long? MemoryUsage { get; }
 
         /// <summary>
         /// The total physical memory available [bytes].
         /// </summary>
-        [Id(5), Obsolete($"The will be removed, use {nameof(MaximumAvailableMemoryBytes)}", error: false)]
+        [Id(5), Obsolete($"The will be removed, use {nameof(EnvironmentStatistics.MaximumAvailableMemoryBytes)}", error: false)]
         public long? TotalPhysicalMemory { get; }
 
         /// <summary>
@@ -60,9 +60,15 @@ namespace Orleans.Runtime
         [Id(7)]
         public long ClientCount { get; }
 
+        /// <summary>
+        /// The number of messages received by that silo.
+        /// </summary>
         [Id(8)]
         public long ReceivedMessages { get; }
 
+        /// <summary>
+        /// The number of messages sent by that silo.
+        /// </summary>
         [Id(9)]
         public long SentMessages { get; }
 
@@ -72,35 +78,8 @@ namespace Orleans.Runtime
         [Id(10)]
         public DateTime DateTime { get; }
 
-        /// <summary>
-        /// Gets the system CPU usage.
-        /// </summary>
-        /// <remarks>Ranges from 0.0-100.0.</remarks>
         [Id(11)]
-        public float CpuUsagePercentage { get; }
-
-        /// <summary>
-        /// Gets the currently occupied memory by the process.
-        /// </summary>
-        /// <remarks>Includes fragmented memory.</remarks>
-        [Id(12)]
-        public long MemoryUsageBytes { get; }
-
-        /// <summary>
-        /// Gets the currently available memory for allocations to the process.
-        /// </summary>
-        /// <remarks>
-        /// Includes the currently available memory of the process, and the system.
-        /// </remarks>
-        [Id(13)]
-        public long AvailableMemoryBytes { get; }
-
-        /// <summary>
-        /// Gets the maximum possible memory of the system.
-        /// </summary>
-        /// <remarks>Represents the physical memory, unless a lower-bound (typically in containers) has been specified.</remarks>
-        [Id(14)]
-        public long MaximumAvailableMemoryBytes { get; }
+        public EnvironmentStatistics EnvironmentStatistics { get; }
 
         internal SiloRuntimeStatistics(
             int activationCount,
@@ -118,24 +97,21 @@ namespace Orleans.Runtime
 
             var statistics = environmentStatisticsProvider.GetEnvironmentStatistics();
 
-            CpuUsagePercentage = statistics.CpuUsagePercentage;
-            AvailableMemoryBytes = statistics.AvailableMemoryBytes;
-            MemoryUsageBytes = statistics.MemoryUsageBytes;
-            MaximumAvailableMemoryBytes = statistics.MaximumAvailableMemoryBytes;
-
+            EnvironmentStatistics = statistics;
             IsOverloaded = loadSheddingOptions.Value.LoadSheddingEnabled && OverloadDetectionLogic.IsOverloaded(ref statistics, loadSheddingOptions.Value);
 
 #pragma warning disable 618
-            CpuUsage = CpuUsagePercentage;
-            MemoryUsage = MemoryUsageBytes;
-            AvailableMemory = AvailableMemoryBytes;
-            TotalPhysicalMemory = MaximumAvailableMemoryBytes;
+            CpuUsage = statistics.CpuUsagePercentage;
+            MemoryUsage = statistics.MemoryUsageBytes;
+            AvailableMemory = statistics.AvailableMemoryBytes;
+            TotalPhysicalMemory = statistics.MaximumAvailableMemoryBytes;
 #pragma warning restore 618
         }
 
         public override string ToString() => @$"SiloRuntimeStatistics: ActivationCount={ActivationCount} RecentlyUsedActivationCount={RecentlyUsedActivationCount
-            } CpuUsage={CpuUsagePercentage.ToString() ?? "<unset>"} AvailableMemory={AvailableMemoryBytes} MemoryUsage={MemoryUsageBytes} IsOverloaded={IsOverloaded
-            } ClientCount={ClientCount} MaximumAvailableMemory={MaximumAvailableMemoryBytes} DateTime={DateTime}";
+            } CpuUsagePercentage={EnvironmentStatistics.CpuUsagePercentage} MemoryUsageBytes={EnvironmentStatistics.MemoryUsageBytes
+            } AvailableMemory={EnvironmentStatistics.AvailableMemoryBytes} MaximumAvailableMemoryBytes={EnvironmentStatistics.MaximumAvailableMemoryBytes
+            } IsOverloaded={IsOverloaded} ClientCount={ClientCount} ReceivedMessages={ReceivedMessages} SentMessages={SentMessages} DateTime={DateTime}";
     }
 
     /// <summary>

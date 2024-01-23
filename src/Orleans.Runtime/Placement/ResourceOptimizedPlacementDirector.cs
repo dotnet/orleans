@@ -209,7 +209,7 @@ internal sealed class ResourceOptimizedPlacementDirector : IPlacementDirector, I
             long maxAvailableMemory = stats.MaxAvailableMemory; // cache locally
 
             float normalizedMemoryUsage = stats.MemoryUsage / maxAvailableMemory;
-            float normalizedAvailableMemory = Math.Max(0, 1 - stats.AvailableMemory / maxAvailableMemory);
+            float normalizedAvailableMemory = 1 - stats.AvailableMemory / maxAvailableMemory;
             float normalizedMaxAvailableMemoryWeight = MaxAvailableMemoryScalingFactor * maxAvailableMemory;
 
             score += _weights.MemoryUsageWeight * normalizedMemoryUsage +
@@ -252,20 +252,22 @@ internal sealed class ResourceOptimizedPlacementDirector : IPlacementDirector, I
         private readonly DualModeKalmanFilter _availableMemoryFilter = new();
         private readonly DualModeKalmanFilter _memoryUsageFilter = new();
 
-        private float _cpuUsage = statistics.CpuUsagePercentage;
-        private float _availableMemory = statistics.AvailableMemoryBytes;
-        private long _memoryUsage = statistics.MemoryUsageBytes;
-        private long _maxAvailableMemory = statistics.MaximumAvailableMemoryBytes;
+        private float _cpuUsage = statistics.EnvironmentStatistics.CpuUsagePercentage;
+        private float _availableMemory = statistics.EnvironmentStatistics.AvailableMemoryBytes;
+        private long _memoryUsage = statistics.EnvironmentStatistics.MemoryUsageBytes;
+        private long _maxAvailableMemory = statistics.EnvironmentStatistics.MaximumAvailableMemoryBytes;
         private bool _isOverloaded = statistics.IsOverloaded;
 
         public ResourceStatistics Value => new(_cpuUsage, _memoryUsage, _availableMemory, _maxAvailableMemory, _isOverloaded);
 
         public void Update(SiloRuntimeStatistics statistics)
         {
-            _cpuUsage = _cpuUsageFilter.Filter(statistics.CpuUsagePercentage);
-            _memoryUsage = (long)_memoryUsageFilter.Filter(statistics.MemoryUsageBytes);
-            _availableMemory = _availableMemoryFilter.Filter(statistics.AvailableMemoryBytes);
-            _maxAvailableMemory = statistics.MaximumAvailableMemoryBytes;
+            var envStats = statistics.EnvironmentStatistics;
+
+            _cpuUsage = _cpuUsageFilter.Filter(envStats.CpuUsagePercentage);
+            _memoryUsage = (long)_memoryUsageFilter.Filter(envStats.MemoryUsageBytes);
+            _availableMemory = _availableMemoryFilter.Filter(envStats.AvailableMemoryBytes);
+            _maxAvailableMemory = envStats.MaximumAvailableMemoryBytes;
             _isOverloaded = statistics.IsOverloaded;
         }
     }

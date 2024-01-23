@@ -13,7 +13,7 @@ internal static class OverloadDetectionLogic
     {
         var maxProcessMemoryBytes = statistics.MaximumAvailableMemoryBytes;
         var minFreeMemoryFraction = (100 - options.MemoryThreshold) / 100d;
-        var minFreeMemoryBytes = (long)(maxProcessMemoryBytes * minFreeMemoryFraction);
+        var minFreeMemoryBytes = (long)(maxProcessMemoryBytes * minFreeMemoryFraction); // represents the minimum amount of memory that should remain available
 
         bool isMemoryOverloaded = statistics.AvailableMemoryBytes < minFreeMemoryBytes;
         bool isCpuOverloaded = statistics.CpuUsagePercentage > options.CpuThreshold;
