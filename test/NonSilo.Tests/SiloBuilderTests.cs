@@ -150,7 +150,7 @@ namespace NonSilo.Tests
                         .Configure<LoadSheddingOptions>(options =>
                         {
                             options.LoadSheddingEnabled = true;
-                            options.LoadSheddingLimit = 101;
+                            options.CpuThreshold = 101;
                         })
                         .ConfigureServices(svcCollection =>
                         {

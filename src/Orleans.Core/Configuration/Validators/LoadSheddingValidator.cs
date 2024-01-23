@@ -27,12 +27,12 @@ internal class LoadSheddingValidator(IOptions<LoadSheddingOptions> loadSheddingO
             return;
         }
 
-        if (_loadSheddingOptions.LoadSheddingLimit > 100)
+        if (_loadSheddingOptions.CpuThreshold > 100 || _loadSheddingOptions.CpuThreshold < 0)
         {
             throw new OrleansConfigurationException(InvalidLimit);
         }
 
-        if (_loadSheddingOptions.MemoryLoadLimit > 100)
+        if (_loadSheddingOptions.MemoryThreshold > 100 || _loadSheddingOptions.MemoryThreshold < 0)
         {
             throw new OrleansConfigurationException(InvalidLimit);
         }

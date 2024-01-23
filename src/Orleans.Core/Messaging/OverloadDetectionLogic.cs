@@ -9,14 +9,15 @@ internal static class OverloadDetectionLogic
     /// <summary>
     /// Determines whether or not the process is overloaded.
     /// </summary>
-    /// <remarks><see cref="LoadSheddingOptions.LoadSheddingEnabled"/> is ignored.</remarks>
+    /// <remarks><see cref="LoadSheddingOptions.LoadSheddingEnabled"/> is ignored here.</remarks>
     public static bool IsOverloaded(ref readonly EnvironmentStatistics statistics, LoadSheddingOptions options)
     {
-        var info = GC.GetGCMemoryInfo();
-        var maximumMemoryLimit = Math.Min(info.TotalAvailableMemoryBytes, info.HighMemoryLoadThresholdBytes);
+        var maxProcessMemoryBytes = statistics.MaximumAvailableMemoryBytes;
+        var minFreeMemoryFraction = (100 - options.MemoryThreshold) / 100d;
+        var minFreeMemoryBytes = (long)(maxProcessMemoryBytes * minFreeMemoryFraction);
 
-        bool isMemoryOverloaded = info.MemoryLoadBytes >= maximumMemoryLimit * options.MemoryLoadLimit / 100.0d;
-        bool isCpuOverloaded = statistics.CpuUsagePercentage > options.LoadSheddingLimit;
+        bool isMemoryOverloaded = statistics.AvailableMemoryBytes < minFreeMemoryBytes;
+        bool isCpuOverloaded = statistics.CpuUsagePercentage > options.CpuThreshold;
 
         return isMemoryOverloaded || isCpuOverloaded;
     }

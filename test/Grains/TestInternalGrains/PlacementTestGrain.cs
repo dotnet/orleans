@@ -103,7 +103,7 @@ namespace UnitTests.Grains
         public Task LatchOverloaded()
         {
             var stats = environmentStatistics.GetEnvironmentStatistics();
-            environmentStatistics.SetHardwareStatistics(new(loadSheddingOptions.LoadSheddingLimit + 1, stats.MemoryUsageBytes, stats.AvailableMemoryBytes, stats.MaximumAvailableMemoryBytes));
+            environmentStatistics.SetHardwareStatistics(new(loadSheddingOptions.CpuThreshold + 1, stats.MemoryUsageBytes, stats.AvailableMemoryBytes, stats.MaximumAvailableMemoryBytes));
             return PropigateStatisticsToCluster(GrainFactory);
         }
 

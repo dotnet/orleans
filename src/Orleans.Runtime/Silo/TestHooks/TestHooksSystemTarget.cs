@@ -80,11 +80,11 @@ namespace Orleans.Runtime.TestHooks
         {
             if (overloaded)
             {
-                this.LatchCpuUsage(this.loadSheddingOptions.LoadSheddingLimit + 1, latchPeriod);
+                this.LatchCpuUsage(this.loadSheddingOptions.CpuThreshold + 1, latchPeriod);
             }
             else
             {
-                this.LatchCpuUsage(this.loadSheddingOptions.LoadSheddingLimit - 1, latchPeriod);
+                this.LatchCpuUsage(this.loadSheddingOptions.CpuThreshold - 1, latchPeriod);
             }
 
             return Task.CompletedTask;

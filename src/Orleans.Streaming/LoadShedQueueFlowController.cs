@@ -24,11 +24,11 @@ namespace Orleans.Streams
         /// <param name="percentOfSiloSheddingLimit">Percentage of load shed limit which triggers a reduction of queue read rate.</param>
         /// <param name="environmentStatisticsProvider">The silo environment statistics.</param>
         /// <returns>The flow controller.</returns>
-        public static IQueueFlowController CreateAsPercentOfLoadSheddingLimit(LoadSheddingOptions options, IEnvironmentStatisticsProvider environmentStatisticsProvider, int percentOfSiloSheddingLimit = LoadSheddingOptions.DefaultLoadSheddingLimit)
+        public static IQueueFlowController CreateAsPercentOfLoadSheddingLimit(LoadSheddingOptions options, IEnvironmentStatisticsProvider environmentStatisticsProvider, int percentOfSiloSheddingLimit = LoadSheddingOptions.DefaultCpuThreshold)
         {
             if (percentOfSiloSheddingLimit < 0.0 || percentOfSiloSheddingLimit > 100.0) throw new ArgumentOutOfRangeException(nameof(percentOfSiloSheddingLimit), "Percent value must be between 0-100");
             // Start shedding before silo reaches shedding limit.
-            return new LoadShedQueueFlowController((int)(options.LoadSheddingLimit * (percentOfSiloSheddingLimit / 100.0)), options, environmentStatisticsProvider);
+            return new LoadShedQueueFlowController((int)(options.CpuThreshold * (percentOfSiloSheddingLimit / 100.0)), options, environmentStatisticsProvider);
         }
 
         /// <summary>
