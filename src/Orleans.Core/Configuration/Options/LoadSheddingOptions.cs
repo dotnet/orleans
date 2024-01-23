@@ -31,7 +31,7 @@ namespace Orleans.Configuration
         /// </summary>
         /// <value>Load shedding begins at a CPU utilization of 95% by default, if load shedding is enabled.</value>
         /// <remarks>This property is deprecated. Use <see cref="CpuThreshold"/> instead.</remarks>
-        [Obsolete($"Use {nameof(CpuThreshold)} instead.")]
+        [Obsolete($"Use {nameof(CpuThreshold)} instead.", error: true)]
         public int LoadSheddingLimit { get => CpuThreshold; set => CpuThreshold = value; }
 
         /// <summary>

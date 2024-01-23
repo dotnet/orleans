@@ -18,7 +18,7 @@ internal sealed class ResourceOptimizedPlacementDirector : IPlacementDirector, I
     /// <summary>
     /// 1 / (1024 * 1024)
     /// </summary>
-    private const float PhysicalMemoryScalingFactor = 0.00000095367431640625f;
+    private const float MaxAvailableMemoryScalingFactor = 0.00000095367431640625f;
     private const int FourKiloByte = 4096;
 
     private readonly NormalizedWeights _weights;
@@ -38,14 +38,14 @@ internal sealed class ResourceOptimizedPlacementDirector : IPlacementDirector, I
 
     private static NormalizedWeights NormalizeWeights(ResourceOptimizedPlacementOptions input)
     {
-        int totalWeight = input.CpuUsageWeight + input.MemoryUsageWeight + input.PhysicalMemoryWeight + input.AvailableMemoryWeight;
+        int totalWeight = input.CpuUsageWeight + input.MemoryUsageWeight + input.AvailableMemoryWeight + input.MaxAvailableMemoryWeight;
     
         return totalWeight == 0 ? new(0f, 0f, 0f, 0f) :
             new (
                 CpuUsageWeight: (float)input.CpuUsageWeight / totalWeight,
                 MemoryUsageWeight: (float)input.MemoryUsageWeight / totalWeight,
-                PhysicalMemoryWeight: (float)input.PhysicalMemoryWeight / totalWeight,
-                AvailableMemoryWeight: (float)input.AvailableMemoryWeight / totalWeight);
+                AvailableMemoryWeight: (float)input.AvailableMemoryWeight / totalWeight,
+                MaxAvailableMemoryWeight: (float)input.MaxAvailableMemoryWeight / totalWeight);
     }
 
     public Task<SiloAddress> OnAddActivation(PlacementStrategy strategy, PlacementTarget target, IPlacementContext context)
@@ -210,11 +210,11 @@ internal sealed class ResourceOptimizedPlacementDirector : IPlacementDirector, I
 
             float normalizedMemoryUsage = stats.MemoryUsage / maxAvailableMemory;
             float normalizedAvailableMemory = Math.Max(0, 1 - stats.AvailableMemory / maxAvailableMemory);
-            float normalizedPhysicalMemoryWeight = PhysicalMemoryScalingFactor * maxAvailableMemory;
+            float normalizedMaxAvailableMemoryWeight = MaxAvailableMemoryScalingFactor * maxAvailableMemory;
 
             score += _weights.MemoryUsageWeight * normalizedMemoryUsage +
                      _weights.AvailableMemoryWeight * normalizedAvailableMemory +
-                     _weights.PhysicalMemoryWeight * normalizedPhysicalMemoryWeight;
+                     _weights.MaxAvailableMemoryWeight * normalizedMaxAvailableMemoryWeight;
         }
 
         Debug.Assert(score >= 0f && score <= 1f);
@@ -241,10 +241,10 @@ internal sealed class ResourceOptimizedPlacementDirector : IPlacementDirector, I
     // As this will be created very frequently, we shave off the extra 7 bytes, bringing its size down to 25 bytes.
     // It will help increase the number of ValueTuple<int, ResourceStatistics> (see inside 'MakePick') that can be stack allocated.
     [StructLayout(LayoutKind.Sequential, Pack = 1)]
-    private readonly record struct ResourceStatistics(float CpuUsage, float AvailableMemory, long MemoryUsage, long MaxAvailableMemory, bool IsOverloaded);
+    private readonly record struct ResourceStatistics(float CpuUsage, long MemoryUsage, float AvailableMemory, long MaxAvailableMemory, bool IsOverloaded);
 
     // No need to touch 'NormalizedWeights' as its created only once and is the same for all silos in the cluster.
-    private readonly record struct NormalizedWeights(float CpuUsageWeight, float MemoryUsageWeight, float AvailableMemoryWeight, float PhysicalMemoryWeight);
+    private readonly record struct NormalizedWeights(float CpuUsageWeight, float MemoryUsageWeight, float AvailableMemoryWeight, float MaxAvailableMemoryWeight);
 
     private sealed class FilteredSiloStatistics(SiloRuntimeStatistics statistics)
     {
@@ -258,13 +258,13 @@ internal sealed class ResourceOptimizedPlacementDirector : IPlacementDirector, I
         private long _maxAvailableMemory = statistics.MaximumAvailableMemoryBytes;
         private bool _isOverloaded = statistics.IsOverloaded;
 
-        public ResourceStatistics Value => new(_cpuUsage, _availableMemory, _memoryUsage, _maxAvailableMemory, _isOverloaded);
+        public ResourceStatistics Value => new(_cpuUsage, _memoryUsage, _availableMemory, _maxAvailableMemory, _isOverloaded);
 
         public void Update(SiloRuntimeStatistics statistics)
         {
             _cpuUsage = _cpuUsageFilter.Filter(statistics.CpuUsagePercentage);
-            _availableMemory = _availableMemoryFilter.Filter(statistics.AvailableMemoryBytes);
             _memoryUsage = (long)_memoryUsageFilter.Filter(statistics.MemoryUsageBytes);
+            _availableMemory = _availableMemoryFilter.Filter(statistics.AvailableMemoryBytes);
             _maxAvailableMemory = statistics.MaximumAvailableMemoryBytes;
             _isOverloaded = statistics.IsOverloaded;
         }

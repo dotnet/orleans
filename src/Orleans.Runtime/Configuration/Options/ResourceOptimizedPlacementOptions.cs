@@ -51,19 +51,20 @@ public sealed class ResourceOptimizedPlacementOptions
     public const int DEFAULT_AVAILABLE_MEMORY_WEIGHT = 20;
 
     /// <summary>
-    /// The importance of the physical memory to the silo.
+    /// The importance of the maximum available memory to the silo.
     /// </summary>
     /// <remarks><i>
-    /// <para>A <u>higher</u> values results in the placement favoring silos with <u>higher</u> physical memory.</para>
+    /// <para>A <u>higher</u> values results in the placement favoring silos with <u>higher</u> maximum available memory.</para>
     /// <para>This may have an impact in clusters with resources distributed unevenly across silos.</para>
+    /// <para>This relates strongly to the physical memory in the silo, and the configured memory limit (if it has been configured).</para>
     /// <para>Valid range is [0-100]</para>
     /// </i></remarks>
-    public int PhysicalMemoryWeight { get; set; } = DEFAULT_PHYSICAL_MEMORY_WEIGHT;
+    public int MaxAvailableMemoryWeight { get; set; } = DEFAULT_MAX_AVAILABLE_MEMORY_WEIGHT;
 
     /// <summary>
-    /// The default value of <see cref="PhysicalMemoryWeight"/>.
+    /// The default value of <see cref="MaxAvailableMemoryWeight"/>.
     /// </summary>
-    public const int DEFAULT_PHYSICAL_MEMORY_WEIGHT = 10;
+    public const int DEFAULT_MAX_AVAILABLE_MEMORY_WEIGHT = 10;
 
     /// <summary>
     /// The specified margin for which: if two silos (one of them being the local to the current pending activation), have a utilization score that should be considered "the same" within this margin.
@@ -106,9 +107,9 @@ internal sealed class ResourceOptimizedPlacementOptionsValidator
             ThrowOutOfRange(nameof(ResourceOptimizedPlacementOptions.AvailableMemoryWeight));
         }
 
-        if (_options.PhysicalMemoryWeight < 0 || _options.PhysicalMemoryWeight > 100)
+        if (_options.MaxAvailableMemoryWeight < 0 || _options.MaxAvailableMemoryWeight > 100)
         {
-            ThrowOutOfRange(nameof(ResourceOptimizedPlacementOptions.PhysicalMemoryWeight));
+            ThrowOutOfRange(nameof(ResourceOptimizedPlacementOptions.MaxAvailableMemoryWeight));
         }
 
         if (_options.LocalSiloPreferenceMargin < 0 || _options.LocalSiloPreferenceMargin > 100)
