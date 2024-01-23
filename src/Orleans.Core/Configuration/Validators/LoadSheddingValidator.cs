@@ -16,8 +16,6 @@ internal class LoadSheddingValidator(IOptions<LoadSheddingOptions> loadSheddingO
 {
     private readonly LoadSheddingOptions _loadSheddingOptions = loadSheddingOptions.Value;
 
-    internal const string InvalidLimit = "Limit cannot exceed 100%.";
-
     /// <inheritdoc />
     public void ValidateConfiguration()
     {
@@ -27,14 +25,14 @@ internal class LoadSheddingValidator(IOptions<LoadSheddingOptions> loadSheddingO
             return;
         }
 
-        if (_loadSheddingOptions.CpuThreshold > 100 || _loadSheddingOptions.CpuThreshold < 0)
+        if (_loadSheddingOptions.CpuThreshold > 100 || _loadSheddingOptions.CpuThreshold <= 0)
         {
-            throw new OrleansConfigurationException(InvalidLimit);
+            throw new OrleansConfigurationException($"Limit '{nameof(LoadSheddingOptions)}.{nameof(LoadSheddingOptions.CpuThreshold)}' must be greater than 0% and less than or equal to 100%.");
         }
 
-        if (_loadSheddingOptions.MemoryThreshold > 100 || _loadSheddingOptions.MemoryThreshold < 0)
+        if (_loadSheddingOptions.MemoryThreshold > 100 || _loadSheddingOptions.MemoryThreshold <= 0)
         {
-            throw new OrleansConfigurationException(InvalidLimit);
+            throw new OrleansConfigurationException($"Limit '{nameof(LoadSheddingOptions)}.{nameof(LoadSheddingOptions.MemoryThreshold)}' must be greater than 0% and less than or equal to 100%.");
         }
     }
 }
