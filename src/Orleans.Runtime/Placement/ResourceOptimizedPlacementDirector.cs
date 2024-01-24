@@ -5,7 +5,6 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Runtime.CompilerServices;
-using System.Runtime.InteropServices;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Options;
 using Orleans.Runtime.Configuration.Options;
@@ -87,8 +86,8 @@ internal sealed class ResourceOptimizedPlacementDirector : IPlacementDirector, I
         int compatibleSilosCount = compatibleSilos.Length;
 
         // It is good practice not to allocate more than 1[KB] on the stack
-        // but the size of ValueTuple<int, ResourceStatistics> = 32 bytes, by increasing
-        // the limit to 4[KB] we can stackalloc for up to 4096 / 32 = 128 silos in a cluster.
+        // but the size of ValueTuple<int, ResourceStatistics> = 24 bytes, by increasing
+        // the limit to 4[KB] we can stackalloc for up to 4096 / 24 ~= 170 silos in a cluster.
         if (compatibleSilosCount * Unsafe.SizeOf<(int, ResourceStatistics)>() <= FourKiloByte)
         {
             pick = MakePick(stackalloc (int, ResourceStatistics)[compatibleSilosCount]);
@@ -197,7 +196,8 @@ internal sealed class ResourceOptimizedPlacementDirector : IPlacementDirector, I
     ///         physical_mem_weight * (1 / (1024 * 1024 * physical_mem)
     /// </returns>
     /// <remarks>physical_mem is represented in [MB] to keep the result within [0-1] in cases of silos having physical_mem less than [1GB]</remarks>
-    private float CalculateScore(in ResourceStatistics stats) // as size of ResourceStatistics > IntPtr, we pass it by reference to avoid potential defensive copying
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private float CalculateScore(ref readonly ResourceStatistics stats) // as size of ResourceStatistics > IntPtr, we pass it by (readonly)-reference to avoid potential defensive copying
     {
         float normalizedCpuUsage = stats.CpuUsage / 100f;
         float score = _weights.CpuUsageWeight * normalizedCpuUsage;
@@ -230,7 +230,7 @@ internal sealed class ResourceOptimizedPlacementDirector : IPlacementDirector, I
             addValueFactory: static (_, statistics) => ResourceStatistics.FromRuntime(statistics),
             updateValueFactory: static (_, _, statistics) => ResourceStatistics.FromRuntime(statistics));
 
-    [StructLayout(LayoutKind.Sequential, Pack = 1)]
+    private readonly record struct NormalizedWeights(float CpuUsageWeight, float MemoryUsageWeight, float AvailableMemoryWeight, float MaxAvailableMemoryWeight);
     private readonly record struct ResourceStatistics(bool IsOverloaded, float CpuUsage, float MemoryUsage, float AvailableMemory, float MaxAvailableMemory)
     {
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -242,6 +242,4 @@ internal sealed class ResourceOptimizedPlacementDirector : IPlacementDirector, I
                 AvailableMemory: statistics.EnvironmentStatistics.AvailableMemoryBytes,
                 MaxAvailableMemory: statistics.EnvironmentStatistics.MaximumAvailableMemoryBytes);
     }
-
-    private readonly record struct NormalizedWeights(float CpuUsageWeight, float MemoryUsageWeight, float AvailableMemoryWeight, float MaxAvailableMemoryWeight);
 }
