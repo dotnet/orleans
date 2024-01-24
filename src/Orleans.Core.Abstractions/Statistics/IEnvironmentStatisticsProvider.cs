@@ -14,6 +14,10 @@ public interface IEnvironmentStatisticsProvider
     EnvironmentStatistics GetEnvironmentStatistics();
 }
 
+// This struct is intentionally 'packed' in order to avoid extra padding.
+// This will be created very frequently, so we reduce stack size and lower the serialization cost.
+// As more fields are added to this, they could be placed in such a manner that it may result in a lot of 'empty' space.
+
 /// <summary>
 /// Contains statistics about the current process and its execution environment.
 /// </summary>

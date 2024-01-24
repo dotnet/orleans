@@ -23,7 +23,7 @@ internal sealed class ResourceOptimizedPlacementDirector : IPlacementDirector, I
 
     private readonly NormalizedWeights _weights;
     private readonly float _localSiloPreferenceMargin;
-    private readonly ConcurrentDictionary<SiloAddress, FilteredSiloStatistics> _siloStatistics = [];
+    private readonly ConcurrentDictionary<SiloAddress, ResourceStatistics> _siloStatistics = [];
 
     private Task<SiloAddress> _cachedLocalSilo;
 
@@ -39,9 +39,9 @@ internal sealed class ResourceOptimizedPlacementDirector : IPlacementDirector, I
     private static NormalizedWeights NormalizeWeights(ResourceOptimizedPlacementOptions input)
     {
         int totalWeight = input.CpuUsageWeight + input.MemoryUsageWeight + input.AvailableMemoryWeight + input.MaxAvailableMemoryWeight;
-    
+
         return totalWeight == 0 ? new(0f, 0f, 0f, 0f) :
-            new (
+            new(
                 CpuUsageWeight: (float)input.CpuUsageWeight / totalWeight,
                 MemoryUsageWeight: (float)input.MemoryUsageWeight / totalWeight,
                 AvailableMemoryWeight: (float)input.AvailableMemoryWeight / totalWeight,
@@ -111,10 +111,9 @@ internal sealed class ResourceOptimizedPlacementDirector : IPlacementDirector, I
                 var silo = compatibleSilos[i];
                 if (_siloStatistics.TryGetValue(silo, out var stats))
                 {
-                    var filteredStats = stats.Value;
-                    if (!filteredStats.IsOverloaded)
+                    if (!stats.IsOverloaded)
                     {
-                        relevantSilos[relevantSilosCount++] = new(i, filteredStats);
+                        relevantSilos[relevantSilosCount++] = new(i, stats);
                     }
                 }
             }
@@ -174,18 +173,17 @@ internal sealed class ResourceOptimizedPlacementDirector : IPlacementDirector, I
             return false;
         }
 
-        if (!_siloStatistics.TryGetValue(context.LocalSilo, out var local))
+        if (!_siloStatistics.TryGetValue(context.LocalSilo, out var localStats))
         {
             return false;
         }
 
-        var statistics = local.Value;
-        if (statistics.IsOverloaded)
+        if (localStats.IsOverloaded)
         {
             return false;
         }
 
-        var localSiloScore = CalculateScore(in statistics);
+        var localSiloScore = CalculateScore(in localStats);
         return localSiloScore - _localSiloPreferenceMargin <= bestCandidateScore;
     }
 
@@ -206,7 +204,7 @@ internal sealed class ResourceOptimizedPlacementDirector : IPlacementDirector, I
 
         if (stats.MaxAvailableMemory > 0)
         {
-            long maxAvailableMemory = stats.MaxAvailableMemory; // cache locally
+            float maxAvailableMemory = stats.MaxAvailableMemory; // cache locally
 
             float normalizedMemoryUsage = stats.MemoryUsage / maxAvailableMemory;
             float normalizedAvailableMemory = 1 - stats.AvailableMemory / maxAvailableMemory;
@@ -227,126 +225,23 @@ internal sealed class ResourceOptimizedPlacementDirector : IPlacementDirector, I
 
     public void SiloStatisticsChangeNotification(SiloAddress address, SiloRuntimeStatistics statistics)
         => _siloStatistics.AddOrUpdate(
-            address,
-            addValueFactory: static (_, statistics) => new(statistics),
-            updateValueFactory: static (_, existing, statistics) =>
-            {
-                existing.Update(statistics);
-                return existing;
-            },
-            statistics);
+            key: address,
+            factoryArgument: statistics,
+            addValueFactory: static (_, statistics) => ResourceStatistics.FromRuntime(statistics),
+            updateValueFactory: static (_, _, statistics) => ResourceStatistics.FromRuntime(statistics));
 
-    // This struct has a total of 32 bytes: 4 (float) + 8 (long) + 4 (float) + 8 (long) + 1 (bool) + 7 (padding)
-    // Padding is added because by default it gets aligned by the largest element of the struct (our 'long'), so 1 + 7 = 8.
-    // As this will be created very frequently, we shave off the extra 7 bytes, bringing its size down to 25 bytes.
-    // It will help increase the number of ValueTuple<int, ResourceStatistics> (see inside 'MakePick') that can be stack allocated.
     [StructLayout(LayoutKind.Sequential, Pack = 1)]
-    private readonly record struct ResourceStatistics(float CpuUsage, long MemoryUsage, float AvailableMemory, long MaxAvailableMemory, bool IsOverloaded);
+    private readonly record struct ResourceStatistics(bool IsOverloaded, float CpuUsage, float MemoryUsage, float AvailableMemory, float MaxAvailableMemory)
+    {
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static ResourceStatistics FromRuntime(SiloRuntimeStatistics statistics)
+            => new(
+                IsOverloaded: statistics.IsOverloaded,
+                CpuUsage: statistics.EnvironmentStatistics.CpuUsagePercentage,
+                MemoryUsage: statistics.EnvironmentStatistics.MemoryUsageBytes,
+                AvailableMemory: statistics.EnvironmentStatistics.AvailableMemoryBytes,
+                MaxAvailableMemory: statistics.EnvironmentStatistics.MaximumAvailableMemoryBytes);
+    }
 
-    // No need to touch 'NormalizedWeights' as its created only once and is the same for all silos in the cluster.
     private readonly record struct NormalizedWeights(float CpuUsageWeight, float MemoryUsageWeight, float AvailableMemoryWeight, float MaxAvailableMemoryWeight);
-
-    private sealed class FilteredSiloStatistics(SiloRuntimeStatistics statistics)
-    {
-        private readonly DualModeKalmanFilter _cpuUsageFilter = new();
-        private readonly DualModeKalmanFilter _availableMemoryFilter = new();
-        private readonly DualModeKalmanFilter _memoryUsageFilter = new();
-
-        private float _cpuUsage = statistics.EnvironmentStatistics.CpuUsagePercentage;
-        private float _availableMemory = statistics.EnvironmentStatistics.AvailableMemoryBytes;
-        private long _memoryUsage = statistics.EnvironmentStatistics.MemoryUsageBytes;
-        private long _maxAvailableMemory = statistics.EnvironmentStatistics.MaximumAvailableMemoryBytes;
-        private bool _isOverloaded = statistics.IsOverloaded;
-
-        public ResourceStatistics Value => new(_cpuUsage, _memoryUsage, _availableMemory, _maxAvailableMemory, _isOverloaded);
-
-        public void Update(SiloRuntimeStatistics statistics)
-        {
-            var envStats = statistics.EnvironmentStatistics;
-
-            _cpuUsage = _cpuUsageFilter.Filter(envStats.CpuUsagePercentage);
-            _memoryUsage = (long)_memoryUsageFilter.Filter(envStats.MemoryUsageBytes);
-            _availableMemory = _availableMemoryFilter.Filter(envStats.AvailableMemoryBytes);
-            _maxAvailableMemory = envStats.MaximumAvailableMemoryBytes;
-            _isOverloaded = statistics.IsOverloaded;
-        }
-    }
-
-    // The rationale behind using a dual-mode KF, is that we want the input signal to follow a trajectory that
-    // decays with a slower rate than the original one, but also tracks the signal in case of signal increases
-    // (which represent potential of overloading). Both are important, but they are inversely correlated to each other.
-    private sealed class DualModeKalmanFilter
-    {
-        private const float SlowProcessNoiseCovariance = 0f;
-        private const float FastProcessNoiseCovariance = 0.01f;
-
-        private KalmanFilter _slowFilter = new();
-        private KalmanFilter _fastFilter = new();
-
-        private FilterRegime _regime = FilterRegime.Slow;
-
-        private enum FilterRegime
-        {
-            Slow,
-            Fast
-        }
-
-        public float Filter(float? measurement)
-        {
-            float _measurement = measurement ?? 0f;
-
-            float slowEstimate = _slowFilter.Filter(_measurement, SlowProcessNoiseCovariance);
-            float fastEstimate = _fastFilter.Filter(_measurement, FastProcessNoiseCovariance);
-
-            if (_measurement > slowEstimate)
-            {
-                if (_regime == FilterRegime.Slow)
-                {
-                    _regime = FilterRegime.Fast;
-                    _fastFilter.SetState(_measurement, 0f);
-                    fastEstimate = _fastFilter.Filter(_measurement, FastProcessNoiseCovariance);
-                }
-
-                return fastEstimate;
-            }
-            else
-            {
-                if (_regime == FilterRegime.Fast)
-                {
-                    _regime = FilterRegime.Slow;
-                    _slowFilter.SetState(_fastFilter.PriorEstimate, _fastFilter.PriorErrorCovariance);
-                    slowEstimate = _slowFilter.Filter(_measurement, SlowProcessNoiseCovariance);
-                }
-
-                return slowEstimate;
-            }
-        }
-
-        private struct KalmanFilter()
-        {
-            public float PriorEstimate { get; private set; } = 0f;
-            public float PriorErrorCovariance { get; private set; } = 1f;
-
-            public void SetState(float estimate, float errorCovariance)
-            {
-                PriorEstimate = estimate;
-                PriorErrorCovariance = errorCovariance;
-            }
-
-            public float Filter(float measurement, float processNoiseCovariance)
-            {
-                float estimate = PriorEstimate;
-                float errorCovariance = PriorErrorCovariance + processNoiseCovariance;
-
-                float gain = errorCovariance / (errorCovariance + 1f);
-                float newEstimate = estimate + gain * (measurement - estimate);
-                float newErrorCovariance = (1f - gain) * errorCovariance;
-
-                PriorEstimate = newEstimate;
-                PriorErrorCovariance = newErrorCovariance;
-
-                return newEstimate;
-            }
-        }
-    }
 }
