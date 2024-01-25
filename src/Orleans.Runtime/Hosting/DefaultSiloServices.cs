@@ -421,6 +421,11 @@ namespace Orleans.Hosting
                 services.Configure<EndpointOptions>(o => o.Bind(ep));
             }
 
+            if (bool.TryParse(cfg["EnableActivityPropagation"], out var enableDistributedTracing) && enableDistributedTracing)
+            {
+                builder.AddActivityPropagation();
+            }
+
             ApplySubsection(builder, cfg, knownProviderTypes, "Clustering");
             ApplySubsection(builder, cfg, knownProviderTypes, "Reminders");
             ApplyNamedSubsections(builder, cfg, knownProviderTypes, "BroadcastChannel");
