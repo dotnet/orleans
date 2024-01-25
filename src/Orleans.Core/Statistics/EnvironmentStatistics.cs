@@ -50,7 +50,7 @@ internal sealed class EnvironmentStatisticsProvider : IEnvironmentStatisticsProv
         var availableMemory = systemAvailable + processAvailable;
         var maxAvailableMemory = Math.Min(memoryInfo.TotalAvailableMemoryBytes, memoryInfo.HighMemoryLoadThresholdBytes);
 
-        var filteredCpuUsage = (long)_cpuUsageFilter.Filter((float)cpuUsage);
+        var filteredCpuUsage = _cpuUsageFilter.Filter(cpuUsage);
         var filteredMemoryUsage = (long)_memoryUsageFilter.Filter(memoryUsage);
         var filteredAvailableMemory = (long)_availableMemoryFilter.Filter(availableMemory);
         // no need to filter 'maxAvailableMemory' as it will almost always be a steady value.
@@ -65,7 +65,7 @@ internal sealed class EnvironmentStatisticsProvider : IEnvironmentStatisticsProv
 
     private sealed class EventCounterListener : EventListener
     {
-        public double CpuUsage { get; private set; } = 0d;
+        public float CpuUsage { get; private set; } = 0f;
 
         protected override void OnEventSourceCreated(EventSource source)
         {
@@ -88,7 +88,7 @@ internal sealed class EnvironmentStatisticsProvider : IEnvironmentStatisticsProv
                         && eventPayload.TryGetValue("Mean", out var mean)
                         && mean is double value)
                     {
-                        CpuUsage = value;
+                        CpuUsage = (float)value;
                         break;
                     }
                 }

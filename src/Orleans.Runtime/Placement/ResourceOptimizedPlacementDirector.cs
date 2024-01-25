@@ -230,7 +230,7 @@ internal sealed class ResourceOptimizedPlacementDirector : IPlacementDirector, I
             addValueFactory: static (_, statistics) => ResourceStatistics.FromRuntime(statistics),
             updateValueFactory: static (_, _, statistics) => ResourceStatistics.FromRuntime(statistics));
 
-    private readonly record struct NormalizedWeights(float CpuUsageWeight, float MemoryUsageWeight, float AvailableMemoryWeight, float MaxAvailableMemoryWeight);
+    private record NormalizedWeights(float CpuUsageWeight, float MemoryUsageWeight, float AvailableMemoryWeight, float MaxAvailableMemoryWeight);
     private readonly record struct ResourceStatistics(bool IsOverloaded, float CpuUsage, float MemoryUsage, float AvailableMemory, float MaxAvailableMemory)
     {
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
