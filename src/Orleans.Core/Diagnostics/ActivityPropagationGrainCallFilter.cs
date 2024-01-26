@@ -97,14 +97,12 @@ namespace Orleans.Runtime
             var source = GetActivitySource(context);
             var activity = source.StartActivity(context.Request.GetActivityName(), ActivityKind.Client);
 
-            if (activity is not null)
+            if (activity is null)
             {
-                _propagator.Inject(activity, null, static (carrier, key, value) =>
-                {
-                    RequestContext.Set(key, value);
-                });
+                return context.Invoke();
             }
 
+            _propagator.Inject(activity, null, static (carrier, key, value) => RequestContext.Set(key, value));
             return Process(context, activity);
         }
     }
@@ -170,7 +168,12 @@ namespace Orleans.Runtime
                 activity = source.CreateActivity(context.Request.GetActivityName(), ActivityKind.Server);
             }
 
-            activity?.Start();
+            if (activity is null)
+            {
+                return context.Invoke();
+            }
+
+            activity.Start();
             return Process(context, activity);
         }
     }
