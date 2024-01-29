@@ -148,12 +148,39 @@
     <value>A single type is not allowed to have multiple constructors annotated with the [OrleansConstructor] attribute</value>
   </data>
   <data name="AddAliasAttributesDescription" xml:space="preserve">
-    <value>Add [Alias] attributes to specify well-known names that can be used to identify types or methods.</value>
+    <value>Add [Alias] to specify well-known names that can be used to identify types or methods.</value>
   </data>
   <data name="AddAliasAttributesTitle" xml:space="preserve">
-    <value>Add missing alias attributes</value>
+    <value>Add missing [Alias]</value>
   </data>
   <data name="AddAliasMessageFormat" xml:space="preserve">
-    <value>Add missing alias attributes</value>
+    <value>Add missing [Alias]</value>
+  </data>
+  <data name="AliasClashDetectedDescription" xml:space="preserve">
+    <value>The [Alias] attribute must be unique to the declaring type.</value>
+  </data>
+  <data name="AliasClashDetectedMessageFormat" xml:space="preserve">
+    <value>Rename duplicated [Alias]</value>
+  </data>
+  <data name="AliasClashDetectedTitle" xml:space="preserve">
+    <value>Rename duplicated [Alias]</value>
+  </data>
+  <data name="IdClashDetectedDescription" xml:space="preserve">
+    <value>The [Id] attribute must be unique to each members of the declaring type.</value>
+  </data>
+  <data name="IdClashDetectedMessageFormat" xml:space="preserve">
+    <value>Change duplicated [Id]</value>
+  </data>
+  <data name="IdClashDetectedTitle" xml:space="preserve">
+    <value>Change duplicated [Id]</value>
+  </data>
+  <data name="IncorrectAttributeUseMessageFormat" xml:space="preserve">
+    <value>Remove attribute [{0}]</value>
+  </data>
+  <data name="IncorrectAttributeUseTitle" xml:space="preserve">
+    <value>Remove attribute</value>
+  </data>
+  <data name="IncorrectAttributeUseTitleDescription" xml:space="preserve">
+    <value>This attribute should not be used on grain implementations.</value>
   </data>
 </root>

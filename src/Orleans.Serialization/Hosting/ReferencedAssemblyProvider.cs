@@ -1,4 +1,3 @@
-using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyModel;
 using System;
 using System.Buffers;
@@ -10,11 +9,11 @@ using System.Reflection;
 using System.Runtime.Loader;
 #endif
 
-namespace Orleans.Serialization
+namespace Orleans.Serialization.Internal
 {
-    internal static class ReferencedAssemblyHelper
+    public static class ReferencedAssemblyProvider
     {
-        public static IEnumerable<Assembly> GetRelevantAssemblies(this IServiceCollection services)
+        public static IEnumerable<Assembly> GetRelevantAssemblies()
         {
             var parts = new HashSet<Assembly>();
 
@@ -74,7 +73,7 @@ namespace Orleans.Serialization
 
         public static void AddFromAssemblyLoadContext(HashSet<Assembly> parts, Assembly assembly = null)
         {
-            assembly ??= typeof(ReferencedAssemblyHelper).Assembly;
+            assembly ??= typeof(ReferencedAssemblyProvider).Assembly;
             var assemblies = new HashSet<Assembly>();
             var context = AssemblyLoadContext.GetLoadContext(assembly);
             foreach (var asm in context.Assemblies)
@@ -211,7 +210,5 @@ namespace Orleans.Serialization
                 }
             }
         }
-
-        private static T GetServiceFromCollection<T>(IServiceCollection services) => (T)services.LastOrDefault(d => d.ServiceType == typeof(T))?.ImplementationInstance;
     }
 }

@@ -33,9 +33,7 @@ namespace Orleans.Runtime
 
         private readonly IActivationWorkingSet activationWorkingSet;
 
-        private readonly IAppEnvironmentStatistics appEnvironmentStatistics;
-
-        private readonly IHostEnvironmentStatistics hostEnvironmentStatistics;
+        private readonly IEnvironmentStatisticsProvider environmentStatisticsProvider;
 
         private readonly IOptions<LoadSheddingOptions> loadSheddingOptions;
         private readonly GrainCountStatistics _grainCountStatistics;
@@ -53,8 +51,7 @@ namespace Orleans.Runtime
             ActivationCollector activationCollector,
             ActivationDirectory activationDirectory,
             IActivationWorkingSet activationWorkingSet,
-            IAppEnvironmentStatistics appEnvironmentStatistics,
-            IHostEnvironmentStatistics hostEnvironmentStatistics,
+            IEnvironmentStatisticsProvider environmentStatisticsProvider,
             IOptions<LoadSheddingOptions> loadSheddingOptions,
             GrainCountStatistics grainCountStatistics)
             : base(Constants.SiloControlType, localSiloDetails.SiloAddress, loggerFactory)
@@ -71,8 +68,7 @@ namespace Orleans.Runtime
             _activationCollector = activationCollector;
             this.activationDirectory = activationDirectory;
             this.activationWorkingSet = activationWorkingSet;
-            this.appEnvironmentStatistics = appEnvironmentStatistics;
-            this.hostEnvironmentStatistics = hostEnvironmentStatistics;
+            this.environmentStatisticsProvider = environmentStatisticsProvider;
             this.loadSheddingOptions = loadSheddingOptions;
             _grainCountStatistics = grainCountStatistics;
         }
@@ -110,8 +106,7 @@ namespace Orleans.Runtime
             var stats = new SiloRuntimeStatistics(
                 activationCount,
                 activationWorkingSet.Count,
-                this.appEnvironmentStatistics,
-                this.hostEnvironmentStatistics,
+                this.environmentStatisticsProvider,
                 this.loadSheddingOptions,
                 DateTime.UtcNow);
             return Task.FromResult(stats);

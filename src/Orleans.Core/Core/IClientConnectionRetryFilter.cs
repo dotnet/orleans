@@ -1,6 +1,7 @@
 using System;
 using System.Threading;
 using System.Threading.Tasks;
+using Orleans.Runtime;
 
 namespace Orleans
 {
@@ -16,5 +17,31 @@ namespace Orleans
         /// <param name="cancellationToken">The cancellation token used to notify when connection has been aborted externally.</param>
         /// <returns><see langword="true"/> if connection should be re-attempted, <see langword="false"/> if attempts to connect to the cluster should be aborted.</returns>
         Task<bool> ShouldRetryConnectionAttempt(Exception exception, CancellationToken cancellationToken);
+    }
+
+    internal sealed class LinearBackoffClientConnectionRetryFilter : IClientConnectionRetryFilter
+    {
+        private int _retryCount = 0;
+
+        private const int MaxRetry = 5;
+        private const int Delay = 1_500;
+
+        public async Task<bool> ShouldRetryConnectionAttempt(
+            Exception exception,
+            CancellationToken cancellationToken)
+        {
+            if (_retryCount >= MaxRetry)
+            {
+                return false;
+            }
+
+            if (!cancellationToken.IsCancellationRequested && exception is SiloUnavailableException)
+            {
+                await Task.Delay(++_retryCount * Delay, cancellationToken);
+                return true;
+            }
+
+            return false;
+        }
     }
 }

@@ -9,6 +9,7 @@ using Orleans.Configuration;
 
 namespace Orleans.Runtime.Placement
 {
+
     internal class ActivationCountPlacementDirector : RandomPlacementDirector, ISiloStatisticsChangeListener, IPlacementDirector
     {
         private class CachedLocalStat
@@ -38,8 +39,6 @@ namespace Orleans.Runtime.Placement
             deploymentLoadPublisher?.SubscribeToStatisticsChangeEvents(this);
         }
 
-        private static bool IsSiloOverloaded(SiloRuntimeStatistics stats) => stats.IsOverloaded || (stats.CpuUsage ?? 0) >= 100;
-
         private SiloAddress SelectSiloPowerOfK(SiloAddress[] silos)
         {
             var compatibleSilos = silos.ToSet();
@@ -50,7 +49,7 @@ namespace Orleans.Runtime.Placement
             foreach (var kv in _localCache)
             {
                 totalSilos++;
-                if (IsSiloOverloaded(kv.Value.SiloStats)) continue;
+                if (kv.Value.SiloStats.IsOverloaded) continue;
                 if (!compatibleSilos.Contains(kv.Key)) continue;
 
                 relevantSilos.Add(kv);

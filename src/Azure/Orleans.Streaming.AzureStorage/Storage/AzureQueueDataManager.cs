@@ -73,7 +73,7 @@ namespace Orleans.AzureUtils
             {
                 MessageVisibilityTimeout = visibilityTimeout
             };
-            options.ConfigureQueueServiceClient(storageConnectionString);
+            options.QueueServiceClient = new(storageConnectionString);
             return options;
         }
 

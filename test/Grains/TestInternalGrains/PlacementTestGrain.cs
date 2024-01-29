@@ -8,7 +8,7 @@ using Orleans.Placement;
 using Orleans.Runtime;
 using Orleans.Runtime.Messaging;
 using Orleans.Runtime.TestHooks;
-
+using Orleans.Statistics;
 using UnitTests.GrainInterfaces;
 
 namespace UnitTests.Grains
@@ -19,19 +19,19 @@ namespace UnitTests.Grains
 
         private readonly OverloadDetector overloadDetector;
 
-        private readonly TestHooksHostEnvironmentStatistics hostEnvironmentStatistics;
+        private readonly TestHooksEnvironmentStatisticsProvider environmentStatistics;
         private readonly IGrainContext _grainContext;
         private readonly LoadSheddingOptions loadSheddingOptions;
 
         public PlacementTestGrainBase(
             OverloadDetector overloadDetector,
-            TestHooksHostEnvironmentStatistics hostEnvironmentStatistics,
+            TestHooksEnvironmentStatisticsProvider hostEnvironmentStatistics,
             IOptions<LoadSheddingOptions> loadSheddingOptions,
             IGrainContext grainContext)
         {
             _grainContext = grainContext;
             this.overloadDetector = overloadDetector;
-            this.hostEnvironmentStatistics = hostEnvironmentStatistics;
+            this.environmentStatistics = hostEnvironmentStatistics;
             this.loadSheddingOptions = loadSheddingOptions.Value;
         }
 
@@ -102,25 +102,29 @@ namespace UnitTests.Grains
 
         public Task LatchOverloaded()
         {
-            this.hostEnvironmentStatistics.CpuUsage = this.loadSheddingOptions.LoadSheddingLimit + 1;
+            var stats = environmentStatistics.GetEnvironmentStatistics();
+            environmentStatistics.SetHardwareStatistics(new(loadSheddingOptions.CpuThreshold + 1, stats.MemoryUsageBytes, stats.AvailableMemoryBytes, stats.MaximumAvailableMemoryBytes));
             return PropigateStatisticsToCluster(GrainFactory);
         }
 
         public Task UnlatchOverloaded()
         {
-            this.hostEnvironmentStatistics.CpuUsage = null;
+            var stats = environmentStatistics.GetEnvironmentStatistics();
+            environmentStatistics.SetHardwareStatistics(new(0, stats.MemoryUsageBytes, stats.AvailableMemoryBytes, stats.MaximumAvailableMemoryBytes));
             return PropigateStatisticsToCluster(GrainFactory);
         }
 
         public Task LatchCpuUsage(float value)
         {
-            this.hostEnvironmentStatistics.CpuUsage = value;
+            var stats = environmentStatistics.GetEnvironmentStatistics();
+            environmentStatistics.SetHardwareStatistics(new(value, stats.MemoryUsageBytes, stats.AvailableMemoryBytes, stats.MaximumAvailableMemoryBytes));
             return PropigateStatisticsToCluster(GrainFactory);
         }
 
         public Task UnlatchCpuUsage()
         {
-            this.hostEnvironmentStatistics.CpuUsage = null;
+            var stats = environmentStatistics.GetEnvironmentStatistics();
+            environmentStatistics.SetHardwareStatistics(new(0, stats.MemoryUsageBytes, stats.AvailableMemoryBytes, stats.MaximumAvailableMemoryBytes));
             return PropigateStatisticsToCluster(GrainFactory);
         }
 
@@ -135,7 +139,7 @@ namespace UnitTests.Grains
     {
         public RandomPlacementTestGrain(
             OverloadDetector overloadDetector,
-            TestHooksHostEnvironmentStatistics hostEnvironmentStatistics,
+            TestHooksEnvironmentStatisticsProvider hostEnvironmentStatistics,
             IOptions<LoadSheddingOptions> loadSheddingOptions,
             IGrainContext grainContext)
             : base(overloadDetector, hostEnvironmentStatistics, loadSheddingOptions, grainContext)
@@ -148,7 +152,7 @@ namespace UnitTests.Grains
     {
         public PreferLocalPlacementTestGrain(
             OverloadDetector overloadDetector,
-            TestHooksHostEnvironmentStatistics hostEnvironmentStatistics,
+            TestHooksEnvironmentStatisticsProvider hostEnvironmentStatistics,
             IOptions<LoadSheddingOptions> loadSheddingOptions,
             IGrainContext grainContext)
             : base(overloadDetector, hostEnvironmentStatistics, loadSheddingOptions, grainContext)
@@ -161,7 +165,7 @@ namespace UnitTests.Grains
     {
         public LocalPlacementTestGrain(
             OverloadDetector overloadDetector,
-            TestHooksHostEnvironmentStatistics hostEnvironmentStatistics,
+            TestHooksEnvironmentStatisticsProvider hostEnvironmentStatistics,
             IOptions<LoadSheddingOptions> loadSheddingOptions,
             IGrainContext grainContext)
             : base(overloadDetector, hostEnvironmentStatistics, loadSheddingOptions, grainContext)
@@ -174,7 +178,7 @@ namespace UnitTests.Grains
     {
         public ActivationCountBasedPlacementTestGrain(
             OverloadDetector overloadDetector,
-            TestHooksHostEnvironmentStatistics hostEnvironmentStatistics,
+            TestHooksEnvironmentStatisticsProvider hostEnvironmentStatistics,
             IOptions<LoadSheddingOptions> loadSheddingOptions,
             IGrainContext grainContext)
             : base(overloadDetector, hostEnvironmentStatistics, loadSheddingOptions, grainContext)

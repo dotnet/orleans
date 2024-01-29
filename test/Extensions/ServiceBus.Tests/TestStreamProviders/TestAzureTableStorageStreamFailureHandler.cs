@@ -46,11 +46,11 @@ namespace ServiceBus.Tests.TestStreamProviders.EventHub
             var options = new AzureStorageOperationOptions { TableName = TableName };
             if (TestDefaultConfiguration.UseAadAuthentication)
             {
-                options.ConfigureTableServiceClient(TestDefaultConfiguration.TableEndpoint, new DefaultAzureCredential());
+                options.TableServiceClient = new(TestDefaultConfiguration.TableEndpoint, new DefaultAzureCredential());
             }
             else
             {
-                options.ConfigureTableServiceClient(TestDefaultConfiguration.DataConnectionString);
+                options.TableServiceClient = new(TestDefaultConfiguration.DataConnectionString);
             }
 
             return options;
@@ -61,11 +61,11 @@ namespace ServiceBus.Tests.TestStreamProviders.EventHub
             var options = new Orleans.Streaming.AzureStorage.AzureStorageOperationOptions { TableName = TableName };
             if (TestDefaultConfiguration.UseAadAuthentication)
             {
-                options.ConfigureTableServiceClient(TestDefaultConfiguration.TableEndpoint, new DefaultAzureCredential());
+                options.TableServiceClient = new(TestDefaultConfiguration.TableEndpoint, new DefaultAzureCredential());
             }
             else
             {
-                options.ConfigureTableServiceClient(TestDefaultConfiguration.DataConnectionString);
+                options.TableServiceClient = new(TestDefaultConfiguration.DataConnectionString);
             }
 
             return options;

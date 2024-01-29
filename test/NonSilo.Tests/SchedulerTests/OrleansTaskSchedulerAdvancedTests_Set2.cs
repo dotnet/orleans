@@ -1,6 +1,5 @@
 using System.Diagnostics;
 using Microsoft.Extensions.Logging;
-using Orleans;
 using Orleans.Internal;
 using Orleans.Runtime;
 using Orleans.Runtime.Scheduler;
@@ -21,14 +20,14 @@ namespace UnitTests.SchedulerTests
         private readonly ITestOutputHelper output;
         private readonly UnitTestSchedulingContext context;
 
-        private readonly IHostEnvironmentStatistics performanceMetrics;
+        private readonly IEnvironmentStatisticsProvider environmentStatisticsProvider;
         private readonly ILoggerFactory loggerFactory;
         public OrleansTaskSchedulerAdvancedTests_Set2(ITestOutputHelper output)
         {
             this.output = output;
             this.loggerFactory = OrleansTaskSchedulerBasicTests.InitSchedulerLogging();
             this.context = new UnitTestSchedulingContext();
-            this.performanceMetrics = new TestHooksHostEnvironmentStatistics();
+            this.environmentStatisticsProvider = new TestHooksEnvironmentStatisticsProvider();
         }
         
         public void Dispose()

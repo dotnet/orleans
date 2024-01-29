@@ -80,7 +80,7 @@ namespace Orleans.Messaging
                 knownGateways.Count,
                 Utils.EnumerableToString(knownGateways));
 
-            this.roundRobinCounter = this.gatewayOptions.PreferedGatewayIndex >= 0 ? this.gatewayOptions.PreferedGatewayIndex : Random.Shared.Next(knownGateways.Count);
+            this.roundRobinCounter = this.gatewayOptions.PreferredGatewayIndex >= 0 ? this.gatewayOptions.PreferredGatewayIndex : Random.Shared.Next(knownGateways.Count);
             this.knownGateways = this.cachedLiveGateways = knownGateways.Select(gw => gw.ToGatewayAddress()).ToList();
             this.cachedLiveGatewaysSet = new HashSet<SiloAddress>(cachedLiveGateways);
             this.lastRefreshTime = DateTime.UtcNow;
@@ -152,7 +152,9 @@ namespace Orleans.Messaging
         /// is in the same order every time.
         /// </summary>
         /// <returns></returns>
-        public SiloAddress GetLiveGateway()
+        #nullable enable
+        public SiloAddress? GetLiveGateway()
+        #nullable disable
         {
             List<SiloAddress> live = GetLiveGateways();
             int count = live.Count;
@@ -168,6 +170,7 @@ namespace Orleans.Messaging
             // If we drop through, then all of the known gateways are presumed dead
             return null;
         }
+       
 
         public List<SiloAddress> GetLiveGateways()
         {

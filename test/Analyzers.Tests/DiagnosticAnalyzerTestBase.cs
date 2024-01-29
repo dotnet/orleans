@@ -24,6 +24,17 @@ namespace Analyzers.Tests
             "Orleans"
         };
 
+        public static IEnumerable<object[]> GrainInterfaces =>
+            new List<object[]>
+            {
+                new object[] { "Orleans.IGrain" },
+                new object[] { "Orleans.IGrainWithStringKey" },
+                new object[] { "Orleans.IGrainWithGuidKey" },
+                new object[] { "Orleans.IGrainWithGuidCompoundKey" },
+                new object[] { "Orleans.IGrainWithIntegerKey" },
+                new object[] { "Orleans.IGrainWithIntegerCompoundKey" }
+            };
+
         protected virtual DiagnosticAnalyzer CreateDiagnosticAnalyzer() => new TDiagnosticAnalyzer();
 
         protected async Task AssertNoDiagnostics(string source, params string[] extraUsings)

@@ -43,7 +43,7 @@ namespace DistributedTests.Client.Commands
                 .UseOrleansClient((ctx, builder) => {
                     builder
                         .Configure<ClusterOptions>(options => { options.ClusterId = parameters.ClusterId; options.ServiceId = parameters.ServiceId; })
-                        .UseAzureStorageClustering(options => options.ConfigureTableServiceClient(secrets.ClusteringConnectionString));
+                        .UseAzureStorageClustering(options => options.TableServiceClient = new(secrets.ClusteringConnectionString));
                 });
             using var host = hostBuilder.Build();
             await host.StartAsync();

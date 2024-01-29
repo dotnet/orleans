@@ -79,7 +79,7 @@ namespace Orleans.Analyzers {
         }
         
         /// <summary>
-        ///   Looks up a localized string similar to Add [Alias] attributes to specify well-known names that can be used to identify types or methods.
+        ///   Looks up a localized string similar to Add [Alias] to specify well-known names that can be used to identify types or methods..
         /// </summary>
         internal static string AddAliasAttributesDescription {
             get {
@@ -88,7 +88,7 @@ namespace Orleans.Analyzers {
         }
         
         /// <summary>
-        ///   Looks up a localized string similar to Add missing alias attributes.
+        ///   Looks up a localized string similar to Add missing [Alias].
         /// </summary>
         internal static string AddAliasAttributesTitle {
             get {
@@ -97,7 +97,7 @@ namespace Orleans.Analyzers {
         }
         
         /// <summary>
-        ///   Looks up a localized string similar to Add missing alias attributes.
+        ///   Looks up a localized string similar to Add missing [Alias].
         /// </summary>
         internal static string AddAliasMessageFormat {
             get {
@@ -106,7 +106,7 @@ namespace Orleans.Analyzers {
         }
         
         /// <summary>
-        ///   Looks up a localized string similar to Add the [GenerateSerializer] attribute to serializable types in your application.
+        ///   Looks up a localized string similar to Add the [GenerateSerializer] attribute to serializable types in your application..
         /// </summary>
         internal static string AddGenerateSerializerAttributeDescription {
             get {
@@ -160,6 +160,33 @@ namespace Orleans.Analyzers {
         }
         
         /// <summary>
+        ///   Looks up a localized string similar to The [Alias] attribute must be unique to the declaring type..
+        /// </summary>
+        internal static string AliasClashDetectedDescription {
+            get {
+                return ResourceManager.GetString("AliasClashDetectedDescription", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Rename duplicated [Alias].
+        /// </summary>
+        internal static string AliasClashDetectedMessageFormat {
+            get {
+                return ResourceManager.GetString("AliasClashDetectedMessageFormat", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Rename duplicated [Alias].
+        /// </summary>
+        internal static string AliasClashDetectedTitle {
+            get {
+                return ResourceManager.GetString("AliasClashDetectedTitle", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Looks up a localized string similar to A single type is not allowed to have multiple constructors annotated with the [OrleansConstructor] attribute.
         /// </summary>
         internal static string AtMostOneOrleansConstructorMessageFormat {
@@ -174,6 +201,60 @@ namespace Orleans.Analyzers {
         internal static string AtMostOneOrleansConstructorTitle {
             get {
                 return ResourceManager.GetString("AtMostOneOrleansConstructorTitle", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to The [Id] attribute must be unique to each members of the declaring type..
+        /// </summary>
+        internal static string IdClashDetectedDescription {
+            get {
+                return ResourceManager.GetString("IdClashDetectedDescription", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Change duplicated [Id].
+        /// </summary>
+        internal static string IdClashDetectedMessageFormat {
+            get {
+                return ResourceManager.GetString("IdClashDetectedMessageFormat", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Change duplicated [Id].
+        /// </summary>
+        internal static string IdClashDetectedTitle {
+            get {
+                return ResourceManager.GetString("IdClashDetectedTitle", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Remove attribute [{0}].
+        /// </summary>
+        internal static string IncorrectAttributeUseMessageFormat {
+            get {
+                return ResourceManager.GetString("IncorrectAttributeUseMessageFormat", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Remove attribute.
+        /// </summary>
+        internal static string IncorrectAttributeUseTitle {
+            get {
+                return ResourceManager.GetString("IncorrectAttributeUseTitle", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to This attribute should not be used on grain implementations..
+        /// </summary>
+        internal static string IncorrectAttributeUseTitleDescription {
+            get {
+                return ResourceManager.GetString("IncorrectAttributeUseTitleDescription", resourceCulture);
             }
         }
     }

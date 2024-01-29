@@ -35,7 +35,7 @@ namespace Orleans.Providers.Streams.AzureQueue
         public static async Task DeleteAllUsedAzureQueues(ILoggerFactory loggerFactory, List<string> azureQueueNames, string storageConnectionString)
         {
             var options = new AzureQueueOptions();
-            options.ConfigureQueueServiceClient(storageConnectionString);
+            options.QueueServiceClient = new(storageConnectionString);
             await DeleteAllUsedAzureQueues(loggerFactory, azureQueueNames, options);
         }
 
@@ -66,7 +66,7 @@ namespace Orleans.Providers.Streams.AzureQueue
         public static async Task ClearAllUsedAzureQueues(ILoggerFactory loggerFactory, List<string> azureQueueNames, string storageConnectionString)
         {
             var options = new AzureQueueOptions();
-            options.ConfigureQueueServiceClient(storageConnectionString);
+            options.QueueServiceClient = new(storageConnectionString);
             await ClearAllUsedAzureQueues(loggerFactory, azureQueueNames, options);
         }
 
