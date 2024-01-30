@@ -93,7 +93,7 @@ namespace OrleansAWSUtils.Streams
             var cacheOptions = services.GetOptionsByName<SimpleQueueCacheOptions>(name);
             var queueMapperOptions = services.GetOptionsByName<HashRingStreamQueueMapperOptions>(name);
             IOptions<ClusterOptions> clusterOptions = services.GetProviderClusterOptions(name);
-            var dataAdapter = services.GetServiceByName<ISQSDataAdapter>(name)
+            var dataAdapter = services.GetKeyedService<ISQSDataAdapter>(name)
                                ?? services.GetService<ISQSDataAdapter>()
                                ?? ActivatorUtilities.CreateInstance<SQSDataAdapter>(services);
             var factory = ActivatorUtilities.CreateInstance<SQSAdapterFactory>(services, name, sqsOptions, cacheOptions, queueMapperOptions, clusterOptions, dataAdapter);
