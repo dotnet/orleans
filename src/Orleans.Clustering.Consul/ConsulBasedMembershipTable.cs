@@ -233,7 +233,7 @@ namespace Orleans.Runtime.Membership
 
             foreach (var entry in allRegistrations)
             {
-                if (entry.Registration.IAmAliveTime < beforeDate)
+                if (entry.Registration.IAmAliveTime < beforeDate && entry.Registration.Status != SiloStatus.Active)
                 {
                     await _consulClient.KV.DeleteTree(entry.RegistrationKey);
                 }
