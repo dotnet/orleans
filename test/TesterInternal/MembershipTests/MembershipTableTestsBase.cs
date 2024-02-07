@@ -457,10 +457,28 @@ namespace UnitTests.MembershipTests
             Assert.True(ok, "InsertRow failed");
 
             data = await membershipTable.ReadAll();
+            newTableVersion = data.Version.Next();
             logger.LogInformation("Membership.ReadAll returned TableVersion={TableVersion} Data={Data}", data.Version, data);
 
             Assert.Equal(3, data.Members.Count);
 
+
+            // Every status other than Active should get cleared out if old
+            foreach (var siloStatus in Enum.GetValues<SiloStatus>())
+            {
+                if (siloStatus == SiloStatus.Active) continue;
+
+                var oldEntry = CreateMembershipEntryForTest();
+                oldEntry.IAmAliveTime = oldEntry.IAmAliveTime.AddDays(-10);
+                oldEntry.StartTime = oldEntry.StartTime.AddDays(-10);
+                oldEntry.Status = siloStatus;
+                ok = await membershipTable.InsertRow(oldEntry, newTableVersion);
+                table = await membershipTable.ReadAll();
+
+                Assert.True(ok, "InsertRow failed");
+
+                newTableVersion = table.Version.Next();
+            }
 
             await membershipTable.CleanupDefunctSiloEntries(oldEntryDead.IAmAliveTime.AddDays(3));
 
