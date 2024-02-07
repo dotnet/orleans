@@ -466,8 +466,6 @@ namespace UnitTests.MembershipTests
             // Every status other than Active should get cleared out if old
             foreach (var siloStatus in Enum.GetValues<SiloStatus>())
             {
-                if (siloStatus == SiloStatus.Active) continue;
-
                 var oldEntry = CreateMembershipEntryForTest();
                 oldEntry.IAmAliveTime = oldEntry.IAmAliveTime.AddDays(-10);
                 oldEntry.StartTime = oldEntry.StartTime.AddDays(-10);
@@ -485,7 +483,7 @@ namespace UnitTests.MembershipTests
             data = await membershipTable.ReadAll();
             logger.LogInformation("Membership.ReadAll returned TableVersion={TableVersion} Data={Data}", data.Version, data);
 
-            Assert.Single(data.Members);
+            Assert.Equal(2, data.Members.Count);
         }
 
         // Utility methods
