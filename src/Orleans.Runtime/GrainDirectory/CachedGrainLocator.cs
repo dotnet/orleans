@@ -30,12 +30,14 @@ namespace Orleans.Runtime.GrainDirectory
         MembershipVersion ITestAccessor.LastMembershipVersion { get; set; }
 
         public CachedGrainLocator(
+            IServiceProvider serviceProvider,
             GrainDirectoryResolver grainDirectoryResolver,
-            IClusterMembershipService clusterMembershipService)
+            IClusterMembershipService clusterMembershipService,
+            IOptions<GrainDirectoryOptions> grainDirectoryOptions)
         {
             this.grainDirectoryResolver = grainDirectoryResolver;
             this.clusterMembershipService = clusterMembershipService;
-            this.cache = new LRUBasedGrainDirectoryCache(GrainDirectoryOptions.DEFAULT_CACHE_SIZE, GrainDirectoryOptions.DEFAULT_MAXIMUM_CACHE_TTL);
+            this.cache = GrainDirectoryCacheFactory.CreateGrainDirectoryCache(serviceProvider, grainDirectoryOptions.Value);
         }
 
         public async ValueTask<GrainAddress> Lookup(GrainId grainId)
