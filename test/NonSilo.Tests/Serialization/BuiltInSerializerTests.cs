@@ -63,7 +63,6 @@ namespace UnitTests.Serialization
         /// <summary>
         /// Tests that the default (non-fallback) serializer can handle complex classes.
         /// </summary>
-        /// <param name="serializerToUse"></param>
         [Fact, TestCategory("BVT")]
         public void Serialize_ComplexAccessibleClass()
         {

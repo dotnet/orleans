@@ -114,8 +114,6 @@ namespace DefaultCluster.Tests.General
                         Assert.Equal(targetHost, newAddress.SiloAddress);
                         break;
                     }
-
-                    await Task.Delay(100);
                 }
 
                 while (true)
@@ -123,15 +121,9 @@ namespace DefaultCluster.Tests.General
                     var newAddress = await b.GetGrainAddress();
                     if (newAddress.ActivationId != originalAddressB.ActivationId)
                     {
-                        if (targetHost != newAddress.SiloAddress)
-                        {
-                            Debugger.Break();
-                        }
                         Assert.Equal(targetHost, newAddress.SiloAddress);
                         break;
                     }
-
-                    await Task.Delay(100);
                 }
 
                 Assert.Equal(expectedState, await a.GetState());

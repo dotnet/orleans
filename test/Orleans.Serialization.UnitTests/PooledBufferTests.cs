@@ -126,6 +126,90 @@ namespace Orleans.Serialization.UnitTests
             }
         }
 
+        /// <summary>
+        /// Tests that the serializer can correctly serialized <see cref="PooledBuffer"/>.
+        /// </summary>
+        [Fact]
+        public void PooledBuffer_SerializerRoundTrip()
+        {
+            var serviceProvider = new ServiceCollection()
+                .AddSerializer()
+                .BuildServiceProvider();
+            var serializer = serviceProvider.GetRequiredService<Serializer>();
+
+            var random = new Random();
+            for (var i = 0; i < 10; i++)
+            {
+                const int TargetLength = 8120;
+
+                // NOTE: The serializer is responsible for freeing the buffer provided to it, so we do not free this.
+                var buffer = new PooledBuffer();
+                while (buffer.Length < TargetLength)
+                {
+                    var span = buffer.GetSpan(TargetLength - buffer.Length);
+                    var writeLen = Math.Min(span.Length, TargetLength - buffer.Length);
+                    random.NextBytes(span[..writeLen]);
+                    buffer.Advance(writeLen);
+                }
+
+                var bytes = buffer.ToArray();
+                Assert.Equal(TargetLength, bytes.Length);
+
+                var result = serializer.Deserialize<PooledBuffer>(serializer.SerializeToArray(buffer));
+                Assert.Equal(TargetLength, result.Length);
+
+                var resultBytes = result.ToArray();
+                Assert.Equal(bytes, resultBytes);
+
+                // NOTE: we are responsible for disposing a buffer returned from deserialization.
+                result.Dispose();
+            }
+        }
+
+        /// <summary>
+        /// Tests that the serializer can correctly serialized <see cref="PooledBuffer"/> when it's embedded in another structure.
+        /// </summary>
+        [Fact]
+        public void PooledBuffer_SerializerRoundTrip_Embedded()
+        {
+            var serviceProvider = new ServiceCollection()
+                .AddSerializer()
+                .BuildServiceProvider();
+            var serializer = serviceProvider.GetRequiredService<Serializer>();
+
+            var random = new Random();
+            for (var i = 0; i < 10; i++)
+            {
+                const int TargetLength = 8120;
+
+                // NOTE: The serializer is responsible for freeing the buffer provided to it, so we do not free this.
+                var buffer = new PooledBuffer();
+                while (buffer.Length < TargetLength)
+                {
+                    var span = buffer.GetSpan(TargetLength - buffer.Length);
+                    var writeLen = Math.Min(span.Length, TargetLength - buffer.Length);
+                    random.NextBytes(span[..writeLen]);
+                    buffer.Advance(writeLen);
+                }
+
+                var bytes = buffer.ToArray();
+                Assert.Equal(TargetLength, bytes.Length);
+
+                var embed = (Guid: Guid.NewGuid(), Buffer: buffer, Int: 42);
+                var result = serializer.Deserialize<(Guid Guid, PooledBuffer Buffer, int Int)>(serializer.SerializeToArray(embed));
+                Assert.Equal(embed.Guid, result.Guid);
+                Assert.Equal(embed.Int, result.Int);
+                var resultBuffer = result.Buffer;
+                Assert.Equal(TargetLength, resultBuffer.Length);
+
+                var resultBytes = resultBuffer.ToArray();
+                Assert.Equal(bytes, resultBytes);
+
+                // NOTE: we are responsible for disposing a buffer returned from deserialization.
+                resultBuffer.Dispose();
+            }
+        }
+
         [GenerateSerializer]
         public readonly record struct LargeObject(
             [property: Id(0)] Guid Id,
