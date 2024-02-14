@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using Orleans.Core.Internal;
 using Orleans.Runtime;
 using Orleans.Runtime.Placement;
@@ -72,6 +73,61 @@ namespace DefaultCluster.Tests.General
 
                 var newState = await grain.GetState();
                 Assert.Equal(expectedState, newState);
+            }
+        }
+
+        /// <summary>
+        /// Tests that multiple grains can be migrated simultaneously.
+        /// </summary>
+        [Fact, TestCategory("BVT")]
+        public async Task MultiGrainDirectedMigrationTest()
+        {
+            var baseId = GetRandomGrainId();
+            for (var i = 1; i < 100; ++i)
+            {
+                var a = GrainFactory.GetGrain<IMigrationTestGrain>(baseId + 2 * i);
+                var expectedState = Random.Shared.Next();
+                await a.SetState(expectedState);
+                var originalAddressA = await a.GetGrainAddress();
+                var originalHostA = originalAddressA.SiloAddress;
+
+                RequestContext.Set(IPlacementDirector.PlacementHintKey, originalHostA);
+                var b = GrainFactory.GetGrain<IMigrationTestGrain>(baseId + 1 + 2 * i);
+                await b.SetState(expectedState);
+                var originalAddressB = await b.GetGrainAddress();
+                Assert.Equal(originalHostA, originalAddressB.SiloAddress);
+
+                var targetHost = Fixture.HostedCluster.GetActiveSilos().Select(s => s.SiloAddress).First(address => address != originalHostA);
+
+                // Trigger migration, setting a placement hint to coerce the placement director to use the target silo
+                RequestContext.Set(IPlacementDirector.PlacementHintKey, targetHost);
+                var migrateA = a.Cast<IGrainManagementExtension>().MigrateOnIdle();
+                var migrateB = b.Cast<IGrainManagementExtension>().MigrateOnIdle();
+                await migrateA;
+                await migrateB;
+
+                while (true)
+                {
+                    var newAddress = await a.GetGrainAddress();
+                    if (newAddress.ActivationId != originalAddressA.ActivationId)
+                    {
+                        Assert.Equal(targetHost, newAddress.SiloAddress);
+                        break;
+                    }
+                }
+
+                while (true)
+                {
+                    var newAddress = await b.GetGrainAddress();
+                    if (newAddress.ActivationId != originalAddressB.ActivationId)
+                    {
+                        Assert.Equal(targetHost, newAddress.SiloAddress);
+                        break;
+                    }
+                }
+
+                Assert.Equal(expectedState, await a.GetState());
+                Assert.Equal(expectedState, await b.GetState());
             }
         }
 
