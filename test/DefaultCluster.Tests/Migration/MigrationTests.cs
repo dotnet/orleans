@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using Orleans.Core.Internal;
 using Orleans.Runtime;
 using Orleans.Runtime.Placement;
@@ -81,51 +82,60 @@ namespace DefaultCluster.Tests.General
         [Fact, TestCategory("BVT")]
         public async Task MultiGrainDirectedMigrationTest()
         {
+            var baseId = GetRandomGrainId();
             for (var i = 1; i < 100; ++i)
             {
-                var grainA = GrainFactory.GetGrain<IMigrationTestGrain>(GetRandomGrainId());
-                var grainB = GrainFactory.GetGrain<IMigrationTestGrain>(GetRandomGrainId());
+                var a = GrainFactory.GetGrain<IMigrationTestGrain>(baseId + 2 * i);
                 var expectedState = Random.Shared.Next();
-                await grainA.SetState(expectedState);
-                var originalAddressA = await grainA.GetGrainAddress();
+                await a.SetState(expectedState);
+                var originalAddressA = await a.GetGrainAddress();
                 var originalHostA = originalAddressA.SiloAddress;
-                RequestContext.Set(IPlacementDirector.PlacementHintKey, originalHostA);
 
-                await grainB.SetState(expectedState);
-                var originalAddressB = await grainB.GetGrainAddress();
+                RequestContext.Set(IPlacementDirector.PlacementHintKey, originalHostA);
+                var b = GrainFactory.GetGrain<IMigrationTestGrain>(baseId + 1 + 2 * i);
+                await b.SetState(expectedState);
+                var originalAddressB = await b.GetGrainAddress();
                 Assert.Equal(originalHostA, originalAddressB.SiloAddress);
 
                 var targetHost = Fixture.HostedCluster.GetActiveSilos().Select(s => s.SiloAddress).First(address => address != originalHostA);
 
                 // Trigger migration, setting a placement hint to coerce the placement director to use the target silo
                 RequestContext.Set(IPlacementDirector.PlacementHintKey, targetHost);
-                var migrateA = grainA.Cast<IGrainManagementExtension>().MigrateOnIdle();
-                var migrateB = grainB.Cast<IGrainManagementExtension>().MigrateOnIdle();
+                var migrateA = a.Cast<IGrainManagementExtension>().MigrateOnIdle();
+                var migrateB = b.Cast<IGrainManagementExtension>().MigrateOnIdle();
                 await migrateA;
                 await migrateB;
 
-                GrainAddress newAddress;
-                do
+                while (true)
                 {
-                    newAddress = await grainA.GetGrainAddress();
-                } while (newAddress.ActivationId == originalAddressA.ActivationId);
+                    var newAddress = await a.GetGrainAddress();
+                    if (newAddress.ActivationId != originalAddressA.ActivationId)
+                    {
+                        Assert.Equal(targetHost, newAddress.SiloAddress);
+                        break;
+                    }
 
-                var newHost = newAddress.SiloAddress;
-                Assert.Equal(targetHost, newHost);
+                    await Task.Delay(100);
+                }
 
-                do
+                while (true)
                 {
-                    newAddress = await grainB.GetGrainAddress();
-                } while (newAddress.ActivationId == originalAddressB.ActivationId);
+                    var newAddress = await b.GetGrainAddress();
+                    if (newAddress.ActivationId != originalAddressB.ActivationId)
+                    {
+                        if (targetHost != newAddress.SiloAddress)
+                        {
+                            Debugger.Break();
+                        }
+                        Assert.Equal(targetHost, newAddress.SiloAddress);
+                        break;
+                    }
 
-                newHost = newAddress.SiloAddress;
-                Assert.Equal(targetHost, newHost);
+                    await Task.Delay(100);
+                }
 
-                var newStateA = await grainA.GetState();
-                Assert.Equal(expectedState, newStateA);
-
-                var newStateB = await grainB.GetState();
-                Assert.Equal(expectedState, newStateB);
+                Assert.Equal(expectedState, await a.GetState());
+                Assert.Equal(expectedState, await b.GetState());
             }
         }
 

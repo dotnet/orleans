@@ -399,6 +399,7 @@ namespace Orleans.Hosting
             services.AddSingleton<MigrationContext.SerializationHooks>();
             services.AddSingleton<ActivationMigrationManager>();
             services.AddFromExisting<IActivationMigrationManager, ActivationMigrationManager>();
+            services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, ActivationMigrationManager>();
 
             ApplyConfiguration(builder);
         }
