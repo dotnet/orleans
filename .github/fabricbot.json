@@ -12,19 +12,14 @@
           "operator": "and",
           "operands": [
             {
+              "name": "isIssue",
+              "parameters": {}
+            },
+            {
               "name": "isAction",
               "parameters": {
                 "action": "opened"
               }
-            },
-            {
-              "operator": "not",
-              "operands": [
-                {
-                  "name": "isPartOfProject",
-                  "parameters": {}
-                }
-              ]
             },
             {
               "operator": "not",
@@ -47,8 +42,7 @@
         ],
         "eventType": "issue",
         "eventNames": [
-          "issues",
-          "project_card"
+          "issues"
         ]
       },
       "id": "9WhXC0yr9Za"
@@ -63,6 +57,10 @@
         "conditions": {
           "operator": "and",
           "operands": [
+            {
+              "name": "isIssue",
+              "parameters": {}
+            },
             {
               "name": "isAction",
               "parameters": {
@@ -121,6 +119,10 @@
           "operator": "and",
           "operands": [
             {
+              "name": "isIssue",
+              "parameters": {}
+            },
+            {
               "operator": "not",
               "operands": [
                 {
@@ -149,8 +151,7 @@
         ],
         "eventType": "issue",
         "eventNames": [
-          "issues",
-          "project_card"
+          "issues"
         ]
       },
       "id": "y4Hbkh-A4Rq"
@@ -165,6 +166,10 @@
         "conditions": {
           "operator": "and",
           "operands": [
+            {
+              "name": "isIssue",
+              "parameters": {}
+            },
             {
               "name": "hasLabel",
               "parameters": {
@@ -552,6 +557,10 @@
           "operator": "and",
           "operands": [
             {
+              "name": "isPr",
+              "parameters": {}
+            },
+            {
               "name": "isAction",
               "parameters": {
                 "action": "submitted"
@@ -591,6 +600,10 @@
           "operator": "and",
           "operands": [
             {
+              "name": "isPr",
+              "parameters": {}
+            },
+            {
               "name": "isActivitySender",
               "parameters": {
                 "user": {
@@ -628,8 +641,7 @@
         "eventType": "pull_request",
         "eventNames": [
           "pull_request",
-          "issues",
-          "project_card"
+          "issues"
         ]
       },
       "id": "VFwc6u_tfc-"
@@ -644,6 +656,10 @@
         "conditions": {
           "operator": "and",
           "operands": [
+            {
+              "name": "isPr",
+              "parameters": {}
+            },
             {
               "name": "isActivitySender",
               "parameters": {
@@ -686,6 +702,10 @@
           "operator": "and",
           "operands": [
             {
+              "name": "isPr",
+              "parameters": {}
+            },
+            {
               "name": "isActivitySender",
               "parameters": {
                 "user": {
@@ -727,6 +747,10 @@
           "operator": "and",
           "operands": [
             {
+              "name": "isPr",
+              "parameters": {}
+            },
+            {
               "operator": "not",
               "operands": [
                 {
@@ -756,8 +780,7 @@
         "eventType": "pull_request",
         "eventNames": [
           "pull_request",
-          "issues",
-          "project_card"
+          "issues"
         ]
       },
       "id": "8Vz5xHPu3pR"
@@ -772,6 +795,10 @@
         "conditions": {
           "operator": "and",
           "operands": [
+            {
+              "name": "isPr",
+              "parameters": {}
+            },
             {
               "name": "hasLabel",
               "parameters": {
@@ -805,6 +832,10 @@
         "conditions": {
           "operator": "and",
           "operands": [
+            {
+              "name": "isPr",
+              "parameters": {}
+            },
             {
               "name": "hasLabel",
               "parameters": {
@@ -1053,223 +1084,6 @@
         ]
       },
       "id": "QT-EMWLcBq1"
-    },
-    {
-      "taskType": "trigger",
-      "capabilityId": "AutoMerge",
-      "subCapability": "AutoMerge",
-      "version": "1.0",
-      "config": {
-        "taskName": "Automatically merge pull requests",
-        "label": "auto merge",
-        "silentMode": false,
-        "minMinutesOpen": 480,
-        "mergeType": "squash",
-        "allowAutoMergeInstructionsWithoutLabel": true
-      },
-      "id": "rhnI_EmIJoD",
-      "disabled": true
-    },
-    {
-      "taskType": "trigger",
-      "capabilityId": "IssueResponder",
-      "subCapability": "IssueCommentResponder",
-      "version": "1.0",
-      "config": {
-        "conditions": {
-          "operator": "and",
-          "operands": [
-            {
-              "operator": "not",
-              "operands": [
-                {
-                  "name": "isOpen",
-                  "parameters": {}
-                }
-              ]
-            },
-            {
-              "name": "isAction",
-              "parameters": {
-                "action": "created"
-              }
-            },
-            {
-              "name": "hasLabel",
-              "parameters": {
-                "label": "Status: No Recent Activity"
-              }
-            },
-            {
-              "name": "hasLabel",
-              "parameters": {
-                "label": "Needs: Author Feedback"
-              }
-            },
-            {
-              "operator": "not",
-              "operands": [
-                {
-                  "name": "noActivitySince",
-                  "parameters": {
-                    "days": 7
-                  }
-                }
-              ]
-            },
-            {
-              "operator": "not",
-              "operands": [
-                {
-                  "name": "isCloseAndComment",
-                  "parameters": {}
-                }
-              ]
-            },
-            {
-              "name": "isActivitySender",
-              "parameters": {
-                "user": {
-                  "type": "author"
-                }
-              }
-            },
-            {
-              "name": "activitySenderHasPermissions",
-              "parameters": {
-                "permissions": "none"
-              }
-            }
-          ]
-        },
-        "eventType": "issue",
-        "eventNames": [
-          "issue_comment"
-        ],
-        "taskName": "For issues closed due to inactivity, re-open an issue if issue author posts a reply within 7 days.",
-        "actions": [
-          {
-            "name": "reopenIssue",
-            "parameters": {}
-          },
-          {
-            "name": "removeLabel",
-            "parameters": {
-              "label": "Status: No Recent Activity"
-            }
-          },
-          {
-            "name": "removeLabel",
-            "parameters": {
-              "label": "Needs: Author Feedback"
-            }
-          },
-          {
-            "name": "addLabel",
-            "parameters": {
-              "label": "Needs: Attention :wave:"
-            }
-          }
-        ]
-      },
-      "id": "8YjRoneKS"
-    },
-    {
-      "taskType": "trigger",
-      "capabilityId": "IssueResponder",
-      "subCapability": "IssueCommentResponder",
-      "version": "1.0",
-      "config": {
-        "conditions": {
-          "operator": "and",
-          "operands": [
-            {
-              "name": "isAction",
-              "parameters": {
-                "action": "created"
-              }
-            },
-            {
-              "operator": "not",
-              "operands": [
-                {
-                  "name": "isOpen",
-                  "parameters": {}
-                }
-              ]
-            },
-            {
-              "name": "activitySenderHasPermissions",
-              "parameters": {
-                "permissions": "none"
-              }
-            },
-            {
-              "name": "noActivitySince",
-              "parameters": {
-                "days": 7
-              }
-            },
-            {
-              "operator": "not",
-              "operands": [
-                {
-                  "name": "isCloseAndComment",
-                  "parameters": {}
-                }
-              ]
-            }
-          ]
-        },
-        "eventType": "issue",
-        "eventNames": [
-          "issue_comment"
-        ],
-        "taskName": "For issues closed with no activity over 7 days, ask non-contributor to consider opening a new issue instead.",
-        "actions": [
-          {
-            "name": "addReply",
-            "parameters": {
-              "comment": "Hello lovely human, thank you for your comment on this issue. Because this issue has been closed for a period of time, please strongly consider opening a new issue linking to this issue instead to ensure better visibility of your comment. Thank you!"
-            }
-          }
-        ]
-      },
-      "id": "sSq5QO3bVD"
-    },
-    {
-      "taskType": "trigger",
-      "capabilityId": "IssueResponder",
-      "subCapability": "IssuesOnlyResponder",
-      "version": "1.0",
-      "id": "wDb08nd-bvog__k3HmCFA",
-      "config": {
-        "conditions": {
-          "operator": "and",
-          "operands": [
-            {
-              "name": "hasLabel",
-              "parameters": {
-                "label": "INTERNAL: Debug"
-              }
-            }
-          ]
-        },
-        "eventType": "issue",
-        "eventNames": [
-          "issues",
-          "project_card"
-        ],
-        "taskName": "[ARTAK TEST] Automation test",
-        "actions": [
-          {
-            "name": "addReply",
-            "parameters": {
-              "comment": "I'm an automation created to help you with managing this repo."
-            }
-          }
-        ]
-      }
     },
     {
       "taskType": "scheduled",
@@ -1723,6 +1537,10 @@
           "operator": "and",
           "operands": [
             {
+              "name": "isIssue",
+              "parameters": {}
+            },
+            {
               "name": "labelAdded",
               "parameters": {
                 "label": "stale"
@@ -1732,8 +1550,7 @@
         },
         "eventType": "issue",
         "eventNames": [
-          "issues",
-          "project_card"
+          "issues"
         ],
         "taskName": "Add comment for stale issues",
         "actions": [
@@ -1965,6 +1782,10 @@
           "operator": "and",
           "operands": [
             {
+              "name": "isIssue",
+              "parameters": {}
+            },
+            {
               "name": "isOpen",
               "parameters": {}
             },
@@ -1978,8 +1799,7 @@
         },
         "eventType": "issue",
         "eventNames": [
-          "issues",
-          "project_card"
+          "issues"
         ],
         "taskName": "Add to backlog comment",
         "actions": [
@@ -2003,6 +1823,10 @@
           "operator": "and",
           "operands": [
             {
+              "name": "isIssue",
+              "parameters": {}
+            },
+            {
               "name": "isOpen",
               "parameters": {}
             },
@@ -2016,8 +1840,7 @@
         },
         "eventType": "issue",
         "eventNames": [
-          "issues",
-          "project_card"
+          "issues"
         ],
         "actions": [
           {
@@ -2041,6 +1864,10 @@
           "operator": "and",
           "operands": [
             {
+              "name": "isIssue",
+              "parameters": {}
+            },
+            {
               "name": "isOpen",
               "parameters": {}
             },
@@ -2054,8 +1881,7 @@
         },
         "eventType": "issue",
         "eventNames": [
-          "issues",
-          "project_card"
+          "issues"
         ],
         "taskName": "Add to Planning Milestone",
         "actions": [
