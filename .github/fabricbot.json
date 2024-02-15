@@ -42,8 +42,7 @@
         ],
         "eventType": "issue",
         "eventNames": [
-          "issues",
-          "project_card"
+          "issues"
         ]
       },
       "id": "9WhXC0yr9Za"
@@ -152,8 +151,7 @@
         ],
         "eventType": "issue",
         "eventNames": [
-          "issues",
-          "project_card"
+          "issues"
         ]
       },
       "id": "y4Hbkh-A4Rq"
@@ -643,8 +641,7 @@
         "eventType": "pull_request",
         "eventNames": [
           "pull_request",
-          "issues",
-          "project_card"
+          "issues"
         ]
       },
       "id": "VFwc6u_tfc-"
@@ -783,8 +780,7 @@
         "eventType": "pull_request",
         "eventNames": [
           "pull_request",
-          "issues",
-          "project_card"
+          "issues"
         ]
       },
       "id": "8Vz5xHPu3pR"
@@ -1554,8 +1550,7 @@
         },
         "eventType": "issue",
         "eventNames": [
-          "issues",
-          "project_card"
+          "issues"
         ],
         "taskName": "Add comment for stale issues",
         "actions": [
@@ -1804,8 +1799,7 @@
         },
         "eventType": "issue",
         "eventNames": [
-          "issues",
-          "project_card"
+          "issues"
         ],
         "taskName": "Add to backlog comment",
         "actions": [
@@ -1846,8 +1840,7 @@
         },
         "eventType": "issue",
         "eventNames": [
-          "issues",
-          "project_card"
+          "issues"
         ],
         "actions": [
           {
@@ -1888,8 +1881,7 @@
         },
         "eventType": "issue",
         "eventNames": [
-          "issues",
-          "project_card"
+          "issues"
         ],
         "taskName": "Add to Planning Milestone",
         "actions": [
