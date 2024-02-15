@@ -12,19 +12,14 @@
           "operator": "and",
           "operands": [
             {
+              "name": "isIssue",
+              "parameters": {}
+            },
+            {
               "name": "isAction",
               "parameters": {
                 "action": "opened"
               }
-            },
-            {
-              "operator": "not",
-              "operands": [
-                {
-                  "name": "isPartOfProject",
-                  "parameters": {}
-                }
-              ]
             },
             {
               "operator": "not",
@@ -63,6 +58,10 @@
         "conditions": {
           "operator": "and",
           "operands": [
+            {
+              "name": "isIssue",
+              "parameters": {}
+            },
             {
               "name": "isAction",
               "parameters": {
@@ -121,6 +120,10 @@
           "operator": "and",
           "operands": [
             {
+              "name": "isIssue",
+              "parameters": {}
+            },
+            {
               "operator": "not",
               "operands": [
                 {
@@ -165,6 +168,10 @@
         "conditions": {
           "operator": "and",
           "operands": [
+            {
+              "name": "isIssue",
+              "parameters": {}
+            },
             {
               "name": "hasLabel",
               "parameters": {
@@ -552,6 +559,10 @@
           "operator": "and",
           "operands": [
             {
+              "name": "isPr",
+              "parameters": {}
+            },
+            {
               "name": "isAction",
               "parameters": {
                 "action": "submitted"
@@ -590,6 +601,10 @@
         "conditions": {
           "operator": "and",
           "operands": [
+            {
+              "name": "isPr",
+              "parameters": {}
+            },
             {
               "name": "isActivitySender",
               "parameters": {
@@ -645,6 +660,10 @@
           "operator": "and",
           "operands": [
             {
+              "name": "isPr",
+              "parameters": {}
+            },
+            {
               "name": "isActivitySender",
               "parameters": {
                 "user": {
@@ -686,6 +705,10 @@
           "operator": "and",
           "operands": [
             {
+              "name": "isPr",
+              "parameters": {}
+            },
+            {
               "name": "isActivitySender",
               "parameters": {
                 "user": {
@@ -726,6 +749,10 @@
         "conditions": {
           "operator": "and",
           "operands": [
+            {
+              "name": "isPr",
+              "parameters": {}
+            },
             {
               "operator": "not",
               "operands": [
@@ -773,6 +800,10 @@
           "operator": "and",
           "operands": [
             {
+              "name": "isPr",
+              "parameters": {}
+            },
+            {
               "name": "hasLabel",
               "parameters": {
                 "label": "Status: no recent activity"
@@ -805,6 +836,10 @@
         "conditions": {
           "operator": "and",
           "operands": [
+            {
+              "name": "isPr",
+              "parameters": {}
+            },
             {
               "name": "hasLabel",
               "parameters": {
@@ -1069,69 +1104,6 @@
       },
       "id": "rhnI_EmIJoD",
       "disabled": true
-    },
-    {
-      "taskType": "trigger",
-      "capabilityId": "IssueResponder",
-      "subCapability": "IssueCommentResponder",
-      "version": "1.0",
-      "config": {
-        "conditions": {
-          "operator": "and",
-          "operands": [
-            {
-              "name": "isAction",
-              "parameters": {
-                "action": "created"
-              }
-            },
-            {
-              "operator": "not",
-              "operands": [
-                {
-                  "name": "isOpen",
-                  "parameters": {}
-                }
-              ]
-            },
-            {
-              "name": "activitySenderHasPermissions",
-              "parameters": {
-                "permissions": "none"
-              }
-            },
-            {
-              "name": "noActivitySince",
-              "parameters": {
-                "days": 7
-              }
-            },
-            {
-              "operator": "not",
-              "operands": [
-                {
-                  "name": "isCloseAndComment",
-                  "parameters": {}
-                }
-              ]
-            }
-          ]
-        },
-        "eventType": "issue",
-        "eventNames": [
-          "issue_comment"
-        ],
-        "taskName": "For issues closed with no activity over 7 days, ask non-contributor to consider opening a new issue instead.",
-        "actions": [
-          {
-            "name": "addReply",
-            "parameters": {
-              "comment": "Hello lovely human, thank you for your comment on this issue. Because this issue has been closed for a period of time, please strongly consider opening a new issue linking to this issue instead to ensure better visibility of your comment. Thank you!"
-            }
-          }
-        ]
-      },
-      "id": "sSq5QO3bVD"
     },
     {
       "taskType": "trigger",
@@ -1619,6 +1591,10 @@
           "operator": "and",
           "operands": [
             {
+              "name": "isIssue",
+              "parameters": {}
+            },
+            {
               "name": "labelAdded",
               "parameters": {
                 "label": "stale"
@@ -1861,6 +1837,10 @@
           "operator": "and",
           "operands": [
             {
+              "name": "isIssue",
+              "parameters": {}
+            },
+            {
               "name": "isOpen",
               "parameters": {}
             },
@@ -1899,6 +1879,10 @@
           "operator": "and",
           "operands": [
             {
+              "name": "isIssue",
+              "parameters": {}
+            },
+            {
               "name": "isOpen",
               "parameters": {}
             },
@@ -1936,6 +1920,10 @@
         "conditions": {
           "operator": "and",
           "operands": [
+            {
+              "name": "isIssue",
+              "parameters": {}
+            },
             {
               "name": "isOpen",
               "parameters": {}
