@@ -1090,56 +1090,6 @@
       "id": "QT-EMWLcBq1"
     },
     {
-      "taskType": "trigger",
-      "capabilityId": "AutoMerge",
-      "subCapability": "AutoMerge",
-      "version": "1.0",
-      "config": {
-        "taskName": "Automatically merge pull requests",
-        "label": "auto merge",
-        "silentMode": false,
-        "minMinutesOpen": 480,
-        "mergeType": "squash",
-        "allowAutoMergeInstructionsWithoutLabel": true
-      },
-      "id": "rhnI_EmIJoD",
-      "disabled": true
-    },
-    {
-      "taskType": "trigger",
-      "capabilityId": "IssueResponder",
-      "subCapability": "IssuesOnlyResponder",
-      "version": "1.0",
-      "id": "wDb08nd-bvog__k3HmCFA",
-      "config": {
-        "conditions": {
-          "operator": "and",
-          "operands": [
-            {
-              "name": "hasLabel",
-              "parameters": {
-                "label": "INTERNAL: Debug"
-              }
-            }
-          ]
-        },
-        "eventType": "issue",
-        "eventNames": [
-          "issues",
-          "project_card"
-        ],
-        "taskName": "[ARTAK TEST] Automation test",
-        "actions": [
-          {
-            "name": "addReply",
-            "parameters": {
-              "comment": "I'm an automation created to help you with managing this repo."
-            }
-          }
-        ]
-      }
-    },
-    {
       "taskType": "scheduled",
       "capabilityId": "ScheduledSearch",
       "subCapability": "ScheduledSearch",
