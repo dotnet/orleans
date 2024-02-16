@@ -9,6 +9,7 @@ using System.Threading.Tasks;
 using System.Threading.Tasks.Sources;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.ObjectPool;
+using Orleans.Internal;
 using Orleans.Runtime.Internal;
 using Orleans.Runtime.Scheduler;
 
@@ -52,7 +53,7 @@ internal interface IActivationMigrationManager
 /// <summary>
 /// Migrates grain activations to target hosts and handles migration requests from other hosts.
 /// </summary>
-internal class ActivationMigrationManager : SystemTarget, IActivationMigrationManagerSystemTarget, IActivationMigrationManager
+internal class ActivationMigrationManager : SystemTarget, IActivationMigrationManagerSystemTarget, IActivationMigrationManager, ILifecycleParticipant<ISiloLifecycle>
 {
     private const int MaxBatchSize = 1_000;
     private readonly ConcurrentDictionary<SiloAddress, (Task PumpTask, Channel<MigrationWorkItem> WorkItemChannel)> _workers = new();
@@ -303,6 +304,28 @@ internal class ActivationMigrationManager : SystemTarget, IActivationMigrationMa
                 item.SetException(exception);
             }
         }
+    }
+
+    private Task StartAsync(CancellationToken cancellationToken) => Task.CompletedTask;
+    private async Task StopAsync(CancellationToken cancellationToken)
+    {
+        var workerTasks = new List<Task>();
+        foreach (var (_, value) in _workers)
+        {
+            value.WorkItemChannel.Writer.TryComplete();
+            workerTasks.Add(value.PumpTask);
+        }
+
+        await Task.WhenAll(workerTasks).WithCancellation(cancellationToken);
+    }
+
+    void ILifecycleParticipant<ISiloLifecycle>.Participate(ISiloLifecycle lifecycle)
+    {
+        lifecycle.Subscribe(
+            nameof(ActivationMigrationManager),
+            ServiceLifecycleStage.RuntimeGrainServices,
+                ct => this.RunOrQueueTask(() => StartAsync(ct)),
+                ct => this.RunOrQueueTask(() => StopAsync(ct)));
     }
 
     private class MigrationWorkItem : IValueTaskSource
