@@ -18,7 +18,7 @@ using Xunit;
 
 namespace Orleans.Serialization.UnitTests;
 
-//[Trait("Category", "BVT")]
+[Trait("Category", "BVT")]
 public class GeneratedSerializerTests : IDisposable
 {
     private readonly ServiceProvider _serviceProvider;
