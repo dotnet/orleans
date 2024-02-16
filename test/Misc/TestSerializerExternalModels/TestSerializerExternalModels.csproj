@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <RootNamespace>UnitTests.SerializerExternalModels</RootNamespace>
+    <AssemblyName>SerializerExternalModels</AssemblyName>
+    <TargetFrameworks>$(TestTargetFrameworks);netcoreapp3.1</TargetFrameworks>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\src\Orleans.Serialization.Abstractions\Orleans.Serialization.Abstractions.csproj" />
+  </ItemGroup>
+</Project>

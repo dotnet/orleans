@@ -1,21 +1,24 @@
+using System;
+using System.Collections.Concurrent;
+using System.Collections.Generic;
+using System.IO.Pipelines;
+using System.Linq;
+using Microsoft.Extensions.DependencyInjection;
+using Newtonsoft.Json;
+using Orleans;
 using Orleans.Serialization.Buffers;
 using Orleans.Serialization.Codecs;
 using Orleans.Serialization.Serializers;
 using Orleans.Serialization.Session;
 using Orleans.Serialization.Utilities;
-using Microsoft.Extensions.DependencyInjection;
-using Newtonsoft.Json;
-using System;
-using System.Buffers;
-using System.Collections.Concurrent;
-using System.Collections.Generic;
-using System.IO.Pipelines;
+using UnitTests.SerializerExternalModels;
 using Xunit;
-using System.Linq;
+
+[assembly: GenerateCodeForDeclaringAssembly(typeof(Person2External))]
 
 namespace Orleans.Serialization.UnitTests;
 
-[Trait("Category", "BVT")]
+//[Trait("Category", "BVT")]
 public class GeneratedSerializerTests : IDisposable
 {
     private readonly ServiceProvider _serviceProvider;
@@ -127,6 +130,23 @@ public class GeneratedSerializerTests : IDisposable
         Assert.Equal(original.StarSign, result.StarSign);
     }
 
+    [Fact]
+    public void GeneratedLibExternalRecordWithPCtorSerializersRoundTripThroughCodec()
+    {
+        var original = new Person2External(2, "harry")
+        {
+            FavouriteColor = "redborine",
+            StarSign = "Aquaricorn"
+        };
+
+        var result = RoundTripThroughCodec(original);
+
+        Assert.Equal(original.Age, result.Age);
+        Assert.Equal(original.Name, result.Name);
+        Assert.Equal(original.FavouriteColor, result.FavouriteColor);
+        Assert.Equal(original.StarSign, result.StarSign);
+    }
+
 #if NET6_0_OR_GREATER
     [Fact]
     public void RequiredMembersAreSupported()
@@ -201,7 +221,7 @@ public class GeneratedSerializerTests : IDisposable
         // Note that this only works because we are serializing each object using the "expected type" optimization and
         // therefore omitting the concrete type names.
         var originalAsArray = _serializer.SerializeToArray(original);
-        var classVersion = new Person5_Class { Age = 2,  Name = "harry", FavouriteColor = "redborine", StarSign = "Aquaricorn" };
+        var classVersion = new Person5_Class { Age = 2, Name = "harry", FavouriteColor = "redborine", StarSign = "Aquaricorn" };
         var classAsArray = _serializer.SerializeToArray(classVersion);
         Assert.Equal(originalAsArray, classAsArray);
     }
@@ -232,7 +252,7 @@ public class GeneratedSerializerTests : IDisposable
     public void GeneratedSerializersRoundTripThroughSerializer_ImmutableStruct()
     {
         var original = new ImmutableStruct(30, 2);
-         var result = (ImmutableStruct)RoundTripThroughUntypedSerializer(original, out _);
+        var result = (ImmutableStruct)RoundTripThroughUntypedSerializer(original, out _);
 
         Assert.Equal(original.GetIntField(), result.GetIntField());
         Assert.Equal(original.IntProperty, result.IntProperty);
