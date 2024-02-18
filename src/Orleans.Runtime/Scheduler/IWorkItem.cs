@@ -1,3 +1,4 @@
+using System;
 using System.Threading;
 
 namespace Orleans.Runtime.Scheduler
@@ -6,5 +7,7 @@ namespace Orleans.Runtime.Scheduler
     {
         string Name { get; }
         IGrainContext GrainContext { get; }
+
+        internal static readonly Action<object> ExecuteWorkItem = state => ((IWorkItem)state).Execute();
     }
 }

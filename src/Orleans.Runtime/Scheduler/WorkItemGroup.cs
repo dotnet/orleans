@@ -14,7 +14,7 @@ using Orleans.Internal;
 namespace Orleans.Runtime.Scheduler
 {
     [DebuggerDisplay("WorkItemGroup Name={Name} State={state}")]
-    internal class WorkItemGroup : IWorkItem, IWorkItemScheduler
+    internal sealed class WorkItemGroup : IWorkItem, IWorkItemScheduler
     {
         private enum WorkGroupStatus
         {
@@ -204,7 +204,7 @@ namespace Orleans.Runtime.Scheduler
 
                     try
                     {
-                        TaskScheduler.RunTask(task);
+                        TaskScheduler.RunTaskFromWorkItemGroup(task);
                     }
                     catch (Exception ex)
                     {
@@ -307,7 +307,7 @@ namespace Orleans.Runtime.Scheduler
         }
 
         public void QueueAction(Action action) => TaskScheduler.QueueAction(action);
+        public void QueueAction(Action<object> action, object state) => TaskScheduler.QueueAction(action, state);
         public void QueueTask(Task task) => task.Start(TaskScheduler);
-        public void QueueWorkItem(IThreadPoolWorkItem workItem) => TaskScheduler.QueueThreadPoolWorkItem(workItem);
     }
 }
