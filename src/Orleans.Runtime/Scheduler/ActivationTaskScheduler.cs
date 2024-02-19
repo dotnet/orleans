@@ -38,7 +38,6 @@ namespace Orleans.Runtime.Scheduler
 
         public void RunTask(Task task)
         {
-            RuntimeContext.SetExecutionContext(workerGroup.GrainContext);
             bool done = TryExecuteTask(task);
             if (!done)
                 logger.LogWarning(

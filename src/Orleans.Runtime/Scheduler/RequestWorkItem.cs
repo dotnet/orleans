@@ -5,28 +5,28 @@ namespace Orleans.Runtime.Scheduler
     internal sealed class RequestWorkItem : WorkItemBase
     {
         private readonly Message request;
-        private readonly SystemTarget target;
+        private readonly SystemTarget _target;
 
         public RequestWorkItem(SystemTarget t, Message m)
         {
-            target = t;
+            _target = t;
             request = m;
         }
 
         public override string Name => $"RequestWorkItem:Id={request.Id}";
 
-        public override IGrainContext GrainContext => this.target;
+        public override IGrainContext GrainContext => _target;
 
         public override void Execute()
         {
+            RuntimeContext.SetExecutionContext(_target, out var originalContext);
             try
             {
-                RuntimeContext.SetExecutionContext(this.target);
-                target.HandleNewRequest(request);
+                _target.HandleNewRequest(request);
             }
             finally
             {
-                RuntimeContext.ResetExecutionContext();
+                RuntimeContext.ResetExecutionContext(originalContext);
             }
         }
 

@@ -7,7 +7,7 @@ namespace Orleans.Runtime.Scheduler
 {
     internal static class TaskSchedulerUtils
     {
-        private static readonly Action<object> TaskFunc = (state) => RunWorkItemTask((IWorkItem)state);
+        private static readonly Action<object> TaskFunc = RunWorkItemTask;
         private static readonly Action<object> ThreadPoolWorkItemTaskFunc = (state) => RunThreadPoolWorkItemTask((IThreadPoolWorkItem)state);
 
         private static void RunThreadPoolWorkItemTask(IThreadPoolWorkItem todo)
@@ -15,20 +15,21 @@ namespace Orleans.Runtime.Scheduler
             todo.Execute();
         }
 
-        private static void RunWorkItemTask(IWorkItem todo)
+        private static void RunWorkItemTask(object state)
         {
+            var workItem = (RequestWorkItem)state;
+            RuntimeContext.SetExecutionContext(workItem.GrainContext, out var originalContext);
             try
             {
-                RuntimeContext.SetExecutionContext(todo.GrainContext);
-                todo.Execute();
+                workItem.Execute();
             }
             finally
             {
-                RuntimeContext.ResetExecutionContext();
+                RuntimeContext.ResetExecutionContext(originalContext);
             }
         }
 
-        public static void QueueAction(this TaskScheduler taskScheduler, Action action)
+        public static void QueueAction(this ActivationTaskScheduler taskScheduler, Action action)
         {
             using var suppressExecutionContext = new ExecutionContextSuppressor(); 
 
@@ -36,7 +37,7 @@ namespace Orleans.Runtime.Scheduler
             task.Start(taskScheduler);
         }
 
-        public static void QueueAction(this TaskScheduler taskScheduler, Action<object> action, object state)
+        public static void QueueAction(this ActivationTaskScheduler taskScheduler, Action<object> action, object state)
         {
             using var suppressExecutionContext = new ExecutionContextSuppressor(); 
 
@@ -44,15 +45,15 @@ namespace Orleans.Runtime.Scheduler
             task.Start(taskScheduler);
         }
 
-        public static void QueueWorkItem(this TaskScheduler taskScheduler, IWorkItem todo)
+        public static void QueueRequestWorkItem(this ActivationTaskScheduler taskScheduler, RequestWorkItem requestWorkItem)
         {
             using var suppressExecutionContext = new ExecutionContextSuppressor(); 
 
-            var workItemTask = new Task(TaskFunc, todo);
+            var workItemTask = new Task(TaskFunc, requestWorkItem);
             workItemTask.Start(taskScheduler);
         }
 
-        public static void QueueThreadPoolWorkItem(this TaskScheduler taskScheduler, IThreadPoolWorkItem workItem)
+        public static void QueueThreadPoolWorkItem(this ActivationTaskScheduler taskScheduler, IThreadPoolWorkItem workItem)
         {
             using var suppressExecutionContext = new ExecutionContextSuppressor(); 
 
