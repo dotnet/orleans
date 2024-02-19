@@ -164,12 +164,12 @@ namespace Orleans.Runtime.Scheduler
 
         // Execute one or more turns for this activation.
         // This method is always called in a single-threaded environment -- that is, no more than one
-        // thread will be in this method at once -- but other asynch threads may still be queueing tasks, etc.
+        // thread will be in this method at once -- but other async threads may still be queueing tasks, etc.
         public void Execute()
         {
+            RuntimeContext.SetExecutionContext(GrainContext, out var originalContext);
             try
             {
-                RuntimeContext.SetExecutionContext(this.GrainContext);
 
                 // Process multiple items -- drain the applicationMessageQueue (up to max items) for this physical activation
                 int count = 0;
@@ -264,7 +264,7 @@ namespace Orleans.Runtime.Scheduler
                     }
                 }
 
-                RuntimeContext.ResetExecutionContext();
+                RuntimeContext.ResetExecutionContext(originalContext);
             }
         }
 

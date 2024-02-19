@@ -280,7 +280,7 @@ namespace Orleans.Runtime
                     {
                         this.MessagingTrace.OnEnqueueMessageOnActivation(msg, this);
                         var workItem = new RequestWorkItem(this, msg);
-                        this.WorkItemGroup.TaskScheduler.QueueWorkItem(workItem);
+                        this.WorkItemGroup.TaskScheduler.QueueRequestWorkItem(workItem);
                         break;
                     }
 

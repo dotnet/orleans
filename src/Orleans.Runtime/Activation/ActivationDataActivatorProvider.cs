@@ -116,7 +116,7 @@ namespace Orleans.Runtime
                     _serviceProvider,
                     _sharedComponents);
 
-                RuntimeContext.SetExecutionContext(context, out var existingContext);
+                RuntimeContext.SetExecutionContext(context, out var originalContext);
 
                 try
                 {
@@ -126,7 +126,7 @@ namespace Orleans.Runtime
                 }
                 finally
                 {
-                    RuntimeContext.SetExecutionContext(existingContext);
+                    RuntimeContext.ResetExecutionContext(originalContext);
                 }
 
                 return context;
