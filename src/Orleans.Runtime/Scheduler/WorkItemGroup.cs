@@ -174,9 +174,8 @@ namespace Orleans.Runtime.Scheduler
             {
 
                 // Process multiple items -- drain the queue (up to max items) for this activation
-                var loopStart = Environment.TickCount64;
-                var taskStart = loopStart;
-                var taskEnd = taskStart;
+                long loopStart, taskStart, taskEnd;
+                loopStart = taskStart = taskEnd = Environment.TickCount64;
                 do
                 {
                     Task task;
@@ -203,11 +202,6 @@ namespace Orleans.Runtime.Scheduler
                     try
                     {
                         TaskScheduler.RunTaskFromWorkItemGroup(task);
-                    }
-                    catch (Exception ex)
-                    {
-                        LogTaskRunError(task, ex);
-                        throw;
                     }
                     finally
                     {
