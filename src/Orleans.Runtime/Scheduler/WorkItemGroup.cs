@@ -14,7 +14,7 @@ using Orleans.Internal;
 namespace Orleans.Runtime.Scheduler
 {
     [DebuggerDisplay("WorkItemGroup Name={Name} State={state}")]
-    internal sealed class WorkItemGroup : IWorkItem, IWorkItemScheduler
+    internal sealed class WorkItemGroup : IThreadPoolWorkItem, IWorkItemScheduler
     {
         private enum WorkGroupStatus
         {

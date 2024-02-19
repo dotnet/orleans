@@ -1,12 +1,12 @@
 using System;
-using System.Threading;
 
 namespace Orleans.Runtime.Scheduler
 {
-    internal interface IWorkItem : IThreadPoolWorkItem
+    internal interface IWorkItem
     {
         string Name { get; }
         IGrainContext GrainContext { get; }
+        void Execute();
 
         internal static readonly Action<object> ExecuteWorkItem = state => ((IWorkItem)state).Execute();
     }
