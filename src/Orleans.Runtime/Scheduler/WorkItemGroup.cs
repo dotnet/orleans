@@ -1,7 +1,8 @@
+#nullable enable
+
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
-using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Text;
 using System.Threading;
@@ -33,7 +34,7 @@ internal sealed class WorkItemGroup : IThreadPoolWorkItem, IWorkItemScheduler
     private long _lastLongQueueWarningTimestamp;
 
     private WorkGroupStatus _state;
-    private Task _currentTask;
+    private Task? _currentTask;
     private long _currentTaskStarted;
 
     internal ActivationTaskScheduler TaskScheduler { get; }
