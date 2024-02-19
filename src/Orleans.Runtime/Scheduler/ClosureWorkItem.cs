@@ -27,7 +27,6 @@ namespace Orleans.Runtime.Scheduler
 
         public override async void Execute()
         {
-            RuntimeContext.SetExecutionContext(GrainContext, out var originalContext);
             try
             {
                 RequestContext.Clear();
@@ -37,10 +36,6 @@ namespace Orleans.Runtime.Scheduler
             catch (Exception exception)
             {
                 this.completion.TrySetException(exception);
-            }
-            finally
-            {
-                RuntimeContext.ResetExecutionContext(originalContext);
             }
         }
 
@@ -73,7 +68,6 @@ namespace Orleans.Runtime.Scheduler
 
         public override async void Execute()
         {
-            RuntimeContext.SetExecutionContext(GrainContext, out var originalContext);
             try
             {
                 RequestContext.Clear();
@@ -83,10 +77,6 @@ namespace Orleans.Runtime.Scheduler
             catch (Exception exception)
             {
                 this.completion.TrySetException(exception);
-            }
-            finally
-            {
-                RuntimeContext.ResetExecutionContext(originalContext);
             }
         }
 
