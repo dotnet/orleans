@@ -17,7 +17,7 @@ namespace Orleans.Runtime.Scheduler;
 [DebuggerDisplay("WorkItemGroup Name={Name} State={state}")]
 internal sealed class WorkItemGroup : IThreadPoolWorkItem, IWorkItemScheduler
 {
-    private enum WorkGroupStatus
+    private enum WorkGroupStatus : byte
     {
         Waiting = 0,
         Runnable = 1,
