@@ -38,7 +38,7 @@ namespace Orleans.Runtime.GrainDirectory
         {
             this.grainDirectoryResolver = grainDirectoryResolver;
             this.clusterMembershipService = clusterMembershipService;
-            this.cache = GrainDirectoryCacheFactory.CreateGrainDirectoryCache(serviceProvider, grainDirectoryOptions.Value);
+            this.cache = GrainDirectoryCacheFactory.CreateCustomGrainDirectoryCache(serviceProvider, grainDirectoryOptions.Value);
         }
 
         public async ValueTask<GrainAddress> Lookup(GrainId grainId)
