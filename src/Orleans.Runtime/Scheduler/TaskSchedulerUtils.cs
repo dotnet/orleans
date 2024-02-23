@@ -1,5 +1,5 @@
 using System;
-using System.Threading;
+using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
 using Orleans.Runtime.Internal;
 
@@ -7,28 +7,7 @@ namespace Orleans.Runtime.Scheduler
 {
     internal static class TaskSchedulerUtils
     {
-        private static readonly Action<object> TaskFunc = RunWorkItemTask;
-        private static readonly Action<object> ThreadPoolWorkItemTaskFunc = (state) => RunThreadPoolWorkItemTask((IThreadPoolWorkItem)state);
-
-        private static void RunThreadPoolWorkItemTask(IThreadPoolWorkItem todo)
-        {
-            todo.Execute();
-        }
-
-        private static void RunWorkItemTask(object state)
-        {
-            var workItem = (RequestWorkItem)state;
-            RuntimeContext.SetExecutionContext(workItem.GrainContext, out var originalContext);
-            try
-            {
-                workItem.Execute();
-            }
-            finally
-            {
-                RuntimeContext.ResetExecutionContext(originalContext);
-            }
-        }
-
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static void QueueAction(this ActivationTaskScheduler taskScheduler, Action action)
         {
             using var suppressExecutionContext = new ExecutionContextSuppressor(); 
@@ -37,6 +16,7 @@ namespace Orleans.Runtime.Scheduler
             task.Start(taskScheduler);
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static void QueueAction(this ActivationTaskScheduler taskScheduler, Action<object> action, object state)
         {
             using var suppressExecutionContext = new ExecutionContextSuppressor(); 
@@ -45,20 +25,16 @@ namespace Orleans.Runtime.Scheduler
             task.Start(taskScheduler);
         }
 
-        public static void QueueRequestWorkItem(this ActivationTaskScheduler taskScheduler, RequestWorkItem requestWorkItem)
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static void QueueWorkItem(this WorkItemGroup scheduler, IWorkItem workItem)
         {
-            using var suppressExecutionContext = new ExecutionContextSuppressor(); 
-
-            var workItemTask = new Task(TaskFunc, requestWorkItem);
-            workItemTask.Start(taskScheduler);
+            QueueAction(scheduler.TaskScheduler, IWorkItem.ExecuteWorkItem, workItem);
         }
 
-        public static void QueueThreadPoolWorkItem(this ActivationTaskScheduler taskScheduler, IThreadPoolWorkItem workItem)
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static void QueueWorkItem(this IWorkItemScheduler scheduler, IWorkItem workItem)
         {
-            using var suppressExecutionContext = new ExecutionContextSuppressor(); 
-
-            var workItemTask = new Task(ThreadPoolWorkItemTaskFunc , workItem);
-            workItemTask.Start(taskScheduler);
+            scheduler.QueueAction(IWorkItem.ExecuteWorkItem, workItem);
         }
     }
 }

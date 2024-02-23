@@ -17,18 +17,7 @@ namespace Orleans.Runtime.Scheduler
 
         public override IGrainContext GrainContext => _target;
 
-        public override void Execute()
-        {
-            RuntimeContext.SetExecutionContext(_target, out var originalContext);
-            try
-            {
-                _target.HandleNewRequest(request);
-            }
-            finally
-            {
-                RuntimeContext.ResetExecutionContext(originalContext);
-            }
-        }
+        public override void Execute() => _target.HandleNewRequest(request);
 
         public override bool TryFormat(Span<char> destination, out int charsWritten, ReadOnlySpan<char> format, IFormatProvider provider)
         {
