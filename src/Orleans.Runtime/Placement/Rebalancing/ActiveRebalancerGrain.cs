@@ -74,7 +74,7 @@ internal sealed class ActiveRebalancerGrain : Grain, IActiveRebalancerGrain
     {
         _timer?.Dispose();
         _timer = RegisterTimer(
-            // We make the timer respect the reentrancy of the grain, so further edge recordings will be stopped untill the protocol runs.
+            // We make the timer respect the reentrancy of the grain, so further edge recordings will be stopped until the protocol runs.
             // At the end the counters table gets updated for the next round of collection. Note that the client calling 'RecordEdge' will await
             // till the protocol has finished, and in case a huge amount of messages accumulate, the channel will drop older once (which is fine).
             _ => this.AsReference<IActiveRebalancerGrain>().TriggerExchangeRequest(), null!, dueTime, _options.RebalancingPeriod);

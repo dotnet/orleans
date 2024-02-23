@@ -11,7 +11,7 @@ namespace Orleans.Runtime.Placement.Rebalancing;
 /// <summary>
 /// Implementation of the Space-Saving algorithm: https://www.cse.ust.hk/~raywong/comp5331/References/EfficientComputationOfFrequentAndTop-kElementsInDataStreams.pdf
 /// </summary>
-internal sealed partial class FrequencySink(int capacity)
+internal sealed class FrequencySink(int capacity)
 {
     private readonly Dictionary<ulong, EdgeCounter> _counters = new(capacity);
     private readonly UpdateableMinHeap _heap = new(capacity);
