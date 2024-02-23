@@ -42,6 +42,7 @@ using System.Collections.Generic;
 using Microsoft.Extensions.Configuration;
 using Orleans.Serialization.Internal;
 using Orleans.Runtime.Configuration.Options;
+using Orleans.Placement.Rebalancing;
 
 namespace Orleans.Hosting
 {
@@ -356,6 +357,7 @@ namespace Orleans.Hosting
                 (sp, _) => sp.GetRequiredService<IAsyncEnumerableGrainExtension>());
 
             // Networking
+            services.TryAddSingleton<IActiveRebalancerGateway, NoOpActiveRebalancerGateway>();
             services.TryAddSingleton<ConnectionCommon>();
             services.TryAddSingleton<ConnectionManager>();
             services.TryAddSingleton<ConnectionPreambleHelper>();

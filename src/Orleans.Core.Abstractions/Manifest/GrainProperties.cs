@@ -162,6 +162,11 @@ namespace Orleans.Metadata
         /// Specifies the name of a method used to determine if a request can interleave other requests.
         /// </summary>
         public const string MayInterleavePredicate = "may-interleave-predicate";
+
+        /// <summary>
+        /// Whether a grain can be migrated by active-rebalancing or not.
+        /// </summary>
+        public const string Immovable = "immovable";
     }
 
     /// <summary>

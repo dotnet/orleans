@@ -7,6 +7,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
+using Orleans.Placement.Rebalancing;
 
 namespace Orleans.Runtime.Messaging
 {
@@ -14,6 +15,7 @@ namespace Orleans.Runtime.Messaging
     {
         internal static readonly object ServicesKey = new object();
         private readonly ILocalSiloDetails localSiloDetails;
+        private readonly IActiveRebalancerGateway rebalancerGateway;
         private readonly MessageCenter messageCenter;
         private readonly ConnectionCommon connectionShared;
         private readonly ConnectionPreambleHelper connectionPreambleHelper;
@@ -29,6 +31,7 @@ namespace Orleans.Runtime.Messaging
             IOptions<SiloConnectionOptions> siloConnectionOptions,
             OverloadDetector overloadDetector,
             ILocalSiloDetails localSiloDetails,
+            IActiveRebalancerGateway rebalancerGateway,
             IOptions<EndpointOptions> endpointOptions,
             MessageCenter messageCenter,
             ConnectionManager connectionManager,
@@ -41,6 +44,7 @@ namespace Orleans.Runtime.Messaging
             this.overloadDetector = overloadDetector;
             this.gateway = messageCenter.Gateway;
             this.localSiloDetails = localSiloDetails;
+            this.rebalancerGateway = rebalancerGateway;
             this.messageCenter = messageCenter;
             this.connectionShared = connectionShared;
             this.connectionPreambleHelper = connectionPreambleHelper;
@@ -61,7 +65,8 @@ namespace Orleans.Runtime.Messaging
                 this.ConnectionOptions,
                 this.messageCenter,
                 this.connectionShared,
-                this.connectionPreambleHelper);
+                this.connectionPreambleHelper,
+                this.rebalancerGateway);
         }
 
         protected override void ConfigureConnectionBuilder(IConnectionBuilder connectionBuilder)

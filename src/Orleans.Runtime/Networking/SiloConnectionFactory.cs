@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Connections;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
+using Orleans.Placement.Rebalancing;
 
 namespace Orleans.Runtime.Messaging
 {
@@ -12,6 +13,7 @@ namespace Orleans.Runtime.Messaging
     {
         internal static readonly object ServicesKey = new object();
         private readonly ILocalSiloDetails localSiloDetails;
+        private readonly IActiveRebalancerGateway rebalancerGateway;
         private readonly ConnectionCommon connectionShared;
         private readonly ProbeRequestMonitor probeRequestMonitor;
         private readonly ConnectionPreambleHelper connectionPreambleHelper;
@@ -28,6 +30,7 @@ namespace Orleans.Runtime.Messaging
             IOptions<ConnectionOptions> connectionOptions,
             IOptions<SiloConnectionOptions> siloConnectionOptions,
             ILocalSiloDetails localSiloDetails,
+            IActiveRebalancerGateway rebalancerGateway,
             ConnectionCommon connectionShared,
             ProbeRequestMonitor probeRequestMonitor,
             ConnectionPreambleHelper connectionPreambleHelper)
@@ -36,6 +39,7 @@ namespace Orleans.Runtime.Messaging
             this.serviceProvider = serviceProvider;
             this.siloConnectionOptions = siloConnectionOptions.Value;
             this.localSiloDetails = localSiloDetails;
+            this.rebalancerGateway = rebalancerGateway;
             this.connectionShared = connectionShared;
             this.probeRequestMonitor = probeRequestMonitor;
             this.connectionPreambleHelper = connectionPreambleHelper;
@@ -67,7 +71,8 @@ namespace Orleans.Runtime.Messaging
                 this.ConnectionOptions,
                 this.connectionShared,
                 this.probeRequestMonitor,
-                this.connectionPreambleHelper);
+                this.connectionPreambleHelper,
+                this.rebalancerGateway);
         }
 
         protected override void ConfigureConnectionBuilder(IConnectionBuilder connectionBuilder)
