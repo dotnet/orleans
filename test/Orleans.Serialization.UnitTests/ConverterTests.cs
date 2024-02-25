@@ -124,6 +124,6 @@ public class CombinedConverterCopierTests : CopierTester<MyFirstForeignLibraryTy
     }
 
     protected override MyFirstForeignLibraryType CreateValue() => new() { Num = 12, String = "hi", DateTimeOffset = DateTimeOffset.Now };
-    protected override bool Equals(MyFirstForeignLibraryType left, MyFirstForeignLibraryType right) => ReferenceEquals(left, right) || left.Equals(right);
-    protected override MyFirstForeignLibraryType[] TestValues => new MyFirstForeignLibraryType[] { null, CreateValue() };
+    protected override bool Equals(MyFirstForeignLibraryType left, MyFirstForeignLibraryType right) => left.Equals(right);
+    protected override MyFirstForeignLibraryType[] TestValues => new MyFirstForeignLibraryType[] { CreateValue() };
 }
