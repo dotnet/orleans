@@ -115,3 +115,15 @@ public class DerivedConverterCopierTests : CopierTester<DerivedFromMyForeignLibr
     protected override bool Equals(DerivedFromMyForeignLibraryType left, DerivedFromMyForeignLibraryType right) => ReferenceEquals(left, right) || left.Equals(right);
     protected override DerivedFromMyForeignLibraryType[] TestValues => new DerivedFromMyForeignLibraryType[] { null, CreateValue() };
 }
+
+
+public class CombinedConverterCopierTests : CopierTester<MyFirstForeignLibraryType, IDeepCopier<MyFirstForeignLibraryType>>
+{
+    public CombinedConverterCopierTests(ITestOutputHelper output) : base(output)
+    {
+    }
+
+    protected override MyFirstForeignLibraryType CreateValue() => new() { Num = 12, String = "hi", DateTimeOffset = DateTimeOffset.Now };
+    protected override bool Equals(MyFirstForeignLibraryType left, MyFirstForeignLibraryType right) => ReferenceEquals(left, right) || left.Equals(right);
+    protected override MyFirstForeignLibraryType[] TestValues => new MyFirstForeignLibraryType[] { null, CreateValue() };
+}
