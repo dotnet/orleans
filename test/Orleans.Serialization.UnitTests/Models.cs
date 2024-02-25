@@ -850,6 +850,14 @@ namespace Orleans.Serialization.UnitTests
         public int Num { get; set; }
         public string String { get; set; }
         public DateTimeOffset DateTimeOffset { get; set; }
+
+        public override bool Equals(object obj) =>
+            obj is MyFirstForeignLibraryType type
+            && Num == type.Num
+            && string.Equals(String, type.String, StringComparison.Ordinal)
+            && DateTimeOffset.Equals(type.DateTimeOffset);
+
+        public override int GetHashCode() => HashCode.Combine(Num, String, DateTimeOffset);
     }
 
     public class MySecondForeignLibraryType
@@ -857,6 +865,14 @@ namespace Orleans.Serialization.UnitTests
         public string Name { get; set; }
         public float Value { get; set; }
         public DateTimeOffset Timestamp { get; set; }
+
+        public override bool Equals(object obj) =>
+            obj is MySecondForeignLibraryType type
+            && string.Equals(Name, type.Name, StringComparison.Ordinal)
+            && Value == type.Value
+            && Timestamp.Equals(type.Timestamp);
+
+        public override int GetHashCode() => HashCode.Combine(Name, Value, Timestamp);
     }
 
     [GenerateSerializer]
