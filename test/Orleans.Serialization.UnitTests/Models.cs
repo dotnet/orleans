@@ -843,4 +843,62 @@ namespace Orleans.Serialization.UnitTests
         [Id(2)] public object UntypedValue;
         [Id(3)] public Type Type2;
     }
+
+    public class MyFirstForeignLibraryType
+    {
+        
+        public int Num { get; set; }
+        public string String { get; set; }
+        public DateTimeOffset DateTimeOffset { get; set; }
+    }
+
+    public class MySecondForeignLibraryType
+    {
+        public string Name { get; set; }
+        public float Value { get; set; }
+        public DateTimeOffset Timestamp { get; set; }
+    }
+
+    [GenerateSerializer]
+    public struct MyFirstForeignLibraryTypeSurrogate
+    {
+        [Id(0)]
+        public int Num { get; set; }
+
+        [Id(1)]
+        public string String { get; set; }
+
+        [Id(2)]
+        public DateTimeOffset DateTimeOffset { get; set; }
+    }
+
+
+    [GenerateSerializer]
+    public struct MySecondForeignLibraryTypeSurrogate
+    {
+        [Id(0)]
+        public string Name { get; set; }
+
+        [Id(1)]
+        public float Value { get; set; }
+
+        [Id(2)]
+        public DateTimeOffset Timestamp { get; set; }
+    }
+
+    [RegisterConverter]
+    public sealed class MyCombinedForeignLibraryValueTypeSurrogateConverter :
+        IConverter<MyFirstForeignLibraryType, MyFirstForeignLibraryTypeSurrogate>,
+        IConverter<MySecondForeignLibraryType, MySecondForeignLibraryTypeSurrogate>
+    {
+        public MyFirstForeignLibraryType ConvertFromSurrogate(in MyFirstForeignLibraryTypeSurrogate surrogate)
+            => new () { Num = surrogate.Num, String = surrogate.String, DateTimeOffset = surrogate.DateTimeOffset };
+        public MyFirstForeignLibraryTypeSurrogate ConvertToSurrogate(in MyFirstForeignLibraryType value)
+            => new() { Num = value.Num, String = value.String, DateTimeOffset = value.DateTimeOffset };
+
+        public MySecondForeignLibraryType ConvertFromSurrogate(in MySecondForeignLibraryTypeSurrogate surrogate)
+            => new() { Name = surrogate.Name, Value = surrogate.Value, Timestamp = surrogate.Timestamp };
+        public MySecondForeignLibraryTypeSurrogate ConvertToSurrogate(in MySecondForeignLibraryType value)
+            => new () { Name = value.Name, Value = value.Value, Timestamp = value.Timestamp };
+    }
 }
