@@ -299,7 +299,7 @@ internal sealed class ActiveRebalancerGrain : Grain, IActiveRebalancerGrain
                 }
                 else
                 {
-                    // Should be rare that this happens, but still, if the transfer score are equal, than we check the anticipated imbalances
+                    // Other than testing scenarious with a handful of activations, it should be rare that this happens. If the transfer scores are equal, than we check the anticipated imbalances
                     // for both cases, and proceed with whichever lowers the overall imbalance, even though the other option could still be within the tolerance margin.
                     // The imbalance check is the first step micro-optimization, which doesnt neccessarily mean that the migration direction (L2R, R2L) will happen, that is still
                     // determined within the migration methods. In case both anticipated imbalances are also equal, we have to pick one, and we stick for consistency with L2R in that case.
@@ -321,15 +321,15 @@ internal sealed class ActiveRebalancerGrain : Grain, IActiveRebalancerGrain
             }
             else if (localHeap.IsNotEmpty)
             {
-                _ = TryMigrateLocalToRemote();  // Means that remote heap is empty, so just try to migrate L2R, if imbalance allows for
+                _ = TryMigrateLocalToRemote();  // Means that remote heap is empty, so just try to migrate L2R, if imbalance allows for!
             }
             else if (remoteHeap.IsNotEmpty)
             {
-                _ = TryMigrateRemoteToLocal();  // Means that remote heap is empty, so just try to migrate R2L, if imbalance allows for
+                _ = TryMigrateRemoteToLocal();  // Means that remote heap is empty, so just try to migrate R2L, if imbalance allows for!
             }
             else
             {
-                break;                          // Means that both heaps are empty, at this point we are done
+                break;                          // Means that both heaps are empty, at this point we are done.
             }
         }
 

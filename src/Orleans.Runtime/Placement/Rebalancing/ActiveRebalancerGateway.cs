@@ -135,26 +135,8 @@ internal sealed class ActiveRebalancerGateway : IActiveRebalancerGateway, ILifec
             return;
         }
 
-        // Sender and target need to be addressible grains to know where to move each.
-        if (message.SendingGrain.IsDefault || message.TargetGrain.IsDefault)
-        {
-            return;
-        }
-
-        // Sender must exist, and must not be a client (we cant move grains to a client, only to a server).
-        if (message.SendingSilo is null || message.SendingSilo.IsClient || message.SendingGrain.IsClient())
-        {
-            return;
-        }
-
-        // Target must exist, and must not be a client (we cant move grains to a client, only to a server).
-        if (message.TargetSilo is null || message.TargetSilo.IsClient || message.TargetGrain.IsClient())
-        { 
-            return;
-        }
-
-        // Ignore rebalancer messages: either to another rebalancer, or when executing migration requests to activations.
-        if (IsRebalancer(message.SendingGrain.Type) || IsRebalancer(message.TargetGrain.Type))
+        // Sender and target need to be fully addressible to know where to move to or towards.
+        if (!message.IsSenderFullyAddressed || !message.IsTargetFullyAddressed)
         {
             return;
         }
@@ -163,6 +145,12 @@ internal sealed class ActiveRebalancerGateway : IActiveRebalancerGateway, ILifec
         // as wherever this grain would be located in the cluster, it would always be a local call (since it targets itself), this would add negative transfer cost
         // which would skew a potential relocation of this grain, while it shouldn't, because whenever this grain is located, it would still make local calls to itself.
         if (message.SendingGrain == message.TargetGrain)
+        {
+            return;
+        }
+
+        // Ignore rebalancer messages: either to another rebalancer, or when executing migration requests to activations.
+        if (IsRebalancer(message.SendingGrain.Type) || IsRebalancer(message.TargetGrain.Type))
         {
             return;
         }
@@ -192,7 +180,7 @@ internal sealed class ActiveRebalancerGateway : IActiveRebalancerGateway, ILifec
             // since we don't anticipate a huge number of grain *types*, i think its just fine to have this in place as fast-check.
             if (!_migratableStatuses.TryGetValue(hash, out var isMigratable))
             {
-                isMigratable = !(grainType.IsSystemTarget() || grainType.IsGrainService() || IsStatelessWorker(grainType) || IsImmovable(grainType));
+                isMigratable = !(grainType.IsClient() || grainType.IsSystemTarget() || grainType.IsGrainService() || IsStatelessWorker(grainType) || IsImmovable(grainType));
                 _migratableStatuses.TryAdd(hash, isMigratable);
             }
 
