@@ -211,13 +211,13 @@ internal sealed class ActiveRebalancerGrain : Grain, IActiveRebalancerGrain
                 if (response.Type == AcceptExchangeResponse.ResponseType.ExchangedRecently)
                 {
                     _logger.LogDebug(
-                        "Exchange request from {ThisSilo} failed, due to {OtherSilo} having been recently involved in another exchange." +
+                        "Exchange request from {ThisSilo} failed, due to {OtherSilo} having been recently involved in another exchange. " +
                         "I will try the next best candidate (if one is available), otherwise I will wait for my next period to come.", ThisSilo, candidateSilo);
                 }
                 else if (response.Type == AcceptExchangeResponse.ResponseType.MutualExchangeAttempt)
                 {
                     _logger.LogDebug(
-                        "Exchange request from {ThisSilo} failed, due to an mutual exchange attempt with {OtherSilo}." +
+                        "Exchange request from {ThisSilo} failed, due to an mutual exchange attempt with {OtherSilo}. " +
                         "I will try the next best candidate (if one is available), otherwise I will wait for my next period to come.", ThisSilo, candidateSilo);
                 }
             }
