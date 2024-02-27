@@ -21,6 +21,8 @@ namespace Orleans.Runtime.Placement
         private readonly ImmutableDictionary<string, Type> _strategies;
         private readonly PlacementStrategy _defaultPlacementStrategy;
 
+        private ImmutableDictionary<GrainType, StatelessWorkerPlacement> _placementStrategies = ImmutableDictionary.Create<GrainType, StatelessWorkerPlacement>();
+
         /// <summary>
         /// Create a <see cref="PlacementStrategyResolver"/> instance.
         /// </summary>
@@ -70,6 +72,18 @@ namespace Orleans.Runtime.Placement
                 && properties.Properties.TryGetValue(WellKnownGrainTypeProperties.PlacementStrategy, out var placementStrategyId)
                 && !string.IsNullOrWhiteSpace(placementStrategyId))
             {
+                if (placementStrategyId == typeof(StatelessWorkerPlacement).Name)
+                {
+                    strategy = ImmutableInterlocked.GetOrAdd(ref _placementStrategies, grainType,
+                        key =>
+                        {
+                            var strategy = new StatelessWorkerPlacement();
+                            strategy.Initialize(properties);
+                            return strategy;
+                        });
+                    return true;
+                }
+
                 if (_strategies.TryGetValue(placementStrategyId, out var strategyType))
                 {
                     strategy = (PlacementStrategy)_services.GetService(strategyType);
