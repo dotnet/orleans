@@ -10,6 +10,7 @@ using Orleans.Runtime.Messaging;
 using Orleans.Runtime.TestHooks;
 using Orleans.Statistics;
 using UnitTests.GrainInterfaces;
+using Xunit;
 
 namespace UnitTests.Grains
 {
@@ -58,7 +59,7 @@ namespace UnitTests.Grains
         public Task StartLocalGrains(List<Guid> keys)
         {
             // we call Nop() on the grain references to ensure that they're instantiated before the promise is delivered.
-            var grains = keys.Select(i => GrainFactory.GetGrain<ILocalPlacementTestGrain>(i));
+            var grains = keys.Select(i => GrainFactory.GetGrain<IStatelessWorkerPlacementTestGrain>(i));
             var promises = grains.Select(g => g.Nop());
             return Task.WhenAll(promises);
         }
@@ -70,7 +71,7 @@ namespace UnitTests.Grains
             return key;
         }
 
-        private static IEnumerable<Task<IPEndPoint>> SampleLocalGrainEndpoint(ILocalPlacementTestGrain grain, int sampleSize)
+        private static IEnumerable<Task<IPEndPoint>> SampleLocalGrainEndpoint(IStatelessWorkerPlacementTestGrain grain, int sampleSize)
         {
             for (var i = 0; i < sampleSize; ++i)
                 yield return grain.GetEndpoint();
@@ -78,20 +79,18 @@ namespace UnitTests.Grains
 
         public async Task<List<IPEndPoint>> SampleLocalGrainEndpoint(Guid key, int sampleSize)
         {
-            var grain = GrainFactory.GetGrain<ILocalPlacementTestGrain>(key);
-            var p = await Task<IPEndPoint>.WhenAll(SampleLocalGrainEndpoint(grain, sampleSize));
+            var grain = GrainFactory.GetGrain<IStatelessWorkerPlacementTestGrain>(key);
+            var p = await Task.WhenAll(SampleLocalGrainEndpoint(grain, sampleSize));
             return p.ToList();
         }
 
-        private static async Task PropigateStatisticsToCluster(IGrainFactory grainFactory)
+        private static async Task PropagateStatisticsToCluster(IGrainFactory grainFactory)
         {
-            // force the latched statistics to propigate throughout the cluster.
-            IManagementGrain mgmtGrain =
-                grainFactory.GetGrain<IManagementGrain>(0);
-
-            var hosts = await mgmtGrain.GetHosts(true);
+            // force the latched statistics to propagate throughout the cluster.
+            var managementGrain = grainFactory.GetGrain<IManagementGrain>(0);
+            var hosts = await managementGrain.GetHosts(true);
             var keys = hosts.Select(kvp => kvp.Key).ToArray();
-            await mgmtGrain.ForceRuntimeStatisticsCollection(keys);
+            await managementGrain.ForceRuntimeStatisticsCollection(keys);
         }
 
         public Task EnableOverloadDetection(bool enabled)
@@ -104,28 +103,28 @@ namespace UnitTests.Grains
         {
             var stats = environmentStatistics.GetEnvironmentStatistics();
             environmentStatistics.SetHardwareStatistics(new(loadSheddingOptions.CpuThreshold + 1, stats.MemoryUsageBytes, stats.AvailableMemoryBytes, stats.MaximumAvailableMemoryBytes));
-            return PropigateStatisticsToCluster(GrainFactory);
+            return PropagateStatisticsToCluster(GrainFactory);
         }
 
         public Task UnlatchOverloaded()
         {
             var stats = environmentStatistics.GetEnvironmentStatistics();
             environmentStatistics.SetHardwareStatistics(new(0, stats.MemoryUsageBytes, stats.AvailableMemoryBytes, stats.MaximumAvailableMemoryBytes));
-            return PropigateStatisticsToCluster(GrainFactory);
+            return PropagateStatisticsToCluster(GrainFactory);
         }
 
         public Task LatchCpuUsage(float value)
         {
             var stats = environmentStatistics.GetEnvironmentStatistics();
             environmentStatistics.SetHardwareStatistics(new(value, stats.MemoryUsageBytes, stats.AvailableMemoryBytes, stats.MaximumAvailableMemoryBytes));
-            return PropigateStatisticsToCluster(GrainFactory);
+            return PropagateStatisticsToCluster(GrainFactory);
         }
 
         public Task UnlatchCpuUsage()
         {
             var stats = environmentStatistics.GetEnvironmentStatistics();
             environmentStatistics.SetHardwareStatistics(new(0, stats.MemoryUsageBytes, stats.AvailableMemoryBytes, stats.MaximumAvailableMemoryBytes));
-            return PropigateStatisticsToCluster(GrainFactory);
+            return PropagateStatisticsToCluster(GrainFactory);
         }
 
         public Task<SiloAddress> GetLocation()
@@ -160,16 +159,51 @@ namespace UnitTests.Grains
         }
     }
 
-    [StatelessWorker]
-    internal class LocalPlacementTestGrain : PlacementTestGrainBase, ILocalPlacementTestGrain
+    [StatelessWorker(1)]
+    internal class StatelessWorkerPlacementTestGrain : PlacementTestGrainBase, IStatelessWorkerPlacementTestGrain
     {
-        public LocalPlacementTestGrain(
+        public StatelessWorkerPlacementTestGrain(
             OverloadDetector overloadDetector,
             TestHooksEnvironmentStatisticsProvider hostEnvironmentStatistics,
             IOptions<LoadSheddingOptions> loadSheddingOptions,
             IGrainContext grainContext)
             : base(overloadDetector, hostEnvironmentStatistics, loadSheddingOptions, grainContext)
         {
+        }
+
+        public ValueTask<int> GetWorkerLimit()
+        {
+            var placementStrategy = GrainContext.GetComponent<PlacementStrategy>();
+            if (placementStrategy is not StatelessWorkerPlacement statelessWorkerPlacement)
+            {
+                throw new InvalidOperationException($"Unexpected placement strategy: {placementStrategy}");
+            }
+
+            return new(statelessWorkerPlacement.MaxLocal);
+        }
+    }
+
+    [StatelessWorker(2)]
+    internal class OtherStatelessWorkerPlacementTestGrain : PlacementTestGrainBase, IOtherStatelessWorkerPlacementTestGrain
+    {
+        public OtherStatelessWorkerPlacementTestGrain(
+            OverloadDetector overloadDetector,
+            TestHooksEnvironmentStatisticsProvider hostEnvironmentStatistics,
+            IOptions<LoadSheddingOptions> loadSheddingOptions,
+            IGrainContext grainContext)
+            : base(overloadDetector, hostEnvironmentStatistics, loadSheddingOptions, grainContext)
+        {
+        }
+
+        public ValueTask<int> GetWorkerLimit()
+        {
+            var placementStrategy = GrainContext.GetComponent<PlacementStrategy>();
+            if (placementStrategy is not StatelessWorkerPlacement statelessWorkerPlacement)
+            {
+                throw new InvalidOperationException($"Unexpected placement strategy: {placementStrategy}");
+            }
+
+            return new(statelessWorkerPlacement.MaxLocal);
         }
     }
 
