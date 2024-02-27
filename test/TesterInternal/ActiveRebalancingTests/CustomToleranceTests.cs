@@ -1,10 +1,11 @@
-﻿using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection;
 using Orleans.Configuration;
 using Orleans.Placement;
 using Orleans.Placement.Rebalancing;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration.Options;
 using Orleans.Runtime.Placement;
+using Orleans.Runtime.Placement.Rebalancing;
 using Orleans.TestingHost;
 using TestExtensions;
 using Xunit;
@@ -208,7 +209,8 @@ public class CustomToleranceTests(CustomToleranceTests.Fixture fixture)
                         // Make this practically zero, so we can invoke the protocol more than once without needing to put a delay in the tests. 
                         o.RecoveryPeriod = TimeSpan.FromMilliseconds(1);
                     })
-                    .AddActiveRebalancing<HardLimitRule>();
+                    .AddActiveRebalancing<HardLimitRule>()
+                    .ConfigureServices(service => service.AddSingleton<IRebalancingMessageFilter, TestMessageFilter>());
         }
 
         private class HardLimitRule : IImbalanceToleranceRule

@@ -1,10 +1,12 @@
 using System.Diagnostics;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Configuration;
+using Orleans.Configuration.Internal;
 using Orleans.Placement;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration.Options;
 using Orleans.Runtime.Placement;
+using Orleans.Runtime.Placement.Rebalancing;
 using Orleans.Streams;
 using Orleans.TestingHost;
 using TestExtensions;
@@ -616,8 +618,8 @@ public class DefaultToleranceTests(DefaultToleranceTests.Fixture fixture)
                         c.ConfigurePartitioning(1);
                         c.ConfigureStreamPubSub(StreamPubSubType.ImplicitOnly);
                     })
-                    .AddActiveRebalancing();
+                    .AddActiveRebalancing()
+                    .ConfigureServices(service => service.AddSingleton<IRebalancingMessageFilter, TestMessageFilter>());
         }
     }
-
 }

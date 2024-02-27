@@ -27,7 +27,7 @@ public static class ActiveRebalancingExtensions
     private static IServiceCollection AddActiveRebalancing<TRule>(this IServiceCollection services) where TRule : class, IImbalanceToleranceRule
     {
         services.AddTransient<IConfigurationValidator, ActiveRebalancingOptionsValidator>();
-
+        
         if (typeof(TRule) == typeof(DefaultImbalanceRule))
         {
             services.AddSingleton<DefaultImbalanceRule>();
@@ -39,6 +39,7 @@ public static class ActiveRebalancingExtensions
             services.AddSingleton<IImbalanceToleranceRule, TRule>();
         }
 
+        services.AddSingleton<IRebalancingMessageFilter, RebalancingMessageFilter>();
         services.AddSingleton<ActiveRebalancerGateway>();
         services.AddFromExisting<IActiveRebalancerGateway, ActiveRebalancerGateway>();
         services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, ActiveRebalancerGateway>();

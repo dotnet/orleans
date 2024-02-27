@@ -25,7 +25,10 @@ namespace Orleans.Runtime.Placement.Rebalancing;
 
 #nullable enable
 
-[PreferLocalPlacement, MayInterleave(nameof(MayInterleave)), GrainType(IActiveRebalancerGrain.TypeName)]
+[KeepAlive]
+[PreferLocalPlacement]
+[MayInterleave(nameof(MayInterleave))]
+[GrainType(IActiveRebalancerGrain.TypeName)]
 internal sealed class ActiveRebalancerGrain : Grain, IActiveRebalancerGrain
 {
     private readonly ILogger _logger;
