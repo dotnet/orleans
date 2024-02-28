@@ -1,3 +1,5 @@
+using System.Diagnostics;
+using System.Diagnostics.Metrics;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Orleans.Runtime;
@@ -40,9 +42,7 @@ namespace UnitTests.StreamingTests
             // produce some messages
             await producer.BecomeProducer(streamGuid, streamNamespace, streamProviderName);
 
-            await producer.StartPeriodicProducing();
-            await Task.Delay(TimeSpan.FromMilliseconds(1000));
-            await producer.StopPeriodicProducing();
+            await RunFor(() => producer.Produce(), TimeSpan.FromSeconds(1));
 
             // check
             await TestingUtils.WaitUntilAsync(lastTry => CheckCounters(producer, consumer, 2, lastTry), Timeout);
@@ -412,6 +412,16 @@ namespace UnitTests.StreamingTests
                 numProduced,
                 numConsumed);
             return true;
+        }
+
+        private async Task RunFor(Func<Task> func, TimeSpan duration)
+        {
+            var sw = Stopwatch.StartNew();
+            do
+            {
+                await func();
+            }
+            while (sw.Elapsed < duration);
         }
     }
 }
