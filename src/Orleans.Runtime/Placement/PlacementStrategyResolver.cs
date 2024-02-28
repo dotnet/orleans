@@ -70,6 +70,13 @@ namespace Orleans.Runtime.Placement
                 && properties.Properties.TryGetValue(WellKnownGrainTypeProperties.PlacementStrategy, out var placementStrategyId)
                 && !string.IsNullOrWhiteSpace(placementStrategyId))
             {
+                if (placementStrategyId == typeof(StatelessWorkerPlacement).Name)
+                {
+                    strategy = new StatelessWorkerPlacement();
+                    strategy.Initialize(properties);
+                    return true;
+                }
+
                 if (_strategies.TryGetValue(placementStrategyId, out var strategyType))
                 {
                     strategy = (PlacementStrategy)_services.GetService(strategyType);
