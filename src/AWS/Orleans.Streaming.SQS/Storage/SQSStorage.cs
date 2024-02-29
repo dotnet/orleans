@@ -4,6 +4,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net;
+using System.Text;
 using System.Threading.Tasks;
 using Amazon.SQS.Model;
 using Microsoft.Extensions.Logging;
@@ -52,7 +53,7 @@ namespace OrleansAWSUtils.Storage
         {
             if (sqsOptions is null) throw new ArgumentNullException(nameof(sqsOptions));
             this.sqsOptions = sqsOptions;
-            QueueName = string.IsNullOrWhiteSpace(serviceId) ? queueName : $"{serviceId}-{queueName}";
+            QueueName = ConstructQueueName(queueName, sqsOptions, serviceId);
             ParseDataConnectionString(sqsOptions.ConnectionString);
             Logger = loggerFactory.CreateLogger<SQSStorage>();
             CreateClient();
@@ -151,7 +152,26 @@ namespace OrleansAWSUtils.Storage
             {
                 if (string.IsNullOrWhiteSpace(await GetQueueUrl()))
                 {
-                    var response = await sqsClient.CreateQueueAsync(QueueName);
+                    var createQueueRequest = new CreateQueueRequest(QueueName);
+
+                    if (sqsOptions.FifoQueue)
+                    {
+                        createQueueRequest.Attributes = new()
+                        {
+                            { QueueAttributeName.FifoQueue, "true" },
+                            { QueueAttributeName.FifoThroughputLimit, "perMessageGroupId" },
+                            { QueueAttributeName.DeduplicationScope, "messageGroup" },
+                            { QueueAttributeName.ContentBasedDeduplication, "true" },
+                        };
+                    }
+
+                    if (sqsOptions.ReceiveWaitTimeSeconds.HasValue)
+                    {
+                        createQueueRequest.Attributes.Add(QueueAttributeName.ReceiveMessageWaitTimeSeconds,
+                            sqsOptions.ReceiveWaitTimeSeconds.Value.ToString());
+                    }
+
+                    var response = await sqsClient.CreateQueueAsync(createQueueRequest);
                     queueUrl = response.QueueUrl;
                 }
             }
@@ -258,7 +278,7 @@ namespace OrleansAWSUtils.Storage
                 if (string.IsNullOrWhiteSpace(queueUrl))
                     throw new InvalidOperationException("Queue not initialized");
 
-                await sqsClient.DeleteMessageAsync(
+                var result = await sqsClient.DeleteMessageAsync(
                     new DeleteMessageRequest { QueueUrl = queueUrl, ReceiptHandle = message.ReceiptHandle });
             }
             catch (Exception exc)
@@ -271,6 +291,21 @@ namespace OrleansAWSUtils.Storage
         {
             Logger.LogError((int)errorCode, exc, "Error doing {Operation} for SQS queue {QueueName}", operation, QueueName);
             throw new AggregateException($"Error doing {operation} for SQS queue {QueueName}", exc);
+        }
+
+        private static string ConstructQueueName(string queueName, SqsOptions sqsOptions, string serviceId)
+        {
+            var queueNameBuilder = new StringBuilder();
+            if (!string.IsNullOrEmpty(serviceId))
+            {
+                queueNameBuilder.Append(serviceId);
+                queueNameBuilder.Append("-");
+            }
+
+            queueNameBuilder.Append(queueName);
+            if (sqsOptions.FifoQueue)
+                queueNameBuilder.Append(".fifo");
+            return queueNameBuilder.ToString();
         }
     }
 }
