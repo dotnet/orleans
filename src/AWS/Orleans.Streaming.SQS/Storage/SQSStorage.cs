@@ -171,6 +171,12 @@ namespace OrleansAWSUtils.Storage
                             sqsOptions.ReceiveWaitTimeSeconds.Value.ToString());
                     }
 
+                    if (sqsOptions.VisibilityTimeoutSeconds.HasValue)
+                    {
+                        createQueueRequest.Attributes.Add(QueueAttributeName.VisibilityTimeout,
+                            sqsOptions.VisibilityTimeoutSeconds.Value.ToString());
+                    }
+
                     var response = await sqsClient.CreateQueueAsync(createQueueRequest);
                     queueUrl = response.QueueUrl;
                 }
