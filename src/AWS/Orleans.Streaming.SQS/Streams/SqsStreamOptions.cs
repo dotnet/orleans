@@ -32,6 +32,15 @@ namespace Orleans.Configuration
         /// </summary>
         public int? ReceiveWaitTimeSeconds { get; set; }
 
+        /// <summary>
+        /// The visibility timeout begins when Amazon SQS returns a message.
+        /// During this time, the consumer processes and deletes the message.
+        /// However, if the consumer fails before deleting the message and your system doesn't call the DeleteMessage action for that message before the visibility timeout expires,
+        /// the message becomes visible to other consumers and the message is received again.
+        /// If a message must be received only once, your consumer should delete it within the duration of the visibility timeout.
+        /// </summary>
+        public int? VisibilityTimeoutSeconds { get; set; }
+
         public bool FifoQueue { get; set; }
     }
 }
