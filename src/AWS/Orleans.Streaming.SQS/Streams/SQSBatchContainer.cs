@@ -30,7 +30,7 @@ namespace OrleansAWSUtils.Streams
         [NonSerialized]
         // Need to store reference to the original SQS Message to be able to delete it later on.
         // Don't need to serialize it, since we are never interested in sending it to stream consumers.
-        internal SQSMessage Message;
+        public SQSMessage Message;
 
         [Orleans.Id(3)]
         public StreamId StreamId { get; private set; }
