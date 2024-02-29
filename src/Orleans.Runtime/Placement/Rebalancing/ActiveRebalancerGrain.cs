@@ -43,7 +43,7 @@ internal sealed class ActiveRebalancerGrain : Grain, IActiveRebalancerGrain
     private FrequencySink _frequencySink;
     private DateTimeOffset? _lastExchangeTime;
 
-    [AllowNull] private IDisposable? _timer;
+    private IDisposable? _timer;
     [AllowNull] private IManagementGrain _managementGrain;
 
     public ActiveRebalancerGrain(
