@@ -31,5 +31,7 @@ namespace Orleans.Configuration
         /// The optional duration to long-poll for new SQS messages.
         /// </summary>
         public int? ReceiveWaitTimeSeconds { get; set; }
+
+        public bool FifoQueue { get; set; }
     }
 }
