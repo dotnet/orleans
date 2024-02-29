@@ -81,7 +81,7 @@ internal sealed class ActiveRebalancerGateway : IActiveRebalancerGateway, ILifec
                     return;
                 }
 
-                await _channelTask;
+                await _channelTask.ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing);
             }
             catch (Exception) { }
         }
