@@ -670,7 +670,7 @@ internal sealed class ActiveRebalancerGrain : Grain, IActiveRebalancerGrain
         bool IsTargetThisSilo(EdgeCounter counter) => counter.Edge.Target.Silo.IsSameLogicalSilo(ThisSilo);
     }
 
-    private enum Direction
+    private enum Direction : byte
     {
         Unspecified = 0,
         LocalToLocal = 1,
