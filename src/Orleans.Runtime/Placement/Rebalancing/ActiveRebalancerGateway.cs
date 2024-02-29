@@ -73,17 +73,13 @@ internal sealed class ActiveRebalancerGateway : IActiveRebalancerGateway, ILifec
     {
         if (_cts is not null)
         {
-            try
+            _cts.Cancel();
+            if (_channelTask is null)
             {
-                _cts.Cancel();
-                if (_channelTask is null)
-                {
-                    return;
-                }
-
-                await _channelTask.ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing);
+                return;
             }
-            catch (Exception) { }
+
+            await _channelTask.ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing);
         }
 
         if (_logger.IsEnabled(LogLevel.Trace))

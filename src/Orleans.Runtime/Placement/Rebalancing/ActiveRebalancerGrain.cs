@@ -18,6 +18,7 @@ using System.Threading;
 using Orleans.Placement;
 using Orleans.Internal;
 using System.Collections;
+using System.Text.RegularExpressions;
 
 namespace Orleans.Runtime.Placement.Rebalancing;
 
@@ -29,14 +30,14 @@ namespace Orleans.Runtime.Placement.Rebalancing;
 [PreferLocalPlacement]
 [MayInterleave(nameof(MayInterleave))]
 [GrainType(IActiveRebalancerGrain.TypeName)]
-internal sealed class ActiveRebalancerGrain : Grain, IActiveRebalancerGrain
+internal sealed partial class ActiveRebalancerGrain : Grain, IActiveRebalancerGrain
 {
     private readonly ILogger _logger;
     private readonly IInternalGrainFactory _grainFactory;
     private readonly IImbalanceToleranceRule _toleranceRule;
     private readonly ActivationDirectory _activationDirectory;
     private readonly ActiveRebalancingOptions _options;
-   
+
     private static SiloAddress? _currentExchangeSilo;
 
     private TaskCompletionSource? _unblocker;
@@ -82,10 +83,7 @@ internal sealed class ActiveRebalancerGrain : Grain, IActiveRebalancerGrain
             // till the protocol has finished, and in case a huge amount of messages accumulate, the channel will drop older once (which is fine).
             _ => this.AsReference<IActiveRebalancerGrain>().TriggerExchangeRequest(), null!, dueTime, _options.RebalancingPeriod);
 
-        if (_logger.IsEnabled(LogLevel.Debug))
-        {
-            _logger.LogDebug("I will periodically initiate the exchange protocol every {Period} starting in {DueTime}.", _options.RebalancingPeriod, dueTime);
-        }
+        LogPeriodicallyInvokeProtocol(_options.RebalancingPeriod, dueTime);
     }
 
     private SiloAddress ThisSilo
@@ -129,11 +127,7 @@ internal sealed class ActiveRebalancerGrain : Grain, IActiveRebalancerGrain
         var silos = await _managementGrain.GetHosts(onlyActive: true);
         if (silos.Count == 1)
         {
-            if (_logger.IsEnabled(LogLevel.Debug))
-            {
-                _logger.LogDebug("Active rebalancing is enabled, but the cluster contains only one silo. Awaiting for at least another silo to join the cluster to proceed.");
-            }
-
+            LogSingleSiloCluster();
             return;   // If its a single-silo cluster we have no business doing any kind of rebalancing
         }
 
@@ -145,14 +139,8 @@ internal sealed class ActiveRebalancerGrain : Grain, IActiveRebalancerGrain
             (var candidateSilo, var exchangeSet, var _) = set;
             if (exchangeSet.Length == 0)
             {
-                if (_logger.IsEnabled(LogLevel.Debug))
-                {
-                    _logger.LogDebug(
-                        "Exchange set for candidate silo {Silo} is empty. " +
-                        "I will try the next best candidate (if one is available), otherwise I will wait for my next period to come.", candidateSilo);
-                }
-
-                continue; 
+                LogExchangeSetIsEmpty(candidateSilo);
+                continue;
             }
 
             _unblocker = new();
@@ -164,21 +152,12 @@ internal sealed class ActiveRebalancerGrain : Grain, IActiveRebalancerGrain
             AcceptExchangeResponse? response = null;
             try
             {
-                if (_logger.IsEnabled(LogLevel.Debug))
-                {
-                    _logger.LogDebug("Begining exchange protocol between {ThisSilo} and {RemoteSilo}.", ThisSilo, candidateSilo);
-                }
+                LogBeginingProtocol(ThisSilo, candidateSilo);
 
                 var completedTask = await Task.WhenAny(_unblocker.Task, exchangeTask);
                 if (completedTask == _unblocker.Task)
                 {
-                    if (_logger.IsEnabled(LogLevel.Debug))
-                    {
-                        _logger.LogDebug(
-                            "I just got unblocked from a mutual exchange attempt. " +
-                            "I will try the next best candidate (if one is available), otherwise I will wait for my next period to come.");
-                    }
-
+                    LogUnblockedMutualExchangeAttempt();
                     continue;
                 }
 
@@ -186,13 +165,7 @@ internal sealed class ActiveRebalancerGrain : Grain, IActiveRebalancerGrain
             }
             catch (Exception ex)
             {
-                if (_logger.IsEnabled(LogLevel.Warning))
-                {
-                    _logger.LogWarning(ex,
-                        "En error occured while performing exchange request from {ThisSilo} to {CandidateSilo}." +
-                        "I will try the next best candidate (if one is available), otherwise I will wait for my next period to come.", ThisSilo, candidateSilo);
-                }
-
+                LogErrorOnProtocolExecution(ThisSilo, candidateSilo, ex.Message);
                 continue; // there was some problem, try the next best candidate
             }
 
@@ -206,20 +179,16 @@ internal sealed class ActiveRebalancerGrain : Grain, IActiveRebalancerGrain
 
             _currentExchangeSilo = null;
 
-            if (_logger.IsEnabled(LogLevel.Debug))
+            if (response.Type == AcceptExchangeResponse.ResponseType.ExchangedRecently)
             {
-                if (response.Type == AcceptExchangeResponse.ResponseType.ExchangedRecently)
-                {
-                    _logger.LogDebug(
-                        "Exchange request from {ThisSilo} failed, due to {OtherSilo} having been recently involved in another exchange. " +
-                        "I will try the next best candidate (if one is available), otherwise I will wait for my next period to come.", ThisSilo, candidateSilo);
-                }
-                else if (response.Type == AcceptExchangeResponse.ResponseType.MutualExchangeAttempt)
-                {
-                    _logger.LogDebug(
-                        "Exchange request from {ThisSilo} failed, due to an mutual exchange attempt with {OtherSilo}. " +
-                        "I will try the next best candidate (if one is available), otherwise I will wait for my next period to come.", ThisSilo, candidateSilo);
-                }
+                LogExchangedRecentlyResponse(ThisSilo, candidateSilo);
+                continue;
+            }
+
+            if (response.Type == AcceptExchangeResponse.ResponseType.MutualExchangeAttempt)
+            {
+                LogMutualExchangeAttemptResponse(ThisSilo, candidateSilo);
+                continue;
             }
         }
     }
@@ -231,29 +200,17 @@ internal sealed class ActiveRebalancerGrain : Grain, IActiveRebalancerGrain
             _unblocker?.SetResult();
             _unblocker = new();
 
-            if (_logger.IsEnabled(LogLevel.Debug))
-            {
-                _logger.LogDebug(
-                    "I got an exchange request from {Silo}, but I am performing one with it at the same time. " +
-                    "I will phase-shift my timer to avoid these conflicts.", request.SendingSilo);
-            }
-
             // We pick some random time between 'min' and 'max' and than substract from it 'min'. We do this so this silo doesn't have to wait for 'min + random',
             // as it did the very first time this was started. It is guaranteed that 'random - min' >= 0; as 'random' will be at the least equal to 'min'.
             RegisterOrUpdateTimer(RandomTimeSpan.Next(_options.MinimumRebalancingDueTime, _options.MaximumRebalancingDueTime) - _options.MinimumRebalancingDueTime);
+            LogMutualExchangeAttempt(request.SendingSilo);
 
             return AcceptExchangeResponse.CachedMutualExchangeAttempt;
         }
 
         if (_lastExchangeTime is { } time && time.AddTicks(_options.RecoveryPeriod.Ticks) > DateTime.UtcNow)
         {
-            if (_logger.IsEnabled(LogLevel.Debug))
-            {
-                _logger.LogDebug(
-                    "I got an exchange request from {Silo}, but I have been recently involved in another exchange {Time} ago. " +
-                    "My recovery period is {RecoveryPeriod}", request.SendingSilo, DateTime.UtcNow - time, _options.RecoveryPeriod);
-            }
-
+            LogExchangedRecently(request.SendingSilo, DateTime.UtcNow - time, _options.RecoveryPeriod);
             return AcceptExchangeResponse.CachedExchangedRecently;
         }
 
@@ -370,7 +327,7 @@ internal sealed class ActiveRebalancerGrain : Grain, IActiveRebalancerGrain
             localActivations--;
             remoteActivations++;
             currentImbalance = anticipatedImbalance;
-              
+
             foreach (var vertex in localHeap)
             {
                 var connectedVertex = chosenVertex.ConnectedVertices.FirstOrDefault(x => x.Id == vertex.Id);
@@ -484,7 +441,7 @@ internal sealed class ActiveRebalancerGrain : Grain, IActiveRebalancerGrain
             {
                 migrationTasks.Add(_grainFactory.GetGrain(grainId).Cast<IGrainManagementExtension>().MigrateOnIdle().AsTask());
             }
-            
+
             try
             {
                 await Task.WhenAll(migrationTasks);
@@ -493,24 +450,14 @@ internal sealed class ActiveRebalancerGrain : Grain, IActiveRebalancerGrain
             {
                 // This should happen rarely, but at this point we cant really do much, as its out of our control.
                 // Even if some fail, at the end the algorithm will run again and eventually succeed with moving all activations were they belong.
-                if (_logger.IsEnabled(LogLevel.Warning))
-                {
-                    var aggEx = new AggregateException(migrationTasks.Select(t => t.Exception).Where(ex => ex is not null)!);
-                    _logger.LogWarning("There was an issue during the migration of the activation set initiated by {Silo}.\n AggregateException: {Message}", ThisSilo, aggEx.Message);
-                }
+                var aggEx = new AggregateException(migrationTasks.Select(t => t.Exception).Where(ex => ex is not null)!);
+                LogErrorOnMigratingActivations(ThisSilo, aggEx.Message);
             }
 
             if (isReceiver)
             {
                 _lastExchangeTime = DateTime.UtcNow;  // Stamp this silos exchange for a potential next pair exchange request.
             }
-        }
-
-        if (_logger.IsEnabled(LogLevel.Debug))
-        {
-            _logger.LogDebug(
-                    "I have successfully finalized my part of the exchange protocol. " +
-                    "It was decided that I will take on a total of {ActivationCount} activations.", idsToMigrateCount);
         }
 
         if (affectedIds.Any())
@@ -525,6 +472,8 @@ internal sealed class ActiveRebalancerGrain : Grain, IActiveRebalancerGrain
                 }
             }
         }
+
+        LogProtocolFinalized(idsToMigrateCount);
     }
 
     private List<ValueTuple<SiloAddress, ImmutableArray<CandidateVertex>, ulong>> CreateCandidateSets(Dictionary<SiloAddress, SiloStatus> silos)
