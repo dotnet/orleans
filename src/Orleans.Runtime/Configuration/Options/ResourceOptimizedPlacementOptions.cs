@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Options;
+using Orleans.Runtime;
 
-namespace Orleans.Runtime.Configuration.Options;
+namespace Orleans.Configuration;
 
 /// <summary>
 /// Settings which regulate the placement of grains across a cluster when using <see cref="ResourceOptimizedPlacement"/>.

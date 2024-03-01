@@ -41,7 +41,6 @@ using Orleans.Serialization.Cloning;
 using System.Collections.Generic;
 using Microsoft.Extensions.Configuration;
 using Orleans.Serialization.Internal;
-using Orleans.Runtime.Configuration.Options;
 
 namespace Orleans.Hosting
 {

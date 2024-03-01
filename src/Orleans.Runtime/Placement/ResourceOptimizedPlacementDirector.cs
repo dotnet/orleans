@@ -7,7 +7,7 @@ using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Options;
-using Orleans.Runtime.Configuration.Options;
+using Orleans.Configuration;
 
 namespace Orleans.Runtime.Placement;
 
