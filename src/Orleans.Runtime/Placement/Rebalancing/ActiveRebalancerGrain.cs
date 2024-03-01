@@ -18,7 +18,6 @@ using System.Threading;
 using Orleans.Placement;
 using Orleans.Internal;
 using System.Collections;
-using System.Text.RegularExpressions;
 
 namespace Orleans.Runtime.Placement.Rebalancing;
 
