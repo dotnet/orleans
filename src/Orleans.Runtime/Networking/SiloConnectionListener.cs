@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Connections;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
+using Orleans.Placement.Rebalancing;
 
 namespace Orleans.Runtime.Messaging
 {
@@ -13,6 +14,7 @@ namespace Orleans.Runtime.Messaging
     {
         internal static readonly object ServicesKey = new object();
         private readonly ILocalSiloDetails localSiloDetails;
+        private readonly IActiveRebalancerGateway rebalancerGateway;
         private readonly SiloConnectionOptions siloConnectionOptions;
         private readonly MessageCenter messageCenter;
         private readonly EndpointOptions endpointOptions;
@@ -28,6 +30,7 @@ namespace Orleans.Runtime.Messaging
             MessageCenter messageCenter,
             IOptions<EndpointOptions> endpointOptions,
             ILocalSiloDetails localSiloDetails,
+            IActiveRebalancerGateway rebalancerGateway,
             ConnectionManager connectionManager,
             ConnectionCommon connectionShared,
             ProbeRequestMonitor probeRequestMonitor,
@@ -37,6 +40,7 @@ namespace Orleans.Runtime.Messaging
             this.siloConnectionOptions = siloConnectionOptions.Value;
             this.messageCenter = messageCenter;
             this.localSiloDetails = localSiloDetails;
+            this.rebalancerGateway = rebalancerGateway;
             this.connectionManager = connectionManager;
             this.connectionShared = connectionShared;
             this.probeRequestMonitor = probeRequestMonitor;
@@ -58,7 +62,8 @@ namespace Orleans.Runtime.Messaging
                 this.ConnectionOptions,
                 this.connectionShared,
                 this.probeRequestMonitor,
-                this.connectionPreambleHelper);
+                this.connectionPreambleHelper,
+                this.rebalancerGateway);
         }
 
         protected override void ConfigureConnectionBuilder(IConnectionBuilder connectionBuilder)

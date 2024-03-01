@@ -3,6 +3,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 using Orleans.Messaging;
+using Orleans.Placement.Rebalancing;
 
 namespace Orleans.Runtime.Messaging
 {
@@ -13,6 +14,7 @@ namespace Orleans.Runtime.Messaging
         private readonly ClientConnectionOptions clientConnectionOptions;
         private readonly ClusterOptions clusterOptions;
         private readonly ConnectionPreambleHelper connectionPreambleHelper;
+        private readonly IActiveRebalancerGateway rebalancerGateway;
         private readonly object initializationLock = new object();
         private volatile bool isInitialized;
         private ClientMessageCenter messageCenter;
@@ -22,10 +24,12 @@ namespace Orleans.Runtime.Messaging
             IOptions<ConnectionOptions> connectionOptions,
             IOptions<ClientConnectionOptions> clientConnectionOptions,
             IOptions<ClusterOptions> clusterOptions,
+            IActiveRebalancerGateway rebalancerGateway,
             ConnectionCommon connectionShared,
             ConnectionPreambleHelper connectionPreambleHelper)
             : base(connectionShared.ServiceProvider.GetRequiredKeyedService<IConnectionFactory>(ServicesKey), connectionShared.ServiceProvider, connectionOptions)
         {
+            this.rebalancerGateway = rebalancerGateway;
             this.connectionShared = connectionShared;
             this.clientConnectionOptions = clientConnectionOptions.Value;
             this.clusterOptions = clusterOptions.Value;
@@ -45,7 +49,8 @@ namespace Orleans.Runtime.Messaging
                 this.ConnectionOptions,
                 this.connectionShared,
                 this.connectionPreambleHelper,
-                this.clusterOptions);
+                this.clusterOptions,
+                this.rebalancerGateway);
         }
 
         protected override void ConfigureConnectionBuilder(IConnectionBuilder connectionBuilder)

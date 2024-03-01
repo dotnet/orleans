@@ -12,6 +12,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.ObjectPool;
 using Orleans.Configuration;
 using Orleans.Messaging;
+using Orleans.Placement.Rebalancing;
 using Orleans.Serialization.Invocation;
 
 namespace Orleans.Runtime.Messaging
@@ -29,6 +30,7 @@ namespace Orleans.Runtime.Messaging
 
         private static readonly ObjectPool<MessageHandler> MessageHandlerPool = ObjectPool.Create(new MessageHandlerPoolPolicy());
         private readonly ConnectionCommon shared;
+        private readonly IActiveRebalancerGateway _rebalancerGateway;
         private readonly ConnectionDelegate middleware;
         private readonly Channel<Message> outgoingMessages;
         private readonly ChannelWriter<Message> outgoingMessageWriter;
@@ -41,10 +43,12 @@ namespace Orleans.Runtime.Messaging
         private Task _closeTask;
 
         protected Connection(
+            IActiveRebalancerGateway rebalancerGateway,
             ConnectionContext connection,
             ConnectionDelegate middleware,
             ConnectionCommon shared)
         {
+            _rebalancerGateway = rebalancerGateway ?? throw new ArgumentNullException(nameof(rebalancerGateway));
             this.Context = connection ?? throw new ArgumentNullException(nameof(connection));
             this.middleware = middleware ?? throw new ArgumentNullException(nameof(middleware));
             this.shared = shared;
@@ -273,9 +277,7 @@ namespace Orleans.Runtime.Messaging
 
         protected abstract void RecordMessageReceive(Message msg, int numTotalBytes, int headerBytes);
         protected abstract void RecordMessageSend(Message msg, int numTotalBytes, int headerBytes);
-
         protected abstract void OnReceivedMessage(Message message);
-
         protected abstract void OnSendMessageFailure(Message message, string error);
 
         private async Task ProcessIncoming()
@@ -375,6 +377,7 @@ namespace Orleans.Runtime.Messaging
                             inflight.Add(message);
                             var (headerLength, bodyLength) = serializer.Write(output, message);
                             RecordMessageSend(message, headerLength + bodyLength, headerLength);
+                            _rebalancerGateway.RecordMessage(message);
                             message = null;
                         }
                     }

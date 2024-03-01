@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Connections;
 using Microsoft.Extensions.Logging;
 using Orleans.Configuration;
 using Orleans.Messaging;
+using Orleans.Placement.Rebalancing;
 
 namespace Orleans.Runtime.Messaging
 {
@@ -26,8 +27,9 @@ namespace Orleans.Runtime.Messaging
             ConnectionOptions connectionOptions,
             ConnectionCommon connectionShared,
             ConnectionPreambleHelper connectionPreambleHelper,
-            ClusterOptions clusterOptions)
-            : base(connection, middleware, connectionShared)
+            ClusterOptions clusterOptions,
+            IActiveRebalancerGateway rebalancerGateway)
+            : base(rebalancerGateway, connection, middleware, connectionShared)
         {
             this.messageCenter = messageCenter;
             this.connectionManager = connectionManager;
