@@ -6,7 +6,6 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Orleans.Configuration;
-using Orleans.Runtime.Configuration.Options;
 
 namespace Benchmarks.Ping
 {

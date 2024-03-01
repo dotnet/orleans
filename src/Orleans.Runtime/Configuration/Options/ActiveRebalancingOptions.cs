@@ -1,7 +1,8 @@
 using System;
 using Microsoft.Extensions.Options;
+using Orleans.Runtime;
 
-namespace Orleans.Runtime.Configuration.Options;
+namespace Orleans.Configuration;
 
 public sealed class ActiveRebalancingOptions
 {

@@ -10,7 +10,6 @@ using System.Collections.Immutable;
 using Orleans.Concurrency;
 using Orleans.Serialization.Invocation;
 using Orleans.Core.Internal;
-using Orleans.Runtime.Configuration.Options;
 using System.Data;
 using System.Diagnostics.CodeAnalysis;
 using Orleans.Placement.Rebalancing;
@@ -18,6 +17,7 @@ using System.Threading;
 using Orleans.Placement;
 using Orleans.Internal;
 using System.Collections;
+using Orleans.Configuration;
 
 namespace Orleans.Runtime.Placement.Rebalancing;
 

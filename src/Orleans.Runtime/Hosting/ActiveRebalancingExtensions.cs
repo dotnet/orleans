@@ -2,7 +2,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Orleans.Configuration.Internal;
 using Orleans.Placement.Rebalancing;
 using Orleans.Runtime;
-using Orleans.Runtime.Configuration.Options;
+using Orleans.Configuration;
 using Orleans.Runtime.Placement.Rebalancing;
 
 namespace Orleans.Hosting;

@@ -3,7 +3,6 @@ using Orleans.Configuration;
 using Orleans.Placement;
 using Orleans.Placement.Rebalancing;
 using Orleans.Runtime;
-using Orleans.Runtime.Configuration.Options;
 using Orleans.Runtime.Placement;
 using Orleans.Runtime.Placement.Rebalancing;
 using Orleans.TestingHost;

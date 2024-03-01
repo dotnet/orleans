@@ -4,7 +4,6 @@ using Orleans.Configuration;
 using Orleans.Configuration.Internal;
 using Orleans.Placement;
 using Orleans.Runtime;
-using Orleans.Runtime.Configuration.Options;
 using Orleans.Runtime.Placement;
 using Orleans.Runtime.Placement.Rebalancing;
 using Orleans.Streams;
