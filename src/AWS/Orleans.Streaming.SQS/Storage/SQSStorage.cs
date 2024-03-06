@@ -163,6 +163,10 @@ namespace OrleansAWSUtils.Storage
                             { QueueAttributeName.DeduplicationScope, "messageGroup" },
                             { QueueAttributeName.ContentBasedDeduplication, "true" },
                         };
+
+                        // We require to bring down the AWS set SequenceNumber when on a FIFO queue
+                        // in order to populate the SQSFIFOSequenceToken from it.
+                        sqsOptions.ReceiveAttributes.Add("SequenceNumber");
                     }
 
                     if (sqsOptions.ReceiveWaitTimeSeconds.HasValue)

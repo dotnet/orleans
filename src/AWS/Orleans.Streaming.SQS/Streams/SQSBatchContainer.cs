@@ -17,7 +17,7 @@ namespace OrleansAWSUtils.Streams
     {
         [JsonProperty]
         [Orleans.Id(0)]
-        private EventSequenceTokenV2 sequenceToken = null!;
+        private StreamSequenceToken sequenceToken = null!;
 
         [JsonProperty]
         [Orleans.Id(1)]
@@ -45,7 +45,7 @@ namespace OrleansAWSUtils.Streams
             StreamId streamId,
             List<object> events,
             Dictionary<string, object>? requestContext,
-            EventSequenceTokenV2 sequenceToken)
+            StreamSequenceToken sequenceToken)
             : this(streamId, events, requestContext)
         {
             this.sequenceToken = sequenceToken;
@@ -62,7 +62,17 @@ namespace OrleansAWSUtils.Streams
 
         public IEnumerable<Tuple<T, StreamSequenceToken>> GetEvents<T>()
         {
-            return events.OfType<T>().Select((e, i) => Tuple.Create<T, StreamSequenceToken>(e, sequenceToken.CreateSequenceTokenForEvent(i)));
+            static StreamSequenceToken CreateStreamSequenceToken(StreamSequenceToken tok, int eventIndex)
+            {
+                return tok switch
+                {
+                    EventSequenceTokenV2 v2Tok => v2Tok.CreateSequenceTokenForEvent(eventIndex),
+                    SQSFIFOSequenceToken fifoTok => fifoTok.CreateSequenceTokenForEvent(eventIndex),
+                    _ => throw new NotSupportedException("Unknown SequenceToken provided.")
+                };
+            }
+
+            return events.OfType<T>().Select((e, i) => Tuple.Create<T, StreamSequenceToken>(e, CreateStreamSequenceToken(sequenceToken, i)));
         }
 
         internal static SQSMessage ToSQSMessage<T>(
@@ -89,7 +99,12 @@ namespace OrleansAWSUtils.Streams
             // A valid SQS stream message contains a serialized batch payload.
             var sqsBatch = serializer.Deserialize(json["payload"]!.ToObject<byte[]>()!)!;
             sqsBatch.Message = msg;
-            sqsBatch.sequenceToken = new EventSequenceTokenV2(sequenceNumber);
+
+            if(msg.Attributes.TryGetValue("SequenceNumber", out var fifoSeqNum))
+                sqsBatch.sequenceToken = new SQSFIFOSequenceToken(UInt128.Parse(fifoSeqNum));
+            else 
+                sqsBatch.sequenceToken = new EventSequenceTokenV2(sequenceNumber);
+
             return sqsBatch;
         }
 
