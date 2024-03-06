@@ -245,6 +245,7 @@ namespace OrleansAWSUtils.Storage
                 if (count < 1)
                     throw new ArgumentOutOfRangeException(nameof(count));
 
+
                 var request = new ReceiveMessageRequest
                 {
                     QueueUrl = queueUrl,
@@ -291,6 +292,56 @@ namespace OrleansAWSUtils.Storage
             {
                 ReportErrorAndRethrow(exc, "DeleteMessage");
             }
+        }
+
+        public async Task DeleteMessages(IEnumerable<SQSMessage> messages)
+        {
+            try
+            {
+                ArgumentNullException.ThrowIfNull(messages);
+                if (string.IsNullOrWhiteSpace(queueUrl))
+                {
+                    throw new InvalidOperationException("Queue not initialized");
+                }
+
+                var messagesToDelete = messages.ToArray();
+                foreach (var message in messagesToDelete)
+                {
+                    ValidateMessageForDeletion(message);
+                }
+
+                foreach (var batch in messagesToDelete.Chunk(MAX_NUMBER_OF_MESSAGE_TO_PEEK))
+                {
+                    var deleteRequest = new DeleteMessageBatchRequest
+                    {
+                        QueueUrl = queueUrl,
+                        Entries = batch
+                            .Select((m, i) =>
+                                new DeleteMessageBatchRequestEntry(i.ToString(), m.ReceiptHandle))
+                            .ToList()
+                    };
+
+                    var result = await sqsClient.DeleteMessageBatchAsync(deleteRequest);
+                    foreach (var failed in result.Failed)
+                    {
+                        Logger.LogWarning("Failed to delete message {MessageId} from SQS queue {QueueName}. Error code: {ErrorCode}. Error message: {ErrorMessage}",
+                                failed.Id, QueueName, failed.Code, failed.Message);
+                    }
+                }
+            }
+            catch (Exception exc)
+            {
+                ReportErrorAndRethrow(exc, "DeleteMessages");
+            }
+        }
+
+        private static void ValidateMessageForDeletion(SQSMessage message)
+        {
+            if (message == null)
+                throw new ArgumentNullException(nameof(message));
+
+            if (string.IsNullOrWhiteSpace(message.ReceiptHandle))
+                throw new ArgumentNullException(nameof(message.ReceiptHandle));
         }
 
         private void ReportErrorAndRethrow(Exception exc, string operation)
