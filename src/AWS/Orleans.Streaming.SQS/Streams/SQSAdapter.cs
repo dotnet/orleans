@@ -9,6 +9,7 @@ using Microsoft.Extensions.Logging;
 using Orleans.Configuration;
 using Orleans.Runtime;
 using Orleans.Streaming.SQS.Streams;
+using System.Linq;
 
 namespace OrleansAWSUtils.Streams
 {
@@ -59,6 +60,13 @@ namespace OrleansAWSUtils.Streams
 
             var sqsMessage = dataAdapter.ToQueueMessage(streamId, events, token, requestContext);
             var sqsRequest = new SendMessageRequest(string.Empty, sqsMessage.Body);
+
+            if (this.sqsOptions.FifoQueue)
+            {
+                // Ensure the SQS Queue ensures FIFO order of messages over this QueueId.
+                sqsRequest.MessageGroupId = queueId.ToString();
+            }
+            
             foreach (var attr in sqsMessage.Attributes)
             {
                 sqsRequest.MessageAttributes.Add(attr.Key, new MessageAttributeValue
