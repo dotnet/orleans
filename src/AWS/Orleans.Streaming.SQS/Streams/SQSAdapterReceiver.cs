@@ -78,7 +78,7 @@ namespace OrleansAWSUtils.Streams
                 if (queueRef == null) return new List<IBatchContainer>();
 
                 int count = maxCount < 0 || maxCount == QueueAdapterConstants.UNLIMITED_GET_QUEUE_MSG ?
-                    SQSStorage.MAX_NUMBER_OF_MESSAGE_TO_PEAK : Math.Min(maxCount, SQSStorage.MAX_NUMBER_OF_MESSAGE_TO_PEAK);
+                    SQSStorage.MAX_NUMBER_OF_MESSAGE_TO_PEEK : Math.Min(maxCount, SQSStorage.MAX_NUMBER_OF_MESSAGE_TO_PEEK);
 
                 var task = queueRef.GetMessages(count);
                 outstandingTask = task;
@@ -100,7 +100,7 @@ namespace OrleansAWSUtils.Streams
                 var queueRef = queue; // store direct ref, in case we are somehow asked to shutdown while we are receiving.  
                 if (messages.Count == 0 || queueRef == null) return;
                 List<SQSMessage> cloudQueueMessages = messages.Cast<SQSBatchContainer>().Select(b => b.Message).ToList();
-                outstandingTask = Task.WhenAll(cloudQueueMessages.Select(queueRef.DeleteMessage));
+                outstandingTask = queue.DeleteMessages(cloudQueueMessages);
                 try
                 {
                     await outstandingTask;
