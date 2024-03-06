@@ -100,7 +100,7 @@ namespace OrleansAWSUtils.Streams
                 var queueRef = queue; // store direct ref, in case we are somehow asked to shutdown while we are receiving.  
                 if (messages.Count == 0 || queueRef == null) return;
                 List<SQSMessage> cloudQueueMessages = messages.Cast<SQSBatchContainer>().Select(b => b.Message).ToList();
-                outstandingTask = Task.WhenAll(cloudQueueMessages.Select(queueRef.DeleteMessage));
+                outstandingTask = queue.DeleteMessages(cloudQueueMessages);
                 try
                 {
                     await outstandingTask;

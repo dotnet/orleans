@@ -103,7 +103,7 @@ namespace AWSUtils.Tests.Streaming
                 {
                     while (receivedBatches < NumBatches)
                     {
-                        var messages = (await receiver.GetQueueMessagesAsync(SQSStorage.MAX_NUMBER_OF_MESSAGE_TO_PEAK)).ToArray();
+                        var messages = (await receiver.GetQueueMessagesAsync(SQSStorage.MAX_NUMBER_OF_MESSAGE_TO_PEEK)).ToArray();
                         if (!messages.Any())
                         {
                             await Task.Delay(QueuePollRate);
