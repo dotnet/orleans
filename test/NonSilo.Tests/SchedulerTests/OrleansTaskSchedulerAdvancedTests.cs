@@ -1,10 +1,8 @@
 using System.Diagnostics;
 using Microsoft.Extensions.Logging;
-using Orleans;
 using Orleans.Runtime;
 using Orleans.Runtime.Scheduler;
 using Orleans.Internal;
-using UnitTests.TesterInternal;
 using Xunit;
 using Xunit.Abstractions;
 
@@ -40,9 +38,7 @@ namespace UnitTests.SchedulerTests
         {
             int n = 0;
             bool insideTask = false;
-            UnitTestSchedulingContext context = new UnitTestSchedulingContext();
-            var workItemGroup = SchedulingHelper.CreateWorkItemGroupForTesting(context, loggerFactory);
-            context.Scheduler = workItemGroup;
+            var context = UnitTestSchedulingContext.Create(loggerFactory);
 
             this.output.WriteLine("Running Main in Context=" + RuntimeContext.Current);
             context.Scheduler.QueueAction(() =>
@@ -77,9 +73,7 @@ namespace UnitTests.SchedulerTests
         {
             int n = 0;
             bool insideTask = false;
-            UnitTestSchedulingContext context = new UnitTestSchedulingContext();
-            var workItemGroup = SchedulingHelper.CreateWorkItemGroupForTesting(context, loggerFactory);
-            context.Scheduler = workItemGroup;
+            var context = UnitTestSchedulingContext.Create(loggerFactory);
 
             var result = new TaskCompletionSource<bool>();
 
@@ -151,9 +145,7 @@ namespace UnitTests.SchedulerTests
             // For example, you have a  long running main turn and in the middle it spawns a lot of short CWs (on Done promise) and StartNew. 
             // You test that no CW/StartNew runs until the main turn is fully done. And run in stress.
 
-            UnitTestSchedulingContext context = new UnitTestSchedulingContext();
-            var workItemGroup = SchedulingHelper.CreateWorkItemGroupForTesting(context, loggerFactory);
-            context.Scheduler = workItemGroup;
+            var context = UnitTestSchedulingContext.Create(loggerFactory);
 
             var result1 = new TaskCompletionSource<bool>();
             var result2 = new TaskCompletionSource<bool>();
@@ -191,9 +183,7 @@ namespace UnitTests.SchedulerTests
         [Fact, TestCategory("Functional"), TestCategory("Scheduler")]
         public async Task Sched_Stopped_WorkItemGroup()
         {
-            var context = new UnitTestSchedulingContext();
-            var workItemGroup = SchedulingHelper.CreateWorkItemGroupForTesting(context, loggerFactory);
-            context.Scheduler = workItemGroup;
+            var context = UnitTestSchedulingContext.Create(loggerFactory);
 
             void CheckScheduler(object state)
             {
@@ -219,7 +209,7 @@ namespace UnitTests.SchedulerTests
                 "some state",
                 CancellationToken.None,
                 TaskCreationOptions.DenyChildAttach,
-                workItemGroup.TaskScheduler);
+                context.WorkItemGroup.TaskScheduler);
 
             // Check that the WorkItemGroup is functioning.
             await await ScheduleTask();
@@ -248,10 +238,8 @@ namespace UnitTests.SchedulerTests
             // For example, you have a long running main turn and in the middle it spawns a lot of short CWs (on Done promise) and StartNew. 
             // You test that no CW/StartNew runs until the main turn is fully done. And run in stress.
 
-            UnitTestSchedulingContext context = new UnitTestSchedulingContext();
-            WorkItemGroup workItemGroup = SchedulingHelper.CreateWorkItemGroupForTesting(context, this.loggerFactory);
-            context.Scheduler = workItemGroup;
-            ActivationTaskScheduler activationScheduler = workItemGroup.TaskScheduler;
+            var context = UnitTestSchedulingContext.Create(loggerFactory);
+            ActivationTaskScheduler activationScheduler = context.WorkItemGroup.TaskScheduler;
 
             this.mainDone = false;
             this.stageNum1 = this.stageNum2 = 0;
@@ -381,10 +369,8 @@ namespace UnitTests.SchedulerTests
         [Fact, TestCategory("Functional"), TestCategory("Scheduler")]
         public async Task Sched_AC_Current_TaskScheduler()
         {
-            UnitTestSchedulingContext context = new UnitTestSchedulingContext();
-            var workItemGroup = SchedulingHelper.CreateWorkItemGroupForTesting(context, loggerFactory); 
-            context.Scheduler = workItemGroup;
-            ActivationTaskScheduler activationScheduler = workItemGroup.TaskScheduler;
+            UnitTestSchedulingContext context = UnitTestSchedulingContext.Create(loggerFactory);
+            ActivationTaskScheduler activationScheduler = context.WorkItemGroup.TaskScheduler;
 
             this.mainDone = false;
 
@@ -476,9 +462,7 @@ namespace UnitTests.SchedulerTests
         [Fact, TestCategory("Functional"), TestCategory("Scheduler")]
         public async Task Sched_AC_ContinueWith_1_Test()
         {
-            UnitTestSchedulingContext context = new UnitTestSchedulingContext();
-            var workItemGroup = SchedulingHelper.CreateWorkItemGroupForTesting(context, loggerFactory);
-            context.Scheduler = workItemGroup;
+            var context = UnitTestSchedulingContext.Create(loggerFactory);
 
             var result = new TaskCompletionSource<bool>();
             int n = 0;
@@ -508,9 +492,7 @@ namespace UnitTests.SchedulerTests
             Stopwatch stopwatch = new Stopwatch();
             stopwatch.Start();
 
-            UnitTestSchedulingContext context = new UnitTestSchedulingContext();
-            var workItemGroup = SchedulingHelper.CreateWorkItemGroupForTesting(context, loggerFactory);
-            context.Scheduler = workItemGroup;
+            var context = UnitTestSchedulingContext.Create(loggerFactory);
 
             context.Scheduler.QueueAction(() =>
             {
@@ -554,9 +536,8 @@ namespace UnitTests.SchedulerTests
         [Fact, TestCategory("Functional"), TestCategory("Scheduler")]
         public async Task Sched_AC_ContinueWith_2_OrleansSched()
         {
-            var context = new UnitTestSchedulingContext();
-            var workItemGroup = SchedulingHelper.CreateWorkItemGroupForTesting(context, loggerFactory);
-            context.Scheduler = workItemGroup;
+            var context = UnitTestSchedulingContext.Create(loggerFactory);
+            var workItemGroup = context.WorkItemGroup;
 
             var result1 = new TaskCompletionSource<bool>();
             var result2 = new TaskCompletionSource<bool>();
@@ -604,9 +585,7 @@ namespace UnitTests.SchedulerTests
         [Fact, TestCategory("Functional"), TestCategory("Scheduler")]
         public async Task Sched_Task_SchedulingContext()
         {
-            var context = new UnitTestSchedulingContext();
-            var workItemGroup = SchedulingHelper.CreateWorkItemGroupForTesting(context, loggerFactory);
-            context.Scheduler = workItemGroup;
+            var context = UnitTestSchedulingContext.Create(loggerFactory);
 
             var result = new TaskCompletionSource<bool>();
             Task endOfChain = null;
@@ -653,7 +632,7 @@ namespace UnitTests.SchedulerTests
                     Assert.False(task.IsFaulted, "Faulted with Exception=" + task.Exception);
                 });
             });
-            wrapper.Start(workItemGroup.TaskScheduler);
+            wrapper.Start(context.WorkItemGroup.TaskScheduler);
             await wrapper.WaitAsync(TimeSpan.FromSeconds(1));
 
             Assert.False(wrapper.IsFaulted, "Wrapper Task Faulted with Exception=" + wrapper.Exception);

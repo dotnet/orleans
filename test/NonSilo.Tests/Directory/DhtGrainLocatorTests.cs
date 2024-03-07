@@ -24,10 +24,7 @@ namespace UnitTests.Directory
         {
             this.output = output;
             this.loggerFactory = new LoggerFactory(new[] { new XunitLoggerProvider(output) });
-            this.rootContext = new UnitTestSchedulingContext()
-            {
-                Scheduler = SchedulingHelper.CreateWorkItemGroupForTesting(this.rootContext, this.loggerFactory)
-            };
+            this.rootContext = UnitTestSchedulingContext.Create(loggerFactory);
             this.localGrainDirectory = new MockLocalGrainDirectory(
                 TimeSpan.FromMilliseconds(100),
                 TimeSpan.FromMilliseconds(200));
