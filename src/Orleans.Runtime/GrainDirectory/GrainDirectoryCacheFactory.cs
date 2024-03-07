@@ -36,6 +36,19 @@ namespace Orleans.Runtime.GrainDirectory
             }
         }
 
+        internal static IGrainDirectoryCache CreateCustomGrainDirectoryCache(IServiceProvider services, GrainDirectoryOptions options)
+        {
+            var grainDirectoryCache = services.GetService<IGrainDirectoryCache>();
+            if (grainDirectoryCache != null)
+            {
+                return grainDirectoryCache;
+            }
+            else
+            {
+                return new LRUBasedGrainDirectoryCache(options.CacheSize, options.MaximumCacheTTL);
+            }
+        }
+
         internal static AdaptiveDirectoryCacheMaintainer CreateGrainDirectoryCacheMaintainer(
             LocalGrainDirectory router,
             IGrainDirectoryCache cache,
