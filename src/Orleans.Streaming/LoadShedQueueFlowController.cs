@@ -13,7 +13,7 @@ namespace Orleans.Streams
     {
         private readonly LoadSheddingOptions options;
         private readonly double loadSheddingLimit;
-        private readonly IHostEnvironmentStatistics _hostEnvironmentStatistics;
+        private readonly IEnvironmentStatisticsProvider environmentStatisticsProvider;
 
         /// <summary>
         /// Creates a flow controller triggered when the CPU reaches a percentage of the cluster load shedding limit.
@@ -22,13 +22,13 @@ namespace Orleans.Streams
         /// </summary>
         /// <param name="options">The silo statistics options.</param>
         /// <param name="percentOfSiloSheddingLimit">Percentage of load shed limit which triggers a reduction of queue read rate.</param>
-        /// <param name="hostEnvironmentStatistics">The host environment statistics.</param>
+        /// <param name="environmentStatisticsProvider">The silo environment statistics.</param>
         /// <returns>The flow controller.</returns>
-        public static IQueueFlowController CreateAsPercentOfLoadSheddingLimit(LoadSheddingOptions options, IHostEnvironmentStatistics hostEnvironmentStatistics, int percentOfSiloSheddingLimit = LoadSheddingOptions.DefaultLoadSheddingLimit)
+        public static IQueueFlowController CreateAsPercentOfLoadSheddingLimit(LoadSheddingOptions options, IEnvironmentStatisticsProvider environmentStatisticsProvider, int percentOfSiloSheddingLimit = LoadSheddingOptions.DefaultCpuThreshold)
         {
             if (percentOfSiloSheddingLimit < 0.0 || percentOfSiloSheddingLimit > 100.0) throw new ArgumentOutOfRangeException(nameof(percentOfSiloSheddingLimit), "Percent value must be between 0-100");
             // Start shedding before silo reaches shedding limit.
-            return new LoadShedQueueFlowController((int)(options.LoadSheddingLimit * (percentOfSiloSheddingLimit / 100.0)), options, hostEnvironmentStatistics);
+            return new LoadShedQueueFlowController((int)(options.CpuThreshold * (percentOfSiloSheddingLimit / 100.0)), options, environmentStatisticsProvider);
         }
 
         /// <summary>
@@ -37,28 +37,26 @@ namespace Orleans.Streams
         /// </summary>
         /// <param name="loadSheddingLimit">Percentage of CPU which triggers queue read rate reduction</param>
         /// <param name="options">The silo statistics options.</param>
-        /// <param name="hostEnvironmentStatistics">The host environment statistics.</param>
+        /// <param name="environmentStatisticsProvider">The silo environment statistics.</param>
         /// <returns>The flow controller.</returns>
-        public static IQueueFlowController CreateAsPercentageOfCPU(int loadSheddingLimit, LoadSheddingOptions options, IHostEnvironmentStatistics hostEnvironmentStatistics)
+        public static IQueueFlowController CreateAsPercentageOfCPU(int loadSheddingLimit, LoadSheddingOptions options, IEnvironmentStatisticsProvider environmentStatisticsProvider)
         {
             if (loadSheddingLimit < 0 || loadSheddingLimit > 100) throw new ArgumentOutOfRangeException(nameof(loadSheddingLimit), "Value must be between 0-100");
-            return new LoadShedQueueFlowController(loadSheddingLimit, options, hostEnvironmentStatistics);
+            return new LoadShedQueueFlowController(loadSheddingLimit, options, environmentStatisticsProvider);
         }
 
-        private LoadShedQueueFlowController(int loadSheddingLimit, LoadSheddingOptions options, IHostEnvironmentStatistics hostEnvironmentStatistics)
+        private LoadShedQueueFlowController(int loadSheddingLimit, LoadSheddingOptions options, IEnvironmentStatisticsProvider environmentStatisticsProvider)
         {
             this.options = options;
             if (loadSheddingLimit < 0 || loadSheddingLimit > 100) throw new ArgumentOutOfRangeException(nameof(loadSheddingLimit), "Value must be between 0-100");
             this.loadSheddingLimit = loadSheddingLimit != 0 ? loadSheddingLimit : int.MaxValue;
-            _hostEnvironmentStatistics = hostEnvironmentStatistics;
+            this.environmentStatisticsProvider = environmentStatisticsProvider;
         }
 
         /// <inheritdoc/>
         public int GetMaxAddCount()
         {
-            return options.LoadSheddingEnabled && GetCpuUsage() > loadSheddingLimit ? 0 : int.MaxValue;
+            return options.LoadSheddingEnabled && environmentStatisticsProvider.GetEnvironmentStatistics().CpuUsagePercentage > loadSheddingLimit ? 0 : int.MaxValue;
         }
-
-        private float GetCpuUsage() => _hostEnvironmentStatistics.CpuUsage ?? default;
     }
 }

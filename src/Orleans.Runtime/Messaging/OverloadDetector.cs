@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
+using Orleans.Core.Messaging;
 using Orleans.Statistics;
 
 namespace Orleans.Runtime.Messaging
@@ -9,14 +10,15 @@ namespace Orleans.Runtime.Messaging
     /// </summary>
     internal class OverloadDetector
     {
-        private readonly IHostEnvironmentStatistics hostEnvironmentStatistics;
-        private readonly float limit;
+        private readonly IEnvironmentStatisticsProvider _environmentStatisticsProvider;
+        private readonly LoadSheddingOptions _options;
 
-        public OverloadDetector(IHostEnvironmentStatistics hostEnvironmentStatistics, IOptions<LoadSheddingOptions> loadSheddingOptions)
+        public OverloadDetector(IEnvironmentStatisticsProvider environmentStatisticsProvider, IOptions<LoadSheddingOptions> loadSheddingOptions)
         {
-            this.hostEnvironmentStatistics = hostEnvironmentStatistics;
-            this.Enabled = loadSheddingOptions.Value.LoadSheddingEnabled;
-            this.limit = loadSheddingOptions.Value.LoadSheddingLimit;
+            _environmentStatisticsProvider = environmentStatisticsProvider;
+            _options = loadSheddingOptions.Value;
+
+            Enabled = _options.LoadSheddingEnabled;
         }
 
         /// <summary>
@@ -27,6 +29,16 @@ namespace Orleans.Runtime.Messaging
         /// <summary>
         /// Returns <see langword="true"/> if this process is overloaded, <see langword="false"/> otherwise.
         /// </summary>
-        public bool Overloaded => this.Enabled && (this.hostEnvironmentStatistics.CpuUsage ?? 0) > this.limit;
+        public bool IsOverloaded
+        {
+            get
+            {
+                if (!Enabled)
+                    return false;
+            
+                var stats = _environmentStatisticsProvider.GetEnvironmentStatistics();
+                return OverloadDetectionLogic.IsOverloaded(ref stats, _options);
+            }
+        }
     }
 }

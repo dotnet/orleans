@@ -21,7 +21,7 @@ namespace Orleans.Streaming.EventHubs
     public class EventHubAdapterFactory : IQueueAdapterFactory, IQueueAdapter, IQueueAdapterCache
     {
         private readonly ILoggerFactory loggerFactory;
-        private readonly IHostEnvironmentStatistics _hostEnvironmentStatistics;
+        private readonly IEnvironmentStatisticsProvider environmentStatisticsProvider;
 
         /// <summary>
         /// Data adapter
@@ -112,7 +112,7 @@ namespace Orleans.Streaming.EventHubs
             IEventHubDataAdapter dataAdapter,
             IServiceProvider serviceProvider,
             ILoggerFactory loggerFactory,
-            IHostEnvironmentStatistics hostEnvironmentStatistics)
+            IEnvironmentStatisticsProvider environmentStatisticsProvider)
         {
             this.Name = name;
             this.cacheEvictionOptions = cacheEvictionOptions ?? throw new ArgumentNullException(nameof(cacheEvictionOptions));
@@ -123,7 +123,7 @@ namespace Orleans.Streaming.EventHubs
             this.receiverOptions = receiverOptions?? throw new ArgumentNullException(nameof(receiverOptions));
             this.serviceProvider = serviceProvider ?? throw new ArgumentNullException(nameof(serviceProvider));
             this.loggerFactory = loggerFactory ?? throw new ArgumentNullException(nameof(loggerFactory));
-            _hostEnvironmentStatistics = hostEnvironmentStatistics;
+            this.environmentStatisticsProvider = environmentStatisticsProvider;
         }
 
         public virtual void Init()
@@ -288,7 +288,7 @@ namespace Orleans.Streaming.EventHubs
                 this.loggerFactory,
                 this.ReceiverMonitorFactory(receiverMonitorDimensions, this.loggerFactory),
                 this.serviceProvider.GetRequiredService<IOptions<LoadSheddingOptions>>().Value,
-                _hostEnvironmentStatistics,
+                this.environmentStatisticsProvider,
                 this.EventHubReceiverFactory);
         }
 

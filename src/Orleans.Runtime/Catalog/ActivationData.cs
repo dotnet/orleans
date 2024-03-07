@@ -2050,22 +2050,13 @@ namespace Orleans.Runtime
             }
         }
 
-        private class MigrateWorkItem : IWorkItem
+        private class MigrateWorkItem(ActivationData activation, Dictionary<string, object> requestContext, CancellationToken cancellationToken) : WorkItemBase
         {
-            private readonly ActivationData _activation;
-            private readonly Dictionary<string, object> _requestContext;
-            private readonly CancellationToken _cancellationToken;
+            public override string Name => "Migrate";
 
-            public MigrateWorkItem(ActivationData activation, Dictionary<string, object> requestContext, CancellationToken cancellationToken)
-            {
-                _activation = activation;
-                _requestContext = requestContext;
-                _cancellationToken = cancellationToken;
-            }
+            public override IGrainContext GrainContext => activation;
 
-            public string Name => "Migrate";
-            public IGrainContext GrainContext => _activation;
-            public void Execute() => _activation.StartMigratingAsync(_requestContext, _cancellationToken).Ignore();
+            public override void Execute() => activation.StartMigratingAsync(requestContext, cancellationToken).Ignore();
         }
     }
 }

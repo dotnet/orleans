@@ -1,7 +1,6 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Orleans.Configuration;
-using Orleans.Runtime;
 using Orleans.Serialization;
 using Orleans.Streaming.EventHubs;
 using Orleans.Streams;
@@ -20,9 +19,9 @@ namespace ServiceBus.Tests.TestStreamProviders.EventHub
             StreamStatisticOptions statisticOptions,
             IEventHubDataAdapter dataAdapter,
             IServiceProvider serviceProvider,
-            IHostEnvironmentStatistics hostEnvironmentStatistics,
+            IEnvironmentStatisticsProvider environmentStatisticsProvider,
             ILoggerFactory loggerFactory)
-            : base(name, ehOptions, receiverOptions, cacheOptions, evictionOptions, statisticOptions, dataAdapter, serviceProvider, loggerFactory, hostEnvironmentStatistics)
+            : base(name, ehOptions, receiverOptions, cacheOptions, evictionOptions, statisticOptions, dataAdapter, serviceProvider, loggerFactory, environmentStatisticsProvider)
         {
             StreamFailureHandlerFactory = qid => TestAzureTableStorageStreamFailureHandler.Create(this.serviceProvider.GetRequiredService<Serializer<StreamSequenceToken>>());
         }

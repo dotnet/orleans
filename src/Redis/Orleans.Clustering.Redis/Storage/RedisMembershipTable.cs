@@ -1,3 +1,4 @@
+#nullable enable
 using System;
 using System.Threading.Tasks;
 using Orleans.Runtime;
@@ -8,6 +9,7 @@ using System.Linq;
 using Microsoft.Extensions.Options;
 using System.Globalization;
 using System.Text;
+using System.Diagnostics.CodeAnalysis;
 
 namespace Orleans.Clustering.Redis
 {
@@ -19,8 +21,8 @@ namespace Orleans.Clustering.Redis
         private readonly ClusterOptions _clusterOptions;
         private readonly JsonSerializerSettings _jsonSerializerSettings;
         private readonly RedisKey _clusterKey;
-        private IConnectionMultiplexer _muxer;
-        private IDatabase _db;
+        private IConnectionMultiplexer _muxer = null!;
+        private IDatabase _db = null!;
 
         public RedisMembershipTable(IOptions<RedisClusteringOptions> redisOptions, IOptions<ClusterOptions> clusterOptions)
         {
@@ -69,12 +71,17 @@ namespace Orleans.Clustering.Redis
             {
                 tx.HashSetAsync(_clusterKey, TableVersionKey, SerializeVersion(tableVersion)).Ignore();
             }
+
             var versionCondition = tx.AddCondition(Condition.HashEqual(_clusterKey, TableVersionKey, SerializeVersion(Predeccessor(tableVersion))));
 
-            ConditionResult insertCondition = null;
+            ConditionResult? insertCondition;
             if (allowInsertOnly)
             {
                 insertCondition = tx.AddCondition(Condition.HashNotExists(_clusterKey, rowKey));
+            }
+            else
+            {
+                insertCondition = null;
             }
 
             tx.HashSetAsync(_clusterKey, rowKey, Serialize(entry)).Ignore();
@@ -91,9 +98,9 @@ namespace Orleans.Clustering.Redis
                 return UpsertResult.Conflict;
             }
 
-            if (!insertCondition.WasSatisfied)
+            if (insertCondition is not null && !insertCondition.WasSatisfied)
             {
-                return UpsertResult.Failure;
+                return UpsertResult.Conflict;
             }
 
             return UpsertResult.Failure;
@@ -105,15 +112,32 @@ namespace Orleans.Clustering.Redis
             var tableVersionRow = all.SingleOrDefault(h => TableVersionKey.Equals(h.Name, StringComparison.Ordinal));
             TableVersion tableVersion = GetTableVersionFromRow(tableVersionRow.Value);
 
-            var data = all.Where(h => !TableVersionKey.Equals(h.Name, StringComparison.Ordinal) && h.Value.HasValue)
-                .Select(x => Tuple.Create(Deserialize(x.Value), tableVersion.VersionEtag))
+            var data = all.Where(x => !TableVersionKey.Equals(x.Name, StringComparison.Ordinal) && x.Value.HasValue)
+                .Select(x => Tuple.Create(Deserialize(x.Value!), tableVersion.VersionEtag))
                 .ToList();
             return new MembershipTableData(data, tableVersion);
         }
 
         private static TableVersion GetTableVersionFromRow(RedisValue tableVersionRow)
         {
-            return tableVersionRow.HasValue ? DeserializeVersion(tableVersionRow) : DefaultTableVersion;
+            if (TryGetValueString(tableVersionRow, out var value))
+            {
+                return DeserializeVersion(value);
+            }
+
+            return DefaultTableVersion;
+        }
+
+        private static bool TryGetValueString(RedisValue key, [NotNullWhen(true)] out string? value)
+        {
+            if (key.HasValue)
+            {
+                value = key.ToString();
+                return true;
+            }
+
+            value = null;
+            return false;
         }
 
         public async Task<MembershipTableData> ReadRow(SiloAddress key)
@@ -128,9 +152,9 @@ namespace Orleans.Clustering.Redis
 
             TableVersion tableVersion = GetTableVersionFromRow(await tableVersionRowTask);
             var entryRow = await entryRowTask;
-            if (entryRow.HasValue)
+            if (TryGetValueString(entryRow, out var entryValueString))
             {
-                var entry = Deserialize(entryRow);
+                var entry = Deserialize(entryValueString);
                 return new MembershipTableData(Tuple.Create(entry, tableVersion.VersionEtag), tableVersion);
             }
             else
@@ -151,13 +175,13 @@ namespace Orleans.Clustering.Redis
             }
 
             var entryRow = await entryRowTask;
-            if (!entryRow.HasValue)
+            if (!TryGetValueString(entryRow, out var entryRowValue))
             {
                 throw new RedisClusteringException($"Could not find a value for the key {key}");
             }
 
             TableVersion tableVersion = GetTableVersionFromRow(await tableVersionRowTask).Next();
-            var existingEntry = Deserialize(entryRow);
+            var existingEntry = Deserialize(entryRowValue);
 
             // Update only the IAmAliveTime property.
             existingEntry.IAmAliveTime = entry.IAmAliveTime;
@@ -226,7 +250,7 @@ namespace Orleans.Clustering.Redis
 
         private MembershipEntry Deserialize(string json)
         {
-            return JsonConvert.DeserializeObject<MembershipEntry>(json, _jsonSerializerSettings);
+            return JsonConvert.DeserializeObject<MembershipEntry>(json, _jsonSerializerSettings)!;
         }
     }
 }

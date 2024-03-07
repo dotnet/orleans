@@ -38,7 +38,6 @@ using Orleans.Storage;
 using Orleans.Serialization.TypeSystem;
 using Orleans.Serialization.Serializers;
 using Orleans.Serialization.Cloning;
-using System.Runtime.InteropServices;
 using System.Collections.Generic;
 using Microsoft.Extensions.Configuration;
 using Orleans.Serialization.Internal;
@@ -74,16 +73,14 @@ namespace Orleans.Hosting
             services.AddSingleton<SiloOptionsLogger>();
             services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, SiloOptionsLogger>();
 
-            if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
-            {
-                LinuxEnvironmentStatisticsServices.RegisterServices<ISiloLifecycle>(services);
-            }
-            else
-            {
-                services.TryAddSingleton<IHostEnvironmentStatistics, NoOpHostEnvironmentStatistics>();
-            }
+            // Statistics
+            services.AddSingleton<IEnvironmentStatisticsProvider, EnvironmentStatisticsProvider>();
+#pragma warning disable 618
+            services.AddSingleton<OldEnvironmentStatistics>();
+            services.AddFromExisting<IAppEnvironmentStatistics, OldEnvironmentStatistics>();
+            services.AddFromExisting<IHostEnvironmentStatistics, OldEnvironmentStatistics>();
+#pragma warning restore 618
 
-            services.TryAddSingleton<IAppEnvironmentStatistics, AppEnvironmentStatistics>();
             services.TryAddSingleton<OverloadDetector>();
 
             services.TryAddSingleton<FallbackSystemTarget>();
@@ -190,6 +187,7 @@ namespace Orleans.Hosting
 
             // Placement
             services.AddSingleton<IConfigurationValidator, ActivationCountBasedPlacementOptionsValidator>();
+            services.AddSingleton<IConfigurationValidator, ResourceOptimizedPlacementOptionsValidator>();
             services.AddSingleton<PlacementService>();
             services.AddSingleton<PlacementStrategyResolver>();
             services.AddSingleton<PlacementDirectorResolver>();
@@ -207,6 +205,7 @@ namespace Orleans.Hosting
             services.AddPlacementDirector<HashBasedPlacement, HashBasedPlacementDirector>();
             services.AddPlacementDirector<ClientObserversPlacement, ClientObserversPlacementDirector>();
             services.AddPlacementDirector<SiloRoleBasedPlacement, SiloRoleBasedPlacementDirector>();
+            services.AddPlacementDirector<ResourceOptimizedPlacement, ResourceOptimizedPlacementDirector>();
 
             // Versioning
             services.TryAddSingleton<VersionSelectorManager>();
@@ -298,6 +297,7 @@ namespace Orleans.Hosting
             services.ConfigureFormatter<ClusterMembershipOptions>();
             services.ConfigureFormatter<GrainDirectoryOptions>();
             services.ConfigureFormatter<ActivationCountBasedPlacementOptions>();
+            services.ConfigureFormatter<ResourceOptimizedPlacementOptions>();
             services.ConfigureFormatter<GrainCollectionOptions>();
             services.ConfigureFormatter<GrainVersioningOptions>();
             services.ConfigureFormatter<ConsistentRingOptions>();
@@ -398,6 +398,7 @@ namespace Orleans.Hosting
             services.AddSingleton<MigrationContext.SerializationHooks>();
             services.AddSingleton<ActivationMigrationManager>();
             services.AddFromExisting<IActivationMigrationManager, ActivationMigrationManager>();
+            services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, ActivationMigrationManager>();
 
             ApplyConfiguration(builder);
         }
@@ -418,6 +419,11 @@ namespace Orleans.Hosting
             if (cfg.GetSection("Endpoints") is { } ep && ep.Exists())
             {
                 services.Configure<EndpointOptions>(o => o.Bind(ep));
+            }
+
+            if (bool.TryParse(cfg["EnableDistributedTracing"], out var enableDistributedTracing) && enableDistributedTracing)
+            {
+                builder.AddActivityPropagation();
             }
 
             ApplySubsection(builder, cfg, knownProviderTypes, "Clustering");

@@ -12,7 +12,7 @@ namespace Orleans.Runtime
 {
     /// <summary>
     /// Base class for various system services, such as grain directory, reminder service, etc.
-    /// Made public for GrainSerive to inherit from it.
+    /// Made public for GrainService to inherit from it.
     /// Can be turned to internal after a refactoring that would remove the inheritance relation.
     /// </summary>
     public abstract class SystemTarget : ISystemTarget, ISystemTargetBase, IGrainContext, IGrainExtensionBinder, ISpanFormattable, IDisposable
@@ -280,7 +280,7 @@ namespace Orleans.Runtime
                     {
                         this.MessagingTrace.OnEnqueueMessageOnActivation(msg, this);
                         var workItem = new RequestWorkItem(this, msg);
-                        this.WorkItemGroup.TaskScheduler.QueueWorkItem(workItem);
+                        this.WorkItemGroup.QueueWorkItem(workItem);
                         break;
                     }
 

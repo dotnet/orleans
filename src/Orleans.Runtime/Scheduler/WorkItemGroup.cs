@@ -1,7 +1,8 @@
+#nullable enable
+
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
-using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Text;
 using System.Threading;
@@ -11,303 +12,299 @@ using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 using Orleans.Internal;
 
-namespace Orleans.Runtime.Scheduler
+namespace Orleans.Runtime.Scheduler;
+
+[DebuggerDisplay("WorkItemGroup Name={Name} State={state}")]
+internal sealed class WorkItemGroup : IThreadPoolWorkItem, IWorkItemScheduler
 {
-    [DebuggerDisplay("WorkItemGroup Name={Name} State={state}")]
-    internal class WorkItemGroup : IWorkItem, IWorkItemScheduler
+    private enum WorkGroupStatus : byte
     {
-        private enum WorkGroupStatus
-        {
-            Waiting = 0,
-            Runnable = 1,
-            Running = 2
-        }
+        Waiting = 0,
+        Runnable = 1,
+        Running = 2
+    }
 
-        private readonly ILogger log;
-        private WorkGroupStatus state;
-        private readonly object lockable;
-        private readonly Queue<Task> workItems;
+    private readonly ILogger _log;
+    private readonly object _lockObj = new();
+    private readonly Queue<Task> _workItems = new();
+    private readonly SchedulingOptions _schedulingOptions;
 
-        private long totalItemsEnqueued;
-        private long totalItemsProcessed;
-        private long lastLongQueueWarningTimestamp;
+    private long _totalItemsEnqueued;
+    private long _totalItemsProcessed;
+    private long _lastLongQueueWarningTimestamp;
 
-        private Task currentTask;
-        private long currentTaskStarted;
+    private WorkGroupStatus _state;
+    private Task? _currentTask;
+    private long _currentTaskStarted;
 
-        private readonly SchedulingOptions schedulingOptions;
+    internal ActivationTaskScheduler TaskScheduler { get; }
 
-        internal ActivationTaskScheduler TaskScheduler { get; }
+    public IGrainContext GrainContext { get; set; }
 
-        public IGrainContext GrainContext { get; set; }
+    internal int ExternalWorkItemCount
+    {
+        get { lock (_lockObj) { return _workItems.Count; } }
+    }
 
-        internal bool IsSystemGroup => this.GrainContext is ISystemTargetBase;
+    public WorkItemGroup(
+        IGrainContext grainContext,
+        ILogger<WorkItemGroup> logger,
+        ILogger<ActivationTaskScheduler> activationTaskSchedulerLogger,
+        IOptions<SchedulingOptions> schedulingOptions)
+    {
+        GrainContext = grainContext;
+        _schedulingOptions = schedulingOptions.Value;
+        _state = WorkGroupStatus.Waiting;
+        _log = logger;
+        TaskScheduler = new ActivationTaskScheduler(this, activationTaskSchedulerLogger);
+    }
 
-        public string Name => GrainContext?.ToString() ?? "Unknown";
-
-        internal int ExternalWorkItemCount
-        {
-            get { lock (lockable) { return WorkItemCount; } }
-        }
-
-        private Task CurrentTask
-        {
-            get => currentTask;
-            set
-            {
-                currentTask = value;
-                currentTaskStarted = Environment.TickCount64;
-            }
-        }
-
-        private int WorkItemCount => workItems.Count;
-
-        public WorkItemGroup(
-            IGrainContext grainContext,
-            ILogger<WorkItemGroup> logger,
-            ILogger<ActivationTaskScheduler> activationTaskSchedulerLogger,
-            IOptions<SchedulingOptions> schedulingOptions)
-        {
-            GrainContext = grainContext;
-            this.schedulingOptions = schedulingOptions.Value;
-            state = WorkGroupStatus.Waiting;
-            workItems = new Queue<Task>();
-            lockable = new object();
-            totalItemsEnqueued = 0;
-            totalItemsProcessed = 0;
-            TaskScheduler = new ActivationTaskScheduler(this, activationTaskSchedulerLogger);
-            log = logger;
-        }
-
-        /// <summary>
-        /// Adds a task to this activation.
-        /// If we're adding it to the run list and we used to be waiting, now we're runnable.
-        /// </summary>
-        /// <param name="task">The work item to add.</param>
-        public void EnqueueTask(Task task)
-        {
+    /// <summary>
+    /// Adds a task to this activation.
+    /// If we're adding it to the run list and we used to be waiting, now we're runnable.
+    /// </summary>
+    /// <param name="task">The work item to add.</param>
+    public void EnqueueTask(Task task)
+    {
 #if DEBUG
-            if (log.IsEnabled(LogLevel.Trace))
+        if (_log.IsEnabled(LogLevel.Trace))
+        {
+            _log.LogTrace(
+                "EnqueueWorkItem {Task} into {GrainContext} when TaskScheduler.Current={TaskScheduler}",
+                task,
+                GrainContext,
+                System.Threading.Tasks.TaskScheduler.Current);
+        }
+#endif
+
+        lock (_lockObj)
+        {
+            long thisSequenceNumber = _totalItemsEnqueued++;
+            int count = _workItems.Count;
+
+            _workItems.Enqueue(task);
+            int maxPendingItemsLimit = _schedulingOptions.MaxPendingWorkItemsSoftLimit;
+            if (maxPendingItemsLimit > 0 && count > maxPendingItemsLimit)
             {
-                this.log.LogTrace(
-                    "EnqueueWorkItem {Task} into {GrainContext} when TaskScheduler.Current={TaskScheduler}",
+                var now = Environment.TickCount64;
+                if (now > _lastLongQueueWarningTimestamp + 10_000)
+                {
+                    LogTooManyTasksInQueue(count, maxPendingItemsLimit);
+                }
+
+                _lastLongQueueWarningTimestamp = now;
+            }
+
+            if (_state != WorkGroupStatus.Waiting)
+            {
+                return;
+            }
+
+            _state = WorkGroupStatus.Runnable;
+#if DEBUG
+            if (_log.IsEnabled(LogLevel.Trace))
+            {
+                _log.LogTrace(
+                    "Add to RunQueue {Task}, #{SequenceNumber}, onto {GrainContext}",
                     task,
-                    this.GrainContext,
-                    System.Threading.Tasks.TaskScheduler.Current);
+                    thisSequenceNumber,
+                    GrainContext);
             }
 #endif
-
-            lock (lockable)
-            {
-                long thisSequenceNumber = totalItemsEnqueued++;
-                int count = WorkItemCount;
-
-                workItems.Enqueue(task);
-                int maxPendingItemsLimit = schedulingOptions.MaxPendingWorkItemsSoftLimit;
-                if (maxPendingItemsLimit > 0 && count > maxPendingItemsLimit)
-                {
-                    var now = ValueStopwatch.GetTimestamp();
-                    if (ValueStopwatch.FromTimestamp(this.lastLongQueueWarningTimestamp, now).Elapsed > TimeSpan.FromSeconds(10))
-                    {
-                        log.LogWarning(
-                            (int)ErrorCode.SchedulerTooManyPendingItems,
-                            "{PendingWorkItemCount} pending work items for group {WorkGroupName}, exceeding the warning threshold of {WarningThreshold}",
-                            count,
-                            this.Name,
-                            maxPendingItemsLimit);
-                    }
-
-                    lastLongQueueWarningTimestamp = now;
-                }
-                if (state != WorkGroupStatus.Waiting) return;
-
-                state = WorkGroupStatus.Runnable;
-#if DEBUG
-                if (log.IsEnabled(LogLevel.Trace))
-                {
-                    log.LogTrace(
-                        "Add to RunQueue {Task}, #{SequenceNumber}, onto {GrainContext}",
-                        task,
-                        thisSequenceNumber,
-                        GrainContext);
-                }
-#endif
-                ScheduleExecution(this);
-            }
+            ScheduleExecution(this);
         }
+    }
 
-        /// <summary>
-        /// For debugger purposes only.
-        /// </summary>
-        internal IEnumerable<Task> GetScheduledTasks()
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private void LogTooManyTasksInQueue(int count, int maxPendingItemsLimit)
+    {
+        _log.LogWarning(
+            (int)ErrorCode.SchedulerTooManyPendingItems,
+            "{PendingWorkItemCount} pending work items for group {WorkGroupName}, exceeding the warning threshold of {WarningThreshold}",
+            count,
+            GrainContext?.ToString() ?? "Unknown",
+            maxPendingItemsLimit);
+    }
+
+    /// <summary>
+    /// For debugger purposes only.
+    /// </summary>
+    internal IEnumerable<Task> GetScheduledTasks()
+    {
+        foreach (var task in _workItems)
         {
-            foreach (var task in this.workItems)
-            {
-                yield return task;
-            }
+            yield return task;
         }
+    }
 
-        private static object DumpAsyncState(object o)
+    // Execute one or more turns for this activation.
+    // This method is always called in a single-threaded environment -- that is, no more than one
+    // thread will be in this method at once -- but other async threads may still be queueing tasks, etc.
+    public void Execute()
+    {
+        RuntimeContext.SetExecutionContext(GrainContext, out var originalContext);
+        var turnWarningDurationMs = (long)Math.Ceiling(_schedulingOptions.TurnWarningLengthThreshold.TotalMilliseconds);
+        var activationSchedulingQuantumMs = (long)_schedulingOptions.ActivationSchedulingQuantum.TotalMilliseconds;
+        try
         {
-            if (o is Delegate action)
-                return action.Target is null ? action.Method.DeclaringType + "." + action.Method.Name
-                    : action.Method.DeclaringType.Name + "." + action.Method.Name + ": " + DumpAsyncState(action.Target);
 
-            if (o?.GetType() is { Name: "ContinuationWrapper" } wrapper
-                && (wrapper.GetField("_continuation", BindingFlags.Instance | BindingFlags.NonPublic)
-                    ?? wrapper.GetField("m_continuation", BindingFlags.Instance | BindingFlags.NonPublic)
-                    )?.GetValue(o) is Action continuation)
-                return DumpAsyncState(continuation);
-
-            return o;
-        }
-
-        // Execute one or more turns for this activation.
-        // This method is always called in a single-threaded environment -- that is, no more than one
-        // thread will be in this method at once -- but other asynch threads may still be queueing tasks, etc.
-        public void Execute()
-        {
-            try
+            // Process multiple items -- drain the queue (up to max items) for this activation
+            long loopStart, taskStart, taskEnd;
+            loopStart = taskStart = taskEnd = Environment.TickCount64;
+            do
             {
-                RuntimeContext.SetExecutionContext(this.GrainContext);
-
-                // Process multiple items -- drain the applicationMessageQueue (up to max items) for this physical activation
-                int count = 0;
-                var stopwatch = ValueStopwatch.StartNew();
-                do
+                Task task;
+                lock (_lockObj)
                 {
-                    lock (lockable)
-                    {
-                        state = WorkGroupStatus.Running;
-                    }
+                    _state = WorkGroupStatus.Running;
 
                     // Get the first Work Item on the list
-                    Task task;
-                    lock (lockable)
+                    if (_workItems.Count > 0)
                     {
-                        if (workItems.Count > 0)
-                            CurrentTask = task = workItems.Dequeue();
-                        else // If the list is empty, then we're done
-                            break;
-                    }
-
-#if DEBUG
-                    if (log.IsEnabled(LogLevel.Trace))
-                    {
-                        log.LogTrace(
-                        "About to execute task {Task} in GrainContext={GrainContext}",
-                        OrleansTaskExtentions.ToString(task),
-                        this.GrainContext);
-                    }
-#endif
-                    var taskStart = stopwatch.Elapsed;
-
-                    try
-                    {
-                        TaskScheduler.RunTask(task);
-                    }
-                    catch (Exception ex)
-                    {
-                        this.log.LogError(
-                            (int)ErrorCode.SchedulerExceptionFromExecute,
-                            ex,
-                            "Worker thread caught an exception thrown from Execute by task {Task}",
-                            OrleansTaskExtentions.ToString(task));
-                        throw;
-                    }
-                    finally
-                    {
-                        totalItemsProcessed++;
-                        var taskLength = stopwatch.Elapsed - taskStart;
-                        if (taskLength > schedulingOptions.TurnWarningLengthThreshold)
-                        {
-                            SchedulerInstruments.LongRunningTurnsCounter.Add(1);
-                            this.log.LogWarning(
-                                (int)ErrorCode.SchedulerTurnTooLong3,
-                                "Task {Task} in WorkGroup {GrainContext} took elapsed time {Duration} for execution, which is longer than {TurnWarningLengthThreshold}. Running on thread {Thread}",
-                                OrleansTaskExtentions.ToString(task),
-                                this.GrainContext.ToString(),
-                                taskLength.ToString("g"),
-                                schedulingOptions.TurnWarningLengthThreshold,
-                                Thread.CurrentThread.ManagedThreadId.ToString());
-                        }
-
-                        CurrentTask = null;
-                    }
-                    count++;
-                }
-                while (schedulingOptions.ActivationSchedulingQuantum <= TimeSpan.Zero || stopwatch.Elapsed < schedulingOptions.ActivationSchedulingQuantum);
-            }
-            catch (Exception ex)
-            {
-                this.log.LogError(
-                    (int)ErrorCode.Runtime_Error_100032,
-                    ex,
-                    "Worker thread {Thread} caught an exception thrown from IWorkItem.Execute",
-                    Thread.CurrentThread.ManagedThreadId);
-            }
-            finally
-            {
-                // Now we're not Running anymore.
-                // If we left work items on our run list, we're Runnable, and need to go back on the silo run queue;
-                // If our run list is empty, then we're waiting.
-                lock (lockable)
-                {
-                    if (WorkItemCount > 0)
-                    {
-                        state = WorkGroupStatus.Runnable;
-                        ScheduleExecution(this);
+                        _currentTask = task = _workItems.Dequeue();
+                        _currentTaskStarted = taskStart;
                     }
                     else
                     {
-                        state = WorkGroupStatus.Waiting;
+                        // If the list is empty, then we're done
+                        break;
                     }
                 }
 
-                RuntimeContext.ResetExecutionContext();
-            }
-        }
-
-        public override string ToString() => $"{(IsSystemGroup ? "System*" : "")}WorkItemGroup:Name={Name},WorkGroupStatus={state}";
-
-        public string DumpStatus()
-        {
-            lock (lockable)
-            {
-                var sb = new StringBuilder();
-                sb.Append(this);
-                sb.AppendFormat(". Currently QueuedWorkItems={0}; Total Enqueued={1}; Total processed={2}; ",
-                    WorkItemCount, totalItemsEnqueued, totalItemsProcessed);
-                if (CurrentTask is Task task)
+#if DEBUG
+                LogTaskStart(task);
+#endif
+                try
                 {
-                    sb.AppendFormat(" Executing Task Id={0} Status={1} for {2}.",
-                        task.Id, task.Status, TimeSpan.FromMilliseconds(Environment.TickCount64 - currentTaskStarted));
+                    TaskScheduler.RunTaskFromWorkItemGroup(task);
                 }
-
-                sb.AppendFormat("TaskRunner={0}; ", TaskScheduler);
-                if (GrainContext != null)
+                finally
                 {
-                    var detailedStatus = this.GrainContext switch
+                    _totalItemsProcessed++;
+                    taskEnd = Environment.TickCount64;
+                    var taskDurationMs = taskEnd - taskStart;
+                    taskStart = taskEnd;
+                    if (taskDurationMs > turnWarningDurationMs)
                     {
-                        ActivationData activationData => activationData.ToDetailedString(includeExtraDetails: true),
-                        SystemTarget systemTarget => systemTarget.ToDetailedString(),
-                        object obj => obj.ToString(),
-                        _ => "None"
-                    };
-                    sb.AppendFormat("Detailed context=<{0}>", detailedStatus);
+                        SchedulerInstruments.LongRunningTurnsCounter.Add(1);
+                        LogLongRunningTurn(task, taskDurationMs);
+                    }
+
+                    _currentTask = null;
                 }
-                return sb.ToString();
             }
+            while (activationSchedulingQuantumMs <= 0 || taskEnd - loopStart < activationSchedulingQuantumMs);
         }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static void ScheduleExecution(WorkItemGroup workItem)
+        catch (Exception ex)
         {
-            ThreadPool.UnsafeQueueUserWorkItem(workItem, preferLocal: true);
+            LogTaskLoopError(ex);
         }
+        finally
+        {
+            // Now we're not Running anymore.
+            // If we left work items on our run list, we're Runnable, and need to go back on the silo run queue;
+            // If our run list is empty, then we're waiting.
+            lock (_lockObj)
+            {
+                if (_workItems.Count > 0)
+                {
+                    _state = WorkGroupStatus.Runnable;
+                    ScheduleExecution(this);
+                }
+                else
+                {
+                    _state = WorkGroupStatus.Waiting;
+                }
+            }
 
-        public void QueueAction(Action action) => TaskScheduler.QueueAction(action);
-        public void QueueTask(Task task) => task.Start(TaskScheduler);
-        public void QueueWorkItem(IThreadPoolWorkItem workItem) => TaskScheduler.QueueThreadPoolWorkItem(workItem);
+            RuntimeContext.ResetExecutionContext(originalContext);
+        }
     }
+
+#if DEBUG
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private void LogTaskStart(Task task)
+    {
+        if (_log.IsEnabled(LogLevel.Trace))
+        {
+            _log.LogTrace(
+            "About to execute task {Task} in GrainContext={GrainContext}",
+            OrleansTaskExtentions.ToString(task),
+            GrainContext);
+        }
+    }
+#endif
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private void LogTaskLoopError(Exception ex)
+    {
+        _log.LogError(
+            (int)ErrorCode.Runtime_Error_100032,
+            ex,
+            "Worker thread {Thread} caught an exception thrown from IWorkItem.Execute",
+            Thread.CurrentThread.ManagedThreadId);
+    }
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private void LogTaskRunError(Task task, Exception ex)
+    {
+        _log.LogError(
+            (int)ErrorCode.SchedulerExceptionFromExecute,
+            ex,
+            "Worker thread caught an exception thrown from Execute by task {Task}",
+            OrleansTaskExtentions.ToString(task));
+    }
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private void LogLongRunningTurn(Task task, long taskDurationMs)
+    {
+        var taskDuration = TimeSpan.FromMilliseconds(taskDurationMs);
+        _log.LogWarning(
+            (int)ErrorCode.SchedulerTurnTooLong3,
+            "Task {Task} in WorkGroup {GrainContext} took elapsed time {Duration} for execution, which is longer than {TurnWarningLengthThreshold}. Running on thread {Thread}",
+            OrleansTaskExtentions.ToString(task),
+            GrainContext.ToString(),
+            taskDuration.ToString("g"),
+            _schedulingOptions.TurnWarningLengthThreshold,
+            Thread.CurrentThread.ManagedThreadId.ToString());
+    }
+
+    public override string ToString() => $"{(GrainContext is SystemTarget ? "System*" : "")}WorkItemGroup:Name={GrainContext?.ToString() ?? "Unknown"},WorkGroupStatus={_state}";
+
+    public string DumpStatus()
+    {
+        lock (_lockObj)
+        {
+            var sb = new StringBuilder();
+            sb.Append(this);
+            sb.AppendFormat(". Currently QueuedWorkItems={0}; Total Enqueued={1}; Total processed={2}; ",
+                _workItems.Count, _totalItemsEnqueued, _totalItemsProcessed);
+            if (_currentTask is Task task)
+            {
+                sb.AppendFormat(" Executing Task Id={0} Status={1} for {2}.",
+                    task.Id, task.Status, TimeSpan.FromMilliseconds(Environment.TickCount64 - _currentTaskStarted));
+            }
+
+            sb.AppendFormat("TaskRunner={0}; ", TaskScheduler);
+            if (GrainContext != null)
+            {
+                var detailedStatus = GrainContext switch
+                {
+                    ActivationData activationData => activationData.ToDetailedString(includeExtraDetails: true),
+                    SystemTarget systemTarget => systemTarget.ToDetailedString(),
+                    object obj => obj.ToString(),
+                    _ => "None"
+                };
+                sb.AppendFormat("Detailed context=<{0}>", detailedStatus);
+            }
+            return sb.ToString();
+        }
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static void ScheduleExecution(WorkItemGroup workItem) => ThreadPool.UnsafeQueueUserWorkItem(workItem, preferLocal: true);
+
+    public void QueueAction(Action action) => TaskScheduler.QueueAction(action);
+    public void QueueAction(Action<object> action, object state) => TaskScheduler.QueueAction(action, state);
+    public void QueueTask(Task task) => task.Start(TaskScheduler);
 }

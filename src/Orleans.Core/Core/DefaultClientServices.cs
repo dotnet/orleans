@@ -19,7 +19,6 @@ using Orleans.Statistics;
 using Orleans.Serialization.Serializers;
 using Orleans.Serialization.Cloning;
 using Microsoft.Extensions.Hosting;
-using System.Runtime.InteropServices;
 using System.Collections.Generic;
 using Orleans.Serialization.Internal;
 using System;
@@ -57,16 +56,14 @@ namespace Orleans
             services.AddSingleton<ClientOptionsLogger>();
             services.AddFromExisting<ILifecycleParticipant<IClusterClientLifecycle>, ClientOptionsLogger>();
 
-            if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
-            {
-                LinuxEnvironmentStatisticsServices.RegisterServices<IClusterClientLifecycle>(services);
-            }
-            else
-            {
-                services.TryAddSingleton<IHostEnvironmentStatistics, NoOpHostEnvironmentStatistics>();
-            }
+            // Statistics
+            services.AddSingleton<IEnvironmentStatisticsProvider, EnvironmentStatisticsProvider>();
+#pragma warning disable 618
+            services.AddSingleton<OldEnvironmentStatistics>();
+            services.AddFromExisting<IAppEnvironmentStatistics, OldEnvironmentStatistics>();
+            services.AddFromExisting<IHostEnvironmentStatistics, OldEnvironmentStatistics>();
+#pragma warning restore 618
 
-            services.TryAddSingleton<IAppEnvironmentStatistics, AppEnvironmentStatistics>();
             services.AddLogging();
             services.TryAddSingleton<GrainBindingsResolver>();
             services.TryAddSingleton<LocalClientDetails>();
@@ -169,6 +166,11 @@ namespace Orleans
             services.Configure<ClusterOptions>(cfg);
             services.Configure<ClientMessagingOptions>(cfg.GetSection("Messaging"));
             services.Configure<GatewayOptions>(cfg.GetSection("Gateway"));
+
+            if (bool.TryParse(cfg["EnableDistributedTracing"], out var enableDistributedTracing) && enableDistributedTracing)
+            {
+                builder.AddActivityPropagation();
+            }
 
             ApplySubsection(builder, cfg, knownProviderTypes, "Clustering");
             ApplySubsection(builder, cfg, knownProviderTypes, "Reminders");

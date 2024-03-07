@@ -51,8 +51,8 @@ namespace Orleans.TestingHost
 
             hostBuilder.ConfigureServices((context, services) =>
             {
-                services.AddSingleton<TestHooksHostEnvironmentStatistics>();
-                services.AddFromExisting<IHostEnvironmentStatistics, TestHooksHostEnvironmentStatistics>();
+                services.AddSingleton<TestHooksEnvironmentStatisticsProvider>();
+                services.AddFromExisting<IEnvironmentStatisticsProvider, TestHooksEnvironmentStatisticsProvider>();
                 services.AddSingleton<TestHooksSystemTarget>();
 
                 //TryConfigureClusterMembership(context.Configuration, services);

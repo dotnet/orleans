@@ -117,10 +117,10 @@ internal sealed class MigrationContext : IDehydrationContext, IRehydrationContex
     IEnumerator<string> IEnumerable<string>.GetEnumerator() => new Enumerator(this);
     IEnumerator IEnumerable.GetEnumerator() => new Enumerator(this);
 
-    private sealed class Enumerator : IEnumerator<string>, IEnumerator
+    private sealed class Enumerator(MigrationContext context) : IEnumerator<string>, IEnumerator
     {
-        private Dictionary<string, (int Offset, int Length)>.KeyCollection.Enumerator _value;
-        public Enumerator(MigrationContext context) => _value = context._indices.Keys.GetEnumerator();
+        private Dictionary<string, (int Offset, int Length)>.KeyCollection.Enumerator _value = context._indices.Keys.GetEnumerator();
+
         public string Current => _value.Current;
         object IEnumerator.Current => Current;
         public void Dispose() => _value.Dispose();
@@ -133,18 +133,8 @@ internal sealed class MigrationContext : IDehydrationContext, IRehydrationContex
         }
     }
 
-    internal sealed class SerializationHooks
+    internal sealed class SerializationHooks(SerializerSessionPool serializerSessionPool)
     {
-        private readonly SerializerSessionPool _serializerSessionPool;
-
-        public SerializationHooks(SerializerSessionPool serializerSessionPool)
-        {
-            _serializerSessionPool = serializerSessionPool;
-        }
-
-        public void OnDeserializing(MigrationContext context)
-        {
-            context._sessionPool = _serializerSessionPool;
-        }
+        public void OnDeserializing(MigrationContext context) => context._sessionPool = serializerSessionPool;
     }
 }

@@ -16,7 +16,7 @@ public partial class AliasClashAttributeAnalyzer : DiagnosticAnalyzer
 
     public const string RuleId = "ORLEANS0011";
 
-    private static readonly DiagnosticDescriptor Rule = new(
+    private static readonly DiagnosticDescriptor Rule = new DiagnosticDescriptor(
        id: RuleId,
        category: "Usage",
        defaultSeverity: DiagnosticSeverity.Error,

@@ -51,19 +51,24 @@ namespace Orleans.Runtime
                 await context.Invoke();
                 if (activity is not null && activity.IsAllDataRequested)
                 {
-                    activity.SetTag("status", "Ok");
+                    activity.SetStatus(ActivityStatusCode.Ok);
                 }
             }
             catch (Exception e)
             {
                 if (activity is not null && activity.IsAllDataRequested)
                 {
+                    activity.SetStatus(ActivityStatusCode.Error);
+
                     // exception attributes from https://github.com/open-telemetry/opentelemetry-specification/blob/main/specification/trace/semantic_conventions/exceptions.md
                     activity.SetTag("exception.type", e.GetType().FullName);
                     activity.SetTag("exception.message", e.Message);
-                    activity.SetTag("exception.stacktrace", e.StackTrace);
+
+                    // Note that "exception.stacktrace" is the full exception detail, not just the StackTrace property. 
+                    // See https://opentelemetry.io/docs/specs/semconv/attributes-registry/exception/
+                    // and https://github.com/open-telemetry/opentelemetry-specification/pull/697#discussion_r453662519
+                    activity.SetTag("exception.stacktrace", e.ToString());
                     activity.SetTag("exception.escaped", true);
-                    activity.SetTag("status", "Error");
                 }
                 
                 throw;
@@ -97,14 +102,12 @@ namespace Orleans.Runtime
             var source = GetActivitySource(context);
             var activity = source.StartActivity(context.Request.GetActivityName(), ActivityKind.Client);
 
-            if (activity is not null)
+            if (activity is null)
             {
-                _propagator.Inject(activity, null, static (carrier, key, value) =>
-                {
-                    RequestContext.Set(key, value);
-                });
+                return context.Invoke();
             }
 
+            _propagator.Inject(activity, null, static (carrier, key, value) => RequestContext.Set(key, value));
             return Process(context, activity);
         }
     }
@@ -170,7 +173,12 @@ namespace Orleans.Runtime
                 activity = source.CreateActivity(context.Request.GetActivityName(), ActivityKind.Server);
             }
 
-            activity?.Start();
+            if (activity is null)
+            {
+                return context.Invoke();
+            }
+
+            activity.Start();
             return Process(context, activity);
         }
     }
