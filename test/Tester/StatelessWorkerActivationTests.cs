@@ -36,7 +36,7 @@ public class StatelessWorkerActivationTests : IClassFixture<StatelessWorkerActiv
     [Fact, TestCategory("BVT"), TestCategory("StatelessWorker")]
     public async Task SingleWorkerInvocationUnderLoad()
     {
-        var workerGrain = _fixture.GrainFactory.GetGrain<IStatelessWorkerScalingGrain>(Random.Shared.Next());
+        var workerGrain = _fixture.GrainFactory.GetGrain<IStatelessWorkerScalingGrain>(0);
 
         for (var i = 0; i < 100; i++)
         {
