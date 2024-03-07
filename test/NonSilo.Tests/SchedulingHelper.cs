@@ -13,6 +13,8 @@ namespace UnitTests.TesterInternal
             IGrainContext context,
             ILoggerFactory loggerFactory)
         {
+            ArgumentNullException.ThrowIfNull(context);
+            ArgumentNullException.ThrowIfNull(loggerFactory);
             var services = new ServiceCollection();
             services.AddOptions();
             services.AddLogging();

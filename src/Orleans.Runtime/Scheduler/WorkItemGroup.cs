@@ -52,6 +52,7 @@ internal sealed class WorkItemGroup : IThreadPoolWorkItem, IWorkItemScheduler
         ILogger<ActivationTaskScheduler> activationTaskSchedulerLogger,
         IOptions<SchedulingOptions> schedulingOptions)
     {
+        ArgumentNullException.ThrowIfNull(grainContext);
         GrainContext = grainContext;
         _schedulingOptions = schedulingOptions.Value;
         _state = WorkGroupStatus.Waiting;
