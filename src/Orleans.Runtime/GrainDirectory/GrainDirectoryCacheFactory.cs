@@ -36,13 +36,7 @@ namespace Orleans.Runtime.GrainDirectory
             }
         }
 
-        /// <summary>
-        /// Creates <see cref="IGrainDirectoryCache"/> from DI or defaults to <see cref="LRUBasedGrainDirectoryCache"/> if no <see cref="IGrainDirectoryCache"/> found in DI.
-        /// </summary>
-        /// <param name="services">The services.</param>
-        /// <param name="options">The options.</param>
-        /// <returns>The newly created <see cref="IGrainDirectoryCache"/> instance.</returns>
-        public static IGrainDirectoryCache CreateCustomGrainDirectoryCache(IServiceProvider services, GrainDirectoryOptions options)
+        internal static IGrainDirectoryCache CreateCustomGrainDirectoryCache(IServiceProvider services, GrainDirectoryOptions options)
         {
             var grainDirectoryCache = services.GetService<IGrainDirectoryCache>();
             if (grainDirectoryCache != null)
