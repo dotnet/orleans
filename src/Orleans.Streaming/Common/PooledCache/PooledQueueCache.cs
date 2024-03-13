@@ -201,9 +201,10 @@ namespace Orleans.Providers.Streams.Common
             if (oldestMessage.Compare(sequenceToken) > 0)
             {
                 // Check if we missed an event since we last purged the cache
-                if (this.lastPurgedToken.TryGetValue(cursor.StreamId, out var entry) && sequenceToken.CompareTo(entry.Token) >= 0)
+                var isLastPurged = this.lastPurgedToken.TryGetValue(cursor.StreamId, out var entry);
+                if (!isLastPurged || sequenceToken.CompareTo(entry.Token) >= 0)
                 {
-                    // If the token is more recent than the last purged token, then we didn't lose anything. Start from the oldest message in cache
+                    // If last purged token does not exists, or the token is more recent than the last purged token, then we didn't lose anything. Start from the oldest message in cache
                     cursor.State = CursorStates.Set;
                     cursor.CurrentBlock = oldestBlock;
                     cursor.Index = oldestBlock.Value.OldestMessageIndex;
