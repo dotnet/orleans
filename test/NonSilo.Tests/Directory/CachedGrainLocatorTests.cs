@@ -1,9 +1,13 @@
+// Ignore Spelling: Locator
+
 using System.Collections.Immutable;
 using System.Net;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using NSubstitute;
 using NSubstitute.ReceivedExtensions;
+using Orleans.Configuration;
 using Orleans.GrainDirectory;
 using Orleans.Metadata;
 using Orleans.Runtime;
@@ -20,7 +24,7 @@ namespace UnitTests.Directory
     {
         private readonly LoggerFactory loggerFactory;
         private readonly SiloLifecycleSubject lifecycle;
-
+        private readonly IOptions<GrainDirectoryOptions> grainDirectoryOptions;
         private readonly IGrainDirectory grainDirectory;
         private readonly GrainDirectoryResolver grainDirectoryResolver;
         private readonly MockClusterMembershipService mockMembershipService;
@@ -42,9 +46,12 @@ namespace UnitTests.Directory
                 Array.Empty<IGrainDirectoryResolver>());
             this.mockMembershipService = new MockClusterMembershipService();
 
+            grainDirectoryOptions = Options.Create(new GrainDirectoryOptions());
             this.grainLocator = new CachedGrainLocator(
+                services,
                 this.grainDirectoryResolver, 
-                this.mockMembershipService.Target);
+                this.mockMembershipService.Target,
+                grainDirectoryOptions);
 
             this.grainLocator.Participate(this.lifecycle);
         }

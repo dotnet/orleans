@@ -1,15 +1,9 @@
-﻿namespace Orleans.Runtime.Hosting
+using System;
+
+namespace Orleans.Runtime.Hosting
 {
-    internal class NamedService<TService>
+    internal class NamedService<TService>(string name)
     {
-        public NamedService(string name, TService service)
-        {
-            Name= name;
-            Service = service;
-        }
-
-        public string Name { get; }
-
-        public TService Service { get; }
+        public string Name { get; } = name;
     }
 }
