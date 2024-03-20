@@ -1,4 +1,4 @@
-using Google.Api.Gax.Grpc;
+using Google.Api.Gax;
 using Google.Cloud.PubSub.V1;
 using Grpc.Core;
 using System;
@@ -6,13 +6,14 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
+using System.Threading;
 namespace Orleans.Providers.GCP.Streams.PubSub
 {
     /// <summary>
     /// Utility class to encapsulate access to Google PubSub APIs.
     /// </summary>
     /// <remarks> Used by Google PubSub streaming provider.</remarks>
-    public class PubSubDataManager
+    public class PubSubDataManager : IAsyncDisposable
     {
         public const int MAX_PULLED_MESSAGES = 1000;
 
@@ -21,15 +22,17 @@ namespace Orleans.Providers.GCP.Streams.PubSub
 
         private Subscription _subscription;
         private Topic _topic;
+        private PublisherServiceApiClient _publisherService;
         private PublisherClient _publisher;
-        private SubscriberClient _subscriber;
+        private SubscriberServiceApiClient _subscriberService;
+        private SubscriberServiceApiClient _subscriber;
         private readonly TimeSpan? _deadline;
-        private readonly ServiceEndpoint _customEndpoint;
+        private readonly string _customEndpoint;
 
         [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Security", "CA2104:DoNotDeclareReadOnlyMutableReferenceTypes")]
         private readonly ILogger _logger;
 
-        public PubSubDataManager(ILoggerFactory loggerFactory, string projectId, string topicId, string subscriptionId, string serviceId, TimeSpan? deadline = null, string customEndpoint = "")
+        public PubSubDataManager(ILoggerFactory loggerFactory, string projectId, string topicId, string subscriptionId, string serviceId, TimeSpan? deadline = null, string customEndpoint = null)
         {
             if (string.IsNullOrWhiteSpace(serviceId)) throw new ArgumentNullException(nameof(serviceId));
             if (string.IsNullOrWhiteSpace(projectId)) throw new ArgumentNullException(nameof(projectId));
@@ -38,29 +41,31 @@ namespace Orleans.Providers.GCP.Streams.PubSub
 
             _logger = loggerFactory.CreateLogger<PubSubDataManager>();
             _deadline = deadline;
+            _customEndpoint = customEndpoint;
+            
             topicId = $"{topicId}-{serviceId}";
             subscriptionId = $"{projectId}-{serviceId}";
             TopicName = new TopicName(projectId, topicId);
             SubscriptionName = new SubscriptionName(projectId, subscriptionId);
-
-            if (!string.IsNullOrWhiteSpace(customEndpoint))
-            {
-                var hostPort = customEndpoint.Split(new char[] { ':' }, StringSplitOptions.RemoveEmptyEntries);
-                if (hostPort.Length != 2) throw new ArgumentException(nameof(customEndpoint));
-
-                var host = hostPort[0];
-                int port;
-                if (!int.TryParse(hostPort[1], out port)) throw new ArgumentException(nameof(customEndpoint));
-
-                _customEndpoint = new ServiceEndpoint(host, port);
-            }
         }
 
         public async Task Initialize()
         {
+            var useEmulator = Environment.GetEnvironmentVariable("PUBSUB_EMULATOR_HOST") != null;
+            var detection = useEmulator ? EmulatorDetection.EmulatorOnly : EmulatorDetection.ProductionOnly;
+            
             try
             {
-                _publisher = await PublisherClient.CreateAsync(_customEndpoint);
+                _publisherService = await new PublisherServiceApiClientBuilder
+                {
+                    EmulatorDetection = detection,
+                }.BuildAsync();
+
+                _publisher = await new PublisherClientBuilder
+                {
+                    TopicName = TopicName,
+                    EmulatorDetection = detection,
+                }.BuildAsync();
             }
             catch (Exception e)
             {
@@ -71,7 +76,7 @@ namespace Orleans.Providers.GCP.Streams.PubSub
 
             try
             {
-                _topic = await _publisher.CreateTopicAsync(TopicName);
+                _topic = await _publisherService.CreateTopicAsync(TopicName);
                 didCreate = true;
             }
             catch (RpcException e)
@@ -79,7 +84,7 @@ namespace Orleans.Providers.GCP.Streams.PubSub
                 if (e.Status.StatusCode != StatusCode.AlreadyExists)
                     ReportErrorAndRethrow(e, "CreateTopicAsync", GoogleErrorCode.Initializing);
 
-                _topic = await _publisher.GetTopicAsync(TopicName);
+                _topic = await _publisherService.GetTopicAsync(TopicName);
             }
 
             _logger.LogInformation((int)GoogleErrorCode.Initializing, "{Verb} Google PubSub Topic {TopicId}", (didCreate ? "Created" : "Attached to"), TopicName.TopicId);
@@ -88,8 +93,17 @@ namespace Orleans.Providers.GCP.Streams.PubSub
 
             try
             {
-                _subscriber = await SubscriberClient.CreateAsync(_customEndpoint);
-                _subscription = await _subscriber.CreateSubscriptionAsync(SubscriptionName, TopicName, pushConfig: null,
+                _subscriberService = await new SubscriberServiceApiClientBuilder 
+                {
+                    EmulatorDetection = detection,
+                }.BuildAsync();
+
+                _subscriber = await new SubscriberServiceApiClientBuilder
+                {
+                    EmulatorDetection = detection,
+                }.BuildAsync();
+                
+                _subscription = await _subscriberService.CreateSubscriptionAsync(SubscriptionName, TopicName, pushConfig: null,
                     ackDeadlineSeconds: _deadline.HasValue ? (int)_deadline.Value.TotalSeconds : 60);
                 didCreate = true;
             }
@@ -98,7 +112,7 @@ namespace Orleans.Providers.GCP.Streams.PubSub
                 if (e.Status.StatusCode != StatusCode.AlreadyExists)
                     ReportErrorAndRethrow(e, "CreateSubscriptionAsync", GoogleErrorCode.Initializing);
 
-                _subscription = await _subscriber.GetSubscriptionAsync(SubscriptionName);
+                _subscription = await _subscriberService.GetSubscriptionAsync(SubscriptionName);
             }
 
             _logger.LogInformation(
@@ -114,7 +128,7 @@ namespace Orleans.Providers.GCP.Streams.PubSub
             if (_logger.IsEnabled(LogLevel.Debug)) _logger.LogDebug("Deleting Google PubSub topic: {TopicId}", TopicName.TopicId);
             try
             {
-                await _publisher?.DeleteTopicAsync(TopicName);
+                await _publisherService?.DeleteTopicAsync(TopicName);
                 _logger.LogInformation((int)GoogleErrorCode.Initializing, "Deleted Google PubSub topic {TopicId}", TopicName.TopicId);
             }
             catch (Exception exc)
@@ -132,7 +146,10 @@ namespace Orleans.Providers.GCP.Streams.PubSub
 
             try
             {
-                await _publisher?.PublishAsync(TopicName, messages);
+                foreach(var message in messages)
+                {
+                    await _publisher?.PublishAsync(message);
+                }
             }
             catch (Exception exc)
             {
@@ -148,7 +165,7 @@ namespace Orleans.Providers.GCP.Streams.PubSub
             try
             {
                 //According to Google, no more than 1000 messages can be published/received
-                response = await _subscriber.PullAsync(SubscriptionName, true, count < 1 ? MAX_PULLED_MESSAGES : count);
+                response = await _subscriber.PullAsync(SubscriptionName, count < 1 ? MAX_PULLED_MESSAGES : count);
             }
             catch (Exception exc)
             {
@@ -201,6 +218,17 @@ namespace Orleans.Providers.GCP.Streams.PubSub
             throw new AggregateException(
                 $"Error doing {operation} for Google Project {TopicName.ProjectId} at PubSub Topic {TopicName.TopicId} {Environment.NewLine}Exception = {exc}",
                 exc);
+        }
+
+        public async ValueTask ShutdownAsync(CancellationToken hardShutdown)
+        {
+            await _publisher.ShutdownAsync(hardShutdown);
+        }
+
+        public async ValueTask DisposeAsync() 
+        {
+            var hardToken = new CancellationTokenSource(500);
+            await ShutdownAsync(hardToken.Token);
         }
     }
 }
