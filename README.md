@@ -60,6 +60,7 @@ public interface IThermostatControl : IGrainWithStringKey
 
     Task UpdateConfiguration(ThermostatConfiguration config);
 }
+
 ```
 
 These two interfaces (`IThermostat` and `IThermostatControl`) are implemented by a single implementation class:
