@@ -570,7 +570,8 @@ namespace Orleans.Serialization.Serializers
                 var converterInterfaceArgs = Array.Empty<Type>();
                 foreach (var @interface in converterType.GetInterfaces())
                 {
-                    if (@interface.IsConstructedGenericType && @interface.GetGenericTypeDefinition() == typeof(IConverter<,>))
+                    if (@interface.IsConstructedGenericType && @interface.GetGenericTypeDefinition() == typeof(IConverter<,>)
+                        && @interface.GenericTypeArguments[0] == fieldType)
                     {
                         converterInterfaceArgs = @interface.GetGenericArguments();
                     }
