@@ -61,6 +61,7 @@
     <PackageVersion Include="ZooKeeperNetEx" Version="3.4.12.4" />
     <PackageVersion Include="StackExchange.Redis" Version="2.6.122" />
     <PackageVersion Include="KubernetesClient" Version="12.1.1" />
+    <PackageVersion Include="CassandraCSharpDriver" Version="3.20.1" />
     <!-- Test related packages -->
     <PackageVersion Include="FluentAssertions" Version="6.7.0" />
     <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="17.9.0-preview-23503-02" />
@@ -95,6 +96,7 @@
     <PackageVersion Include="SpanJson" Version="4.0.1" />
     <PackageVersion Include="Hyperion" Version="0.12.2" />
     <PackageVersion Include="Grpc.Tools" Version="2.58.0" />
+    <PackageVersion Include="Testcontainers" Version="3.7.0" />
     <!-- Tooling related packages -->
     <PackageVersion Include="Microsoft.SourceLink.AzureRepos.Git" Version="8.0.0" />
     <PackageVersion Include="Microsoft.SourceLink.GitHub" Version="8.0.0" />
