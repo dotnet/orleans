@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using System.Threading.Tasks;
 
 namespace Orleans.EventSourcing.CustomStorage
@@ -18,11 +19,21 @@ namespace Orleans.EventSourcing.CustomStorage
         Task<KeyValuePair<int,TState>> ReadStateFromStorage();
 
         /// <summary>
-        /// Applies the given array of deltas to storage, and returns true, if the version in storage matches the expected version. 
+        /// Applies the given array of deltas to storage, and returns true, if the version in storage matches the expected version.
         /// Otherwise, does nothing and returns false. If successful, the version of storage must be increased by the number of deltas.
         /// </summary>
         /// <returns>true if the deltas were applied, false otherwise</returns>
         Task<bool> ApplyUpdatesToStorage(IReadOnlyList<TDelta> updates, int expectedversion);
+
+        /// <summary>
+        /// Attempt to retrieve a segment of the log, possibly from storage. Throws <see cref="NotSupportedException"/> if
+        /// the log cannot be read, which depends on the providers used and how they are configured.
+        /// </summary>
+        /// <param name="fromVersion">the start position </param>
+        /// <param name="toVersion">the end position</param>
+        /// <returns></returns>
+        Task<IReadOnlyList<TDelta>> RetrieveLogSegment(int fromVersion, int toVersion) =>
+            throw new NotSupportedException();
     }
 
 }
