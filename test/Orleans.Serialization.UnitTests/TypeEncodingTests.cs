@@ -91,7 +91,7 @@ namespace Orleans.Serialization.UnitTests
             Assert.True(res.IsCompletedSuccessfully);
             var method = calls.Dequeue();
             var (payload, bitStream) = SerializePayload(method);
-            var expectedString = "(\"inv\",[_my_proxy_base_],[Orleans.Serialization.UnitTests.IGenericProxyAliasTestGrain`3,Orleans.Serialization.UnitTests],\"777\")`6[[int],[string],[double],[int],[_custom_type_alias_],[int]]";
+            var expectedString = "(\"inv\",[_my_proxy_base_],[test.IGenericProxyAliasTestGrain`3],\"777\")`6[[int],[string],[double],[int],[_custom_type_alias_],[int]]";
             var expectedEncoding = Encoding.UTF8.GetBytes(expectedString).AsSpan();
             Assert.True(payload.AsSpan().IndexOf(expectedEncoding) >= 0, $"Expected to find string \"{expectedString}\" in bitstream (formatted: {bitStream})");
         }
@@ -102,6 +102,22 @@ namespace Orleans.Serialization.UnitTests
             using var session = _sessionPool.GetSession();
             var bitStream = BitStreamFormatter.Format(payload, session);
             return (payload, bitStream);
+        }
+
+        [Fact]
+        public void AliasAttributeIsApplied()
+        {
+            var original = new Person(2, "harry");
+
+            var bytes = _serializer.SerializeToArray(original.GetType());
+            var resultType = _serializer.Deserialize<Type>(bytes);
+
+            var alias = original.GetType().GetCustomAttributes(false).OfType<AliasAttribute>().SingleOrDefault();
+            Assert.NotNull(alias);
+            Assert.NotNull(alias.Alias);
+            Assert.Equal(typeof(Person), resultType);
+            var expectedBytes = Encoding.UTF8.GetBytes(alias.Alias);
+            Assert.True(bytes.AsSpan().IndexOf(expectedBytes) >= 0);
         }
     }
 
