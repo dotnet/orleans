@@ -9,21 +9,6 @@ namespace Orleans.Networking.Shared
         private const int SIO_LOOPBACK_FAST_PATH = -1744830448;
         private static readonly byte[] Enabled = BitConverter.GetBytes(1);
 
-        private static readonly bool IsSocketKeepAliveRetryCountSupported = CheckIfSocketKeepAliveRetryCountSupported();
-
-        private static bool CheckIfSocketKeepAliveRetryCountSupported()
-        {
-            if (!RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
-            {
-                return true;
-            }
-
-            // On Windows, RetryCount is only available on Windows 10 version 1703 and later, which is build 15063.
-            // On other platforms, we always return true.
-            var osVersion = Environment.OSVersion.Version;
-            return osVersion.Major > 10 || osVersion.Major == 10 && (osVersion.Minor > 0 || osVersion.Build >= 15063);
-        }
-
         /// <summary>
         /// Enables TCP Loopback Fast Path on a socket.
         /// See https://blogs.technet.microsoft.com/wincat/2012/12/05/fast-tcp-loopback-performance-and-low-latency-with-windows-server-2012-tcp-loopback-fast-path/
@@ -67,11 +52,7 @@ namespace Orleans.Networking.Shared
                 socket.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.KeepAlive, true);
                 socket.SetSocketOption(SocketOptionLevel.Tcp, SocketOptionName.TcpKeepAliveTime, timeSeconds);
                 socket.SetSocketOption(SocketOptionLevel.Tcp, SocketOptionName.TcpKeepAliveInterval, intervalSeconds);
-
-                if (IsSocketKeepAliveRetryCountSupported)
-                {
-                    socket.SetSocketOption(SocketOptionLevel.Tcp, SocketOptionName.TcpKeepAliveRetryCount, retryCount);
-                }
+                socket.SetSocketOption(SocketOptionLevel.Tcp, SocketOptionName.TcpKeepAliveRetryCount, retryCount);
             }
             catch
             {
