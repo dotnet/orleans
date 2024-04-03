@@ -13,7 +13,7 @@ public class CassandraContainer
         new(async () =>
         {
             var cassandraImage = new ImageFromDockerfileBuilder()
-                .WithDockerfileDirectory(CommonDirectoryPath.GetProjectDirectory(), string.Empty)
+                .WithDockerfileDirectory(CommonDirectoryPath.GetProjectDirectory(Directory.GetCurrentDirectory()), string.Empty)
                 .WithDockerfile("Cassandra.dockerfile")
                 .WithBuildArgument("CASSANDRAVERSION", Environment.GetEnvironmentVariable("CASSANDRAVERSION"))
                 .Build();

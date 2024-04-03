@@ -96,7 +96,7 @@
     <PackageVersion Include="SpanJson" Version="4.0.1" />
     <PackageVersion Include="Hyperion" Version="0.12.2" />
     <PackageVersion Include="Grpc.Tools" Version="2.58.0" />
-    <PackageVersion Include="Testcontainers" Version="3.7.0" />
+    <PackageVersion Include="Testcontainers" Version="3.8.0" />
     <!-- Tooling related packages -->
     <PackageVersion Include="Microsoft.SourceLink.AzureRepos.Git" Version="8.0.0" />
     <PackageVersion Include="Microsoft.SourceLink.GitHub" Version="8.0.0" />

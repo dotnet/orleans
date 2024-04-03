@@ -16,4 +16,10 @@
 
   </ItemGroup>
 
+  <ItemGroup>
+    <None Update="Cassandra.dockerfile">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
 </Project>
