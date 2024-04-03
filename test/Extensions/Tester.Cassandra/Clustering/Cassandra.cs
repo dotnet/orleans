@@ -11,6 +11,7 @@ using Xunit.Abstractions;
 
 namespace Tester.Cassandra.Clustering;
 
+[TestCategory("Cassandra"), TestCategory("Clustering"), TestCategory("Functional")]
 public sealed class Cassandra : IClassFixture<CassandraContainer>
 {
     private readonly CassandraContainer _cassandraContainer;
@@ -26,7 +27,6 @@ public sealed class Cassandra : IClassFixture<CassandraContainer>
     }
 
     [Fact]
-    [Trait("Category", nameof(Cassandra))]
     public async Task MembershipTable_GetGateways()
     {
         var (membershipTable, gatewayListProvider) = await CreateNewMembershipTableAsync();
@@ -63,7 +63,6 @@ public sealed class Cassandra : IClassFixture<CassandraContainer>
     }
 
     [Fact]
-    [Trait("Category", nameof(Cassandra))]
     public async Task MembershipTable_ReadAll_EmptyTable()
     {
         var (membershipTable, _) = await CreateNewMembershipTableAsync();
@@ -79,7 +78,6 @@ public sealed class Cassandra : IClassFixture<CassandraContainer>
     }
 
     [Fact]
-    [Trait("Category", nameof(Cassandra))]
     public async Task MembershipTable_InsertRow()
     {
         var (membershipTable, _) = await CreateNewMembershipTableAsync();
@@ -104,7 +102,6 @@ public sealed class Cassandra : IClassFixture<CassandraContainer>
 
     // Cassandra doesn't have the capability to prevent a duplicate insert in the way this test requires
     /*[Fact]
-    [Trait("Category", nameof(Cassandra))]
     public async Task MembershipTable_ReadRow_Insert_Read()
     {
         var (membershipTable, gatewayProvider) = await CreateNewMembershipTableAsync("Phalanx", "blu");
@@ -160,7 +157,6 @@ public sealed class Cassandra : IClassFixture<CassandraContainer>
     }*/
 
     [Fact]
-    [Trait("Category", nameof(Cassandra))]
     public async Task MembershipTable_ReadRow_Insert_Read_modified()
     {
         var (membershipTable, _) = await CreateNewMembershipTableAsync();
@@ -217,7 +213,6 @@ public sealed class Cassandra : IClassFixture<CassandraContainer>
     }
 
     [Fact]
-    [Trait("Category", nameof(Cassandra))]
     public async Task MembershipTable_ReadAll_Insert_ReadAll()
     {
         var (membershipTable, _) = await CreateNewMembershipTableAsync();
@@ -251,7 +246,6 @@ public sealed class Cassandra : IClassFixture<CassandraContainer>
     }
 
     [Fact]
-    [Trait("Category", nameof(Cassandra))]
     public async Task MembershipTable_UpdateRow()
     {
         var (membershipTable, _) = await CreateNewMembershipTableAsync();
@@ -346,7 +340,6 @@ public sealed class Cassandra : IClassFixture<CassandraContainer>
     }
 
     [Fact]
-    [Trait("Category", nameof(Cassandra))]
     public async Task MembershipTable_UpdateRowInParallel()
     {
         var (membershipTable, _) = await CreateNewMembershipTableAsync();
@@ -394,7 +387,6 @@ public sealed class Cassandra : IClassFixture<CassandraContainer>
     }
 
     [Fact]
-    [Trait("Category", nameof(Cassandra))]
     public async Task MembershipTable_UpdateIAmAlive()
     {
         var (membershipTable, _) = await CreateNewMembershipTableAsync();
@@ -427,7 +419,6 @@ public sealed class Cassandra : IClassFixture<CassandraContainer>
     }
 
     [Fact]
-    [Trait("Category", nameof(Cassandra))]
     public async Task MembershipTable_CleanupDefunctSiloEntries()
     {
         var (membershipTable, _) = await CreateNewMembershipTableAsync();
@@ -556,7 +547,6 @@ public sealed class Cassandra : IClassFixture<CassandraContainer>
     }
 
     [Fact]
-    [Trait("Category", nameof(Cassandra))]
     public async Task A_Test()
     {
         var serviceId = $"Service_{Guid.NewGuid()}";
