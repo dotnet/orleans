@@ -20,7 +20,9 @@ namespace Orleans.Networking.Shared
             try { socket.NoDelay = true; } catch { }
 
             if (!RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+            {
                 return;
+            }
 
             try
             {
@@ -36,6 +38,24 @@ namespace Orleans.Networking.Shared
                 // If the operating system version on this machine did
                 // not support SIO_LOOPBACK_FAST_PATH (i.e. version
                 // prior to Windows 8 / Windows Server 2012), handle the exception
+            }
+        }
+
+        /// <summary>
+        /// Enables TCP KeepAlive on a socket.
+        /// </summary>
+        /// <param name="socket">The socket.</param>
+        internal static void EnableKeepAlive(this Socket socket, int timeSeconds = 90, int intervalSeconds = 30, int retryCount = 2)
+        {
+            try
+            {
+                socket.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.KeepAlive, true);
+                socket.SetSocketOption(SocketOptionLevel.Tcp, SocketOptionName.TcpKeepAliveTime, timeSeconds);
+                socket.SetSocketOption(SocketOptionLevel.Tcp, SocketOptionName.TcpKeepAliveInterval, intervalSeconds);
+                socket.SetSocketOption(SocketOptionLevel.Tcp, SocketOptionName.TcpKeepAliveRetryCount, retryCount);
+            }
+            catch
+            {
             }
         }
     }
