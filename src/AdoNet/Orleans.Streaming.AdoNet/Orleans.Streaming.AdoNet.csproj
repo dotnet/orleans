@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <PackageId>Microsoft.Orleans.Streaming.AdoNet</PackageId>
+    <Title>Microsoft Orleans ADO.NET Streaming Provider</Title>
+    <Description>Microsoft Orleans streaming provider backed by ADO.NET</Description>
+    <PackageTags>$(PackageTags) ADO.NET SQL</PackageTags>
+    <TargetFrameworks>$(DefaultTargetFrameworks)</TargetFrameworks>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <AssemblyName>Orleans.Streaming.AdoNet</AssemblyName>
+    <RootNamespace>Orleans.Streaming.AdoNet</RootNamespace>
+    <DefineConstants>$(DefineConstants);STREAMING_ADONET</DefineConstants>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="..\Shared\Storage\*.cs" LinkBase="Storage" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="$(SourceRoot)src\Orleans.Runtime\Orleans.Runtime.csproj" />
+  </ItemGroup>
+
+</Project>
