@@ -1,10 +1,10 @@
-using Microsoft.CodeAnalysis;
-using Microsoft.CodeAnalysis.Text;
-using Orleans.CodeGenerator.Diagnostics;
 using System;
 using System.Diagnostics;
 using System.Linq;
 using System.Text;
+using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.Text;
+using Orleans.CodeGenerator.Diagnostics;
 
 #pragma warning disable RS1035 // Do not use APIs banned for analyzers
 namespace Orleans.CodeGenerator
@@ -12,6 +12,8 @@ namespace Orleans.CodeGenerator
     [Generator]
     public class OrleansSerializationSourceGenerator : ISourceGenerator
     {
+        private static readonly string[] WarningsToDisable = ["CS1591"];
+
         public void Execute(GeneratorExecutionContext context)
         {
             try
@@ -72,6 +74,15 @@ namespace Orleans.CodeGenerator
                 var codeGenerator = new CodeGenerator(context.Compilation, options);
                 var syntax = codeGenerator.GenerateCode(context.CancellationToken);
                 var sourceString = syntax.NormalizeWhitespace().ToFullString();
+
+                sourceString = new StringBuilder()
+                    .Append($"#pragma warning disable {string.Join(", ", WarningsToDisable)}")
+                    .Append(Environment.NewLine)
+                    .Append(sourceString)
+                    .Append(Environment.NewLine)
+                    .Append($"#pragma warning restore {string.Join(", ", WarningsToDisable)}")
+                    .ToString();
+
                 var sourceText = SourceText.From(sourceString, Encoding.UTF8);
                 context.AddSource($"{context.Compilation.AssemblyName ?? "assembly"}.orleans.g.cs", sourceText);
             }
