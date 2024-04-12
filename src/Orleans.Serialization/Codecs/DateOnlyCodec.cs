@@ -34,7 +34,13 @@ public sealed class DateOnlyCodec : IFieldCodec<DateOnly>
     /// <inheritdoc/>
     DateOnly IFieldCodec<DateOnly>.ReadValue<TInput>(ref Reader<TInput> reader, Field field) => ReadValue(ref reader, field);
 
-    /// <inheritdoc/>
+    /// <summary>
+    /// Reads a <see cref="DateOnly"/> value.
+    /// </summary>
+    /// <typeparam name="TInput">The reader input type.</typeparam>
+    /// <param name="reader">The reader.</param>
+    /// <param name="field">The field.</param>
+    /// <returns>The <see cref="DateOnly"/> value.</returns>
     public static DateOnly ReadValue<TInput>(ref Reader<TInput> reader, Field field)
     {
         ReferenceCodec.MarkValueField(reader.Session);

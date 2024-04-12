@@ -41,6 +41,7 @@ namespace Orleans.Serialization.UnitTests
         Two
     }
 
+    [Trait("Category", "BVT")]
     public class CodecTestTests
     {
         [Fact]
@@ -1182,6 +1183,63 @@ namespace Orleans.Serialization.UnitTests
         protected override ImmutableArray<int> CreateValue() => Enumerable.Range(0, Random.Next(120) + 50).Select(_ => Guid.NewGuid().GetHashCode()).ToImmutableArray();
         protected override bool Equals(ImmutableArray<int> left, ImmutableArray<int> right) => (left.IsDefault && right.IsDefault) || left.SequenceEqual(right);
         protected override ImmutableArray<int>[] TestValues => [default, [], CreateValue(), CreateValue(), CreateValue()];
+    }
+
+    public class PooledBufferCodecTests(ITestOutputHelper output) : FieldCodecTester<PooledBuffer, PooledBufferCodec>(output)
+    {
+        protected override PooledBuffer CreateValue()
+        {
+            var result = new PooledBuffer();
+            var len = 1 + Random.Next(5765);
+            var remaining = len;
+            while (remaining > 0)
+            {
+                var chunk = result.GetSpan(0);
+                var buf = chunk[..Math.Min(chunk.Length, remaining)];
+                Random.NextBytes(buf);
+                remaining -= buf.Length;
+                result.Advance(buf.Length);
+            }
+
+            return result;
+        }
+
+        protected override bool Equals(PooledBuffer left, PooledBuffer right) => left.ToArray().SequenceEqual(right.ToArray());
+        protected override PooledBuffer[] TestValues => [default, CreateValue(), CreateValue(), CreateValue()];
+        protected override PooledBuffer GetWriteCopy(PooledBuffer input)
+        {
+            var result = new PooledBuffer();
+            result.Write(input.ToArray());
+            return result;
+        }
+    }
+
+    public class PooledBufferCopierTests(ITestOutputHelper output) : CopierTester<PooledBuffer, PooledBufferCopier>(output)
+    {
+        protected override bool IsImmutable => true;
+
+        protected override bool IsPooled => true;
+
+        protected override PooledBuffer CreateValue()
+        {
+            var result = new PooledBuffer();
+            var len = Random.Next(8765);
+            var remaining = len;
+            while (remaining > 0)
+            {
+                var chunk = result.GetSpan(0);
+                var chunkLen = Math.Min(chunk.Length, remaining);
+                var buf = chunk[..chunkLen];
+                Random.NextBytes(buf);
+                remaining -= buf.Length;
+                result.Advance(buf.Length);
+            }
+
+            return result;
+        }
+
+        protected override bool Equals(PooledBuffer left, PooledBuffer right) => left.ToArray().SequenceEqual(right.ToArray());
+        protected override PooledBuffer[] TestValues => [default, CreateValue(), CreateValue(), CreateValue()];
     }
 
 #if NET7_0_OR_GREATER
