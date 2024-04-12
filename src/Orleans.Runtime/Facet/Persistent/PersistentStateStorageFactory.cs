@@ -56,7 +56,7 @@ namespace Orleans.Runtime
 
     internal sealed class PersistentState<TState> : StateStorageBridge<TState>, IPersistentState<TState>, ILifecycleObserver
     {
-        public PersistentState(string stateName, IGrainContext context, IGrainStorage storageProvider) : base(stateName, context, storageProvider, context.ActivationServices.GetRequiredService<ILoggerFactory>(), context.ActivationServices.GetRequiredService<IActivatorProvider>())
+        public PersistentState(string stateName, IGrainContext context, IGrainStorage storageProvider) : base(stateName, context, storageProvider)
         {
             var lifecycle = context.ObservableLifecycle;
             lifecycle.Subscribe(RuntimeTypeNameFormatter.Format(GetType()), GrainLifecycleStage.SetupState, this);
