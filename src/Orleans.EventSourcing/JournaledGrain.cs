@@ -9,8 +9,8 @@ namespace Orleans.EventSourcing
     /// <summary>
     /// A base class for log-consistent grains using standard event-sourcing terminology.
     /// All operations are reentrancy-safe.
-    /// <typeparam name="TGrainState">The type for the grain state, i.e. the aggregate view of the event log.</typeparam>
     /// </summary>
+    /// <typeparam name="TGrainState">The type for the grain state, i.e. the aggregate view of the event log.</typeparam>
     public abstract class JournaledGrain<TGrainState> : JournaledGrain<TGrainState, object>
         where TGrainState : class, new()
     {
@@ -23,9 +23,9 @@ namespace Orleans.EventSourcing
     /// <summary>
     /// A base class for log-consistent grains using standard event-sourcing terminology.
     /// All operations are reentrancy-safe.
+    /// </summary>
     /// <typeparam name="TGrainState">The type for the grain state, i.e. the aggregate view of the event log.</typeparam>
     /// <typeparam name="TEventBase">The common base class for the events</typeparam>
-    /// </summary>
     public abstract class JournaledGrain<TGrainState,TEventBase> :
         LogConsistentGrain<TGrainState>,
         ILogConsistencyProtocolParticipant,
