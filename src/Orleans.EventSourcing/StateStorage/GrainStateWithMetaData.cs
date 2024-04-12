@@ -5,7 +5,7 @@ namespace Orleans.EventSourcing.StateStorage
 {
     /// <summary>
     /// A class that extends grain state with versioning metadata, so that a grain with log-view consistency
-    /// can use a standard storage provider via <see cref="LogViewAdaptor{TView,TEntry}"/>
+    /// can use a standard storage provider.
     /// </summary>
     /// <typeparam name="TView">The type used for log view</typeparam>
     [Serializable]
@@ -57,9 +57,8 @@ namespace Orleans.EventSourcing.StateStorage
 
     /// <summary>
     /// A class that extends grain state with versioning metadata, so that a log-consistent grain
-    /// can use a standard storage provider via <see cref="LogViewAdaptor{TView,TEntry}"/>
+    /// can use a standard storage provider.
     /// </summary>
-    /// <typeparam name="TView"></typeparam>
     [Serializable]
     [GenerateSerializer]
     public sealed class GrainStateWithMetaData<TView> where TView : class, new()
