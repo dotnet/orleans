@@ -34,7 +34,13 @@ public sealed class TimeOnlyCodec : IFieldCodec<TimeOnly>
     /// <inheritdoc/>
     TimeOnly IFieldCodec<TimeOnly>.ReadValue<TInput>(ref Reader<TInput> reader, Field field) => ReadValue(ref reader, field);
 
-    /// <inheritdoc/>
+    /// <summary>
+    /// Reads a <see cref="TimeOnly"/> value.
+    /// </summary>
+    /// <typeparam name="TInput">The reader input type.</typeparam>
+    /// <param name="reader">The reader.</param>
+    /// <param name="field">The field.</param>
+    /// <returns>The <see cref="TimeOnly"/> value.</returns>
     public static TimeOnly ReadValue<TInput>(ref Reader<TInput> reader, Field field)
     {
         ReferenceCodec.MarkValueField(reader.Session);

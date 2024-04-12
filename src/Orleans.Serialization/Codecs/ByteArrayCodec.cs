@@ -300,6 +300,7 @@ namespace Orleans.Serialization.Codecs
     {
         public void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, PooledBuffer value) where TBufferWriter : IBufferWriter<byte>
         {
+            ReferenceCodec.MarkValueField(writer.Session);
             writer.WriteFieldHeader(fieldIdDelta, expectedType, typeof(PooledBuffer), WireType.LengthPrefixed);
             writer.WriteVarUInt32((uint)value.Length);
             foreach (var segment in value)
@@ -316,6 +317,7 @@ namespace Orleans.Serialization.Codecs
 
         public PooledBuffer ReadValue<TInput>(ref Reader<TInput> reader, Field field)
         {
+            ReferenceCodec.MarkValueField(reader.Session);
             field.EnsureWireType(WireType.LengthPrefixed);
             var value = new PooledBuffer();
             const int MaxSpanLength = 4096;
