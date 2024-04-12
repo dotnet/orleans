@@ -38,10 +38,13 @@ namespace Orleans.Core
 
     internal sealed class StateStorageBridgeShared<TState>(string name, IGrainStorage store, ILogger logger, IActivator<TState> activator)
     {
+        private string? _migrationContextKey;
+
         public readonly string Name = name;
         public readonly IGrainStorage Store = store;
         public readonly ILogger Logger = logger;
         public readonly IActivator<TState> Activator = activator;
+        public string MigrationContextKey => _migrationContextKey ??= $"state.{Name}";
     }
 
     /// <summary>
@@ -162,7 +165,7 @@ namespace Orleans.Core
         {
             try
             {
-                dehydrationContext.TryAddValue($"state.{_shared.Name}", _grainState);
+                dehydrationContext.TryAddValue(_shared.MigrationContextKey, _grainState);
             }
             catch (Exception exception)
             {
@@ -177,7 +180,7 @@ namespace Orleans.Core
         {
             try
             {
-                if (rehydrationContext.TryGetValue<GrainState<TState>>($"state.{_shared.Name}", out var grainState))
+                if (rehydrationContext.TryGetValue<GrainState<TState>>(_shared.MigrationContextKey, out var grainState))
                 {
                     _grainState = grainState;
                     IsStateInitialized = true;
