@@ -20,20 +20,14 @@ namespace Orleans.Core
         private readonly IActivatorProvider _activatorProvider = activatorProvider;
 
         public StateStorageBridgeShared<TState> Get<TState>(string name, IGrainStorage store)
-        {
-            var result = _instances.GetOrAdd((name, store, typeof(TState)), static (key, self) =>
-            {
-                var (name, store, _) = key;
-                return new StateStorageBridgeShared<TState>(
-                    name,
-                    store,
-                    self._loggerFactory.CreateLogger(store.GetType()),
-                    self._activatorProvider.GetActivator<TState>());
-            },
-            this);
-
-            return (StateStorageBridgeShared<TState>)result;
-        }
+            => (StateStorageBridgeShared<TState>)_instances.GetOrAdd(
+                (name, store, typeof(TState)),
+                static (key, self) => new StateStorageBridgeShared<TState>(
+                    key.Name,
+                    key.Store,
+                    self._loggerFactory.CreateLogger(key.Store.GetType()),
+                    self._activatorProvider.GetActivator<TState>()),
+                this);
     }
 
     internal sealed class StateStorageBridgeShared<TState>(string name, IGrainStorage store, ILogger logger, IActivator<TState> activator)
@@ -144,6 +138,7 @@ namespace Orleans.Core
                 GrainRuntime.CheckRuntimeContext(RuntimeContext.Current);
 
                 var sw = ValueStopwatch.StartNew();
+
                 // Clear (most likely Delete) state from external storage
                 await _shared.Store.ClearStateAsync(_shared.Name, _grainContext.GrainId, GrainState);
                 sw.Stop();
