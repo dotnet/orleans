@@ -13,34 +13,6 @@ using Orleans.Storage;
 
 namespace Orleans.Core
 {
-    internal sealed class StateStorageBridgeSharedMap(ILoggerFactory loggerFactory, IActivatorProvider activatorProvider)
-    {
-        private readonly ConcurrentDictionary<(string Name, IGrainStorage Store, Type StateType), object> _instances = new();
-        private readonly ILoggerFactory _loggerFactory = loggerFactory;
-        private readonly IActivatorProvider _activatorProvider = activatorProvider;
-
-        public StateStorageBridgeShared<TState> Get<TState>(string name, IGrainStorage store)
-            => (StateStorageBridgeShared<TState>)_instances.GetOrAdd(
-                (name, store, typeof(TState)),
-                static (key, self) => new StateStorageBridgeShared<TState>(
-                    key.Name,
-                    key.Store,
-                    self._loggerFactory.CreateLogger(key.Store.GetType()),
-                    self._activatorProvider.GetActivator<TState>()),
-                this);
-    }
-
-    internal sealed class StateStorageBridgeShared<TState>(string name, IGrainStorage store, ILogger logger, IActivator<TState> activator)
-    {
-        private string? _migrationContextKey;
-
-        public readonly string Name = name;
-        public readonly IGrainStorage Store = store;
-        public readonly ILogger Logger = logger;
-        public readonly IActivator<TState> Activator = activator;
-        public string MigrationContextKey => _migrationContextKey ??= $"state.{Name}";
-    }
-
     /// <summary>
     /// Provides functionality for operating on grain state.
     /// Implements the <see cref="IStorage{TState}" />
@@ -59,7 +31,12 @@ namespace Orleans.Core
             get
             {
                 GrainRuntime.CheckRuntimeContext(RuntimeContext.Current);
-                return GrainState.State;
+                if (_grainState is { } grainState)
+                {
+                    return grainState.State;
+                }
+
+                return default!;
             }
 
             set
@@ -73,10 +50,14 @@ namespace Orleans.Core
         internal bool IsStateInitialized { get; private set; }
 
         /// <inheritdoc/>
-        public string? Etag { get => GrainState.ETag; set => GrainState.ETag = value; }
+        public string? Etag { get => _grainState?.ETag; set => GrainState.ETag = value; }
 
         /// <inheritdoc/>
-        public bool RecordExists => GrainState.RecordExists;
+        public bool RecordExists => IsStateInitialized switch
+        {
+            true => GrainState.RecordExists,
+            _ => throw new InvalidOperationException("State has not yet been loaded")
+        };
 
         [Obsolete("Use StateStorageBridge(string, IGrainContext, IGrainStorage) instead.")]
         public StateStorageBridge(string name, IGrainContext grainContext, IGrainStorage store, ILoggerFactory loggerFactory, IActivatorProvider activatorProvider) : this(name, grainContext, store)
@@ -208,5 +189,33 @@ namespace Orleans.Core
 
             ExceptionDispatchInfo.Throw(exception);
         }
+    }
+
+    internal sealed class StateStorageBridgeSharedMap(ILoggerFactory loggerFactory, IActivatorProvider activatorProvider)
+    {
+        private readonly ConcurrentDictionary<(string Name, IGrainStorage Store, Type StateType), object> _instances = new();
+        private readonly ILoggerFactory _loggerFactory = loggerFactory;
+        private readonly IActivatorProvider _activatorProvider = activatorProvider;
+
+        public StateStorageBridgeShared<TState> Get<TState>(string name, IGrainStorage store)
+            => (StateStorageBridgeShared<TState>)_instances.GetOrAdd(
+                (name, store, typeof(TState)),
+                static (key, self) => new StateStorageBridgeShared<TState>(
+                    key.Name,
+                    key.Store,
+                    self._loggerFactory.CreateLogger(key.Store.GetType()),
+                    self._activatorProvider.GetActivator<TState>()),
+                this);
+    }
+
+    internal sealed class StateStorageBridgeShared<TState>(string name, IGrainStorage store, ILogger logger, IActivator<TState> activator)
+    {
+        private string? _migrationContextKey;
+
+        public readonly string Name = name;
+        public readonly IGrainStorage Store = store;
+        public readonly ILogger Logger = logger;
+        public readonly IActivator<TState> Activator = activator;
+        public string MigrationContextKey => _migrationContextKey ??= $"state.{Name}";
     }
 }
