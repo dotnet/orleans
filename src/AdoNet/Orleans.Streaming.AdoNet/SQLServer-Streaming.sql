@@ -1,10 +1,10 @@
 /*
-Orleans Streaming Message Sequence.
+Orleans Stream Message Sequence.
 This sequence reduces contention on generation of [MessageId] values vs an identity column.
 The CACHE parameter can be increased to further reduce contention.
 */
-IF OBJECT_ID('[OrleansStreamSequence]') IS NULL
-CREATE SEQUENCE [OrleansStreamSequence]
+IF OBJECT_ID('[OrleansStreamMessageSequence]') IS NULL
+CREATE SEQUENCE [OrleansStreamMessageSequence]
 AS BIGINT
 START WITH 1
 INCREMENT BY 1
@@ -20,57 +20,64 @@ This table stores queued messages awaiting processing by Orleans.
 
 The demands for this table are as follows:
 
-1. The table will see inserts only at the tail, as new messages are added.
+1. The table will see inserts only at the tail, as new rows are added.
 2. The table will be polled with high frequency to reserve the first batch of rows that matches a well-known criteria ("visible" and "not expired" and "under max attempts").
 3. The table will see rows being removed at the head as messages are confirmed.
 4. The table will see rows being removed at the head as expired messages are moved to dead letters.
-5. Due to the above queries locking more than one row, there is a possibility of deadlocks.
+5. Due to the above queries touching more than one row at a time, there is a possibility of deadlocks.
 6. A few faulted or poisoned messages can linger for some time at the head before being moved to dead letters.
-7. The table will occasionaly become empty as the cluster succeeds to catch up to all messages.
+7. The table will occasionaly become empty or at least sparse as the cluster succeeds to catch up to all messages.
 
 While [1-6] all cause page fragmentation over time, [7] self resolves this degradation by allowing sql server to eventually remove all pages.
 Therefore the design attempts to optimise for [2] while assuming the resulting degradation eventually resolves itself.
 
 The design also attempts to minimize the possibility of deadlocks at the expense of higher locking contention.
-This happens by forcing all queries to select data in the exact same order of the clustered index and using eager row locking.
+This happens by forcing all queries to touch data in the exact same order of the clustered index and using eager row locking as opposed to allowing upgrades.
 
 */
-IF OBJECT_ID('[OrleansStreamMessage]') IS NULL
 CREATE TABLE [OrleansStreamMessage]
 (
 	/* Identifies the application */
 	[ServiceId] NVARCHAR(150) NOT NULL,
 
-	/* Identifies the individual queue */
-	[QueueName] NVARCHAR(150) NOT NULL,
+    /* Identifies the provider within the application */
+    [ProviderId] NVARCHAR(150) NOT NULL,
 
-	/* The ascending number of the queue message */
+	/* Identifies the individual queue shard as configured in the provider*/
+	[QueueId] INT NOT NULL,
+
+	/* The unique ascending number of the queued message */
 	[MessageId] BIGINT NOT NULL,
 
-	/* The number of times the message was dequeued */
+    /* The confirmation receipt of the message */
+    [Receipt] UNIQUEIDENTIFIER NOT NULL,
+
+	/* The number of times the event was dequeued */
 	[Dequeued] INT NOT NULL,
 
-	/* The UTC time at which the message will become visible */
+	/* The UTC time at which the event will become visible */
 	[VisibleOn] DATETIME2(7) NOT NULL,
 
-	/* The UTC time at which the message will expire */
+	/* The UTC time at which the event will expire */
 	[ExpiresOn] DATETIME2(7) NOT NULL,
 
-	/* The UTC time at which the message was created - troubleshooting only */
+    /* The UTC time at which the event was created - troubleshooting only */
 	[CreatedOn] DATETIME2(7) NOT NULL,
 
-	/* The UTC time at which the message was updated - troubleshooting only */
+    /* The UTC time at which the event was updated - troubleshooting only */
 	[ModifiedOn] DATETIME2(7) NOT NULL,
 
-	/* The arbitrarily large payload of the message */
+	/* The arbitrarily large payload of the event */
 	[Payload] VARBINARY(MAX) NULL,
 
-	/* This Clustered PK supports the various scanning queries. */
+	/* This Clustered PK supports the various ordered scanning queries. */
+    /* Its main purpose is to help partition the update row locks as to minimize dequeing contention. */
 	CONSTRAINT [PK_OrleansStreamMessage] PRIMARY KEY CLUSTERED
 	(
 		[ServiceId] ASC,
-		[QueueName] ASC,
-		[MessageId] ASC
+        [ProviderId] ASC,
+		[QueueId] ASC,
+		[EventId] ASC
 	)
 );
 GO
@@ -78,7 +85,7 @@ GO
 /*
 Orleans Streaming Dead Letters.
 
-This table holds messages that could not be processed within the allowed number of attempts or that have expired.
+This table holds events that could not be processed within the allowed number of attempts or that have expired.
 */
 IF OBJECT_ID('[OrleansStreamDeadLetter]') IS NULL
 CREATE TABLE [OrleansStreamDeadLetter]
@@ -86,50 +93,59 @@ CREATE TABLE [OrleansStreamDeadLetter]
 	/* Identifies the application */
 	[ServiceId] NVARCHAR(150) NOT NULL,
 
-	/* Identifies the individual queue */
-	[QueueName] NVARCHAR(150) NOT NULL,
+    /* Identifies the provider within the application */
+    [ProviderId] NVARCHAR(150) NOT NULL,
 
-	/* The ascending number of the queue message */
+	/* Identifies the individual queue shard as configured in the provider*/
+	[QueueId] INT NOT NULL,
+
+	/* The unique ascending number of the queued message */
 	[MessageId] BIGINT NOT NULL,
 
-	/* The number of times the message was dequeued */
+    /* The confirmation receipt of the message */
+    [Receipt] UNIQUEIDENTIFIER NOT NULL,
+
+	/* The number of times the event was dequeued */
 	[Dequeued] INT NOT NULL,
 
-	/* The UTC time at which the message will become visible */
+	/* The UTC time at which the event will become visible */
 	[VisibleOn] DATETIME2(7) NOT NULL,
 
-	/* The UTC time at which the message will expire */
+	/* The UTC time at which the event will expire */
 	[ExpiresOn] DATETIME2(7) NOT NULL,
 
-	/* The UTC time at which the message was created - troubleshooting only */
+    /* The UTC time at which the event was created - troubleshooting only */
 	[CreatedOn] DATETIME2(7) NOT NULL,
 
-	/* The UTC time at which the message was updated - troubleshooting only */
+    /* The UTC time at which the event was updated - troubleshooting only */
 	[ModifiedOn] DATETIME2(7) NOT NULL,
 
-	/* The UTC time at which the message was given up on - troubleshooting only */
+    /* The UTC time at which the event was given up on - troubleshooting only */
 	[DeadOn] DATETIME2(7) NOT NULL,
 
-	/* The UTC time at which the message is scheduled to be removed from dead letters */
+	/* The UTC time at which the event is scheduled to be removed from dead letters */
 	[RemoveOn] DATETIME2(7) NOT NULL,
 
-	/* The arbitrarily large payload of the message */
+	/* The arbitrarily large payload of the event */
 	[Payload] VARBINARY(MAX) NULL,
 
-	/* This Clustered PK supports the various scanning queries. */
+	/* This Clustered PK supports the various ordered scanning queries. */
+    /* Its main purpose is to help partition the update row locks as to minimize dequeing contention. */
 	CONSTRAINT [PK_OrleansStreamDeadLetter] PRIMARY KEY CLUSTERED
 	(
 		[ServiceId] ASC,
-		[QueueName] ASC,
-		[MessageId] ASC
+        [ProviderId] ASC,
+		[QueueId] ASC,
+		[EventId] ASC
 	)
 );
 GO
 
-/* Enqueues an Orleans Streaming Message to the Messages table. */
-CREATE PROCEDURE [EnqueueOrleansStreamMessage]
+/* Enqueues a message to the Orleans Streaming Message Queue */
+CREATE PROCEDURE [EnqueueStreamMessage]
 	@ServiceId NVARCHAR(150),
-	@QueueName NVARCHAR(150),
+    @ProviderId NVARCHAR(150),
+	@QueueId INT,
 	@Payload VARBINARY(MAX),
 	@ExpiryTimeout INT
 AS
@@ -137,14 +153,15 @@ BEGIN
 
 SET NOCOUNT ON;
 
-DECLARE @MessageId BIGINT = NEXT VALUE FOR [OrleansStreamSequence];
+DECLARE @MessageId BIGINT = NEXT VALUE FOR [OrleansStreamMessageSequence];
 DECLARE @Now DATETIME2(7) = SYSUTCDATETIME();
 DECLARE @ExpiresOn DATETIME2(7) = DATEADD(SECOND, @ExpiryTimeout, @Now);
 
 INSERT INTO [OrleansStreamMessage]
 (
 	ServiceId,
-	QueueName,
+    ProviderId,
+	QueueId,
 	MessageId,
 	Dequeued,
 	VisibleOn,
@@ -156,7 +173,8 @@ INSERT INTO [OrleansStreamMessage]
 VALUES
 (
 	@ServiceId,
-	@QueueName,
+    @ProviderId,
+	@QueueId,
 	@MessageId,
 	0,
 	@Now,
@@ -176,14 +194,15 @@ INSERT INTO [OrleansQuery]
 )
 SELECT
 	'EnqueueStreamMessageKey',
-	'EXECUTE [EnqueueOrleansStreamMessage] @ServiceId = @ServiceId, @QueueName = @QueueName, @Payload = @Payload, @ExpiryTimeout = @ExpiryTimeout'
+	'EXECUTE [EnqueueStreamMessage] @ServiceId = @ServiceId, @ProviderId = @ProviderId, @QueueName = @QueueName, @Payload = @Payload, @ExpiryTimeout = @ExpiryTimeout'
 GO
 
-/* Dequeues a message batch from the messages table. */
-CREATE PROCEDURE [DequeueOrleansStreamMessages]
+/* Dequeues message batches from the Orleans Streaming Message Queue */
+CREATE PROCEDURE [DequeueStreamMessages]
 	@ServiceId NVARCHAR(150),
-	@QueueName NVARCHAR(150),
-	@BatchSize INT,
+    @ProviderId NVARCHAR(150),
+	@QueueId INT,
+    @MaxCount INT,
 	@MaxAttempts INT,
 	@VisibilityTimeout INT
 AS
@@ -196,9 +215,10 @@ DECLARE @VisibleOn DATETIME2(7) = DATEADD(SECOND, @VisibilityTimeout, @Now);
 
 WITH Batch AS
 (
-	SELECT TOP (@BatchSize)
+	SELECT TOP (@MaxCount)
 		[ServiceId],
-		[QueueName],
+        [ProviderId],
+		[QueueId],
 		[MessageId],
 		[Dequeued],
 		[VisibleOn],
@@ -207,10 +227,11 @@ WITH Batch AS
 		[ModifiedOn],
 		[Payload]
 	FROM
-		[OrleansStreamMessage] WITH (ROWLOCK, UPDLOCK, HOLDLOCK)
+		[OrleansStreamEvent] WITH (ROWLOCK, UPDLOCK, HOLDLOCK)
 	WHERE
 		[ServiceId] = @ServiceId
-		AND [QueueName] = @QueueName
+        AND [ProviderId] = @ProviderId
+		AND [QueueId] = @QueueId
 		AND [Dequeued] < @MaxAttempts
 		AND [VisibleOn] <= @Now
 		AND [ExpiresOn] > @Now
@@ -224,7 +245,8 @@ SET
 	[ModifiedOn] = @Now
 OUTPUT
 	[Inserted].[ServiceId],
-	[Inserted].[QueueName],
+    [Inserted].[ProviderId],
+	[Inserted].[QueueId],
 	[Inserted].[MessageId],
 	[Inserted].[Dequeued],
 	[Inserted].[VisibleOn],
@@ -245,24 +267,58 @@ INSERT INTO [OrleansQuery]
 )
 SELECT
 	'DequeueStreamMessagesKey',
-	'EXECUTE [DequeueOrleansStreamMessages] @ServiceId = @ServiceId, @QueueName = @QueueName, @BatchSize = @BatchSize, @MaxAttempts = @MaxAttempts, @VisibilityTimeout = @VisibilityTimeout'
+	'EXECUTE [DequeueStreamMessages] @ServiceId = @ServiceId, @ProviderId = @ProviderId, @QueueId = @QueueId, @MaxCount = @MaxCount, @MaxAttempts = @MaxAttempts, @VisibilityTimeout = @VisibilityTimeout'
 GO
 
-/* Acknowledges delivery of a stream message. */
-CREATE PROCEDURE [AckOrleansStreamMessage]
+/* Confirms delivery of a stream message. */
+CREATE PROCEDURE [ConfirmStreamMessages]
 	@ServiceId NVARCHAR(150),
-	@QueueName NVARCHAR(150),
-	@MessageId BIGINT
+    @ProviderId NVARCHAR(150),
+	@QueueId INT,
+    @Items NVARCHAR(MAX)
 AS
 BEGIN
 
 SET NOCOUNT ON;
 
+DECLARE @ItemsTable TABLE
+(
+    [MessageId] BIGINT NOT NULL,
+    [Receipt] UNIQUEIDENTIFIER NOT NULL
+);
+
+WITH Items AS
+(
+	SELECT [Value] FROM STRING_SPLIT(@Items, '|')
+)
+INSERT INTO @ItemsTable
+(
+    [MessageId],
+    [Receipt]
+)
+SELECT
+	CAST(SUBSTRING([Value], 1, CHARINDEX(':', [Value], 1) - 1) AS INT) AS [MessageId],
+	CAST(SUBSTRING([Value], CHARINDEX(':', [Value], 1) + 1, LEN([Value])) AS UNIQUEIDENTIFIER) AS [Receipt]
+FROM
+	Items;
+
 DELETE FROM [OrleansStreamMessage]
+OUTPUT
+    [Deleted].[ServiceId],
+    [Deleted].[ProviderId],
+    [Deleted].[QueueId],
+    [Deleted].[MessageId]
+FROM
+    [OrleansStreamMessage] AS [M]
+    INNER JOIN @ItemsTable AS [I]
+        ON [M].[MessageId] = [I].[MessageId]
+        AND [M].[Receipt] = [I].[Receipt]
 WHERE
 	[ServiceId] = @ServiceId
-	AND [QueueName] = @QueueName
+    AND [ProviderId] = @ProviderId
+	AND [QueueId] = @QueueId
 	AND [MessageId] = @MessageId
+    AND [Receipt] = @Receipt;
 
 END
 GO
@@ -273,15 +329,16 @@ INSERT INTO [OrleansQuery]
 	[QueryText]
 )
 SELECT
-	'AcknowledgeStreamMessageKey',
-	'EXECUTE [AckOrleansStreamMessage] @ServiceId = @ServiceId, @QueueName = @QueueName, @MessageId = @MessageId'
+	'ConfirmStreamMessagesKey',
+	'EXECUTE [ConfirmStreamMessages] @ServiceId = @ServiceId, @ProviderId = @ProviderId, @QueueId = @QueueId, @Items = @Items'
 GO
 
-/* Moves non-delivered messages from the message table to the dead letter table. */
-CREATE PROCEDURE [CollectOrleansStreamMessages]
+/* Moves non-delivered messages from the message table to the dead letter table for human troubleshooting. */
+CREATE PROCEDURE [CleanStreamMessages]
 	@ServiceId NVARCHAR(150),
-	@QueueName NVARCHAR(150),
-	@BatchSize INT,
+    @ProviderId NVARCHAR(150),
+	@QueueId INT,
+	@MaxCount INT,
 	@MaxAttempts INT,
 	@RemovalTimeout INT
 AS
@@ -295,9 +352,10 @@ DECLARE @RemoveOn DATETIME2(7) = DATEADD(SECOND, @RemovalTimeout, @Now);
 
 WITH Batch AS
 (
-	SELECT TOP (@BatchSize)
+	SELECT TOP (@MaxCount)
 		[ServiceId],
-		[QueueName],
+        [ProviderId]
+		[QueueId],
 		[MessageId],
 		[Dequeued],
 		[VisibleOn],
@@ -311,7 +369,8 @@ WITH Batch AS
 		[OrleansStreamMessage] WITH (ROWLOCK, UPDLOCK, HOLDLOCK)
 	WHERE
 		[ServiceId] = @ServiceId
-		AND [QueueName] = @QueueName
+        AND [ProviderId] = @ProviderId
+		AND [QueueId] = @QueueId
 		AND
 		(
 			-- a message is no longer dequeueable if the last attempt timed out
@@ -326,7 +385,8 @@ WITH Batch AS
 DELETE FROM Batch
 OUTPUT
 	[Deleted].[ServiceId],
-	[Deleted].[QueueName],
+    [Deleted].[ProviderId],
+	[Deleted].[QueueId],
 	[Deleted].[MessageId],
 	[Deleted].[Dequeued],
 	[Deleted].[VisibleOn],
@@ -339,7 +399,8 @@ OUTPUT
 INTO [OrleansStreamDeadLetter]
 (
 	[ServiceId],
-	[QueueName],
+    [ProviderId],
+	[QueueId],
 	[MessageId],
 	[Dequeued],
 	[VisibleOn],
@@ -360,15 +421,16 @@ INSERT INTO [OrleansQuery]
 	[QueryText]
 )
 SELECT
-	'CollectStreamMessagesKey',
-	'EXECUTE [CollectOrleansStreamMessages] @ServiceId = @ServiceId, @QueueName = @QueueName, @BatchSize = @BatchSize, @MaxAttempts = @MaxAttempts, @RemovalTimeout = @RemovalTimeout'
+	'CleanStreamMessagesKey',
+	'EXECUTE [CleanStreamMessages] @ServiceId = @ServiceId, @ProviderId = @ProviderId, @QueueId = @QueueId, @MaxCount = @MaxCount, @MaxAttempts = @MaxAttempts, @RemovalTimeout = @RemovalTimeout'
 GO
 
-/* Cleans up messages from the dead letters table. */
-CREATE PROCEDURE [CollectOrleansStreamDeadLetters]
+/* Removes messages from the dead letters table. */
+CREATE PROCEDURE [CleanDeadLetters]
 	@ServiceId NVARCHAR(150),
-	@QueueName NVARCHAR(150),
-	@BatchSize INT
+    @ProviderId NVARCHAR(150),
+	@QueueId INT,
+	@MaxCount INT
 AS
 BEGIN
 
@@ -376,12 +438,23 @@ SET NOCOUNT ON;
 
 DECLARE @Now DATETIME2(7) = SYSUTCDATETIME();
 
-DELETE TOP (@BatchSize)
-FROM [OrleansStreamDeadLetter]
-WHERE
-	[ServiceId] = @ServiceId
-	AND [QueueName] = @QueueName
-	AND [RemoveOn] <= @Now;
+WITH Batch AS
+(
+    SELECT TOP (@MaxCount)
+        [ServiceId],
+        [ProviderId],
+        [QueueId],
+        [MessageId]
+    FROM
+        [OrleansStreamDeadLetter] WITH (ROWLOCK, XLOCK, HOLDLOCK)
+    WHERE
+        [ServiceId] = @ServiceId
+        AND [ProviderId] = @ProviderId
+        AND [QueueId] = @QueueId
+    ORDER BY
+        [MessageId]
+)
+DELETE FROM Batch;
 
 END
 GO
@@ -392,6 +465,6 @@ INSERT INTO [OrleansQuery]
 	[QueryText]
 )
 SELECT
-	'CollectStreamDeadLettersKey',
-	'EXECUTE [CollectOrleansStreamDeadLetters] @ServiceId = @ServiceId, @QueueName = @QueueName, @BatchSize = @BatchSize'
+	'CleanDeadLettersKey',
+	'EXECUTE [CleanDeadLetters] @ServiceId = @ServiceId, @ProviderId = @ProviderId, @QueueId = @QueueId, @MaxCount = @MaxCount'
 GO
