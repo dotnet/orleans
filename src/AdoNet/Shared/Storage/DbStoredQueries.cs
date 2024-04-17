@@ -138,6 +138,36 @@ namespace Orleans.Tests.SqlUtils
 
 #endif
 
+#if STREAMING_ADONET || TESTER_SQLUTILS
+
+        /// <summary>
+        /// A query template to enqueue a message into a stream table.
+        /// </summary>
+        internal string EnqueueStreamMessageKey => queries[nameof(EnqueueStreamMessageKey)];
+
+        /// <summary>
+        /// A query template to dequeue messages from a stream table.
+        /// </summary>
+        internal string DequeueStreamMessagesKey => queries[nameof(DequeueStreamMessagesKey)];
+
+        /// <summary>
+        /// A query template to confirm message delivery from a stream table.
+        /// </summary>
+        internal string ConfirmStreamMessagesKey => queries[nameof(ConfirmStreamMessagesKey)];
+
+        /// <summary>
+        /// A query template to clean undeliverable messages from a stream table.
+        /// This will normally mean moving them into a dead letters table for later analysis.
+        /// </summary>
+        internal string CleanStreamMessagesKey => queries[nameof(CleanStreamMessagesKey)];
+
+        /// <summary>
+        /// A query template to clean expired messages from a dead letters table.
+        /// </summary>
+        internal string CleanDeadLettersKey => queries[nameof(CleanDeadLettersKey)];
+
+#endif
+
         internal static class Converters
         {
             internal static KeyValuePair<string, string> GetQueryKeyAndValue(IDataRecord record)
@@ -146,7 +176,7 @@ namespace Orleans.Tests.SqlUtils
                     record.GetValue<string>("QueryText"));
             }
 
-    
+
             internal static Tuple<MembershipEntry, int> GetMembershipEntry(IDataRecord record)
             {
                 //TODO: This is a bit of hack way to check in the current version if there's membership data or not, but if there's a start time, there's member.            
@@ -243,7 +273,7 @@ namespace Orleans.Tests.SqlUtils
             {
                 command.AddParameter(paramName, paramValue, dbType: dbType);
             }
-            
+
             private void AddAddress(string name, IPAddress address)
             {
                 Add(name, address.ToString(), dbType: DbType.AnsiString);
@@ -375,7 +405,8 @@ namespace Orleans.Tests.SqlUtils
 
             internal TimeSpan Period
             {
-                set {
+                set
+                {
                     if (value.TotalMilliseconds <= int.MaxValue)
                     {
                         // Original casting when old schema is used.  Here to maintain backwards compatibility
@@ -407,6 +438,51 @@ namespace Orleans.Tests.SqlUtils
                         : string.Join("|", value.Select(
                             s => $"{s.Item1.ToParsableString()},{LogFormatter.PrintDate(s.Item2)}")));
                 }
+            }
+
+            internal int QueueId
+            {
+                set => Add(nameof(QueueId), value);
+            }
+
+            internal byte[] Payload
+            {
+                set => Add(nameof(Payload), value);
+            }
+
+            internal int ExpiryTimeout
+            {
+                set => Add(nameof(ExpiryTimeout), value);
+            }
+
+            internal int MaxCount
+            {
+                set => Add(nameof(MaxCount), value);
+            }
+
+            internal int MaxAttempts
+            {
+                set => Add(nameof(MaxAttempts), value);
+            }
+
+            internal int VisibilityTimeout
+            {
+                set => Add(nameof(VisibilityTimeout), value);
+            }
+
+            internal string EventIds
+            {
+                set => Add(nameof(EventIds), value);
+            }
+
+            internal string ProviderId
+            {
+                set => Add(nameof(ProviderId), value);
+            }
+
+            internal string Items
+            {
+                set => Add(nameof(Items), value);
             }
         }
     }

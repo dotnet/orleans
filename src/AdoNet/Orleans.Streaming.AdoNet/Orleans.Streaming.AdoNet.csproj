@@ -15,11 +15,16 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <InternalsVisibleTo Include="Tester.AdoNet"/>
+  </ItemGroup>
+
+  <ItemGroup>
     <Compile Include="..\Shared\Storage\*.cs" LinkBase="Storage" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="$(SourceRoot)src\Orleans.Runtime\Orleans.Runtime.csproj" />
+    <ProjectReference Include="..\..\Orleans.Streaming\Orleans.Streaming.csproj" />
   </ItemGroup>
 
 </Project>

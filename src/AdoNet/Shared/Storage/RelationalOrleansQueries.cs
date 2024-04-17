@@ -1,9 +1,10 @@
 using System;
 using System.Collections.Generic;
 using System.Data;
+using System.IO;
 using System.Linq;
+using System.Text;
 using System.Threading.Tasks;
-
 using Orleans.Runtime;
 
 #if CLUSTERING_ADONET
@@ -15,6 +16,7 @@ namespace Orleans.Reminders.AdoNet.Storage
 #elif STREAMING_ADONET
 namespace Orleans.Streaming.AdoNet.Storage
 #elif TESTER_SQLUTILS
+using Orleans.Streaming.AdoNet;
 namespace Orleans.Tests.SqlUtils
 #else
 // No default namespace intentionally to cause compile errors if something is not defined
@@ -40,10 +42,10 @@ namespace Orleans.Tests.SqlUtils
             DbStoredQueries.Columns.Statistic
         };
 
-    /// <summary>
-    /// the orleans functional queries
-    /// </summary>
-    private readonly DbStoredQueries dbStoredQueries;
+        /// <summary>
+        /// the orleans functional queries
+        /// </summary>
+        private readonly DbStoredQueries dbStoredQueries;
 
         /// <summary>
         /// Constructor
@@ -85,7 +87,7 @@ namespace Orleans.Tests.SqlUtils
             return aggregator(ret);
         }
 
-#if REMINDERS_ADONET || TESTER_SQLUTILS 
+#if REMINDERS_ADONET || TESTER_SQLUTILS
 
         /// <summary>
         /// Reads Orleans reminder data from the tables.
@@ -369,6 +371,99 @@ namespace Orleans.Tests.SqlUtils
                 membershipEntries.AddRange(retList.Select(i => new Tuple<MembershipEntry, string>(i.Item1, string.Empty)));
             }
             return new MembershipTableData(membershipEntries, new TableVersion(tableVersionEtag, tableVersionEtag.ToString()));
+        }
+
+#endif
+
+#if STREAMING_ADONET || TESTER_SQLUTILS
+
+        /// <summary>
+        /// Enqueues a message to the stream message table.
+        /// </summary>
+        /// <param name="serviceId">The service identifier.</param>
+        /// <param name="providerId">The provider identifier.</param>
+        /// <param name="queueId">The queue identifier.</param>
+        /// <param name="payload">The serialized event payload.</param>
+        /// <param name="expiryTimeout">The expiry timeout for this event batch.</param>
+        internal Task QueueMessageBatchAsync(string serviceId, string providerId, int queueId, byte[] payload, int expiryTimeout)
+        {
+            return ExecuteAsync(
+                dbStoredQueries.EnqueueStreamMessageKey,
+                command => new DbStoredQueries.Columns(command)
+                {
+                    ServiceId = serviceId,
+                    ProviderId = providerId,
+                    QueueId = queueId,
+                    Payload = payload,
+                    ExpiryTimeout = expiryTimeout,
+                });
+        }
+
+        /// <summary>
+        /// Dequeues messages from the stream message table.
+        /// </summary>
+        /// <param name="serviceId">The service identifier.</param>
+        /// <param name="providerId">The provider identifier.</param>
+        /// <param name="queueId">The queue identifier.</param>
+        /// <param name="maxCount">The maximum count of event batches to get.</param>
+        /// <param name="maxAttempts">The maximum attempts to lock an unprocessed event batch.</param>
+        /// <param name="visibilityTimeout">The visibility timeout for the retrieved event batches.</param>
+        /// <returns>A list of dequeued payloads.</returns>
+        internal Task<IList<AdoNetStreamMessage>> GetQueueMessagesAsync(string serviceId, string providerId, int queueId, int maxCount, int maxAttempts, int visibilityTimeout)
+        {
+            return ReadAsync<AdoNetStreamMessage, IList<AdoNetStreamMessage>>(
+                dbStoredQueries.DequeueStreamMessagesKey,
+                record => new AdoNetStreamMessage(
+                    (string)record[nameof(AdoNetStreamMessage.ServiceId)],
+                    (string)record[nameof(AdoNetStreamMessage.ProviderId)],
+                    (int)record[nameof(AdoNetStreamMessage.QueueId)],
+                    (int)record[nameof(AdoNetStreamMessage.MessageId)],
+                    (Guid)record[nameof(AdoNetStreamMessage.Receipt)],
+                    (int)record[nameof(AdoNetStreamMessage.Dequeued)],
+                    (DateTime)record[nameof(AdoNetStreamMessage.VisibleOn)],
+                    (DateTime)record[nameof(AdoNetStreamMessage.ExpiresOn)],
+                    (DateTime)record[nameof(AdoNetStreamMessage.CreatedOn)],
+                    (DateTime)record[nameof(AdoNetStreamMessage.ModifiedOn)],
+                    (byte[])record[nameof(AdoNetStreamMessage.Payload)]),
+                command => new DbStoredQueries.Columns(command)
+                {
+                    ServiceId = serviceId,
+                    ProviderId = providerId,
+                    QueueId = queueId,
+                    MaxCount = maxCount,
+                    MaxAttempts = maxAttempts,
+                    VisibilityTimeout = visibilityTimeout,
+                },
+                result => result.ToList());
+        }
+
+        /// <summary>
+        /// Confirms delivery of messages from the stream message table.
+        /// </summary>
+        /// <param name="serviceId">The service identifier.</param>
+        /// <param name="providerId">The provider identifier.</param>
+        /// <param name="queueId">The queue identifier.</param>
+        /// <param name="messages">The messages to confirm.</param>
+        /// <returns>A list of confirmations.</returns>
+        internal Task<IList<AdoNetStreamConfirmation>> MessagesDeliveredAsync(string serviceId, string providerId, int queueId, IList<AdoNetStreamMessage> messages)
+        {
+            var items = messages.Aggregate(new StringBuilder(), (b, m) => b.Append(b.Length > 0 ? "|" : "").Append(m.MessageId).Append(':').Append(m.Receipt), b => b.ToString());
+
+            return ReadAsync<AdoNetStreamConfirmation, IList<AdoNetStreamConfirmation>>(
+                dbStoredQueries.ConfirmStreamMessagesKey,
+                record => new AdoNetStreamConfirmation(
+                    (string)record[nameof(AdoNetStreamConfirmation.ServiceId)],
+                    (string)record[nameof(AdoNetStreamConfirmation.ProviderId)],
+                    (int)record[nameof(AdoNetStreamConfirmation.QueueId)],
+                    (int)record[nameof(AdoNetStreamConfirmation.MessageId)]),
+                command => new DbStoredQueries.Columns(command)
+                {
+                    ServiceId = serviceId,
+                    ProviderId = providerId,
+                    QueueId = queueId,
+                    Items = items
+                },
+                result => result.ToList());
         }
 
 #endif
