@@ -46,6 +46,8 @@ namespace Orleans.Runtime
             Start(dueTime, period);
         }
 
+        public bool IsStarted => timerStarted;
+
         public void Start(TimeSpan due, TimeSpan period)
         {
             if (timerStarted) throw new InvalidOperationException(string.Format("Calling start on timer {0} is not allowed, since it was already created in a started mode with specified due.", GetFullName()));
@@ -66,10 +68,18 @@ namespace Orleans.Runtime
             timer.Change(due, Constants.INFINITE_TIMESPAN);
         }
 
-        private void Init(ILogger logger, Func<object, Task> asynCallback, TimerCallback synCallback, object state, TimeSpan due, TimeSpan period)
+        public void Stop()
         {
-            if (synCallback == null && asynCallback == null) throw new ArgumentNullException(nameof(synCallback), "Cannot use null for both sync and asyncTask timer callbacks.");
-            int numNonNulls = (asynCallback != null ? 1 : 0) + (synCallback != null ? 1 : 0);
+            timerFrequency = Constants.INFINITE_TIMESPAN;
+            dueTime = Constants.INFINITE_TIMESPAN;
+            timerStarted = false;
+            timer.Change(Constants.INFINITE_TIMESPAN, Constants.INFINITE_TIMESPAN);
+        }
+
+        private void Init(ILogger logger, Func<object, Task> asyncCallback, TimerCallback synCallback, object state, TimeSpan due, TimeSpan period)
+        {
+            if (synCallback == null && asyncCallback == null) throw new ArgumentNullException(nameof(synCallback), "Cannot use null for both sync and asyncTask timer callbacks.");
+            int numNonNulls = (asyncCallback != null ? 1 : 0) + (synCallback != null ? 1 : 0);
             if (numNonNulls > 1) throw new ArgumentNullException(nameof(synCallback), "Cannot define more than one timer callbacks. Pick one.");
             if (period == TimeSpan.Zero) throw new ArgumentOutOfRangeException(nameof(period), period, "Cannot use TimeSpan.Zero for timer period");
 
@@ -81,7 +91,7 @@ namespace Orleans.Runtime
             if (periodTm < -1) throw new ArgumentOutOfRangeException(nameof(period), "The period must not be less than -1.");
             if (periodTm > MaxSupportedTimeout) throw new ArgumentOutOfRangeException(nameof(period), "The period interval must be less than 2^32-2.");
 
-            this.asyncTaskCallback = asynCallback;
+            this.asyncTaskCallback = asyncCallback;
             syncCallbackFunc = synCallback;
             timerFrequency = period;
             this.dueTime = due;
