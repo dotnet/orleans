@@ -58,6 +58,14 @@ namespace Orleans.Runtime
             timer.Change(due, Constants.INFINITE_TIMESPAN);
         }
 
+        public void Stop()
+        {
+            timerFrequency = Constants.INFINITE_TIMESPAN;
+            dueTime = Constants.INFINITE_TIMESPAN;
+            timerStarted = false;
+            timer.Change(Constants.INFINITE_TIMESPAN, Constants.INFINITE_TIMESPAN);
+        }
+
         private void Init(ILogger logger, Func<object, Task> asynCallback, TimerCallback synCallback, object state, TimeSpan due, TimeSpan period)
         {
             if (synCallback == null && asynCallback == null) throw new ArgumentNullException("synCallback", "Cannot use null for both sync and asyncTask timer callbacks.");
