@@ -226,13 +226,16 @@ namespace Orleans.Runtime
         public int ActivationCount { get { return activations.Count; } }
 
         /// <summary>
-        /// If activation already exists, use it
-        /// Otherwise, create an activation of an existing grain by reading its state.
-        /// Return immediately using a dummy that will queue messages.
-        /// Concurrently start creating and initializing the real activation and replace it when it is ready.
+        /// If activation already exists, return it.
+        /// Otherwise, creates a new activation, begins rehydrating it and activating it, then returns it.
         /// </summary>
-        /// <param name="grainId">The grain identity</param>
-        /// <param name="requestContextData">Request context data.</param>
+        /// <remarks>
+        /// There is no guarantee about the validity of the activation which is returned.
+        /// Activations are responsible for handling any messages which they receive.
+        /// </remarks>
+        /// <param name="grainId">The grain identity.</param>
+        /// <param name="requestContextData">Optional request context data.</param>
+        /// <param name="rehydrationContext">Optional rehydration context.</param>
         /// <returns></returns>
         public IGrainContext GetOrCreateActivation(
             in GrainId grainId,
