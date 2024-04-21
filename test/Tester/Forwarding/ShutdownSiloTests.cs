@@ -4,7 +4,6 @@ using UnitTests.GrainInterfaces;
 using Xunit;
 using Orleans.Configuration;
 using System.Diagnostics;
-using Orleans.Runtime;
 using Microsoft.Extensions.DependencyInjection;
 using Azure.Data.Tables;
 using Azure.Identity;

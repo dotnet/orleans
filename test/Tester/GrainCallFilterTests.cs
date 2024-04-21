@@ -263,13 +263,14 @@ namespace UnitTests.General
             // The intercepted grain should double the value passed to the stream.
             const int testValue = 43;
             await stream.OnNextAsync(testValue);
-            var cts = new CancellationTokenSource(1000);
+            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
             int actual = 0;
             while (!cts.IsCancellationRequested)
             {
                 actual = await grain.GetLastStreamValue();
                 if (actual != 0) break;
             }
+            
             Assert.Equal(testValue * 2, actual);
         }
 

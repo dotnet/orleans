@@ -1,5 +1,6 @@
 using System.Globalization;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.ObjectPool;
 using Orleans.Concurrency;
 using Orleans.Providers;
 using Orleans.Runtime;
@@ -576,16 +577,15 @@ namespace UnitTests.Grains
 
         public Task ScheduleDelayedPing(IGenericPingSelf<T> target, T t, TimeSpan delay)
         {
-            _timerRegistry.RegisterTimer(
+            _timerRegistry.RegisterGrainTimer<object>(
                 GrainContext,
-                o =>
+                (_, cancellationToken) =>
                 {
                     this.logger.LogDebug("***Timer fired for pinging {0}***", target.GetPrimaryKey());
                     return target.Ping(t);
                 },
                 null,
-                delay,
-                TimeSpan.FromMilliseconds(-1));
+                new() { DueTime = delay, Period = Timeout.InfiniteTimeSpan });
             return Task.CompletedTask;
         }
 

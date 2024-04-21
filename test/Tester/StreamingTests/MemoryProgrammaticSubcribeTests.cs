@@ -8,7 +8,7 @@ using Xunit;
 namespace UnitTests.StreamingTests
 {
     [TestCategory("BVT"), TestCategory("Streaming")]
-    public class MemoryProgrammaticSubcribeTests : ProgrammaticSubcribeTestsRunner, IClassFixture<MemoryProgrammaticSubcribeTests.Fixture>
+    public class MemoryProgrammaticSubcribeTests : ProgrammaticSubscribeTestsRunner, IClassFixture<MemoryProgrammaticSubcribeTests.Fixture>
     {
         public class Fixture : BaseTestClusterFixture
         {

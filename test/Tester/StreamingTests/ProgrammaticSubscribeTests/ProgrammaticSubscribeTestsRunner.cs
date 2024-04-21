@@ -11,12 +11,12 @@ using UnitTests.Grains.ProgrammaticSubscribe;
 
 namespace Tester.StreamingTests
 {
-    public abstract class ProgrammaticSubcribeTestsRunner 
+    public abstract class ProgrammaticSubscribeTestsRunner 
     {
         private readonly BaseTestClusterFixture fixture;
         public const string StreamProviderName = "StreamProvider1";
         public const string StreamProviderName2 = "StreamProvider2";
-        public ProgrammaticSubcribeTestsRunner(BaseTestClusterFixture fixture)
+        public ProgrammaticSubscribeTestsRunner(BaseTestClusterFixture fixture)
         {
             this.fixture = fixture;
         }

@@ -49,8 +49,8 @@ namespace UnitTests.SchedulerTests
 
         object IGrainContext.GrainInstance => throw new NotImplementedException();
 
-        public void Activate(Dictionary<string, object> requestContext, CancellationToken? cancellationToken = default) => throw new NotImplementedException();
-        public void Deactivate(DeactivationReason deactivationReason, CancellationToken? cancellationToken = default) { }
+        public void Activate(Dictionary<string, object> requestContext, CancellationToken cancellationToken) => throw new NotImplementedException();
+        public void Deactivate(DeactivationReason deactivationReason, CancellationToken cancellationToken) { }
         public Task Deactivated => Task.CompletedTask;
         public void Dispose() => (Scheduler as IDisposable)?.Dispose();
         public TComponent GetComponent<TComponent>() where TComponent : class => throw new NotImplementedException();
@@ -61,7 +61,7 @@ namespace UnitTests.SchedulerTests
 
         bool IEquatable<IGrainContext>.Equals(IGrainContext other) => ReferenceEquals(this, other);
         void IGrainContext.Rehydrate(IRehydrationContext context) => throw new NotImplementedException();
-        void IGrainContext.Migrate(Dictionary<string, object> requestContext, CancellationToken? cancellationToken) => throw new NotImplementedException();
+        void IGrainContext.Migrate(Dictionary<string, object> requestContext, CancellationToken cancellationToken) => throw new NotImplementedException();
     }
     
     [TestCategory("BVT"), TestCategory("Scheduler")]

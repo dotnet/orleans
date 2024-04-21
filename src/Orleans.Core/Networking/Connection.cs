@@ -263,6 +263,7 @@ namespace Orleans.Runtime.Messaging
 
         public virtual void Send(Message message)
         {
+            Debug.Assert(!message.IsLocalOnly);
             if (!this.outgoingMessageWriter.TryWrite(message))
             {
                 this.RerouteMessage(message);

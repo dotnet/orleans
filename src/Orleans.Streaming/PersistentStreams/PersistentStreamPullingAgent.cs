@@ -146,7 +146,7 @@ namespace Orleans.Streams
             // Setup a reader for a new receiver.
             // Even if the receiver failed to initialize, treat it as OK and start pumping it. It's receiver responsibility to retry initialization.
             var randomTimerOffset = RandomTimeSpan.Next(this.options.GetQueueMsgsTimerPeriod);
-            timer = RegisterGrainTimer(AsyncTimerCallback, QueueId, randomTimerOffset, this.options.GetQueueMsgsTimerPeriod);
+            timer = RegisterTimer(AsyncTimerCallback, QueueId, randomTimerOffset, this.options.GetQueueMsgsTimerPeriod);
 
             StreamInstruments.RegisterPersistentStreamPubSubCacheSizeObserve(() => new Measurement<int>(pubSubCache.Count, new KeyValuePair<string, object>("name", StatisticUniquePostfix)));
 
@@ -160,44 +160,15 @@ namespace Orleans.Streams
 
             var asyncTimer = timer;
             timer = null;
-            if (asyncTimer != null)
-            {
-                try
-                {
-                    if (asyncTimer is IAsyncDisposable asyncDisposable)
-                    {
-                        var task = asyncDisposable.DisposeAsync();
-                        if (!task.IsCompletedSuccessfully)
-                        {
-                            await task.AsTask().WithTimeout(TimeSpan.FromSeconds(5));
-                        }
-                    }
-                    else
-                    {
-                        asyncTimer.Dispose();
-                    }
-                }
-                catch (Exception ex)
-                {
-                    this.logger.LogWarning(ex, "Waiting for the last timer tick failed");
-                }
-            }
+            asyncTimer.Dispose();
 
             this.queueCache = null;
 
             Task localReceiverInitTask = receiverInitTask;
             if (localReceiverInitTask != null)
             {
-                try
-                {
-                    await localReceiverInitTask;
-                    receiverInitTask = null;
-                }
-                catch (Exception)
-                {
-                    receiverInitTask = null;
-                    // squelch
-                }
+                await localReceiverInitTask.ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing);
+                receiverInitTask = null;
             }
 
             try
@@ -392,7 +363,7 @@ namespace Orleans.Streams
                 if (IsShutdown) return; // timer was already removed, last tick
 
                 // loop through the queue until it is empty.
-                while (!IsShutdown) // timer will be set to null when we are asked to shudown.
+                while (!IsShutdown) // timer will be set to null when we are asked to shutdown.
                 {
                     int maxCacheAddCount = queueCache?.GetMaxAddCount() ?? QueueAdapterConstants.UNLIMITED_GET_QUEUE_MSG;
                     if (maxCacheAddCount != QueueAdapterConstants.UNLIMITED_GET_QUEUE_MSG && maxCacheAddCount <= 0)
@@ -406,7 +377,7 @@ namespace Orleans.Streams
                         i => ReadFromQueue(queueId, receiver, maxCacheAddCount),
                         ReadLoopRetryMax,
                         ReadLoopRetryExceptionFilter,
-                        Constants.INFINITE_TIMESPAN,
+                        Timeout.InfiniteTimeSpan,
                         queueReaderBackoffProvider);
                     if (!moreData)
                         return;
@@ -849,7 +820,7 @@ namespace Orleans.Streams
                                     await PubsubRegisterProducer(pubSub, streamId, GrainId, logger); },
                                 AsyncExecutorWithRetries.INFINITE_RETRIES,
                                 (exception, i) => !IsShutdown,
-                                Constants.INFINITE_TIMESPAN,
+                                Timeout.InfiniteTimeSpan,
                                 deliveryBackoffProvider);
 
 

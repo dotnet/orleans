@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -10,11 +11,6 @@ using Orleans.Serialization.Invocation;
 
 namespace Orleans.Runtime.Messaging
 {
-    internal interface IMessagingSystemTarget : ISystemTarget
-    {
-        ValueTask OnMessagesForwarded(List<(GrainId TargetGrainId, CorrelationId CorrelationId, SiloAddress From, SiloAddress To)> forwards);
-    }
-
     internal class MessageCenter : IMessageCenter, IAsyncDisposable
     {
         private readonly ISiloStatusOracle siloStatusOracle;
@@ -136,6 +132,8 @@ namespace Orleans.Runtime.Messaging
 
         public void SendMessage(Message msg)
         {
+            Debug.Assert(!msg.IsLocalOnly);
+
             // Note that if we identify or add other grains that are required for proper stopping, we will need to treat them as we do the membership table grain here.
             if (IsBlockingApplicationMessages && !msg.IsSystemMessage && msg.Result is not Message.ResponseTypes.Rejection && !Constants.SystemMembershipTableType.Equals(msg.TargetGrain))
             {
@@ -282,6 +280,8 @@ namespace Orleans.Runtime.Messaging
 
                 foreach (var message in messages)
                 {
+                    Debug.Assert(!message.IsLocalOnly);
+
                     if (oldAddress != null)
                     {
                         message.AddToCacheInvalidationHeader(oldAddress, validAddress: validAddress);
@@ -310,7 +310,7 @@ namespace Orleans.Runtime.Messaging
             }
         }
 
-        internal void ProcessRequestToInvalidActivation(
+        private void ProcessRequestToInvalidActivation(
             Message message,
             GrainAddress oldAddress,
             SiloAddress forwardingAddress,
@@ -318,6 +318,8 @@ namespace Orleans.Runtime.Messaging
             Exception exc = null,
             bool rejectMessages = false)
         {
+            Debug.Assert(!message.IsLocalOnly);
+
             // Just use this opportunity to invalidate local Cache Entry as well.
             if (oldAddress != null)
             {
@@ -344,8 +346,10 @@ namespace Orleans.Runtime.Messaging
             }
         }
 
-        internal void TryForwardRequest(Message message, GrainAddress oldAddress, GrainAddress destination, string failedOperation = null, Exception exc = null)
+        private void TryForwardRequest(Message message, GrainAddress oldAddress, GrainAddress destination, string failedOperation = null, Exception exc = null)
         {
+            Debug.Assert(!message.IsLocalOnly);
+
             bool forwardingSucceeded = false;
             var forwardingAddress = destination?.SiloAddress;
             try
@@ -400,7 +404,7 @@ namespace Orleans.Runtime.Messaging
             ResendMessageImpl(message);
         }
 
-        internal bool TryForwardMessage(Message message, SiloAddress forwardingAddress)
+        private bool TryForwardMessage(Message message, SiloAddress forwardingAddress)
         {
             if (!MayForward(message, this.messagingOptions)) return false;
 
@@ -502,6 +506,7 @@ namespace Orleans.Runtime.Messaging
 
         public void ReceiveMessage(Message msg)
         {
+            Debug.Assert(!msg.IsLocalOnly);
             try
             {
                 this.messagingTrace.OnIncomingMessageAgentReceiveMessage(msg);
