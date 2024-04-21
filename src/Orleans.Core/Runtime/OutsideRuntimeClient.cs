@@ -36,7 +36,9 @@ namespace Orleans
         private readonly ILoggerFactory loggerFactory;
 
         private readonly SharedCallbackData sharedCallbackData;
-        private SafeTimer callbackTimer;
+        private readonly PeriodicTimer callbackTimer;
+        private Task callbackTimerTask;
+
         public GrainAddress CurrentActivationAddress
         {
             get;
@@ -60,8 +62,10 @@ namespace Orleans
             ILoggerFactory loggerFactory,
             IOptions<ClientMessagingOptions> clientMessagingOptions,
             MessagingTrace messagingTrace,
-            IServiceProvider serviceProvider)
+            IServiceProvider serviceProvider,
+            TimeProvider timeProvider)
         {
+            TimeProvider = timeProvider;
             this.ServiceProvider = serviceProvider;
             _localClientDetails = localClientDetails;
             this.loggerFactory = loggerFactory;
@@ -69,7 +73,7 @@ namespace Orleans
             this.logger = loggerFactory.CreateLogger<OutsideRuntimeClient>();
             callbacks = new ConcurrentDictionary<CorrelationId, CallbackData>();
             this.clientMessagingOptions = clientMessagingOptions.Value;
-
+            this.callbackTimer = new PeriodicTimer(TimeSpan.FromTicks(Math.Min(this.clientMessagingOptions.ResponseTimeout.Ticks, TimeSpan.FromSeconds(1).Ticks)), timeProvider);
             this.sharedCallbackData = new SharedCallbackData(
                 msg => this.UnregisterCallback(msg.Id),
                 this.loggerFactory.CreateLogger<CallbackData>(),
@@ -104,10 +108,7 @@ namespace Orleans
                     this.messagingTrace,
                     this.loggerFactory.CreateLogger<ClientGrainContext>());
 
-                var timerLogger = this.loggerFactory.CreateLogger<SafeTimer>();
-                var minTicks = Math.Min(this.clientMessagingOptions.ResponseTimeout.Ticks, TimeSpan.FromSeconds(1).Ticks);
-                var period = TimeSpan.FromTicks(minTicks);
-                this.callbackTimer = new SafeTimer(timerLogger, this.OnCallbackExpiryTick, null, period, period);
+                this.callbackTimerTask = Task.Run(MonitorCallbackExpiry);
 
                 this.GrainReferenceRuntime = this.ServiceProvider.GetRequiredService<IGrainReferenceRuntime>();
 
@@ -129,7 +130,9 @@ namespace Orleans
 
         public IServiceProvider ServiceProvider { get; private set; }
 
-        public async Task Start(CancellationToken cancellationToken)
+        public TimeProvider TimeProvider { get; }
+
+        public async Task StartAsync(CancellationToken cancellationToken)
         {
             ConsumeServices();
 
@@ -138,6 +141,22 @@ namespace Orleans
             await Task.Run(() => this.StartInternal(cancellationToken)).ConfigureAwait(false);
 
             logger.LogInformation((int)ErrorCode.ProxyClient_StartDone, "Started client with address {ActivationAddress} and id {ClientId}", CurrentActivationAddress.ToString(), _localClientDetails.ClientId);
+        }
+
+        public async Task StopAsync(CancellationToken cancellationToken)
+        {
+            this.callbackTimer.Dispose();
+            if (this.callbackTimerTask is { } task)
+            {
+                await task.WaitAsync(cancellationToken);
+            }
+
+            if (MessageCenter is { } messageCenter)
+            {
+                await messageCenter.StopAsync(cancellationToken);
+            }
+
+            ConstructorReset();
         }
 
         // used for testing to (carefully!) allow two clients in the same process
@@ -313,18 +332,6 @@ namespace Orleans
             callbacks.TryRemove(id, out _);
         }
 
-        public void Reset()
-        {
-            Utils.SafeExecute(() =>
-                {
-                    if (MessageCenter != null)
-                    {
-                        MessageCenter.Stop();
-                    }
-                }, logger, "Client.Stop-Transport");
-            ConstructorReset();
-        }
-
         private void ConstructorReset()
         {
             Utils.SafeExecute(() => this.Dispose());
@@ -380,7 +387,7 @@ namespace Orleans
             if (this.disposing) return;
             this.disposing = true;
 
-            Utils.SafeExecute(() => this.callbackTimer?.Dispose());
+            Utils.SafeExecute(() => this.callbackTimer.Dispose());
 
             Utils.SafeExecute(() => MessageCenter?.Dispose());
 
@@ -434,14 +441,30 @@ namespace Orleans
             }
         }
 
-        private void OnCallbackExpiryTick(object state)
+        private async Task MonitorCallbackExpiry()
         {
-            var currentStopwatchTicks = ValueStopwatch.GetTimestamp();
-            foreach (var pair in callbacks)
+            while (await callbackTimer.WaitForNextTickAsync())
             {
-                var callback = pair.Value;
-                if (callback.IsCompleted) continue;
-                if (callback.IsExpired(currentStopwatchTicks)) callback.OnTimeout();
+                try
+                {
+                    var currentStopwatchTicks = ValueStopwatch.GetTimestamp();
+                    foreach (var (_, callback) in callbacks)
+                    {
+                        if (callback.IsCompleted)
+                        {
+                            continue;
+                        }
+
+                        if (callback.IsExpired(currentStopwatchTicks))
+                        {
+                            callback.OnTimeout();
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    logger.LogWarning(ex, "Error while processing callback expiry.");
+                }
             }
         }
 
