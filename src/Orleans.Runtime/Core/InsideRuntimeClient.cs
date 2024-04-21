@@ -150,7 +150,7 @@ namespace Orleans.Runtime
                 sharedData = this.sharedCallbackData;
             }
 
-            if (message.IsExpirableMessage(this.messagingOptions.DropExpiredMessages))
+            if (this.messagingOptions.DropExpiredMessages && message.IsExpirableMessage())
             {
                 message.TimeToLive = request.GetDefaultResponseTimeout() ?? sharedData.ResponseTimeout;
             }

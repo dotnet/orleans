@@ -536,11 +536,18 @@ namespace Orleans.Runtime
 
                     try
                     {
-                        await catalog.DeactivateAllActivations().WithCancellation(ct);
+                        await catalog.DeactivateAllActivations().WaitAsync(ct);
                     }
                     catch (Exception exception)
                     {
-                        logger.LogError(exception, "Error deactivating activations");
+                        if (!ct.IsCancellationRequested)
+                        {
+                            logger.LogError(exception, "Error deactivating activations.");
+                        }
+                        else
+                        {
+                            logger.LogWarning("Some grains failed to deactivate promptly.");
+                        }
                     }
 
                     // Wait for all queued message sent to OutboundMessageQueue before MessageCenter stop and OutboundMessageQueue stop.

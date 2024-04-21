@@ -176,6 +176,62 @@ namespace DefaultCluster.Tests.TimerTests
             }
         }
 
+        [Fact, TestCategory("BVT"), TestCategory("Timers")]
+        public async Task GrainTimer_TestAllOverloads()
+        {
+            var grain = GrainFactory.GetGrain<ITimerRequestGrain>(GetRandomGrainId());
+
+            var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+            var numTimers = await grain.TestAllTimerOverloads();
+            while (true)
+            {
+                var completedTimers = await grain.PollCompletedTimers().WaitAsync(cts.Token);
+                if (completedTimers == numTimers)
+                {
+                    break;
+                }
+
+                await Task.Delay(TimeSpan.FromMilliseconds(50), cts.Token);
+            }
+
+            await grain.TestCompletedTimerResults();
+        }
+
+        [Fact, TestCategory("SlowBVT"), TestCategory("Timers")]
+        public async Task NonReentrantGrainTimer_Test()
+        {
+            const string testName = "NonReentrantGrainTimer_Test";
+            var delay = TimeSpan.FromSeconds(5);
+            var wait = delay.Multiply(2);
+
+            var grain = GrainFactory.GetGrain<INonReentrantTimerCallGrain>(GetRandomGrainId());
+
+            // Schedule multiple timers with the same delay
+            await grain.StartTimer(testName, delay);
+            await grain.StartTimer($"{testName}_1", delay);
+            await grain.StartTimer($"{testName}_2", delay);
+
+            // Invoke some non-interleaving methods.
+            var externalTicks = 0;
+            var stopwatch = Stopwatch.StartNew();
+            while (stopwatch.Elapsed < wait)
+            {
+                await grain.ExternalTick("external");
+                externalTicks++;
+            }
+
+            var tickCount = await grain.GetTickCount();
+
+            Assert.Equal(3 + externalTicks, tickCount);
+
+            var err = await grain.GetException();
+            Assert.Null(err); // Should be no exceptions during timer callback
+
+            await grain.StopTimer(testName);
+            await grain.StopTimer($"{testName}_1");
+            await grain.StopTimer($"{testName}_2");
+        }
+
         [Fact, TestCategory("SlowBVT"), TestCategory("Timers")]
         public async Task GrainTimer_Change()
         {
