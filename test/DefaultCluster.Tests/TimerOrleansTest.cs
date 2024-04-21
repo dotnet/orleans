@@ -120,7 +120,7 @@ namespace DefaultCluster.Tests.TimerTests
             last = await grain.GetCounter();
             stopwatch.Stop();
 
-            double maximalNumTicks = stopwatch.Elapsed.Divide(period);
+            int maximalNumTicks = (int)Math.Round(stopwatch.Elapsed.Divide(period), MidpointRounding.ToPositiveInfinity);
             Assert.True(
                 last <= maximalNumTicks,
                 $"Assert: last <= maximalNumTicks. Actual: last = {last}, maximalNumTicks = {maximalNumTicks}");
@@ -174,6 +174,66 @@ namespace DefaultCluster.Tests.TimerTests
             {
                 Assert.Fail($"Test {testName} failed with error {error}");
             }
+        }
+
+        [Fact, TestCategory("SlowBVT"), TestCategory("Timers")]
+        public async Task GrainTimer_Change()
+        {
+            const string testName = nameof(GrainTimer_Change);
+            TimeSpan delay = TimeSpan.FromSeconds(5);
+            TimeSpan wait = delay.Multiply(2);
+
+            var grain = GrainFactory.GetGrain<ITimerCallGrain>(GetRandomGrainId());
+
+            await grain.StartTimer(testName, delay);
+
+            await Task.Delay(wait);
+
+            int tickCount = await grain.GetTickCount();
+            Assert.Equal(1, tickCount);
+
+            await grain.RestartTimer(testName, delay);
+
+            await Task.Delay(wait);
+
+            tickCount = await grain.GetTickCount();
+            Assert.Equal(2, tickCount);
+
+            // Infinite timeouts should be valid.
+            await grain.RestartTimer(testName, Timeout.InfiniteTimeSpan);
+            await grain.RestartTimer(testName, Timeout.InfiniteTimeSpan, Timeout.InfiniteTimeSpan);
+
+            // Zero and sub-ms timeouts should be valid (rounded up to 1ms)
+            await grain.RestartTimer(testName, TimeSpan.Zero);
+            await grain.RestartTimer(testName, TimeSpan.FromMicroseconds(10));
+            await grain.RestartTimer(testName, TimeSpan.Zero, TimeSpan.Zero);
+            await grain.RestartTimer(testName, TimeSpan.FromMicroseconds(10), TimeSpan.FromMicroseconds(10));
+            await grain.RestartTimer(testName, TimeSpan.FromMilliseconds(-0.4));
+            await grain.RestartTimer(testName, TimeSpan.FromSeconds(1), TimeSpan.FromMilliseconds(-0.5));
+
+            // Invalid values
+            await Assert.ThrowsAsync<ArgumentOutOfRangeException>(async () => await grain.RestartTimer(testName, TimeSpan.FromSeconds(-5)));
+            await Assert.ThrowsAsync<ArgumentOutOfRangeException>(async () => await grain.RestartTimer(testName, TimeSpan.MaxValue));
+            await Assert.ThrowsAsync<ArgumentOutOfRangeException>(async () => await grain.RestartTimer(testName, TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(-5)));
+            await Assert.ThrowsAsync<ArgumentOutOfRangeException>(async () => await grain.RestartTimer(testName, TimeSpan.FromSeconds(1), TimeSpan.MaxValue));
+
+            Exception err = await grain.GetException();
+            Assert.Null(err); // Should be no exceptions during timer callback
+
+            // Valid operations called from within a timer: updating the period and disposing the timer.
+            var grain2 = GrainFactory.GetGrain<ITimerCallGrain>(GetRandomGrainId());
+            await grain2.StartTimer(testName, delay, "update_period");
+            await Task.Delay(wait);
+            Assert.Null(await grain2.GetException()); // Should be no exceptions during timer callback
+            Assert.Equal(1, await grain2.GetTickCount());
+
+            var grain3 = GrainFactory.GetGrain<ITimerCallGrain>(GetRandomGrainId());
+            await grain3.StartTimer(testName, delay, "dispose_timer");
+            await Task.Delay(wait);
+            Assert.Null(await grain3.GetException()); // Should be no exceptions during timer callback
+            Assert.Equal(1, await grain3.GetTickCount());
+
+            await grain.StopTimer(testName);
         }
     }
 }
