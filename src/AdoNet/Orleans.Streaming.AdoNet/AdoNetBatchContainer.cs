@@ -1,8 +1,12 @@
-using Orleans.Providers.Streams.Common;
-using Orleans.Runtime;
-
 namespace Orleans.Streaming.AdoNet;
 
+/// <summary>
+/// The <see cref="IBatchContainer"/> implementation for the ADONET provider.
+/// </summary>
+/// <remarks>
+/// 1. This class only supports binary serialization as performance and data size is the priority for database storage.
+/// 2. Though the <see cref="SequenceToken"/> is supported here, it is not yet used, as the ADONET provider is not yet rewindable.
+/// </remarks>
 [GenerateSerializer]
 internal class AdoNetBatchContainer : IBatchContainer
 {
@@ -11,40 +15,46 @@ internal class AdoNetBatchContainer : IBatchContainer
         ArgumentNullException.ThrowIfNull(events);
 
         StreamId = streamId;
-        _events = events;
-        _requestContext = requestContext;
+        Events = events;
+        RequestContext = requestContext;
     }
 
     #region Serialized State
 
     [Id(0)]
-    private readonly EventSequenceTokenV2 _sequenceToken;
+    public StreamId StreamId { get; }
 
     [Id(1)]
-    private readonly List<object> _events;
+    public List<object> Events { get; }
 
     [Id(2)]
-    private readonly Dictionary<string, object> _requestContext;
+    private Dictionary<string, object> RequestContext { get; }
 
     [Id(3)]
-    public StreamId StreamId { get; }
+    public EventSequenceTokenV2 SequenceToken { get; internal set; }
 
     #endregion Serialized State
 
-    public StreamSequenceToken SequenceToken => _sequenceToken;
+    #region Interface
 
-    public IEnumerable<Tuple<T, StreamSequenceToken>> GetEvents<T>() => _events.OfType<T>().Select((e, i) => Tuple.Create<T, StreamSequenceToken>(e, _sequenceToken.CreateSequenceTokenForEvent(i)));
+    StreamSequenceToken IBatchContainer.SequenceToken => SequenceToken;
+
+    public IEnumerable<Tuple<T, StreamSequenceToken>> GetEvents<T>() => Events
+        .OfType<T>()
+        .Select((e, i) => Tuple.Create<T, StreamSequenceToken>(e, SequenceToken.CreateSequenceTokenForEvent(i)));
 
     public bool ImportRequestContext()
     {
-        if (_requestContext is not null)
+        if (RequestContext is not null)
         {
-            RequestContextExtensions.Import(_requestContext);
+            RequestContextExtensions.Import(RequestContext);
             return true;
         }
 
         return false;
     }
 
-    public override string ToString() => $"[{nameof(AdoNetBatchContainer)}:Stream={StreamId},#Items={_events.Count}]";
+    #endregion Interface
+
+    public override string ToString() => $"[{nameof(AdoNetBatchContainer)}:Stream={StreamId},#Items={Events.Count}]";
 }

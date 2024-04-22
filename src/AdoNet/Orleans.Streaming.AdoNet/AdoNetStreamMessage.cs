@@ -1,3 +1,5 @@
+using static System.String;
+
 namespace Orleans.Streaming.AdoNet;
 
 /// <summary>
@@ -8,11 +10,16 @@ internal record AdoNetStreamMessage(
     string ServiceId,
     string ProviderId,
     int QueueId,
-    int MessageId,
+    long MessageId,
     Guid Receipt,
     int Dequeued,
     DateTime VisibleOn,
     DateTime ExpiresOn,
     DateTime CreatedOn,
     DateTime ModifiedOn,
-    byte[] Payload);
+    byte[] Payload)
+{
+    public AdoNetStreamMessage() : this(Empty, Empty, 0, 0, Guid.Empty, 0, DateTime.MinValue, DateTime.MinValue, DateTime.MinValue, DateTime.MinValue, [])
+    {
+    }
+}

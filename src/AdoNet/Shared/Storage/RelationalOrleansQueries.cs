@@ -14,6 +14,7 @@ namespace Orleans.Persistence.AdoNet.Storage
 #elif REMINDERS_ADONET
 namespace Orleans.Reminders.AdoNet.Storage
 #elif STREAMING_ADONET
+
 namespace Orleans.Streaming.AdoNet.Storage
 #elif TESTER_SQLUTILS
 using Orleans.Streaming.AdoNet;
@@ -24,7 +25,7 @@ namespace Orleans.Tests.SqlUtils
 {
     /// <summary>
     /// A class for all relational storages that support all systems stores : membership, reminders and statistics
-    /// </summary>    
+    /// </summary>
     internal class RelationalOrleansQueries
     {
         /// <summary>
@@ -59,7 +60,7 @@ namespace Orleans.Tests.SqlUtils
         }
 
         /// <summary>
-        /// Creates an instance of a database of type <see cref="RelationalOrleansQueries"/> and Initializes Orleans queries from the database. 
+        /// Creates an instance of a database of type <see cref="RelationalOrleansQueries"/> and Initializes Orleans queries from the database.
         /// Orleans uses only these queries and the variables therein, nothing more.
         /// </summary>
         /// <param name="invariantName">The invariant name of the connector for this database.</param>
@@ -102,7 +103,6 @@ namespace Orleans.Tests.SqlUtils
                 ret => new ReminderTableData(ret.ToList()));
         }
 
-
         /// <summary>
         /// Reads Orleans reminder data from the tables.
         /// </summary>
@@ -118,7 +118,6 @@ namespace Orleans.Tests.SqlUtils
                 new DbStoredQueries.Columns(command) { ServiceId = serviceId, BeginHash = beginHash, EndHash = endHash },
                 ret => new ReminderTableData(ret.ToList()));
         }
-
 
         internal static KeyValuePair<string, string> GetQueryKeyAndValue(IDataRecord record)
         {
@@ -385,10 +384,16 @@ namespace Orleans.Tests.SqlUtils
         /// <param name="queueId">The queue identifier.</param>
         /// <param name="payload">The serialized event payload.</param>
         /// <param name="expiryTimeout">The expiry timeout for this event batch.</param>
-        internal Task QueueMessageBatchAsync(string serviceId, string providerId, int queueId, byte[] payload, int expiryTimeout)
+        /// <returns>An acknowledgement that the message was queued.</returns>
+        internal Task<AdoNetStreamAck> QueueMessageBatchAsync(string serviceId, string providerId, int queueId, byte[] payload, int expiryTimeout)
         {
-            return ExecuteAsync(
+            return ReadAsync(
                 dbStoredQueries.EnqueueStreamMessageKey,
+                record => new AdoNetStreamAck(
+                    (string)record[nameof(AdoNetStreamAck.ServiceId)],
+                    (string)record[nameof(AdoNetStreamAck.ProviderId)],
+                    (int)record[nameof(AdoNetStreamAck.QueueId)],
+                    (long)record[nameof(AdoNetStreamAck.MessageId)]),
                 command => new DbStoredQueries.Columns(command)
                 {
                     ServiceId = serviceId,
@@ -396,7 +401,8 @@ namespace Orleans.Tests.SqlUtils
                     QueueId = queueId,
                     Payload = payload,
                     ExpiryTimeout = expiryTimeout,
-                });
+                },
+                result => result.Single());
         }
 
         /// <summary>
@@ -417,7 +423,7 @@ namespace Orleans.Tests.SqlUtils
                     (string)record[nameof(AdoNetStreamMessage.ServiceId)],
                     (string)record[nameof(AdoNetStreamMessage.ProviderId)],
                     (int)record[nameof(AdoNetStreamMessage.QueueId)],
-                    (int)record[nameof(AdoNetStreamMessage.MessageId)],
+                    (long)record[nameof(AdoNetStreamMessage.MessageId)],
                     (Guid)record[nameof(AdoNetStreamMessage.Receipt)],
                     (int)record[nameof(AdoNetStreamMessage.Dequeued)],
                     (DateTime)record[nameof(AdoNetStreamMessage.VisibleOn)],
@@ -467,6 +473,5 @@ namespace Orleans.Tests.SqlUtils
         }
 
 #endif
-
     }
 }

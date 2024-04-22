@@ -3,7 +3,6 @@ Orleans Stream Message Sequence.
 This sequence reduces contention on generation of [MessageId] values vs an identity column.
 The CACHE parameter can be increased to further reduce contention.
 */
-IF OBJECT_ID('[OrleansStreamMessageSequence]') IS NULL
 CREATE SEQUENCE [OrleansStreamMessageSequence]
 AS BIGINT
 START WITH 1
@@ -77,7 +76,7 @@ CREATE TABLE [OrleansStreamMessage]
 		[ServiceId] ASC,
         [ProviderId] ASC,
 		[QueueId] ASC,
-		[EventId] ASC
+		[MessageId] ASC
 	)
 );
 GO
@@ -87,7 +86,6 @@ Orleans Streaming Dead Letters.
 
 This table holds events that could not be processed within the allowed number of attempts or that have expired.
 */
-IF OBJECT_ID('[OrleansStreamDeadLetter]') IS NULL
 CREATE TABLE [OrleansStreamDeadLetter]
 (
 	/* Identifies the application */
@@ -136,7 +134,7 @@ CREATE TABLE [OrleansStreamDeadLetter]
 		[ServiceId] ASC,
         [ProviderId] ASC,
 		[QueueId] ASC,
-		[EventId] ASC
+		[MessageId] ASC
 	)
 );
 GO
@@ -154,6 +152,7 @@ BEGIN
 SET NOCOUNT ON;
 
 DECLARE @MessageId BIGINT = NEXT VALUE FOR [OrleansStreamMessageSequence];
+DECLARE @Receipt UNIQUEIDENTIFIER = CAST(0x0 AS UNIQUEIDENTIFIER);
 DECLARE @Now DATETIME2(7) = SYSUTCDATETIME();
 DECLARE @ExpiresOn DATETIME2(7) = DATEADD(SECOND, @ExpiryTimeout, @Now);
 
@@ -163,6 +162,7 @@ INSERT INTO [OrleansStreamMessage]
     ProviderId,
 	QueueId,
 	MessageId,
+    Receipt,
 	Dequeued,
 	VisibleOn,
 	ExpiresOn,
@@ -170,12 +170,18 @@ INSERT INTO [OrleansStreamMessage]
 	ModifiedOn,
 	Payload
 )
+OUTPUT
+    [Inserted].[ServiceId],
+    [Inserted].[ProviderId],
+    [Inserted].[QueueId],
+    [Inserted].[MessageId]
 VALUES
 (
 	@ServiceId,
     @ProviderId,
 	@QueueId,
 	@MessageId,
+    @Receipt,
 	0,
 	@Now,
 	@ExpiresOn,
@@ -194,7 +200,7 @@ INSERT INTO [OrleansQuery]
 )
 SELECT
 	'EnqueueStreamMessageKey',
-	'EXECUTE [EnqueueStreamMessage] @ServiceId = @ServiceId, @ProviderId = @ProviderId, @QueueName = @QueueName, @Payload = @Payload, @ExpiryTimeout = @ExpiryTimeout'
+	'EXECUTE [EnqueueStreamMessage] @ServiceId = @ServiceId, @ProviderId = @ProviderId, @QueueId = @QueueId, @Payload = @Payload, @ExpiryTimeout = @ExpiryTimeout'
 GO
 
 /* Dequeues message batches from the Orleans Streaming Message Queue */
@@ -220,6 +226,7 @@ WITH Batch AS
         [ProviderId],
 		[QueueId],
 		[MessageId],
+        [Receipt],
 		[Dequeued],
 		[VisibleOn],
 		[ExpiresOn],
@@ -227,7 +234,7 @@ WITH Batch AS
 		[ModifiedOn],
 		[Payload]
 	FROM
-		[OrleansStreamEvent] WITH (ROWLOCK, UPDLOCK, HOLDLOCK)
+		[OrleansStreamMessage] WITH (ROWLOCK, UPDLOCK, HOLDLOCK)
 	WHERE
 		[ServiceId] = @ServiceId
         AND [ProviderId] = @ProviderId
@@ -241,6 +248,7 @@ WITH Batch AS
 UPDATE Batch
 SET
 	[Dequeued] += 1,
+    [Receipt] = NEWID(),
 	[VisibleOn] = @VisibleOn,
 	[ModifiedOn] = @Now
 OUTPUT
@@ -248,6 +256,7 @@ OUTPUT
     [Inserted].[ProviderId],
 	[Inserted].[QueueId],
 	[Inserted].[MessageId],
+    [Inserted].[Receipt],
 	[Inserted].[Dequeued],
 	[Inserted].[VisibleOn],
 	[Inserted].[ExpiresOn],
@@ -317,8 +326,6 @@ WHERE
 	[ServiceId] = @ServiceId
     AND [ProviderId] = @ProviderId
 	AND [QueueId] = @QueueId
-	AND [MessageId] = @MessageId
-    AND [Receipt] = @Receipt;
 
 END
 GO
@@ -354,7 +361,7 @@ WITH Batch AS
 (
 	SELECT TOP (@MaxCount)
 		[ServiceId],
-        [ProviderId]
+        [ProviderId],
 		[QueueId],
 		[MessageId],
 		[Dequeued],
