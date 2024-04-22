@@ -316,17 +316,21 @@ namespace Orleans.CodeGenerator
             var assemblyAttributes = ApplicationPartAttributeGenerator.GenerateSyntax(LibraryTypes, MetadataModel);
             assemblyAttributes.Add(metadataAttribute);
 
-            assemblyAttributes[0] = assemblyAttributes[0]
-                .WithLeadingTrivia(
-                    SyntaxFactory.TriviaList(
-                        new List<SyntaxTrivia>
-                        {
-                             Trivia(
-                                PragmaWarningDirectiveTrivia(
-                                    Token(SyntaxKind.DisableKeyword),
-                                    SeparatedList(DisabledWarnings.Select(w => (ExpressionSyntax)w.GetLiteralExpression())),
-                                    isActive: true)),
-                        }));
+            if (assemblyAttributes.Count > 0)
+            {
+                assemblyAttributes[0] = assemblyAttributes[0]
+                    .WithLeadingTrivia(
+                        SyntaxFactory.TriviaList(
+                            new List<SyntaxTrivia>
+                            {
+                                             Trivia(
+                                                PragmaWarningDirectiveTrivia(
+                                                    Token(SyntaxKind.DisableKeyword),
+                                                    SeparatedList(DisabledWarnings.Select(w => (ExpressionSyntax)w.GetLiteralExpression())),
+                                                    isActive: true)),
+                            }));
+            }
+
 
             var usings = List(new[] { UsingDirective(ParseName("global::Orleans.Serialization.Codecs")), UsingDirective(ParseName("global::Orleans.Serialization.GeneratedCodeHelpers")) });
             var namespaces = new List<MemberDeclarationSyntax>(_namespacedMembers.Count);
@@ -338,17 +342,21 @@ namespace Orleans.CodeGenerator
                 namespaces.Add(NamespaceDeclaration(ParseName(ns)).WithMembers(List(member)).WithUsings(usings));
             }
 
-            namespaces[0] = namespaces[0]
-               .WithTrailingTrivia(
-                   SyntaxFactory.TriviaList(
-                       new List<SyntaxTrivia>
-                       {
-                             Trivia(
-                                PragmaWarningDirectiveTrivia(
-                                    Token(SyntaxKind.RestoreKeyword),
-                                    SeparatedList(DisabledWarnings.Select(w => (ExpressionSyntax)w.GetLiteralExpression())),
-                                    isActive: true)),
-                       }));
+            if (namespaces.Count > 0)
+            {
+                namespaces[0] = namespaces[0]
+                    .WithTrailingTrivia(
+                       SyntaxFactory.TriviaList(
+                           new List<SyntaxTrivia>
+                           {
+                                                 Trivia(
+                                                    PragmaWarningDirectiveTrivia(
+                                                        Token(SyntaxKind.RestoreKeyword),
+                                                        SeparatedList(DisabledWarnings.Select(w => (ExpressionSyntax)w.GetLiteralExpression())),
+                                                        isActive: true)),
+                           }));
+            }
+
 
             return CompilationUnit()
                 .WithAttributeLists(List(assemblyAttributes))
