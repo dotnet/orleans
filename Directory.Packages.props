@@ -78,7 +78,7 @@
     <PackageVersion Include="System.CodeDom" Version="8.0.0" />
     <PackageVersion Include="Microsoft.NETFramework.ReferenceAssemblies" Version="1.0.3" />
     <PackageVersion Include="FSharp.Core" Version="7.0.0" />
-    <PackageVersion Include="Azure.Identity" Version="1.10.2" />
+    <PackageVersion Include="Azure.Identity" Version="1.11.0" />
     <PackageVersion Include="Azure.Security.KeyVault.Secrets" Version="4.5.0" />
     <PackageVersion Include="NSubstitute" Version="4.4.0" />
     <PackageVersion Include="NSubstitute.Analyzers.CSharp" Version="1.0.15" />

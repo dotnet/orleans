@@ -6,7 +6,7 @@ namespace Orleans.EventSourcing.LogStorage
 {
     /// <summary>
     /// A class that extends grain state with versioning metadata, so that a grain with log-view consistency
-    /// can use a standard storage provider via <see cref="LogViewAdaptor{TView,TEntry}"/>
+    /// can use a standard storage provider.
     /// </summary>
     /// <typeparam name="TEntry">The type used for log entries</typeparam>
     [Serializable]
@@ -47,12 +47,10 @@ namespace Orleans.EventSourcing.LogStorage
         }
     }
 
-
     /// <summary>
     /// A class that extends grain state with versioning metadata, so that a log-consistent grain
-    /// can use a standard storage provider via <see cref="LogViewAdaptor{TView,TEntry}"/>
+    /// can use a standard storage provider.
     /// </summary>
-    /// <typeparam name="TEntry"></typeparam>
     [Serializable]
     [GenerateSerializer]
     public sealed class LogStateWithMetaData<TEntry> where TEntry : class
@@ -67,7 +65,6 @@ namespace Orleans.EventSourcing.LogStorage
         /// The length of the log
         /// </summary>
         public int GlobalVersion { get { return Log.Count; } }
-
 
         /// <summary>
         /// Metadata that is used to avoid duplicate appends.
@@ -85,32 +82,31 @@ namespace Orleans.EventSourcing.LogStorage
         /// </summary>
         public LogStateWithMetaData()
         {
-            Log = new List<TEntry>();
+            Log = [];
             WriteVector = "";
         }
-
 
         /// <summary>
         /// Gets one of the bits in <see cref="WriteVector"/>
         /// </summary>
-        /// <param name="Replica">The replica for which we want to look up the bit</param>
+        /// <param name="replica">The replica for which we want to look up the bit</param>
         /// <returns></returns>
-        public bool GetBit(string Replica) {
-            return StringEncodedWriteVector.GetBit(WriteVector, Replica);
+        public bool GetBit(string replica)
+        {
+            return StringEncodedWriteVector.GetBit(WriteVector, replica);
         }
 
         /// <summary>
-        /// toggle one of the bits in <see cref="WriteVector"/> and return the new value.
+        /// Toggle one of the bits in <see cref="WriteVector"/> and return the new value.
         /// </summary>
-        /// <param name="Replica">The replica for which we want to flip the bit</param>
+        /// <param name="replica">The replica for which we want to flip the bit</param>
         /// <returns>the state of the bit after flipping it</returns>
-        public bool FlipBit(string Replica) {
+        public bool FlipBit(string replica)
+        {
             var str = WriteVector;
-            var rval = StringEncodedWriteVector.FlipBit(ref str, Replica);
+            var result = StringEncodedWriteVector.FlipBit(ref str, replica);
             WriteVector = str;
-            return rval;
+            return result;
         }
-
-
     }
 }

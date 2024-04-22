@@ -8,8 +8,11 @@ using System.Diagnostics.CodeAnalysis;
 
 namespace Orleans.Serialization.TestKit
 {
+    /// <summary>
+    /// Helper for testing buffer types.
+    /// </summary>
     [ExcludeFromCodeCoverage]
-    public static class BufferTestHelper<TValue>
+    internal static class BufferTestHelper<TValue>
     {
         public static IBufferTestSerializer[] GetTestSerializers(IServiceProvider serviceProvider, int[] maxSizes)
         {

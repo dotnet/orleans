@@ -1,16 +1,12 @@
 using System;
-using Microsoft.Extensions.Logging;
 using Orleans.Core;
 using Orleans.Timers;
 using Orleans.Storage;
-using Orleans.Serialization.Serializers;
 
 namespace Orleans.Runtime
 {
     internal class GrainRuntime : IGrainRuntime
     {
-        private readonly ILoggerFactory loggerFactory;
-        private readonly IActivatorProvider activatorProvider;
         private readonly IServiceProvider serviceProvider;
         private readonly ITimerRegistry timerRegistry;
         private readonly IGrainFactory grainFactory;
@@ -19,17 +15,13 @@ namespace Orleans.Runtime
             ILocalSiloDetails localSiloDetails,
             IGrainFactory grainFactory,
             ITimerRegistry timerRegistry,
-            IServiceProvider serviceProvider,
-            ILoggerFactory loggerFactory,
-            IActivatorProvider activatorProvider)
+            IServiceProvider serviceProvider)
         {
             SiloAddress = localSiloDetails.SiloAddress;
             SiloIdentity = SiloAddress.ToString();
             this.grainFactory = grainFactory;
             this.timerRegistry = timerRegistry;
             this.serviceProvider = serviceProvider;
-            this.loggerFactory = loggerFactory;
-            this.activatorProvider = activatorProvider;
         }
 
         public string SiloIdentity { get; }
@@ -85,7 +77,7 @@ namespace Orleans.Runtime
             if (grainContext is null) throw new ArgumentNullException(nameof(grainContext));
             var grainType = grainContext.GrainInstance?.GetType() ?? throw new ArgumentNullException(nameof(IGrainContext.GrainInstance));
             IGrainStorage grainStorage = GrainStorageHelpers.GetGrainStorage(grainType, ServiceProvider);
-            return new StateStorageBridge<TGrainState>("state", grainContext, grainStorage, this.loggerFactory, this.activatorProvider);
+            return new StateStorageBridge<TGrainState>("state", grainContext, grainStorage);
         }
 
         public static void CheckRuntimeContext(IGrainContext context)

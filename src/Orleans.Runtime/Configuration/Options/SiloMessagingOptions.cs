@@ -131,7 +131,6 @@ namespace Orleans.Configuration
 
         /// <summary>
         /// Gets or sets the default timeout before an internal system request is assumed to have failed.
-        /// <seealso cref="MessagingOptions.ResponseTimeoutWithDebugger"/>
         /// </summary>
         public TimeSpan SystemResponseTimeout
         {

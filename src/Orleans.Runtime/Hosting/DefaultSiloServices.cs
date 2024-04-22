@@ -41,6 +41,7 @@ using Orleans.Serialization.Cloning;
 using System.Collections.Generic;
 using Microsoft.Extensions.Configuration;
 using Orleans.Serialization.Internal;
+using Orleans.Core;
 
 namespace Orleans.Hosting
 {
@@ -346,6 +347,7 @@ namespace Orleans.Hosting
             services.TryAddSingleton<IGrainStorageSerializer, JsonGrainStorageSerializer>();
             services.TryAddSingleton<IPersistentStateFactory, PersistentStateFactory>();
             services.TryAddSingleton(typeof(IAttributeToFactoryMapper<PersistentStateAttribute>), typeof(PersistentStateAttributeMapper));
+            services.TryAddSingleton<StateStorageBridgeSharedMap>();
 
             // IAsyncEnumerable support
             services.AddScoped<IAsyncEnumerableGrainExtension, AsyncEnumerableGrainExtension>();
