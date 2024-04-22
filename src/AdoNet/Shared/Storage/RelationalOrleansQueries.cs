@@ -387,6 +387,9 @@ namespace Orleans.Tests.SqlUtils
         /// <returns>An acknowledgement that the message was queued.</returns>
         internal Task<AdoNetStreamAck> QueueMessageBatchAsync(string serviceId, string providerId, int queueId, byte[] payload, int expiryTimeout)
         {
+            ArgumentNullException.ThrowIfNull(serviceId);
+            ArgumentNullException.ThrowIfNull(providerId);
+
             return ReadAsync(
                 dbStoredQueries.EnqueueStreamMessageKey,
                 record => new AdoNetStreamAck(
@@ -417,6 +420,9 @@ namespace Orleans.Tests.SqlUtils
         /// <returns>A list of dequeued payloads.</returns>
         internal Task<IList<AdoNetStreamMessage>> GetQueueMessagesAsync(string serviceId, string providerId, int queueId, int maxCount, int maxAttempts, int visibilityTimeout)
         {
+            ArgumentNullException.ThrowIfNull(serviceId);
+            ArgumentNullException.ThrowIfNull(providerId);
+
             return ReadAsync<AdoNetStreamMessage, IList<AdoNetStreamMessage>>(
                 dbStoredQueries.DequeueStreamMessagesKey,
                 record => new AdoNetStreamMessage(
@@ -451,8 +457,20 @@ namespace Orleans.Tests.SqlUtils
         /// <param name="queueId">The queue identifier.</param>
         /// <param name="messages">The messages to confirm.</param>
         /// <returns>A list of confirmations.</returns>
+        /// <remarks>
+        /// If <paramref name="messages"/> is empty then an empty confirmation list is returned.
+        /// </remarks>
         internal Task<IList<AdoNetStreamConfirmation>> MessagesDeliveredAsync(string serviceId, string providerId, int queueId, IList<AdoNetStreamMessage> messages)
         {
+            ArgumentNullException.ThrowIfNull(serviceId);
+            ArgumentNullException.ThrowIfNull(providerId);
+            ArgumentNullException.ThrowIfNull(messages);
+
+            if (messages.Count == 0)
+            {
+                return Task.FromResult<IList<AdoNetStreamConfirmation>>([]);
+            }
+
             var items = messages.Aggregate(new StringBuilder(), (b, m) => b.Append(b.Length > 0 ? "|" : "").Append(m.MessageId).Append(':').Append(m.Receipt), b => b.ToString());
 
             return ReadAsync<AdoNetStreamConfirmation, IList<AdoNetStreamConfirmation>>(
@@ -461,7 +479,7 @@ namespace Orleans.Tests.SqlUtils
                     (string)record[nameof(AdoNetStreamConfirmation.ServiceId)],
                     (string)record[nameof(AdoNetStreamConfirmation.ProviderId)],
                     (int)record[nameof(AdoNetStreamConfirmation.QueueId)],
-                    (int)record[nameof(AdoNetStreamConfirmation.MessageId)]),
+                    (long)record[nameof(AdoNetStreamConfirmation.MessageId)]),
                 command => new DbStoredQueries.Columns(command)
                 {
                     ServiceId = serviceId,

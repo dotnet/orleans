@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using Orleans.Streaming.AdoNet;
 using Orleans.Streaming.AdoNet.Storage;
 using UnitTests.General;
@@ -534,13 +535,111 @@ public class RelationStorageStreamingTests : IAsyncLifetime
         Assert.Equal(payload, stored.Payload);
     }
 
-
-    /*
     /// <summary>
-    /// Chaos tests that enqueuing and dequeuing work in parallel in a complex random scenario.
-    /// This code tests for concurrent brittleness rather than a specific condition.
-    /// If this test is flaky then there likely is an issue with the implementation that needs investigation.
+    /// Tests that messages can be confirmed.
     /// </summary>
+    [SkippableFact]
+    public async Task ConfirmsMessages()
+    {
+        // arrange
+        await _storage.ExecuteAsync("DELETE FROM [OrleansStreamMessage]");
+        var serviceId = RandomServiceId();
+        var providerId = RandomProviderId();
+        var queueId = RandomQueueId();
+        var payload = RandomPayload();
+        var expiryTimeout = 100;
+        var maxCount = 10;
+        var maxAttempts = 3;
+        var visibilityTimeout = 10;
+
+        // arrange - enqueue many messages
+        var acks = await Task.WhenAll(Enumerable
+            .Range(0, maxCount)
+            .Select(i => _queries.QueueMessageBatchAsync(serviceId, providerId, queueId, payload, expiryTimeout))
+            .ToList());
+
+        // arrange - dequeue all messages
+        var messages = await _queries.GetQueueMessagesAsync(serviceId, providerId, queueId, maxCount, maxAttempts, visibilityTimeout);
+
+        // act - confirm all messages
+        var results = await _queries.MessagesDeliveredAsync(serviceId, providerId, queueId, messages);
+
+        // assert - confirmations are as expected
+        Assert.Equal(maxCount, acks.Length);
+        Assert.Equal(maxCount, messages.Count);
+        Assert.Equal(maxCount, results.Count);
+
+        var lookup = acks.Select(x => (x.ServiceId, x.ProviderId, x.QueueId, x.MessageId)).ToHashSet();
+        foreach (var result in results)
+        {
+            Assert.True(lookup.Remove((result.ServiceId, result.ProviderId, result.QueueId, result.MessageId)), "Unexpected Confirmation");
+        }
+
+        // assert - no data remains in storage
+        var stored = await _storage.ReadAsync<AdoNetStreamMessage>("SELECT * FROM [OrleansStreamMessage]");
+        Assert.Empty(stored);
+    }
+
+    /// <summary>
+    /// Chaos tests that some messages can be confirmed while others are not.
+    /// </summary>
+    [SkippableFact]
+    public async Task ConfirmsSomeMessagesAndNotOthers()
+    {
+        // arrange
+        await _storage.ExecuteAsync("DELETE FROM [OrleansStreamMessage]");
+        var serviceId = RandomServiceId();
+        var providerId = RandomProviderId();
+        var queueId = RandomQueueId();
+        var payload = RandomPayload(1000);
+        var expiryTimeout = 100;
+        var maxCount = 100;
+        var maxAttempts = 3;
+        var visibilityTimeout = 10;
+        var partial = 30;
+
+        // arrange - enqueue many messages
+        var acks = await Task.WhenAll(Enumerable
+            .Range(0, maxCount)
+            .Select(i => _queries.QueueMessageBatchAsync(serviceId, providerId, queueId, payload, expiryTimeout))
+            .ToList());
+
+        // arrange - dequeue all the messages
+        var messages = await _queries.GetQueueMessagesAsync(serviceId, providerId, queueId, maxCount, maxAttempts, visibilityTimeout);
+
+        // act - confirm some of the messages at random
+        var completed = Randomize(messages).Take(partial).ToList();
+        var confirmed = await _queries.MessagesDeliveredAsync(serviceId, providerId, queueId, completed);
+
+        // assert - counts are as expected
+        Assert.Equal(maxCount, acks.Length);
+        Assert.Equal(maxCount, messages.Count);
+        Assert.Equal(partial, confirmed.Count);
+
+        // assert - confirmed messages are as expected
+        var lookup = acks.ToDictionary(x => (x.ServiceId, x.ProviderId, x.QueueId, x.MessageId));
+        var stored = (await _storage.ReadAsync<AdoNetStreamMessage>("SELECT * FROM [OrleansStreamMessage]"))
+            .ToDictionary(x => (x.ServiceId, x.ProviderId, x.QueueId, x.MessageId));
+        foreach (var item in confirmed)
+        {
+            Assert.True(lookup.Remove((item.ServiceId, item.ProviderId, item.QueueId, item.MessageId)), "Unexpected Confirmation");
+            Assert.False(stored.TryGetValue((item.ServiceId, item.ProviderId, item.QueueId, item.MessageId), out _), "Message still in storage");
+        }
+
+        // assert - unconfirmed messages remain in storage
+        Assert.Equal(maxCount - partial, stored.Count);
+        Assert.Equal(lookup.Keys.Order(), stored.Keys.Order());
+    }
+
+    /// <summary>
+    /// Chaos tests that enqueuing, dequeuing and confirmation work in parallel in a complex random scenario where faults happen.
+    /// This looks for concurrent brittleness, especially proneness to database deadlocks, rather than a specific condition.
+    /// If this test becomes flaky then there is likely some issue with the implementation that needs investigation.
+    /// </summary>
+    /// <remarks>
+    /// At dev time, this test consistently induced deadlocks until the underlying queries were perfected.
+    /// This is an expensive test to run but can protect against invisible regression.
+    /// </remarks>
     [SkippableFact]
     public async Task ChaosEnqueuesAndDequeuesManyMessagesOnManyQueues()
     {
@@ -548,117 +647,130 @@ public class RelationStorageStreamingTests : IAsyncLifetime
         await _storage.ExecuteAsync("DELETE FROM [OrleansStreamMessage]");
 
         // arrange - generate test data
-        var serviceIds = Enumerable.Range(0, 10).Select(x => $"ServiceId{x}").ToList();
-        var providerIds = Enumerable.Range(0, 10).Select(x => $"ProviderId{x}").ToList();
-        var queueIds = Enumerable.Range(0, 10).ToList();
-        var payload = CreatePayload(1);
+        var total = 10000;
+        var serviceIds = Enumerable.Range(0, 3).Select(x => $"ServiceId{x}").ToList();
+        var providerIds = Enumerable.Range(0, 3).Select(x => $"ProviderId{x}").ToList();
+        var queueIds = Enumerable.Range(0, 3).ToList();
+        var payload = RandomPayload(1000);
+        var source = Enumerable
+            .Range(0, total)
+            .Select(x =>
+            (
+                ServiceId: serviceIds[Random.Shared.Next(serviceIds.Count)],
+                ProviderId: providerIds[Random.Shared.Next(providerIds.Count)],
+                QueueId: queueIds[Random.Shared.Next(queueIds.Count)],
+                Payload: RandomPayload(10),
+                ExpiryTimeout: RandomExpiryTimeout(3)
+            ))
+            .ToList();
+
         var maxCount = 3;
         var maxAttempts = 3;
-        var visibilityTimeout = 100;
+        var visibilityTimeout = 1;
 
-        // act - chaos enqueue
-        var enqueuing = Enumerable
-            .Range(0, 1000)
-            .Select(i => Task.Run(() =>
+        // act - chaos enqueue, dequeue, confirm
+        // the tasks below are not expected to result in a planned outcome but are expected to result in a consistent one
+        var acks = new ConcurrentBag<AdoNetStreamAck>();
+        var dequeued1 = new ConcurrentBag<AdoNetStreamMessage>();
+        var dequeued2 = new ConcurrentBag<AdoNetStreamMessage>();
+        var confirmed = new ConcurrentBag<AdoNetStreamConfirmation>();
+        await Task.WhenAll(Enumerable
+            .Range(0, total)
+            .Select(async i =>
             {
-                var serviceId = serviceIds[Random.Shared.Next(serviceIds.Count)];
-                var providerId = providerIds[Random.Shared.Next(providerIds.Count)];
-                var queueId = queueIds[Random.Shared.Next(queueIds.Count)];
-                return _queries.QueueMessageBatchAsync(serviceId, providerId, queueId, payload, 100);
-            }))
-            .ToList();
+                // spin up a random enqueuing task
+                var enqueue = Task.Run(async () =>
+                {
+                    var serviceId = serviceIds[Random.Shared.Next(serviceIds.Count)];
+                    var providerId = providerIds[Random.Shared.Next(providerIds.Count)];
+                    var queueId = queueIds[Random.Shared.Next(queueIds.Count)];
 
-        // act - chaos dequeue
-        var dequeuing = Enumerable
-            .Range(0, 1000)
-            .Select(i => Task.Run(() =>
-            {
-                var serviceId = serviceIds[Random.Shared.Next(serviceIds.Count)];
-                var providerId = providerIds[Random.Shared.Next(providerIds.Count)];
-                var queueId = queueIds[Random.Shared.Next(queueIds.Count)];
+                    var ack = await _queries.QueueMessageBatchAsync(serviceId, providerId, queueId, payload, visibilityTimeout);
 
-                return _queries.GetQueueMessagesAsync(ServiceId, ProviderId, queueId, maxCount, maxAttempts, visibilityTimeout);
-            }))
-            .ToList();
+                    acks.Add(ack);
+                });
 
-        // act - wait for completion
-        var enqueued = await Task.WhenAll(enqueuing);
-        var dequeued = await Task.WhenAll(dequeuing);
+                // spin up a random dequeuing task that does not confirm
+                var dequeue = Task.Run(async () =>
+                {
+                    var serviceId = serviceIds[Random.Shared.Next(serviceIds.Count)];
+                    var providerId = providerIds[Random.Shared.Next(providerIds.Count)];
+                    var queueId = queueIds[Random.Shared.Next(queueIds.Count)];
 
-        // act - pick up remnants
+                    var messages = await _queries.GetQueueMessagesAsync(serviceId, providerId, queueId, maxCount, maxAttempts, visibilityTimeout);
 
-        var queueId = 123;
-        var maxCount = 1;
-        var maxAttempts = 3;
-        var visibilityTimeout = 0;
+                    foreach (var item in messages)
+                    {
+                        dequeued1.Add(item);
+                    }
+                });
 
-        // arrange - enqueue a message
-        var payload = CreatePayload();
-        var ack = await _queries.QueueMessageBatchAsync(ServiceId, ProviderId, 123, payload, 100);
+                // spin a random dequeuing task that also confirms
+                var confirm = Task.Run(async () =>
+                {
+                    var serviceId = serviceIds[Random.Shared.Next(serviceIds.Count)];
+                    var providerId = providerIds[Random.Shared.Next(providerIds.Count)];
+                    var queueId = queueIds[Random.Shared.Next(queueIds.Count)];
 
-        // act - dequeue a message with zero timeout to make it immediately available
-        var first = Assert.Single(await _queries.GetQueueMessagesAsync(ServiceId, ProviderId, queueId, maxCount, maxAttempts, visibilityTimeout));
-        var second = Assert.Single(await _queries.GetQueueMessagesAsync(ServiceId, ProviderId, queueId, maxCount, maxAttempts, visibilityTimeout));
-        var third = Assert.Single(await _queries.GetQueueMessagesAsync(ServiceId, ProviderId, queueId, maxCount, maxAttempts, visibilityTimeout));
+                    var messages = await _queries.GetQueueMessagesAsync(serviceId, providerId, queueId, maxCount, maxAttempts, visibilityTimeout);
 
-        // act - dequeue after max count is reached
-        Assert.Empty(await _queries.GetQueueMessagesAsync(ServiceId, ProviderId, queueId, maxCount, maxAttempts, visibilityTimeout));
+                    foreach (var item in messages)
+                    {
+                        dequeued2.Add(item);
+                    }
 
-        // assert - first attempt is as expected
-        Assert.Equal(ack.ServiceId, first.ServiceId);
-        Assert.Equal(ack.ProviderId, first.ProviderId);
-        Assert.Equal(ack.QueueId, first.QueueId);
-        Assert.Equal(ack.MessageId, first.MessageId);
-        Assert.NotEqual(Guid.Empty, first.Receipt);
-        Assert.Equal(1, first.Dequeued);
-        Assert.True(first.VisibleOn >= DateTime.UtcNow.AddSeconds(-1) && first.VisibleOn <= DateTime.UtcNow.AddSeconds(1));
-        Assert.True(first.ExpiresOn >= DateTime.UtcNow.AddSeconds(95) && first.ExpiresOn <= DateTime.UtcNow.AddSeconds(105));
-        Assert.True(first.CreatedOn >= DateTime.UtcNow.AddSeconds(-5) && first.CreatedOn <= DateTime.UtcNow.AddSeconds(1));
-        Assert.True(first.ModifiedOn >= DateTime.UtcNow.AddSeconds(-5) && first.ModifiedOn <= DateTime.UtcNow.AddSeconds(1));
-        Assert.Equal(payload, first.Payload);
+                    var confirmation = await _queries.MessagesDeliveredAsync(serviceId, providerId, queueId, messages);
 
-        // assert - second attempt has different receipt
-        Assert.Equal(ack.ServiceId, second.ServiceId);
-        Assert.Equal(ack.ProviderId, second.ProviderId);
-        Assert.Equal(ack.QueueId, second.QueueId);
-        Assert.Equal(ack.MessageId, second.MessageId);
-        Assert.NotEqual(Guid.Empty, second.Receipt);
-        Assert.NotEqual(first.Receipt, second.Receipt);
-        Assert.Equal(2, second.Dequeued);
-        Assert.True(second.VisibleOn > first.VisibleOn);
-        Assert.Equal(second.ExpiresOn, first.ExpiresOn);
-        Assert.Equal(second.CreatedOn, first.CreatedOn);
-        Assert.True(second.ModifiedOn > first.ModifiedOn);
-        Assert.Equal(second.Payload, first.Payload);
+                    foreach (var item in confirmation)
+                    {
+                        confirmed.Add(item);
+                    }
+                });
 
-        // assert - third attempt has different receipt
-        Assert.Equal(ack.ServiceId, third.ServiceId);
-        Assert.Equal(ack.ProviderId, third.ProviderId);
-        Assert.Equal(ack.QueueId, third.QueueId);
-        Assert.Equal(ack.MessageId, third.MessageId);
-        Assert.NotEqual(Guid.Empty, third.Receipt);
-        Assert.NotEqual(first.Receipt, third.Receipt);
-        Assert.NotEqual(second.Receipt, third.Receipt);
-        Assert.Equal(3, third.Dequeued);
-        Assert.True(third.VisibleOn > second.VisibleOn);
-        Assert.Equal(third.ExpiresOn, second.ExpiresOn);
-        Assert.Equal(third.CreatedOn, second.CreatedOn);
-        Assert.True(third.ModifiedOn > second.ModifiedOn);
-        Assert.Equal(third.Payload, second.Payload);
+                // wait for all to complete
+                await Task.WhenAll(enqueue, dequeue, confirm);
+            })
+            .ToList());
 
-        // assert - stored value is consistent
-        var stored = Assert.Single(await _storage.ReadAsync<AdoNetStreamMessage>("SELECT * FROM [OrleansStreamMessage]"));
-        Assert.Equal(ack.ServiceId, stored.ServiceId);
-        Assert.Equal(ack.ProviderId, stored.ProviderId);
-        Assert.Equal(ack.QueueId, stored.QueueId);
-        Assert.Equal(ack.MessageId, stored.MessageId);
-        Assert.Equal(third.Receipt, stored.Receipt);
-        Assert.Equal(third.Dequeued, stored.Dequeued);
-        Assert.Equal(third.VisibleOn, stored.VisibleOn);
-        Assert.Equal(third.ExpiresOn, stored.ExpiresOn);
-        Assert.Equal(third.CreatedOn, stored.CreatedOn);
-        Assert.Equal(third.ModifiedOn, stored.ModifiedOn);
-        Assert.Equal(third.Payload, stored.Payload);
+        // assert - all messages were enqueued
+        Assert.Equal(total, acks.Count);
+
+        // assert - some messages were dequeued (rng dependant, remove assert if flaky)
+        Assert.NotEmpty(dequeued1);
+        Assert.NotEmpty(dequeued2);
+
+        // assert - some messages were confirmed (rng dependant, remove assert if flaky)
+        Assert.NotEmpty(confirmed);
+
+        // assert - some messages were left behind (rng dependant, remove assert if flaky)
+        var stored = await _storage.ReadAsync<AdoNetStreamMessage>("SELECT * FROM [OrleansStreamMessage]");
+        Assert.NotEmpty(stored);
+
+        // assert - confirmed messages were not left behind
+        Assert.Empty(confirmed.IntersectBy(stored.Select(x => x.MessageId), x => x.MessageId));
+
+        // assert - confirmed messages all match acks
+        Assert.Empty(confirmed.ExceptBy(acks.Select(x => x.MessageId), x => x.MessageId));
     }
-    */
+
+    private static IList<T> Randomize<T>(IEnumerable<T> source)
+    {
+        var list = new List<T>(source.TryGetNonEnumeratedCount(out var count) ? count : 0);
+
+        foreach (var item in source)
+        {
+            var index = Random.Shared.Next(list.Count + 1);
+            if (index == list.Count)
+            {
+                list.Add(item);
+            }
+            else
+            {
+                list.Add(list[index]);
+                list[index] = item;
+            }
+        }
+
+        return list;
+    }
 }

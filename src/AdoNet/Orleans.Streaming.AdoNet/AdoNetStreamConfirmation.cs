@@ -8,4 +8,4 @@ internal record AdoNetStreamConfirmation(
     string ServiceId,
     string ProviderId,
     int QueueId,
-    int MessageId);
+    long MessageId);

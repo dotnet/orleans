@@ -219,6 +219,7 @@ SET NOCOUNT ON;
 DECLARE @Now DATETIME2(7) = SYSUTCDATETIME();
 DECLARE @VisibleOn DATETIME2(7) = DATEADD(SECOND, @VisibilityTimeout, @Now);
 
+/* update messages in the exact same order as the clustered index to avoid deadlocks with other queries */
 WITH Batch AS
 (
 	SELECT TOP (@MaxCount)
@@ -234,7 +235,7 @@ WITH Batch AS
 		[ModifiedOn],
 		[Payload]
 	FROM
-		[OrleansStreamMessage] WITH (ROWLOCK, UPDLOCK, HOLDLOCK)
+		[OrleansStreamMessage]
 	WHERE
 		[ServiceId] = @ServiceId
         AND [ProviderId] = @ProviderId
@@ -243,6 +244,9 @@ WITH Batch AS
 		AND [VisibleOn] <= @Now
 		AND [ExpiresOn] > @Now
 	ORDER BY
+        [ServiceId],
+        [ProviderId],
+        [QueueId],
 		[MessageId]
 )
 UPDATE Batch
@@ -290,12 +294,12 @@ BEGIN
 
 SET NOCOUNT ON;
 
+/* parse the message identifiers to be deleted */
 DECLARE @ItemsTable TABLE
 (
-    [MessageId] BIGINT NOT NULL,
+    [MessageId] BIGINT PRIMARY KEY NOT NULL,
     [Receipt] UNIQUEIDENTIFIER NOT NULL
 );
-
 WITH Items AS
 (
 	SELECT [Value] FROM STRING_SPLIT(@Items, '|')
@@ -311,21 +315,39 @@ SELECT
 FROM
 	Items;
 
-DELETE FROM [OrleansStreamMessage]
+/* count the number of messages to delete so we can use order by in the next query */
+DECLARE @Count INT = (SELECT COUNT(*) FROM @ItemsTable);
+
+/* delete messages in the exact same order as the clustered index to avoid deadlocks with other queries */
+WITH Batch AS
+(
+	SELECT TOP (@Count)
+		*
+	FROM
+		[OrleansStreamMessage] AS [M]
+	WHERE
+		[ServiceId] = @ServiceId
+        AND [ProviderId] = @ProviderId
+		AND [QueueId] = @QueueId
+        AND EXISTS
+        (
+            SELECT *
+            FROM @ItemsTable AS [I]
+            WHERE [I].[MessageId] = [M].[MessageId]
+            AND [I].[Receipt] = [M].[Receipt]
+        )
+	ORDER BY
+        [ServiceId],
+        [ProviderId],
+        [QueueId],
+		[MessageId]
+)
+DELETE FROM [Batch]
 OUTPUT
     [Deleted].[ServiceId],
     [Deleted].[ProviderId],
     [Deleted].[QueueId],
-    [Deleted].[MessageId]
-FROM
-    [OrleansStreamMessage] AS [M]
-    INNER JOIN @ItemsTable AS [I]
-        ON [M].[MessageId] = [I].[MessageId]
-        AND [M].[Receipt] = [I].[Receipt]
-WHERE
-	[ServiceId] = @ServiceId
-    AND [ProviderId] = @ProviderId
-	AND [QueueId] = @QueueId
+    [Deleted].[MessageId];
 
 END
 GO
@@ -357,6 +379,7 @@ SET XACT_ABORT ON;
 DECLARE @Now DATETIME2(7) = SYSUTCDATETIME();
 DECLARE @RemoveOn DATETIME2(7) = DATEADD(SECOND, @RemovalTimeout, @Now);
 
+/* delete messages in the exact same order as the clustered index to avoid deadlocks with other queries */
 WITH Batch AS
 (
 	SELECT TOP (@MaxCount)
@@ -373,7 +396,7 @@ WITH Batch AS
 		[RemoveOn] = @RemoveOn,
 		[Payload]
 	FROM
-		[OrleansStreamMessage] WITH (ROWLOCK, UPDLOCK, HOLDLOCK)
+		[OrleansStreamMessage]
 	WHERE
 		[ServiceId] = @ServiceId
         AND [ProviderId] = @ProviderId
@@ -387,6 +410,9 @@ WITH Batch AS
 			([ExpiresOn] <= @Now)
 		)
 	ORDER BY
+        [ServiceId],
+        [ProviderId],
+        [QueueId],
 		[MessageId]
 )
 DELETE FROM Batch
@@ -445,6 +471,7 @@ SET NOCOUNT ON;
 
 DECLARE @Now DATETIME2(7) = SYSUTCDATETIME();
 
+/* delete messages in the exact same order as the clustered index to avoid deadlocks with other queries */
 WITH Batch AS
 (
     SELECT TOP (@MaxCount)
@@ -459,6 +486,9 @@ WITH Batch AS
         AND [ProviderId] = @ProviderId
         AND [QueueId] = @QueueId
     ORDER BY
+        [ServiceId],
+        [ProviderId],
+        [QueueId],
         [MessageId]
 )
 DELETE FROM Batch;
