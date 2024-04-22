@@ -1,6 +1,9 @@
+using Microsoft.Extensions.DependencyInjection;
+
 namespace Orleans.Streaming.AdoNet;
 
-internal class AdoNetDataAdapter(Serializer<AdoNetBatchContainer> serializer) : IQueueDataAdapter<byte[], IBatchContainer>
+[SerializationCallbacks(typeof(OnDeserializedCallbacks))]
+internal class AdoNetQueueDataAdapter(Serializer<AdoNetBatchContainer> serializer) : IQueueDataAdapter<byte[], IBatchContainer>, IOnDeserialized
 {
     public byte[] ToQueueMessage<T>(StreamId streamId, IEnumerable<T> events, StreamSequenceToken token, Dictionary<string, object> requestContext)
     {
@@ -20,4 +23,6 @@ internal class AdoNetDataAdapter(Serializer<AdoNetBatchContainer> serializer) : 
         container.SequenceToken = new(sequenceId);
         return container;
     }
+
+    public void OnDeserialized(DeserializationContext context) => serializer = context.ServiceProvider.GetRequiredService<Serializer<AdoNetBatchContainer>>();
 }

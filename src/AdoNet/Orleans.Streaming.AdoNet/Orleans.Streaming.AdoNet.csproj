@@ -6,6 +6,7 @@
     <Description>Microsoft Orleans streaming provider backed by ADO.NET</Description>
     <PackageTags>$(PackageTags) ADO.NET SQL</PackageTags>
     <TargetFrameworks>$(DefaultTargetFrameworks)</TargetFrameworks>
+    <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
   </PropertyGroup>
 
   <PropertyGroup>
@@ -15,7 +16,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <InternalsVisibleTo Include="Tester.AdoNet"/>
+    <InternalsVisibleTo Include="Tester.AdoNet" />
   </ItemGroup>
 
   <ItemGroup>
@@ -24,7 +25,7 @@
 
   <ItemGroup>
     <ProjectReference Include="$(SourceRoot)src\Orleans.Runtime\Orleans.Runtime.csproj" />
-    <ProjectReference Include="..\..\Orleans.Streaming\Orleans.Streaming.csproj" />
+    <ProjectReference Include="$(SourceRoot)src\Orleans.Streaming\Orleans.Streaming.csproj" />
   </ItemGroup>
 
 </Project>

@@ -8,6 +8,7 @@ namespace Orleans.Streaming.AdoNet;
 /// 2. Though the <see cref="SequenceToken"/> is supported here, it is not yet used, as the ADONET provider is not yet rewindable.
 /// </remarks>
 [GenerateSerializer]
+[Alias("Orleans.Streaming.AdoNet.AdoNetBatchContainer")]
 internal class AdoNetBatchContainer : IBatchContainer
 {
     public AdoNetBatchContainer(StreamId streamId, List<object> events, Dictionary<string, object> requestContext)
@@ -28,7 +29,7 @@ internal class AdoNetBatchContainer : IBatchContainer
     public List<object> Events { get; }
 
     [Id(2)]
-    private Dictionary<string, object> RequestContext { get; }
+    public Dictionary<string, object> RequestContext { get; }
 
     [Id(3)]
     public EventSequenceTokenV2 SequenceToken { get; internal set; }
