@@ -11,13 +11,14 @@ namespace Orleans.Streaming.AdoNet;
 [Alias("Orleans.Streaming.AdoNet.AdoNetBatchContainer")]
 internal class AdoNetBatchContainer : IBatchContainer
 {
-    public AdoNetBatchContainer(StreamId streamId, List<object> events, Dictionary<string, object> requestContext)
+    public AdoNetBatchContainer(StreamId streamId, List<object> events, Dictionary<string, object> requestContext, int dequeued)
     {
         ArgumentNullException.ThrowIfNull(events);
 
         StreamId = streamId;
         Events = events;
         RequestContext = requestContext;
+        Dequeued = dequeued;
     }
 
     #region Serialized State
@@ -33,6 +34,12 @@ internal class AdoNetBatchContainer : IBatchContainer
 
     [Id(3)]
     public EventSequenceTokenV2 SequenceToken { get; internal set; }
+
+    /// <summary>
+    /// Holds the receipt for message confirmation.
+    /// </summary>
+    [Id(4)]
+    public int Dequeued { get; internal set; }
 
     #endregion Serialized State
 
@@ -56,6 +63,22 @@ internal class AdoNetBatchContainer : IBatchContainer
     }
 
     #endregion Interface
+
+    #region Conversion
+
+    public static AdoNetBatchContainer FromMessage(Serializer<AdoNetBatchContainer> serializer, AdoNetStreamMessage message)
+    {
+        ArgumentNullException.ThrowIfNull(serializer);
+        ArgumentNullException.ThrowIfNull(message);
+
+        var container = serializer.Deserialize(message.Payload);
+        container.SequenceToken = new(message.MessageId);
+        container.Dequeued = message.Dequeued;
+
+        return container;
+    }
+
+    #endregion Conversion
 
     public override string ToString() => $"[{nameof(AdoNetBatchContainer)}:Stream={StreamId},#Items={Events.Count}]";
 }

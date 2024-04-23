@@ -48,9 +48,6 @@ CREATE TABLE [OrleansStreamMessage]
 	/* The unique ascending number of the queued message */
 	[MessageId] BIGINT NOT NULL,
 
-    /* The confirmation receipt of the message */
-    [Receipt] UNIQUEIDENTIFIER NOT NULL,
-
 	/* The number of times the event was dequeued */
 	[Dequeued] INT NOT NULL,
 
@@ -99,9 +96,6 @@ CREATE TABLE [OrleansStreamDeadLetter]
 
 	/* The unique ascending number of the queued message */
 	[MessageId] BIGINT NOT NULL,
-
-    /* The confirmation receipt of the message */
-    [Receipt] UNIQUEIDENTIFIER NOT NULL,
 
 	/* The number of times the event was dequeued */
 	[Dequeued] INT NOT NULL,
@@ -152,7 +146,6 @@ BEGIN
 SET NOCOUNT ON;
 
 DECLARE @MessageId BIGINT = NEXT VALUE FOR [OrleansStreamMessageSequence];
-DECLARE @Receipt UNIQUEIDENTIFIER = CAST(0x0 AS UNIQUEIDENTIFIER);
 DECLARE @Now DATETIME2(7) = SYSUTCDATETIME();
 DECLARE @ExpiresOn DATETIME2(7) = DATEADD(SECOND, @ExpiryTimeout, @Now);
 
@@ -162,7 +155,6 @@ INSERT INTO [OrleansStreamMessage]
     ProviderId,
 	QueueId,
 	MessageId,
-    Receipt,
 	Dequeued,
 	VisibleOn,
 	ExpiresOn,
@@ -181,7 +173,6 @@ VALUES
     @ProviderId,
 	@QueueId,
 	@MessageId,
-    @Receipt,
 	0,
 	@Now,
 	@ExpiresOn,
@@ -227,7 +218,6 @@ WITH Batch AS
         [ProviderId],
 		[QueueId],
 		[MessageId],
-        [Receipt],
 		[Dequeued],
 		[VisibleOn],
 		[ExpiresOn],
@@ -252,7 +242,6 @@ WITH Batch AS
 UPDATE Batch
 SET
 	[Dequeued] += 1,
-    [Receipt] = NEWID(),
 	[VisibleOn] = @VisibleOn,
 	[ModifiedOn] = @Now
 OUTPUT
@@ -260,7 +249,6 @@ OUTPUT
     [Inserted].[ProviderId],
 	[Inserted].[QueueId],
 	[Inserted].[MessageId],
-    [Inserted].[Receipt],
 	[Inserted].[Dequeued],
 	[Inserted].[VisibleOn],
 	[Inserted].[ExpiresOn],
@@ -298,7 +286,7 @@ SET NOCOUNT ON;
 DECLARE @ItemsTable TABLE
 (
     [MessageId] BIGINT PRIMARY KEY NOT NULL,
-    [Receipt] UNIQUEIDENTIFIER NOT NULL
+    [Dequeued] INT NOT NULL
 );
 WITH Items AS
 (
@@ -307,11 +295,11 @@ WITH Items AS
 INSERT INTO @ItemsTable
 (
     [MessageId],
-    [Receipt]
+    [Dequeued]
 )
 SELECT
-	CAST(SUBSTRING([Value], 1, CHARINDEX(':', [Value], 1) - 1) AS INT) AS [MessageId],
-	CAST(SUBSTRING([Value], CHARINDEX(':', [Value], 1) + 1, LEN([Value])) AS UNIQUEIDENTIFIER) AS [Receipt]
+	CAST(SUBSTRING([Value], 1, CHARINDEX(':', [Value], 1) - 1) AS BIGINT) AS [MessageId],
+	CAST(SUBSTRING([Value], CHARINDEX(':', [Value], 1) + 1, LEN([Value])) AS INT) AS [Dequeued]
 FROM
 	Items;
 
@@ -334,7 +322,7 @@ WITH Batch AS
             SELECT *
             FROM @ItemsTable AS [I]
             WHERE [I].[MessageId] = [M].[MessageId]
-            AND [I].[Receipt] = [M].[Receipt]
+            AND [I].[Dequeued] = [M].[Dequeued]
         )
 	ORDER BY
         [ServiceId],

@@ -10,7 +10,6 @@ internal record AdoNetStreamMessage(
     string ProviderId,
     int QueueId,
     long MessageId,
-    Guid Receipt,
     int Dequeued,
     DateTime VisibleOn,
     DateTime ExpiresOn,
@@ -18,7 +17,7 @@ internal record AdoNetStreamMessage(
     DateTime ModifiedOn,
     byte[] Payload)
 {
-    public AdoNetStreamMessage() : this(Empty, Empty, 0, 0, Guid.Empty, 0, DateTime.MinValue, DateTime.MinValue, DateTime.MinValue, DateTime.MinValue, [])
+    public AdoNetStreamMessage() : this(Empty, Empty, 0, 0, 0, DateTime.MinValue, DateTime.MinValue, DateTime.MinValue, DateTime.MinValue, [])
     {
     }
 }

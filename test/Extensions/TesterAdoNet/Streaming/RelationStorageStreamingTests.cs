@@ -82,7 +82,6 @@ public class RelationStorageStreamingTests : IAsyncLifetime
         Assert.Equal(providerId, message.ProviderId);
         Assert.Equal(queueId, message.QueueId);
         Assert.Equal(ack.MessageId, message.MessageId);
-        Assert.Equal(Guid.Empty, message.Receipt);
         Assert.Equal(0, message.Dequeued);
         Assert.True(message.VisibleOn >= before);
         Assert.True(message.VisibleOn <= after);
@@ -145,7 +144,6 @@ public class RelationStorageStreamingTests : IAsyncLifetime
             Assert.Equal(ordered[i].ProviderId, stored[i].ProviderId);
             Assert.Equal(ordered[i].QueueId, stored[i].QueueId);
             Assert.Equal(ordered[i].MessageId, stored[i].MessageId);
-            Assert.Equal(Guid.Empty, stored[i].Receipt);
             Assert.Equal(0, stored[i].Dequeued);
             Assert.True(stored[i].VisibleOn >= before);
             Assert.True(stored[i].VisibleOn <= after);
@@ -211,7 +209,6 @@ public class RelationStorageStreamingTests : IAsyncLifetime
         {
             Assert.True(stored.TryGetValue((ack.ServiceId, ack.ProviderId, ack.QueueId, ack.MessageId), out var message), $"Message not found in storage");
 
-            Assert.Equal(Guid.Empty, message.Receipt);
             Assert.Equal(0, message.Dequeued);
             Assert.True(message.VisibleOn >= before);
             Assert.True(message.VisibleOn <= after);
@@ -257,7 +254,6 @@ public class RelationStorageStreamingTests : IAsyncLifetime
         Assert.Equal(ack.ProviderId, message.ProviderId);
         Assert.Equal(ack.QueueId, message.QueueId);
         Assert.Equal(ack.MessageId, message.MessageId);
-        Assert.NotEqual(Guid.Empty, message.Receipt);
         Assert.Equal(1, message.Dequeued);
         Assert.True(message.VisibleOn >= beforeDequeuing.AddSeconds(visibilityTimeout));
         Assert.True(message.VisibleOn <= afterDequeuing.AddSeconds(visibilityTimeout));
@@ -275,7 +271,6 @@ public class RelationStorageStreamingTests : IAsyncLifetime
         Assert.Equal(message.ProviderId, stored.ProviderId);
         Assert.Equal(message.QueueId, stored.QueueId);
         Assert.Equal(message.MessageId, stored.MessageId);
-        Assert.Equal(message.Receipt, stored.Receipt);
         Assert.Equal(message.Dequeued, stored.Dequeued);
         Assert.Equal(message.VisibleOn, stored.VisibleOn);
         Assert.Equal(message.ExpiresOn, stored.ExpiresOn);
@@ -332,7 +327,6 @@ public class RelationStorageStreamingTests : IAsyncLifetime
             Assert.Equal(ack.ProviderId, message.ProviderId);
             Assert.Equal(ack.QueueId, message.QueueId);
             Assert.Equal(ack.MessageId, message.MessageId);
-            Assert.NotEqual(Guid.Empty, message.Receipt);
             Assert.Equal(1, message.Dequeued);
             Assert.True(message.VisibleOn >= beforeDequeuing.AddSeconds(visibilityTimeout));
             Assert.True(message.VisibleOn <= afterDequeuing.AddSeconds(visibilityTimeout));
@@ -358,7 +352,6 @@ public class RelationStorageStreamingTests : IAsyncLifetime
             Assert.Equal(message.ProviderId, item.ProviderId);
             Assert.Equal(message.QueueId, item.QueueId);
             Assert.Equal(message.MessageId, item.MessageId);
-            Assert.Equal(message.Receipt, item.Receipt);
             Assert.Equal(message.Dequeued, item.Dequeued);
             Assert.Equal(message.VisibleOn, item.VisibleOn);
             Assert.Equal(message.ExpiresOn, item.ExpiresOn);
@@ -408,7 +401,6 @@ public class RelationStorageStreamingTests : IAsyncLifetime
             Assert.Equal(ack.ProviderId, message.ProviderId);
             Assert.Equal(ack.QueueId, message.QueueId);
             Assert.Equal(ack.MessageId, message.MessageId);
-            Assert.NotEqual(Guid.Empty, message.Receipt);
             Assert.Equal(i + 1, message.Dequeued);
             Assert.True(message.VisibleOn >= beforeDequeuing.AddSeconds(visibilityTimeout));
             Assert.True(message.VisibleOn <= afterDequeuing.AddSeconds(visibilityTimeout));
@@ -431,7 +423,6 @@ public class RelationStorageStreamingTests : IAsyncLifetime
         Assert.Equal(final.ProviderId, stored.ProviderId);
         Assert.Equal(final.QueueId, stored.QueueId);
         Assert.Equal(final.MessageId, stored.MessageId);
-        Assert.Equal(final.Receipt, stored.Receipt);
         Assert.Equal(final.Dequeued, stored.Dequeued);
         Assert.Equal(final.VisibleOn, stored.VisibleOn);
         Assert.Equal(final.ExpiresOn, stored.ExpiresOn);
@@ -476,7 +467,6 @@ public class RelationStorageStreamingTests : IAsyncLifetime
         Assert.Equal(first.ProviderId, stored.ProviderId);
         Assert.Equal(first.QueueId, stored.QueueId);
         Assert.Equal(first.MessageId, stored.MessageId);
-        Assert.Equal(first.Receipt, stored.Receipt);
         Assert.Equal(first.Dequeued, stored.Dequeued);
         Assert.Equal(first.VisibleOn, stored.VisibleOn);
         Assert.Equal(first.ExpiresOn, stored.ExpiresOn);
@@ -522,7 +512,6 @@ public class RelationStorageStreamingTests : IAsyncLifetime
         Assert.Equal(ack.ProviderId, stored.ProviderId);
         Assert.Equal(ack.QueueId, stored.QueueId);
         Assert.Equal(ack.MessageId, stored.MessageId);
-        Assert.Equal(Guid.Empty, stored.Receipt);
         Assert.Equal(0, stored.Dequeued);
         Assert.True(stored.VisibleOn >= before);
         Assert.True(stored.VisibleOn <= after);
@@ -562,7 +551,8 @@ public class RelationStorageStreamingTests : IAsyncLifetime
         var messages = await _queries.GetQueueMessagesAsync(serviceId, providerId, queueId, maxCount, maxAttempts, visibilityTimeout);
 
         // act - confirm all messages
-        var results = await _queries.MessagesDeliveredAsync(serviceId, providerId, queueId, messages);
+        var items = messages.Select(x => new AdoNetStreamConfirmation(x.MessageId, x.Dequeued)).ToList();
+        var results = await _queries.MessagesDeliveredAsync(serviceId, providerId, queueId, items);
 
         // assert - confirmations are as expected
         Assert.Equal(maxCount, acks.Length);
@@ -578,6 +568,46 @@ public class RelationStorageStreamingTests : IAsyncLifetime
         // assert - no data remains in storage
         var stored = await _storage.ReadAsync<AdoNetStreamMessage>("SELECT * FROM [OrleansStreamMessage]");
         Assert.Empty(stored);
+    }
+
+    /// <summary>
+    /// Tests that messages are not confirmed if the receipt is incorrect.
+    /// </summary>
+    [SkippableFact]
+    public async Task DoesNotConfirmMessagesWithWrongReceipt()
+    {
+        // arrange
+        await _storage.ExecuteAsync("DELETE FROM [OrleansStreamMessage]");
+        var serviceId = RandomServiceId();
+        var providerId = RandomProviderId();
+        var queueId = RandomQueueId();
+        var payload = RandomPayload();
+        var expiryTimeout = 100;
+        var maxCount = 10;
+        var maxAttempts = 3;
+        var visibilityTimeout = 10;
+
+        // arrange - enqueue many messages
+        var acks = await Task.WhenAll(Enumerable
+            .Range(0, maxCount)
+            .Select(i => _queries.QueueMessageBatchAsync(serviceId, providerId, queueId, payload, expiryTimeout))
+            .ToList());
+
+        // arrange - dequeue all messages
+        var messages = await _queries.GetQueueMessagesAsync(serviceId, providerId, queueId, maxCount, maxAttempts, visibilityTimeout);
+
+        // act - confirm all messages in a faulty way
+        var faulty = messages.Select(x => new AdoNetStreamConfirmation(x.MessageId, x.Dequeued - 1)).ToList();
+        var results = await _queries.MessagesDeliveredAsync(serviceId, providerId, queueId, faulty);
+
+        // assert - confirmations are as expected
+        Assert.Equal(maxCount, acks.Length);
+        Assert.Equal(maxCount, messages.Count);
+        Assert.Empty(results);
+
+        // assert - data remains in storage
+        var stored = await _storage.ReadAsync<AdoNetStreamMessage>("SELECT * FROM [OrleansStreamMessage]");
+        Assert.Equal(maxCount, stored.Count());
     }
 
     /// <summary>
@@ -608,7 +638,7 @@ public class RelationStorageStreamingTests : IAsyncLifetime
         var messages = await _queries.GetQueueMessagesAsync(serviceId, providerId, queueId, maxCount, maxAttempts, visibilityTimeout);
 
         // act - confirm some of the messages at random
-        var completed = Randomize(messages).Take(partial).ToList();
+        var completed = Randomize(messages).Take(partial).Select(x => new AdoNetStreamConfirmation(x.MessageId, x.Dequeued)).ToList();
         var confirmed = await _queries.MessagesDeliveredAsync(serviceId, providerId, queueId, completed);
 
         // assert - counts are as expected
@@ -670,10 +700,10 @@ public class RelationStorageStreamingTests : IAsyncLifetime
 
         // act - chaos enqueue, dequeue, confirm
         // the tasks below are not expected to result in a planned outcome but are expected to result in a consistent one
-        var acks = new ConcurrentBag<AdoNetStreamAck>();
+        var acks = new ConcurrentBag<AdoNetStreamMessageAck>();
         var dequeued1 = new ConcurrentBag<AdoNetStreamMessage>();
         var dequeued2 = new ConcurrentBag<AdoNetStreamMessage>();
-        var confirmed = new ConcurrentBag<AdoNetStreamConfirmation>();
+        var confirmed = new ConcurrentBag<AdoNetStreamConfirmationAck>();
         await Task.WhenAll(Enumerable
             .Range(0, total)
             .Select(async i =>
@@ -719,7 +749,7 @@ public class RelationStorageStreamingTests : IAsyncLifetime
                         dequeued2.Add(item);
                     }
 
-                    var confirmation = await _queries.MessagesDeliveredAsync(serviceId, providerId, queueId, messages);
+                    var confirmation = await _queries.MessagesDeliveredAsync(serviceId, providerId, queueId, messages.Select(x => new AdoNetStreamConfirmation(x.MessageId, x.Dequeued)).ToList());
 
                     foreach (var item in confirmation)
                     {

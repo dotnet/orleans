@@ -385,18 +385,18 @@ namespace Orleans.Tests.SqlUtils
         /// <param name="payload">The serialized event payload.</param>
         /// <param name="expiryTimeout">The expiry timeout for this event batch.</param>
         /// <returns>An acknowledgement that the message was queued.</returns>
-        internal Task<AdoNetStreamAck> QueueMessageBatchAsync(string serviceId, string providerId, int queueId, byte[] payload, int expiryTimeout)
+        internal Task<AdoNetStreamMessageAck> QueueMessageBatchAsync(string serviceId, string providerId, int queueId, byte[] payload, int expiryTimeout)
         {
             ArgumentNullException.ThrowIfNull(serviceId);
             ArgumentNullException.ThrowIfNull(providerId);
 
             return ReadAsync(
                 dbStoredQueries.EnqueueStreamMessageKey,
-                record => new AdoNetStreamAck(
-                    (string)record[nameof(AdoNetStreamAck.ServiceId)],
-                    (string)record[nameof(AdoNetStreamAck.ProviderId)],
-                    (int)record[nameof(AdoNetStreamAck.QueueId)],
-                    (long)record[nameof(AdoNetStreamAck.MessageId)]),
+                record => new AdoNetStreamMessageAck(
+                    (string)record[nameof(AdoNetStreamMessageAck.ServiceId)],
+                    (string)record[nameof(AdoNetStreamMessageAck.ProviderId)],
+                    (int)record[nameof(AdoNetStreamMessageAck.QueueId)],
+                    (long)record[nameof(AdoNetStreamMessageAck.MessageId)]),
                 command => new DbStoredQueries.Columns(command)
                 {
                     ServiceId = serviceId,
@@ -430,7 +430,6 @@ namespace Orleans.Tests.SqlUtils
                     (string)record[nameof(AdoNetStreamMessage.ProviderId)],
                     (int)record[nameof(AdoNetStreamMessage.QueueId)],
                     (long)record[nameof(AdoNetStreamMessage.MessageId)],
-                    (Guid)record[nameof(AdoNetStreamMessage.Receipt)],
                     (int)record[nameof(AdoNetStreamMessage.Dequeued)],
                     (DateTime)record[nameof(AdoNetStreamMessage.VisibleOn)],
                     (DateTime)record[nameof(AdoNetStreamMessage.ExpiresOn)],
@@ -460,7 +459,7 @@ namespace Orleans.Tests.SqlUtils
         /// <remarks>
         /// If <paramref name="messages"/> is empty then an empty confirmation list is returned.
         /// </remarks>
-        internal Task<IList<AdoNetStreamConfirmation>> MessagesDeliveredAsync(string serviceId, string providerId, int queueId, IList<AdoNetStreamMessage> messages)
+        internal Task<IList<AdoNetStreamConfirmationAck>> MessagesDeliveredAsync(string serviceId, string providerId, int queueId, IList<AdoNetStreamConfirmation> messages)
         {
             ArgumentNullException.ThrowIfNull(serviceId);
             ArgumentNullException.ThrowIfNull(providerId);
@@ -468,18 +467,21 @@ namespace Orleans.Tests.SqlUtils
 
             if (messages.Count == 0)
             {
-                return Task.FromResult<IList<AdoNetStreamConfirmation>>([]);
+                return Task.FromResult<IList<AdoNetStreamConfirmationAck>>([]);
             }
 
-            var items = messages.Aggregate(new StringBuilder(), (b, m) => b.Append(b.Length > 0 ? "|" : "").Append(m.MessageId).Append(':').Append(m.Receipt), b => b.ToString());
+            // this builds a string in the form "1:2|3:4|5:6" where the first number is the message id and the second is the dequeue counter which acts as a receipt
+            // while we have more efficient ways of passing this data per RDMS, we use a string here to ensure call compatibility across adonet providers
+            // it is the responsibility of the RDMS implementation to parse this string and apply it correctly
+            var items = messages.Aggregate(new StringBuilder(), (b, m) => b.Append(b.Length > 0 ? "|" : "").Append(m.MessageId).Append(':').Append(m.Dequeued), b => b.ToString());
 
-            return ReadAsync<AdoNetStreamConfirmation, IList<AdoNetStreamConfirmation>>(
+            return ReadAsync<AdoNetStreamConfirmationAck, IList<AdoNetStreamConfirmationAck>>(
                 dbStoredQueries.ConfirmStreamMessagesKey,
-                record => new AdoNetStreamConfirmation(
-                    (string)record[nameof(AdoNetStreamConfirmation.ServiceId)],
-                    (string)record[nameof(AdoNetStreamConfirmation.ProviderId)],
-                    (int)record[nameof(AdoNetStreamConfirmation.QueueId)],
-                    (long)record[nameof(AdoNetStreamConfirmation.MessageId)]),
+                record => new AdoNetStreamConfirmationAck(
+                    (string)record[nameof(AdoNetStreamConfirmationAck.ServiceId)],
+                    (string)record[nameof(AdoNetStreamConfirmationAck.ProviderId)],
+                    (int)record[nameof(AdoNetStreamConfirmationAck.QueueId)],
+                    (long)record[nameof(AdoNetStreamConfirmationAck.MessageId)]),
                 command => new DbStoredQueries.Columns(command)
                 {
                     ServiceId = serviceId,
