@@ -47,7 +47,7 @@ internal partial class AdoNetQueueAdapterReceiver : IQueueAdapterReceiver
     /// <summary>
     /// Initializes the receiver with the underlying storage queries.
     /// </summary>
-    public async Task Initialize(TimeSpan timeout) => _queries = await RelationalOrleansQueries.CreateInstance(_adoNetStreamingOptions.Invariant, _adoNetStreamingOptions.ConnectionString);
+    public async Task Initialize(TimeSpan timeout) => _queries = await RelationalOrleansQueries.CreateInstance(_adoNetStreamingOptions.Invariant, _adoNetStreamingOptions.ConnectionString).WaitAsync(timeout);
 
     /// <summary>
     /// This receiver does not need to shutdown.

@@ -11,14 +11,13 @@ namespace Orleans.Streaming.AdoNet;
 [Alias("Orleans.Streaming.AdoNet.AdoNetBatchContainer")]
 internal class AdoNetBatchContainer : IBatchContainer
 {
-    public AdoNetBatchContainer(StreamId streamId, List<object> events, Dictionary<string, object> requestContext, int dequeued)
+    public AdoNetBatchContainer(StreamId streamId, List<object> events, Dictionary<string, object> requestContext)
     {
         ArgumentNullException.ThrowIfNull(events);
 
         StreamId = streamId;
         Events = events;
         RequestContext = requestContext;
-        Dequeued = dequeued;
     }
 
     #region Serialized State

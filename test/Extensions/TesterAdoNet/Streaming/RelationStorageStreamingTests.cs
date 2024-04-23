@@ -14,8 +14,6 @@ public class RelationStorageStreamingTests : IAsyncLifetime
 {
     private const string TestDatabaseName = "OrleansStreamTest";
     private const string AdoNetInvariantName = AdoNetInvariants.InvariantNameSqlServer;
-    private const string ServiceId = "MyServiceId";
-    private const string ProviderId = "MyProviderId";
 
     private IRelationalStorage _storage;
     private RelationalOrleansQueries _queries;
