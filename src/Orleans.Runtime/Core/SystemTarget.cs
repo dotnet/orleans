@@ -185,7 +185,7 @@ namespace Orleans.Runtime
             var ctxt = RuntimeContext.Current;
             name = name ?? ctxt.GrainId + "Timer";
 
-            var timer = GrainTimer.FromTaskCallback(this.timerLogger, asyncCallback, state, dueTime, period, name);
+            var timer = GrainTimer.FromTaskCallback(this.timerLogger, asyncCallback, state, dueTime, period, name, grainContext: this);
             timer.Start();
             return timer;
         }
