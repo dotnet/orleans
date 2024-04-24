@@ -70,8 +70,8 @@ public sealed class ResourceOptimizedPlacementOptions
     /// <summary>
     /// The specified margin for which: if two silos (one of them being the local to the current pending activation), have a utilization score that should be considered "the same" within this margin.
     /// <list type="bullet">
-    /// <item>When this value is 0, then the policy will always favor the silo with the lower resource utilization, even if that silo is remote to the current pending activation.</item>
-    /// <item>When this value is 100, then the policy will always favor the local silo, regardless of its relative utilization score. This policy essentially becomes equivalent to <see cref="PreferLocalPlacement"/>.</item>
+    /// <item><description>When this value is 0, then the policy will always favor the silo with the lower resource utilization, even if that silo is remote to the current pending activation.</description></item>
+    /// <item><description>When this value is 100, then the policy will always favor the local silo, regardless of its relative utilization score. This policy essentially becomes equivalent to <see cref="PreferLocalPlacement"/>.</description></item>
     /// </list>
     /// </summary>
     /// <remarks><i>
