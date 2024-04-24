@@ -16,7 +16,8 @@ namespace Tester.AdoNet.Streaming;
 public class AdoNetQueueAdapterReceiverTests(TestEnvironmentFixture fixture) : IAsyncLifetime
 {
     private readonly TestEnvironmentFixture _fixture = fixture;
-    private RelationalStorageForTesting _storage;
+    private RelationalStorageForTesting _testing;
+    private IRelationalStorage _storage;
     private RelationalOrleansQueries _queries;
 
     private const string TestDatabaseName = "OrleansStreamTest";
@@ -24,28 +25,32 @@ public class AdoNetQueueAdapterReceiverTests(TestEnvironmentFixture fixture) : I
 
     public async Task InitializeAsync()
     {
-        _storage = await RelationalStorageForTesting.SetupInstance(AdoNetInvariantName, TestDatabaseName);
+        _testing = await RelationalStorageForTesting.SetupInstance(AdoNetInvariantName, TestDatabaseName);
+        Skip.If(IsNullOrEmpty(_testing.CurrentConnectionString), $"Database '{TestDatabaseName}' not initialized");
 
-        Skip.If(IsNullOrEmpty(_storage.CurrentConnectionString), $"Database '{TestDatabaseName}' not initialized");
-
-        _queries = await RelationalOrleansQueries.CreateInstance(AdoNetInvariantName, _storage.CurrentConnectionString);
+        _storage = _testing.Storage;
+        _queries = await RelationalOrleansQueries.CreateInstance(AdoNetInvariantName, _storage.ConnectionString);
     }
 
+    /// <summary>
+    /// Tests that the <see cref="AdoNetQueueAdapterReceiver"/> can get and confirm messages.
+    /// </summary>
     [SkippableFact]
-    public async Task AdoNetQueueAdapterReceiver_GetsMessages()
+    public async Task AdoNetQueueAdapterReceiver_GetsMessages_ConfirmsMessages()
     {
         // arrange - receiver
+        var serviceId = "MyServiceId";
         var clusterOptions = new ClusterOptions
         {
-            ServiceId = "MyServiceId",
-            ClusterId = "MyClusterId"
+            ServiceId = serviceId
         };
         var providerId = "MyProviderId";
         var queueId = 1;
+        var maxCount = 10;
         var adoNetStreamingOptions = new AdoNetStreamingOptions
         {
             Invariant = AdoNetInvariantName,
-            ConnectionString = _storage.CurrentConnectionString
+            ConnectionString = _storage.ConnectionString
         };
         var serializer = _fixture.Serializer.GetSerializer<AdoNetBatchContainer>();
         var logger = NullLogger<AdoNetQueueAdapterReceiver>.Instance;
@@ -58,20 +63,52 @@ public class AdoNetQueueAdapterReceiverTests(TestEnvironmentFixture fixture) : I
         var context = new Dictionary<string, object> { { "MyKey", "MyValue" } };
         var container = new AdoNetBatchContainer(streamId, events, context);
         var payload = serializer.SerializeToArray(container);
-        var ack = await _queries.QueueMessageBatchAsync(clusterOptions.ServiceId, providerId, queueId, payload, 100);
 
-        // act
-        var messages = await receiver.GetQueueMessagesAsync(10);
+        // arrange - enqueue (via storage) some invalid messages followed by a valid message
+        var beforeEnqueued = DateTime.UtcNow;
+        var ackExpired = await _queries.QueueMessageBatchAsync(serviceId, providerId, queueId, payload, 0);
+        var ackOtherQueueId = await _queries.QueueMessageBatchAsync(serviceId, providerId, queueId + 1, payload, 100);
+        var ackOtherProviderId = await _queries.QueueMessageBatchAsync(serviceId, providerId + "X", queueId, payload, 100);
+        var ackOtherServiceId = await _queries.QueueMessageBatchAsync(serviceId + "X", providerId, queueId, payload, 100);
+        var ackValid = await _queries.QueueMessageBatchAsync(serviceId, providerId, queueId, payload, 100);
+        var afterEnqueued = DateTime.UtcNow;
 
-        // assert
-        Assert.NotNull(messages);
-        var single = Assert.Single(messages);
-        var typed = Assert.IsType<AdoNetBatchContainer>(single);
-        Assert.Equal(streamId, typed.StreamId);
-        Assert.Equal(events, typed.Events);
-        Assert.Equal(context.Select(x => (x.Key, x.Value)), typed.RequestContext.Select(x => (x.Key, x.Value)));
-        Assert.Equal(ack.MessageId, typed.SequenceToken.SequenceNumber);
-        Assert.Equal(1, typed.Dequeued);
+        // act - dequeue messages via receiver
+        var beforeDequeued = DateTime.UtcNow;
+        var dequeued = await receiver.GetQueueMessagesAsync(maxCount);
+        var afterDequeued = DateTime.UtcNow;
+        var storedDequeued = (await _storage.ReadAsync<AdoNetStreamMessage>("SELECT * FROM [OrleansStreamMessage]")).ToDictionary(x => x.MessageId);
+
+        // act - confirm messages via receiver
+        var beforeConfirmed = DateTime.UtcNow;
+        await receiver.MessagesDeliveredAsync(dequeued);
+        var afterConfirmed = DateTime.UtcNow;
+        var storedConfirmed = (await _storage.ReadAsync<AdoNetStreamMessage>("SELECT * FROM [OrleansStreamMessage]")).ToDictionary(x => x.MessageId);
+
+        // assert - dequeued messages are as expected
+        Assert.NotNull(dequeued);
+        var single = Assert.IsType<AdoNetBatchContainer>(Assert.Single(dequeued));
+        Assert.Equal(streamId, single.StreamId);
+        Assert.Equal(events, single.Events);
+        Assert.Equal(context.Select(x => (x.Key, x.Value)), single.RequestContext.Select(x => (x.Key, x.Value)));
+        Assert.Equal(ackValid.MessageId, single.SequenceToken.SequenceNumber);
+        Assert.Equal(1, single.Dequeued);
+
+        // assert - storage is as expected after dequeuing
+        Assert.Equal(5, storedDequeued.Count);
+        Assert.Equal(0, storedDequeued[ackExpired.MessageId].Dequeued);
+        Assert.Equal(0, storedDequeued[ackOtherQueueId.MessageId].Dequeued);
+        Assert.Equal(0, storedDequeued[ackOtherProviderId.MessageId].Dequeued);
+        Assert.Equal(0, storedDequeued[ackOtherServiceId.MessageId].Dequeued);
+        Assert.Equal(1, storedDequeued[ackValid.MessageId].Dequeued);
+
+        // assert - stored confirmed messages
+        Assert.Equal(4, storedConfirmed.Count);
+        Assert.True(storedConfirmed.ContainsKey(ackExpired.MessageId));
+        Assert.True(storedConfirmed.ContainsKey(ackOtherQueueId.MessageId));
+        Assert.True(storedConfirmed.ContainsKey(ackOtherProviderId.MessageId));
+        Assert.True(storedConfirmed.ContainsKey(ackOtherServiceId.MessageId));
+        Assert.False(storedConfirmed.ContainsKey(ackValid.MessageId));
     }
 
     public Task DisposeAsync() => Task.CompletedTask;

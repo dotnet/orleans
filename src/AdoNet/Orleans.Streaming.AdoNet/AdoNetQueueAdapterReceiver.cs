@@ -102,8 +102,6 @@ internal partial class AdoNetQueueAdapterReceiver : IQueueAdapterReceiver
 
     public async Task MessagesDeliveredAsync(IList<IBatchContainer> messages)
     {
-        await Task.Yield();
-
         // skip work if there are no messages to deliver
         if (messages.Count == 0)
         {
