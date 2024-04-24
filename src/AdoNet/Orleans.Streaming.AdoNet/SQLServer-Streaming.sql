@@ -43,7 +43,7 @@ CREATE TABLE [OrleansStreamMessage]
     [ProviderId] NVARCHAR(150) NOT NULL,
 
 	/* Identifies the individual queue shard as configured in the provider*/
-	[QueueId] INT NOT NULL,
+	[QueueId] NVARCHAR(150) NOT NULL,
 
 	/* The unique ascending number of the queued message */
 	[MessageId] BIGINT NOT NULL,
@@ -92,7 +92,7 @@ CREATE TABLE [OrleansStreamDeadLetter]
     [ProviderId] NVARCHAR(150) NOT NULL,
 
 	/* Identifies the individual queue shard as configured in the provider*/
-	[QueueId] INT NOT NULL,
+	[QueueId] NVARCHAR(150) NOT NULL,
 
 	/* The unique ascending number of the queued message */
 	[MessageId] BIGINT NOT NULL,
@@ -137,7 +137,7 @@ GO
 CREATE PROCEDURE [EnqueueStreamMessage]
 	@ServiceId NVARCHAR(150),
     @ProviderId NVARCHAR(150),
-	@QueueId INT,
+	@QueueId NVARCHAR(150),
 	@Payload VARBINARY(MAX),
 	@ExpiryTimeout INT
 AS
@@ -198,7 +198,7 @@ GO
 CREATE PROCEDURE [DequeueStreamMessages]
 	@ServiceId NVARCHAR(150),
     @ProviderId NVARCHAR(150),
-	@QueueId INT,
+	@QueueId NVARCHAR(150),
     @MaxCount INT,
 	@MaxAttempts INT,
 	@VisibilityTimeout INT
@@ -275,7 +275,7 @@ GO
 CREATE PROCEDURE [ConfirmStreamMessages]
 	@ServiceId NVARCHAR(150),
     @ProviderId NVARCHAR(150),
-	@QueueId INT,
+	@QueueId NVARCHAR(150),
     @Items NVARCHAR(MAX)
 AS
 BEGIN
@@ -354,7 +354,7 @@ GO
 CREATE PROCEDURE [CleanStreamMessages]
 	@ServiceId NVARCHAR(150),
     @ProviderId NVARCHAR(150),
-	@QueueId INT,
+	@QueueId NVARCHAR(150),
 	@MaxCount INT,
 	@MaxAttempts INT,
 	@RemovalTimeout INT
@@ -450,7 +450,7 @@ GO
 CREATE PROCEDURE [CleanDeadLetters]
 	@ServiceId NVARCHAR(150),
     @ProviderId NVARCHAR(150),
-	@QueueId INT,
+	@QueueId NVARCHAR(150),
 	@MaxCount INT
 AS
 BEGIN

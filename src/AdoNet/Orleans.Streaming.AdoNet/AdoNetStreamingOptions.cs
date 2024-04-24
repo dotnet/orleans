@@ -37,11 +37,16 @@ public class AdoNetStreamingOptions
     /// <summary>
     /// The visibility timeout, in seconds, before a dequeued but unconfirmed message becomes available for dequeuing again.
     /// </summary>
-    public int VisibilityTimeout { get; set; } = 30;
+    public int VisibilityTimeout { get; set; } = 60;
 
     /// <summary>
     /// The maximum number of messages to dequeue in a single operation.
     /// This value is further capped by the maximum number of messages that the current queue cache supports.
     /// </summary>
     public int MaxBatchSize { get; set; } = 32;
+
+    /// <summary>
+    /// The expiry timeout, in seconds, until a message is considered expired and moved to dead letters.
+    /// </summary>
+    public int ExpiryTimeout { get; set; } = 300;
 }

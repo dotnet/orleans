@@ -32,7 +32,7 @@ public class RelationStorageStreamingTests : IAsyncLifetime
 
     private static string RandomProviderId(int max = 10) => $"ProviderId{Random.Shared.Next(max)}";
 
-    private static int RandomQueueId(int max = 10) => Random.Shared.Next(max);
+    private static string RandomQueueId(int max = 10) => $"QueueId{Random.Shared.Next(max)}";
 
     private static int RandomExpiryTimeout(int max = 100) => Random.Shared.Next(max);
 
@@ -678,7 +678,7 @@ public class RelationStorageStreamingTests : IAsyncLifetime
         var total = 10000;
         var serviceIds = Enumerable.Range(0, 3).Select(x => $"ServiceId{x}").ToList();
         var providerIds = Enumerable.Range(0, 3).Select(x => $"ProviderId{x}").ToList();
-        var queueIds = Enumerable.Range(0, 3).ToList();
+        var queueIds = Enumerable.Range(0, 3).Select(x => $"QueueId{x}").ToList();
         var payload = RandomPayload(1000);
         var source = Enumerable
             .Range(0, total)

@@ -385,7 +385,7 @@ namespace Orleans.Tests.SqlUtils
         /// <param name="payload">The serialized event payload.</param>
         /// <param name="expiryTimeout">The expiry timeout for this event batch.</param>
         /// <returns>An acknowledgement that the message was queued.</returns>
-        internal Task<AdoNetStreamMessageAck> QueueMessageBatchAsync(string serviceId, string providerId, int queueId, byte[] payload, int expiryTimeout)
+        internal Task<AdoNetStreamMessageAck> QueueMessageBatchAsync(string serviceId, string providerId, string queueId, byte[] payload, int expiryTimeout)
         {
             ArgumentNullException.ThrowIfNull(serviceId);
             ArgumentNullException.ThrowIfNull(providerId);
@@ -395,7 +395,7 @@ namespace Orleans.Tests.SqlUtils
                 record => new AdoNetStreamMessageAck(
                     (string)record[nameof(AdoNetStreamMessageAck.ServiceId)],
                     (string)record[nameof(AdoNetStreamMessageAck.ProviderId)],
-                    (int)record[nameof(AdoNetStreamMessageAck.QueueId)],
+                    (string)record[nameof(AdoNetStreamMessageAck.QueueId)],
                     (long)record[nameof(AdoNetStreamMessageAck.MessageId)]),
                 command => new DbStoredQueries.Columns(command)
                 {
@@ -418,7 +418,7 @@ namespace Orleans.Tests.SqlUtils
         /// <param name="maxAttempts">The maximum attempts to lock an unprocessed event batch.</param>
         /// <param name="visibilityTimeout">The visibility timeout for the retrieved event batches.</param>
         /// <returns>A list of dequeued payloads.</returns>
-        internal Task<IList<AdoNetStreamMessage>> GetQueueMessagesAsync(string serviceId, string providerId, int queueId, int maxCount, int maxAttempts, int visibilityTimeout)
+        internal Task<IList<AdoNetStreamMessage>> GetQueueMessagesAsync(string serviceId, string providerId, string queueId, int maxCount, int maxAttempts, int visibilityTimeout)
         {
             ArgumentNullException.ThrowIfNull(serviceId);
             ArgumentNullException.ThrowIfNull(providerId);
@@ -428,7 +428,7 @@ namespace Orleans.Tests.SqlUtils
                 record => new AdoNetStreamMessage(
                     (string)record[nameof(AdoNetStreamMessage.ServiceId)],
                     (string)record[nameof(AdoNetStreamMessage.ProviderId)],
-                    (int)record[nameof(AdoNetStreamMessage.QueueId)],
+                    (string)record[nameof(AdoNetStreamMessage.QueueId)],
                     (long)record[nameof(AdoNetStreamMessage.MessageId)],
                     (int)record[nameof(AdoNetStreamMessage.Dequeued)],
                     (DateTime)record[nameof(AdoNetStreamMessage.VisibleOn)],
@@ -459,7 +459,7 @@ namespace Orleans.Tests.SqlUtils
         /// <remarks>
         /// If <paramref name="messages"/> is empty then an empty confirmation list is returned.
         /// </remarks>
-        internal Task<IList<AdoNetStreamConfirmationAck>> MessagesDeliveredAsync(string serviceId, string providerId, int queueId, IList<AdoNetStreamConfirmation> messages)
+        internal Task<IList<AdoNetStreamConfirmationAck>> MessagesDeliveredAsync(string serviceId, string providerId, string queueId, IList<AdoNetStreamConfirmation> messages)
         {
             ArgumentNullException.ThrowIfNull(serviceId);
             ArgumentNullException.ThrowIfNull(providerId);
@@ -480,7 +480,7 @@ namespace Orleans.Tests.SqlUtils
                 record => new AdoNetStreamConfirmationAck(
                     (string)record[nameof(AdoNetStreamConfirmationAck.ServiceId)],
                     (string)record[nameof(AdoNetStreamConfirmationAck.ProviderId)],
-                    (int)record[nameof(AdoNetStreamConfirmationAck.QueueId)],
+                    (string)record[nameof(AdoNetStreamConfirmationAck.QueueId)],
                     (long)record[nameof(AdoNetStreamConfirmationAck.MessageId)]),
                 command => new DbStoredQueries.Columns(command)
                 {

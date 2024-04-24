@@ -1,5 +1,6 @@
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 using Orleans.Streaming.AdoNet.Storage;
 
@@ -10,26 +11,27 @@ namespace Orleans.Streaming.AdoNet;
 /// </summary>
 internal partial class AdoNetQueueAdapterReceiver : IQueueAdapterReceiver
 {
-    public AdoNetQueueAdapterReceiver(string providerId, int queueId, ClusterOptions clusterOptions, AdoNetStreamingOptions adoNetStreamingOptions, Serializer<AdoNetBatchContainer> serializer, ILogger<AdoNetQueueAdapterReceiver> logger)
+    public AdoNetQueueAdapterReceiver(string providerId, string queueId, AdoNetStreamingOptions adoNetStreamingOptions, IOptions<ClusterOptions> clusterOptions, Serializer<AdoNetBatchContainer> serializer, ILogger<AdoNetQueueAdapterReceiver> logger)
     {
         ArgumentNullException.ThrowIfNull(providerId);
-        ArgumentNullException.ThrowIfNull(clusterOptions);
+        ArgumentNullException.ThrowIfNull(queueId);
         ArgumentNullException.ThrowIfNull(adoNetStreamingOptions);
+        ArgumentNullException.ThrowIfNull(clusterOptions);
         ArgumentNullException.ThrowIfNull(serializer);
         ArgumentNullException.ThrowIfNull(logger);
 
         _providerId = providerId;
         _queueId = queueId;
-        _clusterOptions = clusterOptions;
         _adoNetStreamingOptions = adoNetStreamingOptions;
+        _clusterOptions = clusterOptions;
         _serializer = serializer;
         _logger = logger;
     }
 
     private readonly string _providerId;
-    private readonly int _queueId;
-    private readonly ClusterOptions _clusterOptions;
+    private readonly string _queueId;
     private readonly AdoNetStreamingOptions _adoNetStreamingOptions;
+    private readonly IOptions<ClusterOptions> _clusterOptions;
     private readonly Serializer<AdoNetBatchContainer> _serializer;
     private readonly ILogger _logger;
     private RelationalOrleansQueries _queries;
@@ -82,7 +84,7 @@ internal partial class AdoNetQueueAdapterReceiver : IQueueAdapterReceiver
         try
         {
             // grab a message batch from storage while pinning the task so shutdown can wait for it
-            var task = _queries.GetQueueMessagesAsync(_clusterOptions.ServiceId, _providerId, _queueId, maxCount, _adoNetStreamingOptions.MaxAttempts, _adoNetStreamingOptions.VisibilityTimeout);
+            var task = _queries.GetQueueMessagesAsync(_clusterOptions.Value.ServiceId, _providerId, _queueId, maxCount, _adoNetStreamingOptions.MaxAttempts, _adoNetStreamingOptions.VisibilityTimeout);
             _outstandingTask = task;
             var messages = await task;
 
@@ -91,7 +93,7 @@ internal partial class AdoNetQueueAdapterReceiver : IQueueAdapterReceiver
         }
         catch (Exception ex)
         {
-            LogDequeueFailed(ex, _clusterOptions.ServiceId, _providerId, _queueId);
+            LogDequeueFailed(ex, _clusterOptions.Value.ServiceId, _providerId, _queueId);
             throw;
         }
         finally
@@ -114,7 +116,7 @@ internal partial class AdoNetQueueAdapterReceiver : IQueueAdapterReceiver
         try
         {
             // execute the confirmation while pinning the task so shutdown can wait for it
-            var task = _queries.MessagesDeliveredAsync(_clusterOptions.ServiceId, _providerId, _queueId, items);
+            var task = _queries.MessagesDeliveredAsync(_clusterOptions.Value.ServiceId, _providerId, _queueId, items);
             _outstandingTask = task;
 
             try
@@ -123,7 +125,7 @@ internal partial class AdoNetQueueAdapterReceiver : IQueueAdapterReceiver
             }
             catch (Exception ex)
             {
-                LogConfirmationFailed(ex, _clusterOptions.ServiceId, _providerId, _queueId, items);
+                LogConfirmationFailed(ex, _clusterOptions.Value.ServiceId, _providerId, _queueId, items);
                 throw;
             }
         }
@@ -136,10 +138,10 @@ internal partial class AdoNetQueueAdapterReceiver : IQueueAdapterReceiver
     #region Logging
 
     [LoggerMessage(1, LogLevel.Error, "Failed to dequeue messages for ServiceId: {ServiceId}, ProviderId: {ProviderId}, QueueId: {QueueId}")]
-    private partial void LogDequeueFailed(Exception exception, string serviceId, string providerId, int queueId);
+    private partial void LogDequeueFailed(Exception exception, string serviceId, string providerId, string queueId);
 
     [LoggerMessage(2, LogLevel.Error, "Failed to confirm messages for ServiceId: {ServiceId}, ProviderId: {ProviderId}, QueueId: {QueueId}, Items: {Items}")]
-    private partial void LogConfirmationFailed(Exception exception, string serviceId, string providerId, int queueId, List<AdoNetStreamConfirmation> items);
+    private partial void LogConfirmationFailed(Exception exception, string serviceId, string providerId, string queueId, List<AdoNetStreamConfirmation> items);
 
     #endregion Logging
 }

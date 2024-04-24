@@ -8,7 +8,7 @@ namespace Orleans.Streaming.AdoNet;
 internal record AdoNetStreamMessage(
     string ServiceId,
     string ProviderId,
-    int QueueId,
+    string QueueId,
     long MessageId,
     int Dequeued,
     DateTime VisibleOn,
@@ -17,7 +17,7 @@ internal record AdoNetStreamMessage(
     DateTime ModifiedOn,
     byte[] Payload)
 {
-    public AdoNetStreamMessage() : this(Empty, Empty, 0, 0, 0, DateTime.MinValue, DateTime.MinValue, DateTime.MinValue, DateTime.MinValue, [])
+    public AdoNetStreamMessage() : this(Empty, Empty, Empty, 0, 0, DateTime.MinValue, DateTime.MinValue, DateTime.MinValue, DateTime.MinValue, [])
     {
     }
 }

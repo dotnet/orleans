@@ -440,7 +440,7 @@ namespace Orleans.Tests.SqlUtils
                 }
             }
 
-            internal int QueueId
+            internal string QueueId
             {
                 set => Add(nameof(QueueId), value);
             }

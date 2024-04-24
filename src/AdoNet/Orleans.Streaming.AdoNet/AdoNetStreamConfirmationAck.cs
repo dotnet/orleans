@@ -8,10 +8,10 @@ namespace Orleans.Streaming.AdoNet;
 internal record AdoNetStreamConfirmationAck(
     string ServiceId,
     string ProviderId,
-    int QueueId,
+    string QueueId,
     long MessageId)
 {
-    public AdoNetStreamConfirmationAck() : this(Empty, Empty, 0, 0)
+    public AdoNetStreamConfirmationAck() : this(Empty, Empty, Empty, 0)
     {
     }
 }

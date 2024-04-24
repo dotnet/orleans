@@ -9,10 +9,10 @@ namespace Orleans.Streaming.AdoNet;
 internal record AdoNetStreamMessageAck(
     string ServiceId,
     string ProviderId,
-    int QueueId,
+    string QueueId,
     long MessageId)
 {
-    public AdoNetStreamMessageAck() : this(Empty, Empty, 0, 0)
+    public AdoNetStreamMessageAck() : this(Empty, Empty, Empty, 0)
     {
     }
 }

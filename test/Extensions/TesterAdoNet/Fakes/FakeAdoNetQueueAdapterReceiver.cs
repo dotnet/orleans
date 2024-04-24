@@ -1,0 +1,19 @@
+using Orleans.Configuration;
+using Orleans.Streams;
+
+namespace Tester.AdoNet.Fakes;
+
+internal class FakeAdoNetQueueAdapterReceiver(string providerId, string queueId, AdoNetStreamingOptions adoNetStreamingOptions) : IQueueAdapterReceiver
+{
+    public string ProviderId { get; } = providerId;
+    public string QueueId { get; } = queueId;
+    public AdoNetStreamingOptions AdoNetStreamingOptions { get; } = adoNetStreamingOptions;
+
+    public Task<IList<IBatchContainer>> GetQueueMessagesAsync(int maxCount) => Task.FromResult<IList<IBatchContainer>>([]);
+
+    public Task Initialize(TimeSpan timeout) => Task.CompletedTask;
+
+    public Task MessagesDeliveredAsync(IList<IBatchContainer> messages) => Task.CompletedTask;
+
+    public Task Shutdown(TimeSpan timeout) => Task.CompletedTask;
+}
