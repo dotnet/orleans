@@ -10,7 +10,7 @@ namespace Orleans.Streaming.AdoNet;
 /// </summary>
 internal interface IAdoNetQueueAdapterReceiverFactory
 {
-    IQueueAdapterReceiver Create(string providerId, string queueId, AdoNetStreamingOptions adoNetStreamingOptions);
+    IQueueAdapterReceiver Create(string providerId, string queueId, AdoNetStreamOptions adoNetStreamingOptions);
 }
 
 /// <summary>
@@ -20,7 +20,7 @@ internal class AdoNetQueueAdapterReceiverFactory(IServiceProvider serviceProvide
 {
     private readonly IServiceProvider _serviceProvider = serviceProvider;
 
-    public IQueueAdapterReceiver Create(string providerId, string queueId, AdoNetStreamingOptions adoNetStreamingOptions)
+    public IQueueAdapterReceiver Create(string providerId, string queueId, AdoNetStreamOptions adoNetStreamingOptions)
     {
         var clusterOptions = _serviceProvider.GetRequiredService<IOptions<ClusterOptions>>();
         var serializer = _serviceProvider.GetRequiredService<Serializer<AdoNetBatchContainer>>();

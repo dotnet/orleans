@@ -3,7 +3,7 @@ namespace Orleans.Configuration;
 /// <summary>
 /// Options for ADO.NET Streaming.
 /// </summary>
-public class AdoNetStreamingOptions
+public class AdoNetStreamOptions
 {
     /// <summary>
     /// Gets or sets the ADO.NET invariant.

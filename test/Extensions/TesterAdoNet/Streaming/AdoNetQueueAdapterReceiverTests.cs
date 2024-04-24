@@ -48,7 +48,7 @@ public class AdoNetQueueAdapterReceiverTests(TestEnvironmentFixture fixture) : I
         var providerId = "MyProviderId";
         var queueId = "MyQueueId";
         var maxCount = 10;
-        var adoNetStreamingOptions = new AdoNetStreamingOptions
+        var adoNetStreamingOptions = new AdoNetStreamOptions
         {
             Invariant = AdoNetInvariantName,
             ConnectionString = _storage.ConnectionString

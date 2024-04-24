@@ -11,7 +11,7 @@ namespace Orleans.Streaming.AdoNet;
 /// </summary>
 internal partial class AdoNetQueueAdapterReceiver : IQueueAdapterReceiver
 {
-    public AdoNetQueueAdapterReceiver(string providerId, string queueId, AdoNetStreamingOptions adoNetStreamingOptions, IOptions<ClusterOptions> clusterOptions, Serializer<AdoNetBatchContainer> serializer, ILogger<AdoNetQueueAdapterReceiver> logger)
+    public AdoNetQueueAdapterReceiver(string providerId, string queueId, AdoNetStreamOptions adoNetStreamingOptions, IOptions<ClusterOptions> clusterOptions, Serializer<AdoNetBatchContainer> serializer, ILogger<AdoNetQueueAdapterReceiver> logger)
     {
         ArgumentNullException.ThrowIfNull(providerId);
         ArgumentNullException.ThrowIfNull(queueId);
@@ -30,7 +30,7 @@ internal partial class AdoNetQueueAdapterReceiver : IQueueAdapterReceiver
 
     private readonly string _providerId;
     private readonly string _queueId;
-    private readonly AdoNetStreamingOptions _adoNetStreamingOptions;
+    private readonly AdoNetStreamOptions _adoNetStreamingOptions;
     private readonly IOptions<ClusterOptions> _clusterOptions;
     private readonly Serializer<AdoNetBatchContainer> _serializer;
     private readonly ILogger _logger;

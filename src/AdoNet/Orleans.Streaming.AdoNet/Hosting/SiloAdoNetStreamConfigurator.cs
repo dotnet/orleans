@@ -1,9 +1,8 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
-using Orleans.Hosting;
 
-namespace Orleans.Streaming.AdoNet.Hosting;
+namespace Orleans.Hosting;
 
 public class SiloAdoNetStreamConfigurator : SiloPersistentStreamConfigurator
 {
@@ -16,13 +15,13 @@ public class SiloAdoNetStreamConfigurator : SiloPersistentStreamConfigurator
         ConfigureDelegate(services =>
         {
             services
-                .ConfigureNamedOptionForLogging<AdoNetStreamingOptions>(name)
+                .ConfigureNamedOptionForLogging<AdoNetStreamOptions>(name)
                 .ConfigureNamedOptionForLogging<SimpleQueueCacheOptions>(name)
                 .ConfigureNamedOptionForLogging<HashRingStreamQueueMapperOptions>(name);
         });
     }
 
-    public SiloAdoNetStreamConfigurator ConfigureAdoNet(Action<OptionsBuilder<AdoNetStreamingOptions>> configureOptions)
+    public SiloAdoNetStreamConfigurator ConfigureAdoNet(Action<OptionsBuilder<AdoNetStreamOptions>> configureOptions)
     {
         ArgumentNullException.ThrowIfNull(configureOptions);
 

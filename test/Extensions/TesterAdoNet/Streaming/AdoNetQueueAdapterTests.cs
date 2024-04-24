@@ -45,7 +45,7 @@ public class AdoNetQueueAdapterTests(TestEnvironmentFixture fixture) : IAsyncLif
             ServiceId = serviceId
         });
         var providerId = "MyProviderId";
-        var adoNetStreamingOptions = new AdoNetStreamingOptions
+        var adoNetStreamingOptions = new AdoNetStreamOptions
         {
             Invariant = AdoNetInvariantName,
             ConnectionString = _storage.ConnectionString,
@@ -109,7 +109,7 @@ public class AdoNetQueueAdapterTests(TestEnvironmentFixture fixture) : IAsyncLif
             ServiceId = serviceId
         });
         var providerId = "MyProviderId";
-        var adoNetStreamingOptions = new AdoNetStreamingOptions
+        var adoNetStreamingOptions = new AdoNetStreamOptions
         {
             Invariant = AdoNetInvariantName,
             ConnectionString = _storage.ConnectionString,

@@ -1,8 +1,7 @@
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
-using Orleans.Hosting;
 
-namespace Orleans.Streaming.AdoNet.Hosting;
+namespace Orleans.Hosting;
 
 public class ClusterClientAdoNetStreamConfigurator : ClusterClientPersistentStreamConfigurator
 {
@@ -15,12 +14,12 @@ public class ClusterClientAdoNetStreamConfigurator : ClusterClientPersistentStre
         clientBuilder.ConfigureServices(services =>
         {
             services
-                .ConfigureNamedOptionForLogging<AdoNetStreamingOptions>(name)
+                .ConfigureNamedOptionForLogging<AdoNetStreamOptions>(name)
                 .ConfigureNamedOptionForLogging<HashRingStreamQueueMapperOptions>(name);
         });
     }
 
-    public ClusterClientAdoNetStreamConfigurator ConfigureAdoNet(Action<OptionsBuilder<AdoNetStreamingOptions>> configureOptions)
+    public ClusterClientAdoNetStreamConfigurator ConfigureAdoNet(Action<OptionsBuilder<AdoNetStreamOptions>> configureOptions)
     {
         ArgumentNullException.ThrowIfNull(configureOptions);
 

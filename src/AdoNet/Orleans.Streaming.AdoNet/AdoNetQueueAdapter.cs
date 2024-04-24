@@ -11,10 +11,10 @@ namespace Orleans.Streaming.AdoNet;
 /// <summary>
 /// Stream queue storage adapter for ADO.NET providers.
 /// </summary>
-internal class AdoNetQueueAdapter(string providerId, AdoNetStreamingOptions adoNetStreamingOptions, ILogger<AdoNetQueueAdapter> logger, IConsistentRingStreamQueueMapper mapper, Serializer<AdoNetBatchContainer> serializer, IAdoNetQueueAdapterReceiverFactory receiverFactory, IOptions<ClusterOptions> clusterOptions) : IQueueAdapter
+internal class AdoNetQueueAdapter(string providerId, AdoNetStreamOptions adoNetStreamingOptions, ILogger<AdoNetQueueAdapter> logger, IConsistentRingStreamQueueMapper mapper, Serializer<AdoNetBatchContainer> serializer, IAdoNetQueueAdapterReceiverFactory receiverFactory, IOptions<ClusterOptions> clusterOptions) : IQueueAdapter
 {
     private readonly ILogger<AdoNetQueueAdapter> _logger = logger;
-    private readonly AdoNetStreamingOptions _adoNetStreamingOptions = adoNetStreamingOptions;
+    private readonly AdoNetStreamOptions _adoNetStreamingOptions = adoNetStreamingOptions;
     private readonly IConsistentRingStreamQueueMapper _mapper = mapper;
     private readonly Serializer<AdoNetBatchContainer> _serializer = serializer;
     private readonly IAdoNetQueueAdapterReceiverFactory _receiverFactory = receiverFactory;

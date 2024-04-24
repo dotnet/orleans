@@ -3,11 +3,11 @@ using Orleans.Streams;
 
 namespace Tester.AdoNet.Fakes;
 
-internal class FakeAdoNetQueueAdapterReceiver(string providerId, string queueId, AdoNetStreamingOptions adoNetStreamingOptions) : IQueueAdapterReceiver
+internal class FakeAdoNetQueueAdapterReceiver(string providerId, string queueId, AdoNetStreamOptions adoNetStreamingOptions) : IQueueAdapterReceiver
 {
     public string ProviderId { get; } = providerId;
     public string QueueId { get; } = queueId;
-    public AdoNetStreamingOptions AdoNetStreamingOptions { get; } = adoNetStreamingOptions;
+    public AdoNetStreamOptions AdoNetStreamingOptions { get; } = adoNetStreamingOptions;
 
     public Task<IList<IBatchContainer>> GetQueueMessagesAsync(int maxCount) => Task.FromResult<IList<IBatchContainer>>([]);
 
