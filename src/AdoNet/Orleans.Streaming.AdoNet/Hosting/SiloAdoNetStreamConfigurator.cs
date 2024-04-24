@@ -1,16 +1,19 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
+using Orleans.Streaming.AdoNet;
 
 namespace Orleans.Hosting;
 
+/// <summary>
+/// Helps set up an individual stream provider on a silo.
+/// </summary>
 public class SiloAdoNetStreamConfigurator : SiloPersistentStreamConfigurator
 {
-    public SiloAdoNetStreamConfigurator(string name, Action<Action<IServiceCollection>> configureDelegate, Func<IServiceProvider, string, IQueueAdapterFactory> adapterFactory) : base(name, configureDelegate, adapterFactory)
+    public SiloAdoNetStreamConfigurator(string name, Action<Action<IServiceCollection>> configureDelegate) : base(name, configureDelegate, AdoNetQueueAdapterFactory.Create)
     {
         ArgumentNullException.ThrowIfNull(name);
         ArgumentNullException.ThrowIfNull(configureDelegate);
-        ArgumentNullException.ThrowIfNull(adapterFactory);
 
         ConfigureDelegate(services =>
         {

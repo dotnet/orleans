@@ -1,8 +1,8 @@
 using System.Collections.Concurrent;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 using Orleans.Streaming.AdoNet.Storage;
 
@@ -11,14 +11,14 @@ namespace Orleans.Streaming.AdoNet;
 /// <summary>
 /// Stream queue storage adapter for ADO.NET providers.
 /// </summary>
-internal class AdoNetQueueAdapter(string providerId, AdoNetStreamOptions adoNetStreamingOptions, ILogger<AdoNetQueueAdapter> logger, IConsistentRingStreamQueueMapper mapper, Serializer<AdoNetBatchContainer> serializer, IAdoNetQueueAdapterReceiverFactory receiverFactory, IOptions<ClusterOptions> clusterOptions) : IQueueAdapter
+internal class AdoNetQueueAdapter(string name, ILogger<AdoNetQueueAdapter> logger, AdoNetStreamOptions streamOptions, ClusterOptions clusterOptions, IConsistentRingStreamQueueMapper mapper, Serializer<AdoNetBatchContainer> serializer, IServiceProvider serviceProvider) : IQueueAdapter
 {
     private readonly ILogger<AdoNetQueueAdapter> _logger = logger;
-    private readonly AdoNetStreamOptions _adoNetStreamingOptions = adoNetStreamingOptions;
+    private readonly AdoNetStreamOptions _streamOptions = streamOptions;
+    private readonly ClusterOptions _clusterOptions = clusterOptions;
     private readonly IConsistentRingStreamQueueMapper _mapper = mapper;
     private readonly Serializer<AdoNetBatchContainer> _serializer = serializer;
-    private readonly IAdoNetQueueAdapterReceiverFactory _receiverFactory = receiverFactory;
-    private readonly IOptions<ClusterOptions> _clusterOptions = clusterOptions;
+    private readonly IServiceProvider _serviceProvider = serviceProvider;
 
     /// <summary>
     /// Caches queue names to avoid garbage allocations.
@@ -33,12 +33,17 @@ internal class AdoNetQueueAdapter(string providerId, AdoNetStreamOptions adoNetS
     /// <summary>
     /// The adonet repository abstraction.
     /// </summary>
-    private readonly Lazy<Task<RelationalOrleansQueries>> _queries = new(() => RelationalOrleansQueries.CreateInstance(adoNetStreamingOptions.Invariant, adoNetStreamingOptions.ConnectionString), LazyThreadSafetyMode.ExecutionAndPublication);
+    private readonly Lazy<Task<RelationalOrleansQueries>> _queries = new(() => RelationalOrleansQueries.CreateInstance(streamOptions.Invariant, streamOptions.ConnectionString), LazyThreadSafetyMode.ExecutionAndPublication);
+
+    /// <summary>
+    /// The receiver factory.
+    /// </summary>
+    private readonly ObjectFactory<AdoNetQueueAdapterReceiver> _receiverFactory = ActivatorUtilities.CreateFactory<AdoNetQueueAdapterReceiver>([typeof(string), typeof(string), typeof(string), typeof(AdoNetStreamOptions)]);
 
     /// <summary>
     /// Maps to the ProviderId in the database.
     /// </summary>
-    public string Name { get; } = providerId;
+    public string Name { get; } = name;
 
     /// <summary>
     /// The ADO.NET provider is not yet rewindable.
@@ -56,7 +61,7 @@ internal class AdoNetQueueAdapter(string providerId, AdoNetStreamOptions adoNetS
         var adoNetQueueId = GetAdoNetQueueId(queueId);
 
         // create the receiver
-        return _receiverFactory.Create(Name, adoNetQueueId, _adoNetStreamingOptions);
+        return _receiverFactory(_serviceProvider, [_clusterOptions.ServiceId, Name, adoNetQueueId, _streamOptions]);
     }
 
     public async Task QueueMessageBatchAsync<T>(StreamId streamId, IEnumerable<T> events, StreamSequenceToken token, Dictionary<string, object> requestContext)
@@ -79,7 +84,7 @@ internal class AdoNetQueueAdapter(string providerId, AdoNetStreamOptions adoNetS
 
         // we can enqueue the message now
         var queries = await _queries.Value;
-        await queries.QueueMessageBatchAsync(_clusterOptions.Value.ServiceId, Name, adoNetQueueId, payload, _adoNetStreamingOptions.ExpiryTimeout);
+        await queries.QueueMessageBatchAsync(_clusterOptions.ServiceId, Name, adoNetQueueId, payload, _streamOptions.ExpiryTimeout);
     }
 
     private string GetAdoNetQueueId(QueueId queueId) => _queues.GetOrAdd(queueId, _getQueueName);

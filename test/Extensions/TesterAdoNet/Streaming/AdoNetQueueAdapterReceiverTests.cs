@@ -55,7 +55,7 @@ public class AdoNetQueueAdapterReceiverTests(TestEnvironmentFixture fixture) : I
         };
         var serializer = _fixture.Serializer.GetSerializer<AdoNetBatchContainer>();
         var logger = NullLogger<AdoNetQueueAdapterReceiver>.Instance;
-        var receiver = new AdoNetQueueAdapterReceiver(providerId, queueId, adoNetStreamingOptions, clusterOptions, serializer, logger);
+        var receiver = new AdoNetQueueAdapterReceiver(serviceId, providerId, queueId, adoNetStreamingOptions, serializer, logger);
         await receiver.Initialize(TimeSpan.FromSeconds(10));
 
         // arrange - data

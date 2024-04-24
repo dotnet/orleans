@@ -1,15 +1,18 @@
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
+using Orleans.Streaming.AdoNet;
 
 namespace Orleans.Hosting;
 
+/// <summary>
+/// Helps set up an individual stream provider on a silo.
+/// </summary>
 public class ClusterClientAdoNetStreamConfigurator : ClusterClientPersistentStreamConfigurator
 {
-    public ClusterClientAdoNetStreamConfigurator(string name, IClientBuilder clientBuilder, Func<IServiceProvider, string, IQueueAdapterFactory> adapterFactory) : base(name, clientBuilder, adapterFactory)
+    public ClusterClientAdoNetStreamConfigurator(string name, IClientBuilder clientBuilder) : base(name, clientBuilder, AdoNetQueueAdapterFactory.Create)
     {
         ArgumentNullException.ThrowIfNull(name);
         ArgumentNullException.ThrowIfNull(clientBuilder);
-        ArgumentNullException.ThrowIfNull(adapterFactory);
 
         clientBuilder.ConfigureServices(services =>
         {

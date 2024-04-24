@@ -1,5 +1,5 @@
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
-using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 using Orleans.Runtime;
 using Orleans.Streaming.AdoNet;
@@ -38,12 +38,12 @@ public class AdoNetQueueAdapterTests(TestEnvironmentFixture fixture) : IAsyncLif
     [SkippableFact]
     public async Task AdoNetQueueAdapter_EnqueuesMessages()
     {
-        // arrange - receiver
+        // arrange
         var serviceId = "MyServiceId";
-        var clusterOptions = Options.Create(new ClusterOptions
+        var clusterOptions = new ClusterOptions
         {
             ServiceId = serviceId
-        });
+        };
         var providerId = "MyProviderId";
         var adoNetStreamingOptions = new AdoNetStreamOptions
         {
@@ -56,8 +56,8 @@ public class AdoNetQueueAdapterTests(TestEnvironmentFixture fixture) : IAsyncLif
         var streamId = StreamId.Create("MyNamespace", "MyKey");
         var mapper = new FakeConsistentRingStreamQueueMapper();
         var queueId = mapper.GetQueueForStream(streamId).ToString();
-        var receiverFactory = new FakeAdoNetQueueAdapterReceiverFactory();
-        var adapter = new AdoNetQueueAdapter(providerId, adoNetStreamingOptions, logger, mapper, serializer, receiverFactory, clusterOptions);
+        var serviceProvider = new ServiceCollection().BuildServiceProvider();
+        var adapter = new AdoNetQueueAdapter(providerId, logger, adoNetStreamingOptions, clusterOptions, mapper, serializer, serviceProvider);
         var context = new Dictionary<string, object> { { "MyKey", "MyValue" } };
 
         // act - enqueue (via adapter) some messages
@@ -97,23 +97,22 @@ public class AdoNetQueueAdapterTests(TestEnvironmentFixture fixture) : IAsyncLif
     }
 
     /// <summary>
-    /// Tests that the <see cref="AdoNetQueueAdapter"/> works together with created receivers.
+    /// Tests that the <see cref="AdoNetQueueAdapter"/> can enqueue messages that are visible to its receivers.
     /// </summary>
     [SkippableFact]
-    public void AdoNetQueueAdapter_CreatesReceiver()
+    public async Task AdoNetQueueAdapter_WiresUpReceivers()
     {
-        // arrange - receiver
+        // arrange
         var serviceId = "MyServiceId";
-        var clusterOptions = Options.Create(new ClusterOptions
+        var clusterOptions = new ClusterOptions
         {
             ServiceId = serviceId
-        });
+        };
         var providerId = "MyProviderId";
-        var adoNetStreamingOptions = new AdoNetStreamOptions
+        var streamOptions = new AdoNetStreamOptions
         {
             Invariant = AdoNetInvariantName,
-            ConnectionString = _storage.ConnectionString,
-            ExpiryTimeout = 100
+            ConnectionString = _storage.ConnectionString
         };
         var serializer = _fixture.Serializer.GetSerializer<AdoNetBatchContainer>();
         var logger = NullLogger<AdoNetQueueAdapter>.Instance;
@@ -121,23 +120,66 @@ public class AdoNetQueueAdapterTests(TestEnvironmentFixture fixture) : IAsyncLif
         var mapper = new FakeConsistentRingStreamQueueMapper();
         var queueId = mapper.GetQueueForStream(streamId);
         var adoNetQueueId = queueId.ToString();
-        var receiver = new FakeAdoNetQueueAdapterReceiver(providerId, adoNetQueueId, adoNetStreamingOptions);
-        var receiverFactory = new FakeAdoNetQueueAdapterReceiverFactory(create: (providerIdArg, queueIdArg, adoNetStreamingOptionsArg) =>
+        var serviceProvider = new ServiceCollection()
+            .AddSingleton(serializer)
+            .BuildServiceProvider();
+        var adapter = new AdoNetQueueAdapter(providerId, logger, streamOptions, clusterOptions, mapper, serializer, _fixture.Services);
+
+        // act - enqueue (via adapter) some messages
+        await _storage.ExecuteAsync("DELETE FROM [OrleansStreamMessage]");
+        var beforeEnqueued = DateTime.UtcNow;
+        await adapter.QueueMessageBatchAsync(streamId, new[] { new TestModel(1) }, null, new Dictionary<string, object> { { "MyKey", 1 } });
+        await adapter.QueueMessageBatchAsync(streamId, new[] { new TestModel(2) }, null, new Dictionary<string, object> { { "MyKey", 2 } });
+        await adapter.QueueMessageBatchAsync(streamId, new[] { new TestModel(3) }, null, new Dictionary<string, object> { { "MyKey", 3 } });
+        var afterEnqueued = DateTime.UtcNow;
+
+        // act - grab receivers and dequeue messages
+        var receiver = adapter.CreateReceiver(queueId);
+        await receiver.Initialize(TimeSpan.FromSeconds(10));
+        var beforeDequeued = DateTime.UtcNow;
+        var messages = await receiver.GetQueueMessagesAsync(10);
+        var afterDequeued = DateTime.UtcNow;
+
+        // assert - dequeued messages are as expected
+        Assert.Equal(3, messages.Count);
+        for (var i = 0; i < messages.Count; i++)
         {
-            Assert.Equal(providerId, providerIdArg);
-            Assert.Equal(adoNetQueueId, queueIdArg);
-            Assert.Same(adoNetStreamingOptions, adoNetStreamingOptionsArg);
+            var message = messages[i];
 
-            return receiver;
-        });
-        var adapter = new AdoNetQueueAdapter(providerId, adoNetStreamingOptions, logger, mapper, serializer, receiverFactory, clusterOptions);
-        var context = new Dictionary<string, object> { { "MyKey", "MyValue" } };
+            Assert.Equal(streamId, message.StreamId);
+            Assert.Equal([new TestModel(i + 1)], message.GetEvents<TestModel>().Select(x => x.Item1));
+            Assert.True(message.ImportRequestContext());
+            Assert.Equal(i + 1, RequestContext.Get("MyKey"));
+        }
 
-        // act - create receiver
-        var result = adapter.CreateReceiver(queueId);
+        // assert - stored messages are as expected
+        var stored = (await _storage.ReadAsync<AdoNetStreamMessage>("SELECT * FROM [OrleansStreamMessage]")).ToList();
+        for (var i = 0; i < stored.Count; i++)
+        {
+            var item = stored[i];
 
-        // assert - receiver created
-        Assert.Same(receiver, result);
+            Assert.Equal(serviceId, item.ServiceId);
+            Assert.Equal(providerId, item.ProviderId);
+            Assert.Equal(adoNetQueueId, item.QueueId);
+            Assert.NotEqual(0, item.MessageId);
+            Assert.Equal(1, item.Dequeued);
+            Assert.True(item.VisibleOn >= beforeDequeued.AddSeconds(streamOptions.VisibilityTimeout));
+            Assert.True(item.VisibleOn <= afterDequeued.AddSeconds(streamOptions.VisibilityTimeout));
+            Assert.True(item.ExpiresOn >= beforeEnqueued.AddSeconds(streamOptions.ExpiryTimeout));
+            Assert.True(item.ExpiresOn <= afterEnqueued.AddSeconds(streamOptions.ExpiryTimeout));
+            Assert.True(item.CreatedOn >= beforeEnqueued);
+            Assert.True(item.CreatedOn <= afterEnqueued);
+            Assert.True(item.ModifiedOn >= beforeDequeued);
+            Assert.True(item.ModifiedOn <= afterDequeued);
+
+            var serializedContainer = serializer.Deserialize(item.Payload);
+            Assert.Equal(streamId, serializedContainer.StreamId);
+            Assert.Null(serializedContainer.SequenceToken);
+            Assert.Equal(new[] { new TestModel(i + 1) }, serializedContainer.Events);
+            Assert.Single(serializedContainer.RequestContext);
+            Assert.Equal(i + 1, serializedContainer.RequestContext["MyKey"]);
+            Assert.Equal(0, serializedContainer.Dequeued);
+        }
     }
 
     public Task DisposeAsync() => Task.CompletedTask;
