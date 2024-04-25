@@ -12,14 +12,14 @@ using Xunit.Abstractions;
 namespace Tester.Cassandra.Clustering;
 
 [TestCategory("Cassandra"), TestCategory("Clustering"), TestCategory("Functional")]
-public sealed class Cassandra : IClassFixture<CassandraContainer>
+public sealed class CassandraClusteringTableTests : IClassFixture<CassandraContainer>
 {
     private readonly CassandraContainer _cassandraContainer;
     private readonly ITestOutputHelper _testOutputHelper;
     private static readonly string HostName = Dns.GetHostName();
     private static int _generation;
 
-    public Cassandra(CassandraContainer cassandraContainer, ITestOutputHelper testOutputHelper)
+    public CassandraClusteringTableTests(CassandraContainer cassandraContainer, ITestOutputHelper testOutputHelper)
     {
         _cassandraContainer = cassandraContainer;
         _cassandraContainer.Name = nameof(Cassandra);
