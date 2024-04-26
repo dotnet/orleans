@@ -6,3 +6,4 @@
 using System.Diagnostics.CodeAnalysis;
 
 [assembly: SuppressMessage("Style", "IDE0053:Use expression body for lambda expression", Justification = "N/A")]
+[assembly: SuppressMessage("Usage", "VSTHRD011:Use AsyncLazy<T>", Justification = "AsyncLazy<T> not available")]

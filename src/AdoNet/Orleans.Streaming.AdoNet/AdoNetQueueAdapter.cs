@@ -1,6 +1,3 @@
-using System.Collections.Concurrent;
-using System.Threading;
-using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Orleans.Configuration;
@@ -11,34 +8,14 @@ namespace Orleans.Streaming.AdoNet;
 /// <summary>
 /// Stream queue storage adapter for ADO.NET providers.
 /// </summary>
-internal class AdoNetQueueAdapter(string name, ILogger<AdoNetQueueAdapter> logger, AdoNetStreamOptions streamOptions, ClusterOptions clusterOptions, IConsistentRingStreamQueueMapper mapper, Serializer<AdoNetBatchContainer> serializer, IServiceProvider serviceProvider) : IQueueAdapter
+internal partial class AdoNetQueueAdapter(string name, AdoNetStreamOptions streamOptions, ClusterOptions clusterOptions, IAdoNetStreamQueueMapper mapper, RelationalOrleansQueries queries, Serializer<AdoNetBatchContainer> serializer, ILogger<AdoNetQueueAdapter> logger, IServiceProvider serviceProvider) : IQueueAdapter
 {
     private readonly ILogger<AdoNetQueueAdapter> _logger = logger;
-    private readonly AdoNetStreamOptions _streamOptions = streamOptions;
-    private readonly ClusterOptions _clusterOptions = clusterOptions;
-    private readonly IConsistentRingStreamQueueMapper _mapper = mapper;
-    private readonly Serializer<AdoNetBatchContainer> _serializer = serializer;
-    private readonly IServiceProvider _serviceProvider = serviceProvider;
-
-    /// <summary>
-    /// Caches queue names to avoid garbage allocations.
-    /// </summary>
-    private readonly ConcurrentDictionary<QueueId, string> _queues = new();
-
-    /// <summary>
-    /// Caches the queue name creation delegate.
-    /// </summary>
-    private readonly Func<QueueId, string> _getQueueName = (QueueId queueId) => queueId.ToString();
-
-    /// <summary>
-    /// The adonet repository abstraction.
-    /// </summary>
-    private readonly Lazy<Task<RelationalOrleansQueries>> _queries = new(() => RelationalOrleansQueries.CreateInstance(streamOptions.Invariant, streamOptions.ConnectionString), LazyThreadSafetyMode.ExecutionAndPublication);
 
     /// <summary>
     /// The receiver factory.
     /// </summary>
-    private readonly ObjectFactory<AdoNetQueueAdapterReceiver> _receiverFactory = ActivatorUtilities.CreateFactory<AdoNetQueueAdapterReceiver>([typeof(string), typeof(string), typeof(string), typeof(AdoNetStreamOptions)]);
+    private readonly ObjectFactory<AdoNetQueueAdapterReceiver> _receiverFactory = ActivatorUtilities.CreateFactory<AdoNetQueueAdapterReceiver>([typeof(string), typeof(string), typeof(AdoNetStreamOptions), typeof(ClusterOptions), typeof(RelationalOrleansQueries)]);
 
     /// <summary>
     /// Maps to the ProviderId in the database.
@@ -57,11 +34,11 @@ internal class AdoNetQueueAdapter(string name, ILogger<AdoNetQueueAdapter> logge
 
     public IQueueAdapterReceiver CreateReceiver(QueueId queueId)
     {
-        // get the adonet queue id
-        var adoNetQueueId = GetAdoNetQueueId(queueId);
+        // map the queue id
+        var adoNetQueueId = mapper.GetAdoNetQueueId(queueId);
 
         // create the receiver
-        return _receiverFactory(_serviceProvider, [_clusterOptions.ServiceId, Name, adoNetQueueId, _streamOptions]);
+        return _receiverFactory(serviceProvider, [Name, adoNetQueueId, streamOptions, clusterOptions, queries]);
     }
 
     public async Task QueueMessageBatchAsync<T>(StreamId streamId, IEnumerable<T> events, StreamSequenceToken token, Dictionary<string, object> requestContext)
@@ -73,19 +50,28 @@ internal class AdoNetQueueAdapter(string name, ILogger<AdoNetQueueAdapter> logge
         }
 
         // map the orleans stream id to the corresponding queue id
-        var queueId = _mapper.GetQueueForStream(streamId);
-
-        // get the adonet queue id
-        var adoNetQueueId = GetAdoNetQueueId(queueId);
+        var queueId = mapper.GetAdoNetQueueId(streamId);
 
         // create the payload from the events
         var container = new AdoNetBatchContainer(streamId, events.Cast<object>().ToList(), requestContext);
-        var payload = _serializer.SerializeToArray(container);
+        var payload = serializer.SerializeToArray(container);
 
         // we can enqueue the message now
-        var queries = await _queries.Value;
-        await queries.QueueMessageBatchAsync(_clusterOptions.ServiceId, Name, adoNetQueueId, payload, _streamOptions.ExpiryTimeout);
+        try
+        {
+            await queries.QueueStreamMessageAsync(clusterOptions.ServiceId, Name, queueId, payload, streamOptions.ExpiryTimeout);
+        }
+        catch (Exception ex)
+        {
+            LogFailedToQueueStreamMessage(ex, clusterOptions.ServiceId, Name, queueId);
+            throw;
+        }
     }
 
-    private string GetAdoNetQueueId(QueueId queueId) => _queues.GetOrAdd(queueId, _getQueueName);
+    #region Logging
+
+    [LoggerMessage(1, LogLevel.Error, "Failed to queue stream message with ({ServiceId}, {ProviderId}, {QueueId})")]
+    private partial void LogFailedToQueueStreamMessage(Exception ex, string serviceId, string providerId, string queueId);
+
+    #endregion Logging
 }

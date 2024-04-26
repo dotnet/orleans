@@ -36,8 +36,6 @@ public class RelationStorageStreamingTests : IAsyncLifetime
 
     private static int RandomExpiryTimeout(int max = 100) => Random.Shared.Next(max);
 
-    private static int RandomVisibilityTimeout(int max = 100) => Random.Shared.Next(max);
-
     private static byte[] RandomPayload(int size = 1_000_000)
     {
         var payload = new byte[size];
@@ -63,7 +61,7 @@ public class RelationStorageStreamingTests : IAsyncLifetime
 
         // act
         var before = DateTime.UtcNow;
-        var ack = await _queries.QueueMessageBatchAsync(serviceId, providerId, queueId, payload, expiryTimeout);
+        var ack = await _queries.QueueStreamMessageAsync(serviceId, providerId, queueId, payload, expiryTimeout);
         var after = DateTime.UtcNow;
 
         // assert - ack
@@ -109,7 +107,7 @@ public class RelationStorageStreamingTests : IAsyncLifetime
         var before = DateTime.UtcNow;
         var acks = await Task.WhenAll(Enumerable
             .Range(0, count)
-            .Select(i => Task.Run(() => _queries.QueueMessageBatchAsync(serviceId, providerId, queueId, payload, expiryTimeout)))
+            .Select(i => Task.Run(() => _queries.QueueStreamMessageAsync(serviceId, providerId, queueId, payload, expiryTimeout)))
             .ToList());
         var after = DateTime.UtcNow;
 
@@ -179,7 +177,7 @@ public class RelationStorageStreamingTests : IAsyncLifetime
         var results = await Task.WhenAll(partitions
             .Select(p => Task.Run(async () =>
             {
-                var ack = await _queries.QueueMessageBatchAsync(p.ServiceId, p.ProviderId, p.QueueId, p.Payload, expiryTimeout);
+                var ack = await _queries.QueueStreamMessageAsync(p.ServiceId, p.ProviderId, p.QueueId, p.Payload, expiryTimeout);
                 return (Partition: p, Ack: ack);
             }))
             .ToList());
@@ -239,12 +237,12 @@ public class RelationStorageStreamingTests : IAsyncLifetime
 
         // arrange - enqueue a message
         var beforeQueueing = DateTime.UtcNow;
-        var ack = await _queries.QueueMessageBatchAsync(serviceId, providerId, queueId, payload, expiryTimeout);
+        var ack = await _queries.QueueStreamMessageAsync(serviceId, providerId, queueId, payload, expiryTimeout);
         var afterQueueing = DateTime.UtcNow;
 
         // act - dequeue a message
         var beforeDequeuing = DateTime.UtcNow;
-        var message = Assert.Single(await _queries.GetQueueMessagesAsync(serviceId, providerId, queueId, maxCount, maxAttempts, visibilityTimeout));
+        var message = Assert.Single(await _queries.GetStreamMessagesAsync(serviceId, providerId, queueId, maxCount, maxAttempts, visibilityTimeout));
         var afterDequeuing = DateTime.UtcNow;
 
         // assert - the message is the same
@@ -299,15 +297,15 @@ public class RelationStorageStreamingTests : IAsyncLifetime
         var beforeQueueing = DateTime.UtcNow;
         var acks = await Task.WhenAll(Enumerable
             .Range(0, total)
-            .Select(i => _queries.QueueMessageBatchAsync(serviceId, providerId, queueId, payload, expiryTimeout))
+            .Select(i => _queries.QueueStreamMessageAsync(serviceId, providerId, queueId, payload, expiryTimeout))
             .ToList());
         var afterQueueing = DateTime.UtcNow;
 
         // act - dequeue three batches of three messages
         var beforeDequeuing = DateTime.UtcNow;
-        var first = await _queries.GetQueueMessagesAsync(serviceId, providerId, queueId, maxCount, maxAttempts, visibilityTimeout);
-        var second = await _queries.GetQueueMessagesAsync(serviceId, providerId, queueId, maxCount, maxAttempts, visibilityTimeout);
-        var third = await _queries.GetQueueMessagesAsync(serviceId, providerId, queueId, maxCount, maxAttempts, visibilityTimeout);
+        var first = await _queries.GetStreamMessagesAsync(serviceId, providerId, queueId, maxCount, maxAttempts, visibilityTimeout);
+        var second = await _queries.GetStreamMessagesAsync(serviceId, providerId, queueId, maxCount, maxAttempts, visibilityTimeout);
+        var third = await _queries.GetStreamMessagesAsync(serviceId, providerId, queueId, maxCount, maxAttempts, visibilityTimeout);
         var afterDequeuing = DateTime.UtcNow;
 
         // assert - batch counts
@@ -378,7 +376,7 @@ public class RelationStorageStreamingTests : IAsyncLifetime
 
         // arrange - enqueue a message
         var beforeQueueing = DateTime.UtcNow;
-        var ack = await _queries.QueueMessageBatchAsync(serviceId, providerId, queueId, payload, expiryTimeout);
+        var ack = await _queries.QueueStreamMessageAsync(serviceId, providerId, queueId, payload, expiryTimeout);
         var afterQueueing = DateTime.UtcNow;
 
         // act - dequeue messages until max attempts plus one
@@ -386,7 +384,7 @@ public class RelationStorageStreamingTests : IAsyncLifetime
         var results = new List<IList<AdoNetStreamMessage>>();
         for (var i = 0; i < maxAttempts + 1; i++)
         {
-            results.Add(await _queries.GetQueueMessagesAsync(serviceId, providerId, queueId, maxCount, maxAttempts, visibilityTimeout));
+            results.Add(await _queries.GetStreamMessagesAsync(serviceId, providerId, queueId, maxCount, maxAttempts, visibilityTimeout));
         }
         var afterDequeuing = DateTime.UtcNow;
 
@@ -447,11 +445,11 @@ public class RelationStorageStreamingTests : IAsyncLifetime
         var visibilityTimeout = 10;
 
         // arrange - enqueue a message
-        var ack = await _queries.QueueMessageBatchAsync(serviceId, providerId, queueId, payload, expiryTimeout);
+        var ack = await _queries.QueueStreamMessageAsync(serviceId, providerId, queueId, payload, expiryTimeout);
 
         // act - dequeue messages
-        var first = Assert.Single(await _queries.GetQueueMessagesAsync(serviceId, providerId, queueId, maxCount, maxAttempts, visibilityTimeout));
-        var second = await _queries.GetQueueMessagesAsync(serviceId, providerId, queueId, maxCount, maxAttempts, visibilityTimeout);
+        var first = Assert.Single(await _queries.GetStreamMessagesAsync(serviceId, providerId, queueId, maxCount, maxAttempts, visibilityTimeout));
+        var second = await _queries.GetStreamMessagesAsync(serviceId, providerId, queueId, maxCount, maxAttempts, visibilityTimeout);
 
         // assert - first dequeued message is consistent with ack
         Assert.Equal(ack.ServiceId, first.ServiceId);
@@ -495,11 +493,11 @@ public class RelationStorageStreamingTests : IAsyncLifetime
 
         // arrange - enqueue a message
         var before = DateTime.UtcNow;
-        var ack = await _queries.QueueMessageBatchAsync(serviceId, providerId, queueId, payload, expiryTimeout);
+        var ack = await _queries.QueueStreamMessageAsync(serviceId, providerId, queueId, payload, expiryTimeout);
         var after = DateTime.UtcNow;
 
         // act - dequeue messages
-        var messages = await _queries.GetQueueMessagesAsync(serviceId, providerId, queueId, maxCount, maxAttempts, visibilityTimeout);
+        var messages = await _queries.GetStreamMessagesAsync(serviceId, providerId, queueId, maxCount, maxAttempts, visibilityTimeout);
 
         // assert - no messages dequeued
         Assert.Empty(messages);
@@ -542,15 +540,15 @@ public class RelationStorageStreamingTests : IAsyncLifetime
         // arrange - enqueue many messages
         var acks = await Task.WhenAll(Enumerable
             .Range(0, maxCount)
-            .Select(i => _queries.QueueMessageBatchAsync(serviceId, providerId, queueId, payload, expiryTimeout))
+            .Select(i => _queries.QueueStreamMessageAsync(serviceId, providerId, queueId, payload, expiryTimeout))
             .ToList());
 
         // arrange - dequeue all messages
-        var messages = await _queries.GetQueueMessagesAsync(serviceId, providerId, queueId, maxCount, maxAttempts, visibilityTimeout);
+        var messages = await _queries.GetStreamMessagesAsync(serviceId, providerId, queueId, maxCount, maxAttempts, visibilityTimeout);
 
         // act - confirm all messages
         var items = messages.Select(x => new AdoNetStreamConfirmation(x.MessageId, x.Dequeued)).ToList();
-        var results = await _queries.MessagesDeliveredAsync(serviceId, providerId, queueId, items);
+        var results = await _queries.ConfirmStreamMessagesAsync(serviceId, providerId, queueId, items);
 
         // assert - confirmations are as expected
         Assert.Equal(maxCount, acks.Length);
@@ -588,15 +586,15 @@ public class RelationStorageStreamingTests : IAsyncLifetime
         // arrange - enqueue many messages
         var acks = await Task.WhenAll(Enumerable
             .Range(0, maxCount)
-            .Select(i => _queries.QueueMessageBatchAsync(serviceId, providerId, queueId, payload, expiryTimeout))
+            .Select(i => _queries.QueueStreamMessageAsync(serviceId, providerId, queueId, payload, expiryTimeout))
             .ToList());
 
         // arrange - dequeue all messages
-        var messages = await _queries.GetQueueMessagesAsync(serviceId, providerId, queueId, maxCount, maxAttempts, visibilityTimeout);
+        var messages = await _queries.GetStreamMessagesAsync(serviceId, providerId, queueId, maxCount, maxAttempts, visibilityTimeout);
 
         // act - confirm all messages in a faulty way
         var faulty = messages.Select(x => new AdoNetStreamConfirmation(x.MessageId, x.Dequeued - 1)).ToList();
-        var results = await _queries.MessagesDeliveredAsync(serviceId, providerId, queueId, faulty);
+        var results = await _queries.ConfirmStreamMessagesAsync(serviceId, providerId, queueId, faulty);
 
         // assert - confirmations are as expected
         Assert.Equal(maxCount, acks.Length);
@@ -629,15 +627,15 @@ public class RelationStorageStreamingTests : IAsyncLifetime
         // arrange - enqueue many messages
         var acks = await Task.WhenAll(Enumerable
             .Range(0, maxCount)
-            .Select(i => _queries.QueueMessageBatchAsync(serviceId, providerId, queueId, payload, expiryTimeout))
+            .Select(i => _queries.QueueStreamMessageAsync(serviceId, providerId, queueId, payload, expiryTimeout))
             .ToList());
 
         // arrange - dequeue all the messages
-        var messages = await _queries.GetQueueMessagesAsync(serviceId, providerId, queueId, maxCount, maxAttempts, visibilityTimeout);
+        var messages = await _queries.GetStreamMessagesAsync(serviceId, providerId, queueId, maxCount, maxAttempts, visibilityTimeout);
 
         // act - confirm some of the messages at random
         var completed = Randomize(messages).Take(partial).Select(x => new AdoNetStreamConfirmation(x.MessageId, x.Dequeued)).ToList();
-        var confirmed = await _queries.MessagesDeliveredAsync(serviceId, providerId, queueId, completed);
+        var confirmed = await _queries.ConfirmStreamMessagesAsync(serviceId, providerId, queueId, completed);
 
         // assert - counts are as expected
         Assert.Equal(maxCount, acks.Length);
@@ -713,7 +711,7 @@ public class RelationStorageStreamingTests : IAsyncLifetime
                     var providerId = providerIds[Random.Shared.Next(providerIds.Count)];
                     var queueId = queueIds[Random.Shared.Next(queueIds.Count)];
 
-                    var ack = await _queries.QueueMessageBatchAsync(serviceId, providerId, queueId, payload, visibilityTimeout);
+                    var ack = await _queries.QueueStreamMessageAsync(serviceId, providerId, queueId, payload, visibilityTimeout);
 
                     acks.Add(ack);
                 });
@@ -725,7 +723,7 @@ public class RelationStorageStreamingTests : IAsyncLifetime
                     var providerId = providerIds[Random.Shared.Next(providerIds.Count)];
                     var queueId = queueIds[Random.Shared.Next(queueIds.Count)];
 
-                    var messages = await _queries.GetQueueMessagesAsync(serviceId, providerId, queueId, maxCount, maxAttempts, visibilityTimeout);
+                    var messages = await _queries.GetStreamMessagesAsync(serviceId, providerId, queueId, maxCount, maxAttempts, visibilityTimeout);
 
                     foreach (var item in messages)
                     {
@@ -740,14 +738,14 @@ public class RelationStorageStreamingTests : IAsyncLifetime
                     var providerId = providerIds[Random.Shared.Next(providerIds.Count)];
                     var queueId = queueIds[Random.Shared.Next(queueIds.Count)];
 
-                    var messages = await _queries.GetQueueMessagesAsync(serviceId, providerId, queueId, maxCount, maxAttempts, visibilityTimeout);
+                    var messages = await _queries.GetStreamMessagesAsync(serviceId, providerId, queueId, maxCount, maxAttempts, visibilityTimeout);
 
                     foreach (var item in messages)
                     {
                         dequeued2.Add(item);
                     }
 
-                    var confirmation = await _queries.MessagesDeliveredAsync(serviceId, providerId, queueId, messages.Select(x => new AdoNetStreamConfirmation(x.MessageId, x.Dequeued)).ToList());
+                    var confirmation = await _queries.ConfirmStreamMessagesAsync(serviceId, providerId, queueId, messages.Select(x => new AdoNetStreamConfirmation(x.MessageId, x.Dequeued)).ToList());
 
                     foreach (var item in confirmation)
                     {
@@ -781,7 +779,7 @@ public class RelationStorageStreamingTests : IAsyncLifetime
         Assert.Empty(confirmed.ExceptBy(acks.Select(x => x.MessageId), x => x.MessageId));
     }
 
-    private static IList<T> Randomize<T>(IEnumerable<T> source)
+    private static List<T> Randomize<T>(IEnumerable<T> source)
     {
         var list = new List<T>(source.TryGetNonEnumeratedCount(out var count) ? count : 0);
 

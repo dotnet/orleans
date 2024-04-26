@@ -143,17 +143,22 @@ namespace Orleans.Tests.SqlUtils
         /// <summary>
         /// A query template to enqueue a message into a stream table.
         /// </summary>
-        internal string EnqueueStreamMessageKey => queries[nameof(EnqueueStreamMessageKey)];
+        internal string QueueStreamMessageKey => queries[nameof(QueueStreamMessageKey)];
 
         /// <summary>
         /// A query template to dequeue messages from a stream table.
         /// </summary>
-        internal string DequeueStreamMessagesKey => queries[nameof(DequeueStreamMessagesKey)];
+        internal string GetStreamMessagesKey => queries[nameof(GetStreamMessagesKey)];
 
         /// <summary>
         /// A query template to confirm message delivery from a stream table.
         /// </summary>
         internal string ConfirmStreamMessagesKey => queries[nameof(ConfirmStreamMessagesKey)];
+
+        /// <summary>
+        /// A query template to move a message to dead letters.
+        /// </summary>
+        internal string MoveStreamMessageToDeadLettersKey => queries[nameof(MoveStreamMessageToDeadLettersKey)];
 
         /// <summary>
         /// A query template to clean undeliverable messages from a stream table.
@@ -445,6 +450,11 @@ namespace Orleans.Tests.SqlUtils
                 set => Add(nameof(QueueId), value);
             }
 
+            internal long MessageId
+            {
+                set => Add(nameof(MessageId), value);
+            }
+
             internal byte[] Payload
             {
                 set => Add(nameof(Payload), value);
@@ -463,6 +473,11 @@ namespace Orleans.Tests.SqlUtils
             internal int MaxAttempts
             {
                 set => Add(nameof(MaxAttempts), value);
+            }
+
+            internal int RemovalTimeout
+            {
+                set => Add(nameof(RemovalTimeout), value);
             }
 
             internal int VisibilityTimeout

@@ -49,4 +49,15 @@ public class AdoNetStreamOptions
     /// The expiry timeout, in seconds, until a message is considered expired and moved to dead letters.
     /// </summary>
     public int ExpiryTimeout { get; set; } = 300;
+
+    /// <summary>
+    /// The removal timeout, in seconds, until a failed message is deleted from the dead letters table.
+    /// Defaults to seven days.
+    /// </summary>
+    public int RemovalTimeout { get; set; } = 604800;
+
+    /// <summary>
+    /// Whether to delete messages from the dead letters table after <see cref="RemovalTimeout"/>.
+    /// </summary>
+    public bool RemoveDeadLetters { get; set; } = true;
 }

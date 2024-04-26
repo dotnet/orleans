@@ -3,11 +3,12 @@ using Microsoft.Extensions.Logging.Abstractions;
 using Orleans.Configuration;
 using Orleans.Runtime;
 using Orleans.Streaming.AdoNet;
+using Orleans.Streams;
 using Orleans.Tests.SqlUtils;
-using Tester.AdoNet.Fakes;
 using TestExtensions;
 using UnitTests.General;
 using static System.String;
+using RelationalOrleansQueries = Orleans.Streaming.AdoNet.Storage.RelationalOrleansQueries;
 
 namespace Tester.AdoNet.Streaming;
 
@@ -20,6 +21,7 @@ public class AdoNetQueueAdapterTests(TestEnvironmentFixture fixture) : IAsyncLif
     private readonly TestEnvironmentFixture _fixture = fixture;
     private RelationalStorageForTesting _testing;
     private IRelationalStorage _storage;
+    private RelationalOrleansQueries _queries;
 
     private const string TestDatabaseName = "OrleansStreamTest";
     private const string AdoNetInvariantName = AdoNetInvariants.InvariantNameSqlServer;
@@ -30,6 +32,7 @@ public class AdoNetQueueAdapterTests(TestEnvironmentFixture fixture) : IAsyncLif
         Skip.If(IsNullOrEmpty(_testing.CurrentConnectionString), $"Database '{TestDatabaseName}' not initialized");
 
         _storage = _testing.Storage;
+        _queries = await RelationalOrleansQueries.CreateInstance(AdoNetInvariantName, _testing.CurrentConnectionString);
     }
 
     /// <summary>
@@ -45,7 +48,7 @@ public class AdoNetQueueAdapterTests(TestEnvironmentFixture fixture) : IAsyncLif
             ServiceId = serviceId
         };
         var providerId = "MyProviderId";
-        var adoNetStreamingOptions = new AdoNetStreamOptions
+        var streamOptions = new AdoNetStreamOptions
         {
             Invariant = AdoNetInvariantName,
             ConnectionString = _storage.ConnectionString,
@@ -54,10 +57,11 @@ public class AdoNetQueueAdapterTests(TestEnvironmentFixture fixture) : IAsyncLif
         var serializer = _fixture.Serializer.GetSerializer<AdoNetBatchContainer>();
         var logger = NullLogger<AdoNetQueueAdapter>.Instance;
         var streamId = StreamId.Create("MyNamespace", "MyKey");
-        var mapper = new FakeConsistentRingStreamQueueMapper();
-        var queueId = mapper.GetQueueForStream(streamId).ToString();
-        var serviceProvider = new ServiceCollection().BuildServiceProvider();
-        var adapter = new AdoNetQueueAdapter(providerId, logger, adoNetStreamingOptions, clusterOptions, mapper, serializer, serviceProvider);
+        var hashOptions = new HashRingStreamQueueMapperOptions { TotalQueueCount = 8 };
+        var hashMapper = new HashRingBasedStreamQueueMapper(hashOptions, "MyQueue");
+        var adoNetMapper = new AdoNetStreamQueueMapper(hashMapper);
+        var adoNetQueueId = adoNetMapper.GetAdoNetQueueId(streamId);
+        var adapter = new AdoNetQueueAdapter(providerId, streamOptions, clusterOptions, adoNetMapper, _queries, serializer, logger, _fixture.Services);
         var context = new Dictionary<string, object> { { "MyKey", "MyValue" } };
 
         // act - enqueue (via adapter) some messages
@@ -76,13 +80,13 @@ public class AdoNetQueueAdapterTests(TestEnvironmentFixture fixture) : IAsyncLif
 
             Assert.Equal(serviceId, item.ServiceId);
             Assert.Equal(providerId, item.ProviderId);
-            Assert.Equal(queueId, item.QueueId);
+            Assert.Equal(adoNetQueueId, item.QueueId);
             Assert.NotEqual(0, item.MessageId);
             Assert.Equal(0, item.Dequeued);
             Assert.True(item.VisibleOn >= beforeEnqueued);
             Assert.True(item.VisibleOn <= afterEnqueued);
-            Assert.True(item.ExpiresOn >= beforeEnqueued.AddSeconds(adoNetStreamingOptions.ExpiryTimeout));
-            Assert.True(item.ExpiresOn <= afterEnqueued.AddSeconds(adoNetStreamingOptions.ExpiryTimeout));
+            Assert.True(item.ExpiresOn >= beforeEnqueued.AddSeconds(streamOptions.ExpiryTimeout));
+            Assert.True(item.ExpiresOn <= afterEnqueued.AddSeconds(streamOptions.ExpiryTimeout));
             Assert.Equal(item.VisibleOn, item.CreatedOn);
             Assert.Equal(item.VisibleOn, item.ModifiedOn);
 
@@ -117,13 +121,15 @@ public class AdoNetQueueAdapterTests(TestEnvironmentFixture fixture) : IAsyncLif
         var serializer = _fixture.Serializer.GetSerializer<AdoNetBatchContainer>();
         var logger = NullLogger<AdoNetQueueAdapter>.Instance;
         var streamId = StreamId.Create("MyNamespace", "MyKey");
-        var mapper = new FakeConsistentRingStreamQueueMapper();
-        var queueId = mapper.GetQueueForStream(streamId);
-        var adoNetQueueId = queueId.ToString();
+        var hashOptions = new HashRingStreamQueueMapperOptions { TotalQueueCount = 8 };
+        var hashMapper = new HashRingBasedStreamQueueMapper(hashOptions, "MyQueue");
+        var queueId = hashMapper.GetQueueForStream(streamId);
+        var adoMapper = new AdoNetStreamQueueMapper(hashMapper);
+        var adoNetQueueId = adoMapper.GetAdoNetQueueId(streamId);
         var serviceProvider = new ServiceCollection()
             .AddSingleton(serializer)
             .BuildServiceProvider();
-        var adapter = new AdoNetQueueAdapter(providerId, logger, streamOptions, clusterOptions, mapper, serializer, _fixture.Services);
+        var adapter = new AdoNetQueueAdapter(providerId, streamOptions, clusterOptions, adoMapper, _queries, serializer, logger, _fixture.Services);
 
         // act - enqueue (via adapter) some messages
         await _storage.ExecuteAsync("DELETE FROM [OrleansStreamMessage]");

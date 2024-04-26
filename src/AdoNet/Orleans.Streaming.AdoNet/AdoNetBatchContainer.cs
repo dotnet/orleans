@@ -5,7 +5,7 @@ namespace Orleans.Streaming.AdoNet;
 /// </summary>
 /// <remarks>
 /// 1. This class only supports binary serialization as performance and data size is the priority for database storage.
-/// 2. Though the <see cref="SequenceToken"/> is supported here, it is not yet used, as the ADONET provider is not yet rewindable.
+/// 2. Though the <see cref="SequenceToken"/> is supported here, it is not yet used, as the ADO.NET provider is not rewindable.
 /// </remarks>
 [GenerateSerializer]
 [Alias("Orleans.Streaming.AdoNet.AdoNetBatchContainer")]
@@ -32,7 +32,7 @@ internal class AdoNetBatchContainer : IBatchContainer
     public Dictionary<string, object> RequestContext { get; }
 
     [Id(3)]
-    public EventSequenceTokenV2 SequenceToken { get; internal set; }
+    public EventSequenceTokenV2 SequenceToken { get; internal set; } = null!;
 
     /// <summary>
     /// Holds the receipt for message confirmation.

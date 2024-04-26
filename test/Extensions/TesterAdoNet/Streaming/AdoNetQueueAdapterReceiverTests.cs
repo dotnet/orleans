@@ -1,5 +1,4 @@
 using Microsoft.Extensions.Logging.Abstractions;
-using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 using Orleans.Runtime;
 using Orleans.Streaming.AdoNet;
@@ -7,6 +6,7 @@ using Orleans.Tests.SqlUtils;
 using TestExtensions;
 using UnitTests.General;
 using static System.String;
+using RelationalOrleansQueries = Orleans.Streaming.AdoNet.Storage.RelationalOrleansQueries;
 
 namespace Tester.AdoNet.Streaming;
 
@@ -41,21 +41,21 @@ public class AdoNetQueueAdapterReceiverTests(TestEnvironmentFixture fixture) : I
     {
         // arrange - receiver
         var serviceId = "MyServiceId";
-        var clusterOptions = Options.Create(new ClusterOptions
+        var clusterOptions = new ClusterOptions
         {
             ServiceId = serviceId
-        });
+        };
         var providerId = "MyProviderId";
         var queueId = "MyQueueId";
         var maxCount = 10;
-        var adoNetStreamingOptions = new AdoNetStreamOptions
+        var streamOptions = new AdoNetStreamOptions
         {
             Invariant = AdoNetInvariantName,
             ConnectionString = _storage.ConnectionString
         };
         var serializer = _fixture.Serializer.GetSerializer<AdoNetBatchContainer>();
         var logger = NullLogger<AdoNetQueueAdapterReceiver>.Instance;
-        var receiver = new AdoNetQueueAdapterReceiver(serviceId, providerId, queueId, adoNetStreamingOptions, serializer, logger);
+        var receiver = new AdoNetQueueAdapterReceiver(providerId, queueId, streamOptions, clusterOptions, _queries, serializer, logger);
         await receiver.Initialize(TimeSpan.FromSeconds(10));
 
         // arrange - data
@@ -68,11 +68,11 @@ public class AdoNetQueueAdapterReceiverTests(TestEnvironmentFixture fixture) : I
         // arrange - enqueue (via storage) some invalid messages followed by a valid message
         await _storage.ExecuteAsync("DELETE FROM [OrleansStreamMessage]");
         var beforeEnqueued = DateTime.UtcNow;
-        var ackExpired = await _queries.QueueMessageBatchAsync(serviceId, providerId, queueId, payload, 0);
-        var ackOtherQueueId = await _queries.QueueMessageBatchAsync(serviceId, providerId, queueId + "X", payload, 100);
-        var ackOtherProviderId = await _queries.QueueMessageBatchAsync(serviceId, providerId + "X", queueId, payload, 100);
-        var ackOtherServiceId = await _queries.QueueMessageBatchAsync(serviceId + "X", providerId, queueId, payload, 100);
-        var ackValid = await _queries.QueueMessageBatchAsync(serviceId, providerId, queueId, payload, 100);
+        var ackExpired = await _queries.QueueStreamMessageAsync(serviceId, providerId, queueId, payload, 0);
+        var ackOtherQueueId = await _queries.QueueStreamMessageAsync(serviceId, providerId, queueId + "X", payload, 100);
+        var ackOtherProviderId = await _queries.QueueStreamMessageAsync(serviceId, providerId + "X", queueId, payload, 100);
+        var ackOtherServiceId = await _queries.QueueStreamMessageAsync(serviceId + "X", providerId, queueId, payload, 100);
+        var ackValid = await _queries.QueueStreamMessageAsync(serviceId, providerId, queueId, payload, 100);
         var afterEnqueued = DateTime.UtcNow;
 
         // act - dequeue messages via receiver

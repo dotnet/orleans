@@ -1,4 +1,3 @@
-using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Orleans.Configuration;
 using Orleans.Streaming.AdoNet.Storage;
@@ -8,91 +7,66 @@ namespace Orleans.Streaming.AdoNet;
 /// <summary>
 /// Receives message batches from an individual queue of an ADO.NET provider.
 /// </summary>
-internal partial class AdoNetQueueAdapterReceiver : IQueueAdapterReceiver
+internal partial class AdoNetQueueAdapterReceiver(string providerId, string queueId, AdoNetStreamOptions streamOptions, ClusterOptions clusterOptions, RelationalOrleansQueries queries, Serializer<AdoNetBatchContainer> serializer, ILogger<AdoNetQueueAdapterReceiver> logger) : IQueueAdapterReceiver
 {
-    public AdoNetQueueAdapterReceiver(string serviceId, string providerId, string queueId, AdoNetStreamOptions streamOptions, Serializer<AdoNetBatchContainer> serializer, ILogger<AdoNetQueueAdapterReceiver> logger)
-    {
-        ArgumentNullException.ThrowIfNull(serviceId);
-        ArgumentNullException.ThrowIfNull(providerId);
-        ArgumentNullException.ThrowIfNull(queueId);
-        ArgumentNullException.ThrowIfNull(streamOptions);
-        ArgumentNullException.ThrowIfNull(serializer);
-        ArgumentNullException.ThrowIfNull(logger);
-
-        _serviceId = serviceId;
-        _providerId = providerId;
-        _queueId = queueId;
-        _streamOptions = streamOptions;
-        _serializer = serializer;
-        _logger = logger;
-    }
-
-    private readonly string _serviceId;
-    private readonly string _providerId;
-    private readonly string _queueId;
-    private readonly AdoNetStreamOptions _streamOptions;
-    private readonly Serializer<AdoNetBatchContainer> _serializer;
-    private readonly ILogger _logger;
-    private RelationalOrleansQueries _queries;
+    private readonly ILogger<AdoNetQueueAdapterReceiver> _logger = logger;
 
     /// <summary>
     /// Flags that further work should be attempted.
     /// </summary>
-    private bool _halt;
+    private bool _shutdown;
 
     /// <summary>
     /// Helps shutdown wait for any outstanding storage operation.
     /// </summary>
-    private Task _outstandingTask = null;
+    private Task _outstandingTask;
 
     /// <summary>
-    /// Initializes the receiver with the underlying storage queries.
+    /// This receiver does not require initialization.
     /// </summary>
-    public async Task Initialize(TimeSpan timeout) => _queries = await RelationalOrleansQueries.CreateInstance(_streamOptions.Invariant, _streamOptions.ConnectionString).WaitAsync(timeout);
+    public Task Initialize(TimeSpan timeout) => Task.CompletedTask;
 
     /// <summary>
-    /// This receiver does not need to shutdown.
+    /// Waits for any outstanding work before shutting down.
     /// </summary>
     public async Task Shutdown(TimeSpan timeout)
     {
         // disable any further attempts to access storage
-        _halt = true;
+        _shutdown = true;
 
         // wait for any outstanding storage operation to complete.
         var outstandingTask = _outstandingTask;
         if (outstandingTask is not null)
         {
-            await outstandingTask;
+            await outstandingTask.WaitAsync(timeout);
         }
     }
 
-    /// <summary>
-    /// Dequeues a batch of messages from the associated adonet queue.
-    /// </summary>
+    /// <inheritdoc />
     public async Task<IList<IBatchContainer>> GetQueueMessagesAsync(int maxCount)
     {
-        // if shutdown has been called we refuse to work gracefully
-        if (_halt)
+        // if shutdown has been called then we refuse further requests gracefully
+        if (_shutdown)
         {
             return [];
         }
 
         // cap max count as appropriate
-        maxCount = maxCount <= 0 ? _streamOptions.MaxBatchSize : Math.Min(maxCount, _streamOptions.MaxBatchSize);
+        maxCount = maxCount <= 0 ? streamOptions.MaxBatchSize : Math.Min(maxCount, streamOptions.MaxBatchSize);
 
         try
         {
             // grab a message batch from storage while pinning the task so shutdown can wait for it
-            var task = _queries.GetQueueMessagesAsync(_serviceId, _providerId, _queueId, maxCount, _streamOptions.MaxAttempts, _streamOptions.VisibilityTimeout);
+            var task = queries.GetStreamMessagesAsync(clusterOptions.ServiceId, providerId, queueId, maxCount, streamOptions.MaxAttempts, streamOptions.VisibilityTimeout);
             _outstandingTask = task;
             var messages = await task;
 
             // convert the messages into standard batch containers
-            return messages.Select(x => AdoNetBatchContainer.FromMessage(_serializer, x)).Cast<IBatchContainer>().ToList();
+            return messages.Select(x => AdoNetBatchContainer.FromMessage(serializer, x)).Cast<IBatchContainer>().ToList();
         }
         catch (Exception ex)
         {
-            LogDequeueFailed(ex, _serviceId, _providerId, _queueId);
+            LogDequeueFailed(ex, clusterOptions.ServiceId, providerId, queueId);
             throw;
         }
         finally
@@ -101,6 +75,7 @@ internal partial class AdoNetQueueAdapterReceiver : IQueueAdapterReceiver
         }
     }
 
+    /// <inheritdoc />
     public async Task MessagesDeliveredAsync(IList<IBatchContainer> messages)
     {
         // skip work if there are no messages to deliver
@@ -115,7 +90,7 @@ internal partial class AdoNetQueueAdapterReceiver : IQueueAdapterReceiver
         try
         {
             // execute the confirmation while pinning the task so shutdown can wait for it
-            var task = _queries.MessagesDeliveredAsync(_serviceId, _providerId, _queueId, items);
+            var task = queries.ConfirmStreamMessagesAsync(clusterOptions.ServiceId, providerId, queueId, items);
             _outstandingTask = task;
 
             try
@@ -124,7 +99,7 @@ internal partial class AdoNetQueueAdapterReceiver : IQueueAdapterReceiver
             }
             catch (Exception ex)
             {
-                LogConfirmationFailed(ex, _serviceId, _providerId, _queueId, items);
+                LogConfirmationFailed(ex, clusterOptions.ClusterId, providerId, queueId, items);
                 throw;
             }
         }
@@ -136,10 +111,10 @@ internal partial class AdoNetQueueAdapterReceiver : IQueueAdapterReceiver
 
     #region Logging
 
-    [LoggerMessage(1, LogLevel.Error, "Failed to dequeue messages for ServiceId: {ServiceId}, ProviderId: {ProviderId}, QueueId: {QueueId}")]
+    [LoggerMessage(1, LogLevel.Error, "Failed to get messages from ({ServiceId}, {ProviderId}, {QueueId})")]
     private partial void LogDequeueFailed(Exception exception, string serviceId, string providerId, string queueId);
 
-    [LoggerMessage(2, LogLevel.Error, "Failed to confirm messages for ServiceId: {ServiceId}, ProviderId: {ProviderId}, QueueId: {QueueId}, Items: {Items}")]
+    [LoggerMessage(2, LogLevel.Error, "Failed to confirm messages for ({ServiceId}, {ProviderId}, {QueueId}, {@Items})")]
     private partial void LogConfirmationFailed(Exception exception, string serviceId, string providerId, string queueId, List<AdoNetStreamConfirmation> items);
 
     #endregion Logging

@@ -133,8 +133,8 @@ CREATE TABLE [OrleansStreamDeadLetter]
 );
 GO
 
-/* Enqueues a message to the Orleans Streaming Message Queue */
-CREATE PROCEDURE [EnqueueStreamMessage]
+/* Queues a message to the Orleans Streaming Message Queue */
+CREATE PROCEDURE [QueueStreamMessage]
 	@ServiceId NVARCHAR(150),
     @ProviderId NVARCHAR(150),
 	@QueueId NVARCHAR(150),
@@ -190,12 +190,12 @@ INSERT INTO [OrleansQuery]
 	[QueryText]
 )
 SELECT
-	'EnqueueStreamMessageKey',
-	'EXECUTE [EnqueueStreamMessage] @ServiceId = @ServiceId, @ProviderId = @ProviderId, @QueueId = @QueueId, @Payload = @Payload, @ExpiryTimeout = @ExpiryTimeout'
+	'QueueStreamMessageKey',
+	'EXECUTE [QueueStreamMessage] @ServiceId = @ServiceId, @ProviderId = @ProviderId, @QueueId = @QueueId, @Payload = @Payload, @ExpiryTimeout = @ExpiryTimeout'
 GO
 
-/* Dequeues message batches from the Orleans Streaming Message Queue */
-CREATE PROCEDURE [DequeueStreamMessages]
+/* Gets message batches from the Orleans Streaming Message Queue */
+CREATE PROCEDURE [GetStreamMessages]
 	@ServiceId NVARCHAR(150),
     @ProviderId NVARCHAR(150),
 	@QueueId NVARCHAR(150),
@@ -267,8 +267,8 @@ INSERT INTO [OrleansQuery]
 	[QueryText]
 )
 SELECT
-	'DequeueStreamMessagesKey',
-	'EXECUTE [DequeueStreamMessages] @ServiceId = @ServiceId, @ProviderId = @ProviderId, @QueueId = @QueueId, @MaxCount = @MaxCount, @MaxAttempts = @MaxAttempts, @VisibilityTimeout = @VisibilityTimeout'
+	'GetStreamMessagesKey',
+	'EXECUTE [GetStreamMessages] @ServiceId = @ServiceId, @ProviderId = @ProviderId, @QueueId = @QueueId, @MaxCount = @MaxCount, @MaxAttempts = @MaxAttempts, @VisibilityTimeout = @VisibilityTimeout'
 GO
 
 /* Confirms delivery of a stream message. */
@@ -348,6 +348,97 @@ INSERT INTO [OrleansQuery]
 SELECT
 	'ConfirmStreamMessagesKey',
 	'EXECUTE [ConfirmStreamMessages] @ServiceId = @ServiceId, @ProviderId = @ProviderId, @QueueId = @QueueId, @Items = @Items'
+GO
+
+/* Moves a non-delivered message from the message table to the dead letter table for human troubleshooting. */
+CREATE PROCEDURE [MoveStreamMessageToDeadLetters]
+	@ServiceId NVARCHAR(150),
+    @ProviderId NVARCHAR(150),
+	@QueueId NVARCHAR(150),
+    @MessageId INT,
+	@MaxAttempts INT,
+	@RemovalTimeout INT
+AS
+BEGIN
+
+SET NOCOUNT ON;
+SET XACT_ABORT ON;
+
+DECLARE @Now DATETIME2(7) = SYSUTCDATETIME();
+DECLARE @RemoveOn DATETIME2(7) = DATEADD(SECOND, @RemovalTimeout, @Now);
+
+WITH [Message] AS
+(
+	SELECT
+		[ServiceId],
+        [ProviderId],
+		[QueueId],
+		[MessageId],
+		[Dequeued],
+		[VisibleOn],
+		[ExpiresOn],
+		[CreatedOn],
+		[ModifiedOn],
+		[DeadOn] = @Now,
+		[RemoveOn] = @RemoveOn,
+		[Payload]
+	FROM
+		[OrleansStreamMessage]
+	WHERE
+		[ServiceId] = @ServiceId
+        AND [ProviderId] = @ProviderId
+		AND [QueueId] = @QueueId
+        AND [MessageId] = @MessageId
+		AND
+		(
+			-- a message is no longer dequeueable if the last attempt timed out
+			([Dequeued] >= @MaxAttempts AND [VisibleOn] <= @Now)
+			OR
+			-- a message is no longer dequeueable if it has expired regardless
+			([ExpiresOn] <= @Now)
+		)
+)
+DELETE FROM [Message]
+OUTPUT
+	[Deleted].[ServiceId],
+    [Deleted].[ProviderId],
+	[Deleted].[QueueId],
+	[Deleted].[MessageId],
+	[Deleted].[Dequeued],
+	[Deleted].[VisibleOn],
+	[Deleted].[ExpiresOn],
+	[Deleted].[CreatedOn],
+	[Deleted].[ModifiedOn],
+	[Deleted].[DeadOn],
+	[Deleted].[RemoveOn],
+	[Deleted].[Payload]
+INTO [OrleansStreamDeadLetter]
+(
+	[ServiceId],
+    [ProviderId],
+	[QueueId],
+	[MessageId],
+	[Dequeued],
+	[VisibleOn],
+	[ExpiresOn],
+	[CreatedOn],
+	[ModifiedOn],
+	[DeadOn],
+	[RemoveOn],
+	[Payload]
+);
+
+END
+GO
+
+INSERT INTO [OrleansQuery]
+(
+	[QueryKey],
+	[QueryText]
+)
+SELECT
+	'MoveStreamMessageToDeadLettersKey',
+	'EXECUTE [MoveStreamMessageToDeadLetters] @ServiceId = @ServiceId, @ProviderId = @ProviderId, @QueueId = @QueueId, @MessageId = @MessageId, @MaxCount = @MaxCount, @MaxAttempts = @MaxAttempts, @RemovalTimeout = @RemovalTimeout'
 GO
 
 /* Moves non-delivered messages from the message table to the dead letter table for human troubleshooting. */
