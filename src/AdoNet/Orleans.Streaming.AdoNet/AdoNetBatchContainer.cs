@@ -46,9 +46,14 @@ internal class AdoNetBatchContainer : IBatchContainer
 
     StreamSequenceToken IBatchContainer.SequenceToken => SequenceToken;
 
-    public IEnumerable<Tuple<T, StreamSequenceToken>> GetEvents<T>() => Events
-        .OfType<T>()
-        .Select((e, i) => Tuple.Create<T, StreamSequenceToken>(e, SequenceToken.CreateSequenceTokenForEvent(i)));
+    public IEnumerable<Tuple<T, StreamSequenceToken>> GetEvents<T>()
+    {
+        return SequenceToken is null
+            ? throw new InvalidOperationException($"Cannot get events from a half-baked {nameof(AdoNetBatchContainer)}")
+            : Events
+                .OfType<T>()
+                .Select((e, i) => Tuple.Create<T, StreamSequenceToken>(e, SequenceToken.CreateSequenceTokenForEvent(i)));
+    }
 
     public bool ImportRequestContext()
     {
