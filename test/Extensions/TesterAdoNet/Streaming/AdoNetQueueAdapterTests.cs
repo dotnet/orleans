@@ -36,6 +36,37 @@ public class AdoNetQueueAdapterTests(TestEnvironmentFixture fixture) : IAsyncLif
     }
 
     /// <summary>
+    /// Tests that the <see cref="AdoNetQueueAdapter"/> constructs with the expected state.
+    /// </summary>
+    [SkippableFact]
+    public void AdoNetQueueAdapter_Constructs()
+    {
+        // arrange
+        var name = "MyProviderId";
+        var streamOptions = new AdoNetStreamOptions
+        {
+            Invariant = AdoNetInvariantName,
+            ConnectionString = _storage.ConnectionString
+        };
+        var clusterOptions = new ClusterOptions
+        {
+            ServiceId = "MyServiceId"
+        };
+        var mapper = new AdoNetStreamQueueMapper(new HashRingBasedStreamQueueMapper(new HashRingStreamQueueMapperOptions { TotalQueueCount = 8 }, "MyQueue"));
+        var serializer = _fixture.Serializer.GetSerializer<AdoNetBatchContainer>();
+        var logger = NullLogger<AdoNetQueueAdapter>.Instance;
+        var serviceProvider = _fixture.Services;
+
+        // act
+        var adapter = new AdoNetQueueAdapter(name, streamOptions, clusterOptions, mapper, _queries, serializer, logger, serviceProvider);
+
+        // assert
+        Assert.Equal(name, adapter.Name);
+        Assert.False(adapter.IsRewindable);
+        Assert.Equal(StreamProviderDirection.ReadWrite, adapter.Direction);
+    }
+
+    /// <summary>
     /// Tests that the <see cref="AdoNetQueueAdapter"/> can enqueue messages.
     /// </summary>
     [SkippableFact]
@@ -104,7 +135,7 @@ public class AdoNetQueueAdapterTests(TestEnvironmentFixture fixture) : IAsyncLif
     /// Tests that the <see cref="AdoNetQueueAdapter"/> can enqueue messages that are visible to its receivers.
     /// </summary>
     [SkippableFact]
-    public async Task AdoNetQueueAdapter_WiresUpReceivers()
+    public async Task AdoNetQueueAdapter_WiresUpReceiver()
     {
         // arrange
         var serviceId = "MyServiceId";
@@ -126,9 +157,6 @@ public class AdoNetQueueAdapterTests(TestEnvironmentFixture fixture) : IAsyncLif
         var queueId = hashMapper.GetQueueForStream(streamId);
         var adoMapper = new AdoNetStreamQueueMapper(hashMapper);
         var adoNetQueueId = adoMapper.GetAdoNetQueueId(streamId);
-        var serviceProvider = new ServiceCollection()
-            .AddSingleton(serializer)
-            .BuildServiceProvider();
         var adapter = new AdoNetQueueAdapter(providerId, streamOptions, clusterOptions, adoMapper, _queries, serializer, logger, _fixture.Services);
 
         // act - enqueue (via adapter) some messages
@@ -139,7 +167,7 @@ public class AdoNetQueueAdapterTests(TestEnvironmentFixture fixture) : IAsyncLif
         await adapter.QueueMessageBatchAsync(streamId, new[] { new TestModel(3) }, null, new Dictionary<string, object> { { "MyKey", 3 } });
         var afterEnqueued = DateTime.UtcNow;
 
-        // act - grab receivers and dequeue messages
+        // act - grab receiver and dequeue messages
         var receiver = adapter.CreateReceiver(queueId);
         await receiver.Initialize(TimeSpan.FromSeconds(10));
         var beforeDequeued = DateTime.UtcNow;
