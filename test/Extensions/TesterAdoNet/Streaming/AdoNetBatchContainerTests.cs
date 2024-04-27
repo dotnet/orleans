@@ -90,6 +90,41 @@ public class AdoNetBatchContainerTests(TestEnvironmentFixture fixture)
         Assert.Equal([new EventSequenceTokenV2(123, 0), new EventSequenceTokenV2(123, 1)], container.GetEvents<OtherModel>().Select(x => x.Item2));
     }
 
+    [Fact]
+    public void AdoNetBatchContainer_ImportsRequestContext()
+    {
+        // arrange
+        var streamId = StreamId.Create("MyNamespace", "MyKey");
+        var events = new List<object> { new TestModel(1) };
+        var requestContext = new Dictionary<string, object> { { "MyKey", "Value" } };
+
+        // act
+        var container = new AdoNetBatchContainer(streamId, events, requestContext);
+
+        // assert
+        Assert.Equal(streamId, container.StreamId);
+        Assert.Equal(events, container.Events);
+        Assert.Equal(requestContext, container.RequestContext);
+        Assert.Null(container.SequenceToken);
+        Assert.Equal(0, container.Dequeued);
+    }
+
+    [Fact]
+    public void AdoNetBatchContainer_ToStringRenders()
+    {
+        // arrange
+        var streamId = StreamId.Create("MyNamespace", "MyKey");
+        var events = new List<object> { new TestModel(1) };
+        var requestContext = new Dictionary<string, object> { { "MyKey", "Value" } };
+        var container = new AdoNetBatchContainer(streamId, events, requestContext);
+
+        // act
+        var result = container.ToString();
+
+        // assert
+        Assert.Equal($"[{nameof(AdoNetBatchContainer)}:Stream={streamId},#Items={events.Count}]", result);
+    }
+
     [GenerateSerializer]
     [Alias("Tester.AdoNet.Streaming.AdoNetBatchContainerTests.TestModel")]
     public record TestModel(
