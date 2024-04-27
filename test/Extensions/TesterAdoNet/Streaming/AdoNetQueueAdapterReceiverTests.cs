@@ -113,6 +113,45 @@ public class AdoNetQueueAdapterReceiverTests(TestEnvironmentFixture fixture) : I
         Assert.False(storedConfirmed.ContainsKey(ackValid.MessageId));
     }
 
+    /// <summary>
+    /// Tests that <see cref="AdoNetQueueAdapterReceiver.Shutdown(TimeSpan)"/> waits for the outstanding task.
+    /// </summary>
+    /// <returns></returns>
+    [SkippableFact]
+    public async Task AdoNetQueueAdapterReceiver_Shutdown_WaitsForOutstandingTask()
+    {
+        // arrange - receiver
+        var serviceId = "MyServiceId";
+        var clusterOptions = new ClusterOptions
+        {
+            ServiceId = serviceId
+        };
+        var providerId = "MyProviderId";
+        var queueId = "MyQueueId";
+        var streamOptions = new AdoNetStreamOptions
+        {
+            Invariant = AdoNetInvariantName,
+            ConnectionString = _storage.ConnectionString
+        };
+        var serializer = _fixture.Serializer.GetSerializer<AdoNetBatchContainer>();
+        var logger = NullLogger<AdoNetQueueAdapterReceiver>.Instance;
+        var receiver = new AdoNetQueueAdapterReceiver(providerId, queueId, streamOptions, clusterOptions, _queries, serializer, logger);
+        await receiver.Initialize(TimeSpan.FromSeconds(10));
+
+        // arrange - enqueue a message
+        var payload = serializer.SerializeToArray(new AdoNetBatchContainer(StreamId.Create("MyNamespace", "MyKey"), [new TestModel(1)], null));
+        await _queries.QueueStreamMessageAsync(serviceId, providerId, queueId, payload, 100);
+
+        // act - start getting messages from the receiver
+        var getTask = receiver.GetQueueMessagesAsync(10);
+
+        // act - shutdown the receiver
+        await receiver.Shutdown(TimeSpan.FromSeconds(10));
+
+        // assert - the outstanding task completes before the shutdown task
+        Assert.True(getTask.IsCompleted);
+    }
+
     public Task DisposeAsync() => Task.CompletedTask;
 
     [GenerateSerializer]
