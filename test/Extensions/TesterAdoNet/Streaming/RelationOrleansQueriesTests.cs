@@ -1,16 +1,21 @@
 using System.Collections.Concurrent;
+using Microsoft.Extensions.Logging.Abstractions;
+using Orleans.Configuration;
+using Orleans.Providers.Streams.Common;
+using Orleans.Runtime;
 using Orleans.Streaming.AdoNet;
 using Orleans.Streaming.AdoNet.Storage;
+using Orleans.Streams;
 using UnitTests.General;
 using static System.String;
 
 namespace Tester.AdoNet.Streaming;
 
 /// <summary>
-/// Tests the relational storage layer.
+/// Tests the relational storage layer via <see cref="RelationalOrleansQueries"/>.
 /// </summary>
 [TestCategory("AdoNet"), TestCategory("Streaming")]
-public class RelationStorageStreamingTests : IAsyncLifetime
+public class RelationOrleansQueriesTests : IAsyncLifetime
 {
     private const string TestDatabaseName = "OrleansStreamTest";
     private const string AdoNetInvariantName = AdoNetInvariants.InvariantNameSqlServer;
@@ -46,10 +51,10 @@ public class RelationStorageStreamingTests : IAsyncLifetime
     public Task DisposeAsync() => Task.CompletedTask;
 
     /// <summary>
-    /// Tests that a single message is enqueued.
+    /// Tests that a single message is queued.
     /// </summary>
     [SkippableFact]
-    public async Task EnqueuesMessage()
+    public async Task RelationalOrleansQueries_QueuesMessage()
     {
         // arrange
         await _storage.ExecuteAsync("DELETE FROM [OrleansStreamMessage]");
@@ -89,10 +94,10 @@ public class RelationStorageStreamingTests : IAsyncLifetime
     }
 
     /// <summary>
-    /// Tests that many messages are enqueued in parallel on the same queue.
+    /// Tests that many messages are queued in parallel on the same queue.
     /// </summary>
     [SkippableFact]
-    public async Task EnqueuesManyMessagesInParallel()
+    public async Task RelationalOrleansQueries_QueuesManyMessagesInParallel()
     {
         // arrange
         await _storage.ExecuteAsync("DELETE FROM [OrleansStreamMessage]");
@@ -152,10 +157,10 @@ public class RelationStorageStreamingTests : IAsyncLifetime
     }
 
     /// <summary>
-    /// Tests that many messages are enqueued in parallel on many queues.
+    /// Tests that many messages are queued in parallel on many queues.
     /// </summary>
     [SkippableFact]
-    public async Task EnqueuesManyMessagesInParallelOnManyQueues()
+    public async Task RelationalOrleansQueries_QueuesManyMessagesInParallelOnManyQueues()
     {
         // arrange - create up to 27 random partition keys with around 1000 random messages per partition in random order
         await _storage.ExecuteAsync("DELETE FROM [OrleansStreamMessage]");
@@ -222,7 +227,7 @@ public class RelationStorageStreamingTests : IAsyncLifetime
     /// Tests that a single message is dequeued correctly.
     /// </summary>
     [SkippableFact]
-    public async Task DequeuesSingleMessage()
+    public async Task RelationalOrleansQueries_DequeuesSingleMessage()
     {
         // arrange
         await _storage.ExecuteAsync("DELETE FROM [OrleansStreamMessage]");
@@ -279,7 +284,7 @@ public class RelationStorageStreamingTests : IAsyncLifetime
     /// Tests that messages are dequeued in a batch.
     /// </summary>
     [SkippableFact]
-    public async Task DequeuesMessageBatches()
+    public async Task RelationalOrleansQueries_DequeuesMessageBatches()
     {
         // arrange
         await _storage.ExecuteAsync("DELETE FROM [OrleansStreamMessage]");
@@ -361,7 +366,7 @@ public class RelationStorageStreamingTests : IAsyncLifetime
     /// Tests that a single message is re-dequeued after visibility timeout until max attempts.
     /// </summary>
     [SkippableFact]
-    public async Task DequeuesSingleMessageAgainAfterVisibilityTimeout()
+    public async Task RelationalOrleansQueries_DequeuesSingleMessageAgainAfterVisibilityTimeout()
     {
         // arrange
         await _storage.ExecuteAsync("DELETE FROM [OrleansStreamMessage]");
@@ -431,7 +436,7 @@ public class RelationStorageStreamingTests : IAsyncLifetime
     /// Tests that a single message is not dequeued again before the visibility timeout.
     /// </summary>
     [SkippableFact]
-    public async Task DoesNotDequeueSingleMessageBeforeVisibilityTimeout()
+    public async Task RelationalOrleansQueries_DoesNotDequeueSingleMessageBeforeVisibilityTimeout()
     {
         // arrange
         await _storage.ExecuteAsync("DELETE FROM [OrleansStreamMessage]");
@@ -478,7 +483,7 @@ public class RelationStorageStreamingTests : IAsyncLifetime
     /// Tests that a single message is not dequeued again after expiry
     /// </summary>
     [SkippableFact]
-    public async Task DoesNotDequeueSingleMessageAfterExpiry()
+    public async Task RelationalOrleansQueries_DoesNotDequeueSingleMessageAfterExpiry()
     {
         // arrange
         await _storage.ExecuteAsync("DELETE FROM [OrleansStreamMessage]");
@@ -524,7 +529,7 @@ public class RelationStorageStreamingTests : IAsyncLifetime
     /// Tests that messages can be confirmed.
     /// </summary>
     [SkippableFact]
-    public async Task ConfirmsMessages()
+    public async Task RelationalOrleansQueries_ConfirmsMessages()
     {
         // arrange
         await _storage.ExecuteAsync("DELETE FROM [OrleansStreamMessage]");
@@ -570,7 +575,7 @@ public class RelationStorageStreamingTests : IAsyncLifetime
     /// Tests that messages are not confirmed if the receipt is incorrect.
     /// </summary>
     [SkippableFact]
-    public async Task DoesNotConfirmMessagesWithWrongReceipt()
+    public async Task RelationalOrleansQueries_DoesNotConfirmMessagesWithWrongReceipt()
     {
         // arrange
         await _storage.ExecuteAsync("DELETE FROM [OrleansStreamMessage]");
@@ -610,7 +615,7 @@ public class RelationStorageStreamingTests : IAsyncLifetime
     /// Chaos tests that some messages can be confirmed while others are not.
     /// </summary>
     [SkippableFact]
-    public async Task ConfirmsSomeMessagesAndNotOthers()
+    public async Task RelationalOrleansQueries_ConfirmsSomeMessagesAndNotOthers()
     {
         // arrange
         await _storage.ExecuteAsync("DELETE FROM [OrleansStreamMessage]");
@@ -667,7 +672,7 @@ public class RelationStorageStreamingTests : IAsyncLifetime
     /// This is an expensive test to run but can protect against invisible regression.
     /// </remarks>
     [SkippableFact]
-    public async Task ChaosEnqueuesAndDequeuesManyMessagesOnManyQueues()
+    public async Task RelationalOrleansQueries_ChaosEnqueuesAndDequeuesManyMessagesOnManyQueues()
     {
         // arrange - clean up
         await _storage.ExecuteAsync("DELETE FROM [OrleansStreamMessage]");
@@ -678,18 +683,6 @@ public class RelationStorageStreamingTests : IAsyncLifetime
         var providerIds = Enumerable.Range(0, 3).Select(x => $"ProviderId{x}").ToList();
         var queueIds = Enumerable.Range(0, 3).Select(x => $"QueueId{x}").ToList();
         var payload = RandomPayload(1000);
-        var source = Enumerable
-            .Range(0, total)
-            .Select(x =>
-            (
-                ServiceId: serviceIds[Random.Shared.Next(serviceIds.Count)],
-                ProviderId: providerIds[Random.Shared.Next(providerIds.Count)],
-                QueueId: queueIds[Random.Shared.Next(queueIds.Count)],
-                Payload: RandomPayload(10),
-                ExpiryTimeout: RandomExpiryTimeout(3)
-            ))
-            .ToList();
-
         var maxCount = 3;
         var maxAttempts = 3;
         var visibilityTimeout = 1;
@@ -777,6 +770,131 @@ public class RelationStorageStreamingTests : IAsyncLifetime
 
         // assert - confirmed messages all match acks
         Assert.Empty(confirmed.ExceptBy(acks.Select(x => x.MessageId), x => x.MessageId));
+    }
+
+    /// <summary>
+    /// Tests that an expired message can be moved to dead letters.
+    /// </summary>
+    [SkippableFact]
+    public async Task RelationalOrleansQueries_MovesExpiredMessageToDeadLetters()
+    {
+        // arrange
+        var serviceId = "ServiceId";
+        var providerId = "ProviderId";
+        var streamOptions = new AdoNetStreamOptions();
+
+        // arrange - queue an expired message
+        await _storage.ExecuteAsync("DELETE FROM [OrleansStreamMessage]");
+        await _storage.ExecuteAsync("DELETE FROM [OrleansStreamDeadLetter]");
+        var queueId = "QueueId";
+        var payload = new byte[] { 0xFF };
+
+        var beforeQueued = DateTime.UtcNow;
+        var ack = await _queries.QueueStreamMessageAsync(serviceId, providerId, queueId, payload, 0);
+        var afterQueued = DateTime.UtcNow;
+
+        // act
+        var beforeFailure = DateTime.UtcNow;
+        await _queries.MoveMessageToDeadLettersAsync(ack.ServiceId, ack.ProviderId, ack.QueueId, ack.MessageId, streamOptions.MaxAttempts, streamOptions.RemovalTimeout);
+        var afterFailure = DateTime.UtcNow;
+
+        // assert
+        var dead = Assert.Single(await _storage.ReadAsync<AdoNetStreamDeadLetter>("SELECT * FROM [OrleansStreamDeadLetter]"));
+        Assert.Equal(serviceId, dead.ServiceId);
+        Assert.Equal(providerId, dead.ProviderId);
+        Assert.Equal(queueId, dead.QueueId);
+        Assert.Equal(ack.MessageId, dead.MessageId);
+        Assert.Equal(0, dead.Dequeued);
+        Assert.True(dead.ExpiresOn >= beforeQueued);
+        Assert.True(dead.ExpiresOn <= afterQueued);
+        Assert.True(dead.CreatedOn >= beforeQueued);
+        Assert.True(dead.CreatedOn <= afterQueued);
+        Assert.True(dead.ModifiedOn >= beforeQueued);
+        Assert.True(dead.ModifiedOn <= afterQueued);
+        Assert.True(dead.DeadOn >= beforeFailure);
+        Assert.True(dead.DeadOn <= afterFailure);
+        Assert.True(dead.RemoveOn >= beforeFailure.AddSeconds(streamOptions.RemovalTimeout));
+        Assert.True(dead.RemoveOn <= afterFailure.AddSeconds(streamOptions.RemovalTimeout));
+        Assert.Equal(payload, dead.Payload);
+    }
+
+    /// <summary>
+    /// Tests that a poisoned message can be moved to dead letters.
+    /// </summary>
+    [SkippableFact]
+    public async Task RelationalOrleansQueries_MovesPoisonedMessageToDeadLetters()
+    {
+        // arrange
+        var serviceId = "ServiceId";
+        var providerId = "ProviderId";
+        var streamOptions = new AdoNetStreamOptions();
+
+        // arrange - queue an expired message
+        await _storage.ExecuteAsync("DELETE FROM [OrleansStreamMessage]");
+        await _storage.ExecuteAsync("DELETE FROM [OrleansStreamDeadLetter]");
+        var queueId = "QueueId";
+        var payload = new byte[] { 0xFF };
+
+        var beforeQueued = DateTime.UtcNow;
+        var ack = await _queries.QueueStreamMessageAsync(serviceId, providerId, queueId, payload, streamOptions.ExpiryTimeout);
+        var afterQueued = DateTime.UtcNow;
+
+        // arrange - dequeue the message and make immediately available
+        var beforeDequeued = DateTime.UtcNow;
+        await _queries.GetStreamMessagesAsync(ack.ServiceId, ack.ProviderId, ack.QueueId, streamOptions.MaxBatchSize, streamOptions.MaxAttempts, 0);
+        var afterDequeued = DateTime.UtcNow;
+
+        // act - clean up with max attempts of one so the message above is flagged
+        var beforeFailure = DateTime.UtcNow;
+        await _queries.MoveMessageToDeadLettersAsync(ack.ServiceId, ack.ProviderId, ack.QueueId, ack.MessageId, 1, streamOptions.RemovalTimeout);
+        var afterFailure = DateTime.UtcNow;
+
+        // assert
+        var dead = Assert.Single(await _storage.ReadAsync<AdoNetStreamDeadLetter>("SELECT * FROM [OrleansStreamDeadLetter]"));
+        Assert.Equal(serviceId, dead.ServiceId);
+        Assert.Equal(providerId, dead.ProviderId);
+        Assert.Equal(queueId, dead.QueueId);
+        Assert.Equal(ack.MessageId, dead.MessageId);
+        Assert.Equal(1, dead.Dequeued);
+        Assert.True(dead.ExpiresOn >= beforeQueued.AddSeconds(streamOptions.ExpiryTimeout));
+        Assert.True(dead.ExpiresOn <= afterQueued.AddSeconds(streamOptions.ExpiryTimeout));
+        Assert.True(dead.CreatedOn >= beforeQueued);
+        Assert.True(dead.CreatedOn <= afterQueued);
+        Assert.True(dead.ModifiedOn >= beforeDequeued);
+        Assert.True(dead.ModifiedOn <= afterDequeued);
+        Assert.True(dead.DeadOn >= beforeFailure);
+        Assert.True(dead.DeadOn <= afterFailure);
+        Assert.True(dead.RemoveOn >= beforeFailure.AddSeconds(streamOptions.RemovalTimeout));
+        Assert.True(dead.RemoveOn <= afterFailure.AddSeconds(streamOptions.RemovalTimeout));
+        Assert.Equal(payload, dead.Payload);
+    }
+
+    /// <summary>
+    /// Tests that a healthy message is not moved to dead letters.
+    /// </summary>
+    [SkippableFact]
+    public async Task RelationalOrleansQueries_DoesNotMoveHealthyMessageToDeadLetters()
+    {
+        // arrange
+        var serviceId = "ServiceId";
+        var providerId = "ProviderId";
+        var streamOptions = new AdoNetStreamOptions();
+
+        // arrange - queue an expired message
+        await _storage.ExecuteAsync("DELETE FROM [OrleansStreamMessage]");
+        await _storage.ExecuteAsync("DELETE FROM [OrleansStreamDeadLetter]");
+        var queueId = "QueueId";
+        var payload = new byte[] { 0xFF };
+        var ack = await _queries.QueueStreamMessageAsync(serviceId, providerId, queueId, payload, streamOptions.ExpiryTimeout);
+
+        // arrange - dequeue the message and make immediately available
+        await _queries.GetStreamMessagesAsync(ack.ServiceId, ack.ProviderId, ack.QueueId, streamOptions.MaxBatchSize, streamOptions.MaxAttempts, streamOptions.VisibilityTimeout);
+
+        // act - clean up with max attempts of one so the message above is flagged
+        await _queries.MoveMessageToDeadLettersAsync(ack.ServiceId, ack.ProviderId, ack.QueueId, ack.MessageId, streamOptions.MaxAttempts, streamOptions.RemovalTimeout);
+
+        // assert
+        Assert.Empty(await _storage.ReadAsync<AdoNetStreamDeadLetter>("SELECT * FROM [OrleansStreamDeadLetter]"));
     }
 
     private static List<T> Randomize<T>(IEnumerable<T> source)

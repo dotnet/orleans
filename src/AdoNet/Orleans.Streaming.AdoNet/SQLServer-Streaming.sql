@@ -391,10 +391,10 @@ WITH [Message] AS
         AND [MessageId] = @MessageId
 		AND
 		(
-			-- a message is no longer dequeueable if the last attempt timed out
+			-- a message is dead if the last attempt timed out
 			([Dequeued] >= @MaxAttempts AND [VisibleOn] <= @Now)
 			OR
-			-- a message is no longer dequeueable if it has expired regardless
+			-- a message is dead if it expired regardless
 			([ExpiresOn] <= @Now)
 		)
 )
@@ -438,7 +438,7 @@ INSERT INTO [OrleansQuery]
 )
 SELECT
 	'MoveStreamMessageToDeadLettersKey',
-	'EXECUTE [MoveStreamMessageToDeadLetters] @ServiceId = @ServiceId, @ProviderId = @ProviderId, @QueueId = @QueueId, @MessageId = @MessageId, @MaxCount = @MaxCount, @MaxAttempts = @MaxAttempts, @RemovalTimeout = @RemovalTimeout'
+	'EXECUTE [MoveStreamMessageToDeadLetters] @ServiceId = @ServiceId, @ProviderId = @ProviderId, @QueueId = @QueueId, @MessageId = @MessageId, @MaxAttempts = @MaxAttempts, @RemovalTimeout = @RemovalTimeout'
 GO
 
 /* Moves non-delivered messages from the message table to the dead letter table for human troubleshooting. */

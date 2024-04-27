@@ -54,6 +54,7 @@ internal partial class AdoNetStreamFailureHandler(bool faultOnFailure, AdoNetStr
         catch (Exception ex)
         {
             LogFailedToMoveMessage(ex, clusterOptions.ServiceId, streamProviderName, queueId, sequenceToken.SequenceNumber);
+            throw;
         }
     }
 

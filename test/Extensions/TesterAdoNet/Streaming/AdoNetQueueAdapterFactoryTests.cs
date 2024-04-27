@@ -15,6 +15,7 @@ namespace Tester.AdoNet.Streaming;
 /// Tests for <see cref="AdoNetQueueAdapterFactory"/>.
 /// </summary>
 [Collection(TestEnvironmentFixture.DefaultCollection)]
+[TestCategory("AdoNet"), TestCategory("Streaming")]
 public class AdoNetQueueAdapterFactoryTests(TestEnvironmentFixture fixture) : IAsyncLifetime
 {
     private readonly TestEnvironmentFixture _fixture = fixture;
