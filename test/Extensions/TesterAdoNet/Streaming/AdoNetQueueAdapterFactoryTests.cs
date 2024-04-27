@@ -7,7 +7,6 @@ using Orleans.Tests.SqlUtils;
 using TestExtensions;
 using UnitTests.General;
 using static System.String;
-using RelationalOrleansQueries = Orleans.Streaming.AdoNet.Storage.RelationalOrleansQueries;
 
 namespace Tester.AdoNet.Streaming;
 
@@ -21,7 +20,6 @@ public class AdoNetQueueAdapterFactoryTests(TestEnvironmentFixture fixture) : IA
     private readonly TestEnvironmentFixture _fixture = fixture;
     private RelationalStorageForTesting _testing;
     private IRelationalStorage _storage;
-    private RelationalOrleansQueries _queries;
 
     private const string TestDatabaseName = "OrleansStreamTest";
     private const string AdoNetInvariantName = AdoNetInvariants.InvariantNameSqlServer;
@@ -32,7 +30,6 @@ public class AdoNetQueueAdapterFactoryTests(TestEnvironmentFixture fixture) : IA
         Skip.If(IsNullOrEmpty(_testing.CurrentConnectionString), $"Database '{TestDatabaseName}' not initialized");
 
         _storage = _testing.Storage;
-        _queries = await RelationalOrleansQueries.CreateInstance(AdoNetInvariantName, _testing.CurrentConnectionString);
     }
 
     /// <summary>

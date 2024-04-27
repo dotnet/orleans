@@ -663,7 +663,7 @@ public class RelationOrleansQueriesTests : IAsyncLifetime
     }
 
     /// <summary>
-    /// Chaos tests that enqueuing, dequeuing and confirmation work in parallel in a complex random scenario where faults happen.
+    /// Chaos tests that queuing, dequeuing and confirmation work in parallel in a complex random scenario where faults happen.
     /// This looks for concurrent brittleness, especially proneness to database deadlocks, rather than a specific condition.
     /// If this test becomes flaky then there is likely some issue with the implementation that needs investigation.
     /// </summary>
@@ -672,7 +672,7 @@ public class RelationOrleansQueriesTests : IAsyncLifetime
     /// This is an expensive test to run but can protect against invisible regression.
     /// </remarks>
     [SkippableFact]
-    public async Task RelationalOrleansQueries_ChaosEnqueuesAndDequeuesManyMessagesOnManyQueues()
+    public async Task RelationalOrleansQueries_ChaosTest()
     {
         // arrange - clean up
         await _storage.ExecuteAsync("DELETE FROM [OrleansStreamMessage]");
