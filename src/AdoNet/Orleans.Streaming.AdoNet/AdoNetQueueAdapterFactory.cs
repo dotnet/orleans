@@ -18,7 +18,6 @@ internal class AdoNetQueueAdapterFactory : IQueueAdapterFactory
         _streamQueueMapper = new HashRingBasedStreamQueueMapper(hashOptions, name);
         _cache = new SimpleQueueAdapterCache(cacheOptions, name, loggerFactory);
         _adoNetQueueMapper = new AdoNetStreamQueueMapper(_streamQueueMapper);
-        _adapterFactory = ActivatorUtilities.CreateFactory<AdoNetQueueAdapter>([typeof(string), typeof(AdoNetStreamOptions), typeof(ClusterOptions), typeof(IAdoNetStreamQueueMapper)]);
     }
 
     private readonly string _name;
@@ -65,6 +64,11 @@ internal class AdoNetQueueAdapterFactory : IQueueAdapterFactory
         var cacheOptions = serviceProvider.GetOptionsByName<SimpleQueueCacheOptions>(name);
         var hashOptions = serviceProvider.GetOptionsByName<HashRingStreamQueueMapperOptions>(name);
 
-        return ActivatorUtilities.CreateInstance<AdoNetQueueAdapterFactory>(serviceProvider, [name, streamOptions, clusterOptions, cacheOptions, hashOptions]);
+        return QueueAdapterFactoryFactory(serviceProvider, [name, streamOptions, clusterOptions, cacheOptions, hashOptions]);
     }
+
+    /// <summary>
+    /// Factory for the <see cref="AdoNetQueueAdapterFactory"/>.
+    /// </summary>
+    private static readonly ObjectFactory<AdoNetQueueAdapterFactory> QueueAdapterFactoryFactory = ActivatorUtilities.CreateFactory<AdoNetQueueAdapterFactory>([typeof(string), typeof(AdoNetStreamOptions), typeof(ClusterOptions), typeof(SimpleQueueCacheOptions), typeof(HashRingStreamQueueMapperOptions)]);
 }
