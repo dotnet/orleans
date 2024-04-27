@@ -1,5 +1,3 @@
-using Microsoft.Extensions.Options;
-using Orleans.Configuration;
 using Orleans.Streaming.AdoNet;
 
 namespace Orleans.Hosting;

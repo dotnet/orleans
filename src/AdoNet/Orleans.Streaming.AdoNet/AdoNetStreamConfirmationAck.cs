@@ -1,5 +1,3 @@
-using static System.String;
-
 namespace Orleans.Streaming.AdoNet;
 
 /// <summary>
@@ -11,7 +9,7 @@ internal record AdoNetStreamConfirmationAck(
     string QueueId,
     long MessageId)
 {
-    public AdoNetStreamConfirmationAck() : this(Empty, Empty, Empty, 0)
+    public AdoNetStreamConfirmationAck() : this("", "", "", 0)
     {
     }
 }

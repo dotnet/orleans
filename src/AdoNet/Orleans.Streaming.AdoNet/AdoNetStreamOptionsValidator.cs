@@ -1,4 +1,3 @@
-using Microsoft.Extensions.Options;
 using static System.String;
 
 namespace Orleans.Configuration;

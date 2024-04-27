@@ -1,5 +1,3 @@
-using static System.String;
-
 namespace Orleans.Streaming.AdoNet;
 
 /// <summary>
@@ -12,7 +10,7 @@ internal record AdoNetStreamMessageAck(
     string QueueId,
     long MessageId)
 {
-    public AdoNetStreamMessageAck() : this(Empty, Empty, Empty, 0)
+    public AdoNetStreamMessageAck() : this("", "", "", 0)
     {
     }
 }

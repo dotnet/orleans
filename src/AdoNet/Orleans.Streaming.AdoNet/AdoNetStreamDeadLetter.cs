@@ -1,5 +1,3 @@
-using static System.String;
-
 namespace Orleans.Streaming.AdoNet;
 
 /// <summary>
@@ -19,7 +17,7 @@ internal record AdoNetStreamDeadLetter(
     DateTime RemoveOn,
     byte[] Payload)
 {
-    public AdoNetStreamDeadLetter() : this(Empty, Empty, Empty, 0, 0, DateTime.MinValue, DateTime.MinValue, DateTime.MinValue, DateTime.MinValue, DateTime.MinValue, DateTime.MinValue, [])
+    public AdoNetStreamDeadLetter() : this("", "", "", 0, 0, DateTime.MinValue, DateTime.MinValue, DateTime.MinValue, DateTime.MinValue, DateTime.MinValue, DateTime.MinValue, [])
     {
     }
 }

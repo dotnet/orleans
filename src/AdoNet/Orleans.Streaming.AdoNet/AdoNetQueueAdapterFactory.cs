@@ -1,9 +1,3 @@
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Logging;
-using Orleans.Configuration;
-using Orleans.Configuration.Overrides;
-using Orleans.Streaming.AdoNet.Storage;
-
 namespace Orleans.Streaming.AdoNet;
 
 internal class AdoNetQueueAdapterFactory : IQueueAdapterFactory

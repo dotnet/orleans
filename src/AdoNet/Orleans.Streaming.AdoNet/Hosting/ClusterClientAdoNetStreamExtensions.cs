@@ -1,5 +1,3 @@
-using Orleans.Configuration;
-
 namespace Orleans.Hosting;
 
 /// <summary>
