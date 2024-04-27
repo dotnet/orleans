@@ -28,8 +28,6 @@ internal class AdoNetQueueAdapterFactory : IQueueAdapterFactory
     private readonly HashRingBasedStreamQueueMapper _streamQueueMapper;
     private readonly SimpleQueueAdapterCache _cache;
     private readonly IAdoNetStreamQueueMapper _adoNetQueueMapper;
-    private readonly ObjectFactory<AdoNetQueueAdapter> _adapterFactory = ActivatorUtilities.CreateFactory<AdoNetQueueAdapter>([typeof(string), typeof(AdoNetStreamOptions), typeof(ClusterOptions), typeof(IAdoNetStreamQueueMapper), typeof(RelationalOrleansQueries)]);
-    private readonly ObjectFactory<AdoNetStreamFailureHandler> _handlerFactory = ActivatorUtilities.CreateFactory<AdoNetStreamFailureHandler>([typeof(bool), typeof(AdoNetStreamOptions), typeof(ClusterOptions), typeof(IAdoNetStreamQueueMapper), typeof(RelationalOrleansQueries)]);
 
     private Task<RelationalOrleansQueries> GetQueriesAsync() => RelationalOrleansQueries.CreateInstance(_streamOptions.Invariant, _streamOptions.ConnectionString);
 
@@ -37,14 +35,14 @@ internal class AdoNetQueueAdapterFactory : IQueueAdapterFactory
     {
         var queries = await GetQueriesAsync();
 
-        return _adapterFactory(_serviceProvider, [_name, _streamOptions, _clusterOptions, _adoNetQueueMapper, queries]);
+        return AdapterFactory(_serviceProvider, [_name, _streamOptions, _clusterOptions, _adoNetQueueMapper, queries]);
     }
 
     public async Task<IStreamFailureHandler> GetDeliveryFailureHandler(QueueId queueId)
     {
         var queries = await GetQueriesAsync();
 
-        return _handlerFactory(_serviceProvider, [false, _streamOptions, _clusterOptions, _adoNetQueueMapper, queries]);
+        return HandlerFactory(_serviceProvider, [false, _streamOptions, _clusterOptions, _adoNetQueueMapper, queries]);
     }
 
     public IQueueAdapterCache GetQueueAdapterCache() => _cache;
@@ -68,7 +66,17 @@ internal class AdoNetQueueAdapterFactory : IQueueAdapterFactory
     }
 
     /// <summary>
-    /// Factory for the <see cref="AdoNetQueueAdapterFactory"/>.
+    /// Factory of <see cref="AdoNetQueueAdapterFactory"/> instances.
     /// </summary>
     private static readonly ObjectFactory<AdoNetQueueAdapterFactory> QueueAdapterFactoryFactory = ActivatorUtilities.CreateFactory<AdoNetQueueAdapterFactory>([typeof(string), typeof(AdoNetStreamOptions), typeof(ClusterOptions), typeof(SimpleQueueCacheOptions), typeof(HashRingStreamQueueMapperOptions)]);
+
+    /// <summary>
+    /// Factory of <see cref="AdoNetQueueAdapter"/> instances.
+    /// </summary>
+    private static readonly ObjectFactory<AdoNetQueueAdapter> AdapterFactory = ActivatorUtilities.CreateFactory<AdoNetQueueAdapter>([typeof(string), typeof(AdoNetStreamOptions), typeof(ClusterOptions), typeof(IAdoNetStreamQueueMapper), typeof(RelationalOrleansQueries)]);
+
+    /// <summary>
+    /// Factory of <see cref="AdoNetStreamFailureHandler"/> instances.
+    /// </summary>
+    private static readonly ObjectFactory<AdoNetStreamFailureHandler> HandlerFactory = ActivatorUtilities.CreateFactory<AdoNetStreamFailureHandler>([typeof(bool), typeof(AdoNetStreamOptions), typeof(ClusterOptions), typeof(IAdoNetStreamQueueMapper), typeof(RelationalOrleansQueries)]);
 }

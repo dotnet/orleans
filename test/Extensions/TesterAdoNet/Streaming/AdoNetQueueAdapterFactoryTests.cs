@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Logging.Abstractions;
 using Orleans.Configuration;
+using Orleans.Providers.Streams.Common;
 using Orleans.Streaming.AdoNet;
 using Orleans.Streams;
 using Orleans.Tests.SqlUtils;
@@ -33,6 +34,9 @@ public class AdoNetQueueAdapterFactoryTests(TestEnvironmentFixture fixture) : IA
         _queries = await RelationalOrleansQueries.CreateInstance(AdoNetInvariantName, _testing.CurrentConnectionString);
     }
 
+    /// <summary>
+    /// Tests that the <see cref="AdoNetQueueAdapterFactory"/> creates an <see cref="AdoNetQueueAdapter"/> instance.
+    /// </summary>
     [SkippableFact]
     public async Task AdoNetQueueAdapterFactory_CreatesAdapter()
     {
@@ -62,6 +66,118 @@ public class AdoNetQueueAdapterFactoryTests(TestEnvironmentFixture fixture) : IA
         Assert.Equal(name, adapter.Name);
         Assert.False(adapter.IsRewindable);
         Assert.Equal(StreamProviderDirection.ReadWrite, adapter.Direction);
+    }
+
+    /// <summary>
+    /// Tests that the <see cref="AdoNetQueueAdapterFactory"/> gets a <see cref="AdoNetStreamFailureHandler"/> instance.
+    /// </summary>
+    [SkippableFact]
+    public async Task AdoNetQueueAdapterFactory_GetsDeliveryFailureHandler()
+    {
+        // arrange
+        var name = "MyProviderName";
+        var streamOptions = new AdoNetStreamOptions
+        {
+            Invariant = AdoNetInvariantName,
+            ConnectionString = _storage.ConnectionString
+        };
+        var clusterOptions = new ClusterOptions
+        {
+            ServiceId = "MyServiceId"
+        };
+        var cacheOptions = new SimpleQueueCacheOptions();
+        var hashOptions = new HashRingStreamQueueMapperOptions();
+        var loggerFactory = NullLoggerFactory.Instance;
+        var serviceProvider = _fixture.Services;
+        var factory = new AdoNetQueueAdapterFactory(name, streamOptions, clusterOptions, cacheOptions, hashOptions, loggerFactory, serviceProvider);
+        var queueId = QueueId.GetQueueId("MyQueueName", 1, 2);
+
+        // act
+        var handler = await factory.GetDeliveryFailureHandler(queueId);
+
+        // assert
+        Assert.NotNull(handler);
+        Assert.IsType<AdoNetStreamFailureHandler>(handler);
+        Assert.False(handler.ShouldFaultSubsriptionOnError);
+    }
+
+    /// <summary>
+    /// Tests that the <see cref="AdoNetQueueAdapterFactory"/> gets a <see cref="SimpleQueueCache"/> instance.
+    /// </summary>
+    [SkippableFact]
+    public void AdoNetQueueAdapterFactory_GetsQueueAdapterCache()
+    {
+        // arrange
+        var name = "MyProviderName";
+        var streamOptions = new AdoNetStreamOptions
+        {
+            Invariant = AdoNetInvariantName,
+            ConnectionString = _storage.ConnectionString
+        };
+        var clusterOptions = new ClusterOptions
+        {
+            ServiceId = "MyServiceId"
+        };
+        var cacheOptions = new SimpleQueueCacheOptions();
+        var hashOptions = new HashRingStreamQueueMapperOptions();
+        var loggerFactory = NullLoggerFactory.Instance;
+        var serviceProvider = _fixture.Services;
+        var factory = new AdoNetQueueAdapterFactory(name, streamOptions, clusterOptions, cacheOptions, hashOptions, loggerFactory, serviceProvider);
+
+        // act
+        var cache = factory.GetQueueAdapterCache();
+
+        // assert
+        Assert.NotNull(cache);
+        Assert.IsType<SimpleQueueAdapterCache>(cache);
+    }
+
+    /// <summary>
+    /// Tests that the <see cref="AdoNetQueueAdapterFactory"/> gets a <see cref="HashRingBasedStreamQueueMapper"/> instance.
+    /// </summary>
+    [SkippableFact]
+    public void AdoNetQueueAdapterFactory_GetsStreamQueueMapper()
+    {
+        // arrange
+        var name = "MyProviderName";
+        var streamOptions = new AdoNetStreamOptions
+        {
+            Invariant = AdoNetInvariantName,
+            ConnectionString = _storage.ConnectionString
+        };
+        var clusterOptions = new ClusterOptions
+        {
+            ServiceId = "MyServiceId"
+        };
+        var cacheOptions = new SimpleQueueCacheOptions();
+        var hashOptions = new HashRingStreamQueueMapperOptions();
+        var loggerFactory = NullLoggerFactory.Instance;
+        var serviceProvider = _fixture.Services;
+        var factory = new AdoNetQueueAdapterFactory(name, streamOptions, clusterOptions, cacheOptions, hashOptions, loggerFactory, serviceProvider);
+
+        // act
+        var mapper = factory.GetStreamQueueMapper();
+
+        // assert
+        Assert.NotNull(mapper);
+        Assert.IsType<HashRingBasedStreamQueueMapper>(mapper);
+    }
+
+    /// <summary>
+    /// Tests that the <see cref="AdoNetQueueAdapterFactory"/> constructs via its static factory method.
+    /// </summary>
+    [SkippableFact]
+    public void AdoNetQueueAdapterFactory_ConstructsViaStaticFactory()
+    {
+        // arrange
+        var name = "MyProviderName";
+
+        // act
+        var factory = AdoNetQueueAdapterFactory.Create(_fixture.Services, name);
+
+        // assert
+        Assert.NotNull(factory);
+        Assert.IsType<AdoNetQueueAdapterFactory>(factory);
     }
 
     public Task DisposeAsync() => Task.CompletedTask;
