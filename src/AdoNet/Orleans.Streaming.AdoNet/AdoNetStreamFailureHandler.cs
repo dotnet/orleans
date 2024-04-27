@@ -7,7 +7,7 @@ namespace Orleans.Streaming.AdoNet;
 /// <summary>
 /// An <see cref="IStreamFailureHandler"/> that attempts to move the message to dead letters.
 /// </summary>
-internal partial class AdoNetStreamFailureHandler(bool faultOnFailure, AdoNetStreamOptions streamOptions, ClusterOptions clusterOptions, IAdoNetStreamQueueMapper mapper, RelationalOrleansQueries queries, ILogger<AdoNetStreamFailureHandler> logger) : IStreamFailureHandler
+internal partial class AdoNetStreamFailureHandler(bool faultOnFailure, AdoNetStreamOptions streamOptions, ClusterOptions clusterOptions, AdoNetStreamQueueMapper mapper, RelationalOrleansQueries queries, ILogger<AdoNetStreamFailureHandler> logger) : IStreamFailureHandler
 {
     private readonly ILogger<AdoNetStreamFailureHandler> _logger = logger;
 
@@ -19,30 +19,21 @@ internal partial class AdoNetStreamFailureHandler(bool faultOnFailure, AdoNetStr
     /// <summary>
     /// Attempts to move the message to dead letters on delivery failure.
     /// </summary>
-    public Task OnDeliveryFailure(GuidId subscriptionId, string streamProviderName, StreamId streamIdentity, StreamSequenceToken sequenceToken)
-    {
-        ArgumentNullException.ThrowIfNull(streamProviderName);
-        ArgumentNullException.ThrowIfNull(sequenceToken);
-
-        return OnFailureAsync(streamProviderName, streamIdentity, sequenceToken);
-    }
+    public Task OnDeliveryFailure(GuidId subscriptionId, string streamProviderName, StreamId streamIdentity, StreamSequenceToken sequenceToken) => OnFailureAsync(streamProviderName, streamIdentity, sequenceToken);
 
     /// <summary>
     /// Attempts to move the message to dead letters on delivery failure.
     /// </summary>
-    public Task OnSubscriptionFailure(GuidId subscriptionId, string streamProviderName, StreamId streamIdentity, StreamSequenceToken sequenceToken)
-    {
-        ArgumentNullException.ThrowIfNull(streamProviderName);
-        ArgumentNullException.ThrowIfNull(sequenceToken);
-
-        return OnFailureAsync(streamProviderName, streamIdentity, sequenceToken);
-    }
+    public Task OnSubscriptionFailure(GuidId subscriptionId, string streamProviderName, StreamId streamIdentity, StreamSequenceToken sequenceToken) => OnFailureAsync(streamProviderName, streamIdentity, sequenceToken);
 
     /// <summary>
     /// Attempts to move the message to dead letters on delivery failure.
     /// </summary>
     private async Task OnFailureAsync(string streamProviderName, StreamId streamIdentity, StreamSequenceToken sequenceToken)
     {
+        ArgumentNullException.ThrowIfNull(streamProviderName);
+        ArgumentNullException.ThrowIfNull(sequenceToken);
+
         var queueId = mapper.GetAdoNetQueueId(streamIdentity);
 
         try
@@ -54,6 +45,7 @@ internal partial class AdoNetStreamFailureHandler(bool faultOnFailure, AdoNetStr
         catch (Exception ex)
         {
             LogFailedToMoveMessage(ex, clusterOptions.ServiceId, streamProviderName, queueId, sequenceToken.SequenceNumber);
+            throw;
         }
     }
 
