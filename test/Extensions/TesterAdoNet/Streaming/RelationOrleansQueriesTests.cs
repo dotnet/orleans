@@ -1,11 +1,7 @@
 using System.Collections.Concurrent;
-using Microsoft.Extensions.Logging.Abstractions;
 using Orleans.Configuration;
-using Orleans.Providers.Streams.Common;
-using Orleans.Runtime;
 using Orleans.Streaming.AdoNet;
 using Orleans.Streaming.AdoNet.Storage;
-using Orleans.Streams;
 using UnitTests.General;
 using static System.String;
 
