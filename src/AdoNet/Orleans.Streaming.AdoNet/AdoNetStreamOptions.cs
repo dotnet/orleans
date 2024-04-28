@@ -17,18 +17,6 @@ public class AdoNetStreamOptions
     public string ConnectionString { get; set; }
 
     /// <summary>
-    /// The number of individual "queues" to use in the storage table.
-    /// Each "queue":
-    /// - Maps to an individual clustered index key in the table.
-    /// - Will have its own individual pulling agent in the cluster.
-    /// Therefore:
-    /// - A higher number of queues can increase throughput at the expense of increased i/o contention.
-    /// - A lower number of queues can reduce i/o contention at the expense of reduced throughput.
-    /// The default is 8.
-    /// </summary>
-    public int QueueCount { get; set; } = 8;
-
-    /// <summary>
     /// The maximum number of attempts to deliver a message.
     /// The message is eventually moved to dead letters if these many attempts are made without success.
     /// </summary>
