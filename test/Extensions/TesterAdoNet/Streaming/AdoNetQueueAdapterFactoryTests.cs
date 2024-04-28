@@ -51,9 +51,10 @@ public class AdoNetQueueAdapterFactoryTests(TestEnvironmentFixture fixture) : IA
         };
         var cacheOptions = new SimpleQueueCacheOptions();
         var hashOptions = new HashRingStreamQueueMapperOptions();
+        var agentOptions = new StreamPullingAgentOptions();
         var loggerFactory = NullLoggerFactory.Instance;
         var serviceProvider = _fixture.Services;
-        var factory = new AdoNetQueueAdapterFactory(name, streamOptions, clusterOptions, cacheOptions, hashOptions, loggerFactory, serviceProvider);
+        var factory = new AdoNetQueueAdapterFactory(name, streamOptions, clusterOptions, cacheOptions, hashOptions, agentOptions, loggerFactory, serviceProvider);
 
         // act
         var adapter = await factory.CreateAdapter();
@@ -85,9 +86,10 @@ public class AdoNetQueueAdapterFactoryTests(TestEnvironmentFixture fixture) : IA
         };
         var cacheOptions = new SimpleQueueCacheOptions();
         var hashOptions = new HashRingStreamQueueMapperOptions();
+        var agentOptions = new StreamPullingAgentOptions();
         var loggerFactory = NullLoggerFactory.Instance;
         var serviceProvider = _fixture.Services;
-        var factory = new AdoNetQueueAdapterFactory(name, streamOptions, clusterOptions, cacheOptions, hashOptions, loggerFactory, serviceProvider);
+        var factory = new AdoNetQueueAdapterFactory(name, streamOptions, clusterOptions, cacheOptions, hashOptions, agentOptions, loggerFactory, serviceProvider);
         var queueId = QueueId.GetQueueId("MyQueueName", 1, 2);
 
         // act
@@ -118,9 +120,10 @@ public class AdoNetQueueAdapterFactoryTests(TestEnvironmentFixture fixture) : IA
         };
         var cacheOptions = new SimpleQueueCacheOptions();
         var hashOptions = new HashRingStreamQueueMapperOptions();
+        var agentOptions = new StreamPullingAgentOptions();
         var loggerFactory = NullLoggerFactory.Instance;
         var serviceProvider = _fixture.Services;
-        var factory = new AdoNetQueueAdapterFactory(name, streamOptions, clusterOptions, cacheOptions, hashOptions, loggerFactory, serviceProvider);
+        var factory = new AdoNetQueueAdapterFactory(name, streamOptions, clusterOptions, cacheOptions, hashOptions, agentOptions, loggerFactory, serviceProvider);
 
         // act
         var cache = factory.GetQueueAdapterCache();
@@ -149,9 +152,10 @@ public class AdoNetQueueAdapterFactoryTests(TestEnvironmentFixture fixture) : IA
         };
         var cacheOptions = new SimpleQueueCacheOptions();
         var hashOptions = new HashRingStreamQueueMapperOptions();
+        var agentOptions = new StreamPullingAgentOptions();
         var loggerFactory = NullLoggerFactory.Instance;
         var serviceProvider = _fixture.Services;
-        var factory = new AdoNetQueueAdapterFactory(name, streamOptions, clusterOptions, cacheOptions, hashOptions, loggerFactory, serviceProvider);
+        var factory = new AdoNetQueueAdapterFactory(name, streamOptions, clusterOptions, cacheOptions, hashOptions, agentOptions, loggerFactory, serviceProvider);
 
         // act
         var mapper = factory.GetStreamQueueMapper();

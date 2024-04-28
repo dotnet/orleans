@@ -5,7 +5,6 @@ using Orleans.Runtime;
 using Orleans.Streaming.AdoNet;
 using Orleans.Streams;
 using Orleans.Tests.SqlUtils;
-using TestExtensions;
 using UnitTests.General;
 using static System.String;
 using RelationalOrleansQueries = Orleans.Streaming.AdoNet.Storage.RelationalOrleansQueries;
@@ -15,11 +14,9 @@ namespace Tester.AdoNet.Streaming;
 /// <summary>
 /// Tests for <see cref="AdoNetStreamFailureHandler"/>.
 /// </summary>
-[Collection(TestEnvironmentFixture.DefaultCollection)]
 [TestCategory("AdoNet"), TestCategory("Streaming")]
-public class AdoNetStreamFailureHandlerTests(TestEnvironmentFixture fixture) : IAsyncLifetime
+public class AdoNetStreamFailureHandlerTests() : IAsyncLifetime
 {
-    private readonly TestEnvironmentFixture _fixture = fixture;
     private RelationalStorageForTesting _testing;
     private IRelationalStorage _storage;
     private RelationalOrleansQueries _queries;
@@ -134,8 +131,11 @@ public class AdoNetStreamFailureHandlerTests(TestEnvironmentFixture fixture) : I
         {
             Invariant = AdoNetInvariantName,
             ConnectionString = _storage.ConnectionString,
-            MaxAttempts = 1,
-            VisibilityTimeout = 0
+            MaxAttempts = 1
+        };
+        var agentOptions = new StreamPullingAgentOptions
+        {
+            MaxEventDeliveryTime = TimeSpan.FromSeconds(0)
         };
         var clusterOptions = new ClusterOptions
         {
@@ -158,7 +158,7 @@ public class AdoNetStreamFailureHandlerTests(TestEnvironmentFixture fixture) : I
 
         // arrange - dequeue the message and make immediately available
         var beforeDequeued = DateTime.UtcNow;
-        await _queries.GetStreamMessagesAsync(ack.ServiceId, ack.ProviderId, ack.QueueId, streamOptions.MaxBatchSize, streamOptions.MaxAttempts, streamOptions.VisibilityTimeout);
+        await _queries.GetStreamMessagesAsync(ack.ServiceId, ack.ProviderId, ack.QueueId, streamOptions.MaxBatchSize, streamOptions.MaxAttempts, agentOptions.MaxEventDeliveryTime.ToSecondsCeiling());
         var afterDequeued = DateTime.UtcNow;
 
         // act - clean up with max attempts of one so the message above is flagged
@@ -200,6 +200,7 @@ public class AdoNetStreamFailureHandlerTests(TestEnvironmentFixture fixture) : I
             Invariant = AdoNetInvariantName,
             ConnectionString = _storage.ConnectionString
         };
+        var agentOptions = new StreamPullingAgentOptions();
         var clusterOptions = new ClusterOptions
         {
             ServiceId = "MyServiceId"
@@ -217,7 +218,7 @@ public class AdoNetStreamFailureHandlerTests(TestEnvironmentFixture fixture) : I
         var ack = await _queries.QueueStreamMessageAsync(clusterOptions.ServiceId, providerId, queueId, payload, streamOptions.ExpiryTimeout);
 
         // arrange - dequeue the message and make immediately available
-        await _queries.GetStreamMessagesAsync(ack.ServiceId, ack.ProviderId, ack.QueueId, streamOptions.MaxBatchSize, streamOptions.MaxAttempts, streamOptions.VisibilityTimeout);
+        await _queries.GetStreamMessagesAsync(ack.ServiceId, ack.ProviderId, ack.QueueId, streamOptions.MaxBatchSize, streamOptions.MaxAttempts, agentOptions.MaxEventDeliveryTime.ToSecondsCeiling());
 
         // act - clean up with max attempts of one so the message above is flagged
         await handler.OnDeliveryFailure(GuidId.GetNewGuidId(), providerId, streamId, new EventSequenceTokenV2(ack.MessageId));
@@ -225,7 +226,6 @@ public class AdoNetStreamFailureHandlerTests(TestEnvironmentFixture fixture) : I
         // assert
         Assert.Empty(await _storage.ReadAsync<AdoNetStreamDeadLetter>("SELECT * FROM [OrleansStreamDeadLetter]"));
     }
-
 
     public Task DisposeAsync() => Task.CompletedTask;
 }

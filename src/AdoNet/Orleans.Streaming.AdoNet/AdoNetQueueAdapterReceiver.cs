@@ -3,7 +3,7 @@ namespace Orleans.Streaming.AdoNet;
 /// <summary>
 /// Receives message batches from an individual queue of an ADO.NET provider.
 /// </summary>
-internal partial class AdoNetQueueAdapterReceiver(string providerId, string queueId, AdoNetStreamOptions streamOptions, ClusterOptions clusterOptions, RelationalOrleansQueries queries, Serializer<AdoNetBatchContainer> serializer, ILogger<AdoNetQueueAdapterReceiver> logger) : IQueueAdapterReceiver
+internal partial class AdoNetQueueAdapterReceiver(string providerId, string queueId, AdoNetStreamOptions streamOptions, ClusterOptions clusterOptions, StreamPullingAgentOptions agentOptions, RelationalOrleansQueries queries, Serializer<AdoNetBatchContainer> serializer, ILogger<AdoNetQueueAdapterReceiver> logger) : IQueueAdapterReceiver
 {
     private readonly ILogger<AdoNetQueueAdapterReceiver> _logger = logger;
 
@@ -53,7 +53,7 @@ internal partial class AdoNetQueueAdapterReceiver(string providerId, string queu
         try
         {
             // grab a message batch from storage while pinning the task so shutdown can wait for it
-            var task = queries.GetStreamMessagesAsync(clusterOptions.ServiceId, providerId, queueId, maxCount, streamOptions.MaxAttempts, streamOptions.VisibilityTimeout);
+            var task = queries.GetStreamMessagesAsync(clusterOptions.ServiceId, providerId, queueId, maxCount, streamOptions.MaxAttempts, agentOptions.MaxEventDeliveryTime.ToSecondsCeiling());
             _outstandingTask = task;
             var messages = await task;
 

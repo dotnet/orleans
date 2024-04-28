@@ -46,6 +46,7 @@ public class AdoNetQueueAdapterReceiverTests(TestEnvironmentFixture fixture) : I
         {
             ServiceId = serviceId
         };
+        var agentOptions = new StreamPullingAgentOptions();
         var providerId = "MyProviderId";
         var queueId = "MyQueueId";
         var maxCount = 10;
@@ -56,7 +57,7 @@ public class AdoNetQueueAdapterReceiverTests(TestEnvironmentFixture fixture) : I
         };
         var serializer = _fixture.Serializer.GetSerializer<AdoNetBatchContainer>();
         var logger = NullLogger<AdoNetQueueAdapterReceiver>.Instance;
-        var receiver = new AdoNetQueueAdapterReceiver(providerId, queueId, streamOptions, clusterOptions, _queries, serializer, logger);
+        var receiver = new AdoNetQueueAdapterReceiver(providerId, queueId, streamOptions, clusterOptions, agentOptions, _queries, serializer, logger);
         await receiver.Initialize(TimeSpan.FromSeconds(10));
 
         // arrange - data
@@ -68,24 +69,18 @@ public class AdoNetQueueAdapterReceiverTests(TestEnvironmentFixture fixture) : I
 
         // arrange - enqueue (via storage) some invalid messages followed by a valid message
         await _storage.ExecuteAsync("DELETE FROM [OrleansStreamMessage]");
-        var beforeEnqueued = DateTime.UtcNow;
         var ackExpired = await _queries.QueueStreamMessageAsync(serviceId, providerId, queueId, payload, 0);
         var ackOtherQueueId = await _queries.QueueStreamMessageAsync(serviceId, providerId, queueId + "X", payload, 100);
         var ackOtherProviderId = await _queries.QueueStreamMessageAsync(serviceId, providerId + "X", queueId, payload, 100);
         var ackOtherServiceId = await _queries.QueueStreamMessageAsync(serviceId + "X", providerId, queueId, payload, 100);
         var ackValid = await _queries.QueueStreamMessageAsync(serviceId, providerId, queueId, payload, 100);
-        var afterEnqueued = DateTime.UtcNow;
 
         // act - dequeue messages via receiver
-        var beforeDequeued = DateTime.UtcNow;
         var dequeued = await receiver.GetQueueMessagesAsync(maxCount);
-        var afterDequeued = DateTime.UtcNow;
         var storedDequeued = (await _storage.ReadAsync<AdoNetStreamMessage>("SELECT * FROM [OrleansStreamMessage]")).ToDictionary(x => x.MessageId);
 
         // act - confirm messages via receiver
-        var beforeConfirmed = DateTime.UtcNow;
         await receiver.MessagesDeliveredAsync(dequeued);
-        var afterConfirmed = DateTime.UtcNow;
         var storedConfirmed = (await _storage.ReadAsync<AdoNetStreamMessage>("SELECT * FROM [OrleansStreamMessage]")).ToDictionary(x => x.MessageId);
 
         // assert - dequeued messages are as expected
@@ -127,6 +122,7 @@ public class AdoNetQueueAdapterReceiverTests(TestEnvironmentFixture fixture) : I
         {
             ServiceId = serviceId
         };
+        var agentOptions = new StreamPullingAgentOptions();
         var providerId = "MyProviderId";
         var queueId = "MyQueueId";
         var streamOptions = new AdoNetStreamOptions
@@ -136,7 +132,7 @@ public class AdoNetQueueAdapterReceiverTests(TestEnvironmentFixture fixture) : I
         };
         var serializer = _fixture.Serializer.GetSerializer<AdoNetBatchContainer>();
         var logger = NullLogger<AdoNetQueueAdapterReceiver>.Instance;
-        var receiver = new AdoNetQueueAdapterReceiver(providerId, queueId, streamOptions, clusterOptions, _queries, serializer, logger);
+        var receiver = new AdoNetQueueAdapterReceiver(providerId, queueId, streamOptions, clusterOptions, agentOptions, _queries, serializer, logger);
         await receiver.Initialize(TimeSpan.FromSeconds(10));
 
         // arrange - enqueue a message

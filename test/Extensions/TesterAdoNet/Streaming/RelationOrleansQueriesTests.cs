@@ -875,6 +875,7 @@ public class RelationOrleansQueriesTests : IAsyncLifetime
         var serviceId = "ServiceId";
         var providerId = "ProviderId";
         var streamOptions = new AdoNetStreamOptions();
+        var agentOptions = new StreamPullingAgentOptions();
 
         // arrange - queue an expired message
         await _storage.ExecuteAsync("DELETE FROM [OrleansStreamMessage]");
@@ -883,8 +884,8 @@ public class RelationOrleansQueriesTests : IAsyncLifetime
         var payload = new byte[] { 0xFF };
         var ack = await _queries.QueueStreamMessageAsync(serviceId, providerId, queueId, payload, streamOptions.ExpiryTimeout);
 
-        // arrange - dequeue the message and make immediately available
-        await _queries.GetStreamMessagesAsync(ack.ServiceId, ack.ProviderId, ack.QueueId, streamOptions.MaxBatchSize, streamOptions.MaxAttempts, streamOptions.VisibilityTimeout);
+        // arrange - dequeue the message
+        await _queries.GetStreamMessagesAsync(ack.ServiceId, ack.ProviderId, ack.QueueId, streamOptions.MaxBatchSize, streamOptions.MaxAttempts, agentOptions.MaxEventDeliveryTime.ToSecondsCeiling());
 
         // act - clean up with max attempts of one so the message above is flagged
         await _queries.MoveMessageToDeadLettersAsync(ack.ServiceId, ack.ProviderId, ack.QueueId, ack.MessageId, streamOptions.MaxAttempts, streamOptions.RemovalTimeout);

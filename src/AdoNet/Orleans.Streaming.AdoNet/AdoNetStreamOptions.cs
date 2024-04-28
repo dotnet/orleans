@@ -35,11 +35,6 @@ public class AdoNetStreamOptions
     public int MaxAttempts { get; set; } = 5;
 
     /// <summary>
-    /// The visibility timeout, in seconds, before a dequeued but unconfirmed message becomes available for dequeuing again.
-    /// </summary>
-    public int VisibilityTimeout { get; set; } = 60;
-
-    /// <summary>
     /// The maximum number of messages to dequeue in a single operation.
     /// This value is further capped by the maximum number of messages that the current queue cache supports.
     /// </summary>
