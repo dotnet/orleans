@@ -59,7 +59,7 @@ namespace Orleans
         /// <inheritdoc />
         public async Task StartAsync(CancellationToken cancellationToken)
         {
-            await _runtimeClient.Start(cancellationToken).ConfigureAwait(false);
+            await _runtimeClient.StartAsync(cancellationToken).ConfigureAwait(false);
             await _clusterClientLifecycle.OnStart(cancellationToken).ConfigureAwait(false);
         }
 
@@ -71,8 +71,7 @@ namespace Orleans
                 _logger.LogInformation("Client shutting down");
 
                 await _clusterClientLifecycle.OnStop(cancellationToken).ConfigureAwait(false);
-
-                _runtimeClient?.Reset();
+                await _runtimeClient.StopAsync(cancellationToken).WaitAsync(cancellationToken);
             }
             finally
             {

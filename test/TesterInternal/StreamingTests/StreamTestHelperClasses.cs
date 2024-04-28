@@ -115,7 +115,22 @@ namespace UnitTests.StreamingTests
         {
             return this.producer.ProducePeriodicSeries(timerCallback =>
                     {
-                        return new AsyncTaskSafeTimer(NullLogger.Instance, timerCallback, null, TimeSpan.Zero, TimeSpan.FromMilliseconds(10));
+                        var timer = new PeriodicTimer(TimeSpan.FromMicroseconds(10));
+                        _ = Task.Run(async () =>
+                        {
+                            do
+                            {
+                                try
+                                {
+                                    await timerCallback(null);
+                                }
+                                catch
+                                {
+                                    // Ignore
+                                }
+                            } while (await timer.WaitForNextTickAsync());
+                        });
+                        return timer;
                     }, count);
         }
 

@@ -145,10 +145,10 @@ namespace Orleans.Messaging
             }
         }
 
-        public void Stop()
+        public async Task StopAsync(CancellationToken cancellationToken)
         {
             Running = false;
-            gatewayManager.Stop();
+            await gatewayManager.StopAsync(cancellationToken);
         }
 
         public void DispatchLocalMessage(Message message)
