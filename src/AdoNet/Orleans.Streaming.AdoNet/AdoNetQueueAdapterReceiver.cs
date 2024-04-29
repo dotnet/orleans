@@ -3,7 +3,7 @@ namespace Orleans.Streaming.AdoNet;
 /// <summary>
 /// Receives message batches from an individual queue of an ADO.NET provider.
 /// </summary>
-internal partial class AdoNetQueueAdapterReceiver(string providerId, string queueId, AdoNetStreamOptions streamOptions, ClusterOptions clusterOptions, StreamPullingAgentOptions agentOptions, RelationalOrleansQueries queries, Serializer<AdoNetBatchContainer> serializer, ILogger<AdoNetQueueAdapterReceiver> logger) : IQueueAdapterReceiver
+internal partial class AdoNetQueueAdapterReceiver(string providerId, string queueId, AdoNetStreamOptions streamOptions, ClusterOptions clusterOptions, SimpleQueueCacheOptions cacheOptions, StreamPullingAgentOptions agentOptions, RelationalOrleansQueries queries, Serializer<AdoNetBatchContainer> serializer, ILogger<AdoNetQueueAdapterReceiver> logger) : IQueueAdapterReceiver
 {
     private readonly ILogger<AdoNetQueueAdapterReceiver> _logger = logger;
 
@@ -48,7 +48,7 @@ internal partial class AdoNetQueueAdapterReceiver(string providerId, string queu
         }
 
         // cap max count as appropriate
-        maxCount = maxCount <= 0 ? streamOptions.MaxBatchSize : Math.Min(maxCount, streamOptions.MaxBatchSize);
+        maxCount = Math.Min(maxCount, cacheOptions.CacheSize);
 
         try
         {

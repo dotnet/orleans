@@ -824,6 +824,7 @@ public class RelationOrleansQueriesTests : IAsyncLifetime
         var serviceId = "ServiceId";
         var providerId = "ProviderId";
         var streamOptions = new AdoNetStreamOptions();
+        var cacheOptions = new SimpleQueueCacheOptions();
 
         // arrange - queue an expired message
         await _storage.ExecuteAsync("DELETE FROM [OrleansStreamMessage]");
@@ -837,7 +838,7 @@ public class RelationOrleansQueriesTests : IAsyncLifetime
 
         // arrange - dequeue the message and make immediately available
         var beforeDequeued = DateTime.UtcNow;
-        await _queries.GetStreamMessagesAsync(ack.ServiceId, ack.ProviderId, ack.QueueId, streamOptions.MaxBatchSize, streamOptions.MaxAttempts, 0);
+        await _queries.GetStreamMessagesAsync(ack.ServiceId, ack.ProviderId, ack.QueueId, cacheOptions.CacheSize, streamOptions.MaxAttempts, 0);
         var afterDequeued = DateTime.UtcNow;
 
         // act - clean up with max attempts of one so the message above is flagged
@@ -875,6 +876,7 @@ public class RelationOrleansQueriesTests : IAsyncLifetime
         var serviceId = "ServiceId";
         var providerId = "ProviderId";
         var streamOptions = new AdoNetStreamOptions();
+        var cacheOptions = new SimpleQueueCacheOptions();
         var agentOptions = new StreamPullingAgentOptions();
 
         // arrange - queue an expired message
@@ -885,7 +887,7 @@ public class RelationOrleansQueriesTests : IAsyncLifetime
         var ack = await _queries.QueueStreamMessageAsync(serviceId, providerId, queueId, payload, streamOptions.ExpiryTimeout);
 
         // arrange - dequeue the message
-        await _queries.GetStreamMessagesAsync(ack.ServiceId, ack.ProviderId, ack.QueueId, streamOptions.MaxBatchSize, streamOptions.MaxAttempts, agentOptions.MaxEventDeliveryTime.ToSecondsCeiling());
+        await _queries.GetStreamMessagesAsync(ack.ServiceId, ack.ProviderId, ack.QueueId, cacheOptions.CacheSize, streamOptions.MaxAttempts, agentOptions.MaxEventDeliveryTime.ToSecondsCeiling());
 
         // act - clean up with max attempts of one so the message above is flagged
         await _queries.MoveMessageToDeadLettersAsync(ack.ServiceId, ack.ProviderId, ack.QueueId, ack.MessageId, streamOptions.MaxAttempts, streamOptions.RemovalTimeout);

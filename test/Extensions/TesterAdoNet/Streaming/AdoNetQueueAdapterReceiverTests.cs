@@ -46,7 +46,6 @@ public class AdoNetQueueAdapterReceiverTests(TestEnvironmentFixture fixture) : I
         {
             ServiceId = serviceId
         };
-        var agentOptions = new StreamPullingAgentOptions();
         var providerId = "MyProviderId";
         var queueId = "MyQueueId";
         var maxCount = 10;
@@ -55,9 +54,11 @@ public class AdoNetQueueAdapterReceiverTests(TestEnvironmentFixture fixture) : I
             Invariant = AdoNetInvariantName,
             ConnectionString = _storage.ConnectionString
         };
+        var cacheOptions = new SimpleQueueCacheOptions();
+        var agentOptions = new StreamPullingAgentOptions();
         var serializer = _fixture.Serializer.GetSerializer<AdoNetBatchContainer>();
         var logger = NullLogger<AdoNetQueueAdapterReceiver>.Instance;
-        var receiver = new AdoNetQueueAdapterReceiver(providerId, queueId, streamOptions, clusterOptions, agentOptions, _queries, serializer, logger);
+        var receiver = new AdoNetQueueAdapterReceiver(providerId, queueId, streamOptions, clusterOptions, cacheOptions, agentOptions, _queries, serializer, logger);
         await receiver.Initialize(TimeSpan.FromSeconds(10));
 
         // arrange - data
@@ -122,7 +123,6 @@ public class AdoNetQueueAdapterReceiverTests(TestEnvironmentFixture fixture) : I
         {
             ServiceId = serviceId
         };
-        var agentOptions = new StreamPullingAgentOptions();
         var providerId = "MyProviderId";
         var queueId = "MyQueueId";
         var streamOptions = new AdoNetStreamOptions
@@ -130,9 +130,11 @@ public class AdoNetQueueAdapterReceiverTests(TestEnvironmentFixture fixture) : I
             Invariant = AdoNetInvariantName,
             ConnectionString = _storage.ConnectionString
         };
+        var cacheOptions = new SimpleQueueCacheOptions();
+        var agentOptions = new StreamPullingAgentOptions();
         var serializer = _fixture.Serializer.GetSerializer<AdoNetBatchContainer>();
         var logger = NullLogger<AdoNetQueueAdapterReceiver>.Instance;
-        var receiver = new AdoNetQueueAdapterReceiver(providerId, queueId, streamOptions, clusterOptions, agentOptions, _queries, serializer, logger);
+        var receiver = new AdoNetQueueAdapterReceiver(providerId, queueId, streamOptions, clusterOptions, cacheOptions, agentOptions, _queries, serializer, logger);
         await receiver.Initialize(TimeSpan.FromSeconds(10));
 
         // arrange - enqueue a message

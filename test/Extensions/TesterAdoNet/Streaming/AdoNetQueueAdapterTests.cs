@@ -52,6 +52,7 @@ public class AdoNetQueueAdapterTests(TestEnvironmentFixture fixture) : IAsyncLif
         {
             ServiceId = "MyServiceId"
         };
+        var cacheOptions = new SimpleQueueCacheOptions();
         var agentOptions = new StreamPullingAgentOptions();
         var mapper = new AdoNetStreamQueueMapper(new HashRingBasedStreamQueueMapper(new HashRingStreamQueueMapperOptions { TotalQueueCount = 8 }, "MyQueue"));
         var serializer = _fixture.Serializer.GetSerializer<AdoNetBatchContainer>();
@@ -59,7 +60,7 @@ public class AdoNetQueueAdapterTests(TestEnvironmentFixture fixture) : IAsyncLif
         var serviceProvider = _fixture.Services;
 
         // act
-        var adapter = new AdoNetQueueAdapter(name, streamOptions, clusterOptions, agentOptions, mapper, _queries, serializer, logger, serviceProvider);
+        var adapter = new AdoNetQueueAdapter(name, streamOptions, clusterOptions, cacheOptions, agentOptions, mapper, _queries, serializer, logger, serviceProvider);
 
         // assert
         Assert.Equal(name, adapter.Name);
@@ -79,6 +80,7 @@ public class AdoNetQueueAdapterTests(TestEnvironmentFixture fixture) : IAsyncLif
         {
             ServiceId = serviceId
         };
+        var cacheOptions = new SimpleQueueCacheOptions();
         var agentOptions = new StreamPullingAgentOptions();
         var providerId = "MyProviderId";
         var streamOptions = new AdoNetStreamOptions
@@ -94,7 +96,7 @@ public class AdoNetQueueAdapterTests(TestEnvironmentFixture fixture) : IAsyncLif
         var hashMapper = new HashRingBasedStreamQueueMapper(hashOptions, "MyQueue");
         var adoNetMapper = new AdoNetStreamQueueMapper(hashMapper);
         var adoNetQueueId = adoNetMapper.GetAdoNetQueueId(streamId);
-        var adapter = new AdoNetQueueAdapter(providerId, streamOptions, clusterOptions, agentOptions, adoNetMapper, _queries, serializer, logger, _fixture.Services);
+        var adapter = new AdoNetQueueAdapter(providerId, streamOptions, clusterOptions, cacheOptions, agentOptions, adoNetMapper, _queries, serializer, logger, _fixture.Services);
         var context = new Dictionary<string, object> { { "MyKey", "MyValue" } };
 
         // act - enqueue (via adapter) some messages
@@ -145,6 +147,7 @@ public class AdoNetQueueAdapterTests(TestEnvironmentFixture fixture) : IAsyncLif
         {
             ServiceId = serviceId
         };
+        var cacheOptions = new SimpleQueueCacheOptions();
         var providerId = "MyProviderId";
         var streamOptions = new AdoNetStreamOptions
         {
@@ -160,7 +163,7 @@ public class AdoNetQueueAdapterTests(TestEnvironmentFixture fixture) : IAsyncLif
         var queueId = hashMapper.GetQueueForStream(streamId);
         var adoMapper = new AdoNetStreamQueueMapper(hashMapper);
         var adoNetQueueId = adoMapper.GetAdoNetQueueId(streamId);
-        var adapter = new AdoNetQueueAdapter(providerId, streamOptions, clusterOptions, agentOptions, adoMapper, _queries, serializer, logger, _fixture.Services);
+        var adapter = new AdoNetQueueAdapter(providerId, streamOptions, clusterOptions, cacheOptions, agentOptions, adoMapper, _queries, serializer, logger, _fixture.Services);
 
         // act - enqueue (via adapter) some messages
         await _storage.ExecuteAsync("DELETE FROM [OrleansStreamMessage]");

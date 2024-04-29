@@ -20,13 +20,7 @@ public class AdoNetStreamOptions
     /// The maximum number of attempts to deliver a message.
     /// The message is eventually moved to dead letters if these many attempts are made without success.
     /// </summary>
-    public int MaxAttempts { get; set; } = 5;
-
-    /// <summary>
-    /// The maximum number of messages to dequeue in a single operation.
-    /// This value is further capped by the maximum number of messages that the current queue cache supports.
-    /// </summary>
-    public int MaxBatchSize { get; set; } = 32;
+    public int MaxAttempts { get; set; } = 3;
 
     /// <summary>
     /// The expiry timeout, in seconds, until a message is considered expired and moved to dead letters.

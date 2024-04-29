@@ -7,6 +7,7 @@ internal class AdoNetQueueAdapterFactory : IQueueAdapterFactory
         _name = name;
         _streamOptions = streamOptions;
         _clusterOptions = clusterOptions;
+        _cacheOptions = cacheOptions;
         _agentOptions = agentOptions;
         _serviceProvider = serviceProvider;
 
@@ -18,6 +19,7 @@ internal class AdoNetQueueAdapterFactory : IQueueAdapterFactory
     private readonly string _name;
     private readonly AdoNetStreamOptions _streamOptions;
     private readonly ClusterOptions _clusterOptions;
+    private readonly SimpleQueueCacheOptions _cacheOptions;
     private readonly StreamPullingAgentOptions _agentOptions;
     private readonly IServiceProvider _serviceProvider;
 
@@ -31,7 +33,7 @@ internal class AdoNetQueueAdapterFactory : IQueueAdapterFactory
     {
         var queries = await GetQueriesAsync();
 
-        return AdapterFactory(_serviceProvider, [_name, _streamOptions, _clusterOptions, _adoNetQueueMapper, _agentOptions, queries]);
+        return AdapterFactory(_serviceProvider, [_name, _streamOptions, _clusterOptions, _cacheOptions, _adoNetQueueMapper, _agentOptions, queries]);
     }
 
     public async Task<IStreamFailureHandler> GetDeliveryFailureHandler(QueueId queueId)
@@ -70,7 +72,7 @@ internal class AdoNetQueueAdapterFactory : IQueueAdapterFactory
     /// <summary>
     /// Factory of <see cref="AdoNetQueueAdapter"/> instances.
     /// </summary>
-    private static readonly ObjectFactory<AdoNetQueueAdapter> AdapterFactory = ActivatorUtilities.CreateFactory<AdoNetQueueAdapter>([typeof(string), typeof(AdoNetStreamOptions), typeof(ClusterOptions), typeof(AdoNetStreamQueueMapper), typeof(StreamPullingAgentOptions), typeof(RelationalOrleansQueries)]);
+    private static readonly ObjectFactory<AdoNetQueueAdapter> AdapterFactory = ActivatorUtilities.CreateFactory<AdoNetQueueAdapter>([typeof(string), typeof(AdoNetStreamOptions), typeof(ClusterOptions), typeof(SimpleQueueCacheOptions), typeof(AdoNetStreamQueueMapper), typeof(StreamPullingAgentOptions), typeof(RelationalOrleansQueries)]);
 
     /// <summary>
     /// Factory of <see cref="AdoNetStreamFailureHandler"/> instances.
