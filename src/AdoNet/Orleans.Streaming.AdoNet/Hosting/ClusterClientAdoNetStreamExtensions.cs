@@ -14,7 +14,13 @@ public static class ClusterClientAdoNetStreamExtensions
         ArgumentNullException.ThrowIfNull(name);
         ArgumentNullException.ThrowIfNull(configureOptions);
 
-        return builder.AddAdoNetStreams(name, b => b.ConfigureAdoNet(ob => ob.Configure(configureOptions)));
+        return builder.AddAdoNetStreams(name, b =>
+        {
+            b.ConfigureAdoNet(ob => ob.Configure(configureOptions));
+
+            // this prevents the pulling agent from running wild on the shared database
+            b.Configure<StreamPullingAgentOptions>(ob => ob.Configure(options => options.GetQueueMsgsTimerPeriod = TimeSpan.FromSeconds(1)));
+        });
     }
 
     /// <summary>
@@ -28,7 +34,7 @@ public static class ClusterClientAdoNetStreamExtensions
 
         var configurator = new ClusterClientAdoNetStreamConfigurator(name, builder);
 
-        configure?.Invoke(configurator);
+        configure.Invoke(configurator);
 
         return builder;
     }
