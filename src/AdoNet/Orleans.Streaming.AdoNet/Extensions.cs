@@ -6,10 +6,15 @@ namespace Orleans.Streaming.AdoNet;
 internal static class Extensions
 {
     /// <inheritdoc cref="Math.Ceiling(double)"/>
-    public static int ToInt32Ceiling(this double value) => (int)Math.Ceiling(value);
+    public static int Int32Ceiling(this double value) => (int)Math.Ceiling(value);
 
     /// <summary>
-    /// Gets the smallest integer value that is equal to or greater than the total seconds of the specified time span.
+    /// Rounds up the specified time span to the nearest upper second and returns the total number of seconds as an integer.
     /// </summary>
-    public static int ToSecondsCeiling(this TimeSpan value) => value.TotalSeconds.ToInt32Ceiling();
+    public static int TotalSecondsCeiling(this TimeSpan value) => value.TotalSeconds.Int32Ceiling();
+
+    /// <summary>
+    /// Rounds up the specified time span to the nearest upper second and returns the total number of seconds as an integer.
+    /// </summary>
+    public static TimeSpan SecondsCeiling(this TimeSpan value) => TimeSpan.FromSeconds(Math.Ceiling(value.TotalSeconds));
 }

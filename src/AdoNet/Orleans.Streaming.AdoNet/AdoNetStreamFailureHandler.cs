@@ -34,7 +34,7 @@ internal partial class AdoNetStreamFailureHandler(bool faultOnFailure, AdoNetStr
 
         try
         {
-            await queries.MoveMessageToDeadLettersAsync(clusterOptions.ServiceId, streamProviderName, queueId, sequenceToken.SequenceNumber, streamOptions.MaxAttempts, streamOptions.RemovalTimeout);
+            await queries.MoveMessageToDeadLettersAsync(clusterOptions.ServiceId, streamProviderName, queueId, sequenceToken.SequenceNumber, streamOptions.MaxAttempts, streamOptions.RemovalTimeout.TotalSecondsCeiling());
 
             LogMovedMessage(clusterOptions.ServiceId, streamProviderName, queueId, sequenceToken.SequenceNumber);
         }

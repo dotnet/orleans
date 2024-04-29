@@ -87,7 +87,7 @@ public class AdoNetQueueAdapterTests(TestEnvironmentFixture fixture) : IAsyncLif
         {
             Invariant = AdoNetInvariantName,
             ConnectionString = _storage.ConnectionString,
-            ExpiryTimeout = 100
+            ExpiryTimeout = TimeSpan.FromSeconds(100)
         };
         var serializer = _fixture.Serializer.GetSerializer<AdoNetBatchContainer>();
         var logger = NullLogger<AdoNetQueueAdapter>.Instance;
@@ -120,8 +120,8 @@ public class AdoNetQueueAdapterTests(TestEnvironmentFixture fixture) : IAsyncLif
             Assert.Equal(0, item.Dequeued);
             Assert.True(item.VisibleOn >= beforeEnqueued);
             Assert.True(item.VisibleOn <= afterEnqueued);
-            Assert.True(item.ExpiresOn >= beforeEnqueued.AddSeconds(streamOptions.ExpiryTimeout));
-            Assert.True(item.ExpiresOn <= afterEnqueued.AddSeconds(streamOptions.ExpiryTimeout));
+            Assert.True(item.ExpiresOn >= beforeEnqueued.Add(streamOptions.ExpiryTimeout));
+            Assert.True(item.ExpiresOn <= afterEnqueued.Add(streamOptions.ExpiryTimeout));
             Assert.Equal(item.VisibleOn, item.CreatedOn);
             Assert.Equal(item.VisibleOn, item.ModifiedOn);
 
@@ -203,10 +203,10 @@ public class AdoNetQueueAdapterTests(TestEnvironmentFixture fixture) : IAsyncLif
             Assert.Equal(adoNetQueueId, item.QueueId);
             Assert.NotEqual(0, item.MessageId);
             Assert.Equal(1, item.Dequeued);
-            Assert.True(item.VisibleOn >= beforeDequeued.AddSeconds(agentOptions.MaxEventDeliveryTime.ToSecondsCeiling()));
-            Assert.True(item.VisibleOn <= afterDequeued.AddSeconds(agentOptions.MaxEventDeliveryTime.ToSecondsCeiling()));
-            Assert.True(item.ExpiresOn >= beforeEnqueued.AddSeconds(streamOptions.ExpiryTimeout));
-            Assert.True(item.ExpiresOn <= afterEnqueued.AddSeconds(streamOptions.ExpiryTimeout));
+            Assert.True(item.VisibleOn >= beforeDequeued.Add(agentOptions.MaxEventDeliveryTime));
+            Assert.True(item.VisibleOn <= afterDequeued.Add(agentOptions.MaxEventDeliveryTime));
+            Assert.True(item.ExpiresOn >= beforeEnqueued.Add(streamOptions.ExpiryTimeout));
+            Assert.True(item.ExpiresOn <= afterEnqueued.Add(streamOptions.ExpiryTimeout));
             Assert.True(item.CreatedOn >= beforeEnqueued);
             Assert.True(item.CreatedOn <= afterEnqueued);
             Assert.True(item.ModifiedOn >= beforeDequeued);

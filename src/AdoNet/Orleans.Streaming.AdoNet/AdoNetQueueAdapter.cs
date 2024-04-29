@@ -54,7 +54,7 @@ internal partial class AdoNetQueueAdapter(string name, AdoNetStreamOptions strea
         // we can enqueue the message now
         try
         {
-            await queries.QueueStreamMessageAsync(clusterOptions.ServiceId, Name, queueId, payload, streamOptions.ExpiryTimeout);
+            await queries.QueueStreamMessageAsync(clusterOptions.ServiceId, Name, queueId, payload, streamOptions.ExpiryTimeout.TotalSecondsCeiling());
         }
         catch (Exception ex)
         {

@@ -791,7 +791,7 @@ public class RelationOrleansQueriesTests : IAsyncLifetime
 
         // act
         var beforeFailure = DateTime.UtcNow;
-        await _queries.MoveMessageToDeadLettersAsync(ack.ServiceId, ack.ProviderId, ack.QueueId, ack.MessageId, streamOptions.MaxAttempts, streamOptions.RemovalTimeout);
+        await _queries.MoveMessageToDeadLettersAsync(ack.ServiceId, ack.ProviderId, ack.QueueId, ack.MessageId, streamOptions.MaxAttempts, streamOptions.RemovalTimeout.TotalSecondsCeiling());
         var afterFailure = DateTime.UtcNow;
 
         // assert
@@ -809,8 +809,8 @@ public class RelationOrleansQueriesTests : IAsyncLifetime
         Assert.True(dead.ModifiedOn <= afterQueued);
         Assert.True(dead.DeadOn >= beforeFailure);
         Assert.True(dead.DeadOn <= afterFailure);
-        Assert.True(dead.RemoveOn >= beforeFailure.AddSeconds(streamOptions.RemovalTimeout));
-        Assert.True(dead.RemoveOn <= afterFailure.AddSeconds(streamOptions.RemovalTimeout));
+        Assert.True(dead.RemoveOn >= beforeFailure.Add(streamOptions.RemovalTimeout));
+        Assert.True(dead.RemoveOn <= afterFailure.Add(streamOptions.RemovalTimeout));
         Assert.Equal(payload, dead.Payload);
     }
 
@@ -833,7 +833,7 @@ public class RelationOrleansQueriesTests : IAsyncLifetime
         var payload = new byte[] { 0xFF };
 
         var beforeQueued = DateTime.UtcNow;
-        var ack = await _queries.QueueStreamMessageAsync(serviceId, providerId, queueId, payload, streamOptions.ExpiryTimeout);
+        var ack = await _queries.QueueStreamMessageAsync(serviceId, providerId, queueId, payload, streamOptions.ExpiryTimeout.TotalSecondsCeiling());
         var afterQueued = DateTime.UtcNow;
 
         // arrange - dequeue the message and make immediately available
@@ -843,7 +843,7 @@ public class RelationOrleansQueriesTests : IAsyncLifetime
 
         // act - clean up with max attempts of one so the message above is flagged
         var beforeFailure = DateTime.UtcNow;
-        await _queries.MoveMessageToDeadLettersAsync(ack.ServiceId, ack.ProviderId, ack.QueueId, ack.MessageId, 1, streamOptions.RemovalTimeout);
+        await _queries.MoveMessageToDeadLettersAsync(ack.ServiceId, ack.ProviderId, ack.QueueId, ack.MessageId, 1, streamOptions.RemovalTimeout.TotalSecondsCeiling());
         var afterFailure = DateTime.UtcNow;
 
         // assert
@@ -853,16 +853,16 @@ public class RelationOrleansQueriesTests : IAsyncLifetime
         Assert.Equal(queueId, dead.QueueId);
         Assert.Equal(ack.MessageId, dead.MessageId);
         Assert.Equal(1, dead.Dequeued);
-        Assert.True(dead.ExpiresOn >= beforeQueued.AddSeconds(streamOptions.ExpiryTimeout));
-        Assert.True(dead.ExpiresOn <= afterQueued.AddSeconds(streamOptions.ExpiryTimeout));
+        Assert.True(dead.ExpiresOn >= beforeQueued.Add(streamOptions.ExpiryTimeout.SecondsCeiling()));
+        Assert.True(dead.ExpiresOn <= afterQueued.Add(streamOptions.ExpiryTimeout.SecondsCeiling()));
         Assert.True(dead.CreatedOn >= beforeQueued);
         Assert.True(dead.CreatedOn <= afterQueued);
         Assert.True(dead.ModifiedOn >= beforeDequeued);
         Assert.True(dead.ModifiedOn <= afterDequeued);
         Assert.True(dead.DeadOn >= beforeFailure);
         Assert.True(dead.DeadOn <= afterFailure);
-        Assert.True(dead.RemoveOn >= beforeFailure.AddSeconds(streamOptions.RemovalTimeout));
-        Assert.True(dead.RemoveOn <= afterFailure.AddSeconds(streamOptions.RemovalTimeout));
+        Assert.True(dead.RemoveOn >= beforeFailure.Add(streamOptions.RemovalTimeout.SecondsCeiling()));
+        Assert.True(dead.RemoveOn <= afterFailure.Add(streamOptions.RemovalTimeout.SecondsCeiling()));
         Assert.Equal(payload, dead.Payload);
     }
 
@@ -884,13 +884,13 @@ public class RelationOrleansQueriesTests : IAsyncLifetime
         await _storage.ExecuteAsync("DELETE FROM [OrleansStreamDeadLetter]");
         var queueId = "QueueId";
         var payload = new byte[] { 0xFF };
-        var ack = await _queries.QueueStreamMessageAsync(serviceId, providerId, queueId, payload, streamOptions.ExpiryTimeout);
+        var ack = await _queries.QueueStreamMessageAsync(serviceId, providerId, queueId, payload, streamOptions.ExpiryTimeout.TotalSecondsCeiling());
 
         // arrange - dequeue the message
-        await _queries.GetStreamMessagesAsync(ack.ServiceId, ack.ProviderId, ack.QueueId, cacheOptions.CacheSize, streamOptions.MaxAttempts, agentOptions.MaxEventDeliveryTime.ToSecondsCeiling());
+        await _queries.GetStreamMessagesAsync(ack.ServiceId, ack.ProviderId, ack.QueueId, cacheOptions.CacheSize, streamOptions.MaxAttempts, agentOptions.MaxEventDeliveryTime.TotalSecondsCeiling());
 
         // act - clean up with max attempts of one so the message above is flagged
-        await _queries.MoveMessageToDeadLettersAsync(ack.ServiceId, ack.ProviderId, ack.QueueId, ack.MessageId, streamOptions.MaxAttempts, streamOptions.RemovalTimeout);
+        await _queries.MoveMessageToDeadLettersAsync(ack.ServiceId, ack.ProviderId, ack.QueueId, ack.MessageId, streamOptions.MaxAttempts, streamOptions.RemovalTimeout.TotalSecondsCeiling());
 
         // assert
         Assert.Empty(await _storage.ReadAsync<AdoNetStreamDeadLetter>("SELECT * FROM [OrleansStreamDeadLetter]"));

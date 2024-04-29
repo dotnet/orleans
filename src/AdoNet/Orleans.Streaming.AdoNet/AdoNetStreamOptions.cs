@@ -23,15 +23,15 @@ public class AdoNetStreamOptions
     public int MaxAttempts { get; set; } = 3;
 
     /// <summary>
-    /// The expiry timeout, in seconds, until a message is considered expired and moved to dead letters.
+    /// The expiry timeout until a message is considered expired and moved to dead letters regardless of attempts.
+    /// The message is only moved if the current attempt is also past its visibility timeout.
     /// </summary>
-    public int ExpiryTimeout { get; set; } = 300;
+    public TimeSpan ExpiryTimeout { get; set; } = TimeSpan.FromMinutes(10);
 
     /// <summary>
-    /// The removal timeout, in seconds, until a failed message is deleted from the dead letters table.
-    /// Defaults to seven days.
+    /// The removal timeout until a failed message is deleted from the dead letters table.
     /// </summary>
-    public int RemovalTimeout { get; set; } = 604800;
+    public TimeSpan RemovalTimeout { get; set; } = TimeSpan.FromDays(7);
 
     /// <summary>
     /// Whether to delete messages from the dead letters table after <see cref="RemovalTimeout"/>.

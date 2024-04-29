@@ -113,8 +113,8 @@ public class AdoNetStreamFailureHandlerTests() : IAsyncLifetime
         Assert.True(dead.ModifiedOn <= afterQueued);
         Assert.True(dead.DeadOn >= beforeFailure);
         Assert.True(dead.DeadOn <= afterFailure);
-        Assert.True(dead.RemoveOn >= beforeFailure.AddSeconds(streamOptions.RemovalTimeout));
-        Assert.True(dead.RemoveOn <= afterFailure.AddSeconds(streamOptions.RemovalTimeout));
+        Assert.True(dead.RemoveOn >= beforeFailure.Add(streamOptions.RemovalTimeout));
+        Assert.True(dead.RemoveOn <= afterFailure.Add(streamOptions.RemovalTimeout));
         Assert.Equal(payload, dead.Payload);
     }
 
@@ -154,12 +154,12 @@ public class AdoNetStreamFailureHandlerTests() : IAsyncLifetime
         var payload = new byte[] { 0xFF };
 
         var beforeQueued = DateTime.UtcNow;
-        var ack = await _queries.QueueStreamMessageAsync(clusterOptions.ServiceId, providerId, queueId, payload, streamOptions.ExpiryTimeout);
+        var ack = await _queries.QueueStreamMessageAsync(clusterOptions.ServiceId, providerId, queueId, payload, streamOptions.ExpiryTimeout.TotalSecondsCeiling());
         var afterQueued = DateTime.UtcNow;
 
         // arrange - dequeue the message and make immediately available
         var beforeDequeued = DateTime.UtcNow;
-        await _queries.GetStreamMessagesAsync(ack.ServiceId, ack.ProviderId, ack.QueueId, cacheOptions.CacheSize, streamOptions.MaxAttempts, agentOptions.MaxEventDeliveryTime.ToSecondsCeiling());
+        await _queries.GetStreamMessagesAsync(ack.ServiceId, ack.ProviderId, ack.QueueId, cacheOptions.CacheSize, streamOptions.MaxAttempts, agentOptions.MaxEventDeliveryTime.TotalSecondsCeiling());
         var afterDequeued = DateTime.UtcNow;
 
         // act - clean up with max attempts of one so the message above is flagged
@@ -174,16 +174,16 @@ public class AdoNetStreamFailureHandlerTests() : IAsyncLifetime
         Assert.Equal(queueId, dead.QueueId);
         Assert.Equal(ack.MessageId, dead.MessageId);
         Assert.Equal(1, dead.Dequeued);
-        Assert.True(dead.ExpiresOn >= beforeQueued.AddSeconds(streamOptions.ExpiryTimeout));
-        Assert.True(dead.ExpiresOn <= afterQueued.AddSeconds(streamOptions.ExpiryTimeout));
+        Assert.True(dead.ExpiresOn >= beforeQueued.Add(streamOptions.ExpiryTimeout.SecondsCeiling()));
+        Assert.True(dead.ExpiresOn <= afterQueued.Add(streamOptions.ExpiryTimeout.SecondsCeiling()));
         Assert.True(dead.CreatedOn >= beforeQueued);
         Assert.True(dead.CreatedOn <= afterQueued);
         Assert.True(dead.ModifiedOn >= beforeDequeued);
         Assert.True(dead.ModifiedOn <= afterDequeued);
         Assert.True(dead.DeadOn >= beforeFailure);
         Assert.True(dead.DeadOn <= afterFailure);
-        Assert.True(dead.RemoveOn >= beforeFailure.AddSeconds(streamOptions.RemovalTimeout));
-        Assert.True(dead.RemoveOn <= afterFailure.AddSeconds(streamOptions.RemovalTimeout));
+        Assert.True(dead.RemoveOn >= beforeFailure.Add(streamOptions.RemovalTimeout.SecondsCeiling()));
+        Assert.True(dead.RemoveOn <= afterFailure.Add(streamOptions.RemovalTimeout.SecondsCeiling()));
         Assert.Equal(payload, dead.Payload);
     }
 
@@ -217,10 +217,10 @@ public class AdoNetStreamFailureHandlerTests() : IAsyncLifetime
         var streamId = StreamId.Create("MyNamespace", "MyKey");
         var queueId = mapper.GetAdoNetQueueId(streamId);
         var payload = new byte[] { 0xFF };
-        var ack = await _queries.QueueStreamMessageAsync(clusterOptions.ServiceId, providerId, queueId, payload, streamOptions.ExpiryTimeout);
+        var ack = await _queries.QueueStreamMessageAsync(clusterOptions.ServiceId, providerId, queueId, payload, streamOptions.ExpiryTimeout.TotalSecondsCeiling());
 
         // arrange - dequeue the message and make immediately available
-        await _queries.GetStreamMessagesAsync(ack.ServiceId, ack.ProviderId, ack.QueueId, cacheOptions.CacheSize, streamOptions.MaxAttempts, agentOptions.MaxEventDeliveryTime.ToSecondsCeiling());
+        await _queries.GetStreamMessagesAsync(ack.ServiceId, ack.ProviderId, ack.QueueId, cacheOptions.CacheSize, streamOptions.MaxAttempts, agentOptions.MaxEventDeliveryTime.TotalSecondsCeiling());
 
         // act - clean up with max attempts of one so the message above is flagged
         await handler.OnDeliveryFailure(GuidId.GetNewGuidId(), providerId, streamId, new EventSequenceTokenV2(ack.MessageId));
