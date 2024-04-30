@@ -35,11 +35,11 @@ namespace GoogleUtils.Tests.Streaming
             {
                 hostBuilder
                     .AddMemoryGrainStorage("MemoryStore", op => op.NumStorageGrains = 1)
-                    .AddMemoryGrainStorage("PubSubStorage")
-                    .AddSimpleMessageStreamProvider("SMSProvider")
+                    .AddMemoryGrainStorage("PubSubStore")
                     .AddPubSubStreams<PubSubDataAdapter>(PUBSUB_STREAM_PROVIDER_NAME, b=>
                         b.ConfigurePubSub(ob=>ob.Configure(options =>
                         {
+                            options.CustomEndpoint = GoogleTestUtils.EmulatorAddress;
                             options.ProjectId = GoogleTestUtils.ProjectId;
                             options.TopicId = GoogleTestUtils.TopicId;
                             options.Deadline = TimeSpan.FromSeconds(600);
@@ -52,10 +52,10 @@ namespace GoogleUtils.Tests.Streaming
             public void Configure(IConfiguration configuration, IClientBuilder clientBuilder)
             {
                 clientBuilder
-                    .AddSimpleMessageStreamProvider("SMSProvider")
                     .AddPubSubStreams<PubSubDataAdapter>(PUBSUB_STREAM_PROVIDER_NAME, b=>
                         b.ConfigurePubSub(ob=>ob.Configure(options =>
                         {
+                            options.CustomEndpoint = GoogleTestUtils.EmulatorAddress;
                             options.ProjectId = GoogleTestUtils.ProjectId;
                             options.TopicId = GoogleTestUtils.TopicId;
                             options.Deadline = TimeSpan.FromSeconds(600);
