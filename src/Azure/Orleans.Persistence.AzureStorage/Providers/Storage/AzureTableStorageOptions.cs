@@ -20,6 +20,11 @@ namespace Orleans.Configuration
         public bool DeleteStateOnClear { get; set; } = false;
 
         /// <summary>
+        /// Indicates if grain data should be stored as a json string or in binary format.
+        /// </summary>
+        public bool UseJson { get; set; }
+
+        /// <summary>
         /// Stage of silo lifecycle where storage should be initialized.  Storage must be initialized prior to use.
         /// </summary>
         public int InitStage { get; set; } = DEFAULT_INIT_STAGE;
