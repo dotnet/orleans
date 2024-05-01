@@ -5,6 +5,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Orleans.Configuration;
 using Orleans.Streaming.EventHubs;
 using Orleans.Streaming.EventHubs.Testing;
+using Orleans.Streams;
 
 namespace Orleans.Hosting.Developer
 {

@@ -69,5 +69,14 @@ namespace Orleans.Hosting
             configurator.ConfigurePartitionBalancing((s, n) => LeaseBasedQueueBalancer.Create(s, n),
                 configureOptions);
         }
+
+        /// <summary>
+        /// Configures the stream provider to use grain-based checkpointer.
+        /// </summary>
+        /// <param name="configurator">The configuration builder.</param>
+        public static void UseGrainCheckpointer(this ISiloPersistentStreamConfigurator configurator)
+        {
+            configurator.ConfigureComponent(GrainStreamQueueCheckpointerFactory.CreateFactory);
+        }
     }
 }
