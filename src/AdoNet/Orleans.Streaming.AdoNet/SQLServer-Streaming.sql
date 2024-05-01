@@ -524,6 +524,8 @@ INTO [OrleansStreamDeadLetter]
 	[Payload]
 );
 
+SELECT @@ROWCOUNT AS [Affected];
+
 END
 GO
 
@@ -538,7 +540,7 @@ SELECT
 GO
 
 /* Removes messages from the dead letters table. */
-CREATE PROCEDURE [CleanDeadLetters]
+CREATE PROCEDURE [CleanStreamDeadLetters]
 	@ServiceId NVARCHAR(150),
     @ProviderId NVARCHAR(150),
 	@QueueId NVARCHAR(150),
@@ -572,6 +574,8 @@ WITH Batch AS
 )
 DELETE FROM Batch;
 
+SELECT @@ROWCOUNT AS [Affected];
+
 END
 GO
 
@@ -581,6 +585,6 @@ INSERT INTO [OrleansQuery]
 	[QueryText]
 )
 SELECT
-	'CleanDeadLettersKey',
-	'EXECUTE [CleanDeadLetters] @ServiceId = @ServiceId, @ProviderId = @ProviderId, @QueueId = @QueueId, @MaxCount = @MaxCount'
+	'CleanStreamDeadLettersKey',
+	'EXECUTE [CleanStreamDeadLetters] @ServiceId = @ServiceId, @ProviderId = @ProviderId, @QueueId = @QueueId, @MaxCount = @MaxCount'
 GO

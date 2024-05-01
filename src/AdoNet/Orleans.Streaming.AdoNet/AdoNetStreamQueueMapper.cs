@@ -25,9 +25,24 @@ internal class AdoNetStreamQueueMapper(IConsistentRingStreamQueueMapper mapper)
     /// </summary>
     private readonly Func<QueueId, string> _fromQueueFactory = (QueueId queueId) => queueId.ToString();
 
-    /// <inheritdoc />
+    /// <summary>
+    /// Gets the ADO.NET QueueId for the specified Orleans StreamId.
+    /// </summary>
     public string GetAdoNetQueueId(StreamId streamId) => _byStreamLookup.GetOrAdd(streamId, _fromStreamFactory);
 
-    /// <inheritdoc />
+    /// <summary>
+    /// Gets the ADO.NET QueueId for the specified Orleans QueueId.
+    /// </summary>
     public string GetAdoNetQueueId(QueueId queueId) => _byQueueLookup.GetOrAdd(queueId, _fromQueueFactory);
+
+    /// <summary>
+    /// Gets all ADO.NET QueueIds in the current space.
+    /// </summary>
+    public IEnumerable<string> GetAllAdoNetQueueIds()
+    {
+        foreach (var queueId in mapper.GetAllQueues())
+        {
+            yield return _byQueueLookup.GetOrAdd(queueId, _fromQueueFactory);
+        }
+    }
 }

@@ -169,7 +169,7 @@ namespace Orleans.Tests.SqlUtils
         /// <summary>
         /// A query template to clean expired messages from a dead letters table.
         /// </summary>
-        internal string CleanDeadLettersKey => queries[nameof(CleanDeadLettersKey)];
+        internal string CleanStreamDeadLettersKey => queries[nameof(CleanStreamDeadLettersKey)];
 
 #endif
 

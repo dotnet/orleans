@@ -8,11 +8,6 @@ internal partial class AdoNetQueueAdapter(string name, AdoNetStreamOptions strea
     private readonly ILogger<AdoNetQueueAdapter> _logger = logger;
 
     /// <summary>
-    /// The receiver factory.
-    /// </summary>
-    private readonly ObjectFactory<AdoNetQueueAdapterReceiver> _receiverFactory = ActivatorUtilities.CreateFactory<AdoNetQueueAdapterReceiver>([typeof(string), typeof(string), typeof(AdoNetStreamOptions), typeof(ClusterOptions), typeof(SimpleQueueCacheOptions), typeof(StreamPullingAgentOptions), typeof(RelationalOrleansQueries)]);
-
-    /// <summary>
     /// Maps to the ProviderId in the database.
     /// </summary>
     public string Name { get; } = name;
@@ -33,7 +28,7 @@ internal partial class AdoNetQueueAdapter(string name, AdoNetStreamOptions strea
         var adoNetQueueId = mapper.GetAdoNetQueueId(queueId);
 
         // create the receiver
-        return _receiverFactory(serviceProvider, [Name, adoNetQueueId, streamOptions, clusterOptions, cacheOptions, agentOptions, queries]);
+        return ReceiverFactory(serviceProvider, [Name, adoNetQueueId, streamOptions, clusterOptions, cacheOptions, agentOptions, queries]);
     }
 
     public async Task QueueMessageBatchAsync<T>(StreamId streamId, IEnumerable<T> events, StreamSequenceToken token, Dictionary<string, object> requestContext)
@@ -62,6 +57,13 @@ internal partial class AdoNetQueueAdapter(string name, AdoNetStreamOptions strea
             throw;
         }
     }
+
+    /// <summary>
+    /// The receiver factory.
+    /// </summary>
+    private static readonly ObjectFactory<AdoNetQueueAdapterReceiver> ReceiverFactory = ActivatorUtilities.CreateFactory<AdoNetQueueAdapterReceiver>([typeof(string), typeof(string), typeof(AdoNetStreamOptions), typeof(ClusterOptions), typeof(SimpleQueueCacheOptions), typeof(StreamPullingAgentOptions), typeof(RelationalOrleansQueries)]);
+
+    private static readonly ObjectFactory<AdoNetQueueHousekeeper>
 
     #region Logging
 

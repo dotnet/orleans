@@ -521,6 +521,64 @@ namespace Orleans.Tests.SqlUtils
                 });
         }
 
+        /// <summary>
+        /// Moves eligible messages from the stream message table to the dead letter table.
+        /// </summary>
+        /// <param name="serviceId">The service identifier.</param>
+        /// <param name="providerId">The provider identifier.</param>
+        /// <param name="queueId">The queue identifier.</param>
+        /// <param name="maxCount">The max number of messages to move in this batch.</param>
+        /// <param name="maxAttempts">The max number of times a message can be dequeued.</param>
+        /// <param name="removalTimeout">The timeout before the message is to be deleted from dead letters.</param>
+        /// <returns>The number of records affected.</returns>
+        internal Task<int> CleanStreamMessagesAsync(string serviceId, string providerId, string queueId, int maxCount, int maxAttempts, int removalTimeout)
+        {
+            ArgumentNullException.ThrowIfNull(serviceId);
+            ArgumentNullException.ThrowIfNull(providerId);
+            ArgumentNullException.ThrowIfNull(queueId);
+
+            return ReadAsync(
+                dbStoredQueries.CleanStreamMessagesKey,
+                record => (int)record["Affected"],
+                command => new DbStoredQueries.Columns(command)
+                {
+                    ServiceId = serviceId,
+                    ProviderId = providerId,
+                    QueueId = queueId,
+                    MaxCount = maxCount,
+                    MaxAttempts = maxAttempts,
+                    RemovalTimeout = removalTimeout
+                },
+                results => results.Single());
+        }
+
+        /// <summary>
+        /// Removes messages from the dead letter after their removal timeout expires.
+        /// </summary>
+        /// <param name="serviceId">The service identifier.</param>
+        /// <param name="providerId">The provider identifier.</param>
+        /// <param name="queueId">The queue identifier.</param>
+        /// <param name="maxCount">The max number of messages to move in this batch.</param>
+        /// <returns>The number of records affected.</returns>
+        internal Task<int> CleanStreamDeadLettersAsync(string serviceId, string providerId, string queueId, int maxCount)
+        {
+            ArgumentNullException.ThrowIfNull(serviceId);
+            ArgumentNullException.ThrowIfNull(providerId);
+            ArgumentNullException.ThrowIfNull(queueId);
+
+            return ReadAsync(
+                dbStoredQueries.CleanStreamDeadLettersKey,
+                record => (int)record["Affected"],
+                command => new DbStoredQueries.Columns(command)
+                {
+                    ServiceId = serviceId,
+                    ProviderId = providerId,
+                    QueueId = queueId,
+                    MaxCount = maxCount
+                },
+                results => results.Single());
+        }
+
 #endif
     }
 }

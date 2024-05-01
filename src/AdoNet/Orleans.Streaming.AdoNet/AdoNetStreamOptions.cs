@@ -37,4 +37,19 @@ public class AdoNetStreamOptions
     /// Whether to delete messages from the dead letters table after <see cref="RemovalTimeout"/>.
     /// </summary>
     public bool RemoveDeadLetters { get; set; } = true;
+
+    /// <summary>
+    /// The maximum number of messages affected by a sweep batch.
+    /// Lower this number to lessen the impact of maintenance on streaming activities.
+    /// Increasing this number above ~5000 may cause the underlying RDBMS to suffer from deadlocks due to automatic lock promotion.
+    /// In that situation also alter the sql queries to always use table locks.
+    /// </summary>
+    public int SweepBatchSize { get; set; } = 1000;
+
+    /// <summary>
+    /// The cluster-wide period between sweep activities.
+    /// These include moving expired messages to dead letters and removing dead letters after their own lifetime.
+    /// This period is scaled and randomized dynamically according to the current number of silos in the cluster to avoid database stampedes.
+    /// </summary>
+    public TimeSpan SweepPeriod { get; set; } = TimeSpan.FromMinutes(1);
 }
