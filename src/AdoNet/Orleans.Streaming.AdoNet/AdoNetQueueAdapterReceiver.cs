@@ -8,7 +8,7 @@ internal partial class AdoNetQueueAdapterReceiver(string providerId, string queu
     private readonly ILogger<AdoNetQueueAdapterReceiver> _logger = logger;
 
     /// <summary>
-    /// Flags that further work should be attempted.
+    /// Flags that no further work should be attempted.
     /// </summary>
     private bool _shutdown;
 
@@ -34,7 +34,14 @@ internal partial class AdoNetQueueAdapterReceiver(string providerId, string queu
         var outstandingTask = _outstandingTask;
         if (outstandingTask is not null)
         {
-            await outstandingTask.WaitAsync(timeout);
+            try
+            {
+                await outstandingTask.WaitAsync(timeout);
+            }
+            catch (Exception ex)
+            {
+                LogShutdownFault(ex, clusterOptions.ServiceId, providerId, queueId);
+            }
         }
     }
 
@@ -123,6 +130,9 @@ internal partial class AdoNetQueueAdapterReceiver(string providerId, string queu
 
     [LoggerMessage(2, LogLevel.Error, "Failed to confirm messages for ({ServiceId}, {ProviderId}, {QueueId}, {@Items})")]
     private partial void LogConfirmationFailed(Exception exception, string serviceId, string providerId, string queueId, List<AdoNetStreamConfirmation> items);
+
+    [LoggerMessage(3, LogLevel.Warning, "Handled fault while shutting down receiver for ({ServiceId}, {ProviderId}, {QueueId})")]
+    private partial void LogShutdownFault(Exception exception, string serviceId, string providerId, string queueId);
 
     #endregion Logging
 }
