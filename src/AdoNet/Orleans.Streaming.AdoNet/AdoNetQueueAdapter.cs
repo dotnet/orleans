@@ -36,7 +36,7 @@ internal partial class AdoNetQueueAdapter(string name, AdoNetStreamOptions strea
         // the ADO.NET provider is not rewindable so we do not support user supplied tokens
         if (token is not null)
         {
-            throw new ArgumentException($"{nameof(AdoNetQueueAdapter)} does yet support a user supplied {nameof(StreamSequenceToken)}.");
+            throw new ArgumentException($"{nameof(AdoNetQueueAdapter)} does not support a user supplied {nameof(StreamSequenceToken)}.");
         }
 
         // map the Orleans stream id to the corresponding queue id
