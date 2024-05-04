@@ -11,7 +11,7 @@ namespace Tester.AdoNet.Streaming;
 /// Tests the relational storage layer via <see cref="RelationalOrleansQueries"/>.
 /// </summary>
 [TestCategory("AdoNet"), TestCategory("Streaming")]
-public class RelationOrleansQueriesTests : IAsyncLifetime
+public class RelationalOrleansQueriesTests : IAsyncLifetime
 {
     private const string TestDatabaseName = "OrleansStreamTest";
     private const string AdoNetInvariantName = AdoNetInvariants.InvariantNameSqlServer;
@@ -827,7 +827,7 @@ public class RelationOrleansQueriesTests : IAsyncLifetime
 
         // act
         var beforeFailure = DateTime.UtcNow;
-        await _queries.MoveMessageToDeadLettersAsync(ack.ServiceId, ack.ProviderId, ack.QueueId, ack.MessageId, streamOptions.MaxAttempts, streamOptions.DeadLetterEvictionTimeout.TotalSecondsCeiling());
+        await _queries.EvictStreamMessageAsync(ack.ServiceId, ack.ProviderId, ack.QueueId, ack.MessageId, streamOptions.MaxAttempts, streamOptions.DeadLetterEvictionTimeout.TotalSecondsCeiling());
         var afterFailure = DateTime.UtcNow;
 
         // assert
@@ -879,7 +879,7 @@ public class RelationOrleansQueriesTests : IAsyncLifetime
 
         // act - clean up with max attempts of one so the message above is flagged
         var beforeFailure = DateTime.UtcNow;
-        await _queries.MoveMessageToDeadLettersAsync(ack.ServiceId, ack.ProviderId, ack.QueueId, ack.MessageId, 1, streamOptions.DeadLetterEvictionTimeout.TotalSecondsCeiling());
+        await _queries.EvictStreamMessageAsync(ack.ServiceId, ack.ProviderId, ack.QueueId, ack.MessageId, 1, streamOptions.DeadLetterEvictionTimeout.TotalSecondsCeiling());
         var afterFailure = DateTime.UtcNow;
 
         // assert
@@ -926,7 +926,7 @@ public class RelationOrleansQueriesTests : IAsyncLifetime
         await _queries.GetStreamMessagesAsync(ack.ServiceId, ack.ProviderId, ack.QueueId, cacheOptions.CacheSize, streamOptions.MaxAttempts, agentOptions.MaxEventDeliveryTime.TotalSecondsCeiling(), streamOptions.DeadLetterEvictionTimeout.TotalSecondsCeiling(), streamOptions.EvictionInterval.TotalSecondsCeiling(), streamOptions.EvictionBatchSize);
 
         // act - clean up with max attempts of one so the message above is flagged
-        await _queries.MoveMessageToDeadLettersAsync(ack.ServiceId, ack.ProviderId, ack.QueueId, ack.MessageId, streamOptions.MaxAttempts, streamOptions.DeadLetterEvictionTimeout.TotalSecondsCeiling());
+        await _queries.EvictStreamMessageAsync(ack.ServiceId, ack.ProviderId, ack.QueueId, ack.MessageId, streamOptions.MaxAttempts, streamOptions.DeadLetterEvictionTimeout.TotalSecondsCeiling());
 
         // assert
         Assert.Empty(await _storage.ReadAsync<AdoNetStreamDeadLetter>("SELECT * FROM [OrleansStreamDeadLetter]"));

@@ -502,20 +502,20 @@ namespace Orleans.Tests.SqlUtils
         }
 
         /// <summary>
-        /// Moves a single message from the stream message table to the dead letter table if the expiration policy applies.
+        /// Evicts a single message from the stream message table to the dead letters table if the expiration policy applies.
         /// </summary>
         /// <param name="serviceId">The service identifier.</param>
         /// <param name="providerId">The provider identifier.</param>
         /// <param name="queueId">The queue identifier.</param>
         /// <param name="messageId">The message identifier.</param>
-        internal Task MoveMessageToDeadLettersAsync(string serviceId, string providerId, string queueId, long messageId, int maxAttempts, int removalTimeout)
+        internal Task EvictStreamMessageAsync(string serviceId, string providerId, string queueId, long messageId, int maxAttempts, int removalTimeout)
         {
             ArgumentNullException.ThrowIfNull(serviceId);
             ArgumentNullException.ThrowIfNull(providerId);
             ArgumentNullException.ThrowIfNull(queueId);
 
             return ExecuteAsync(
-                dbStoredQueries.SweepStreamMessageKey,
+                dbStoredQueries.EvictStreamMessageKey,
                 command => new DbStoredQueries.Columns(command)
                 {
                     ServiceId = serviceId,

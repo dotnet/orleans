@@ -456,8 +456,8 @@ SELECT
 	'EXECUTE [ConfirmStreamMessages] @ServiceId = @ServiceId, @ProviderId = @ProviderId, @QueueId = @QueueId, @Items = @Items'
 GO
 
-/* Moves a single non-delivered message from the message table to the dead letter table for human troubleshooting. */
-CREATE PROCEDURE [SweepStreamMessage]
+/* Evicts a single non-delivered message from the message table to the dead letter table for human troubleshooting. */
+CREATE PROCEDURE [EvictStreamMessage]
 	@ServiceId NVARCHAR(150),
     @ProviderId NVARCHAR(150),
 	@QueueId NVARCHAR(150),
@@ -543,8 +543,8 @@ INSERT INTO [OrleansQuery]
 	[QueryText]
 )
 SELECT
-	'SweepStreamMessageKey',
-	'EXECUTE [SweepStreamMessage] @ServiceId = @ServiceId, @ProviderId = @ProviderId, @QueueId = @QueueId, @MessageId = @MessageId, @MaxAttempts = @MaxAttempts, @RemovalTimeout = @RemovalTimeout'
+	'EvictStreamMessageKey',
+	'EXECUTE [EvictStreamMessage] @ServiceId = @ServiceId, @ProviderId = @ProviderId, @QueueId = @QueueId, @MessageId = @MessageId, @MaxAttempts = @MaxAttempts, @RemovalTimeout = @RemovalTimeout'
 GO
 
 /* Moves non-delivered messages from the message table to the dead letter table for human troubleshooting. */

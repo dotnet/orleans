@@ -158,7 +158,7 @@ namespace Orleans.Tests.SqlUtils
         /// <summary>
         /// A query template to sweep a single message (to the dead letters table).
         /// </summary>
-        internal string SweepStreamMessageKey => queries[nameof(SweepStreamMessageKey)];
+        internal string EvictStreamMessageKey => queries[nameof(EvictStreamMessageKey)];
 
         /// <summary>
         /// A query template to batch sweep messages (to the dead letters table).
