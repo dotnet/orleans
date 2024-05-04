@@ -17,8 +17,11 @@ public class SiloAdoNetStreamConfigurator : SiloPersistentStreamConfigurator
             services
                 .ConfigureNamedOptionForLogging<AdoNetStreamOptions>(name)
                 .ConfigureNamedOptionForLogging<SimpleQueueCacheOptions>(name)
-                .ConfigureNamedOptionForLogging<HashRingStreamQueueMapperOptions>(name);
+                .ConfigureNamedOptionForLogging<HashRingStreamQueueMapperOptions>(name)
+                .AddTransient<IConfigurationValidator>(sp => new AdoNetStreamOptionsValidator(sp.GetOptionsByName<AdoNetStreamOptions>(name), name));
         });
+
+        ConfigurePartitioning(1);
     }
 
     public SiloAdoNetStreamConfigurator ConfigureAdoNet(Action<OptionsBuilder<AdoNetStreamOptions>> configureOptions)

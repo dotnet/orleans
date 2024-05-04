@@ -16,8 +16,12 @@ public class ClusterClientAdoNetStreamConfigurator : ClusterClientPersistentStre
         {
             services
                 .ConfigureNamedOptionForLogging<AdoNetStreamOptions>(name)
-                .ConfigureNamedOptionForLogging<HashRingStreamQueueMapperOptions>(name);
+                .ConfigureNamedOptionForLogging<SimpleQueueCacheOptions>(name)
+                .ConfigureNamedOptionForLogging<HashRingStreamQueueMapperOptions>(name)
+                .AddTransient<IConfigurationValidator>(sp => new AdoNetStreamOptionsValidator(sp.GetOptionsByName<AdoNetStreamOptions>(name), name));
         });
+
+        ConfigurePartitioning(1);
     }
 
     public ClusterClientAdoNetStreamConfigurator ConfigureAdoNet(Action<OptionsBuilder<AdoNetStreamOptions>> configureOptions)
@@ -25,6 +29,13 @@ public class ClusterClientAdoNetStreamConfigurator : ClusterClientPersistentStre
         ArgumentNullException.ThrowIfNull(configureOptions);
 
         this.Configure(configureOptions);
+
+        return this;
+    }
+
+    public ClusterClientAdoNetStreamConfigurator ConfigureCache(int cacheSize = SimpleQueueCacheOptions.DEFAULT_CACHE_SIZE)
+    {
+        this.Configure<SimpleQueueCacheOptions>(ob => ob.Configure(options => options.CacheSize = cacheSize));
 
         return this;
     }
