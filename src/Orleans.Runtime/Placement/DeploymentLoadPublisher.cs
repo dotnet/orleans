@@ -76,8 +76,7 @@ namespace Orleans.Runtime
                     static state => ((DeploymentLoadPublisher)state).PublishStatistics(),
                     this,
                     randomTimerOffset,
-                    _statisticsRefreshTime,
-                    "DeploymentLoadPublisher.PublishStatisticsTimer");
+                    _statisticsRefreshTime);
             }
 
             await RefreshClusterStatistics();

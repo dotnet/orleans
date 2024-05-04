@@ -59,7 +59,10 @@ namespace Orleans.Hosting
 
             services.Add(ServiceDescriptor);
 
+            // Common services
+            services.AddLogging();
             services.AddOptions();
+            services.TryAddSingleton<TimeProvider>(TimeProvider.System);
 
             services.TryAddSingleton(typeof(IOptionFormatter<>), typeof(DefaultOptionsFormatter<>));
             services.TryAddSingleton(typeof(IOptionFormatterResolver<>), typeof(DefaultOptionsFormatterResolver<>));
@@ -87,7 +90,6 @@ namespace Orleans.Hosting
             services.TryAddSingleton<FallbackSystemTarget>();
             services.TryAddSingleton<LifecycleSchedulingSystemTarget>();
 
-            services.AddLogging();
             services.TryAddSingleton<ITimerRegistry, TimerRegistry>();
             
             services.TryAddSingleton<GrainRuntime>();
