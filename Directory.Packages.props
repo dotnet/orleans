@@ -10,8 +10,6 @@
   <ItemGroup>
     <!-- System packages -->
     <PackageVersion Include="Microsoft.Extensions.Configuration.Abstractions" Version="8.0.0" />
-    <PackageVersion Include="Microsoft.VisualStudio.Threading" Version="17.9.28" />
-    <PackageVersion Include="Microsoft.VisualStudio.Threading.Analyzers" Version="17.9.28" />
     <PackageVersion Include="System.Diagnostics.PerformanceCounter" Version="8.0.0" />
     <PackageVersion Include="System.IO.Hashing" Version="8.0.0" NoWarn="NU5104" />
     <PackageVersion Include="System.IO.Pipelines" Version="8.0.0" />
