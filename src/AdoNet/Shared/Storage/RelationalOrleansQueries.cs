@@ -418,8 +418,11 @@ namespace Orleans.Tests.SqlUtils
         /// <param name="maxCount">The maximum count of event batches to get.</param>
         /// <param name="maxAttempts">The maximum attempts to lock an unprocessed event batch.</param>
         /// <param name="visibilityTimeout">The visibility timeout for the retrieved event batches.</param>
+        /// <param name="removalTimeout">The timeout before the message is to be deleted from dead letters.</param>
+        /// <param name="evictionInterval">The interval between opportunistic data eviction.</param>
+        /// <param name="evictionBatchSize">The number of messages to evict in each batch.</param>
         /// <returns>A list of dequeued payloads.</returns>
-        internal Task<IList<AdoNetStreamMessage>> GetStreamMessagesAsync(string serviceId, string providerId, string queueId, int maxCount, int maxAttempts, int visibilityTimeout)
+        internal Task<IList<AdoNetStreamMessage>> GetStreamMessagesAsync(string serviceId, string providerId, string queueId, int maxCount, int maxAttempts, int visibilityTimeout, int removalTimeout, int evictionInterval, int evictionBatchSize)
         {
             ArgumentNullException.ThrowIfNull(serviceId);
             ArgumentNullException.ThrowIfNull(providerId);
@@ -446,6 +449,9 @@ namespace Orleans.Tests.SqlUtils
                     MaxCount = maxCount,
                     MaxAttempts = maxAttempts,
                     VisibilityTimeout = visibilityTimeout,
+                    RemovalTimeout = removalTimeout,
+                    SweepInterval = evictionInterval,
+                    SweepBatchSize = evictionBatchSize
                 },
                 result => result.ToList());
         }
@@ -509,7 +515,7 @@ namespace Orleans.Tests.SqlUtils
             ArgumentNullException.ThrowIfNull(queueId);
 
             return ExecuteAsync(
-                dbStoredQueries.MoveStreamMessageToDeadLettersKey,
+                dbStoredQueries.SweepStreamMessageKey,
                 command => new DbStoredQueries.Columns(command)
                 {
                     ServiceId = serviceId,
@@ -538,7 +544,7 @@ namespace Orleans.Tests.SqlUtils
             ArgumentNullException.ThrowIfNull(queueId);
 
             return ReadAsync(
-                dbStoredQueries.CleanStreamMessagesKey,
+                dbStoredQueries.SweepStreamMessagesKey,
                 record => (int)record["Affected"],
                 command => new DbStoredQueries.Columns(command)
                 {
@@ -567,7 +573,7 @@ namespace Orleans.Tests.SqlUtils
             ArgumentNullException.ThrowIfNull(queueId);
 
             return ReadAsync(
-                dbStoredQueries.CleanStreamDeadLettersKey,
+                dbStoredQueries.SweepStreamDeadLettersKey,
                 record => (int)record["Affected"],
                 command => new DbStoredQueries.Columns(command)
                 {

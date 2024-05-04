@@ -17,9 +17,6 @@ public static class SiloBuilderAdoNetStreamExtensions
         return builder.AddAdoNetStreams(name, b =>
         {
             b.ConfigureAdoNet(ob => ob.Configure(configureOptions));
-
-            // this prevents the pulling agent from running wild on the shared database
-            b.Configure<StreamPullingAgentOptions>(ob => ob.Configure(options => options.GetQueueMsgsTimerPeriod = TimeSpan.FromSeconds(1)));
         });
     }
 

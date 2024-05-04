@@ -52,7 +52,10 @@ public class AdoNetQueueAdapterReceiverTests(TestEnvironmentFixture fixture) : I
         var streamOptions = new AdoNetStreamOptions
         {
             Invariant = AdoNetInvariantName,
-            ConnectionString = _storage.ConnectionString
+            ConnectionString = _storage.ConnectionString,
+
+            // disable sweeping for this test
+            EvictionBatchSize = 0
         };
         var cacheOptions = new SimpleQueueCacheOptions();
         var agentOptions = new StreamPullingAgentOptions();

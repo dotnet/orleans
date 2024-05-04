@@ -133,6 +133,34 @@ CREATE TABLE [OrleansStreamDeadLetter]
 );
 GO
 
+/*
+Orleans Streaming Control Table.
+This table holds schedule variables to help providers self manage their own work.
+*/
+CREATE TABLE [OrleansStreamControl]
+(
+	/* Identifies the application */
+	[ServiceId] NVARCHAR(150) NOT NULL,
+
+    /* Identifies the provider within the application */
+    [ProviderId] NVARCHAR(150) NOT NULL,
+
+	/* Identifies the individual queue shard as configured in the provider */
+	[QueueId] NVARCHAR(150) NOT NULL,
+
+    /* The next due schedule for messages to be sweeped */
+    [SweepOn] DATETIME2(7) NOT NULL,
+
+    /* Each row represents a flat configuration object for an individual queue */
+	CONSTRAINT [PK_OrleansStreamControl] PRIMARY KEY CLUSTERED
+	(
+		[ServiceId] ASC,
+        [ProviderId] ASC,
+		[QueueId] ASC
+	)
+);
+GO
+
 /* Queues a message to the Orleans Streaming Message Queue */
 CREATE PROCEDURE [QueueStreamMessage]
 	@ServiceId NVARCHAR(150),
@@ -195,13 +223,17 @@ SELECT
 GO
 
 /* Gets message batches from the Orleans Streaming Message Queue */
+/* Also opportunistically performs sweeping activities when they are due */
 CREATE PROCEDURE [GetStreamMessages]
 	@ServiceId NVARCHAR(150),
     @ProviderId NVARCHAR(150),
 	@QueueId NVARCHAR(150),
     @MaxCount INT,
 	@MaxAttempts INT,
-	@VisibilityTimeout INT
+	@VisibilityTimeout INT,
+    @RemovalTimeout INT,
+    @SweepInterval INT,
+    @SweepBatchSize INT
 AS
 BEGIN
 
@@ -209,6 +241,80 @@ SET NOCOUNT ON;
 
 DECLARE @Now DATETIME2(7) = SYSUTCDATETIME();
 DECLARE @VisibleOn DATETIME2(7) = DATEADD(SECOND, @VisibilityTimeout, @Now);
+
+/* lightweight check to see if a sweeping activity is due */
+DECLARE @SweepOn DATETIME2(7) =
+(
+    SELECT [SweepOn]
+    FROM [OrleansStreamControl]
+    WHERE
+        [ServiceId] = @ServiceId
+        AND [ProviderId] = @ProviderId
+        AND [QueueId] = @QueueId
+);
+
+/* escalate to a sweep attempt only if an activity is due */
+IF @SweepOn IS NULL OR @SweepOn < @Now
+BEGIN
+
+    /* attempt to win a race to update the schedule */
+    /* this will also initialize the table if necessary */
+    WITH [Candidate] AS
+    (
+        SELECT
+            [ServiceId] = @ServiceId,
+            [ProviderId] = @ProviderId,
+            [QueueId] = @QueueId,
+            [Now] = @Now,
+            [SweepOn] = DATEADD(SECOND, @SweepInterval, @Now)
+    )
+    MERGE [OrleansStreamControl] WITH (UPDLOCK, HOLDLOCK) AS [T]
+    USING [Candidate] AS [S]
+    ON [T].[ServiceId] = [S].[ServiceId]
+    AND [T].[ProviderId] = [S].[ProviderId]
+    AND [T].[QueueId] = [S].[QueueId]
+    WHEN MATCHED AND [T].[SweepOn] < [S].[Now] THEN
+    UPDATE SET [T].[SweepOn] = [S].[SweepOn]
+    WHEN NOT MATCHED BY TARGET THEN
+    INSERT
+    (
+        [ServiceId],
+        [ProviderId],
+        [QueueId],
+        [SweepOn]
+    )
+    VALUES
+    (
+        [ServiceId],
+        [ProviderId],
+        [QueueId],
+        [Now]
+    );
+
+    /* if the above statement won the race then we also get to run the sweep */
+    /* other concurrent queries will continue running as normal until the next due time */
+    IF (@@ROWCOUNT > 0)
+    BEGIN
+
+        /* sweep messages */
+        EXECUTE [SweepStreamMessages]
+            @ServiceId = @ServiceId,
+            @ProviderId = @ProviderId,
+            @QueueId = @QueueId,
+            @MaxAttempts = @MaxAttempts,
+            @RemovalTimeout = @RemovalTimeout,
+            @SweepBatchSize = @SweepBatchSize
+
+        /* sweep dead letters */
+        EXECUTE [SweepStreamDeadLetters]
+            @ServiceId = @ServiceId,
+            @ProviderId = @ProviderId,
+            @QueueId = @QueueId,
+            @SweepBatchSize = @SweepBatchSize;
+            
+    END;
+
+END;
 
 /* update messages in the exact same order as the clustered index to avoid deadlocks with other queries */
 WITH Batch AS
@@ -256,7 +362,7 @@ OUTPUT
 	[Inserted].[ModifiedOn],
 	[Inserted].[Payload]
 FROM
-	Batch
+	Batch;
 
 END
 GO
@@ -268,7 +374,7 @@ INSERT INTO [OrleansQuery]
 )
 SELECT
 	'GetStreamMessagesKey',
-	'EXECUTE [GetStreamMessages] @ServiceId = @ServiceId, @ProviderId = @ProviderId, @QueueId = @QueueId, @MaxCount = @MaxCount, @MaxAttempts = @MaxAttempts, @VisibilityTimeout = @VisibilityTimeout'
+	'EXECUTE [GetStreamMessages] @ServiceId = @ServiceId, @ProviderId = @ProviderId, @QueueId = @QueueId, @MaxCount = @MaxCount, @MaxAttempts = @MaxAttempts, @VisibilityTimeout = @VisibilityTimeout, @RemovalTimeout = @RemovalTimeout, @SweepInterval = @SweepInterval, @SweepBatchSize = @SweepBatchSize'
 GO
 
 /* Confirms delivery of a stream message. */
@@ -350,8 +456,8 @@ SELECT
 	'EXECUTE [ConfirmStreamMessages] @ServiceId = @ServiceId, @ProviderId = @ProviderId, @QueueId = @QueueId, @Items = @Items'
 GO
 
-/* Moves a non-delivered message from the message table to the dead letter table for human troubleshooting. */
-CREATE PROCEDURE [MoveStreamMessageToDeadLetters]
+/* Moves a single non-delivered message from the message table to the dead letter table for human troubleshooting. */
+CREATE PROCEDURE [SweepStreamMessage]
 	@ServiceId NVARCHAR(150),
     @ProviderId NVARCHAR(150),
 	@QueueId NVARCHAR(150),
@@ -437,16 +543,16 @@ INSERT INTO [OrleansQuery]
 	[QueryText]
 )
 SELECT
-	'MoveStreamMessageToDeadLettersKey',
-	'EXECUTE [MoveStreamMessageToDeadLetters] @ServiceId = @ServiceId, @ProviderId = @ProviderId, @QueueId = @QueueId, @MessageId = @MessageId, @MaxAttempts = @MaxAttempts, @RemovalTimeout = @RemovalTimeout'
+	'SweepStreamMessageKey',
+	'EXECUTE [SweepStreamMessage] @ServiceId = @ServiceId, @ProviderId = @ProviderId, @QueueId = @QueueId, @MessageId = @MessageId, @MaxAttempts = @MaxAttempts, @RemovalTimeout = @RemovalTimeout'
 GO
 
 /* Moves non-delivered messages from the message table to the dead letter table for human troubleshooting. */
-CREATE PROCEDURE [CleanStreamMessages]
+CREATE PROCEDURE [SweepStreamMessages]
 	@ServiceId NVARCHAR(150),
     @ProviderId NVARCHAR(150),
 	@QueueId NVARCHAR(150),
-	@MaxCount INT,
+	@SweepBatchSize INT,
 	@MaxAttempts INT,
 	@RemovalTimeout INT
 AS
@@ -461,7 +567,7 @@ DECLARE @RemoveOn DATETIME2(7) = DATEADD(SECOND, @RemovalTimeout, @Now);
 /* delete messages in the exact same order as the clustered index to avoid deadlocks with other queries */
 WITH Batch AS
 (
-	SELECT TOP (@MaxCount)
+	SELECT TOP (@SweepBatchSize)
 		[ServiceId],
         [ProviderId],
 		[QueueId],
@@ -524,8 +630,6 @@ INTO [OrleansStreamDeadLetter]
 	[Payload]
 );
 
-SELECT @@ROWCOUNT AS [Affected];
-
 END
 GO
 
@@ -535,16 +639,16 @@ INSERT INTO [OrleansQuery]
 	[QueryText]
 )
 SELECT
-	'CleanStreamMessagesKey',
-	'EXECUTE [CleanStreamMessages] @ServiceId = @ServiceId, @ProviderId = @ProviderId, @QueueId = @QueueId, @MaxCount = @MaxCount, @MaxAttempts = @MaxAttempts, @RemovalTimeout = @RemovalTimeout'
+	'SweepStreamMessagesKey',
+	'EXECUTE [SweepStreamMessages] @ServiceId = @ServiceId, @ProviderId = @ProviderId, @QueueId = @QueueId, @SweepBatchSize = @SweepBatchSize, @MaxAttempts = @MaxAttempts, @RemovalTimeout = @RemovalTimeout'
 GO
 
 /* Removes messages from the dead letters table. */
-CREATE PROCEDURE [CleanStreamDeadLetters]
+CREATE PROCEDURE [SweepStreamDeadLetters]
 	@ServiceId NVARCHAR(150),
     @ProviderId NVARCHAR(150),
 	@QueueId NVARCHAR(150),
-	@MaxCount INT
+	@SweepBatchSize INT
 AS
 BEGIN
 
@@ -555,13 +659,13 @@ DECLARE @Now DATETIME2(7) = SYSUTCDATETIME();
 /* delete messages in the exact same order as the clustered index to avoid deadlocks with other queries */
 WITH Batch AS
 (
-    SELECT TOP (@MaxCount)
+    SELECT TOP (@SweepBatchSize)
         [ServiceId],
         [ProviderId],
         [QueueId],
         [MessageId]
     FROM
-        [OrleansStreamDeadLetter] WITH (ROWLOCK, XLOCK, HOLDLOCK)
+        [OrleansStreamDeadLetter]
     WHERE
         [ServiceId] = @ServiceId
         AND [ProviderId] = @ProviderId
@@ -574,8 +678,6 @@ WITH Batch AS
 )
 DELETE FROM Batch;
 
-SELECT @@ROWCOUNT AS [Affected];
-
 END
 GO
 
@@ -585,6 +687,6 @@ INSERT INTO [OrleansQuery]
 	[QueryText]
 )
 SELECT
-	'CleanStreamDeadLettersKey',
-	'EXECUTE [CleanStreamDeadLetters] @ServiceId = @ServiceId, @ProviderId = @ProviderId, @QueueId = @QueueId, @MaxCount = @MaxCount'
+	'SweepStreamDeadLettersKey',
+	'EXECUTE [SweepStreamDeadLetters] @ServiceId = @ServiceId, @ProviderId = @ProviderId, @QueueId = @QueueId, @SweepBatchSize = @SweepBatchSize'
 GO

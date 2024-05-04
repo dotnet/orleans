@@ -27,9 +27,9 @@ public class AdoNetStreamOptionsValidator(IOptions<AdoNetStreamOptions> options)
             throw new OrleansConfigurationException($"Invalid {nameof(AdoNetStreamOptions)} values for ADO.NET Streaming. {nameof(_options.MaxAttempts)} must be greater than 0.");
         }
 
-        if (_options.SweepPeriod < TimeSpan.FromSeconds(1))
+        if (_options.EvictionInterval < TimeSpan.FromSeconds(1))
         {
-            throw new OrleansConfigurationException($"Invalid {nameof(AdoNetStreamOptions)} values for ADO.NET Streaming. {nameof(_options.SweepPeriod)} must be at least 1 second.");
+            throw new OrleansConfigurationException($"Invalid {nameof(AdoNetStreamOptions)} values for ADO.NET Streaming. {nameof(_options.EvictionInterval)} must be at least 1 second.");
         }
 
         if (_options.ExpiryTimeout <= TimeSpan.Zero)
@@ -37,9 +37,9 @@ public class AdoNetStreamOptionsValidator(IOptions<AdoNetStreamOptions> options)
             throw new OrleansConfigurationException($"Invalid {nameof(AdoNetStreamOptions)} values for ADO.NET Streaming. {nameof(_options.ExpiryTimeout)} must be greater than zero.");
         }
 
-        if (_options.RemovalTimeout <= TimeSpan.Zero)
+        if (_options.DeadLetterEvictionTimeout <= TimeSpan.Zero)
         {
-            throw new OrleansConfigurationException($"Invalid {nameof(AdoNetStreamOptions)} values for ADO.NET Streaming. {nameof(_options.RemovalTimeout)} must be greater than zero.");
+            throw new OrleansConfigurationException($"Invalid {nameof(AdoNetStreamOptions)} values for ADO.NET Streaming. {nameof(_options.DeadLetterEvictionTimeout)} must be greater than zero.");
         }
     }
 }

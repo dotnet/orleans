@@ -20,7 +20,7 @@ public class AdoNetStreamOptions
     /// The maximum number of attempts to deliver a message.
     /// The message is eventually moved to dead letters if these many attempts are made without success.
     /// </summary>
-    public int MaxAttempts { get; set; } = 3;
+    public int MaxAttempts { get; set; } = 5;
 
     /// <summary>
     /// The expiry timeout until a message is considered expired and moved to dead letters regardless of attempts.
@@ -31,25 +31,17 @@ public class AdoNetStreamOptions
     /// <summary>
     /// The removal timeout until a failed message is deleted from the dead letters table.
     /// </summary>
-    public TimeSpan RemovalTimeout { get; set; } = TimeSpan.FromDays(7);
+    public TimeSpan DeadLetterEvictionTimeout { get; set; } = TimeSpan.FromDays(7);
 
     /// <summary>
-    /// Whether to delete messages from the dead letters table after <see cref="RemovalTimeout"/>.
-    /// </summary>
-    public bool RemoveDeadLetters { get; set; } = true;
-
-    /// <summary>
-    /// The maximum number of messages affected by a sweep batch.
-    /// Lower this number to lessen the impact of maintenance on streaming activities.
-    /// Increasing this number above ~5000 may cause the underlying RDBMS to suffer from deadlocks due to automatic lock promotion.
-    /// In that situation also alter the sql queries to always use table locks.
-    /// </summary>
-    public int SweepBatchSize { get; set; } = 1000;
-
-    /// <summary>
-    /// The cluster-wide period between sweep activities.
+    /// The period of time between eviction activities.
     /// These include moving expired messages to dead letters and removing dead letters after their own lifetime.
-    /// This period is scaled and randomized dynamically according to the current number of silos in the cluster to avoid database stampedes.
+    /// This period is cluster wide and will not change with the number of silos.
     /// </summary>
-    public TimeSpan SweepPeriod { get; set; } = TimeSpan.FromMinutes(1);
+    public TimeSpan EvictionInterval { get; set; } = TimeSpan.FromSeconds(10);
+
+    /// <summary>
+    /// The maximum number of messages affected by an eviction batch.
+    /// </summary>
+    public int EvictionBatchSize { get; set; } = 1000;
 }

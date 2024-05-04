@@ -141,35 +141,34 @@ namespace Orleans.Tests.SqlUtils
 #if STREAMING_ADONET || TESTER_SQLUTILS
 
         /// <summary>
-        /// A query template to enqueue a message into a stream table.
+        /// A query template to enqueue a message into the stream table.
         /// </summary>
         internal string QueueStreamMessageKey => queries[nameof(QueueStreamMessageKey)];
 
         /// <summary>
-        /// A query template to dequeue messages from a stream table.
+        /// A query template to dequeue messages from the stream table.
         /// </summary>
         internal string GetStreamMessagesKey => queries[nameof(GetStreamMessagesKey)];
 
         /// <summary>
-        /// A query template to confirm message delivery from a stream table.
+        /// A query template to confirm message delivery from the stream table.
         /// </summary>
         internal string ConfirmStreamMessagesKey => queries[nameof(ConfirmStreamMessagesKey)];
 
         /// <summary>
-        /// A query template to move a message to dead letters.
+        /// A query template to sweep a single message (to the dead letters table).
         /// </summary>
-        internal string MoveStreamMessageToDeadLettersKey => queries[nameof(MoveStreamMessageToDeadLettersKey)];
+        internal string SweepStreamMessageKey => queries[nameof(SweepStreamMessageKey)];
 
         /// <summary>
-        /// A query template to clean undeliverable messages from a stream table.
-        /// This will normally mean moving them into a dead letters table for later analysis.
+        /// A query template to batch sweep messages (to the dead letters table).
         /// </summary>
-        internal string CleanStreamMessagesKey => queries[nameof(CleanStreamMessagesKey)];
+        internal string SweepStreamMessagesKey => queries[nameof(SweepStreamMessagesKey)];
 
         /// <summary>
-        /// A query template to clean expired messages from a dead letters table.
+        /// A query template to sweep expired dead letters.
         /// </summary>
-        internal string CleanStreamDeadLettersKey => queries[nameof(CleanStreamDeadLettersKey)];
+        internal string SweepStreamDeadLettersKey => queries[nameof(SweepStreamDeadLettersKey)];
 
 #endif
 
@@ -483,6 +482,16 @@ namespace Orleans.Tests.SqlUtils
             internal int VisibilityTimeout
             {
                 set => Add(nameof(VisibilityTimeout), value);
+            }
+
+            internal int SweepInterval
+            {
+                set => Add(nameof(SweepInterval), value);
+            }
+
+            internal int SweepBatchSize
+            {
+                set => Add(nameof(SweepBatchSize), value);
             }
 
             internal string EventIds

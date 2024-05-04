@@ -4,6 +4,7 @@ using Orleans.Providers.Streams.Common;
 using Orleans.Streaming.AdoNet;
 using Orleans.Streams;
 using Orleans.Tests.SqlUtils;
+using Tester.AdoNet.Streaming.Fakes;
 using TestExtensions;
 using UnitTests.General;
 using static System.String;
@@ -53,8 +54,9 @@ public class AdoNetQueueAdapterFactoryTests(TestEnvironmentFixture fixture) : IA
         var hashOptions = new HashRingStreamQueueMapperOptions();
         var agentOptions = new StreamPullingAgentOptions();
         var loggerFactory = NullLoggerFactory.Instance;
+        var lifetime = new FakeHostApplicationLifetime();
         var serviceProvider = _fixture.Services;
-        var factory = new AdoNetQueueAdapterFactory(name, streamOptions, clusterOptions, cacheOptions, hashOptions, agentOptions, loggerFactory, serviceProvider);
+        var factory = new AdoNetQueueAdapterFactory(name, streamOptions, clusterOptions, cacheOptions, hashOptions, agentOptions, loggerFactory, lifetime, serviceProvider);
 
         // act
         var adapter = await factory.CreateAdapter();
@@ -88,8 +90,9 @@ public class AdoNetQueueAdapterFactoryTests(TestEnvironmentFixture fixture) : IA
         var hashOptions = new HashRingStreamQueueMapperOptions();
         var agentOptions = new StreamPullingAgentOptions();
         var loggerFactory = NullLoggerFactory.Instance;
+        var lifetime = new FakeHostApplicationLifetime();
         var serviceProvider = _fixture.Services;
-        var factory = new AdoNetQueueAdapterFactory(name, streamOptions, clusterOptions, cacheOptions, hashOptions, agentOptions, loggerFactory, serviceProvider);
+        var factory = new AdoNetQueueAdapterFactory(name, streamOptions, clusterOptions, cacheOptions, hashOptions, agentOptions, loggerFactory, lifetime, serviceProvider);
         var queueId = QueueId.GetQueueId("MyQueueName", 1, 2);
 
         // act
@@ -122,8 +125,9 @@ public class AdoNetQueueAdapterFactoryTests(TestEnvironmentFixture fixture) : IA
         var hashOptions = new HashRingStreamQueueMapperOptions();
         var agentOptions = new StreamPullingAgentOptions();
         var loggerFactory = NullLoggerFactory.Instance;
+        var lifetime = new FakeHostApplicationLifetime();
         var serviceProvider = _fixture.Services;
-        var factory = new AdoNetQueueAdapterFactory(name, streamOptions, clusterOptions, cacheOptions, hashOptions, agentOptions, loggerFactory, serviceProvider);
+        var factory = new AdoNetQueueAdapterFactory(name, streamOptions, clusterOptions, cacheOptions, hashOptions, agentOptions, loggerFactory, lifetime, serviceProvider);
 
         // act
         var cache = factory.GetQueueAdapterCache();
@@ -154,8 +158,9 @@ public class AdoNetQueueAdapterFactoryTests(TestEnvironmentFixture fixture) : IA
         var hashOptions = new HashRingStreamQueueMapperOptions();
         var agentOptions = new StreamPullingAgentOptions();
         var loggerFactory = NullLoggerFactory.Instance;
+        var lifetime = new FakeHostApplicationLifetime();
         var serviceProvider = _fixture.Services;
-        var factory = new AdoNetQueueAdapterFactory(name, streamOptions, clusterOptions, cacheOptions, hashOptions, agentOptions, loggerFactory, serviceProvider);
+        var factory = new AdoNetQueueAdapterFactory(name, streamOptions, clusterOptions, cacheOptions, hashOptions, agentOptions, loggerFactory, lifetime, serviceProvider);
 
         // act
         var mapper = factory.GetStreamQueueMapper();

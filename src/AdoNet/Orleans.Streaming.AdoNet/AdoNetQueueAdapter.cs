@@ -63,8 +63,6 @@ internal partial class AdoNetQueueAdapter(string name, AdoNetStreamOptions strea
     /// </summary>
     private static readonly ObjectFactory<AdoNetQueueAdapterReceiver> ReceiverFactory = ActivatorUtilities.CreateFactory<AdoNetQueueAdapterReceiver>([typeof(string), typeof(string), typeof(AdoNetStreamOptions), typeof(ClusterOptions), typeof(SimpleQueueCacheOptions), typeof(StreamPullingAgentOptions), typeof(RelationalOrleansQueries)]);
 
-    private static readonly ObjectFactory<AdoNetQueueHousekeeper>
-
     #region Logging
 
     [LoggerMessage(1, LogLevel.Error, "Failed to queue stream message with ({ServiceId}, {ProviderId}, {QueueId})")]

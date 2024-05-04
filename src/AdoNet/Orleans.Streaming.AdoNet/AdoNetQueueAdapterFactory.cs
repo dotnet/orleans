@@ -5,15 +5,15 @@ namespace Orleans.Streaming.AdoNet;
 
 internal class AdoNetQueueAdapterFactory : IQueueAdapterFactory
 {
-    public AdoNetQueueAdapterFactory(string name, AdoNetStreamOptions streamOptions, ClusterOptions clusterOptions, SimpleQueueCacheOptions cacheOptions, HashRingStreamQueueMapperOptions hashOptions, StreamPullingAgentOptions agentOptions, ILoggerFactory loggerFactory, IServiceProvider serviceProvider, IHostApplicationLifetime lifetime)
+    public AdoNetQueueAdapterFactory(string name, AdoNetStreamOptions streamOptions, ClusterOptions clusterOptions, SimpleQueueCacheOptions cacheOptions, HashRingStreamQueueMapperOptions hashOptions, StreamPullingAgentOptions agentOptions, ILoggerFactory loggerFactory, IHostApplicationLifetime lifetime, IServiceProvider serviceProvider)
     {
         _name = name;
         _streamOptions = streamOptions;
         _clusterOptions = clusterOptions;
         _cacheOptions = cacheOptions;
         _agentOptions = agentOptions;
-        _serviceProvider = serviceProvider;
         _lifetime = lifetime;
+        _serviceProvider = serviceProvider;
 
         _streamQueueMapper = new HashRingBasedStreamQueueMapper(hashOptions, name);
         _cache = new SimpleQueueAdapterCache(cacheOptions, name, loggerFactory);
@@ -25,14 +25,13 @@ internal class AdoNetQueueAdapterFactory : IQueueAdapterFactory
     private readonly ClusterOptions _clusterOptions;
     private readonly SimpleQueueCacheOptions _cacheOptions;
     private readonly StreamPullingAgentOptions _agentOptions;
-    private readonly IServiceProvider _serviceProvider;
     private readonly IHostApplicationLifetime _lifetime;
+    private readonly IServiceProvider _serviceProvider;
 
     private readonly HashRingBasedStreamQueueMapper _streamQueueMapper;
     private readonly SimpleQueueAdapterCache _cache;
     private readonly AdoNetStreamQueueMapper _adoNetQueueMapper;
 
-    private AdoNetQueueSweeper _sweeper;
     private RelationalOrleansQueries _queries;
 
     /// <summary>
@@ -42,14 +41,8 @@ internal class AdoNetQueueAdapterFactory : IQueueAdapterFactory
     private readonly SemaphoreSlim _semaphore = new(1);
 
     /// <summary>
-    /// Ensures queries are loaded only once.
+    /// Ensures queries are loaded only once while allowing for recovery if the load fails.
     /// </summary>
-    /// <remarks>
-    /// Concurrent calls will wait for the current attempt.
-    /// Subsequent calls after failure will attempt again.
-    /// Once the first attempt is successful that result is cached forever.
-    /// Faults are propagated.
-    /// </remarks>
     private ValueTask<RelationalOrleansQueries> GetQueriesAsync()
     {
         // attempt fast path
@@ -61,57 +54,14 @@ internal class AdoNetQueueAdapterFactory : IQueueAdapterFactory
             await _semaphore.WaitAsync(_lifetime.ApplicationStopping);
             try
             {
-                // attempt fast path
+                // attempt fast path again
                 if (_queries is not null)
                 {
                     return _queries;
                 }
 
-                // slow path - if this fails then the variable wont be set
+                // slow path - the member variable will only be set if the call succeeds
                 return _queries = await RelationalOrleansQueries.CreateInstance(_streamOptions.Invariant, _streamOptions.ConnectionString);
-            }
-            finally
-            {
-                _semaphore.Release();
-            }
-        }
-    }
-
-    /// <summary>
-    /// Ensures the sweeper has started.
-    /// </summary>
-    /// <remarks>
-    /// Concurrent calls will wait for the current attempt.
-    /// Subsequent calls after failure will attempt again.
-    /// Once the first attempt is successful that result is cached forever.
-    /// Faults are propagated.
-    /// </remarks>
-    private Task EnsureSweeperStartedAsync(RelationalOrleansQueries queries)
-    {
-        // attempt fast path
-        return _sweeper is not null ? _sweeper.Started : CoreAsync();
-
-        // slow path
-        async Task CoreAsync()
-        {
-            await _semaphore.WaitAsync(_lifetime.ApplicationStopping);
-            try
-            {
-                // attempt fast path
-                if (_sweeper is not null)
-                {
-                    await _sweeper.Started;
-                    return;
-                }
-
-                // slow path
-                var sweeper = SweeperFactory(_serviceProvider, [_name, _streamOptions, _clusterOptions, _adoNetQueueMapper, queries]);
-                await sweeper.StartAsync(_lifetime.ApplicationStopping);
-
-                sweeper.StopAsync(_lifetime.ApplicationStopping);
-
-                // only keep the new sweeper if it started
-                _sweeper = sweeper;
             }
             finally
             {
@@ -169,9 +119,4 @@ internal class AdoNetQueueAdapterFactory : IQueueAdapterFactory
     /// Factory of <see cref="AdoNetStreamFailureHandler"/> instances.
     /// </summary>
     private static readonly ObjectFactory<AdoNetStreamFailureHandler> HandlerFactory = ActivatorUtilities.CreateFactory<AdoNetStreamFailureHandler>([typeof(bool), typeof(AdoNetStreamOptions), typeof(ClusterOptions), typeof(AdoNetStreamQueueMapper), typeof(RelationalOrleansQueries)]);
-
-    /// <summary>
-    /// Factory of <see cref="AdoNetQueueSweeper"/> instances.
-    /// </summary>
-    private static readonly ObjectFactory<AdoNetQueueSweeper> SweeperFactory = ActivatorUtilities.CreateFactory<AdoNetQueueCleaner>([typeof(string), typeof(AdoNetStreamOptions), typeof(ClusterOptions), typeof(AdoNetStreamQueueMapper), typeof(RelationalOrleansQueries)]);
 }

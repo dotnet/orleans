@@ -53,8 +53,19 @@ internal partial class AdoNetQueueAdapterReceiver(string providerId, string queu
         try
         {
             // grab a message batch from storage while pinning the task so shutdown can wait for it
-            var task = queries.GetStreamMessagesAsync(clusterOptions.ServiceId, providerId, queueId, maxCount, streamOptions.MaxAttempts, agentOptions.MaxEventDeliveryTime.TotalSecondsCeiling());
+            var task = queries.GetStreamMessagesAsync(
+                clusterOptions.ServiceId,
+                providerId,
+                queueId,
+                maxCount,
+                streamOptions.MaxAttempts,
+                agentOptions.MaxEventDeliveryTime.TotalSecondsCeiling(),
+                streamOptions.DeadLetterEvictionTimeout.TotalSecondsCeiling(),
+                streamOptions.EvictionInterval.TotalSecondsCeiling(),
+                streamOptions.EvictionBatchSize);
+
             _outstandingTask = task;
+
             var messages = await task;
 
             // convert the messages into standard batch containers

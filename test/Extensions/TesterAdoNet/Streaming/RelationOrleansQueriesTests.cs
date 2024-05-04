@@ -235,6 +235,9 @@ public class RelationOrleansQueriesTests : IAsyncLifetime
         var maxCount = 1;
         var maxAttempts = 3;
         var visibilityTimeout = 10;
+        var removalTimeout = 100;
+        var sweepInterval = 10;
+        var sweepBatchSize = 1000;
 
         // arrange - enqueue a message
         var beforeQueueing = DateTime.UtcNow;
@@ -243,7 +246,16 @@ public class RelationOrleansQueriesTests : IAsyncLifetime
 
         // act - dequeue a message
         var beforeDequeuing = DateTime.UtcNow;
-        var message = Assert.Single(await _queries.GetStreamMessagesAsync(serviceId, providerId, queueId, maxCount, maxAttempts, visibilityTimeout));
+        var message = Assert.Single(await _queries.GetStreamMessagesAsync(
+            serviceId,
+            providerId,
+            queueId,
+            maxCount,
+            maxAttempts,
+            visibilityTimeout,
+            removalTimeout,
+            sweepInterval,
+            sweepBatchSize));
         var afterDequeuing = DateTime.UtcNow;
 
         // assert - the message is the same
@@ -292,6 +304,9 @@ public class RelationOrleansQueriesTests : IAsyncLifetime
         var maxCount = 3;
         var maxAttempts = 3;
         var visibilityTimeout = 10;
+        var removalTimeout = 100;
+        var sweepInterval = 10;
+        var sweepBatchSize = 1000;
         var total = 5;
 
         // arrange - enqueue five messages
@@ -304,9 +319,9 @@ public class RelationOrleansQueriesTests : IAsyncLifetime
 
         // act - dequeue three batches of three messages
         var beforeDequeuing = DateTime.UtcNow;
-        var first = await _queries.GetStreamMessagesAsync(serviceId, providerId, queueId, maxCount, maxAttempts, visibilityTimeout);
-        var second = await _queries.GetStreamMessagesAsync(serviceId, providerId, queueId, maxCount, maxAttempts, visibilityTimeout);
-        var third = await _queries.GetStreamMessagesAsync(serviceId, providerId, queueId, maxCount, maxAttempts, visibilityTimeout);
+        var first = await _queries.GetStreamMessagesAsync(serviceId, providerId, queueId, maxCount, maxAttempts, visibilityTimeout, removalTimeout, sweepInterval, sweepBatchSize);
+        var second = await _queries.GetStreamMessagesAsync(serviceId, providerId, queueId, maxCount, maxAttempts, visibilityTimeout, removalTimeout, sweepInterval, sweepBatchSize);
+        var third = await _queries.GetStreamMessagesAsync(serviceId, providerId, queueId, maxCount, maxAttempts, visibilityTimeout, removalTimeout, sweepInterval, sweepBatchSize);
         var afterDequeuing = DateTime.UtcNow;
 
         // assert - batch counts
@@ -374,6 +389,9 @@ public class RelationOrleansQueriesTests : IAsyncLifetime
         var maxCount = 1;
         var maxAttempts = 3;
         var visibilityTimeout = 0;
+        var removalTimeout = 100;
+        var sweepInterval = 100;
+        var sweepBatchSize = 0;
 
         // arrange - enqueue a message
         var beforeQueueing = DateTime.UtcNow;
@@ -385,7 +403,7 @@ public class RelationOrleansQueriesTests : IAsyncLifetime
         var results = new List<IList<AdoNetStreamMessage>>();
         for (var i = 0; i < maxAttempts + 1; i++)
         {
-            results.Add(await _queries.GetStreamMessagesAsync(serviceId, providerId, queueId, maxCount, maxAttempts, visibilityTimeout));
+            results.Add(await _queries.GetStreamMessagesAsync(serviceId, providerId, queueId, maxCount, maxAttempts, visibilityTimeout, removalTimeout, sweepInterval, sweepBatchSize));
         }
         var afterDequeuing = DateTime.UtcNow;
 
@@ -444,13 +462,16 @@ public class RelationOrleansQueriesTests : IAsyncLifetime
         var maxCount = 3;
         var maxAttempts = 3;
         var visibilityTimeout = 10;
+        var removalTimeout = 100;
+        var sweepInterval = 10;
+        var sweepBatchSize = 1000;
 
         // arrange - enqueue a message
         var ack = await _queries.QueueStreamMessageAsync(serviceId, providerId, queueId, payload, expiryTimeout);
 
         // act - dequeue messages
-        var first = Assert.Single(await _queries.GetStreamMessagesAsync(serviceId, providerId, queueId, maxCount, maxAttempts, visibilityTimeout));
-        var second = await _queries.GetStreamMessagesAsync(serviceId, providerId, queueId, maxCount, maxAttempts, visibilityTimeout);
+        var first = Assert.Single(await _queries.GetStreamMessagesAsync(serviceId, providerId, queueId, maxCount, maxAttempts, visibilityTimeout, removalTimeout, sweepInterval, sweepBatchSize));
+        var second = await _queries.GetStreamMessagesAsync(serviceId, providerId, queueId, maxCount, maxAttempts, visibilityTimeout, removalTimeout, sweepInterval, sweepBatchSize);
 
         // assert - first dequeued message is consistent with ack
         Assert.Equal(ack.ServiceId, first.ServiceId);
@@ -491,6 +512,9 @@ public class RelationOrleansQueriesTests : IAsyncLifetime
         var maxCount = 3;
         var maxAttempts = 3;
         var visibilityTimeout = 0;
+        var removalTimeout = 100;
+        var sweepInterval = 10;
+        var sweepBatchSize = 0;
 
         // arrange - enqueue a message
         var before = DateTime.UtcNow;
@@ -498,7 +522,7 @@ public class RelationOrleansQueriesTests : IAsyncLifetime
         var after = DateTime.UtcNow;
 
         // act - dequeue messages
-        var messages = await _queries.GetStreamMessagesAsync(serviceId, providerId, queueId, maxCount, maxAttempts, visibilityTimeout);
+        var messages = await _queries.GetStreamMessagesAsync(serviceId, providerId, queueId, maxCount, maxAttempts, visibilityTimeout, removalTimeout, sweepInterval, sweepBatchSize);
 
         // assert - no messages dequeued
         Assert.Empty(messages);
@@ -537,6 +561,9 @@ public class RelationOrleansQueriesTests : IAsyncLifetime
         var maxCount = 10;
         var maxAttempts = 3;
         var visibilityTimeout = 10;
+        var removalTimeout = 100;
+        var sweepInterval = 10;
+        var sweepBatchSize = 1000;
 
         // arrange - enqueue many messages
         var acks = await Task.WhenAll(Enumerable
@@ -545,7 +572,7 @@ public class RelationOrleansQueriesTests : IAsyncLifetime
             .ToList());
 
         // arrange - dequeue all messages
-        var messages = await _queries.GetStreamMessagesAsync(serviceId, providerId, queueId, maxCount, maxAttempts, visibilityTimeout);
+        var messages = await _queries.GetStreamMessagesAsync(serviceId, providerId, queueId, maxCount, maxAttempts, visibilityTimeout, removalTimeout, sweepInterval, sweepBatchSize);
 
         // act - confirm all messages
         var items = messages.Select(x => new AdoNetStreamConfirmation(x.MessageId, x.Dequeued)).ToList();
@@ -583,6 +610,9 @@ public class RelationOrleansQueriesTests : IAsyncLifetime
         var maxCount = 10;
         var maxAttempts = 3;
         var visibilityTimeout = 10;
+        var removalTimeout = 100;
+        var sweepInterval = 10;
+        var sweepBatchSize = 1000;
 
         // arrange - enqueue many messages
         var acks = await Task.WhenAll(Enumerable
@@ -591,7 +621,7 @@ public class RelationOrleansQueriesTests : IAsyncLifetime
             .ToList());
 
         // arrange - dequeue all messages
-        var messages = await _queries.GetStreamMessagesAsync(serviceId, providerId, queueId, maxCount, maxAttempts, visibilityTimeout);
+        var messages = await _queries.GetStreamMessagesAsync(serviceId, providerId, queueId, maxCount, maxAttempts, visibilityTimeout, removalTimeout, sweepInterval, sweepBatchSize);
 
         // act - confirm all messages in a faulty way
         var faulty = messages.Select(x => new AdoNetStreamConfirmation(x.MessageId, x.Dequeued - 1)).ToList();
@@ -623,6 +653,9 @@ public class RelationOrleansQueriesTests : IAsyncLifetime
         var maxCount = 100;
         var maxAttempts = 3;
         var visibilityTimeout = 10;
+        var removalTimeout = 100;
+        var sweepInterval = 10;
+        var sweepBatchSize = 1000;
         var partial = 30;
 
         // arrange - enqueue many messages
@@ -632,7 +665,7 @@ public class RelationOrleansQueriesTests : IAsyncLifetime
             .ToList());
 
         // arrange - dequeue all the messages
-        var messages = await _queries.GetStreamMessagesAsync(serviceId, providerId, queueId, maxCount, maxAttempts, visibilityTimeout);
+        var messages = await _queries.GetStreamMessagesAsync(serviceId, providerId, queueId, maxCount, maxAttempts, visibilityTimeout, removalTimeout, sweepInterval, sweepBatchSize);
 
         // act - confirm some of the messages at random
         var completed = Randomize(messages).Take(partial).Select(x => new AdoNetStreamConfirmation(x.MessageId, x.Dequeued)).ToList();
@@ -659,13 +692,13 @@ public class RelationOrleansQueriesTests : IAsyncLifetime
     }
 
     /// <summary>
-    /// Chaos tests that queuing, dequeuing and confirmation work in parallel in a complex random scenario where faults happen.
+    /// Chaos tests that queuing, dequeuing, confirmation and eviction work in parallel in a complex random scenario.
     /// This looks for concurrent brittleness, especially proneness to database deadlocks, rather than a specific condition.
-    /// If this test becomes flaky then there is likely some issue with the implementation that needs investigation.
+    /// If this test faults due to deadlocks then there is likely some issue with the implementation that needs investigation.
     /// </summary>
     /// <remarks>
     /// At dev time, this test consistently induced deadlocks until the underlying queries were perfected.
-    /// This is an expensive test to run but can protect against invisible regression.
+    /// This is an expensive test to run but can protect against query regression.
     /// </remarks>
     [SkippableFact]
     public async Task RelationalOrleansQueries_ChaosTest()
@@ -674,7 +707,7 @@ public class RelationOrleansQueriesTests : IAsyncLifetime
         await _storage.ExecuteAsync("DELETE FROM [OrleansStreamMessage]");
 
         // arrange - generate test data
-        var total = 10000;
+        var total = 30000;
         var serviceIds = Enumerable.Range(0, 3).Select(x => $"ServiceId{x}").ToList();
         var providerIds = Enumerable.Range(0, 3).Select(x => $"ProviderId{x}").ToList();
         var queueIds = Enumerable.Range(0, 3).Select(x => $"QueueId{x}").ToList();
@@ -682,6 +715,9 @@ public class RelationOrleansQueriesTests : IAsyncLifetime
         var maxCount = 3;
         var maxAttempts = 3;
         var visibilityTimeout = 1;
+        var removalTimeout = 1;
+        var sweepInterval = 1;
+        var sweepBatchSize = 1000;
 
         // act - chaos enqueue, dequeue, confirm
         // the tasks below are not expected to result in a planned outcome but are expected to result in a consistent one
@@ -712,7 +748,7 @@ public class RelationOrleansQueriesTests : IAsyncLifetime
                     var providerId = providerIds[Random.Shared.Next(providerIds.Count)];
                     var queueId = queueIds[Random.Shared.Next(queueIds.Count)];
 
-                    var messages = await _queries.GetStreamMessagesAsync(serviceId, providerId, queueId, maxCount, maxAttempts, visibilityTimeout);
+                    var messages = await _queries.GetStreamMessagesAsync(serviceId, providerId, queueId, maxCount, maxAttempts, visibilityTimeout, removalTimeout, sweepInterval, sweepBatchSize);
 
                     foreach (var item in messages)
                     {
@@ -727,7 +763,7 @@ public class RelationOrleansQueriesTests : IAsyncLifetime
                     var providerId = providerIds[Random.Shared.Next(providerIds.Count)];
                     var queueId = queueIds[Random.Shared.Next(queueIds.Count)];
 
-                    var messages = await _queries.GetStreamMessagesAsync(serviceId, providerId, queueId, maxCount, maxAttempts, visibilityTimeout);
+                    var messages = await _queries.GetStreamMessagesAsync(serviceId, providerId, queueId, maxCount, maxAttempts, visibilityTimeout, removalTimeout, sweepInterval, sweepBatchSize);
 
                     foreach (var item in messages)
                     {
@@ -791,7 +827,7 @@ public class RelationOrleansQueriesTests : IAsyncLifetime
 
         // act
         var beforeFailure = DateTime.UtcNow;
-        await _queries.MoveMessageToDeadLettersAsync(ack.ServiceId, ack.ProviderId, ack.QueueId, ack.MessageId, streamOptions.MaxAttempts, streamOptions.RemovalTimeout.TotalSecondsCeiling());
+        await _queries.MoveMessageToDeadLettersAsync(ack.ServiceId, ack.ProviderId, ack.QueueId, ack.MessageId, streamOptions.MaxAttempts, streamOptions.DeadLetterEvictionTimeout.TotalSecondsCeiling());
         var afterFailure = DateTime.UtcNow;
 
         // assert
@@ -809,8 +845,8 @@ public class RelationOrleansQueriesTests : IAsyncLifetime
         Assert.True(dead.ModifiedOn <= afterQueued);
         Assert.True(dead.DeadOn >= beforeFailure);
         Assert.True(dead.DeadOn <= afterFailure);
-        Assert.True(dead.RemoveOn >= beforeFailure.Add(streamOptions.RemovalTimeout));
-        Assert.True(dead.RemoveOn <= afterFailure.Add(streamOptions.RemovalTimeout));
+        Assert.True(dead.RemoveOn >= beforeFailure.Add(streamOptions.DeadLetterEvictionTimeout));
+        Assert.True(dead.RemoveOn <= afterFailure.Add(streamOptions.DeadLetterEvictionTimeout));
         Assert.Equal(payload, dead.Payload);
     }
 
@@ -838,12 +874,12 @@ public class RelationOrleansQueriesTests : IAsyncLifetime
 
         // arrange - dequeue the message and make immediately available
         var beforeDequeued = DateTime.UtcNow;
-        await _queries.GetStreamMessagesAsync(ack.ServiceId, ack.ProviderId, ack.QueueId, cacheOptions.CacheSize, streamOptions.MaxAttempts, 0);
+        await _queries.GetStreamMessagesAsync(ack.ServiceId, ack.ProviderId, ack.QueueId, cacheOptions.CacheSize, streamOptions.MaxAttempts, 0, streamOptions.DeadLetterEvictionTimeout.TotalSecondsCeiling(), streamOptions.EvictionInterval.TotalSecondsCeiling(), streamOptions.EvictionBatchSize);
         var afterDequeued = DateTime.UtcNow;
 
         // act - clean up with max attempts of one so the message above is flagged
         var beforeFailure = DateTime.UtcNow;
-        await _queries.MoveMessageToDeadLettersAsync(ack.ServiceId, ack.ProviderId, ack.QueueId, ack.MessageId, 1, streamOptions.RemovalTimeout.TotalSecondsCeiling());
+        await _queries.MoveMessageToDeadLettersAsync(ack.ServiceId, ack.ProviderId, ack.QueueId, ack.MessageId, 1, streamOptions.DeadLetterEvictionTimeout.TotalSecondsCeiling());
         var afterFailure = DateTime.UtcNow;
 
         // assert
@@ -861,8 +897,8 @@ public class RelationOrleansQueriesTests : IAsyncLifetime
         Assert.True(dead.ModifiedOn <= afterDequeued);
         Assert.True(dead.DeadOn >= beforeFailure);
         Assert.True(dead.DeadOn <= afterFailure);
-        Assert.True(dead.RemoveOn >= beforeFailure.Add(streamOptions.RemovalTimeout.SecondsCeiling()));
-        Assert.True(dead.RemoveOn <= afterFailure.Add(streamOptions.RemovalTimeout.SecondsCeiling()));
+        Assert.True(dead.RemoveOn >= beforeFailure.Add(streamOptions.DeadLetterEvictionTimeout.SecondsCeiling()));
+        Assert.True(dead.RemoveOn <= afterFailure.Add(streamOptions.DeadLetterEvictionTimeout.SecondsCeiling()));
         Assert.Equal(payload, dead.Payload);
     }
 
@@ -887,10 +923,10 @@ public class RelationOrleansQueriesTests : IAsyncLifetime
         var ack = await _queries.QueueStreamMessageAsync(serviceId, providerId, queueId, payload, streamOptions.ExpiryTimeout.TotalSecondsCeiling());
 
         // arrange - dequeue the message
-        await _queries.GetStreamMessagesAsync(ack.ServiceId, ack.ProviderId, ack.QueueId, cacheOptions.CacheSize, streamOptions.MaxAttempts, agentOptions.MaxEventDeliveryTime.TotalSecondsCeiling());
+        await _queries.GetStreamMessagesAsync(ack.ServiceId, ack.ProviderId, ack.QueueId, cacheOptions.CacheSize, streamOptions.MaxAttempts, agentOptions.MaxEventDeliveryTime.TotalSecondsCeiling(), streamOptions.DeadLetterEvictionTimeout.TotalSecondsCeiling(), streamOptions.EvictionInterval.TotalSecondsCeiling(), streamOptions.EvictionBatchSize);
 
         // act - clean up with max attempts of one so the message above is flagged
-        await _queries.MoveMessageToDeadLettersAsync(ack.ServiceId, ack.ProviderId, ack.QueueId, ack.MessageId, streamOptions.MaxAttempts, streamOptions.RemovalTimeout.TotalSecondsCeiling());
+        await _queries.MoveMessageToDeadLettersAsync(ack.ServiceId, ack.ProviderId, ack.QueueId, ack.MessageId, streamOptions.MaxAttempts, streamOptions.DeadLetterEvictionTimeout.TotalSecondsCeiling());
 
         // assert
         Assert.Empty(await _storage.ReadAsync<AdoNetStreamDeadLetter>("SELECT * FROM [OrleansStreamDeadLetter]"));
