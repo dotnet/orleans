@@ -70,6 +70,9 @@ internal class AdoNetBatchContainer : IBatchContainer
 
     #region Conversion
 
+    /// <summary>
+    /// Creates a new <see cref="AdoNetBatchContainer"/> from the specified <see cref="AdoNetStreamMessage"/>.
+    /// </summary>
     public static AdoNetBatchContainer FromMessage(Serializer<AdoNetBatchContainer> serializer, AdoNetStreamMessage message)
     {
         ArgumentNullException.ThrowIfNull(serializer);
@@ -80,6 +83,20 @@ internal class AdoNetBatchContainer : IBatchContainer
         container.Dequeued = message.Dequeued;
 
         return container;
+    }
+
+    /// <summary>
+    /// Converts the specified <see cref="AdoNetBatchContainer"/> to a message payload.
+    /// </summary>
+    public static byte[] ToMessagePayload(Serializer<AdoNetBatchContainer> serializer, StreamId streamId, List<object> events, Dictionary<string, object> requestContext)
+    {
+        ArgumentNullException.ThrowIfNull(serializer);
+        ArgumentNullException.ThrowIfNull(events);
+
+        var container = new AdoNetBatchContainer(streamId, events.Cast<object>().ToList(), requestContext);
+        var payload = serializer.SerializeToArray(container);
+
+        return payload;
     }
 
     #endregion Conversion
