@@ -148,8 +148,8 @@ CREATE TABLE [OrleansStreamControl]
 	/* Identifies the individual queue shard as configured in the provider */
 	[QueueId] NVARCHAR(150) NOT NULL,
 
-    /* The next due schedule for messages to be sweeped */
-    [SweepOn] DATETIME2(7) NOT NULL,
+    /* The next due schedule for messages to be evicted */
+    [EvictOn] DATETIME2(7) NOT NULL,
 
     /* Each row represents a flat configuration object for an individual queue */
 	CONSTRAINT [PK_OrleansStreamControl] PRIMARY KEY CLUSTERED
@@ -223,7 +223,7 @@ SELECT
 GO
 
 /* Gets message batches from the Orleans Streaming Message Queue */
-/* Also opportunistically performs sweeping activities when they are due */
+/* Also opportunistically performs eviction activities when they are due */
 CREATE PROCEDURE [GetStreamMessages]
 	@ServiceId NVARCHAR(150),
     @ProviderId NVARCHAR(150),
@@ -232,8 +232,8 @@ CREATE PROCEDURE [GetStreamMessages]
 	@MaxAttempts INT,
 	@VisibilityTimeout INT,
     @RemovalTimeout INT,
-    @SweepInterval INT,
-    @SweepBatchSize INT
+    @EvictionInterval INT,
+    @EvictionBatchSize INT
 AS
 BEGIN
 
@@ -242,10 +242,10 @@ SET NOCOUNT ON;
 DECLARE @Now DATETIME2(7) = SYSUTCDATETIME();
 DECLARE @VisibleOn DATETIME2(7) = DATEADD(SECOND, @VisibilityTimeout, @Now);
 
-/* lightweight check to see if a sweeping activity is due */
-DECLARE @SweepOn DATETIME2(7) =
+/* lightweight check to see if an eviction activity is due */
+DECLARE @EvictOn DATETIME2(7) =
 (
-    SELECT [SweepOn]
+    SELECT [EvictOn]
     FROM [OrleansStreamControl]
     WHERE
         [ServiceId] = @ServiceId
@@ -253,8 +253,8 @@ DECLARE @SweepOn DATETIME2(7) =
         AND [QueueId] = @QueueId
 );
 
-/* escalate to a sweep attempt only if an activity is due */
-IF @SweepOn IS NULL OR @SweepOn < @Now
+/* escalate to a eviction attempt only if an activity is due */
+IF @EvictOn IS NULL OR @EvictOn < @Now
 BEGIN
 
     /* attempt to win a race to update the schedule */
@@ -266,51 +266,51 @@ BEGIN
             [ProviderId] = @ProviderId,
             [QueueId] = @QueueId,
             [Now] = @Now,
-            [SweepOn] = DATEADD(SECOND, @SweepInterval, @Now)
+            [EvictOn] = DATEADD(SECOND, @EvictionInterval, @Now)
     )
     MERGE [OrleansStreamControl] WITH (UPDLOCK, HOLDLOCK) AS [T]
     USING [Candidate] AS [S]
     ON [T].[ServiceId] = [S].[ServiceId]
     AND [T].[ProviderId] = [S].[ProviderId]
     AND [T].[QueueId] = [S].[QueueId]
-    WHEN MATCHED AND [T].[SweepOn] < [S].[Now] THEN
-    UPDATE SET [T].[SweepOn] = [S].[SweepOn]
+    WHEN MATCHED AND [T].[EvictOn] < [S].[Now] THEN
+    UPDATE SET [T].[EvictOn] = [S].[EvictOn]
     WHEN NOT MATCHED BY TARGET THEN
     INSERT
     (
         [ServiceId],
         [ProviderId],
         [QueueId],
-        [SweepOn]
+        [EvictOn]
     )
     VALUES
     (
         [ServiceId],
         [ProviderId],
         [QueueId],
-        [Now]
+        [EvictOn]
     );
 
-    /* if the above statement won the race then we also get to run the sweep */
+    /* if the above statement won the race then we also get to run the eviction */
     /* other concurrent queries will continue running as normal until the next due time */
     IF (@@ROWCOUNT > 0)
     BEGIN
 
-        /* sweep messages */
-        EXECUTE [SweepStreamMessages]
+        /* evict messages */
+        EXECUTE [EvictStreamMessages]
             @ServiceId = @ServiceId,
             @ProviderId = @ProviderId,
             @QueueId = @QueueId,
             @MaxAttempts = @MaxAttempts,
             @RemovalTimeout = @RemovalTimeout,
-            @SweepBatchSize = @SweepBatchSize
+            @BatchSize = @EvictionBatchSize
 
-        /* sweep dead letters */
-        EXECUTE [SweepStreamDeadLetters]
+        /* evict dead letters */
+        EXECUTE [EvictStreamDeadLetters]
             @ServiceId = @ServiceId,
             @ProviderId = @ProviderId,
             @QueueId = @QueueId,
-            @SweepBatchSize = @SweepBatchSize;
+            @BatchSize = @EvictionBatchSize;
             
     END;
 
@@ -374,7 +374,7 @@ INSERT INTO [OrleansQuery]
 )
 SELECT
 	'GetStreamMessagesKey',
-	'EXECUTE [GetStreamMessages] @ServiceId = @ServiceId, @ProviderId = @ProviderId, @QueueId = @QueueId, @MaxCount = @MaxCount, @MaxAttempts = @MaxAttempts, @VisibilityTimeout = @VisibilityTimeout, @RemovalTimeout = @RemovalTimeout, @SweepInterval = @SweepInterval, @SweepBatchSize = @SweepBatchSize'
+	'EXECUTE [GetStreamMessages] @ServiceId = @ServiceId, @ProviderId = @ProviderId, @QueueId = @QueueId, @MaxCount = @MaxCount, @MaxAttempts = @MaxAttempts, @VisibilityTimeout = @VisibilityTimeout, @RemovalTimeout = @RemovalTimeout, @EvictionInterval = @EvictionInterval, @EvictionBatchSize = @EvictionBatchSize'
 GO
 
 /* Confirms delivery of a stream message. */
@@ -548,11 +548,11 @@ SELECT
 GO
 
 /* Moves non-delivered messages from the message table to the dead letter table for human troubleshooting. */
-CREATE PROCEDURE [SweepStreamMessages]
+CREATE PROCEDURE [EvictStreamMessages]
 	@ServiceId NVARCHAR(150),
     @ProviderId NVARCHAR(150),
 	@QueueId NVARCHAR(150),
-	@SweepBatchSize INT,
+	@BatchSize INT,
 	@MaxAttempts INT,
 	@RemovalTimeout INT
 AS
@@ -567,7 +567,7 @@ DECLARE @RemoveOn DATETIME2(7) = DATEADD(SECOND, @RemovalTimeout, @Now);
 /* delete messages in the exact same order as the clustered index to avoid deadlocks with other queries */
 WITH Batch AS
 (
-	SELECT TOP (@SweepBatchSize)
+	SELECT TOP (@BatchSize)
 		[ServiceId],
         [ProviderId],
 		[QueueId],
@@ -639,16 +639,16 @@ INSERT INTO [OrleansQuery]
 	[QueryText]
 )
 SELECT
-	'SweepStreamMessagesKey',
-	'EXECUTE [SweepStreamMessages] @ServiceId = @ServiceId, @ProviderId = @ProviderId, @QueueId = @QueueId, @SweepBatchSize = @SweepBatchSize, @MaxAttempts = @MaxAttempts, @RemovalTimeout = @RemovalTimeout'
+	'EvictStreamMessagesKey',
+	'EXECUTE [EvictStreamMessages] @ServiceId = @ServiceId, @ProviderId = @ProviderId, @QueueId = @QueueId, @BatchSize = @BatchSize, @MaxAttempts = @MaxAttempts, @RemovalTimeout = @RemovalTimeout'
 GO
 
 /* Removes messages from the dead letters table. */
-CREATE PROCEDURE [SweepStreamDeadLetters]
+CREATE PROCEDURE [EvictStreamDeadLetters]
 	@ServiceId NVARCHAR(150),
     @ProviderId NVARCHAR(150),
 	@QueueId NVARCHAR(150),
-	@SweepBatchSize INT
+	@BatchSize INT
 AS
 BEGIN
 
@@ -659,7 +659,7 @@ DECLARE @Now DATETIME2(7) = SYSUTCDATETIME();
 /* delete messages in the exact same order as the clustered index to avoid deadlocks with other queries */
 WITH Batch AS
 (
-    SELECT TOP (@SweepBatchSize)
+    SELECT TOP (@BatchSize)
         [ServiceId],
         [ProviderId],
         [QueueId],
@@ -687,6 +687,6 @@ INSERT INTO [OrleansQuery]
 	[QueryText]
 )
 SELECT
-	'SweepStreamDeadLettersKey',
-	'EXECUTE [SweepStreamDeadLetters] @ServiceId = @ServiceId, @ProviderId = @ProviderId, @QueueId = @QueueId, @SweepBatchSize = @SweepBatchSize'
+	'EvictStreamDeadLettersKey',
+	'EXECUTE [EvictStreamDeadLetters] @ServiceId = @ServiceId, @ProviderId = @ProviderId, @QueueId = @QueueId, @BatchSize = @BatchSize'
 GO

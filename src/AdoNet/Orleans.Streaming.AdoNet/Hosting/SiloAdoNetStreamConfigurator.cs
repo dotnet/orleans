@@ -21,6 +21,8 @@ public class SiloAdoNetStreamConfigurator : SiloPersistentStreamConfigurator
                 .AddTransient<IConfigurationValidator>(sp => new AdoNetStreamOptionsValidator(sp.GetOptionsByName<AdoNetStreamOptions>(name), name));
         });
 
+        // in a typical i/o bound shared database there is little benefit to more than one queue per provider
+        // however multiple queues are fully supported if the user wants to fine tune throughput for their own system
         ConfigurePartitioning(1);
     }
 

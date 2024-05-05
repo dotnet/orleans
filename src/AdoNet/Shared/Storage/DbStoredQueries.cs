@@ -156,19 +156,19 @@ namespace Orleans.Tests.SqlUtils
         internal string ConfirmStreamMessagesKey => queries[nameof(ConfirmStreamMessagesKey)];
 
         /// <summary>
-        /// A query template to sweep a single message (to the dead letters table).
+        /// A query template to evict a single message (by moving it to dead letters).
         /// </summary>
         internal string EvictStreamMessageKey => queries[nameof(EvictStreamMessageKey)];
 
         /// <summary>
-        /// A query template to batch sweep messages (to the dead letters table).
+        /// A query template to batch evict messages (by moving them to dead letters).
         /// </summary>
-        internal string SweepStreamMessagesKey => queries[nameof(SweepStreamMessagesKey)];
+        internal string EvictStreamMessagesKey => queries[nameof(EvictStreamMessagesKey)];
 
         /// <summary>
-        /// A query template to sweep expired dead letters.
+        /// A query template to evict expired dead letters (by deleting them).
         /// </summary>
-        internal string SweepStreamDeadLettersKey => queries[nameof(SweepStreamDeadLettersKey)];
+        internal string EvictStreamDeadLettersKey => queries[nameof(EvictStreamDeadLettersKey)];
 
 #endif
 
@@ -484,14 +484,14 @@ namespace Orleans.Tests.SqlUtils
                 set => Add(nameof(VisibilityTimeout), value);
             }
 
-            internal int SweepInterval
+            internal int EvictionInterval
             {
-                set => Add(nameof(SweepInterval), value);
+                set => Add(nameof(EvictionInterval), value);
             }
 
-            internal int SweepBatchSize
+            internal int EvictionBatchSize
             {
-                set => Add(nameof(SweepBatchSize), value);
+                set => Add(nameof(EvictionBatchSize), value);
             }
 
             internal string EventIds

@@ -236,8 +236,8 @@ public class RelationalOrleansQueriesTests : IAsyncLifetime
         var maxAttempts = 3;
         var visibilityTimeout = 10;
         var removalTimeout = 100;
-        var sweepInterval = 10;
-        var sweepBatchSize = 1000;
+        var evictionInterval = 10;
+        var evictionBatchSize = 1000;
 
         // arrange - enqueue a message
         var beforeQueueing = DateTime.UtcNow;
@@ -254,8 +254,8 @@ public class RelationalOrleansQueriesTests : IAsyncLifetime
             maxAttempts,
             visibilityTimeout,
             removalTimeout,
-            sweepInterval,
-            sweepBatchSize));
+            evictionInterval,
+            evictionBatchSize));
         var afterDequeuing = DateTime.UtcNow;
 
         // assert - the message is the same
@@ -305,8 +305,8 @@ public class RelationalOrleansQueriesTests : IAsyncLifetime
         var maxAttempts = 3;
         var visibilityTimeout = 10;
         var removalTimeout = 100;
-        var sweepInterval = 10;
-        var sweepBatchSize = 1000;
+        var evictionInterval = 10;
+        var evictionBatchSize = 1000;
         var total = 5;
 
         // arrange - enqueue five messages
@@ -319,9 +319,9 @@ public class RelationalOrleansQueriesTests : IAsyncLifetime
 
         // act - dequeue three batches of three messages
         var beforeDequeuing = DateTime.UtcNow;
-        var first = await _queries.GetStreamMessagesAsync(serviceId, providerId, queueId, maxCount, maxAttempts, visibilityTimeout, removalTimeout, sweepInterval, sweepBatchSize);
-        var second = await _queries.GetStreamMessagesAsync(serviceId, providerId, queueId, maxCount, maxAttempts, visibilityTimeout, removalTimeout, sweepInterval, sweepBatchSize);
-        var third = await _queries.GetStreamMessagesAsync(serviceId, providerId, queueId, maxCount, maxAttempts, visibilityTimeout, removalTimeout, sweepInterval, sweepBatchSize);
+        var first = await _queries.GetStreamMessagesAsync(serviceId, providerId, queueId, maxCount, maxAttempts, visibilityTimeout, removalTimeout, evictionInterval, evictionBatchSize);
+        var second = await _queries.GetStreamMessagesAsync(serviceId, providerId, queueId, maxCount, maxAttempts, visibilityTimeout, removalTimeout, evictionInterval, evictionBatchSize);
+        var third = await _queries.GetStreamMessagesAsync(serviceId, providerId, queueId, maxCount, maxAttempts, visibilityTimeout, removalTimeout, evictionInterval, evictionBatchSize);
         var afterDequeuing = DateTime.UtcNow;
 
         // assert - batch counts
@@ -390,8 +390,8 @@ public class RelationalOrleansQueriesTests : IAsyncLifetime
         var maxAttempts = 3;
         var visibilityTimeout = 0;
         var removalTimeout = 100;
-        var sweepInterval = 100;
-        var sweepBatchSize = 0;
+        var evictionInterval = 100;
+        var evictionBatchSize = 0;
 
         // arrange - enqueue a message
         var beforeQueueing = DateTime.UtcNow;
@@ -403,7 +403,7 @@ public class RelationalOrleansQueriesTests : IAsyncLifetime
         var results = new List<IList<AdoNetStreamMessage>>();
         for (var i = 0; i < maxAttempts + 1; i++)
         {
-            results.Add(await _queries.GetStreamMessagesAsync(serviceId, providerId, queueId, maxCount, maxAttempts, visibilityTimeout, removalTimeout, sweepInterval, sweepBatchSize));
+            results.Add(await _queries.GetStreamMessagesAsync(serviceId, providerId, queueId, maxCount, maxAttempts, visibilityTimeout, removalTimeout, evictionInterval, evictionBatchSize));
         }
         var afterDequeuing = DateTime.UtcNow;
 
@@ -463,15 +463,15 @@ public class RelationalOrleansQueriesTests : IAsyncLifetime
         var maxAttempts = 3;
         var visibilityTimeout = 10;
         var removalTimeout = 100;
-        var sweepInterval = 10;
-        var sweepBatchSize = 1000;
+        var evictionInterval = 10;
+        var evictionBatchSize = 1000;
 
         // arrange - enqueue a message
         var ack = await _queries.QueueStreamMessageAsync(serviceId, providerId, queueId, payload, expiryTimeout);
 
         // act - dequeue messages
-        var first = Assert.Single(await _queries.GetStreamMessagesAsync(serviceId, providerId, queueId, maxCount, maxAttempts, visibilityTimeout, removalTimeout, sweepInterval, sweepBatchSize));
-        var second = await _queries.GetStreamMessagesAsync(serviceId, providerId, queueId, maxCount, maxAttempts, visibilityTimeout, removalTimeout, sweepInterval, sweepBatchSize);
+        var first = Assert.Single(await _queries.GetStreamMessagesAsync(serviceId, providerId, queueId, maxCount, maxAttempts, visibilityTimeout, removalTimeout, evictionInterval, evictionBatchSize));
+        var second = await _queries.GetStreamMessagesAsync(serviceId, providerId, queueId, maxCount, maxAttempts, visibilityTimeout, removalTimeout, evictionInterval, evictionBatchSize);
 
         // assert - first dequeued message is consistent with ack
         Assert.Equal(ack.ServiceId, first.ServiceId);
@@ -513,8 +513,8 @@ public class RelationalOrleansQueriesTests : IAsyncLifetime
         var maxAttempts = 3;
         var visibilityTimeout = 0;
         var removalTimeout = 100;
-        var sweepInterval = 10;
-        var sweepBatchSize = 0;
+        var evictionInterval = 10;
+        var evictionBatchSize = 0;
 
         // arrange - enqueue a message
         var before = DateTime.UtcNow;
@@ -522,7 +522,7 @@ public class RelationalOrleansQueriesTests : IAsyncLifetime
         var after = DateTime.UtcNow;
 
         // act - dequeue messages
-        var messages = await _queries.GetStreamMessagesAsync(serviceId, providerId, queueId, maxCount, maxAttempts, visibilityTimeout, removalTimeout, sweepInterval, sweepBatchSize);
+        var messages = await _queries.GetStreamMessagesAsync(serviceId, providerId, queueId, maxCount, maxAttempts, visibilityTimeout, removalTimeout, evictionInterval, evictionBatchSize);
 
         // assert - no messages dequeued
         Assert.Empty(messages);
@@ -562,8 +562,8 @@ public class RelationalOrleansQueriesTests : IAsyncLifetime
         var maxAttempts = 3;
         var visibilityTimeout = 10;
         var removalTimeout = 100;
-        var sweepInterval = 10;
-        var sweepBatchSize = 1000;
+        var evictionInterval = 10;
+        var evictionBatchSize = 1000;
 
         // arrange - enqueue many messages
         var acks = await Task.WhenAll(Enumerable
@@ -572,7 +572,7 @@ public class RelationalOrleansQueriesTests : IAsyncLifetime
             .ToList());
 
         // arrange - dequeue all messages
-        var messages = await _queries.GetStreamMessagesAsync(serviceId, providerId, queueId, maxCount, maxAttempts, visibilityTimeout, removalTimeout, sweepInterval, sweepBatchSize);
+        var messages = await _queries.GetStreamMessagesAsync(serviceId, providerId, queueId, maxCount, maxAttempts, visibilityTimeout, removalTimeout, evictionInterval, evictionBatchSize);
 
         // act - confirm all messages
         var items = messages.Select(x => new AdoNetStreamConfirmation(x.MessageId, x.Dequeued)).ToList();
@@ -611,8 +611,8 @@ public class RelationalOrleansQueriesTests : IAsyncLifetime
         var maxAttempts = 3;
         var visibilityTimeout = 10;
         var removalTimeout = 100;
-        var sweepInterval = 10;
-        var sweepBatchSize = 1000;
+        var evictionInterval = 10;
+        var evictionBatchSize = 1000;
 
         // arrange - enqueue many messages
         var acks = await Task.WhenAll(Enumerable
@@ -621,7 +621,7 @@ public class RelationalOrleansQueriesTests : IAsyncLifetime
             .ToList());
 
         // arrange - dequeue all messages
-        var messages = await _queries.GetStreamMessagesAsync(serviceId, providerId, queueId, maxCount, maxAttempts, visibilityTimeout, removalTimeout, sweepInterval, sweepBatchSize);
+        var messages = await _queries.GetStreamMessagesAsync(serviceId, providerId, queueId, maxCount, maxAttempts, visibilityTimeout, removalTimeout, evictionInterval, evictionBatchSize);
 
         // act - confirm all messages in a faulty way
         var faulty = messages.Select(x => new AdoNetStreamConfirmation(x.MessageId, x.Dequeued - 1)).ToList();
@@ -654,8 +654,8 @@ public class RelationalOrleansQueriesTests : IAsyncLifetime
         var maxAttempts = 3;
         var visibilityTimeout = 10;
         var removalTimeout = 100;
-        var sweepInterval = 10;
-        var sweepBatchSize = 1000;
+        var evictionInterval = 10;
+        var evictionBatchSize = 1000;
         var partial = 30;
 
         // arrange - enqueue many messages
@@ -665,7 +665,7 @@ public class RelationalOrleansQueriesTests : IAsyncLifetime
             .ToList());
 
         // arrange - dequeue all the messages
-        var messages = await _queries.GetStreamMessagesAsync(serviceId, providerId, queueId, maxCount, maxAttempts, visibilityTimeout, removalTimeout, sweepInterval, sweepBatchSize);
+        var messages = await _queries.GetStreamMessagesAsync(serviceId, providerId, queueId, maxCount, maxAttempts, visibilityTimeout, removalTimeout, evictionInterval, evictionBatchSize);
 
         // act - confirm some of the messages at random
         var completed = Randomize(messages).Take(partial).Select(x => new AdoNetStreamConfirmation(x.MessageId, x.Dequeued)).ToList();
@@ -716,8 +716,8 @@ public class RelationalOrleansQueriesTests : IAsyncLifetime
         var maxAttempts = 3;
         var visibilityTimeout = 1;
         var removalTimeout = 1;
-        var sweepInterval = 1;
-        var sweepBatchSize = 1000;
+        var evictionInterval = 1;
+        var evictionBatchSize = 1000;
 
         // act - chaos enqueue, dequeue, confirm
         // the tasks below are not expected to result in a planned outcome but are expected to result in a consistent one
@@ -748,7 +748,7 @@ public class RelationalOrleansQueriesTests : IAsyncLifetime
                     var providerId = providerIds[Random.Shared.Next(providerIds.Count)];
                     var queueId = queueIds[Random.Shared.Next(queueIds.Count)];
 
-                    var messages = await _queries.GetStreamMessagesAsync(serviceId, providerId, queueId, maxCount, maxAttempts, visibilityTimeout, removalTimeout, sweepInterval, sweepBatchSize);
+                    var messages = await _queries.GetStreamMessagesAsync(serviceId, providerId, queueId, maxCount, maxAttempts, visibilityTimeout, removalTimeout, evictionInterval, evictionBatchSize);
 
                     foreach (var item in messages)
                     {
@@ -763,7 +763,7 @@ public class RelationalOrleansQueriesTests : IAsyncLifetime
                     var providerId = providerIds[Random.Shared.Next(providerIds.Count)];
                     var queueId = queueIds[Random.Shared.Next(queueIds.Count)];
 
-                    var messages = await _queries.GetStreamMessagesAsync(serviceId, providerId, queueId, maxCount, maxAttempts, visibilityTimeout, removalTimeout, sweepInterval, sweepBatchSize);
+                    var messages = await _queries.GetStreamMessagesAsync(serviceId, providerId, queueId, maxCount, maxAttempts, visibilityTimeout, removalTimeout, evictionInterval, evictionBatchSize);
 
                     foreach (var item in messages)
                     {

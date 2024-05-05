@@ -450,8 +450,8 @@ namespace Orleans.Tests.SqlUtils
                     MaxAttempts = maxAttempts,
                     VisibilityTimeout = visibilityTimeout,
                     RemovalTimeout = removalTimeout,
-                    SweepInterval = evictionInterval,
-                    SweepBatchSize = evictionBatchSize
+                    EvictionInterval = evictionInterval,
+                    EvictionBatchSize = evictionBatchSize
                 },
                 result => result.ToList());
         }
@@ -544,7 +544,7 @@ namespace Orleans.Tests.SqlUtils
             ArgumentNullException.ThrowIfNull(queueId);
 
             return ReadAsync(
-                dbStoredQueries.SweepStreamMessagesKey,
+                dbStoredQueries.EvictStreamMessagesKey,
                 record => (int)record["Affected"],
                 command => new DbStoredQueries.Columns(command)
                 {
@@ -573,7 +573,7 @@ namespace Orleans.Tests.SqlUtils
             ArgumentNullException.ThrowIfNull(queueId);
 
             return ReadAsync(
-                dbStoredQueries.SweepStreamDeadLettersKey,
+                dbStoredQueries.EvictStreamDeadLettersKey,
                 record => (int)record["Affected"],
                 command => new DbStoredQueries.Columns(command)
                 {
