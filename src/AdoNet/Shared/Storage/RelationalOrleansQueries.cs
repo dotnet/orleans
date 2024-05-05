@@ -480,7 +480,7 @@ namespace Orleans.Tests.SqlUtils
             }
 
             // this builds a string in the form "1:2|3:4|5:6" where the first number is the message id and the second is the dequeue counter which acts as a receipt
-            // while we have more efficient ways of passing this data per RDMS, we use a string here to ensure call compatibility across adonet providers
+            // while we have more efficient ways of passing this data per RDMS, we use a string here to ensure call compatibility across ADONET providers
             // it is the responsibility of the RDMS implementation to parse this string and apply it correctly
             var items = messages.Aggregate(new StringBuilder(), (b, m) => b.Append(b.Length > 0 ? "|" : "").Append(m.MessageId).Append(':').Append(m.Dequeued), b => b.ToString());
 
@@ -536,16 +536,14 @@ namespace Orleans.Tests.SqlUtils
         /// <param name="maxCount">The max number of messages to move in this batch.</param>
         /// <param name="maxAttempts">The max number of times a message can be dequeued.</param>
         /// <param name="removalTimeout">The timeout before the message is to be deleted from dead letters.</param>
-        /// <returns>The number of records affected.</returns>
-        internal Task<int> CleanStreamMessagesAsync(string serviceId, string providerId, string queueId, int maxCount, int maxAttempts, int removalTimeout)
+        internal Task EvictStreamMessagesAsync(string serviceId, string providerId, string queueId, int maxCount, int maxAttempts, int removalTimeout)
         {
             ArgumentNullException.ThrowIfNull(serviceId);
             ArgumentNullException.ThrowIfNull(providerId);
             ArgumentNullException.ThrowIfNull(queueId);
 
-            return ReadAsync(
+            return ExecuteAsync(
                 dbStoredQueries.EvictStreamMessagesKey,
-                record => (int)record["Affected"],
                 command => new DbStoredQueries.Columns(command)
                 {
                     ServiceId = serviceId,
@@ -554,8 +552,7 @@ namespace Orleans.Tests.SqlUtils
                     MaxCount = maxCount,
                     MaxAttempts = maxAttempts,
                     RemovalTimeout = removalTimeout
-                },
-                results => results.Single());
+                });
         }
 
         /// <summary>
@@ -565,24 +562,21 @@ namespace Orleans.Tests.SqlUtils
         /// <param name="providerId">The provider identifier.</param>
         /// <param name="queueId">The queue identifier.</param>
         /// <param name="maxCount">The max number of messages to move in this batch.</param>
-        /// <returns>The number of records affected.</returns>
-        internal Task<int> CleanStreamDeadLettersAsync(string serviceId, string providerId, string queueId, int maxCount)
+        internal Task EvictStreamDeadLettersAsync(string serviceId, string providerId, string queueId, int maxCount)
         {
             ArgumentNullException.ThrowIfNull(serviceId);
             ArgumentNullException.ThrowIfNull(providerId);
             ArgumentNullException.ThrowIfNull(queueId);
 
-            return ReadAsync(
+            return ExecuteAsync(
                 dbStoredQueries.EvictStreamDeadLettersKey,
-                record => (int)record["Affected"],
                 command => new DbStoredQueries.Columns(command)
                 {
                     ServiceId = serviceId,
                     ProviderId = providerId,
                     QueueId = queueId,
                     MaxCount = maxCount
-                },
-                results => results.Single());
+                });
         }
 
 #endif
