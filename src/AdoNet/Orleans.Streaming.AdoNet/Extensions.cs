@@ -16,5 +16,5 @@ internal static class Extensions
     /// <summary>
     /// Rounds up the specified time span to the nearest upper second and returns the total number of seconds as an integer.
     /// </summary>
-    public static TimeSpan SecondsCeiling(this TimeSpan value) => TimeSpan.FromSeconds(Math.Ceiling(value.TotalSeconds));
+    public static TimeSpan SecondsCeiling(this TimeSpan value) => TimeSpan.FromSeconds(value.TotalSecondsCeiling());
 }
