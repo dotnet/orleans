@@ -54,7 +54,7 @@ public class AdoNetQueueAdapterReceiverTests(TestEnvironmentFixture fixture) : I
             Invariant = AdoNetInvariantName,
             ConnectionString = _storage.ConnectionString,
 
-            // disable sweeping for this test
+            // disable eviction for this test
             EvictionBatchSize = 0
         };
         var cacheOptions = new SimpleQueueCacheOptions();

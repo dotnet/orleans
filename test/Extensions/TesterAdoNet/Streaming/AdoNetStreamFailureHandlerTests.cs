@@ -27,6 +27,7 @@ public class AdoNetStreamFailureHandlerTests() : IAsyncLifetime
     public async Task InitializeAsync()
     {
         _testing = await RelationalStorageForTesting.SetupInstance(AdoNetInvariantName, TestDatabaseName);
+
         Skip.If(IsNullOrEmpty(_testing.CurrentConnectionString), $"Database '{TestDatabaseName}' not initialized");
 
         _storage = _testing.Storage;

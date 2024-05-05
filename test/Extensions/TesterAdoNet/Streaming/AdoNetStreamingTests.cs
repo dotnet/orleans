@@ -1,4 +1,3 @@
-using System.Diagnostics.CodeAnalysis;
 using Microsoft.Extensions.Configuration;
 using Orleans.TestingHost;
 using Orleans.Tests.SqlUtils;
@@ -14,7 +13,6 @@ namespace Tester.AdoNet.Streaming;
 /// Cluster streaming tests for ADO.NET Streaming.
 /// </summary>
 [TestCategory("AdoNet"), TestCategory("Streaming")]
-[SuppressMessage("Blocker Code Smell", "S2699:Tests should include assertions", Justification = "N/A")]
 public class AdoNetStreamingTests : TestClusterPerTest
 {
     private const string TestDatabaseName = "OrleansStreamTest";

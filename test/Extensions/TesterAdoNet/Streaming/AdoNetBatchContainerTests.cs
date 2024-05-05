@@ -55,6 +55,27 @@ public class AdoNetBatchContainerTests(TestEnvironmentFixture fixture)
     }
 
     [Fact]
+    public void AdoNetBatchContainer_ToMessagePayload_CreatesPayload()
+    {
+        // arrange
+        var serializer = fixture.Serializer.GetSerializer<AdoNetBatchContainer>();
+        var streamId = StreamId.Create("MyNamespace", "MyKey");
+        var events = new List<object> { new TestModel(1), new OtherModel(2), new TestModel(3), new OtherModel(4) };
+        var requestContext = new Dictionary<string, object> { { "MyKey", "Value" } };
+
+        // act
+        var payload = AdoNetBatchContainer.ToMessagePayload(serializer, streamId, events, requestContext);
+
+        // assert
+        var container = serializer.Deserialize(payload);
+        Assert.Equal(streamId, container.StreamId);
+        Assert.Equal(events, container.Events);
+        Assert.Equal(requestContext, container.RequestContext);
+        Assert.Null(container.SequenceToken);
+        Assert.Equal(0, container.Dequeued);
+    }
+
+    [Fact]
     public void AdoNetBatchContainer_GetEvents_ThrowsOnHalfBaked()
     {
         // arrange
@@ -111,7 +132,7 @@ public class AdoNetBatchContainerTests(TestEnvironmentFixture fixture)
     }
 
     [Fact]
-    public void AdoNetBatchContainer_ToStringRenders()
+    public void AdoNetBatchContainer_ToString_Renders()
     {
         // arrange
         var streamId = StreamId.Create("MyNamespace", "MyKey");

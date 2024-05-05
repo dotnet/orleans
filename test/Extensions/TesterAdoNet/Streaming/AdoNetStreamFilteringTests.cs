@@ -1,4 +1,3 @@
-using System.Diagnostics.CodeAnalysis;
 using Microsoft.Extensions.Configuration;
 using Orleans.Streaming.AdoNet.Storage;
 using Orleans.TestingHost;
@@ -10,7 +9,6 @@ using static System.String;
 namespace Tester.AdoNet.Streaming;
 
 [TestCategory("AdoNet"), TestCategory("Streaming")]
-[SuppressMessage("Blocker Code Smell", "S2699:Tests should include assertions", Justification = "N/A")]
 public class AdoNetStreamFilteringTests : StreamFilteringTestsBase, IClassFixture<AdoNetStreamFilteringTests.Fixture>
 {
     private const string TestDatabaseName = "OrleansStreamTest";
