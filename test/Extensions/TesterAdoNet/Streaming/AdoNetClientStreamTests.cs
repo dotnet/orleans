@@ -10,22 +10,27 @@ using static System.String;
 
 namespace Tester.AdoNet.Streaming;
 
-[TestCategory("AdoNet"), TestCategory("Streaming")]
-public class AdoNetClientStreamTests(ITestOutputHelper output) : TestClusterPerTest
+public class AdoNetClientStreamTests : TestClusterPerTest
 {
+    public AdoNetClientStreamTests(string invariant, ITestOutputHelper output)
+    {
+        _adoNetInvariantName = invariant;
+        _output = output;
+    }
+
+    private static string _adoNetInvariantName;
     private const string TestDatabaseName = "OrleansStreamTest";
-    private const string AdoNetInvariantName = AdoNetInvariants.InvariantNameSqlServer;
     private const string AdoNetStreamProviderName = "AdoNet";
     private const string StreamNamespace = "AdoNetSubscriptionMultiplicityTestsNamespace";
 
-    private readonly ITestOutputHelper _output = output;
+    private readonly ITestOutputHelper _output;
     private static RelationalStorageForTesting _testing;
     private ClientStreamTestRunner _runner;
 
     public override async Task InitializeAsync()
     {
         // set up the adonet environment before the base initializes
-        _testing = await RelationalStorageForTesting.SetupInstance(AdoNetInvariantName, TestDatabaseName);
+        _testing = await RelationalStorageForTesting.SetupInstance(_adoNetInvariantName, TestDatabaseName);
 
         Skip.If(IsNullOrEmpty(_testing.CurrentConnectionString), $"Database '{TestDatabaseName}' not initialized");
 
@@ -48,7 +53,7 @@ public class AdoNetClientStreamTests(ITestOutputHelper output) : TestClusterPerT
             clientBuilder
                 .AddAdoNetStreams(AdoNetStreamProviderName, options =>
                 {
-                    options.Invariant = AdoNetInvariantName;
+                    options.Invariant = _adoNetInvariantName;
                     options.ConnectionString = _testing.CurrentConnectionString;
                 })
                 .Configure<SiloMessagingOptions>(options => options.ClientDropTimeout = TimeSpan.FromSeconds(5));
@@ -62,18 +67,16 @@ public class AdoNetClientStreamTests(ITestOutputHelper output) : TestClusterPerT
             siloBuilder
                 .AddAdoNetStreams(AdoNetStreamProviderName, options =>
                 {
-                    options.Invariant = AdoNetInvariantName;
+                    options.Invariant = _adoNetInvariantName;
                     options.ConnectionString = _testing.CurrentConnectionString;
                 })
                 .AddMemoryGrainStorage("PubSubStore");
         }
     }
 
-    [SkippableFact, TestCategory("Functional")]
-    public Task AdoNetStreamProducerOnDroppedClientTest() => _runner.StreamProducerOnDroppedClientTest(AdoNetStreamProviderName, StreamNamespace);
+    public virtual Task AdoNetStreamProducerOnDroppedClientTest() => _runner.StreamProducerOnDroppedClientTest(AdoNetStreamProviderName, StreamNamespace);
 
-    [SkippableFact, TestCategory("Functional")]
-    public async Task AdoNetStreamConsumerOnDroppedClientTest()
+    public virtual async Task AdoNetStreamConsumerOnDroppedClientTest()
     {
         await _runner.StreamConsumerOnDroppedClientTest(
             AdoNetStreamProviderName,
@@ -84,4 +87,24 @@ public class AdoNetClientStreamTests(ITestOutputHelper output) : TestClusterPerT
                 _ => { },
                 (record, i, ct) => Task.FromResult((int)record["Count"]))).Single());
     }
+}
+
+[TestCategory("AdoNet"), TestCategory("Streaming")]
+public class SqlServerAdoNetClientStreamTests(ITestOutputHelper output) : AdoNetClientStreamTests(AdoNetInvariants.InvariantNameSqlServer, output)
+{
+    [SkippableFact, TestCategory("Functional")]
+    public override Task AdoNetStreamProducerOnDroppedClientTest() => base.AdoNetStreamProducerOnDroppedClientTest();
+
+    [SkippableFact, TestCategory("Functional")]
+    public override Task AdoNetStreamConsumerOnDroppedClientTest() => base.AdoNetStreamConsumerOnDroppedClientTest();
+}
+
+[TestCategory("AdoNet"), TestCategory("Streaming")]
+public class MySqlAdoNetClientStreamTests(ITestOutputHelper output) : AdoNetClientStreamTests(AdoNetInvariants.InvariantNameMySql, output)
+{
+    [SkippableFact, TestCategory("Functional")]
+    public override Task AdoNetStreamProducerOnDroppedClientTest() => base.AdoNetStreamProducerOnDroppedClientTest();
+
+    [SkippableFact, TestCategory("Functional")]
+    public override Task AdoNetStreamConsumerOnDroppedClientTest() => base.AdoNetStreamConsumerOnDroppedClientTest();
 }

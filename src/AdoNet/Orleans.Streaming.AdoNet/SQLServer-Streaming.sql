@@ -31,7 +31,8 @@ While [1-6] all cause page fragmentation over time, [7] self resolves this degra
 Therefore the design attempts to optimise for [2] while assuming the resulting degradation eventually resolves itself.
 
 The design also attempts to minimize the possibility of deadlocks at the expense of higher locking contention.
-This happens by forcing all queries to touch data in the exact same order of the clustered index and using eager row locking as opposed to allowing upgrades.
+This happens by forcing all queries to touch data in the exact same order of the clustered index
+This induces ordered resource lock acquisition while avoiding the cost of ordering itself
 
 */
 CREATE TABLE [OrleansStreamMessage]
@@ -64,10 +65,9 @@ CREATE TABLE [OrleansStreamMessage]
 	[ModifiedOn] DATETIME2(7) NOT NULL,
 
 	/* The arbitrarily large payload of the event */
-	[Payload] VARBINARY(MAX) NULL,
+	[Payload] VARBINARY(MAX) NOT NULL,
 
 	/* This Clustered PK supports the various ordered scanning queries. */
-    /* Its main purpose is to help partition the update row locks as to minimize dequeing contention. */
 	CONSTRAINT [PK_OrleansStreamMessage] PRIMARY KEY CLUSTERED
 	(
 		[ServiceId] ASC,
@@ -172,6 +172,7 @@ AS
 BEGIN
 
 SET NOCOUNT ON;
+SET XACT_ABORT ON;
 
 DECLARE @MessageId BIGINT = NEXT VALUE FOR [OrleansStreamMessageSequence];
 DECLARE @Now DATETIME2(7) = SYSUTCDATETIME();
@@ -238,6 +239,7 @@ AS
 BEGIN
 
 SET NOCOUNT ON;
+SET XACT_ABORT ON;
 
 DECLARE @Now DATETIME2(7) = SYSUTCDATETIME();
 DECLARE @VisibleOn DATETIME2(7) = DATEADD(SECOND, @VisibilityTimeout, @Now);
@@ -387,6 +389,7 @@ AS
 BEGIN
 
 SET NOCOUNT ON;
+SET XACT_ABORT ON;
 
 /* parse the message identifiers to be deleted */
 DECLARE @ItemsTable TABLE
@@ -653,6 +656,7 @@ AS
 BEGIN
 
 SET NOCOUNT ON;
+SET XACT_ABORT ON;
 
 DECLARE @Now DATETIME2(7) = SYSUTCDATETIME();
 
