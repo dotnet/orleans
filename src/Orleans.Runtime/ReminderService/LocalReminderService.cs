@@ -47,15 +47,20 @@ namespace Orleans.Runtime.ReminderService
             this.listRefreshTimer = asyncTimerFactory.Create(Constants.RefreshReminderList, "ReminderService.ReminderListRefresher");
         }
 
+        public override async Task Init(IServiceProvider serviceProvider)
+        {
+            await base.Init(serviceProvider);
+
+            // confirm that it can access the underlying store, as after this the ReminderService will load in the background, without the opportunity to prevent the Silo from starting
+            await reminderTable.Init().WithTimeout(initTimeout, $"ReminderTable Initialization failed due to timeout {initTimeout}");
+        }
+
         /// <summary>
         /// Attempt to retrieve reminders, that are my responsibility, from the global reminder table when starting this silo (reminder service instance)
         /// </summary>
         /// <returns></returns>
         public override async Task Start()
         {
-            // confirm that it can access the underlying store, as after this the ReminderService will load in the background, without the opportunity to prevent the Silo from starting
-            await reminderTable.Init().WithTimeout(initTimeout, $"ReminderTable Initialization failed due to timeout {initTimeout}");
-
             await base.Start();
         }
 

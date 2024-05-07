@@ -8,14 +8,11 @@ using System.Threading.Tasks;
 using Azure;
 using Azure.Data.Tables;
 using Microsoft.Extensions.Logging;
-using Orleans.AzureUtils.Utilities;
 using Orleans.Reminders.AzureStorage;
-using Orleans.Internal;
-using Orleans.Configuration;
 
 namespace Orleans.Runtime.ReminderService
 {
-    internal class ReminderTableEntry : ITableEntity
+    internal sealed class ReminderTableEntry : ITableEntity
     {
         public string GrainReference        { get; set; }    // Part of RowKey
         public string ReminderName          { get; set; }    // Part of RowKey
@@ -86,29 +83,12 @@ namespace Orleans.Runtime.ReminderService
         }
     }
 
-    internal class RemindersTableManager : AzureTableDataManager<ReminderTableEntry>
+    internal sealed class RemindersTableManager : AzureTableDataManager<ReminderTableEntry>
     {
-        public string ServiceId { get; private set; }
-        public string ClusterId { get; private set; }
+        public string ServiceId { get; }
+        public string ClusterId { get; }
 
-        public static async Task<RemindersTableManager> GetManager(string serviceId, string clusterId, ILoggerFactory loggerFactory, AzureStorageOperationOptions options)
-        {
-            var singleton = new RemindersTableManager(serviceId, clusterId, options, loggerFactory);
-            try
-            {
-                singleton.Logger.Info("Creating RemindersTableManager for service id {0} and clusterId {1}.", serviceId, clusterId);
-                await singleton.InitTableAsync();
-            }
-            catch (Exception ex)
-            {
-                string errorMsg = $"Exception trying to create or connect to the Azure table: {ex.Message}";
-                singleton.Logger.Error((int)AzureReminderErrorCode.AzureTable_39, errorMsg, ex);
-                throw new OrleansException(errorMsg, ex);
-            }
-            return singleton;
-        }
-        
-        private RemindersTableManager(
+        public RemindersTableManager(
             string serviceId,
             string clusterId,
             AzureStorageOperationOptions options,
