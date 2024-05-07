@@ -125,7 +125,7 @@ namespace Orleans.Runtime
 
             logger.LogInformation(
                 (int)ErrorCode.SiloInitializing,
-                "-------------- Initializing silo on host {HostName} MachineName {MachineNAme} at {LocalEndpoint}, gen {Generation} --------------",
+                "-------------- Initializing silo on host {HostName} MachineName {MachineName} at {LocalEndpoint}, gen {Generation} --------------",
                 this.siloDetails.DnsHostName,
                 Environment.MachineName,
                 localEndpoint,
