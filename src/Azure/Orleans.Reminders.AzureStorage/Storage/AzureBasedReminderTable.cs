@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Threading;
 using System.Threading.Tasks;
 using Azure;
 using Microsoft.Extensions.Logging;
@@ -16,7 +17,8 @@ namespace Orleans.Runtime.ReminderService
         private readonly ILoggerFactory loggerFactory;
         private readonly ClusterOptions clusterOptions;
         private readonly AzureTableReminderStorageOptions storageOptions;
-        private RemindersTableManager remTableManager;
+        private readonly RemindersTableManager remTableManager;
+        private readonly TaskCompletionSource _initializationTask = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
         public AzureBasedReminderTable(
             ILoggerFactory loggerFactory,
@@ -27,15 +29,37 @@ namespace Orleans.Runtime.ReminderService
             this.loggerFactory = loggerFactory;
             this.clusterOptions = clusterOptions.Value;
             this.storageOptions = storageOptions.Value;
-        }
-
-        public async Task Init()
-        {
-            this.remTableManager = await RemindersTableManager.GetManager(
+            this.remTableManager = new RemindersTableManager(
                 this.clusterOptions.ServiceId,
                 this.clusterOptions.ClusterId,
-                this.loggerFactory,
-                options: this.storageOptions);
+                this.storageOptions,
+                this.loggerFactory);
+        }
+
+        public async Task StartAsync(CancellationToken cancellationToken)
+        {
+            while (!cancellationToken.IsCancellationRequested)
+            {
+                try
+                {
+                    await remTableManager.InitTableAsync();
+                    _initializationTask.TrySetResult();
+                    return;
+                }
+                catch (Exception ex)
+                {
+                    logger.LogError((int)AzureReminderErrorCode.AzureTable_39, ex, "Exception trying to create or connect to the Azure table");
+                    await Task.Delay(TimeSpan.FromSeconds(1), cancellationToken);
+                }
+            }
+
+            cancellationToken.ThrowIfCancellationRequested();
+        }
+
+        public Task StopAsync(CancellationToken cancellationToken)
+        {
+            _initializationTask.TrySetCanceled(CancellationToken.None);
+            return Task.CompletedTask;
         }
 
         private ReminderTableData ConvertFromTableEntryList(List<(ReminderTableEntry Entity, string ETag)> entries)
@@ -78,7 +102,7 @@ namespace Orleans.Runtime.ReminderService
             }
             finally
             {
-                string serviceIdStr = this.remTableManager.ServiceId;
+                string serviceIdStr = this.clusterOptions.ServiceId;
                 if (!tableEntry.ServiceId.Equals(serviceIdStr))
                 {
                     this.logger.LogWarning(
@@ -116,15 +140,25 @@ namespace Orleans.Runtime.ReminderService
             };
         }
 
-        public Task TestOnlyClearTable()
+        public async Task TestOnlyClearTable()
         {
-            return this.remTableManager.DeleteTableEntries();
+            if (!_initializationTask.Task.IsCompleted)
+            {
+                await _initializationTask.Task;
+            }
+
+            await this.remTableManager.DeleteTableEntries();
         }
 
         public async Task<ReminderTableData> ReadRows(GrainId grainId)
         {
             try
             {
+                if (!_initializationTask.Task.IsCompleted)
+                {
+                    await _initializationTask.Task;
+                }
+
                 var entries = await this.remTableManager.FindReminderEntries(grainId);
                 ReminderTableData data = ConvertFromTableEntryList(entries);
                 if (this.logger.IsEnabled(LogLevel.Trace)) this.logger.LogTrace($"Read for grain {{GrainId}} Table={Environment.NewLine}{{Data}}", grainId, data.ToString());
@@ -143,6 +177,11 @@ namespace Orleans.Runtime.ReminderService
         {
             try
             {
+                if (!_initializationTask.Task.IsCompleted)
+                {
+                    await _initializationTask.Task;
+                }
+
                 var entries = await this.remTableManager.FindReminderEntries(begin, end);
                 ReminderTableData data = ConvertFromTableEntryList(entries);
                 if (this.logger.IsEnabled(LogLevel.Trace)) this.logger.LogTrace($"Read in {{RingRange}} Table={Environment.NewLine}{{Data}}", RangeFactory.CreateRange(begin, end), data);
@@ -161,6 +200,11 @@ namespace Orleans.Runtime.ReminderService
         {
             try
             {
+                if (!_initializationTask.Task.IsCompleted)
+                {
+                    await _initializationTask.Task;
+                }
+
                 if (this.logger.IsEnabled(LogLevel.Debug)) this.logger.LogDebug("ReadRow grainRef = {GrainId} reminderName = {ReminderName}", grainId, reminderName);
                 var result = await this.remTableManager.FindReminderEntry(grainId, reminderName);
                 return result.Entity is null ? null : ConvertFromTableEntry(result.Entity, result.ETag);
@@ -178,8 +222,13 @@ namespace Orleans.Runtime.ReminderService
         {
             try
             {
+                if (!_initializationTask.Task.IsCompleted)
+                {
+                    await _initializationTask.Task;
+                }
+
                 if (this.logger.IsEnabled(LogLevel.Debug)) this.logger.LogDebug("UpsertRow entry = {Data}", entry.ToString());
-                ReminderTableEntry remTableEntry = ConvertToTableEntry(entry, this.remTableManager.ServiceId, this.remTableManager.ClusterId);
+                ReminderTableEntry remTableEntry = ConvertToTableEntry(entry, this.clusterOptions.ServiceId, this.clusterOptions.ClusterId);
 
                 string result = await this.remTableManager.UpsertRow(remTableEntry);
                 if (result == null)
@@ -202,12 +251,18 @@ namespace Orleans.Runtime.ReminderService
         {
             var entry = new ReminderTableEntry
             {
-                PartitionKey = ReminderTableEntry.ConstructPartitionKey(this.remTableManager.ServiceId, grainId),
+                PartitionKey = ReminderTableEntry.ConstructPartitionKey(this.clusterOptions.ServiceId, grainId),
                 RowKey = ReminderTableEntry.ConstructRowKey(grainId, reminderName),
                 ETag = new ETag(eTag),
             };
+
             try
             {
+                if (!_initializationTask.Task.IsCompleted)
+                {
+                    await _initializationTask.Task;
+                }
+
                 if (this.logger.IsEnabled(LogLevel.Trace)) this.logger.LogTrace("RemoveRow entry = {Data}", entry.ToString());
 
                 bool result = await this.remTableManager.DeleteReminderEntryConditionally(entry, eTag);
