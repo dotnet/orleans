@@ -12,6 +12,7 @@ using Orleans.Messaging;
 using Orleans.Runtime;
 using Orleans.Serialization;
 using Orleans.Serialization.Invocation;
+using static Orleans.Internal.StandardExtensions;
 
 namespace Orleans
 {
@@ -73,7 +74,12 @@ namespace Orleans
             this.logger = loggerFactory.CreateLogger<OutsideRuntimeClient>();
             callbacks = new ConcurrentDictionary<CorrelationId, CallbackData>();
             this.clientMessagingOptions = clientMessagingOptions.Value;
-            this.callbackTimer = new PeriodicTimer(TimeSpan.FromTicks(Math.Min(this.clientMessagingOptions.ResponseTimeout.Ticks, TimeSpan.FromSeconds(1).Ticks)), timeProvider);
+            var period = Max(
+                TimeSpan.FromMilliseconds(1),
+                Min(
+                    this.clientMessagingOptions.ResponseTimeout,
+                    TimeSpan.FromSeconds(1)));
+            this.callbackTimer = new PeriodicTimer(period, timeProvider);
             this.sharedCallbackData = new SharedCallbackData(
                 msg => this.UnregisterCallback(msg.Id),
                 this.loggerFactory.CreateLogger<CallbackData>(),

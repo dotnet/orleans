@@ -10,6 +10,7 @@ using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 using Orleans.Runtime;
 using Orleans.Runtime.Messaging;
+using static Orleans.Internal.StandardExtensions;
 
 namespace Orleans.Messaging
 {
@@ -50,7 +51,8 @@ namespace Orleans.Messaging
             this.connectionManager = connectionManager;
             this.gatewayListProvider = gatewayListProvider;
 
-            this.gatewayRefreshTimer = new PeriodicTimer(this.gatewayOptions.GatewayListRefreshPeriod, timeProvider);
+            var refreshPeriod = Max(this.gatewayOptions.GatewayListRefreshPeriod, TimeSpan.FromMilliseconds(1));
+            this.gatewayRefreshTimer = new PeriodicTimer(this.gatewayOptions.GatewayListRefreshPeriod, timeProvider); 
         }
 
         public async Task StartAsync(CancellationToken cancellationToken)
