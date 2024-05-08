@@ -38,22 +38,35 @@ namespace Orleans.Runtime.ReminderService
 
         public async Task StartAsync(CancellationToken cancellationToken)
         {
-            while (!cancellationToken.IsCancellationRequested)
+            try
             {
-                try
+                while (true)
                 {
-                    await remTableManager.InitTableAsync();
-                    _initializationTask.TrySetResult();
-                    return;
-                }
-                catch (Exception ex)
-                {
-                    logger.LogError((int)AzureReminderErrorCode.AzureTable_39, ex, "Exception trying to create or connect to the Azure table");
-                    await Task.Delay(TimeSpan.FromSeconds(1), cancellationToken);
+                    try
+                    {
+                        await remTableManager.InitTableAsync();
+                        _initializationTask.TrySetResult();
+                        return;
+                    }
+                    catch (Exception ex) when (!cancellationToken.IsCancellationRequested)
+                    {
+                        logger.LogError((int)AzureReminderErrorCode.AzureTable_39, ex, "Exception trying to create or connect to the Azure table");
+                        await Task.Delay(TimeSpan.FromSeconds(1), cancellationToken);
+                    }
                 }
             }
-
-            cancellationToken.ThrowIfCancellationRequested();
+            catch (OperationCanceledException ex)
+            {
+                logger.LogError(ex, "Reminder table initialization canceled.");
+                _initializationTask.TrySetCanceled(ex.CancellationToken);
+                throw;
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "Error initializing reminder table.");
+                _initializationTask.TrySetException(ex);
+                throw;
+            }
         }
 
         public Task StopAsync(CancellationToken cancellationToken)
@@ -142,10 +155,7 @@ namespace Orleans.Runtime.ReminderService
 
         public async Task TestOnlyClearTable()
         {
-            if (!_initializationTask.Task.IsCompleted)
-            {
-                await _initializationTask.Task;
-            }
+            await _initializationTask.Task;
 
             await this.remTableManager.DeleteTableEntries();
         }
@@ -154,10 +164,7 @@ namespace Orleans.Runtime.ReminderService
         {
             try
             {
-                if (!_initializationTask.Task.IsCompleted)
-                {
-                    await _initializationTask.Task;
-                }
+                await _initializationTask.Task;
 
                 var entries = await this.remTableManager.FindReminderEntries(grainId);
                 ReminderTableData data = ConvertFromTableEntryList(entries);
@@ -177,10 +184,7 @@ namespace Orleans.Runtime.ReminderService
         {
             try
             {
-                if (!_initializationTask.Task.IsCompleted)
-                {
-                    await _initializationTask.Task;
-                }
+                await _initializationTask.Task;
 
                 var entries = await this.remTableManager.FindReminderEntries(begin, end);
                 ReminderTableData data = ConvertFromTableEntryList(entries);
@@ -200,10 +204,7 @@ namespace Orleans.Runtime.ReminderService
         {
             try
             {
-                if (!_initializationTask.Task.IsCompleted)
-                {
-                    await _initializationTask.Task;
-                }
+                await _initializationTask.Task;
 
                 if (this.logger.IsEnabled(LogLevel.Debug)) this.logger.LogDebug("ReadRow grainRef = {GrainId} reminderName = {ReminderName}", grainId, reminderName);
                 var result = await this.remTableManager.FindReminderEntry(grainId, reminderName);
@@ -222,10 +223,7 @@ namespace Orleans.Runtime.ReminderService
         {
             try
             {
-                if (!_initializationTask.Task.IsCompleted)
-                {
-                    await _initializationTask.Task;
-                }
+                await _initializationTask.Task;
 
                 if (this.logger.IsEnabled(LogLevel.Debug)) this.logger.LogDebug("UpsertRow entry = {Data}", entry.ToString());
                 ReminderTableEntry remTableEntry = ConvertToTableEntry(entry, this.clusterOptions.ServiceId, this.clusterOptions.ClusterId);
@@ -258,10 +256,7 @@ namespace Orleans.Runtime.ReminderService
 
             try
             {
-                if (!_initializationTask.Task.IsCompleted)
-                {
-                    await _initializationTask.Task;
-                }
+                await _initializationTask.Task;
 
                 if (this.logger.IsEnabled(LogLevel.Trace)) this.logger.LogTrace("RemoveRow entry = {Data}", entry.ToString());
 

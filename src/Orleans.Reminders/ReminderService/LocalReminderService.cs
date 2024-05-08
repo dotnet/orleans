@@ -81,8 +81,9 @@ namespace Orleans.Runtime.ReminderService
                 ServiceLifecycleStage.Active,
                 async ct =>
                 {
-                    using var timeoutCancellation = new CancellationTokenSource(this.reminderOptions.InitializationTimeout);
-                    using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct, timeoutCancellation.Token);
+                    using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+                    cts.CancelAfter(this.reminderOptions.InitializationTimeout);
+
                     await this.QueueTask(Start)
                         .WithCancellation($"Starting ReminderService failed because the task was canceled.", cts.Token);
                 },
@@ -95,8 +96,8 @@ namespace Orleans.Runtime.ReminderService
         /// <returns></returns>
         private async Task Initialize(CancellationToken cancellationToken)
         {
-            using var timeoutCancellation = new CancellationTokenSource(this.reminderOptions.InitializationTimeout);
-            using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeoutCancellation.Token);
+            using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            cts.CancelAfter(this.reminderOptions.InitializationTimeout);
 
             // Confirm that it can access the underlying store, as after this the ReminderService will load in the background, without the opportunity to prevent the Silo from starting
             await reminderTable.StartAsync(cts.Token);
