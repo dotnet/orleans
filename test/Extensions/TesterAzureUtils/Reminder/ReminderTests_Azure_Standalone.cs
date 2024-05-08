@@ -45,7 +45,7 @@ namespace Tester.AzureUtils.TimerTests
             storageOptions.Value.ConfigureTestDefaults();
 
             IReminderTable table = new AzureBasedReminderTable(this.loggerFactory, clusterOptions, storageOptions);
-            await table.Init();
+            await table.StartAsync();
 
             await TestTableInsertRate(table, 10);
             await TestTableInsertRate(table, 500);
@@ -59,7 +59,7 @@ namespace Tester.AzureUtils.TimerTests
             var storageOptions = Options.Create(new AzureTableReminderStorageOptions());
             storageOptions.Value.ConfigureTestDefaults();
             IReminderTable table = new AzureBasedReminderTable(this.loggerFactory, clusterOptions, storageOptions);
-            await table.Init();
+            await table.StartAsync();
 
             ReminderEntry[] rows = (await GetAllRows(table)).ToArray();
             Assert.Empty(rows); // "The reminder table (sid={0}, did={1}) was not empty.", ServiceId, clusterId);
