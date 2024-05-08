@@ -122,7 +122,7 @@ namespace Orleans.CodeGenerator
             return ClassDeclaration("Metadata_" + SyntaxGeneration.Identifier.SanitizeIdentifierName(_codeGenerator.Compilation.AssemblyName))
                 .AddBaseListTypes(SimpleBaseType(interfaceType.ToTypeSyntax()))
                 .AddModifiers(Token(SyntaxKind.InternalKeyword), Token(SyntaxKind.SealedKeyword))
-                .AddAttributeLists(AttributeList(SingletonSeparatedList(CodeGenerator.GetGeneratedCodeAttributeSyntax())))
+                .AddAttributeLists(CodeGenerator.GetGeneratedCodeAttributes())
                 .AddMembers(configureMethod);
         }
 

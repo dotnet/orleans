@@ -122,7 +122,7 @@ namespace Orleans.CodeGenerator
             var classDeclaration = ClassDeclaration(generatedClassName)
                 .AddBaseListTypes(SimpleBaseType(baseClassType.ToTypeSyntax(method.TypeParameterSubstitutions)))
                 .AddModifiers(Token(accessibilityKind), Token(SyntaxKind.SealedKeyword))
-                .AddAttributeLists(AttributeList(SingletonSeparatedList(CodeGenerator.GetGeneratedCodeAttributeSyntax())))
+                .AddAttributeLists(CodeGenerator.GetGeneratedCodeAttributes())
                 .AddMembers(fields);
 
             foreach (var alias in compoundTypeAliases)
