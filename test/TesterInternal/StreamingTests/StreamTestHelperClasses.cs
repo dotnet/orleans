@@ -115,7 +115,7 @@ namespace UnitTests.StreamingTests
         {
             return this.producer.ProducePeriodicSeries(timerCallback =>
                     {
-                        var timer = new PeriodicTimer(TimeSpan.FromMicroseconds(10));
+                        var timer = new PeriodicTimer(TimeSpan.FromMilliseconds(1));
                         _ = Task.Run(async () =>
                         {
                             do

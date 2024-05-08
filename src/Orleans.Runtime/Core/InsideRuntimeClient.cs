@@ -16,6 +16,7 @@ using Orleans.Runtime.Messaging;
 using Orleans.Serialization;
 using Orleans.Serialization.Invocation;
 using Orleans.Storage;
+using static Orleans.Internal.StandardExtensions;
 
 namespace Orleans.Runtime
 {
@@ -74,7 +75,8 @@ namespace Orleans.Runtime
             this.messagingOptions = messagingOptions.Value;
             this.messagingTrace = messagingTrace;
             this.responseCopier = deepCopier.GetCopier<Response>();
-            this.callbackTimer = new PeriodicTimer(TimeSpan.FromTicks(Math.Min(this.messagingOptions.ResponseTimeout.Ticks, TimeSpan.FromSeconds(1).Ticks)), timeProvider);
+            var period = Max(TimeSpan.FromMilliseconds(1), Min(this.messagingOptions.ResponseTimeout, TimeSpan.FromSeconds(1)));
+            this.callbackTimer = new PeriodicTimer(period, timeProvider);
 
             this.sharedCallbackData = new SharedCallbackData(
                 msg => this.UnregisterCallback(msg.TargetGrain, msg.Id),
