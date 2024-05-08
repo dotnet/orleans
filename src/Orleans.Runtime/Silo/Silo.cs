@@ -60,7 +60,7 @@ namespace Orleans.Runtime
             new TaskCompletionSource<int>(TaskCreationOptions.RunContinuationsAsynchronously);
         private readonly SiloStatisticsManager siloStatistics;
         private readonly InsideRuntimeClient runtimeClient;
-        private IReminderService reminderService;
+        private LocalReminderService reminderService;
         private SystemTarget fallbackScheduler;
         private readonly ISiloStatusOracle siloStatusOracle;
         private Watchdog platformWatchdog;
@@ -96,7 +96,6 @@ namespace Orleans.Runtime
 
         private bool isFastKilledNeeded = false; // Set to true if something goes wrong in the shutdown/stop phase
 
-        private IGrainContext reminderServiceContext;
         private LifecycleSchedulingSystemTarget lifecycleSchedulingSystemTarget;
 
         /// <summary>
@@ -397,6 +396,13 @@ namespace Orleans.Runtime
         {
             var stopWatch = Stopwatch.StartNew();
 
+            // Initialize the reminder service.
+            if (reminderService is not null)
+            {
+                await this.scheduler.QueueTask(() => reminderService.Init(Services), reminderService)
+                    .WithTimeout(this.initTimeout, $"GrainService Initializing failed due to timeout {initTimeout}");
+            }
+
             // Load and init grain services before silo becomes active.
             await StartAsyncTaskWithPerfAnalysis("Init grain services",
                 () => CreateGrainServices(), stopWatch);
@@ -462,8 +468,7 @@ namespace Orleans.Runtime
                 async Task StartReminderService()
                 {
                     // so, we have the view of the membership in the consistentRingProvider. We can start the reminder service
-                    this.reminderServiceContext = (this.reminderService as IGrainContext) ?? this.fallbackScheduler;
-                    await this.scheduler.QueueTask(this.reminderService.Start, this.reminderServiceContext)
+                    await this.scheduler.QueueTask(this.reminderService.Start, this.reminderService)
                         .WithTimeout(this.initTimeout, $"Starting ReminderService failed due to timeout {initTimeout}");
                     this.logger.Debug("Reminder service started successfully.");
                 }
@@ -702,7 +707,7 @@ namespace Orleans.Runtime
             if (reminderService != null)
             {
                 await this.scheduler
-                    .QueueTask(reminderService.Stop, this.reminderServiceContext)
+                    .QueueTask(reminderService.Stop, this.reminderService)
                     .WithCancellation(ct, "Stopping ReminderService failed because the task was cancelled");
             }
 
