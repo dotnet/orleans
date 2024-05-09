@@ -31,8 +31,8 @@ While [1-6] all cause page fragmentation over time, [7] self resolves this degra
 Therefore the design attempts to optimise for [2] while assuming the resulting degradation eventually resolves itself.
 
 The design also attempts to minimize the possibility of deadlocks at the expense of higher locking contention.
-This happens by forcing all queries to touch data in the exact same order of the clustered index
-This induces ordered resource lock acquisition while avoiding the cost of ordering itself
+This happens by forcing all queries to touch data in the exact same order of the clustered index.
+This induces ordered resource lock acquisition while avoiding the cost of ordering itself.
 
 */
 CREATE TABLE [OrleansStreamMessage]
@@ -674,6 +674,7 @@ WITH Batch AS
         [ServiceId] = @ServiceId
         AND [ProviderId] = @ProviderId
         AND [QueueId] = @QueueId
+        AND [RemoveOn] <= @Now
     ORDER BY
         [ServiceId],
         [ProviderId],

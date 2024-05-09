@@ -10,9 +10,9 @@ using static System.String;
 
 namespace Tester.AdoNet.Streaming;
 
-public class AdoNetClientStreamTests : TestClusterPerTest
+public abstract class AdoNetClientStreamTests : TestClusterPerTest
 {
-    public AdoNetClientStreamTests(string invariant, ITestOutputHelper output)
+    protected AdoNetClientStreamTests(string invariant, ITestOutputHelper output)
     {
         _adoNetInvariantName = invariant;
         _output = output;
@@ -74,11 +74,13 @@ public class AdoNetClientStreamTests : TestClusterPerTest
         }
     }
 
-    public virtual Task AdoNetStreamProducerOnDroppedClientTest() => _runner.StreamProducerOnDroppedClientTest(AdoNetStreamProviderName, StreamNamespace);
+    [SkippableFact, TestCategory("Functional")]
+    public Task AdoNetStreamProducerOnDroppedClientTest() => _runner.StreamProducerOnDroppedClientTest(AdoNetStreamProviderName, StreamNamespace);
 
-    public virtual async Task AdoNetStreamConsumerOnDroppedClientTest()
+    [SkippableFact, TestCategory("Functional")]
+    public Task AdoNetStreamConsumerOnDroppedClientTest()
     {
-        await _runner.StreamConsumerOnDroppedClientTest(
+        return _runner.StreamConsumerOnDroppedClientTest(
             AdoNetStreamProviderName,
             StreamNamespace,
             _output,
@@ -92,19 +94,9 @@ public class AdoNetClientStreamTests : TestClusterPerTest
 [TestCategory("AdoNet"), TestCategory("Streaming")]
 public class SqlServerAdoNetClientStreamTests(ITestOutputHelper output) : AdoNetClientStreamTests(AdoNetInvariants.InvariantNameSqlServer, output)
 {
-    [SkippableFact, TestCategory("Functional")]
-    public override Task AdoNetStreamProducerOnDroppedClientTest() => base.AdoNetStreamProducerOnDroppedClientTest();
-
-    [SkippableFact, TestCategory("Functional")]
-    public override Task AdoNetStreamConsumerOnDroppedClientTest() => base.AdoNetStreamConsumerOnDroppedClientTest();
 }
 
 [TestCategory("AdoNet"), TestCategory("Streaming")]
 public class MySqlAdoNetClientStreamTests(ITestOutputHelper output) : AdoNetClientStreamTests(AdoNetInvariants.InvariantNameMySql, output)
 {
-    [SkippableFact, TestCategory("Functional")]
-    public override Task AdoNetStreamProducerOnDroppedClientTest() => base.AdoNetStreamProducerOnDroppedClientTest();
-
-    [SkippableFact, TestCategory("Functional")]
-    public override Task AdoNetStreamConsumerOnDroppedClientTest() => base.AdoNetStreamConsumerOnDroppedClientTest();
 }
