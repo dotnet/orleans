@@ -10,15 +10,24 @@ using static System.String;
 
 namespace Tester.AdoNet.Streaming;
 
+public class SqlServerAdoNetClientStreamTests(ITestOutputHelper output) : AdoNetClientStreamTests(AdoNetInvariants.InvariantNameSqlServer, output)
+{
+}
+
+public class MySqlAdoNetClientStreamTests(ITestOutputHelper output) : AdoNetClientStreamTests(AdoNetInvariants.InvariantNameMySql, output)
+{
+}
+
+[TestCategory("AdoNet"), TestCategory("Streaming")]
 public abstract class AdoNetClientStreamTests : TestClusterPerTest
 {
     protected AdoNetClientStreamTests(string invariant, ITestOutputHelper output)
     {
-        _adoNetInvariantName = invariant;
+        _invariant = invariant;
         _output = output;
     }
 
-    private static string _adoNetInvariantName;
+    private static string _invariant;
     private const string TestDatabaseName = "OrleansStreamTest";
     private const string AdoNetStreamProviderName = "AdoNet";
     private const string StreamNamespace = "AdoNetSubscriptionMultiplicityTestsNamespace";
@@ -30,7 +39,7 @@ public abstract class AdoNetClientStreamTests : TestClusterPerTest
     public override async Task InitializeAsync()
     {
         // set up the adonet environment before the base initializes
-        _testing = await RelationalStorageForTesting.SetupInstance(_adoNetInvariantName, TestDatabaseName);
+        _testing = await RelationalStorageForTesting.SetupInstance(_invariant, TestDatabaseName);
 
         Skip.If(IsNullOrEmpty(_testing.CurrentConnectionString), $"Database '{TestDatabaseName}' not initialized");
 
@@ -53,7 +62,7 @@ public abstract class AdoNetClientStreamTests : TestClusterPerTest
             clientBuilder
                 .AddAdoNetStreams(AdoNetStreamProviderName, options =>
                 {
-                    options.Invariant = _adoNetInvariantName;
+                    options.Invariant = _invariant;
                     options.ConnectionString = _testing.CurrentConnectionString;
                 })
                 .Configure<SiloMessagingOptions>(options => options.ClientDropTimeout = TimeSpan.FromSeconds(5));
@@ -67,7 +76,7 @@ public abstract class AdoNetClientStreamTests : TestClusterPerTest
             siloBuilder
                 .AddAdoNetStreams(AdoNetStreamProviderName, options =>
                 {
-                    options.Invariant = _adoNetInvariantName;
+                    options.Invariant = _invariant;
                     options.ConnectionString = _testing.CurrentConnectionString;
                 })
                 .AddMemoryGrainStorage("PubSubStore");
@@ -89,14 +98,4 @@ public abstract class AdoNetClientStreamTests : TestClusterPerTest
                 _ => { },
                 (record, i, ct) => Task.FromResult((int)record["Count"]))).Single());
     }
-}
-
-[TestCategory("AdoNet"), TestCategory("Streaming")]
-public class SqlServerAdoNetClientStreamTests(ITestOutputHelper output) : AdoNetClientStreamTests(AdoNetInvariants.InvariantNameSqlServer, output)
-{
-}
-
-[TestCategory("AdoNet"), TestCategory("Streaming")]
-public class MySqlAdoNetClientStreamTests(ITestOutputHelper output) : AdoNetClientStreamTests(AdoNetInvariants.InvariantNameMySql, output)
-{
 }

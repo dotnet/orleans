@@ -120,55 +120,52 @@ CREATE PROCEDURE QueueStreamMessage
 )
 BEGIN
 
-    DECLARE _MessageId BIGINT;
-    DECLARE _Now DATETIME(6);
-    DECLARE _ExpiresOn DATETIME(6);
-    DECLARE EXIT HANDLER FOR SQLEXCEPTION ROLLBACK;
+DECLARE _MessageId BIGINT;
+DECLARE _Now DATETIME(6);
+DECLARE _ExpiresOn DATETIME(6);
+DECLARE EXIT HANDLER FOR SQLEXCEPTION ROLLBACK;
 
-    SET _Now = UTC_TIMESTAMP(6);
-    SET _ExpiresOn = DATE_ADD(_Now, INTERVAL _ExpiryTimeout SECOND);
+SET _Now = UTC_TIMESTAMP(6);
+SET _ExpiresOn = DATE_ADD(_Now, INTERVAL _ExpiryTimeout SECOND);
 
-    UPDATE OrleansStreamMessageSequence SET MessageId = LAST_INSERT_ID(MessageId + 1);
-    SET _MessageId = LAST_INSERT_ID();
+UPDATE OrleansStreamMessageSequence
+SET MessageId = LAST_INSERT_ID(MessageId + 1);
 
-    INSERT INTO OrleansStreamMessage
-    (
-        ServiceId,
-        ProviderId,
-        QueueId,
-        MessageId,
-        Dequeued,
-        VisibleOn,
-        ExpiresOn,
-        CreatedOn,
-        ModifiedOn,
-        Payload
-    )
-    VALUES
-    (
-        _ServiceId,
-        _ProviderId,
-        _QueueId,
-        _MessageId,
-        0,
-        _Now,
-        _ExpiresOn,
-        _Now,
-        _Now,
-        _Payload
-    );
+SET _MessageId = LAST_INSERT_ID();
 
-    SELECT 
-        ServiceId,
-        ProviderId,
-        QueueId,
-        MessageId
-    FROM
-        OrleansStreamMessage
-    WHERE
-        MessageId = _MessageId;
+INSERT INTO OrleansStreamMessage
+(
+    ServiceId,
+    ProviderId,
+    QueueId,
+    MessageId,
+    Dequeued,
+    VisibleOn,
+    ExpiresOn,
+    CreatedOn,
+    ModifiedOn,
+    Payload
+)
+VALUES
+(
+    _ServiceId,
+    _ProviderId,
+    _QueueId,
+    _MessageId,
+    0,
+    _Now,
+    _ExpiresOn,
+    _Now,
+    _Now,
+    _Payload
+)
+RETURNING
+    ServiceId,
+    ProviderId,
+    QueueId,
+    MessageId;
 
-END
+END;
 
 DELIMITER $$
 
@@ -205,12 +202,15 @@ DECLARE EXIT HANDLER FOR SQLEXCEPTION ROLLBACK;
 SET _Now = UTC_TIMESTAMP(6);
 SET _VisibleOn = DATE_ADD(_Now, INTERVAL _VisibilityTimeout SECOND);
 
-SELECT EvictOn INTO _EvictOn
-FROM OrleansStreamControl
-WHERE
-    ServiceId = _ServiceId
-    AND ProviderId = _ProviderId
-    AND QueueId = _QueueId;
+SET _EvictOn =
+(
+    SELECT EvictOn
+    FROM OrleansStreamControl
+    WHERE
+        ServiceId = _ServiceId
+        AND ProviderId = _ProviderId
+        AND QueueId = _QueueId
+);
 
 /* initialize the control row as necessary */
 IF _EvictOn IS NULL THEN
@@ -223,14 +223,14 @@ IF _EvictOn IS NULL THEN
         EvictOn
     )
     SELECT
-        ServiceId,
-        ProviderId,
-        QueueId,
+        _ServiceId,
+        _ProviderId,
+        _QueueId,
         _Now
     WHERE
         NOT EXISTS
         (
-            SELECT 1
+            SELECT *
             FROM OrleansStreamControl
             WHERE
                 ServiceId = _ServiceId
@@ -244,6 +244,7 @@ IF _EvictOn IS NULL THEN
         ServiceId = _ServiceId
         AND ProviderId = _ProviderId
         AND QueueId = _QueueId;
+
 END IF;
 
 IF _EvictOn < _Now THEN
@@ -283,11 +284,11 @@ SELECT
     ProviderId,
     QueueId,
     MessageId,
-    Dequeued = Dequeued + 1,
-    VisibleOn = _VisibleOn,
+    Dequeued + 1,
+    _VisibleOn,
     ExpiresOn,
     CreatedOn,
-    ModifiedOn = _Now,
+    _Now,
     Payload
 FROM
     OrleansStreamMessage

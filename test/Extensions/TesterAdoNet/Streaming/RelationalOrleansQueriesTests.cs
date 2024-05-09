@@ -8,25 +8,38 @@ using static System.String;
 namespace Tester.AdoNet.Streaming;
 
 /// <summary>
+/// Tests the relational storage layer via <see cref="RelationalOrleansQueries"/> against Sql Server.
+/// </summary>
+public class SqlServerRelationalOrleansQueriesTests() : RelationalOrleansQueriesTests(AdoNetInvariants.InvariantNameSqlServer)
+{
+}
+
+/// <summary>
+/// Tests the relational storage layer via <see cref="RelationalOrleansQueries"/> against MySQL.
+/// </summary>
+public class MySqlRelationalOrleansQueriesTests() : RelationalOrleansQueriesTests(AdoNetInvariants.InvariantNameMySql)
+{
+}
+
+/// <summary>
 /// Tests the relational storage layer via <see cref="RelationalOrleansQueries"/>.
 /// </summary>
 [TestCategory("AdoNet"), TestCategory("Streaming")]
-public class RelationalOrleansQueriesTests : IAsyncLifetime
+public abstract class RelationalOrleansQueriesTests(string invariant) : IAsyncLifetime
 {
     private const string TestDatabaseName = "OrleansStreamTest";
-    private const string AdoNetInvariantName = AdoNetInvariants.InvariantNameSqlServer;
 
     private IRelationalStorage _storage;
     private RelationalOrleansQueries _queries;
 
     public async Task InitializeAsync()
     {
-        var testing = await RelationalStorageForTesting.SetupInstance(AdoNetInvariantName, TestDatabaseName);
+        var testing = await RelationalStorageForTesting.SetupInstance(invariant, TestDatabaseName);
         Skip.If(IsNullOrEmpty(testing.CurrentConnectionString), $"Database '{TestDatabaseName}' not initialized");
 
-        _storage = RelationalStorage.CreateInstance(AdoNetInvariantName, testing.CurrentConnectionString);
+        _storage = RelationalStorage.CreateInstance(invariant, testing.CurrentConnectionString);
 
-        _queries = await RelationalOrleansQueries.CreateInstance(AdoNetInvariantName, testing.CurrentConnectionString);
+        _queries = await RelationalOrleansQueries.CreateInstance(invariant, testing.CurrentConnectionString);
     }
 
     private static string RandomServiceId(int max = 10) => $"ServiceId{Random.Shared.Next(max)}";
@@ -53,7 +66,6 @@ public class RelationalOrleansQueriesTests : IAsyncLifetime
     public async Task RelationalOrleansQueries_QueuesMessage()
     {
         // arrange
-        await _storage.ExecuteAsync("DELETE FROM [OrleansStreamMessage]");
         var serviceId = RandomServiceId();
         var providerId = RandomProviderId();
         var queueId = RandomQueueId();
@@ -73,7 +85,7 @@ public class RelationalOrleansQueriesTests : IAsyncLifetime
         Assert.True(ack.MessageId > 0);
 
         // assert - storage
-        var messages = await _storage.ReadAsync<AdoNetStreamMessage>("SELECT * FROM [OrleansStreamMessage]");
+        var messages = await _storage.ReadAsync<AdoNetStreamMessage>("SELECT * FROM OrleansStreamMessage");
         var message = Assert.Single(messages);
         Assert.Equal(serviceId, message.ServiceId);
         Assert.Equal(providerId, message.ProviderId);
@@ -96,13 +108,12 @@ public class RelationalOrleansQueriesTests : IAsyncLifetime
     public async Task RelationalOrleansQueries_QueuesManyMessagesInParallel()
     {
         // arrange
-        await _storage.ExecuteAsync("DELETE FROM [OrleansStreamMessage]");
         var serviceId = RandomServiceId();
         var providerId = RandomProviderId();
         var queueId = RandomQueueId();
         var expiryTimeout = RandomExpiryTimeout();
         var payload = RandomPayload(1000);
-        var count = 1000;
+        var count = 10000;
 
         // act
         var before = DateTime.UtcNow;
@@ -129,7 +140,7 @@ public class RelationalOrleansQueriesTests : IAsyncLifetime
         }
 
         // assert - messages were stored as expected
-        var stored = (await _storage.ReadAsync<AdoNetStreamMessage>("SELECT * FROM [OrleansStreamMessage]"))
+        var stored = (await _storage.ReadAsync<AdoNetStreamMessage>("SELECT * FROM OrleansStreamMessage"))
             .OrderBy(x => x.ServiceId)
             .ThenBy(x => x.ProviderId)
             .ThenBy(x => x.QueueId)
@@ -159,7 +170,6 @@ public class RelationalOrleansQueriesTests : IAsyncLifetime
     public async Task RelationalOrleansQueries_QueuesManyMessagesInParallelOnManyQueues()
     {
         // arrange - create up to 27 random partition keys with around 1000 random messages per partition in random order
-        await _storage.ExecuteAsync("DELETE FROM [OrleansStreamMessage]");
         var expiryTimeout = RandomExpiryTimeout();
         var count = 3 * 3 * 3 * 1000;
         var partitions = Enumerable
@@ -199,7 +209,7 @@ public class RelationalOrleansQueriesTests : IAsyncLifetime
         Assert.Equal(messageIds.Max, messageIds.Min + messageIds.Count - 1);
 
         // assert - messages were stored as expected
-        var stored = (await _storage.ReadAsync<AdoNetStreamMessage>("SELECT * FROM [OrleansStreamMessage]"))
+        var stored = (await _storage.ReadAsync<AdoNetStreamMessage>("SELECT * FROM OrleansStreamMessage"))
             .ToDictionary(x => (x.ServiceId, x.ProviderId, x.QueueId, x.MessageId));
 
         foreach (var (partition, ack) in results)
@@ -226,7 +236,7 @@ public class RelationalOrleansQueriesTests : IAsyncLifetime
     public async Task RelationalOrleansQueries_DequeuesSingleMessage()
     {
         // arrange
-        await _storage.ExecuteAsync("DELETE FROM [OrleansStreamMessage]");
+        await _storage.ExecuteAsync("DELETE FROM OrleansStreamMessage");
         var serviceId = RandomServiceId();
         var providerId = RandomProviderId();
         var queueId = RandomQueueId();
@@ -275,7 +285,7 @@ public class RelationalOrleansQueriesTests : IAsyncLifetime
         Assert.Equal(payload, message.Payload);
 
         // assert - the stored message changed
-        var stored = Assert.Single(await _storage.ReadAsync<AdoNetStreamMessage>("SELECT * FROM [OrleansStreamMessage]"));
+        var stored = Assert.Single(await _storage.ReadAsync<AdoNetStreamMessage>("SELECT * FROM OrleansStreamMessage"));
         Assert.Equal(message.ServiceId, stored.ServiceId);
         Assert.Equal(message.ProviderId, stored.ProviderId);
         Assert.Equal(message.QueueId, stored.QueueId);
@@ -295,7 +305,6 @@ public class RelationalOrleansQueriesTests : IAsyncLifetime
     public async Task RelationalOrleansQueries_DequeuesMessageBatches()
     {
         // arrange
-        await _storage.ExecuteAsync("DELETE FROM [OrleansStreamMessage]");
         var serviceId = RandomServiceId();
         var providerId = RandomProviderId();
         var queueId = RandomQueueId();
@@ -355,7 +364,7 @@ public class RelationalOrleansQueriesTests : IAsyncLifetime
 
         // assert - stored messages are consistent with dequeued messages
         var messageLookup = messages.ToDictionary(x => (x.ServiceId, x.ProviderId, x.QueueId, x.MessageId));
-        var stored = await _storage.ReadAsync<AdoNetStreamMessage>("SELECT * FROM [OrleansStreamMessage]");
+        var stored = await _storage.ReadAsync<AdoNetStreamMessage>("SELECT * FROM OrleansStreamMessage");
         foreach (var item in stored)
         {
             Assert.True(messageLookup.TryGetValue((item.ServiceId, item.ProviderId, item.QueueId, item.MessageId), out var message), "Message not found");
@@ -380,7 +389,6 @@ public class RelationalOrleansQueriesTests : IAsyncLifetime
     public async Task RelationalOrleansQueries_DequeuesSingleMessageAgainAfterVisibilityTimeout()
     {
         // arrange
-        await _storage.ExecuteAsync("DELETE FROM [OrleansStreamMessage]");
         var serviceId = RandomServiceId();
         var providerId = RandomProviderId();
         var queueId = RandomQueueId();
@@ -432,7 +440,7 @@ public class RelationalOrleansQueriesTests : IAsyncLifetime
         Assert.Empty(results[maxAttempts]);
 
         // assert - final stored message is consistent with final dequeued message
-        var stored = Assert.Single(await _storage.ReadAsync<AdoNetStreamMessage>("SELECT * FROM [OrleansStreamMessage]"));
+        var stored = Assert.Single(await _storage.ReadAsync<AdoNetStreamMessage>("SELECT * FROM OrleansStreamMessage"));
         var final = Assert.Single(results[maxAttempts - 1]);
         Assert.Equal(final.ServiceId, stored.ServiceId);
         Assert.Equal(final.ProviderId, stored.ProviderId);
@@ -453,7 +461,6 @@ public class RelationalOrleansQueriesTests : IAsyncLifetime
     public async Task RelationalOrleansQueries_DoesNotDequeueSingleMessageBeforeVisibilityTimeout()
     {
         // arrange
-        await _storage.ExecuteAsync("DELETE FROM [OrleansStreamMessage]");
         var serviceId = RandomServiceId();
         var providerId = RandomProviderId();
         var queueId = RandomQueueId();
@@ -480,7 +487,7 @@ public class RelationalOrleansQueriesTests : IAsyncLifetime
         Assert.Equal(ack.MessageId, first.MessageId);
 
         // assert - stored message is consistent with first message
-        var stored = Assert.Single(await _storage.ReadAsync<AdoNetStreamMessage>("SELECT * FROM [OrleansStreamMessage]"));
+        var stored = Assert.Single(await _storage.ReadAsync<AdoNetStreamMessage>("SELECT * FROM OrleansStreamMessage"));
         Assert.Equal(first.ServiceId, stored.ServiceId);
         Assert.Equal(first.ProviderId, stored.ProviderId);
         Assert.Equal(first.QueueId, stored.QueueId);
@@ -503,7 +510,6 @@ public class RelationalOrleansQueriesTests : IAsyncLifetime
     public async Task RelationalOrleansQueries_DoesNotDequeueSingleMessageAfterExpiry()
     {
         // arrange
-        await _storage.ExecuteAsync("DELETE FROM [OrleansStreamMessage]");
         var serviceId = RandomServiceId();
         var providerId = RandomProviderId();
         var queueId = RandomQueueId();
@@ -528,7 +534,7 @@ public class RelationalOrleansQueriesTests : IAsyncLifetime
         Assert.Empty(messages);
 
         // assert - stored message are as expected
-        var stored = Assert.Single(await _storage.ReadAsync<AdoNetStreamMessage>("SELECT * FROM [OrleansStreamMessage]"));
+        var stored = Assert.Single(await _storage.ReadAsync<AdoNetStreamMessage>("SELECT * FROM OrleansStreamMessage"));
         Assert.Equal(ack.ServiceId, stored.ServiceId);
         Assert.Equal(ack.ProviderId, stored.ProviderId);
         Assert.Equal(ack.QueueId, stored.QueueId);
@@ -552,7 +558,6 @@ public class RelationalOrleansQueriesTests : IAsyncLifetime
     public async Task RelationalOrleansQueries_ConfirmsMessages()
     {
         // arrange
-        await _storage.ExecuteAsync("DELETE FROM [OrleansStreamMessage]");
         var serviceId = RandomServiceId();
         var providerId = RandomProviderId();
         var queueId = RandomQueueId();
@@ -590,7 +595,7 @@ public class RelationalOrleansQueriesTests : IAsyncLifetime
         }
 
         // assert - no data remains in storage
-        var stored = await _storage.ReadAsync<AdoNetStreamMessage>("SELECT * FROM [OrleansStreamMessage]");
+        var stored = await _storage.ReadAsync<AdoNetStreamMessage>("SELECT * FROM OrleansStreamMessage");
         Assert.Empty(stored);
     }
 
@@ -601,7 +606,6 @@ public class RelationalOrleansQueriesTests : IAsyncLifetime
     public async Task RelationalOrleansQueries_DoesNotConfirmMessagesWithWrongReceipt()
     {
         // arrange
-        await _storage.ExecuteAsync("DELETE FROM [OrleansStreamMessage]");
         var serviceId = RandomServiceId();
         var providerId = RandomProviderId();
         var queueId = RandomQueueId();
@@ -633,7 +637,7 @@ public class RelationalOrleansQueriesTests : IAsyncLifetime
         Assert.Empty(results);
 
         // assert - data remains in storage
-        var stored = await _storage.ReadAsync<AdoNetStreamMessage>("SELECT * FROM [OrleansStreamMessage]");
+        var stored = await _storage.ReadAsync<AdoNetStreamMessage>("SELECT * FROM OrleansStreamMessage");
         Assert.Equal(maxCount, stored.Count());
     }
 
@@ -644,7 +648,6 @@ public class RelationalOrleansQueriesTests : IAsyncLifetime
     public async Task RelationalOrleansQueries_ConfirmsSomeMessagesAndNotOthers()
     {
         // arrange
-        await _storage.ExecuteAsync("DELETE FROM [OrleansStreamMessage]");
         var serviceId = RandomServiceId();
         var providerId = RandomProviderId();
         var queueId = RandomQueueId();
@@ -678,7 +681,7 @@ public class RelationalOrleansQueriesTests : IAsyncLifetime
 
         // assert - confirmed messages are as expected
         var lookup = acks.ToDictionary(x => (x.ServiceId, x.ProviderId, x.QueueId, x.MessageId));
-        var stored = (await _storage.ReadAsync<AdoNetStreamMessage>("SELECT * FROM [OrleansStreamMessage]"))
+        var stored = (await _storage.ReadAsync<AdoNetStreamMessage>("SELECT * FROM OrleansStreamMessage"))
             .ToDictionary(x => (x.ServiceId, x.ProviderId, x.QueueId, x.MessageId));
         foreach (var item in confirmed)
         {
@@ -703,9 +706,6 @@ public class RelationalOrleansQueriesTests : IAsyncLifetime
     [SkippableFact]
     public async Task RelationalOrleansQueries_ChaosTest()
     {
-        // arrange - clean up
-        await _storage.ExecuteAsync("DELETE FROM [OrleansStreamMessage]");
-
         // arrange - generate test data
         var total = 30000;
         var serviceIds = Enumerable.Range(0, 3).Select(x => $"ServiceId{x}").ToList();
@@ -794,7 +794,7 @@ public class RelationalOrleansQueriesTests : IAsyncLifetime
         Assert.NotEmpty(confirmed);
 
         // assert - some messages were left behind (rng dependant, remove assert if flaky)
-        var stored = await _storage.ReadAsync<AdoNetStreamMessage>("SELECT * FROM [OrleansStreamMessage]");
+        var stored = await _storage.ReadAsync<AdoNetStreamMessage>("SELECT * FROM OrleansStreamMessage");
         Assert.NotEmpty(stored);
 
         // assert - confirmed messages were not left behind
@@ -816,8 +816,6 @@ public class RelationalOrleansQueriesTests : IAsyncLifetime
         var streamOptions = new AdoNetStreamOptions();
 
         // arrange - queue an expired message
-        await _storage.ExecuteAsync("DELETE FROM [OrleansStreamMessage]");
-        await _storage.ExecuteAsync("DELETE FROM [OrleansStreamDeadLetter]");
         var queueId = "QueueId";
         var payload = new byte[] { 0xFF };
 
@@ -831,7 +829,7 @@ public class RelationalOrleansQueriesTests : IAsyncLifetime
         var afterFailure = DateTime.UtcNow;
 
         // assert
-        var dead = Assert.Single(await _storage.ReadAsync<AdoNetStreamDeadLetter>("SELECT * FROM [OrleansStreamDeadLetter]"));
+        var dead = Assert.Single(await _storage.ReadAsync<AdoNetStreamDeadLetter>("SELECT * FROM OrleansStreamDeadLetter"));
         Assert.Equal(serviceId, dead.ServiceId);
         Assert.Equal(providerId, dead.ProviderId);
         Assert.Equal(queueId, dead.QueueId);
@@ -863,8 +861,6 @@ public class RelationalOrleansQueriesTests : IAsyncLifetime
         var cacheOptions = new SimpleQueueCacheOptions();
 
         // arrange - queue an expired message
-        await _storage.ExecuteAsync("DELETE FROM [OrleansStreamMessage]");
-        await _storage.ExecuteAsync("DELETE FROM [OrleansStreamDeadLetter]");
         var queueId = "QueueId";
         var payload = new byte[] { 0xFF };
 
@@ -883,7 +879,7 @@ public class RelationalOrleansQueriesTests : IAsyncLifetime
         var afterFailure = DateTime.UtcNow;
 
         // assert
-        var dead = Assert.Single(await _storage.ReadAsync<AdoNetStreamDeadLetter>("SELECT * FROM [OrleansStreamDeadLetter]"));
+        var dead = Assert.Single(await _storage.ReadAsync<AdoNetStreamDeadLetter>("SELECT * FROM OrleansStreamDeadLetter"));
         Assert.Equal(serviceId, dead.ServiceId);
         Assert.Equal(providerId, dead.ProviderId);
         Assert.Equal(queueId, dead.QueueId);
@@ -916,8 +912,6 @@ public class RelationalOrleansQueriesTests : IAsyncLifetime
         var agentOptions = new StreamPullingAgentOptions();
 
         // arrange - queue an expired message
-        await _storage.ExecuteAsync("DELETE FROM [OrleansStreamMessage]");
-        await _storage.ExecuteAsync("DELETE FROM [OrleansStreamDeadLetter]");
         var queueId = "QueueId";
         var payload = new byte[] { 0xFF };
         var ack = await _queries.QueueStreamMessageAsync(serviceId, providerId, queueId, payload, streamOptions.ExpiryTimeout.TotalSecondsCeiling());
@@ -929,7 +923,7 @@ public class RelationalOrleansQueriesTests : IAsyncLifetime
         await _queries.EvictStreamMessageAsync(ack.ServiceId, ack.ProviderId, ack.QueueId, ack.MessageId, streamOptions.MaxAttempts, streamOptions.DeadLetterEvictionTimeout.TotalSecondsCeiling());
 
         // assert
-        Assert.Empty(await _storage.ReadAsync<AdoNetStreamDeadLetter>("SELECT * FROM [OrleansStreamDeadLetter]"));
+        Assert.Empty(await _storage.ReadAsync<AdoNetStreamDeadLetter>("SELECT * FROM OrleansStreamDeadLetter"));
     }
 
     private static List<T> Randomize<T>(IEnumerable<T> source)
