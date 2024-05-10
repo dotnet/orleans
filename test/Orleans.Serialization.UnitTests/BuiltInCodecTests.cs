@@ -2154,6 +2154,45 @@ namespace Orleans.Serialization.UnitTests
         protected override bool Equals(Dictionary<string, int> left, Dictionary<string, int> right) => object.ReferenceEquals(left, right) || left.SequenceEqual(right);
     }
 
+    [GenerateSerializer]
+    public class TypeWithDictionaryBase : Dictionary<string, int>
+    {
+        public TypeWithDictionaryBase() : this(true) { }
+        public TypeWithDictionaryBase(bool addDefaultValue)
+        {
+            if (addDefaultValue)
+            {
+                this["key"] = 1;
+            }
+        }
+
+        [Id(0)]
+        public int OtherProperty { get; set; }
+
+        public override string ToString() => $"[OtherProperty: {OtherProperty}, Values: [{string.Join(", ", this.Select(kvp => $"[{kvp.Key}] = '{kvp.Value}'"))}]]";
+    }
+
+    public class DictionaryBaseCodecTests : FieldCodecTester<TypeWithDictionaryBase, IFieldCodec<TypeWithDictionaryBase>>
+    {
+        public DictionaryBaseCodecTests(ITestOutputHelper output) : base(output) { }
+        protected override TypeWithDictionaryBase[] TestValues => new TypeWithDictionaryBase[] { null, new(), new(addDefaultValue: false), new() { ["foo"] = 15 }, new() { ["foo"] = 15, OtherProperty = 123 } };
+
+        protected override TypeWithDictionaryBase CreateValue() => new() { OtherProperty = Random.Next() };
+        protected override bool Equals(TypeWithDictionaryBase left, TypeWithDictionaryBase right) => ReferenceEquals(left, right) || left.SequenceEqual(right) && left.OtherProperty == right.OtherProperty;
+    }
+
+    public class DictionaryBaseCopierTests : CopierTester<TypeWithDictionaryBase, IDeepCopier<TypeWithDictionaryBase>>
+    {
+        public DictionaryBaseCopierTests(ITestOutputHelper output) : base(output)
+        {
+        }
+
+        protected override TypeWithDictionaryBase[] TestValues => new TypeWithDictionaryBase[] { null, new(), new(addDefaultValue: false), new() { ["foo"] = 15 }, new() { ["foo"] = 15, OtherProperty = 123 } };
+
+        protected override TypeWithDictionaryBase CreateValue() => new() { OtherProperty = Random.Next() };
+        protected override bool Equals(TypeWithDictionaryBase left, TypeWithDictionaryBase right) => ReferenceEquals(left, right) || left.SequenceEqual(right) && left.OtherProperty == right.OtherProperty;
+    }
+
     public class DictionaryWithComparerCodecTests : FieldCodecTester<Dictionary<string, int>, DictionaryCodec<string, int>>
     {
         protected override int[] MaxSegmentSizes => new[] { 1024 };
