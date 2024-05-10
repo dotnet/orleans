@@ -84,7 +84,7 @@
     <PackageVersion Include="NSubstitute.Analyzers.CSharp" Version="1.0.15" />
     <PackageVersion Include="CsCheck" Version="2.10.0" />
     <PackageVersion Include="System.Data.SqlClient" Version="4.8.5" />
-    <PackageVersion Include="Npgsql" Version="6.0.7" />
+    <PackageVersion Include="Npgsql" Version="8.0.3" />
     <PackageVersion Include="MySql.Data" Version="8.0.31" />
     <PackageVersion Include="Microsoft.Extensions.Configuration.AzureKeyVault" Version="3.1.24" />
     <PackageVersion Include="System.CommandLine" Version="2.0.0-beta1.21308.1" />
