@@ -26,7 +26,6 @@ namespace Orleans.Runtime.ReminderService
         private readonly Dictionary<ReminderIdentity, LocalReminderData> localReminders = new();
         private readonly IReminderTable reminderTable;
         private readonly TaskCompletionSource<bool> startedTask;
-        private readonly TimeSpan initTimeout;
         private readonly IAsyncTimerFactory asyncTimerFactory;
         private readonly IAsyncTimer listRefreshTimer; // timer that refreshes our list of reminders to reflect global reminder table
         private readonly GrainReferenceActivator _referenceActivator;
@@ -54,7 +53,6 @@ namespace Orleans.Runtime.ReminderService
             _referenceActivator = referenceActivator;
             _grainInterfaceType = interfaceTypeResolver.GetGrainInterfaceType(typeof(IRemindable));
             this.reminderOptions = reminderOptions.Value;
-            this.initTimeout = this.reminderOptions.InitializationTimeout;
             this.reminderTable = reminderTable;
             this.asyncTimerFactory = asyncTimerFactory;
             ReminderInstruments.RegisterActiveRemindersObserve(() => localReminders.Count);
@@ -68,36 +66,46 @@ namespace Orleans.Runtime.ReminderService
         {
             observer.Subscribe(
                 nameof(LocalReminderService),
+                ServiceLifecycleStage.BecomeActive,
+                async ct =>
+                {
+                    await this.QueueTask(() => Initialize(ct));
+                },
+                async ct =>
+                {
+                    await this.QueueTask(Stop)
+                        .WithCancellation("Stopping ReminderService failed because the task was cancelled.", ct);
+                });
+            observer.Subscribe(
+                nameof(LocalReminderService),
                 ServiceLifecycleStage.Active,
                 async ct =>
                 {
-                    using var timeoutCancellation = new CancellationTokenSource(initTimeout);
-                    var cts = CancellationTokenSource.CreateLinkedTokenSource(ct, timeoutCancellation.Token);
+                    using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+                    cts.CancelAfter(this.reminderOptions.InitializationTimeout);
+
                     await this.QueueTask(Start)
-                        .WithCancellation($"Starting ReminderService failed due to timeout {initTimeout}", ct);
+                        .WithCancellation($"Starting ReminderService failed because the task was canceled.", cts.Token);
                 },
-                ct =>
-                {
-                    return this.QueueTask(Stop)
-                        .WithCancellation("Stopping ReminderService failed because the task was cancelled", ct);
-                });
+                ct => Task.CompletedTask);
         }
 
         /// <summary>
         /// Attempt to retrieve reminders, that are my responsibility, from the global reminder table when starting this silo (reminder service instance)
         /// </summary>
         /// <returns></returns>
-        public override async Task Start()
+        private async Task Initialize(CancellationToken cancellationToken)
         {
-            // confirm that it can access the underlying store, as after this the ReminderService will load in the background, without the opportunity to prevent the Silo from starting
-            await reminderTable.Init().WithTimeout(initTimeout, $"ReminderTable Initialization failed due to timeout {initTimeout}");
+            using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            cts.CancelAfter(this.reminderOptions.InitializationTimeout);
 
-            _ = base.Start();
+            // Confirm that it can access the underlying store, as after this the ReminderService will load in the background, without the opportunity to prevent the Silo from starting
+            await reminderTable.StartAsync(cts.Token);
         }
 
         public async override Task Stop()
         {
-            _ = base.Stop();
+            await base.Stop();
 
             if (listRefreshTimer != null)
             {
@@ -113,7 +121,9 @@ namespace Orleans.Runtime.ReminderService
                 r.StopReminder();
             }
 
-            // for a graceful shutdown, also handover reminder responsibilities to new owner, and update the ReminderTable
+            await reminderTable.StopAsync();
+
+            // For a graceful shutdown, also handover reminder responsibilities to new owner, and update the ReminderTable
             // currently, this is taken care of by periodically reading the reminder table
         }
 
