@@ -8,6 +8,28 @@ namespace Tester.CodeGenTests
     using Orleans;
     using Orleans.Providers;
 
+    public interface ISomeInterface<in T>
+    {
+        Task M(T arg);
+    }
+
+    public interface IBase : ISomeInterface<object>;
+
+    public interface IDerived : IBase, ISomeInterface<string>
+    {
+        Task ISomeInterface<object>.M(object obj) => M(obj);
+    }
+
+    public interface ISomeGrainWithExplicitImplementation : IDerived, IGrainWithGuidKey;
+
+    public class SomeGrain : Grain, ISomeGrainWithExplicitImplementation
+    {
+        public Task M(string arg)
+        {
+            throw new NotImplementedException();
+        }
+    }
+
     public interface IGrainWithGenericMethods : IGrainWithGuidKey
     {
         Task<Type[]> GetTypesExplicit<T, U, V>();
