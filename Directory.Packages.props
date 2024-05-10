@@ -63,7 +63,7 @@
     <PackageVersion Include="KubernetesClient" Version="12.1.1" />
     <!-- Test related packages -->
     <PackageVersion Include="FluentAssertions" Version="6.7.0" />
-    <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="17.9.0-preview-23503-02" />
+    <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="17.9.0" />
     <PackageVersion Include="BenchmarkDotNet" Version="0.13.9" />
     <PackageVersion Include="BenchmarkDotNet.Diagnostics.Windows" Version="0.13.9" />
     <PackageVersion Include="Xunit.SkippableFact" Version="1.4.13" />
@@ -84,8 +84,8 @@
     <PackageVersion Include="NSubstitute.Analyzers.CSharp" Version="1.0.15" />
     <PackageVersion Include="CsCheck" Version="2.10.0" />
     <PackageVersion Include="System.Data.SqlClient" Version="4.8.6" />
-    <PackageVersion Include="Npgsql" Version="6.0.7" />
-    <PackageVersion Include="MySql.Data" Version="8.0.31" />
+    <PackageVersion Include="Npgsql" Version="8.0.3" />
+    <PackageVersion Include="MySql.Data" Version="8.4.0" />
     <PackageVersion Include="Microsoft.Extensions.Configuration.AzureKeyVault" Version="3.1.24" />
     <PackageVersion Include="System.CommandLine" Version="2.0.0-beta1.21308.1" />
     <PackageVersion Include="Microsoft.Crank.EventSources" Version="0.2.0-alpha.23422.5" />
