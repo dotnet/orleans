@@ -16,13 +16,13 @@ namespace TestExtensions
             TestDefaultConfiguration.InitializeDefaults();
         }
 
-        public TestCluster HostedCluster { get; private set; }
+        public TestCluster HostedCluster { get; protected set; }
 
         public IGrainFactory GrainFactory => this.HostedCluster?.GrainFactory;
 
         public IClusterClient Client => this.HostedCluster?.Client;
 
-        public ILogger Logger { get; private set; }
+        public ILogger Logger { get; protected set; }
 
         public virtual async Task InitializeAsync()
         {
