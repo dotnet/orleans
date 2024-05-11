@@ -8,16 +8,27 @@ using static System.String;
 
 namespace Tester.AdoNet.Streaming;
 
+public class SqlServerAdoNetStreamFilteringTests(AdoNetStreamFilteringTests.Fixture fixture) : AdoNetStreamFilteringTests(AdoNetInvariants.InvariantNameSqlServer, fixture), IClassFixture<AdoNetStreamFilteringTests.Fixture>
+{
+}
+
+public class MySqlAdoNetStreamFilteringTests(AdoNetStreamFilteringTests.Fixture fixture) : AdoNetStreamFilteringTests(AdoNetInvariants.InvariantNameMySql, fixture), IClassFixture<AdoNetStreamFilteringTests.Fixture>
+{
+}
+
 [TestCategory("AdoNet"), TestCategory("Streaming")]
-public class AdoNetStreamFilteringTests : StreamFilteringTestsBase, IClassFixture<AdoNetStreamFilteringTests.Fixture>
+public abstract class AdoNetStreamFilteringTests : StreamFilteringTestsBase
 {
     private const string TestDatabaseName = "OrleansStreamTest";
-    private const string AdoNetInvariantName = AdoNetInvariants.InvariantNameSqlServer;
     private const string AdoNetStreamProviderName = "AdoNet";
-    private static RelationalStorageForTesting _testing;
 
-    public AdoNetStreamFilteringTests(Fixture fixture) : base(fixture)
+    private static RelationalStorageForTesting _testing;
+    private static string _invariant = AdoNetInvariants.InvariantNameSqlServer;
+
+    protected AdoNetStreamFilteringTests(string invariant, Fixture fixture) : base(fixture)
     {
+        _invariant = invariant;
+
         fixture.EnsurePreconditionsMet();
     }
 
@@ -26,7 +37,7 @@ public class AdoNetStreamFilteringTests : StreamFilteringTestsBase, IClassFixtur
         public override async Task InitializeAsync()
         {
             // set up the adonet environment before the base initializes
-            _testing = await RelationalStorageForTesting.SetupInstance(AdoNetInvariantName, TestDatabaseName);
+            _testing = await RelationalStorageForTesting.SetupInstance(_invariant, TestDatabaseName);
 
             Skip.If(IsNullOrEmpty(_testing.CurrentConnectionString), $"Database '{TestDatabaseName}' not initialized");
 
@@ -46,7 +57,7 @@ public class AdoNetStreamFilteringTests : StreamFilteringTestsBase, IClassFixtur
                 siloBuilder
                     .AddAdoNetStreams(AdoNetStreamProviderName, options =>
                     {
-                        options.Invariant = AdoNetInvariantName;
+                        options.Invariant = _invariant;
                         options.ConnectionString = _testing.CurrentConnectionString;
                     })
                     .AddMemoryGrainStorage("MemoryStore")
@@ -62,7 +73,7 @@ public class AdoNetStreamFilteringTests : StreamFilteringTestsBase, IClassFixtur
                 clientBuilder
                     .AddAdoNetStreams(AdoNetStreamProviderName, options =>
                     {
-                        options.Invariant = AdoNetInvariantName;
+                        options.Invariant = _invariant;
                         options.ConnectionString = _testing.CurrentConnectionString;
                     })
                     .AddStreamFilter<CustomStreamFilter>(AdoNetStreamProviderName);
