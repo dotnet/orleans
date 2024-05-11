@@ -8,32 +8,40 @@ using static System.String;
 
 namespace Tester.AdoNet.Streaming;
 
-public class SqlServerAdoNetStreamFilteringTests(AdoNetStreamFilteringTests.Fixture fixture) : AdoNetStreamFilteringTests(AdoNetInvariants.InvariantNameSqlServer, fixture), IClassFixture<AdoNetStreamFilteringTests.Fixture>
+public class SqlServerAdoNetStreamFilteringTests() : AdoNetStreamFilteringTests(new Fixture(AdoNetInvariants.InvariantNameSqlServer))
 {
 }
 
-public class MySqlAdoNetStreamFilteringTests(AdoNetStreamFilteringTests.Fixture fixture) : AdoNetStreamFilteringTests(AdoNetInvariants.InvariantNameMySql, fixture), IClassFixture<AdoNetStreamFilteringTests.Fixture>
+public class MySqlAdoNetStreamFilteringTests() : AdoNetStreamFilteringTests(new Fixture(AdoNetInvariants.InvariantNameMySql))
 {
 }
 
 [TestCategory("AdoNet"), TestCategory("Streaming")]
-public abstract class AdoNetStreamFilteringTests : StreamFilteringTestsBase
+public abstract class AdoNetStreamFilteringTests : StreamFilteringTestsBase, IAsyncLifetime
 {
     private const string TestDatabaseName = "OrleansStreamTest";
     private const string AdoNetStreamProviderName = "AdoNet";
 
     private static RelationalStorageForTesting _testing;
-    private static string _invariant = AdoNetInvariants.InvariantNameSqlServer;
 
-    protected AdoNetStreamFilteringTests(string invariant, Fixture fixture) : base(fixture)
+    protected AdoNetStreamFilteringTests(Fixture fixture) : base(fixture)
     {
-        _invariant = invariant;
-
         fixture.EnsurePreconditionsMet();
     }
 
+    public Task InitializeAsync() => fixture.InitializeAsync();
+
+    public Task DisposeAsync() => fixture.DisposeAsync();
+
     public class Fixture : BaseTestClusterFixture
     {
+        private static string _invariant;
+
+        public Fixture(string invariant)
+        {
+            _invariant = invariant;
+        }
+
         public override async Task InitializeAsync()
         {
             // set up the adonet environment before the base initializes
