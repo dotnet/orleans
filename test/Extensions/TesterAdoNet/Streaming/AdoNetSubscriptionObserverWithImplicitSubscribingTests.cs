@@ -11,19 +11,43 @@ using static System.String;
 
 namespace Tester.AdoNet.Streaming;
 
+public class SqlServerAdoNetSubscriptionObserverWithImplicitSubscribingTests() : AdoNetSubscriptionObserverWithImplicitSubscribingTests(new Fixture(AdoNetInvariants.InvariantNameSqlServer))
+{
+}
+
+public class MySqlAdoNetSubscriptionObserverWithImplicitSubscribingTests() : AdoNetSubscriptionObserverWithImplicitSubscribingTests(new Fixture(AdoNetInvariants.InvariantNameMySql))
+{
+}
+
 [TestCategory("AdoNet"), TestCategory("Streaming"), TestCategory("Functional")]
-public class AdoNetSubscriptionObserverWithImplicitSubscribingTests : SubscriptionObserverWithImplicitSubscribingTestRunner, IClassFixture<AdoNetSubscriptionObserverWithImplicitSubscribingTests.Fixture>
+public abstract class AdoNetSubscriptionObserverWithImplicitSubscribingTests(AdoNetSubscriptionObserverWithImplicitSubscribingTests.Fixture fixture) : SubscriptionObserverWithImplicitSubscribingTestRunner(fixture), IAsyncLifetime
 {
     private const string TestDatabaseName = "OrleansStreamTest";
-    private const string AdoNetInvariantName = AdoNetInvariants.InvariantNameSqlServer;
     private static RelationalStorageForTesting _testing;
+    private readonly Fixture _fixture = fixture;
+
+    public async Task InitializeAsync()
+    {
+        await _fixture.InitializeAsync();
+
+        _fixture.EnsurePreconditionsMet();
+    }
+
+    public Task DisposeAsync() => _fixture.DisposeAsync();
 
     public class Fixture : BaseTestClusterFixture
     {
+        private static string _invariant;
+
+        public Fixture(string invariant)
+        {
+            _invariant = invariant;
+        }
+
         public override async Task InitializeAsync()
         {
             // set up the adonet environment before the base initializes
-            _testing = await RelationalStorageForTesting.SetupInstance(AdoNetInvariantName, TestDatabaseName);
+            _testing = await RelationalStorageForTesting.SetupInstance(_invariant, TestDatabaseName);
 
             Skip.If(IsNullOrEmpty(_testing.CurrentConnectionString), $"Database '{TestDatabaseName}' not initialized");
 
@@ -35,40 +59,35 @@ public class AdoNetSubscriptionObserverWithImplicitSubscribingTests : Subscripti
             builder.AddSiloBuilderConfigurator<TestClusterConfigurator>();
             builder.AddClientBuilderConfigurator<TestClusterConfigurator>();
         }
-    }
 
-    private class TestClusterConfigurator : ISiloConfigurator, IClientBuilderConfigurator
-    {
-        public void Configure(ISiloBuilder siloBuilder)
+        private class TestClusterConfigurator : ISiloConfigurator, IClientBuilderConfigurator
         {
-            siloBuilder
-                .AddAdoNetStreams(StreamProviderName, sb =>
-                {
-                    sb.ConfigureAdoNet(ob => ob.Configure<IOptions<ClusterOptions>>((options, dep) =>
+            public void Configure(ISiloBuilder siloBuilder)
+            {
+                siloBuilder
+                    .AddAdoNetStreams(StreamProviderName, sb =>
                     {
-                        options.Invariant = AdoNetInvariantName;
-                        options.ConnectionString = _testing.CurrentConnectionString;
-                    }));
-                    sb.ConfigureStreamPubSub(StreamPubSubType.ImplicitOnly);
-                })
-                .AddAdoNetStreams(StreamProviderName2, sb =>
-                {
-                    sb.ConfigureAdoNet(ob => ob.Configure<IOptions<ClusterOptions>>((options, dep) =>
+                        sb.ConfigureAdoNet(ob => ob.Configure<IOptions<ClusterOptions>>((options, dep) =>
+                        {
+                            options.Invariant = _invariant;
+                            options.ConnectionString = _testing.CurrentConnectionString;
+                        }));
+                        sb.ConfigureStreamPubSub(StreamPubSubType.ImplicitOnly);
+                    })
+                    .AddAdoNetStreams(StreamProviderName2, sb =>
                     {
-                        options.Invariant = AdoNetInvariantName;
-                        options.ConnectionString = _testing.CurrentConnectionString;
-                    }));
-                    sb.ConfigureStreamPubSub(StreamPubSubType.ImplicitOnly);
-                })
-                .AddMemoryGrainStorageAsDefault()
-                .AddMemoryGrainStorage("PubSubStore");
+                        sb.ConfigureAdoNet(ob => ob.Configure<IOptions<ClusterOptions>>((options, dep) =>
+                        {
+                            options.Invariant = _invariant;
+                            options.ConnectionString = _testing.CurrentConnectionString;
+                        }));
+                        sb.ConfigureStreamPubSub(StreamPubSubType.ImplicitOnly);
+                    })
+                    .AddMemoryGrainStorageAsDefault()
+                    .AddMemoryGrainStorage("PubSubStore");
+            }
+
+            public void Configure(IConfiguration configuration, IClientBuilder clientBuilder) => clientBuilder.AddStreaming();
         }
-
-        public void Configure(IConfiguration configuration, IClientBuilder clientBuilder) => clientBuilder.AddStreaming();
-    }
-
-    public AdoNetSubscriptionObserverWithImplicitSubscribingTests(Fixture fixture) : base(fixture)
-    {
-        fixture.EnsurePreconditionsMet();
     }
 }
