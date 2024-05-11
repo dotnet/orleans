@@ -115,11 +115,25 @@ public abstract class RelationalOrleansQueriesTests(string invariant) : IAsyncLi
         var payload = RandomPayload(1000);
         var count = 10000;
 
+        // this keeps requests under the default connection pool limit to avoid flaky tests due to connection timeouts
+        var semaphore = new SemaphoreSlim(100);
+
         // act
         var before = DateTime.UtcNow;
         var acks = await Task.WhenAll(Enumerable
             .Range(0, count)
-            .Select(i => Task.Run(() => _queries.QueueStreamMessageAsync(serviceId, providerId, queueId, payload, expiryTimeout)))
+            .Select(i => Task.Run(async () =>
+            {
+                await semaphore.WaitAsync();
+                try
+                {
+                    return await _queries.QueueStreamMessageAsync(serviceId, providerId, queueId, payload, expiryTimeout);
+                }
+                finally
+                {
+                    semaphore.Release();
+                }
+            }))
             .ToList());
         var after = DateTime.UtcNow;
 
@@ -183,13 +197,24 @@ public abstract class RelationalOrleansQueriesTests(string invariant) : IAsyncLi
             ))
             .ToList();
 
+        // this keeps requests under the default connection pool limit to avoid flaky tests due to connection timeouts
+        var semaphore = new SemaphoreSlim(100);
+
         // act - queue the random messages in parallel
         var before = DateTime.UtcNow;
         var results = await Task.WhenAll(partitions
             .Select(p => Task.Run(async () =>
             {
-                var ack = await _queries.QueueStreamMessageAsync(p.ServiceId, p.ProviderId, p.QueueId, p.Payload, expiryTimeout);
-                return (Partition: p, Ack: ack);
+                await semaphore.WaitAsync();
+                try
+                {
+                    var ack = await _queries.QueueStreamMessageAsync(p.ServiceId, p.ProviderId, p.QueueId, p.Payload, expiryTimeout);
+                    return (Partition: p, Ack: ack);
+                }
+                finally
+                {
+                    semaphore.Release();
+                }
             }))
             .ToList());
         var after = DateTime.UtcNow;
@@ -700,24 +725,29 @@ public abstract class RelationalOrleansQueriesTests(string invariant) : IAsyncLi
     /// If this test faults due to deadlocks then there is likely some issue with the implementation that needs investigation.
     /// </summary>
     /// <remarks>
-    /// At dev time, this test consistently induced deadlocks until the underlying queries were perfected.
+    /// At early dev time, this test consistently induced deadlocks until the underlying queries were perfected.
     /// This is an expensive test to run but can protect against query regression.
+    /// For MySQL in particular, this test also detected deadlocks with the driver connection pool itself, which required a package upgrade.
+    /// See: https://bugs.mysql.com/bug.php?id=114272
     /// </remarks>
     [SkippableFact]
     public async Task RelationalOrleansQueries_ChaosTest()
     {
         // arrange - generate test data
-        var total = 30000;
+        var total = 10000;
         var serviceIds = Enumerable.Range(0, 3).Select(x => $"ServiceId{x}").ToList();
         var providerIds = Enumerable.Range(0, 3).Select(x => $"ProviderId{x}").ToList();
         var queueIds = Enumerable.Range(0, 3).Select(x => $"QueueId{x}").ToList();
         var payload = RandomPayload(1000);
-        var maxCount = 3;
+        var maxCount = 10;
         var maxAttempts = 3;
         var visibilityTimeout = 1;
         var removalTimeout = 1;
         var evictionInterval = 1;
         var evictionBatchSize = 1000;
+
+        // this keeps requests under the default connection pool limit to avoid flaky tests due to connection timeouts
+        var semaphore = new SemaphoreSlim(100);
 
         // act - chaos enqueue, dequeue, confirm
         // the tasks below are not expected to result in a planned outcome but are expected to result in a consistent one
@@ -736,7 +766,16 @@ public abstract class RelationalOrleansQueriesTests(string invariant) : IAsyncLi
                     var providerId = providerIds[Random.Shared.Next(providerIds.Count)];
                     var queueId = queueIds[Random.Shared.Next(queueIds.Count)];
 
-                    var ack = await _queries.QueueStreamMessageAsync(serviceId, providerId, queueId, payload, visibilityTimeout);
+                    AdoNetStreamMessageAck ack;
+                    await semaphore.WaitAsync();
+                    try
+                    {
+                        ack = await _queries.QueueStreamMessageAsync(serviceId, providerId, queueId, payload, visibilityTimeout);
+                    }
+                    finally
+                    {
+                        semaphore.Release();
+                    }
 
                     acks.Add(ack);
                 });
@@ -748,7 +787,16 @@ public abstract class RelationalOrleansQueriesTests(string invariant) : IAsyncLi
                     var providerId = providerIds[Random.Shared.Next(providerIds.Count)];
                     var queueId = queueIds[Random.Shared.Next(queueIds.Count)];
 
-                    var messages = await _queries.GetStreamMessagesAsync(serviceId, providerId, queueId, maxCount, maxAttempts, visibilityTimeout, removalTimeout, evictionInterval, evictionBatchSize);
+                    IEnumerable<AdoNetStreamMessage> messages;
+                    await semaphore.WaitAsync();
+                    try
+                    {
+                        messages = await _queries.GetStreamMessagesAsync(serviceId, providerId, queueId, maxCount, maxAttempts, visibilityTimeout, removalTimeout, evictionInterval, evictionBatchSize);
+                    }
+                    finally
+                    {
+                        semaphore.Release();
+                    }
 
                     foreach (var item in messages)
                     {
@@ -763,14 +811,32 @@ public abstract class RelationalOrleansQueriesTests(string invariant) : IAsyncLi
                     var providerId = providerIds[Random.Shared.Next(providerIds.Count)];
                     var queueId = queueIds[Random.Shared.Next(queueIds.Count)];
 
-                    var messages = await _queries.GetStreamMessagesAsync(serviceId, providerId, queueId, maxCount, maxAttempts, visibilityTimeout, removalTimeout, evictionInterval, evictionBatchSize);
+                    IEnumerable<AdoNetStreamMessage> messages;
+                    await semaphore.WaitAsync();
+                    try
+                    {
+                        messages = await _queries.GetStreamMessagesAsync(serviceId, providerId, queueId, maxCount, maxAttempts, visibilityTimeout, removalTimeout, evictionInterval, evictionBatchSize);
+                    }
+                    finally
+                    {
+                        semaphore.Release();
+                    }
 
                     foreach (var item in messages)
                     {
                         dequeued2.Add(item);
                     }
 
-                    var confirmation = await _queries.ConfirmStreamMessagesAsync(serviceId, providerId, queueId, messages.Select(x => new AdoNetStreamConfirmation(x.MessageId, x.Dequeued)).ToList());
+                    IEnumerable<AdoNetStreamConfirmationAck> confirmation;
+                    await semaphore.WaitAsync();
+                    try
+                    {
+                        confirmation = await _queries.ConfirmStreamMessagesAsync(serviceId, providerId, queueId, messages.Select(x => new AdoNetStreamConfirmation(x.MessageId, x.Dequeued)).ToList());
+                    }
+                    finally
+                    {
+                        semaphore.Release();
+                    }
 
                     foreach (var item in confirmation)
                     {
