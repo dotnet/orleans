@@ -12,22 +12,35 @@ using static System.String;
 namespace Tester.AdoNet.Streaming;
 
 /// <summary>
+/// Tests for <see cref="AdoNetQueueAdapterFactory"/> against SQL Server.
+/// </summary>
+public class SqlServerAdoNetQueueAdapterFactoryTests(TestEnvironmentFixture fixture) : AdoNetQueueAdapterFactoryTests(AdoNetInvariants.InvariantNameSqlServer, fixture)
+{
+}
+
+/// <summary>
+/// Tests for <see cref="AdoNetQueueAdapterFactory"/> against MySQL.
+/// </summary>
+public class MySqlAdoNetQueueAdapterFactoryTests(TestEnvironmentFixture fixture) : AdoNetQueueAdapterFactoryTests(AdoNetInvariants.InvariantNameMySql, fixture)
+{
+}
+
+/// <summary>
 /// Tests for <see cref="AdoNetQueueAdapterFactory"/>.
 /// </summary>
 [Collection(TestEnvironmentFixture.DefaultCollection)]
 [TestCategory("AdoNet"), TestCategory("Streaming")]
-public class AdoNetQueueAdapterFactoryTests(TestEnvironmentFixture fixture) : IAsyncLifetime
+public abstract class AdoNetQueueAdapterFactoryTests(string invariant, TestEnvironmentFixture fixture) : IAsyncLifetime
 {
     private readonly TestEnvironmentFixture _fixture = fixture;
     private RelationalStorageForTesting _testing;
     private IRelationalStorage _storage;
 
     private const string TestDatabaseName = "OrleansStreamTest";
-    private const string AdoNetInvariantName = AdoNetInvariants.InvariantNameSqlServer;
 
     public async Task InitializeAsync()
     {
-        _testing = await RelationalStorageForTesting.SetupInstance(AdoNetInvariantName, TestDatabaseName);
+        _testing = await RelationalStorageForTesting.SetupInstance(invariant, TestDatabaseName);
 
         Skip.If(IsNullOrEmpty(_testing.CurrentConnectionString), $"Database '{TestDatabaseName}' not initialized");
 
@@ -44,7 +57,7 @@ public class AdoNetQueueAdapterFactoryTests(TestEnvironmentFixture fixture) : IA
         var name = "MyProviderName";
         var streamOptions = new AdoNetStreamOptions
         {
-            Invariant = AdoNetInvariantName,
+            Invariant = invariant,
             ConnectionString = _storage.ConnectionString
         };
         var clusterOptions = new ClusterOptions
@@ -80,7 +93,7 @@ public class AdoNetQueueAdapterFactoryTests(TestEnvironmentFixture fixture) : IA
         var name = "MyProviderName";
         var streamOptions = new AdoNetStreamOptions
         {
-            Invariant = AdoNetInvariantName,
+            Invariant = invariant,
             ConnectionString = _storage.ConnectionString
         };
         var clusterOptions = new ClusterOptions
@@ -115,7 +128,7 @@ public class AdoNetQueueAdapterFactoryTests(TestEnvironmentFixture fixture) : IA
         var name = "MyProviderName";
         var streamOptions = new AdoNetStreamOptions
         {
-            Invariant = AdoNetInvariantName,
+            Invariant = invariant,
             ConnectionString = _storage.ConnectionString
         };
         var clusterOptions = new ClusterOptions
@@ -148,7 +161,7 @@ public class AdoNetQueueAdapterFactoryTests(TestEnvironmentFixture fixture) : IA
         var name = "MyProviderName";
         var streamOptions = new AdoNetStreamOptions
         {
-            Invariant = AdoNetInvariantName,
+            Invariant = invariant,
             ConnectionString = _storage.ConnectionString
         };
         var clusterOptions = new ClusterOptions
