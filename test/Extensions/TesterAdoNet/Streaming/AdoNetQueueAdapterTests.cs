@@ -12,11 +12,25 @@ using RelationalOrleansQueries = Orleans.Streaming.AdoNet.Storage.RelationalOrle
 namespace Tester.AdoNet.Streaming;
 
 /// <summary>
+/// Tests for <see cref="AdoNetQueueAdapter"/> against SQL Server.
+/// </summary>
+public class SqlServerAdoNetQueueAdapterTests(TestEnvironmentFixture fixture) : AdoNetQueueAdapterTests(AdoNetInvariants.InvariantNameSqlServer, fixture)
+{
+}
+
+/// <summary>
+/// Tests for <see cref="AdoNetQueueAdapter"/> against MySQL.
+/// </summary>
+public class MySqlAdoNetQueueAdapterTests(TestEnvironmentFixture fixture) : AdoNetQueueAdapterTests(AdoNetInvariants.InvariantNameMySql, fixture)
+{
+}
+
+/// <summary>
 /// Tests for <see cref="AdoNetQueueAdapter"/>.
 /// </summary>
 [Collection(TestEnvironmentFixture.DefaultCollection)]
 [TestCategory("AdoNet"), TestCategory("Streaming")]
-public class AdoNetQueueAdapterTests(TestEnvironmentFixture fixture) : IAsyncLifetime
+public abstract class AdoNetQueueAdapterTests(string invariant, TestEnvironmentFixture fixture) : IAsyncLifetime
 {
     private readonly TestEnvironmentFixture _fixture = fixture;
     private RelationalStorageForTesting _testing;
@@ -24,16 +38,15 @@ public class AdoNetQueueAdapterTests(TestEnvironmentFixture fixture) : IAsyncLif
     private RelationalOrleansQueries _queries;
 
     private const string TestDatabaseName = "OrleansStreamTest";
-    private const string AdoNetInvariantName = AdoNetInvariants.InvariantNameSqlServer;
 
     public async Task InitializeAsync()
     {
-        _testing = await RelationalStorageForTesting.SetupInstance(AdoNetInvariantName, TestDatabaseName);
+        _testing = await RelationalStorageForTesting.SetupInstance(invariant, TestDatabaseName);
 
         Skip.If(IsNullOrEmpty(_testing.CurrentConnectionString), $"Database '{TestDatabaseName}' not initialized");
 
         _storage = _testing.Storage;
-        _queries = await RelationalOrleansQueries.CreateInstance(AdoNetInvariantName, _testing.CurrentConnectionString);
+        _queries = await RelationalOrleansQueries.CreateInstance(invariant, _testing.CurrentConnectionString);
     }
 
     /// <summary>
@@ -46,7 +59,7 @@ public class AdoNetQueueAdapterTests(TestEnvironmentFixture fixture) : IAsyncLif
         var name = "MyProviderId";
         var streamOptions = new AdoNetStreamOptions
         {
-            Invariant = AdoNetInvariantName,
+            Invariant = invariant,
             ConnectionString = _storage.ConnectionString
         };
         var clusterOptions = new ClusterOptions
@@ -86,7 +99,7 @@ public class AdoNetQueueAdapterTests(TestEnvironmentFixture fixture) : IAsyncLif
         var providerId = "MyProviderId";
         var streamOptions = new AdoNetStreamOptions
         {
-            Invariant = AdoNetInvariantName,
+            Invariant = invariant,
             ConnectionString = _storage.ConnectionString,
             ExpiryTimeout = TimeSpan.FromSeconds(100)
         };
@@ -101,7 +114,6 @@ public class AdoNetQueueAdapterTests(TestEnvironmentFixture fixture) : IAsyncLif
         var context = new Dictionary<string, object> { { "MyKey", "MyValue" } };
 
         // act - enqueue (via adapter) some messages
-        await _storage.ExecuteAsync("DELETE FROM [OrleansStreamMessage]");
         var beforeEnqueued = DateTime.UtcNow;
         await adapter.QueueMessageBatchAsync(streamId, new[] { new TestModel(1) }, null, context);
         await adapter.QueueMessageBatchAsync(streamId, new[] { new TestModel(2) }, null, context);
@@ -109,7 +121,7 @@ public class AdoNetQueueAdapterTests(TestEnvironmentFixture fixture) : IAsyncLif
         var afterEnqueued = DateTime.UtcNow;
 
         // assert - stored messages are as expected
-        var stored = (await _storage.ReadAsync<AdoNetStreamMessage>("SELECT * FROM [OrleansStreamMessage]")).ToList();
+        var stored = (await _storage.ReadAsync<AdoNetStreamMessage>("SELECT * FROM OrleansStreamMessage")).ToList();
         for (var i = 0; i < stored.Count; i++)
         {
             var item = stored[i];
@@ -152,7 +164,7 @@ public class AdoNetQueueAdapterTests(TestEnvironmentFixture fixture) : IAsyncLif
         var providerId = "MyProviderId";
         var streamOptions = new AdoNetStreamOptions
         {
-            Invariant = AdoNetInvariantName,
+            Invariant = invariant,
             ConnectionString = _storage.ConnectionString
         };
         var agentOptions = new StreamPullingAgentOptions();
@@ -167,7 +179,6 @@ public class AdoNetQueueAdapterTests(TestEnvironmentFixture fixture) : IAsyncLif
         var adapter = new AdoNetQueueAdapter(providerId, streamOptions, clusterOptions, cacheOptions, agentOptions, adoMapper, _queries, serializer, logger, _fixture.Services);
 
         // act - enqueue (via adapter) some messages
-        await _storage.ExecuteAsync("DELETE FROM [OrleansStreamMessage]");
         var beforeEnqueued = DateTime.UtcNow;
         await adapter.QueueMessageBatchAsync(streamId, new[] { new TestModel(1) }, null, new Dictionary<string, object> { { "MyKey", 1 } });
         await adapter.QueueMessageBatchAsync(streamId, new[] { new TestModel(2) }, null, new Dictionary<string, object> { { "MyKey", 2 } });
@@ -194,7 +205,7 @@ public class AdoNetQueueAdapterTests(TestEnvironmentFixture fixture) : IAsyncLif
         }
 
         // assert - stored messages are as expected
-        var stored = (await _storage.ReadAsync<AdoNetStreamMessage>("SELECT * FROM [OrleansStreamMessage]")).ToList();
+        var stored = (await _storage.ReadAsync<AdoNetStreamMessage>("SELECT * FROM OrleansStreamMessage")).ToList();
         for (var i = 0; i < stored.Count; i++)
         {
             var item = stored[i];
