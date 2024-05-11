@@ -12,26 +12,39 @@ using RelationalOrleansQueries = Orleans.Streaming.AdoNet.Storage.RelationalOrle
 namespace Tester.AdoNet.Streaming;
 
 /// <summary>
+/// Tests for <see cref="AdoNetStreamFailureHandler"/> against SQL Server.
+/// </summary>
+public class SqlServerAdoNetStreamFailureHandlerTests() : AdoNetStreamFailureHandlerTests(AdoNetInvariants.InvariantNameSqlServer)
+{
+}
+
+/// <summary>
+/// Tests for <see cref="AdoNetStreamFailureHandler"/> against MySQL.
+/// </summary>
+public class MySqlAdoNetStreamFailureHandlerTests() : AdoNetStreamFailureHandlerTests(AdoNetInvariants.InvariantNameMySql)
+{
+}
+
+/// <summary>
 /// Tests for <see cref="AdoNetStreamFailureHandler"/>.
 /// </summary>
 [TestCategory("AdoNet"), TestCategory("Streaming")]
-public class AdoNetStreamFailureHandlerTests() : IAsyncLifetime
+public abstract class AdoNetStreamFailureHandlerTests(string invariant) : IAsyncLifetime
 {
     private RelationalStorageForTesting _testing;
     private IRelationalStorage _storage;
     private RelationalOrleansQueries _queries;
 
     private const string TestDatabaseName = "OrleansStreamTest";
-    private const string AdoNetInvariantName = AdoNetInvariants.InvariantNameSqlServer;
 
     public async Task InitializeAsync()
     {
-        _testing = await RelationalStorageForTesting.SetupInstance(AdoNetInvariantName, TestDatabaseName);
+        _testing = await RelationalStorageForTesting.SetupInstance(invariant, TestDatabaseName);
 
         Skip.If(IsNullOrEmpty(_testing.CurrentConnectionString), $"Database '{TestDatabaseName}' not initialized");
 
         _storage = _testing.Storage;
-        _queries = await RelationalOrleansQueries.CreateInstance(AdoNetInvariantName, _testing.CurrentConnectionString);
+        _queries = await RelationalOrleansQueries.CreateInstance(invariant, _testing.CurrentConnectionString);
     }
 
     /// <summary>
@@ -44,7 +57,7 @@ public class AdoNetStreamFailureHandlerTests() : IAsyncLifetime
         var faultOnFailure = false;
         var streamOptions = new AdoNetStreamOptions
         {
-            Invariant = AdoNetInvariantName,
+            Invariant = invariant,
             ConnectionString = _storage.ConnectionString
         };
         var clusterOptions = new ClusterOptions
@@ -72,7 +85,7 @@ public class AdoNetStreamFailureHandlerTests() : IAsyncLifetime
         var faultOnFailure = false;
         var streamOptions = new AdoNetStreamOptions
         {
-            Invariant = AdoNetInvariantName,
+            Invariant = invariant,
             ConnectionString = _storage.ConnectionString
         };
         var clusterOptions = new ClusterOptions
@@ -84,8 +97,6 @@ public class AdoNetStreamFailureHandlerTests() : IAsyncLifetime
         var handler = new AdoNetStreamFailureHandler(faultOnFailure, streamOptions, clusterOptions, mapper, _queries, logger);
 
         // arrange - queue an expired message
-        await _storage.ExecuteAsync("DELETE FROM [OrleansStreamMessage]");
-        await _storage.ExecuteAsync("DELETE FROM [OrleansStreamDeadLetter]");
         var streamId = StreamId.Create("MyNamespace", "MyKey");
         var queueId = mapper.GetAdoNetQueueId(streamId);
         var payload = new byte[] { 0xFF };
@@ -100,7 +111,7 @@ public class AdoNetStreamFailureHandlerTests() : IAsyncLifetime
         var afterFailure = DateTime.UtcNow;
 
         // assert
-        var dead = Assert.Single(await _storage.ReadAsync<AdoNetStreamDeadLetter>("SELECT * FROM [OrleansStreamDeadLetter]"));
+        var dead = Assert.Single(await _storage.ReadAsync<AdoNetStreamDeadLetter>("SELECT * FROM OrleansStreamDeadLetter"));
         Assert.Equal(clusterOptions.ServiceId, dead.ServiceId);
         Assert.Equal(providerId, dead.ProviderId);
         Assert.Equal(queueId, dead.QueueId);
@@ -130,7 +141,7 @@ public class AdoNetStreamFailureHandlerTests() : IAsyncLifetime
         var faultOnFailure = false;
         var streamOptions = new AdoNetStreamOptions
         {
-            Invariant = AdoNetInvariantName,
+            Invariant = invariant,
             ConnectionString = _storage.ConnectionString,
             MaxAttempts = 1
         };
@@ -148,8 +159,6 @@ public class AdoNetStreamFailureHandlerTests() : IAsyncLifetime
         var handler = new AdoNetStreamFailureHandler(faultOnFailure, streamOptions, clusterOptions, mapper, _queries, logger);
 
         // arrange - queue an expired message
-        await _storage.ExecuteAsync("DELETE FROM [OrleansStreamMessage]");
-        await _storage.ExecuteAsync("DELETE FROM [OrleansStreamDeadLetter]");
         var streamId = StreamId.Create("MyNamespace", "MyKey");
         var queueId = mapper.GetAdoNetQueueId(streamId);
         var payload = new byte[] { 0xFF };
@@ -178,7 +187,7 @@ public class AdoNetStreamFailureHandlerTests() : IAsyncLifetime
         var afterFailure = DateTime.UtcNow;
 
         // assert
-        var dead = Assert.Single(await _storage.ReadAsync<AdoNetStreamDeadLetter>("SELECT * FROM [OrleansStreamDeadLetter]"));
+        var dead = Assert.Single(await _storage.ReadAsync<AdoNetStreamDeadLetter>("SELECT * FROM OrleansStreamDeadLetter"));
         Assert.Equal(clusterOptions.ServiceId, dead.ServiceId);
         Assert.Equal(providerId, dead.ProviderId);
         Assert.Equal(queueId, dead.QueueId);
@@ -208,7 +217,7 @@ public class AdoNetStreamFailureHandlerTests() : IAsyncLifetime
         var faultOnFailure = false;
         var streamOptions = new AdoNetStreamOptions
         {
-            Invariant = AdoNetInvariantName,
+            Invariant = invariant,
             ConnectionString = _storage.ConnectionString
         };
         var cacheOptions = new SimpleQueueCacheOptions();
@@ -222,8 +231,6 @@ public class AdoNetStreamFailureHandlerTests() : IAsyncLifetime
         var handler = new AdoNetStreamFailureHandler(faultOnFailure, streamOptions, clusterOptions, mapper, _queries, logger);
 
         // arrange - queue an expired message
-        await _storage.ExecuteAsync("DELETE FROM [OrleansStreamMessage]");
-        await _storage.ExecuteAsync("DELETE FROM [OrleansStreamDeadLetter]");
         var streamId = StreamId.Create("MyNamespace", "MyKey");
         var queueId = mapper.GetAdoNetQueueId(streamId);
         var payload = new byte[] { 0xFF };
@@ -245,7 +252,7 @@ public class AdoNetStreamFailureHandlerTests() : IAsyncLifetime
         await handler.OnDeliveryFailure(GuidId.GetNewGuidId(), providerId, streamId, new EventSequenceTokenV2(ack.MessageId));
 
         // assert
-        Assert.Empty(await _storage.ReadAsync<AdoNetStreamDeadLetter>("SELECT * FROM [OrleansStreamDeadLetter]"));
+        Assert.Empty(await _storage.ReadAsync<AdoNetStreamDeadLetter>("SELECT * FROM OrleansStreamDeadLetter"));
     }
 
     public Task DisposeAsync() => Task.CompletedTask;
