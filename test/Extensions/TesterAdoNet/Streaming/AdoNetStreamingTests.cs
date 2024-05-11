@@ -1,6 +1,6 @@
 using Microsoft.Extensions.Configuration;
+using Orleans.Streaming.AdoNet.Storage;
 using Orleans.TestingHost;
-using Orleans.Tests.SqlUtils;
 using TestExtensions;
 using UnitTests.General;
 using UnitTests.Streaming;
@@ -10,14 +10,34 @@ using static System.String;
 namespace Tester.AdoNet.Streaming;
 
 /// <summary>
+/// Cluster streaming tests for ADO.NET Streaming against SQL Server.
+/// </summary>
+public class SqlServerAdoNetStreamingTests() : AdoNetStreamingTests(AdoNetInvariants.InvariantNameSqlServer)
+{
+}
+
+/// <summary>
+/// Cluster streaming tests for ADO.NET Streaming against MySQL.
+/// </summary>
+public class MySqlAdoNetStreamingTests() : AdoNetStreamingTests(AdoNetInvariants.InvariantNameMySql)
+{
+}
+
+/// <summary>
 /// Cluster streaming tests for ADO.NET Streaming.
 /// </summary>
 [TestCategory("AdoNet"), TestCategory("Streaming")]
-public class AdoNetStreamingTests : TestClusterPerTest
+public abstract class AdoNetStreamingTests : TestClusterPerTest
 {
     private const string TestDatabaseName = "OrleansStreamTest";
-    private const string AdoNetInvariantName = AdoNetInvariants.InvariantNameSqlServer;
     private const string AdoNetStreamProviderName = "AdoNet";
+
+    private static string _invariant;
+
+    protected AdoNetStreamingTests(string invariant)
+    {
+        _invariant = invariant;
+    }
 
     private static RelationalStorageForTesting _testing;
     private SingleStreamTestRunner _runner;
@@ -25,7 +45,7 @@ public class AdoNetStreamingTests : TestClusterPerTest
     public override async Task InitializeAsync()
     {
         // set up the adonet environment before the base initializes
-        _testing = await RelationalStorageForTesting.SetupInstance(AdoNetInvariantName, TestDatabaseName);
+        _testing = await RelationalStorageForTesting.SetupInstance(_invariant, TestDatabaseName);
 
         Skip.If(IsNullOrEmpty(_testing.CurrentConnectionString), $"Database '{TestDatabaseName}' not initialized");
 
@@ -49,7 +69,7 @@ public class AdoNetStreamingTests : TestClusterPerTest
             siloBuilder
                 .AddAdoNetStreams(AdoNetStreamProviderName, options =>
                 {
-                    options.Invariant = AdoNetInvariantName;
+                    options.Invariant = _invariant;
                     options.ConnectionString = _testing.CurrentConnectionString;
                 })
                 .AddMemoryGrainStorage("MemoryStore")
@@ -63,7 +83,7 @@ public class AdoNetStreamingTests : TestClusterPerTest
         {
             clientBuilder.AddAdoNetStreams(AdoNetStreamProviderName, options =>
             {
-                options.Invariant = AdoNetInvariantName;
+                options.Invariant = _invariant;
                 options.ConnectionString = _testing.CurrentConnectionString;
             });
         }
