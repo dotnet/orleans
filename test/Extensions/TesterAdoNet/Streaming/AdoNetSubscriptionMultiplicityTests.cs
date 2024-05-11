@@ -8,21 +8,35 @@ using static System.String;
 
 namespace Tester.AdoNet.Streaming;
 
+public class SqlServerAdoNetSubscriptionMultiplicityTests() : AdoNetSubscriptionMultiplicityTests(AdoNetInvariants.InvariantNameSqlServer)
+{
+}
+
+public class MySqlAdoNetSubscriptionMultiplicityTests() : AdoNetSubscriptionMultiplicityTests(AdoNetInvariants.InvariantNameMySql)
+{
+}
+
 [TestCategory("AdoNet"), TestCategory("Streaming")]
-public class AdoNetSubscriptionMultiplicityTests : TestClusterPerTest
+public abstract class AdoNetSubscriptionMultiplicityTests : TestClusterPerTest
 {
     private const string TestDatabaseName = "OrleansStreamTest";
-    private const string AdoNetInvariantName = AdoNetInvariants.InvariantNameSqlServer;
     private const string AdoNetStreamProviderName = "AdoNet";
     private const string StreamNamespace = "AdoNetSubscriptionMultiplicityTestsNamespace";
+
+    private static string _invariant;
 
     private static RelationalStorageForTesting _testing;
     private SubscriptionMultiplicityTestRunner _runner;
 
+    protected AdoNetSubscriptionMultiplicityTests(string invariant)
+    {
+        _invariant = invariant;
+    }
+
     public override async Task InitializeAsync()
     {
         // set up the adonet environment before the base initializes
-        _testing = await RelationalStorageForTesting.SetupInstance(AdoNetInvariantName, TestDatabaseName);
+        _testing = await RelationalStorageForTesting.SetupInstance(_invariant, TestDatabaseName);
 
         Skip.If(IsNullOrEmpty(_testing.CurrentConnectionString), $"Database '{TestDatabaseName}' not initialized");
 
@@ -46,7 +60,7 @@ public class AdoNetSubscriptionMultiplicityTests : TestClusterPerTest
             clientBuilder
                 .AddAdoNetStreams(AdoNetStreamProviderName, options =>
                 {
-                    options.Invariant = AdoNetInvariantName;
+                    options.Invariant = _invariant;
                     options.ConnectionString = _testing.CurrentConnectionString;
                 });
         }
@@ -59,7 +73,7 @@ public class AdoNetSubscriptionMultiplicityTests : TestClusterPerTest
             siloBuilder
                 .AddAdoNetStreams(AdoNetStreamProviderName, options =>
                 {
-                    options.Invariant = AdoNetInvariantName;
+                    options.Invariant = _invariant;
                     options.ConnectionString = _testing.CurrentConnectionString;
                 })
                 .AddMemoryGrainStorage("PubSubStore");
