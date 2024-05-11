@@ -51,7 +51,7 @@ internal class AdoNetQueueAdapterFactory : IQueueAdapterFactory
         // slow path
         async Task<RelationalOrleansQueries> CoreAsync()
         {
-            await _semaphore.WaitAsync(_lifetime.ApplicationStopping);
+            await _semaphore.WaitAsync(_streamOptions.InitializationTimeout, _lifetime.ApplicationStopping);
             try
             {
                 // attempt fast path again
@@ -61,7 +61,9 @@ internal class AdoNetQueueAdapterFactory : IQueueAdapterFactory
                 }
 
                 // slow path - the member variable will only be set if the call succeeds
-                return _queries = await RelationalOrleansQueries.CreateInstance(_streamOptions.Invariant, _streamOptions.ConnectionString);
+                return _queries = await RelationalOrleansQueries
+                    .CreateInstance(_streamOptions.Invariant, _streamOptions.ConnectionString)
+                    .WaitAsync(_streamOptions.InitializationTimeout);
             }
             finally
             {

@@ -44,4 +44,9 @@ public class AdoNetStreamOptions
     /// The maximum number of messages affected by an eviction batch.
     /// </summary>
     public int EvictionBatchSize { get; set; } = 1000;
+
+    /// <summary>
+    /// A safety timeout for underlying database initialization.
+    /// </summary>
+    public TimeSpan InitializationTimeout { get; set; } = TimeSpan.FromSeconds(30);
 }
