@@ -23,6 +23,11 @@ public class AdoNetStreamOptions
     public int MaxAttempts { get; set; } = 5;
 
     /// <summary>
+    /// The timeout until a message is allowed to be dequeued again if not yet confirmed.
+    /// </summary>
+    public TimeSpan VisibilityTimeout { get; set; } = TimeSpan.FromMinutes(1);
+
+    /// <summary>
     /// The expiry timeout until a message is considered expired and moved to dead letters regardless of attempts.
     /// The message is only moved if the current attempt is also past its visibility timeout.
     /// </summary>

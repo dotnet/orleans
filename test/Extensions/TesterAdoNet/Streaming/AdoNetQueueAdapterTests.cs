@@ -74,14 +74,13 @@ public abstract class AdoNetQueueAdapterTests(string invariant, TestEnvironmentF
             ServiceId = "MyServiceId"
         };
         var cacheOptions = new SimpleQueueCacheOptions();
-        var agentOptions = new StreamPullingAgentOptions();
         var mapper = new AdoNetStreamQueueMapper(new HashRingBasedStreamQueueMapper(new HashRingStreamQueueMapperOptions { TotalQueueCount = 8 }, "MyQueue"));
         var serializer = _fixture.Serializer.GetSerializer<AdoNetBatchContainer>();
         var logger = NullLogger<AdoNetQueueAdapter>.Instance;
         var serviceProvider = _fixture.Services;
 
         // act
-        var adapter = new AdoNetQueueAdapter(name, streamOptions, clusterOptions, cacheOptions, agentOptions, mapper, _queries, serializer, logger, serviceProvider);
+        var adapter = new AdoNetQueueAdapter(name, streamOptions, clusterOptions, cacheOptions, mapper, _queries, serializer, logger, serviceProvider);
 
         // assert
         Assert.Equal(name, adapter.Name);
@@ -102,7 +101,6 @@ public abstract class AdoNetQueueAdapterTests(string invariant, TestEnvironmentF
             ServiceId = serviceId
         };
         var cacheOptions = new SimpleQueueCacheOptions();
-        var agentOptions = new StreamPullingAgentOptions();
         var providerId = "MyProviderId";
         var streamOptions = new AdoNetStreamOptions
         {
@@ -117,7 +115,7 @@ public abstract class AdoNetQueueAdapterTests(string invariant, TestEnvironmentF
         var hashMapper = new HashRingBasedStreamQueueMapper(hashOptions, "MyQueue");
         var adoNetMapper = new AdoNetStreamQueueMapper(hashMapper);
         var adoNetQueueId = adoNetMapper.GetAdoNetQueueId(streamId);
-        var adapter = new AdoNetQueueAdapter(providerId, streamOptions, clusterOptions, cacheOptions, agentOptions, adoNetMapper, _queries, serializer, logger, _fixture.Services);
+        var adapter = new AdoNetQueueAdapter(providerId, streamOptions, clusterOptions, cacheOptions, adoNetMapper, _queries, serializer, logger, _fixture.Services);
         var context = new Dictionary<string, object> { { "MyKey", "MyValue" } };
 
         // act - enqueue (via adapter) some messages
@@ -174,7 +172,6 @@ public abstract class AdoNetQueueAdapterTests(string invariant, TestEnvironmentF
             Invariant = invariant,
             ConnectionString = _storage.ConnectionString
         };
-        var agentOptions = new StreamPullingAgentOptions();
         var serializer = _fixture.Serializer.GetSerializer<AdoNetBatchContainer>();
         var logger = NullLogger<AdoNetQueueAdapter>.Instance;
         var streamId = StreamId.Create("MyNamespace", "MyKey");
@@ -183,7 +180,7 @@ public abstract class AdoNetQueueAdapterTests(string invariant, TestEnvironmentF
         var queueId = hashMapper.GetQueueForStream(streamId);
         var adoMapper = new AdoNetStreamQueueMapper(hashMapper);
         var adoNetQueueId = adoMapper.GetAdoNetQueueId(streamId);
-        var adapter = new AdoNetQueueAdapter(providerId, streamOptions, clusterOptions, cacheOptions, agentOptions, adoMapper, _queries, serializer, logger, _fixture.Services);
+        var adapter = new AdoNetQueueAdapter(providerId, streamOptions, clusterOptions, cacheOptions, adoMapper, _queries, serializer, logger, _fixture.Services);
 
         // act - enqueue (via adapter) some messages
         var beforeEnqueued = DateTime.UtcNow;
@@ -222,8 +219,8 @@ public abstract class AdoNetQueueAdapterTests(string invariant, TestEnvironmentF
             Assert.Equal(adoNetQueueId, item.QueueId);
             Assert.NotEqual(0, item.MessageId);
             Assert.Equal(1, item.Dequeued);
-            Assert.True(item.VisibleOn >= beforeDequeued.Add(agentOptions.MaxEventDeliveryTime));
-            Assert.True(item.VisibleOn <= afterDequeued.Add(agentOptions.MaxEventDeliveryTime));
+            Assert.True(item.VisibleOn >= beforeDequeued.Add(streamOptions.VisibilityTimeout));
+            Assert.True(item.VisibleOn <= afterDequeued.Add(streamOptions.VisibilityTimeout));
             Assert.True(item.ExpiresOn >= beforeEnqueued.Add(streamOptions.ExpiryTimeout));
             Assert.True(item.ExpiresOn <= afterEnqueued.Add(streamOptions.ExpiryTimeout));
             Assert.True(item.CreatedOn >= beforeEnqueued);

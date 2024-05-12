@@ -3,7 +3,7 @@ namespace Orleans.Streaming.AdoNet;
 /// <summary>
 /// Receives message batches from an individual queue of an ADO.NET provider.
 /// </summary>
-internal partial class AdoNetQueueAdapterReceiver(string providerId, string queueId, AdoNetStreamOptions streamOptions, ClusterOptions clusterOptions, SimpleQueueCacheOptions cacheOptions, StreamPullingAgentOptions agentOptions, RelationalOrleansQueries queries, Serializer<AdoNetBatchContainer> serializer, ILogger<AdoNetQueueAdapterReceiver> logger) : IQueueAdapterReceiver
+internal partial class AdoNetQueueAdapterReceiver(string providerId, string queueId, AdoNetStreamOptions streamOptions, ClusterOptions clusterOptions, SimpleQueueCacheOptions cacheOptions, RelationalOrleansQueries queries, Serializer<AdoNetBatchContainer> serializer, ILogger<AdoNetQueueAdapterReceiver> logger) : IQueueAdapterReceiver
 {
     private readonly ILogger<AdoNetQueueAdapterReceiver> _logger = logger;
 
@@ -66,7 +66,7 @@ internal partial class AdoNetQueueAdapterReceiver(string providerId, string queu
                 queueId,
                 maxCount,
                 streamOptions.MaxAttempts,
-                agentOptions.MaxEventDeliveryTime.TotalSecondsCeiling(),
+                streamOptions.VisibilityTimeout.TotalSecondsCeiling(),
                 streamOptions.DeadLetterEvictionTimeout.TotalSecondsCeiling(),
                 streamOptions.EvictionInterval.TotalSecondsCeiling(),
                 streamOptions.EvictionBatchSize);

@@ -78,10 +78,9 @@ public abstract class AdoNetQueueAdapterReceiverTests(string invariant, TestEnvi
             EvictionBatchSize = 0
         };
         var cacheOptions = new SimpleQueueCacheOptions();
-        var agentOptions = new StreamPullingAgentOptions();
         var serializer = _fixture.Serializer.GetSerializer<AdoNetBatchContainer>();
         var logger = NullLogger<AdoNetQueueAdapterReceiver>.Instance;
-        var receiver = new AdoNetQueueAdapterReceiver(providerId, queueId, streamOptions, clusterOptions, cacheOptions, agentOptions, _queries, serializer, logger);
+        var receiver = new AdoNetQueueAdapterReceiver(providerId, queueId, streamOptions, clusterOptions, cacheOptions, _queries, serializer, logger);
         await receiver.Initialize(TimeSpan.FromSeconds(10));
 
         // arrange - data
@@ -153,10 +152,9 @@ public abstract class AdoNetQueueAdapterReceiverTests(string invariant, TestEnvi
             ConnectionString = _storage.ConnectionString
         };
         var cacheOptions = new SimpleQueueCacheOptions();
-        var agentOptions = new StreamPullingAgentOptions();
         var serializer = _fixture.Serializer.GetSerializer<AdoNetBatchContainer>();
         var logger = NullLogger<AdoNetQueueAdapterReceiver>.Instance;
-        var receiver = new AdoNetQueueAdapterReceiver(providerId, queueId, streamOptions, clusterOptions, cacheOptions, agentOptions, _queries, serializer, logger);
+        var receiver = new AdoNetQueueAdapterReceiver(providerId, queueId, streamOptions, clusterOptions, cacheOptions, _queries, serializer, logger);
         await receiver.Initialize(TimeSpan.FromSeconds(10));
 
         // arrange - enqueue a message

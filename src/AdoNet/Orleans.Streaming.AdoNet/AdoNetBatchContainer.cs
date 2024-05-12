@@ -93,7 +93,7 @@ internal class AdoNetBatchContainer : IBatchContainer
         ArgumentNullException.ThrowIfNull(serializer);
         ArgumentNullException.ThrowIfNull(events);
 
-        var container = new AdoNetBatchContainer(streamId, events.Cast<object>().ToList(), requestContext);
+        var container = new AdoNetBatchContainer(streamId, events, requestContext);
         var payload = serializer.SerializeToArray(container);
 
         return payload;
