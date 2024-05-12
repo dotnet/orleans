@@ -26,6 +26,13 @@ public class MySqlAdoNetQueueAdapterTests(TestEnvironmentFixture fixture) : AdoN
 }
 
 /// <summary>
+/// Tests for <see cref="AdoNetQueueAdapter"/> against PostgreSQL.
+/// </summary>
+public class PostgreSqlAdoNetQueueAdapterTests(TestEnvironmentFixture fixture) : AdoNetQueueAdapterTests(AdoNetInvariants.InvariantNamePostgreSql, fixture)
+{
+}
+
+/// <summary>
 /// Tests for <see cref="AdoNetQueueAdapter"/>.
 /// </summary>
 [Collection(TestEnvironmentFixture.DefaultCollection)]

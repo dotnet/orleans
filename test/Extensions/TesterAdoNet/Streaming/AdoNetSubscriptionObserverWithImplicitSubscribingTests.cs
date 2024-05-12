@@ -19,6 +19,10 @@ public class MySqlAdoNetSubscriptionObserverWithImplicitSubscribingTests() : Ado
 {
 }
 
+public class PostgreSqlAdoNetSubscriptionObserverWithImplicitSubscribingTests() : AdoNetSubscriptionObserverWithImplicitSubscribingTests(new Fixture(AdoNetInvariants.InvariantNamePostgreSql))
+{
+}
+
 [TestCategory("AdoNet"), TestCategory("Streaming"), TestCategory("Functional")]
 public abstract class AdoNetSubscriptionObserverWithImplicitSubscribingTests(AdoNetSubscriptionObserverWithImplicitSubscribingTests.Fixture fixture) : SubscriptionObserverWithImplicitSubscribingTestRunner(fixture), IAsyncLifetime
 {

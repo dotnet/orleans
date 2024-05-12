@@ -21,6 +21,10 @@ public class MySqlAdoNetStreamsBatchingTests(ITestOutputHelper output) : AdoNetS
 {
 }
 
+public class PostgreSqlAdoNetStreamsBatchingTests(ITestOutputHelper output) : AdoNetStreamsBatchingTests(new Fixture(AdoNetInvariants.InvariantNamePostgreSql), output)
+{
+}
+
 [TestCategory("AdoNet"), TestCategory("Streaming")]
 public abstract class AdoNetStreamsBatchingTests : StreamBatchingTestRunner, IAsyncLifetime
 {

@@ -16,6 +16,10 @@ public class MySqlAdoNetSubscriptionMultiplicityTests() : AdoNetSubscriptionMult
 {
 }
 
+public class PostgreSqlAdoNetSubscriptionMultiplicityTests() : AdoNetSubscriptionMultiplicityTests(AdoNetInvariants.InvariantNamePostgreSql)
+{
+}
+
 [TestCategory("AdoNet"), TestCategory("Streaming")]
 public abstract class AdoNetSubscriptionMultiplicityTests : TestClusterPerTest
 {

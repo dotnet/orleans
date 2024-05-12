@@ -16,6 +16,10 @@ public class MySqlAdoNetStreamFilteringTests() : AdoNetStreamFilteringTests(new 
 {
 }
 
+public class PostgreSqlAdoNetStreamFilteringTests() : AdoNetStreamFilteringTests(new Fixture(AdoNetInvariants.InvariantNamePostgreSql))
+{
+}
+
 [TestCategory("AdoNet"), TestCategory("Streaming")]
 public abstract class AdoNetStreamFilteringTests : StreamFilteringTestsBase, IAsyncLifetime
 {

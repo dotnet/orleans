@@ -24,6 +24,13 @@ public class MySqlAdoNetStreamingTests() : AdoNetStreamingTests(AdoNetInvariants
 }
 
 /// <summary>
+/// Cluster streaming tests for ADO.NET Streaming against PostgreSQL.
+/// </summary>
+public class PostgreSqlAdoNetStreamingTests() : AdoNetStreamingTests(AdoNetInvariants.InvariantNamePostgreSql)
+{
+}
+
+/// <summary>
 /// Cluster streaming tests for ADO.NET Streaming.
 /// </summary>
 [TestCategory("AdoNet"), TestCategory("Streaming")]

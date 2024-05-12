@@ -18,6 +18,10 @@ public class MySqlAdoNetClientStreamTests(ITestOutputHelper output) : AdoNetClie
 {
 }
 
+public class PostgreSqlAdoNetClientStreamTests(ITestOutputHelper output) : AdoNetClientStreamTests(AdoNetInvariants.InvariantNamePostgreSql, output)
+{
+}
+
 [TestCategory("AdoNet"), TestCategory("Streaming")]
 public abstract class AdoNetClientStreamTests : TestClusterPerTest
 {
@@ -65,7 +69,10 @@ public abstract class AdoNetClientStreamTests : TestClusterPerTest
                     options.Invariant = _invariant;
                     options.ConnectionString = _testing.CurrentConnectionString;
                 })
-                .Configure<SiloMessagingOptions>(options => options.ClientDropTimeout = TimeSpan.FromSeconds(5));
+                .Configure<ClientMessagingOptions>(options =>
+                {
+                    options.ResponseTimeout = TimeSpan.FromSeconds(5);
+                });
         }
     }
 
@@ -78,6 +85,11 @@ public abstract class AdoNetClientStreamTests : TestClusterPerTest
                 {
                     options.Invariant = _invariant;
                     options.ConnectionString = _testing.CurrentConnectionString;
+                })
+                .Configure<SiloMessagingOptions>(options =>
+                {
+                    options.ClientDropTimeout = TimeSpan.FromSeconds(5);
+                    options.ResponseTimeout = TimeSpan.FromSeconds(5);
                 })
                 .AddMemoryGrainStorage("PubSubStore");
         }

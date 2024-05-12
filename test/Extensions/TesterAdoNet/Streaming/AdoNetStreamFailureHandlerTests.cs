@@ -26,6 +26,13 @@ public class MySqlAdoNetStreamFailureHandlerTests() : AdoNetStreamFailureHandler
 }
 
 /// <summary>
+/// Tests for <see cref="AdoNetStreamFailureHandler"/> against PostgreSQL.
+/// </summary>
+public class PostgreSqlAdoNetStreamFailureHandlerTests() : AdoNetStreamFailureHandlerTests(AdoNetInvariants.InvariantNamePostgreSql)
+{
+}
+
+/// <summary>
 /// Tests for <see cref="AdoNetStreamFailureHandler"/>.
 /// </summary>
 [TestCategory("AdoNet"), TestCategory("Streaming")]
