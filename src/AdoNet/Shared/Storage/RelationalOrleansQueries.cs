@@ -502,20 +502,20 @@ namespace Orleans.Tests.SqlUtils
         }
 
         /// <summary>
-        /// Evicts a single message from the stream message table to the dead letters table if the expiration policy applies.
+        /// Applies delivery failure logic to a stream message, such as making the message visible again or moving it to dead letters.
         /// </summary>
         /// <param name="serviceId">The service identifier.</param>
         /// <param name="providerId">The provider identifier.</param>
         /// <param name="queueId">The queue identifier.</param>
         /// <param name="messageId">The message identifier.</param>
-        internal Task EvictStreamMessageAsync(string serviceId, string providerId, string queueId, long messageId, int maxAttempts, int removalTimeout)
+        internal Task FailStreamMessageAsync(string serviceId, string providerId, string queueId, long messageId, int maxAttempts, int removalTimeout)
         {
             ArgumentNullException.ThrowIfNull(serviceId);
             ArgumentNullException.ThrowIfNull(providerId);
             ArgumentNullException.ThrowIfNull(queueId);
 
             return ExecuteAsync(
-                dbStoredQueries.EvictStreamMessageKey,
+                dbStoredQueries.FailStreamMessageKey,
                 command => new DbStoredQueries.Columns(command)
                 {
                     ServiceId = serviceId,

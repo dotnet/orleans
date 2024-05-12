@@ -879,50 +879,6 @@ public abstract class RelationalOrleansQueriesTests(string invariant) : IAsyncLi
     }
 
     /// <summary>
-    /// Tests that an expired message can be moved to dead letters.
-    /// </summary>
-    [SkippableFact]
-    public async Task RelationalOrleansQueries_MovesExpiredMessageToDeadLetters()
-    {
-        // arrange
-        var serviceId = "ServiceId";
-        var providerId = "ProviderId";
-        var streamOptions = new AdoNetStreamOptions();
-
-        // arrange - queue an expired message
-        var queueId = "QueueId";
-        var payload = new byte[] { 0xFF };
-
-        var beforeQueued = DateTime.UtcNow;
-        var ack = await _queries.QueueStreamMessageAsync(serviceId, providerId, queueId, payload, 0);
-        var afterQueued = DateTime.UtcNow;
-
-        // act
-        var beforeFailure = DateTime.UtcNow;
-        await _queries.EvictStreamMessageAsync(ack.ServiceId, ack.ProviderId, ack.QueueId, ack.MessageId, streamOptions.MaxAttempts, streamOptions.DeadLetterEvictionTimeout.TotalSecondsCeiling());
-        var afterFailure = DateTime.UtcNow;
-
-        // assert
-        var dead = Assert.Single(await _storage.ReadAsync<AdoNetStreamDeadLetter>("SELECT * FROM OrleansStreamDeadLetter"));
-        Assert.Equal(serviceId, dead.ServiceId);
-        Assert.Equal(providerId, dead.ProviderId);
-        Assert.Equal(queueId, dead.QueueId);
-        Assert.Equal(ack.MessageId, dead.MessageId);
-        Assert.Equal(0, dead.Dequeued);
-        Assert.True(dead.ExpiresOn >= beforeQueued);
-        Assert.True(dead.ExpiresOn <= afterQueued);
-        Assert.True(dead.CreatedOn >= beforeQueued);
-        Assert.True(dead.CreatedOn <= afterQueued);
-        Assert.True(dead.ModifiedOn >= beforeQueued);
-        Assert.True(dead.ModifiedOn <= afterQueued);
-        Assert.True(dead.DeadOn >= beforeFailure);
-        Assert.True(dead.DeadOn <= afterFailure);
-        Assert.True(dead.RemoveOn >= beforeFailure.Add(streamOptions.DeadLetterEvictionTimeout));
-        Assert.True(dead.RemoveOn <= afterFailure.Add(streamOptions.DeadLetterEvictionTimeout));
-        Assert.Equal(payload, dead.Payload);
-    }
-
-    /// <summary>
     /// Tests that a poisoned message can be moved to dead letters.
     /// </summary>
     [SkippableFact]
@@ -949,10 +905,13 @@ public abstract class RelationalOrleansQueriesTests(string invariant) : IAsyncLi
 
         // act - clean up with max attempts of one so the message above is flagged
         var beforeFailure = DateTime.UtcNow;
-        await _queries.EvictStreamMessageAsync(ack.ServiceId, ack.ProviderId, ack.QueueId, ack.MessageId, 1, streamOptions.DeadLetterEvictionTimeout.TotalSecondsCeiling());
+        await _queries.FailStreamMessageAsync(ack.ServiceId, ack.ProviderId, ack.QueueId, ack.MessageId, 1, streamOptions.DeadLetterEvictionTimeout.TotalSecondsCeiling());
         var afterFailure = DateTime.UtcNow;
 
-        // assert
+        // assert - message no longer in the message table
+        Assert.Empty(await _storage.ReadAsync<AdoNetStreamMessage>("SELECT * FROM OrleansStreamMessage"));
+
+        // assert - message was moved
         var dead = Assert.Single(await _storage.ReadAsync<AdoNetStreamDeadLetter>("SELECT * FROM OrleansStreamDeadLetter"));
         Assert.Equal(serviceId, dead.ServiceId);
         Assert.Equal(providerId, dead.ProviderId);
@@ -981,22 +940,33 @@ public abstract class RelationalOrleansQueriesTests(string invariant) : IAsyncLi
         // arrange
         var serviceId = "ServiceId";
         var providerId = "ProviderId";
+        var queueId = "QueueId";
         var streamOptions = new AdoNetStreamOptions();
         var cacheOptions = new SimpleQueueCacheOptions();
-        var agentOptions = new StreamPullingAgentOptions();
 
-        // arrange - queue an expired message
-        var queueId = "QueueId";
+        // arrange - queue a normal message
         var payload = new byte[] { 0xFF };
         var ack = await _queries.QueueStreamMessageAsync(serviceId, providerId, queueId, payload, streamOptions.ExpiryTimeout.TotalSecondsCeiling());
 
         // arrange - dequeue the message
-        await _queries.GetStreamMessagesAsync(ack.ServiceId, ack.ProviderId, ack.QueueId, cacheOptions.CacheSize, streamOptions.MaxAttempts, agentOptions.MaxEventDeliveryTime.TotalSecondsCeiling(), streamOptions.DeadLetterEvictionTimeout.TotalSecondsCeiling(), streamOptions.EvictionInterval.TotalSecondsCeiling(), streamOptions.EvictionBatchSize);
+        await _queries.GetStreamMessagesAsync(ack.ServiceId, ack.ProviderId, ack.QueueId, cacheOptions.CacheSize, streamOptions.MaxAttempts, streamOptions.VisibilityTimeout.TotalSecondsCeiling(), streamOptions.DeadLetterEvictionTimeout.TotalSecondsCeiling(), streamOptions.EvictionInterval.TotalSecondsCeiling(), streamOptions.EvictionBatchSize);
 
-        // act - clean up with max attempts of one so the message above is flagged
-        await _queries.EvictStreamMessageAsync(ack.ServiceId, ack.ProviderId, ack.QueueId, ack.MessageId, streamOptions.MaxAttempts, streamOptions.DeadLetterEvictionTimeout.TotalSecondsCeiling());
+        // act - fail the message
+        var beforeFailed = DateTime.UtcNow;
+        await _queries.FailStreamMessageAsync(ack.ServiceId, ack.ProviderId, ack.QueueId, ack.MessageId, streamOptions.MaxAttempts, streamOptions.DeadLetterEvictionTimeout.TotalSecondsCeiling());
+        var afterFailed = DateTime.UtcNow;
 
-        // assert
+        // assert - the message is still in the table and was made visible again
+        var saved = Assert.Single(await _storage.ReadAsync<AdoNetStreamMessage>("SELECT * FROM OrleansStreamMessage"));
+        Assert.Equal(ack.ServiceId, saved.ServiceId);
+        Assert.Equal(ack.ProviderId, saved.ProviderId);
+        Assert.Equal(ack.QueueId, saved.QueueId);
+        Assert.Equal(ack.MessageId, saved.MessageId);
+        Assert.Equal(1, saved.Dequeued);
+        Assert.True(saved.VisibleOn >= beforeFailed);
+        Assert.True(saved.VisibleOn <= afterFailed);
+
+        // assert - no message arrived at dead letters
         Assert.Empty(await _storage.ReadAsync<AdoNetStreamDeadLetter>("SELECT * FROM OrleansStreamDeadLetter"));
     }
 

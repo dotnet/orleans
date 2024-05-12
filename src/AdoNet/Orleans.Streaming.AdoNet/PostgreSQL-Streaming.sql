@@ -318,65 +318,58 @@ DECLARE
 	_Count INT;
 BEGIN
 
-	CREATE TEMP TABLE _ItemsTable
-	(
-	    MessageId BIGINT PRIMARY KEY NOT NULL,
-	    Dequeued INT NOT NULL
-	) ON COMMIT DROP;
+CREATE TEMP TABLE _ItemsTable
+(
+	MessageId BIGINT PRIMARY KEY NOT NULL,
+	Dequeued INT NOT NULL
+) ON COMMIT DROP;
 
-	INSERT INTO _ItemsTable
-	(
-	    MessageId,
-	    Dequeued
-	)
+INSERT INTO _ItemsTable
+(
+	MessageId,
+	Dequeued
+)
+SELECT
+	CAST(split_part(Value, ':', 1) AS BIGINT) AS MessageId,
+	CAST(split_part(Value, ':', 2) AS INT) AS Dequeued
+FROM
+	UNNEST(string_to_array(_Items, '|')) AS Value;
+
+RETURN QUERY
+WITH Batch AS
+(
 	SELECT
-		CAST(split_part(Value, ':', 1) AS BIGINT) AS MessageId,
-		CAST(split_part(Value, ':', 2) AS INT) AS Dequeued
+		M.*
 	FROM
-		UNNEST(string_to_array(_Items, '|')) AS Value;
+		OrleansStreamMessage AS M
+        INNER JOIN _ItemsTable AS I
+            ON I.MessageId = M.MessageId
+            AND I.Dequeued = M.Dequeued
+	WHERE
+		ServiceId = _ServiceId
+	    AND ProviderId = _ProviderId
+		AND QueueId = _QueueId
 
-	SELECT COUNT(*) INTO _Count FROM _ItemsTable;
-
-    RETURN QUERY
-	WITH Batch AS
-	(
-		SELECT
-			*
-		FROM
-			OrleansStreamMessage AS M
-		WHERE
-			ServiceId = _ServiceId
-	        AND ProviderId = _ProviderId
-			AND QueueId = _QueueId
-	        AND EXISTS
-	        (
-	            SELECT 1
-	            FROM _ItemsTable AS I
-	            WHERE I.MessageId = M.MessageId
-	            AND I.Dequeued = M.Dequeued
-	        )
-
-        /* the criteria below helps prevent deadlocks but not skip locked */
-		ORDER BY
-	        ServiceId,
-	        ProviderId,
-	        QueueId,
-			MessageId
-        FOR UPDATE
-		LIMIT _Count
-	)
-	DELETE FROM OrleansStreamMessage AS M
-    USING Batch AS B
-    WHERE
-        M.ServiceId = B.ServiceId
-        AND M.ProviderId = B.ProviderId
-        AND M.QueueId = B.QueueId
-        AND M.MessageId = B.MessageId
-    RETURNING
-        M.ServiceId,
-        M.ProviderId,
-        M.QueueId,
-        M.MessageId;
+    /* the criteria below helps prevent deadlocks */
+	ORDER BY
+	    ServiceId,
+	    ProviderId,
+	    QueueId,
+		MessageId
+    FOR UPDATE
+)
+DELETE FROM OrleansStreamMessage AS M
+USING Batch AS B
+WHERE
+    M.ServiceId = B.ServiceId
+    AND M.ProviderId = B.ProviderId
+    AND M.QueueId = B.QueueId
+    AND M.MessageId = B.MessageId
+RETURNING
+    M.ServiceId,
+    M.ProviderId,
+    M.QueueId,
+    M.MessageId;
 
 END;
 $$;
@@ -391,7 +384,7 @@ SELECT
 	'SELECT * FROM ConfirmStreamMessages(@ServiceId, @ProviderId, @QueueId, @Items)'
 ;
 
-CREATE OR REPLACE PROCEDURE EvictStreamMessage
+CREATE OR REPLACE PROCEDURE FailStreamMessage
 (
     _ServiceId VARCHAR(150),
     _ProviderId VARCHAR(150),
@@ -408,37 +401,32 @@ DECLARE
     _RemoveOn TIMESTAMP(6) WITHOUT TIME ZONE := _Now + INTERVAL '1 SECOND' * _RemovalTimeout;
 BEGIN
 
-    /* delete the message */
-    WITH Deleted AS
-    (
-        DELETE FROM OrleansStreamMessage
-        WHERE
-            ServiceId = _ServiceId
-            AND ProviderId = _ProviderId
-            AND QueueId = _QueueId
-            AND MessageId = _MessageId
-            AND
-            (
-                (Dequeued >= _MaxAttempts AND VisibleOn <= _Now)
-                OR
-                (ExpiresOn <= _Now)
-            )
-        RETURNING
-            ServiceId,
-            ProviderId,
-            QueueId,
-            MessageId,
-            Dequeued,
-            VisibleOn,
-            ExpiresOn,
-            CreatedOn,
-            ModifiedOn,
-            Payload
-    )
+/* if the message can still be dequeued then attempt to mark it visible again */
+UPDATE OrleansStreamMessage
+SET
+    VisibleOn = _Now,
+    ModifiedOn = _Now
+WHERE
+    ServiceId = _ServiceId
+    AND ProviderId = _ProviderId
+    AND QueueId = _QueueId
+    AND MessageId = _MessageId
+    AND Dequeued < _MaxAttempts;
 
-    /* also copy it to the dead-letter table */
-    INSERT INTO OrleansStreamDeadLetter
-    (
+IF FOUND THEN
+    RETURN;
+END IF;
+
+/* otherwise attempt to move the message to dead letters */
+WITH Deleted AS
+(
+    DELETE FROM OrleansStreamMessage
+    WHERE
+        ServiceId = _ServiceId
+        AND ProviderId = _ProviderId
+        AND QueueId = _QueueId
+        AND MessageId = _MessageId
+    RETURNING
         ServiceId,
         ProviderId,
         QueueId,
@@ -448,25 +436,38 @@ BEGIN
         ExpiresOn,
         CreatedOn,
         ModifiedOn,
-        DeadOn,
-        RemoveOn,
         Payload
-    )
-    SELECT
-        ServiceId,
-        ProviderId,
-        QueueId,
-        MessageId,
-        Dequeued,
-        VisibleOn,
-        ExpiresOn,
-        CreatedOn,
-        ModifiedOn,
-        _Now,
-        _RemoveOn,
-        Payload
-    FROM
-        Deleted;
+)
+INSERT INTO OrleansStreamDeadLetter
+(
+    ServiceId,
+    ProviderId,
+    QueueId,
+    MessageId,
+    Dequeued,
+    VisibleOn,
+    ExpiresOn,
+    CreatedOn,
+    ModifiedOn,
+    DeadOn,
+    RemoveOn,
+    Payload
+)
+SELECT
+    ServiceId,
+    ProviderId,
+    QueueId,
+    MessageId,
+    Dequeued,
+    VisibleOn,
+    ExpiresOn,
+    CreatedOn,
+    ModifiedOn,
+    _Now AS DeadOn,
+    _RemoveOn AS RemoveOn,
+    Payload
+FROM
+    Deleted;
 
 END;
 $$;
@@ -477,8 +478,8 @@ INSERT INTO OrleansQuery
 	QueryText
 )
 SELECT
-	'EvictStreamMessageKey',
-	'CALL EvictStreamMessage(@ServiceId, @ProviderId, @QueueId, @MessageId, @MaxAttempts, @RemovalTimeout)'
+	'FailStreamMessageKey',
+	'CALL FailStreamMessage(@ServiceId, @ProviderId, @QueueId, @MessageId, @MaxAttempts, @RemovalTimeout)'
 ;
 
 CREATE OR REPLACE PROCEDURE EvictStreamMessages
@@ -498,91 +499,96 @@ DECLARE
     _RemoveOn TIMESTAMP(6) WITHOUT TIME ZONE := _Now + INTERVAL '1 second' * _RemovalTimeout;
 BEGIN
 
-    /* elect the next batch of messages to evict */
-    WITH Batch AS
-    (
-        SELECT
-            ServiceId,
-            ProviderId,
-            QueueId,
-            MessageId
-        FROM
-            OrleansStreamMessage
-        WHERE
-            ServiceId = _ServiceId
-            AND ProviderId = _ProviderId
-            AND QueueId = _QueueId
-            AND
-            (
-                (Dequeued >= _MaxAttempts AND VisibleOn <= _Now)
-                OR
-                (ExpiresOn <= _Now)
-            )
-
-        /* the criteria below helps prevent deadlocks while improving queue-like throughput */
-        ORDER BY
-            ServiceId,
-            ProviderId,
-            QueueId,
-            MessageId
-        FOR UPDATE SKIP LOCKED
-        LIMIT _BatchSize
-    ),
-
-    /* delete the messages locked in the batch */
-    Deleted AS
-    (
-        DELETE FROM OrleansStreamMessage AS M
-        USING Batch AS B
-        WHERE
-            M.ServiceId = B.ServiceId
-            AND M.ProviderId = B.ProviderId
-            AND M.QueueId = B.QueueId
-            AND M.MessageId = B.MessageId
-        RETURNING
-            M.ServiceId,
-            M.ProviderId,
-            M.QueueId,
-            M.MessageId,
-            M.Dequeued,
-            M.VisibleOn,
-            M.ExpiresOn,
-            M.CreatedOn,
-            M.ModifiedOn,
-            M.Payload
-    )
-
-    /* copy the deleted messages to the dead-letter table */
-    INSERT INTO OrleansStreamDeadLetter
-    (
-        ServiceId,
-        ProviderId,
-        QueueId,
-        MessageId,
-        Dequeued,
-        VisibleOn,
-        ExpiresOn,
-        CreatedOn,
-        ModifiedOn,
-        DeadOn,
-        RemoveOn,
-        Payload
-    )
+/* elect the next batch of messages to evict */
+WITH Batch AS
+(
     SELECT
         ServiceId,
         ProviderId,
         QueueId,
-        MessageId,
-        Dequeued,
-        VisibleOn,
-        ExpiresOn,
-        CreatedOn,
-        ModifiedOn,
-        _Now,
-        _RemoveOn,
-        Payload
+        MessageId
     FROM
-        Deleted AS D;
+        OrleansStreamMessage
+    WHERE
+        ServiceId = _ServiceId
+        AND ProviderId = _ProviderId
+        AND QueueId = _QueueId
+
+        -- the message was given the opportunity to complete
+        AND VisibleOn <= _Now
+		AND
+		(
+			-- the message was dequeued too many times
+			Dequeued >= _MaxAttempts
+			OR
+			-- the message expired
+			ExpiresOn <= _Now
+		)
+
+    /* the criteria below helps prevent deadlocks while improving queue-like throughput */
+    ORDER BY
+        ServiceId,
+        ProviderId,
+        QueueId,
+        MessageId
+    FOR UPDATE SKIP LOCKED
+    LIMIT _BatchSize
+),
+
+/* delete the messages locked in the batch */
+Deleted AS
+(
+    DELETE FROM OrleansStreamMessage AS M
+    USING Batch AS B
+    WHERE
+        M.ServiceId = B.ServiceId
+        AND M.ProviderId = B.ProviderId
+        AND M.QueueId = B.QueueId
+        AND M.MessageId = B.MessageId
+    RETURNING
+        M.ServiceId,
+        M.ProviderId,
+        M.QueueId,
+        M.MessageId,
+        M.Dequeued,
+        M.VisibleOn,
+        M.ExpiresOn,
+        M.CreatedOn,
+        M.ModifiedOn,
+        M.Payload
+)
+
+/* copy the deleted messages to the dead-letter table */
+INSERT INTO OrleansStreamDeadLetter
+(
+    ServiceId,
+    ProviderId,
+    QueueId,
+    MessageId,
+    Dequeued,
+    VisibleOn,
+    ExpiresOn,
+    CreatedOn,
+    ModifiedOn,
+    DeadOn,
+    RemoveOn,
+    Payload
+)
+SELECT
+    ServiceId,
+    ProviderId,
+    QueueId,
+    MessageId,
+    Dequeued,
+    VisibleOn,
+    ExpiresOn,
+    CreatedOn,
+    ModifiedOn,
+    _Now,
+    _RemoveOn,
+    Payload
+FROM
+    Deleted AS D;
 
 END;
 $$;
@@ -611,38 +617,38 @@ DECLARE
     _Now TIMESTAMP(6) WITHOUT TIME ZONE := CURRENT_TIMESTAMP AT TIME ZONE 'UTC';
 BEGIN
 
-    /* elect the next batch of dead letters to evict */
-    WITH Batch AS
-    (
-        SELECT
-            ServiceId,
-            ProviderId,
-            QueueId,
-            MessageId
-        FROM
-            OrleansStreamDeadLetter
-        WHERE
-            ServiceId = _ServiceId
-            AND ProviderId = _ProviderId
-            AND QueueId = _QueueId
-            AND RemoveOn <= _Now
-
-        /* the criteria below helps prevent deadlocks while improving queue-like throughput */
-        ORDER BY
-            ServiceId,
-            ProviderId,
-            QueueId,
-            MessageId
-        FOR UPDATE SKIP LOCKED
-        LIMIT _BatchSize
-    )
-    DELETE FROM OrleansStreamDeadLetter AS M
-    USING Batch AS B
+/* elect the next batch of dead letters to evict */
+WITH Batch AS
+(
+    SELECT
+        ServiceId,
+        ProviderId,
+        QueueId,
+        MessageId
+    FROM
+        OrleansStreamDeadLetter
     WHERE
-        M.ServiceId = B.ServiceId
-        AND M.ProviderId = B.ProviderId
-        AND M.QueueId = B.QueueId
-        AND M.MessageId = B.MessageId;
+        ServiceId = _ServiceId
+        AND ProviderId = _ProviderId
+        AND QueueId = _QueueId
+        AND RemoveOn <= _Now
+
+    /* the criteria below helps prevent deadlocks while improving queue-like throughput */
+    ORDER BY
+        ServiceId,
+        ProviderId,
+        QueueId,
+        MessageId
+    FOR UPDATE SKIP LOCKED
+    LIMIT _BatchSize
+)
+DELETE FROM OrleansStreamDeadLetter AS M
+USING Batch AS B
+WHERE
+    M.ServiceId = B.ServiceId
+    AND M.ProviderId = B.ProviderId
+    AND M.QueueId = B.QueueId
+    AND M.MessageId = B.MessageId;
 
 END;
 $$;

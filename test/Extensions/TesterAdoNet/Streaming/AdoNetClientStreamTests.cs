@@ -69,10 +69,7 @@ public abstract class AdoNetClientStreamTests : TestClusterPerTest
                     options.Invariant = _invariant;
                     options.ConnectionString = _testing.CurrentConnectionString;
                 })
-                .Configure<ClientMessagingOptions>(options =>
-                {
-                    options.ResponseTimeout = TimeSpan.FromSeconds(5);
-                });
+                .Configure<SiloMessagingOptions>(options => options.ClientDropTimeout = TimeSpan.FromSeconds(5));
         }
     }
 
@@ -86,11 +83,7 @@ public abstract class AdoNetClientStreamTests : TestClusterPerTest
                     options.Invariant = _invariant;
                     options.ConnectionString = _testing.CurrentConnectionString;
                 })
-                .Configure<SiloMessagingOptions>(options =>
-                {
-                    options.ClientDropTimeout = TimeSpan.FromSeconds(5);
-                    options.ResponseTimeout = TimeSpan.FromSeconds(5);
-                })
+                .Configure<SiloMessagingOptions>(options => options.ClientDropTimeout = TimeSpan.FromSeconds(5))
                 .AddMemoryGrainStorage("PubSubStore");
         }
     }
@@ -99,7 +92,7 @@ public abstract class AdoNetClientStreamTests : TestClusterPerTest
     public Task AdoNetStreamProducerOnDroppedClientTest() => _runner.StreamProducerOnDroppedClientTest(AdoNetStreamProviderName, StreamNamespace);
 
     [SkippableFact, TestCategory("Functional")]
-    public Task AdoNetStreamConsumerOnDroppedClientTest()
+    public virtual Task AdoNetStreamConsumerOnDroppedClientTest()
     {
         return _runner.StreamConsumerOnDroppedClientTest(
             AdoNetStreamProviderName,

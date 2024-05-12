@@ -3,7 +3,7 @@ Orleans Stream Message Sequence.
 This sequence reduces contention on generation of [MessageId] values vs an identity column.
 The CACHE parameter can be increased to further reduce contention.
 */
-CREATE SEQUENCE [OrleansStreamMessageSequence]
+CREATE SEQUENCE OrleansStreamMessageSequence
 AS BIGINT
 START WITH 1
 INCREMENT BY 1
@@ -35,45 +35,45 @@ This happens by forcing all queries to touch data in the exact same order of the
 This induces ordered resource lock acquisition while avoiding the cost of ordering itself.
 
 */
-CREATE TABLE [OrleansStreamMessage]
+CREATE TABLE OrleansStreamMessage
 (
 	/* Identifies the application */
-	[ServiceId] NVARCHAR(150) NOT NULL,
+	ServiceId NVARCHAR(150) NOT NULL,
 
     /* Identifies the provider within the application */
-    [ProviderId] NVARCHAR(150) NOT NULL,
+    ProviderId NVARCHAR(150) NOT NULL,
 
 	/* Identifies the individual queue shard as configured in the provider*/
-	[QueueId] NVARCHAR(150) NOT NULL,
+	QueueId NVARCHAR(150) NOT NULL,
 
 	/* The unique ascending number of the queued message */
-	[MessageId] BIGINT NOT NULL,
+	MessageId BIGINT NOT NULL,
 
 	/* The number of times the event was dequeued */
-	[Dequeued] INT NOT NULL,
+	Dequeued INT NOT NULL,
 
 	/* The UTC time at which the event will become visible */
-	[VisibleOn] DATETIME2(7) NOT NULL,
+	VisibleOn DATETIME2(7) NOT NULL,
 
 	/* The UTC time at which the event will expire */
-	[ExpiresOn] DATETIME2(7) NOT NULL,
+	ExpiresOn DATETIME2(7) NOT NULL,
 
     /* The UTC time at which the event was created - troubleshooting only */
-	[CreatedOn] DATETIME2(7) NOT NULL,
+	CreatedOn DATETIME2(7) NOT NULL,
 
     /* The UTC time at which the event was updated - troubleshooting only */
-	[ModifiedOn] DATETIME2(7) NOT NULL,
+	ModifiedOn DATETIME2(7) NOT NULL,
 
 	/* The arbitrarily large payload of the event */
-	[Payload] VARBINARY(MAX) NOT NULL,
+	Payload VARBINARY(MAX) NOT NULL,
 
 	/* This Clustered PK supports the various ordered scanning queries. */
-	CONSTRAINT [PK_OrleansStreamMessage] PRIMARY KEY CLUSTERED
+	CONSTRAINT PK_OrleansStreamMessage PRIMARY KEY CLUSTERED
 	(
-		[ServiceId] ASC,
-        [ProviderId] ASC,
-		[QueueId] ASC,
-		[MessageId] ASC
+		ServiceId ASC,
+        ProviderId ASC,
+		QueueId ASC,
+		MessageId ASC
 	)
 );
 GO
@@ -83,52 +83,52 @@ Orleans Streaming Dead Letters.
 
 This table holds events that could not be processed within the allowed number of attempts or that have expired.
 */
-CREATE TABLE [OrleansStreamDeadLetter]
+CREATE TABLE OrleansStreamDeadLetter
 (
 	/* Identifies the application */
-	[ServiceId] NVARCHAR(150) NOT NULL,
+	ServiceId NVARCHAR(150) NOT NULL,
 
     /* Identifies the provider within the application */
-    [ProviderId] NVARCHAR(150) NOT NULL,
+    ProviderId NVARCHAR(150) NOT NULL,
 
 	/* Identifies the individual queue shard as configured in the provider*/
-	[QueueId] NVARCHAR(150) NOT NULL,
+	QueueId NVARCHAR(150) NOT NULL,
 
 	/* The unique ascending number of the queued message */
-	[MessageId] BIGINT NOT NULL,
+	MessageId BIGINT NOT NULL,
 
 	/* The number of times the event was dequeued */
-	[Dequeued] INT NOT NULL,
+	Dequeued INT NOT NULL,
 
 	/* The UTC time at which the event will become visible */
-	[VisibleOn] DATETIME2(7) NOT NULL,
+	VisibleOn DATETIME2(7) NOT NULL,
 
 	/* The UTC time at which the event will expire */
-	[ExpiresOn] DATETIME2(7) NOT NULL,
+	ExpiresOn DATETIME2(7) NOT NULL,
 
     /* The UTC time at which the event was created - troubleshooting only */
-	[CreatedOn] DATETIME2(7) NOT NULL,
+	CreatedOn DATETIME2(7) NOT NULL,
 
     /* The UTC time at which the event was updated - troubleshooting only */
-	[ModifiedOn] DATETIME2(7) NOT NULL,
+	ModifiedOn DATETIME2(7) NOT NULL,
 
     /* The UTC time at which the event was given up on - troubleshooting only */
-	[DeadOn] DATETIME2(7) NOT NULL,
+	DeadOn DATETIME2(7) NOT NULL,
 
 	/* The UTC time at which the event is scheduled to be removed from dead letters */
-	[RemoveOn] DATETIME2(7) NOT NULL,
+	RemoveOn DATETIME2(7) NOT NULL,
 
 	/* The arbitrarily large payload of the event */
-	[Payload] VARBINARY(MAX) NULL,
+	Payload VARBINARY(MAX) NULL,
 
 	/* This Clustered PK supports the various ordered scanning queries. */
     /* Its main purpose is to help partition the update row locks as to minimize dequeing contention. */
-	CONSTRAINT [PK_OrleansStreamDeadLetter] PRIMARY KEY CLUSTERED
+	CONSTRAINT PK_OrleansStreamDeadLetter PRIMARY KEY CLUSTERED
 	(
-		[ServiceId] ASC,
-        [ProviderId] ASC,
-		[QueueId] ASC,
-		[MessageId] ASC
+		ServiceId ASC,
+        ProviderId ASC,
+		QueueId ASC,
+		MessageId ASC
 	)
 );
 GO
@@ -137,32 +137,32 @@ GO
 Orleans Streaming Control Table.
 This table holds schedule variables to help providers self manage their own work.
 */
-CREATE TABLE [OrleansStreamControl]
+CREATE TABLE OrleansStreamControl
 (
 	/* Identifies the application */
-	[ServiceId] NVARCHAR(150) NOT NULL,
+	ServiceId NVARCHAR(150) NOT NULL,
 
     /* Identifies the provider within the application */
-    [ProviderId] NVARCHAR(150) NOT NULL,
+    ProviderId NVARCHAR(150) NOT NULL,
 
 	/* Identifies the individual queue shard as configured in the provider */
-	[QueueId] NVARCHAR(150) NOT NULL,
+	QueueId NVARCHAR(150) NOT NULL,
 
     /* The next due schedule for messages to be evicted */
-    [EvictOn] DATETIME2(7) NOT NULL,
+    EvictOn DATETIME2(7) NOT NULL,
 
     /* Each row represents a flat configuration object for an individual queue */
-	CONSTRAINT [PK_OrleansStreamControl] PRIMARY KEY CLUSTERED
+	CONSTRAINT PK_OrleansStreamControl PRIMARY KEY CLUSTERED
 	(
-		[ServiceId] ASC,
-        [ProviderId] ASC,
-		[QueueId] ASC
+		ServiceId ASC,
+        ProviderId ASC,
+		QueueId ASC
 	)
 );
 GO
 
 /* Queues a message to the Orleans Streaming Message Queue */
-CREATE PROCEDURE [QueueStreamMessage]
+CREATE PROCEDURE QueueStreamMessage
 	@ServiceId NVARCHAR(150),
     @ProviderId NVARCHAR(150),
 	@QueueId NVARCHAR(150),
@@ -174,11 +174,11 @@ BEGIN
 SET NOCOUNT ON;
 SET XACT_ABORT ON;
 
-DECLARE @MessageId BIGINT = NEXT VALUE FOR [OrleansStreamMessageSequence];
+DECLARE @MessageId BIGINT = NEXT VALUE FOR OrleansStreamMessageSequence;
 DECLARE @Now DATETIME2(7) = SYSUTCDATETIME();
 DECLARE @ExpiresOn DATETIME2(7) = DATEADD(SECOND, @ExpiryTimeout, @Now);
 
-INSERT INTO [OrleansStreamMessage]
+INSERT INTO OrleansStreamMessage
 (
 	ServiceId,
     ProviderId,
@@ -192,10 +192,10 @@ INSERT INTO [OrleansStreamMessage]
 	Payload
 )
 OUTPUT
-    [Inserted].[ServiceId],
-    [Inserted].[ProviderId],
-    [Inserted].[QueueId],
-    [Inserted].[MessageId]
+    Inserted.ServiceId,
+    Inserted.ProviderId,
+    Inserted.QueueId,
+    Inserted.MessageId
 VALUES
 (
 	@ServiceId,
@@ -213,19 +213,19 @@ VALUES
 END
 GO
 
-INSERT INTO [OrleansQuery]
+INSERT INTO OrleansQuery
 (
-	[QueryKey],
-	[QueryText]
+	QueryKey,
+	QueryText
 )
 SELECT
 	'QueueStreamMessageKey',
-	'EXECUTE [QueueStreamMessage] @ServiceId = @ServiceId, @ProviderId = @ProviderId, @QueueId = @QueueId, @Payload = @Payload, @ExpiryTimeout = @ExpiryTimeout'
+	'EXECUTE QueueStreamMessage @ServiceId = @ServiceId, @ProviderId = @ProviderId, @QueueId = @QueueId, @Payload = @Payload, @ExpiryTimeout = @ExpiryTimeout'
 GO
 
 /* Gets message batches from the Orleans Streaming Message Queue */
 /* Also opportunistically performs eviction activities when they are due */
-CREATE PROCEDURE [GetStreamMessages]
+CREATE PROCEDURE GetStreamMessages
 	@ServiceId NVARCHAR(150),
     @ProviderId NVARCHAR(150),
 	@QueueId NVARCHAR(150),
@@ -247,12 +247,12 @@ DECLARE @VisibleOn DATETIME2(7) = DATEADD(SECOND, @VisibilityTimeout, @Now);
 /* lightweight check to see if an eviction activity is due */
 DECLARE @EvictOn DATETIME2(7) =
 (
-    SELECT [EvictOn]
-    FROM [OrleansStreamControl]
+    SELECT EvictOn
+    FROM OrleansStreamControl
     WHERE
-        [ServiceId] = @ServiceId
-        AND [ProviderId] = @ProviderId
-        AND [QueueId] = @QueueId
+        ServiceId = @ServiceId
+        AND ProviderId = @ProviderId
+        AND QueueId = @QueueId
 );
 
 /* escalate to a eviction attempt only if an activity is due */
@@ -261,36 +261,36 @@ BEGIN
 
     /* attempt to win a race to update the schedule */
     /* this will also initialize the table if necessary */
-    WITH [Candidate] AS
+    WITH Candidate AS
     (
         SELECT
-            [ServiceId] = @ServiceId,
-            [ProviderId] = @ProviderId,
-            [QueueId] = @QueueId,
-            [Now] = @Now,
-            [EvictOn] = DATEADD(SECOND, @EvictionInterval, @Now)
+            ServiceId = @ServiceId,
+            ProviderId = @ProviderId,
+            QueueId = @QueueId,
+            Now = @Now,
+            EvictOn = DATEADD(SECOND, @EvictionInterval, @Now)
     )
-    MERGE [OrleansStreamControl] WITH (UPDLOCK, HOLDLOCK) AS [T]
-    USING [Candidate] AS [S]
-    ON [T].[ServiceId] = [S].[ServiceId]
-    AND [T].[ProviderId] = [S].[ProviderId]
-    AND [T].[QueueId] = [S].[QueueId]
-    WHEN MATCHED AND [T].[EvictOn] < [S].[Now] THEN
-    UPDATE SET [T].[EvictOn] = [S].[EvictOn]
+    MERGE OrleansStreamControl WITH (UPDLOCK, HOLDLOCK) AS T
+    USING Candidate AS S
+    ON T.ServiceId = S.ServiceId
+    AND T.ProviderId = S.ProviderId
+    AND T.QueueId = S.QueueId
+    WHEN MATCHED AND T.EvictOn < S.Now THEN
+    UPDATE SET T.EvictOn = S.EvictOn
     WHEN NOT MATCHED BY TARGET THEN
     INSERT
     (
-        [ServiceId],
-        [ProviderId],
-        [QueueId],
-        [EvictOn]
+        ServiceId,
+        ProviderId,
+        QueueId,
+        EvictOn
     )
     VALUES
     (
-        [ServiceId],
-        [ProviderId],
-        [QueueId],
-        [EvictOn]
+        ServiceId,
+        ProviderId,
+        QueueId,
+        EvictOn
     );
 
     /* if the above statement won the race then we also get to run the eviction */
@@ -299,7 +299,7 @@ BEGIN
     BEGIN
 
         /* evict messages */
-        EXECUTE [EvictStreamMessages]
+        EXECUTE EvictStreamMessages
             @ServiceId = @ServiceId,
             @ProviderId = @ProviderId,
             @QueueId = @QueueId,
@@ -308,7 +308,7 @@ BEGIN
             @BatchSize = @EvictionBatchSize
 
         /* evict dead letters */
-        EXECUTE [EvictStreamDeadLetters]
+        EXECUTE EvictStreamDeadLetters
             @ServiceId = @ServiceId,
             @ProviderId = @ProviderId,
             @QueueId = @QueueId,
@@ -322,65 +322,65 @@ END;
 WITH Batch AS
 (
 	SELECT TOP (@MaxCount)
-		[ServiceId],
-        [ProviderId],
-		[QueueId],
-		[MessageId],
-		[Dequeued],
-		[VisibleOn],
-		[ExpiresOn],
-		[CreatedOn],
-		[ModifiedOn],
-		[Payload]
+		ServiceId,
+        ProviderId,
+		QueueId,
+		MessageId,
+		Dequeued,
+		VisibleOn,
+		ExpiresOn,
+		CreatedOn,
+		ModifiedOn,
+		Payload
 	FROM
-		[OrleansStreamMessage]
+		OrleansStreamMessage WITH (UPDLOCK, READPAST)
 	WHERE
-		[ServiceId] = @ServiceId
-        AND [ProviderId] = @ProviderId
-		AND [QueueId] = @QueueId
-		AND [Dequeued] < @MaxAttempts
-		AND [VisibleOn] <= @Now
-		AND [ExpiresOn] > @Now
+		ServiceId = @ServiceId
+        AND ProviderId = @ProviderId
+		AND QueueId = @QueueId
+		AND Dequeued < @MaxAttempts
+		AND VisibleOn <= @Now
+		AND ExpiresOn > @Now
 	ORDER BY
-        [ServiceId],
-        [ProviderId],
-        [QueueId],
-		[MessageId]
+        ServiceId,
+        ProviderId,
+        QueueId,
+		MessageId
 )
 UPDATE Batch
 SET
-	[Dequeued] += 1,
-	[VisibleOn] = @VisibleOn,
-	[ModifiedOn] = @Now
+	Dequeued += 1,
+	VisibleOn = @VisibleOn,
+	ModifiedOn = @Now
 OUTPUT
-	[Inserted].[ServiceId],
-    [Inserted].[ProviderId],
-	[Inserted].[QueueId],
-	[Inserted].[MessageId],
-	[Inserted].[Dequeued],
-	[Inserted].[VisibleOn],
-	[Inserted].[ExpiresOn],
-	[Inserted].[CreatedOn],
-	[Inserted].[ModifiedOn],
-	[Inserted].[Payload]
+	Inserted.ServiceId,
+    Inserted.ProviderId,
+	Inserted.QueueId,
+	Inserted.MessageId,
+	Inserted.Dequeued,
+	Inserted.VisibleOn,
+	Inserted.ExpiresOn,
+	Inserted.CreatedOn,
+	Inserted.ModifiedOn,
+	Inserted.Payload
 FROM
 	Batch;
 
 END
 GO
 
-INSERT INTO [OrleansQuery]
+INSERT INTO OrleansQuery
 (
-	[QueryKey],
-	[QueryText]
+	QueryKey,
+	QueryText
 )
 SELECT
 	'GetStreamMessagesKey',
-	'EXECUTE [GetStreamMessages] @ServiceId = @ServiceId, @ProviderId = @ProviderId, @QueueId = @QueueId, @MaxCount = @MaxCount, @MaxAttempts = @MaxAttempts, @VisibilityTimeout = @VisibilityTimeout, @RemovalTimeout = @RemovalTimeout, @EvictionInterval = @EvictionInterval, @EvictionBatchSize = @EvictionBatchSize'
+	'EXECUTE GetStreamMessages @ServiceId = @ServiceId, @ProviderId = @ProviderId, @QueueId = @QueueId, @MaxCount = @MaxCount, @MaxAttempts = @MaxAttempts, @VisibilityTimeout = @VisibilityTimeout, @RemovalTimeout = @RemovalTimeout, @EvictionInterval = @EvictionInterval, @EvictionBatchSize = @EvictionBatchSize'
 GO
 
 /* Confirms delivery of a stream message. */
-CREATE PROCEDURE [ConfirmStreamMessages]
+CREATE PROCEDURE ConfirmStreamMessages
 	@ServiceId NVARCHAR(150),
     @ProviderId NVARCHAR(150),
 	@QueueId NVARCHAR(150),
@@ -394,21 +394,21 @@ SET XACT_ABORT ON;
 /* parse the message identifiers to be deleted */
 DECLARE @ItemsTable TABLE
 (
-    [MessageId] BIGINT PRIMARY KEY NOT NULL,
-    [Dequeued] INT NOT NULL
+    MessageId BIGINT PRIMARY KEY NOT NULL,
+    Dequeued INT NOT NULL
 );
 WITH Items AS
 (
-	SELECT [Value] FROM STRING_SPLIT(@Items, '|')
+	SELECT Value FROM STRING_SPLIT(@Items, '|')
 )
 INSERT INTO @ItemsTable
 (
-    [MessageId],
-    [Dequeued]
+    MessageId,
+    Dequeued
 )
 SELECT
-	CAST(SUBSTRING([Value], 1, CHARINDEX(':', [Value], 1) - 1) AS BIGINT) AS [MessageId],
-	CAST(SUBSTRING([Value], CHARINDEX(':', [Value], 1) + 1, LEN([Value])) AS INT) AS [Dequeued]
+	CAST(SUBSTRING(Value, 1, CHARINDEX(':', Value, 1) - 1) AS BIGINT) AS MessageId,
+	CAST(SUBSTRING(Value, CHARINDEX(':', Value, 1) + 1, LEN(Value)) AS INT) AS Dequeued
 FROM
 	Items;
 
@@ -421,46 +421,49 @@ WITH Batch AS
 	SELECT TOP (@Count)
 		*
 	FROM
-		[OrleansStreamMessage] AS [M]
+		OrleansStreamMessage AS M WITH (UPDLOCK, HOLDLOCK)
 	WHERE
-		[ServiceId] = @ServiceId
-        AND [ProviderId] = @ProviderId
-		AND [QueueId] = @QueueId
+		ServiceId = @ServiceId
+        AND ProviderId = @ProviderId
+		AND QueueId = @QueueId
         AND EXISTS
         (
             SELECT *
-            FROM @ItemsTable AS [I]
-            WHERE [I].[MessageId] = [M].[MessageId]
-            AND [I].[Dequeued] = [M].[Dequeued]
+            FROM @ItemsTable AS I
+            WHERE I.MessageId = M.MessageId
+            AND I.Dequeued = M.Dequeued
         )
 	ORDER BY
-        [ServiceId],
-        [ProviderId],
-        [QueueId],
-		[MessageId]
+        ServiceId,
+        ProviderId,
+        QueueId,
+		MessageId
 )
-DELETE FROM [Batch]
+DELETE FROM Batch
 OUTPUT
-    [Deleted].[ServiceId],
-    [Deleted].[ProviderId],
-    [Deleted].[QueueId],
-    [Deleted].[MessageId];
+    Deleted.ServiceId,
+    Deleted.ProviderId,
+    Deleted.QueueId,
+    Deleted.MessageId;
 
 END
 GO
 
-INSERT INTO [OrleansQuery]
+INSERT INTO OrleansQuery
 (
-	[QueryKey],
-	[QueryText]
+	QueryKey,
+	QueryText
 )
 SELECT
 	'ConfirmStreamMessagesKey',
-	'EXECUTE [ConfirmStreamMessages] @ServiceId = @ServiceId, @ProviderId = @ProviderId, @QueueId = @QueueId, @Items = @Items'
+	'EXECUTE ConfirmStreamMessages @ServiceId = @ServiceId, @ProviderId = @ProviderId, @QueueId = @QueueId, @Items = @Items'
 GO
 
-/* Evicts a single non-delivered message from the message table to the dead letter table for human troubleshooting. */
-CREATE PROCEDURE [EvictStreamMessage]
+/* Applies delivery failure rules to the specified message. */
+/* If the message has been dequeued too many times, we move it to the dead letter table. */
+/* If the message has expired, we move to the dead letter table. */
+/* If the message is still eligible for delivery, it is made visible again. */
+CREATE PROCEDURE FailStreamMessage
 	@ServiceId NVARCHAR(150),
     @ProviderId NVARCHAR(150),
 	@QueueId NVARCHAR(150),
@@ -476,82 +479,71 @@ SET XACT_ABORT ON;
 DECLARE @Now DATETIME2(7) = SYSUTCDATETIME();
 DECLARE @RemoveOn DATETIME2(7) = DATEADD(SECOND, @RemovalTimeout, @Now);
 
-WITH [Message] AS
-(
-	SELECT
-		[ServiceId],
-        [ProviderId],
-		[QueueId],
-		[MessageId],
-		[Dequeued],
-		[VisibleOn],
-		[ExpiresOn],
-		[CreatedOn],
-		[ModifiedOn],
-		[DeadOn] = @Now,
-		[RemoveOn] = @RemoveOn,
-		[Payload]
-	FROM
-		[OrleansStreamMessage]
-	WHERE
-		[ServiceId] = @ServiceId
-        AND [ProviderId] = @ProviderId
-		AND [QueueId] = @QueueId
-        AND [MessageId] = @MessageId
-		AND
-		(
-			-- a message is dead if the last attempt timed out
-			([Dequeued] >= @MaxAttempts AND [VisibleOn] <= @Now)
-			OR
-			-- a message is dead if it expired regardless
-			([ExpiresOn] <= @Now)
-		)
-)
-DELETE FROM [Message]
+/* if the message can still be dequeued then attempt to mark it visible again */
+UPDATE OrleansStreamMessage
+SET
+    VisibleOn = @Now,
+    ModifiedOn = @Now
+WHERE
+    ServiceId = @ServiceId
+    AND ProviderId = @ProviderId
+    AND QueueId = @QueueId
+    AND MessageId = @MessageId
+    AND Dequeued < @MaxAttempts;
+
+IF @@ROWCOUNT > 0 RETURN;
+
+/* otherwise attempt to move the message to dead letters */
+DELETE FROM OrleansStreamMessage
 OUTPUT
-	[Deleted].[ServiceId],
-    [Deleted].[ProviderId],
-	[Deleted].[QueueId],
-	[Deleted].[MessageId],
-	[Deleted].[Dequeued],
-	[Deleted].[VisibleOn],
-	[Deleted].[ExpiresOn],
-	[Deleted].[CreatedOn],
-	[Deleted].[ModifiedOn],
-	[Deleted].[DeadOn],
-	[Deleted].[RemoveOn],
-	[Deleted].[Payload]
-INTO [OrleansStreamDeadLetter]
+    Deleted.ServiceId,
+    Deleted.ProviderId,
+    Deleted.QueueId,
+    Deleted.MessageId,
+    Deleted.Dequeued,
+    Deleted.VisibleOn,
+    Deleted.ExpiresOn,
+    Deleted.CreatedOn,
+    Deleted.ModifiedOn,
+    @Now AS DeadOn,
+    @RemoveOn AS RemoveOn,
+    Deleted.Payload
+INTO OrleansStreamDeadLetter
 (
-	[ServiceId],
-    [ProviderId],
-	[QueueId],
-	[MessageId],
-	[Dequeued],
-	[VisibleOn],
-	[ExpiresOn],
-	[CreatedOn],
-	[ModifiedOn],
-	[DeadOn],
-	[RemoveOn],
-	[Payload]
-);
+    ServiceId,
+    ProviderId,
+    QueueId,
+    MessageId,
+    Dequeued,
+    VisibleOn,
+    ExpiresOn,
+    CreatedOn,
+    ModifiedOn,
+    DeadOn,
+    RemoveOn,
+    Payload
+)
+WHERE
+    ServiceId = @ServiceId
+    AND ProviderId = @ProviderId
+    AND QueueId = @QueueId
+    AND MessageId = @MessageId;
 
 END
 GO
 
-INSERT INTO [OrleansQuery]
+INSERT INTO OrleansQuery
 (
-	[QueryKey],
-	[QueryText]
+	QueryKey,
+	QueryText
 )
 SELECT
-	'EvictStreamMessageKey',
-	'EXECUTE [EvictStreamMessage] @ServiceId = @ServiceId, @ProviderId = @ProviderId, @QueueId = @QueueId, @MessageId = @MessageId, @MaxAttempts = @MaxAttempts, @RemovalTimeout = @RemovalTimeout'
+	'FailStreamMessageKey',
+	'EXECUTE FailStreamMessage @ServiceId = @ServiceId, @ProviderId = @ProviderId, @QueueId = @QueueId, @MessageId = @MessageId, @MaxAttempts = @MaxAttempts, @RemovalTimeout = @RemovalTimeout'
 GO
 
 /* Moves non-delivered messages from the message table to the dead letter table for human troubleshooting. */
-CREATE PROCEDURE [EvictStreamMessages]
+CREATE PROCEDURE EvictStreamMessages
 	@ServiceId NVARCHAR(150),
     @ProviderId NVARCHAR(150),
 	@QueueId NVARCHAR(150),
@@ -571,83 +563,86 @@ DECLARE @RemoveOn DATETIME2(7) = DATEADD(SECOND, @RemovalTimeout, @Now);
 WITH Batch AS
 (
 	SELECT TOP (@BatchSize)
-		[ServiceId],
-        [ProviderId],
-		[QueueId],
-		[MessageId],
-		[Dequeued],
-		[VisibleOn],
-		[ExpiresOn],
-		[CreatedOn],
-		[ModifiedOn],
-		[DeadOn] = @Now,
-		[RemoveOn] = @RemoveOn,
-		[Payload]
+		ServiceId,
+        ProviderId,
+		QueueId,
+		MessageId,
+		Dequeued,
+		VisibleOn,
+		ExpiresOn,
+		CreatedOn,
+		ModifiedOn,
+		DeadOn = @Now,
+		RemoveOn = @RemoveOn,
+		Payload
 	FROM
-		[OrleansStreamMessage]
+		OrleansStreamMessage WITH (UPDLOCK, READPAST)
 	WHERE
-		[ServiceId] = @ServiceId
-        AND [ProviderId] = @ProviderId
-		AND [QueueId] = @QueueId
+		ServiceId = @ServiceId
+        AND ProviderId = @ProviderId
+		AND QueueId = @QueueId
+
+        -- the message was given the opportunity to complete
+        AND VisibleOn <= @Now
 		AND
 		(
-			-- a message is no longer dequeueable if the last attempt timed out
-			([Dequeued] >= @MaxAttempts AND [VisibleOn] <= @Now)
+			-- the message was dequeued too many times
+			Dequeued >= @MaxAttempts
 			OR
-			-- a message is no longer dequeueable if it has expired regardless
-			([ExpiresOn] <= @Now)
+			-- the message expired
+			ExpiresOn <= @Now
 		)
 	ORDER BY
-        [ServiceId],
-        [ProviderId],
-        [QueueId],
-		[MessageId]
+        ServiceId,
+        ProviderId,
+        QueueId,
+		MessageId
 )
 DELETE FROM Batch
 OUTPUT
-	[Deleted].[ServiceId],
-    [Deleted].[ProviderId],
-	[Deleted].[QueueId],
-	[Deleted].[MessageId],
-	[Deleted].[Dequeued],
-	[Deleted].[VisibleOn],
-	[Deleted].[ExpiresOn],
-	[Deleted].[CreatedOn],
-	[Deleted].[ModifiedOn],
-	[Deleted].[DeadOn],
-	[Deleted].[RemoveOn],
-	[Deleted].[Payload]
-INTO [OrleansStreamDeadLetter]
+	Deleted.ServiceId,
+    Deleted.ProviderId,
+	Deleted.QueueId,
+	Deleted.MessageId,
+	Deleted.Dequeued,
+	Deleted.VisibleOn,
+	Deleted.ExpiresOn,
+	Deleted.CreatedOn,
+	Deleted.ModifiedOn,
+	Deleted.DeadOn,
+	Deleted.RemoveOn,
+	Deleted.Payload
+INTO OrleansStreamDeadLetter
 (
-	[ServiceId],
-    [ProviderId],
-	[QueueId],
-	[MessageId],
-	[Dequeued],
-	[VisibleOn],
-	[ExpiresOn],
-	[CreatedOn],
-	[ModifiedOn],
-	[DeadOn],
-	[RemoveOn],
-	[Payload]
+	ServiceId,
+    ProviderId,
+	QueueId,
+	MessageId,
+	Dequeued,
+	VisibleOn,
+	ExpiresOn,
+	CreatedOn,
+	ModifiedOn,
+	DeadOn,
+	RemoveOn,
+	Payload
 );
 
 END
 GO
 
-INSERT INTO [OrleansQuery]
+INSERT INTO OrleansQuery
 (
-	[QueryKey],
-	[QueryText]
+	QueryKey,
+	QueryText
 )
 SELECT
 	'EvictStreamMessagesKey',
-	'EXECUTE [EvictStreamMessages] @ServiceId = @ServiceId, @ProviderId = @ProviderId, @QueueId = @QueueId, @BatchSize = @BatchSize, @MaxAttempts = @MaxAttempts, @RemovalTimeout = @RemovalTimeout'
+	'EXECUTE EvictStreamMessages @ServiceId = @ServiceId, @ProviderId = @ProviderId, @QueueId = @QueueId, @BatchSize = @BatchSize, @MaxAttempts = @MaxAttempts, @RemovalTimeout = @RemovalTimeout'
 GO
 
 /* Removes messages from the dead letters table. */
-CREATE PROCEDURE [EvictStreamDeadLetters]
+CREATE PROCEDURE EvictStreamDeadLetters
 	@ServiceId NVARCHAR(150),
     @ProviderId NVARCHAR(150),
 	@QueueId NVARCHAR(150),
@@ -664,34 +659,34 @@ DECLARE @Now DATETIME2(7) = SYSUTCDATETIME();
 WITH Batch AS
 (
     SELECT TOP (@BatchSize)
-        [ServiceId],
-        [ProviderId],
-        [QueueId],
-        [MessageId]
+        ServiceId,
+        ProviderId,
+        QueueId,
+        MessageId
     FROM
-        [OrleansStreamDeadLetter]
+        OrleansStreamDeadLetter WITH (UPDLOCK, READPAST)
     WHERE
-        [ServiceId] = @ServiceId
-        AND [ProviderId] = @ProviderId
-        AND [QueueId] = @QueueId
-        AND [RemoveOn] <= @Now
+        ServiceId = @ServiceId
+        AND ProviderId = @ProviderId
+        AND QueueId = @QueueId
+        AND RemoveOn <= @Now
     ORDER BY
-        [ServiceId],
-        [ProviderId],
-        [QueueId],
-        [MessageId]
+        ServiceId,
+        ProviderId,
+        QueueId,
+        MessageId
 )
 DELETE FROM Batch;
 
 END
 GO
 
-INSERT INTO [OrleansQuery]
+INSERT INTO OrleansQuery
 (
-	[QueryKey],
-	[QueryText]
+	QueryKey,
+	QueryText
 )
 SELECT
 	'EvictStreamDeadLettersKey',
-	'EXECUTE [EvictStreamDeadLetters] @ServiceId = @ServiceId, @ProviderId = @ProviderId, @QueueId = @QueueId, @BatchSize = @BatchSize'
+	'EXECUTE EvictStreamDeadLetters @ServiceId = @ServiceId, @ProviderId = @ProviderId, @QueueId = @QueueId, @BatchSize = @BatchSize'
 GO

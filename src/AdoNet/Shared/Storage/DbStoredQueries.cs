@@ -158,7 +158,7 @@ namespace Orleans.Tests.SqlUtils
         /// <summary>
         /// A query template to evict a single message (by moving it to dead letters).
         /// </summary>
-        internal string EvictStreamMessageKey => queries[nameof(EvictStreamMessageKey)];
+        internal string FailStreamMessageKey => queries[nameof(FailStreamMessageKey)];
 
         /// <summary>
         /// A query template to batch evict messages (by moving them to dead letters).

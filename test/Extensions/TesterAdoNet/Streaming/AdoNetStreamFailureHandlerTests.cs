@@ -82,62 +82,6 @@ public abstract class AdoNetStreamFailureHandlerTests(string invariant) : IAsync
     }
 
     /// <summary>
-    /// Tests that a <see cref="AdoNetStreamFailureHandler"/> can move a dead message to dead letters.
-    /// </summary>
-    [SkippableFact]
-    public async Task AdoNetStreamFailureHandler_OnDeliveryFailure_MovesExpiredMessageToDeadLetters()
-    {
-        // arrange - handler
-        var providerId = "MyProviderId";
-        var faultOnFailure = false;
-        var streamOptions = new AdoNetStreamOptions
-        {
-            Invariant = invariant,
-            ConnectionString = _storage.ConnectionString
-        };
-        var clusterOptions = new ClusterOptions
-        {
-            ServiceId = "MyServiceId"
-        };
-        var mapper = new AdoNetStreamQueueMapper(new HashRingBasedStreamQueueMapper(new HashRingStreamQueueMapperOptions(), "MyQueuePrefix"));
-        var logger = NullLogger<AdoNetStreamFailureHandler>.Instance;
-        var handler = new AdoNetStreamFailureHandler(faultOnFailure, streamOptions, clusterOptions, mapper, _queries, logger);
-
-        // arrange - queue an expired message
-        var streamId = StreamId.Create("MyNamespace", "MyKey");
-        var queueId = mapper.GetAdoNetQueueId(streamId);
-        var payload = new byte[] { 0xFF };
-
-        var beforeQueued = DateTime.UtcNow;
-        var ack = await _queries.QueueStreamMessageAsync(clusterOptions.ServiceId, providerId, queueId, payload, 0);
-        var afterQueued = DateTime.UtcNow;
-
-        // act
-        var beforeFailure = DateTime.UtcNow;
-        await handler.OnDeliveryFailure(GuidId.GetNewGuidId(), providerId, streamId, new EventSequenceTokenV2(ack.MessageId));
-        var afterFailure = DateTime.UtcNow;
-
-        // assert
-        var dead = Assert.Single(await _storage.ReadAsync<AdoNetStreamDeadLetter>("SELECT * FROM OrleansStreamDeadLetter"));
-        Assert.Equal(clusterOptions.ServiceId, dead.ServiceId);
-        Assert.Equal(providerId, dead.ProviderId);
-        Assert.Equal(queueId, dead.QueueId);
-        Assert.Equal(ack.MessageId, dead.MessageId);
-        Assert.Equal(0, dead.Dequeued);
-        Assert.True(dead.ExpiresOn >= beforeQueued);
-        Assert.True(dead.ExpiresOn <= afterQueued);
-        Assert.True(dead.CreatedOn >= beforeQueued);
-        Assert.True(dead.CreatedOn <= afterQueued);
-        Assert.True(dead.ModifiedOn >= beforeQueued);
-        Assert.True(dead.ModifiedOn <= afterQueued);
-        Assert.True(dead.DeadOn >= beforeFailure);
-        Assert.True(dead.DeadOn <= afterFailure);
-        Assert.True(dead.RemoveOn >= beforeFailure.Add(streamOptions.DeadLetterEvictionTimeout));
-        Assert.True(dead.RemoveOn <= afterFailure.Add(streamOptions.DeadLetterEvictionTimeout));
-        Assert.Equal(payload, dead.Payload);
-    }
-
-    /// <summary>
     /// Tests that a <see cref="AdoNetStreamFailureHandler"/> can move a poisoned message to dead letters.
     /// </summary>
     [SkippableFact]
