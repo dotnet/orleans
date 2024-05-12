@@ -22,6 +22,13 @@ public class MySqlRelationalOrleansQueriesTests() : RelationalOrleansQueriesTest
 }
 
 /// <summary>
+/// Tests the relational storage layer via <see cref="RelationalOrleansQueries"/> against PostgreSQL.
+/// </summary>
+public class PostgreSqlRelationalOrleansQueriesTests() : RelationalOrleansQueriesTests(AdoNetInvariants.InvariantNamePostgreSql)
+{
+}
+
+/// <summary>
 /// Tests the relational storage layer via <see cref="RelationalOrleansQueries"/>.
 /// </summary>
 [TestCategory("AdoNet"), TestCategory("Streaming")]
@@ -82,7 +89,7 @@ public abstract class RelationalOrleansQueriesTests(string invariant) : IAsyncLi
         Assert.Equal(serviceId, ack.ServiceId);
         Assert.Equal(providerId, ack.ProviderId);
         Assert.Equal(queueId, ack.QueueId);
-        Assert.True(ack.MessageId > 0);
+        Assert.Equal(1, ack.MessageId);
 
         // assert - storage
         var messages = await _storage.ReadAsync<AdoNetStreamMessage>("SELECT * FROM OrleansStreamMessage");
@@ -116,7 +123,7 @@ public abstract class RelationalOrleansQueriesTests(string invariant) : IAsyncLi
         var count = 10000;
 
         // this keeps requests under the default connection pool limit to avoid flaky tests due to connection timeouts
-        var semaphore = new SemaphoreSlim(100);
+        using var semaphore = new SemaphoreSlim(100);
 
         // act
         var before = DateTime.UtcNow;
@@ -198,7 +205,7 @@ public abstract class RelationalOrleansQueriesTests(string invariant) : IAsyncLi
             .ToList();
 
         // this keeps requests under the default connection pool limit to avoid flaky tests due to connection timeouts
-        var semaphore = new SemaphoreSlim(100);
+        using var semaphore = new SemaphoreSlim(100);
 
         // act - queue the random messages in parallel
         var before = DateTime.UtcNow;
@@ -231,7 +238,8 @@ public abstract class RelationalOrleansQueriesTests(string invariant) : IAsyncLi
 
         // assert - generated message ids are consistent
         Assert.Equal(count, messageIds.Count);
-        Assert.Equal(messageIds.Max, messageIds.Min + messageIds.Count - 1);
+        Assert.Equal(1, messageIds.Min);
+        Assert.Equal(messageIds.Count, messageIds.Max);
 
         // assert - messages were stored as expected
         var stored = (await _storage.ReadAsync<AdoNetStreamMessage>("SELECT * FROM OrleansStreamMessage"))
@@ -747,7 +755,7 @@ public abstract class RelationalOrleansQueriesTests(string invariant) : IAsyncLi
         var evictionBatchSize = 1000;
 
         // this keeps requests under the default connection pool limit to avoid flaky tests due to connection timeouts
-        var semaphore = new SemaphoreSlim(100);
+        using var semaphore = new SemaphoreSlim(100);
 
         // act - chaos enqueue, dequeue, confirm
         // the tasks below are not expected to result in a planned outcome but are expected to result in a consistent one

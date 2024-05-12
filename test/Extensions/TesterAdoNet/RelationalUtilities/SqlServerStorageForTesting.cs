@@ -1,3 +1,4 @@
+using System.Data.SqlClient;
 using Orleans.Tests.SqlUtils;
 using TestExtensions;
 
@@ -61,5 +62,7 @@ namespace UnitTests.General
 
             return batches;
         }
+
+        protected override void ClearAllPools() => SqlConnection.ClearAllPools();
     }
 }

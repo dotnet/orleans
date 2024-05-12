@@ -193,9 +193,11 @@ namespace UnitTests.General
         /// </summary>
         /// <param name="databaseName">The name of the database to drop.</param>
         /// <returns>The call will be successful if the DDL query is successful. Otherwise an exception will be thrown.</returns>
-        private Task DropDatabaseAsync(string databaseName)
+        private async Task DropDatabaseAsync(string databaseName)
         {
-            return Storage.ExecuteAsync(string.Format(DropDatabaseTemplate, databaseName), command => { });
+            await Storage.ExecuteAsync(string.Format(DropDatabaseTemplate, databaseName), command => { });
+
+            ClearAllPools();
         }
 
         /// <summary>
@@ -211,5 +213,11 @@ namespace UnitTests.General
             return CreateTestInstance(Storage.InvariantName, csb.ConnectionString);
         }
 
+        /// <summary>
+        /// Clears all the connection pools.
+        /// This helps avoid connection dropped errors from race conditions when the database is dropped and recreated quickly.
+        /// PostgreSQL is particularly sensitive to this when running locally.
+        /// </summary>
+        protected abstract void ClearAllPools();
     }
 }

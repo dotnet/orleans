@@ -1,3 +1,4 @@
+using Npgsql;
 using Orleans.Tests.SqlUtils;
 using TestExtensions;
 using UnitTests.General;
@@ -49,5 +50,7 @@ namespace Tester.RelationalUtilities
 
             return batches;
         }
+
+        protected override void ClearAllPools() => NpgsqlConnection.ClearAllPools();
     }
 }
