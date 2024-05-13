@@ -467,7 +467,7 @@ CREATE PROCEDURE FailStreamMessage
 	@ServiceId NVARCHAR(150),
     @ProviderId NVARCHAR(150),
 	@QueueId NVARCHAR(150),
-    @MessageId INT,
+    @MessageId BIGINT,
 	@MaxAttempts INT,
 	@RemovalTimeout INT
 AS

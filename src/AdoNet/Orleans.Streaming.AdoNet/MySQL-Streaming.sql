@@ -462,7 +462,7 @@ CREATE PROCEDURE FailStreamMessage
     IN _ServiceId NVARCHAR(150),
     IN _ProviderId NVARCHAR(150),
     IN _QueueId NVARCHAR(150),
-    IN _MessageId INT,
+    IN _MessageId BIGINT,
     IN _MaxAttempts INT,
     IN _RemovalTimeout INT
 )
