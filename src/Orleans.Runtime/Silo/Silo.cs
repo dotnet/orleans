@@ -31,9 +31,9 @@ namespace Orleans.Runtime
         private readonly ILogger logger;
         private readonly TaskCompletionSource<int> siloTerminatedTask = new TaskCompletionSource<int>(TaskCreationOptions.RunContinuationsAsynchronously);
         private readonly InsideRuntimeClient runtimeClient;
-        private SystemTarget fallbackScheduler;
+        private readonly SystemTarget fallbackScheduler;
         private readonly ISiloStatusOracle siloStatusOracle;
-        private Watchdog platformWatchdog;
+        private readonly Watchdog platformWatchdog;
         private readonly TimeSpan waitForMessageToBeQueuedForOutbound;
         private readonly TimeSpan initTimeout;
         private readonly TimeSpan stopTimeout = TimeSpan.FromMinutes(1);
@@ -42,13 +42,9 @@ namespace Orleans.Runtime
         private readonly GrainFactory grainFactory;
         private readonly ISiloLifecycleSubject siloLifecycle;
         private readonly IMembershipService membershipService;
-        internal List<GrainService> grainServices = new List<GrainService>();
-
+        private readonly List<GrainService> grainServices = new List<GrainService>();
         private readonly ILoggerFactory loggerFactory;
-        /// <summary>
-        /// Gets the type of this
-        /// </summary>
-        internal string Name => this.siloDetails.Name;
+
         internal ILocalGrainDirectory LocalGrainDirectory { get { return localGrainDirectory; } }
         internal IConsistentRingProvider RingProvider { get; private set; }
         internal List<GrainService> GrainServices => grainServices;
@@ -79,10 +75,11 @@ namespace Orleans.Runtime
             Justification = "Should not Dispose of messageCenter in this method because it continues to run / exist after this point.")]
         public Silo(ILocalSiloDetails siloDetails, IServiceProvider services)
         {
-            string name = siloDetails.Name;
-            // Temporarily still require this. Hopefuly gone when 2.0 is released.
+            SystemStatus = SystemStatus.Creating;
+            Services = services;
+            platformWatchdog = services.GetRequiredService<Watchdog>();
+            fallbackScheduler = services.GetRequiredService<FallbackSystemTarget>();
             this.siloDetails = siloDetails;
-            this.SystemStatus = SystemStatus.Creating;
 
             IOptions<ClusterMembershipOptions> clusterMembershipOptions = services.GetRequiredService<IOptions<ClusterMembershipOptions>>();
             initTimeout = clusterMembershipOptions.Value.MaxJoinAttemptTime;
@@ -93,8 +90,6 @@ namespace Orleans.Runtime
             }
 
             var localEndpoint = this.siloDetails.SiloAddress.Endpoint;
-
-            this.Services = services;
 
             //set PropagateActivityId flag from node config
             IOptions<SiloMessagingOptions> messagingOptions = services.GetRequiredService<IOptions<SiloMessagingOptions>>();
@@ -133,7 +128,7 @@ namespace Orleans.Runtime
             logger.LogInformation(
                 (int)ErrorCode.SiloInitConfig,
                 "Starting silo {SiloName}",
-                name);
+                siloDetails.Name);
 
             try
             {
@@ -193,7 +188,6 @@ namespace Orleans.Runtime
         {
             // SystemTarget for provider init calls
             this.lifecycleSchedulingSystemTarget = Services.GetRequiredService<LifecycleSchedulingSystemTarget>();
-            this.fallbackScheduler = Services.GetRequiredService<FallbackSystemTarget>();
             RegisterSystemTarget(lifecycleSchedulingSystemTarget);
 
             try
@@ -235,7 +229,6 @@ namespace Orleans.Runtime
             this.siloStatusOracle.SubscribeToSiloStatusEvents(Services.GetRequiredService<DeploymentLoadPublisher>());
 
             // SystemTarget for provider init calls
-            this.fallbackScheduler = Services.GetRequiredService<FallbackSystemTarget>();
             RegisterSystemTarget(fallbackScheduler);
         }
 
@@ -312,11 +305,7 @@ namespace Orleans.Runtime
                 }
 
                 // Start background timer tick to watch for platform execution stalls, such as when GC kicks in
-                var healthCheckParticipants = this.Services.GetService<IEnumerable<IHealthCheckParticipant>>().ToList();
-                var membershipOptions = Services.GetRequiredService<IOptions<ClusterMembershipOptions>>().Value;
-                this.platformWatchdog = new Watchdog(membershipOptions.LocalHealthDegradationMonitoringPeriod, healthCheckParticipants, this.loggerFactory.CreateLogger<Watchdog>());
                 this.platformWatchdog.Start();
-                if (this.logger.IsEnabled(LogLevel.Debug)) { logger.LogDebug("Silo platform watchdog started successfully."); }
             }
             catch (Exception exc)
             {
@@ -503,17 +492,15 @@ namespace Orleans.Runtime
                 return Task.CompletedTask;
 
             // Start rejecting all silo to silo application messages
-            SafeExecute(messageCenter.BlockApplicationMessages);
+            messageCenter.BlockApplicationMessages();
 
             return Task.CompletedTask;
         }
 
         private async Task OnRuntimeInitializeStop(CancellationToken ct)
         {
-            if (platformWatchdog != null)
-            {
-                SafeExecute(platformWatchdog.Stop); // Silo may be dying before platformWatchdog was set up
-            }
+            // Silo may be dying before platformWatchdog was set up
+            platformWatchdog.Stop(); 
 
             try
             {
