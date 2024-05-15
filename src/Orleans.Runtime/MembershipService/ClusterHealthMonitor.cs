@@ -17,7 +17,7 @@ namespace Orleans.Runtime.MembershipService
     /// <summary>
     /// Responsible for ensuring that this silo monitors other silos in the cluster.
     /// </summary>
-    internal class ClusterHealthMonitor : IHealthCheckParticipant, ILifecycleParticipant<ISiloLifecycle>, ClusterHealthMonitor.ITestAccessor
+    internal class ClusterHealthMonitor : IHealthCheckParticipant, ILifecycleParticipant<ISiloLifecycle>, ClusterHealthMonitor.ITestAccessor, IDisposable, IAsyncDisposable
     {
         private readonly CancellationTokenSource shutdownCancellation = new CancellationTokenSource();
         private readonly ILocalSiloDetails localSiloDetails;
@@ -283,6 +283,57 @@ namespace Orleans.Runtime.MembershipService
             }
 
             return ok;
+        }
+
+        public void Dispose()
+        {
+            try
+            {
+                shutdownCancellation.Cancel();
+            }
+            catch (Exception exception)
+            {
+                log.LogError(exception, "Error cancelling shutdown token.");
+            }
+
+            foreach (var monitor in monitoredSilos.Values)
+            {
+                try
+                {
+                    monitor.Dispose();
+                }
+                catch (Exception exception)
+                {
+                    log.LogError(exception, "Error disposing monitor for {SiloAddress}.", monitor.SiloAddress);
+                }
+            }
+        }
+
+        public async ValueTask DisposeAsync()
+        {
+            try
+            {
+                shutdownCancellation.Cancel();
+            }
+            catch (Exception exception)
+            {
+                log.LogError(exception, "Error cancelling shutdown token.");
+            }
+
+            var tasks = new List<Task>();
+            foreach (var monitor in monitoredSilos.Values)
+            {
+                try
+                {
+                    tasks.Add(monitor.DisposeAsync().AsTask());
+                }
+                catch (Exception exception)
+                {
+                    log.LogError(exception, "Error disposing monitor for {SiloAddress}.", monitor.SiloAddress);
+                }
+            }
+
+            await Task.WhenAll(tasks).ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing);
         }
     }
 }
