@@ -1,4 +1,5 @@
 using System;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace Orleans.Runtime.MembershipService
@@ -13,10 +14,11 @@ namespace Orleans.Runtime.MembershipService
         /// </summary>
         /// <param name="silo">The silo to probe.</param>
         /// <param name="probeNumber">The probe identifier for diagnostic purposes.</param>
+        /// <param name="cancellationToken">The cancellation token.</param>
         /// <returns>
         /// A <see cref="Task"/> which completes when the probe returns successfully and faults when the probe fails.
         /// </returns>
-        Task Probe(SiloAddress silo, int probeNumber);
+        Task Probe(SiloAddress silo, int probeNumber, CancellationToken cancellationToken = default);
 
         /// <summary>
         /// Probes the specified <paramref name="target"/> indirectly, via <paramref name="intermediary"/>.
@@ -25,6 +27,7 @@ namespace Orleans.Runtime.MembershipService
         /// <param name="target">The silo which will be probed.</param>
         /// <param name="probeTimeout">The timeout which the <paramref name="intermediary" /> should apply to the probe.</param>
         /// <param name="probeNumber">The probe number for diagnostic purposes.</param>
-        Task<IndirectProbeResponse> ProbeIndirectly(SiloAddress intermediary, SiloAddress target, TimeSpan probeTimeout, int probeNumber);
+        /// <param name="cancellationToken">The cancellation token.</param>
+        Task<IndirectProbeResponse> ProbeIndirectly(SiloAddress intermediary, SiloAddress target, TimeSpan probeTimeout, int probeNumber, CancellationToken cancellationToken = default);
     }
 }
