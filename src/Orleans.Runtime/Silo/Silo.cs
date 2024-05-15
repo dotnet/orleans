@@ -21,7 +21,7 @@ namespace Orleans.Runtime
     /// <summary>
     /// Orleans silo.
     /// </summary>
-    public class Silo
+    public sealed class Silo : IAsyncDisposable, IDisposable
     {
         /// <summary>Standard name for Primary silo. </summary>
         public const string PrimarySiloName = "Primary";
@@ -627,6 +627,24 @@ namespace Orleans.Runtime
             lifecycle.Subscribe<Silo>(ServiceLifecycleStage.RuntimeGrainServices, (ct) => Task.Run(() => OnRuntimeGrainServicesStart(ct)));
             lifecycle.Subscribe<Silo>(ServiceLifecycleStage.BecomeActive, (ct) => Task.Run(() => OnBecomeActiveStart(ct)), (ct) => Task.Run(() => OnBecomeActiveStop(ct)));
             lifecycle.Subscribe<Silo>(ServiceLifecycleStage.Active, (ct) => Task.Run(() => OnActiveStart(ct)), (ct) => Task.Run(() => OnActiveStop(ct)));
+        }
+
+        public async ValueTask DisposeAsync()
+        {
+            using var cts = new CancellationTokenSource();
+            cts.Cancel();
+            await StopAsync(cts.Token).ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing);
+        }
+
+        public void Dispose()
+        {
+            try
+            {
+                Stop();
+            }
+            catch
+            {
+            }
         }
     }
 
