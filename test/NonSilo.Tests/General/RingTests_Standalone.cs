@@ -1,4 +1,5 @@
-﻿using Microsoft.Extensions.Logging.Abstractions;
+using System.Net;
+using Microsoft.Extensions.Logging.Abstractions;
 using Orleans.Runtime;
 using Orleans.Runtime.ConsistentRing;
 using TestExtensions;
@@ -100,7 +101,7 @@ namespace UnitTests.General
             for (int i = 1; i <= n; i++)
             {
                 SiloAddress addr = SiloAddressUtils.NewLocalSiloAddress(i);
-                rings.Add(addr, new ConsistentRingProvider(addr, NullLoggerFactory.Instance));
+                rings.Add(addr, new ConsistentRingProvider(addr, NullLoggerFactory.Instance, new FakeSiloStatusOracle()));
             }
             return rings;
         }
@@ -203,6 +204,53 @@ namespace UnitTests.General
         }
     }
 
+    internal sealed class FakeSiloStatusOracle : ISiloStatusOracle
+    {
+        private readonly Dictionary<SiloAddress, SiloStatus> _content = [];
+
+        public FakeSiloStatusOracle()
+        {
+            SiloAddress = SiloAddress.New(IPAddress.Loopback, Random.Shared.Next(2000, 40_000), SiloAddress.AllocateNewGeneration());
+            _content[SiloAddress] = SiloStatus.Active;
+        }
+
+        public SiloStatus CurrentStatus => SiloStatus.Active;
+
+        public string SiloName => "TestSilo";
+
+        public SiloAddress SiloAddress { get; }
+
+        public SiloStatus GetApproximateSiloStatus(SiloAddress siloAddress)
+        {
+            if (_content.TryGetValue(siloAddress, out var status))
+            {
+                return status;
+            }
+            return SiloStatus.None;
+        }
+
+        public Dictionary<SiloAddress, SiloStatus> GetApproximateSiloStatuses(bool onlyActive = false)
+        {
+            return onlyActive
+                ? new Dictionary<SiloAddress, SiloStatus>(_content.Where(kvp => kvp.Value == SiloStatus.Active))
+                : new Dictionary<SiloAddress, SiloStatus>(_content);
+        }
+
+        public void SetSiloStatus(SiloAddress siloAddress, SiloStatus status) => _content[siloAddress] = status;
+
+        public bool IsDeadSilo(SiloAddress silo) => GetApproximateSiloStatus(silo) == SiloStatus.Dead;
+
+        public bool IsFunctionalDirectory(SiloAddress siloAddress) => !GetApproximateSiloStatus(siloAddress).IsTerminating();
+
+        #region Not Implemented
+        public bool SubscribeToSiloStatusEvents(ISiloStatusListener observer) => throw new NotImplementedException();
+
+        public bool TryGetSiloName(SiloAddress siloAddress, out string siloName) => throw new NotImplementedException();
+
+        public bool UnSubscribeFromSiloStatusEvents(ISiloStatusListener observer) => throw new NotImplementedException();
+        #endregion
+    }
+
     internal class RangeBreakable
     {
         private List<SingleRange> ranges { get; set; }
@@ -217,10 +265,10 @@ namespace UnitTests.General
         public bool Remove(IRingRange range)
         {
             bool wholerange = true;
-            foreach (SingleRange s in RangeFactory.GetSubRanges(range))
+            foreach (var s in RangeFactory.GetSubRanges(range))
             {
                 bool found = false;
-                foreach (SingleRange m in ranges)
+                foreach (var m in ranges)
                 {
                     if (m.Begin == m.End) // treat full range as special case
                     {

@@ -46,8 +46,7 @@ namespace Orleans.Runtime
         private readonly ILoggerFactory loggerFactory;
 
         internal ILocalGrainDirectory LocalGrainDirectory { get { return localGrainDirectory; } }
-        internal IConsistentRingProvider RingProvider { get; private set; }
-        internal List<GrainService> GrainServices => grainServices;
+        internal IConsistentRingProvider RingProvider { get; }
 
         internal SystemStatus SystemStatus { get; set; }
 
@@ -77,6 +76,7 @@ namespace Orleans.Runtime
         {
             SystemStatus = SystemStatus.Creating;
             Services = services;
+            RingProvider = services.GetRequiredService<IConsistentRingProvider>();
             platformWatchdog = services.GetRequiredService<Watchdog>();
             fallbackScheduler = services.GetRequiredService<FallbackSystemTarget>();
             this.siloDetails = siloDetails;
@@ -151,9 +151,6 @@ namespace Orleans.Runtime
             // This has to come after the message center //; note that it then gets injected back into the message center.;
             localGrainDirectory = Services.GetRequiredService<LocalGrainDirectory>();
 
-            // Now the consistent ring provider
-            RingProvider = Services.GetRequiredService<IConsistentRingProvider>();
-
             catalog = Services.GetRequiredService<Catalog>();
 
             siloStatusOracle = Services.GetRequiredService<ISiloStatusOracle>();
@@ -222,9 +219,6 @@ namespace Orleans.Runtime
         {
             catalog.SiloStatusOracle = this.siloStatusOracle;
             this.siloStatusOracle.SubscribeToSiloStatusEvents(localGrainDirectory);
-
-            // consistentRingProvider is not a system target per say, but it behaves like the localGrainDirectory, so it is here
-            this.siloStatusOracle.SubscribeToSiloStatusEvents((ISiloStatusListener)RingProvider);
 
             this.siloStatusOracle.SubscribeToSiloStatusEvents(Services.GetRequiredService<DeploymentLoadPublisher>());
 
