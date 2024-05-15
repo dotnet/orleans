@@ -57,15 +57,10 @@ namespace Orleans.Streams
             return Task.CompletedTask;
         }
 
-        #region Queue change notification - replace with IAsyncEnumerable change feed - jbragg
-
         /// <inheritdoc/>
         public bool SubscribeToQueueDistributionChangeEvents(IStreamQueueBalanceListener observer)
         {
-            if (observer == null)
-            {
-                throw new ArgumentNullException(nameof(observer));
-            }
+            ArgumentNullException.ThrowIfNull(observer);
             lock (this.queueBalanceListeners)
             {
                 if (this.queueBalanceListeners.Contains(observer))
@@ -79,10 +74,7 @@ namespace Orleans.Streams
         /// <inheritdoc/>
         public bool UnSubscribeFromQueueDistributionChangeEvents(IStreamQueueBalanceListener observer)
         {
-            if (observer == null)
-            {
-                throw new ArgumentNullException(nameof(observer));
-            }
+            ArgumentNullException.ThrowIfNull(observer);
             lock (this.queueBalanceListeners)
             {
                 return this.queueBalanceListeners.Remove(observer);
@@ -99,23 +91,29 @@ namespace Orleans.Streams
             }
             return Task.WhenAll(queueBalanceListenersCopy.Select(listener => listener.QueueDistributionChangeNotification()));
         }
-#endregion
 
         private async Task ListenForClusterChanges()
         {
             var current = new HashSet<SiloAddress>();
             await foreach (var membershipSnapshot in this.clusterMembershipUpdates.WithCancellation(this.Cancellation))
             {
-                // get active members
-                var update = new HashSet<SiloAddress>(membershipSnapshot.Members.Values
-                    .Where(member => member.Status == SiloStatus.Active)
-                    .Select(member => member.SiloAddress));
-
-                // if active list has changed, track new list and notify
-                if(!current.SetEquals(update))
+                try
                 {
-                    current = update;
-                    OnClusterMembershipChange(current);
+                    // Get active members.
+                    var update = new HashSet<SiloAddress>(membershipSnapshot.Members.Values
+                        .Where(member => member.Status == SiloStatus.Active)
+                        .Select(member => member.SiloAddress));
+
+                    // If active list has changed, track new list and notify.
+                    if (!current.SetEquals(update))
+                    {
+                        current = update;
+                        OnClusterMembershipChange(current);
+                    }
+                }
+                catch (Exception exception)
+                {
+                    Logger.LogError(exception, "Error processing cluster membership update.");
                 }
             }
         }
