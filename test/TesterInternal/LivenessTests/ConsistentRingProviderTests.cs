@@ -129,6 +129,7 @@ namespace UnitTests.LivenessTests
         internal sealed class FakeSiloStatusOracle : ISiloStatusOracle
         {
             private readonly Dictionary<SiloAddress, SiloStatus> _content = [];
+            private readonly HashSet<ISiloStatusListener> _subscribers = [];
 
             public FakeSiloStatusOracle()
             {
@@ -158,19 +159,28 @@ namespace UnitTests.LivenessTests
                     : new Dictionary<SiloAddress, SiloStatus>(_content);
             }
 
-            public void SetSiloStatus(SiloAddress siloAddress, SiloStatus status) => _content[siloAddress] = status;
+            public void SetSiloStatus(SiloAddress siloAddress, SiloStatus status)
+            {
+                _content[siloAddress] = status;
+                foreach (var subscriber in _subscribers)
+                {
+                    subscriber.SiloStatusChangeNotification(siloAddress, status);
+                }
+            }
 
             public bool IsDeadSilo(SiloAddress silo) => GetApproximateSiloStatus(silo) == SiloStatus.Dead;
 
             public bool IsFunctionalDirectory(SiloAddress siloAddress) => !GetApproximateSiloStatus(siloAddress).IsTerminating();
 
-            #region Not Implemented
-            public bool SubscribeToSiloStatusEvents(ISiloStatusListener observer) => throw new NotImplementedException();
+            public bool SubscribeToSiloStatusEvents(ISiloStatusListener observer) => _subscribers.Add(observer);
 
-            public bool TryGetSiloName(SiloAddress siloAddress, out string siloName) => throw new NotImplementedException();
+            public bool TryGetSiloName(SiloAddress siloAddress, out string siloName)
+            {
+                siloName = "TestSilo";
+                return true;
+            }
 
-            public bool UnSubscribeFromSiloStatusEvents(ISiloStatusListener observer) => throw new NotImplementedException();
-            #endregion
+            public bool UnSubscribeFromSiloStatusEvents(ISiloStatusListener observer) => _subscribers.Remove(observer);
         }
     }
 }
