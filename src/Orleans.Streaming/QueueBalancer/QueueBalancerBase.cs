@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Orleans.Runtime;
+using Orleans.Runtime.Internal;
 
 namespace Orleans.Streams
 {
@@ -17,6 +18,7 @@ namespace Orleans.Streams
         private readonly IAsyncEnumerable<ClusterMembershipSnapshot> clusterMembershipUpdates;
         private readonly List<IStreamQueueBalanceListener> queueBalanceListeners;
         private readonly CancellationTokenSource cts;
+        private Task _listenForClusterChangesTask;
 
         protected CancellationToken Cancellation => this.cts.Token;
 
@@ -47,25 +49,29 @@ namespace Orleans.Streams
         /// <inheritdoc/>
         public virtual Task Initialize(IStreamQueueMapper queueMapper)
         {
-            ListenForClusterChanges().Ignore();
+            using var _ = new ExecutionContextSuppressor();
+            _listenForClusterChangesTask = ListenForClusterChanges();
             return Task.CompletedTask;
         }
 
-        public virtual Task Shutdown()
+        public virtual async Task Shutdown()
         {
-            this.cts.Cancel(throwOnFirstException: false);
-            return Task.CompletedTask;
-        }
+            try
+            {
+                this.cts.Cancel(throwOnFirstException: false);
+            }
+            catch (Exception exc)
+            {
+                Logger.LogError(exc, "Error signaling shutdown token.");
+            }
 
-        #region Queue change notification - replace with IAsyncEnumerable change feed - jbragg
+            await _listenForClusterChangesTask;
+        }
 
         /// <inheritdoc/>
         public bool SubscribeToQueueDistributionChangeEvents(IStreamQueueBalanceListener observer)
         {
-            if (observer == null)
-            {
-                throw new ArgumentNullException(nameof(observer));
-            }
+            ArgumentNullException.ThrowIfNull(observer);
             lock (this.queueBalanceListeners)
             {
                 if (this.queueBalanceListeners.Contains(observer))
@@ -79,10 +85,7 @@ namespace Orleans.Streams
         /// <inheritdoc/>
         public bool UnSubscribeFromQueueDistributionChangeEvents(IStreamQueueBalanceListener observer)
         {
-            if (observer == null)
-            {
-                throw new ArgumentNullException(nameof(observer));
-            }
+            ArgumentNullException.ThrowIfNull(observer);
             lock (this.queueBalanceListeners)
             {
                 return this.queueBalanceListeners.Remove(observer);
@@ -99,23 +102,30 @@ namespace Orleans.Streams
             }
             return Task.WhenAll(queueBalanceListenersCopy.Select(listener => listener.QueueDistributionChangeNotification()));
         }
-#endregion
 
         private async Task ListenForClusterChanges()
         {
+            await Task.CompletedTask.ConfigureAwait(ConfigureAwaitOptions.ForceYielding);
             var current = new HashSet<SiloAddress>();
             await foreach (var membershipSnapshot in this.clusterMembershipUpdates.WithCancellation(this.Cancellation))
             {
-                // get active members
-                var update = new HashSet<SiloAddress>(membershipSnapshot.Members.Values
-                    .Where(member => member.Status == SiloStatus.Active)
-                    .Select(member => member.SiloAddress));
-
-                // if active list has changed, track new list and notify
-                if(!current.SetEquals(update))
+                try
                 {
-                    current = update;
-                    OnClusterMembershipChange(current);
+                    // Get active members.
+                    var update = new HashSet<SiloAddress>(membershipSnapshot.Members.Values
+                        .Where(member => member.Status == SiloStatus.Active)
+                        .Select(member => member.SiloAddress));
+
+                    // If active list has changed, track new list and notify.
+                    if (!current.SetEquals(update))
+                    {
+                        current = update;
+                        OnClusterMembershipChange(current);
+                    }
+                }
+                catch (Exception exception)
+                {
+                    Logger.LogError(exception, "Error processing cluster membership update.");
                 }
             }
         }

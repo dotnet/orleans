@@ -3,7 +3,6 @@ using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 using Orleans.Providers;
 using Orleans.Providers.Streams.Common;
-using Orleans.Runtime;
 using Orleans.TestingHost;
 using Orleans.TestingHost.Utils;
 using TestExtensions;
@@ -46,7 +45,7 @@ namespace Tester.AzureUtils.Lease
                         {
                             options.LeaseLength = TimeSpan.FromSeconds(15);
                             options.LeaseRenewPeriod = TimeSpan.FromSeconds(10);
-                            options.LeaseAquisitionPeriod = TimeSpan.FromSeconds(10);
+                            options.LeaseAcquisitionPeriod = TimeSpan.FromSeconds(10);
                         }));
                     })
                     .ConfigureLogging(builder => builder.AddFilter($"LeaseBasedQueueBalancer-{StreamProviderName}", LogLevel.Trace))
