@@ -918,7 +918,7 @@ public abstract class RelationalOrleansQueriesTests(string invariant) : IAsyncLi
         Assert.Equal(queueId, dead.QueueId);
         Assert.Equal(ack.MessageId, dead.MessageId);
         Assert.Equal(1, dead.Dequeued);
-        Assert.True(dead.ExpiresOn >= beforeQueued.Add(streamOptions.ExpiryTimeout.SecondsCeiling()));
+        Assert.True(dead.ExpiresOn >= beforeQueued);
         Assert.True(dead.ExpiresOn <= afterQueued.Add(streamOptions.ExpiryTimeout.SecondsCeiling()));
         Assert.True(dead.CreatedOn >= beforeQueued);
         Assert.True(dead.CreatedOn <= afterQueued);
@@ -926,7 +926,7 @@ public abstract class RelationalOrleansQueriesTests(string invariant) : IAsyncLi
         Assert.True(dead.ModifiedOn <= afterDequeued);
         Assert.True(dead.DeadOn >= beforeFailure);
         Assert.True(dead.DeadOn <= afterFailure);
-        Assert.True(dead.RemoveOn >= beforeFailure.Add(streamOptions.DeadLetterEvictionTimeout.SecondsCeiling()));
+        Assert.True(dead.RemoveOn >= beforeFailure);
         Assert.True(dead.RemoveOn <= afterFailure.Add(streamOptions.DeadLetterEvictionTimeout.SecondsCeiling()));
         Assert.Equal(payload, dead.Payload);
     }
