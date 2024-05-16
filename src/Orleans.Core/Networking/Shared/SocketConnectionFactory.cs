@@ -7,6 +7,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Connections;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Orleans.Runtime;
 
 namespace Orleans.Networking.Shared
@@ -16,13 +17,15 @@ namespace Orleans.Networking.Shared
         private readonly SocketsTrace trace;
         private readonly SocketSchedulers schedulers;
         private readonly MemoryPool<byte> memoryPool;
+        private readonly SocketConnectionOptions _options;
 
-        public SocketConnectionFactory(ILoggerFactory loggerFactory, SocketSchedulers schedulers, SharedMemoryPool memoryPool)
+        public SocketConnectionFactory(ILoggerFactory loggerFactory, SocketSchedulers schedulers, SharedMemoryPool memoryPool, IOptions<SocketConnectionOptions> options)
         {
             var logger = loggerFactory.CreateLogger("Orleans.Sockets");
             this.trace = new SocketsTrace(logger);
             this.schedulers = schedulers;
             this.memoryPool = memoryPool.Pool;
+            _options = options.Value;
         }
 
         public async ValueTask<ConnectionContext> ConnectAsync(EndPoint endpoint, CancellationToken cancellationToken)
@@ -30,8 +33,16 @@ namespace Orleans.Networking.Shared
             var socket = new Socket(endpoint.AddressFamily, SocketType.Stream, ProtocolType.Tcp)
             {
                 LingerState = new LingerOption(true, 0),
-                NoDelay = true
+                NoDelay = _options.NoDelay,
             };
+
+            if (_options.KeepAlive)
+            {
+                socket.EnableKeepAlive(
+                    timeSeconds: _options.KeepAliveTimeSeconds,
+                    intervalSeconds: _options.KeepAliveIntervalSeconds,
+                    retryCount: _options.KeepAliveRetryCount);
+            }
 
             socket.EnableFastPath();
             using var completion = new SingleUseSocketAsyncEventArgs

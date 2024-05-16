@@ -1,31 +1,25 @@
+#nullable enable
 using System;
+using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 
-namespace Orleans.Runtime.MembershipService
+namespace Orleans.Runtime.MembershipService;
+
+/// <inheritdoc />
+internal class RemoteSiloProber(IServiceProvider serviceProvider) : IRemoteSiloProber
 {
     /// <inheritdoc />
-    internal class RemoteSiloProber : IRemoteSiloProber
+    public async Task Probe(SiloAddress remoteSilo, int probeNumber, CancellationToken cancellationToken)
     {
-        private readonly IServiceProvider serviceProvider;
+        var systemTarget = serviceProvider.GetRequiredService<MembershipSystemTarget>();
+        await systemTarget.ProbeRemoteSilo(remoteSilo, probeNumber).WaitAsync(cancellationToken);
+    }
 
-        public RemoteSiloProber(IServiceProvider serviceProvider)
-        {
-            this.serviceProvider = serviceProvider;
-        }
-
-        /// <inheritdoc />
-        public Task Probe(SiloAddress remoteSilo, int probeNumber)
-        {
-            var systemTarget = this.serviceProvider.GetRequiredService<MembershipSystemTarget>();
-            return systemTarget.ProbeRemoteSilo(remoteSilo, probeNumber);
-        }
-
-        /// <inheritdoc />
-        public Task<IndirectProbeResponse> ProbeIndirectly(SiloAddress intermediary, SiloAddress target, TimeSpan probeTimeout, int probeNumber)
-        {
-            var systemTarget = this.serviceProvider.GetRequiredService<MembershipSystemTarget>();
-            return systemTarget.ProbeRemoteSiloIndirectly(intermediary, target, probeTimeout, probeNumber);
-        }
+    /// <inheritdoc />
+    public async Task<IndirectProbeResponse> ProbeIndirectly(SiloAddress intermediary, SiloAddress target, TimeSpan probeTimeout, int probeNumber, CancellationToken cancellationToken)
+    {
+        var systemTarget = serviceProvider.GetRequiredService<MembershipSystemTarget>();
+        return await systemTarget.ProbeRemoteSiloIndirectly(intermediary, target, probeTimeout, probeNumber).WaitAsync(cancellationToken);
     }
 }

@@ -223,8 +223,9 @@ namespace Orleans.Runtime
         /// <summary>
         /// Schedules a work item for execution by this instance.
         /// </summary>
-        /// <param name="workItem">The work item.</param>
-        void QueueWorkItem(IThreadPoolWorkItem workItem);
+        /// <param name="action">The work item.</param>
+        /// <param name="state">The state passed when invoking the item.</param>
+        void QueueAction(Action<object> action, object state);
     }
 
     /// <summary>

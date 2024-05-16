@@ -29,7 +29,7 @@ namespace Orleans.Runtime.GrainDirectory
             var services = serviceProvider.GetGrainDirectories();
             foreach (var svc in services)
             {
-                this.directoryPerName.Add(svc.Name, svc.Service);
+                this.directoryPerName.Add(svc.Name, serviceProvider.GetRequiredKeyedService<IGrainDirectory>(svc.Name));
             }
 
             this.directoryPerName.TryGetValue(GrainDirectoryAttribute.DEFAULT_GRAIN_DIRECTORY, out var defaultDirectory);

@@ -19,7 +19,7 @@ namespace Orleans.EventSourcing.CustomStorage
         private readonly CustomStorageLogConsistencyOptions options;
 
         /// <summary>
-        /// Specifies a clusterid of the primary cluster from which to access storage exclusively, null if
+        /// Specifies a cluster id of the primary cluster from which to access storage exclusively, null if
         /// storage should be accessed directly from all clusters.
         /// </summary>
         public string PrimaryCluster => options.PrimaryCluster;
@@ -33,11 +33,11 @@ namespace Orleans.EventSourcing.CustomStorage
         }
 
         /// <inheritdoc/>
-        public ILogViewAdaptor<TView, TEntry> MakeLogViewAdaptor<TView, TEntry>(ILogViewAdaptorHost<TView, TEntry> hostgrain, TView initialstate, string graintypename, IGrainStorage grainStorage, ILogConsistencyProtocolServices services)
+        public ILogViewAdaptor<TView, TEntry> MakeLogViewAdaptor<TView, TEntry>(ILogViewAdaptorHost<TView, TEntry> hostGrain, TView initialState, string grainTypeName, IGrainStorage grainStorage, ILogConsistencyProtocolServices services)
             where TView : class, new()
             where TEntry : class
         {
-            return new CustomStorageAdaptor<TView, TEntry>(hostgrain, initialstate, services, PrimaryCluster);
+            return new CustomStorageAdaptor<TView, TEntry>(hostGrain, initialState, services, PrimaryCluster);
         }
     }
 

@@ -1,3 +1,4 @@
+#nullable enable
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -9,6 +10,7 @@ using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 using Orleans.Runtime;
 using Orleans.Runtime.Messaging;
+using static Orleans.Internal.StandardExtensions;
 
 namespace Orleans.Messaging
 {
@@ -27,28 +29,30 @@ namespace Orleans.Messaging
         private readonly ILogger logger;
         private readonly ConnectionManager connectionManager;
         private readonly GatewayOptions gatewayOptions;
-        private AsyncTaskSafeTimer gatewayRefreshTimer;
-        private List<SiloAddress> cachedLiveGateways;
-        private HashSet<SiloAddress> cachedLiveGatewaysSet;
-        private List<SiloAddress> knownGateways;
+        private readonly PeriodicTimer gatewayRefreshTimer;
+        private List<SiloAddress> cachedLiveGateways = [];
+        private HashSet<SiloAddress> cachedLiveGatewaysSet = [];
+        private List<SiloAddress> knownGateways = [];
         private DateTime lastRefreshTime;
         private int roundRobinCounter;
         private bool gatewayRefreshCallInitiated;
         private bool gatewayListProviderInitialized;
-
-        private readonly ILogger<SafeTimer> timerLogger;
+        private Task? gatewayRefreshTimerTask;
 
         public GatewayManager(
             IOptions<GatewayOptions> gatewayOptions,
             IGatewayListProvider gatewayListProvider,
             ILoggerFactory loggerFactory,
-            ConnectionManager connectionManager)
+            ConnectionManager connectionManager,
+            TimeProvider timeProvider)
         {
             this.gatewayOptions = gatewayOptions.Value;
             this.logger = loggerFactory.CreateLogger<GatewayManager>();
             this.connectionManager = connectionManager;
             this.gatewayListProvider = gatewayListProvider;
-            this.timerLogger = loggerFactory.CreateLogger<SafeTimer>();
+
+            var refreshPeriod = Max(this.gatewayOptions.GatewayListRefreshPeriod, TimeSpan.FromMilliseconds(1));
+            this.gatewayRefreshTimer = new PeriodicTimer(this.gatewayOptions.GatewayListRefreshPeriod, timeProvider); 
         }
 
         public async Task StartAsync(CancellationToken cancellationToken)
@@ -58,13 +62,6 @@ namespace Orleans.Messaging
                 await this.gatewayListProvider.InitializeGatewayListProvider();
                 gatewayListProviderInitialized = true;
             }
-
-            this.gatewayRefreshTimer = new AsyncTaskSafeTimer(
-                this.timerLogger,
-                RefreshSnapshotLiveGateways_TimerCallback,
-                null,
-                this.gatewayOptions.GatewayListRefreshPeriod,
-                this.gatewayOptions.GatewayListRefreshPeriod);
 
             var knownGateways = await this.gatewayListProvider.GetGateways();
             if (knownGateways.Count == 0)
@@ -81,19 +78,28 @@ namespace Orleans.Messaging
                 Utils.EnumerableToString(knownGateways));
 
             this.roundRobinCounter = this.gatewayOptions.PreferredGatewayIndex >= 0 ? this.gatewayOptions.PreferredGatewayIndex : Random.Shared.Next(knownGateways.Count);
-            this.knownGateways = this.cachedLiveGateways = knownGateways.Select(gw => gw.ToGatewayAddress()).ToList();
-            this.cachedLiveGatewaysSet = new HashSet<SiloAddress>(cachedLiveGateways);
-            this.lastRefreshTime = DateTime.UtcNow;
-        }
-
-        public void Stop()
-        {
-            if (gatewayRefreshTimer != null)
+            var newGateways = new List<SiloAddress>();
+            foreach (var gatewayUri in knownGateways)
             {
-                Utils.SafeExecute(gatewayRefreshTimer.Dispose, logger);
+                if (gatewayUri?.ToGatewayAddress() is { } gatewayAddress)
+                {
+                    newGateways.Add(gatewayAddress);
+                }
             }
 
-            gatewayRefreshTimer = null;
+            this.knownGateways = this.cachedLiveGateways = newGateways;
+            this.cachedLiveGatewaysSet = new HashSet<SiloAddress>(cachedLiveGateways);
+            this.lastRefreshTime = DateTime.UtcNow;
+            this.gatewayRefreshTimerTask ??= PeriodicallyRefreshGatewaySnapshot();
+        }
+
+        public async Task StopAsync(CancellationToken cancellationToken)
+        {
+            gatewayRefreshTimer.Dispose();
+            if (gatewayRefreshTimerTask is { } task)
+            {
+                await task.WaitAsync(cancellationToken);
+            }
         }
 
         public void MarkAsDead(SiloAddress gateway)
@@ -217,22 +223,39 @@ namespace Orleans.Messaging
             {
                 try
                 {
-                    await RefreshSnapshotLiveGateways_TimerCallback(null);
-                    gatewayRefreshCallInitiated = false;
+                    await RefreshGatewaySnapshot();
                 }
-                catch
+                finally
                 {
-                    // Intentionally ignore any exceptions here.
+                    gatewayRefreshCallInitiated = false;
                 }
             });
         }
 
         [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Design", "CA1031:DoNotCatchGeneralExceptionTypes")]
-        internal async Task RefreshSnapshotLiveGateways_TimerCallback(object context)
+        internal async Task PeriodicallyRefreshGatewaySnapshot()
+        {
+            await Task.Yield();
+
+            if (gatewayListProvider is null)
+            {
+                return;
+            }
+
+            while (await gatewayRefreshTimer.WaitForNextTickAsync())
+            {
+                await RefreshGatewaySnapshot();
+            }
+        }
+
+        private async Task RefreshGatewaySnapshot()
         {
             try
             {
-                if (gatewayListProvider is null) return;
+                if (gatewayListProvider is null)
+                {
+                    return;
+                }
 
                 // the listProvider.GetGateways() is not under lock.
                 var allGateways = await gatewayListProvider.GetGateways();
@@ -242,7 +265,7 @@ namespace Orleans.Messaging
             }
             catch (Exception exc)
             {
-                logger.LogError((int)ErrorCode.ProxyClient_GetGateways, exc, "Exception occurred during RefreshSnapshotLiveGateways_TimerCallback -> listProvider.GetGateways()");
+                logger.LogError((int)ErrorCode.ProxyClient_GetGateways, exc, "Error refreshing gateways.");
             }
         }
 
@@ -367,7 +390,7 @@ namespace Orleans.Messaging
 
         public void Dispose()
         {
-            this.gatewayRefreshTimer?.Dispose();
+            this.gatewayRefreshTimer.Dispose();
         }
     }
 }

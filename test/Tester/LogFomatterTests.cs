@@ -77,6 +77,7 @@ namespace Tester
             services.AddSingleton<OptionsLogger, TestOptionsLogger>();
             services.Configure<TestOptionsWithSecrets>(options => {
                 options.Data = "Hello";
+                // [SuppressMessage("Microsoft.Security", "CS002:SecretInNextLine", Justification="Not a secret")]
                 options.Password = "v3ryS3cur3!!!";
                 options.SomeConnectionString = "DefaultEndpointsProtocol=https;AccountName=someAccount;AccountKey=someKey;EndpointSuffix=core.windows.net";
             });

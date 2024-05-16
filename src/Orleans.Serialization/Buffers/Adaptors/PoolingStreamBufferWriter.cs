@@ -83,7 +83,7 @@ namespace Orleans.Serialization.Buffers.Adaptors
         private void Resize(int sizeHint)
         {
             var newBuffer = ArrayPool<byte>.Shared.Rent(_bytesWritten + sizeHint);
-            _buffer.CopyTo(newBuffer, 0);
+            _buffer[0.._bytesWritten].CopyTo(newBuffer, 0);
             ArrayPool<byte>.Shared.Return(_buffer);
             _buffer = newBuffer;
         }

@@ -7,7 +7,7 @@ using System.Text.Json;
 using Newtonsoft.Json;
 using Orleans;
 
-[GenerateSerializer]
+[Alias("test.person.alias"), GenerateSerializer]
 public record Person([property: Id(0)] int Age, [property: Id(1)] string Name)
 {
     [Id(2)]

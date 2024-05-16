@@ -41,7 +41,7 @@ using Orleans.Serialization.Cloning;
 using System.Collections.Generic;
 using Microsoft.Extensions.Configuration;
 using Orleans.Serialization.Internal;
-using Orleans.Runtime.Configuration.Options;
+using Orleans.Core;
 
 namespace Orleans.Hosting
 {
@@ -59,12 +59,16 @@ namespace Orleans.Hosting
 
             services.Add(ServiceDescriptor);
 
+            // Common services
+            services.AddLogging();
             services.AddOptions();
+            services.TryAddSingleton<TimeProvider>(TimeProvider.System);
 
             services.TryAddSingleton(typeof(IOptionFormatter<>), typeof(DefaultOptionsFormatter<>));
             services.TryAddSingleton(typeof(IOptionFormatterResolver<>), typeof(DefaultOptionsFormatterResolver<>));
 
             services.AddSingleton<Silo>();
+            services.AddSingleton<Watchdog>();
             services.AddHostedService<SiloHostedService>();
             services.PostConfigure<SiloOptions>(options => options.SiloName ??= $"Silo_{Guid.NewGuid().ToString("N")[..5]}");
             services.TryAddSingleton<ILocalSiloDetails, LocalSiloDetails>();
@@ -87,7 +91,6 @@ namespace Orleans.Hosting
             services.TryAddSingleton<FallbackSystemTarget>();
             services.TryAddSingleton<LifecycleSchedulingSystemTarget>();
 
-            services.AddLogging();
             services.TryAddSingleton<ITimerRegistry, TimerRegistry>();
             
             services.TryAddSingleton<GrainRuntime>();
@@ -200,8 +203,7 @@ namespace Orleans.Hosting
             // Placement directors
             services.AddPlacementDirector<RandomPlacement, RandomPlacementDirector>();
             services.AddPlacementDirector<PreferLocalPlacement, PreferLocalPlacementDirector>();
-            services.AddPlacementDirector<StatelessWorkerPlacement, StatelessWorkerDirector>();
-            services.Replace(new ServiceDescriptor(typeof(StatelessWorkerPlacement), sp => new StatelessWorkerPlacement(), ServiceLifetime.Singleton));
+            services.AddPlacementDirector<StatelessWorkerPlacement, StatelessWorkerDirector>(ServiceLifetime.Transient);
             services.AddPlacementDirector<ActivationCountBasedPlacement, ActivationCountPlacementDirector>();
             services.AddPlacementDirector<HashBasedPlacement, HashBasedPlacementDirector>();
             services.AddPlacementDirector<ClientObserversPlacement, ClientObserversPlacementDirector>();
@@ -261,12 +263,13 @@ namespace Orleans.Hosting
                     var consistentRingOptions = sp.GetRequiredService<IOptions<ConsistentRingOptions>>().Value;
                     var siloDetails = sp.GetRequiredService<ILocalSiloDetails>();
                     var loggerFactory = sp.GetRequiredService<ILoggerFactory>();
+                    var siloStatusOracle = sp.GetRequiredService<ISiloStatusOracle>();
                     if (consistentRingOptions.UseVirtualBucketsConsistentRing)
                     {
-                        return new VirtualBucketsRingProvider(siloDetails.SiloAddress, loggerFactory, consistentRingOptions.NumVirtualBucketsConsistentRing);
+                        return new VirtualBucketsRingProvider(siloDetails.SiloAddress, loggerFactory, consistentRingOptions.NumVirtualBucketsConsistentRing, siloStatusOracle);
                     }
 
-                    return new ConsistentRingProvider(siloDetails.SiloAddress, loggerFactory);
+                    return new ConsistentRingProvider(siloDetails.SiloAddress, loggerFactory, siloStatusOracle);
                 });
 
             services.AddSingleton<IConfigureOptions<GrainTypeOptions>, DefaultGrainTypeOptionsProvider>();
@@ -348,6 +351,7 @@ namespace Orleans.Hosting
             services.TryAddSingleton<IGrainStorageSerializer, JsonGrainStorageSerializer>();
             services.TryAddSingleton<IPersistentStateFactory, PersistentStateFactory>();
             services.TryAddSingleton(typeof(IAttributeToFactoryMapper<PersistentStateAttribute>), typeof(PersistentStateAttributeMapper));
+            services.TryAddSingleton<StateStorageBridgeSharedMap>();
 
             // IAsyncEnumerable support
             services.AddScoped<IAsyncEnumerableGrainExtension, AsyncEnumerableGrainExtension>();

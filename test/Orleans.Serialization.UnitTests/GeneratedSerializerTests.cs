@@ -12,6 +12,12 @@ using Orleans.Serialization.Serializers;
 using Orleans.Serialization.Session;
 using Orleans.Serialization.Utilities;
 using UnitTests.SerializerExternalModels;
+using Microsoft.Extensions.DependencyInjection;
+using Newtonsoft.Json;
+using System;
+using System.Collections.Concurrent;
+using System.Collections.Generic;
+using System.IO.Pipelines;
 using Xunit;
 
 [assembly: GenerateCodeForDeclaringAssembly(typeof(Person2External))]
@@ -565,6 +571,15 @@ public class GeneratedSerializerTests : IDisposable
         Assert.Contains("[#3 TagDelimited Id: 2 SchemaType: Encoded RuntimeType: MyValue", formattedBitStream); // UntypedValue
         Assert.Contains("[#5 TagDelimited Id: 3 SchemaType: Expected]", formattedBitStream); // Type2
         Assert.Contains("[#7 VarInt Id: 2 SchemaType: Expected] Value: 2", formattedBitStream); // type reference from Type2 field pointing to the encoded field type of UntypedValue
+    }
+
+    [Fact(Skip = "Fix me please")]
+    public void TypeDerivedFromList()
+    {
+        var original = new SerializableClassWithCompiledBase { IntProperty = 30 };
+        var result = RoundTripThroughCodec(original);
+
+        Assert.Equal(original.IntProperty, result.IntProperty);
     }
 
     [Fact]

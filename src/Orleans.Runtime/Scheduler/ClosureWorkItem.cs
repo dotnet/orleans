@@ -29,7 +29,6 @@ namespace Orleans.Runtime.Scheduler
         {
             try
             {
-                RuntimeContext.SetExecutionContext(this.GrainContext);
                 RequestContext.Clear();
                 await this.continuation();
                 this.completion.TrySetResult(true);
@@ -37,10 +36,6 @@ namespace Orleans.Runtime.Scheduler
             catch (Exception exception)
             {
                 this.completion.TrySetException(exception);
-            }
-            finally
-            {
-                RuntimeContext.ResetExecutionContext();
             }
         }
 
@@ -75,7 +70,6 @@ namespace Orleans.Runtime.Scheduler
         {
             try
             {
-                RuntimeContext.SetExecutionContext(this.GrainContext);
                 RequestContext.Clear();
                 var result = await this.continuation();
                 this.completion.TrySetResult(result);
@@ -83,10 +77,6 @@ namespace Orleans.Runtime.Scheduler
             catch (Exception exception)
             {
                 this.completion.TrySetException(exception);
-            }
-            finally
-            {
-                RuntimeContext.ResetExecutionContext();
             }
         }
 

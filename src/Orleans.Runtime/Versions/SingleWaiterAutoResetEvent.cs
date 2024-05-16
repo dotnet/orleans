@@ -9,7 +9,7 @@ namespace Orleans.Runtime
 {
     /// <summary>
     /// Represents a synchronization event that, when signaled, resets automatically after releasing a single waiter.
-    /// This type supports concurrent signallers but only a single waiter.
+    /// This type supports concurrent signalers but only a single waiter.
     /// </summary>
     internal sealed class SingleWaiterAutoResetEvent : IValueTaskSource
     {
@@ -51,6 +51,12 @@ namespace Orleans.Runtime
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void Signal()
         {
+            if ((_status & SignaledFlag) == SignaledFlag)
+            {
+                // The event is already signaled.
+                return;
+            }
+
             // Set the signaled flag.
             var status = Interlocked.Or(ref _status, SignaledFlag);
 
@@ -58,7 +64,7 @@ namespace Orleans.Runtime
             if ((status & SignaledFlag) != SignaledFlag && (status & WaitingFlag) == WaitingFlag)
             {
                 // Note that in this assert we are checking the volatile _status field.
-                // This is a sanity check to ensure that the signalling conditions are true:
+                // This is a sanity check to ensure that the signaling conditions are true:
                 // that "Signaled" and "Waiting" flags are both set.
                 Debug.Assert((_status & (SignaledFlag | WaitingFlag)) == (SignaledFlag | WaitingFlag));
                 _waitSource.SetResult(true);

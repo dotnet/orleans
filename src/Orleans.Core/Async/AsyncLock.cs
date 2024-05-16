@@ -12,8 +12,8 @@ namespace Orleans
     ///
     /// When programming with <b>async</b>, the <b>lock</b> keyword is problematic:
     /// <list type="bullet">
-    ///     <item><b>lock</b> will cause the thread to block while it waits for exclusive access to the critical section of code.</item>
-    ///     <item>The <b>await</b> keyword cannot be used within the scope of a <b>lock</b> construct.</item>
+    ///     <item><description><b>lock</b> will cause the thread to block while it waits for exclusive access to the critical section of code.</description></item>
+    ///     <item><description>The <b>await</b> keyword cannot be used within the scope of a <b>lock</b> construct.</description></item>
     /// </list>
     ///
     /// It is still useful, at times, to provide exclusive access to a critical section of code. AsyncLock provides semantics

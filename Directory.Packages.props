@@ -2,7 +2,7 @@
   <PropertyGroup>
     <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
     <!-- Shared Package Versions -->
-    <xUnitVersion>2.5.2</xUnitVersion>
+    <xUnitVersion>2.5.3</xUnitVersion>
     <xUnitVersion Condition=" '$(TargetFramework)' == 'netcoreapp3.1' or '$(TargetFramework)' == 'netstandard2.1' ">2.4.2</xUnitVersion>
     <xUnitRunnerVersion>2.5.3</xUnitRunnerVersion>
     <xUnitRunnerVersion Condition=" '$(TargetFramework)' == 'netcoreapp3.1' or '$(TargetFramework)' == 'netstandard2.1' ">2.4.5</xUnitRunnerVersion>
@@ -34,6 +34,7 @@
     <PackageVersion Include="Microsoft.Extensions.DependencyInjection" Version="8.0.0" />
     <PackageVersion Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="8.0.0" />
     <PackageVersion Include="Microsoft.Extensions.DependencyModel" Version="8.0.0" />
+    <PackageVersion Include="Microsoft.Extensions.Diagnostics.Testing" Version="8.0.0" />
     <PackageVersion Include="Microsoft.Extensions.Logging" Version="8.0.0" />
     <PackageVersion Include="Microsoft.Extensions.Logging.Console" Version="8.0.0" />
     <PackageVersion Include="Microsoft.Extensions.Logging.Abstractions" Version="8.0.0" />
@@ -51,8 +52,8 @@
     <PackageVersion Include="Azure.Storage.Queues" Version="12.16.0" />
     <!-- 3rd party packages -->
     <PackageVersion Include="Google.Cloud.PubSub.V1" Version="1.0.0-beta13" />
-    <PackageVersion Include="AWSSDK.DynamoDBv2" Version="3.7.203.2" />
-    <PackageVersion Include="AWSSDK.SQS" Version="3.7.200.55" />
+    <PackageVersion Include="AWSSDK.DynamoDBv2" Version="3.7.300.6" />
+    <PackageVersion Include="AWSSDK.SQS" Version="3.7.300" />
     <PackageVersion Include="Consul" Version="1.6.10.9" />
     <PackageVersion Include="Google.Protobuf" Version="3.24.4" />
     <PackageVersion Include="protobuf-net" Version="3.2.26" />
@@ -63,8 +64,8 @@
     <!-- Test related packages -->
     <PackageVersion Include="FluentAssertions" Version="6.7.0" />
     <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="17.9.0-preview-23503-02" />
-    <PackageVersion Include="BenchmarkDotNet" Version="0.13.9" />
-    <PackageVersion Include="BenchmarkDotNet.Diagnostics.Windows" Version="0.13.9" />
+    <PackageVersion Include="BenchmarkDotNet" Version="0.13.12" />
+    <PackageVersion Include="BenchmarkDotNet.Diagnostics.Windows" Version="0.13.12" />
     <PackageVersion Include="Xunit.SkippableFact" Version="1.4.13" />
     <PackageVersion Include="xunit" Version="$(xUnitVersion)" />
     <PackageVersion Include="xunit.assert" Version="$(xUnitVersion)" />
@@ -77,13 +78,13 @@
     <PackageVersion Include="System.CodeDom" Version="8.0.0" />
     <PackageVersion Include="Microsoft.NETFramework.ReferenceAssemblies" Version="1.0.3" />
     <PackageVersion Include="FSharp.Core" Version="7.0.0" />
-    <PackageVersion Include="Azure.Identity" Version="1.10.2" />
+    <PackageVersion Include="Azure.Identity" Version="1.11.0" />
     <PackageVersion Include="Azure.Security.KeyVault.Secrets" Version="4.5.0" />
     <PackageVersion Include="NSubstitute" Version="4.4.0" />
     <PackageVersion Include="NSubstitute.Analyzers.CSharp" Version="1.0.15" />
-    <PackageVersion Include="CsCheck" Version="2.10.0" />
+    <PackageVersion Include="CsCheck" Version="2.14.1" />
     <PackageVersion Include="System.Data.SqlClient" Version="4.8.6" />
-    <PackageVersion Include="Npgsql" Version="6.0.7" />
+    <PackageVersion Include="Npgsql" Version="8.0.3" />
     <PackageVersion Include="MySql.Data" Version="8.0.31" />
     <PackageVersion Include="Microsoft.Extensions.Configuration.AzureKeyVault" Version="3.1.24" />
     <PackageVersion Include="System.CommandLine" Version="2.0.0-beta1.21308.1" />

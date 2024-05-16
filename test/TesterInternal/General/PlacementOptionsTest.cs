@@ -1,6 +1,6 @@
 using Microsoft.Extensions.Options;
 using Orleans.Runtime;
-using Orleans.Runtime.Configuration.Options;
+using Orleans.Configuration;
 using TestExtensions;
 using Xunit;
 

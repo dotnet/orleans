@@ -40,7 +40,6 @@ namespace Orleans.Runtime
             _innerActivator = innerActivator;
             _maxWorkers = ((StatelessWorkerPlacement)_shared.PlacementStrategy).MaxLocal;
             _messageLoopTask = Task.Run(RunMessageLoop);
-            _shared.OnCreateActivation(this);
         }
 
         public GrainReference GrainReference => _grainReference ??= _shared.GrainReferenceActivator.CreateReference(GrainId, default);
@@ -91,16 +90,9 @@ namespace Orleans.Runtime
 
         public async ValueTask DisposeAsync()
         {
-            try
-            {
-                var completion = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
-                _workItems.Enqueue(new(WorkItemType.DisposeAsync, new DisposeAsyncWorkItemState(completion)));
-                await completion.Task;
-            }
-            finally
-            {
-                _shared.OnDestroyActivation(this);
-            }
+            var completion = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+            _workItems.Enqueue(new(WorkItemType.DisposeAsync, new DisposeAsyncWorkItemState(completion)));
+            await completion.Task;
         }
 
         public bool Equals([AllowNull] IGrainContext other) => other is not null && ActivationId.Equals(other.ActivationId);

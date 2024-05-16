@@ -6,7 +6,7 @@ using Orleans.Runtime.ReminderService;
 namespace Orleans.Hosting
 {
     /// <summary>
-    /// Extensions to <see cref="ISiloBuilder"/> for configuring reminder provider <see cref="InMemoryReminderTable"/>.
+    /// Extensions to <see cref="ISiloBuilder"/> for configuring the in-memory reminder provider.
     /// </summary>
     public static class SiloBuilderReminderMemoryExtensions
     {
