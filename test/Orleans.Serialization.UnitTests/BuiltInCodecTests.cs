@@ -2443,11 +2443,13 @@ namespace Orleans.Serialization.UnitTests
     public class TypeWithDictionaryBase : Dictionary<string, int>
     {
         public TypeWithDictionaryBase() : this(true) { }
-        public TypeWithDictionaryBase(bool addDefaultValue)
+        public TypeWithDictionaryBase(bool addDefaultValue, IEqualityComparer<string> comparer = null) : base(comparer)
         {
             if (addDefaultValue)
             {
-                this["key"] = 1;
+                this["kEY"] = 1;
+                this["key"] = 2;
+                this["Key"] = 3;
             }
         }
 
@@ -2459,10 +2461,23 @@ namespace Orleans.Serialization.UnitTests
 
     public class DictionaryBaseCodecTests(ITestOutputHelper output) : FieldCodecTester<TypeWithDictionaryBase, IFieldCodec<TypeWithDictionaryBase>>(output)
     {
-        protected override TypeWithDictionaryBase[] TestValues => [null, new(), new(addDefaultValue: false), new() { ["foo"] = 15 }, new() { ["foo"] = 15, OtherProperty = 123 }];
+        protected override TypeWithDictionaryBase[] TestValues =>
+        [
+            null,
+            new(),
+            new(addDefaultValue: true, StringComparer.OrdinalIgnoreCase),
+            new(addDefaultValue: false),
+            new(addDefaultValue: true, comparer: StringComparer.Ordinal),
+            new() { ["foo"] = 15 },
+            new() { ["foo"] = 15, OtherProperty = 123 }
+        ];
 
         protected override TypeWithDictionaryBase CreateValue() => new() { OtherProperty = Random.Next() };
-        protected override bool Equals(TypeWithDictionaryBase left, TypeWithDictionaryBase right) => ReferenceEquals(left, right) || left.SequenceEqual(right) && left.OtherProperty == right.OtherProperty;
+        protected override bool Equals(TypeWithDictionaryBase left, TypeWithDictionaryBase right) =>
+            ReferenceEquals(left, right)
+            || left.SequenceEqual(right)
+            && left.OtherProperty == right.OtherProperty
+            && left.Comparer?.GetType() == right.Comparer?.GetType();
     }
 
     public class DictionaryBaseCopierTests(ITestOutputHelper output) : CopierTester<TypeWithDictionaryBase, IDeepCopier<TypeWithDictionaryBase>>(output)
@@ -2975,6 +2990,88 @@ namespace Orleans.Serialization.UnitTests
         protected override HashSet<string>[] TestValues => [null, new HashSet<string>(), CreateValue(), CreateValue(), CreateValue()];
 
         protected override bool Equals(HashSet<string> left, HashSet<string> right) => ReferenceEquals(left, right) || left.SetEquals(right);
+    }
+
+    [GenerateSerializer]
+    public class TypeWithHashSetBase : HashSet<string>
+    {
+        public TypeWithHashSetBase() : this(true) { }
+        public TypeWithHashSetBase(bool addDefaultValue, IEqualityComparer<string> comparer = null) : base(comparer)
+        {
+            if (addDefaultValue)
+            {
+                this.Add("key");
+                this.Add("kEY");
+                this.Add("Key");
+                this.Add("KEY");
+            }
+        }
+
+        [Id(0)]
+        public int OtherProperty { get; set; }
+
+        public override string ToString() => $"[OtherProperty: {OtherProperty}, Values: [{string.Join(", ", this)}]]";
+    }
+
+    public class HashSetBaseCodecTests(ITestOutputHelper output) : FieldCodecTester<TypeWithHashSetBase, IFieldCodec<TypeWithHashSetBase>>(output)
+    {
+        private static TypeWithHashSetBase AddValues(TypeWithHashSetBase value)
+        {
+            value.Add("one");
+            value.Add("ONE");
+            value.Add("two");
+            value.Add("three");
+            return value;
+        }
+
+        protected override TypeWithHashSetBase[] TestValues =>
+        [
+            null,
+            new(),
+            new(addDefaultValue: true, StringComparer.OrdinalIgnoreCase),
+            new(addDefaultValue: false),
+            new(addDefaultValue: true, comparer: StringComparer.Ordinal),
+            new() { "foo" },
+            AddValues(new() { OtherProperty = 123 })
+        ];
+
+        protected override TypeWithHashSetBase CreateValue() => AddValues(new() { OtherProperty = Random.Next() });
+        protected override bool Equals(TypeWithHashSetBase left, TypeWithHashSetBase right) =>
+            ReferenceEquals(left, right)
+            || left.SequenceEqual(right)
+            && left.OtherProperty == right.OtherProperty
+            && left?.Comparer == right?.Comparer;
+    }
+
+    public class HashSetBaseCopierTests(ITestOutputHelper output) : CopierTester<TypeWithHashSetBase, IDeepCopier<TypeWithHashSetBase>>(output)
+    {
+        private static TypeWithHashSetBase AddValues(TypeWithHashSetBase value)
+        {
+            value.Add("one");
+            value.Add("ONE");
+            value.Add("two");
+            value.Add("three");
+            return value;
+        }
+
+        protected override TypeWithHashSetBase[] TestValues =>
+        [
+            null,
+            new(),
+            new(addDefaultValue: true, StringComparer.OrdinalIgnoreCase),
+            new(addDefaultValue: false),
+            new(addDefaultValue: true, comparer: StringComparer.Ordinal),
+            new() { "foo" },
+            AddValues(new() { OtherProperty = 123 })
+        ];
+
+        protected override TypeWithHashSetBase CreateValue() => AddValues(new() { OtherProperty = Random.Next() });
+
+        protected override bool Equals(TypeWithHashSetBase left, TypeWithHashSetBase right) =>
+            ReferenceEquals(left, right)
+            || left.SequenceEqual(right)
+            && left.OtherProperty == right.OtherProperty
+            && left?.Comparer == right?.Comparer;
     }
 
     public class ImmutableHashSetTests(ITestOutputHelper output) : FieldCodecTester<ImmutableHashSet<string>, ImmutableHashSetCodec<string>>(output)

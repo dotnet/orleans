@@ -202,9 +202,13 @@ namespace Orleans.Serialization.Codecs
         public void DeepCopy(Dictionary<TKey, TValue> input, Dictionary<TKey, TValue> output, CopyContext context)
         {
             output.Clear();
-            if (input.Comparer is { } comparer)
+            if (input.Comparer != EqualityComparer<TKey>.Default)
             {
-                _baseConstructor.Invoke(output, [input.Count, comparer]);
+                _baseConstructor.Invoke(output, [input.Count, input.Comparer]);
+            }
+            else
+            {
+                output.EnsureCapacity(input.Count);
             }
 
             foreach (var pair in input)
@@ -300,7 +304,14 @@ namespace Orleans.Serialization.Codecs
                         }
 
                         hasLengthField = true;
-                        _baseConstructor.Invoke(value, [length, comparer]);
+                        if (comparer is not null)
+                        {
+                            _baseConstructor.Invoke(value, [length, comparer]);
+                        }
+                        else
+                        {
+                            value.EnsureCapacity(length);
+                        }
 
                         break;
                     case 2:
