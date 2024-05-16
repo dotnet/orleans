@@ -1893,6 +1893,56 @@ namespace Orleans.Serialization.UnitTests
         protected override List<int>[] TestValues => [null, new List<int>(), CreateValue(), CreateValue(), CreateValue()];
     }
 
+    [GenerateSerializer]
+    public class TypeWithListBase : List<int>
+    {
+        public TypeWithListBase() : this(true) { }
+        public TypeWithListBase(bool addDefaultValue)
+        {
+            if (addDefaultValue)
+            {
+                this.Add(42);
+            }
+        }
+
+        [Id(0)]
+        public int OtherProperty { get; set; }
+
+        public override string ToString() => $"[OtherProperty: {OtherProperty}, Values: [{string.Join(", ", this)}]]";
+    }
+
+    public class ListBaseCodecTests(ITestOutputHelper output) : FieldCodecTester<TypeWithListBase, IFieldCodec<TypeWithListBase>>(output)
+    {
+        private static TypeWithListBase AddValues(TypeWithListBase value)
+        {
+            value.Add(1);
+            value.Add(2);
+            value.Add(3);
+            return value;
+        }
+
+        protected override TypeWithListBase[] TestValues => [null, new(), new(addDefaultValue: false), new() { 15 }, AddValues(new() { OtherProperty = 123 })];
+
+        protected override TypeWithListBase CreateValue() => AddValues(new() { OtherProperty = Random.Next() });
+        protected override bool Equals(TypeWithListBase left, TypeWithListBase right) => ReferenceEquals(left, right) || left.SequenceEqual(right) && left.OtherProperty == right.OtherProperty;
+    }
+
+    public class ListBaseCopierTests(ITestOutputHelper output) : CopierTester<TypeWithListBase, IDeepCopier<TypeWithListBase>>(output)
+    {
+        private static TypeWithListBase AddValues(TypeWithListBase value)
+        {
+            value.Add(1);
+            value.Add(2);
+            value.Add(3);
+            return value;
+        }
+
+        protected override TypeWithListBase[] TestValues => [null, new(), new(addDefaultValue: false), new() { 15 }, AddValues(new() { OtherProperty = 123 })];
+
+        protected override TypeWithListBase CreateValue() => AddValues(new() { OtherProperty = Random.Next() });
+        protected override bool Equals(TypeWithListBase left, TypeWithListBase right) => ReferenceEquals(left, right) || left.SequenceEqual(right) && left.OtherProperty == right.OtherProperty;
+    }
+
     public class ListCopierTests(ITestOutputHelper output) : CopierTester<List<int>, ListCopier<int>>(output)
     {
         protected override List<int> CreateValue()
