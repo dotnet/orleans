@@ -2,12 +2,14 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics.Metrics;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Orleans.Configuration;
 using Orleans.Internal;
 using Orleans.Runtime;
 using Orleans.Streams.Filtering;
+using Orleans.Timers;
 
 namespace Orleans.Streams
 {
@@ -140,7 +142,7 @@ namespace Orleans.Streams
             }
 
             // Setup a reader for a new receiver.
-            // Even if the receiver failed to initialise, treat it as OK and start pumping it. It's receiver responsibility to retry initialization.
+            // Even if the receiver failed to initialize, treat it as OK and start pumping it. It's receiver responsibility to retry initialization.
             var randomTimerOffset = RandomTimeSpan.Next(this.options.GetQueueMsgsTimerPeriod);
             timer = RegisterGrainTimer(AsyncTimerCallback, QueueId, randomTimerOffset, this.options.GetQueueMsgsTimerPeriod);
 
@@ -154,15 +156,24 @@ namespace Orleans.Streams
             // Stop pulling from queues that are not in my range anymore.
             logger.LogInformation((int)ErrorCode.PersistentStreamPullingAgent_05, "Shutdown of {Name} responsible for queue: {Queue}", GetType().Name, QueueId.ToStringWithHashCode());
 
-            if (timer != null)
+            var asyncTimer = timer;
+            timer = null;
+            if (asyncTimer != null)
             {
-                var tmp = timer;
-                timer = null;
-                Utils.SafeExecute(tmp.Dispose, this.logger);
-
                 try
                 {
-                    await tmp.GetCurrentlyExecutingTickTask().WithTimeout(TimeSpan.FromSeconds(5));
+                    if (asyncTimer is IAsyncDisposable asyncDisposable)
+                    {
+                        var task = asyncDisposable.DisposeAsync();
+                        if (!task.IsCompletedSuccessfully)
+                        {
+                            await task.AsTask().WithTimeout(TimeSpan.FromSeconds(5));
+                        }
+                    }
+                    else
+                    {
+                        asyncTimer.Dispose();
+                    }
                 }
                 catch (Exception ex)
                 {
