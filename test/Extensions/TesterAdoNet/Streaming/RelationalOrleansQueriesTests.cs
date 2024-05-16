@@ -963,8 +963,8 @@ public abstract class RelationalOrleansQueriesTests(string invariant) : IAsyncLi
         Assert.Equal(ack.QueueId, saved.QueueId);
         Assert.Equal(ack.MessageId, saved.MessageId);
         Assert.Equal(1, saved.Dequeued);
-        Assert.True(saved.VisibleOn >= beforeFailed);
-        Assert.True(saved.VisibleOn <= afterFailed);
+        Assert.True(saved.VisibleOn >= beforeFailed, $"{saved.VisibleOn} must be greater than or equal to {beforeFailed}");
+        Assert.True(saved.VisibleOn <= afterFailed, $"{saved.VisibleOn} must be lesser than or equal to {afterFailed}");
 
         // assert - no message arrived at dead letters
         Assert.Empty(await _storage.ReadAsync<AdoNetStreamDeadLetter>("SELECT * FROM OrleansStreamDeadLetter"));
