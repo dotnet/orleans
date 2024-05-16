@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Orleans.Runtime;
+using Orleans.Runtime.Internal;
 
 namespace Orleans.Streams
 {
@@ -17,6 +18,7 @@ namespace Orleans.Streams
         private readonly IAsyncEnumerable<ClusterMembershipSnapshot> clusterMembershipUpdates;
         private readonly List<IStreamQueueBalanceListener> queueBalanceListeners;
         private readonly CancellationTokenSource cts;
+        private Task _listenForClusterChangesTask;
 
         protected CancellationToken Cancellation => this.cts.Token;
 
@@ -47,14 +49,23 @@ namespace Orleans.Streams
         /// <inheritdoc/>
         public virtual Task Initialize(IStreamQueueMapper queueMapper)
         {
-            ListenForClusterChanges().Ignore();
+            using var _ = new ExecutionContextSuppressor();
+            _listenForClusterChangesTask = ListenForClusterChanges();
             return Task.CompletedTask;
         }
 
-        public virtual Task Shutdown()
+        public virtual async Task Shutdown()
         {
-            this.cts.Cancel(throwOnFirstException: false);
-            return Task.CompletedTask;
+            try
+            {
+                this.cts.Cancel(throwOnFirstException: false);
+            }
+            catch (Exception exc)
+            {
+                Logger.LogError(exc, "Error signaling shutdown token.");
+            }
+
+            await _listenForClusterChangesTask;
         }
 
         /// <inheritdoc/>
@@ -94,6 +105,7 @@ namespace Orleans.Streams
 
         private async Task ListenForClusterChanges()
         {
+            await Task.CompletedTask.ConfigureAwait(ConfigureAwaitOptions.ForceYielding);
             var current = new HashSet<SiloAddress>();
             await foreach (var membershipSnapshot in this.clusterMembershipUpdates.WithCancellation(this.Cancellation))
             {
