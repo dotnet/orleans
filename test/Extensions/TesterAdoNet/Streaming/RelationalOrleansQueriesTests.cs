@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using Npgsql;
 using Orleans.Configuration;
 using Orleans.Streaming.AdoNet;
 using Orleans.Streaming.AdoNet.Storage;
@@ -10,29 +11,33 @@ namespace Tester.AdoNet.Streaming;
 /// <summary>
 /// Tests the relational storage layer via <see cref="RelationalOrleansQueries"/> against Sql Server.
 /// </summary>
-public class SqlServerRelationalOrleansQueriesTests() : RelationalOrleansQueriesTests(AdoNetInvariants.InvariantNameSqlServer)
+public class SqlServerRelationalOrleansQueriesTests() : RelationalOrleansQueriesTests(AdoNetInvariants.InvariantNameSqlServer, 90)
 {
 }
 
 /// <summary>
 /// Tests the relational storage layer via <see cref="RelationalOrleansQueries"/> against MySQL.
 /// </summary>
-public class MySqlRelationalOrleansQueriesTests() : RelationalOrleansQueriesTests(AdoNetInvariants.InvariantNameMySql)
+public class MySqlRelationalOrleansQueriesTests() : RelationalOrleansQueriesTests(AdoNetInvariants.InvariantNameMySql, 100)
 {
 }
 
 /// <summary>
 /// Tests the relational storage layer via <see cref="RelationalOrleansQueries"/> against PostgreSQL.
 /// </summary>
-public class PostgreSqlRelationalOrleansQueriesTests() : RelationalOrleansQueriesTests(AdoNetInvariants.InvariantNamePostgreSql)
+public class PostgreSqlRelationalOrleansQueriesTests : RelationalOrleansQueriesTests
 {
+    public PostgreSqlRelationalOrleansQueriesTests() : base(AdoNetInvariants.InvariantNamePostgreSql, 99)
+    {
+        NpgsqlConnection.ClearAllPools();
+    }
 }
 
 /// <summary>
 /// Tests the relational storage layer via <see cref="RelationalOrleansQueries"/>.
 /// </summary>
 [TestCategory("AdoNet"), TestCategory("Streaming")]
-public abstract class RelationalOrleansQueriesTests(string invariant) : IAsyncLifetime
+public abstract class RelationalOrleansQueriesTests(string invariant, int concurrency = 100) : IAsyncLifetime
 {
     private const string TestDatabaseName = "OrleansStreamTest";
 
@@ -80,9 +85,9 @@ public abstract class RelationalOrleansQueriesTests(string invariant) : IAsyncLi
         var payload = RandomPayload();
 
         // act
-        var before = DateTime.UtcNow;
+        var before = DateTime.UtcNow.AddSeconds(-1);
         var ack = await _queries.QueueStreamMessageAsync(serviceId, providerId, queueId, payload, expiryTimeout);
-        var after = DateTime.UtcNow;
+        var after = DateTime.UtcNow.AddSeconds(1);
 
         // assert - ack
         Assert.NotNull(ack);
@@ -123,10 +128,10 @@ public abstract class RelationalOrleansQueriesTests(string invariant) : IAsyncLi
         var count = 10000;
 
         // this keeps requests under the default connection pool limit to avoid flaky tests due to connection timeouts
-        using var semaphore = new SemaphoreSlim(100);
+        using var semaphore = new SemaphoreSlim(concurrency);
 
         // act
-        var before = DateTime.UtcNow;
+        var before = DateTime.UtcNow.AddSeconds(-1);
         var acks = await Task.WhenAll(Enumerable
             .Range(0, count)
             .Select(i => Task.Run(async () =>
@@ -142,7 +147,7 @@ public abstract class RelationalOrleansQueriesTests(string invariant) : IAsyncLi
                 }
             }))
             .ToList());
-        var after = DateTime.UtcNow;
+        var after = DateTime.UtcNow.AddSeconds(1);
 
         // assert - messages were inserted in sequence.
         var ordered = acks
@@ -205,10 +210,10 @@ public abstract class RelationalOrleansQueriesTests(string invariant) : IAsyncLi
             .ToList();
 
         // this keeps requests under the default connection pool limit to avoid flaky tests due to connection timeouts
-        using var semaphore = new SemaphoreSlim(100);
+        using var semaphore = new SemaphoreSlim(concurrency);
 
         // act - queue the random messages in parallel
-        var before = DateTime.UtcNow;
+        var before = DateTime.UtcNow.AddSeconds(-1);
         var results = await Task.WhenAll(partitions
             .Select(p => Task.Run(async () =>
             {
@@ -224,7 +229,7 @@ public abstract class RelationalOrleansQueriesTests(string invariant) : IAsyncLi
                 }
             }))
             .ToList());
-        var after = DateTime.UtcNow;
+        var after = DateTime.UtcNow.AddSeconds(1);
 
         // assert - all messages were acknowledged
         var messageIds = new SortedSet<long>();
@@ -283,12 +288,12 @@ public abstract class RelationalOrleansQueriesTests(string invariant) : IAsyncLi
         var evictionBatchSize = 1000;
 
         // arrange - enqueue a message
-        var beforeQueueing = DateTime.UtcNow;
+        var beforeQueueing = DateTime.UtcNow.AddSeconds(-1);
         var ack = await _queries.QueueStreamMessageAsync(serviceId, providerId, queueId, payload, expiryTimeout);
-        var afterQueueing = DateTime.UtcNow;
+        var afterQueueing = DateTime.UtcNow.AddSeconds(1);
 
         // act - dequeue a message
-        var beforeDequeuing = DateTime.UtcNow;
+        var beforeDequeuing = DateTime.UtcNow.AddSeconds(-1);
         var message = Assert.Single(await _queries.GetStreamMessagesAsync(
             serviceId,
             providerId,
@@ -299,7 +304,7 @@ public abstract class RelationalOrleansQueriesTests(string invariant) : IAsyncLi
             removalTimeout,
             evictionInterval,
             evictionBatchSize));
-        var afterDequeuing = DateTime.UtcNow;
+        var afterDequeuing = DateTime.UtcNow.AddSeconds(1);
 
         // assert - the message is the same
         Assert.Equal(ack.ServiceId, message.ServiceId);
@@ -352,19 +357,19 @@ public abstract class RelationalOrleansQueriesTests(string invariant) : IAsyncLi
         var total = 5;
 
         // arrange - enqueue five messages
-        var beforeQueueing = DateTime.UtcNow;
+        var beforeQueueing = DateTime.UtcNow.AddSeconds(-1);
         var acks = await Task.WhenAll(Enumerable
             .Range(0, total)
             .Select(i => _queries.QueueStreamMessageAsync(serviceId, providerId, queueId, payload, expiryTimeout))
             .ToList());
-        var afterQueueing = DateTime.UtcNow;
+        var afterQueueing = DateTime.UtcNow.AddSeconds(1);
 
         // act - dequeue three batches of three messages
-        var beforeDequeuing = DateTime.UtcNow;
+        var beforeDequeuing = DateTime.UtcNow.AddSeconds(-1);
         var first = await _queries.GetStreamMessagesAsync(serviceId, providerId, queueId, maxCount, maxAttempts, visibilityTimeout, removalTimeout, evictionInterval, evictionBatchSize);
         var second = await _queries.GetStreamMessagesAsync(serviceId, providerId, queueId, maxCount, maxAttempts, visibilityTimeout, removalTimeout, evictionInterval, evictionBatchSize);
         var third = await _queries.GetStreamMessagesAsync(serviceId, providerId, queueId, maxCount, maxAttempts, visibilityTimeout, removalTimeout, evictionInterval, evictionBatchSize);
-        var afterDequeuing = DateTime.UtcNow;
+        var afterDequeuing = DateTime.UtcNow.AddSeconds(1);
 
         // assert - batch counts
         Assert.Equal(maxCount, first.Count);
@@ -435,18 +440,18 @@ public abstract class RelationalOrleansQueriesTests(string invariant) : IAsyncLi
         var evictionBatchSize = 0;
 
         // arrange - enqueue a message
-        var beforeQueueing = DateTime.UtcNow;
+        var beforeQueueing = DateTime.UtcNow.AddSeconds(-1);
         var ack = await _queries.QueueStreamMessageAsync(serviceId, providerId, queueId, payload, expiryTimeout);
-        var afterQueueing = DateTime.UtcNow;
+        var afterQueueing = DateTime.UtcNow.AddSeconds(1);
 
         // act - dequeue messages until max attempts plus one
-        var beforeDequeuing = DateTime.UtcNow;
+        var beforeDequeuing = DateTime.UtcNow.AddSeconds(-1);
         var results = new List<IList<AdoNetStreamMessage>>();
         for (var i = 0; i < maxAttempts + 1; i++)
         {
             results.Add(await _queries.GetStreamMessagesAsync(serviceId, providerId, queueId, maxCount, maxAttempts, visibilityTimeout, removalTimeout, evictionInterval, evictionBatchSize));
         }
-        var afterDequeuing = DateTime.UtcNow;
+        var afterDequeuing = DateTime.UtcNow.AddSeconds(1);
 
         // assert - batches are as expected
         for (var i = 0; i < maxAttempts; i++)
@@ -556,9 +561,9 @@ public abstract class RelationalOrleansQueriesTests(string invariant) : IAsyncLi
         var evictionBatchSize = 0;
 
         // arrange - enqueue a message
-        var before = DateTime.UtcNow;
+        var before = DateTime.UtcNow.AddSeconds(-1);
         var ack = await _queries.QueueStreamMessageAsync(serviceId, providerId, queueId, payload, expiryTimeout);
-        var after = DateTime.UtcNow;
+        var after = DateTime.UtcNow.AddSeconds(1);
 
         // act - dequeue messages
         var messages = await _queries.GetStreamMessagesAsync(serviceId, providerId, queueId, maxCount, maxAttempts, visibilityTimeout, removalTimeout, evictionInterval, evictionBatchSize);
@@ -755,7 +760,7 @@ public abstract class RelationalOrleansQueriesTests(string invariant) : IAsyncLi
         var evictionBatchSize = 1000;
 
         // this keeps requests under the default connection pool limit to avoid flaky tests due to connection timeouts
-        using var semaphore = new SemaphoreSlim(100);
+        using var semaphore = new SemaphoreSlim(concurrency);
 
         // act - chaos enqueue, dequeue, confirm
         // the tasks below are not expected to result in a planned outcome but are expected to result in a consistent one
@@ -894,19 +899,19 @@ public abstract class RelationalOrleansQueriesTests(string invariant) : IAsyncLi
         var queueId = "QueueId";
         var payload = new byte[] { 0xFF };
 
-        var beforeQueued = DateTime.UtcNow;
+        var beforeQueued = DateTime.UtcNow.AddSeconds(-1);
         var ack = await _queries.QueueStreamMessageAsync(serviceId, providerId, queueId, payload, streamOptions.ExpiryTimeout.TotalSecondsCeiling());
-        var afterQueued = DateTime.UtcNow;
+        var afterQueued = DateTime.UtcNow.AddSeconds(1);
 
         // arrange - dequeue the message and make immediately available
-        var beforeDequeued = DateTime.UtcNow;
+        var beforeDequeued = DateTime.UtcNow.AddSeconds(-1);
         await _queries.GetStreamMessagesAsync(ack.ServiceId, ack.ProviderId, ack.QueueId, cacheOptions.CacheSize, streamOptions.MaxAttempts, 0, streamOptions.DeadLetterEvictionTimeout.TotalSecondsCeiling(), streamOptions.EvictionInterval.TotalSecondsCeiling(), streamOptions.EvictionBatchSize);
-        var afterDequeued = DateTime.UtcNow;
+        var afterDequeued = DateTime.UtcNow.AddSeconds(1);
 
         // act - clean up with max attempts of one so the message above is flagged
-        var beforeFailure = DateTime.UtcNow;
+        var beforeFailure = DateTime.UtcNow.AddSeconds(-1);
         await _queries.FailStreamMessageAsync(ack.ServiceId, ack.ProviderId, ack.QueueId, ack.MessageId, 1, streamOptions.DeadLetterEvictionTimeout.TotalSecondsCeiling());
-        var afterFailure = DateTime.UtcNow;
+        var afterFailure = DateTime.UtcNow.AddSeconds(1);
 
         // assert - message no longer in the message table
         Assert.Empty(await _storage.ReadAsync<AdoNetStreamMessage>("SELECT * FROM OrleansStreamMessage"));
@@ -952,9 +957,9 @@ public abstract class RelationalOrleansQueriesTests(string invariant) : IAsyncLi
         await _queries.GetStreamMessagesAsync(ack.ServiceId, ack.ProviderId, ack.QueueId, cacheOptions.CacheSize, streamOptions.MaxAttempts, streamOptions.VisibilityTimeout.TotalSecondsCeiling(), streamOptions.DeadLetterEvictionTimeout.TotalSecondsCeiling(), streamOptions.EvictionInterval.TotalSecondsCeiling(), streamOptions.EvictionBatchSize);
 
         // act - fail the message
-        var beforeFailed = DateTime.UtcNow;
+        var beforeFailed = DateTime.UtcNow.AddSeconds(-1);
         await _queries.FailStreamMessageAsync(ack.ServiceId, ack.ProviderId, ack.QueueId, ack.MessageId, streamOptions.MaxAttempts, streamOptions.DeadLetterEvictionTimeout.TotalSecondsCeiling());
-        var afterFailed = DateTime.UtcNow;
+        var afterFailed = DateTime.UtcNow.AddSeconds(1);
 
         // assert - the message is still in the table and was made visible again
         var saved = Assert.Single(await _storage.ReadAsync<AdoNetStreamMessage>("SELECT * FROM OrleansStreamMessage"));

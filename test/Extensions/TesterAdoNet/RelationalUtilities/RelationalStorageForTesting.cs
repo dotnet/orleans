@@ -13,6 +13,7 @@ namespace UnitTests.General
                 {AdoNetInvariants.InvariantNameMySql, cs => new MySqlStorageForTesting(cs)},
                 {AdoNetInvariants.InvariantNamePostgreSql, cs => new PostgreSqlStorageForTesting(cs)}
             };
+
         public IRelationalStorage Storage { get; private set; }
 
         public string CurrentConnectionString
@@ -32,11 +33,14 @@ namespace UnitTests.General
 
         public abstract string CreateStreamTestTable { get; }
 
-        public virtual string DeleteStreamTestTable { get { return "DELETE StreamingTest;"; } }
+        public virtual string DeleteStreamTestTable
+        { get { return "DELETE StreamingTest;"; } }
 
-        public virtual string StreamTestSelect { get { return "SELECT Id, StreamData FROM StreamingTest WHERE Id = @streamId;"; } }
+        public virtual string StreamTestSelect
+        { get { return "SELECT Id, StreamData FROM StreamingTest WHERE Id = @streamId;"; } }
 
-        public virtual string StreamTestInsert { get { return "INSERT INTO StreamingTest(Id, StreamData) VALUES(@id, @streamData);"; } }
+        public virtual string StreamTestInsert
+        { get { return "INSERT INTO StreamingTest(Id, StreamData) VALUES(@id, @streamData);"; } }
 
         /// <summary>
         /// The script that creates Orleans schema in the database, usually CreateOrleansTables_xxxx.sql
@@ -187,7 +191,6 @@ namespace UnitTests.General
             await Storage.ExecuteAsync(string.Format(CreateDatabaseTemplate, databaseName), command => { }).ConfigureAwait(continueOnCapturedContext: false);
         }
 
-
         /// <summary>
         /// Drops a database with a given name.
         /// </summary>
@@ -196,8 +199,6 @@ namespace UnitTests.General
         private async Task DropDatabaseAsync(string databaseName)
         {
             await Storage.ExecuteAsync(string.Format(DropDatabaseTemplate, databaseName), command => { });
-
-            ClearAllPools();
         }
 
         /// <summary>
@@ -212,12 +213,5 @@ namespace UnitTests.General
             csb["Database"] = newDatabaseName;
             return CreateTestInstance(Storage.InvariantName, csb.ConnectionString);
         }
-
-        /// <summary>
-        /// Clears all the connection pools.
-        /// This helps avoid connection dropped errors from race conditions when the database is dropped and recreated quickly.
-        /// PostgreSQL is particularly sensitive to this when running locally.
-        /// </summary>
-        protected abstract void ClearAllPools();
     }
 }

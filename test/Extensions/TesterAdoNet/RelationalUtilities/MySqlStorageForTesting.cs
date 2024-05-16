@@ -43,7 +43,5 @@ namespace UnitTests.General
 
             return batches;
         }
-
-        protected override void ClearAllPools() => MySqlConnection.ClearAllPools();
     }
 }

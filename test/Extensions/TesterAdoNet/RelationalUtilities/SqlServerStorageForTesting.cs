@@ -62,7 +62,5 @@ namespace UnitTests.General
 
             return batches;
         }
-
-        protected override void ClearAllPools() => SqlConnection.ClearAllPools();
     }
 }
