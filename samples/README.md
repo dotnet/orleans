@@ -1,6 +1,7 @@
 # Orleans Samples
 
-📢 This collection of samples has been moved to the official `dotnet/samples` repository and is part of the Samples browser experience.
+> [!IMPORTANT]
+> 📢 This collection of samples has been moved to the official [`dotnet/samples` repository](https://github.com/dotnet/samples/tree/main/orleans) and is part of the [Samples browser experience](https://learn.microsoft.com/en-us/samples/browse/?expanded=dotnet&products=dotnet-orleans).
 
 - :octocat: [dotnet/samples](https://github.com/dotnet/samples/tree/main/orleans)
 - :eyes: [Samples browser](https://learn.microsoft.com/samples/browse/?expanded=dotnet&products=dotnet-orleans)
