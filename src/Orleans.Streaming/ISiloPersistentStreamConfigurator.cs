@@ -11,7 +11,7 @@ namespace Orleans.Hosting
     public interface ISiloPersistentStreamConfigurator : IPersistentStreamConfigurator { }
 
     /// <summary>
-    /// Extnesions for <see cref="ISiloPersistentStreamConfigurator"/>.
+    /// Extensions for <see cref="ISiloPersistentStreamConfigurator"/>.
     /// </summary>
     public static class SiloPersistentStreamConfiguratorExtensions
     {

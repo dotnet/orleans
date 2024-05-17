@@ -8,13 +8,13 @@ namespace Orleans.Runtime.ConsistentRing
 {
     /// <summary>
     /// We use the 'backward/clockwise' definition to assign responsibilities on the ring. 
-    /// E.g. in a ring of nodes {5, 10, 15} the responsible for key 7 is 10 (the node is responsible for its predecessing range). 
+    /// E.g. in a ring of nodes {5, 10, 15} the responsible for key 7 is 10 (the node is responsible for its preceding range). 
     /// The backwards/clockwise approach is consistent with many overlays, e.g., Chord, Cassandra, etc.
     /// Note: MembershipOracle uses 'forward/counter-clockwise' definition to assign responsibilities. 
-    /// E.g. in a ring of nodes {5, 10, 15}, the responsible of key 7 is node 5 (the node is responsible for its sucessing range)..
+    /// E.g. in a ring of nodes {5, 10, 15}, the responsible of key 7 is node 5 (the node is responsible for its succeeding range).
     /// </summary>
     internal sealed class ConsistentRingProvider :
-        IConsistentRingProvider, ISiloStatusListener // make the ring shutdown-able?
+        IConsistentRingProvider, ISiloStatusListener, IDisposable
     {
         // internal, so that unit tests can access them
         internal SiloAddress MyAddress { get; }
@@ -26,12 +26,14 @@ namespace Orleans.Runtime.ConsistentRing
         private bool isRunning;
         private readonly int myKey;
         private readonly List<IRingRangeListener> statusListeners = new();
+        private readonly ISiloStatusOracle _siloStatusOracle;
         private (IRingRange OldRange, IRingRange NewRange, bool Increased) lastNotification;
 
-        public ConsistentRingProvider(SiloAddress siloAddr, ILoggerFactory loggerFactory)
+        public ConsistentRingProvider(SiloAddress siloAddr, ILoggerFactory loggerFactory, ISiloStatusOracle siloStatusOracle)
         {
             log = loggerFactory.CreateLogger<ConsistentRingProvider>();
             MyAddress = siloAddr;
+            _siloStatusOracle = siloStatusOracle;
             myKey = MyAddress.GetConsistentHashCode();
 
             myRange = RangeFactory.CreateFullRange(); // i am responsible for the whole range
@@ -40,6 +42,7 @@ namespace Orleans.Runtime.ConsistentRing
             // add myself to the list of members
             AddServer(MyAddress);
             Start();
+            siloStatusOracle.SubscribeToSiloStatusEvents(this);
         }
 
         /// <summary>
@@ -93,25 +96,14 @@ namespace Orleans.Runtime.ConsistentRing
                     (myOldIndex == 0 && index == membershipRingList.Count - 1)) // I am the first node, and the new server is the last node
                 {
                     IRingRange oldRange = myRange;
-                    try
-                    {
-                        myRange = RangeFactory.CreateRange(unchecked((uint)hash), unchecked((uint)myKey));
-                    }
-                    catch (OverflowException exc)
-                    {
-                        log.LogError(
-                            (int)ErrorCode.ConsistentRingProviderBase + 5,
-                            exc,
-                            "OverflowException: hash as int: x{Hash}, hash as uint: x{HashUInt}, myKey as int: x{MyKey}, myKey as uint: x{MyKeyUInt}.",
-                            hash.ToString("X8"),
-                            ((uint)hash).ToString("X8"),
-                            myKey.ToString("X8"),
-                            ((uint)myKey).ToString("X8"));
-                    }
+                    myRange = RangeFactory.CreateRange(unchecked((uint)hash), unchecked((uint)myKey));
                     NotifyLocalRangeSubscribers(oldRange, myRange, false);
                 }
 
-                log.LogInformation("Added Server {SiloAddress}. Current view: {CurrentView}", silo.ToStringWithHashCode(), this.ToString());
+                if (log.IsEnabled(LogLevel.Debug))
+                {
+                    log.LogDebug("Added Server {SiloAddress}. Current view: {CurrentView}", silo.ToStringWithHashCode(), this.ToString());
+                }
             }
         }
 
@@ -130,6 +122,7 @@ namespace Orleans.Runtime.ConsistentRing
                     IRingRange range = RangeFactory.CreateRange(unchecked((uint)curr.GetConsistentHashCode()), unchecked((uint)next.GetConsistentHashCode()));
                     sb.Append($"{curr:H} -> {range},  ");
                 }
+
                 return sb.Append(']').ToString();
             }
         }
@@ -170,11 +163,14 @@ namespace Orleans.Runtime.ConsistentRing
                     }
                 }
 
-                log.LogInformation(
-                    "Removed Server {SiloAddress} hash {Hash}. Current view {CurrentView}",
-                    silo,
-                    silo.GetConsistentHashCode(),
-                    this.ToString());
+                if (log.IsEnabled(LogLevel.Debug))
+                {
+                    log.LogDebug(
+                        "Removed Server {SiloAddress} hash {Hash}. Current view {CurrentView}",
+                        silo,
+                        silo.GetConsistentHashCode(),
+                        this.ToString());
+                }
             }
         }
 
@@ -203,13 +199,18 @@ namespace Orleans.Runtime.ConsistentRing
 
         private void NotifyLocalRangeSubscribers(IRingRange old, IRingRange now, bool increased)
         {
-            log.LogInformation("NotifyLocalRangeSubscribers about old {OldRange} new {NewRange} increased? {IsIncreased}", old, now, increased);
+            if (log.IsEnabled(LogLevel.Debug))
+            {
+                log.LogDebug("NotifyLocalRangeSubscribers about old {OldRange} new {NewRange} increased? {IsIncreased}", old, now, increased);
+            }
+
             IRingRangeListener[] copy;
             lock (statusListeners)
             {
                 lastNotification = (old, now, increased);
                 copy = statusListeners.ToArray();
             }
+
             foreach (IRingRangeListener listener in copy)
             {
                 try
@@ -218,14 +219,14 @@ namespace Orleans.Runtime.ConsistentRing
                 }
                 catch (Exception exc)
                 {
-                    log.LogError(
+                    log.LogWarning(
                         (int)ErrorCode.CRP_Local_Subscriber_Exception,
                         exc,
-                        "Local IRangeChangeListener {Name} has thrown an exception when was notified about RangeChangeNotification about old {OldRange} new {NewRange} increased? {IsIncrease}",
+                        "Error notifying listener '{ListenerType}' of ring range {AdjustmentKind} from '{OldRange}' to '{NewRange}'.",
                         listener.GetType().FullName,
+                        increased ? "expansion" : "contraction",
                         old,
-                        now,
-                        increased);
+                        now);
                 }
             }
         }
@@ -311,6 +312,11 @@ namespace Orleans.Runtime.ConsistentRing
         private bool IsSiloNextInTheRing(SiloAddress siloAddr, uint hash, bool excludeMySelf)
         {
             return siloAddr.GetConsistentHashCode() >= hash && (!siloAddr.Equals(MyAddress) || !excludeMySelf);
+        }
+
+        public void Dispose()
+        {
+            _siloStatusOracle.UnSubscribeFromSiloStatusEvents(this);
         }
     }
 }

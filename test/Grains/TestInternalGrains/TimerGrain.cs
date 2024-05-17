@@ -132,7 +132,7 @@ namespace UnitTestGrains
     {
         private int tickCount;
         private Exception tickException;
-        private IDisposable timer;
+        private IGrainTimer timer;
         private string timerName;
         private IGrainContext context;
         private TaskScheduler activationTaskScheduler;
@@ -157,8 +157,39 @@ namespace UnitTestGrains
         public Task StartTimer(string name, TimeSpan delay)
         {
             logger.LogInformation("StartTimer Name={Name} Delay={Delay}", name, delay);
-            this.timerName = name;
+            if (timer is not null) throw new InvalidOperationException("Expected timer to be null");
             this.timer = base.RegisterTimer(TimerTick, name, delay, Constants.INFINITE_TIMESPAN); // One shot timer
+            this.timerName = name;
+
+            return Task.CompletedTask;
+        }
+
+        public Task StartTimer(string name, TimeSpan delay, string operationType)
+        {
+            logger.LogInformation("StartTimer Name={Name} Delay={Delay}", name, delay);
+            if (timer is not null) throw new InvalidOperationException("Expected timer to be null");
+            var state = Tuple.Create<string, object>(operationType, name);
+            this.timer = base.RegisterTimer(TimerTickAdvanced, state, delay, Constants.INFINITE_TIMESPAN); // One shot timer
+            this.timerName = name;
+
+            return Task.CompletedTask;
+        }
+
+        public Task RestartTimer(string name, TimeSpan delay)
+        {
+            logger.LogInformation("RestartTimer Name={Name} Delay={Delay}", name, delay);
+            this.timerName = name;
+            timer.Change(delay, Constants.INFINITE_TIMESPAN);
+
+            return Task.CompletedTask;
+        }
+
+        public Task RestartTimer(string name, TimeSpan delay, TimeSpan period)
+        {
+            logger.LogInformation("RestartTimer Name={Name} Delay={Delay} Period={Period}", name, delay, period);
+            this.timerName = name;
+            timer.Change(delay, period);
+
             return Task.CompletedTask;
         }
 
@@ -169,7 +200,10 @@ namespace UnitTestGrains
             {
                 throw new ArgumentException($"Wrong timer name: Expected={this.timerName} Actual={name}");
             }
+
             timer.Dispose();
+            timer = null;
+            timerName = null;
             return Task.CompletedTask;
         }
 
@@ -178,6 +212,33 @@ namespace UnitTestGrains
             try
             {
                 await ProcessTimerTick(data);
+            }
+            catch (Exception exc)
+            {
+                this.tickException = exc;
+                throw;
+            }
+        }
+
+        private async Task TimerTickAdvanced(object data)
+        {
+            try
+            {
+                var state = (Tuple<string, object>)data;
+                var operation = state.Item1;
+                var name = state.Item2;
+
+                await ProcessTimerTick(name);
+
+                if (operation == "update_period")
+                {
+                    var newPeriod = TimeSpan.FromSeconds(100);
+                    timer.Change(newPeriod, newPeriod);
+                }
+                else if (operation == "dispose_timer")
+                {
+                    await StopTimer((string)name);
+                }
             }
             catch (Exception exc)
             {

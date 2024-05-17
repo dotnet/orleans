@@ -514,12 +514,17 @@ namespace Orleans.CodeGenerator
             return result;
         }
 
-        internal static AttributeSyntax GetGeneratedCodeAttributeSyntax() => GeneratedCodeAttributeSyntax;
-        private static readonly AttributeSyntax GeneratedCodeAttributeSyntax =
+        internal static AttributeListSyntax GetGeneratedCodeAttributes() => GeneratedCodeAttributeSyntax;
+        private static readonly AttributeListSyntax GeneratedCodeAttributeSyntax =
+            AttributeList().AddAttributes(
                 Attribute(ParseName("global::System.CodeDom.Compiler.GeneratedCodeAttribute"))
                     .AddArgumentListArguments(
                         AttributeArgument(CodeGeneratorName.GetLiteralExpression()),
-                        AttributeArgument(typeof(CodeGenerator).Assembly.GetName().Version.ToString().GetLiteralExpression()));
+                        AttributeArgument(typeof(CodeGenerator).Assembly.GetName().Version.ToString().GetLiteralExpression())),
+                Attribute(ParseName("global::System.ComponentModel.EditorBrowsableAttribute"))
+                    .AddArgumentListArguments(
+                        AttributeArgument(ParseName("global::System.ComponentModel.EditorBrowsableState").Member("Never")))
+            );
 
         internal static AttributeSyntax GetMethodImplAttributeSyntax() => MethodImplAttributeSyntax;
         private static readonly AttributeSyntax MethodImplAttributeSyntax =
