@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Configuration;
+using MySql.Data.MySqlClient;
 using Orleans.Configuration;
 using Orleans.Streaming.AdoNet.Storage;
 using Orleans.TestingHost;
@@ -14,8 +15,12 @@ public class SqlServerAdoNetClientStreamTests(ITestOutputHelper output) : AdoNet
 {
 }
 
-public class MySqlAdoNetClientStreamTests(ITestOutputHelper output) : AdoNetClientStreamTests(AdoNetInvariants.InvariantNameMySql, output)
+public class MySqlAdoNetClientStreamTests : AdoNetClientStreamTests
 {
+    public MySqlAdoNetClientStreamTests(ITestOutputHelper output) : base(AdoNetInvariants.InvariantNameMySql, output)
+    {
+        MySqlConnection.ClearAllPools();
+    }
 }
 
 public class PostgreSqlAdoNetClientStreamTests(ITestOutputHelper output) : AdoNetClientStreamTests(AdoNetInvariants.InvariantNamePostgreSql, output)

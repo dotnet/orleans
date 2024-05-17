@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Configuration;
+using MySql.Data.MySqlClient;
 using Orleans.Streaming.AdoNet.Storage;
 using Orleans.TestingHost;
 using TestExtensions;
@@ -19,8 +20,12 @@ public class SqlServerAdoNetStreamingTests() : AdoNetStreamingTests(AdoNetInvari
 /// <summary>
 /// Cluster streaming tests for ADO.NET Streaming against MySQL.
 /// </summary>
-public class MySqlAdoNetStreamingTests() : AdoNetStreamingTests(AdoNetInvariants.InvariantNameMySql)
+public class MySqlAdoNetStreamingTests : AdoNetStreamingTests
 {
+    public MySqlAdoNetStreamingTests() : base(AdoNetInvariants.InvariantNameMySql)
+    {
+        MySqlConnection.ClearAllPools();
+    }
 }
 
 /// <summary>

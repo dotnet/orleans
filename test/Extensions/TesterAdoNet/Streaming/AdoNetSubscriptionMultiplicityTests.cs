@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Configuration;
+using MySql.Data.MySqlClient;
 using Orleans.Streaming.AdoNet.Storage;
 using Orleans.TestingHost;
 using TestExtensions;
@@ -12,8 +13,12 @@ public class SqlServerAdoNetSubscriptionMultiplicityTests() : AdoNetSubscription
 {
 }
 
-public class MySqlAdoNetSubscriptionMultiplicityTests() : AdoNetSubscriptionMultiplicityTests(AdoNetInvariants.InvariantNameMySql)
+public class MySqlAdoNetSubscriptionMultiplicityTests : AdoNetSubscriptionMultiplicityTests
 {
+    public MySqlAdoNetSubscriptionMultiplicityTests() : base(AdoNetInvariants.InvariantNameMySql)
+    {
+        MySqlConnection.ClearAllPools();
+    }
 }
 
 public class PostgreSqlAdoNetSubscriptionMultiplicityTests() : AdoNetSubscriptionMultiplicityTests(AdoNetInvariants.InvariantNamePostgreSql)

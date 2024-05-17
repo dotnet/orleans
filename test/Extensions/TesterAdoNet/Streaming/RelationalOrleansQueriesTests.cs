@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using MySql.Data.MySqlClient;
 using Npgsql;
 using Orleans.Configuration;
 using Orleans.Streaming.AdoNet;
@@ -18,8 +19,12 @@ public class SqlServerRelationalOrleansQueriesTests() : RelationalOrleansQueries
 /// <summary>
 /// Tests the relational storage layer via <see cref="RelationalOrleansQueries"/> against MySQL.
 /// </summary>
-public class MySqlRelationalOrleansQueriesTests() : RelationalOrleansQueriesTests(AdoNetInvariants.InvariantNameMySql, 100)
+public class MySqlRelationalOrleansQueriesTests : RelationalOrleansQueriesTests
 {
+    public MySqlRelationalOrleansQueriesTests() : base(AdoNetInvariants.InvariantNameMySql, 100)
+    {
+        MySqlConnection.ClearAllPools();
+    }
 }
 
 /// <summary>

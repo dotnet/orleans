@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Logging.Abstractions;
+using MySql.Data.MySqlClient;
 using Orleans.Configuration;
 using Orleans.Providers.Streams.Common;
 using Orleans.Streaming.AdoNet;
@@ -21,8 +22,12 @@ public class SqlServerAdoNetQueueAdapterFactoryTests(TestEnvironmentFixture fixt
 /// <summary>
 /// Tests for <see cref="AdoNetQueueAdapterFactory"/> against MySQL.
 /// </summary>
-public class MySqlAdoNetQueueAdapterFactoryTests(TestEnvironmentFixture fixture) : AdoNetQueueAdapterFactoryTests(AdoNetInvariants.InvariantNameMySql, fixture)
+public class MySqlAdoNetQueueAdapterFactoryTests : AdoNetQueueAdapterFactoryTests
 {
+    public MySqlAdoNetQueueAdapterFactoryTests(TestEnvironmentFixture fixture) : base(AdoNetInvariants.InvariantNameMySql, fixture)
+    {
+        MySqlConnection.ClearAllPools();
+    }
 }
 
 /// <summary>
