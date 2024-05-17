@@ -1,7 +1,6 @@
 using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 using Microsoft.Extensions.Configuration;
-using Orleans.Runtime;
 using Orleans.Streams;
 using Orleans.TestingHost;
 using TestExtensions;
@@ -14,23 +13,39 @@ namespace UnitTests.General
 {
     internal interface IMyRegularInterface
     {
+        [Alias("Set")]
         ValueTask SetExtensionValue(int value);
+
+        [Alias("Get")]
         ValueTask<int> GetExtensionValue();
     }
 
-    internal interface IMyGrainExtension : IGrainExtension, IMyRegularInterface
+    internal interface IMyOtherInterface
+    {
+        [Alias("Set")]
+        ValueTask SetExtensionValue(int value);
+
+        [Alias("Get")]
+        ValueTask<int> GetExtensionValue();
+    }
+
+    internal interface IMyGrainExtension : IGrainExtension, IMyRegularInterface, IMyOtherInterface
     {
     }
 
     internal sealed class MyGrainExtension : IMyGrainExtension
     {
         private int _value;
+
         ValueTask<int> IMyRegularInterface.GetExtensionValue() => new(_value);
+
         public ValueTask SetExtensionValue(int value)
         {
             _value = value;
             return default;
         }
+
+        ValueTask<int> IMyOtherInterface.GetExtensionValue() => new(100 + _value);
     }
 
     [TestCategory("BVT"), TestCategory("GrainCallFilter")]
@@ -406,9 +421,12 @@ namespace UnitTests.General
             var grain = this.fixture.GrainFactory.GetGrain<IMethodInterceptionGrain>(Random.Shared.Next());
             var extension = grain.AsReference<IMyGrainExtension>();
 
-            await extension.SetExtensionValue(42);
-            var result = await extension.GetExtensionValue();
+            await ((IMyRegularInterface)extension).SetExtensionValue(42);
+            var result = await ((IMyRegularInterface)extension).GetExtensionValue();
             Assert.Equal(-42, result);
+
+            result = await ((IMyOtherInterface)extension).GetExtensionValue();
+            Assert.Equal(100-42, result);
         }
 
         /// <summary>

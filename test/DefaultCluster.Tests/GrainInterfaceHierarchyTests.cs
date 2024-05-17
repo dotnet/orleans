@@ -90,7 +90,6 @@ namespace DefaultCluster.Tests
             Assert.Equal(11, await doSomethingCombinedGrain.GetA());
             Assert.Equal(11, await doSomethingCombinedGrain.GetB());
             Assert.Equal(11, await doSomethingCombinedGrain.GetC());
-
         }
     }
 }

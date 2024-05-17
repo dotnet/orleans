@@ -674,7 +674,7 @@ namespace Orleans.CodeGenerator
             return description;
         }
 
-        internal ProxyMethodDescription GetProxyMethodDescription(INamedTypeSymbol interfaceType, IMethodSymbol method, bool hasCollision)
+        internal ProxyMethodDescription GetProxyMethodDescription(INamedTypeSymbol interfaceType, IMethodSymbol method)
         {
             var originalMethod = method.OriginalDefinition;
             var proxyBaseInfo = GetProxyBase(interfaceType);
@@ -713,7 +713,7 @@ namespace Orleans.CodeGenerator
                 }
             }
 
-            var proxyMethodDescription = ProxyMethodDescription.Create(interfaceDescription, generatedInvokable, method, hasCollision);
+            var proxyMethodDescription = ProxyMethodDescription.Create(interfaceDescription, generatedInvokable, method);
 
             // For backwards compatibility, generate invokers for the specific implementation types as well, where they differ.
             if (Options.GenerateCompatibilityInvokers && !SymbolEqualityComparer.Default.Equals(method.OriginalDefinition.ContainingType, interfaceType))

@@ -113,7 +113,7 @@ namespace Orleans.CodeGenerator
                 {
                     declaration = declaration.WithModifiers(TokenList(Token(SyntaxKind.PublicKeyword)));
 
-                    // Type parameter constrains are not valid on explicit interface definitions
+                    // Type parameter constraints are not valid on explicit interface definitions
                     var typeParameters = SyntaxFactoryUtility.GetTypeParameterConstraints(methodDescription.MethodTypeParameters);
                     foreach (var (name, constraints) in typeParameters)
                     {
