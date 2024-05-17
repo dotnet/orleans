@@ -257,7 +257,7 @@ WITH Batch AS
 		ProviderId,
 		QueueId,
 		MessageId
-    FOR UPDATE SKIP LOCKED
+    FOR UPDATE
 	LIMIT _MaxCount
 )
 UPDATE OrleansStreamMessage AS M
@@ -531,7 +531,7 @@ WITH Batch AS
         ProviderId,
         QueueId,
         MessageId
-    FOR UPDATE SKIP LOCKED
+    FOR UPDATE
     LIMIT _BatchSize
 ),
 
@@ -639,7 +639,7 @@ WITH Batch AS
         ProviderId,
         QueueId,
         MessageId
-    FOR UPDATE SKIP LOCKED
+    FOR UPDATE
     LIMIT _BatchSize
 )
 DELETE FROM OrleansStreamDeadLetter AS M
