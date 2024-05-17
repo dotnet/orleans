@@ -12,6 +12,27 @@ using Orleans.Providers;
 
 namespace UnitTests.General
 {
+    internal interface IMyRegularInterface
+    {
+        ValueTask SetExtensionValue(int value);
+        ValueTask<int> GetExtensionValue();
+    }
+
+    internal interface IMyGrainExtension : IGrainExtension, IMyRegularInterface
+    {
+    }
+
+    internal sealed class MyGrainExtension : IMyGrainExtension
+    {
+        private int _value;
+        ValueTask<int> IMyRegularInterface.GetExtensionValue() => new(_value);
+        public ValueTask SetExtensionValue(int value)
+        {
+            _value = value;
+            return default;
+        }
+    }
+
     [TestCategory("BVT"), TestCategory("GrainCallFilter")]
     public class GrainCallFilterTests : OrleansTestingBase, IClassFixture<GrainCallFilterTests.Fixture>
     {
@@ -29,18 +50,34 @@ namespace UnitTests.General
                 public void Configure(ISiloBuilder hostBuilder)
                 {
                     hostBuilder
+                        .AddGrainExtension<IMyGrainExtension, MyGrainExtension>()
                         .AddIncomingGrainCallFilter(context =>
                         {
-                            if (string.Equals(context.InterfaceMethod?.Name, nameof(IGrainCallFilterTestGrain.GetRequestContext)))
+                            Assert.NotNull(context);
+                            Assert.NotNull(context.InterfaceMethod);
+                            Assert.NotNull(context.Grain);
+                            Assert.NotNull(context.ImplementationMethod);
+                            Assert.NotNull(context.TargetContext);
+                            Assert.NotEmpty(context.InterfaceName);
+                            Assert.NotEmpty(context.MethodName);
+                            Assert.False(context.TargetId.IsDefault);
+                            Assert.False(context.InterfaceType.IsDefault);
+
+                            if (string.Equals(context.InterfaceMethod.Name, nameof(IGrainCallFilterTestGrain.GetRequestContext)))
                             {
                                 if (RequestContext.Get(GrainCallFilterTestConstants.Key) != null) throw new InvalidOperationException();
                                 RequestContext.Set(GrainCallFilterTestConstants.Key, "1");
                             }
 
-                            if (string.Equals(context.InterfaceMethod?.Name, nameof(IGrainCallFilterTestGrain.SystemWideCallFilterMarker)))
+                            if (string.Equals(context.InterfaceMethod.Name, nameof(IGrainCallFilterTestGrain.SystemWideCallFilterMarker)))
                             {
-                                // explicitely do not continue calling Invoke
+                                // explicitly do not continue calling Invoke
                                 return Task.CompletedTask;
+                            }
+
+                            if (string.Equals(context.InterfaceMethod.Name, nameof(IMyGrainExtension.SetExtensionValue)))
+                            {
+                                context.Request.SetArgument(0, (int)context.Request.GetArgument(0) * -1);
                             }
 
                             return context.Invoke();
@@ -75,20 +112,27 @@ namespace UnitTests.General
                 {
                     clientBuilder
                         .AddOutgoingGrainCallFilter(RetryCertainCalls)
-                        .AddOutgoingGrainCallFilter(async ctx =>
+                        .AddOutgoingGrainCallFilter(async context =>
                         {
-                            if (ctx.InterfaceMethod?.DeclaringType == typeof(IOutgoingMethodInterceptionGrain)
-                                && ctx.InterfaceMethod?.Name == nameof(IOutgoingMethodInterceptionGrain.EchoViaOtherGrain))
+                            Assert.NotNull(context);
+                            Assert.NotNull(context.InterfaceMethod);
+                            Assert.NotNull(context.Grain);
+                            Assert.NotEmpty(context.InterfaceName);
+                            Assert.NotEmpty(context.MethodName);
+                            Assert.False(context.TargetId.IsDefault);
+                            Assert.False(context.InterfaceType.IsDefault);
+                            if (context.InterfaceMethod?.DeclaringType == typeof(IOutgoingMethodInterceptionGrain)
+                                && context.InterfaceMethod?.Name == nameof(IOutgoingMethodInterceptionGrain.EchoViaOtherGrain))
                             {
-                                ctx.Request.SetArgument(1, ((string)ctx.Request.GetArgument(1)).ToUpperInvariant());
+                                context.Request.SetArgument(1, ((string)context.Request.GetArgument(1)).ToUpperInvariant());
                             }
 
-                            await ctx.Invoke();
+                            await context.Invoke();
 
-                            if (ctx.InterfaceMethod?.DeclaringType == typeof(IOutgoingMethodInterceptionGrain)
-                                && ctx.InterfaceMethod?.Name == nameof(IOutgoingMethodInterceptionGrain.EchoViaOtherGrain))
+                            if (context.InterfaceMethod?.DeclaringType == typeof(IOutgoingMethodInterceptionGrain)
+                                && context.InterfaceMethod?.Name == nameof(IOutgoingMethodInterceptionGrain.EchoViaOtherGrain))
                             {
-                                var result = (Dictionary<string, object>)ctx.Result;
+                                var result = (Dictionary<string, object>)context.Result;
                                 result["orig"] = result["result"];
                                 result["result"] = "intercepted!";
                             }
@@ -241,7 +285,7 @@ namespace UnitTests.General
         }
 
         /// <summary>
-        /// Tests that an ougoing call filter can retry calls.
+        /// Tests that an outgoing call filter can retry calls.
         /// </summary>
         [Fact]
         public async Task GrainCallFilter_Outgoing_Retry_Test()
@@ -351,6 +395,20 @@ namespace UnitTests.General
             // This grain method throws, but the exception should be handled by one of the filters and converted
             // into a specific message.
             await Assert.ThrowsAsync<InvalidCastException>(() => grain.IncorrectResultType());
+        }
+
+        /// <summary>
+        /// Tests that grain call filters work as expected on grain extensions.
+        /// </summary>
+        [Fact]
+        public async Task GrainCallFilter_GrainExtension()
+        {
+            var grain = this.fixture.GrainFactory.GetGrain<IMethodInterceptionGrain>(Random.Shared.Next());
+            var extension = grain.AsReference<IMyGrainExtension>();
+
+            await extension.SetExtensionValue(42);
+            var result = await extension.GetExtensionValue();
+            Assert.Equal(-42, result);
         }
 
         /// <summary>
