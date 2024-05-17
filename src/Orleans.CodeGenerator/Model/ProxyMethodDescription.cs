@@ -79,7 +79,6 @@ namespace Orleans.CodeGenerator
         public ConstructedGeneratedInvokableDescription GeneratedInvokable { get; }
         public ProxyInterfaceDescription ProxyInterface { get; }
 
-        public bool HasCollision { get; }   
         public IMethodSymbol Method { get; }
         public InvokableMethodId InvokableId { get; }
         public List<(string Name, ITypeParameterSymbol Parameter)> TypeParameters { get; }
