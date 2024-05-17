@@ -144,7 +144,8 @@ namespace Orleans.Runtime
             var source = GetActivitySource(context);
             if (!string.IsNullOrEmpty(traceParent))
             {
-                activity = source.CreateActivity(context.Request.GetActivityName(), ActivityKind.Server, traceParent);
+                ActivityContext.TryParse(traceParent, traceState, isRemote: true, out ActivityContext parentContext);
+                activity = source.CreateActivity(context.Request.GetActivityName(), ActivityKind.Server, parentContext);
 
                 if (activity is not null)
                 {
