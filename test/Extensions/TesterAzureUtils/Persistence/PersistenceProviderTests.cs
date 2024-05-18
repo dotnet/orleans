@@ -302,6 +302,11 @@ namespace Tester.AzureUtils.Persistence
 
         private async Task<AzureTableGrainStorage> InitAzureTableGrainStorage(bool useJson = false, bool useStringFormat = false, TypeNameHandling? typeNameHandling = null)
         {
+            if (useStringFormat && !useJson)
+            {
+                throw new InvalidOperationException($"Using {nameof(OrleansGrainStorageSerializer)} in conjuction with string data format makes no sense, there for stopping attempt.");
+            }
+
             var options = new AzureTableStorageOptions();
             var jsonOptions = this.providerRuntime.ServiceProvider.GetService<IOptions<OrleansJsonSerializerOptions>>();
             if (typeNameHandling != null)
