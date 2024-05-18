@@ -167,6 +167,40 @@ namespace Tester.AzureUtils.Persistence
         }
 
         [SkippableTheory, TestCategory("Functional"), TestCategory("AzureStorage")]
+        [InlineData(null, true, false)]
+        [InlineData(null, false, true)]
+        [InlineData(15 * 32 * 1024 - 256, true, false)]
+        [InlineData(15 * 32 * 1024 - 256, false, true)]
+        public async Task PersistenceProvider_Azure_ChangeStorageDataFormat_WhenJsonSerializerIsUsed(int? stringLength, bool useStringFormatForFirstWrite, bool useStringFormatForSecondWrite)
+        {
+            // always use JsonSerializer over OrleansSerializer since specifying 'useStringFormat = true'
+            // writes to 'StringData', the OrleansSerializer can not read from the 'StringData' column as its not a format which it expects.
+            const bool useJson = true;
+
+            var testName = string.Format("{0}({1}={2},{3}={4},{5}={6})",
+                nameof(PersistenceProvider_Azure_ChangeStorageDataFormat_WhenJsonSerializerIsUsed),
+                nameof(stringLength), stringLength == null ? "default" : stringLength.ToString(),
+                "strFormat1stW", useStringFormatForFirstWrite,
+                "strFormat2ndW", useStringFormatForSecondWrite);
+
+            var grainState = TestStoreGrainState.NewRandomState(stringLength);
+            EnsureEnvironmentSupportsState(grainState);
+
+            var grainId = LegacyGrainId.NewId();
+
+            var store = await InitAzureTableGrainStorage(useJson: useJson, useStringFormat: useStringFormatForFirstWrite);
+
+            await Test_PersistenceProvider_WriteRead(testName, store, grainState, grainId);
+
+            grainState = TestStoreGrainState.NewRandomState(stringLength);
+            grainState.ETag = "*";
+
+            store = await InitAzureTableGrainStorage(useJson: useJson, useStringFormat: useStringFormatForSecondWrite);
+
+            await Test_PersistenceProvider_WriteRead(testName, store, grainState, grainId);
+        }
+
+        [SkippableTheory, TestCategory("Functional"), TestCategory("AzureStorage")]
         [InlineData(null, false)]
         [InlineData(null, true)]
         [InlineData(15 * 64 * 1024 - 256, false)]
@@ -266,7 +300,7 @@ namespace Tester.AzureUtils.Persistence
             return store;
         }
 
-        private async Task<AzureTableGrainStorage> InitAzureTableGrainStorage(bool useJson = false, TypeNameHandling? typeNameHandling = null)
+        private async Task<AzureTableGrainStorage> InitAzureTableGrainStorage(bool useJson = false, bool useStringFormat = false, TypeNameHandling? typeNameHandling = null)
         {
             var options = new AzureTableStorageOptions();
             var jsonOptions = this.providerRuntime.ServiceProvider.GetService<IOptions<OrleansJsonSerializerOptions>>();
@@ -276,6 +310,7 @@ namespace Tester.AzureUtils.Persistence
             }
 
             options.ConfigureTestDefaults();
+            options.UseStringFormat = useStringFormat;
 
             // TODO change test to include more serializer?
             var binarySerializer = new OrleansGrainStorageSerializer(this.providerRuntime.ServiceProvider.GetRequiredService<Serializer>());

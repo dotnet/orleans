@@ -207,7 +207,7 @@ namespace Orleans.Storage
 
             CheckMaxDataSize(binaryData.ToMemory().Length, MAX_DATA_CHUNK_SIZE * MAX_DATA_CHUNKS_COUNT);
 
-            if (options.UseJson)
+            if (options.UseStringFormat)
             {
                 var properties = SplitStringData(binaryData.ToString().AsMemory());
 
