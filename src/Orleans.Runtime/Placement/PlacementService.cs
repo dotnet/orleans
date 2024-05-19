@@ -68,7 +68,7 @@ namespace Orleans.Runtime.Placement
         /// </summary>
         public Task AddressMessage(Message message)
         {
-            if (message.IsFullyAddressed) return Task.CompletedTask;
+            if (message.IsTargetFullyAddressed) return Task.CompletedTask;
             if (message.TargetGrain.IsDefault) ThrowMissingAddress();
 
             var grainId = message.TargetGrain;

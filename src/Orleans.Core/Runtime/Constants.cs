@@ -25,6 +25,7 @@ namespace Orleans.Runtime
         public static readonly GrainType StreamPullingAgentType = SystemTargetGrainId.CreateGrainType("stream.agent");
         public static readonly GrainType ManifestProviderType = SystemTargetGrainId.CreateGrainType("manifest");
         public static readonly GrainType ActivationMigratorType = SystemTargetGrainId.CreateGrainType("migrator");
+        public static readonly GrainType ActivationRebalancerType = SystemTargetGrainId.CreateGrainType("rebalancer");
 
         public static readonly GrainId SiloDirectConnectionId = GrainId.Create(
             GrainType.Create(GrainTypePrefix.SystemPrefix + "silo"),

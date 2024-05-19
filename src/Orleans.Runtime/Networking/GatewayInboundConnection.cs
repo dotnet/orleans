@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Connections;
 using Microsoft.Extensions.Logging;
 using Orleans.Configuration;
 using Orleans.Messaging;
+using Orleans.Placement.Rebalancing;
 
 namespace Orleans.Runtime.Messaging
 {
@@ -45,13 +46,13 @@ namespace Orleans.Runtime.Messaging
 
         protected override void RecordMessageReceive(Message msg, int numTotalBytes, int headerBytes)
         {
-            MessagingInstruments.OnMessageReceive(msg, numTotalBytes, headerBytes, ConnectionDirection);
+            MessagingInstruments.OnMessageReceive(msg, numTotalBytes, headerBytes);
             GatewayInstruments.GatewayReceived.Add(1);
         }
 
         protected override void RecordMessageSend(Message msg, int numTotalBytes, int headerBytes)
         {
-            MessagingInstruments.OnMessageSend(msg, numTotalBytes, headerBytes, ConnectionDirection);
+            MessagingInstruments.OnMessageSend(msg, numTotalBytes, headerBytes);
             GatewayInstruments.GatewaySent.Add(1);
         }
 

@@ -74,7 +74,8 @@ namespace Orleans.Runtime
 
         public bool HasDirection => _headers.Direction != Directions.None;
 
-        public bool IsFullyAddressed => TargetSilo is not null && !TargetGrain.IsDefault;
+        public bool IsSenderFullyAddressed => SendingSilo is not null && !SendingGrain.IsDefault;
+        public bool IsTargetFullyAddressed => TargetSilo is not null && !TargetGrain.IsDefault;
 
         public bool IsExpired => _timeToExpiry is { IsDefault: false, ElapsedMilliseconds: > 0 };
 

@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
@@ -167,6 +168,8 @@ public class GrainDirectoryPartitionTests
                 ? new Dictionary<SiloAddress, SiloStatus>(_content.Where(kvp => kvp.Value == SiloStatus.Active))
                 : new Dictionary<SiloAddress, SiloStatus>(_content);
         }
+
+        public ImmutableArray<SiloAddress> GetActiveSilos() => _content.Keys.ToImmutableArray();
 
         public void SetSiloStatus(SiloAddress siloAddress, SiloStatus status) => _content[siloAddress] = status;
 

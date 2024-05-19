@@ -64,16 +64,14 @@ namespace Orleans.Runtime
             MessagingProcessingInstruments.RegisterActivationDataAllObserve(() =>
             {
                 long counter = 0;
-                lock (activations)
+                foreach (var activation in activations)
                 {
-                    foreach (var activation in activations)
+                    if (activation.Value is ActivationData data)
                     {
-                        if (activation.Value is ActivationData data)
-                        {
-                            counter += data.GetRequestCount();
-                        }
+                        counter += data.GetRequestCount();
                     }
                 }
+
                 return counter;
             });
             grainDirectory.SetSiloRemovedCatalogCallback(this.OnSiloStatusChange);
