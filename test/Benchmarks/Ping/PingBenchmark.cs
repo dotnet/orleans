@@ -4,6 +4,7 @@ using BenchmarkGrainInterfaces.Ping;
 using BenchmarkGrains.Ping;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 using Orleans.Configuration;
 
 namespace Benchmarks.Ping
@@ -26,6 +27,17 @@ namespace Benchmarks.Ping
                 var primary = i == 0 ? null : new IPEndPoint(IPAddress.Loopback, 11111);
                 var hostBuilder = new HostBuilder().UseOrleans((ctx, siloBuilder) =>
                 {
+#pragma warning disable ORLEANSEXP001 // Type is for evaluation purposes only and is subject to change or removal in future updates. Suppress this diagnostic to proceed.
+                    siloBuilder.AddActiveRebalancing();
+#pragma warning restore ORLEANSEXP001 // Type is for evaluation purposes only and is subject to change or removal in future updates. Suppress this diagnostic to proceed.
+                    siloBuilder.ConfigureLogging(l =>
+                    {
+                        l.AddConsole();
+                        l.AddFilter("Orleans.Runtime.Placement.Rebalancing", LogLevel.Debug);
+                    });
+                    siloBuilder.Configure<ActiveRebalancingOptions>(o =>
+                    {
+                    });
                     siloBuilder.UseLocalhostClustering(
                         siloPort: 11111 + i,
                         gatewayPort: 30000 + i,

@@ -138,7 +138,7 @@ namespace Orleans.Runtime
         public override bool Equals(object? obj) => obj is GrainId id && Equals(id);
 
         /// <inheritdoc/>
-        public bool Equals(GrainId other) => _type.Equals(other._type) && _key.Equals(other._key);
+        public bool Equals(GrainId other) => _key.Equals(other._key) && _type.Equals(other._type);
 
         /// <inheritdoc/>
         public override int GetHashCode() => HashCode.Combine(_type, _key);

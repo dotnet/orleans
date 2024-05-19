@@ -12,6 +12,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.ObjectPool;
 using Orleans.Configuration;
 using Orleans.Messaging;
+using Orleans.Placement.Rebalancing;
 using Orleans.Serialization.Invocation;
 
 namespace Orleans.Runtime.Messaging
@@ -274,9 +275,7 @@ namespace Orleans.Runtime.Messaging
 
         protected abstract void RecordMessageReceive(Message msg, int numTotalBytes, int headerBytes);
         protected abstract void RecordMessageSend(Message msg, int numTotalBytes, int headerBytes);
-
         protected abstract void OnReceivedMessage(Message message);
-
         protected abstract void OnSendMessageFailure(Message message, string error);
 
         private async Task ProcessIncoming()
@@ -355,6 +354,7 @@ namespace Orleans.Runtime.Messaging
 
             Exception error = default;
             var serializer = this.shared.ServiceProvider.GetRequiredService<MessageSerializer>();
+            var messageStatisticsSink = this.shared.MessageStatisticsSink;
             try
             {
                 var output = this._transport.Output;
@@ -376,6 +376,7 @@ namespace Orleans.Runtime.Messaging
                             inflight.Add(message);
                             var (headerLength, bodyLength) = serializer.Write(output, message);
                             RecordMessageSend(message, headerLength + bodyLength, headerLength);
+                            messageStatisticsSink.RecordMessage(message);
                             message = null;
                         }
                     }

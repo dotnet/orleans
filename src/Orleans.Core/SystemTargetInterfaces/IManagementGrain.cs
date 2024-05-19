@@ -124,5 +124,47 @@ namespace Orleans.Runtime
         /// <param name="type">The type.</param>
         /// <returns>A list of all active grains of the specified type.</returns>
         ValueTask<List<GrainId>> GetActiveGrains(GrainType type);
+
+        Task<List<GrainCallFrequency>> GetGrainCallFrequencies(SiloAddress[] hostsIds = null);
+        ValueTask ResetGrainCallFrequencies(SiloAddress[] hostsIds = null);
+    }
+
+    /// <summary>
+    /// Represents an estimation of the frequency calls made from a source grain to a target grain.
+    /// </summary>
+    [GenerateSerializer]
+    [Alias("Orleans.Runtime.GrainCallFrequency")]
+    [Immutable]
+    public struct GrainCallFrequency
+    {
+        /// <summary>
+        /// The source grain.
+        /// </summary>
+        [Id(0)]
+        public GrainId SourceGrain { get; set; }
+
+        /// <summary>
+        /// The target grain.
+        /// </summary>
+        [Id(1)]
+        public GrainId TargetGrain { get; set; }
+
+        /// <summary>
+        /// The source host.
+        /// </summary>
+        [Id(2)]
+        public SiloAddress SourceHost { get; set; }
+
+        /// <summary>
+        /// The target host.
+        /// </summary>
+        [Id(3)]
+        public SiloAddress TargetHost { get; set; }
+
+        /// <summary>
+        /// The estimated number of calls made.
+        /// </summary>
+        [Id(4)]
+        public ulong CallCount { get; set; }
     }
 }

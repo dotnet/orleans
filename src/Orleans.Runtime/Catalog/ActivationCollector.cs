@@ -512,7 +512,7 @@ namespace Orleans.Runtime
             var mtcs = new MultiTaskCompletionSource(list.Count);
 
             logger.LogInformation((int)ErrorCode.Catalog_ShutdownActivations_1, "DeactivateActivationsFromCollector: total {Count} to promptly Destroy.", list.Count);
-            CatalogInstruments.ActiviationShutdownViaCollection();
+            CatalogInstruments.ActivationShutdownViaCollection();
 
             void signalCompletion(Task task) => mtcs.SetOneResult();
             var reason = GetDeactivationReason();

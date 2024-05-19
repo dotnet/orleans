@@ -25,6 +25,7 @@ using System;
 using Orleans.Hosting;
 using System.Reflection;
 using Microsoft.Extensions.Configuration;
+using Orleans.Placement.Rebalancing;
 
 namespace Orleans
 {
@@ -114,6 +115,7 @@ namespace Orleans
             services.AddSingleton<SharedMemoryPool>();
 
             // Networking
+            services.TryAddSingleton<IMessageStatisticsSink, NoOpMessageStatisticsSink>();
             services.TryAddSingleton<ConnectionCommon>();
             services.TryAddSingleton<ConnectionManager>();
             services.TryAddSingleton<ConnectionPreambleHelper>();

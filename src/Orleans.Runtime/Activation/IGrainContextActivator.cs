@@ -5,6 +5,7 @@ using System.Collections.Immutable;
 using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using System.Reflection;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Concurrency;
@@ -168,63 +169,23 @@ namespace Orleans.Runtime
         private readonly ConcurrentDictionary<GrainType, GrainTypeSharedContext> _components = new();
         private readonly IConfigureGrainTypeComponents[] _configurators;
         private readonly GrainPropertiesResolver _grainPropertiesResolver;
-        private readonly GrainReferenceActivator _grainReferenceActivator;
         private readonly Func<GrainType, GrainTypeSharedContext> _createFunc;
-        private readonly IClusterManifestProvider _clusterManifestProvider;
-        private readonly GrainClassMap _grainClassMap;
-        private readonly IOptions<SiloMessagingOptions> _messagingOptions;
-        private readonly IOptions<GrainCollectionOptions> _collectionOptions;
-        private readonly IOptions<SchedulingOptions> _schedulingOptions;
-        private readonly PlacementStrategyResolver _placementStrategyResolver;
-        private readonly IGrainRuntime _grainRuntime;
-        private readonly ILogger<Grain> _logger;
         private readonly IServiceProvider _serviceProvider;
-        private readonly SerializerSessionPool _serializerSessionPool;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="GrainTypeSharedContextResolver"/> class.
         /// </summary>
         /// <param name="configurators">The grain type component configuration providers.</param>
         /// <param name="grainPropertiesResolver">The grain properties resolver.</param>
-        /// <param name="grainReferenceActivator">The grain reference activator.</param>
-        /// <param name="clusterManifestProvider">The cluster manifest provider.</param>
-        /// <param name="grainClassMap">The grain class map.</param>
-        /// <param name="placementStrategyResolver">The grain placement strategy resolver.</param>
-        /// <param name="messagingOptions">The messaging options.</param>
-        /// <param name="collectionOptions">The grain activation collection options</param>
-        /// <param name="schedulingOptions">The scheduling options</param>
-        /// <param name="grainRuntime">The grain runtime.</param>
-        /// <param name="logger">The logger.</param>
         /// <param name="serviceProvider">The service provider.</param>
-        /// <param name="serializerSessionPool">The serializer session pool.</param>
         public GrainTypeSharedContextResolver(
             IEnumerable<IConfigureGrainTypeComponents> configurators,
             GrainPropertiesResolver grainPropertiesResolver,
-            GrainReferenceActivator grainReferenceActivator,
-            IClusterManifestProvider clusterManifestProvider,
-            GrainClassMap grainClassMap,
-            PlacementStrategyResolver placementStrategyResolver,
-            IOptions<SiloMessagingOptions> messagingOptions,
-            IOptions<GrainCollectionOptions> collectionOptions,
-            IOptions<SchedulingOptions> schedulingOptions,
-            IGrainRuntime grainRuntime,
-            ILogger<Grain> logger,
-            IServiceProvider serviceProvider,
-            SerializerSessionPool serializerSessionPool)
+            IServiceProvider serviceProvider)
         {
             _configurators = configurators.ToArray();
             _grainPropertiesResolver = grainPropertiesResolver;
-            _grainReferenceActivator = grainReferenceActivator;
-            _clusterManifestProvider = clusterManifestProvider;
-            _grainClassMap = grainClassMap;
-            _placementStrategyResolver = placementStrategyResolver;
-            _messagingOptions = messagingOptions;
-            _collectionOptions = collectionOptions;
-            _schedulingOptions = schedulingOptions;
-            _grainRuntime = grainRuntime;
-            _logger = logger;
             _serviceProvider = serviceProvider;
-            _serializerSessionPool = serializerSessionPool;
             _createFunc = Create;
         }
 
@@ -237,19 +198,7 @@ namespace Orleans.Runtime
 
         private GrainTypeSharedContext Create(GrainType grainType)
         {
-            var result = new GrainTypeSharedContext(
-                grainType,
-                _clusterManifestProvider,
-                _grainClassMap,
-                _placementStrategyResolver,
-                _messagingOptions,
-                _collectionOptions,
-                _schedulingOptions,
-                _grainRuntime,
-                _logger,
-                _grainReferenceActivator,
-                _serviceProvider,
-                _serializerSessionPool);
+            var result = ActivatorUtilities.CreateInstance<GrainTypeSharedContext>(_serviceProvider, grainType);
             var properties = _grainPropertiesResolver.GetGrainProperties(grainType);
             foreach (var configurator in _configurators)
             {
