@@ -6,6 +6,10 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <InternalsVisibleTo Include="Benchmarks.AdoNet" />
+  </ItemGroup>
+
+  <ItemGroup>
     <!--<PackageReference Include="Microsoft.Data.SqlClient" Version="2.1.1" />-->
     <!--<PackageReference Include="MySqlConnector" Version="1.2.1" />-->
     <PackageReference Include="System.Data.SqlClient" />

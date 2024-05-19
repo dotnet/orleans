@@ -17,6 +17,7 @@
 
   <ItemGroup>
     <InternalsVisibleTo Include="Tester.AdoNet" />
+    <InternalsVisibleTo Include="Benchmarks.AdoNet" />
   </ItemGroup>
 
   <ItemGroup>

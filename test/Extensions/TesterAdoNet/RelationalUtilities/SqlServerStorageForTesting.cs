@@ -28,7 +28,7 @@ namespace UnitTests.General
                     NAME = [{0}],
                     FILENAME =''' + @fileName + ''',
                     SIZE = 20MB,
-                    MAXSIZE = 100MB,
+                    MAXSIZE = 10000MB,
                     FILEGROWTH = 5MB
                 )')";
             }
