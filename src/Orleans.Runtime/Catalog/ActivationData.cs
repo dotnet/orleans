@@ -577,7 +577,7 @@ namespace Orleans.Runtime
 
                 foreach (var timer in Timers)
                 {
-                    timer.Stop();
+                    timer.Change(Timeout.InfiniteTimeSpan, Timeout.InfiniteTimeSpan);
                 }
             }
         }
@@ -595,9 +595,18 @@ namespace Orleans.Runtime
                 var timerCopy = Timers.ToList(); // need to copy since OnTimerDisposed will change the timers set.
                 foreach (var timer in timerCopy)
                 {
-                    // first call dispose, then wait to finish.
-                    Utils.SafeExecute(timer.Dispose, _shared.Logger, "timer.Dispose has thrown");
-                    tasks.Add(timer.GetCurrentlyExecutingTickTask());
+                    if (timer is IAsyncDisposable asyncDisposable)
+                    {
+                        var task = asyncDisposable.DisposeAsync();
+                        if (!task.IsCompletedSuccessfully)
+                        {
+                            tasks.Add(task.AsTask());
+                        }
+                    }
+                    else
+                    {
+                        timer.Dispose();
+                    }
                 }
 
                 return Task.WhenAll(tasks).WithCancellation(cancellationToken);

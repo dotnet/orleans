@@ -68,6 +68,7 @@ namespace Orleans.Hosting
             services.TryAddSingleton(typeof(IOptionFormatterResolver<>), typeof(DefaultOptionsFormatterResolver<>));
 
             services.AddSingleton<Silo>();
+            services.AddSingleton<Watchdog>();
             services.AddHostedService<SiloHostedService>();
             services.PostConfigure<SiloOptions>(options => options.SiloName ??= $"Silo_{Guid.NewGuid().ToString("N")[..5]}");
             services.TryAddSingleton<ILocalSiloDetails, LocalSiloDetails>();
@@ -262,12 +263,13 @@ namespace Orleans.Hosting
                     var consistentRingOptions = sp.GetRequiredService<IOptions<ConsistentRingOptions>>().Value;
                     var siloDetails = sp.GetRequiredService<ILocalSiloDetails>();
                     var loggerFactory = sp.GetRequiredService<ILoggerFactory>();
+                    var siloStatusOracle = sp.GetRequiredService<ISiloStatusOracle>();
                     if (consistentRingOptions.UseVirtualBucketsConsistentRing)
                     {
-                        return new VirtualBucketsRingProvider(siloDetails.SiloAddress, loggerFactory, consistentRingOptions.NumVirtualBucketsConsistentRing);
+                        return new VirtualBucketsRingProvider(siloDetails.SiloAddress, loggerFactory, consistentRingOptions.NumVirtualBucketsConsistentRing, siloStatusOracle);
                     }
 
-                    return new ConsistentRingProvider(siloDetails.SiloAddress, loggerFactory);
+                    return new ConsistentRingProvider(siloDetails.SiloAddress, loggerFactory, siloStatusOracle);
                 });
 
             services.AddSingleton<IConfigureOptions<GrainTypeOptions>, DefaultGrainTypeOptionsProvider>();

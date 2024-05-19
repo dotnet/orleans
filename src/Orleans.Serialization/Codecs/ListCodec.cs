@@ -5,6 +5,7 @@ using System.Runtime.CompilerServices;
 using Orleans.Serialization.Buffers;
 using Orleans.Serialization.Cloning;
 using Orleans.Serialization.GeneratedCodeHelpers;
+using Orleans.Serialization.Serializers;
 using Orleans.Serialization.WireProtocol;
 
 namespace Orleans.Serialization.Codecs
@@ -14,7 +15,7 @@ namespace Orleans.Serialization.Codecs
     /// </summary>
     /// <typeparam name="T">The element type.</typeparam>
     [RegisterSerializer]
-    public sealed class ListCodec<T> : IFieldCodec<List<T>>
+    public sealed class ListCodec<T> : IFieldCodec<List<T>>, IBaseCodec<List<T>>
     {
         private readonly Type CodecElementType = typeof(T);
 
@@ -40,16 +41,7 @@ namespace Orleans.Serialization.Codecs
 
             writer.WriteFieldHeader(fieldIdDelta, expectedType, value.GetType(), WireType.TagDelimited);
 
-            if (value.Count > 0)
-            {
-                UInt32Codec.WriteField(ref writer, 0, (uint)value.Count);
-                uint innerFieldIdDelta = 1;
-                foreach (var element in value)
-                {
-                    _fieldCodec.WriteField(ref writer, innerFieldIdDelta, CodecElementType, element);
-                    innerFieldIdDelta = 0;
-                }
-            }
+            Serialize(ref writer, value);
 
             writer.WriteEndObject();
         }
@@ -91,7 +83,7 @@ namespace Orleans.Serialization.Codecs
                     case 1:
                         if (result is null)
                         {
-                            ThrowLengthFieldMissing();
+                            ListCodec<T>.ThrowLengthFieldMissing();
                         }
 
                         result.Add(_fieldCodec.ReadValue(ref reader, header));
@@ -114,7 +106,60 @@ namespace Orleans.Serialization.Codecs
         private void ThrowInvalidSizeException(int length) => throw new IndexOutOfRangeException(
             $"Declared length of {typeof(List<T>)}, {length}, is greater than total length of input.");
 
-        private void ThrowLengthFieldMissing() => throw new RequiredFieldMissingException("Serialized array is missing its length field.");
+        private static void ThrowLengthFieldMissing() => throw new RequiredFieldMissingException("Serialized array is missing its length field.");
+
+        public void Serialize<TBufferWriter>(ref Writer<TBufferWriter> writer, List<T> value) where TBufferWriter : IBufferWriter<byte>
+        {
+            if (value.Count > 0)
+            {
+                UInt32Codec.WriteField(ref writer, 0, (uint)value.Count);
+                uint innerFieldIdDelta = 1;
+                foreach (var element in value)
+                {
+                    _fieldCodec.WriteField(ref writer, innerFieldIdDelta, CodecElementType, element);
+                    innerFieldIdDelta = 0;
+                }
+            }
+        }
+
+        public void Deserialize<TInput>(ref Reader<TInput> reader, List<T> value)
+        {
+            // If the value has some values added by the constructor, clear them.
+            // If those values are in the serialized payload, they will be added below.
+            value.Clear();
+
+            uint fieldId = 0;
+            while (true)
+            {
+                var header = reader.ReadFieldHeader();
+                if (header.IsEndBaseOrEndObject)
+                {
+                    break;
+                }
+
+                fieldId += header.FieldIdDelta;
+                switch (fieldId)
+                {
+                    case 0:
+                        var length = (int)UInt32Codec.ReadValue(ref reader, header);
+                        if (length > 10240 && length > reader.Length)
+                        {
+                            ThrowInvalidSizeException(length);
+                        }
+
+#if NET6_0_OR_GREATER
+                        value.EnsureCapacity(length);
+#endif
+                        break;
+                    case 1:
+                        value.Add(_fieldCodec.ReadValue(ref reader, header));
+                        break;
+                    default:
+                        reader.ConsumeUnknownField(header);
+                        break;
+                }
+            }
+        }
     }
 
     /// <summary>
@@ -161,6 +206,11 @@ namespace Orleans.Serialization.Codecs
         /// <inheritdoc/>
         public void DeepCopy(List<T> input, List<T> output, CopyContext context)
         {
+            output.Clear();
+
+#if NET6_0_OR_GREATER
+            output.EnsureCapacity(input.Count);
+#endif
             foreach (var item in input)
             {
                 output.Add(_copier.DeepCopy(item, context));

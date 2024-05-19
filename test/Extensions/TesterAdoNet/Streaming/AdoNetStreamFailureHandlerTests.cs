@@ -1,7 +1,7 @@
 using Microsoft.Extensions.Logging.Abstractions;
+using MySql.Data.MySqlClient;
 using Orleans.Configuration;
 using Orleans.Providers.Streams.Common;
-using Orleans.Runtime;
 using Orleans.Streaming.AdoNet;
 using Orleans.Streams;
 using Orleans.Tests.SqlUtils;
@@ -21,8 +21,12 @@ public class SqlServerAdoNetStreamFailureHandlerTests() : AdoNetStreamFailureHan
 /// <summary>
 /// Tests for <see cref="AdoNetStreamFailureHandler"/> against MySQL.
 /// </summary>
-public class MySqlAdoNetStreamFailureHandlerTests() : AdoNetStreamFailureHandlerTests(AdoNetInvariants.InvariantNameMySql)
+public class MySqlAdoNetStreamFailureHandlerTests : AdoNetStreamFailureHandlerTests
 {
+    public MySqlAdoNetStreamFailureHandlerTests() : base(AdoNetInvariants.InvariantNameMySql)
+    {
+        MySqlConnection.ClearAllPools();
+    }
 }
 
 /// <summary>

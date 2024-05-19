@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Options;
+using MySql.Data.MySqlClient;
 using Orleans.Configuration;
 using Orleans.Streams;
 using Orleans.TestingHost;
@@ -15,8 +16,12 @@ public class SqlServerAdoNetSubscriptionObserverWithImplicitSubscribingTests() :
 {
 }
 
-public class MySqlAdoNetSubscriptionObserverWithImplicitSubscribingTests() : AdoNetSubscriptionObserverWithImplicitSubscribingTests(new Fixture(AdoNetInvariants.InvariantNameMySql))
+public class MySqlAdoNetSubscriptionObserverWithImplicitSubscribingTests : AdoNetSubscriptionObserverWithImplicitSubscribingTests
 {
+    public MySqlAdoNetSubscriptionObserverWithImplicitSubscribingTests() : base(new Fixture(AdoNetInvariants.InvariantNameMySql))
+    {
+        MySqlConnection.ClearAllPools();
+    }
 }
 
 public class PostgreSqlAdoNetSubscriptionObserverWithImplicitSubscribingTests() : AdoNetSubscriptionObserverWithImplicitSubscribingTests(new Fixture(AdoNetInvariants.InvariantNamePostgreSql))

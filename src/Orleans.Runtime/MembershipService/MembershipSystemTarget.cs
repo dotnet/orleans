@@ -180,7 +180,7 @@ namespace Orleans.Runtime.MembershipService
                 var remoteOracle = this.grainFactory.GetSystemTarget<IMembershipService>(Constants.MembershipServiceType, remoteSilo);
                 task = remoteOracle.Ping(probeNumber);
 
-                // Update stats counter. Only count Pings that were successfuly sent, but not necessarily replied to.
+                // Update stats counter. Only count Pings that were successfully sent, but not necessarily replied to.
                 MessagingInstruments.OnPingSend(remoteSilo);
             }
             finally
