@@ -20,7 +20,7 @@ public class SqlServerMessageQueueingBenchmark() : MessageQueueingBenchmark(AdoN
 /// <summary>
 /// This benchmark measures the performance of message queueing.
 /// </summary>
-[InProcess, WarmupCount(1), IterationCount(3), InvocationCount(1)]
+[InProcess, WarmupCount(1), IterationCount(3), InvocationCount(1), MarkdownExporter]
 public abstract class MessageQueueingBenchmark(string invariant, string database)
 {
     private const int OperationsPerInvoke = 1000;
@@ -34,7 +34,7 @@ public abstract class MessageQueueingBenchmark(string invariant, string database
     /// <summary>
     /// This highlights degradation from database locking.
     /// </summary>
-    [Params(1, 10, 100)]
+    [Params(1, 4, 8)]
     public int QueueCount { get; set; }
 
     /// <summary>
@@ -46,7 +46,7 @@ public abstract class MessageQueueingBenchmark(string invariant, string database
     /// <summary>
     /// This highlights degradation from concurrency.
     /// </summary>
-    [Params(1, 10, 100)]
+    [Params(1, 4, 8)]
     public int Concurrency { get; set; }
 
     [GlobalSetup]
