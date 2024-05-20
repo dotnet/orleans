@@ -8,9 +8,28 @@ using Orleans.Placement.Rebalancing;
 
 namespace Orleans.Runtime.Placement.Rebalancing;
 
-internal sealed class CandidateVertexMaxHeap(ICollection<CandidateVertex> values) : MaxHeap<CandidateVertex>(values)
+internal enum VertexLocation
 {
-    protected override int Compare(CandidateVertex left, CandidateVertex right) => -left.AccumulatedTransferScore.CompareTo(right.AccumulatedTransferScore);
+    Local,
+    Remote
+}
+
+internal sealed class CandidateVertexHeapElement(CandidateVertex value) : IHeapElement<CandidateVertexHeapElement>
+{
+    public CandidateVertex Vertex { get; } = value;
+    public List<(CandidateVertexHeapElement Element, long TransferScore)> ConnectedVertices { get; } = [];
+    public GrainId Id => Vertex.Id;
+    public long AccumulatedTransferScore { get => Vertex.AccumulatedTransferScore; set => Vertex.AccumulatedTransferScore = value; }
+    public VertexLocation Location { get; set; }
+    int IHeapElement<CandidateVertexHeapElement>.HeapIndex { get; set; }
+    int IHeapElement<CandidateVertexHeapElement>.CompareTo(CandidateVertexHeapElement other)
+        => Vertex.AccumulatedTransferScore.CompareTo(other.Vertex.AccumulatedTransferScore);
+}
+
+internal interface IHeapElement<TElement> where TElement : notnull
+{
+    int HeapIndex { get; set; }
+    int CompareTo(TElement other);
 }
 
 /// <summary>
@@ -22,7 +41,7 @@ internal sealed class CandidateVertexMaxHeap(ICollection<CandidateVertex> values
 ///  Elements with the lowest priority get removed first.
 /// </remarks>
 [DebuggerDisplay("Count = {Count}")]
-internal abstract class MaxHeap<TElement> where TElement : notnull
+internal sealed class MaxHeap<TElement> where TElement : notnull, IHeapElement<TElement>
 {
     /// <summary>
     /// Represents an implicit heap-ordered complete d-ary tree, stored as an array.
@@ -44,8 +63,6 @@ internal abstract class MaxHeap<TElement> where TElement : notnull
     /// The binary logarithm of <see cref="Arity" />.
     /// </summary>
     private const int Log2Arity = 2;
-
-    protected abstract int Compare(TElement left, TElement right);
 
 #if DEBUG
     static MaxHeap()
@@ -73,11 +90,19 @@ internal abstract class MaxHeap<TElement> where TElement : notnull
         _size = items.Count;
         var nodes = new TElement[_size];
         items.CopyTo(nodes, 0);
-        _nodes = nodes;
+        for (var i = 0; i< nodes.Length; i++)
+        {
+            nodes[i].HeapIndex = i;
+        }
 
+        _nodes = nodes;
         if (_size > 1)
         {
             Heapify();
+        }
+        else if (_size == 1)
+        {
+            _nodes[0]!.HeapIndex = 0;
         }
     }
 
@@ -115,6 +140,7 @@ internal abstract class MaxHeap<TElement> where TElement : notnull
 
         var element = _nodes[0]!;
         RemoveRootNode();
+        element.HeapIndex = -1;
         return element;
 
         void RemoveRootNode()
@@ -144,6 +170,30 @@ internal abstract class MaxHeap<TElement> where TElement : notnull
     /// </summary>
     private static int GetFirstChildIndex(int index) => (index << Log2Arity) + 1;
 
+    public void OnDecreaseElementPriority(TElement element)
+    {
+        // If the element has already been removed from the heap, this is a no-op.
+        if (element.HeapIndex < 0)
+        {
+            return;
+        }
+
+        // The element's priority has decreased, so move it down as necessary to restore the heap property.
+        MoveDown(element, element.HeapIndex);
+    }
+
+    public void OnIncreaseElementPriority(TElement element)
+    {
+        // If the element has already been removed from the heap, this is a no-op.
+        if (element.HeapIndex <= 0)
+        {
+            return;
+        }
+
+        // The element's priority has increased, so move it down as necessary to restore the heap property.
+        MoveUp(element, element.HeapIndex);
+    }
+
     /// <summary>
     /// Converts an unordered list into a heap.
     /// </summary>
@@ -168,6 +218,35 @@ internal abstract class MaxHeap<TElement> where TElement : notnull
     public UnorderedElementEnumerable UnorderedElements => new(this);
 
     /// <summary>
+    /// Moves a node up in the tree to restore heap order.
+    /// </summary>
+    private void MoveUp(TElement node, int nodeIndex)
+    {
+        Debug.Assert(0 <= nodeIndex && nodeIndex < _size);
+
+        var nodes = _nodes;
+
+        while (nodeIndex > 0)
+        {
+            var parentIndex = GetParentIndex(nodeIndex);
+            var parentNode = nodes[parentIndex]!;
+
+            if (node.CompareTo(parentNode) <= 0)
+            {
+                // The parent is more larger than the current node.
+                break;
+            }
+
+            nodes[nodeIndex] = parentNode;
+            parentNode.HeapIndex = nodeIndex;
+            nodeIndex = parentIndex;
+        }
+
+        nodes[nodeIndex] = node;
+        node.HeapIndex = nodeIndex;
+    }
+
+    /// <summary>
     /// Moves a node down in the tree to restore heap order.
     /// </summary>
     private void MoveDown(TElement node, int nodeIndex)
@@ -185,33 +264,35 @@ internal abstract class MaxHeap<TElement> where TElement : notnull
         while ((i = GetFirstChildIndex(nodeIndex)) < size)
         {
             // Find the child node with the maximal priority
-            var minChild = nodes[i]!;
-            var minChildIndex = i;
+            var maxChild = nodes[i]!;
+            var maxChildIndex = i;
 
             var childIndexUpperBound = Math.Min(i + Arity, size);
             while (++i < childIndexUpperBound)
             {
                 var nextChild = nodes[i]!;
-                if (Compare(nextChild, minChild) < 0)
+                if (nextChild.CompareTo(maxChild) > 0)
                 {
-                    minChild = nextChild;
-                    minChildIndex = i;
+                    maxChild = nextChild;
+                    maxChildIndex = i;
                 }
             }
 
             // Heap property is satisfied; insert node in this location.
-            if (Compare(node, minChild) <= 0)
+            if (node.CompareTo(maxChild) >= 0)
             {
                 break;
             }
 
             // Move the maximal child up by one node and
             // continue recursively from its location.
-            nodes[nodeIndex] = minChild;
-            nodeIndex = minChildIndex;
+            nodes[nodeIndex] = maxChild;
+            maxChild.HeapIndex = nodeIndex;
+            nodeIndex = maxChildIndex;
         }
 
         nodes[nodeIndex] = node;
+        node.HeapIndex = nodeIndex;
     }
 
     /// <summary>

@@ -15,6 +15,9 @@ using System.Threading;
 using Orleans.Internal;
 using Orleans.Configuration;
 using Orleans.Runtime.Utilities;
+using Microsoft.Extensions.DependencyInjection;
+using Orleans.Serialization;
+using System.Runtime.InteropServices;
 
 namespace Orleans.Runtime.Placement.Rebalancing;
 
@@ -141,7 +144,10 @@ internal sealed partial class ActivationRebalancer : SystemTarget, IActivationRe
                 var remoteRef = IActivationRebalancerSystemTarget.GetReference(_grainFactory, candidateSilo);
                 var sw2 = ValueStopwatch.StartNew();
                 _logger.LogInformation("Sending AcceptExchangeRequest");
-                var response = await remoteRef.AcceptExchangeRequest(new(Silo, exchangeSet, GetLocalActivationCount()));
+                AcceptExchangeRequest payload = new(Silo, exchangeSet, GetLocalActivationCount());
+                var dummy = ActivationServices.GetRequiredService<Serializer>().SerializeToArray(payload);
+                _logger.LogInformation("Serializing AcceptExchangeRequest to {Size} bytes took {Elapsed}", dummy.Length, sw2.Elapsed);
+                var response = await remoteRef.AcceptExchangeRequest(payload);
                 _logger.LogInformation("Sent AcceptExchangeRequest. It took {Elapsed}", sw2.Elapsed);
 
                 switch (response.Type)
@@ -186,6 +192,7 @@ internal sealed partial class ActivationRebalancer : SystemTarget, IActivationRe
 
     public async ValueTask<AcceptExchangeResponse> AcceptExchangeRequest(AcceptExchangeRequest request)
     {
+        _logger.LogInformation("Received AcceptExchangeRequest from {Silo}", request.SendingSilo);
         if (request.SendingSilo.Equals(_currentExchangeSilo) && Silo.CompareTo(request.SendingSilo) <= 0)
         {
             // Reject the request, as we are already in the process of exchanging with the sending silo.
@@ -210,16 +217,18 @@ internal sealed partial class ActivationRebalancer : SystemTarget, IActivationRe
         // This prevents other requests from interleaving.
         _currentExchangeSilo = request.SendingSilo;
 
-        var sw = ValueStopwatch.StartNew();
         try
         {
             var remoteSet = request.ExchangeSet;
+            _logger.LogInformation("About to create candidate set");
             var localSet = CreateCandidateSet(CreateLocalVertexEdges(), request.SendingSilo);
+            _logger.LogInformation("Created candidate set");
 
             if (localSet.Count == 0)
             {
                 // We have nothing to give back (very fringe case), so just accept the set.
                 var set = remoteSet.Select(x => x.Id).ToImmutableArray();
+                _logger.LogInformation("Finalizing protocol with empty local set");
                 await FinalizeProtocol(set, set, isReceiver: true);
 
                 return new(AcceptExchangeResponse.ResponseType.Success, []);
@@ -235,12 +244,21 @@ internal sealed partial class ActivationRebalancer : SystemTarget, IActivationRe
 
             var currentImbalance = 0;
             currentImbalance = CalculateImbalance(Direction.Unspecified);
+            _logger.LogInformation("Imbalance is {Imbalance}", currentImbalance);
 
-            var localHeap = new CandidateVertexMaxHeap(localSet);
-            var remoteHeap = new CandidateVertexMaxHeap(remoteSet);
+            var (localHeap, remoteHeap) = CreateCandidateHeaps(localSet, remoteSet);
 
+            _logger.LogInformation("Computing transfer set");
+            var swTxs = ValueStopwatch.StartNew();
+            var iterations = 0;
             while (true)
             {
+                if (++iterations % 128 == 0)
+                {
+                    // Give other tasks a chance to execute periodically.
+                    await Task.Delay(1);
+                }
+
                 if (localHeap.Count > 0 && remoteHeap.Count > 0)
                 {
                     var localVertex = localHeap.Peek();
@@ -287,9 +305,11 @@ internal sealed partial class ActivationRebalancer : SystemTarget, IActivationRe
                 }
             }
 
+            _logger.LogInformation("2 Computing transfer set took {Elapsed}", swTxs.Elapsed);
             var unionSet = ImmutableArray.CreateBuilder<GrainId>();
             var mySet = ImmutableArray.CreateBuilder<GrainId>();
             var theirSet = ImmutableArray.CreateBuilder<GrainId>();
+            swTxs.Restart();
             foreach (var candidate in toMigrate)
             {
                 if (candidate.TransferScore <= 0)
@@ -311,7 +331,10 @@ internal sealed partial class ActivationRebalancer : SystemTarget, IActivationRe
                 }
             }
 
+            _logger.LogInformation("Creating migration set took {Elapsed}", swTxs.Elapsed);
+            swTxs.Restart();
             await FinalizeProtocol(mySet.ToImmutable(), unionSet.ToImmutable(), isReceiver: true);
+            _logger.LogInformation("Finalizing protocol based on provided set took {Elapsed}", swTxs.Elapsed);
 
             return new(AcceptExchangeResponse.ResponseType.Success, theirSet.ToImmutable());
 
@@ -328,10 +351,10 @@ internal sealed partial class ActivationRebalancer : SystemTarget, IActivationRe
                     return false;
                 }
 
-                // If it got affected by a previous run, and the score is not positive, simply pop and ignore it.
                 var chosenVertex = localHeap.Pop();
                 if (chosenVertex.AccumulatedTransferScore <= 0)
                 {
+                    // If it got affected by a previous run, and the score is not positive, simply pop and ignore it.
                     return false;
                 }
 
@@ -341,47 +364,25 @@ internal sealed partial class ActivationRebalancer : SystemTarget, IActivationRe
                 remoteActivations++;
                 currentImbalance = anticipatedImbalance;
 
-                var didUpdate = false;
-                foreach (var vertex in localHeap.UnorderedElements)
+                foreach (var (connectedVertex, transferScore) in chosenVertex.ConnectedVertices)
                 {
-                    var connectedVertex = chosenVertex.ConnectedVertices.FirstOrDefault(x => x.Id == vertex.Id);
-                    if (connectedVertex == default)
+                    switch (connectedVertex.Location)
                     {
-                        // If no connection is present between [chosenVertex, vertex], we skip transfer score modification as the migration of 'chosenVertex', has not effect on this 'vertex'.
-                        continue;
+                        case VertexLocation.Local:
+                            // Add the transfer score as these two vectors will now be remote to each other.
+                            connectedVertex.AccumulatedTransferScore += transferScore;
+                            localHeap.OnIncreaseElementPriority(connectedVertex);
+                            break;
+                        case VertexLocation.Remote:
+                            // Subtract the transfer score as these two vectors will now be local to each other.
+                            connectedVertex.AccumulatedTransferScore -= transferScore;
+                            remoteHeap.OnDecreaseElementPriority(connectedVertex);
+                            break;
                     }
-
-                    // We add 'connectedVertex.TransferScore' to 'vertex.AccumulatedTransferScore', as the 'chosenVertex' will now be remote to 'vertex' (because this is in the local heap).
-                    vertex.AccumulatedTransferScore += connectedVertex.TransferScore;
-                    didUpdate = true;
                 }
 
-                if (didUpdate)
-                {
-                    // Re-heapify the heap, since we changed priorities.
-                    localHeap.Heapify();
-                }
-
-                didUpdate = false;
-                foreach (var vertex in remoteHeap.UnorderedElements)
-                {
-                    var connectedVertex = chosenVertex.ConnectedVertices.FirstOrDefault(x => x.Id == vertex.Id);
-                    if (connectedVertex == default)
-                    {
-                        // If no connection is present between [chosenVertex, vertex], we skip transfer score modification as the migration of 'chosenVertex', has not effect on this 'vertex'.
-                        continue;
-                    }
-
-                    // We subtract 'connectedVertex.TransferScore' from 'vertex.AccumulatedTransferScore', as the 'chosenVertex' will now be local to 'vertex' (because this is in the remote heap).
-                    vertex.AccumulatedTransferScore -= connectedVertex.TransferScore;
-                    didUpdate = true;
-                }
-
-                if (didUpdate)
-                {
-                    // Re-heapify the heap, since we changed priorities.
-                    remoteHeap.Heapify();
-                }
+                // We will perform any future operations assuming the vector is remote.
+                chosenVertex.Location = VertexLocation.Remote;
 
                 return true;
             }
@@ -400,8 +401,9 @@ internal sealed partial class ActivationRebalancer : SystemTarget, IActivationRe
                 }
 
                 var chosenVertex = remoteHeap.Pop();
-                if (chosenVertex.AccumulatedTransferScore <= 0) // If it got affected by a previous run, and the score is not positive, simply pop and ignore it.
+                if (chosenVertex.AccumulatedTransferScore <= 0)
                 {
+                    // If it got affected by a previous run, and the score is not positive, simply pop and ignore it.
                     return false;
                 }
 
@@ -410,48 +412,25 @@ internal sealed partial class ActivationRebalancer : SystemTarget, IActivationRe
                 localActivations++;
                 remoteActivations--;
                 currentImbalance = anticipatedImbalance;
-
-                var didUpdate = false;
-                foreach (var vertex in localHeap.UnorderedElements)
+                foreach (var (connectedVertex, transferScore) in chosenVertex.ConnectedVertices)
                 {
-                    var connectedVertex = chosenVertex.ConnectedVertices.FirstOrDefault(x => x.Id == vertex.Id);
-                    if (connectedVertex == default)
+                    switch (connectedVertex.Location)
                     {
-                        // If no connection is present between [chosenVertex, vertex], we skip transfer score modification as the migration of 'chosenVertex', has not effect on this 'vertex'.
-                        continue;
+                        case VertexLocation.Local:
+                            // Subtract the transfer score as these two vectors will now be local to each other.
+                            connectedVertex.AccumulatedTransferScore -= transferScore;
+                            localHeap.OnDecreaseElementPriority(connectedVertex);
+                            break;
+                        case VertexLocation.Remote:
+                            // Add the transfer score as these two vectors will now be remote to each other.
+                            connectedVertex.AccumulatedTransferScore += transferScore;
+                            remoteHeap.OnIncreaseElementPriority(connectedVertex);
+                            break;
                     }
-
-                    // We subtract 'connectedVertex.TransferScore' from 'vertex.AccumulatedTransferScore', as the 'chosenVertex' will now be local to 'vertex' (because this is in the local heap).
-                    vertex.AccumulatedTransferScore -= connectedVertex.TransferScore;
-                    didUpdate = true;
                 }
 
-                if (didUpdate)
-                {
-                    // Re-heapify the heap, since we changed priorities.
-                    localHeap.Heapify();
-                }
-
-                didUpdate = false;
-                foreach (var vertex in remoteHeap.UnorderedElements)
-                {
-                    var connectedVertex = chosenVertex.ConnectedVertices.FirstOrDefault(x => x.Id == vertex.Id);
-                    if (connectedVertex == default)
-                    {
-                        // If no connection is present between [chosenVertex, vertex], we skip transfer score modification as the migration of 'chosenVertex', has not effect on this 'vertex'.
-                        continue;
-                    }
-
-                    // We add 'connectedVertex.TransferScore' to 'vertex.AccumulatedTransferScore', as the 'chosenVertex' will now be remote to 'vertex' (because this is in the remote heap)
-                    vertex.AccumulatedTransferScore += connectedVertex.TransferScore;
-                    didUpdate = true;
-                }
-
-                if (didUpdate)
-                {
-                    // Re-heapify the heap, since we changed priorities.
-                    remoteHeap.Heapify();
-                }
+                // We will perform any future operations assuming the vector is local.
+                chosenVertex.Location = VertexLocation.Local;
 
                 return true;
             }
@@ -468,10 +447,71 @@ internal sealed partial class ActivationRebalancer : SystemTarget, IActivationRe
                 return Math.Abs(Math.Abs(remoteActivations + rDelta) - Math.Abs(localActivations + lDelta));
             }
         }
+        catch (Exception exception)
+        {
+            _logger.LogError(exception, "Error accepting exchange request.");
+            Debugger.Launch();
+            throw;
+        }
         finally
         {
-            _logger.LogInformation("Computing transfer set took {Elapsed}.", sw.Elapsed);
             _currentExchangeSilo = null;
+        }
+
+        (MaxHeap<CandidateVertexHeapElement> LocalHeap, MaxHeap<CandidateVertexHeapElement> RemoteHeap) CreateCandidateHeaps(List<CandidateVertex> localSet, ImmutableArray<CandidateVertex> remoteSet)
+        {
+            Dictionary<GrainId, CandidateVertex> sourceIndex = [];
+            foreach (var element in localSet)
+            {
+                sourceIndex[element.Id] = element;
+            }
+
+            foreach (var element in remoteSet)
+            {
+                sourceIndex[element.Id] = element;
+            }
+
+            Dictionary<GrainId, CandidateVertexHeapElement> index = [];
+            List<CandidateVertexHeapElement> localVertexList = [];
+            foreach (var element in localSet)
+            {
+                var vertex = CreateVertex(sourceIndex, index, element);
+                vertex.Location = VertexLocation.Local;
+                localVertexList.Add(vertex);
+            }
+
+            List<CandidateVertexHeapElement> remoteVertexList = [];
+            foreach (var element in remoteSet)
+            {
+                var vertex = CreateVertex(sourceIndex, index, element);
+                vertex.Location = VertexLocation.Remote;
+                remoteVertexList.Add(vertex);
+            }
+
+            var localHeap = new MaxHeap<CandidateVertexHeapElement>(localVertexList);
+            var remoteHeap = new MaxHeap<CandidateVertexHeapElement>(remoteVertexList);
+            return (localHeap, remoteHeap);
+
+            static CandidateVertexHeapElement CreateVertex(Dictionary<GrainId, CandidateVertex> sourceIndex, Dictionary<GrainId, CandidateVertexHeapElement> index, CandidateVertex element)
+            {
+                var vertex = GetOrAddVertex(index, element);
+                foreach (var connectedVertex in element.ConnectedVertices)
+                {
+                    if (sourceIndex.TryGetValue(connectedVertex.Id, out var connected))
+                    {
+                        vertex.ConnectedVertices.Add((GetOrAddVertex(index, connected), connectedVertex.TransferScore));
+                    }
+                }
+
+                return vertex;
+
+                static CandidateVertexHeapElement GetOrAddVertex(Dictionary<GrainId, CandidateVertexHeapElement> index, CandidateVertex element)
+                {
+                    ref var vertex = ref CollectionsMarshal.GetValueRefOrAddDefault(index, element.Id, out var exists);
+                    vertex ??= new(element);
+                    return vertex;
+                }
+            }
         }
     }
 
@@ -513,6 +553,7 @@ internal sealed partial class ActivationRebalancer : SystemTarget, IActivationRe
                 LogErrorOnMigratingActivations(aggEx, Silo);
             }
 
+            _logger.LogInformation("Waiting for {Count} grains to migrate took {Elapsed}", affectedIds.Length, sw1.Elapsed);
             if (isReceiver)
             {
                 // Stamp this silos exchange for a potential next pair exchange request.
@@ -521,12 +562,19 @@ internal sealed partial class ActivationRebalancer : SystemTarget, IActivationRe
         }
 
         var sw = ValueStopwatch.StartNew();
+        var iterations = 0;
         if (affectedIds.Length != 0)
         {
             // Avoid mutating the source while enumerating it.
             var toRemove = new List<Edge>();
             foreach (var (edge, count, error) in _edgeWeights.Elements)
             {
+                if (++iterations % 128 == 0)
+                {
+                    // Give other tasks a chance to execute periodically.
+                    await Task.Delay(1);
+                }
+
                 if (edge.ContainsAny(affectedIds))
                 {
                     toRemove.Add(edge);
@@ -535,6 +583,12 @@ internal sealed partial class ActivationRebalancer : SystemTarget, IActivationRe
 
             foreach (var edge in toRemove)
             {
+                if (++iterations % 128 == 0)
+                {
+                    // Give other tasks a chance to execute periodically.
+                    await Task.Delay(1);
+                }
+
                 // Totally remove this counter, as one or both vertices has migrated. By not doing this it would skew results for the next protocol cycle.
                 // We remove only the affected counters, as there could be other counters that 'this' silo has connections with another silo (which is not part of this exchange cycle).
                 _edgeWeights.Remove(edge);

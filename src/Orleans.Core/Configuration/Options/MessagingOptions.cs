@@ -11,7 +11,7 @@ namespace Orleans.Configuration
         /// <summary>
         /// The <see cref="ResponseTimeout"/> value.
         /// </summary>
-        private TimeSpan _responseTimeout = TimeSpan.FromSeconds(300);
+        private TimeSpan _responseTimeout = TimeSpan.FromSeconds(30);
 
         /// <summary>
         /// Gets or sets the default timeout before a request is assumed to have failed.

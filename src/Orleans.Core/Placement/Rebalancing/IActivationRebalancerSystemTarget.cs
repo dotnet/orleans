@@ -13,8 +13,10 @@ internal interface IActivationRebalancerSystemTarget : ISystemTarget
     static IActivationRebalancerSystemTarget GetReference(IGrainFactory grainFactory, SiloAddress targetSilo)
         => grainFactory.GetGrain<IActivationRebalancerSystemTarget>(SystemTargetGrainId.Create(Constants.ActivationRebalancerType, targetSilo).GrainId);
 
+    [ResponseTimeout("00:10:00")]
     ValueTask TriggerExchangeRequest();
 
+    [ResponseTimeout("00:10:00")]
     ValueTask<AcceptExchangeResponse> AcceptExchangeRequest(AcceptExchangeRequest request);
 
     /// <summary>
@@ -147,12 +149,21 @@ public readonly struct CandidateConnectedVertex(GrainId id, long transferScore)
 [GenerateSerializer, Immutable]
 internal sealed class AcceptExchangeRequest(SiloAddress sendingSilo, ImmutableArray<CandidateVertex> exchangeSet, int activationCountSnapshot)
 {
+    /// <summary>
+    /// The silo which is offering to transfer grains to us.
+    /// </summary>
     [Id(0)]
     public SiloAddress SendingSilo { get; } = sendingSilo;
 
+    /// <summary>
+    /// The set of grains which the sending silo is offering to transfer to us.
+    /// </summary>
     [Id(1)]
     public ImmutableArray<CandidateVertex> ExchangeSet { get; } = exchangeSet;
 
+    /// <summary>
+    /// The activation count of the sending silo at the time of the exchange request.
+    /// </summary>
     [Id(2)]
     public int ActivationCountSnapshot { get; } = activationCountSnapshot;
 }

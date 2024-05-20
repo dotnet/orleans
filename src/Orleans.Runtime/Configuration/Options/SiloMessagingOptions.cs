@@ -12,7 +12,7 @@ namespace Orleans.Configuration
         /// <summary>
         /// <see cref="SystemResponseTimeout"/>.
         /// </summary>
-        private TimeSpan systemResponseTimeout = TimeSpan.FromSeconds(300);
+        private TimeSpan systemResponseTimeout = TimeSpan.FromSeconds(30);
 
         /// <summary>
         /// Gets or sets the number of parallel queues and attendant threads used by the silo to send outbound
