@@ -20,7 +20,7 @@ public class SqlServerMessageQueueingBenchmark() : MessageQueueingBenchmark(AdoN
 /// <summary>
 /// This benchmark measures the performance of message queueing.
 /// </summary>
-[InProcess, WarmupCount(1), IterationCount(3), InvocationCount(1), MarkdownExporter]
+[WarmupCount(1), IterationCount(3), InvocationCount(1), MarkdownExporter]
 public abstract class MessageQueueingBenchmark(string invariant, string database)
 {
     private const int OperationsPerInvoke = 1000;
