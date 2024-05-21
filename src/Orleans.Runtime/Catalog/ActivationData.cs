@@ -749,6 +749,14 @@ namespace Orleans.Runtime
             {
             }
 
+            try
+            {
+                SetGrainInstance(null);
+            }
+            catch (ObjectDisposedException)
+            {
+            }
+
             switch (_serviceScope)
             {
                 case IAsyncDisposable asyncDisposable:
@@ -1349,7 +1357,18 @@ namespace Orleans.Runtime
                     return;
                 }
 
-                if (_shared.Logger.IsEnabled(LogLevel.Debug)) _shared.Logger.LogDebug((int)ErrorCode.Catalog_RerouteAllQueuedMessages, "Rerouting {NumMessages} messages from invalid grain activation {Grain}", msgs.Count, this);
+                if (_shared.Logger.IsEnabled(LogLevel.Debug))
+                {
+                    if (ForwardingAddress is { } address)
+                    {
+                        _shared.Logger.LogDebug((int)ErrorCode.Catalog_RerouteAllQueuedMessages, "Rerouting {NumMessages} messages from invalid grain activation {Grain} to {ForwardingAddress}.", msgs.Count, this, address);
+                    }
+                    else
+                    {
+                        _shared.Logger.LogDebug((int)ErrorCode.Catalog_RerouteAllQueuedMessages, "Rerouting {NumMessages} messages from invalid grain activation {Grain}.", msgs.Count, this);
+                    }
+                }
+
                 _shared.InternalRuntime.GrainLocator.InvalidateCache(Address);
                 _shared.InternalRuntime.MessageCenter.ProcessRequestsToInvalidActivation(msgs, Address, ForwardingAddress, DeactivationReason.Description, DeactivationException);
             }
@@ -1663,10 +1682,10 @@ namespace Orleans.Runtime
                 await WaitForAllTimersToFinish(cancellationToken);
                 await CallGrainDeactivate(cancellationToken);
 
-                if (DehydrationContext is { } context && _shared.MigrationManager is { } migrationManager)
+                if (DehydrationContext is { } context
+                    && ForwardingAddress is { } forwardingAddress
+                    && _shared.MigrationManager is { } migrationManager)
                 {
-                    Debug.Assert(ForwardingAddress is not null);
-
                     try
                     {
                         // Populate the dehydration context.
@@ -1679,15 +1698,16 @@ namespace Orleans.Runtime
                             RequestContext.Clear();
                         }
 
-                        OnDehydrate(context.Value);
+                        OnDehydrate(context.MigrationContext);
 
                         // Send the dehydration context to the target host.
-                        await migrationManager.MigrateAsync(ForwardingAddress, GrainId, context.Value);
+                        await migrationManager.MigrateAsync(forwardingAddress, GrainId, context.MigrationContext);
+                        _shared.InternalRuntime.GrainLocator.UpdateCache(GrainId, forwardingAddress);
                         migrated = true;
                     }
                     catch (Exception exception)
                     {
-                        _shared.Logger.LogWarning(exception, "Failed to migrate grain {GrainId} to {SiloAddress}", GrainId, ForwardingAddress);
+                        _shared.Logger.LogWarning(exception, "Failed to migrate grain {GrainId} to {SiloAddress}", GrainId, forwardingAddress);
                     }
                     finally
                     {
@@ -1737,13 +1757,14 @@ namespace Orleans.Runtime
 
             try
             {
-                UnregisterMessageTarget();
                 await DisposeAsync();
             }
             catch (Exception exception)
             {
                 _shared.Logger.LogWarning(exception, "Exception disposing activation {Activation}", (ActivationData)this);
             }
+
+            UnregisterMessageTarget();
 
             // Signal deactivation
             GetDeactivationCompletionSource().TrySetResult(true);
@@ -1833,10 +1854,6 @@ namespace Orleans.Runtime
         private void UnregisterMessageTarget()
         {
             _shared.InternalRuntime.Catalog.UnregisterMessageTarget(this);
-            if (GrainInstance is not null)
-            {
-                SetGrainInstance(null);
-            }
         }
 
         void ICallChainReentrantGrainContext.OnEnterReentrantSection(Guid reentrancyId)
@@ -1974,42 +1991,25 @@ namespace Orleans.Runtime
         {
             protected Command() { }
 
-            public class Deactivate : Command
+            public class Deactivate(CancellationToken cancellation) : Command
             {
-                public Deactivate(CancellationToken cancellation) => CancellationToken = cancellation;
-                public CancellationToken CancellationToken { get; }
+                public CancellationToken CancellationToken { get; } = cancellation;
             }
 
-            public class Activate : Command
+            public class Activate(Dictionary<string, object> requestContext, CancellationToken cancellationToken) : Command
             {
-                public Activate(Dictionary<string, object> requestContext, CancellationToken cancellationToken)
-                {
-                    RequestContext = requestContext;
-                    CancellationToken = cancellationToken;
-                }
-
-                public Dictionary<string, object> RequestContext { get; }
-                public CancellationToken CancellationToken { get; }
+                public Dictionary<string, object> RequestContext { get; } = requestContext;
+                public CancellationToken CancellationToken { get; } = cancellationToken;
             }
 
-            public class Rehydrate : Command
+            public class Rehydrate(IRehydrationContext context) : Command
             {
-                public readonly IRehydrationContext Context;
-
-                public Rehydrate(IRehydrationContext context)
-                {
-                    Context = context;
-                }
+                public readonly IRehydrationContext Context = context;
             }
 
-            public class Delay : Command
+            public class Delay(TimeSpan duration) : Command
             {
-                public Delay(TimeSpan duration)
-                {
-                    Duration = duration;
-                }
-
-                public TimeSpan Duration { get; }
+                public TimeSpan Duration { get; } = duration;
             }
 
             public class UnregisterFromCatalog : Command
@@ -2048,15 +2048,10 @@ namespace Orleans.Runtime
             }
         }
 
-        private class DehydrationContextHolder
+        private class DehydrationContextHolder(SerializerSessionPool sessionPool, Dictionary<string, object> requestContext)
         {
-            public readonly MigrationContext Value;
-            public readonly Dictionary<string, object> RequestContext;
-            public DehydrationContextHolder(SerializerSessionPool sessionPool, Dictionary<string, object> requestContext)
-            {
-                RequestContext = requestContext;
-                Value = new MigrationContext(sessionPool);
-            }
+            public readonly MigrationContext MigrationContext = new(sessionPool);
+            public readonly Dictionary<string, object> RequestContext = requestContext;
         }
 
         private class MigrateWorkItem(ActivationData activation, Dictionary<string, object> requestContext, CancellationToken cancellationToken) : WorkItemBase
