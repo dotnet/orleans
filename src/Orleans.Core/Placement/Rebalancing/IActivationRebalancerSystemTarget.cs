@@ -60,6 +60,8 @@ internal readonly struct Edge(EdgeVertex source, EdgeVertex target) : IEquatable
     /// Returns a copy of this but with flipped sources and targets.
     /// </summary>
     public Edge Flip() => new(source: Target, target: Source);
+
+    public override string ToString() => $"[{Source} -> {Target}]"; 
 }
 
 /// <summary>
@@ -87,6 +89,8 @@ public readonly struct EdgeVertex(
     public bool Equals(EdgeVertex other) => Id == other.Id && Silo == other.Silo && IsMigratable == other.IsMigratable;
 
     public override int GetHashCode() => HashCode.Combine(Id, Silo, IsMigratable);
+
+    public override string ToString() => $"[{Id}@{Silo}{(IsMigratable ? "" : "/NotMigratable")}]";
 }
 
 /// <summary>

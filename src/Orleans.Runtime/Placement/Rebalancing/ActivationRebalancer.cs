@@ -17,6 +17,7 @@ using Orleans.Configuration;
 using Orleans.Runtime.Utilities;
 using System.Runtime.InteropServices;
 using System.Runtime.ExceptionServices;
+using System.Diagnostics.CodeAnalysis;
 
 namespace Orleans.Runtime.Placement.Rebalancing;
 
@@ -110,31 +111,18 @@ internal sealed partial class ActivationRebalancer : SystemTarget, IActivationRe
         var silos = _siloStatusOracle.GetActiveSilos();
         if (silos.Length == 1)
         {
-            //_enableMessageSampling = false;
             LogSingleSiloCluster();
-            return;   // If its a single-silo cluster we have no business doing any kind of rebalancing
+            return;
         }
         else if (!_enableMessageSampling)
         {
-//            _enableMessageSampling = true;
             return;
         }
 
-        var sets = CreateCandidateSets(silos);
-
-        var countWithNoExchangeSet = 0;
-        foreach (var set in sets)
+        foreach ((var candidateSilo, var offeredGrains, var _) in CreateCandidateSets(silos))
         {
-            if (_currentExchangeSilo is not null)
-            {
-                // Skip this round if we are already in the process of exchanging with another silo.
-                return;
-            }
-
-            (var candidateSilo, var offeredGrains, var _) = set;
             if (offeredGrains.Count == 0)
             {
-                countWithNoExchangeSet++;
                 LogExchangeSetIsEmpty(candidateSilo);
                 continue;
             }
@@ -148,9 +136,7 @@ internal sealed partial class ActivationRebalancer : SystemTarget, IActivationRe
                 LogBeginningProtocol(Silo, candidateSilo);
                 var remoteRef = IActivationRebalancerSystemTarget.GetReference(_grainFactory, candidateSilo);
                 var sw2 = ValueStopwatch.StartNew();
-                _logger.LogInformation("Sending AcceptExchangeRequest");
-                var response = await remoteRef.AcceptExchangeRequest(new (Silo, offeredGrains.ToImmutableArray(), GetLocalActivationCount()));
-                _logger.LogInformation("Sent AcceptExchangeRequest. It took {Elapsed}", sw2.Elapsed);
+                var response = await remoteRef.AcceptExchangeRequest(new(Silo, [.. offeredGrains], GetLocalActivationCount()));
 
                 switch (response.Type)
                 {
@@ -179,44 +165,12 @@ internal sealed partial class ActivationRebalancer : SystemTarget, IActivationRe
                 _currentExchangeSilo = null;
             }
         }
-
-        /*
-        if (countWithNoExchangeSet == sets.Count)
-        {
-            // Disable message sampling for now, since there were no exchanges performed.
-            _logger.LogDebug("Placement has stabilized. Disabling sampling.");
-            _enableMessageSampling = false;
-        }
-        */
     }
 
     private int GetLocalActivationCount() => _activationDirectory.Count + _activationCountOffset;
 
-    private struct AttachDebuggerOnFirstChance : IDisposable
-    {
-        public AttachDebuggerOnFirstChance()
-        {
-            AppDomain.CurrentDomain.FirstChanceException += CurrentDomain_FirstChanceException;
-        }
-
-        public readonly void Dispose()
-        {
-            AppDomain.CurrentDomain.FirstChanceException -= CurrentDomain_FirstChanceException;
-        }
-
-        private void CurrentDomain_FirstChanceException(object? sender, FirstChanceExceptionEventArgs e)
-        {
-            if (e.Exception is IndexOutOfRangeException)
-            {
-                Debugger.Launch();
-            }
-        }
-    }
-
     public async ValueTask<AcceptExchangeResponse> AcceptExchangeRequest(AcceptExchangeRequest request)
     {
-        using var _ = new AttachDebuggerOnFirstChance();
-
         _logger.LogInformation("Received AcceptExchangeRequest from {Silo}", request.SendingSilo);
         if (request.SendingSilo.Equals(_currentExchangeSilo) && Silo.CompareTo(request.SendingSilo) <= 0)
         {
@@ -232,7 +186,7 @@ internal sealed partial class ActivationRebalancer : SystemTarget, IActivationRe
         }
 
         var lastExchangeElapsed = _lastExchangedStopwatch.Elapsed;
-        if (lastExchangeElapsed < _options.RecoveryPeriod || _currentExchangeSilo != null)
+        if (lastExchangeElapsed < _options.RecoveryPeriod)
         {
             LogExchangedRecently(request.SendingSilo, lastExchangeElapsed, _options.RecoveryPeriod);
             return AcceptExchangeResponse.CachedExchangedRecently;
@@ -302,30 +256,12 @@ internal sealed partial class ActivationRebalancer : SystemTarget, IActivationRe
 
             bool TryMigrateLocalToRemote()
             {
-                if (localHeap.Count == 0)
+                if (!TryMigrateCore(localHeap, localDelta: -1, remoteDelta: 1, out var chosenVertex))
                 {
-                    return false;
-                }
-
-                var anticipatedImbalance = CalculateImbalance(localActivations - 1, remoteActivations + 1);
-                if (anticipatedImbalance > imbalance && !_toleranceRule.IsSatisfiedBy((uint)anticipatedImbalance))
-                {
-                    return false;
-                }
-
-                var chosenVertex = localHeap.Pop();
-                if (chosenVertex.AccumulatedTransferScore <= 0)
-                {
-                    // If it got affected by a previous run, and the score is not positive, simply pop and ignore it.
                     return false;
                 }
 
                 givingGrains.Add(chosenVertex.Id);
-
-                localActivations--;
-                remoteActivations++;
-                imbalance = anticipatedImbalance;
-
                 foreach (var (connectedVertex, transferScore) in chosenVertex.ConnectedVertices)
                 {
                     switch (connectedVertex.Location)
@@ -351,29 +287,12 @@ internal sealed partial class ActivationRebalancer : SystemTarget, IActivationRe
 
             bool TryMigrateRemoteToLocal()
             {
-                if (remoteHeap.Count == 0)
+                if (!TryMigrateCore(remoteHeap, localDelta: 1, remoteDelta: -1, out var chosenVertex))
                 {
-                    return false;
-                }
-
-                var anticipatedImbalance = CalculateImbalance(localActivations + 1, remoteActivations - 1);
-                if (anticipatedImbalance > imbalance && !_toleranceRule.IsSatisfiedBy((uint)anticipatedImbalance))
-                {
-                    return false;
-                }
-
-                var chosenVertex = remoteHeap.Pop();
-                if (chosenVertex.AccumulatedTransferScore <= 0)
-                {
-                    // If it got affected by a previous run, and the score is not positive, simply pop and ignore it.
                     return false;
                 }
 
                 acceptedGrains.Add(chosenVertex.Id);
-
-                localActivations++;
-                remoteActivations--;
-                imbalance = anticipatedImbalance;
                 foreach (var (connectedVertex, transferScore) in chosenVertex.ConnectedVertices)
                 {
                     switch (connectedVertex.Location)
@@ -397,7 +316,33 @@ internal sealed partial class ActivationRebalancer : SystemTarget, IActivationRe
                 return true;
             }
 
-            static int CalculateImbalance(int left, int right) => Math.Abs(Math.Abs(left) - Math.Abs(right));
+            bool TryMigrateCore(MaxHeap<CandidateVertexHeapElement> sourceHeap, int localDelta, int remoteDelta, [NotNullWhen(true)] out CandidateVertexHeapElement? chosenVertex)
+            {
+                chosenVertex = null;
+                if (sourceHeap.Count == 0)
+                {
+                    return false;
+                }
+
+                var anticipatedImbalance = CalculateImbalance(localActivations + localDelta, remoteActivations + remoteDelta);
+                if (anticipatedImbalance > imbalance && !_toleranceRule.IsSatisfiedBy((uint)anticipatedImbalance))
+                {
+                    return false;
+                }
+
+                chosenVertex = sourceHeap.Pop();
+                if (chosenVertex.AccumulatedTransferScore <= 0)
+                {
+                    // If it got affected by a previous run, and the score is not positive, simply pop and ignore it.
+                    return false;
+                }
+
+                localActivations += localDelta;
+                remoteActivations += remoteDelta;
+                imbalance = anticipatedImbalance;
+                return true;
+            }
+
         }
         catch (Exception exception)
         {
@@ -408,60 +353,61 @@ internal sealed partial class ActivationRebalancer : SystemTarget, IActivationRe
         {
             _currentExchangeSilo = null;
         }
+    }
 
-        (MaxHeap<CandidateVertexHeapElement> LocalHeap, MaxHeap<CandidateVertexHeapElement> RemoteHeap) CreateCandidateHeaps(List<CandidateVertex> localSet, ImmutableArray<CandidateVertex> remoteSet)
+    private static int CalculateImbalance(int left, int right) => Math.Abs(Math.Abs(left) - Math.Abs(right));
+    private static (MaxHeap<CandidateVertexHeapElement> Local, MaxHeap<CandidateVertexHeapElement> Remote) CreateCandidateHeaps(List<CandidateVertex> local, ImmutableArray<CandidateVertex> remote)
+    {
+        Dictionary<GrainId, CandidateVertex> sourceIndex = new(local.Count + remote.Length);
+        foreach (var element in local)
         {
-            Dictionary<GrainId, CandidateVertex> sourceIndex = [];
-            foreach (var element in localSet)
-            {
-                sourceIndex[element.Id] = element;
-            }
+            sourceIndex[element.Id] = element;
+        }
 
-            foreach (var element in remoteSet)
-            {
-                sourceIndex[element.Id] = element;
-            }
+        foreach (var element in remote)
+        {
+            sourceIndex[element.Id] = element;
+        }
 
-            Dictionary<GrainId, CandidateVertexHeapElement> index = [];
-            List<CandidateVertexHeapElement> localVertexList = [];
-            foreach (var element in localSet)
-            {
-                var vertex = CreateVertex(sourceIndex, index, element);
-                vertex.Location = VertexLocation.Local;
-                localVertexList.Add(vertex);
-            }
+        Dictionary<GrainId, CandidateVertexHeapElement> index = [];
+        List<CandidateVertexHeapElement> localVertexList = new(local.Count);
+        foreach (var element in local)
+        {
+            var vertex = CreateVertex(sourceIndex, index, element);
+            vertex.Location = VertexLocation.Local;
+            localVertexList.Add(vertex);
+        }
 
-            List<CandidateVertexHeapElement> remoteVertexList = [];
-            foreach (var element in remoteSet)
-            {
-                var vertex = CreateVertex(sourceIndex, index, element);
-                vertex.Location = VertexLocation.Remote;
-                remoteVertexList.Add(vertex);
-            }
+        List<CandidateVertexHeapElement> remoteVertexList = new(remote.Length);
+        foreach (var element in remote)
+        {
+            var vertex = CreateVertex(sourceIndex, index, element);
+            vertex.Location = VertexLocation.Remote;
+            remoteVertexList.Add(vertex);
+        }
 
-            var localHeap = new MaxHeap<CandidateVertexHeapElement>(localVertexList);
-            var remoteHeap = new MaxHeap<CandidateVertexHeapElement>(remoteVertexList);
-            return (localHeap, remoteHeap);
+        var localHeap = new MaxHeap<CandidateVertexHeapElement>(localVertexList);
+        var remoteHeap = new MaxHeap<CandidateVertexHeapElement>(remoteVertexList);
+        return (localHeap, remoteHeap);
 
-            static CandidateVertexHeapElement CreateVertex(Dictionary<GrainId, CandidateVertex> sourceIndex, Dictionary<GrainId, CandidateVertexHeapElement> index, CandidateVertex element)
+        static CandidateVertexHeapElement CreateVertex(Dictionary<GrainId, CandidateVertex> sourceIndex, Dictionary<GrainId, CandidateVertexHeapElement> index, CandidateVertex element)
+        {
+            var vertex = GetOrAddVertex(index, element);
+            foreach (var connectedVertex in element.ConnectedVertices)
             {
-                var vertex = GetOrAddVertex(index, element);
-                foreach (var connectedVertex in element.ConnectedVertices)
+                if (sourceIndex.TryGetValue(connectedVertex.Id, out var connected))
                 {
-                    if (sourceIndex.TryGetValue(connectedVertex.Id, out var connected))
-                    {
-                        vertex.ConnectedVertices.Add((GetOrAddVertex(index, connected), connectedVertex.TransferScore));
-                    }
+                    vertex.ConnectedVertices.Add((GetOrAddVertex(index, connected), connectedVertex.TransferScore));
                 }
+            }
 
+            return vertex;
+
+            static CandidateVertexHeapElement GetOrAddVertex(Dictionary<GrainId, CandidateVertexHeapElement> index, CandidateVertex element)
+            {
+                ref var vertex = ref CollectionsMarshal.GetValueRefOrAddDefault(index, element.Id, out var exists);
+                vertex ??= new(element);
                 return vertex;
-
-                static CandidateVertexHeapElement GetOrAddVertex(Dictionary<GrainId, CandidateVertexHeapElement> index, CandidateVertex element)
-                {
-                    ref var vertex = ref CollectionsMarshal.GetValueRefOrAddDefault(index, element.Id, out var exists);
-                    vertex ??= new(element);
-                    return vertex;
-                }
             }
         }
     }
@@ -604,13 +550,15 @@ internal sealed partial class ActivationRebalancer : SystemTarget, IActivationRe
 
             foreach (var entry in grouping)
             {
-                if (entry.Direction == Direction.LocalToLocal)
+                if (entry.Direction is Direction.LocalToLocal)
                 {
                     // Since its L2L, it means the partner silo will be 'this' silo, so we don't need to filter by the partner silo.
                     accLocalScore += entry.Weight;
                 }
-                else if (entry.TargetSilo.Equals(otherSilo) && entry.Direction is Direction.RemoteToLocal or Direction.LocalToRemote)
+                else if (entry.PartnerSilo.Equals(otherSilo))
                 {
+                    Debug.Assert(entry.Direction is Direction.RemoteToLocal or Direction.LocalToRemote);
+
                     // We need to filter here by 'otherSilo' since any L2R or R2L edge can be between the current vertex and a vertex in a silo that is not in 'otherSilo'.
                     accRemoteScore += entry.Weight;
                 }
@@ -659,7 +607,7 @@ internal sealed partial class ActivationRebalancer : SystemTarget, IActivationRe
                 continue;
             }
 
-            var vertexEdge = CreateVertexEdge(new WeightedEdge(edge, count));
+            var vertexEdge = CreateVertexEdge(edge, count);
             yield return vertexEdge;
 
             if (vertexEdge.Direction == Direction.LocalToLocal)
@@ -668,56 +616,48 @@ internal sealed partial class ActivationRebalancer : SystemTarget, IActivationRe
                 // Once an edge exists it means 2 grains are temporally linked, this means that there is a cost associated to potentially move either one of them.
                 // Since the construction of the candidate set takes into account also local connection (which increases the cost of migration), we need
                 // to take into account the edge not only from a source's perspective, but also the target's one, as it too will take part on the candidate set.
-                var flippedEdge = CreateVertexEdge(new WeightedEdge(edge.Flip(), count));
+                var flippedEdge = CreateVertexEdge(edge.Flip(), count);
                 yield return flippedEdge;
             }
         }
 
-        VertexEdge CreateVertexEdge(in WeightedEdge counter)
+        VertexEdge CreateVertexEdge(in Edge edge, long weight)
         {
-            var direction = Direction.Unspecified;
-
-            direction = IsSourceThisSilo(counter)
-                ? IsTargetThisSilo(counter) ? Direction.LocalToLocal : Direction.LocalToRemote
-                : Direction.RemoteToLocal;
-
-            Debug.Assert(direction != Direction.Unspecified);   // this can only occur when both: source and target are remote (which can not happen)
-
-            return direction switch
+            return (IsSourceLocal(edge), IsTargetLocal(edge)) switch
             {
-                Direction.LocalToLocal => new(
-                    SourceId: counter.Edge.Source.Id,                     // 'local' vertex was the 'source' of the communication
-                    TargetId: counter.Edge.Target.Id,
-                    IsMigratable: counter.Edge.Source.IsMigratable,
-                    TargetSilo: Silo,                              // the partner was 'local' (note: this.Silo = Source.Silo = Target.Silo)
-                    Direction: direction,
-                    Weight: counter.Weight),
+                 (true, true) => new(
+                    SourceId: edge.Source.Id,                     // 'local' vertex was the 'source' of the communication
+                    TargetId: edge.Target.Id,
+                    IsMigratable: edge.Source.IsMigratable,
+                    PartnerSilo: Silo,                              // the partner was 'local' (note: this.Silo = Source.Silo = Target.Silo)
+                    Direction: Direction.LocalToLocal,
+                    Weight: weight),
 
-                Direction.LocalToRemote => new(
-                    SourceId: counter.Edge.Source.Id,                     // 'local' vertex was the 'source' of the communication
-                    TargetId: counter.Edge.Target.Id,
-                    IsMigratable: counter.Edge.Source.IsMigratable,
-                    TargetSilo: counter.Edge.Target.Silo,          // the partner was 'remote'
-                    Direction: direction,
-                    Weight: counter.Weight),
+                (true, false) => new(
+                    SourceId: edge.Source.Id,                     // 'local' vertex was the 'source' of the communication
+                    TargetId: edge.Target.Id,
+                    IsMigratable: edge.Source.IsMigratable,
+                    PartnerSilo: edge.Target.Silo,          // the partner was 'remote'
+                    Direction: Direction.LocalToRemote,
+                    Weight: weight),
 
-                Direction.RemoteToLocal => new(
-                    SourceId: counter.Edge.Target.Id,                     // 'local' vertex was the 'target' of the communication
-                    TargetId: counter.Edge.Source.Id,
-                    IsMigratable: counter.Edge.Target.IsMigratable,
-                    TargetSilo: counter.Edge.Source.Silo,          // the partner was 'remote'
-                    Direction: direction,
-                    Weight: counter.Weight),
+                (false, true) => new(
+                    SourceId: edge.Target.Id,                     // 'local' vertex was the 'target' of the communication
+                    TargetId: edge.Source.Id,
+                    IsMigratable: edge.Target.IsMigratable,
+                    PartnerSilo: edge.Source.Silo,          // the partner was 'remote'
+                    Direction: Direction.RemoteToLocal,
+                    Weight: weight),
 
-                _ => throw new UnreachableException($"The edge direction {direction} is out of range.")
+                _ => throw new UnreachableException($"The edge {edge} has an invalid source and target: neither refer to the local silo.")
             };
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        bool IsSourceThisSilo(in WeightedEdge counter) => counter.Edge.Source.Silo.IsSameLogicalSilo(Silo);
+        bool IsSourceLocal(in Edge edge) => edge.Source.Silo.IsSameLogicalSilo(Silo);
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        bool IsTargetThisSilo(in WeightedEdge counter) => counter.Edge.Target.Silo.IsSameLogicalSilo(Silo);
+        bool IsTargetLocal(in Edge edge) => edge.Target.Silo.IsSameLogicalSilo(Silo);
     }
 
     public void Participate(ISiloLifecycle observer)
@@ -764,8 +704,8 @@ internal sealed partial class ActivationRebalancer : SystemTarget, IActivationRe
     /// <param name="SourceId">The id of the grain it represents.</param>
     /// <param name="TargetId">The id of the connected vertex (the one the communication took place with).</param>
     /// <param name="IsMigratable">Specifies if the vertex with <paramref name="SourceId"/> is a migratable type.</param>
-    /// <param name="TargetSilo">The silo partner which interacted with the silo of vertex with <paramref name="SourceId"/>.</param>
+    /// <param name="PartnerSilo">The silo partner which interacted with the silo of vertex with <paramref name="SourceId"/>.</param>
     /// <param name="Direction">The edge's direction</param>
     /// <param name="Weight">The number of estimated messages exchanged between <paramref name="SourceId"/> and <paramref name="TargetId"/>.</param>
-    private readonly record struct VertexEdge(GrainId SourceId, GrainId TargetId, bool IsMigratable, SiloAddress TargetSilo, Direction Direction, long Weight);
+    private readonly record struct VertexEdge(GrainId SourceId, GrainId TargetId, bool IsMigratable, SiloAddress PartnerSilo, Direction Direction, long Weight);
 }

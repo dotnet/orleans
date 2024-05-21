@@ -25,7 +25,7 @@ public sealed class MaxHeapTests
         }
 
         Random.Shared.Shuffle(edges);
-        var heap = new MaxHeap<MyHeapElement>(edges);
+        var heap = new MaxHeap<MyHeapElement>([.. edges]);
         Assert.Equal(100, heap.Count);
         Assert.Equal(99, heap.Peek().Value);
         Assert.Equal(99, heap.Peek().Value);

@@ -83,16 +83,19 @@ internal sealed class MaxHeap<TElement> where TElement : notnull, IHeapElement<T
     ///  Constructs the heap using a heapify operation,
     ///  which is generally faster than enqueuing individual elements sequentially.
     /// </remarks>
-    public MaxHeap(ICollection<TElement> items)
+    public MaxHeap(List<TElement> items)
     {
         ArgumentNullException.ThrowIfNull(items);
 
         _size = items.Count;
         var nodes = new TElement[_size];
-        items.CopyTo(nodes, 0);
-        for (var i = 0; i < nodes.Length; i++)
+
+        var i = 0;
+        foreach (var item in items)
         {
-            nodes[i].HeapIndex = i;
+            nodes[i] = item;
+            item.HeapIndex = i;
+            i++;
         }
 
         _nodes = nodes;
