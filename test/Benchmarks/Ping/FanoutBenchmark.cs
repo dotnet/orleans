@@ -90,6 +90,8 @@ namespace Benchmarks.Ping
 
             _onCancelEvent = CancelPressed;
             Console.CancelKeyPress += _onCancelEvent;
+            AppDomain.CurrentDomain.FirstChanceException += (object sender, System.Runtime.ExceptionServices.FirstChanceExceptionEventArgs e) => Console.WriteLine("FIRST CHANCE EXCEPTION: " + LogFormatter.PrintException(e.Exception));
+            AppDomain.CurrentDomain.UnhandledException += (object sender, UnhandledExceptionEventArgs e) => Console.WriteLine("UNHANDLED EXCEPTION: " + LogFormatter.PrintException((Exception)e.ExceptionObject));
         }
 
         private void CancelPressed(object sender, ConsoleCancelEventArgs e)
