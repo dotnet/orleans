@@ -60,22 +60,6 @@ internal readonly struct Edge(EdgeVertex source, EdgeVertex target) : IEquatable
     /// Returns a copy of this but with flipped sources and targets.
     /// </summary>
     public Edge Flip() => new(source: Target, target: Source);
-
-    /// <summary>
-    /// Checks if any of the <paramref name="grainIds"/> is part of this counter.
-    /// </summary>
-    public readonly bool ContainsAny(ImmutableArray<GrainId> grainIds)
-    {
-        foreach (var grainId in grainIds)
-        {
-            if (Source.Id == grainId || Target.Id == grainId)
-            {
-                return true;
-            }
-        }
-
-        return false;
-    }
 }
 
 /// <summary>
@@ -169,16 +153,19 @@ internal sealed class AcceptExchangeRequest(SiloAddress sendingSilo, ImmutableAr
 }
 
 [GenerateSerializer, Immutable]
-internal sealed class AcceptExchangeResponse(AcceptExchangeResponse.ResponseType type, ImmutableArray<GrainId> exchangeSet)
+internal sealed class AcceptExchangeResponse(AcceptExchangeResponse.ResponseType type, ImmutableArray<GrainId> acceptedGrains, ImmutableArray<GrainId> givenGrains)
 {
-    public static readonly AcceptExchangeResponse CachedExchangedRecently = new(ResponseType.ExchangedRecently, []);
-    public static readonly AcceptExchangeResponse CachedMutualExchangeAttempt = new(ResponseType.MutualExchangeAttempt, []);
+    public static readonly AcceptExchangeResponse CachedExchangedRecently = new(ResponseType.ExchangedRecently, [], []);
+    public static readonly AcceptExchangeResponse CachedMutualExchangeAttempt = new(ResponseType.MutualExchangeAttempt, [], []);
 
     [Id(0)]
     public ResponseType Type { get; } = type;
 
     [Id(1)]
-    public ImmutableArray<GrainId> ExchangeSet { get; } = exchangeSet;
+    public ImmutableArray<GrainId> AcceptedGrainIds { get; } = acceptedGrains;
+
+    [Id(2)]
+    public ImmutableArray<GrainId> GivenGrainIds { get; } = givenGrains;
 
     [GenerateSerializer]
     public enum ResponseType

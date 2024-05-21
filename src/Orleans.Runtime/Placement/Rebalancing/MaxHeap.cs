@@ -3,6 +3,7 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
 using System.Runtime.CompilerServices;
 using Orleans.Placement.Rebalancing;
 
@@ -22,8 +23,7 @@ internal sealed class CandidateVertexHeapElement(CandidateVertex value) : IHeapE
     public long AccumulatedTransferScore { get => Vertex.AccumulatedTransferScore; set => Vertex.AccumulatedTransferScore = value; }
     public VertexLocation Location { get; set; }
     int IHeapElement<CandidateVertexHeapElement>.HeapIndex { get; set; }
-    int IHeapElement<CandidateVertexHeapElement>.CompareTo(CandidateVertexHeapElement other)
-        => Vertex.AccumulatedTransferScore.CompareTo(other.Vertex.AccumulatedTransferScore);
+    int IHeapElement<CandidateVertexHeapElement>.CompareTo(CandidateVertexHeapElement other) => AccumulatedTransferScore.CompareTo(other.AccumulatedTransferScore);
 }
 
 internal interface IHeapElement<TElement> where TElement : notnull
@@ -90,7 +90,7 @@ internal sealed class MaxHeap<TElement> where TElement : notnull, IHeapElement<T
         _size = items.Count;
         var nodes = new TElement[_size];
         items.CopyTo(nodes, 0);
-        for (var i = 0; i< nodes.Length; i++)
+        for (var i = 0; i < nodes.Length; i++)
         {
             nodes[i].HeapIndex = i;
         }
@@ -110,6 +110,20 @@ internal sealed class MaxHeap<TElement> where TElement : notnull, IHeapElement<T
     ///  Gets the number of elements contained in the <see cref="MaxHeap{TElement}"/>.
     /// </summary>
     public int Count => _size;
+
+    public TElement? FirstOrDefault() => _size > 0 ? _nodes[0] : default;
+
+    public bool TryPeek([NotNullWhen(true)] out TElement value)
+    {
+        if (_size > 0)
+        {
+            value = _nodes[0]!;
+            return true;
+        }
+
+        value = default!;
+        return false;
+    }
 
     /// <summary>
     ///  Returns the maximal element from the <see cref="MaxHeap{TElement}"/> without removing it.

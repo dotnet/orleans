@@ -15,9 +15,8 @@ using System.Threading;
 using Orleans.Internal;
 using Orleans.Configuration;
 using Orleans.Runtime.Utilities;
-using Microsoft.Extensions.DependencyInjection;
-using Orleans.Serialization;
 using System.Runtime.InteropServices;
+using System.Runtime.ExceptionServices;
 
 namespace Orleans.Runtime.Placement.Rebalancing;
 
@@ -102,6 +101,12 @@ internal sealed partial class ActivationRebalancer : SystemTarget, IActivationRe
 
     public async ValueTask TriggerExchangeRequest()
     {
+        if (_currentExchangeSilo is not null)
+        {
+            // Skip this round if we are already in the process of exchanging with another silo.
+            return;
+        }
+
         var silos = _siloStatusOracle.GetActiveSilos();
         if (silos.Length == 1)
         {
@@ -126,8 +131,8 @@ internal sealed partial class ActivationRebalancer : SystemTarget, IActivationRe
                 return;
             }
 
-            (var candidateSilo, var exchangeSet, var _) = set;
-            if (exchangeSet.Length == 0)
+            (var candidateSilo, var offeredGrains, var _) = set;
+            if (offeredGrains.Count == 0)
             {
                 countWithNoExchangeSet++;
                 LogExchangeSetIsEmpty(candidateSilo);
@@ -144,17 +149,14 @@ internal sealed partial class ActivationRebalancer : SystemTarget, IActivationRe
                 var remoteRef = IActivationRebalancerSystemTarget.GetReference(_grainFactory, candidateSilo);
                 var sw2 = ValueStopwatch.StartNew();
                 _logger.LogInformation("Sending AcceptExchangeRequest");
-                AcceptExchangeRequest payload = new(Silo, exchangeSet, GetLocalActivationCount());
-                var dummy = ActivationServices.GetRequiredService<Serializer>().SerializeToArray(payload);
-                _logger.LogInformation("Serializing AcceptExchangeRequest to {Size} bytes took {Elapsed}", dummy.Length, sw2.Elapsed);
-                var response = await remoteRef.AcceptExchangeRequest(payload);
+                var response = await remoteRef.AcceptExchangeRequest(new (Silo, offeredGrains.ToImmutableArray(), GetLocalActivationCount()));
                 _logger.LogInformation("Sent AcceptExchangeRequest. It took {Elapsed}", sw2.Elapsed);
 
                 switch (response.Type)
                 {
                     case AcceptExchangeResponse.ResponseType.Success:
                         // Exchange was successful, no need to iterate over another candidate.
-                        await FinalizeProtocol(response.ExchangeSet, exchangeSet.Select(x => x.Id).Union(response.ExchangeSet).ToImmutableArray(), isReceiver: false);
+                        await FinalizeProtocol(response.AcceptedGrainIds, response.GivenGrainIds, isReceiver: false, candidateSilo);
                         return;
                     case AcceptExchangeResponse.ResponseType.ExchangedRecently:
                         // The remote silo has been recently involved in another exchange, try the next best candidate.
@@ -190,8 +192,31 @@ internal sealed partial class ActivationRebalancer : SystemTarget, IActivationRe
 
     private int GetLocalActivationCount() => _activationDirectory.Count + _activationCountOffset;
 
+    private struct AttachDebuggerOnFirstChance : IDisposable
+    {
+        public AttachDebuggerOnFirstChance()
+        {
+            AppDomain.CurrentDomain.FirstChanceException += CurrentDomain_FirstChanceException;
+        }
+
+        public readonly void Dispose()
+        {
+            AppDomain.CurrentDomain.FirstChanceException -= CurrentDomain_FirstChanceException;
+        }
+
+        private void CurrentDomain_FirstChanceException(object? sender, FirstChanceExceptionEventArgs e)
+        {
+            if (e.Exception is IndexOutOfRangeException)
+            {
+                Debugger.Launch();
+            }
+        }
+    }
+
     public async ValueTask<AcceptExchangeResponse> AcceptExchangeRequest(AcceptExchangeRequest request)
     {
+        using var _ = new AttachDebuggerOnFirstChance();
+
         _logger.LogInformation("Received AcceptExchangeRequest from {Silo}", request.SendingSilo);
         if (request.SendingSilo.Equals(_currentExchangeSilo) && Silo.CompareTo(request.SendingSilo) <= 0)
         {
@@ -207,7 +232,7 @@ internal sealed partial class ActivationRebalancer : SystemTarget, IActivationRe
         }
 
         var lastExchangeElapsed = _lastExchangedStopwatch.Elapsed;
-        if (lastExchangeElapsed < _options.RecoveryPeriod)
+        if (lastExchangeElapsed < _options.RecoveryPeriod || _currentExchangeSilo != null)
         {
             LogExchangedRecently(request.SendingSilo, lastExchangeElapsed, _options.RecoveryPeriod);
             return AcceptExchangeResponse.CachedExchangedRecently;
@@ -219,22 +244,12 @@ internal sealed partial class ActivationRebalancer : SystemTarget, IActivationRe
 
         try
         {
+            var acceptedGrains = ImmutableArray.CreateBuilder<GrainId>();
+            var givingGrains = ImmutableArray.CreateBuilder<GrainId>();
             var remoteSet = request.ExchangeSet;
             _logger.LogInformation("About to create candidate set");
             var localSet = CreateCandidateSet(CreateLocalVertexEdges(), request.SendingSilo);
             _logger.LogInformation("Created candidate set");
-
-            if (localSet.Count == 0)
-            {
-                // We have nothing to give back (very fringe case), so just accept the set.
-                var set = remoteSet.Select(x => x.Id).ToImmutableArray();
-                _logger.LogInformation("Finalizing protocol with empty local set");
-                await FinalizeProtocol(set, set, isReceiver: true);
-
-                return new(AcceptExchangeResponse.ResponseType.Success, []);
-            }
-
-            List<(GrainId Grain, SiloAddress Silo, long TransferScore)> toMigrate = [];
 
             // We need to determine 2 subsets:
             // - One that originates from sending silo (request.ExchangeSet) and will be (partially) accepted from this silo.
@@ -242,9 +257,8 @@ internal sealed partial class ActivationRebalancer : SystemTarget, IActivationRe
             var remoteActivations = request.ActivationCountSnapshot;
             var localActivations = GetLocalActivationCount();
 
-            var currentImbalance = 0;
-            currentImbalance = CalculateImbalance(Direction.Unspecified);
-            _logger.LogInformation("Imbalance is {Imbalance}", currentImbalance);
+            var imbalance = CalculateImbalance(remoteActivations, localActivations);
+            _logger.LogInformation("Imbalance is {Imbalance} (remote: {RemoteCount} vs local {LocalCount})", imbalance, remoteActivations, localActivations);
 
             var (localHeap, remoteHeap) = CreateCandidateHeaps(localSet, remoteSet);
 
@@ -259,84 +273,32 @@ internal sealed partial class ActivationRebalancer : SystemTarget, IActivationRe
                     await Task.Delay(1);
                 }
 
-                if (localHeap.Count > 0 && remoteHeap.Count > 0)
-                {
-                    var localVertex = localHeap.Peek();
-                    var remoteVertex = remoteHeap.Peek();
-
-                    if (localVertex.AccumulatedTransferScore > remoteVertex.AccumulatedTransferScore)
-                    {
-                        if (TryMigrateLocalToRemote()) continue;
-                        if (TryMigrateRemoteToLocal()) continue;
-                    }
-                    else if (localVertex.AccumulatedTransferScore < remoteVertex.AccumulatedTransferScore)
-                    {
-                        if (TryMigrateRemoteToLocal()) continue;
-                        if (TryMigrateLocalToRemote()) continue;
-                    }
-                    else
-                    {
-                        // Other than testing scenarios with a handful of activations, it should be rare that this happens. If the transfer scores are equal, than we check the anticipated imbalances
-                        // for both cases, and proceed with whichever lowers the overall imbalance, even though the other option could still be within the tolerance margin.
-                        // The imbalance check is the first step micro-optimization, which doesn't necessarily mean that the migration direction (L2R, R2L) will happen, that is still
-                        // determined within the migration methods. In case both anticipated imbalances are also equal, we have to pick one, and we stick for consistency with L2R in that case.
-                        var l2r_anticipatedImbalance = CalculateImbalance(Direction.LocalToRemote);
-                        var r2l_anticipatedImbalance = CalculateImbalance(Direction.RemoteToLocal);
-
-                        if (l2r_anticipatedImbalance <= r2l_anticipatedImbalance)
-                        {
-                            if (TryMigrateLocalToRemote()) continue;
-                            if (TryMigrateRemoteToLocal()) continue;
-                        }
-                        else
-                        {
-                            if (TryMigrateRemoteToLocal()) continue;
-                            if (TryMigrateLocalToRemote()) continue;
-                        }
-                    }
-                }
-                else
+                // If more is gained by giving grains to the remote silo than taking from it, we will try giving first.
+                var localScore = localHeap.FirstOrDefault()?.AccumulatedTransferScore ?? 0;
+                var remoteScore = remoteHeap.FirstOrDefault()?.AccumulatedTransferScore ?? 0;
+                if (localScore > remoteScore || localActivations > remoteActivations)
                 {
                     if (TryMigrateLocalToRemote()) continue;
                     if (TryMigrateRemoteToLocal()) continue;
-
-                    // Both heaps are empty, at this point we are done.
-                    break;
                 }
+                else
+                {
+                    if (TryMigrateRemoteToLocal()) continue;
+                    if (TryMigrateLocalToRemote()) continue;
+                }
+
+                // No more migrations can be made, so the candidate set has been calculated.
+                break;
             }
 
-            _logger.LogInformation("2 Computing transfer set took {Elapsed}", swTxs.Elapsed);
-            var unionSet = ImmutableArray.CreateBuilder<GrainId>();
-            var mySet = ImmutableArray.CreateBuilder<GrainId>();
-            var theirSet = ImmutableArray.CreateBuilder<GrainId>();
+            _logger.LogInformation("Computing transfer set took {Elapsed}. Anticipated imbalance after transfer is {AnticipatedImbalance}", swTxs.Elapsed, imbalance);
             swTxs.Restart();
-            foreach (var candidate in toMigrate)
-            {
-                if (candidate.TransferScore <= 0)
-                {
-                    continue;
-                }
-
-                if (candidate.Silo.Equals(Silo))
-                {
-                    // Add to the subset that should migrate to 'this' silo.
-                    mySet.Add(candidate.Grain);
-                    unionSet.Add(candidate.Grain);
-                }
-                else if (candidate.Silo.Equals(request.SendingSilo))
-                {
-                    // Add to the subset to send back to 'remote' silo (the actual migration will be handled there)
-                    theirSet.Add(candidate.Grain);
-                    unionSet.Add(candidate.Grain);
-                }
-            }
-
-            _logger.LogInformation("Creating migration set took {Elapsed}", swTxs.Elapsed);
-            swTxs.Restart();
-            await FinalizeProtocol(mySet.ToImmutable(), unionSet.ToImmutable(), isReceiver: true);
+            var giving = givingGrains.ToImmutable();
+            var accepting = acceptedGrains.ToImmutable();
+            await FinalizeProtocol(giving, accepting, isReceiver: true, request.SendingSilo);
             _logger.LogInformation("Finalizing protocol based on provided set took {Elapsed}", swTxs.Elapsed);
 
-            return new(AcceptExchangeResponse.ResponseType.Success, theirSet.ToImmutable());
+            return new(AcceptExchangeResponse.ResponseType.Success, accepting, giving);
 
             bool TryMigrateLocalToRemote()
             {
@@ -345,8 +307,8 @@ internal sealed partial class ActivationRebalancer : SystemTarget, IActivationRe
                     return false;
                 }
 
-                var anticipatedImbalance = CalculateImbalance(Direction.LocalToRemote);
-                if (anticipatedImbalance > currentImbalance && !_toleranceRule.IsSatisfiedBy((uint)anticipatedImbalance))
+                var anticipatedImbalance = CalculateImbalance(localActivations - 1, remoteActivations + 1);
+                if (anticipatedImbalance > imbalance && !_toleranceRule.IsSatisfiedBy((uint)anticipatedImbalance))
                 {
                     return false;
                 }
@@ -358,11 +320,11 @@ internal sealed partial class ActivationRebalancer : SystemTarget, IActivationRe
                     return false;
                 }
 
-                toMigrate.Add(new(chosenVertex.Id, request.SendingSilo, chosenVertex.AccumulatedTransferScore));
+                givingGrains.Add(chosenVertex.Id);
 
                 localActivations--;
                 remoteActivations++;
-                currentImbalance = anticipatedImbalance;
+                imbalance = anticipatedImbalance;
 
                 foreach (var (connectedVertex, transferScore) in chosenVertex.ConnectedVertices)
                 {
@@ -394,8 +356,8 @@ internal sealed partial class ActivationRebalancer : SystemTarget, IActivationRe
                     return false;
                 }
 
-                var anticipatedImbalance = CalculateImbalance(Direction.RemoteToLocal);
-                if (anticipatedImbalance > currentImbalance && !_toleranceRule.IsSatisfiedBy((uint)anticipatedImbalance))
+                var anticipatedImbalance = CalculateImbalance(localActivations + 1, remoteActivations - 1);
+                if (anticipatedImbalance > imbalance && !_toleranceRule.IsSatisfiedBy((uint)anticipatedImbalance))
                 {
                     return false;
                 }
@@ -407,11 +369,11 @@ internal sealed partial class ActivationRebalancer : SystemTarget, IActivationRe
                     return false;
                 }
 
-                toMigrate.Add(new(chosenVertex.Id, Silo, chosenVertex.AccumulatedTransferScore));
+                acceptedGrains.Add(chosenVertex.Id);
 
                 localActivations++;
                 remoteActivations--;
-                currentImbalance = anticipatedImbalance;
+                imbalance = anticipatedImbalance;
                 foreach (var (connectedVertex, transferScore) in chosenVertex.ConnectedVertices)
                 {
                     switch (connectedVertex.Location)
@@ -435,22 +397,11 @@ internal sealed partial class ActivationRebalancer : SystemTarget, IActivationRe
                 return true;
             }
 
-            int CalculateImbalance(Direction direction)
-            {
-                (var rDelta, var lDelta) = direction switch
-                {
-                    Direction.LocalToRemote => (1, -1),
-                    Direction.RemoteToLocal => (-1, 1),
-                    _ => (0, 0)
-                };
-
-                return Math.Abs(Math.Abs(remoteActivations + rDelta) - Math.Abs(localActivations + lDelta));
-            }
+            static int CalculateImbalance(int left, int right) => Math.Abs(Math.Abs(left) - Math.Abs(right));
         }
         catch (Exception exception)
         {
             _logger.LogError(exception, "Error accepting exchange request.");
-            Debugger.Launch();
             throw;
         }
         finally
@@ -517,91 +468,98 @@ internal sealed partial class ActivationRebalancer : SystemTarget, IActivationRe
 
     /// <summary>
     /// <list type="number">
-    /// <item>Initiates the actual migration process of <paramref name="idsToMigrate"/> to 'this' silo.</item>
+    /// <item>Initiates the actual migration process of <paramref name="giving"/> to 'this' silo.</item>
     /// <item>If <paramref name="isReceiver"/> it proceeds to update <see cref="_lastExchangedStopwatch"/>.</item>
-    /// <item>Updates the affected counters within <see cref="_edgeWeights"/> to reflect all <paramref name="affectedIds"/>.</item>
+    /// <item>Updates the affected counters within <see cref="_edgeWeights"/> to reflect all <paramref name="accepting"/>.</item>
     /// </list>
     /// </summary>
-    /// <param name="idsToMigrate">The grain ids to migrate.</param>
-    /// <param name="affectedIds">All grains ids that were affected from both sides.</param>
+    /// <param name="giving">The grain ids to migrate to the remote host.</param>
+    /// <param name="accepting">The grain ids to which are migrating to the local host.</param>
     /// <param name="isReceiver">Is the caller, the protocol receiver or not.</param>
-    private async Task FinalizeProtocol(ImmutableArray<GrainId> idsToMigrate, ImmutableArray<GrainId> affectedIds, bool isReceiver)
+    private async Task FinalizeProtocol(ImmutableArray<GrainId> giving, ImmutableArray<GrainId> accepting, bool isReceiver, SiloAddress targetSilo)
     {
-        if (idsToMigrate.Length > 0)
+        if (giving.Length == 0)
         {
-            // The protocol concluded that 'this' silo should take on 'set', so we hint to the director accordingly.
-            RequestContext.Set(IPlacementDirector.PlacementHintKey, Silo);
-            List<Task> migrationTasks = [];
-
-            var sw1 = ValueStopwatch.StartNew();
-            _logger.LogInformation("Telling {Count} grains to migrate", affectedIds.Length);
-            foreach (var grainId in idsToMigrate)
-            {
-                migrationTasks.Add(_grainFactory.GetGrain(grainId).Cast<IGrainManagementExtension>().MigrateOnIdle().AsTask());
-            }
-            _logger.LogInformation("Telling {Count} grains to migrate took {Elapsed}", affectedIds.Length, sw1.Elapsed);
-
-            try
-            {
-                await Task.WhenAll(migrationTasks);
-            }
-            catch (Exception)
-            {
-                // This should happen rarely, but at this point we cant really do much, as its out of our control.
-                // Even if some fail, at the end the algorithm will run again and eventually succeed with moving all activations were they belong.
-                var aggEx = new AggregateException(migrationTasks.Select(t => t.Exception).Where(ex => ex is not null)!);
-                LogErrorOnMigratingActivations(aggEx, Silo);
-            }
-
-            _logger.LogInformation("Waiting for {Count} grains to migrate took {Elapsed}", affectedIds.Length, sw1.Elapsed);
-            if (isReceiver)
-            {
-                // Stamp this silos exchange for a potential next pair exchange request.
-                _lastExchangedStopwatch.Restart();
-            }
+            LogProtocolFinalized(giving.Length);
+            return;
         }
 
+        // The protocol concluded that 'this' silo should take on 'set', so we hint to the director accordingly.
+        RequestContext.Set(IPlacementDirector.PlacementHintKey, targetSilo);
+        List<Task> migrationTasks = [];
+
+        var sw1 = ValueStopwatch.StartNew();
+        _logger.LogInformation("Telling {Count} grains to migrate from {LocalSilo} to {TargetSilo}", giving.Length, Silo, targetSilo);
+        foreach (var grainId in giving)
+        {
+            migrationTasks.Add(_grainFactory.GetGrain(grainId).Cast<IGrainManagementExtension>().MigrateOnIdle().AsTask());
+        }
+        _logger.LogInformation("Telling {Count} grains to migrate took {Elapsed}", giving.Length, sw1.Elapsed);
+
+        try
+        {
+            await Task.WhenAll(migrationTasks);
+        }
+        catch (Exception)
+        {
+            // This should happen rarely, but at this point we cant really do much, as its out of our control.
+            // Even if some fail, at the end the algorithm will run again and eventually succeed with moving all activations were they belong.
+            var aggEx = new AggregateException(migrationTasks.Select(t => t.Exception).Where(ex => ex is not null)!);
+            LogErrorOnMigratingActivations(aggEx, Silo);
+        }
+
+        _logger.LogInformation("Waiting for {Count} grains to migrate took {Elapsed}", giving.Length, sw1.Elapsed);
+        if (isReceiver)
+        {
+            // Stamp this silos exchange for a potential next pair exchange request.
+            _lastExchangedStopwatch.Restart();
+        }
+
+        // Avoid mutating the source while enumerating it.
         var sw = ValueStopwatch.StartNew();
         var iterations = 0;
-        if (affectedIds.Length != 0)
+        var toRemove = new List<Edge>();
+
+        var affected = new HashSet<GrainId>(giving.Length + accepting.Length);
+        foreach (var id in accepting)
         {
-            // Avoid mutating the source while enumerating it.
-            var toRemove = new List<Edge>();
-            foreach (var (edge, count, error) in _edgeWeights.Elements)
+            affected.Add(id);
+        }
+
+        foreach (var id in giving)
+        {
+            affected.Add(id);
+        }
+
+        foreach (var (edge, count, error) in _edgeWeights.Elements)
+        {
+            if (affected.Contains(edge.Source.Id) || affected.Contains(edge.Target.Id))
             {
-                if (++iterations % 128 == 0)
-                {
-                    // Give other tasks a chance to execute periodically.
-                    await Task.Delay(1);
-                }
-
-                if (edge.ContainsAny(affectedIds))
-                {
-                    toRemove.Add(edge);
-                }
-            }
-
-            foreach (var edge in toRemove)
-            {
-                if (++iterations % 128 == 0)
-                {
-                    // Give other tasks a chance to execute periodically.
-                    await Task.Delay(1);
-                }
-
-                // Totally remove this counter, as one or both vertices has migrated. By not doing this it would skew results for the next protocol cycle.
-                // We remove only the affected counters, as there could be other counters that 'this' silo has connections with another silo (which is not part of this exchange cycle).
-                _edgeWeights.Remove(edge);
+                toRemove.Add(edge);
             }
         }
+
+        foreach (var edge in toRemove)
+        {
+            if (++iterations % 128 == 0)
+            {
+                // Give other tasks a chance to execute periodically.
+                await Task.Delay(1);
+            }
+
+            // Totally remove this counter, as one or both vertices has migrated. By not doing this it would skew results for the next protocol cycle.
+            // We remove only the affected counters, as there could be other counters that 'this' silo has connections with another silo (which is not part of this exchange cycle).
+            _edgeWeights.Remove(edge);
+        }
+
         _logger.LogInformation("Removing transfer set from edge weights took {Elapsed}.", sw.Elapsed);
 
-        LogProtocolFinalized(idsToMigrate.Length);
+        LogProtocolFinalized(accepting.Length);
     }
 
-    private List<(SiloAddress Silo, ImmutableArray<CandidateVertex> Candidates, long TransferScore)> CreateCandidateSets(ImmutableArray<SiloAddress> silos)
+    private List<(SiloAddress Silo, List<CandidateVertex> Candidates, long TransferScore)> CreateCandidateSets(ImmutableArray<SiloAddress> silos)
     {
-        List<(SiloAddress Silo, ImmutableArray<CandidateVertex> Candidates, long TransferScore)> candidateSets = new(silos.Length - 1);
+        List<(SiloAddress Silo, List<CandidateVertex> Candidates, long TransferScore)> candidateSets = new(silos.Length - 1);
         var sw = ValueStopwatch.StartNew();
         var localVertices = CreateLocalVertexEdges().ToList();
         _logger.LogInformation("Computing local vertex edges took {Elapsed}.", sw.Elapsed);
