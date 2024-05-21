@@ -202,7 +202,7 @@ internal sealed partial class ActivationRebalancer : SystemTarget, IActivationRe
             var givingGrains = ImmutableArray.CreateBuilder<GrainId>();
             var remoteSet = request.ExchangeSet;
             _logger.LogInformation("About to create candidate set");
-            var localSet = CreateCandidateSet(CreateLocalVertexEdges(), request.SendingSilo);
+            var localSet = GetCandidatesForSilo(GetMigrationCandidates(), request.SendingSilo);
             _logger.LogInformation("Created candidate set");
 
             // We need to determine 2 subsets:
@@ -230,7 +230,7 @@ internal sealed partial class ActivationRebalancer : SystemTarget, IActivationRe
                 // If more is gained by giving grains to the remote silo than taking from it, we will try giving first.
                 var localScore = localHeap.FirstOrDefault()?.AccumulatedTransferScore ?? 0;
                 var remoteScore = remoteHeap.FirstOrDefault()?.AccumulatedTransferScore ?? 0;
-                if (localScore > remoteScore || localActivations > remoteActivations)
+                if (localScore > remoteScore || localScore == remoteScore && localActivations > remoteActivations)
                 {
                     if (TryMigrateLocalToRemote()) continue;
                     if (TryMigrateRemoteToLocal()) continue;
@@ -507,22 +507,22 @@ internal sealed partial class ActivationRebalancer : SystemTarget, IActivationRe
     {
         List<(SiloAddress Silo, List<CandidateVertex> Candidates, long TransferScore)> candidateSets = new(silos.Length - 1);
         var sw = ValueStopwatch.StartNew();
-        var localVertices = CreateLocalVertexEdges().ToList();
+        var localCandidates = GetMigrationCandidates();
         _logger.LogInformation("Computing local vertex edges took {Elapsed}.", sw.Elapsed);
 
         sw.Restart();
         foreach (var siloAddress in silos)
         {
-            if (siloAddress.IsSameLogicalSilo(Silo))
+            if (siloAddress.Equals(Silo))
             {
                 // We aren't going to exchange anything with ourselves, so skip this silo.
                 continue;
             }
 
-            var candidates = CreateCandidateSet(localVertices, siloAddress);
-            var totalAccTransferScore = candidates.Sum(x => x.AccumulatedTransferScore);
+            var candidatesForRemote = GetCandidatesForSilo(localCandidates, siloAddress);
+            var totalAccTransferScore = candidatesForRemote.Sum(x => x.AccumulatedTransferScore);
 
-            candidateSets.Add(new(siloAddress, [.. candidates], totalAccTransferScore));
+            candidateSets.Add(new(siloAddress, [.. candidatesForRemote], totalAccTransferScore));
         }
 
         _logger.LogInformation("Computing candidate set per-silo took {Elapsed}.", sw.Elapsed);
@@ -533,34 +533,32 @@ internal sealed partial class ActivationRebalancer : SystemTarget, IActivationRe
         return candidateSets;
     }
 
-    private List<CandidateVertex> CreateCandidateSet(IEnumerable<VertexEdge> edges, SiloAddress otherSilo)
+    private List<CandidateVertex> GetCandidatesForSilo(List<IGrouping<GrainId, VertexEdge>> migrationCandidates, SiloAddress otherSilo)
     {
-        Debug.Assert(otherSilo.IsSameLogicalSilo(Silo) is false);
+        Debug.Assert(!otherSilo.Equals(Silo));
 
-        List<CandidateVertex> candidates = [];
+        List<CandidateVertex> result = [];
 
         // We skip types that cant be migrated. Instead the same edge will be recorded from the receiver, so its hosting silo will add it as a candidate to be migrated (over here).
         // We are sure that the receiver is an migratable grain, because the gateway forbids edges that have non-migratable vertices on both sides.
-        foreach (var grouping in edges
-            .Where(x => x.IsMigratable)
-            .GroupBy(x => x.SourceId))
+        foreach (var grainEdges in migrationCandidates)
         {
             var accLocalScore = 0L;
             var accRemoteScore = 0L;
 
-            foreach (var entry in grouping)
+            foreach (var edge in grainEdges)
             {
-                if (entry.Direction is Direction.LocalToLocal)
+                if (edge.Direction is Direction.LocalToLocal)
                 {
                     // Since its L2L, it means the partner silo will be 'this' silo, so we don't need to filter by the partner silo.
-                    accLocalScore += entry.Weight;
+                    accLocalScore += edge.Weight;
                 }
-                else if (entry.PartnerSilo.Equals(otherSilo))
+                else if (edge.PartnerSilo.Equals(otherSilo))
                 {
-                    Debug.Assert(entry.Direction is Direction.RemoteToLocal or Direction.LocalToRemote);
+                    Debug.Assert(edge.Direction is Direction.RemoteToLocal or Direction.LocalToRemote);
 
                     // We need to filter here by 'otherSilo' since any L2R or R2L edge can be between the current vertex and a vertex in a silo that is not in 'otherSilo'.
-                    accRemoteScore += entry.Weight;
+                    accRemoteScore += edge.Weight;
                 }
             }
 
@@ -572,27 +570,29 @@ internal sealed partial class ActivationRebalancer : SystemTarget, IActivationRe
             }
 
             var connVertices = ImmutableArray.CreateBuilder<CandidateConnectedVertex>();
-            foreach (var x in grouping)
+            foreach (var edge in grainEdges)
             {
                 // Note that the connected vertices can be of types which are not migratable, it is important to keep them,
                 // as they too impact the migration cost of the current candidate vertex, especially if they are local to the candidate
                 // as those calls would be potentially converted to remote calls, after the migration of the current candidate.
                 // 'Weight' here represent the weight of a single edge, not the accumulated like above.
-                connVertices.Add(new CandidateConnectedVertex(x.TargetId, x.Weight));
+                connVertices.Add(new CandidateConnectedVertex(edge.TargetId, edge.Weight));
             }
 
             CandidateVertex candidate = new()
             {
-                Id = grouping.Key,
+                Id = grainEdges.Key,
                 AccumulatedTransferScore = totalAccScore,
                 ConnectedVertices = connVertices.ToImmutable()
             };
 
-            candidates.Add(candidate);
+            result.Add(candidate);
         }
 
-        return candidates;
+        return result;
     }
+
+    private List<IGrouping<GrainId, VertexEdge>> GetMigrationCandidates() => CreateLocalVertexEdges().Where(x => x.IsMigratable).GroupBy(x => x.SourceId).ToList();
 
     /// <summary>
     /// Creates a collection of 'local' vertex edges. Multiple entries can have the same Id.
@@ -608,6 +608,12 @@ internal sealed partial class ActivationRebalancer : SystemTarget, IActivationRe
             }
 
             var vertexEdge = CreateVertexEdge(edge, count);
+            if (vertexEdge.Direction is Direction.Unspecified)
+            {
+                // This can occur when a message is re-routed via this silo.
+                continue;
+            }
+
             yield return vertexEdge;
 
             if (vertexEdge.Direction == Direction.LocalToLocal)
@@ -625,39 +631,36 @@ internal sealed partial class ActivationRebalancer : SystemTarget, IActivationRe
         {
             return (IsSourceLocal(edge), IsTargetLocal(edge)) switch
             {
-                 (true, true) => new(
-                    SourceId: edge.Source.Id,                     // 'local' vertex was the 'source' of the communication
-                    TargetId: edge.Target.Id,
-                    IsMigratable: edge.Source.IsMigratable,
-                    PartnerSilo: Silo,                              // the partner was 'local' (note: this.Silo = Source.Silo = Target.Silo)
-                    Direction: Direction.LocalToLocal,
-                    Weight: weight),
-
+                (true, true) => new(
+                   SourceId: edge.Source.Id,                // 'local' vertex was the 'source' of the communication
+                   TargetId: edge.Target.Id,
+                   IsMigratable: edge.Source.IsMigratable,
+                   PartnerSilo: Silo,                       // the partner was 'local' (note: this.Silo = Source.Silo = Target.Silo)
+                   Direction: Direction.LocalToLocal,
+                   Weight: weight),
                 (true, false) => new(
-                    SourceId: edge.Source.Id,                     // 'local' vertex was the 'source' of the communication
+                    SourceId: edge.Source.Id,               // 'local' vertex was the 'source' of the communication
                     TargetId: edge.Target.Id,
                     IsMigratable: edge.Source.IsMigratable,
                     PartnerSilo: edge.Target.Silo,          // the partner was 'remote'
                     Direction: Direction.LocalToRemote,
                     Weight: weight),
-
                 (false, true) => new(
-                    SourceId: edge.Target.Id,                     // 'local' vertex was the 'target' of the communication
+                    SourceId: edge.Target.Id,               // 'local' vertex was the 'target' of the communication
                     TargetId: edge.Source.Id,
                     IsMigratable: edge.Target.IsMigratable,
                     PartnerSilo: edge.Source.Silo,          // the partner was 'remote'
                     Direction: Direction.RemoteToLocal,
                     Weight: weight),
-
-                _ => throw new UnreachableException($"The edge {edge} has an invalid source and target: neither refer to the local silo.")
+                _ => default
             };
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        bool IsSourceLocal(in Edge edge) => edge.Source.Silo.IsSameLogicalSilo(Silo);
+        bool IsSourceLocal(in Edge edge) => edge.Source.Silo.Equals(Silo);
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        bool IsTargetLocal(in Edge edge) => edge.Target.Silo.IsSameLogicalSilo(Silo);
+        bool IsTargetLocal(in Edge edge) => edge.Target.Silo.Equals(Silo);
     }
 
     public void Participate(ISiloLifecycle observer)
@@ -692,10 +695,10 @@ internal sealed partial class ActivationRebalancer : SystemTarget, IActivationRe
 
     private enum Direction : byte
     {
-        Unspecified = 0,
-        LocalToLocal = 1,
-        LocalToRemote = 2,
-        RemoteToLocal = 3
+        Unspecified,
+        LocalToLocal,
+        LocalToRemote,
+        RemoteToLocal
     }
 
     /// <summary>
