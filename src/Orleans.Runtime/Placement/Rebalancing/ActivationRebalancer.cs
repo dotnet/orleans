@@ -211,7 +211,8 @@ internal sealed partial class ActivationRebalancer : SystemTarget, IActivationRe
             var remoteActivations = request.ActivationCountSnapshot;
             var localActivations = GetLocalActivationCount();
 
-            var imbalance = CalculateImbalance(remoteActivations, localActivations);
+            var initialImbalance =  CalculateImbalance(remoteActivations, localActivations);
+            int imbalance = initialImbalance;
             _logger.LogInformation("Imbalance is {Imbalance} (remote: {RemoteCount} vs local {LocalCount})", imbalance, remoteActivations, localActivations);
 
             var (localHeap, remoteHeap) = CreateCandidateHeaps(localSet, remoteSet);
@@ -318,22 +319,23 @@ internal sealed partial class ActivationRebalancer : SystemTarget, IActivationRe
 
             bool TryMigrateCore(MaxHeap<CandidateVertexHeapElement> sourceHeap, int localDelta, int remoteDelta, [NotNullWhen(true)] out CandidateVertexHeapElement? chosenVertex)
             {
-                chosenVertex = null;
-                if (sourceHeap.Count == 0)
-                {
-                    return false;
-                }
-
                 var anticipatedImbalance = CalculateImbalance(localActivations + localDelta, remoteActivations + remoteDelta);
-                if (anticipatedImbalance > imbalance && !_toleranceRule.IsSatisfiedBy((uint)anticipatedImbalance))
+                if (anticipatedImbalance >= initialImbalance && !_toleranceRule.IsSatisfiedBy((uint)anticipatedImbalance))
                 {
+                    // Taking from this heap would not improve imbalance.
+                    chosenVertex = null;
                     return false;
                 }
 
-                chosenVertex = sourceHeap.Pop();
-                if (chosenVertex.AccumulatedTransferScore <= 0)
+                if (!sourceHeap.TryPop(out chosenVertex))
                 {
-                    // If it got affected by a previous run, and the score is not positive, simply pop and ignore it.
+                    // Heap is empty.
+                    return false;
+                }
+
+                if (chosenVertex.AccumulatedTransferScore < 0)
+                {
+                    // If it got affected by a previous run, and the score is negative, simply pop and ignore it.
                     return false;
                 }
 
@@ -355,7 +357,7 @@ internal sealed partial class ActivationRebalancer : SystemTarget, IActivationRe
         }
     }
 
-    private static int CalculateImbalance(int left, int right) => Math.Abs(Math.Abs(left) - Math.Abs(right));
+    private static int CalculateImbalance(int left, int right) => (int)Math.Abs(Math.Abs((long)left) - Math.Abs((long)right));
     private static (MaxHeap<CandidateVertexHeapElement> Local, MaxHeap<CandidateVertexHeapElement> Remote) CreateCandidateHeaps(List<CandidateVertex> local, ImmutableArray<CandidateVertex> remote)
     {
         Dictionary<GrainId, CandidateVertex> sourceIndex = new(local.Count + remote.Length);

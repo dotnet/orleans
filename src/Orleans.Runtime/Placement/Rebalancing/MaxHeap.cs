@@ -143,6 +143,18 @@ internal sealed class MaxHeap<TElement> where TElement : notnull, IHeapElement<T
         return _nodes[0]!;
     }
 
+    public bool TryPop([NotNullWhen(true)] out TElement value)
+    {
+        if (_size > 0)
+        {
+            value = Pop();
+            return true;
+        }
+
+        value = default!;
+        return false;
+    }
+
     /// <summary>
     ///  Removes and returns the maximal element from the <see cref="MaxHeap{TElement}"/>.
     /// </summary>

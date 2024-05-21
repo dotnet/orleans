@@ -20,15 +20,7 @@ public sealed class ActiveRebalancingOptions
     /// In order to preserve memory, the most heaviest links are recorded in a probabilistic way, so there is an inherent error associated with that.
     /// That error is inversely proportional to this value, so values under 100 are not recommended. If you notice that the system is not converging fast enough, do consider increasing this number.
     /// </remarks>
-    public uint MaxEdgeCount { get; set; } =
-
-
-
-        10 * 
-
-
-
-        DEFAULT_MAX_EDGE_COUNT;
+    public uint MaxEdgeCount { get; set; } = DEFAULT_MAX_EDGE_COUNT;
 
     /// <summary>
     /// The default value of <see cref="MaxEdgeCount"/>.
