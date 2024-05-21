@@ -56,5 +56,16 @@ namespace Orleans
         /// Gets the exception which resulted in deactivation.
         /// </summary>
         public Exception Exception { get; }
+
+        /// <inheritdoc/>
+        public override string ToString()
+        {
+            if (Exception is not null)
+            {
+                return $"{ReasonCode}: {Description}. Exception: {Exception}";
+            }
+
+            return $"{ReasonCode}: {Description}";
+        }
     }
 }
