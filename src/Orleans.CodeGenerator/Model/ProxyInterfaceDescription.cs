@@ -79,6 +79,14 @@ namespace Orleans.CodeGenerator
             {
                 foreach (var method in iface.GetDeclaredInstanceMembers<IMethodSymbol>())
                 {
+                    if (method.MethodKind == MethodKind.ExplicitInterfaceImplementation)
+                    {
+                        // Explicit implementations can be ignored when generating a proxy.
+                        // Proxies must implement every method explicitly to ensure faithful reproduction of the interface behavior.
+                        // At the calling side, the explicit implementation will be called if it was not overridden by a derived type.
+                        continue;
+                    }
+
                     var methodDescription = CodeGenerator.GetProxyMethodDescription(InterfaceType, method: method);
                     result.Add(methodDescription);
                 }
