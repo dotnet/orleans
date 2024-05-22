@@ -11,10 +11,12 @@ namespace Orleans.Runtime.Placement.Rebalancing;
 
 internal enum VertexLocation
 {
+    Unknown,
     Local,
     Remote
 }
 
+[DebuggerDisplay("{Vertex} @ {Location}")]
 internal sealed class CandidateVertexHeapElement(CandidateVertex value) : IHeapElement<CandidateVertexHeapElement>
 {
     public CandidateVertex Vertex { get; } = value;
@@ -22,7 +24,7 @@ internal sealed class CandidateVertexHeapElement(CandidateVertex value) : IHeapE
     public GrainId Id => Vertex.Id;
     public long AccumulatedTransferScore { get => Vertex.AccumulatedTransferScore; set => Vertex.AccumulatedTransferScore = value; }
     public VertexLocation Location { get; set; }
-    int IHeapElement<CandidateVertexHeapElement>.HeapIndex { get; set; }
+    int IHeapElement<CandidateVertexHeapElement>.HeapIndex { get; set; } = -1;
     int IHeapElement<CandidateVertexHeapElement>.CompareTo(CandidateVertexHeapElement other) => AccumulatedTransferScore.CompareTo(other.AccumulatedTransferScore);
 }
 

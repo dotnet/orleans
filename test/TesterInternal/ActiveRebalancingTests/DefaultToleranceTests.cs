@@ -224,7 +224,7 @@ public class DefaultToleranceTests(DefaultToleranceTests.Fixture fixture) : Reba
             }
 
             // Since A moved to silo 2 at this point, it will be twice as strongly connected to C as it is to B,
-            // even though its now making remote calls (to B)! Thats why we trigger the exchange from 's1_rebalancer'
+            // even though its now making remote calls (to B)! That's why we trigger the exchange from 's1_rebalancer'
             await Silo1Rebalancer.TriggerExchangeRequest();
 
             do

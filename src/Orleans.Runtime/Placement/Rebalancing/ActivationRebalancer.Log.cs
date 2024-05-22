@@ -29,8 +29,8 @@ internal partial class ActivationRebalancer
     [LoggerMessage(Level = LogLevel.Debug, Message = "Exchange request from {ThisSilo} superseded by a mutual exchange attempt with {CandidateSilo}.")]
     private partial void LogMutualExchangeAttemptResponse(SiloAddress thisSilo, SiloAddress candidateSilo);
 
-    [LoggerMessage(Level = LogLevel.Debug, Message = "I have successfully finalized my part of the exchange protocol. It was decided that I will take on a total of {ActivationCount} activations.")]
-    private partial void LogProtocolFinalized(int activationCount);
+    [LoggerMessage(Level = LogLevel.Debug, Message = "I have successfully finalized my part of the exchange protocol. It was decided that I will give {GivingActivationCount} activations and take on a total of {TakingActivationCount} activations.")]
+    private partial void LogProtocolFinalized(int givingActivationCount, int takingActivationCount);
 
     [LoggerMessage(Level = LogLevel.Warning, Message = "An error occurred while performing exchange request from {ThisSilo} to {CandidateSilo}. I will try the next best candidate (if one is available), otherwise I will wait for my next period to come.")]
     private partial void LogErrorOnProtocolExecution(Exception exception, SiloAddress thisSilo, SiloAddress candidateSilo);

@@ -1,3 +1,4 @@
+using System.ComponentModel;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Configuration;
 using Orleans.Placement;
@@ -11,7 +12,7 @@ using Xunit;
 
 namespace UnitTests.ActiveRebalancingTests;
 
-[TestCategory("Functional"), TestCategory("ActiveRebalancing")]
+[TestCategory("Functional"), TestCategory("ActiveRebalancing"), Category("BVT")]
 public class CustomToleranceTests(CustomToleranceTests.Fixture fixture) : RebalancingTestBase<CustomToleranceTests.Fixture>(fixture), IClassFixture<CustomToleranceTests.Fixture>
 {
     [Fact]

@@ -16,7 +16,6 @@ using Orleans.Internal;
 using Orleans.Configuration;
 using Orleans.Runtime.Utilities;
 using System.Runtime.InteropServices;
-using System.Runtime.ExceptionServices;
 using System.Diagnostics.CodeAnalysis;
 
 namespace Orleans.Runtime.Placement.Rebalancing;
@@ -142,7 +141,7 @@ internal sealed partial class ActivationRebalancer : SystemTarget, IActivationRe
                 {
                     case AcceptExchangeResponse.ResponseType.Success:
                         // Exchange was successful, no need to iterate over another candidate.
-                        await FinalizeProtocol(response.AcceptedGrainIds, response.GivenGrainIds, isReceiver: false, candidateSilo);
+                        await FinalizeProtocol(response.AcceptedGrainIds, response.GivenGrainIds, candidateSilo);
                         return;
                     case AcceptExchangeResponse.ResponseType.ExchangedRecently:
                         // The remote silo has been recently involved in another exchange, try the next best candidate.
@@ -250,7 +249,7 @@ internal sealed partial class ActivationRebalancer : SystemTarget, IActivationRe
             swTxs.Restart();
             var giving = givingGrains.ToImmutable();
             var accepting = acceptedGrains.ToImmutable();
-            await FinalizeProtocol(giving, accepting, isReceiver: true, request.SendingSilo);
+            await FinalizeProtocol(giving, accepting, request.SendingSilo);
             _logger.LogInformation("Finalizing protocol based on provided set took {Elapsed}", swTxs.Elapsed);
 
             return new(AcceptExchangeResponse.ResponseType.Success, accepting, giving);
@@ -333,9 +332,9 @@ internal sealed partial class ActivationRebalancer : SystemTarget, IActivationRe
                     return false;
                 }
 
-                if (chosenVertex.AccumulatedTransferScore < 0)
+                if (chosenVertex.AccumulatedTransferScore <= 0)
                 {
-                    // If it got affected by a previous run, and the score is negative, simply pop and ignore it.
+                    // If it got affected by a previous run, and the score is zero or negative, simply pop and ignore it.
                     return false;
                 }
 
@@ -401,6 +400,10 @@ internal sealed partial class ActivationRebalancer : SystemTarget, IActivationRe
                 {
                     vertex.ConnectedVertices.Add((GetOrAddVertex(index, connected), connectedVertex.TransferScore));
                 }
+                else
+                {
+                    // The connected vertex is not part of either migration candidate set, so we will ignore it.
+                }
             }
 
             return vertex;
@@ -417,21 +420,13 @@ internal sealed partial class ActivationRebalancer : SystemTarget, IActivationRe
     /// <summary>
     /// <list type="number">
     /// <item>Initiates the actual migration process of <paramref name="giving"/> to 'this' silo.</item>
-    /// <item>If <paramref name="isReceiver"/> it proceeds to update <see cref="_lastExchangedStopwatch"/>.</item>
     /// <item>Updates the affected counters within <see cref="_edgeWeights"/> to reflect all <paramref name="accepting"/>.</item>
     /// </list>
     /// </summary>
     /// <param name="giving">The grain ids to migrate to the remote host.</param>
     /// <param name="accepting">The grain ids to which are migrating to the local host.</param>
-    /// <param name="isReceiver">Is the caller, the protocol receiver or not.</param>
-    private async Task FinalizeProtocol(ImmutableArray<GrainId> giving, ImmutableArray<GrainId> accepting, bool isReceiver, SiloAddress targetSilo)
+    private async Task FinalizeProtocol(ImmutableArray<GrainId> giving, ImmutableArray<GrainId> accepting, SiloAddress targetSilo)
     {
-        if (giving.Length == 0)
-        {
-            LogProtocolFinalized(giving.Length);
-            return;
-        }
-
         // The protocol concluded that 'this' silo should take on 'set', so we hint to the director accordingly.
         RequestContext.Set(IPlacementDirector.PlacementHintKey, targetSilo);
         List<Task> migrationTasks = [];
@@ -457,11 +452,6 @@ internal sealed partial class ActivationRebalancer : SystemTarget, IActivationRe
         }
 
         _logger.LogInformation("Waiting for {Count} grains to migrate took {Elapsed}", giving.Length, sw1.Elapsed);
-        if (isReceiver)
-        {
-            // Stamp this silos exchange for a potential next pair exchange request.
-            _lastExchangedStopwatch.Restart();
-        }
 
         // Avoid mutating the source while enumerating it.
         var sw = ValueStopwatch.StartNew();
@@ -479,30 +469,35 @@ internal sealed partial class ActivationRebalancer : SystemTarget, IActivationRe
             affected.Add(id);
         }
 
-        foreach (var (edge, count, error) in _edgeWeights.Elements)
+        if (affected.Count > 0)
         {
-            if (affected.Contains(edge.Source.Id) || affected.Contains(edge.Target.Id))
+            foreach (var (edge, count, error) in _edgeWeights.Elements)
             {
-                toRemove.Add(edge);
-            }
-        }
-
-        foreach (var edge in toRemove)
-        {
-            if (++iterations % 128 == 0)
-            {
-                // Give other tasks a chance to execute periodically.
-                await Task.Delay(1);
+                if (affected.Contains(edge.Source.Id) || affected.Contains(edge.Target.Id))
+                {
+                    toRemove.Add(edge);
+                }
             }
 
-            // Totally remove this counter, as one or both vertices has migrated. By not doing this it would skew results for the next protocol cycle.
-            // We remove only the affected counters, as there could be other counters that 'this' silo has connections with another silo (which is not part of this exchange cycle).
-            _edgeWeights.Remove(edge);
+            foreach (var edge in toRemove)
+            {
+                if (++iterations % 128 == 0)
+                {
+                    // Give other tasks a chance to execute periodically.
+                    await Task.Delay(1);
+                }
+
+                // Totally remove this counter, as one or both vertices has migrated. By not doing this it would skew results for the next protocol cycle.
+                // We remove only the affected counters, as there could be other counters that 'this' silo has connections with another silo (which is not part of this exchange cycle).
+                _edgeWeights.Remove(edge);
+            }
         }
 
         _logger.LogInformation("Removing transfer set from edge weights took {Elapsed}.", sw.Elapsed);
 
-        LogProtocolFinalized(accepting.Length);
+        // Stamp this silos exchange for a potential next pair exchange request.
+        _lastExchangedStopwatch.Restart();
+        LogProtocolFinalized(giving.Length, accepting.Length);
     }
 
     private List<(SiloAddress Silo, List<CandidateVertex> Candidates, long TransferScore)> CreateCandidateSets(ImmutableArray<SiloAddress> silos)

@@ -117,12 +117,17 @@ internal sealed class CandidateVertex
     /// <remarks>These will be important when this vertex is removed from the max-sorted heap on the receiver silo.</remarks>
     [Id(2), Immutable]
     public ImmutableArray<CandidateConnectedVertex> ConnectedVertices { get; init; } = [];
+
+    public override string ToString() => $"[{Id} * {AccumulatedTransferScore} -> [{string.Join(", ", ConnectedVertices)}]]";
 }
 
 [GenerateSerializer, Immutable]
 public readonly struct CandidateConnectedVertex(GrainId id, long transferScore)
 {
+    [Id(0)]
     public GrainId Id { get; } = id;
+
+    [Id(1)]
     public long TransferScore { get; } = transferScore;
 
     public static bool operator ==(CandidateConnectedVertex left, CandidateConnectedVertex right) => left.Equals(right);
@@ -132,6 +137,8 @@ public readonly struct CandidateConnectedVertex(GrainId id, long transferScore)
     public bool Equals(CandidateConnectedVertex other) => Id == other.Id && TransferScore == other.TransferScore;
 
     public override int GetHashCode() => HashCode.Combine(Id, TransferScore);
+
+    public override string ToString() => $"[{Id} * {TransferScore}]";
 }
 
 [GenerateSerializer, Immutable]
@@ -165,9 +172,15 @@ internal sealed class AcceptExchangeResponse(AcceptExchangeResponse.ResponseType
     [Id(0)]
     public ResponseType Type { get; } = type;
 
+    /// <summary>
+    /// The grains which the sender is asking the receiver to transfer.
+    /// </summary>
     [Id(1)]
     public ImmutableArray<GrainId> AcceptedGrainIds { get; } = acceptedGrains;
 
+    /// <summary>
+    /// The grains which the receiver is transferring to the sender.
+    /// </summary>
     [Id(2)]
     public ImmutableArray<GrainId> GivenGrainIds { get; } = givenGrains;
 
@@ -177,16 +190,16 @@ internal sealed class AcceptExchangeResponse(AcceptExchangeResponse.ResponseType
         /// <summary>
         /// The exchange was accepted and an exchange set is returned.
         /// </summary>
-        Success = 0,
+        Success,
 
         /// <summary>
         /// The other silo has been recently involved in another exchange.
         /// </summary>
-        ExchangedRecently = 1,
+        ExchangedRecently,
 
         /// <summary>
         /// An attempt to do an exchange between this and the other silo was about to happen at the same time.
         /// </summary>
-        MutualExchangeAttempt = 2
+        MutualExchangeAttempt
     }
 }
