@@ -71,8 +71,8 @@ internal sealed partial class ActivationRebalancer : SystemTarget, IActivationRe
     {
         Scheduler.QueueAction(() =>
         {
-            var dueTime = RandomTimeSpan.Next(_options.MinRebalancingDueTime, _options.MaxRebalancingDueTime);
-            RegisterOrUpdateTimer(dueTime);
+            // Schedule the first timer tick.
+            UpdateTimer();
             StartProcessingEdges();
         });
 
@@ -93,7 +93,8 @@ internal sealed partial class ActivationRebalancer : SystemTarget, IActivationRe
         return ValueTask.CompletedTask;
     }
 
-    private void RegisterOrUpdateTimer(TimeSpan dueTime)
+    private void UpdateTimer() => UpdateTimer(RandomTimeSpan.Next(_options.MinRebalancingDueTime, _options.MaxRebalancingDueTime));
+    private void UpdateTimer(TimeSpan dueTime)
     {
         _timer.Change(dueTime, dueTime);
         LogPeriodicallyInvokeProtocol(_options.RebalancingPeriod, dueTime);
@@ -101,6 +102,9 @@ internal sealed partial class ActivationRebalancer : SystemTarget, IActivationRe
 
     public async ValueTask TriggerExchangeRequest()
     {
+        // Schedule the next timer tick.
+        UpdateTimer();
+
         if (_currentExchangeSilo is not null)
         {
             // Skip this round if we are already in the process of exchanging with another silo.
@@ -178,7 +182,7 @@ internal sealed partial class ActivationRebalancer : SystemTarget, IActivationRe
 
             // We pick some random time between 'min' and 'max' and than subtract from it 'min'. We do this so this silo doesn't have to wait for 'min + random',
             // as it did the very first time this was started. It is guaranteed that 'random - min' >= 0; as 'random' will be at the least equal to 'min'.
-            RegisterOrUpdateTimer(RandomTimeSpan.Next(_options.MinRebalancingDueTime, _options.MaxRebalancingDueTime) - _options.MinRebalancingDueTime);
+            UpdateTimer(RandomTimeSpan.Next(_options.MinRebalancingDueTime, _options.MaxRebalancingDueTime) - _options.MinRebalancingDueTime);
             LogMutualExchangeAttempt(request.SendingSilo);
 
             return AcceptExchangeResponse.CachedMutualExchangeAttempt;
@@ -353,6 +357,7 @@ internal sealed partial class ActivationRebalancer : SystemTarget, IActivationRe
         finally
         {
             _currentExchangeSilo = null;
+            UpdateTimer();
         }
     }
 
