@@ -8,27 +8,30 @@ namespace Tester.CodeGenTests
     using Orleans;
     using Orleans.Providers;
 
-    public interface ISomeInterface<in T>
+    // Regression test for explicit interface method implementations https://github.com/dotnet/orleans/issues/8991
+    public interface IExplicitInterfaceMethodImplementationTestGenericBase<in T>
     {
         Task M(T arg);
     }
 
-    public interface IBase : ISomeInterface<object>;
+    public interface IExplicitInterfaceMethodImplementationTestBase : IExplicitInterfaceMethodImplementationTestGenericBase<object>;
 
-    public interface IDerived : IBase, ISomeInterface<string>
+    public interface IExplicitInterfaceMethodImplementationTestDerived : IExplicitInterfaceMethodImplementationTestBase, IExplicitInterfaceMethodImplementationTestGenericBase<string>
     {
-        Task ISomeInterface<object>.M(object obj) => M(obj);
+        Task IExplicitInterfaceMethodImplementationTestGenericBase<object>.M(object obj) => M(obj);
     }
 
-    public interface ISomeGrainWithExplicitImplementation : IDerived, IGrainWithGuidKey;
+    public interface IExplicitInterfaceMethodImplementationTestImplementation : IExplicitInterfaceMethodImplementationTestDerived, IGrainWithGuidKey;
 
-    public class SomeGrain : Grain, ISomeGrainWithExplicitImplementation
+    public class ExplicitInterfaceMethodImplementationTestGrain : Grain, IExplicitInterfaceMethodImplementationTestImplementation
     {
         public Task M(string arg)
         {
             throw new NotImplementedException();
         }
     }
+
+    // End regression test for https://github.com/dotnet/orleans/issues/8991
 
     public interface IGrainWithGenericMethods : IGrainWithGuidKey
     {
