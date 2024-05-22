@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Linq.Expressions;
 using System.Runtime.Serialization;
 using System.Text.Json;
+using MessagePack;
 using Newtonsoft.Json;
 using Orleans;
 
@@ -804,4 +805,25 @@ namespace Orleans.Serialization.UnitTests
         [Id(2)] public object UntypedValue;
         [Id(3)] public Type Type2;
     }
+
+    [MessagePackObject]
+    public sealed record MyMessagePackClass
+    {
+        [Key(0)]
+        public int IntProperty { get; init; }
+
+        [Key(1)]
+        public string StringProperty { get; init; }
+
+        [Key(2)]
+        public MyMessagePackSubClass SubClass { get; init; }
+    }
+
+    [MessagePackObject]
+    public sealed record MyMessagePackSubClass
+    {
+        [Key(0)]
+        public Guid Id { get; init; }
+    }
+
 }
