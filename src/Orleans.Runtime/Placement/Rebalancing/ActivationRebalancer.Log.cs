@@ -20,21 +20,33 @@ internal partial class ActivationRebalancer
     [LoggerMessage(Level = LogLevel.Debug, Message = "I got an exchange request from {SendingSilo}, but I have been recently involved in another exchange {LastExchangeDuration} ago. My recovery period is {RecoveryPeriod}")]
     private partial void LogExchangedRecently(SiloAddress sendingSilo, TimeSpan lastExchangeDuration, TimeSpan recoveryPeriod);
 
-    [LoggerMessage(Level = LogLevel.Debug, Message = "Exchange request from {ThisSilo} failed, due to {CandidateSilo} having been recently involved in another exchange. I will try the next best candidate (if one is available), otherwise I will wait for my next period to come.")]
+    [LoggerMessage(Level = LogLevel.Debug, Message = "Exchange request from {ThisSilo} rejected: {CandidateSilo} was recently involved in another exchange. Attempting the next best candidate (if one is available) or waiting for my next period to come.")]
     private partial void LogExchangedRecentlyResponse(SiloAddress thisSilo, SiloAddress candidateSilo);
 
-    [LoggerMessage(Level = LogLevel.Debug, Message = "I got an exchange request from {SendingSilo}, but I am performing one with it at the same time. I have phase-shifted my timer to avoid these conflicts.")]
+    [LoggerMessage(Level = LogLevel.Debug, Message = "Rejecting exchange request from {SendingSilo} since we are already exchanging with that host.")]
     private partial void LogMutualExchangeAttempt(SiloAddress sendingSilo);
 
     [LoggerMessage(Level = LogLevel.Debug, Message = "Exchange request from {ThisSilo} superseded by a mutual exchange attempt with {CandidateSilo}.")]
     private partial void LogMutualExchangeAttemptResponse(SiloAddress thisSilo, SiloAddress candidateSilo);
 
-    [LoggerMessage(Level = LogLevel.Debug, Message = "I have successfully finalized my part of the exchange protocol. It was decided that I will give {GivingActivationCount} activations and take on a total of {TakingActivationCount} activations.")]
+    [LoggerMessage(Level = LogLevel.Debug, Message = "Finalized exchange protocol: migrating {GivingActivationCount} activations, receiving {TakingActivationCount} activations.")]
     private partial void LogProtocolFinalized(int givingActivationCount, int takingActivationCount);
 
-    [LoggerMessage(Level = LogLevel.Warning, Message = "An error occurred while performing exchange request from {ThisSilo} to {CandidateSilo}. I will try the next best candidate (if one is available), otherwise I will wait for my next period to come.")]
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Error performing exchange request from {ThisSilo} to {CandidateSilo}. I will try the next best candidate (if one is available), otherwise I will wait for my next period to come.")]
     private partial void LogErrorOnProtocolExecution(Exception exception, SiloAddress thisSilo, SiloAddress candidateSilo);
 
-    [LoggerMessage(Level = LogLevel.Warning, Message = "There was an issue during the migration of the activation set initiated by {ThisSilo}.")]
-    private partial void LogErrorOnMigratingActivations(Exception exception, SiloAddress thisSilo);
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Error migrating exchange set.")]
+    private partial void LogErrorOnMigratingActivations(Exception exception);
+
+    [LoggerMessage(Level = LogLevel.Debug, Message = "Received AcceptExchangeRequest from {SendingSilo}, offering to send {ExchangeSetCount} activations from a total of {ActivationCount} activations.")]
+    private partial void LogReceivedExchangeRequest(SiloAddress sendingSilo, int exchangeSetCount, int activationCount);
+
+    [LoggerMessage(Level = LogLevel.Debug, Message = "Imbalance is {Imbalance} (remote: {RemoteCount} vs local {LocalCount})")]
+    private partial void LogImbalance(int imbalance, int remoteCount, int localCount);
+
+    [LoggerMessage(Level = LogLevel.Debug, Message = "Computing transfer set took {Elapsed}. Anticipated imbalance after transfer is {AnticipatedImbalance}.")]
+    private partial void LogTransferSetComputed(TimeSpan elapsed, int anticipatedImbalance);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Error accepting exchange request from {SendingSilo}.")]
+    private partial void LogErrorAcceptingExchangeRequest(Exception exception, SiloAddress sendingSilo);
 }

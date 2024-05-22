@@ -25,7 +25,7 @@ public sealed class ActiveRebalancingOptions
     /// <summary>
     /// The default value of <see cref="MaxEdgeCount"/>.
     /// </summary>
-    public const uint DEFAULT_MAX_EDGE_COUNT = 10_000;
+    public const uint DEFAULT_MAX_EDGE_COUNT = 100_000;
 
     /// <summary>
     /// The minimum time given to this silo to gather statistics before triggering the first rebalancing cycle.

@@ -138,7 +138,6 @@ internal sealed partial class ActivationRebalancer : SystemTarget, IActivationRe
 
                 LogBeginningProtocol(Silo, candidateSilo);
                 var remoteRef = IActivationRebalancerSystemTarget.GetReference(_grainFactory, candidateSilo);
-                var sw2 = ValueStopwatch.StartNew();
                 var response = await remoteRef.AcceptExchangeRequest(new(Silo, [.. offeredGrains], GetLocalActivationCount()));
 
                 switch (response.Type)
@@ -174,7 +173,7 @@ internal sealed partial class ActivationRebalancer : SystemTarget, IActivationRe
 
     public async ValueTask<AcceptExchangeResponse> AcceptExchangeRequest(AcceptExchangeRequest request)
     {
-        _logger.LogInformation("Received AcceptExchangeRequest from {Silo}", request.SendingSilo);
+        LogReceivedExchangeRequest(request.SendingSilo, request.ExchangeSet.Length, request.ActivationCountSnapshot);
         if (request.SendingSilo.Equals(_currentExchangeSilo) && Silo.CompareTo(request.SendingSilo) <= 0)
         {
             // Reject the request, as we are already in the process of exchanging with the sending silo.
@@ -204,9 +203,7 @@ internal sealed partial class ActivationRebalancer : SystemTarget, IActivationRe
             var acceptedGrains = ImmutableArray.CreateBuilder<GrainId>();
             var givingGrains = ImmutableArray.CreateBuilder<GrainId>();
             var remoteSet = request.ExchangeSet;
-            _logger.LogInformation("About to create candidate set");
             var localSet = GetCandidatesForSilo(GetMigrationCandidates(), request.SendingSilo);
-            _logger.LogInformation("Created candidate set");
 
             // We need to determine 2 subsets:
             // - One that originates from sending silo (request.ExchangeSet) and will be (partially) accepted from this silo.
@@ -216,12 +213,11 @@ internal sealed partial class ActivationRebalancer : SystemTarget, IActivationRe
 
             var initialImbalance =  CalculateImbalance(remoteActivations, localActivations);
             int imbalance = initialImbalance;
-            _logger.LogInformation("Imbalance is {Imbalance} (remote: {RemoteCount} vs local {LocalCount})", imbalance, remoteActivations, localActivations);
+            LogImbalance(imbalance, remoteActivations, localActivations);
 
             var (localHeap, remoteHeap) = CreateCandidateHeaps(localSet, remoteSet);
 
-            _logger.LogInformation("Computing transfer set");
-            var swTxs = ValueStopwatch.StartNew();
+            var stopwatch = ValueStopwatch.StartNew();
             var iterations = 0;
             while (true)
             {
@@ -249,12 +245,10 @@ internal sealed partial class ActivationRebalancer : SystemTarget, IActivationRe
                 break;
             }
 
-            _logger.LogInformation("Computing transfer set took {Elapsed}. Anticipated imbalance after transfer is {AnticipatedImbalance}", swTxs.Elapsed, imbalance);
-            swTxs.Restart();
+            LogTransferSetComputed(stopwatch.Elapsed, imbalance);
             var giving = givingGrains.ToImmutable();
             var accepting = acceptedGrains.ToImmutable();
             await FinalizeProtocol(giving, accepting, request.SendingSilo);
-            _logger.LogInformation("Finalizing protocol based on provided set took {Elapsed}", swTxs.Elapsed);
 
             return new(AcceptExchangeResponse.ResponseType.Success, accepting, giving);
 
@@ -351,7 +345,7 @@ internal sealed partial class ActivationRebalancer : SystemTarget, IActivationRe
         }
         catch (Exception exception)
         {
-            _logger.LogError(exception, "Error accepting exchange request.");
+            LogErrorAcceptingExchangeRequest(exception, request.SendingSilo);
             throw;
         }
         finally
@@ -436,13 +430,10 @@ internal sealed partial class ActivationRebalancer : SystemTarget, IActivationRe
         RequestContext.Set(IPlacementDirector.PlacementHintKey, targetSilo);
         List<Task> migrationTasks = [];
 
-        var sw1 = ValueStopwatch.StartNew();
-        _logger.LogInformation("Telling {Count} grains to migrate from {LocalSilo} to {TargetSilo}", giving.Length, Silo, targetSilo);
         foreach (var grainId in giving)
         {
             migrationTasks.Add(_grainFactory.GetGrain(grainId).Cast<IGrainManagementExtension>().MigrateOnIdle().AsTask());
         }
-        _logger.LogInformation("Telling {Count} grains to migrate took {Elapsed}", giving.Length, sw1.Elapsed);
 
         try
         {
@@ -451,15 +442,12 @@ internal sealed partial class ActivationRebalancer : SystemTarget, IActivationRe
         catch (Exception)
         {
             // This should happen rarely, but at this point we cant really do much, as its out of our control.
-            // Even if some fail, at the end the algorithm will run again and eventually succeed with moving all activations were they belong.
+            // Even if some fail, the algorithm will eventually run again, so activations will have more chances to migrate.
             var aggEx = new AggregateException(migrationTasks.Select(t => t.Exception).Where(ex => ex is not null)!);
-            LogErrorOnMigratingActivations(aggEx, Silo);
+            LogErrorOnMigratingActivations(aggEx);
         }
 
-        _logger.LogInformation("Waiting for {Count} grains to migrate took {Elapsed}", giving.Length, sw1.Elapsed);
-
         // Avoid mutating the source while enumerating it.
-        var sw = ValueStopwatch.StartNew();
         var iterations = 0;
         var toRemove = new List<Edge>();
 
@@ -498,8 +486,6 @@ internal sealed partial class ActivationRebalancer : SystemTarget, IActivationRe
             }
         }
 
-        _logger.LogInformation("Removing transfer set from edge weights took {Elapsed}.", sw.Elapsed);
-
         // Stamp this silos exchange for a potential next pair exchange request.
         _lastExchangedStopwatch.Restart();
         LogProtocolFinalized(giving.Length, accepting.Length);
@@ -508,11 +494,8 @@ internal sealed partial class ActivationRebalancer : SystemTarget, IActivationRe
     private List<(SiloAddress Silo, List<CandidateVertex> Candidates, long TransferScore)> CreateCandidateSets(ImmutableArray<SiloAddress> silos)
     {
         List<(SiloAddress Silo, List<CandidateVertex> Candidates, long TransferScore)> candidateSets = new(silos.Length - 1);
-        var sw = ValueStopwatch.StartNew();
         var localCandidates = GetMigrationCandidates();
-        _logger.LogInformation("Computing local vertex edges took {Elapsed}.", sw.Elapsed);
 
-        sw.Restart();
         foreach (var siloAddress in silos)
         {
             if (siloAddress.Equals(Silo))
@@ -526,8 +509,6 @@ internal sealed partial class ActivationRebalancer : SystemTarget, IActivationRe
 
             candidateSets.Add(new(siloAddress, [.. candidatesForRemote], totalAccTransferScore));
         }
-
-        _logger.LogInformation("Computing candidate set per-silo took {Elapsed}.", sw.Elapsed);
 
         // Order them by the highest accumulated transfer score
         candidateSets.Sort(static (a, b) => -a.TransferScore.CompareTo(b.TransferScore));
