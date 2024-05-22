@@ -92,8 +92,8 @@ namespace Orleans.CodeGenerator
 
             static Accessibility GetAccessibility(IMethodSymbol methodSymbol)
             {
+                Accessibility accessibility = methodSymbol.DeclaredAccessibility;
                 var t = methodSymbol.ContainingType;
-                Accessibility accessibility = t.DeclaredAccessibility;
                 while (t is not null)
                 {
                     if ((int)t.DeclaredAccessibility < (int)accessibility)
