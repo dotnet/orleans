@@ -1,0 +1,28 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <PackageId>Microsoft.Orleans.AdoNet.Core</PackageId>
+    <Title>Microsoft Orleans ADO.NET shared components</Title>
+    <Description>Microsoft Orleans shared components for ADO.NET providers</Description>
+    <PackageTags>$(PackageTags) ADO.NET SQL</PackageTags>
+    <TargetFrameworks>$(DefaultTargetFrameworks)</TargetFrameworks>
+    <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <AssemblyName>Orleans.AdoNet.Core</AssemblyName>
+    <RootNamespace>Orleans.AdoNet.Core</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Tester.AdoNet" />
+    <InternalsVisibleTo Include="Benchmarks.AdoNet" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="$(SourceRoot)src\Orleans.Runtime\Orleans.Runtime.csproj" />
+  </ItemGroup>
+
+</Project>
