@@ -20,5 +20,6 @@
   <ItemGroup>
     <ProjectReference Include="$(SourceRoot)src\Orleans.Reminders\Orleans.Reminders.csproj" />
     <ProjectReference Include="$(SourceRoot)src\Orleans.Runtime\Orleans.Runtime.csproj" />
+    <ProjectReference Include="..\Orleans.AdoNet.Core\Orleans.AdoNet.Core.csproj" />
   </ItemGroup>
 </Project>

@@ -17,6 +17,10 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <InternalsVisibleTo Include="Orleans.Clustering.AdoNet"/>
+    <InternalsVisibleTo Include="Orleans.Persistence.AdoNet"/>
+    <InternalsVisibleTo Include="Orleans.Reminders.AdoNet"/>
+    <InternalsVisibleTo Include="Orleans.Streaming.AdoNet"/>
     <InternalsVisibleTo Include="Tester.AdoNet" />
     <InternalsVisibleTo Include="Benchmarks.AdoNet" />
   </ItemGroup>

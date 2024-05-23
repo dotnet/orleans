@@ -18,33 +18,15 @@ internal class AdoNetFormatProvider : IFormatProvider
     {
         public string Format(string? format, object? arg, IFormatProvider? formatProvider)
         {
-            //This null check applies also to Nullable<T> when T does not have value defined.
-            if (arg == null)
+            return arg switch
             {
-                return "NULL";
-            }
-
-            if (arg is string v)
-            {
-                return "N'" + v.Replace("'", "''", StringComparison.Ordinal) + "'";
-            }
-
-            if (arg is DateTime time)
-            {
-                return "'" + time.ToString("O") + "'";
-            }
-
-            if (arg is DateTimeOffset offset)
-            {
-                return "'" + offset.ToString("O") + "'";
-            }
-
-            if (arg is IFormattable formattable)
-            {
-                return formattable.ToString(format, CultureInfo.InvariantCulture);
-            }
-
-            return arg.ToString()!;
+                null => "NULL",
+                string v => "N'" + v.Replace("'", "''", StringComparison.Ordinal) + "'",
+                DateTime time => "'" + time.ToString("O") + "'",
+                DateTimeOffset offset => "'" + offset.ToString("O") + "'",
+                IFormattable formattable => formattable.ToString(format, CultureInfo.InvariantCulture),
+                _ => arg.ToString()!
+            };
         }
     }
 }
