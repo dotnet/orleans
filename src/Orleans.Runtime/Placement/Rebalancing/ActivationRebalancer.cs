@@ -17,6 +17,7 @@ using Orleans.Configuration;
 using Orleans.Runtime.Utilities;
 using System.Runtime.InteropServices;
 using System.Diagnostics.CodeAnalysis;
+using Microsoft.CodeAnalysis;
 
 namespace Orleans.Runtime.Placement.Rebalancing;
 
@@ -369,11 +370,11 @@ internal sealed partial class ActivationRebalancer : SystemTarget, IActivationRe
             sourceIndex[element.Id] = element;
         }
 
-        Dictionary<GrainId, CandidateVertexHeapElement> index = [];
+        Dictionary<GrainId, CandidateVertexHeapElement> heapIndex = [];
         List<CandidateVertexHeapElement> localVertexList = new(local.Count);
         foreach (var element in local)
         {
-            var vertex = CreateVertex(sourceIndex, index, element);
+            var vertex = CreateVertex(sourceIndex, heapIndex, element);
             vertex.Location = VertexLocation.Local;
             localVertexList.Add(vertex);
         }
@@ -381,7 +382,13 @@ internal sealed partial class ActivationRebalancer : SystemTarget, IActivationRe
         List<CandidateVertexHeapElement> remoteVertexList = new(remote.Length);
         foreach (var element in remote)
         {
-            var vertex = CreateVertex(sourceIndex, index, element);
+            var vertex = CreateVertex(sourceIndex, heapIndex, element);
+            if (vertex.Location is not VertexLocation.Unknown)
+            {
+                // This vertex is already part of the local set, so assume that the vertex is local and ignore the remote vertex.
+                continue;
+            }
+
             vertex.Location = VertexLocation.Remote;
             remoteVertexList.Add(vertex);
         }
@@ -439,7 +446,7 @@ internal sealed partial class ActivationRebalancer : SystemTarget, IActivationRe
         {
             await Task.WhenAll(migrationTasks);
         }
-        catch (Exception)
+        catch
         {
             // This should happen rarely, but at this point we cant really do much, as its out of our control.
             // Even if some fail, the algorithm will eventually run again, so activations will have more chances to migrate.
