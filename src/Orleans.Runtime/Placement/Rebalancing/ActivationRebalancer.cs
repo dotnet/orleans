@@ -30,6 +30,7 @@ internal sealed partial class ActivationRebalancer : SystemTarget, IActivationRe
     private readonly IRebalancingMessageFilter _messageFilter;
     private readonly IImbalanceToleranceRule _toleranceRule;
     private readonly ActivationDirectory _activationDirectory;
+    private readonly TimeProvider _timeProvider;
     private readonly ActiveRebalancingOptions _options;
     private readonly StripedMpscBuffer<Message> _pendingMessages;
     private readonly SingleWaiterAutoResetEvent _pendingMessageEvent = new() { RunContinuationsAsynchronously = true };
@@ -49,7 +50,8 @@ internal sealed partial class ActivationRebalancer : SystemTarget, IActivationRe
         IImbalanceToleranceRule toleranceRule,
         ActivationDirectory activationDirectory,
         Catalog catalog,
-        IOptions<ActiveRebalancingOptions> options)
+        IOptions<ActiveRebalancingOptions> options,
+        TimeProvider timeProvider)
         : base(Constants.ActivationRebalancerType, localSiloDetails.SiloAddress, loggerFactory)
     {
         _logger = loggerFactory.CreateLogger<ActivationRebalancer>();
@@ -59,10 +61,11 @@ internal sealed partial class ActivationRebalancer : SystemTarget, IActivationRe
         _messageFilter = messageFilter;
         _toleranceRule = toleranceRule;
         _activationDirectory = activationDirectory;
+        _timeProvider = timeProvider;
         _edgeWeights = new((int)options.Value.MaxEdgeCount);
         _pendingMessages = new StripedMpscBuffer<Message>(Environment.ProcessorCount, options.Value.MaxUnprocessedEdges / Environment.ProcessorCount);
 
-        _lastExchangedStopwatch = CoarseStopwatch.StartNew((long)options.Value.RecoveryPeriod.Add(TimeSpan.FromDays(2)).TotalMilliseconds);
+        _lastExchangedStopwatch = CoarseStopwatch.StartNew();
         catalog.RegisterSystemTarget(this);
         _siloStatusOracle.SubscribeToSiloStatusEvents(this);
         _timer = RegisterTimer(_ => TriggerExchangeRequest().AsTask(), null, Timeout.InfiniteTimeSpan, Timeout.InfiniteTimeSpan);
@@ -103,6 +106,13 @@ internal sealed partial class ActivationRebalancer : SystemTarget, IActivationRe
 
     public async ValueTask TriggerExchangeRequest()
     {
+        var coolDown = _options.RebalancingPeriod - _lastExchangedStopwatch.Elapsed;
+        if (coolDown > TimeSpan.Zero)
+        {
+            _logger.LogDebug("Waiting an additional {CoolDown} to cool down before initiating the exchange protocol.", coolDown);
+            await Task.Delay(coolDown, _timeProvider);
+        }
+
         // Schedule the next timer tick.
         UpdateTimer();
 
@@ -352,7 +362,6 @@ internal sealed partial class ActivationRebalancer : SystemTarget, IActivationRe
         finally
         {
             _currentExchangeSilo = null;
-            UpdateTimer();
         }
     }
 
@@ -555,7 +564,7 @@ internal sealed partial class ActivationRebalancer : SystemTarget, IActivationRe
             var totalAccScore = accRemoteScore - accLocalScore;
             if (totalAccScore <= 0)
             {
-                // We skip vertices for which local calls outweigh the remote once.
+                // We skip vertices for which local calls outweigh the remote ones.
                 continue;
             }
 
