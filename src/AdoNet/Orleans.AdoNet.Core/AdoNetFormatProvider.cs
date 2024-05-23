@@ -5,21 +5,18 @@ namespace Orleans.AdoNet.Core;
 /// </summary>
 internal class AdoNetFormatProvider : IFormatProvider
 {
-    private readonly AdoNetFormatter formatter = new AdoNetFormatter();
+    private readonly AdoNetFormatter _formatter = new();
 
     /// <summary>
     /// Returns an instance of the formatter
     /// </summary>
     /// <param name="formatType">Requested format type</param>
     /// <returns></returns>
-    public object GetFormat(Type formatType)
-    {
-        return formatType == typeof(ICustomFormatter) ? formatter : null;
-    }
+    public object GetFormat(Type? formatType) => formatType == typeof(ICustomFormatter) ? _formatter : null!;
 
     private class AdoNetFormatter : ICustomFormatter
     {
-        public string Format(string format, object arg, IFormatProvider formatProvider)
+        public string Format(string? format, object? arg, IFormatProvider? formatProvider)
         {
             //This null check applies also to Nullable<T> when T does not have value defined.
             if (arg == null)
@@ -27,27 +24,27 @@ internal class AdoNetFormatProvider : IFormatProvider
                 return "NULL";
             }
 
-            if (arg is string)
+            if (arg is string v)
             {
-                return "N'" + ((string)arg).Replace("'", "''", StringComparison.Ordinal) + "'";
+                return "N'" + v.Replace("'", "''", StringComparison.Ordinal) + "'";
             }
 
-            if (arg is DateTime)
+            if (arg is DateTime time)
             {
-                return "'" + ((DateTime)arg).ToString("O") + "'";
+                return "'" + time.ToString("O") + "'";
             }
 
-            if (arg is DateTimeOffset)
+            if (arg is DateTimeOffset offset)
             {
-                return "'" + ((DateTimeOffset)arg).ToString("O") + "'";
+                return "'" + offset.ToString("O") + "'";
             }
 
-            if (arg is IFormattable)
+            if (arg is IFormattable formattable)
             {
-                return ((IFormattable)arg).ToString(format, CultureInfo.InvariantCulture);
+                return formattable.ToString(format, CultureInfo.InvariantCulture);
             }
 
-            return arg.ToString();
+            return arg.ToString()!;
         }
     }
 }
