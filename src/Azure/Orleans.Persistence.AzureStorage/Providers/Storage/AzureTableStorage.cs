@@ -40,6 +40,7 @@ namespace Orleans.Storage
 
         private const string BINARY_DATA_PROPERTY_NAME = "Data";
         private const string STRING_DATA_PROPERTY_NAME = "StringData";
+
         private readonly string name;
 
         /// <summary> Default constructor </summary>
@@ -202,23 +203,29 @@ namespace Orleans.Storage
         /// </remarks>
         internal void ConvertToStorageFormat<T>(T grainState, TableEntity entity)
         {
-            int dataSize;
-            IEnumerable<ReadOnlyMemory<byte>> properties;
-            string basePropertyName;
+            var binaryData = storageSerializer.Serialize<T>(grainState);
 
-            // Convert to binary format
-            var data = this.storageSerializer.Serialize<T>(grainState);
-            basePropertyName = BINARY_DATA_PROPERTY_NAME;
+            CheckMaxDataSize(binaryData.ToMemory().Length, MAX_DATA_CHUNK_SIZE * MAX_DATA_CHUNKS_COUNT);
 
-            dataSize = data.ToMemory().Length;
-            properties = SplitBinaryData(data);
-
-            CheckMaxDataSize(dataSize, MAX_DATA_CHUNK_SIZE * MAX_DATA_CHUNKS_COUNT);
-
-            foreach (var keyValuePair in properties.Zip(GetPropertyNames(basePropertyName),
-                (property, name) => new KeyValuePair<string, object>(name, property.ToArray())))
+            if (options.UseStringFormat)
             {
-                entity[keyValuePair.Key] = keyValuePair.Value;
+                var properties = SplitStringData(binaryData.ToString().AsMemory());
+
+                foreach (var keyValuePair in properties.Zip(GetPropertyNames(STRING_DATA_PROPERTY_NAME),
+                (property, name) => new KeyValuePair<string, object>(name, property.ToString())))
+                {
+                    entity[keyValuePair.Key] = keyValuePair.Value;
+                }
+            }
+            else
+            {
+                var properties = SplitBinaryData(binaryData);
+
+                foreach (var keyValuePair in properties.Zip(GetPropertyNames(BINARY_DATA_PROPERTY_NAME),
+                (property, name) => new KeyValuePair<string, object>(name, property.ToArray())))
+                {
+                    entity[keyValuePair.Key] = keyValuePair.Value;
+                }
             }
         }
 
