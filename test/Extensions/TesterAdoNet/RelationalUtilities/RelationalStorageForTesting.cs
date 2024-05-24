@@ -15,7 +15,7 @@ namespace UnitTests.General
                 {AdoNetInvariants.InvariantNamePostgreSql, cs => new PostgreSqlStorageForTesting(cs)}
             };
 
-        public IRelationalStorage Storage { get; private set; }
+        internal IRelationalStorage Storage { get; private set; }
 
         public string CurrentConnectionString
         {

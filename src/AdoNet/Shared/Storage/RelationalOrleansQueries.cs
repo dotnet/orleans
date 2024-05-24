@@ -5,6 +5,7 @@ using System.IO;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using Orleans.AdoNet.Core;
 using Orleans.Runtime;
 
 #if CLUSTERING_ADONET

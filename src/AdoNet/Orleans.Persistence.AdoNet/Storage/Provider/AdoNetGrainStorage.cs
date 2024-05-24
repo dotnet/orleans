@@ -1,6 +1,3 @@
-using Orleans.Persistence.AdoNet.Storage;
-using Orleans.Providers;
-using Orleans.Runtime;
 using System;
 using System.Collections.Generic;
 using System.Data;
@@ -13,8 +10,12 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using Orleans.Configuration.Overrides;
+using Orleans.AdoNet.Core;
 using Orleans.Configuration;
+using Orleans.Configuration.Overrides;
+using Orleans.Persistence.AdoNet.Storage;
+using Orleans.Providers;
+using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 
 namespace Orleans.Storage
