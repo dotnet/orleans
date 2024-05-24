@@ -1,7 +1,7 @@
 namespace Orleans.AdoNet.Core;
 
 /// <summary>
-/// Contains some convenience methods to use in conjunction with <see cref="IRelationalStorage">IRelationalStorage</see> and <see cref="IRelationalStorage">GenericRelationalStorage</see>.
+/// Contains some convenience methods to use in conjunction with <see cref="IRelationalStorage">IRelationalStorage</see> and <see cref="RelationalStorage">GenericRelationalStorage</see>.
 /// </summary>
 internal static class DbExtensions
 {
