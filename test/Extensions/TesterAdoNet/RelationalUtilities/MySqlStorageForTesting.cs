@@ -1,5 +1,4 @@
-using MySql.Data.MySqlClient;
-using Orleans.Tests.SqlUtils;
+using Orleans.AdoNet.Core;
 using TestExtensions;
 
 namespace UnitTests.General

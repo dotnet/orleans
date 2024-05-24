@@ -1,4 +1,4 @@
-using Orleans.Persistence.AdoNet.Storage;
+using Orleans.AdoNet.Core;
 using Orleans.Runtime;
 using Orleans.Storage;
 

@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Logging.Abstractions;
 using MySql.Data.MySqlClient;
+using Orleans.AdoNet.Core;
 using Orleans.Configuration;
 using Orleans.Streaming.AdoNet;
 using Orleans.Streams;

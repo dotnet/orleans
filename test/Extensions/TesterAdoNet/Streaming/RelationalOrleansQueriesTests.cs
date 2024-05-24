@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using MySql.Data.MySqlClient;
 using Npgsql;
+using Orleans.AdoNet.Core;
 using Orleans.Configuration;
 using Orleans.Streaming.AdoNet;
 using Orleans.Streaming.AdoNet.Storage;

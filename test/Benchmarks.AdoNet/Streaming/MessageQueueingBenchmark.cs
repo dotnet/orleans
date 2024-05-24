@@ -1,6 +1,7 @@
 using System.Data.SqlClient;
 using BenchmarkDotNet.Attributes;
 using BenchmarkDotNet.Engines;
+using Orleans.AdoNet.Core;
 using Orleans.Tests.SqlUtils;
 using UnitTests.General;
 using static System.String;

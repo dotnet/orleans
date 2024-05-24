@@ -1,10 +1,10 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Options;
 using MySql.Data.MySqlClient;
+using Orleans.AdoNet.Core;
 using Orleans.Configuration;
 using Orleans.Streams;
 using Orleans.TestingHost;
-using Orleans.Tests.SqlUtils;
 using Tester.StreamingTests.ProgrammaticSubscribeTests;
 using TestExtensions;
 using UnitTests.General;
