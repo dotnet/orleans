@@ -5,6 +5,7 @@ using System.Linq;
 using System.Net;
 using System.Reflection;
 using Orleans.Runtime;
+using Orleans.AdoNet.Core;
 
 #if CLUSTERING_ADONET
 namespace Orleans.Clustering.AdoNet.Storage
