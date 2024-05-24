@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using Orleans.AdoNet.Core;
+using Orleans.AdoNet.Storage;
 
 #if CLUSTERING_ADONET
 namespace Orleans.Clustering.AdoNet.Storage
