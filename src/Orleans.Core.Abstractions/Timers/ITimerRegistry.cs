@@ -26,7 +26,7 @@ public interface ITimerRegistry
     /// Specify <see cref="System.Threading.Timeout.InfiniteTimeSpan"/> to disable periodic signaling.
     /// </param>
     /// <returns>
-    /// An <see cref="IGrainTimer"/> instance which represents the timer.
+    /// An <see cref="IDisposable"/> instance which represents the timer.
     /// </returns>
-    IGrainTimer RegisterTimer(IGrainContext grainContext, Func<object?, Task> callback, object? state, TimeSpan dueTime, TimeSpan period);
+    IDisposable RegisterTimer(IGrainContext grainContext, Func<object?, Task> callback, object? state, TimeSpan dueTime, TimeSpan period);
 }
