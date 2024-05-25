@@ -5,8 +5,8 @@ namespace Orleans.Runtime.Placement.Rebalancing;
 
 internal partial class ActivationRebalancer
 {
-    [LoggerMessage(Level = LogLevel.Debug, Message = "I will periodically initiate the exchange protocol every {RebalancingPeriod} starting in {DueTime}.")]
-    private partial void LogPeriodicallyInvokeProtocol(TimeSpan rebalancingPeriod, TimeSpan dueTime);
+    [LoggerMessage(Level = LogLevel.Debug, Message = "I will periodically initiate the exchange protocol every {MinRebalancingPeriod} to {MaxRebalancingPeriod} starting in {DueTime}.")]
+    private partial void LogPeriodicallyInvokeProtocol(TimeSpan minRebalancingPeriod, TimeSpan maxRebalancingPeriod, TimeSpan dueTime);
 
     [LoggerMessage(Level = LogLevel.Debug, Message = "Active rebalancing is enabled, but the cluster contains only one silo. Waiting for at least another silo to join the cluster to proceed.")]
     private partial void LogSingleSiloCluster();

@@ -20,60 +20,42 @@ public sealed class ActiveRebalancingOptions
     /// In order to preserve memory, the most heaviest links are recorded in a probabilistic way, so there is an inherent error associated with that.
     /// That error is inversely proportional to this value, so values under 100 are not recommended. If you notice that the system is not converging fast enough, do consider increasing this number.
     /// </remarks>
-    public uint MaxEdgeCount { get; set; } = DEFAULT_MAX_EDGE_COUNT;
+    public int MaxEdgeCount { get; set; } = DEFAULT_MAX_EDGE_COUNT;
 
     /// <summary>
     /// The default value of <see cref="MaxEdgeCount"/>.
     /// </summary>
-    public const uint DEFAULT_MAX_EDGE_COUNT = 10_000;
+    public const int DEFAULT_MAX_EDGE_COUNT = 10_000;
 
     /// <summary>
-    /// The minimum time given to this silo to gather statistics before triggering the first rebalancing cycle.
+    /// The minimum time between initiating a rebalancing cycle.
     /// </summary>
-    /// <remarks>The actual due time is picked randomly between this and <see cref="MaxRebalancingDueTime"/>.</remarks>
-    public TimeSpan MinRebalancingDueTime { get; set; } = DEFAULT_MINUMUM_REBALANCING_DUE_TIME;
+    /// <remarks>The actual due time is picked randomly between this and <see cref="MaxRebalancingPeriod"/>.</remarks>
+    public TimeSpan MinRebalancingPeriod { get; set; } = DEFAULT_MINUMUM_REBALANCING_PERIOD;
 
     /// <summary>
-    /// The default value of <see cref="MinRebalancingDueTime"/>.
+    /// The default value of <see cref="MinRebalancingPeriod"/>.
     /// </summary>
-    public static readonly TimeSpan DEFAULT_MINUMUM_REBALANCING_DUE_TIME = TimeSpan.FromMinutes(1);
+    public static readonly TimeSpan DEFAULT_MINUMUM_REBALANCING_PERIOD = TimeSpan.FromMinutes(1);
 
     /// <summary>
-    /// The maximum time given to this silo to gather statistics before triggering the first rebalancing cycle.
+    /// The maximum time between initiating a rebalancing cycle.
     /// </summary>
     /// <remarks>
-    /// <para>The actual due time is picked randomly between this and <see cref="MinRebalancingDueTime"/>.</para>
-    /// <para>For optimal results, you should aim to give this an extra 10 seconds x the maximum anticipated silo count in the cluster.</para>
+    /// <para>The actual due time is picked randomly between this and <see cref="MinRebalancingPeriod"/>.</para>
+    /// <para>For optimal results, you should aim to give this an extra 10 seconds multiplied by the maximum anticipated silo count in the cluster.</para>
     /// </remarks>
-    public TimeSpan MaxRebalancingDueTime { get; set; } = DEFAULT_MAXIMUM_REBALANCING_DUE_TIME;
+    public TimeSpan MaxRebalancingPeriod { get; set; } = DEFAULT_MAXIMUM_REBALANCING_PERIOD;
 
     /// <summary>
-    /// The default value of <see cref="MaxRebalancingDueTime"/>.
+    /// The default value of <see cref="MaxRebalancingPeriod"/>.
     /// </summary>
-    public static readonly TimeSpan DEFAULT_MAXIMUM_REBALANCING_DUE_TIME = TimeSpan.FromMinutes(2);
-
-    /// <summary>
-    /// The cycle upon which this silo will trigger a rebalancing session with another silo.
-    /// </summary>
-    /// <remarks>Must be greater than <see cref="RecoveryPeriod"/>, you should aim for at least 2 times that of <see cref="RecoveryPeriod"/>.</remarks>
-    public TimeSpan RebalancingPeriod { get; set; } = DEFAULT_REBALANCING_PERIOD;
-
-    /// <summary>
-    /// The default value of <see cref="RebalancingPeriod"/>.
-    /// </summary>
-    public static readonly TimeSpan DEFAULT_REBALANCING_PERIOD = TimeSpan.FromMinutes(2);
+    public static readonly TimeSpan DEFAULT_MAXIMUM_REBALANCING_PERIOD = TimeSpan.FromMinutes(2);
 
     /// <summary>
     /// The minimum time needed for a silo to recover from a previous rebalancing.
     /// Until this time has elapsed, this silo will not take part in any rebalancing attempt from another silo.
     /// </summary>
-    /// <remarks>
-    /// <para>
-    /// While this silo will refuse rebalancing attempts from other silos, if <see cref="RebalancingPeriod"/> falls within this period, than
-    /// this silo will attempt a rebalancing with another silo, but this silo will be the initiator, not the other way around.
-    /// </para>
-    /// <para>Must be less than <see cref="RebalancingPeriod"/>, you should aim for at least 1/2 times that of <see cref="RebalancingPeriod"/>.</para>
-    /// </remarks>
     public TimeSpan RecoveryPeriod { get; set; } = DEFAULT_RECOVERY_PERIOD;
 
     /// <summary>
@@ -98,45 +80,45 @@ internal sealed class ActiveRebalancingOptionsValidator(IOptions<ActiveRebalanci
 
     public void ValidateConfiguration()
     {
-        if (_options.MaxEdgeCount == 0)
+        if (_options.MaxEdgeCount <= 0)
         {
             ThrowMustBeGreaterThanZero(nameof(ActiveRebalancingOptions.MaxEdgeCount));
         }
 
-        if (_options.MinRebalancingDueTime == TimeSpan.Zero)
+        if (_options.MaxUnprocessedEdges <= 0)
         {
-            ThrowMustBeGreaterThanZero(nameof(ActiveRebalancingOptions.MinRebalancingDueTime));
+            ThrowMustBeGreaterThanZero(nameof(ActiveRebalancingOptions.MaxUnprocessedEdges));
         }
 
-        if (_options.MaxRebalancingDueTime == TimeSpan.Zero)
+        if (_options.MinRebalancingPeriod <= TimeSpan.Zero)
         {
-            ThrowMustBeGreaterThanZero(nameof(ActiveRebalancingOptions.MaxRebalancingDueTime));
+            ThrowMustBeGreaterThanZero(nameof(ActiveRebalancingOptions.MinRebalancingPeriod));
         }
 
-        if (_options.RebalancingPeriod == TimeSpan.Zero)
+        if (_options.MaxRebalancingPeriod <= TimeSpan.Zero)
         {
-            ThrowMustBeGreaterThanZero(nameof(ActiveRebalancingOptions.RebalancingPeriod));
+            ThrowMustBeGreaterThanZero(nameof(ActiveRebalancingOptions.MaxRebalancingPeriod));
         }
 
-        if (_options.RecoveryPeriod == TimeSpan.Zero)
+        if (_options.RecoveryPeriod <= TimeSpan.Zero)
         {
             ThrowMustBeGreaterThanZero(nameof(ActiveRebalancingOptions.RecoveryPeriod));
         }
 
-        if (_options.MaxRebalancingDueTime <= _options.MinRebalancingDueTime)
+        if (_options.MaxRebalancingPeriod < _options.MinRebalancingPeriod)
         {
-            ThrowMustBeGreaterThan(nameof(ActiveRebalancingOptions.MaxRebalancingDueTime), nameof(ActiveRebalancingOptions.MinRebalancingDueTime));
+            ThrowMustBeGreaterThanOrEqualTo(nameof(ActiveRebalancingOptions.MaxRebalancingPeriod), nameof(ActiveRebalancingOptions.MinRebalancingPeriod));
         }
 
-        if (_options.RebalancingPeriod <= _options.RecoveryPeriod)
+        if (_options.MinRebalancingPeriod < _options.RecoveryPeriod)
         {
-            ThrowMustBeGreaterThan(nameof(ActiveRebalancingOptions.RebalancingPeriod), nameof(ActiveRebalancingOptions.RecoveryPeriod));
+            ThrowMustBeGreaterThanOrEqualTo(nameof(ActiveRebalancingOptions.MinRebalancingPeriod), nameof(ActiveRebalancingOptions.RecoveryPeriod));
         }
     }
 
     private static void ThrowMustBeGreaterThanZero(string propertyName)
         => throw new OrleansConfigurationException($"{propertyName} must be greater than 0");
 
-    private static void ThrowMustBeGreaterThan(string name1, string name2)
-        => throw new OrleansConfigurationException($"{name1} must be greater than {name2}");
+    private static void ThrowMustBeGreaterThanOrEqualTo(string name1, string name2)
+        => throw new OrleansConfigurationException($"{name1} must be greater than or equal to {name2}");
 }

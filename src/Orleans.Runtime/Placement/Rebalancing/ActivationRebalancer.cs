@@ -97,16 +97,16 @@ internal sealed partial class ActivationRebalancer : SystemTarget, IActivationRe
         return ValueTask.CompletedTask;
     }
 
-    private void UpdateTimer() => UpdateTimer(RandomTimeSpan.Next(_options.MinRebalancingDueTime, _options.MaxRebalancingDueTime));
+    private void UpdateTimer() => UpdateTimer(RandomTimeSpan.Next(_options.MinRebalancingPeriod, _options.MaxRebalancingPeriod));
     private void UpdateTimer(TimeSpan dueTime)
     {
         _timer.Change(dueTime, dueTime);
-        LogPeriodicallyInvokeProtocol(_options.RebalancingPeriod, dueTime);
+        LogPeriodicallyInvokeProtocol(_options.MinRebalancingPeriod, _options.MaxRebalancingPeriod, dueTime);
     }
 
     public async ValueTask TriggerExchangeRequest()
     {
-        var coolDown = _options.RebalancingPeriod - _lastExchangedStopwatch.Elapsed;
+        var coolDown = _options.RecoveryPeriod - _lastExchangedStopwatch.Elapsed;
         if (coolDown > TimeSpan.Zero)
         {
             _logger.LogDebug("Waiting an additional {CoolDown} to cool down before initiating the exchange protocol.", coolDown);
@@ -133,7 +133,10 @@ internal sealed partial class ActivationRebalancer : SystemTarget, IActivationRe
             return;
         }
 
-        foreach ((var candidateSilo, var offeredGrains, var _) in CreateCandidateSets(silos))
+        var sw = ValueStopwatch.StartNew();
+        var sets = CreateCandidateSets(silos);
+        _logger.LogInformation("Candidate sets computed in {Elapsed} ms.", sw.Elapsed.TotalMilliseconds);
+        foreach ((var candidateSilo, var offeredGrains, var _) in sets)
         {
             if (offeredGrains.Count == 0)
             {
@@ -192,7 +195,7 @@ internal sealed partial class ActivationRebalancer : SystemTarget, IActivationRe
 
             // We pick some random time between 'min' and 'max' and than subtract from it 'min'. We do this so this silo doesn't have to wait for 'min + random',
             // as it did the very first time this was started. It is guaranteed that 'random - min' >= 0; as 'random' will be at the least equal to 'min'.
-            UpdateTimer(RandomTimeSpan.Next(_options.MinRebalancingDueTime, _options.MaxRebalancingDueTime) - _options.MinRebalancingDueTime);
+            UpdateTimer(RandomTimeSpan.Next(_options.MinRebalancingPeriod, _options.MaxRebalancingPeriod) - _options.MinRebalancingPeriod);
             LogMutualExchangeAttempt(request.SendingSilo);
 
             return AcceptExchangeResponse.CachedMutualExchangeAttempt;
@@ -226,9 +229,11 @@ internal sealed partial class ActivationRebalancer : SystemTarget, IActivationRe
             int imbalance = initialImbalance;
             LogImbalance(imbalance, remoteActivations, localActivations);
 
-            var (localHeap, remoteHeap) = CreateCandidateHeaps(localSet, remoteSet);
-
             var stopwatch = ValueStopwatch.StartNew();
+            var (localHeap, remoteHeap) = CreateCandidateHeaps(localSet, remoteSet);
+            _logger.LogInformation("Candidate heaps created in {Elapsed} ms.", stopwatch.Elapsed.TotalMilliseconds);
+            stopwatch.Restart();
+
             var iterations = 0;
             while (true)
             {

@@ -601,8 +601,8 @@ public class DefaultToleranceTests(DefaultToleranceTests.Fixture fixture) : Reba
                     .Configure<ActiveRebalancingOptions>(o =>
                     {
                         // Make these so that the timers practically never fire! We will invoke the protocol manually.
-                        o.MinRebalancingDueTime = TimeSpan.FromSeconds(299);
-                        o.MaxRebalancingDueTime = TimeSpan.FromSeconds(300);
+                        o.MinRebalancingPeriod = TimeSpan.FromSeconds(299);
+                        o.MaxRebalancingPeriod = TimeSpan.FromSeconds(300);
                         // Make this practically zero, so we can invoke the protocol more than once without needing to put a delay in the tests. 
                         o.RecoveryPeriod = TimeSpan.FromMilliseconds(1);
                     })
