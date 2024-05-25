@@ -2,7 +2,7 @@ using System;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
-using Orleans.Reminders.AdoNet.Storage;
+using Orleans.Reminders.AdoNet;
 
 namespace Orleans.Runtime.ReminderService
 {
@@ -10,7 +10,7 @@ namespace Orleans.Runtime.ReminderService
     {
         private readonly AdoNetReminderTableOptions options;
         private readonly string serviceId;
-        private RelationalOrleansQueries orleansQueries;
+        private RemindersRelationalOrleansQueries orleansQueries;
 
         public AdoNetReminderTable(
             IOptions<ClusterOptions> clusterOptions, 
@@ -22,7 +22,7 @@ namespace Orleans.Runtime.ReminderService
 
         public async Task Init()
         {
-            this.orleansQueries = await RelationalOrleansQueries.CreateInstance(this.options.Invariant, this.options.ConnectionString);
+            this.orleansQueries = await RemindersRelationalOrleansQueries.CreateInstance(this.options.Invariant, this.options.ConnectionString);
         }
 
         public Task<ReminderTableData> ReadRows(GrainId grainId)

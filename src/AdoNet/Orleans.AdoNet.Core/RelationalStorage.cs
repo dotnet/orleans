@@ -98,7 +98,7 @@ internal class RelationalStorage : IRelationalStorage
     ///}).ConfigureAwait(continueOnCapturedContext: false);
     /// </code>
     /// </example>
-    public async Task<IEnumerable<TResult>> ReadAsync<TResult>(string query, Action<IDbCommand> parameterProvider, Func<IDataRecord, int, CancellationToken, Task<TResult>> selector, CommandBehavior commandBehavior = CommandBehavior.Default, CancellationToken cancellationToken = default)
+    public async Task<IEnumerable<TResult>> ReadAsync<TResult>(string query, Action<IDbCommand>? parameterProvider, Func<IDataRecord, int, CancellationToken, Task<TResult>> selector, CommandBehavior commandBehavior = CommandBehavior.Default, CancellationToken cancellationToken = default)
     {
         //If the query is something else that is not acceptable (e.g. an empty string), there will an appropriate database exception.
         ArgumentNullException.ThrowIfNull(query);
@@ -190,7 +190,7 @@ internal class RelationalStorage : IRelationalStorage
 
     private async Task<Tuple<IEnumerable<TResult>, int>> ExecuteAsync<TResult>(
         string query,
-        Action<DbCommand> parameterProvider,
+        Action<DbCommand>? parameterProvider,
         Func<DbCommand, Func<IDataRecord, int, CancellationToken, Task<TResult>>, CommandBehavior, CancellationToken, Task<Tuple<IEnumerable<TResult>, int>>> executor,
         Func<IDataRecord, int, CancellationToken, Task<TResult>> selector,
         CommandBehavior commandBehavior,

@@ -29,7 +29,7 @@ public abstract class MessageDequeuingBenchmark(string invariant, string databas
 
     private readonly Consumer _consumer = new();
     private IRelationalStorage _storage = default!;
-    private RelationalOrleansQueries _queries = default!;
+    private StreamingRelationalOrleansQueries _queries = default!;
     private byte[] _payload = [];
     private string[] _queueIds = default!;
     private AdoNetStreamMessageAck[] _acks = [];
@@ -79,7 +79,7 @@ public abstract class MessageDequeuingBenchmark(string invariant, string databas
                 throw new InvalidOperationException($"Database '{database}' not initialized");
             }
             _storage = RelationalStorage.CreateInstance(invariant, testing.CurrentConnectionString);
-            _queries = await RelationalOrleansQueries.CreateInstance(invariant, testing.CurrentConnectionString);
+            _queries = await StreamingRelationalOrleansQueries.CreateInstance(invariant, testing.CurrentConnectionString);
         }
     }
 
