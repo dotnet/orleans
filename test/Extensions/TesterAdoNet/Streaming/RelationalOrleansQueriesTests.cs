@@ -4,7 +4,6 @@ using Npgsql;
 using Orleans.AdoNet.Core;
 using Orleans.Configuration;
 using Orleans.Streaming.AdoNet;
-using Orleans.Streaming.AdoNet.Storage;
 using UnitTests.General;
 using static System.String;
 

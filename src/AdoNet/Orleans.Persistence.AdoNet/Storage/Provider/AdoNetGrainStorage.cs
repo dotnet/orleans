@@ -13,7 +13,6 @@ using Microsoft.Extensions.Options;
 using Orleans.AdoNet.Core;
 using Orleans.Configuration;
 using Orleans.Configuration.Overrides;
-using Orleans.Persistence.AdoNet.Storage;
 using Orleans.Providers;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;

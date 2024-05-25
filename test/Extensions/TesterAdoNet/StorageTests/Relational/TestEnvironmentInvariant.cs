@@ -4,7 +4,6 @@ using System.Reflection;
 using Newtonsoft.Json.Linq;
 using Orleans.AdoNet.Core;
 using Orleans.TestingHost.Utils;
-using Orleans.Tests.SqlUtils;
 using TestExtensions;
 using UnitTests.General;
 

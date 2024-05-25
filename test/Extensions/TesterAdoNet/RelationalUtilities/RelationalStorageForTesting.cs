@@ -1,6 +1,5 @@
 using System.Data.Common;
 using Orleans.AdoNet.Core;
-using Orleans.Tests.SqlUtils;
 using Tester.RelationalUtilities;
 
 namespace UnitTests.General

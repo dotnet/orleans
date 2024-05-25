@@ -13,5 +13,4 @@ global using Orleans.Hosting;
 global using Orleans.Providers.Streams.Common;
 global using Orleans.Runtime;
 global using Orleans.Serialization;
-global using Orleans.Streaming.AdoNet.Storage;
 global using Orleans.Streams;
