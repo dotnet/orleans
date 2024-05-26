@@ -134,7 +134,9 @@ internal sealed partial class ActivationRebalancer : SystemTarget, IActivationRe
         }
 
         var sw = ValueStopwatch.StartNew();
-        var sets = CreateCandidateSets(silos);
+        var migrationCandidates = GetMigrationCandidates();
+        var sets = CreateCandidateSets(migrationCandidates, silos);
+        var anchoredSet = ComputeAnchoredGrains(migrationCandidates);
         _logger.LogInformation("Candidate sets computed in {Elapsed} ms.", sw.Elapsed.TotalMilliseconds);
         foreach ((var candidateSilo, var offeredGrains, var _) in sets)
         {
@@ -158,7 +160,7 @@ internal sealed partial class ActivationRebalancer : SystemTarget, IActivationRe
                 {
                     case AcceptExchangeResponse.ResponseType.Success:
                         // Exchange was successful, no need to iterate over another candidate.
-                        await FinalizeProtocol(response.AcceptedGrainIds, response.GivenGrainIds, candidateSilo);
+                        await FinalizeProtocol(response.AcceptedGrainIds, response.GivenGrainIds, candidateSilo, anchoredSet);
                         return;
                     case AcceptExchangeResponse.ResponseType.ExchangedRecently:
                         // The remote silo has been recently involved in another exchange, try the next best candidate.
@@ -217,7 +219,9 @@ internal sealed partial class ActivationRebalancer : SystemTarget, IActivationRe
             var acceptedGrains = ImmutableArray.CreateBuilder<GrainId>();
             var givingGrains = ImmutableArray.CreateBuilder<GrainId>();
             var remoteSet = request.ExchangeSet;
-            var localSet = GetCandidatesForSilo(GetMigrationCandidates(), request.SendingSilo);
+            var migrationCandidates = GetMigrationCandidates();
+            var localSet = GetCandidatesForSilo(migrationCandidates, request.SendingSilo);
+            var anchoredSet = ComputeAnchoredGrains(migrationCandidates);
 
             // We need to determine 2 subsets:
             // - One that originates from sending silo (request.ExchangeSet) and will be (partially) accepted from this silo.
@@ -264,7 +268,7 @@ internal sealed partial class ActivationRebalancer : SystemTarget, IActivationRe
             LogTransferSetComputed(stopwatch.Elapsed, imbalance);
             var giving = givingGrains.ToImmutable();
             var accepting = acceptedGrains.ToImmutable();
-            await FinalizeProtocol(giving, accepting, request.SendingSilo);
+            await FinalizeProtocol(giving, accepting, request.SendingSilo, anchoredSet);
 
             return new(AcceptExchangeResponse.ResponseType.Success, accepting, giving);
 
@@ -445,7 +449,7 @@ internal sealed partial class ActivationRebalancer : SystemTarget, IActivationRe
     /// </summary>
     /// <param name="giving">The grain ids to migrate to the remote host.</param>
     /// <param name="accepting">The grain ids to which are migrating to the local host.</param>
-    private async Task FinalizeProtocol(ImmutableArray<GrainId> giving, ImmutableArray<GrainId> accepting, SiloAddress targetSilo)
+    private async Task FinalizeProtocol(ImmutableArray<GrainId> giving, ImmutableArray<GrainId> accepting, SiloAddress targetSilo, HashSet<GrainId> newlyAnchoredGrains)
     {
         // The protocol concluded that 'this' silo should take on 'set', so we hint to the director accordingly.
         RequestContext.Set(IPlacementDirector.PlacementHintKey, targetSilo);
@@ -473,6 +477,17 @@ internal sealed partial class ActivationRebalancer : SystemTarget, IActivationRe
         var toRemove = new List<Edge>();
 
         var affected = new HashSet<GrainId>(giving.Length + accepting.Length);
+        _logger.LogInformation("Adding {NewlyAnchoredGrains} newly anchored grains to set of {AllAnchoredGrainsCount} on host {Silo}. EdgeWeights contains {EdgeWeightCount} elements.", newlyAnchoredGrains.Count, _anchoredGrainIds.Count, Silo, _edgeWeights.Count);
+        foreach (var id in newlyAnchoredGrains)
+        {
+            _anchoredGrainIds.Add(id);
+        }
+
+        foreach (var id in _anchoredGrainIds)
+        {
+            affected.Add(id);
+        }
+
         foreach (var id in accepting)
         {
             affected.Add(id);
@@ -512,10 +527,9 @@ internal sealed partial class ActivationRebalancer : SystemTarget, IActivationRe
         LogProtocolFinalized(giving.Length, accepting.Length);
     }
 
-    private List<(SiloAddress Silo, List<CandidateVertex> Candidates, long TransferScore)> CreateCandidateSets(ImmutableArray<SiloAddress> silos)
+    private List<(SiloAddress Silo, List<CandidateVertex> Candidates, long TransferScore)> CreateCandidateSets(List<IGrouping<GrainId, VertexEdge>> migrationCandidates, ImmutableArray<SiloAddress> silos)
     {
         List<(SiloAddress Silo, List<CandidateVertex> Candidates, long TransferScore)> candidateSets = new(silos.Length - 1);
-        var localCandidates = GetMigrationCandidates();
 
         foreach (var siloAddress in silos)
         {
@@ -525,7 +539,7 @@ internal sealed partial class ActivationRebalancer : SystemTarget, IActivationRe
                 continue;
             }
 
-            var candidatesForRemote = GetCandidatesForSilo(localCandidates, siloAddress);
+            var candidatesForRemote = GetCandidatesForSilo(migrationCandidates, siloAddress);
             var totalAccTransferScore = candidatesForRemote.Sum(x => x.AccumulatedTransferScore);
 
             candidateSets.Add(new(siloAddress, [.. candidatesForRemote], totalAccTransferScore));
@@ -594,6 +608,36 @@ internal sealed partial class ActivationRebalancer : SystemTarget, IActivationRe
         }
 
         return result;
+    }
+
+    private static HashSet<GrainId> ComputeAnchoredGrains(List<IGrouping<GrainId, VertexEdge>> migrationCandidates)
+    {
+        HashSet<GrainId> anchoredGrains = [];
+        foreach (var grainEdges in migrationCandidates)
+        {
+            var accLocalScore = 0L;
+            var accRemoteScore = 0L;
+
+            foreach (var edge in grainEdges)
+            {
+                if (edge.Direction is Direction.LocalToLocal)
+                {
+                    accLocalScore += edge.Weight;
+                }
+                else
+                {
+                    Debug.Assert(edge.Direction is Direction.RemoteToLocal or Direction.LocalToRemote);
+                    accRemoteScore += edge.Weight;
+                }
+            }
+
+            if (accLocalScore > accRemoteScore)
+            {
+                anchoredGrains.Add(grainEdges.Key);
+            }
+        }
+
+        return anchoredGrains;
     }
 
     private List<IGrouping<GrainId, VertexEdge>> GetMigrationCandidates() => CreateLocalVertexEdges().Where(x => x.IsMigratable).GroupBy(x => x.SourceId).ToList();

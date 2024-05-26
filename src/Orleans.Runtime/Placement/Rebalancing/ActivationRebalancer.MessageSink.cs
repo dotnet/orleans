@@ -1,4 +1,5 @@
 #nullable enable
+using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
@@ -40,6 +41,7 @@ internal partial class ActivationRebalancer : IMessageStatisticsSink
         }
     }
 
+    private readonly HashSet<GrainId> _anchoredGrainIds = new();
     private async Task ProcessPendingEdges(CancellationToken cancellationToken)
     {
         const int MaxIterationsPerYield = 100;
@@ -56,9 +58,32 @@ internal partial class ActivationRebalancer : IMessageStatisticsSink
                 {
                     _messageFilter.IsAcceptable(message, out var isSenderMigratable, out var isTargetMigratable);
 
-                    Edge edge = new(
-                        new(message.SendingGrain, message.SendingSilo, isSenderMigratable),
-                        new(message.TargetGrain, message.TargetSilo, isTargetMigratable));
+                    EdgeVertex sourceVertex, destinationVertex;
+                    if (_anchoredGrainIds.Contains(message.SendingGrain))
+                    {
+                        sourceVertex = new(GrainId, Silo, isMigratable: false);
+                    }
+                    else
+                    {
+                        sourceVertex = new(message.SendingGrain, message.SendingSilo, isSenderMigratable);
+                    }
+
+                    if (_anchoredGrainIds.Contains(message.TargetGrain))
+                    {
+                        destinationVertex = new(GrainId, Silo, isMigratable: false);
+                    }
+                    else
+                    {
+                        destinationVertex = new(message.TargetGrain, message.TargetSilo, isTargetMigratable);
+                    }
+
+                    if (!isSenderMigratable && !isTargetMigratable)
+                    {
+                        // Ignore edges between two non-migratable grains.
+                        continue;
+                    }
+                    
+                    Edge edge = new(sourceVertex, destinationVertex);
                     _edgeWeights.Add(edge);
                 }
             }
