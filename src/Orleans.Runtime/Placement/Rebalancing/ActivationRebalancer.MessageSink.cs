@@ -42,11 +42,11 @@ internal partial class ActivationRebalancer : IMessageStatisticsSink
 
     private async Task ProcessPendingEdges(CancellationToken cancellationToken)
     {
-        const int MaxCyclesPerYield = 100;
+        const int MaxIterationsPerYield = 100;
         await Task.CompletedTask.ConfigureAwait(ConfigureAwaitOptions.ForceYielding | ConfigureAwaitOptions.ContinueOnCapturedContext);
 
         var drainBuffer = new Message[256];
-        var cyclesPerYield = 100;
+        var iteration = 0;
         while (!cancellationToken.IsCancellationRequested)
         {
             var count = _pendingMessages.DrainTo(drainBuffer);
@@ -67,9 +67,9 @@ internal partial class ActivationRebalancer : IMessageStatisticsSink
                 await _pendingMessageEvent.WaitAsync();
             }
 
-            if (++cyclesPerYield >= MaxCyclesPerYield)
+            if (++iteration >= MaxIterationsPerYield)
             {
-                cyclesPerYield = 0;
+                iteration = 0;
                 await Task.Yield();
             }
         }
