@@ -477,15 +477,10 @@ internal sealed partial class ActivationRebalancer : SystemTarget, IActivationRe
         var toRemove = new List<Edge>();
 
         var affected = new HashSet<GrainId>(giving.Length + accepting.Length);
-        _logger.LogInformation("Adding {NewlyAnchoredGrains} newly anchored grains to set of {AllAnchoredGrainsCount} on host {Silo}. EdgeWeights contains {EdgeWeightCount} elements.", newlyAnchoredGrains.Count, _anchoredGrainIds.Count, Silo, _edgeWeights.Count);
+        _logger.LogInformation("Adding {NewlyAnchoredGrains} newly anchored grains to set on host {Silo}. EdgeWeights contains {EdgeWeightCount} elements.", newlyAnchoredGrains.Count, Silo, _edgeWeights.Count);
         foreach (var id in newlyAnchoredGrains)
         {
             _anchoredGrainIds.Add(id);
-        }
-
-        foreach (var id in _anchoredGrainIds)
-        {
-            affected.Add(id);
         }
 
         foreach (var id in accepting)
@@ -502,7 +497,7 @@ internal sealed partial class ActivationRebalancer : SystemTarget, IActivationRe
         {
             foreach (var (edge, count, error) in _edgeWeights.Elements)
             {
-                if (affected.Contains(edge.Source.Id) || affected.Contains(edge.Target.Id))
+                if (affected.Contains(edge.Source.Id) || affected.Contains(edge.Target.Id) || _anchoredGrainIds.Contains(edge.Source.Id) || _anchoredGrainIds.Contains(edge.Target.Id))
                 {
                     toRemove.Add(edge);
                 }

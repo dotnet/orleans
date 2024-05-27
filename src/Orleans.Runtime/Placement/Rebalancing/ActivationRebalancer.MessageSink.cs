@@ -1,5 +1,4 @@
 #nullable enable
-using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
@@ -11,6 +10,10 @@ namespace Orleans.Runtime.Placement.Rebalancing;
 internal partial class ActivationRebalancer : IMessageStatisticsSink
 {
     private readonly CancellationTokenSource _shutdownCts = new();
+
+    // This bloom filter contains grain ids which will are anchored to the current silo.
+    // Ids are inserted when a grain is found to have a negative transfer score.
+    private readonly BloomFilter _anchoredGrainIds = new(100_000, 0.01);
     private Task? _processPendingEdgesTask;
 
     public void StartProcessingEdges()
@@ -41,7 +44,6 @@ internal partial class ActivationRebalancer : IMessageStatisticsSink
         }
     }
 
-    private readonly HashSet<GrainId> _anchoredGrainIds = new();
     private async Task ProcessPendingEdges(CancellationToken cancellationToken)
     {
         const int MaxIterationsPerYield = 100;
@@ -56,9 +58,12 @@ internal partial class ActivationRebalancer : IMessageStatisticsSink
             {
                 foreach (var message in drainBuffer[..count])
                 {
-                    _messageFilter.IsAcceptable(message, out var isSenderMigratable, out var isTargetMigratable);
+                    if (!_messageFilter.IsAcceptable(message, out var isSenderMigratable, out var isTargetMigratable))
+                    {
+                        continue;
+                    }
 
-                    EdgeVertex sourceVertex, destinationVertex;
+                    EdgeVertex sourceVertex;
                     if (_anchoredGrainIds.Contains(message.SendingGrain))
                     {
                         sourceVertex = new(GrainId, Silo, isMigratable: false);
@@ -68,6 +73,7 @@ internal partial class ActivationRebalancer : IMessageStatisticsSink
                         sourceVertex = new(message.SendingGrain, message.SendingSilo, isSenderMigratable);
                     }
 
+                    EdgeVertex destinationVertex;
                     if (_anchoredGrainIds.Contains(message.TargetGrain))
                     {
                         destinationVertex = new(GrainId, Silo, isMigratable: false);
@@ -77,7 +83,7 @@ internal partial class ActivationRebalancer : IMessageStatisticsSink
                         destinationVertex = new(message.TargetGrain, message.TargetSilo, isTargetMigratable);
                     }
 
-                    if (!isSenderMigratable && !isTargetMigratable)
+                    if (!sourceVertex.IsMigratable && !destinationVertex.IsMigratable)
                     {
                         // Ignore edges between two non-migratable grains.
                         continue;
@@ -102,7 +108,19 @@ internal partial class ActivationRebalancer : IMessageStatisticsSink
 
     public void RecordMessage(Message message)
     {
-        if (!_enableMessageSampling || !_messageFilter.IsAcceptable(message, out var isSenderMigratable, out var isTargetMigratable))
+        if (!_enableMessageSampling || message.IsSystemMessage)
+        {
+            return;
+        }
+
+        // It must have a direction, and must not be a 'response' as it would skew analysis.
+        if (message.HasDirection is false || message.Direction == Message.Directions.Response)
+        {
+            return;
+        }
+
+        // Sender and target need to be fully addressable to know where to move to or towards.
+        if (!message.IsSenderFullyAddressed || !message.IsTargetFullyAddressed)
         {
             return;
         }

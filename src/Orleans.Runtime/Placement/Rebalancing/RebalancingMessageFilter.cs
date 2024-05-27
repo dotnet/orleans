@@ -4,7 +4,6 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Frozen;
 using System.Runtime.CompilerServices;
-using System.Threading;
 
 namespace Orleans.Runtime.Placement.Rebalancing;
 
@@ -30,24 +29,6 @@ internal sealed class RebalancingMessageFilter(
         isSenderMigratable = false;
         isTargetMigratable = false;
 
-        // Ignore system messages
-        if (message.IsSystemMessage)
-        {
-            return false;
-        }
-
-        // It must have a direction, and must not be a 'response' as it would skew analysis.
-        if (message.HasDirection is false || message.Direction == Message.Directions.Response)
-        {
-            return false;
-        }
-
-        // Sender and target need to be fully addressable to know where to move to or towards.
-        if (!message.IsSenderFullyAddressed || !message.IsTargetFullyAddressed)
-        {
-            return false;
-        }
-
         // There are some edge cases when this can happen i.e. a grain invoking another one of its methods via AsReference<>, but we still exclude it
         // as wherever this grain would be located in the cluster, it would always be a local call (since it targets itself), this would add negative transfer cost
         // which would skew a potential relocation of this grain, while it shouldn't, because whenever this grain is located, it would still make local calls to itself.
@@ -56,24 +37,11 @@ internal sealed class RebalancingMessageFilter(
             return false;
         }
 
-        // Ignore rebalancer messages: either to another rebalancer, or when executing migration requests to activations.
-        if (IsRebalancer(message.SendingGrain.Type) || IsRebalancer(message.TargetGrain.Type))
-        {
-            return false;
-        }
-
         isSenderMigratable = IsMigratable(message.SendingGrain.Type);
         isTargetMigratable = IsMigratable(message.TargetGrain.Type);
 
         // If both are not migratable types we ignore this. But if one of them is not, then we allow passing, as we wish to move grains closer to them, as with any type of grain.
-        if (!isSenderMigratable && !isTargetMigratable)
-        {
-            return false;
-        }
-
-        return true;
-
-        bool IsRebalancer(GrainType grainType) => grainType.Equals(Constants.ActivationRebalancerType);
+        return isSenderMigratable || isTargetMigratable;
 
         bool IsMigratable(GrainType grainType)
         {

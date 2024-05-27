@@ -1,4 +1,4 @@
-﻿using System.Text;
+using System.Text;
 using Orleans.Runtime.Placement.Rebalancing;
 using Xunit;
 

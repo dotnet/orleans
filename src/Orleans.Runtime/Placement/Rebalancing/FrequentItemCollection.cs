@@ -133,6 +133,11 @@ internal abstract class FrequentItemCollection<TKey, TElement>(int capacity) whe
     /// <returns><see langword="true"/> if matching entry was found and removed, <see langword="false"/> otherwise.</returns>
     protected bool RemoveCore(TKey key)
     {
+        // Remove the element from the sketch
+        var sketchMask = _sketch.Length - 1;
+        var sketchHash = key.GetHashCode();
+        _sketch[sketchHash & sketchMask] = 0;
+
         // Remove the element from the heap index
         if (!_heapIndex.Remove(key, out var index))
         {
@@ -152,11 +157,6 @@ internal abstract class FrequentItemCollection<TKey, TElement>(int capacity) whe
         }
 
         nodes[newSize] = default;
-
-        // Remove the element from the sketch
-        var sketchMask = _sketch.Length - 1;
-        var sketchHash = key.GetHashCode();
-        _sketch[sketchHash & sketchMask] = 0;
 
         return true;
     }
