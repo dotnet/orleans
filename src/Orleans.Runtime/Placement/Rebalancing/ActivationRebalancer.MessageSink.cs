@@ -1,4 +1,5 @@
 #nullable enable
+using System;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
@@ -46,11 +47,9 @@ internal partial class ActivationRebalancer : IMessageStatisticsSink
 
     private async Task ProcessPendingEdges(CancellationToken cancellationToken)
     {
-        const int MaxIterationsPerYield = 100;
         await Task.CompletedTask.ConfigureAwait(ConfigureAwaitOptions.ForceYielding | ConfigureAwaitOptions.ContinueOnCapturedContext);
 
-        var drainBuffer = new Message[256];
-        var iteration = 0;
+        var drainBuffer = new Message[128];
         while (!cancellationToken.IsCancellationRequested)
         {
             var count = _pendingMessages.DrainTo(drainBuffer);
@@ -92,16 +91,12 @@ internal partial class ActivationRebalancer : IMessageStatisticsSink
                     Edge edge = new(sourceVertex, destinationVertex);
                     _edgeWeights.Add(edge);
                 }
+
+                await Task.Delay(TimeSpan.FromTicks(TimeSpan.TicksPerMillisecond), CancellationToken.None);
             }
             else
             {
                 await _pendingMessageEvent.WaitAsync();
-            }
-
-            if (++iteration >= MaxIterationsPerYield)
-            {
-                iteration = 0;
-                await Task.Yield();
             }
         }
     }
@@ -114,7 +109,7 @@ internal partial class ActivationRebalancer : IMessageStatisticsSink
         }
 
         // It must have a direction, and must not be a 'response' as it would skew analysis.
-        if (message.HasDirection is false || message.Direction == Message.Directions.Response)
+        if (message.Direction is Message.Directions.None or Message.Directions.Response)
         {
             return;
         }

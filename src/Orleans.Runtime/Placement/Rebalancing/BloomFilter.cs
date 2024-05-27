@@ -27,7 +27,7 @@ internal sealed class BloomFilter
         // Divide the hash count by 2 since we are using 64-bit hash codes split into two 32-bit hash codes.
         var hashFuncCount = (int)Math.Min(minBitCount * 8 / capacity * Ln2 / 2, 8);
         Debug.Assert(hashFuncCount > 0);
-        _hashFuncSeeds = Enumerable.Range(0, hashFuncCount).Select(p => (ulong)unchecked(p * 0xFBA4C795 + 1)).ToArray();
+        _hashFuncSeeds = Enumerable.Range(0, hashFuncCount).Select(p => unchecked((ulong)p * 0xFBA4C795FBA4C795 + 1)).ToArray();
         Debug.Assert(_hashFuncSeeds.Length == hashFuncCount);
     }
 
