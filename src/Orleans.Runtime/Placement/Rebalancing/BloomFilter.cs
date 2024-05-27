@@ -11,7 +11,7 @@ internal sealed class BloomFilter
 {
     private const double Ln2Squared = 0.4804530139182014246671025263266649717305529515945455;
     private const double Ln2 = 0.6931471805599453094172321214581765680755001343602552;
-    private readonly int[] _hashFuncSeeds;
+    private readonly ulong[] _hashFuncSeeds;
     private readonly int[] _filter;
     private readonly int _indexMask;
 
@@ -24,29 +24,32 @@ internal sealed class BloomFilter
         _indexMask = arraySize - 1;
         _filter = new int[arraySize];
 
+        // Divide the hash count by 2 since we are using 64-bit hash codes split into two 32-bit hash codes.
         var hashFuncCount = (int)Math.Min(minBitCount * 8 / capacity * Ln2 / 2, 8);
         Debug.Assert(hashFuncCount > 0);
-        _hashFuncSeeds = Enumerable.Range(0, hashFuncCount).Select(p => (int)unchecked(p * 0xFBA4C795 + 1)).ToArray();
+        _hashFuncSeeds = Enumerable.Range(0, hashFuncCount).Select(p => (ulong)unchecked(p * 0xFBA4C795 + 1)).ToArray();
         Debug.Assert(_hashFuncSeeds.Length == hashFuncCount);
     }
 
     public void Add(GrainId id)
     {
+        var hash = XxHash3.HashToUInt64(id.Key.AsSpan(), id.GetUniformHashCode());
         foreach (var seed in _hashFuncSeeds)
         {
-            var indexes = XxHash3.HashToUInt64(id.Key.AsSpan(), (long)seed << 32 | id.GetUniformHashCode());
-            Set((int)indexes);
-            Set((int)(indexes >> 32));
+            hash = Mix64(hash ^ seed);
+            Set((int)hash);
+            Set((int)(hash >> 32));
         }
     }
 
     public bool Contains(GrainId id)
     {
+        var hash = XxHash3.HashToUInt64(id.Key.AsSpan(), id.GetUniformHashCode());
         foreach (var seed in _hashFuncSeeds)
         {
-            var indexes = XxHash3.HashToUInt64(id.Key.AsSpan(), (long)seed << 32 | id.GetUniformHashCode());
-            var clear = IsClear((int)indexes);
-            clear |= IsClear((int)(indexes >> 32));
+            hash = Mix64(hash ^ seed);
+            var clear = IsClear((int)hash);
+            clear |= IsClear((int)(hash >> 32));
             if (clear)
             {
                 return false;
@@ -61,6 +64,21 @@ internal sealed class BloomFilter
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public void Set(int index) => _filter[(index >> 5) & _indexMask] |= 1 << index;
+
+    /// <summary>
+    /// Computes Stafford variant 13 of 64-bit mix function.
+    /// </summary>
+    /// <param name="z">The input parameter.</param>
+    /// <returns>A bit mix of the input parameter.</returns>
+    /// <remarks>
+    /// See http://zimbry.blogspot.com/2011/09/better-bit-mixing-improving-on.html
+    /// </remarks>
+    public static ulong Mix64(ulong z)
+    {
+        z = (z ^ z >> 30) * 0xbf58476d1ce4e5b9L;
+        z = (z ^ z >> 27) * 0x94d049bb133111ebL;
+        return z ^ z >> 31;
+    }
 
     public void Reset() => Array.Clear(_filter);
 

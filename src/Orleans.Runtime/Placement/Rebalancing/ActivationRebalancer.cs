@@ -239,11 +239,13 @@ internal sealed partial class ActivationRebalancer : SystemTarget, IActivationRe
             stopwatch.Restart();
 
             var iterations = 0;
+            var yieldStopwatch = CoarseStopwatch.StartNew();
             while (true)
             {
-                if (++iterations % 128 == 0)
+                if (++iterations % 128 == 0 && yieldStopwatch.ElapsedMilliseconds > 25)
                 {
                     // Give other tasks a chance to execute periodically.
+                    yieldStopwatch.Restart();
                     await Task.Delay(1);
                 }
 
@@ -493,6 +495,7 @@ internal sealed partial class ActivationRebalancer : SystemTarget, IActivationRe
             affected.Add(id);
         }
 
+        var yieldStopwatch = CoarseStopwatch.StartNew();
         if (affected.Count > 0)
         {
             foreach (var (edge, count, error) in _edgeWeights.Elements)
@@ -505,9 +508,10 @@ internal sealed partial class ActivationRebalancer : SystemTarget, IActivationRe
 
             foreach (var edge in toRemove)
             {
-                if (++iterations % 128 == 0)
+                if (++iterations % 128 == 0 && yieldStopwatch.ElapsedMilliseconds > 25)
                 {
                     // Give other tasks a chance to execute periodically.
+                    yieldStopwatch.Restart();
                     await Task.Delay(1);
                 }
 
