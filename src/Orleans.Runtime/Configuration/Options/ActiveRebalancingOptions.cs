@@ -36,7 +36,7 @@ public sealed class ActiveRebalancingOptions
     /// <summary>
     /// The default value of <see cref="MinRebalancingPeriod"/>.
     /// </summary>
-    public static readonly TimeSpan DEFAULT_MINUMUM_REBALANCING_PERIOD = TimeSpan.FromMinutes(1);
+    public static readonly TimeSpan DEFAULT_MINUMUM_REBALANCING_PERIOD = TimeSpan.FromMinutes(0.5);
 
     /// <summary>
     /// The maximum time between initiating a rebalancing cycle.
@@ -50,7 +50,7 @@ public sealed class ActiveRebalancingOptions
     /// <summary>
     /// The default value of <see cref="MaxRebalancingPeriod"/>.
     /// </summary>
-    public static readonly TimeSpan DEFAULT_MAXIMUM_REBALANCING_PERIOD = TimeSpan.FromMinutes(2);
+    public static readonly TimeSpan DEFAULT_MAXIMUM_REBALANCING_PERIOD = TimeSpan.FromMinutes(1);
 
     /// <summary>
     /// The minimum time needed for a silo to recover from a previous rebalancing.
@@ -61,7 +61,7 @@ public sealed class ActiveRebalancingOptions
     /// <summary>
     /// The default value of <see cref="RecoveryPeriod"/>.
     /// </summary>
-    public static readonly TimeSpan DEFAULT_RECOVERY_PERIOD = TimeSpan.FromMinutes(1);
+    public static readonly TimeSpan DEFAULT_RECOVERY_PERIOD = TimeSpan.FromMinutes(0.5);
 
     /// <summary>
     /// The maximum number of unprocessed edges to buffer. If this number is exceeded, the oldest edges will be discarded.
