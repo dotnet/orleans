@@ -50,6 +50,8 @@ internal partial class ActivationRebalancer : IMessageStatisticsSink
         await Task.CompletedTask.ConfigureAwait(ConfigureAwaitOptions.ForceYielding | ConfigureAwaitOptions.ContinueOnCapturedContext);
 
         var drainBuffer = new Message[128];
+        var iteration = 0;
+        const int MaxIterationsPerYield = 128;
         while (!cancellationToken.IsCancellationRequested)
         {
             var count = _pendingMessages.DrainTo(drainBuffer);
@@ -92,10 +94,15 @@ internal partial class ActivationRebalancer : IMessageStatisticsSink
                     _edgeWeights.Add(edge);
                 }
 
-                await Task.Delay(TimeSpan.FromTicks(TimeSpan.TicksPerMillisecond), CancellationToken.None);
+                if (++iteration >= MaxIterationsPerYield)
+                {
+                    iteration = 0;
+                    await Task.Delay(TimeSpan.FromTicks(TimeSpan.TicksPerMillisecond), CancellationToken.None);
+                }
             }
             else
             {
+                iteration = 0;
                 await _pendingMessageEvent.WaitAsync();
             }
         }
