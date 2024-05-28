@@ -323,14 +323,22 @@ namespace Orleans.CodeGenerator
                         SyntaxFactory.TriviaList(
                             new List<SyntaxTrivia>
                             {
-                                             Trivia(
-                                                PragmaWarningDirectiveTrivia(
-                                                    Token(SyntaxKind.DisableKeyword),
-                                                    SeparatedList(DisabledWarnings.Select(w => (ExpressionSyntax)w.GetLiteralExpression())),
-                                                    isActive: true)),
+                                Trivia(
+                                   PragmaWarningDirectiveTrivia(
+                                       Token(SyntaxKind.DisableKeyword),
+                                       SeparatedList(DisabledWarnings.Select(str =>
+                                       {
+                                           var syntaxToken = SyntaxFactory.Literal(
+                                                SyntaxFactory.TriviaList(),
+                                                str,
+                                                str,
+                                                SyntaxFactory.TriviaList());
+
+                                            return (ExpressionSyntax)SyntaxFactory.LiteralExpression(SyntaxKind.StringLiteralExpression, syntaxToken);
+                                       })),
+                                       isActive: true)),
                             }));
             }
-
 
             var usings = List(new[] { UsingDirective(ParseName("global::Orleans.Serialization.Codecs")), UsingDirective(ParseName("global::Orleans.Serialization.GeneratedCodeHelpers")) });
             var namespaces = new List<MemberDeclarationSyntax>(_namespacedMembers.Count);
@@ -349,14 +357,22 @@ namespace Orleans.CodeGenerator
                        SyntaxFactory.TriviaList(
                            new List<SyntaxTrivia>
                            {
-                                                 Trivia(
-                                                    PragmaWarningDirectiveTrivia(
-                                                        Token(SyntaxKind.RestoreKeyword),
-                                                        SeparatedList(DisabledWarnings.Select(w => (ExpressionSyntax)w.GetLiteralExpression())),
-                                                        isActive: true)),
+                                Trivia(
+                                   PragmaWarningDirectiveTrivia(
+                                       Token(SyntaxKind.RestoreKeyword),
+                                       SeparatedList(DisabledWarnings.Select(str =>
+                                       {
+                                           var syntaxToken = SyntaxFactory.Literal(
+                                                SyntaxFactory.TriviaList(),
+                                                str,
+                                                str,
+                                                SyntaxFactory.TriviaList());
+
+                                            return (ExpressionSyntax)SyntaxFactory.LiteralExpression(SyntaxKind.StringLiteralExpression, syntaxToken);
+                                       })),
+                                       isActive: true)),
                            }));
             }
-
 
             return CompilationUnit()
                 .WithAttributeLists(List(assemblyAttributes))
