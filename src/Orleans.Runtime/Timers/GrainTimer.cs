@@ -1,188 +1,164 @@
+#nullable enable
 using System;
+using System.Diagnostics.CodeAnalysis;
+using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
-using Orleans.Runtime.Scheduler;
+using Orleans.Runtime.Internal;
 
-namespace Orleans.Runtime
+namespace Orleans.Runtime;
+
+internal sealed class GrainTimer : IGrainTimer, IAsyncDisposable
 {
-    internal sealed class GrainTimer : IGrainTimer
+    // PeriodicTimer only supports periods equal to -1ms (infinite timeout) or >= 1ms
+    private static readonly TimeSpan MinimumPeriod = TimeSpan.FromTicks(TimeSpan.TicksPerMillisecond);
+    private readonly PeriodicTimer _timer;
+    private readonly Func<object?, Task> _callback;
+    private readonly ILogger _logger;
+    private readonly IGrainContext _grainContext;
+    private readonly Task _processingTask;
+    private readonly object? _state;
+    private TimeSpan _dueTime;
+    private TimeSpan _period;
+    private bool _changed;
+
+    public GrainTimer(IGrainContext grainContext, ILogger logger, Func<object?, Task> callback, object? state, TimeProvider timeProvider)
     {
-        private Func<object, Task> asyncCallback;
-        private AsyncTaskSafeTimer timer;
-        private readonly TimeSpan dueTime;
-        private readonly TimeSpan timerFrequency;
-        private DateTime previousTickTime;
-        private int totalNumTicks;
-        private readonly ILogger logger;
-        private volatile Task currentlyExecutingTickTask;
-        private readonly object currentlyExecutingTickTaskLock = new();
-        private readonly IGrainContext grainContext;
+        ArgumentNullException.ThrowIfNull(grainContext);
+        ArgumentNullException.ThrowIfNull(logger);
+        ArgumentNullException.ThrowIfNull(callback);
 
-        public string Name { get; }
-
-        private bool TimerAlreadyStopped { get { return timer == null || asyncCallback == null; } }
-
-        private GrainTimer(IGrainContext activationData, ILogger logger, Func<object, Task> asyncCallback, object state, TimeSpan dueTime, TimeSpan period, string name)
+        if (RuntimeContext.Current is null)
         {
-            var ctxt = RuntimeContext.Current;
-            if (ctxt is null)
-            {
-                throw new InvalidSchedulingContextException(
-                    "Current grain context is null. "
-                     + "Please make sure you are not trying to create a Timer from outside Orleans Task Scheduler, "
-                     + "which will be the case if you create it inside Task.Run.");
-            }
-
-            this.grainContext = activationData;
-            this.logger = logger;
-            this.Name = name;
-            this.asyncCallback = asyncCallback;
-            timer = new AsyncTaskSafeTimer(logger,
-                stateObj => TimerTick(stateObj, ctxt),
-                state);
-            this.dueTime = dueTime;
-            timerFrequency = period;
-            previousTickTime = DateTime.UtcNow;
-            totalNumTicks = 0;
+            ThrowInvalidSchedulingContext();
         }
 
-        internal static IGrainTimer FromTaskCallback(
-            ILogger logger,
-            Func<object, Task> asyncCallback,
-            object state,
-            TimeSpan dueTime,
-            TimeSpan period,
-            string name = null,
-            IGrainContext grainContext = null)
+        if (!Equals(RuntimeContext.Current, grainContext))
         {
-            return new GrainTimer(grainContext, logger, asyncCallback, state, dueTime, period, name);
+            ThrowIncorrectGrainContext();
         }
 
-        public void Start()
+        // Avoid capturing async locals.
+        using (new ExecutionContextSuppressor())
         {
-            if (TimerAlreadyStopped)
-                throw new ObjectDisposedException(string.Format("The timer {0} was already disposed.", GetFullName()));
-
-            timer.Start(dueTime, timerFrequency);
+            _grainContext = grainContext;
+            _logger = logger;
+            _callback = callback;
+            _timer = new PeriodicTimer(Timeout.InfiniteTimeSpan, timeProvider);
+            _state = state;
+            _dueTime = Timeout.InfiniteTimeSpan;
+            _period = Timeout.InfiniteTimeSpan;
+            _processingTask = ProcessTimerTicks();
         }
+    }
 
-        public void Stop()
-        {
-            asyncCallback = null;
-        }
+    [DoesNotReturn]
+    private static void ThrowIncorrectGrainContext() => throw new InvalidOperationException("Current grain context differs from specified grain context.");
 
-        private async Task TimerTick(object state, IGrainContext context)
+    [DoesNotReturn]
+    private static void ThrowInvalidSchedulingContext()
+    {
+        throw new InvalidSchedulingContextException(
+            "Current grain context is null. "
+             + "Please make sure you are not trying to create a Timer from outside Orleans Task Scheduler, "
+             + "which will be the case if you create it inside Task.Run.");
+    }
+
+    private async Task ProcessTimerTicks()
+    {
+        // Yield immediately to let the caller continue.
+        await Task.Yield();
+
+        while (await _timer.WaitForNextTickAsync())
         {
-            if (TimerAlreadyStopped)
-                return;
+            _changed = false;
             try
             {
-                // Schedule call back to grain context
-                var workItem = new AsyncClosureWorkItem(() => ForwardToAsyncCallback(state), this.Name, context);
-                context.Scheduler.QueueWorkItem(workItem);
-                await workItem.Task;
-            }
-            catch (InvalidSchedulingContextException exc)
-            {
-                logger.LogError(
-                    (int)ErrorCode.Timer_InvalidContext,
-                    exc,
-                    "Caught an InvalidSchedulingContextException on timer {TimerName}, context is {GrainContext}. Going to dispose this timer!",
-                    GetFullName(),
-                    context);
-                DisposeTimer();
-            }
-        }
-
-        private async Task ForwardToAsyncCallback(object state)
-        {
-            // AsyncSafeTimer ensures that calls to this method are serialized.
-            if (TimerAlreadyStopped) return;
-
-            try
-            {
-                RequestContext.Clear(); // Clear any previous RC, so it does not leak into this call by mistake.
-                lock (this.currentlyExecutingTickTaskLock)
+                if (_logger.IsEnabled(LogLevel.Trace))
                 {
-                    if (TimerAlreadyStopped) return;
-
-                    totalNumTicks++;
-
-                    if (logger.IsEnabled(LogLevel.Trace))
-                        logger.LogTrace((int)ErrorCode.TimerBeforeCallback, "About to make timer callback for timer {TimerName}", GetFullName());
-
-                    currentlyExecutingTickTask = asyncCallback(state);
+                    _logger.LogTrace((int)ErrorCode.TimerBeforeCallback, "About to make timer callback for timer {TimerName}", GetDiagnosticName());
                 }
-                await currentlyExecutingTickTask;
 
-                if (logger.IsEnabled(LogLevel.Trace)) logger.LogTrace((int)ErrorCode.TimerAfterCallback, "Completed timer callback for timer {TimerName}", GetFullName());
+                await _callback(_state);
+
+                if (_logger.IsEnabled(LogLevel.Trace))
+                {
+                    _logger.LogTrace((int)ErrorCode.TimerAfterCallback, "Completed timer callback for timer {TimerName}", GetDiagnosticName());
+                }
             }
             catch (Exception exc)
             {
-                logger.LogError(
+                _logger.LogError(
                     (int)ErrorCode.Timer_GrainTimerCallbackError,
                     exc,
                     "Caught and ignored exception thrown from timer callback for timer {TimerName}",
-                    GetFullName());
+                    GetDiagnosticName());
             }
-            finally
+
+            // Resume regular ticking if the period was not changed during the iteration.
+            if (!_changed && _timer.Period != _period)
             {
-                previousTickTime = DateTime.UtcNow;
-                currentlyExecutingTickTask = null;
-                // if this is not a repeating timer, then we can
-                // dispose of the timer.
-                if (timerFrequency == Constants.INFINITE_TIMESPAN)
-                    DisposeTimer();
+                try
+                {
+                    _timer.Period = _period;
+                }
+                catch (ObjectDisposedException)
+                {
+                    return;
+                }
             }
         }
+    }
 
-        public Task GetCurrentlyExecutingTickTask()
+    public void Change(TimeSpan dueTime, TimeSpan period)
+    {
+        ValidateArguments(dueTime, period);
+
+        _changed = true;
+        _dueTime = AdjustPeriod(dueTime);
+        _period = AdjustPeriod(period);
+        _timer.Period = _dueTime;
+
+        static TimeSpan AdjustPeriod(TimeSpan value)
         {
-            return currentlyExecutingTickTask ?? Task.CompletedTask;
-        }
-
-        private string GetFullName() => $"GrainTimer.{Name} TimerCallbackHandler:{asyncCallback?.Target}->{asyncCallback?.Method}";
-
-        // The reason we need to check CheckTimerFreeze on both the SafeTimer and this GrainTimer
-        // is that SafeTimer may tick OK (no starvation by .NET thread pool), but then scheduler.QueueWorkItem
-        // may not execute and starve this GrainTimer callback.
-        public bool CheckTimerFreeze(DateTime lastCheckTime)
-        {
-            if (TimerAlreadyStopped) return true;
-            // check underlying SafeTimer (checking that .NET thread pool does not starve this timer)
-            if (!timer.CheckTimerFreeze(lastCheckTime, () => Name)) return false;
-            // if SafeTimer failed the check, no need to check GrainTimer too, since it will fail as well.
-
-            // check myself (checking that scheduler.QueueWorkItem does not starve this timer)
-            return SafeTimerBase.CheckTimerDelay(previousTickTime, totalNumTicks,
-                dueTime, timerFrequency, logger, GetFullName, ErrorCode.Timer_TimerInsideGrainIsNotTicking, true);
-        }
-
-        public bool CheckTimerDelay()
-        {
-            return SafeTimerBase.CheckTimerDelay(previousTickTime, totalNumTicks,
-                dueTime, timerFrequency, logger, GetFullName, ErrorCode.Timer_TimerInsideGrainIsNotTicking, false);
-        }
-
-        public void Dispose()
-        {
-            DisposeTimer();
-            asyncCallback = null;
-        }
-
-        private void DisposeTimer()
-        {
-            var tmp = timer;
-            if (tmp == null) return;
-
-            Utils.SafeExecute(tmp.Dispose);
-            timer = null;
-            lock (this.currentlyExecutingTickTaskLock)
+            // Period must be either -1ms (infinite timeout) or >= 1ms
+            if (value != Timeout.InfiniteTimeSpan && value <= MinimumPeriod)
             {
-                asyncCallback = null;
+                // Adjust period to 1ms if it is out of bounds. In practice,
+                // this is smaller than the timer resolution, so the difference is imperceptible.
+                return MinimumPeriod;
             }
 
-            grainContext?.GetComponent<IGrainTimerRegistry>().OnTimerDisposed(this);
+            return value;
         }
+    }
+
+    private static void ValidateArguments(TimeSpan dueTime, TimeSpan period)
+    {
+        // See https://github.com/dotnet/runtime/blob/78b5f40a60d9e095abb2b0aabd8c062b171fb9ab/src/libraries/System.Private.CoreLib/src/System/Threading/Timer.cs#L824-L825
+        const uint MaxSupportedTimeout = 0xfffffffe;
+
+        // See https://github.com/dotnet/runtime/blob/78b5f40a60d9e095abb2b0aabd8c062b171fb9ab/src/libraries/System.Private.CoreLib/src/System/Threading/Timer.cs#L927-L930
+        long dueTm = (long)dueTime.TotalMilliseconds;
+        ArgumentOutOfRangeException.ThrowIfLessThan(dueTm, -1, nameof(dueTime));
+        ArgumentOutOfRangeException.ThrowIfGreaterThan(dueTm, MaxSupportedTimeout, nameof(dueTime));
+
+        long periodTm = (long)period.TotalMilliseconds;
+        ArgumentOutOfRangeException.ThrowIfLessThan(periodTm, -1, nameof(period));
+        ArgumentOutOfRangeException.ThrowIfGreaterThan(periodTm, MaxSupportedTimeout, nameof(period));
+    }
+
+    private string GetDiagnosticName() => $"GrainTimer TimerCallbackHandler:{_callback?.Target}->{_callback?.Method}";
+
+    public void Dispose()
+    {
+        _timer.Dispose();
+        _grainContext.GetComponent<IGrainTimerRegistry>()?.OnTimerDisposed(this);
+    }
+
+    async ValueTask IAsyncDisposable.DisposeAsync()
+    {
+        Dispose();
+        await _processingTask;
     }
 }

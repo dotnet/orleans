@@ -7,6 +7,7 @@ using Microsoft.Extensions.Logging;
 using Orleans.GrainReferences;
 using Orleans.Runtime.Scheduler;
 using Orleans.Serialization.Invocation;
+using Orleans.Timers;
 
 namespace Orleans.Runtime
 {
@@ -168,25 +169,23 @@ namespace Orleans.Runtime
         /// </param>
         /// <param name="period">
         /// The time interval between invocations of <paramref name="asyncCallback"/>.
-        /// Specify <see cref="System.Threading.Timeout.InfiniteTimeSpan"/> to disable periodic signalling.
+        /// Specify <see cref="System.Threading.Timeout.InfiniteTimeSpan"/> to disable periodic signaling.
         /// </param>
-        /// <param name="name">The timer name.</param>
         /// <returns>
         /// An <see cref="IDisposable"/> object which will cancel the timer upon disposal.
         /// </returns>
-        public IDisposable RegisterTimer(Func<object, Task> asyncCallback, object state, TimeSpan dueTime, TimeSpan period, string name = null)
-            => RegisterGrainTimer(asyncCallback, state, dueTime, period, name);
+        public IGrainTimer RegisterTimer(Func<object, Task> asyncCallback, object state, TimeSpan dueTime, TimeSpan period)
+            => RegisterGrainTimer(asyncCallback, state, dueTime, period);
 
         /// <summary>
-        /// Internal version of <see cref="RegisterTimer(Func{object, Task}, object, TimeSpan, TimeSpan, string)"/> that returns the inner IGrainTimer
+        /// Internal version of <see cref="RegisterTimer(Func{object, Task}, object?, TimeSpan, TimeSpan)"/> that returns the inner IGrainTimer
         /// </summary>
-        internal IGrainTimer RegisterGrainTimer(Func<object, Task> asyncCallback, object state, TimeSpan dueTime, TimeSpan period, string name = null)
+        internal IGrainTimer RegisterGrainTimer(Func<object, Task> asyncCallback, object state, TimeSpan dueTime, TimeSpan period)
         {
             var ctxt = RuntimeContext.Current;
-            name = name ?? ctxt.GrainId + "Timer";
 
-            var timer = GrainTimer.FromTaskCallback(this.timerLogger, asyncCallback, state, dueTime, period, name);
-            timer.Start();
+            var timer = new GrainTimer(this, this.timerLogger, asyncCallback, state, RuntimeClient.TimeProvider);
+            timer.Change(dueTime, period);
             return timer;
         }
 

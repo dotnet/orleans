@@ -34,14 +34,26 @@ namespace Orleans.Configuration
         public static readonly TimeSpan DefaultLeaseRenewPeriod = TimeSpan.FromSeconds(29); 
 
         /// <summary>
-        /// Gets or sets how often balancer attempts to aquire leases.
+        /// Gets or sets how often balancer attempts to acquire leases.
         /// </summary>
-        public TimeSpan LeaseAquisitionPeriod { get; set; } = DefaultMinLeaseAquisitionPeriod;
+        public TimeSpan LeaseAcquisitionPeriod { get; set; } = DefaultMinLeaseAcquisitionPeriod;
 
         /// <summary>
-        /// The default minimum lease aquisition period.
+        /// Gets or sets how often balancer attempts to acquire leases.
         /// </summary>
-        public static readonly TimeSpan DefaultMinLeaseAquisitionPeriod = TimeSpan.FromSeconds(30);
+        [Obsolete($"Use {nameof(LeaseAcquisitionPeriod)} instead.", error: true)]
+        public TimeSpan LeaseAquisitionPeriod { get => LeaseAcquisitionPeriod; set => LeaseAcquisitionPeriod = value; }
+
+        /// <summary>
+        /// The default minimum lease acquisition period.
+        /// </summary>
+        public static readonly TimeSpan DefaultMinLeaseAcquisitionPeriod = TimeSpan.FromSeconds(30);
+
+        /// <summary>
+        /// The default minimum lease acquisition period.
+        /// </summary>
+        [Obsolete($"Use {nameof(DefaultMinLeaseAcquisitionPeriod)} instead.", error: true)]
+        public static readonly TimeSpan DefaultMinLeaseAquisitionPeriod = DefaultMinLeaseAcquisitionPeriod;
 
         /// <summary>
         /// Gets or sets the lease category, allows for more fine grain partitioning of leases.

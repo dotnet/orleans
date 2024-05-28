@@ -547,6 +547,18 @@ public class GeneratedSerializerTests : IDisposable
     }
 
     [Fact]
+    public void TypeDerivedFromList()
+    {
+        var original = new SerializableClassWithCompiledBase { IntProperty = 30 };
+        original.Add(1);
+        original.Add(200);
+        var result = RoundTripThroughCodec(original);
+
+        Assert.Equal(original.IntProperty, result.IntProperty);
+        Assert.True(original.SequenceEqual(result));
+    }
+
+    [Fact]
     public void TypeDerivedFromDictionary()
     {
         var original = new DerivedFromDictionary<string, int>(StringComparer.OrdinalIgnoreCase)

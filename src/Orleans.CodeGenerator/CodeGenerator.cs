@@ -563,12 +563,17 @@ namespace Orleans.CodeGenerator
             return result;
         }
 
-        internal static AttributeSyntax GetGeneratedCodeAttributeSyntax() => GeneratedCodeAttributeSyntax;
-        private static readonly AttributeSyntax GeneratedCodeAttributeSyntax =
+        internal static AttributeListSyntax GetGeneratedCodeAttributes() => GeneratedCodeAttributeSyntax;
+        private static readonly AttributeListSyntax GeneratedCodeAttributeSyntax =
+            AttributeList().AddAttributes(
                 Attribute(ParseName("global::System.CodeDom.Compiler.GeneratedCodeAttribute"))
                     .AddArgumentListArguments(
                         AttributeArgument(CodeGeneratorName.GetLiteralExpression()),
-                        AttributeArgument(typeof(CodeGenerator).Assembly.GetName().Version.ToString().GetLiteralExpression()));
+                        AttributeArgument(typeof(CodeGenerator).Assembly.GetName().Version.ToString().GetLiteralExpression())),
+                Attribute(ParseName("global::System.ComponentModel.EditorBrowsableAttribute"))
+                    .AddArgumentListArguments(
+                        AttributeArgument(ParseName("global::System.ComponentModel.EditorBrowsableState").Member("Never")))
+            );
 
         internal static AttributeSyntax GetMethodImplAttributeSyntax() => MethodImplAttributeSyntax;
         private static readonly AttributeSyntax MethodImplAttributeSyntax =
@@ -718,11 +723,18 @@ namespace Orleans.CodeGenerator
             return description;
         }
 
-        internal ProxyMethodDescription GetProxyMethodDescription(INamedTypeSymbol interfaceType, IMethodSymbol method, bool hasCollision)
+        internal ProxyMethodDescription GetProxyMethodDescription(INamedTypeSymbol interfaceType, IMethodSymbol method)
         {
             var originalMethod = method.OriginalDefinition;
             var proxyBaseInfo = GetProxyBase(interfaceType);
-            var invokableId = new InvokableMethodId(proxyBaseInfo, originalMethod);
+
+            // For extensions, we want to ensure that the containing type is always the extension.
+            // This ensures that we will always know which 'component' to get in our SetTarget method.
+            // If the type is not an extension, use the original method definition's containing type.
+            // This is the interface where the type was originally defined.
+            var containingType = proxyBaseInfo.IsExtension ? interfaceType : originalMethod.ContainingType;
+
+            var invokableId = new InvokableMethodId(proxyBaseInfo, containingType, originalMethod);
             var interfaceDescription = GetInvokableInterfaceDescription(invokableId.ProxyBase.ProxyBaseType, interfaceType);
 
             // Get or generate an invokable for the original method definition.
@@ -730,7 +742,7 @@ namespace Orleans.CodeGenerator
             {
                 if (!_invokableMethodDescriptions.TryGetValue(invokableId, out var methodDescription))
                 {
-                    methodDescription = _invokableMethodDescriptions[invokableId] = InvokableMethodDescription.Create(invokableId);
+                    methodDescription = _invokableMethodDescriptions[invokableId] = InvokableMethodDescription.Create(invokableId, containingType);
                 }
 
                 generatedInvokable = MetadataModel.GeneratedInvokables[invokableId] = InvokableGenerator.Generate(methodDescription);
@@ -750,12 +762,12 @@ namespace Orleans.CodeGenerator
                 }
             }
 
-            var proxyMethodDescription = ProxyMethodDescription.Create(interfaceDescription, generatedInvokable, method, hasCollision);
+            var proxyMethodDescription = ProxyMethodDescription.Create(interfaceDescription, generatedInvokable, method);
 
             // For backwards compatibility, generate invokers for the specific implementation types as well, where they differ.
             if (Options.GenerateCompatibilityInvokers && !SymbolEqualityComparer.Default.Equals(method.OriginalDefinition.ContainingType, interfaceType))
             {
-                var compatInvokableId = new InvokableMethodId(proxyBaseInfo, method);
+                var compatInvokableId = new InvokableMethodId(proxyBaseInfo, interfaceType, method);
                 var compatMethodDescription = InvokableMethodDescription.Create(compatInvokableId, interfaceType);
                 var compatInvokable = InvokableGenerator.Generate(compatMethodDescription);
                 AddMember(compatInvokable.GeneratedNamespace, compatInvokable.ClassDeclarationSyntax);

@@ -73,7 +73,7 @@ namespace Orleans.Hosting
             this.ConfigureComponent((s,n) => s.GetRequiredKeyedService<IStreamProvider>(n) as IControllable);
             this.ConfigureDelegate(services => services.AddSingleton(sp => PersistentStreamProvider.ParticipateIn<ISiloLifecycle>(sp, this.Name)));
             this.ConfigureComponent(adapterFactory);
-            this.ConfigureComponent(PersistentStreamStorageConfigurationValidator.Create);
+            this.ConfigureDelegate(services => services.AddSingleton(sp => PersistentStreamStorageConfigurationValidator.Create(sp, this.Name)));
         }
     }
 }

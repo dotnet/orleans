@@ -6,6 +6,7 @@ using Orleans.Streams;
 using Xunit;
 using Xunit.Abstractions;
 using TestExtensions;
+using System.Net;
 
 namespace UnitTests.LivenessTests
 {
@@ -29,7 +30,7 @@ namespace UnitTests.LivenessTests
         public void ConsistentRingProvider_Test1()
         {
             SiloAddress silo1 = SiloAddressUtils.NewLocalSiloAddress(0);
-            ConsistentRingProvider ring = new ConsistentRingProvider(silo1, NullLoggerFactory.Instance);
+            ConsistentRingProvider ring = new ConsistentRingProvider(silo1, NullLoggerFactory.Instance, new FakeSiloStatusOracle());
             output.WriteLine("Silo1 range: {0}. The whole ring is: {1}", ring.GetMyRange(), ring.ToString());
 
             ring.AddServer(SiloAddressUtils.NewLocalSiloAddress(1));
@@ -43,8 +44,7 @@ namespace UnitTests.LivenessTests
         public void ConsistentRingProvider_Test2()
         {
             SiloAddress silo1 = SiloAddressUtils.NewLocalSiloAddress(0);
-            VirtualBucketsRingProvider ring = new VirtualBucketsRingProvider(silo1, NullLoggerFactory.Instance, 30);
-            //ring.logger.SetSeverityLevel(Severity.Warning);
+            VirtualBucketsRingProvider ring = new VirtualBucketsRingProvider(silo1, NullLoggerFactory.Instance, 30, new FakeSiloStatusOracle());
             output.WriteLine("\n\n*** Silo1 range: {0}.\n*** The whole ring with 1 silo is:\n{1}\n\n", ring.GetMyRange(), ring.ToString());
 
             for (int i = 1; i <= 10; i++)
@@ -63,8 +63,7 @@ namespace UnitTests.LivenessTests
 
             Random random = new Random();
             SiloAddress silo1 = SiloAddressUtils.NewLocalSiloAddress(random.Next(100000));
-            VirtualBucketsRingProvider ring = new VirtualBucketsRingProvider(silo1, NullLoggerFactory.Instance, 50);
-            //ring.logger.SetSeverityLevel(Severity.Warning);
+            VirtualBucketsRingProvider ring = new VirtualBucketsRingProvider(silo1, NullLoggerFactory.Instance, 50, new FakeSiloStatusOracle());
             
             for (int i = 1; i <= NUM_SILOS - 1; i++)
             {
@@ -125,6 +124,63 @@ namespace UnitTests.LivenessTests
             }
             //queueHistogram.Sort((t1, t2) => t1.Item2.CompareTo(t2.Item2));
             return queueHistogram;
+        }
+
+        internal sealed class FakeSiloStatusOracle : ISiloStatusOracle
+        {
+            private readonly Dictionary<SiloAddress, SiloStatus> _content = [];
+            private readonly HashSet<ISiloStatusListener> _subscribers = [];
+
+            public FakeSiloStatusOracle()
+            {
+                SiloAddress = SiloAddress.New(IPAddress.Loopback, Random.Shared.Next(2000, 40_000), SiloAddress.AllocateNewGeneration());
+                _content[SiloAddress] = SiloStatus.Active;
+            }
+
+            public SiloStatus CurrentStatus => SiloStatus.Active;
+
+            public string SiloName => "TestSilo";
+
+            public SiloAddress SiloAddress { get; }
+
+            public SiloStatus GetApproximateSiloStatus(SiloAddress siloAddress)
+            {
+                if (_content.TryGetValue(siloAddress, out var status))
+                {
+                    return status;
+                }
+                return SiloStatus.None;
+            }
+
+            public Dictionary<SiloAddress, SiloStatus> GetApproximateSiloStatuses(bool onlyActive = false)
+            {
+                return onlyActive
+                    ? new Dictionary<SiloAddress, SiloStatus>(_content.Where(kvp => kvp.Value == SiloStatus.Active))
+                    : new Dictionary<SiloAddress, SiloStatus>(_content);
+            }
+
+            public void SetSiloStatus(SiloAddress siloAddress, SiloStatus status)
+            {
+                _content[siloAddress] = status;
+                foreach (var subscriber in _subscribers)
+                {
+                    subscriber.SiloStatusChangeNotification(siloAddress, status);
+                }
+            }
+
+            public bool IsDeadSilo(SiloAddress silo) => GetApproximateSiloStatus(silo) == SiloStatus.Dead;
+
+            public bool IsFunctionalDirectory(SiloAddress siloAddress) => !GetApproximateSiloStatus(siloAddress).IsTerminating();
+
+            public bool SubscribeToSiloStatusEvents(ISiloStatusListener observer) => _subscribers.Add(observer);
+
+            public bool TryGetSiloName(SiloAddress siloAddress, out string siloName)
+            {
+                siloName = "TestSilo";
+                return true;
+            }
+
+            public bool UnSubscribeFromSiloStatusEvents(ISiloStatusListener observer) => _subscribers.Remove(observer);
         }
     }
 }

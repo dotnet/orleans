@@ -229,31 +229,8 @@ namespace Orleans.Runtime.MembershipService
                 Exception exception;
                 try
                 {
-                    using var cancellation = new CancellationTokenSource(timeout);
-                    var probeTask = siloProber.Probe(silo, 0);
-                    var cancellationTask = cancellation.Token.WhenCancelled();
-                    var completedTask = await Task.WhenAny(probeTask, cancellationTask).ConfigureAwait(false);
-
-                    if (ReferenceEquals(completedTask, probeTask))
-                    {
-                        cancellation.Cancel();
-                        if (probeTask.IsFaulted)
-                        {
-                            exception = probeTask.Exception;
-                        }
-                        else if (probeTask.Status == TaskStatus.RanToCompletion)
-                        {
-                            return true;
-                        }
-                        else
-                        {
-                            exception = null;
-                        }
-                    }
-                    else
-                    {
-                        exception = null;
-                    }
+                    await siloProber.Probe(silo, 0).WaitAsync(timeout);
+                    return true;
                 }
                 catch (Exception ex)
                 {

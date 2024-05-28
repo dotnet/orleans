@@ -13,6 +13,8 @@ namespace Orleans.Clustering.AdoNet.Storage
 namespace Orleans.Persistence.AdoNet.Storage
 #elif REMINDERS_ADONET
 namespace Orleans.Reminders.AdoNet.Storage
+#elif STREAMING_ADONET
+namespace Orleans.Streaming.AdoNet.Storage
 #elif TESTER_SQLUTILS
 namespace Orleans.Tests.SqlUtils
 #else
@@ -213,8 +215,9 @@ namespace Orleans.Tests.SqlUtils
         private static async Task<Tuple<IEnumerable<TResult>, int>> SelectAsync<TResult>(DbDataReader reader, Func<IDataReader, int, CancellationToken, Task<TResult>> selector, CancellationToken cancellationToken)
         {
             var results = new List<TResult>();
-            int resultSetCount = 0;
-            while (reader.HasRows)
+            var resultSetCount = 0;
+
+            do
             {
                 while (await reader.ReadAsync(cancellationToken).ConfigureAwait(continueOnCapturedContext: false))
                 {
@@ -222,13 +225,12 @@ namespace Orleans.Tests.SqlUtils
                     results.Add(obj);
                 }
 
-                await reader.NextResultAsync(cancellationToken).ConfigureAwait(false);
                 ++resultSetCount;
-            }
+
+            } while (await reader.NextResultAsync(cancellationToken).ConfigureAwait(false));
 
             return Tuple.Create(results.AsEnumerable(), reader.RecordsAffected);
         }
-
 
         private async Task<Tuple<IEnumerable<TResult>, int>> ExecuteReaderAsync<TResult>(DbCommand command, Func<IDataRecord, int, CancellationToken, Task<TResult>> selector, CommandBehavior commandBehavior, CancellationToken cancellationToken)
         {

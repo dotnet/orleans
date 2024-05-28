@@ -73,6 +73,20 @@ namespace DefaultCluster.Tests.General
             Assert.Equal("B3", await serviceRef.B3Method());
         }
 
+        [Fact, TestCategory("BVT"), TestCategory("Cast")]
+        public async Task Polymorphic_InheritedMethodAmbiguity()
+        {
+            // Tests interface inheritance hierarchies which involve duplicate method names, requiring casting to resolve the ambiguity.
+            var grainFullName = typeof(ServiceType).FullName;
+            var serviceRef = this.GrainFactory.GetGrain<IServiceType>(GetRandomGrainId(), grainFullName);
+            var ia = (IA)serviceRef;
+            var ib = (IB)serviceRef;
+            var ic = (IC)serviceRef;
+            Assert.Equal("IA", await ia.CommonMethod());
+            Assert.Equal("IB", await ib.CommonMethod());
+            Assert.Equal("IC", await ic.CommonMethod());
+        }
+
         /// <summary>
         /// This unit test should consolidate all the use cases we are trying to cover with regard to polymorphic grain references
         /// </summary>
