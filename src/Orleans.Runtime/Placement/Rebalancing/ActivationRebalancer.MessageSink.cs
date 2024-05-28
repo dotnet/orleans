@@ -65,7 +65,7 @@ internal partial class ActivationRebalancer : IMessageStatisticsSink
                     }
 
                     EdgeVertex sourceVertex;
-                    if (_anchoredGrainIds.Contains(message.SendingGrain))
+                    if (_anchoredGrainIds.Contains(message.SendingGrain) && Silo.Equals(message.SendingSilo))
                     {
                         sourceVertex = new(GrainId, Silo, isMigratable: false);
                     }
@@ -75,7 +75,7 @@ internal partial class ActivationRebalancer : IMessageStatisticsSink
                     }
 
                     EdgeVertex destinationVertex;
-                    if (_anchoredGrainIds.Contains(message.TargetGrain))
+                    if (_anchoredGrainIds.Contains(message.TargetGrain) && Silo.Equals(message.TargetSilo))
                     {
                         destinationVertex = new(GrainId, Silo, isMigratable: false);
                     }

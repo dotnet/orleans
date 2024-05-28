@@ -50,6 +50,11 @@
     <PackageVersion Include="Azure.Messaging.EventHubs" Version="5.9.3" />
     <PackageVersion Include="Azure.Storage.Blobs" Version="12.18.0" />
     <PackageVersion Include="Azure.Storage.Queues" Version="12.16.0" />
+    <!-- Aspire -->
+    <PackageVersion Include="Aspire.Hosting.AppHost" Version="8.0.1" />
+    <PackageVersion Include="Aspire.Hosting.Orleans" Version="8.0.1" />
+    <PackageVersion Include="Aspire.Hosting.Redis" Version="8.0.1" />
+    <PackageVersion Include="Aspire.StackExchange.Redis" Version="8.0.1" />
     <!-- 3rd party packages -->
     <PackageVersion Include="Google.Cloud.PubSub.V1" Version="1.0.0-beta13" />
     <PackageVersion Include="AWSSDK.DynamoDBv2" Version="3.7.300.6" />

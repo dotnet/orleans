@@ -29,6 +29,7 @@ internal sealed partial class ActivationRebalancer : SystemTarget, IActivationRe
     private readonly IInternalGrainFactory _grainFactory;
     private readonly IRebalancingMessageFilter _messageFilter;
     private readonly IImbalanceToleranceRule _toleranceRule;
+    private readonly IActivationMigrationManager _migrationManager;
     private readonly ActivationDirectory _activationDirectory;
     private readonly TimeProvider _timeProvider;
     private readonly ActiveRebalancingOptions _options;
@@ -48,6 +49,7 @@ internal sealed partial class ActivationRebalancer : SystemTarget, IActivationRe
         IInternalGrainFactory internalGrainFactory,
         IRebalancingMessageFilter messageFilter,
         IImbalanceToleranceRule toleranceRule,
+        IActivationMigrationManager migrationManager,
         ActivationDirectory activationDirectory,
         Catalog catalog,
         IOptions<ActiveRebalancingOptions> options,
@@ -60,6 +62,7 @@ internal sealed partial class ActivationRebalancer : SystemTarget, IActivationRe
         _grainFactory = internalGrainFactory;
         _messageFilter = messageFilter;
         _toleranceRule = toleranceRule;
+        _migrationManager = migrationManager;
         _activationDirectory = activationDirectory;
         _timeProvider = timeProvider;
         _edgeWeights = new((int)options.Value.MaxEdgeCount);
@@ -87,6 +90,7 @@ internal sealed partial class ActivationRebalancer : SystemTarget, IActivationRe
     {
         _pendingMessages.Clear();
         _edgeWeights.Clear();
+        _anchoredGrainIds.Reset();
         return ValueTask.CompletedTask;
     }
 
@@ -301,6 +305,7 @@ internal sealed partial class ActivationRebalancer : SystemTarget, IActivationRe
 
                 // We will perform any future operations assuming the vector is remote.
                 chosenVertex.Location = VertexLocation.Remote;
+                Debug.Assert(((IHeapElement<CandidateVertexHeapElement>)chosenVertex).HeapIndex == -1);
 
                 return true;
             }
@@ -339,7 +344,7 @@ internal sealed partial class ActivationRebalancer : SystemTarget, IActivationRe
             bool TryMigrateCore(MaxHeap<CandidateVertexHeapElement> sourceHeap, int localDelta, int remoteDelta, [NotNullWhen(true)] out CandidateVertexHeapElement? chosenVertex)
             {
                 var anticipatedImbalance = CalculateImbalance(localActivations + localDelta, remoteActivations + remoteDelta);
-                if (anticipatedImbalance >= initialImbalance && !_toleranceRule.IsSatisfiedBy((uint)anticipatedImbalance))
+                if (anticipatedImbalance >= imbalance && !_toleranceRule.IsSatisfiedBy((uint)anticipatedImbalance))
                 {
                     // Taking from this heap would not improve imbalance.
                     chosenVertex = null;
@@ -376,7 +381,7 @@ internal sealed partial class ActivationRebalancer : SystemTarget, IActivationRe
         }
     }
 
-    private static int CalculateImbalance(int left, int right) => (int)Math.Abs(Math.Abs((long)left) - Math.Abs((long)right));
+    private static int CalculateImbalance(int left, int right) => Math.Abs(Math.Abs(left) - Math.Abs(right));
     private static (MaxHeap<CandidateVertexHeapElement> Local, MaxHeap<CandidateVertexHeapElement> Remote) CreateCandidateHeaps(List<CandidateVertex> local, ImmutableArray<CandidateVertex> remote)
     {
         Dictionary<GrainId, CandidateVertex> sourceIndex = new(local.Count + remote.Length);
@@ -454,31 +459,29 @@ internal sealed partial class ActivationRebalancer : SystemTarget, IActivationRe
     private async Task FinalizeProtocol(ImmutableArray<GrainId> giving, ImmutableArray<GrainId> accepting, SiloAddress targetSilo, HashSet<GrainId> newlyAnchoredGrains)
     {
         // The protocol concluded that 'this' silo should take on 'set', so we hint to the director accordingly.
-        RequestContext.Set(IPlacementDirector.PlacementHintKey, targetSilo);
-        List<Task> migrationTasks = [];
-
-        foreach (var grainId in giving)
-        {
-            migrationTasks.Add(_grainFactory.GetGrain(grainId).Cast<IGrainManagementExtension>().MigrateOnIdle().AsTask());
-        }
-
         try
         {
-            await Task.WhenAll(migrationTasks);
+            Dictionary<string, object> migrationRequestContext = new() { [IPlacementDirector.PlacementHintKey] = targetSilo };
+            foreach (var grainId in giving)
+            {
+                if (_activationDirectory.FindTarget(grainId) is { } localActivation)
+                {
+                    localActivation.Migrate(migrationRequestContext);
+                }
+            }
         }
-        catch
+        catch (Exception exception)
         {
             // This should happen rarely, but at this point we cant really do much, as its out of our control.
             // Even if some fail, the algorithm will eventually run again, so activations will have more chances to migrate.
-            var aggEx = new AggregateException(migrationTasks.Select(t => t.Exception).Where(ex => ex is not null)!);
-            LogErrorOnMigratingActivations(aggEx);
+            LogErrorOnMigratingActivations(exception);
         }
 
         // Avoid mutating the source while enumerating it.
         var iterations = 0;
         var toRemove = new List<Edge>();
-
         var affected = new HashSet<GrainId>(giving.Length + accepting.Length);
+
         _logger.LogInformation("Adding {NewlyAnchoredGrains} newly anchored grains to set on host {Silo}. EdgeWeights contains {EdgeWeightCount} elements.", newlyAnchoredGrains.Count, Silo, _edgeWeights.Count);
         foreach (var id in newlyAnchoredGrains)
         {
@@ -498,7 +501,7 @@ internal sealed partial class ActivationRebalancer : SystemTarget, IActivationRe
         var yieldStopwatch = CoarseStopwatch.StartNew();
         if (affected.Count > 0)
         {
-            foreach (var (edge, count, error) in _edgeWeights.Elements)
+            foreach (var (edge, _, _) in _edgeWeights.Elements)
             {
                 if (affected.Contains(edge.Source.Id) || affected.Contains(edge.Target.Id) || _anchoredGrainIds.Contains(edge.Source.Id) || _anchoredGrainIds.Contains(edge.Target.Id))
                 {
@@ -579,13 +582,13 @@ internal sealed partial class ActivationRebalancer : SystemTarget, IActivationRe
                 }
             }
 
-            var totalAccScore = accRemoteScore - accLocalScore;
-            if (totalAccScore <= 0)
+            if (accLocalScore >= accRemoteScore)
             {
                 // We skip vertices for which local calls outweigh the remote ones.
                 continue;
             }
 
+            var totalAccScore = accRemoteScore - accLocalScore;
             var connVertices = ImmutableArray.CreateBuilder<CandidateConnectedVertex>();
             foreach (var edge in grainEdges)
             {
@@ -632,7 +635,23 @@ internal sealed partial class ActivationRebalancer : SystemTarget, IActivationRe
 
             if (accLocalScore > accRemoteScore)
             {
-                anchoredGrains.Add(grainEdges.Key);
+
+
+
+
+               // anchoredGrains.Add(grainEdges.Key);
+                
+
+                
+                
+
+                
+                
+
+                
+                
+
+                
             }
         }
 
@@ -738,6 +757,17 @@ internal sealed partial class ActivationRebalancer : SystemTarget, IActivationRe
     void ISiloStatusListener.SiloStatusChangeNotification(SiloAddress updatedSilo, SiloStatus status)
     {
         _enableMessageSampling = _siloStatusOracle.GetActiveSilos().Length > 1;
+    }
+
+    public ValueTask<ImmutableArray<(Edge, ulong)>> GetGrainCallFrequencies()
+    {
+        var result = ImmutableArray.CreateBuilder<(Edge, ulong)>(_edgeWeights.Count);
+        foreach (var (edge, count, _) in _edgeWeights.Elements)
+        {
+            result.Add((edge, count));
+        }
+
+        return new(result.ToImmutable());
     }
 
     private enum Direction : byte

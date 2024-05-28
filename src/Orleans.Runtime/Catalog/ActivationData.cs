@@ -870,7 +870,7 @@ internal sealed class ActivationData : IGrainContext, ICollectibleGrainContext, 
 
                     // If the activation is not valid, reject all pending messages except for local-only messages.
                     // Local-only messages are used for internal system operations and should not be rejected.
-                    if (State != ActivationState.Valid && !message.IsLocalOnly)
+                    if (State != ActivationState.Valid && !(message.IsLocalOnly && State != ActivationState.Invalid))
                     {
                         ProcessRequestsToInvalidActivation();
                         break;

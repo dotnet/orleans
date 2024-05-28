@@ -33,6 +33,11 @@ internal interface IActivationRebalancerSystemTarget : ISystemTarget
     /// For use in testing only!
     /// </summary>
     ValueTask SetActivationCountOffset(int activationCountOffset);
+
+    /// <summary>
+    /// For diagnostics only.
+    /// </summary>
+    ValueTask<ImmutableArray<(Edge, ulong)>> GetGrainCallFrequencies();
 }
 
 // We use a readonly struct so that we can fully decouple the message-passing and potentially modifications to the Silo fields.

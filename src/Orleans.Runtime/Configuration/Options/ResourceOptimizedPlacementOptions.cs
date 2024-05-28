@@ -65,7 +65,7 @@ public sealed class ResourceOptimizedPlacementOptions
     /// <summary>
     /// The default value of <see cref="MaxAvailableMemoryWeight"/>.
     /// </summary>
-    public const int DEFAULT_MAX_AVAILABLE_MEMORY_WEIGHT = 10;
+    public const int DEFAULT_MAX_AVAILABLE_MEMORY_WEIGHT = 0;
 
     /// <summary>
     /// The specified margin for which: if two silos (one of them being the local to the current pending activation), have a utilization score that should be considered "the same" within this margin.

@@ -96,6 +96,7 @@ internal sealed class MaxHeap<TElement> where TElement : notnull, IHeapElement<T
         foreach (var item in items)
         {
             nodes[i] = item;
+            Debug.Assert(item.HeapIndex == -1);
             item.HeapIndex = i;
             i++;
         }

@@ -8,8 +8,8 @@ public sealed class MaxHeapTests
     public class MyHeapElement(int value) : IHeapElement<MyHeapElement>
     {
         public int Value { get; set; } = value;
-        
-        public int HeapIndex { get; set; }
+
+        public int HeapIndex { get; set; } = -1;
 
         public int CompareTo(MyHeapElement other) => Value.CompareTo(other.Value);
         public override string ToString() => $"{Value} @ {HeapIndex}";

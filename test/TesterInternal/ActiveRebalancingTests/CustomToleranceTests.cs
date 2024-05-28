@@ -18,6 +18,7 @@ public class CustomToleranceTests(CustomToleranceTests.Fixture fixture) : Rebala
     [Fact]
     public async Task Should_ConvertAllRemoteCalls_ToLocalCalls_WhileRespectingTolerance()
     {
+        using var cts = new CancellationTokenSource(TimeSpan.FromMinutes(1));
         await AdjustActivationCountOffsets();
 
         var e1 = GrainFactory.GetGrain<IE>(1);
@@ -73,6 +74,7 @@ public class CustomToleranceTests(CustomToleranceTests.Fixture fixture) : Rebala
             e2_host = await e2.GetAddress();
             e3_host = await e3.GetAddress();
             f1_host = await f1.GetAddress();
+            cts.Token.ThrowIfCancellationRequested();
         }
         while (e2_host == Silo1 || e3_host == Silo1 || f1_host == Silo2);
 
