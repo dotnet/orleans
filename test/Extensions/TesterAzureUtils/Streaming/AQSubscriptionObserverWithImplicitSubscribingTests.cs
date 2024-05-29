@@ -27,8 +27,9 @@ namespace Tester.AzureUtils.Streaming
             public override async Task DisposeAsync()
             {
                 await base.DisposeAsync();
-                if (!string.IsNullOrWhiteSpace(TestDefaultConfiguration.DataConnectionString))
+                try
                 {
+                    TestUtils.CheckForAzureStorage();
                     await AzureQueueStreamProviderUtils.DeleteAllUsedAzureQueues(NullLoggerFactory.Instance,
                         AzureQueueUtilities.GenerateQueueNames($"{this.HostedCluster.Options.ClusterId}{StreamProviderName}", queueCount),
                         new AzureQueueOptions().ConfigureTestDefaults());
@@ -36,6 +37,10 @@ namespace Tester.AzureUtils.Streaming
                     await AzureQueueStreamProviderUtils.DeleteAllUsedAzureQueues(NullLoggerFactory.Instance,
                         AzureQueueUtilities.GenerateQueueNames($"{this.HostedCluster.Options.ClusterId}{StreamProviderName2}", queueCount),
                         new AzureQueueOptions().ConfigureTestDefaults());
+                }
+                catch (SkipException)
+                {
+                    // ignore
                 }
             }
         }

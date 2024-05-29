@@ -84,12 +84,17 @@ namespace Tester.AzureUtils.Streaming
 
         public async Task DisposeAsync()
         {
-            if (!string.IsNullOrWhiteSpace(TestDefaultConfiguration.DataConnectionString))
+            try
             {
+                TestUtils.CheckForAzureStorage();
                 await AzureQueueStreamProviderUtils.ClearAllUsedAzureQueues(
                   NullLoggerFactory.Instance,
                   AzureQueueUtilities.GenerateQueueNames(this.fixture.HostedCluster.Options.ClusterId, queueCount),
                   new AzureQueueOptions().ConfigureTestDefaults());
+            }
+            catch (SkipException)
+            {
+                // Ignore
             }
         }
     }
