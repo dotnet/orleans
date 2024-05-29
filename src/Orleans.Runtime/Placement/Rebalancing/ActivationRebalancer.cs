@@ -635,23 +635,7 @@ internal sealed partial class ActivationRebalancer : SystemTarget, IActivationRe
 
             if (accLocalScore > accRemoteScore)
             {
-
-
-
-
-               // anchoredGrains.Add(grainEdges.Key);
-                
-
-                
-                
-
-                
-                
-
-                
-                
-
-                
+               anchoredGrains.Add(grainEdges.Key);
             }
         }
 

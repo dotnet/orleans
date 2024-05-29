@@ -5,8 +5,8 @@ namespace BenchmarkGrains.Ping;
 public class TreeGrain : Grain, ITreeGrain
 {
     // 16^4 grains (~65K)
-    public const int FanOutFactor = 4;
-    public const int MaxLevel = 3;
+    public const int FanOutFactor = 16;
+    public const int MaxLevel = 4;
     private readonly List<ITreeGrain> _children;
 
     public TreeGrain()
