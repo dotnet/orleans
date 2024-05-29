@@ -1,5 +1,6 @@
 #nullable enable
 using System;
+using System.Threading;
 using System.Threading.Tasks;
 using Orleans.Runtime;
 
@@ -28,5 +29,10 @@ public interface ITimerRegistry
     /// <returns>
     /// An <see cref="IDisposable"/> instance which represents the timer.
     /// </returns>
+    [Obsolete("Use 'RegisterGrainTimer(grainContext, callback, state, new() { DueTime = dueTime, Period = period, Interleave = true })' instead.")]
     IDisposable RegisterTimer(IGrainContext grainContext, Func<object?, Task> callback, object? state, TimeSpan dueTime, TimeSpan period);
+
+    /// <inheritdoc cref="Grain.RegisterGrainTimer{T}(Func{T, CancellationToken, Task}, T, GrainTimerCreationOptions)"/>
+    /// <param name="grainContext">The grain which the timer is associated with.</param>
+    IGrainTimer RegisterGrainTimer<T>(IGrainContext grainContext, Func<T, CancellationToken, Task> callback, T state, GrainTimerCreationOptions options);
 }

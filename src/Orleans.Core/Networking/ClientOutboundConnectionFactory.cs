@@ -3,6 +3,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 using Orleans.Messaging;
+using Orleans.Placement.Rebalancing;
 
 namespace Orleans.Runtime.Messaging
 {

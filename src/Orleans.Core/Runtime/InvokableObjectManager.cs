@@ -340,8 +340,8 @@ namespace Orleans
                 }
             }
 
-            public void Activate(Dictionary<string, object> requestContext, CancellationToken? cancellationToken = null) { }
-            public void Deactivate(DeactivationReason deactivationReason, CancellationToken? cancellationToken = null) { }
+            public void Activate(Dictionary<string, object> requestContext, CancellationToken cancellationToken) { }
+            public void Deactivate(DeactivationReason deactivationReason, CancellationToken cancellationToken) { }
 
             public void Rehydrate(IRehydrationContext context)
             {
@@ -349,7 +349,7 @@ namespace Orleans
                 (context as IDisposable)?.Dispose();
             }
 
-            public void Migrate(Dictionary<string, object> requestContext, CancellationToken? cancellationToken = null)
+            public void Migrate(Dictionary<string, object> requestContext, CancellationToken cancellationToken)
             {
                 // Migration is not supported. Do nothing: the contract is that this method attempts migration, but does not guarantee it will occur.
             }

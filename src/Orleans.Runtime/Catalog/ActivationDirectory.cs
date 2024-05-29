@@ -1,3 +1,4 @@
+#nullable enable
 using System;
 using System.Collections;
 using System.Collections.Concurrent;
@@ -20,7 +21,7 @@ internal sealed class ActivationDirectory : IEnumerable<KeyValuePair<GrainId, IG
 
     public int Count => _activationsCount;
 
-    public IGrainContext FindTarget(GrainId key)
+    public IGrainContext? FindTarget(GrainId key)
     {
         _activations.TryGetValue(key, out var result);
         return result;

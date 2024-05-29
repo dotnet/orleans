@@ -7,6 +7,7 @@ using Xunit;
 using Xunit.Abstractions;
 using TestExtensions;
 using System.Net;
+using System.Collections.Immutable;
 
 namespace UnitTests.LivenessTests
 {
@@ -181,6 +182,7 @@ namespace UnitTests.LivenessTests
             }
 
             public bool UnSubscribeFromSiloStatusEvents(ISiloStatusListener observer) => _subscribers.Remove(observer);
+            public ImmutableArray<SiloAddress> GetActiveSilos() => [.. GetApproximateSiloStatuses(onlyActive: true).Keys];  
         }
     }
 }

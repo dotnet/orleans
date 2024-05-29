@@ -47,12 +47,12 @@ namespace UnitTests.Grains
         public Task StartTimer()
         {
             logger.LogInformation("StartTimer.");
-            base.RegisterTimer(TimerTick, null, TimeSpan.Zero, TimeSpan.FromSeconds(10));
+            this.RegisterGrainTimer(TimerTick, TimeSpan.Zero, TimeSpan.FromSeconds(10));
             
             return Task.CompletedTask;
         }
 
-        private Task TimerTick(object data)
+        private Task TimerTick()
         {
             logger.LogInformation("TimerTick.");
             return Task.CompletedTask;

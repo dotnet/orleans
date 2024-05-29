@@ -11,6 +11,7 @@ using System.Runtime.CompilerServices;
 [assembly: InternalsVisibleTo("Tester.AdoNet")]
 [assembly: InternalsVisibleTo("TesterInternal")]
 [assembly: InternalsVisibleTo("TestInternalGrains")]
+[assembly: InternalsVisibleTo("Benchmarks")]
 
 // Mocking libraries
 [assembly: InternalsVisibleTo("DynamicProxyGenAssembly2")]

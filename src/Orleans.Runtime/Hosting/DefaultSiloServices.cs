@@ -42,6 +42,7 @@ using System.Collections.Generic;
 using Microsoft.Extensions.Configuration;
 using Orleans.Serialization.Internal;
 using Orleans.Core;
+using Orleans.Placement.Rebalancing;
 
 namespace Orleans.Hosting
 {
@@ -115,7 +116,6 @@ namespace Orleans.Hosting
             services.TryAddSingleton<ActivationDirectory>();
             services.TryAddSingleton<GrainCountStatistics>();
             services.AddSingleton<ActivationCollector>();
-            services.AddFromExisting<IHealthCheckParticipant, ActivationCollector>();
             services.AddFromExisting<IActivationWorkingSetObserver, ActivationCollector>();
             services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, ActivationCollector>();
 
@@ -360,6 +360,7 @@ namespace Orleans.Hosting
                 (sp, _) => sp.GetRequiredService<IAsyncEnumerableGrainExtension>());
 
             // Networking
+            services.TryAddSingleton<IMessageStatisticsSink, NoOpMessageStatisticsSink>();
             services.TryAddSingleton<ConnectionCommon>();
             services.TryAddSingleton<ConnectionManager>();
             services.TryAddSingleton<ConnectionPreambleHelper>();

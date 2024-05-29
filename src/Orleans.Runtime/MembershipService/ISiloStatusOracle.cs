@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Collections.Immutable;
 
 namespace Orleans.Runtime
 {
@@ -21,6 +22,11 @@ namespace Orleans.Runtime
         /// Gets the address of this silo.
         /// </summary>
         SiloAddress SiloAddress { get; }
+
+        /// <summary>
+        /// Gets the currently active silos.
+        /// </summary>
+        ImmutableArray<SiloAddress> GetActiveSilos();
 
         /// <summary>
         /// Gets the status of a given silo. 

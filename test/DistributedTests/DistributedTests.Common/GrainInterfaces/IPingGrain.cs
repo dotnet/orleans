@@ -1,7 +1,7 @@
-namespace DistributedTests.GrainInterfaces
+namespace DistributedTests.GrainInterfaces;
+
+public interface IPingGrain : IGrainWithGuidKey
 {
-    public interface IPingGrain : IGrainWithGuidKey
-    {
-        ValueTask Ping();
-    }
+    ValueTask Ping();
 }
+

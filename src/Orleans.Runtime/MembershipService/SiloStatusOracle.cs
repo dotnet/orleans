@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using Microsoft.Extensions.Logging;
 using System.Threading;
+using System.Collections.Immutable;
 
 namespace Orleans.Runtime.MembershipService
 {
@@ -14,6 +15,7 @@ namespace Orleans.Runtime.MembershipService
         private MembershipTableSnapshot cachedSnapshot;
         private Dictionary<SiloAddress, SiloStatus> siloStatusCache = new Dictionary<SiloAddress, SiloStatus>();
         private Dictionary<SiloAddress, SiloStatus> siloStatusCacheOnlyActive = new Dictionary<SiloAddress, SiloStatus>();
+        private ImmutableArray<SiloAddress> _activeSilos = [];
 
         public SiloStatusOracle(
             ILocalSiloDetails localSiloDetails,
@@ -49,35 +51,53 @@ namespace Orleans.Runtime.MembershipService
             return status;
         }
 
+        public ImmutableArray<SiloAddress> GetActiveSilos()
+        {
+            EnsureFreshCache();
+            return _activeSilos;
+        }
+
         public Dictionary<SiloAddress, SiloStatus> GetApproximateSiloStatuses(bool onlyActive = false)
         {
-            if (ReferenceEquals(this.cachedSnapshot, this.membershipTableManager.MembershipTableSnapshot))
+            EnsureFreshCache();
+            return onlyActive ? this.siloStatusCacheOnlyActive : this.siloStatusCache;
+        }
+
+        private void EnsureFreshCache()
+        {
+            var currentMembership = this.membershipTableManager.MembershipTableSnapshot;
+            if (ReferenceEquals(this.cachedSnapshot, currentMembership))
             {
-                return onlyActive ? this.siloStatusCacheOnlyActive : this.siloStatusCache;
+                return;
             }
 
             lock (this.cacheUpdateLock)
             {
-                var currentMembership = this.membershipTableManager.MembershipTableSnapshot;
+                currentMembership = this.membershipTableManager.MembershipTableSnapshot;
                 if (ReferenceEquals(this.cachedSnapshot, currentMembership))
                 {
-                    return onlyActive ? this.siloStatusCacheOnlyActive : this.siloStatusCache;
+                    return;
                 }
 
                 var newSiloStatusCache = new Dictionary<SiloAddress, SiloStatus>();
                 var newSiloStatusCacheOnlyActive = new Dictionary<SiloAddress, SiloStatus>();
+                var newActiveSilos = ImmutableArray.CreateBuilder<SiloAddress>();
                 foreach (var entry in currentMembership.Entries)
                 {
                     var silo = entry.Key;
                     var status = entry.Value.Status;
                     newSiloStatusCache[silo] = status;
-                    if (status == SiloStatus.Active) newSiloStatusCacheOnlyActive[silo] = status;
+                    if (status == SiloStatus.Active)
+                    {
+                        newSiloStatusCacheOnlyActive[silo] = status;
+                        newActiveSilos.Add(silo);
+                    }
                 }
 
                 Interlocked.Exchange(ref this.cachedSnapshot, currentMembership);
                 this.siloStatusCache = newSiloStatusCache;
                 this.siloStatusCacheOnlyActive = newSiloStatusCacheOnlyActive;
-                return onlyActive ? newSiloStatusCacheOnlyActive : newSiloStatusCache;
+                _activeSilos = newActiveSilos.ToImmutable();
             }
         }
 

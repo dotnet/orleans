@@ -35,6 +35,11 @@ namespace DistributedTests.Client.LoadGeneratorScenario
 
         public async Task Run(ClientParameters clientParams, LoadGeneratorParameters loadParams)
         {
+            // Register the measurements. n0 -> format as natural number
+            BenchmarksEventSource.Register("requests", Operations.Sum, Operations.Sum, "Requests", "Number of requests completed", "n0");
+            BenchmarksEventSource.Register("failures", Operations.Sum, Operations.Sum, "Failures", "Number of failures", "n0");
+            BenchmarksEventSource.Register("rps", Operations.Sum, Operations.Median, "Median RPS", "Rate per second", "n0");
+
             var secrets = SecretConfiguration.Load(clientParams.SecretSource);
             var hostBuilder = new HostBuilder().UseOrleansClient((ctx, builder) =>
                 builder.Configure<ClusterOptions>(options => { options.ClusterId = clientParams.ClusterId; options.ServiceId = clientParams.ServiceId; })
@@ -65,15 +70,8 @@ namespace DistributedTests.Client.LoadGeneratorScenario
             _logger.LogInformation("Running");
             var report = await generator.Run(cts.Token);
 
-            // Register the measurements. n0 -> format as natural number
-            BenchmarksEventSource.Register("requests", Operations.First, Operations.Sum, "Requests", "Number of requests completed", "n0");
-            BenchmarksEventSource.Register("failures", Operations.First, Operations.Sum, "Failures", "Number of failures", "n0");
-            BenchmarksEventSource.Register("rps", Operations.First, Operations.Sum, "Rate per second", "Rate per seconds", "n0");
-
-            // Register the measurement values
-            BenchmarksEventSource.Measure("requests", report.Completed);
-            BenchmarksEventSource.Measure("failures", report.Failures);
-            BenchmarksEventSource.Measure("rps", report.RatePerSecond);
+            BenchmarksEventSource.Register("overall-rps", Operations.Last, Operations.Last, "Overall RPS", "RPS", "n0");
+            BenchmarksEventSource.Measure("overall-rps", report.RatePerSecond);
 
             await host.StopAsync();
         }

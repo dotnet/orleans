@@ -10,6 +10,7 @@ var loggerFactory = LoggerFactory.Create(builder => builder.SetMinimumLevel(LogL
 var root = new RootCommand();
 
 root.Add(Scenario.CreateCommand(new PingScenario(), loggerFactory));
+root.Add(Scenario.CreateCommand(new FanOutScenario(), loggerFactory));
 root.Add(new CounterCaptureCommand(loggerFactory.CreateLogger<CounterCaptureCommand>()));
 root.Add(new ChaosAgentCommand(loggerFactory.CreateLogger<ChaosAgentCommand>()));
 

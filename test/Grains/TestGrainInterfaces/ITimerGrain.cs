@@ -32,5 +32,18 @@ namespace UnitTests.GrainInterfaces
         Task StartStuckTimer(TimeSpan dueTime);
 
         Task<string> GetRuntimeInstanceId();
+        Task<int> TestAllTimerOverloads();
+        Task<int> PollCompletedTimers();
+        Task TestCompletedTimerResults();
+    }
+
+    public interface INonReentrantTimerCallGrain : IGrainWithIntegerKey
+    {
+        Task<int> GetTickCount();
+        Task<Exception> GetException();
+
+        Task StartTimer(string name, TimeSpan delay, bool keepAlive = true);
+        Task StopTimer(string name);
+        Task ExternalTick(string name);
     }
 }
