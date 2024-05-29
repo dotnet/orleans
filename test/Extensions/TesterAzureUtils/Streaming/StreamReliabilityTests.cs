@@ -134,8 +134,9 @@ namespace UnitTests.Streaming.Reliability
 #endif
             await base.DisposeAsync();
 
-            if (!string.IsNullOrWhiteSpace(TestDefaultConfiguration.DataConnectionString))
+            try
             {
+                TestUtils.CheckForAzureStorage();
                 await AzureQueueStreamProviderUtils.DeleteAllUsedAzureQueues(NullLoggerFactory.Instance,
                     AzureQueueUtilities.GenerateQueueNames(this.HostedCluster.Options.ClusterId, QueueCount),
                     new AzureQueueOptions().ConfigureTestDefaults());
@@ -143,6 +144,7 @@ namespace UnitTests.Streaming.Reliability
                     AzureQueueUtilities.GenerateQueueNames($"{this.HostedCluster.Options.ClusterId}2", QueueCount),
                     new AzureQueueOptions().ConfigureTestDefaults());
             }
+            catch (SkipException) { }
         }
 
         [SkippableFact, TestCategory("Functional")]
