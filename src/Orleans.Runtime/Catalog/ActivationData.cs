@@ -869,8 +869,8 @@ internal sealed class ActivationData : IGrainContext, ICollectibleGrainContext, 
                     message = _waitingRequests[i].Message;
 
                     // If the activation is not valid, reject all pending messages except for local-only messages.
-                    // Local-only messages are used for internal system operations and should not be rejected.
-                    if (State != ActivationState.Valid && !message.IsLocalOnly)
+                    // Local-only messages are used for internal system operations and should not be rejected while the grain is valid or deactivating.
+                    if (State != ActivationState.Valid && !(message.IsLocalOnly && State is ActivationState.Deactivating))
                     {
                         ProcessRequestsToInvalidActivation();
                         break;
