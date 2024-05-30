@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Threading;
 using System.Threading.Tasks;
 using Orleans.Concurrency;
 using Orleans.Runtime;
@@ -16,8 +17,18 @@ namespace Orleans
         /// <summary>
         /// Initializes this instance.
         /// </summary>
-        /// <returns>A Task representing the work performed.</returns>
-        Task Init();
+        /// <returns>A <see cref="Task"/> representing the work performed.</returns>
+        Task StartAsync(CancellationToken cancellationToken = default)
+#pragma warning disable CS0618 // Type or member is obsolete
+            => Init();
+#pragma warning restore CS0618 // Type or member is obsolete
+
+        /// <summary>
+        /// Initializes this instance.
+        /// </summary>
+        /// <returns>A <see cref="Task"/> representing the work performed.</returns>
+        [Obsolete("Implement and use StartAsync instead")]
+        Task Init() => Task.CompletedTask;
 
         /// <summary>
         /// Reads the reminder table entries associated with the specified grain.
@@ -63,6 +74,13 @@ namespace Orleans
         /// </summary>
         /// <returns>A <see cref="Task"/> representing the work performed.</returns>
         Task TestOnlyClearTable();
+
+        /// <summary>
+        /// Stops the reminder table.
+        /// </summary>
+        /// <param name="cancellationToken">The cancellation token.</param>
+        /// <returns>A <see cref="Task"/> representing the work performed.</returns>
+        Task StopAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
     }
 
     /// <summary>

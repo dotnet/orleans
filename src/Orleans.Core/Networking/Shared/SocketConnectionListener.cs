@@ -50,6 +50,14 @@ namespace Orleans.Networking.Shared
             };
 
             listenSocket.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.ReuseAddress, true);
+            if (_options.KeepAlive)
+            {
+                listenSocket.EnableKeepAlive(
+                    timeSeconds: _options.KeepAliveTimeSeconds,
+                    intervalSeconds: _options.KeepAliveIntervalSeconds,
+                    retryCount: _options.KeepAliveRetryCount);
+            }
+
             listenSocket.EnableFastPath();
 
             // Kestrel expects IPv6Any to bind to both IPv6 and IPv4
@@ -82,6 +90,13 @@ namespace Orleans.Networking.Shared
                 {
                     var acceptSocket = await _listenSocket.AcceptAsync();
                     acceptSocket.NoDelay = _options.NoDelay;
+                    if (_options.KeepAlive)
+                    {
+                        acceptSocket.EnableKeepAlive(
+                            timeSeconds: _options.KeepAliveTimeSeconds,
+                            intervalSeconds: _options.KeepAliveIntervalSeconds,
+                            retryCount: _options.KeepAliveRetryCount);
+                    }
 
                     var connection = new SocketConnection(acceptSocket, _memoryPool, _schedulers.GetScheduler(), _trace);
 

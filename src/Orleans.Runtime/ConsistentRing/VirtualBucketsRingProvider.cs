@@ -7,13 +7,13 @@ namespace Orleans.Runtime.ConsistentRing
 {
     /// <summary>
     /// We use the 'backward/clockwise' definition to assign responsibilities on the ring.
-    /// E.g. in a ring of nodes {5, 10, 15} the responsible for key 7 is 10 (the node is responsible for its predecessing range).
+    /// E.g. in a ring of nodes {5, 10, 15} the responsible for key 7 is 10 (the node is responsible for its preceding range).
     /// The backwards/clockwise approach is consistent with many overlays, e.g., Chord, Cassandra, etc.
     /// Note: MembershipOracle uses 'forward/counter-clockwise' definition to assign responsibilities.
-    /// E.g. in a ring of nodes {5, 10, 15}, the responsible of key 7 is node 5 (the node is responsible for its sucessing range)..
+    /// E.g. in a ring of nodes {5, 10, 15}, the responsible of key 7 is node 5 (the node is responsible for its succeeding range).
     /// </summary>
     internal sealed class VirtualBucketsRingProvider :
-        IConsistentRingProvider, ISiloStatusListener
+        IConsistentRingProvider, ISiloStatusListener, IDisposable
     {
         private readonly List<IRingRangeListener> statusListeners = new();
         private readonly SortedDictionary<uint, SiloAddress> bucketsMap = new();
@@ -21,14 +21,15 @@ namespace Orleans.Runtime.ConsistentRing
         private readonly ILogger logger;
         private readonly SiloAddress myAddress;
         private readonly int numBucketsPerSilo;
+        private readonly ISiloStatusOracle _siloStatusOracle;
         private bool running;
         private IRingRange myRange;
         private (IRingRange OldRange, IRingRange NewRange, bool Increased) lastNotification;
 
-        internal VirtualBucketsRingProvider(SiloAddress siloAddress, ILoggerFactory loggerFactory, int numVirtualBuckets)
+        internal VirtualBucketsRingProvider(SiloAddress siloAddress, ILoggerFactory loggerFactory, int numVirtualBuckets, ISiloStatusOracle siloStatusOracle)
         {
             numBucketsPerSilo = numVirtualBuckets;
-
+            _siloStatusOracle = siloStatusOracle;
             if (numBucketsPerSilo <= 0)
                 throw new IndexOutOfRangeException($"numBucketsPerSilo is out of the range. numBucketsPerSilo = {numBucketsPerSilo}");
 
@@ -54,6 +55,7 @@ namespace Orleans.Runtime.ConsistentRing
 
             // add myself to the list of members
             AddServer(myAddress);
+            siloStatusOracle.SubscribeToSiloStatusEvents(this);
         }
 
         private void Stop()
@@ -118,14 +120,14 @@ namespace Orleans.Runtime.ConsistentRing
                 }
                 catch (Exception exc)
                 {
-                    logger.LogError(
+                    logger.LogWarning(
                         (int)ErrorCode.CRP_Local_Subscriber_Exception,
                         exc,
-                        "Local IRangeChangeListener {Name} has thrown an exception when was notified about RangeChangeNotification about old {OldRange} new {NewRange} increased? {IsIncrease}",
+                        "Error notifying listener '{ListenerType}' of ring range {AdjustmentKind} from '{OldRange}' to '{NewRange}'.",
                         listener.GetType().FullName,
+                        increased ? "expansion" : "contraction",
                         old,
-                        now,
-                        increased);
+                        now);
                 }
             }
         }
@@ -322,11 +324,18 @@ namespace Orleans.Runtime.ConsistentRing
                     s = snapshotBucketsList.Length > 1 ? snapshotBucketsList[1] : default;
                 }
             }
+
             if (logger.IsEnabled(LogLevel.Trace))
             {
                 logger.LogTrace("Calculated ring partition owner silo {Owner} for key {Key}: {Key} --> {OwnerHash}", s.SiloAddress, hash, hash, s.Hash);
             }
+
             return s.SiloAddress;
+        }
+
+        public void Dispose()
+        {
+            _siloStatusOracle.UnSubscribeFromSiloStatusEvents(this);
         }
     }
 }

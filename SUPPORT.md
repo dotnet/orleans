@@ -20,4 +20,5 @@ The Orleans community enjoys a lively discussion on our [Discord server](https:/
 
 ## Microsoft Support Policy  
 
-Support for this project is limited to the resources listed above.
+Orleans is officially supported by Microsoft. Customers with support contracts can create support tickets via https://aka.ms/orleanssupport. Orleans is listed under ASP.NET Core:
+![image](https://github.com/dotnet/orleans/assets/203839/30b02291-06a1-4364-9e1c-9a06209c386d)

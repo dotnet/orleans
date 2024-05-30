@@ -6,6 +6,7 @@ using Orleans.Serialization;
 using Orleans.Streaming.EventHubs;
 using Orleans.Streams;
 using TestExtensions;
+using Tester.AzureUtils;
 
 namespace ServiceBus.Tests.TestStreamProviders.EventHub
 {
@@ -44,14 +45,7 @@ namespace ServiceBus.Tests.TestStreamProviders.EventHub
         private static AzureStorageOperationOptions GetAzureStorageOperationOptions()
         {
             var options = new AzureStorageOperationOptions { TableName = TableName };
-            if (TestDefaultConfiguration.UseAadAuthentication)
-            {
-                options.TableServiceClient = new(TestDefaultConfiguration.TableEndpoint, new DefaultAzureCredential());
-            }
-            else
-            {
-                options.TableServiceClient = new(TestDefaultConfiguration.DataConnectionString);
-            }
+            options.TableServiceClient = AzureStorageOperationOptionsExtensions.GetTableServiceClient();
 
             return options;
         }
@@ -59,14 +53,7 @@ namespace ServiceBus.Tests.TestStreamProviders.EventHub
         private static Orleans.Streaming.AzureStorage.AzureStorageOperationOptions GetStreamingAzureStorageOperationOptions()
         {
             var options = new Orleans.Streaming.AzureStorage.AzureStorageOperationOptions { TableName = TableName };
-            if (TestDefaultConfiguration.UseAadAuthentication)
-            {
-                options.TableServiceClient = new(TestDefaultConfiguration.TableEndpoint, new DefaultAzureCredential());
-            }
-            else
-            {
-                options.TableServiceClient = new(TestDefaultConfiguration.DataConnectionString);
-            }
+            options.TableServiceClient = AzureStorageOperationOptionsExtensions.GetTableServiceClient();
 
             return options;
         }

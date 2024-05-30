@@ -19,6 +19,7 @@ namespace Orleans.Configuration
         /// Stage of silo lifecycle where storage should be initialized.  Storage must be initialized prior to use.
         /// </summary>
         public int InitStage { get; set; } = DEFAULT_INIT_STAGE;
+
         /// <summary>
         /// Default init stage in silo lifecycle.
         /// </summary>
@@ -45,6 +46,7 @@ namespace Orleans.Configuration
     {
         private readonly AdoNetGrainStorageOptions options;
         private readonly string name;
+
         /// <summary>
         /// Constructor
         /// </summary>
@@ -52,11 +54,10 @@ namespace Orleans.Configuration
         /// <param name="name">The name of the option to be validated.</param>
         public AdoNetGrainStorageOptionsValidator(AdoNetGrainStorageOptions configurationOptions, string name)
         {
-            if(configurationOptions == null)
-                throw new OrleansConfigurationException($"Invalid AdoNetGrainStorageOptions for AdoNetGrainStorage {name}. Options is required.");
-            this.options = configurationOptions;
+            this.options = configurationOptions ?? throw new OrleansConfigurationException($"Invalid AdoNetGrainStorageOptions for AdoNetGrainStorage {name}. Options is required.");
             this.name = name;
         }
+
         /// <inheritdoc cref="IConfigurationValidator"/>
         public void ValidateConfiguration()
         {

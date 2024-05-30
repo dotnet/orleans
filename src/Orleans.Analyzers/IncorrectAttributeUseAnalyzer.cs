@@ -11,7 +11,7 @@ public class IncorrectAttributeUseAnalyzer : DiagnosticAnalyzer
 {
     public const string RuleId = "ORLEANS0013";
 
-    private static readonly DiagnosticDescriptor Rule = new(
+    private static readonly DiagnosticDescriptor Rule = new DiagnosticDescriptor(
        id: RuleId,
        category: "Usage",
        defaultSeverity: DiagnosticSeverity.Error,

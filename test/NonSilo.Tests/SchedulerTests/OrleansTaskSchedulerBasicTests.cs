@@ -14,6 +14,17 @@ namespace UnitTests.SchedulerTests
 {
     internal class UnitTestSchedulingContext : IGrainContext, IDisposable
     {
+        public static UnitTestSchedulingContext Create(ILoggerFactory loggerFactory)
+        {
+            var result = new UnitTestSchedulingContext();
+            result.WorkItemGroup = SchedulingHelper.CreateWorkItemGroupForTesting(result, loggerFactory);
+            return result;
+        }
+
+        private UnitTestSchedulingContext() { }
+
+        public WorkItemGroup WorkItemGroup { get; private set; }
+
         public GrainReference GrainReference => throw new NotImplementedException();
 
         public GrainId GrainId => throw new NotImplementedException();
@@ -30,7 +41,7 @@ namespace UnitTests.SchedulerTests
 
         public IGrainLifecycle ObservableLifecycle => throw new NotImplementedException();
 
-        public IWorkItemScheduler Scheduler { get; set; }
+        public IWorkItemScheduler Scheduler => WorkItemGroup;
 
         public bool IsExemptFromCollection => throw new NotImplementedException();
 
@@ -65,8 +76,7 @@ namespace UnitTests.SchedulerTests
             this.output = output;
             SynchronizationContext.SetSynchronizationContext(null);
             this.loggerFactory = InitSchedulerLogging();
-            this.rootContext = new UnitTestSchedulingContext();
-            rootContext.Scheduler = SchedulingHelper.CreateWorkItemGroupForTesting(this.rootContext, this.loggerFactory);
+            this.rootContext = UnitTestSchedulingContext.Create(loggerFactory);
         }
         
         public void Dispose()
@@ -234,9 +244,6 @@ namespace UnitTests.SchedulerTests
         [Fact]
         public async Task Sched_Task_SubTaskExecutionSequencing()
         {
-            UnitTestSchedulingContext context = new UnitTestSchedulingContext();
-            context.Scheduler = SchedulingHelper.CreateWorkItemGroupForTesting(context, this.loggerFactory);
-
             LogContext("Main-task " + Task.CurrentId);
 
             int n = 0;
@@ -276,7 +283,7 @@ namespace UnitTests.SchedulerTests
                 }
             }
 
-            context.Scheduler.QueueAction(closure);
+            rootContext.Scheduler.QueueAction(closure);
 
             // Pause to let things run
             this.output.WriteLine("Main-task sleeping");

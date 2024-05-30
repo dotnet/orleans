@@ -1,5 +1,6 @@
 using System;
 using System.Buffers;
+using System.Runtime.InteropServices;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Serialization.Buffers;
 using Orleans.Serialization.Session;
@@ -21,24 +22,24 @@ namespace Orleans.Serialization.UnitTests
 
             var slice4 = buffer.Slice(3000, 1500);
             var sliceArray4 = slice4.ToArray();
-            Assert.Equal(randomData.AsSpan(3000, 1500).ToArray(), sliceArray4);
+            Assert.True(randomData.AsSpan(3000, 1500).SequenceEqual(sliceArray4));
 
             var slice = buffer.Slice();
             var sliceArray = slice.ToArray();
-            Assert.Equal(randomData, sliceArray);
+            Assert.True(randomData.AsSpan().SequenceEqual(sliceArray));
 
             var slice3 = buffer.Slice(100, 1024);
             var sliceArray3 = slice3.ToArray();
-            Assert.Equal(randomData.AsSpan(100, 1024).ToArray(), sliceArray3);
+            Assert.True(randomData.AsSpan(100, 1024).SequenceEqual(sliceArray3));
 
             var slice2 = buffer.Slice(100);
             var sliceArray2 = slice2.ToArray();
             var slicedRandomData = randomData.AsSpan(100).ToArray();
-            Assert.Equal(slicedRandomData, sliceArray2);
+            Assert.True(slicedRandomData.AsSpan().SequenceEqual(sliceArray2));
 
             var rosArray = new byte[randomData.Length];
             buffer.AsReadOnlySequence().CopyTo(rosArray.AsSpan());
-            Assert.Equal(randomData, rosArray);
+            Assert.True(randomData.AsSpan().SequenceEqual(rosArray));
 
             var spansArray = new byte[randomData.Length];
             var spansArraySpan = spansArray.AsSpan();
@@ -47,7 +48,23 @@ namespace Orleans.Serialization.UnitTests
                 span.CopyTo(spansArraySpan);
                 spansArraySpan = spansArraySpan[span.Length..];
             }
-            Assert.Equal(randomData, spansArray);
+
+            Assert.True(randomData.AsSpan().SequenceEqual(spansArray));
+
+            buffer.Dispose();
+        }
+
+        [Fact]
+        public void LargeBufferRoundTrip_Single()
+        {
+            var random = new Random();
+            var buffer = new PooledBuffer();
+            var randomData = new byte[1024 * 1024 * 10];
+            random.NextBytes(randomData);
+            buffer.Write(randomData);
+
+            var contents = buffer.ToArray();
+            Assert.True(randomData.AsSpan().SequenceEqual(contents));
 
             buffer.Dispose();
         }
@@ -65,27 +82,27 @@ namespace Orleans.Serialization.UnitTests
             var slice = writer.Output.Slice();
             var sliceReader = Reader.Create(slice, null);
             var sliceArray = sliceReader.ReadBytes((uint)randomData.Length);
-            Assert.Equal(randomData, sliceArray);
+            Assert.True(randomData.AsSpan().SequenceEqual(sliceArray));
 
             var slice3 = writer.Output.Slice(100, 1024);
             var reader3 = Reader.Create(slice3, null);
             var result3 = reader3.ReadBytes((uint)slice3.Length);
-            Assert.Equal(randomData.AsSpan(100, 1024).ToArray(), result3);
+            Assert.True(randomData.AsSpan(100, 1024).SequenceEqual(result3));
 
             var slice2 = writer.Output.Slice(100);
             var reader2 = Reader.Create(slice2, null);
             var result2 = reader2.ReadBytes((uint)slice2.Length);
-            Assert.Equal(randomData.AsSpan(100).ToArray(), result2);
+            Assert.True(randomData.AsSpan(100).SequenceEqual(result2));
 
             var slice4 = writer.Output.Slice(3000, 1500);
             var reader4 = Reader.Create(slice4, null);
             var result4 = reader4.ReadBytes((uint)slice4.Length);
-            Assert.Equal(randomData.AsSpan(3000, 1500).ToArray(), result4);
+            Assert.True(randomData.AsSpan(3000, 1500).SequenceEqual(result4));
 
             var ros = writer.Output.AsReadOnlySequence();
             var rosReader = Reader.Create(ros, null);
             var rosArray = rosReader.ReadBytes((uint)randomData.Length);
-            Assert.Equal(randomData, rosArray);
+            Assert.True(randomData.AsSpan().SequenceEqual(rosArray));
 
             writer.Dispose();
         }
@@ -123,6 +140,90 @@ namespace Orleans.Serialization.UnitTests
                     writer.Dispose();
                     session.Dispose();
                 }
+            }
+        }
+
+        /// <summary>
+        /// Tests that the serializer can correctly serialized <see cref="PooledBuffer"/>.
+        /// </summary>
+        [Fact]
+        public void PooledBuffer_SerializerRoundTrip()
+        {
+            var serviceProvider = new ServiceCollection()
+                .AddSerializer()
+                .BuildServiceProvider();
+            var serializer = serviceProvider.GetRequiredService<Serializer>();
+
+            var random = new Random();
+            for (var i = 0; i < 10; i++)
+            {
+                const int TargetLength = 8120;
+
+                // NOTE: The serializer is responsible for freeing the buffer provided to it, so we do not free this.
+                var buffer = new PooledBuffer();
+                while (buffer.Length < TargetLength)
+                {
+                    var span = buffer.GetSpan(TargetLength - buffer.Length);
+                    var writeLen = Math.Min(span.Length, TargetLength - buffer.Length);
+                    random.NextBytes(span[..writeLen]);
+                    buffer.Advance(writeLen);
+                }
+
+                var bytes = buffer.ToArray();
+                Assert.Equal(TargetLength, bytes.Length);
+
+                var result = serializer.Deserialize<PooledBuffer>(serializer.SerializeToArray(buffer));
+                Assert.Equal(TargetLength, result.Length);
+
+                var resultBytes = result.ToArray();
+                Assert.Equal(bytes, resultBytes);
+
+                // NOTE: we are responsible for disposing a buffer returned from deserialization.
+                result.Dispose();
+            }
+        }
+
+        /// <summary>
+        /// Tests that the serializer can correctly serialized <see cref="PooledBuffer"/> when it's embedded in another structure.
+        /// </summary>
+        [Fact]
+        public void PooledBuffer_SerializerRoundTrip_Embedded()
+        {
+            var serviceProvider = new ServiceCollection()
+                .AddSerializer()
+                .BuildServiceProvider();
+            var serializer = serviceProvider.GetRequiredService<Serializer>();
+
+            var random = new Random();
+            for (var i = 0; i < 10; i++)
+            {
+                const int TargetLength = 8120;
+
+                // NOTE: The serializer is responsible for freeing the buffer provided to it, so we do not free this.
+                var buffer = new PooledBuffer();
+                while (buffer.Length < TargetLength)
+                {
+                    var span = buffer.GetSpan(TargetLength - buffer.Length);
+                    var writeLen = Math.Min(span.Length, TargetLength - buffer.Length);
+                    random.NextBytes(span[..writeLen]);
+                    buffer.Advance(writeLen);
+                }
+
+                var bytes = buffer.ToArray();
+                Assert.Equal(TargetLength, bytes.Length);
+
+                var embed = (Guid: Guid.NewGuid(), Buffer: buffer, Int: 42);
+                var result = serializer.Deserialize<(Guid Guid, PooledBuffer Buffer, int Int)>(serializer.SerializeToArray(embed));
+                Assert.Equal(embed.Guid, result.Guid);
+                Assert.Equal(embed.Int, result.Int);
+                var resultBuffer = result.Buffer;
+                Assert.Equal(TargetLength, resultBuffer.Length);
+
+                var resultBytes = resultBuffer.ToArray();
+                Assert.Equal(bytes, resultBytes);
+
+                // NOTE: we are responsible for disposing a buffer returned from deserialization.
+                resultBuffer.Dispose();
             }
         }
 

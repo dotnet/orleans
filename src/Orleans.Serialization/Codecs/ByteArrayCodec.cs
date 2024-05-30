@@ -296,10 +296,12 @@ namespace Orleans.Serialization.Codecs
     /// Serializer for <see cref="PooledBuffer"/> instances.
     /// </summary>
     [RegisterSerializer]
-    public sealed class PooledBufferCodec : IValueSerializer<PooledBuffer>
+    public sealed class PooledBufferCodec : IFieldCodec<PooledBuffer>
     {
-        public void Serialize<TBufferWriter>(ref Writer<TBufferWriter> writer, scoped ref PooledBuffer value) where TBufferWriter : IBufferWriter<byte>
+        public void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, PooledBuffer value) where TBufferWriter : IBufferWriter<byte>
         {
+            ReferenceCodec.MarkValueField(writer.Session);
+            writer.WriteFieldHeader(fieldIdDelta, expectedType, typeof(PooledBuffer), WireType.LengthPrefixed);
             writer.WriteVarUInt32((uint)value.Length);
             foreach (var segment in value)
             {
@@ -311,11 +313,13 @@ namespace Orleans.Serialization.Codecs
             // Senders must not use the value after sending.
             // Receivers must dispose of the value after use.
             value.Reset();
-            value = default;
         }
 
-        public void Deserialize<TInput>(ref Reader<TInput> reader, scoped ref PooledBuffer value)
+        public PooledBuffer ReadValue<TInput>(ref Reader<TInput> reader, Field field)
         {
+            ReferenceCodec.MarkValueField(reader.Session);
+            field.EnsureWireType(WireType.LengthPrefixed);
+            var value = new PooledBuffer();
             const int MaxSpanLength = 4096;
             var length = (int)reader.ReadVarUInt32();
             while (length > 0)
@@ -328,6 +332,7 @@ namespace Orleans.Serialization.Codecs
             }
 
             Debug.Assert(length == 0);
+            return value;
         }
     }
 

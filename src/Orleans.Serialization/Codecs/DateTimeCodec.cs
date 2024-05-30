@@ -33,7 +33,13 @@ namespace Orleans.Serialization.Codecs
         /// <inheritdoc/>
         DateTime IFieldCodec<DateTime>.ReadValue<TInput>(ref Reader<TInput> reader, Field field) => ReadValue(ref reader, field);
 
-        /// <inheritdoc/>
+        /// <summary>
+        /// Reads a <see cref="DateTime"/> value.
+        /// </summary>
+        /// <typeparam name="TInput">The reader input type.</typeparam>
+        /// <param name="reader">The reader.</param>
+        /// <param name="field">The field.</param>
+        /// <returns>The <see cref="DateTime"/> value.</returns>
         public static DateTime ReadValue<TInput>(ref Reader<TInput> reader, Field field)
         {
             ReferenceCodec.MarkValueField(reader.Session);

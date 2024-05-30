@@ -101,7 +101,7 @@ jobs:
       run: dotnet test --filter "Category=${{ matrix.provider }}&(Category=BVT|Category=SlowBVT|Category=Functional)" --blame-hang-timeout 10m --logger "trx" -- -parallel none -noshadow
       env:
 # [SuppressMessage("Microsoft.Security", "CS002:SecretInNextLine", Justification="False positive")]
-        ORLEANSPOSTGRESCONNECTIONSTRING: "Server=127.0.0.1;Port=5432;Integrated Security=true;Pooling=false;User Id=postgres;Password=postgres;SSL Mode=Disable"
+        ORLEANSPOSTGRESCONNECTIONSTRING: "Server=127.0.0.1;Port=5432;Pooling=false;User Id=postgres;Password=postgres;SSL Mode=Disable"
     - name: Archive Test Results
       if: always()
       uses: actions/upload-artifact@v3
@@ -137,8 +137,6 @@ jobs:
       run: dotnet test --filter "Category=${{ matrix.provider }}&(Category=BVT|Category=SlowBVT|Category=Functional)" --blame-hang-timeout 10m --logger "trx" -- -parallel none -noshadow
       env:
 # [SuppressMessage("Microsoft.Security", "CS002:SecretInNextLine", Justification="Not a secret")]
-# [SuppressMessage("Microsoft.Security", "CSCAN0090:ConfigFile", Justification="Not a secret")]
-# [SuppressMessage("Microsoft.Security", "CSCAN0220:DefaultPasswordContexts", Justification="Not a secret")]
         ORLEANSMYSQLCONNECTIONSTRING: "Server=127.0.0.1;Port=3306;UId=root;Pwd=mariadb;"
     - name: Archive Test Results
       if: always()

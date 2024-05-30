@@ -26,8 +26,9 @@ internal sealed class RedisGrainStorageProviderBuilder : IProviderBuilder<ISiloB
                 if (!string.IsNullOrEmpty(serviceKey))
                 {
                     // Get a connection multiplexer instance by name.
-                    var multiplexer = services.GetKeyedService<IConnectionMultiplexer>(serviceKey);
+                    var multiplexer = services.GetRequiredKeyedService<IConnectionMultiplexer>(serviceKey);
                     options.CreateMultiplexer = _ => Task.FromResult(multiplexer);
+                    options.ConfigurationOptions = new ConfigurationOptions();
                 }
                 else
                 {

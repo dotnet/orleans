@@ -49,6 +49,11 @@ namespace Orleans
 
             services.Add(ServiceDescriptor);
 
+            // Common services
+            services.AddLogging();
+            services.AddOptions();
+            services.TryAddSingleton<TimeProvider>(TimeProvider.System);
+
             // Options logging
             services.TryAddSingleton(typeof(IOptionFormatter<>), typeof(DefaultOptionsFormatter<>));
             services.TryAddSingleton(typeof(IOptionFormatterResolver<>), typeof(DefaultOptionsFormatterResolver<>));
@@ -64,7 +69,6 @@ namespace Orleans
             services.AddFromExisting<IHostEnvironmentStatistics, OldEnvironmentStatistics>();
 #pragma warning restore 618
 
-            services.AddLogging();
             services.TryAddSingleton<GrainBindingsResolver>();
             services.TryAddSingleton<LocalClientDetails>();
             services.TryAddSingleton<OutsideRuntimeClient>();

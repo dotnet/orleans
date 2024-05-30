@@ -41,12 +41,12 @@ namespace Orleans.Runtime.MembershipService
     /// membership algorithm (refutation, for example).
     /// The monitor implements the following heuristics:
     /// <list type="bullet">
-    ///   <item>Check that this silos is marked as active in membership.</item>
-    ///   <item>Check that no other silo suspects this silo.</item>
-    ///   <item>Check for recently received successful ping responses.</item>
-    ///   <item>Check for recently received ping requests.</item>
-    ///   <item>Check that the .NET Thread Pool is able to process work items within one second.</item>
-    ///   <item>Check that local async timers have been firing on-time (within 3 seconds of their due time).</item>
+    ///   <item><description>Check that this silos is marked as active in membership.</description></item>
+    ///   <item><description>Check that no other silo suspects this silo.</description></item>
+    ///   <item><description>Check for recently received successful ping responses.</description></item>
+    ///   <item><description>Check for recently received ping requests.</description></item>
+    ///   <item><description>Check that the .NET Thread Pool is able to process work items within one second.</description></item>
+    ///   <item><description>Check that local async timers have been firing on-time (within 3 seconds of their due time).</description></item>
     /// </list>
     /// </remarks>
     internal class LocalSiloHealthMonitor : ILifecycleParticipant<ISiloLifecycle>, ILifecycleObserver, ILocalSiloHealthMonitor
@@ -60,7 +60,7 @@ namespace Orleans.Runtime.MembershipService
         private readonly ClusterMembershipOptions _clusterMembershipOptions;
         private readonly IAsyncTimer _degradationCheckTimer;
         private readonly ThreadPoolMonitor _threadPoolMonitor;
-        private readonly ProbeRequestMonitor _probeRequestMonitor; 
+        private readonly ProbeRequestMonitor _probeRequestMonitor;
         private ValueStopwatch _clusteredDuration;
         private Task? _runTask;
         private bool _isActive;
@@ -103,7 +103,7 @@ namespace Orleans.Runtime.MembershipService
         /// <param name="checkTime">The time which the check is taking place.</param>
         /// <param name="complaints">If not null, will be populated with the current set of detected health issues.</param>
         /// <returns>The local health degradation score, which is a value between 0 (healthy) and <see cref="MaxScore"/> (unhealthy).</returns>
-        public int GetLocalHealthDegradationScore(DateTime checkTime, List<string>? complaints) 
+        public int GetLocalHealthDegradationScore(DateTime checkTime, List<string>? complaints)
         {
             var score = 0;
             score += CheckSuspectingNodes(checkTime, complaints);
@@ -151,7 +151,7 @@ namespace Orleans.Runtime.MembershipService
 
                 complaints?.Add(
                     $".NET Thread Pool is exhibiting delays of {threadPoolDelaySeconds}s. This can indicate .NET Thread Pool starvation, very long .NET GC pauses, or other runtime or machine pauses.");
-            } 
+            }
 
             // Each second of delay contributes to the score.
             return (int)threadPoolDelaySeconds;

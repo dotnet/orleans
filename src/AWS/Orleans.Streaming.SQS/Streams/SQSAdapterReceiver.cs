@@ -78,7 +78,7 @@ namespace OrleansAWSUtils.Streams
                 if (queueRef == null) return new List<IBatchContainer>();
 
                 int count = maxCount < 0 || maxCount == QueueAdapterConstants.UNLIMITED_GET_QUEUE_MSG ?
-                    SQSStorage.MAX_NUMBER_OF_MESSAGE_TO_PEAK : Math.Min(maxCount, SQSStorage.MAX_NUMBER_OF_MESSAGE_TO_PEAK);
+                    SQSStorage.MAX_NUMBER_OF_MESSAGE_TO_PEEK : Math.Min(maxCount, SQSStorage.MAX_NUMBER_OF_MESSAGE_TO_PEEK);
 
                 var task = queueRef.GetMessages(count);
                 outstandingTask = task;
