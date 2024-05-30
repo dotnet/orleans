@@ -1,17 +1,17 @@
-using Orleans.CodeGenerator.SyntaxGeneration;
+using System;
+using System.Collections.Generic;
+using System.Collections.Immutable;
+using System.Linq;
+using System.Text;
+using System.Threading;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading;
-using static Microsoft.CodeAnalysis.CSharp.SyntaxFactory;
-using System.Collections.Immutable;
-using Orleans.CodeGenerator.Hashing;
-using System.Text;
-using static Orleans.CodeGenerator.SyntaxGeneration.SymbolExtensions;
 using Orleans.CodeGenerator.Diagnostics;
+using Orleans.CodeGenerator.Hashing;
+using Orleans.CodeGenerator.SyntaxGeneration;
+using static Microsoft.CodeAnalysis.CSharp.SyntaxFactory;
+using static Orleans.CodeGenerator.SyntaxGeneration.SymbolExtensions;
 
 namespace Orleans.CodeGenerator
 {
@@ -32,6 +32,7 @@ namespace Orleans.CodeGenerator
         private readonly Dictionary<string, List<MemberDeclarationSyntax>> _namespacedMembers = new();
         private readonly Dictionary<InvokableMethodId, InvokableMethodDescription> _invokableMethodDescriptions = new();
         private readonly HashSet<INamedTypeSymbol> _visitedInterfaces = new(SymbolEqualityComparer.Default);
+        private readonly List<string> DisabledWarnings = new() { "CS1591" };
 
         public CodeGenerator(Compilation compilation, CodeGeneratorOptions options)
         {
@@ -166,7 +167,7 @@ namespace Orleans.CodeGenerator
                             {
                                 (_, GenerateFieldIds.PublicProperties) => GenerateFieldIds.PublicProperties,
                                 (GenerateFieldIds.PublicProperties, _) => GenerateFieldIds.PublicProperties,
-                                _  => GenerateFieldIds.None
+                                _ => GenerateFieldIds.None
                             };
                             var fieldIdAssignmentHelper = new FieldIdAssignmentHelper(symbol, constructorParameters, implicitMemberSelectionStrategy, LibraryTypes);
                             if (!fieldIdAssignmentHelper.IsValidForSerialization)
@@ -315,6 +316,30 @@ namespace Orleans.CodeGenerator
             var assemblyAttributes = ApplicationPartAttributeGenerator.GenerateSyntax(LibraryTypes, MetadataModel);
             assemblyAttributes.Add(metadataAttribute);
 
+            if (assemblyAttributes.Count > 0)
+            {
+                assemblyAttributes[0] = assemblyAttributes[0]
+                    .WithLeadingTrivia(
+                        SyntaxFactory.TriviaList(
+                            new List<SyntaxTrivia>
+                            {
+                                Trivia(
+                                   PragmaWarningDirectiveTrivia(
+                                       Token(SyntaxKind.DisableKeyword),
+                                       SeparatedList(DisabledWarnings.Select(str =>
+                                       {
+                                           var syntaxToken = SyntaxFactory.Literal(
+                                                SyntaxFactory.TriviaList(),
+                                                str,
+                                                str,
+                                                SyntaxFactory.TriviaList());
+
+                                            return (ExpressionSyntax)SyntaxFactory.LiteralExpression(SyntaxKind.StringLiteralExpression, syntaxToken);
+                                       })),
+                                       isActive: true)),
+                            }));
+            }
+
             var usings = List(new[] { UsingDirective(ParseName("global::Orleans.Serialization.Codecs")), UsingDirective(ParseName("global::Orleans.Serialization.GeneratedCodeHelpers")) });
             var namespaces = new List<MemberDeclarationSyntax>(_namespacedMembers.Count);
             foreach (var pair in _namespacedMembers)
@@ -323,6 +348,30 @@ namespace Orleans.CodeGenerator
                 var member = pair.Value;
 
                 namespaces.Add(NamespaceDeclaration(ParseName(ns)).WithMembers(List(member)).WithUsings(usings));
+            }
+
+            if (namespaces.Count > 0)
+            {
+                namespaces[0] = namespaces[0]
+                    .WithTrailingTrivia(
+                       SyntaxFactory.TriviaList(
+                           new List<SyntaxTrivia>
+                           {
+                                Trivia(
+                                   PragmaWarningDirectiveTrivia(
+                                       Token(SyntaxKind.RestoreKeyword),
+                                       SeparatedList(DisabledWarnings.Select(str =>
+                                       {
+                                           var syntaxToken = SyntaxFactory.Literal(
+                                                SyntaxFactory.TriviaList(),
+                                                str,
+                                                str,
+                                                SyntaxFactory.TriviaList());
+
+                                            return (ExpressionSyntax)SyntaxFactory.LiteralExpression(SyntaxKind.StringLiteralExpression, syntaxToken);
+                                       })),
+                                       isActive: true)),
+                           }));
             }
 
             return CompilationUnit()
