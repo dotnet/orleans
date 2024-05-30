@@ -18,7 +18,7 @@
     <PackageVersion Include="System.Collections.Immutable" Version="8.0.0" />
     <!-- Microsoft packages -->
     <PackageVersion Include="Microsoft.Azure.Cosmos" Version="3.35.4" />
-    <PackageVersion Include="Microsoft.Build" Version="17.7.2" />
+    <PackageVersion Include="Microsoft.Build" Version="17.10.4" />
     <PackageVersion Include="Microsoft.CSharp" Version="4.7.0" />
     <PackageVersion Include="Microsoft.CodeAnalysis" Version="4.5.0" />
     <PackageVersion Include="Microsoft.CodeAnalysis.Common" Version="4.5.0" />
@@ -86,6 +86,7 @@
     <PackageVersion Include="System.Data.SqlClient" Version="4.8.6" />
     <PackageVersion Include="Npgsql" Version="8.0.3" />
     <PackageVersion Include="MySql.Data" Version="8.0.31" />
+    <PackageVersion Include="System.Drawing.Common" Version="4.7.3" />
     <PackageVersion Include="Microsoft.Extensions.Configuration.AzureKeyVault" Version="3.1.24" />
     <PackageVersion Include="System.CommandLine" Version="2.0.0-beta1.21308.1" />
     <PackageVersion Include="Microsoft.Crank.EventSources" Version="0.2.0-alpha.23422.5" />
