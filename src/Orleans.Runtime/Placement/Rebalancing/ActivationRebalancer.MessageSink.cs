@@ -14,7 +14,7 @@ internal partial class ActivationRebalancer : IMessageStatisticsSink
 
     // This bloom filter contains grain ids which will are anchored to the current silo.
     // Ids are inserted when a grain is found to have a negative transfer score.
-    private readonly BloomFilter _anchoredGrainIds = new(100_000, 0.01);
+    private readonly BlockedBloomFilter _anchoredGrainIds = new(100_000, 0.01);
     private Task? _processPendingEdgesTask;
 
     public void StartProcessingEdges()
