@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
+using Amazon;
 using Amazon.Kinesis;
 using Amazon.Kinesis.Model;
 using Amazon.Runtime;
@@ -19,10 +20,10 @@ namespace Orleans.Streaming.Kinesis
     /// <summary>
     /// Queue adapter factory which allows the PersistentStreamProvider to use AWS Kinesis Data Streams as its backend persistent event queue.
     /// </summary>
-    public class KinesisAdapterFactory : IQueueAdapterFactory, IQueueAdapter
+    internal class KinesisAdapterFactory : IQueueAdapterFactory, IQueueAdapter
     {
         private readonly KinesisStreamOptions _options;
-        private readonly Serializer _serializer;
+        private readonly Serializer<KinesisBatchContainer.Body> _serializer;
         private readonly IStreamQueueCheckpointerFactory _checkpointerFactory;
         private readonly ILoggerFactory _loggerFactory;
         private readonly IQueueAdapterCache _adapterCache;
@@ -36,7 +37,7 @@ namespace Orleans.Streaming.Kinesis
             string name,
             KinesisStreamOptions options,
             SimpleQueueCacheOptions cacheOptions,
-            Serializer serializer,
+            Serializer<KinesisBatchContainer.Body> serializer,
             IStreamQueueCheckpointerFactory checkpointerFactory,
             ILoggerFactory loggerFactory
         )
@@ -69,10 +70,9 @@ namespace Orleans.Streaming.Kinesis
         {
             var streamsConfig = services.GetOptionsByName<KinesisStreamOptions>(name);
             var cacheOptions = services.GetOptionsByName<SimpleQueueCacheOptions>(name);
-            var serializer = services.GetRequiredService<Serializer>();
-            var logger = services.GetRequiredService<ILoggerFactory>();
-            var grainFactory = services.GetRequiredService<IGrainFactory>();
+            var serializer = services.GetRequiredService<Serializer<KinesisBatchContainer.Body>>();
             var checkpointerFactory = services.GetRequiredKeyedService<IStreamQueueCheckpointerFactory>(name);
+            var logger = services.GetRequiredService<ILoggerFactory>();
 
             var factory = ActivatorUtilities.CreateInstance<KinesisAdapterFactory>(
                     services,
@@ -81,9 +81,7 @@ namespace Orleans.Streaming.Kinesis
                     cacheOptions,
                     serializer,
                     checkpointerFactory,
-                    logger,
-                    grainFactory,
-                    services
+                    logger
                 );
 
             return factory;
@@ -137,7 +135,7 @@ namespace Orleans.Streaming.Kinesis
                 );
         }
 
-        private AmazonKinesisClient CreateClient()
+        internal AmazonKinesisClient CreateClient()
         {
             if (_options.Service.StartsWith("http://", StringComparison.OrdinalIgnoreCase) ||
                 _options.Service.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
@@ -153,16 +151,16 @@ namespace Orleans.Streaming.Kinesis
             {
                 // AWS Kinesis instance (auth via explicit credentials)
                 var credentials = new BasicAWSCredentials(_options.AccessKey, _options.SecretKey);
-                return new AmazonKinesisClient(credentials, new AmazonKinesisConfig { RegionEndpoint = AWSUtils.GetRegionEndpoint(_options.Service) });
+                return new AmazonKinesisClient(credentials, new AmazonKinesisConfig { RegionEndpoint = RegionEndpoint.GetBySystemName(_options.Service) });
             }
             else
             {
                 // AWS Kinesis instance (implicit auth - EC2 IAM Roles etc)
-                return new AmazonKinesisClient(new AmazonKinesisConfig { RegionEndpoint = AWSUtils.GetRegionEndpoint(_options.Service) });
+                return new AmazonKinesisClient(new AmazonKinesisConfig { RegionEndpoint = RegionEndpoint.GetBySystemName(_options.Service) });
             }
         }
 
-        private async Task<string[]> GetPartitionIdsAsync()
+        internal async Task<string[]> GetPartitionIdsAsync()
         {
             var request = new ListShardsRequest
             {

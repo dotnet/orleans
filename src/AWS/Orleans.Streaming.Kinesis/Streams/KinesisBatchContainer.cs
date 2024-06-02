@@ -11,7 +11,7 @@ namespace Orleans.Streaming.Kinesis
 {
     [Serializable]
     [Orleans.GenerateSerializer]
-    public class KinesisBatchContainer : IBatchContainer, IComparable<KinesisBatchContainer>
+    internal class KinesisBatchContainer : IBatchContainer, IComparable<KinesisBatchContainer>
     {
         [JsonProperty]
         [Id(0)]
@@ -23,18 +23,24 @@ namespace Orleans.Streaming.Kinesis
 
         [JsonIgnore]
         [field: NonSerialized]
-        internal Serializer Serializer { get; set; }
+        internal Serializer<KinesisBatchContainer.Body> Serializer { get; set; }
 
         [JsonProperty]
         [Id(1)]
         internal KinesisSequenceToken Token { get; }
 
-        private KinesisBatchContainer(Record record, Serializer serializer, long sequenceId)
+        private KinesisBatchContainer(Record record, Serializer<KinesisBatchContainer.Body> serializer, long sequenceId)
         {
             this.Serializer = serializer;
             this._rawRecord = record.Data.ToArray();
 
             Token = new KinesisSequenceToken(record.SequenceNumber, sequenceId, 0);
+        }
+
+        [GeneratedActivatorConstructor]
+        internal KinesisBatchContainer(Serializer<KinesisBatchContainer.Body> serializer)
+        {
+            this.Serializer = serializer;
         }
 
         /// <summary>
@@ -47,7 +53,7 @@ namespace Orleans.Streaming.Kinesis
         /// </summary>
         public StreamSequenceToken SequenceToken => Token;
 
-        private Body GetPayload() => _payload ?? (_payload = this.Serializer.Deserialize<Body>(_rawRecord));
+        private Body GetPayload() => _payload ?? (_payload = this.Serializer.Deserialize(_rawRecord));
 
         /// <summary>
         /// Gets events of a specific type from the batch.
@@ -77,7 +83,21 @@ namespace Orleans.Streaming.Kinesis
         public int CompareTo(KinesisBatchContainer other)
             => Token.SequenceNumber.CompareTo(other.SequenceToken.SequenceNumber);
 
-        internal static byte[] ToKinesisPayload<T>(Serializer serializer, StreamId streamId, IEnumerable<T> events, Dictionary<string, object> requestContext)
+        [Serializable]
+        [GenerateSerializer]
+        internal class Body
+        {
+            [Id(0)]
+            public List<object> Events { get; set; }
+
+            [Id(1)]
+            public Dictionary<string, object> RequestContext { get; set; }
+
+            [Id(2)]
+            public StreamId StreamId { get; set; }
+        }
+
+        internal static byte[] ToKinesisPayload<T>(Serializer<KinesisBatchContainer.Body> serializer, StreamId streamId, IEnumerable<T> events, Dictionary<string, object> requestContext)
         {
             var payload = new Body
             {
@@ -89,21 +109,9 @@ namespace Orleans.Streaming.Kinesis
             return serializer.SerializeToArray(payload);
         }
 
-        internal static KinesisBatchContainer FromKinesisRecord(Serializer serializer, Record record, long sequenceId)
+        internal static KinesisBatchContainer FromKinesisRecord(Serializer<KinesisBatchContainer.Body> serializer, Record record, long sequenceId)
         {
             return new KinesisBatchContainer(record, serializer, sequenceId);
-        }
-
-        [Serializable]
-        [GenerateSerializer]
-        internal class Body
-        {
-            [Id(0)]
-            public List<object> Events { get; set; }
-            [Id(1)]
-            public Dictionary<string, object> RequestContext { get; set; }
-            [Id(2)]
-            public StreamId StreamId { get; set; }
         }
     }
 }

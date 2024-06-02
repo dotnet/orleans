@@ -7,7 +7,7 @@ namespace Orleans.Streaming.Kinesis
 {
     [Serializable]
     [GenerateSerializer]
-    public class KinesisSequenceToken : EventSequenceTokenV2
+    internal class KinesisSequenceToken : EventSequenceTokenV2
     {
         /// <summary>
         /// Initializes a new instance of the <see cref="KinesisSequenceToken" /> class.

@@ -10,14 +10,14 @@ using System.Threading.Tasks;
 
 namespace Orleans.Streaming.Kinesis
 {
-    public class KinesisAdapterReceiver : IQueueAdapterReceiver
+    internal class KinesisAdapterReceiver : IQueueAdapterReceiver
     {
         private readonly ILogger<KinesisAdapterReceiver> _logger;
         private readonly AmazonKinesisClient _client;
         private readonly string _streamName;
         private readonly string _partition;
         private readonly IStreamQueueCheckpointerFactory _checkpointerFactory;
-        private readonly Serializer _serializer;
+        private readonly Serializer<KinesisBatchContainer.Body> _serializer;
 
         private IStreamQueueCheckpointer<string> _checkpointer;
         private string _shardIterator;
@@ -28,7 +28,7 @@ namespace Orleans.Streaming.Kinesis
             string streamName,
             string partition,
             IStreamQueueCheckpointerFactory checkpointerFactory,
-            Serializer serializer,
+            Serializer<KinesisBatchContainer.Body> serializer,
             ILoggerFactory loggerFactory
             )
         {
