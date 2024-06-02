@@ -4,7 +4,10 @@ using System.Collections.Generic;
 using System.Linq.Expressions;
 using System.Runtime.Serialization;
 using System.Text.Json;
+using System.Text.Json.Nodes;
+using System.Text.Json.Serialization;
 using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 using Orleans;
 
 [Alias("test.person.alias"), GenerateSerializer]
@@ -61,6 +64,11 @@ public class Person5_Class
 
 [AttributeUsage(AttributeTargets.Class | AttributeTargets.Struct)]
 public sealed class MyJsonSerializableAttribute : Attribute
+{
+}
+
+[AttributeUsage(AttributeTargets.Class | AttributeTargets.Struct)]
+public sealed class MyNewtonsoftJsonSerializableAttribute : Attribute
 {
 }
 
@@ -389,6 +397,29 @@ namespace Orleans.Serialization.UnitTests
         public override int GetHashCode() => HashCode.Combine(IntProperty);
     }
 
+    [MyNewtonsoftJsonSerializable]
+    public class MyNewtonsoftJsonClass : MyNonJsonBaseClass, IEquatable<MyNewtonsoftJsonClass>
+    {
+        [JsonProperty]
+        public string SubTypeProperty { get; set; }
+
+        [JsonProperty]
+        public TestId Id { get; set; }
+
+        [JsonProperty]
+        public JArray JsonArray { get; set; } = new JArray(true, 42, "hello");
+
+        [JsonProperty]
+        public JObject JsonObject { get; set; } = new() { ["foo"] = "bar" };
+
+        public override string ToString() => $"{nameof(SubTypeProperty)}: {SubTypeProperty}, {base.ToString()}";
+        public bool Equals(MyNewtonsoftJsonClass other) => other is not null && base.Equals(other) && string.Equals(SubTypeProperty, other.SubTypeProperty, StringComparison.Ordinal) && EqualityComparer<TestId>.Default.Equals(Id, other.Id)
+            && string.Equals(JsonConvert.SerializeObject(JsonArray), JsonConvert.SerializeObject(other.JsonArray))
+            && string.Equals(JsonConvert.SerializeObject(JsonObject), JsonConvert.SerializeObject(other.JsonObject));
+        public override bool Equals(object obj) => Equals(obj as MyJsonClass);
+        public override int GetHashCode() => HashCode.Combine(base.GetHashCode(), SubTypeProperty);
+    }
+
     [MyJsonSerializable]
     public class MyJsonClass : MyNonJsonBaseClass, IEquatable<MyJsonClass>
     {
@@ -398,8 +429,16 @@ namespace Orleans.Serialization.UnitTests
         [JsonProperty]
         public TestId Id { get; set; }
 
+        [JsonProperty]
+        public JsonArray JsonArray { get; set; } = new JsonArray(true, 42, "hello");
+
+        [JsonProperty]
+        public JsonObject JsonObject { get; set; } = new() { ["foo"] = "bar" };
+
         public override string ToString() => $"{nameof(SubTypeProperty)}: {SubTypeProperty}, {base.ToString()}";
-        public bool Equals(MyJsonClass other) => other is not null && base.Equals(other) && string.Equals(SubTypeProperty, other.SubTypeProperty, StringComparison.Ordinal) && EqualityComparer<TestId>.Default.Equals(Id, other.Id);
+        public bool Equals(MyJsonClass other) => other is not null && base.Equals(other) && string.Equals(SubTypeProperty, other.SubTypeProperty, StringComparison.Ordinal) && EqualityComparer<TestId>.Default.Equals(Id, other.Id)
+            && string.Equals(System.Text.Json.JsonSerializer.Serialize(JsonArray), System.Text.Json.JsonSerializer.Serialize(other.JsonArray))
+            && string.Equals(System.Text.Json.JsonSerializer.Serialize(JsonObject), System.Text.Json.JsonSerializer.Serialize(other.JsonObject));
         public override bool Equals(object obj) => Equals(obj as MyJsonClass);
         public override int GetHashCode() => HashCode.Combine(base.GetHashCode(), SubTypeProperty);
     }
