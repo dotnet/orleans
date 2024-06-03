@@ -12,11 +12,12 @@ using Orleans.Streams.Filtering;
 using Orleans.Timers;
 
 namespace Orleans.Streams
-{
+{ 
     internal class PersistentStreamPullingAgent : SystemTarget, IPersistentStreamPullingAgent
     {
-        private static readonly IBackoffProvider DeliveryBackoffProvider = new ExponentialBackoff(TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(30), TimeSpan.FromSeconds(1));
-        private static readonly IBackoffProvider ReadLoopBackoff = new ExponentialBackoff(TimeSpan.FromSeconds(10), TimeSpan.FromSeconds(20), TimeSpan.FromSeconds(1));
+        private readonly IBackoffProvider _deliveryBackoffProvider;
+        private readonly IBackoffProvider _queueReaderBackoffProvider;
+
         private const int ReadLoopRetryMax = 6;
         private const int StreamInactivityCheckFrequency = 10;
         private readonly string streamProviderName;
@@ -51,7 +52,9 @@ namespace Orleans.Streams
             SiloAddress siloAddress,
             IQueueAdapter queueAdapter,
             IQueueAdapterCache queueAdapterCache,
-            IStreamFailureHandler streamFailureHandler)
+            IStreamFailureHandler streamFailureHandler,
+            IBackoffProvider deliveryBackoffProvider,
+            IBackoffProvider queueReaderBackoffProvider)
             : base(id, siloAddress, loggerFactory)
         {
             if (strProviderName == null) throw new ArgumentNullException("runtime", "PersistentStreamPullingAgent: strProviderName should not be null");
@@ -65,6 +68,8 @@ namespace Orleans.Streams
             this.queueAdapter = queueAdapter ?? throw new ArgumentNullException(nameof(queueAdapter));
             this.streamFailureHandler = streamFailureHandler ?? throw new ArgumentNullException(nameof(streamFailureHandler));
             this.queueAdapterCache = queueAdapterCache;
+            _deliveryBackoffProvider = deliveryBackoffProvider;
+            _queueReaderBackoffProvider = queueReaderBackoffProvider;
             numMessages = 0;
 
             logger = loggerFactory.CreateLogger($"{this.GetType().Namespace}.{streamProviderName}");
@@ -304,7 +309,7 @@ namespace Orleans.Streams
                          // Do not retry if the agent is shutting down, or if the exception is ClientNotAvailableException
                          (exception, i) => exception is not ClientNotAvailableException && !IsShutdown,
                          this.options.MaxEventDeliveryTime,
-                         DeliveryBackoffProvider);
+                         _deliveryBackoffProvider);
 
                     if (requestedHandshakeToken != null)
                     {
@@ -405,7 +410,7 @@ namespace Orleans.Streams
                         ReadLoopRetryMax,
                         ReadLoopRetryExceptionFilter,
                         Constants.INFINITE_TIMESPAN,
-                        ReadLoopBackoff);
+                        _queueReaderBackoffProvider);
                     if (!moreData)
                         return;
                 }
@@ -625,7 +630,7 @@ namespace Orleans.Streams
                                 // Do not retry if the agent is shutting down, or if the exception is ClientNotAvailableException
                                 (exception, i) => exception is not ClientNotAvailableException && !IsShutdown,
                                 this.options.MaxEventDeliveryTime,
-                                DeliveryBackoffProvider);
+                                _deliveryBackoffProvider);
                             if (newToken != null)
                             {
                                 consumerData.LastToken = newToken;
@@ -848,7 +853,7 @@ namespace Orleans.Streams
                                 AsyncExecutorWithRetries.INFINITE_RETRIES,
                                 (exception, i) => !IsShutdown,
                                 Constants.INFINITE_TIMESPAN,
-                                DeliveryBackoffProvider);
+                                _deliveryBackoffProvider);
 
 
                 if (logger.IsEnabled(LogLevel.Debug))
