@@ -1,6 +1,8 @@
+#nullable enable
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
@@ -25,7 +27,7 @@ namespace Orleans.Runtime;
 /// MUST lock this object for any concurrent access
 /// Consider: compartmentalize by usage, e.g., using separate interfaces for data for catalog, etc.
 /// </summary>
-internal sealed class ActivationData : IGrainContext, ICollectibleGrainContext, IGrainExtensionBinder, IActivationWorkingSetMember, IGrainTimerRegistry, IGrainManagementExtension, ICallChainReentrantGrainContext, IAsyncDisposable
+internal sealed class ActivationData : IGrainContext, ICollectibleGrainContext, IGrainExtensionBinder, IActivationWorkingSetMember, IGrainTimerRegistry, IGrainManagementExtension, ICallChainReentrantGrainContext, IAsyncDisposable, IDisposable
 {
     private const string GrainAddressMigrationContextKey = "sys.addr";
     private readonly GrainTypeSharedContext _shared;
@@ -34,18 +36,18 @@ internal sealed class ActivationData : IGrainContext, ICollectibleGrainContext, 
     private readonly List<(Message Message, CoarseStopwatch QueuedTime)> _waitingRequests = new();
     private readonly Dictionary<Message, CoarseStopwatch> _runningRequests = new();
     private readonly SingleWaiterAutoResetEvent _workSignal = new() { RunContinuationsAsynchronously = true };
-    private GrainLifecycle _lifecycle;
-    private List<object> _pendingOperations;
-    private Message _blockingRequest;
+    private GrainLifecycle? _lifecycle;
+    private List<object>? _pendingOperations;
+    private Message? _blockingRequest;
     private bool _isInWorkingSet;
     private CoarseStopwatch _busyDuration;
     private CoarseStopwatch _idleDuration;
-    private GrainReference _selfReference;
+    private GrainReference? _selfReference;
 
     // Values which are needed less frequently and do not warrant living directly on activation for object size reasons.
     // The values in this field are typically used to represent termination state of an activation or features which are not
     // used by all grains, such as grain timers.
-    private ActivationDataExtra _extras;
+    private ActivationDataExtra? _extras;
 
     // The task representing this activation's message loop.
     // This field is assigned and never read and exists only for debugging purposes (eg, in memory dumps, to associate a loop task with an activation).
@@ -69,7 +71,7 @@ internal sealed class ActivationData : IGrainContext, ICollectibleGrainContext, 
     }
 
     public IGrainRuntime GrainRuntime => _shared.Runtime;
-    public object GrainInstance { get; private set; }
+    public object? GrainInstance { get; private set; }
     public GrainAddress Address { get; }
     public GrainReference GrainReference => _selfReference ??= _shared.GrainReferenceActivator.CreateReference(GrainId, default);
     public ActivationState State { get; private set; }
@@ -107,7 +109,7 @@ internal sealed class ActivationData : IGrainContext, ICollectibleGrainContext, 
     public IWorkItemScheduler Scheduler => _workItemGroup;
     public Task Deactivated => GetDeactivationCompletionSource().Task;
 
-    public SiloAddress ForwardingAddress
+    public SiloAddress? ForwardingAddress
     {
         get => _extras?.ForwardingAddress;
         set
@@ -124,7 +126,7 @@ internal sealed class ActivationData : IGrainContext, ICollectibleGrainContext, 
     /// Gets the previous directory registration for this grain, if known.
     /// This is used to update the grain directory to point to the new registration during activation.
     /// </summary>
-    public GrainAddress PreviousRegistration
+    public GrainAddress? PreviousRegistration
     {
         get => _extras?.PreviousRegistration;
         set
@@ -137,7 +139,7 @@ internal sealed class ActivationData : IGrainContext, ICollectibleGrainContext, 
         }
     }
 
-    private Exception DeactivationException => _extras?.DeactivationReason.Exception;
+    private Exception? DeactivationException => _extras?.DeactivationReason.Exception;
 
     private DeactivationReason DeactivationReason
     {
@@ -152,7 +154,7 @@ internal sealed class ActivationData : IGrainContext, ICollectibleGrainContext, 
         }
     }
 
-    private HashSet<IGrainTimer> Timers
+    private HashSet<IGrainTimer>? Timers
     {
         get => _extras?.Timers;
         set
@@ -204,7 +206,7 @@ internal sealed class ActivationData : IGrainContext, ICollectibleGrainContext, 
         }
     }
 
-    private DehydrationContextHolder DehydrationContext
+    private DehydrationContextHolder? DehydrationContext
     {
         get => _extras?.DehydrationContext;
         set
@@ -219,9 +221,9 @@ internal sealed class ActivationData : IGrainContext, ICollectibleGrainContext, 
 
     public TimeSpan CollectionAgeLimit => _shared.CollectionAgeLimit;
 
-    public TTarget GetTarget<TTarget>() where TTarget : class => (TTarget)GrainInstance;
+    public TTarget? GetTarget<TTarget>() where TTarget : class => (TTarget?)GrainInstance;
 
-    TComponent ITargetHolder.GetComponent<TComponent>()
+    TComponent? ITargetHolder.GetComponent<TComponent>() where TComponent : class
     {
         var result = GetComponent<TComponent>();
         if (result is null && typeof(IGrainExtension).IsAssignableFrom(typeof(TComponent)))
@@ -239,9 +241,9 @@ internal sealed class ActivationData : IGrainContext, ICollectibleGrainContext, 
         return result;
     }
 
-    public TComponent GetComponent<TComponent>() where TComponent : class
+    public TComponent? GetComponent<TComponent>() where TComponent : class
     {
-        TComponent result;
+        TComponent? result;
         if (GrainInstance is TComponent grainResult)
         {
             result = grainResult;
@@ -267,7 +269,7 @@ internal sealed class ActivationData : IGrainContext, ICollectibleGrainContext, 
         return result;
     }
 
-    public void SetComponent<TComponent>(TComponent instance) where TComponent : class
+    public void SetComponent<TComponent>(TComponent? instance) where TComponent : class
     {
         if (GrainInstance is TComponent)
         {
@@ -292,7 +294,7 @@ internal sealed class ActivationData : IGrainContext, ICollectibleGrainContext, 
         }
     }
 
-    internal void SetGrainInstance(object grainInstance)
+    internal void SetGrainInstance(object? grainInstance)
     {
         switch (GrainInstance, grainInstance)
         {
@@ -324,7 +326,7 @@ internal sealed class ActivationData : IGrainContext, ICollectibleGrainContext, 
     /// Returns LimitExceededException if overloaded, otherwise <c>null</c>c>
     /// </summary>
     /// <returns>Returns LimitExceededException if overloaded, otherwise <c>null</c>c></returns>
-    public LimitExceededException CheckOverloaded()
+    public LimitExceededException? CheckOverloaded()
     {
         string limitName = nameof(SiloMessagingOptions.MaxEnqueuedRequestsHardLimit);
         int maxRequestsHardLimit = _shared.MessagingOptions.MaxEnqueuedRequestsHardLimit;
@@ -378,9 +380,20 @@ internal sealed class ActivationData : IGrainContext, ICollectibleGrainContext, 
     {
         lock (this)
         {
-            var tmp = _waitingRequests.Select(m => m.Item1).ToList();
+            var result = new List<Message>(_waitingRequests.Count);
+            foreach (var (message, _) in _waitingRequests)
+            {
+                // Local-only messages are not allowed to escape the activation.
+                if (message.IsLocalOnly)
+                {
+                    continue;
+                }
+
+                result.Add(message);
+            }
+
             _waitingRequests.Clear();
-            return tmp;
+            return result;
         }
     }
 
@@ -408,7 +421,7 @@ internal sealed class ActivationData : IGrainContext, ICollectibleGrainContext, 
         }
         else
         {
-            KeepAliveUntil = DateTime.UtcNow + timespan;
+            KeepAliveUntil = GrainRuntime.TimeProvider.GetUtcNow().UtcDateTime + timespan;
         }
     }
 
@@ -428,18 +441,16 @@ internal sealed class ActivationData : IGrainContext, ICollectibleGrainContext, 
         _workSignal.Signal();
     }
 
-    public void Migrate(Dictionary<string, object> requestContext, CancellationToken? cancellationToken = default)
+    public void Migrate(Dictionary<string, object>? requestContext, CancellationToken cancellationToken = default)
     {
-        if (!cancellationToken.HasValue)
-        {
-            cancellationToken = new CancellationTokenSource(_shared.InternalRuntime.CollectionOptions.Value.DeactivationTimeout).Token;
-        }
+        var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        cts.CancelAfter(_shared.InternalRuntime.CollectionOptions.Value.DeactivationTimeout);
 
         // We use a named work item since it is cheaper than allocating a Task and has the benefit of being named.
-        _workItemGroup.QueueWorkItem(new MigrateWorkItem(this, requestContext, cancellationToken.Value));
+        _workItemGroup.QueueWorkItem(new MigrateWorkItem(this, requestContext, cts));
     }
 
-    private async Task StartMigratingAsync(Dictionary<string, object> requestContext, CancellationToken cancellationToken)
+    private async Task StartMigratingAsync(Dictionary<string, object>? requestContext, CancellationTokenSource cts)
     {
         lock (this)
         {
@@ -455,7 +466,7 @@ internal sealed class ActivationData : IGrainContext, ICollectibleGrainContext, 
         {
             // Run placement to select a new host. If a new (different) host is not selected, do not migrate.
             var placementService = _shared.Runtime.ServiceProvider.GetRequiredService<PlacementService>();
-            newLocation = await placementService.PlaceGrainAsync(GrainId, requestContext, PlacementStrategy);
+            newLocation = await placementService.PlaceGrainAsync(GrainId, requestContext, PlacementStrategy).WaitAsync(cts.Token);
             if (newLocation == Address.SiloAddress || newLocation is null)
             {
                 // No more appropriate silo was selected for this grain. The migration attempt will be aborted.
@@ -503,7 +514,7 @@ internal sealed class ActivationData : IGrainContext, ICollectibleGrainContext, 
             }
 
             // Start deactivation to prevent any other.
-            ScheduleOperation(new Command.Deactivate(cancellationToken));
+            ScheduleOperation(new Command.Deactivate(cts));
         }
         catch (Exception exception)
         {
@@ -512,15 +523,13 @@ internal sealed class ActivationData : IGrainContext, ICollectibleGrainContext, 
         }
     }
 
-    public void Deactivate(DeactivationReason reason, CancellationToken? token = default)
+    public void Deactivate(DeactivationReason reason, CancellationToken cancellationToken)
     {
-        if (!token.HasValue)
-        {
-            token = new CancellationTokenSource(_shared.InternalRuntime.CollectionOptions.Value.DeactivationTimeout).Token;
-        }
+        var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        cts.CancelAfter(_shared.InternalRuntime.CollectionOptions.Value.DeactivationTimeout);
 
         StartDeactivating(reason);
-        ScheduleOperation(new Command.Deactivate(token.Value));
+        ScheduleOperation(new Command.Deactivate(cts));
     }
 
     private void DeactivateStuckActivation()
@@ -530,7 +539,7 @@ internal sealed class ActivationData : IGrainContext, ICollectibleGrainContext, 
         var reason = new DeactivationReason(DeactivationReasonCode.ActivationUnresponsive, msg);
 
         // Mark the grain as deactivating so that messages are forwarded instead of being invoked
-        Deactivate(reason, token: default);
+        Deactivate(reason, cancellationToken: default);
 
         // Try to remove this activation from the catalog and directory
         // This leaves this activation dangling, stuck processing the current request until it eventually completes
@@ -559,14 +568,10 @@ internal sealed class ActivationData : IGrainContext, ICollectibleGrainContext, 
             }
 
             Timers.Remove(orleansTimerInsideGrain);
-            if (Timers.Count == 0)
-            {
-                Timers = null;
-            }
         }
     }
 
-    private void StopAllTimers()
+    private void DisposeTimers()
     {
         lock (this)
         {
@@ -575,41 +580,15 @@ internal sealed class ActivationData : IGrainContext, ICollectibleGrainContext, 
                 return;
             }
 
-            foreach (var timer in Timers)
-            {
-                timer.Change(Timeout.InfiniteTimeSpan, Timeout.InfiniteTimeSpan);
-            }
-        }
-    }
+            // Need to set Timers to null since OnTimerDisposed mutates the timers set if it is not null.
+            var timers = Timers;
+            Timers = null;
 
-    private Task WaitForAllTimersToFinish(CancellationToken cancellationToken)
-    {
-        lock (this)
-        {
-            if (Timers is null)
+            // Dispose all timers.
+            foreach (var timer in timers)
             {
-                return Task.CompletedTask;
+                timer.Dispose();
             }
-
-            var tasks = new List<Task>();
-            var timerCopy = Timers.ToList(); // need to copy since OnTimerDisposed will change the timers set.
-            foreach (var timer in timerCopy)
-            {
-                if (timer is IAsyncDisposable asyncDisposable)
-                {
-                    var task = asyncDisposable.DisposeAsync();
-                    if (!task.IsCompletedSuccessfully)
-                    {
-                        tasks.Add(task.AsTask());
-                    }
-                }
-                else
-                {
-                    timer.Dispose();
-                }
-            }
-
-            return Task.WhenAll(tasks).WithCancellation(cancellationToken);
         }
     }
 
@@ -618,7 +597,7 @@ internal sealed class ActivationData : IGrainContext, ICollectibleGrainContext, 
         var slowRunningRequestDuration = options.RequestProcessingWarningTime;
         var longQueueTimeDuration = options.RequestQueueDelayWarningTime;
 
-        List<string> diagnostics = null;
+        List<string>? diagnostics = null;
         lock (this)
         {
             if (State != ActivationState.Valid)
@@ -697,7 +676,7 @@ internal sealed class ActivationData : IGrainContext, ICollectibleGrainContext, 
             }
         }
 
-        void GetStatusList(ref List<string> diagnostics)
+        void GetStatusList([NotNull] ref List<string>? diagnostics)
         {
             if (diagnostics is not null) return;
 
@@ -731,11 +710,15 @@ internal sealed class ActivationData : IGrainContext, ICollectibleGrainContext, 
         return grainTypeName is null ? $"#Placement={placement}" : $"#GrainType={grainTypeName} Placement={placement}";
     }
 
+    public void Dispose() => DisposeAsync().AsTask().Wait();
+
     public async ValueTask DisposeAsync()
     {
         _extras ??= new();
         if (_extras.IsDisposing) return;
         _extras.IsDisposing = true;
+
+        DisposeTimers();
 
         try
         {
@@ -768,7 +751,7 @@ internal sealed class ActivationData : IGrainContext, ICollectibleGrainContext, 
         }
     }
 
-    bool IEquatable<IGrainContext>.Equals(IGrainContext other) => ReferenceEquals(this, other);
+    bool IEquatable<IGrainContext>.Equals(IGrainContext? other) => ReferenceEquals(this, other);
 
     public (TExtension, TExtensionInterface) GetOrSetExtension<TExtension, TExtensionInterface>(Func<TExtension> newExtensionFunc)
         where TExtension : class, TExtensionInterface
@@ -843,7 +826,7 @@ internal sealed class ActivationData : IGrainContext, ICollectibleGrainContext, 
             {
                 if (!IsCurrentlyExecuting)
                 {
-                    List<object> operations = null;
+                    List<object>? operations = null;
                     lock (this)
                     {
                         if (_pendingOperations is { Count: > 0 })
@@ -875,7 +858,7 @@ internal sealed class ActivationData : IGrainContext, ICollectibleGrainContext, 
 
             do
             {
-                Message message = null;
+                Message? message = null;
                 lock (this)
                 {
                     if (_waitingRequests.Count <= i)
@@ -883,13 +866,16 @@ internal sealed class ActivationData : IGrainContext, ICollectibleGrainContext, 
                         break;
                     }
 
-                    if (State != ActivationState.Valid)
+                    message = _waitingRequests[i].Message;
+
+                    // If the activation is not valid, reject all pending messages except for local-only messages.
+                    // Local-only messages are used for internal system operations and should not be rejected while the grain is valid or deactivating.
+                    if (State != ActivationState.Valid && !(message.IsLocalOnly && State is ActivationState.Deactivating))
                     {
                         ProcessRequestsToInvalidActivation();
                         break;
                     }
 
-                    message = _waitingRequests[i].Message;
                     try
                     {
                         if (!MayInvokeRequest(message))
@@ -935,14 +921,18 @@ internal sealed class ActivationData : IGrainContext, ICollectibleGrainContext, 
                                     DeactivationReasonCode.IncompatibleRequest,
                                     $"Received incompatible request for interface {message.InterfaceType} version {message.InterfaceVersion}. This activation supports interface version {currentVersion}.");
 
-                                Deactivate(reason, token: default);
+                                Deactivate(reason, cancellationToken: default);
                                 return;
                             }
                         }
                     }
                     catch (Exception exception)
                     {
-                        _shared.InternalRuntime.MessageCenter.RejectMessage(message, Message.RejectionTypes.Transient, exception);
+                        if (!message.IsLocalOnly)
+                        {
+                            _shared.InternalRuntime.MessageCenter.RejectMessage(message, Message.RejectionTypes.Transient, exception);
+                        }
+
                         _waitingRequests.RemoveAt(i);
                         continue;
                     }
@@ -950,7 +940,7 @@ internal sealed class ActivationData : IGrainContext, ICollectibleGrainContext, 
                     // Process this message, removing it from the queue.
                     _waitingRequests.RemoveAt(i);
 
-                    Debug.Assert(State == ActivationState.Valid);
+                    Debug.Assert(State == ActivationState.Valid || message.IsLocalOnly);
                     RecordRunning(message, message.IsAlwaysInterleave);
                 }
 
@@ -984,7 +974,7 @@ internal sealed class ActivationData : IGrainContext, ICollectibleGrainContext, 
             if (State is ActivationState.Deactivating)
             {
                 // Determine whether to declare this activation as stuck
-                var deactivatingTime = DateTime.UtcNow - DeactivationStartTime.Value;
+                var deactivatingTime = GrainRuntime.TimeProvider.GetUtcNow().UtcDateTime - DeactivationStartTime!.Value;
                 if (deactivatingTime > _shared.MaxRequestProcessingTime && !IsStuckDeactivating)
                 {
                     IsStuckDeactivating = true;
@@ -1074,13 +1064,28 @@ internal sealed class ActivationData : IGrainContext, ICollectibleGrainContext, 
                             RehydrateInternal(command.Context);
                             break;
                         case Command.Activate command:
-                            await ActivateAsync(command.RequestContext, command.CancellationToken);
+                            try
+                            {
+                                await ActivateAsync(command.RequestContext, command.Cts.Token);
+                            }
+                            finally
+                            {
+                                command.Cts.Dispose();
+                            }
                             break;
                         case Command.Deactivate command:
-                            await FinishDeactivating(command.CancellationToken);
+                            try
+                            {
+                                await FinishDeactivating(command.Cts.Token);
+                            }
+                            finally
+                            {
+                                command.Cts.Dispose();
+                            }
+
                             break;
                         case Command.Delay command:
-                            await Task.Delay(command.Duration);
+                            await Task.Delay(command.Duration, GrainRuntime.TimeProvider);
                             break;
                         case Command.UnregisterFromCatalog:
                             UnregisterMessageTarget();
@@ -1113,7 +1118,7 @@ internal sealed class ActivationData : IGrainContext, ICollectibleGrainContext, 
                     throw new InvalidOperationException($"Attempted to rehydrate a grain in the {State} state");
                 }
 
-                if (context.TryGetValue(GrainAddressMigrationContextKey, out GrainAddress previousRegistration) && previousRegistration is not null)
+                if (context.TryGetValue(GrainAddressMigrationContextKey, out GrainAddress? previousRegistration) && previousRegistration is not null)
                 {
                     // Propagate the previous registration, so that the new activation can atomically replace it with its new address.
                     PreviousRegistration = previousRegistration;
@@ -1230,23 +1235,24 @@ internal sealed class ActivationData : IGrainContext, ICollectibleGrainContext, 
     /// <summary>
     /// Invoked when an activation has finished a transaction and may be ready for additional transactions
     /// </summary>
-    /// <param name="message">The message that has just completed processing.
-    /// This will be <c>null</c> for the case of completion of Activate/Deactivate calls.</param>
+    /// <param name="message">The message that has just completed processing.</param>
     private void OnCompletedRequest(Message message)
     {
         lock (this)
         {
             _runningRequests.Remove(message);
 
-            if (_runningRequests.Count == 0)
+            // If the message is meant to keep the activation active, reset the idle timer and ensure the activation
+            // is in the activation working set.
+            if (message.IsKeepAlive)
             {
                 _idleDuration = CoarseStopwatch.StartNew();
-            }
 
-            if (!_isInWorkingSet)
-            {
-                _isInWorkingSet = true;
-                _shared.InternalRuntime.ActivationWorkingSet.OnActive(this);
+                if (!_isInWorkingSet)
+                {
+                    _isInWorkingSet = true;
+                    _shared.InternalRuntime.ActivationWorkingSet.OnActive(this);
+                }
             }
 
             // The below logic only works for non-reentrant activations
@@ -1305,7 +1311,7 @@ internal sealed class ActivationData : IGrainContext, ICollectibleGrainContext, 
     private void ReceiveRequest(Message message)
     {
         var overloadException = CheckOverloaded();
-        if (overloadException != null)
+        if (overloadException != null && !message.IsLocalOnly)
         {
             MessagingProcessingInstruments.OnDispatcherMessageProcessedError(message);
             _shared.InternalRuntime.MessageCenter.RejectMessage(message, Message.RejectionTypes.Overloaded, overloadException, "Target activation is overloaded " + this);
@@ -1381,17 +1387,15 @@ internal sealed class ActivationData : IGrainContext, ICollectibleGrainContext, 
         ScheduleOperation(new Command.Rehydrate(context));
     }
 
-    public void Activate(Dictionary<string, object> requestContext, CancellationToken? cancellationToken)
+    public void Activate(Dictionary<string, object>? requestContext, CancellationToken cancellationToken)
     {
-        if (!cancellationToken.HasValue)
-        {
-            cancellationToken = new CancellationTokenSource(_shared.InternalRuntime.CollectionOptions.Value.ActivationTimeout).Token;
-        }
+        var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        cts.CancelAfter(_shared.InternalRuntime.CollectionOptions.Value.ActivationTimeout);
 
-        ScheduleOperation(new Command.Activate(requestContext, cancellationToken.Value));
+        ScheduleOperation(new Command.Activate(requestContext, cts));
     }
 
-    private async Task ActivateAsync(Dictionary<string, object> requestContextData, CancellationToken cancellationToken)
+    private async Task ActivateAsync(Dictionary<string, object>? requestContextData, CancellationToken cancellationToken)
     {
         // A chain of promises that will have to complete in order to complete the activation
         // Register with the grain directory, register with the store if necessary and call the Activate method on the new activation.
@@ -1431,7 +1435,7 @@ internal sealed class ActivationData : IGrainContext, ICollectibleGrainContext, 
             _workSignal.Signal();
         }
 
-        async Task<bool> CallActivateAsync(Dictionary<string, object> requestContextData, CancellationToken cancellationToken)
+        async Task<bool> CallActivateAsync(Dictionary<string, object>? requestContextData, CancellationToken cancellationToken)
         {
             if (_shared.Logger.IsEnabled(LogLevel.Debug))
             {
@@ -1506,7 +1510,7 @@ internal sealed class ActivationData : IGrainContext, ICollectibleGrainContext, 
                     ScheduleOperation(new Command.Delay(TimeSpan.FromSeconds(5)));
                 }
 
-                ScheduleOperation(new Command.UnregisterFromCatalog());
+                ScheduleOperation(Command.UnregisterFromCatalog.Instance);
 
                 lock (this)
                 {
@@ -1531,7 +1535,7 @@ internal sealed class ActivationData : IGrainContext, ICollectibleGrainContext, 
         }
         else
         {
-            Exception registrationException;
+            Exception? registrationException;
             var previousRegistration = PreviousRegistration;
             try
             {
@@ -1649,12 +1653,8 @@ internal sealed class ActivationData : IGrainContext, ICollectibleGrainContext, 
                 DeactivationReason = reason;
             }
 
-            DeactivationStartTime = DateTime.UtcNow;
+            DeactivationStartTime = GrainRuntime.TimeProvider.GetUtcNow().UtcDateTime;
             SetState(ActivationState.Deactivating);
-            if (!IsCurrentlyExecuting)
-            {
-                StopAllTimers();
-            }
 
             _shared.InternalRuntime.ActivationWorkingSet.OnDeactivating(this);
         }
@@ -1676,10 +1676,10 @@ internal sealed class ActivationData : IGrainContext, ICollectibleGrainContext, 
                 _shared.Logger.LogTrace("FinishDeactivating activation {Activation}", this.ToDetailedString());
             }
 
-            StopAllTimers();
+            // Stop timers from firing.
+            DisposeTimers();
 
-            // Wait timers and call OnDeactivateAsync(reason, cancellationToken)
-            await WaitForAllTimersToFinish(cancellationToken);
+            // Call OnDeactivateAsync(reason, cancellationToken)
             await CallGrainDeactivate(cancellationToken);
 
             if (DehydrationContext is { } context
@@ -1841,13 +1841,13 @@ internal sealed class ActivationData : IGrainContext, ICollectibleGrainContext, 
 
     ValueTask IGrainManagementExtension.DeactivateOnIdle()
     {
-        Deactivate(new(DeactivationReasonCode.ApplicationRequested, $"{nameof(IGrainManagementExtension.DeactivateOnIdle)} was called."));
+        Deactivate(new(DeactivationReasonCode.ApplicationRequested, $"{nameof(IGrainManagementExtension.DeactivateOnIdle)} was called."), CancellationToken.None);
         return default;
     }
 
     ValueTask IGrainManagementExtension.MigrateOnIdle()
     {
-        Migrate(RequestContext.CallContextData?.Value.Values);
+        Migrate(RequestContext.CallContextData?.Value.Values, CancellationToken.None);
         return default;
     }
 
@@ -1907,22 +1907,22 @@ internal sealed class ActivationData : IGrainContext, ICollectibleGrainContext, 
         private const int IsDisposingFlag = 1 << 2;
         private byte _flags;
 
-        public HashSet<IGrainTimer> Timers { get => GetValueOrDefault<HashSet<IGrainTimer>>(nameof(Timers)); set => SetOrRemoveValue(nameof(Timers), value); }
+        public HashSet<IGrainTimer>? Timers { get => GetValueOrDefault<HashSet<IGrainTimer>>(nameof(Timers)); set => SetOrRemoveValue(nameof(Timers), value); }
 
         /// <summary>
         /// During rehydration, this may contain the address for the previous (recently dehydrated) activation of this grain.
         /// </summary>
-        public GrainAddress PreviousRegistration { get => GetValueOrDefault<GrainAddress>(nameof(PreviousRegistration)); set => SetOrRemoveValue(nameof(PreviousRegistration), value); }
+        public GrainAddress? PreviousRegistration { get => GetValueOrDefault<GrainAddress>(nameof(PreviousRegistration)); set => SetOrRemoveValue(nameof(PreviousRegistration), value); }
 
         /// <summary>
         /// If State == Invalid, this may contain a forwarding address for incoming messages
         /// </summary>
-        public SiloAddress ForwardingAddress { get => GetValueOrDefault<SiloAddress>(nameof(ForwardingAddress)); set => SetOrRemoveValue(nameof(ForwardingAddress), value); }
+        public SiloAddress? ForwardingAddress { get => GetValueOrDefault<SiloAddress>(nameof(ForwardingAddress)); set => SetOrRemoveValue(nameof(ForwardingAddress), value); }
 
         /// <summary>
         /// A <see cref="TaskCompletionSource{TResult}"/> which completes when a grain has deactivated.
         /// </summary>
-        public TaskCompletionSource<bool> DeactivationTask { get => GetDeactivationInfoOrDefault()?.DeactivationTask; set => EnsureDeactivationInfo().DeactivationTask = value; }
+        public TaskCompletionSource<bool>? DeactivationTask { get => GetDeactivationInfoOrDefault()?.DeactivationTask; set => EnsureDeactivationInfo().DeactivationTask = value; }
 
         public DateTime? DeactivationStartTime { get => GetDeactivationInfoOrDefault()?.DeactivationStartTime; set => EnsureDeactivationInfo().DeactivationStartTime = value; }
 
@@ -1931,16 +1931,13 @@ internal sealed class ActivationData : IGrainContext, ICollectibleGrainContext, 
         /// <summary>
         /// When migrating to another location, this contains the information to preserve across activations.
         /// </summary>
-        public DehydrationContextHolder DehydrationContext { get => GetValueOrDefault<DehydrationContextHolder>(nameof(DehydrationContext)); set => SetOrRemoveValue(nameof(DehydrationContext), value); }
+        public DehydrationContextHolder? DehydrationContext { get => GetValueOrDefault<DehydrationContextHolder>(nameof(DehydrationContext)); set => SetOrRemoveValue(nameof(DehydrationContext), value); }
 
-        private DeactivationInfo GetDeactivationInfoOrDefault() => GetValueOrDefault<DeactivationInfo>(nameof(DeactivationInfo));
+        private DeactivationInfo? GetDeactivationInfoOrDefault() => GetValueOrDefault<DeactivationInfo>(nameof(DeactivationInfo));
         private DeactivationInfo EnsureDeactivationInfo()
         {
-            if (!TryGetValue(nameof(DeactivationInfo), out var info))
-            {
-                info = base[nameof(DeactivationInfo)] = new DeactivationInfo();
-            }
-
+            ref var info = ref CollectionsMarshal.GetValueRefOrAddDefault(this, nameof(DeactivationInfo), out _);
+            info ??= new DeactivationInfo();
             return (DeactivationInfo)info;
         }
 
@@ -1961,13 +1958,13 @@ internal sealed class ActivationData : IGrainContext, ICollectibleGrainContext, 
         }
 
         private bool GetFlag(int flag) => (_flags & flag) != 0;
-        private T GetValueOrDefault<T>(object key)
+        private T? GetValueOrDefault<T>(object key)
         {
             TryGetValue(key, out var result);
-            return (T)result;
+            return (T?)result;
         }
 
-        private void SetOrRemoveValue(object key, object value)
+        private void SetOrRemoveValue(object key, object? value)
         {
             if (value is null)
             {
@@ -1983,7 +1980,7 @@ internal sealed class ActivationData : IGrainContext, ICollectibleGrainContext, 
         {
             public DateTime? DeactivationStartTime;
             public DeactivationReason DeactivationReason;
-            public TaskCompletionSource<bool> DeactivationTask;
+            public TaskCompletionSource<bool>? DeactivationTask;
         }
     }
 
@@ -1991,29 +1988,30 @@ internal sealed class ActivationData : IGrainContext, ICollectibleGrainContext, 
     {
         protected Command() { }
 
-        public class Deactivate(CancellationToken cancellation) : Command
+        public sealed class Deactivate(CancellationTokenSource cts) : Command
         {
-            public CancellationToken CancellationToken { get; } = cancellation;
+            public CancellationTokenSource Cts { get; } = cts;
         }
 
-        public class Activate(Dictionary<string, object> requestContext, CancellationToken cancellationToken) : Command
+        public sealed class Activate(Dictionary<string, object>? requestContext, CancellationTokenSource cts) : Command
         {
-            public Dictionary<string, object> RequestContext { get; } = requestContext;
-            public CancellationToken CancellationToken { get; } = cancellationToken;
+            public Dictionary<string, object>? RequestContext { get; } = requestContext;
+            public CancellationTokenSource Cts { get; } = cts;
         }
 
-        public class Rehydrate(IRehydrationContext context) : Command
+        public sealed class Rehydrate(IRehydrationContext context) : Command
         {
             public readonly IRehydrationContext Context = context;
         }
 
-        public class Delay(TimeSpan duration) : Command
+        public sealed class Delay(TimeSpan duration) : Command
         {
             public TimeSpan Duration { get; } = duration;
         }
 
-        public class UnregisterFromCatalog : Command
+        public sealed class UnregisterFromCatalog : Command
         {
+            public static readonly UnregisterFromCatalog Instance = new();
         }
     }
 
@@ -2048,18 +2046,18 @@ internal sealed class ActivationData : IGrainContext, ICollectibleGrainContext, 
         }
     }
 
-    private class DehydrationContextHolder(SerializerSessionPool sessionPool, Dictionary<string, object> requestContext)
+    private class DehydrationContextHolder(SerializerSessionPool sessionPool, Dictionary<string, object>? requestContext)
     {
         public readonly MigrationContext MigrationContext = new(sessionPool);
-        public readonly Dictionary<string, object> RequestContext = requestContext;
+        public readonly Dictionary<string, object>? RequestContext = requestContext;
     }
 
-    private class MigrateWorkItem(ActivationData activation, Dictionary<string, object> requestContext, CancellationToken cancellationToken) : WorkItemBase
+    private class MigrateWorkItem(ActivationData activation, Dictionary<string, object>? requestContext, CancellationTokenSource cts) : WorkItemBase
     {
         public override string Name => "Migrate";
 
         public override IGrainContext GrainContext => activation;
 
-        public override void Execute() => activation.StartMigratingAsync(requestContext, cancellationToken).Ignore();
+        public override void Execute() => activation.StartMigratingAsync(requestContext, cts).Ignore();
     }
 }

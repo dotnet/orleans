@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -84,7 +85,7 @@ namespace Orleans.Runtime.Placement
 
             if (_logger.IsEnabled(LogLevel.Debug))
             {
-                _logger.LogDebug("Placing grain {GrainId} for message {Message}", grainId, message);
+                _logger.LogDebug("Looking up address for grain {GrainId} for message {Message}", grainId, message);
             }
 
             var worker = _workers[grainId.GetUniformHashCode() % PlacementWorkerCount];
@@ -275,11 +276,7 @@ namespace Orleans.Runtime.Placement
                             foreach (var message in messages)
                             {
                                 var target = message.Message.TargetGrain;
-                                if (!_inProgress.TryGetValue(target, out var workItem))
-                                {
-                                    _inProgress[target] = workItem = new();
-                                }
-
+                                var workItem = GetOrAddWorkItem(target);
                                 workItem.Messages.Add(message);
                                 if (workItem.Result is null)
                                 {
@@ -308,10 +305,17 @@ namespace Orleans.Runtime.Placement
                     }
                     catch (Exception exception)
                     {
-                        _logger.LogWarning(exception, "Exception in placement worker");
+                        _logger.LogWarning(exception, "Error in placement worker.");
                     }
 
                     await _workSignal.WaitAsync();
+                }
+
+                GrainPlacementWorkItem GetOrAddWorkItem(GrainId target)
+                {
+                    ref var workItem = ref CollectionsMarshal.GetValueRefOrAddDefault(_inProgress, target, out _);
+                    workItem ??= new();
+                    return workItem;
                 }
             }
 

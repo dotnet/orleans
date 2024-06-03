@@ -11,7 +11,8 @@ public interface IGrainTimer : IDisposable
     /// <summary>Changes the start time and the interval between method invocations for a timer, using <see cref="TimeSpan"/> values to measure time intervals.</summary>
     /// <param name="dueTime">
     /// A <see cref="TimeSpan"/> representing the amount of time to delay before invoking the callback method specified when the <see cref="IGrainTimer"/> was constructed.
-    /// Specify <see cref="Timeout.InfiniteTimeSpan"/> to prevent the timer from restarting. Specify <see cref="TimeSpan.Zero"/> to restart the timer immediately.
+    /// Specify <see cref="Timeout.InfiniteTimeSpan"/> to prevent the timer from restarting.
+    /// Specify <see cref="TimeSpan.Zero"/> to restart the timer immediately.
     /// </param>
     /// <param name="period">
     /// The time interval between invocations of the callback method specified when the timer was constructed.
