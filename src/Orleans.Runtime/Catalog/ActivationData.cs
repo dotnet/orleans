@@ -841,7 +841,7 @@ internal sealed class ActivationData : IGrainContext, ICollectibleGrainContext, 
         {
             try
             {
-                if (!IsCurrentlyExecuting)
+                if (!IsCurrentlyExecuting || State == ActivationState.Deactivating)
                 {
                     List<object> operations = null;
                     lock (this)
