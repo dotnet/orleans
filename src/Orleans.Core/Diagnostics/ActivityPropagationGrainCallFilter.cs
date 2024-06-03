@@ -144,8 +144,16 @@ namespace Orleans.Runtime
             var source = GetActivitySource(context);
             if (!string.IsNullOrEmpty(traceParent))
             {
-                ActivityContext.TryParse(traceParent, traceState, isRemote: true, out ActivityContext parentContext);
-                activity = source.CreateActivity(context.Request.GetActivityName(), ActivityKind.Server, parentContext);
+                if (ActivityContext.TryParse(traceParent, traceState, isRemote: true, out ActivityContext parentContext))
+                {
+                    // traceParent is a W3CId
+                    activity = source.CreateActivity(context.Request.GetActivityName(), ActivityKind.Server, parentContext);
+                }
+                else
+                {
+                    // Most likely, traceParent uses ActivityIdFormat.Hierarchical
+                    activity = source.CreateActivity(context.Request.GetActivityName(), ActivityKind.Server, traceParent);
+                }
 
                 if (activity is not null)
                 {
