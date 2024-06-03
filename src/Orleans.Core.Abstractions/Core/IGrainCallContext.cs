@@ -1,3 +1,4 @@
+#nullable enable
 using System.Reflection;
 using System.Threading.Tasks;
 using Orleans.Runtime;
@@ -74,12 +75,12 @@ namespace Orleans
         /// <summary>
         /// Gets or sets the result.
         /// </summary>
-        object Result { get; set; }
+        object? Result { get; set; }
        
         /// <summary>
         /// Gets or sets the response.
         /// </summary>
-        Response Response { get; set; }
+        Response? Response { get; set; }
 
         /// <summary>
         /// Invokes the request.
@@ -114,6 +115,6 @@ namespace Orleans
         /// <summary>
         /// Gets the grain context of the sender.
         /// </summary>
-        public IGrainContext SourceContext { get; }
+        public IGrainContext? SourceContext { get; }
     }
 }

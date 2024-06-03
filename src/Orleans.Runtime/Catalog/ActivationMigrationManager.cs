@@ -114,7 +114,7 @@ internal class ActivationMigrationManager : SystemTarget, IActivationMigrationMa
             {
                 lock (activation)
                 {
-                    if (activation.State is not ActivationState.Valid or ActivationState.Invalid or ActivationState.FailedToActivate)
+                    if (activation.State is not (ActivationState.Valid or ActivationState.Invalid or ActivationState.FailedToActivate))
                     {
                         allActiveOrTerminal = false;
                         break;

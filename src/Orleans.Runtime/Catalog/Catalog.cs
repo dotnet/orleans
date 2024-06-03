@@ -480,17 +480,5 @@ namespace Orleans.Runtime
                 }
             }
         }
-
-        public ValueTask AcceptMigratingGrains(List<GrainMigrationPackage> migratingGrains)
-        {
-            foreach (var package in migratingGrains)
-            {
-                // If the activation does not exist, create it and provide it with the migration context while doing so.
-                // If the activation already exists or cannot be created, it is too late to perform migration, so ignore the request.
-                GetOrCreateActivation(package.GrainId, requestContextData: null, package.MigrationContext);
-            }
-
-            return default;
-        }
     }
 }
