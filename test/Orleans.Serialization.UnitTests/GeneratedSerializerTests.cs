@@ -12,12 +12,6 @@ using Orleans.Serialization.Serializers;
 using Orleans.Serialization.Session;
 using Orleans.Serialization.Utilities;
 using UnitTests.SerializerExternalModels;
-using Microsoft.Extensions.DependencyInjection;
-using Newtonsoft.Json;
-using System;
-using System.Collections.Concurrent;
-using System.Collections.Generic;
-using System.IO.Pipelines;
 using Xunit;
 
 [assembly: GenerateCodeForDeclaringAssembly(typeof(Person2External))]
