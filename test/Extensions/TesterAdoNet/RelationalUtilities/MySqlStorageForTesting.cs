@@ -1,3 +1,4 @@
+using MySql.Data.MySqlClient;
 using Orleans.Tests.SqlUtils;
 using TestExtensions;
 

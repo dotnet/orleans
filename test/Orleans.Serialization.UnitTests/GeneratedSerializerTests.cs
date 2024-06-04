@@ -573,13 +573,16 @@ public class GeneratedSerializerTests : IDisposable
         Assert.Contains("[#7 VarInt Id: 2 SchemaType: Expected] Value: 2", formattedBitStream); // type reference from Type2 field pointing to the encoded field type of UntypedValue
     }
 
-    [Fact(Skip = "Fix me please")]
+    [Fact]
     public void TypeDerivedFromList()
     {
         var original = new SerializableClassWithCompiledBase { IntProperty = 30 };
+        original.Add(1);
+        original.Add(200);
         var result = RoundTripThroughCodec(original);
 
         Assert.Equal(original.IntProperty, result.IntProperty);
+        Assert.True(original.SequenceEqual(result));
     }
 
     [Fact]

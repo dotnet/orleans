@@ -13,6 +13,7 @@ using UnitTests.Grains;
 using Xunit;
 using Orleans.Configuration;
 using Tester;
+using Tester.AzureUtils;
 
 namespace ServiceBus.Tests.StreamingTests
 {
@@ -40,7 +41,7 @@ namespace ServiceBus.Tests.StreamingTests
                         ImplicitSubscription_RecoverableStream_CollectorGrain.StorageProviderName,
                         (AzureBlobStorageOptions options) =>
                         {
-                            options.BlobServiceClient = new(TestDefaultConfiguration.DataConnectionString);
+                            options.ConfigureTestDefaults();
                         })
                     .AddEventHubStreams(StreamProviderName, b=>
                     {
@@ -55,7 +56,7 @@ namespace ServiceBus.Tests.StreamingTests
 
                         b.UseAzureTableCheckpointer(ob => ob.Configure(options =>
                         {
-                            options.TableServiceClient = new(TestDefaultConfiguration.DataConnectionString);
+                            options.ConfigureTestDefaults();
                             options.PersistInterval = TimeSpan.FromSeconds(1);
                         }));
                     });

@@ -1,4 +1,4 @@
-﻿namespace UnitTests.GrainInterfaces
+namespace UnitTests.GrainInterfaces
 {
     public interface ITimerGrain : IGrainWithIntegerKey
     {
@@ -17,8 +17,12 @@
         Task<int> GetTickCount();
         Task<Exception> GetException();
 
-        Task StartTimer(string name, TimeSpan delay);
+        Task StartTimer(string name, TimeSpan dueTime);
+        Task StartTimer(string name, TimeSpan dueTime, string operationType);
+        Task RestartTimer(string name, TimeSpan dueTime);
+        Task RestartTimer(string name, TimeSpan dueTime, TimeSpan period);
         Task StopTimer(string name);
+
     }
 
     public interface ITimerRequestGrain : IGrainWithIntegerKey

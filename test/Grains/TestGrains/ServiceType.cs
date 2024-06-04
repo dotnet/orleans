@@ -1,4 +1,4 @@
-﻿using UnitTests.GrainInterfaces;
+using UnitTests.GrainInterfaces;
 
 namespace UnitTests.Grains
 {
@@ -96,5 +96,9 @@ namespace UnitTests.Grains
         {
             return Task.FromResult("ServiceTypeMethod3");
         }
+
+        Task<string> IC.CommonMethod() => Task.FromResult("IC");
+        Task<string> IA.CommonMethod() => Task.FromResult("IA");
+        Task<string> IB.CommonMethod() => Task.FromResult("IB");
     }
 }

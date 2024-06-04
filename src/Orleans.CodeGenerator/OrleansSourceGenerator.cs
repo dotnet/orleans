@@ -1,10 +1,11 @@
-using Microsoft.CodeAnalysis;
-using Microsoft.CodeAnalysis.Text;
-using Orleans.CodeGenerator.Diagnostics;
 using System;
 using System.Diagnostics;
 using System.Linq;
 using System.Text;
+using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.Text;
+using Orleans.CodeGenerator.Diagnostics;
 
 #pragma warning disable RS1035 // Do not use APIs banned for analyzers
 namespace Orleans.CodeGenerator

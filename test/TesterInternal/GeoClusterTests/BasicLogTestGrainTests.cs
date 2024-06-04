@@ -6,6 +6,8 @@ using TestExtensions;
 using Tester;
 
 using Orleans.Configuration;
+using Azure.Data.Tables;
+using Azure.Identity;
 
 namespace Tests.GeoClusterTests
 {
@@ -35,13 +37,20 @@ namespace Tests.GeoClusterTests
                         .AddCustomStorageBasedLogConsistencyProvider("CustomStoragePrimaryCluster", "A")
                         .AddAzureTableGrainStorageAsDefault(builder => builder.Configure<IOptions<ClusterOptions>>((options, silo) =>
                         {
-                            options.TableServiceClient = new(TestDefaultConfiguration.DataConnectionString);
+                            options.TableServiceClient = GetTableServiceClient();
                         }))
                         .AddAzureTableGrainStorage("AzureStore", builder => builder.Configure<IOptions<ClusterOptions>>((options, silo) =>
                         {
-                            options.TableServiceClient = new(TestDefaultConfiguration.DataConnectionString);
+                            options.TableServiceClient = GetTableServiceClient();
                         }))
                         .AddMemoryGrainStorage("MemoryStore"); 
+                }
+
+                private static TableServiceClient GetTableServiceClient()
+                {
+                    return TestDefaultConfiguration.UseAadAuthentication
+                        ? new(TestDefaultConfiguration.TableEndpoint, new DefaultAzureCredential())
+                        : new(TestDefaultConfiguration.DataConnectionString);
                 }
             }
         }

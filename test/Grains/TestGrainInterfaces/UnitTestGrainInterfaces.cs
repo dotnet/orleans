@@ -1,7 +1,8 @@
-﻿namespace UnitTests.GrainInterfaces
+namespace UnitTests.GrainInterfaces
 {
     public interface IA : IGrainWithIntegerKey
     {
+        Task<string> CommonMethod();
         Task<string> A1Method();
         Task<string> A2Method();
         Task<string> A3Method();
@@ -9,6 +10,7 @@
 
     public interface IB : IGrainWithIntegerKey
     {
+        Task<string> CommonMethod();
         Task<string> B1Method();
         Task<string> B2Method();
         Task<string> B3Method();
@@ -16,6 +18,7 @@
 
     public interface IC : IA, IB
     {
+        new Task<string> CommonMethod();
         Task<string> C1Method();
         Task<string> C2Method();
         Task<string> C3Method();

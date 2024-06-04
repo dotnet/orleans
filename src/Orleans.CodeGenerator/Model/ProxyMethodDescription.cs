@@ -21,15 +21,14 @@ namespace Orleans.CodeGenerator
         public static ProxyMethodDescription Create(
             ProxyInterfaceDescription proxyInterface,
             GeneratedInvokableDescription generatedInvokable,
-            IMethodSymbol method,
-            bool hasCollision) => new(proxyInterface, generatedInvokable, method, hasCollision);
+            IMethodSymbol method)
+            => new(proxyInterface, generatedInvokable, method);
 
-        private ProxyMethodDescription(ProxyInterfaceDescription proxyInterface, GeneratedInvokableDescription generatedInvokable, IMethodSymbol method, bool hasCollision)
+        private ProxyMethodDescription(ProxyInterfaceDescription proxyInterface, GeneratedInvokableDescription generatedInvokable, IMethodSymbol method)
         {
             _originalInvokable = generatedInvokable;
             Method = method;
             ProxyInterface = proxyInterface;
-            HasCollision = hasCollision;
 
             TypeParameters = new List<(string Name, ITypeParameterSymbol Parameter)>();
             MethodTypeParameters = new List<(string Name, ITypeParameterSymbol Parameter)>();
@@ -80,7 +79,6 @@ namespace Orleans.CodeGenerator
         public ConstructedGeneratedInvokableDescription GeneratedInvokable { get; }
         public ProxyInterfaceDescription ProxyInterface { get; }
 
-        public bool HasCollision { get; }   
         public IMethodSymbol Method { get; }
         public InvokableMethodId InvokableId { get; }
         public List<(string Name, ITypeParameterSymbol Parameter)> TypeParameters { get; }
