@@ -1,18 +1,18 @@
-using System;
-using System.Collections.Concurrent;
-using System.Collections.Generic;
-using System.IO.Pipelines;
-using System.Linq;
-using Microsoft.Extensions.DependencyInjection;
-using Newtonsoft.Json;
 using Orleans;
 using Orleans.Serialization.Buffers;
 using Orleans.Serialization.Codecs;
 using Orleans.Serialization.Serializers;
 using Orleans.Serialization.Session;
 using Orleans.Serialization.Utilities;
-using UnitTests.SerializerExternalModels;
+using Microsoft.Extensions.DependencyInjection;
+using Newtonsoft.Json;
+using System;
+using System.Collections.Concurrent;
+using System.Collections.Generic;
+using System.IO.Pipelines;
 using Xunit;
+using System.Linq;
+using UnitTests.SerializerExternalModels;
 
 [assembly: GenerateCodeForDeclaringAssembly(typeof(Person2External))]
 
