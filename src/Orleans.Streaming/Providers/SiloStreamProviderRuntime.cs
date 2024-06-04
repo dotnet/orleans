@@ -10,9 +10,6 @@ using Orleans.Internal;
 
 namespace Orleans.Runtime.Providers
 {
-    public interface IMessageDeliveryBackoffProvider : IBackoffProvider { }
-    public interface IQueueReaderBackoffProvider : IBackoffProvider { }
-
     internal class SiloStreamProviderRuntime : ISiloSideStreamProviderRuntime
     {
         private readonly IConsistentRingProvider consistentRingProvider;

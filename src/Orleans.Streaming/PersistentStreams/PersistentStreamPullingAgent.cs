@@ -2,24 +2,21 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics.Metrics;
 using System.Linq;
-using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Orleans.Configuration;
 using Orleans.Internal;
 using Orleans.Runtime;
 using Orleans.Streams.Filtering;
-using Orleans.Timers;
 
 namespace Orleans.Streams
-{ 
+{
     internal class PersistentStreamPullingAgent : SystemTarget, IPersistentStreamPullingAgent
     {
-        private readonly IBackoffProvider _deliveryBackoffProvider;
-        private readonly IBackoffProvider _queueReaderBackoffProvider;
-
         private const int ReadLoopRetryMax = 6;
         private const int StreamInactivityCheckFrequency = 10;
+        private readonly IBackoffProvider deliveryBackoffProvider;
+        private readonly IBackoffProvider queueReaderBackoffProvider;
         private readonly string streamProviderName;
         private readonly IStreamPubSub pubSub;
         private readonly IStreamFilter streamFilter;
@@ -68,8 +65,8 @@ namespace Orleans.Streams
             this.queueAdapter = queueAdapter ?? throw new ArgumentNullException(nameof(queueAdapter));
             this.streamFailureHandler = streamFailureHandler ?? throw new ArgumentNullException(nameof(streamFailureHandler));
             this.queueAdapterCache = queueAdapterCache;
-            _deliveryBackoffProvider = deliveryBackoffProvider;
-            _queueReaderBackoffProvider = queueReaderBackoffProvider;
+            this.deliveryBackoffProvider = deliveryBackoffProvider;
+            this.queueReaderBackoffProvider = queueReaderBackoffProvider;
             numMessages = 0;
 
             logger = loggerFactory.CreateLogger($"{this.GetType().Namespace}.{streamProviderName}");
@@ -309,7 +306,7 @@ namespace Orleans.Streams
                          // Do not retry if the agent is shutting down, or if the exception is ClientNotAvailableException
                          (exception, i) => exception is not ClientNotAvailableException && !IsShutdown,
                          this.options.MaxEventDeliveryTime,
-                         _deliveryBackoffProvider);
+                         deliveryBackoffProvider);
 
                     if (requestedHandshakeToken != null)
                     {
@@ -410,7 +407,7 @@ namespace Orleans.Streams
                         ReadLoopRetryMax,
                         ReadLoopRetryExceptionFilter,
                         Constants.INFINITE_TIMESPAN,
-                        _queueReaderBackoffProvider);
+                        queueReaderBackoffProvider);
                     if (!moreData)
                         return;
                 }
@@ -630,7 +627,7 @@ namespace Orleans.Streams
                                 // Do not retry if the agent is shutting down, or if the exception is ClientNotAvailableException
                                 (exception, i) => exception is not ClientNotAvailableException && !IsShutdown,
                                 this.options.MaxEventDeliveryTime,
-                                _deliveryBackoffProvider);
+                                deliveryBackoffProvider);
                             if (newToken != null)
                             {
                                 consumerData.LastToken = newToken;
@@ -853,7 +850,7 @@ namespace Orleans.Streams
                                 AsyncExecutorWithRetries.INFINITE_RETRIES,
                                 (exception, i) => !IsShutdown,
                                 Constants.INFINITE_TIMESPAN,
-                                _deliveryBackoffProvider);
+                                deliveryBackoffProvider);
 
 
                 if (logger.IsEnabled(LogLevel.Debug))
