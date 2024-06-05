@@ -1,6 +1,8 @@
 using System;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
+using Orleans.Internal;
+using Orleans.Runtime.Providers;
 using Orleans.Streams;
 
 namespace Orleans.Hosting
@@ -41,6 +43,26 @@ namespace Orleans.Hosting
         /// <param name="configurator">The configuration builder.</param>
         /// <param name="factory">The partition balancer factory.</param>
         public static void ConfigurePartitionBalancing(this ISiloPersistentStreamConfigurator configurator, Func<IServiceProvider, string, IStreamQueueBalancer> factory)
+        {
+            configurator.ConfigureComponent(factory);
+        }
+
+        /// <summary>
+        /// Configures the pulling agents' message delivery backoff provider.
+        /// </summary>
+        /// <param name="configurator">The configuration builder.</param>
+        /// <param name="factory">The message delivery backoff factory.</param>
+        public static void ConfigureBackoffProvider(this ISiloPersistentStreamConfigurator configurator, Func<IServiceProvider, string, IMessageDeliveryBackoffProvider> factory)
+        {
+            configurator.ConfigureComponent(factory);
+        }
+
+        /// <summary>
+        /// Configures the pulling agents' queue reader backoff provider.
+        /// </summary>
+        /// <param name="configurator">The configuration builder.</param>
+        /// <param name="factory">The queue reader backoff factory.</param>
+        public static void ConfigureBackoffProvider(this ISiloPersistentStreamConfigurator configurator, Func<IServiceProvider, string, IQueueReaderBackoffProvider> factory)
         {
             configurator.ConfigureComponent(factory);
         }

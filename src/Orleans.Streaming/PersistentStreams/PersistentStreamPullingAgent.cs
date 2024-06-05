@@ -2,23 +2,21 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics.Metrics;
 using System.Linq;
-using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Orleans.Configuration;
 using Orleans.Internal;
 using Orleans.Runtime;
 using Orleans.Streams.Filtering;
-using Orleans.Timers;
 
 namespace Orleans.Streams
 {
     internal class PersistentStreamPullingAgent : SystemTarget, IPersistentStreamPullingAgent
     {
-        private static readonly IBackoffProvider DeliveryBackoffProvider = new ExponentialBackoff(TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(30), TimeSpan.FromSeconds(1));
-        private static readonly IBackoffProvider ReadLoopBackoff = new ExponentialBackoff(TimeSpan.FromSeconds(10), TimeSpan.FromSeconds(20), TimeSpan.FromSeconds(1));
         private const int ReadLoopRetryMax = 6;
         private const int StreamInactivityCheckFrequency = 10;
+        private readonly IBackoffProvider deliveryBackoffProvider;
+        private readonly IBackoffProvider queueReaderBackoffProvider;
         private readonly string streamProviderName;
         private readonly IStreamPubSub pubSub;
         private readonly IStreamFilter streamFilter;
@@ -51,7 +49,9 @@ namespace Orleans.Streams
             SiloAddress siloAddress,
             IQueueAdapter queueAdapter,
             IQueueAdapterCache queueAdapterCache,
-            IStreamFailureHandler streamFailureHandler)
+            IStreamFailureHandler streamFailureHandler,
+            IBackoffProvider deliveryBackoffProvider,
+            IBackoffProvider queueReaderBackoffProvider)
             : base(id, siloAddress, loggerFactory)
         {
             if (strProviderName == null) throw new ArgumentNullException("runtime", "PersistentStreamPullingAgent: strProviderName should not be null");
@@ -65,6 +65,8 @@ namespace Orleans.Streams
             this.queueAdapter = queueAdapter ?? throw new ArgumentNullException(nameof(queueAdapter));
             this.streamFailureHandler = streamFailureHandler ?? throw new ArgumentNullException(nameof(streamFailureHandler));
             this.queueAdapterCache = queueAdapterCache;
+            this.deliveryBackoffProvider = deliveryBackoffProvider;
+            this.queueReaderBackoffProvider = queueReaderBackoffProvider;
             numMessages = 0;
 
             logger = loggerFactory.CreateLogger($"{this.GetType().Namespace}.{streamProviderName}");
@@ -304,7 +306,7 @@ namespace Orleans.Streams
                          // Do not retry if the agent is shutting down, or if the exception is ClientNotAvailableException
                          (exception, i) => exception is not ClientNotAvailableException && !IsShutdown,
                          this.options.MaxEventDeliveryTime,
-                         DeliveryBackoffProvider);
+                         deliveryBackoffProvider);
 
                     if (requestedHandshakeToken != null)
                     {
@@ -405,7 +407,7 @@ namespace Orleans.Streams
                         ReadLoopRetryMax,
                         ReadLoopRetryExceptionFilter,
                         Constants.INFINITE_TIMESPAN,
-                        ReadLoopBackoff);
+                        queueReaderBackoffProvider);
                     if (!moreData)
                         return;
                 }
@@ -625,7 +627,7 @@ namespace Orleans.Streams
                                 // Do not retry if the agent is shutting down, or if the exception is ClientNotAvailableException
                                 (exception, i) => exception is not ClientNotAvailableException && !IsShutdown,
                                 this.options.MaxEventDeliveryTime,
-                                DeliveryBackoffProvider);
+                                deliveryBackoffProvider);
                             if (newToken != null)
                             {
                                 consumerData.LastToken = newToken;
@@ -848,7 +850,7 @@ namespace Orleans.Streams
                                 AsyncExecutorWithRetries.INFINITE_RETRIES,
                                 (exception, i) => !IsShutdown,
                                 Constants.INFINITE_TIMESPAN,
-                                DeliveryBackoffProvider);
+                                deliveryBackoffProvider);
 
 
                 if (logger.IsEnabled(LogLevel.Debug))
