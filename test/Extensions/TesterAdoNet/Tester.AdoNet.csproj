@@ -16,6 +16,7 @@
     <!--<PackageReference Include="Microsoft.Data.Sqlite" Version="5.0.2" />-->
     <PackageReference Include="Npgsql" />
     <PackageReference Include="MySql.Data" />
+    <PackageReference Include="System.Drawing.Common" /> <!-- For some reason it's a dependency of MySql.Data. We want to force it to a specific version -->
     <PackageReference Include="System.Diagnostics.PerformanceCounter" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" />
   </ItemGroup>

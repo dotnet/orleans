@@ -1,5 +1,6 @@
 using Azure.Identity;
 using Orleans.Configuration;
+using Tester.AzureUtils;
 using TestExtensions;
 
 namespace ServiceBus.Tests
@@ -17,6 +18,12 @@ namespace ServiceBus.Tests
                 options.ConfigureEventHubConnection(TestDefaultConfiguration.EventHubConnectionString, eventHubName, consumerGroup);
             }
 
+            return options;
+        }
+
+        public static AzureTableStreamCheckpointerOptions ConfigureTestDefaults(this AzureTableStreamCheckpointerOptions options)
+        {
+            options.TableServiceClient = AzureStorageOperationOptionsExtensions.GetTableServiceClient();
             return options;
         }
     }
