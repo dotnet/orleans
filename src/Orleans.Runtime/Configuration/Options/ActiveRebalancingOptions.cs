@@ -72,6 +72,30 @@ public sealed class ActiveRebalancingOptions
     /// The default value of <see cref="MaxUnprocessedEdges"/>.
     /// </summary>
     public const int DEFAULT_MAX_UNPROCESSED_EDGES = 100_000;
+
+    /// <summary>
+    /// When the algorithm has optimized partitioning, a lot of the edges will be internal to any given silo.
+    /// We track those edges to work out which activations should/shouldn't be transferred (cost vs benefit).
+    /// For any given activation, a lookup needs to happen and this flag controls wether that lookup should be
+    /// probabilistic in nature (there is a small error introduced inherently) or deterministic.
+    /// </summary>
+    public bool ProbabilisticFilteringEnabled { get; set; } = DEFAULT_PROBABILISTIC_FILTERING_ENABLED;
+
+    /// <summary>
+    /// The default value of <see cref="ProbabilisticFilteringEnabled"/>.
+    /// </summary>
+    public const bool DEFAULT_PROBABILISTIC_FILTERING_ENABLED = true;
+
+    /// <summary>
+    /// The maximum allowed error rate when <see cref="ProbabilisticFilteringEnabled"/> is set to <see langword="true"/>, otherwise this does not apply.
+    /// </summary>
+    /// <remarks>Allowed range: [0.001 - 0.01](0.1% - 1%)</remarks>
+    public double ProbabilisticFilteringMaxAllowedErrorRate { get; set; }
+
+    /// <summary>
+    /// The default value of <see cref="ProbabilisticFilteringMaxAllowedErrorRate"/>.
+    /// </summary>
+    public double DEFAULT_PROBABILISTIC_FILTERING_MAX_ALLOWED_ERROR = 0.01d;
 }
 
 internal sealed class ActiveRebalancingOptionsValidator(IOptions<ActiveRebalancingOptions> options) : IConfigurationValidator
@@ -113,6 +137,11 @@ internal sealed class ActiveRebalancingOptionsValidator(IOptions<ActiveRebalanci
         if (_options.MinRebalancingPeriod < _options.RecoveryPeriod)
         {
             ThrowMustBeGreaterThanOrEqualTo(nameof(ActiveRebalancingOptions.MinRebalancingPeriod), nameof(ActiveRebalancingOptions.RecoveryPeriod));
+        }
+
+        if (_options.ProbabilisticFilteringMaxAllowedErrorRate < 0.001d || _options.ProbabilisticFilteringMaxAllowedErrorRate > 0.01d)
+        {
+            throw new OrleansConfigurationException($"{nameof(ActiveRebalancingOptions.ProbabilisticFilteringMaxAllowedErrorRate)} must be inclusive between [0.001 - 0.01](0.1% - 1%)");
         }
     }
 

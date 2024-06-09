@@ -8,7 +8,6 @@ using Microsoft.Extensions.Options;
 using System.Runtime.CompilerServices;
 using System.Diagnostics;
 using System.Collections.Immutable;
-using Orleans.Core.Internal;
 using System.Data;
 using Orleans.Placement.Rebalancing;
 using System.Threading;
@@ -65,9 +64,11 @@ internal sealed partial class ActivationRebalancer : SystemTarget, IActivationRe
         _migrationManager = migrationManager;
         _activationDirectory = activationDirectory;
         _timeProvider = timeProvider;
-        _edgeWeights = new((int)options.Value.MaxEdgeCount);
+        _edgeWeights = new(options.Value.MaxEdgeCount);
         _pendingMessages = new StripedMpscBuffer<Message>(Environment.ProcessorCount, options.Value.MaxUnprocessedEdges / Environment.ProcessorCount);
-
+        _anchoredFilter = !options.Value.ProbabilisticFilteringEnabled ? new HashSetFilter() :
+            new BlockedBloomFilter(100_000, options.Value.ProbabilisticFilteringMaxAllowedErrorRate);
+       
         _lastExchangedStopwatch = CoarseStopwatch.StartNew();
         catalog.RegisterSystemTarget(this);
         _siloStatusOracle.SubscribeToSiloStatusEvents(this);
@@ -90,7 +91,7 @@ internal sealed partial class ActivationRebalancer : SystemTarget, IActivationRe
     {
         _pendingMessages.Clear();
         _edgeWeights.Clear();
-        _anchoredGrainIds.Reset();
+        _anchoredFilter.Reset();
         return ValueTask.CompletedTask;
     }
 
@@ -485,7 +486,7 @@ internal sealed partial class ActivationRebalancer : SystemTarget, IActivationRe
         _logger.LogInformation("Adding {NewlyAnchoredGrains} newly anchored grains to set on host {Silo}. EdgeWeights contains {EdgeWeightCount} elements.", newlyAnchoredGrains.Count, Silo, _edgeWeights.Count);
         foreach (var id in newlyAnchoredGrains)
         {
-            _anchoredGrainIds.Add(id);
+            _anchoredFilter.Add(id);
         }
 
         foreach (var id in accepting)
@@ -503,7 +504,7 @@ internal sealed partial class ActivationRebalancer : SystemTarget, IActivationRe
         {
             foreach (var (edge, _, _) in _edgeWeights.Elements)
             {
-                if (affected.Contains(edge.Source.Id) || affected.Contains(edge.Target.Id) || _anchoredGrainIds.Contains(edge.Source.Id) || _anchoredGrainIds.Contains(edge.Target.Id))
+                if (affected.Contains(edge.Source.Id) || affected.Contains(edge.Target.Id) || _anchoredFilter.Contains(edge.Source.Id) || _anchoredFilter.Contains(edge.Target.Id))
                 {
                     toRemove.Add(edge);
                 }
@@ -772,4 +773,18 @@ internal sealed partial class ActivationRebalancer : SystemTarget, IActivationRe
     /// <param name="Direction">The edge's direction</param>
     /// <param name="Weight">The number of estimated messages exchanged between <paramref name="SourceId"/> and <paramref name="TargetId"/>.</param>
     private readonly record struct VertexEdge(GrainId SourceId, GrainId TargetId, bool IsMigratable, SiloAddress PartnerSilo, Direction Direction, long Weight);
+
+    private class HashSetFilter : IAnchoredGrainsFilter
+    {
+        private readonly HashSet<GrainId> _hashSet = [];
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void Add(GrainId id) => _hashSet.Add(id);
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public bool Contains(GrainId id) => _hashSet.Contains(id);
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void Reset() => _hashSet.Clear();
+    }
 }

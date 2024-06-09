@@ -1,8 +1,11 @@
 #nullable enable
 using System;
+using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
+using Orleans.Configuration;
 using Orleans.Placement.Rebalancing;
 using Orleans.Runtime.Internal;
 
@@ -12,9 +15,9 @@ internal partial class ActivationRebalancer : IMessageStatisticsSink
 {
     private readonly CancellationTokenSource _shutdownCts = new();
 
-    // This bloom filter contains grain ids which will are anchored to the current silo.
+    // This filter contains grain ids which will are anchored to the current silo.
     // Ids are inserted when a grain is found to have a negative transfer score.
-    private readonly BlockedBloomFilter _anchoredGrainIds = new(100_000, 0.01);
+    private readonly IAnchoredGrainsFilter _anchoredFilter;
     private Task? _processPendingEdgesTask;
 
     public void StartProcessingEdges()
@@ -65,7 +68,7 @@ internal partial class ActivationRebalancer : IMessageStatisticsSink
                     }
 
                     EdgeVertex sourceVertex;
-                    if (_anchoredGrainIds.Contains(message.SendingGrain) && Silo.Equals(message.SendingSilo))
+                    if (_anchoredFilter.Contains(message.SendingGrain) && Silo.Equals(message.SendingSilo))
                     {
                         sourceVertex = new(GrainId, Silo, isMigratable: false);
                     }
@@ -75,7 +78,7 @@ internal partial class ActivationRebalancer : IMessageStatisticsSink
                     }
 
                     EdgeVertex destinationVertex;
-                    if (_anchoredGrainIds.Contains(message.TargetGrain) && Silo.Equals(message.TargetSilo))
+                    if (_anchoredFilter.Contains(message.TargetGrain) && Silo.Equals(message.TargetSilo))
                     {
                         destinationVertex = new(GrainId, Silo, isMigratable: false);
                     }

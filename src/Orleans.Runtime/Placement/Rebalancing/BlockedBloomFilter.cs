@@ -15,7 +15,7 @@ namespace Orleans.Runtime.Placement.Rebalancing;
 /// Any value with the range, at any precision is supported as the FP rate is regressed via polynomial regression</para>
 /// <para>More information can be read from Section 3: https://www.cs.amherst.edu/~ccmcgeoch/cs34/papers/cacheefficientbloomfilters-jea.pdf</para>
 /// </i></remarks>
-internal sealed class BlockedBloomFilter
+internal sealed class BlockedBloomFilter : IAnchoredGrainsFilter
 {
     private const int BlockSize = 32; // higher value yields better speed, but at a high cost of space
     private const double Ln2Squared = 0.4804530139182014246671025263266649717305529515945455;
@@ -105,6 +105,8 @@ internal sealed class BlockedBloomFilter
 
         return ((mask1 & block1) == mask1) && ((mask2 & block2) == mask2);
     }
+
+    public void Reset() => Array.Clear(_filter);
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static int GetBlockIndex(ulong hash, int buckets) => (int)(((int)hash & 0xffffffffL) * buckets >> 32);
