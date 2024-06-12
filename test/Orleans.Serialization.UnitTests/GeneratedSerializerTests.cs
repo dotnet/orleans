@@ -1,3 +1,4 @@
+using Orleans;
 using Orleans.Serialization.Buffers;
 using Orleans.Serialization.Codecs;
 using Orleans.Serialization.Serializers;
@@ -11,6 +12,9 @@ using System.Collections.Generic;
 using System.IO.Pipelines;
 using Xunit;
 using System.Linq;
+using UnitTests.SerializerExternalModels;
+
+[assembly: GenerateCodeForDeclaringAssembly(typeof(Person2External))]
 
 namespace Orleans.Serialization.UnitTests;
 
@@ -126,6 +130,23 @@ public class GeneratedSerializerTests : IDisposable
         Assert.Equal(original.StarSign, result.StarSign);
     }
 
+    [Fact(Skip = "TODO: Fix")]
+    public void GeneratedLibExternalRecordWithPCtorSerializersRoundTripThroughCodec()
+    {
+        var original = new Person2External(2, "harry")
+        {
+            FavouriteColor = "redborine",
+            StarSign = "Aquaricorn"
+        };
+
+        var result = RoundTripThroughCodec(original);
+
+        Assert.Equal(original.Age, result.Age);
+        Assert.Equal(original.Name, result.Name);
+        Assert.Equal(original.FavouriteColor, result.FavouriteColor);
+        Assert.Equal(original.StarSign, result.StarSign);
+    }
+
 #if NET6_0_OR_GREATER
     [Fact]
     public void RequiredMembersAreSupported()
@@ -200,7 +221,7 @@ public class GeneratedSerializerTests : IDisposable
         // Note that this only works because we are serializing each object using the "expected type" optimization and
         // therefore omitting the concrete type names.
         var originalAsArray = _serializer.SerializeToArray(original);
-        var classVersion = new Person5_Class { Age = 2,  Name = "harry", FavouriteColor = "redborine", StarSign = "Aquaricorn" };
+        var classVersion = new Person5_Class { Age = 2, Name = "harry", FavouriteColor = "redborine", StarSign = "Aquaricorn" };
         var classAsArray = _serializer.SerializeToArray(classVersion);
         Assert.Equal(originalAsArray, classAsArray);
     }
@@ -231,7 +252,7 @@ public class GeneratedSerializerTests : IDisposable
     public void GeneratedSerializersRoundTripThroughSerializer_ImmutableStruct()
     {
         var original = new ImmutableStruct(30, 2);
-         var result = (ImmutableStruct)RoundTripThroughUntypedSerializer(original, out _);
+        var result = (ImmutableStruct)RoundTripThroughUntypedSerializer(original, out _);
 
         Assert.Equal(original.GetIntField(), result.GetIntField());
         Assert.Equal(original.IntProperty, result.IntProperty);
