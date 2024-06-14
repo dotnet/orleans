@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <PackageId>Microsoft.Orleans.Streaming.Kinesis</PackageId>
+    <Title>Microsoft Orleans AWS Kinesis Streaming Provider</Title>
+    <Description>Microsoft Orleans streaming provider backed by AWS Kinesis</Description>
+    <PackageTags>$(PackageTags) AWS Kinesis</PackageTags>
+    <TargetFrameworks>$(DefaultTargetFrameworks)</TargetFrameworks>
+    <DefineConstants>$(DefineConstants);STREAMING_KINESIS</DefineConstants>
+    <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="..\Shared\AWSUtils.cs" Link="AWSUtils.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="$(SourceRoot)src\Orleans.Streaming\Orleans.Streaming.csproj" />
+    <PackageReference Include="AWSSDK.Kinesis" />
+  </ItemGroup>
+
+</Project>
