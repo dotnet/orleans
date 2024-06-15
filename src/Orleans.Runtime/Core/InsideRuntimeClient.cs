@@ -2,6 +2,7 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
@@ -79,15 +80,13 @@ namespace Orleans.Runtime
             this.callbackTimer = new PeriodicTimer(period, timeProvider);
 
             this.sharedCallbackData = new SharedCallbackData(
-                msg => this.UnregisterCallback(msg.TargetGrain, msg.Id),
+                msg => this.UnregisterCallback(msg.SendingGrain, msg.Id),
                 this.loggerFactory.CreateLogger<CallbackData>(),
-                this.messagingOptions,
                 this.messagingOptions.ResponseTimeout);
 
             this.systemSharedCallbackData = new SharedCallbackData(
-                msg => this.UnregisterCallback(msg.TargetGrain, msg.Id),
+                msg => this.UnregisterCallback(msg.SendingGrain, msg.Id),
                 this.loggerFactory.CreateLogger<CallbackData>(),
-                this.messagingOptions,
                 this.messagingOptions.SystemResponseTimeout);
         }
 
@@ -192,7 +191,12 @@ namespace Orleans.Runtime
         /// </summary>
         private void UnregisterCallback(GrainId grainId, CorrelationId correlationId)
         {
-            callbacks.TryRemove((grainId, correlationId), out _);
+            if (!callbacks.TryRemove((grainId, correlationId), out _))
+                this.logger.LogError(
+                    (int)ErrorCode.Dispatcher_FailedToUnregisterCallback,
+                    "Failed to unregister callback for {GrainId} with correlation {CorrelationId}",
+                    grainId,
+                    correlationId);
         }
 
         public void SniffIncomingMessage(Message message)
@@ -521,6 +525,9 @@ namespace Orleans.Runtime
         {
             lifecycle.Subscribe<InsideRuntimeClient>(ServiceLifecycleStage.RuntimeInitialize, OnRuntimeInitializeStart, OnRuntimeInitializeStop);
         }
+
+        public int GetRunningRequestsCount(GrainInterfaceType grainInterfaceType)
+            => this.callbacks.Count(c => c.Value.Message.InterfaceType == grainInterfaceType);
 
         private async Task MonitorCallbackExpiry()
         {
