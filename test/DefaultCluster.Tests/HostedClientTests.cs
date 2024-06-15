@@ -4,6 +4,8 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Orleans.Concurrency;
 using Orleans.Configuration;
+using Orleans.Internal;
+using Orleans.Metadata;
 using Orleans.Providers;
 using Orleans.Runtime;
 using Orleans.Streams;
@@ -80,6 +82,49 @@ namespace DefaultCluster.Tests.General
             await grain.SetA(23);
             var val = await grain.GetA();
             Assert.Equal(23, val);
+        }
+
+        [Fact]
+        public async Task HostedClient_TimeoutTest()
+        {
+            var client = _host.Services.GetRequiredService<IClusterClient>();
+            var runtimeClient = _host.Services.GetRequiredService<IRuntimeClient>();
+            var typeResolver = _host.Services.GetRequiredService<GrainInterfaceTypeResolver>();
+
+            var stuckGrainType = typeResolver.GetGrainInterfaceType(typeof(IStuckGrain));
+            var initialTimeout = runtimeClient.GetResponseTimeout();
+
+            var timeout = TimeSpan.FromSeconds(1);
+            var maxTimeout = timeout.Multiply(3.5);
+
+            try
+            {
+                runtimeClient.SetResponseTimeout(timeout);
+                var stopwatch = Stopwatch.StartNew();
+
+                var assertionTask = Assert.ThrowsAsync<TimeoutException>(
+                        async () =>
+                        {
+                            var grain = client.GetGrain<IStuckGrain>(Guid.NewGuid());
+                            await grain.RunForever();
+                        })
+                    .WithTimeout(maxTimeout);
+
+                Assert.Equal(expected: 1, actual: runtimeClient.GetRunningRequestsCount(stuckGrainType));
+
+                await assertionTask;
+                stopwatch.Stop();
+
+                Assert.Equal(expected: 0, actual: runtimeClient.GetRunningRequestsCount(stuckGrainType));
+
+                Assert.True(stopwatch.Elapsed >= timeout, $"Waited less than {timeout}. Waited {stopwatch.Elapsed}");
+                Assert.True(stopwatch.Elapsed <= maxTimeout, $"Waited longer than {maxTimeout}. Waited {stopwatch.Elapsed}");
+                stopwatch.Stop();
+            }
+            finally
+            {
+                runtimeClient.SetResponseTimeout(initialTimeout);
+            }
         }
 
         [Fact]
