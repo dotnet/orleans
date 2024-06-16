@@ -38,7 +38,7 @@ namespace ServiceBus.Tests.StreamingTests
                                 }));
                                 b.UseAzureTableCheckpointer(ob => ob.Configure(options =>
                                  {
-                                     options.TableServiceClient = new(TestDefaultConfiguration.DataConnectionString);
+                                     options.ConfigureTestDefaults();
                                      options.PersistInterval = TimeSpan.FromSeconds(10);
                                  }));
                                 b.ConfigurePullingAgent(ob => ob.Configure(options =>

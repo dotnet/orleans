@@ -53,12 +53,17 @@ namespace Tester.AzureUtils.Streaming
                 await base.DisposeAsync();
 
                 // Only perform cleanup if this suite was not skipped.
-                if (!string.IsNullOrWhiteSpace(TestDefaultConfiguration.DataConnectionString))
+                try
                 {
+                    TestUtils.CheckForAzureStorage();
                     await AzureQueueStreamProviderUtils.DeleteAllUsedAzureQueues(NullLoggerFactory.Instance,
                         AzureQueueUtilities.GenerateQueueNames(this.HostedCluster.Options.ClusterId, queueCount), new AzureQueueOptions().ConfigureTestDefaults());
                     await AzureQueueStreamProviderUtils.DeleteAllUsedAzureQueues(NullLoggerFactory.Instance,
                         AzureQueueUtilities.GenerateQueueNames($"{this.HostedCluster.Options.ClusterId}2", queueCount), new AzureQueueOptions().ConfigureTestDefaults());
+                }
+                catch (SkipException)
+                {
+                    // ignore
                 }
             }
         }

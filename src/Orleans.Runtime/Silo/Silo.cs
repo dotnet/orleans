@@ -394,21 +394,6 @@ namespace Orleans.Runtime
         public async Task StopAsync(CancellationToken cancellationToken)
         {
             bool gracefully = !cancellationToken.IsCancellationRequested;
-            if (gracefully)
-            {
-                if (logger.IsEnabled(LogLevel.Debug))
-                {
-                    logger.LogDebug((int)ErrorCode.SiloShuttingDown, "Silo shutdown initiated (graceful)");
-                }
-            }
-            else
-            {
-                if (logger.IsEnabled(LogLevel.Warning))
-                {
-                    logger.LogWarning((int)ErrorCode.SiloShuttingDown, "Silo shutdown initiated (non-graceful)");
-                }
-            }
-
             bool stopAlreadyInProgress = false;
             lock (lockable)
             {
@@ -451,6 +436,21 @@ namespace Orleans.Runtime
 
                 await this.SiloTerminated.ConfigureAwait(false);
                 return;
+            }
+
+            if (gracefully)
+            {
+                if (logger.IsEnabled(LogLevel.Debug))
+                {
+                    logger.LogDebug((int)ErrorCode.SiloShuttingDown, "Silo shutdown initiated (graceful)");
+                }
+            }
+            else
+            {
+                if (logger.IsEnabled(LogLevel.Warning))
+                {
+                    logger.LogWarning((int)ErrorCode.SiloShuttingDown, "Silo shutdown initiated (non-graceful)");
+                }
             }
 
             try

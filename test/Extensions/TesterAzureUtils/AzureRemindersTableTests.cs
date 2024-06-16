@@ -45,7 +45,7 @@ namespace UnitTests.RemindersTest
         protected override Task<string> GetConnectionString()
         {
             TestUtils.CheckForAzureStorage();
-            return Task.FromResult(TestDefaultConfiguration.DataConnectionString);
+            return Task.FromResult("not used");
         }
 
         [SkippableFact]

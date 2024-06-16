@@ -4,6 +4,7 @@ using Orleans.Providers.Streams.Common;
 using Orleans.Runtime;
 using Orleans.TestingHost;
 using Tester;
+using Tester.AzureUtils;
 using TestExtensions;
 using Xunit;
 
@@ -27,7 +28,7 @@ namespace UnitTests.StreamingTests
                     .AddAzureQueueStreams(StreamTestsConstants.AZURE_QUEUE_STREAM_PROVIDER_NAME, b=>
                         b.ConfigureAzureQueue(ob => ob.Configure<IOptions<ClusterOptions>>((options, dep) =>
                            {
-                               options.QueueServiceClient = new(TestDefaultConfiguration.DataConnectionString);
+                               options.ConfigureTestDefaults();
                                options.QueueNames = Enumerable.Range(0, 8).Select(num => $"{dep.Value.ClusterId}-{num}").ToList();
                            })));
 

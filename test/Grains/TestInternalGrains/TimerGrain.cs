@@ -158,7 +158,7 @@ namespace UnitTestGrains
         {
             logger.LogInformation("StartTimer Name={Name} Delay={Delay}", name, delay);
             if (timer is not null) throw new InvalidOperationException("Expected timer to be null");
-            this.timer = base.RegisterTimer(TimerTick, name, delay, Constants.INFINITE_TIMESPAN); // One shot timer
+            this.timer = (IGrainTimer)base.RegisterTimer(TimerTick, name, delay, Constants.INFINITE_TIMESPAN); // One shot timer
             this.timerName = name;
 
             return Task.CompletedTask;
@@ -169,7 +169,7 @@ namespace UnitTestGrains
             logger.LogInformation("StartTimer Name={Name} Delay={Delay}", name, delay);
             if (timer is not null) throw new InvalidOperationException("Expected timer to be null");
             var state = Tuple.Create<string, object>(operationType, name);
-            this.timer = base.RegisterTimer(TimerTickAdvanced, state, delay, Constants.INFINITE_TIMESPAN); // One shot timer
+            this.timer = (IGrainTimer)base.RegisterTimer(TimerTickAdvanced, state, delay, Constants.INFINITE_TIMESPAN); // One shot timer
             this.timerName = name;
 
             return Task.CompletedTask;

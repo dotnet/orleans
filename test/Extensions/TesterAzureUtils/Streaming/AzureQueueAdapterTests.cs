@@ -37,10 +37,12 @@ namespace Tester.AzureUtils.Streaming
 
         public async Task DisposeAsync()
         {
-            if (!string.IsNullOrWhiteSpace(TestDefaultConfiguration.DataConnectionString))
+            try
             {
+                TestUtils.CheckForAzureStorage();
                 await AzureQueueStreamProviderUtils.DeleteAllUsedAzureQueues(this.loggerFactory, azureQueueNames, new AzureQueueOptions().ConfigureTestDefaults());
             }
+            catch (SkipException) { }
         }
 
         [SkippableFact, TestCategory("Functional"), TestCategory("Halo")]

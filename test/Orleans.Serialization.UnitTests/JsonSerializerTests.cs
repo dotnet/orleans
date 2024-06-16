@@ -1,6 +1,7 @@
 #nullable enable
 using System;
 using System.Reflection;
+using System.Text.Json.Nodes;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Serialization.Cloning;
 using Orleans.Serialization.Codecs;
@@ -75,21 +76,30 @@ namespace Orleans.Serialization.UnitTests
             Assert.Equal(original.IntProperty, result.IntProperty);
             Assert.Equal(original.SubTypeProperty, result.SubTypeProperty);
         }
+
+        [Fact]
+        public void CanSerializeNativeJsonTypes()
+        {
+            JsonArray jsonArray = new JsonArray([JsonValue.Create(true), JsonValue.Create(42), JsonValue.Create("hello")]);
+            JsonObject? jsonObject = System.Text.Json.JsonSerializer.Deserialize<JsonObject>("{\"foo\": \"bar\"}");
+
+            var deserializedArray = RoundTripThroughUntypedSerializer(jsonArray, out _);
+            Assert.Equal(System.Text.Json.JsonSerializer.Serialize(jsonArray), System.Text.Json.JsonSerializer.Serialize(deserializedArray));
+
+            var deserializedObject = RoundTripThroughUntypedSerializer(jsonObject, out _);
+            Assert.Equal(System.Text.Json.JsonSerializer.Serialize(jsonObject), System.Text.Json.JsonSerializer.Serialize(deserializedObject));
+        }
     }
 
     [Trait("Category", "BVT")]
-    public class JsonCodecCopierTests : CopierTester<MyJsonClass?, IDeepCopier<MyJsonClass?>>
+    public class JsonCodecCopierTests(ITestOutputHelper output) : CopierTester<MyJsonClass?, IDeepCopier<MyJsonClass?>>(output)
     {
-        public JsonCodecCopierTests(ITestOutputHelper output) : base(output)
-        {
-        }
-
         protected override void Configure(ISerializerBuilder builder)
         {
             builder.AddJsonSerializer(isSupported: type => type.GetCustomAttribute<MyJsonSerializableAttribute>(inherit: false) is not null);
         }
-        protected override IDeepCopier<MyJsonClass?> CreateCopier() => ServiceProvider.GetRequiredService<ICodecProvider>().GetDeepCopier<MyJsonClass?>();
 
+        protected override IDeepCopier<MyJsonClass?> CreateCopier() => ServiceProvider.GetRequiredService<ICodecProvider>().GetDeepCopier<MyJsonClass?>();
 
         protected override MyJsonClass? CreateValue() => new MyJsonClass { IntProperty = 30, SubTypeProperty = "hello", Id = new(Guid.NewGuid()) };
 
@@ -100,5 +110,19 @@ namespace Orleans.Serialization.UnitTests
             new MyJsonClass() { IntProperty = 150, SubTypeProperty = new string('c', 20), Id = new(Guid.NewGuid()) },
             new MyJsonClass() { IntProperty = -150_000, SubTypeProperty = new string('c', 6_000), Id = new(Guid.NewGuid()) },
         };
+
+        [Fact]
+        public void CanCopyNativeJsonTypes()
+        {
+            JsonArray jsonArray = new JsonArray([JsonValue.Create(true), JsonValue.Create(42), JsonValue.Create("hello")]);
+            JsonObject? jsonObject = System.Text.Json.JsonSerializer.Deserialize<JsonObject>("{\"foo\": \"bar\"}");
+            var copier = ServiceProvider.GetRequiredService<DeepCopier>();
+
+            var deserializedArray = copier.Copy(jsonArray);
+            Assert.Equal(System.Text.Json.JsonSerializer.Serialize(jsonArray), System.Text.Json.JsonSerializer.Serialize(deserializedArray));
+
+            var deserializedObject = copier.Copy(jsonObject);
+            Assert.Equal(System.Text.Json.JsonSerializer.Serialize(jsonObject), System.Text.Json.JsonSerializer.Serialize(deserializedObject));
+        }
     }
 }

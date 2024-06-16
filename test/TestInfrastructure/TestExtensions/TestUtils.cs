@@ -39,7 +39,8 @@ namespace Tester
 
         public static void CheckForEventHub()
         {
-            if (string.IsNullOrWhiteSpace(EventHubConnectionString))
+            if ((UseAadAuthentication && (EventHubFullyQualifiedNamespace == null)) ||
+                (!UseAadAuthentication && string.IsNullOrWhiteSpace(EventHubConnectionString)))
             {
                 throw new SkipException("No connection string found. Skipping");
             }

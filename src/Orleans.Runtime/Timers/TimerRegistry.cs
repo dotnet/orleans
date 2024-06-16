@@ -10,7 +10,7 @@ internal class TimerRegistry(ILoggerFactory loggerFactory, TimeProvider timeProv
     private readonly ILogger _timerLogger = loggerFactory.CreateLogger<GrainTimer>();
     private readonly TimeProvider _timeProvider = timeProvider;
 
-    public IGrainTimer RegisterTimer(IGrainContext grainContext, Func<object, Task> asyncCallback, object state, TimeSpan dueTime, TimeSpan period)
+    public IDisposable RegisterTimer(IGrainContext grainContext, Func<object, Task> asyncCallback, object state, TimeSpan dueTime, TimeSpan period)
     {
         var timer = new GrainTimer(grainContext, _timerLogger, asyncCallback, state, _timeProvider);
         grainContext?.GetComponent<IGrainTimerRegistry>().OnTimerCreated(timer);

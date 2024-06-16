@@ -1,9 +1,13 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <DefineConstants>$(DefineConstants);TESTER_SQLUTILS</DefineConstants>
     <TargetFrameworks>$(TestTargetFrameworks)</TargetFrameworks>
     <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
   </PropertyGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Benchmarks.AdoNet" />
+  </ItemGroup>
 
   <ItemGroup>
     <!--<PackageReference Include="Microsoft.Data.SqlClient" Version="2.1.1" />-->
@@ -12,6 +16,7 @@
     <!--<PackageReference Include="Microsoft.Data.Sqlite" Version="5.0.2" />-->
     <PackageReference Include="Npgsql" />
     <PackageReference Include="MySql.Data" />
+    <PackageReference Include="System.Drawing.Common" /> <!-- For some reason it's a dependency of MySql.Data. We want to force it to a specific version -->
     <PackageReference Include="System.Diagnostics.PerformanceCounter" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" />
   </ItemGroup>
@@ -26,10 +31,12 @@
     <ProjectReference Include="$(SourceRoot)src\AdoNet\Orleans.Reminders.AdoNet\Orleans.Reminders.AdoNet.csproj" />
     <ProjectReference Include="$(SourceRoot)test\TesterInternal\TesterInternal.csproj" />
     <ProjectReference Include="$(SourceRoot)src\Orleans.Reminders\Orleans.Reminders.csproj" />
+    <ProjectReference Include="$(SourceRoot)src\AdoNet\Orleans.Streaming.AdoNet\Orleans.Streaming.AdoNet.csproj" />
+    <ProjectReference Include="$(SourceRoot)src\Orleans.Streaming\Orleans.Streaming.csproj" />
   </ItemGroup>
 
   <ItemGroup>
-    <None  Include="$(SourceRoot)src\AdoNet\**\*.sql"  Link="%(Filename)%(Extension)">
+    <None Include="$(SourceRoot)src\AdoNet\**\*.sql" Link="%(Filename)%(Extension)">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
   </ItemGroup>
