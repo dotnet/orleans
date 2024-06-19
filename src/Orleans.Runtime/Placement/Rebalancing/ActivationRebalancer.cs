@@ -66,8 +66,9 @@ internal sealed partial class ActivationRebalancer : SystemTarget, IActivationRe
         _timeProvider = timeProvider;
         _edgeWeights = new(options.Value.MaxEdgeCount);
         _pendingMessages = new StripedMpscBuffer<Message>(Environment.ProcessorCount, options.Value.MaxUnprocessedEdges / Environment.ProcessorCount);
-        _anchoredFilter = !options.Value.ProbabilisticFilteringEnabled ? new HashSetFilter() :
-            new BlockedBloomFilter(100_000, options.Value.ProbabilisticFilteringMaxAllowedErrorRate);
+        _anchoredFilter = options.Value.ProbabilisticFilteringEnabled ?
+            new BlockedBloomFilter(100_000, options.Value.ProbabilisticFilteringMaxAllowedErrorRate) :
+            new HashSetFilter();
        
         _lastExchangedStopwatch = CoarseStopwatch.StartNew();
         catalog.RegisterSystemTarget(this);

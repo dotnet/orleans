@@ -1,14 +1,14 @@
-﻿using Orleans.Runtime.Placement.Rebalancing;
+using Orleans.Runtime.Placement.Rebalancing;
 using Xunit;
 
 namespace UnitTests.ActiveRebalancingTests;
 
-public class BloomFilterTests
+public class BlockedBloomFilterTests
 {
     [Fact]
     public void AddAndCheck()
     {
-        var bloomFilter = new BloomFilter(100, 0.01);
+        var bloomFilter = new BlockedBloomFilter(100, 0.01);
         var sample = new GrainId(GrainType.Create("type"), IdSpan.Create("key"));
         bloomFilter.Add(sample);
         Assert.True(bloomFilter.Contains(sample));
@@ -17,7 +17,7 @@ public class BloomFilterTests
     [Fact]
     public void DoesNotContainSome()
     {
-        var bloomFilter = new BloomFilter(100, 0.01);
+        var bloomFilter = new BlockedBloomFilter(100, 0.01);
         var sample = new GrainId(GrainType.Create("type"), IdSpan.Create("key"));
         Assert.False(bloomFilter.Contains(sample));
     }

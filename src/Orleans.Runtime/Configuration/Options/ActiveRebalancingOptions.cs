@@ -90,12 +90,12 @@ public sealed class ActiveRebalancingOptions
     /// The maximum allowed error rate when <see cref="ProbabilisticFilteringEnabled"/> is set to <see langword="true"/>, otherwise this does not apply.
     /// </summary>
     /// <remarks>Allowed range: [0.001 - 0.01](0.1% - 1%)</remarks>
-    public double ProbabilisticFilteringMaxAllowedErrorRate { get; set; }
+    public double ProbabilisticFilteringMaxAllowedErrorRate { get; set; } = DEFAULT_PROBABILISTIC_FILTERING_MAX_ALLOWED_ERROR;
 
     /// <summary>
     /// The default value of <see cref="ProbabilisticFilteringMaxAllowedErrorRate"/>.
     /// </summary>
-    public double DEFAULT_PROBABILISTIC_FILTERING_MAX_ALLOWED_ERROR = 0.01d;
+    public const double DEFAULT_PROBABILISTIC_FILTERING_MAX_ALLOWED_ERROR = 0.01d;
 }
 
 internal sealed class ActiveRebalancingOptionsValidator(IOptions<ActiveRebalancingOptions> options) : IConfigurationValidator
