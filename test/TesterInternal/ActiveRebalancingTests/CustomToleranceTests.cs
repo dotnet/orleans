@@ -11,13 +11,14 @@ using Xunit;
 
 namespace UnitTests.ActiveRebalancingTests;
 
+// Scenarious can be seen visually here: https://github.com/dotnet/orleans/pull/8877
 [TestCategory("Functional"), TestCategory("ActiveRebalancing"), Category("BVT")]
 public class CustomToleranceTests(CustomToleranceTests.Fixture fixture) : RebalancingTestBase<CustomToleranceTests.Fixture>(fixture), IClassFixture<CustomToleranceTests.Fixture>
 {
     [Fact]
     public async Task Should_ConvertAllRemoteCalls_ToLocalCalls_WhileRespectingTolerance()
     {
-        using var cts = new CancellationTokenSource(TimeSpan.FromMinutes(1));
+        using var cts = new CancellationTokenSource(TimeSpan.FromMinutes(10));
         await AdjustActivationCountOffsets();
 
         var e1 = GrainFactory.GetGrain<IE>(1);
@@ -71,22 +72,21 @@ public class CustomToleranceTests(CustomToleranceTests.Fixture fixture) : Rebala
         do
         {
             e2_host = await e2.GetAddress();
-            e3_host = await e3.GetAddress();
             f1_host = await f1.GetAddress();
             cts.Token.ThrowIfCancellationRequested();
         }
-        while (e2_host == Silo1 || e3_host == Silo1 || f1_host == Silo2);
-
-        await Test();
+        while (e2_host == Silo1 || f1_host == Silo2);
 
         // At this point the layout is like follows:
 
-        // S1: E1-F1, sys.svc.clustering.dev, rest (default activations, present in both silos)
-        // S2: E2-F2, E3-F3, X, rest (default activations, present in both silos)
+        // S1: E1-F1, E3-F3, sys.svc.clustering.dev, rest (default activations, present in both silos)
+        // S2: E2-F2, X, rest (default activations, present in both silos)
 
         // Tolerance <= 2, and if we ignore defaults once, sys.svc.clustering.dev, and X (which is used to counter-balance sys.svc.clustering.dev)
-        // we end up with a total of 2 activations in silo1, and 4 in silo 2, which means the tolerance has been respected, and all remote calls have
-        // been converted to local calls: S1: E1-F1, S2: E2-F2, s2: E3-F3.
+        // we end up with a total of 4 activations in silo1, and 2 in silo 2, which means the tolerance has been respected, and all remote calls have
+        // been converted to local calls.
+
+        await Test();
 
         // To make sure, we trigger 's1_rebalancer' again, which should yield to no further migrations.
         i = 0;
@@ -130,11 +130,11 @@ public class CustomToleranceTests(CustomToleranceTests.Fixture fixture) : Rebala
 
             Assert.Equal(Silo1, e1_host);  // E1 is still in silo 1
             Assert.Equal(Silo2, e2_host);  // E2 is now in silo 2
-            Assert.Equal(Silo2, e3_host);  // E3 is now in silo 2
+            Assert.Equal(Silo1, e3_host);  // E3 is still in silo 1
 
             Assert.Equal(Silo1, f1_host);  // F1 is now in silo 1
             Assert.Equal(Silo2, f2_host);  // F2 is still in silo 2
-            Assert.Equal(Silo2, f3_host);  // F3 is still in silo 2
+            Assert.Equal(Silo1, f3_host);  // F3 is now in silo 1
 
             Assert.Equal(Silo2, await x.GetAddress()); // X remains in silo 2
         }

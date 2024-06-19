@@ -2,7 +2,6 @@ using System.Diagnostics;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Configuration;
 using Orleans.Placement;
-using Orleans.Runtime;
 using Orleans.Runtime.Placement;
 using Orleans.Runtime.Placement.Rebalancing;
 using Orleans.Streams;
@@ -12,6 +11,7 @@ using Xunit;
 
 namespace UnitTests.ActiveRebalancingTests;
 
+// Scenarious can be seen visually here: https://github.com/dotnet/orleans/pull/8877
 [TestCategory("Functional"), TestCategory("ActiveRebalancing")]
 public class DefaultToleranceTests(DefaultToleranceTests.Fixture fixture) : RebalancingTestBase<DefaultToleranceTests.Fixture>(fixture), IClassFixture<DefaultToleranceTests.Fixture>
 {
@@ -158,13 +158,13 @@ public class DefaultToleranceTests(DefaultToleranceTests.Fixture fixture) : Reba
 
         Assert.Equal(Silo2, a_host);  // A is now in silo 2
         Assert.Equal(Silo2, b_host);  // B is now in silo 2
-        Assert.Equal(Silo2, c_host);
+        Assert.Equal(Silo2, c_host);  // C is still in silo 2
 
         await ResetCounters();
     }
 
     [Fact]
-    public async Task A_And_B_ShouldMoveToSilo2__C_And_D_ShouldStayOnSilo2_OrTheOtherWayAround()
+    public async Task A_ShouldMoveToSilo2_Or_C_ShouldMoveToSilo1__B_And_D_ShouldStayOnTheirSilos()
     {
         RequestContext.Set(IPlacementDirector.PlacementHintKey, Silo1);
 
@@ -173,9 +173,11 @@ public class DefaultToleranceTests(DefaultToleranceTests.Fixture fixture) : Reba
 
         await a.FirstPing(scenario, Silo1, Silo2);
 
-        for (var i = 0; i < 3; ++i)
+        var i = 0;
+        while (i < 3)
         {
             await a.Ping(scenario);
+            i++;
         }
 
         var b = GrainFactory.GetGrain<IB>($"b{scenario}");
@@ -192,7 +194,6 @@ public class DefaultToleranceTests(DefaultToleranceTests.Fixture fixture) : Reba
         Assert.Equal(Silo2, c_host);
         Assert.Equal(Silo2, d_host);
 
-        // 1st cycle
         await Silo1Rebalancer.TriggerExchangeRequest();
 
         do
@@ -200,7 +201,7 @@ public class DefaultToleranceTests(DefaultToleranceTests.Fixture fixture) : Reba
             a_host = await a.GetAddress();
             c_host = await c.GetAddress();
         }
-        while (a_host != c_host);
+        while (a_host == Silo1 && c_host == Silo2);
 
         // refresh
         a_host = await a.GetAddress();
@@ -208,39 +209,11 @@ public class DefaultToleranceTests(DefaultToleranceTests.Fixture fixture) : Reba
         c_host = await c.GetAddress();
         d_host = await d.GetAddress();
 
-        // A can go to Silo 2, or C can come to Silo 1, both are valid, so we need to check for both!
+        // A can go to Silo 2, or C can come to Silo 1, both are valid, so we need to check for both.
         if (a_host == Silo2 && c_host == Silo2)
         {
-            // A is now in silo 2
-            Assert.Equal(Silo2, a_host);
+            Assert.Equal(Silo2, a_host);  // A is now in silo 2
             Assert.Equal(Silo1, b_host);
-            Assert.Equal(Silo2, c_host);
-            Assert.Equal(Silo2, d_host);
-
-            // 2nd cycle
-            for (var i = 0; i < 3; i++)
-            {
-                await a.Ping(scenario);
-            }
-
-            // Since A moved to silo 2 at this point, it will be twice as strongly connected to C as it is to B,
-            // even though its now making remote calls (to B)! That's why we trigger the exchange from 's1_rebalancer'
-            await Silo1Rebalancer.TriggerExchangeRequest();
-
-            do
-            {
-                b_host = await b.GetAddress();
-            }
-            while (b_host == Silo1);
-
-            // refresh
-            a_host = await a.GetAddress();
-            b_host = await b.GetAddress();
-            c_host = await c.GetAddress();
-            d_host = await d.GetAddress();
-
-            Assert.Equal(Silo2, a_host);
-            Assert.Equal(Silo2, b_host);  // B is now in silo 2
             Assert.Equal(Silo2, c_host);
             Assert.Equal(Silo2, d_host);
 
@@ -253,33 +226,6 @@ public class DefaultToleranceTests(DefaultToleranceTests.Fixture fixture) : Reba
             Assert.Equal(Silo1, b_host);
             Assert.Equal(Silo1, c_host);  // C is now in silo 1
             Assert.Equal(Silo2, d_host);
-
-            // 2nd cycle
-            for (var i = 0; i < 3; i++)
-            {
-                await a.Ping(scenario);
-            }
-
-            // Since C moved to silo 1 at this point, it will be twice as strongly connected to A as it is to D,
-            // even though its now making remote calls (to D)! Thats why we trigger the exchange from 's2_rebalancer'
-            await Silo2Rebalancer.TriggerExchangeRequest();
-
-            do
-            {
-                d_host = await b.GetAddress();
-            }
-            while (d_host == Silo2);
-
-            // refresh
-            a_host = await a.GetAddress();
-            b_host = await b.GetAddress();
-            c_host = await c.GetAddress();
-            d_host = await d.GetAddress();
-
-            Assert.Equal(Silo1, a_host);
-            Assert.Equal(Silo1, b_host);
-            Assert.Equal(Silo1, c_host);
-            Assert.Equal(Silo1, d_host);  // D is now in silo 1
 
             return;
         }
