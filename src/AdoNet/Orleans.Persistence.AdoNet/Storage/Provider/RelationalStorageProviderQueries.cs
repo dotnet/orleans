@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 
 
 namespace Orleans.Storage
@@ -24,6 +24,11 @@ namespace Orleans.Storage
         /// </summary>
         public string ClearState { get; set; }
 
+        /// <summary>
+        /// The clause to clear the storage, deleting row in db.
+        /// </summary>
+        public string DeleteState { get; set; }
+
 
         /// <summary>
         /// Constructor.
@@ -31,7 +36,7 @@ namespace Orleans.Storage
         /// <param name="writeToStorage">The clause to write to a storage.</param>
         /// <param name="readFromStorage">The clause to read from a storage.</param>
         /// <param name="clearState">The clause to clear the storage.</param>
-        public RelationalStorageProviderQueries(string writeToStorage, string readFromStorage, string clearState)
+        public RelationalStorageProviderQueries(string writeToStorage, string readFromStorage, string clearState, string deleteState)
         {
             if(writeToStorage == null)
             {
@@ -48,9 +53,12 @@ namespace Orleans.Storage
                 throw new ArgumentNullException(nameof(clearState));
             }
 
+            //no null check on deleteState for backward compatibility
+
             WriteToStorage = writeToStorage;
             ReadFromStorage = readFromStorage;
             ClearState = clearState;
+            DeleteState = deleteState;
         }
     }
 }
