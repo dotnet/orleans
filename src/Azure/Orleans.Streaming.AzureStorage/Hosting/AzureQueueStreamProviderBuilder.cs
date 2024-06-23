@@ -10,14 +10,26 @@ using Orleans.Hosting;
 using Orleans.Providers;
 
 [assembly: RegisterProvider("AzureQueueStorage", "Streaming", "Silo", typeof(AzureQueueStreamProviderBuilder))]
+[assembly: RegisterProvider("AzureQueueStorage", "Streaming", "Client", typeof(AzureQueueStreamProviderBuilder))]
 
 namespace Orleans.Hosting;
 
-public sealed class AzureQueueStreamProviderBuilder : IProviderBuilder<ISiloBuilder>
+public sealed class AzureQueueStreamProviderBuilder : IProviderBuilder<ISiloBuilder>, IProviderBuilder<IClientBuilder>
 {
     public void Configure(ISiloBuilder builder, string name, IConfigurationSection configurationSection)
     {
-        builder.AddAzureQueueStreams(name, (OptionsBuilder<AzureQueueOptions> optionsBuilder) =>
+        builder.AddAzureQueueStreams(name, GetQueueOptionBuilder(configurationSection));
+    }
+
+    public void Configure(IClientBuilder builder, string name, IConfigurationSection configurationSection)
+    {
+        builder.AddAzureQueueStreams(name, GetQueueOptionBuilder(configurationSection));
+    }
+
+    private static Action<OptionsBuilder<AzureQueueOptions>> GetQueueOptionBuilder(IConfigurationSection configurationSection)
+    {
+        return (OptionsBuilder<AzureQueueOptions> optionsBuilder) =>
+        {
             optionsBuilder.Configure<IServiceProvider>((options, services) =>
             {
                 var queueNames = configurationSection.GetSection("QueueNames")?.Get<List<string>>();
@@ -55,6 +67,7 @@ public sealed class AzureQueueStreamProviderBuilder : IProviderBuilder<ISiloBuil
                         }
                     }
                 }
-            }));
+            });
+        };
     }
 }
