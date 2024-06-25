@@ -11,7 +11,7 @@ using Xunit.Abstractions;
 
 namespace Tester.Cassandra.Clustering;
 
-[TestCategory("Cassandra"), TestCategory("Clustering"), TestCategory("Functional")]
+[TestCategory("Cassandra"), TestCategory("Clustering")]
 public sealed class CassandraClusteringTableTests : IClassFixture<CassandraContainer>
 {
     private readonly CassandraContainer _cassandraContainer;
