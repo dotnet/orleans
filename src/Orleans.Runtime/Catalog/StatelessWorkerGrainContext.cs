@@ -103,7 +103,15 @@ namespace Orleans.Runtime
             _ => _shared.GetComponent<TComponent>()
         };
 
-        public void SetComponent<TComponent>(TComponent instance) where TComponent : class => throw new ArgumentException($"Cannot set a component on a {nameof(StatelessWorkerGrainContext)}");
+        public void SetComponent<TComponent>(TComponent instance) where TComponent : class
+        {
+            if (typeof(TComponent) != typeof(GrainCanInterleave))
+            {
+                throw new ArgumentException($"Cannot set a component of type '{instance.GetType().FullName}' on a {nameof(StatelessWorkerGrainContext)}");
+            }
+
+            _shared.SetComponent(instance);
+        }
 
         public TTarget GetTarget<TTarget>() where TTarget : class => throw new NotImplementedException();
 
