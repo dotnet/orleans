@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Concurrent;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
@@ -83,7 +84,6 @@ namespace Orleans
             this.sharedCallbackData = new SharedCallbackData(
                 msg => this.UnregisterCallback(msg.Id),
                 this.loggerFactory.CreateLogger<CallbackData>(),
-                this.clientMessagingOptions,
                 this.clientMessagingOptions.ResponseTimeout);
         }
 
@@ -335,7 +335,11 @@ namespace Orleans
 
         private void UnregisterCallback(CorrelationId id)
         {
-            callbacks.TryRemove(id, out _);
+            if (!callbacks.TryRemove(id, out _))
+                this.logger.LogError(
+                    (int)ErrorCode.ProxyClient_FailedToUnregisterCallback,
+                    "Failed to unregister callback with correlation {CorrelationId}",
+                    id);
         }
 
         private void ConstructorReset()
@@ -414,6 +418,9 @@ namespace Orleans
                 }
             }
         }
+
+        public int GetRunningRequestsCount(GrainInterfaceType grainInterfaceType)
+            => this.callbacks.Count(c => c.Value.Message.InterfaceType == grainInterfaceType);
 
         /// <inheritdoc />
         public event ConnectionToClusterLostHandler ClusterConnectionLost;

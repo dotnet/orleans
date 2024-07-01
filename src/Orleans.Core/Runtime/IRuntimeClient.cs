@@ -57,6 +57,8 @@ namespace Orleans.Runtime
         IGrainReferenceRuntime GrainReferenceRuntime { get; }
 
         void BreakOutstandingMessagesToDeadSilo(SiloAddress deadSilo);
+
+        int GetRunningRequestsCount(GrainInterfaceType grainInterfaceType);
     }
 
     /// <summary>

@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using Microsoft.Extensions.DependencyInjection;
+using Orleans.Metadata;
 using Orleans.Runtime;
 using TestExtensions;
 using UnitTests.GrainInterfaces;
@@ -15,12 +16,14 @@ namespace UnitTests
         private readonly ITestOutputHelper output;
         private readonly TimeSpan originalTimeout;
         private readonly IRuntimeClient runtimeClient;
+        private readonly GrainInterfaceTypeResolver typeResolver;
 
         public TimeoutTests(ITestOutputHelper output, DefaultClusterFixture fixture) : base(fixture)
         {
             this.output = output;
             this.runtimeClient = this.HostedCluster.ServiceProvider.GetRequiredService<IRuntimeClient>();
             originalTimeout = this.runtimeClient.GetResponseTimeout();
+            this.typeResolver = this.HostedCluster.ServiceProvider.GetRequiredService<GrainInterfaceTypeResolver>();
         }
 
         public virtual void Dispose()
@@ -34,6 +37,7 @@ namespace UnitTests
             bool finished = false;
             var grainName = typeof (ErrorGrain).FullName;
             IErrorGrain grain = this.GrainFactory.GetGrain<IErrorGrain>(GetRandomGrainId(), grainName);
+            var errorGrainType = this.typeResolver.GetGrainInterfaceType(typeof(IErrorGrain));
             TimeSpan timeout = TimeSpan.FromMilliseconds(1000);
             this.runtimeClient.SetResponseTimeout(timeout);
 
@@ -63,6 +67,8 @@ namespace UnitTests
             Assert.True(stopwatch.Elapsed >= timeout.Multiply(0.9), "Waited less than " + timeout.Multiply(0.9) + ". Waited " + stopwatch.Elapsed);
             Assert.True(stopwatch.Elapsed <= timeout.Multiply(3.5), "Waited longer than " + timeout.Multiply(3.5) + ". Waited " + stopwatch.Elapsed);
             Assert.True(promise.Status == TaskStatus.Faulted);
+
+            Assert.Equal(expected: 0, actual: this.runtimeClient.GetRunningRequestsCount(errorGrainType));
 
             // try to re-use the promise and should fail immideately.
             try

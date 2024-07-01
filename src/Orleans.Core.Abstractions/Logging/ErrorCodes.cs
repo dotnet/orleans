@@ -594,6 +594,7 @@ namespace Orleans
         ProxyClient_OGC_TargetNotFound_2 = ProxyClientBase + 30,
         ProxyClient_AppDomain_Unload = ProxyClientBase + 31,
         ProxyClient_GatewayUnknownStatus = ProxyClientBase + 32,
+        ProxyClient_FailedToUnregisterCallback = ProxyClientBase + 33,
 
         MessagingBase = Runtime + 1000,
         Messaging_IMA_DroppingConnection = MessagingBase + 1,
@@ -776,6 +777,7 @@ namespace Orleans
         InvokeWorkItem_UnhandledExceptionInInvoke = DispatcherBase + 39,
         Dispatcher_ErrorCreatingActivation = DispatcherBase + 40,
         Dispatcher_StuckActivation = DispatcherBase + 41,
+        Dispatcher_FailedToUnregisterCallback = DispatcherBase + 42,
 
         SerializationBase = Runtime + 1600,
         Ser_IncompatibleIntermediateType = Runtime_Error_100033, // Backward compatability
