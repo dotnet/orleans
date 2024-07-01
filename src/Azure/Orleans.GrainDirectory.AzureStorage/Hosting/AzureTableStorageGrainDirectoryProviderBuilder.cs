@@ -8,7 +8,7 @@ using Orleans.Configuration;
 using Orleans.Hosting;
 using Orleans.Providers;
 
-[assembly: RegisterProvider("AzureTableStorage", "Clustering", "Silo", typeof(AzureTableStorageGrainDirectoryProviderBuilder))]
+[assembly: RegisterProvider("AzureTableStorage", "GrainDirectory", "Silo", typeof(AzureTableStorageGrainDirectoryProviderBuilder))]
 
 namespace Orleans.Hosting;
 

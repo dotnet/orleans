@@ -10,11 +10,11 @@ using Orleans.Hosting;
 using Orleans.Providers;
 using Orleans.Reminders.AzureStorage;
 
-[assembly: RegisterProvider("AzureTableStorage", "GrainStorage", "Silo", typeof(AzureTableStorageGrainStorageProviderBuilder))]
+[assembly: RegisterProvider("AzureTableStorage", "Reminders", "Silo", typeof(AzureTableStorageRemindersProviderBuilder))]
 
 namespace Orleans.Hosting;
 
-internal sealed class AzureTableStorageGrainStorageProviderBuilder : IProviderBuilder<ISiloBuilder>
+internal sealed class AzureTableStorageRemindersProviderBuilder : IProviderBuilder<ISiloBuilder>
 {
     public void Configure(ISiloBuilder builder, string name, IConfigurationSection configurationSection)
     {
