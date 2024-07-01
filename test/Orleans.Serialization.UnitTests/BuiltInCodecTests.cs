@@ -3156,6 +3156,19 @@ namespace Orleans.Serialization.UnitTests
         protected override bool IsImmutable => true;
     }
 
+    public class FSharpUnitTests(ITestOutputHelper output) : FieldCodecTester<Unit, FSharpUnitCodec>(output)
+    {
+        protected override Unit CreateValue() => null;
+        protected override Unit[] TestValues => [null];
+    }
+
+    public class FSharpUnitCopierTests(ITestOutputHelper output) : CopierTester<Unit, FSharpUnitCopier>(output)
+    {
+        protected override bool IsImmutable => true;
+        protected override Unit CreateValue() => null;
+        protected override Unit[] TestValues => [null];
+    }
+
     public class FSharpOptionTests(ITestOutputHelper output) : FieldCodecTester<FSharpOption<Guid>, FSharpOptionCodec<Guid>>(output)
     {
         protected override FSharpOption<Guid>[] TestValues => [null, FSharpOption<Guid>.None, FSharpOption<Guid>.Some(Guid.Empty), FSharpOption<Guid>.Some(Guid.NewGuid())];

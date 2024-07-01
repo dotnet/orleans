@@ -221,6 +221,8 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Orleans.Streaming.AdoNet", 
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Benchmarks.AdoNet", "test\Benchmarks.AdoNet\Benchmarks.AdoNet.csproj", "{B8F43537-2D2E-42A0-BE67-5E07E4313AEA}"
 EndProject
+Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "Orleans.Serialization.FSharp.Tests", "test\Orleans.Serialization.FSharp.Tests\Orleans.Serialization.FSharp.Tests.fsproj", "{B2D53D3C-E44A-4C9B-AAEE-28FB8C1BDF62}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -587,6 +589,10 @@ Global
 		{B8F43537-2D2E-42A0-BE67-5E07E4313AEA}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{B8F43537-2D2E-42A0-BE67-5E07E4313AEA}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{B8F43537-2D2E-42A0-BE67-5E07E4313AEA}.Release|Any CPU.Build.0 = Release|Any CPU
+		{B2D53D3C-E44A-4C9B-AAEE-28FB8C1BDF62}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{B2D53D3C-E44A-4C9B-AAEE-28FB8C1BDF62}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{B2D53D3C-E44A-4C9B-AAEE-28FB8C1BDF62}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{B2D53D3C-E44A-4C9B-AAEE-28FB8C1BDF62}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -695,6 +701,7 @@ Global
 		{A073C0EE-8732-42F9-A22E-D47034E25076} = {4CD3AA9E-D937-48CA-BB6C-158E12257D23}
 		{2B994F33-16CF-4679-936A-5AEABC529D2C} = {EB2EDE59-5021-42EE-A97A-D59939B39C66}
 		{B8F43537-2D2E-42A0-BE67-5E07E4313AEA} = {2CAB7894-777C-42B1-8B1E-322868CE92C7}
+		{B2D53D3C-E44A-4C9B-AAEE-28FB8C1BDF62} = {A6573187-FD0D-4DF7-91D1-03E07E470C0A}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {7BFB3429-B5BB-4DB1-95B4-67D77A864952}
