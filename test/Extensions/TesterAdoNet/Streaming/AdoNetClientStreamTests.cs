@@ -1,7 +1,7 @@
 using Microsoft.Extensions.Configuration;
 using MySql.Data.MySqlClient;
+using Orleans.AdoNet.Core;
 using Orleans.Configuration;
-using Orleans.Streaming.AdoNet.Storage;
 using Orleans.TestingHost;
 using Tester.StreamingTests;
 using TestExtensions;

@@ -2,14 +2,13 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
+using Orleans.AdoNet.Core;
 using Orleans.Configuration;
 using Orleans.Providers;
-using Orleans.Runtime;
-using Orleans.Tests.SqlUtils;
+using Orleans.Serialization;
 using Orleans.Storage;
 using TestExtensions;
 using UnitTests.General;
-using Orleans.Serialization;
 
 namespace UnitTests.StorageTests.Relational
 {

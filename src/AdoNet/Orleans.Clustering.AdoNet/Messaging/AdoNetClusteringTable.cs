@@ -2,7 +2,7 @@ using System;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using Orleans.Clustering.AdoNet.Storage;
+using Orleans.Clustering.AdoNet;
 using Orleans.Configuration;
 
 namespace Orleans.Runtime.MembershipService
@@ -12,7 +12,7 @@ namespace Orleans.Runtime.MembershipService
         private readonly string clusterId;
         private readonly IServiceProvider serviceProvider;
         private readonly ILogger logger;
-        private RelationalOrleansQueries orleansQueries;
+        private ClusteringRelationalOrleansQueries orleansQueries;
         private readonly AdoNetClusteringSiloOptions clusteringTableOptions;
 
         public AdoNetClusteringTable(
@@ -33,7 +33,7 @@ namespace Orleans.Runtime.MembershipService
 
             //This initializes all of Orleans operational queries from the database using a well known view
             //and assumes the database with appropriate definitions exists already.
-            orleansQueries = await RelationalOrleansQueries.CreateInstance(
+            orleansQueries = await ClusteringRelationalOrleansQueries.CreateInstance(
                 clusteringTableOptions.Invariant,
                 clusteringTableOptions.ConnectionString);
 

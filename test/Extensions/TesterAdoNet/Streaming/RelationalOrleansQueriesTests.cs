@@ -1,9 +1,9 @@
 using System.Collections.Concurrent;
 using MySql.Data.MySqlClient;
 using Npgsql;
+using Orleans.AdoNet.Core;
 using Orleans.Configuration;
 using Orleans.Streaming.AdoNet;
-using Orleans.Streaming.AdoNet.Storage;
 using UnitTests.General;
 using static System.String;
 
@@ -47,7 +47,7 @@ public abstract class RelationalOrleansQueriesTests(string invariant, int concur
     private const string TestDatabaseName = "OrleansStreamTest";
 
     private IRelationalStorage _storage;
-    private RelationalOrleansQueries _queries;
+    private StreamingRelationalOrleansQueries _queries;
 
     public async Task InitializeAsync()
     {
@@ -56,7 +56,7 @@ public abstract class RelationalOrleansQueriesTests(string invariant, int concur
 
         _storage = RelationalStorage.CreateInstance(invariant, testing.CurrentConnectionString);
 
-        _queries = await RelationalOrleansQueries.CreateInstance(invariant, testing.CurrentConnectionString);
+        _queries = await StreamingRelationalOrleansQueries.CreateInstance(invariant, testing.CurrentConnectionString);
     }
 
     private static string RandomServiceId(int max = 10) => $"ServiceId{Random.Shared.Next(max)}";

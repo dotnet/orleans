@@ -1,5 +1,4 @@
-using Npgsql;
-using Orleans.Tests.SqlUtils;
+using Orleans.AdoNet.Core;
 using TestExtensions;
 using UnitTests.General;
 
