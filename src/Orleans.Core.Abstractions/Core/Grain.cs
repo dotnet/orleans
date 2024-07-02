@@ -18,9 +18,7 @@ public abstract partial class Grain : IGrainBase, IAddressable
     // any interaction with it will result in non unit-testable code. Any behavior that can be accessed
     // from within client code (including subclasses of this class), should be exposed through IGrainRuntime.
     // The better solution is to refactor this interface and make it injectable through the constructor.
-    internal IGrainContext GrainContext { get; private set; }
-
-    IGrainContext IGrainBase.GrainContext => GrainContext;
+    public IGrainContext GrainContext { get; private set; }
 
     public GrainReference GrainReference { get { return GrainContext.GrainReference; } }
 
@@ -94,8 +92,8 @@ public abstract partial class Grain : IGrainBase, IAddressable
     /// <param name="dueTime">Due time for first timer tick.</param>
     /// <param name="period">Period of subsequent timer ticks.</param>
     /// <returns>Handle for this timer.</returns>
-    [Obsolete("Use 'RegisterGrainTimer(callback, state, new() { DueTime = dueTime, Period = period, Interleave = true })' instead.")]
-        protected IDisposable RegisterTimer(Func<object?, Task> callback, object? state, TimeSpan dueTime, TimeSpan period)
+    [Obsolete("Use 'this.RegisterGrainTimer(callback, state, new() { DueTime = dueTime, Period = period, Interleave = true })' instead.")]
+    protected IDisposable RegisterTimer(Func<object?, Task> callback, object? state, TimeSpan dueTime, TimeSpan period)
     {
         ArgumentNullException.ThrowIfNull(callback);
 
@@ -153,7 +151,7 @@ public abstract partial class Grain : IGrainBase, IAddressable
     /// <param name="cancellationToken">A cancellation token which signals when deactivation should complete promptly.</param>
     public virtual Task OnDeactivateAsync(DeactivationReason reason, CancellationToken cancellationToken) => Task.CompletedTask;
 
-    private void EnsureRuntime()
+    internal void EnsureRuntime()
     {
         if (Runtime == null)
         {

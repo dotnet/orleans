@@ -32,7 +32,8 @@ public interface ITimerRegistry
     [Obsolete("Use 'RegisterGrainTimer(grainContext, callback, state, new() { DueTime = dueTime, Period = period, Interleave = true })' instead.")]
     IDisposable RegisterTimer(IGrainContext grainContext, Func<object?, Task> callback, object? state, TimeSpan dueTime, TimeSpan period);
 
-    /// <inheritdoc cref="Grain.RegisterGrainTimer{T}(Func{T, CancellationToken, Task}, T, GrainTimerCreationOptions)"/>
+    /// <inheritdoc cref="GrainBaseExtensions.RegisterGrainTimer{TState}(IGrainBase, Func{TState, CancellationToken, Task}, TState, GrainTimerCreationOptions)"/>
     /// <param name="grainContext">The grain which the timer is associated with.</param>
-    IGrainTimer RegisterGrainTimer<T>(IGrainContext grainContext, Func<T, CancellationToken, Task> callback, T state, GrainTimerCreationOptions options);
+    /// <typeparam name="TState">The type of the <paramref name="state"/> parameter.</typeparam>
+    IGrainTimer RegisterGrainTimer<TState>(IGrainContext grainContext, Func<TState, CancellationToken, Task> callback, TState state, GrainTimerCreationOptions options);
 }

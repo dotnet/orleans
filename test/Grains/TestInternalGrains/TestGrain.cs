@@ -61,7 +61,7 @@ namespace UnitTests.Grains
         public Task StartTimer()
         {
             logger.LogInformation("StartTimer.");
-            timer = RegisterGrainTimer(TimerTick, dueTime: TimeSpan.Zero, period: TimeSpan.FromSeconds(10));
+            timer = this.RegisterGrainTimer(TimerTick, dueTime: TimeSpan.Zero, period: TimeSpan.FromSeconds(10));
 
             return Task.CompletedTask;
         }

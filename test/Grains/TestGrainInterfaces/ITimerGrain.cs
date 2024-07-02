@@ -12,6 +12,10 @@ namespace UnitTests.GrainInterfaces
         Task Deactivate();
     }
 
+    public interface IPocoTimerGrain : ITimerGrain
+    {
+    }
+
     public interface ITimerCallGrain : IGrainWithIntegerKey
     {
         Task<int> GetTickCount();
@@ -22,7 +26,10 @@ namespace UnitTests.GrainInterfaces
         Task RestartTimer(string name, TimeSpan dueTime);
         Task RestartTimer(string name, TimeSpan dueTime, TimeSpan period);
         Task StopTimer(string name);
+    }
 
+    public interface IPocoTimerCallGrain : ITimerCallGrain
+    {
     }
 
     public interface ITimerRequestGrain : IGrainWithIntegerKey
@@ -37,6 +44,10 @@ namespace UnitTests.GrainInterfaces
         Task TestCompletedTimerResults();
     }
 
+    public interface IPocoTimerRequestGrain : ITimerRequestGrain
+    {
+    }
+
     public interface INonReentrantTimerCallGrain : IGrainWithIntegerKey
     {
         Task<int> GetTickCount();
@@ -45,5 +56,9 @@ namespace UnitTests.GrainInterfaces
         Task StartTimer(string name, TimeSpan delay, bool keepAlive = true);
         Task StopTimer(string name);
         Task ExternalTick(string name);
+    }
+
+    public interface IPocoNonReentrantTimerCallGrain : INonReentrantTimerCallGrain
+    {
     }
 }
