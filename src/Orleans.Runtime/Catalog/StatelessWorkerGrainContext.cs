@@ -1,3 +1,4 @@
+#nullable enable
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
@@ -27,8 +28,8 @@ namespace Orleans.Runtime
 #pragma warning disable IDE0052 // Remove unread private members
         private readonly Task _messageLoopTask;
 #pragma warning restore IDE0052 // Remove unread private members
-        
-        private GrainReference _grainReference;
+
+        private GrainReference? _grainReference;
 
         public StatelessWorkerGrainContext(
             GrainAddress address,
@@ -46,7 +47,7 @@ namespace Orleans.Runtime
 
         public GrainId GrainId => _address.GrainId;
 
-        public object GrainInstance => null;
+        public object? GrainInstance => null;
 
         public ActivationId ActivationId => _address.ActivationId;
 
@@ -70,10 +71,8 @@ namespace Orleans.Runtime
             }
         }
 
-        public void Activate(Dictionary<string, object> requestContext, CancellationToken? cancellationToken = null)
+        public void Activate(Dictionary<string, object>? requestContext, CancellationToken cancellationToken)
         {
-            _workItems.Enqueue(new(WorkItemType.Activate, new ActivateWorkItemState(requestContext, cancellationToken)));
-            _workSignal.Signal();
         }
 
         public void ReceiveMessage(object message)
@@ -82,7 +81,7 @@ namespace Orleans.Runtime
             _workSignal.Signal();
         }
 
-        public void Deactivate(DeactivationReason deactivationReason, CancellationToken? cancellationToken = null)
+        public void Deactivate(DeactivationReason deactivationReason, CancellationToken cancellationToken)
         {
             _workItems.Enqueue(new(WorkItemType.Deactivate, new DeactivateWorkItemState(deactivationReason, cancellationToken)));
             _workSignal.Signal();
@@ -97,17 +96,17 @@ namespace Orleans.Runtime
 
         public bool Equals([AllowNull] IGrainContext other) => other is not null && ActivationId.Equals(other.ActivationId);
 
-        public TComponent GetComponent<TComponent>() where TComponent : class => this switch
+        public TComponent? GetComponent<TComponent>() where TComponent : class => this switch
         {
             TComponent contextResult => contextResult,
             _ => _shared.GetComponent<TComponent>()
         };
 
-        public void SetComponent<TComponent>(TComponent instance) where TComponent : class
+        public void SetComponent<TComponent>(TComponent? instance) where TComponent : class
         {
             if (typeof(TComponent) != typeof(GrainCanInterleave))
             {
-                throw new ArgumentException($"Cannot set a component of type '{instance.GetType().FullName}' on a {nameof(StatelessWorkerGrainContext)}");
+                throw new ArgumentException($"Cannot set a component of type '{typeof(TComponent)}' on a {nameof(StatelessWorkerGrainContext)}");
             }
 
             _shared.SetComponent(instance);
@@ -128,12 +127,6 @@ namespace Orleans.Runtime
                             case WorkItemType.Message:
                                 ReceiveMessageInternal(workItem.State);
                                 break;
-                            case WorkItemType.Activate:
-                                {
-                                    var state = (ActivateWorkItemState)workItem.State;
-                                    ActivateInternal(state.RequestContext, state.CancellationToken);
-                                    break;
-                                }
                             case WorkItemType.Deactivate:
                                 {
                                     var state = (DeactivateWorkItemState)workItem.State;
@@ -175,8 +168,8 @@ namespace Orleans.Runtime
         {
             try
             {
-                ActivationData worker = null;
-                ActivationData minimumWaitingCountWorker = null;
+                ActivationData? worker = null;
+                ActivationData? minimumWaitingCountWorker = null;
                 var minimumWaitingCount = int.MaxValue;
 
                 // Make sure there is at least one worker
@@ -208,18 +201,16 @@ namespace Orleans.Runtime
                         }
                     }
 
-                    if (worker == null)
+                    if (worker is null)
                     {
-                        // There are no inactive workers, can we make more of them?
-                        if (_workers.Count < _maxWorkers)
-                        {
-                            worker = CreateWorker(message);
-                        }
-                        else
+                        if (_workers.Count >= _maxWorkers)
                         {
                             // Pick the one with the lowest waiting count
                             worker = minimumWaitingCountWorker;
                         }
+
+                        // If there are no workers, make one.
+                        worker ??= CreateWorker(message);
                     }
                 }
 
@@ -252,12 +243,7 @@ namespace Orleans.Runtime
             return newWorker;
         }
 
-        private void ActivateInternal(Dictionary<string, object> requestContext, CancellationToken? cancellationToken)
-        {
-            // No-op
-        }
-
-        private void DeactivateInternal(DeactivationReason reason, CancellationToken? cancellationToken)
+        private void DeactivateInternal(DeactivationReason reason, CancellationToken cancellationToken)
         {
             foreach (var worker in _workers)
             {
@@ -333,23 +319,22 @@ namespace Orleans.Runtime
             (context as IDisposable)?.Dispose();
         }
 
-        public void Migrate(Dictionary<string, object> requestContext, CancellationToken? cancellationToken = null)
+        public void Migrate(Dictionary<string, object>? requestContext, CancellationToken cancellationToken)
         {
             // Migration is not supported. Do nothing: the contract is that this method attempts migration, but does not guarantee it will occur.
         }
 
         private enum WorkItemType
         {
-            Activate = 0,
-            Message = 1,
-            Deactivate = 2,
-            DeactivatedTask = 3,
-            DisposeAsync = 4,
-            OnDestroyActivation = 5,
+            Message,
+            Deactivate,
+            DeactivatedTask,
+            DisposeAsync,
+            OnDestroyActivation,
         }
 
-        private record ActivateWorkItemState(Dictionary<string, object> RequestContext, CancellationToken? CancellationToken);
-        private record DeactivateWorkItemState(DeactivationReason DeactivationReason, CancellationToken? CancellationToken);
+        private record ActivateWorkItemState(Dictionary<string, object>? RequestContext, CancellationToken CancellationToken);
+        private record DeactivateWorkItemState(DeactivationReason DeactivationReason, CancellationToken CancellationToken);
         private record DeactivatedTaskWorkItemState(TaskCompletionSource<bool> Completion);
         private record DisposeAsyncWorkItemState(TaskCompletionSource<bool> Completion);
     }

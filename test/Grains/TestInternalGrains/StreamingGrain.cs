@@ -511,7 +511,7 @@ namespace UnitTests.Grains
 
             await Task.WhenAll(_producers.Select(p => p.ProducePeriodicSeries(timerCallback =>
                 {
-                    return RegisterTimer(timerCallback, null, TimeSpan.Zero, TimeSpan.FromMilliseconds(10));
+                    return this.RegisterGrainTimer(timerCallback, null, TimeSpan.Zero, TimeSpan.FromMilliseconds(10));
                 },count)).ToArray());
         }
 
@@ -815,7 +815,7 @@ namespace UnitTests.Grains
         {
             return _producer.ProducePeriodicSeries(timerCallback =>
             {
-                return RegisterTimer(timerCallback, null, TimeSpan.Zero, TimeSpan.FromMilliseconds(10));
+                return this.RegisterGrainTimer(timerCallback, null, TimeSpan.Zero, TimeSpan.FromMilliseconds(10));
             }, count);
         }
 

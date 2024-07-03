@@ -264,7 +264,7 @@ namespace Orleans
                 message.TargetSilo = systemTargetGrainId.GetSiloAddress();
             }
 
-            if (message.IsExpirableMessage(this.clientMessagingOptions.DropExpiredMessages))
+            if (this.clientMessagingOptions.DropExpiredMessages && message.IsExpirableMessage())
             {
                 // don't set expiration for system target messages.
                 var ttl = request.GetDefaultResponseTimeout() ?? this.clientMessagingOptions.ResponseTimeout;

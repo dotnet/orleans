@@ -115,7 +115,6 @@ namespace Orleans.Hosting
             services.TryAddSingleton<ActivationDirectory>();
             services.TryAddSingleton<GrainCountStatistics>();
             services.AddSingleton<ActivationCollector>();
-            services.AddFromExisting<IHealthCheckParticipant, ActivationCollector>();
             services.AddFromExisting<IActivationWorkingSetObserver, ActivationCollector>();
             services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, ActivationCollector>();
 

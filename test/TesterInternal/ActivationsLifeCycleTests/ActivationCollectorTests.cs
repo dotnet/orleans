@@ -7,6 +7,7 @@ using Orleans.Serialization.TypeSystem;
 using Orleans.TestingHost;
 using Tester;
 using TestExtensions;
+using UnitTestGrains;
 using UnitTests.GrainInterfaces;
 using UnitTests.Grains;
 using Xunit;
@@ -574,5 +575,25 @@ namespace UnitTests.ActivationsLifeCycleTests
             int activationsNotCollected = await TestUtils.GetActivationCount(this.testCluster.GrainFactory, fullGrainTypeName);
             Assert.Equal(0, activationsNotCollected);
         }
+
+        [Fact, TestCategory("SlowBVT"), TestCategory("Timers")]
+        public async Task NonReentrantGrainTimer_NoKeepAlive_Test()
+        {
+            await Initialize(TimeSpan.FromSeconds(5), TimeSpan.FromSeconds(1));
+
+            const string testName = "NonReentrantGrainTimer_NoKeepAlive_Test";
+
+            var grain = this.testCluster.GrainFactory.GetGrain<INonReentrantTimerCallGrain>(GetRandomGrainId());
+
+            // Schedule a timer to fire at the 30s mark which will not extend the grain's lifetime.
+            await grain.StartTimer(testName, TimeSpan.FromSeconds(4), keepAlive: false);
+            await Task.Delay(TimeSpan.FromSeconds(7));
+
+            var tickCount = await grain.GetTickCount();
+
+            // The grain should have been deactivated.
+            Assert.Equal(0, tickCount);
+        }
+
     }
 }
