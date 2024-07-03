@@ -12,6 +12,7 @@ using Orleans.Messaging;
 using Orleans.Runtime;
 using Orleans.Serialization;
 using Orleans.Serialization.Invocation;
+using Orleans.Serialization.Serializers;
 using static Orleans.Internal.StandardExtensions;
 
 namespace Orleans
@@ -29,6 +30,7 @@ namespace Orleans
         private bool disposed;
 
         private readonly MessagingTrace messagingTrace;
+        private readonly InterfaceToImplementationMappingCache _interfaceToImplementationMapping;
 
         public IInternalGrainFactory InternalGrainFactory { get; private set; }
 
@@ -64,9 +66,11 @@ namespace Orleans
             IOptions<ClientMessagingOptions> clientMessagingOptions,
             MessagingTrace messagingTrace,
             IServiceProvider serviceProvider,
-            TimeProvider timeProvider)
+            TimeProvider timeProvider,
+            InterfaceToImplementationMappingCache interfaceToImplementationMapping)
         {
             TimeProvider = timeProvider;
+            _interfaceToImplementationMapping = interfaceToImplementationMapping;
             this.ServiceProvider = serviceProvider;
             _localClientDetails = localClientDetails;
             this.loggerFactory = loggerFactory;
@@ -105,14 +109,14 @@ namespace Orleans
 
                 this.InternalGrainFactory = this.ServiceProvider.GetRequiredService<IInternalGrainFactory>();
                 this.messageFactory = this.ServiceProvider.GetService<MessageFactory>();
-
-                var copier = this.ServiceProvider.GetRequiredService<DeepCopier>();
                 this.localObjects = new InvokableObjectManager(
                     ServiceProvider.GetRequiredService<ClientGrainContext>(),
                     this,
-                    copier,
-                    this.messagingTrace,
-                    this.loggerFactory.CreateLogger<ClientGrainContext>());
+                    ServiceProvider.GetRequiredService<DeepCopier>(),
+                    messagingTrace,
+                    ServiceProvider.GetRequiredService<DeepCopier<Response>>(),
+                    _interfaceToImplementationMapping,
+                    loggerFactory.CreateLogger<ClientGrainContext>());
 
                 this.callbackTimerTask = Task.Run(MonitorCallbackExpiry);
 

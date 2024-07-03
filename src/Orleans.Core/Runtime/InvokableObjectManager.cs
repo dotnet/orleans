@@ -3,6 +3,7 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Orleans.Runtime;
 using Orleans.Serialization;
@@ -14,23 +15,34 @@ namespace Orleans
     {
         private readonly CancellationTokenSource disposed = new CancellationTokenSource();
         private readonly ConcurrentDictionary<ObserverGrainId, LocalObjectData> localObjects = new ConcurrentDictionary<ObserverGrainId, LocalObjectData>();
+
+        private readonly InterfaceToImplementationMappingCache _interfaceToImplementationMapping;
         private readonly IGrainContext rootGrainContext;
         private readonly IRuntimeClient runtimeClient;
         private readonly ILogger logger;
         private readonly DeepCopier deepCopier;
+        private readonly DeepCopier<Response> _responseCopier;
         private readonly MessagingTrace messagingTrace;
+        private List<IIncomingGrainCallFilter> _grainCallFilters;
+
+        private List<IIncomingGrainCallFilter> GrainCallFilters
+            => _grainCallFilters ??= new List<IIncomingGrainCallFilter>(runtimeClient.ServiceProvider.GetServices<IIncomingGrainCallFilter>());
 
         public InvokableObjectManager(
             IGrainContext rootGrainContext,
             IRuntimeClient runtimeClient,
             DeepCopier deepCopier,
             MessagingTrace messagingTrace,
+            DeepCopier<Response> responseCopier,
+            InterfaceToImplementationMappingCache interfaceToImplementationMapping,
             ILogger logger)
         {
             this.rootGrainContext = rootGrainContext;
             this.runtimeClient = runtimeClient;
             this.deepCopier = deepCopier;
             this.messagingTrace = messagingTrace;
+            _responseCopier = responseCopier;
+            _interfaceToImplementationMapping = interfaceToImplementationMapping;
             this.logger = logger;
         }
 
@@ -246,7 +258,20 @@ namespace Orleans
                         try
                         {
                             request.SetTarget(this);
-                            var response = await request.Invoke();
+                            var filters = _manager.GrainCallFilters;
+                            Response response;
+                            if (filters is { Count: > 0 } || LocalObject is IIncomingGrainCallFilter)
+                            {
+                                var invoker = new GrainMethodInvoker(message, this, request, filters, _manager._interfaceToImplementationMapping, _manager._responseCopier);
+                                await invoker.Invoke();
+                                response = invoker.Response;
+                            }
+                            else
+                            {
+                                response = await request.Invoke();
+                                response = _manager._responseCopier.Copy(response);
+                            }
+
                             if (message.Direction != Message.Directions.OneWay)
                             {
                                 this.SendResponseAsync(message, response);

@@ -12,6 +12,7 @@ using Orleans.GrainReferences;
 using Orleans.Internal;
 using Orleans.Runtime.Messaging;
 using Orleans.Serialization;
+using Orleans.Serialization.Invocation;
 
 namespace Orleans.Runtime
 {
@@ -24,7 +25,7 @@ namespace Orleans.Runtime
         private readonly Channel<Message> incomingMessages;
         private readonly IGrainReferenceRuntime grainReferenceRuntime;
         private readonly InvokableObjectManager invokableObjects;
-        private readonly IRuntimeClient runtimeClient;
+        private readonly InsideRuntimeClient runtimeClient;
         private readonly ILogger logger;
         private readonly IInternalGrainFactory grainFactory;
         private readonly MessageCenter siloMessageCenter;
@@ -36,7 +37,7 @@ namespace Orleans.Runtime
         private Task? messagePump;
 
         public HostedClient(
-            IRuntimeClient runtimeClient,
+            InsideRuntimeClient runtimeClient,
             ILocalSiloDetails siloDetails,
             ILogger<HostedClient> logger,
             IGrainReferenceRuntime grainReferenceRuntime,
@@ -44,7 +45,8 @@ namespace Orleans.Runtime
             MessageCenter messageCenter,
             MessagingTrace messagingTrace,
             DeepCopier deepCopier,
-            GrainReferenceActivator referenceActivator)
+            GrainReferenceActivator referenceActivator,
+            InterfaceToImplementationMappingCache interfaceToImplementationMappingCache)
         {
             this.incomingMessages = Channel.CreateUnbounded<Message>(new UnboundedChannelOptions
             {
@@ -61,6 +63,8 @@ namespace Orleans.Runtime
                 runtimeClient,
                 deepCopier,
                 messagingTrace,
+                runtimeClient.ServiceProvider.GetRequiredService<DeepCopier<Response>>(),
+                interfaceToImplementationMappingCache,
                 logger);
             this.siloMessageCenter = messageCenter;
             this.messagingTrace = messagingTrace;

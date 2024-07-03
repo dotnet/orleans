@@ -127,7 +127,8 @@ namespace Orleans.Hosting
             builder.Services.TryAddSingleton(DistributedContextPropagator.Current);
 
             return builder
-                .AddOutgoingGrainCallFilter<ActivityPropagationOutgoingGrainCallFilter>();
+                .AddOutgoingGrainCallFilter<ActivityPropagationOutgoingGrainCallFilter>()
+                .AddIncomingGrainCallFilter<ActivityPropagationIncomingGrainCallFilter>();
         }
 
         /// <summary>
