@@ -1,8 +1,7 @@
 using System.Data;
 using System.Data.Common;
-using Orleans.Tests.SqlUtils;
+using Orleans.AdoNet.Core;
 using UnitTests.General;
-using Xunit;
 
 namespace UnitTests.StorageTests.AdoNet
 {

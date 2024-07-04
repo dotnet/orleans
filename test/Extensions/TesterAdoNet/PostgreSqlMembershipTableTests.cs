@@ -1,13 +1,12 @@
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Orleans.AdoNet.Core;
+using Orleans.Configuration;
 using Orleans.Messaging;
 using Orleans.Runtime.Membership;
 using Orleans.Runtime.MembershipService;
-using Orleans.Tests.SqlUtils;
-using Orleans.Configuration;
 using TestExtensions;
 using UnitTests.General;
-using Xunit;
 
 namespace UnitTests.MembershipTests
 {

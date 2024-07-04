@@ -1,5 +1,4 @@
-using System.Data.SqlClient;
-using Orleans.Tests.SqlUtils;
+using Orleans.AdoNet.Core;
 using TestExtensions;
 
 namespace UnitTests.General

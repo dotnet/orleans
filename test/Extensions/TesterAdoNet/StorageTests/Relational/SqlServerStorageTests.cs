@@ -1,6 +1,5 @@
-using Orleans.Tests.SqlUtils;
+using Orleans.AdoNet.Core;
 using UnitTests.StorageTests.Relational.TestDataSets;
-using Xunit;
 
 namespace UnitTests.StorageTests.Relational
 {

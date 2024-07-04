@@ -1,7 +1,8 @@
 using System.Data.SqlClient;
 using BenchmarkDotNet.Attributes;
 using BenchmarkDotNet.Engines;
-using Orleans.Tests.SqlUtils;
+using Orleans.AdoNet.Core;
+using Orleans.Streaming.AdoNet;
 using UnitTests.General;
 using static System.String;
 
@@ -27,7 +28,7 @@ public abstract class MessageQueueingBenchmark(string invariant, string database
 
     private readonly Consumer _consumer = new();
     private IRelationalStorage _storage = default!;
-    private RelationalOrleansQueries _queries = default!;
+    private StreamingRelationalOrleansQueries _queries = default!;
     private byte[] _payload = [];
     private string[] _queueIds = default!;
 
@@ -66,7 +67,7 @@ public abstract class MessageQueueingBenchmark(string invariant, string database
 
         _storage = RelationalStorage.CreateInstance(invariant, testing.CurrentConnectionString);
 
-        _queries = RelationalOrleansQueries.CreateInstance(invariant, testing.CurrentConnectionString).GetAwaiter().GetResult();
+        _queries = StreamingRelationalOrleansQueries.CreateInstance(invariant, testing.CurrentConnectionString).GetAwaiter().GetResult();
     }
 
     [IterationSetup]

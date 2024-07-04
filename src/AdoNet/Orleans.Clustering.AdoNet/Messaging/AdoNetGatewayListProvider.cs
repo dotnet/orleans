@@ -3,9 +3,9 @@ using System.Collections.Generic;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using Orleans.Clustering.AdoNet.Storage;
-using Orleans.Messaging;
+using Orleans.Clustering.AdoNet;
 using Orleans.Configuration;
+using Orleans.Messaging;
 
 namespace Orleans.Runtime.Membership
 {
@@ -14,7 +14,7 @@ namespace Orleans.Runtime.Membership
         private readonly ILogger _logger;
         private readonly string _clusterId;
         private readonly AdoNetClusteringClientOptions _options;
-        private RelationalOrleansQueries _orleansQueries;
+        private ClusteringRelationalOrleansQueries _orleansQueries;
         private readonly IServiceProvider _serviceProvider;
         private readonly TimeSpan _maxStaleness;
 
@@ -45,7 +45,7 @@ namespace Orleans.Runtime.Membership
         public async Task InitializeGatewayListProvider()
         {
             if (_logger.IsEnabled(LogLevel.Trace)) _logger.LogTrace("AdoNetClusteringTable.InitializeGatewayListProvider called.");
-            _orleansQueries = await RelationalOrleansQueries.CreateInstance(_options.Invariant, _options.ConnectionString);
+            _orleansQueries = await ClusteringRelationalOrleansQueries.CreateInstance(_options.Invariant, _options.ConnectionString);
         }
 
         public async Task<IList<Uri>> GetGateways()

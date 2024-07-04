@@ -1,11 +1,10 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
+using Orleans.AdoNet.Core;
 using Orleans.TestingHost;
-using Orleans.Tests.SqlUtils;
 using TestExtensions;
 using TestExtensions.Runners;
 using UnitTests.General;
-using Xunit;
 using Xunit.Abstractions;
 
 namespace Tester.AdoNet.Persistence

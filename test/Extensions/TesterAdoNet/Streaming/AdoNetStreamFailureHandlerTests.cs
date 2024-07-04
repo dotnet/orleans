@@ -1,13 +1,12 @@
 using Microsoft.Extensions.Logging.Abstractions;
 using MySql.Data.MySqlClient;
+using Orleans.AdoNet.Core;
 using Orleans.Configuration;
 using Orleans.Providers.Streams.Common;
 using Orleans.Streaming.AdoNet;
 using Orleans.Streams;
-using Orleans.Tests.SqlUtils;
 using UnitTests.General;
 using static System.String;
-using RelationalOrleansQueries = Orleans.Streaming.AdoNet.Storage.RelationalOrleansQueries;
 
 namespace Tester.AdoNet.Streaming;
 
@@ -44,7 +43,7 @@ public abstract class AdoNetStreamFailureHandlerTests(string invariant) : IAsync
 {
     private RelationalStorageForTesting _testing;
     private IRelationalStorage _storage;
-    private RelationalOrleansQueries _queries;
+    private StreamingRelationalOrleansQueries _queries;
 
     private const string TestDatabaseName = "OrleansStreamTest";
 
@@ -55,7 +54,7 @@ public abstract class AdoNetStreamFailureHandlerTests(string invariant) : IAsync
         Skip.If(IsNullOrEmpty(_testing.CurrentConnectionString), $"Database '{TestDatabaseName}' not initialized");
 
         _storage = _testing.Storage;
-        _queries = await RelationalOrleansQueries.CreateInstance(invariant, _testing.CurrentConnectionString);
+        _queries = await StreamingRelationalOrleansQueries.CreateInstance(invariant, _testing.CurrentConnectionString);
     }
 
     /// <summary>
