@@ -9,6 +9,8 @@ namespace Orleans.Persistence.DynamoDB
 namespace Orleans.Reminders.DynamoDB
 #elif STREAMING_SQS
 namespace Orleans.Streaming.SQS
+#elif STREAMING_KINESIS
+namespace Orleans.Streaming.Kinesis
 #elif AWSUTILS_TESTS
 namespace Orleans.AWSUtils.Tests
 #elif TRANSACTIONS_DYNAMODB
