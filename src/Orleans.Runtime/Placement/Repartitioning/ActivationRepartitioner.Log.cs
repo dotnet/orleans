@@ -1,14 +1,14 @@
 using System;
 using Microsoft.Extensions.Logging;
 
-namespace Orleans.Runtime.Placement.Rebalancing;
+namespace Orleans.Runtime.Placement.Repartitioning;
 
-internal partial class ActivationRebalancer
+internal partial class ActivationRepartitioner
 {
-    [LoggerMessage(Level = LogLevel.Debug, Message = "I will periodically initiate the exchange protocol every {MinRebalancingPeriod} to {MaxRebalancingPeriod} starting in {DueTime}.")]
-    private partial void LogPeriodicallyInvokeProtocol(TimeSpan minRebalancingPeriod, TimeSpan maxRebalancingPeriod, TimeSpan dueTime);
+    [LoggerMessage(Level = LogLevel.Debug, Message = "I will periodically initiate the exchange protocol every {MinPeriod} to {MaxPeriod} starting in {DueTime}.")]
+    private partial void LogPeriodicallyInvokeProtocol(TimeSpan minPeriod, TimeSpan maxPeriod, TimeSpan dueTime);
 
-    [LoggerMessage(Level = LogLevel.Debug, Message = "Active rebalancing is enabled, but the cluster contains only one silo. Waiting for at least another silo to join the cluster to proceed.")]
+    [LoggerMessage(Level = LogLevel.Debug, Message = "Activation repartitioning is enabled, but the cluster contains only one silo. Waiting for at least another silo to join the cluster to proceed.")]
     private partial void LogSingleSiloCluster();
 
     [LoggerMessage(Level = LogLevel.Debug, Message = "Exchange set for candidate silo {CandidateSilo} is empty. I will try the next best candidate (if one is available), otherwise I will wait for my next period to come.")]

@@ -1,6 +1,6 @@
 using Orleans.Runtime;
 
-namespace Orleans.Placement.Rebalancing;
+namespace Orleans.Placement.Repartitioning;
 
 internal interface IMessageStatisticsSink
 {

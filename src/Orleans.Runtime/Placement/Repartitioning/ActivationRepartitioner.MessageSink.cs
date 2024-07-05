@@ -3,12 +3,12 @@ using System;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
-using Orleans.Placement.Rebalancing;
+using Orleans.Placement.Repartitioning;
 using Orleans.Runtime.Internal;
 
-namespace Orleans.Runtime.Placement.Rebalancing;
+namespace Orleans.Runtime.Placement.Repartitioning;
 
-internal partial class ActivationRebalancer : IMessageStatisticsSink
+internal partial class ActivationRepartitioner : IMessageStatisticsSink
 {
     private readonly CancellationTokenSource _shutdownCts = new();
 
@@ -24,7 +24,7 @@ internal partial class ActivationRebalancer : IMessageStatisticsSink
 
         if (_logger.IsEnabled(LogLevel.Trace))
         {
-            _logger.LogTrace("{Service} has started.", nameof(ActivationRebalancer));
+            _logger.LogTrace("{Service} has started.", nameof(ActivationRepartitioner));
         }
     }
 
@@ -41,7 +41,7 @@ internal partial class ActivationRebalancer : IMessageStatisticsSink
 
         if (_logger.IsEnabled(LogLevel.Trace))
         {
-            _logger.LogTrace("{Service} has stopped.", nameof(ActivationRebalancer));
+            _logger.LogTrace("{Service} has stopped.", nameof(ActivationRepartitioner));
         }
     }
 

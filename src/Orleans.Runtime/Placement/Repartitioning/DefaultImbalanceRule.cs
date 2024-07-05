@@ -1,11 +1,11 @@
 using System;
 using System.Linq;
 using System.Collections.Concurrent;
-using Orleans.Placement.Rebalancing;
 using System.Threading.Tasks;
 using System.Threading;
+using Orleans.Placement.Repartitioning;
 
-namespace Orleans.Runtime.Placement.Rebalancing;
+namespace Orleans.Runtime.Placement.Repartitioning;
 
 /// <summary>
 /// Tolerance rule which is aware of the cluster size.

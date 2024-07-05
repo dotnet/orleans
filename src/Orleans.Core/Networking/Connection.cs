@@ -12,7 +12,6 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.ObjectPool;
 using Orleans.Configuration;
 using Orleans.Messaging;
-using Orleans.Placement.Rebalancing;
 using Orleans.Serialization.Invocation;
 
 namespace Orleans.Runtime.Messaging

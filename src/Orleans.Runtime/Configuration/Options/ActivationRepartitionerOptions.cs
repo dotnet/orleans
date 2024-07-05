@@ -4,14 +4,14 @@ using Orleans.Runtime;
 
 namespace Orleans.Configuration;
 
-public sealed class ActiveRebalancingOptions
+public sealed class ActivationRepartitionerOptions
 {
     /// <summary>
     /// <para>
-    /// The maximum number of edges to retain in-memory during a rebalancing cycle. An edge represents how many calls were made from one grain to another.
+    /// The maximum number of edges to retain in-memory during a repartitioning round. An edge represents how many calls were made from one grain to another.
     /// </para>
     /// <para>
-    /// If this number is N, it does not mean that N activations will be migrated after a rebalancing cycle.
+    /// If this number is N, it does not mean that N activations will be migrated after a repartitioning round.
     /// It also does not mean that if any activation ranked very high, that it will rank high at the next cycle.
     /// At the most extreme case, the number of activations that will be migrated, will equal this number, so this should give you some idea as to setting a reasonable value for this.
     /// </para>
@@ -28,33 +28,33 @@ public sealed class ActiveRebalancingOptions
     public const int DEFAULT_MAX_EDGE_COUNT = 10_000;
 
     /// <summary>
-    /// The minimum time between initiating a rebalancing cycle.
+    /// The minimum time between initiating a repartitioning round.
     /// </summary>
-    /// <remarks>The actual due time is picked randomly between this and <see cref="MaxRebalancingPeriod"/>.</remarks>
-    public TimeSpan MinRebalancingPeriod { get; set; } = DEFAULT_MINUMUM_REBALANCING_PERIOD;
+    /// <remarks>The actual due time is picked randomly between this and <see cref="MaxRoundPeriod"/>.</remarks>
+    public TimeSpan MinRoundPeriod { get; set; } = DEFAULT_MINUMUM_ROUND_PERIOD;
 
     /// <summary>
-    /// The default value of <see cref="MinRebalancingPeriod"/>.
+    /// The default value of <see cref="MinRoundPeriod"/>.
     /// </summary>
-    public static readonly TimeSpan DEFAULT_MINUMUM_REBALANCING_PERIOD = TimeSpan.FromMinutes(1);
+    public static readonly TimeSpan DEFAULT_MINUMUM_ROUND_PERIOD = TimeSpan.FromMinutes(1);
 
     /// <summary>
-    /// The maximum time between initiating a rebalancing cycle.
+    /// The maximum time between initiating a repartitioning round.
     /// </summary>
     /// <remarks>
-    /// <para>The actual due time is picked randomly between this and <see cref="MinRebalancingPeriod"/>.</para>
+    /// <para>The actual due time is picked randomly between this and <see cref="MinRoundPeriod"/>.</para>
     /// <para>For optimal results, you should aim to give this an extra 10 seconds multiplied by the maximum anticipated silo count in the cluster.</para>
     /// </remarks>
-    public TimeSpan MaxRebalancingPeriod { get; set; } = DEFAULT_MAXIMUM_REBALANCING_PERIOD;
+    public TimeSpan MaxRoundPeriod { get; set; } = DEFAULT_MAXIMUM_ROUND_PERIOD;
 
     /// <summary>
-    /// The default value of <see cref="MaxRebalancingPeriod"/>.
+    /// The default value of <see cref="MaxRoundPeriod"/>.
     /// </summary>
-    public static readonly TimeSpan DEFAULT_MAXIMUM_REBALANCING_PERIOD = TimeSpan.FromMinutes(2);
+    public static readonly TimeSpan DEFAULT_MAXIMUM_ROUND_PERIOD = TimeSpan.FromMinutes(2);
 
     /// <summary>
-    /// The minimum time needed for a silo to recover from a previous rebalancing.
-    /// Until this time has elapsed, this silo will not take part in any rebalancing attempt from another silo.
+    /// The minimum time needed for a silo to recover from a previous repartitioning round.
+    /// Until this time has elapsed, this silo will not take part in any repartitioning attempt from another silo.
     /// </summary>
     public TimeSpan RecoveryPeriod { get; set; } = DEFAULT_RECOVERY_PERIOD;
 
@@ -77,7 +77,7 @@ public sealed class ActiveRebalancingOptions
     /// Gets or sets a value indicating whether to enable the local vertex filter. This filter tracks which
     /// vertices are well-partitioned (moving them from the local host would be detrimental) and collapses them
     /// into a single per-silo vertex to reduce the space required to track edges involving that vertex. The result
-    /// is a reduction in accuracy but a potentially significant increase in effectiveness of the rebalancer, since
+    /// is a reduction in accuracy but a potentially significant increase in effectiveness of the repartitioner, since
     /// well-partitioned edges will not dominate the top-K data structure, leaving sufficient room to track
     /// non-well-partitioned vertices. This is enabled by default.
     /// </summary>
@@ -100,50 +100,50 @@ public sealed class ActiveRebalancingOptions
     public const double DEFAULT_PROBABILISTIC_FILTERING_MAX_ALLOWED_ERROR = 0.01d;
 }
 
-internal sealed class ActiveRebalancingOptionsValidator(IOptions<ActiveRebalancingOptions> options) : IConfigurationValidator
+internal sealed class ActivationRepartitionerOptionsValidator(IOptions<ActivationRepartitionerOptions> options) : IConfigurationValidator
 {
-    private readonly ActiveRebalancingOptions _options = options.Value;
+    private readonly ActivationRepartitionerOptions _options = options.Value;
 
     public void ValidateConfiguration()
     {
         if (_options.MaxEdgeCount <= 0)
         {
-            ThrowMustBeGreaterThanZero(nameof(ActiveRebalancingOptions.MaxEdgeCount));
+            ThrowMustBeGreaterThanZero(nameof(ActivationRepartitionerOptions.MaxEdgeCount));
         }
 
         if (_options.MaxUnprocessedEdges <= 0)
         {
-            ThrowMustBeGreaterThanZero(nameof(ActiveRebalancingOptions.MaxUnprocessedEdges));
+            ThrowMustBeGreaterThanZero(nameof(ActivationRepartitionerOptions.MaxUnprocessedEdges));
         }
 
-        if (_options.MinRebalancingPeriod <= TimeSpan.Zero)
+        if (_options.MinRoundPeriod <= TimeSpan.Zero)
         {
-            ThrowMustBeGreaterThanZero(nameof(ActiveRebalancingOptions.MinRebalancingPeriod));
+            ThrowMustBeGreaterThanZero(nameof(ActivationRepartitionerOptions.MinRoundPeriod));
         }
 
-        if (_options.MaxRebalancingPeriod <= TimeSpan.Zero)
+        if (_options.MaxRoundPeriod <= TimeSpan.Zero)
         {
-            ThrowMustBeGreaterThanZero(nameof(ActiveRebalancingOptions.MaxRebalancingPeriod));
+            ThrowMustBeGreaterThanZero(nameof(ActivationRepartitionerOptions.MaxRoundPeriod));
         }
 
         if (_options.RecoveryPeriod <= TimeSpan.Zero)
         {
-            ThrowMustBeGreaterThanZero(nameof(ActiveRebalancingOptions.RecoveryPeriod));
+            ThrowMustBeGreaterThanZero(nameof(ActivationRepartitionerOptions.RecoveryPeriod));
         }
 
-        if (_options.MaxRebalancingPeriod < _options.MinRebalancingPeriod)
+        if (_options.MaxRoundPeriod < _options.MinRoundPeriod)
         {
-            ThrowMustBeGreaterThanOrEqualTo(nameof(ActiveRebalancingOptions.MaxRebalancingPeriod), nameof(ActiveRebalancingOptions.MinRebalancingPeriod));
+            ThrowMustBeGreaterThanOrEqualTo(nameof(ActivationRepartitionerOptions.MaxRoundPeriod), nameof(ActivationRepartitionerOptions.MinRoundPeriod));
         }
 
-        if (_options.MinRebalancingPeriod < _options.RecoveryPeriod)
+        if (_options.MinRoundPeriod < _options.RecoveryPeriod)
         {
-            ThrowMustBeGreaterThanOrEqualTo(nameof(ActiveRebalancingOptions.MinRebalancingPeriod), nameof(ActiveRebalancingOptions.RecoveryPeriod));
+            ThrowMustBeGreaterThanOrEqualTo(nameof(ActivationRepartitionerOptions.MinRoundPeriod), nameof(ActivationRepartitionerOptions.RecoveryPeriod));
         }
 
         if (_options.ProbabilisticFilteringMaxAllowedErrorRate < 0.001d || _options.ProbabilisticFilteringMaxAllowedErrorRate > 0.01d)
         {
-            throw new OrleansConfigurationException($"{nameof(ActiveRebalancingOptions.ProbabilisticFilteringMaxAllowedErrorRate)} must be inclusive between [0.001 - 0.01](0.1% - 1%)");
+            throw new OrleansConfigurationException($"{nameof(ActivationRepartitionerOptions.ProbabilisticFilteringMaxAllowedErrorRate)} must be inclusive between [0.001 - 0.01](0.1% - 1%)");
         }
     }
 

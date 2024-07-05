@@ -29,7 +29,7 @@ namespace Benchmarks.Ping
                 var hostBuilder = new HostBuilder().UseOrleans((ctx, siloBuilder) =>
                 {
 #pragma warning disable ORLEANSEXP001 // Type is for evaluation purposes only and is subject to change or removal in future updates. Suppress this diagnostic to proceed.
-                    siloBuilder.AddActiveRebalancing();
+                    siloBuilder.AddActivationRepartitioner();
 #pragma warning restore ORLEANSEXP001 // Type is for evaluation purposes only and is subject to change or removal in future updates. Suppress this diagnostic to proceed.
                     siloBuilder.ConfigureLogging(l =>
                     {
@@ -39,9 +39,9 @@ namespace Benchmarks.Ping
                             o.TimestampFormat = "HH:mm:ss ";
                             o.ColorBehavior = LoggerColorBehavior.Enabled;
                         });
-                        l.AddFilter("Orleans.Runtime.Placement.Rebalancing", LogLevel.Debug);
+                        l.AddFilter("Orleans.Runtime.Placement.Repartitioning", LogLevel.Debug);
                     });
-                    siloBuilder.Configure<ActiveRebalancingOptions>(o =>
+                    siloBuilder.Configure<ActivationRepartitionerOptions>(o =>
                     {
                     });
                     siloBuilder.UseLocalhostClustering(

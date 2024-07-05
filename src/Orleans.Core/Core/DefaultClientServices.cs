@@ -25,7 +25,7 @@ using System;
 using Orleans.Hosting;
 using System.Reflection;
 using Microsoft.Extensions.Configuration;
-using Orleans.Placement.Rebalancing;
+using Orleans.Placement.Repartitioning;
 
 namespace Orleans
 {

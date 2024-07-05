@@ -1,7 +1,7 @@
 using Orleans.Runtime.Placement;
-using Orleans.Runtime.Placement.Rebalancing;
+using Orleans.Runtime.Placement.Repartitioning;
 
-namespace UnitTests.ActiveRebalancingTests;
+namespace UnitTests.ActivationRepartitioningTests;
 
 /// <summary>
 /// Ignores client messages to make testing easier
@@ -9,9 +9,9 @@ namespace UnitTests.ActiveRebalancingTests;
 internal sealed class TestMessageFilter(
     PlacementStrategyResolver strategyResolver,
     IClusterManifestProvider clusterManifestProvider,
-    TimeProvider timeProvider) : IRebalancingMessageFilter
+    TimeProvider timeProvider) : IRepartitionerMessageFilter
 {
-    private readonly RebalancingMessageFilter _messageFilter = new(strategyResolver, clusterManifestProvider, timeProvider);
+    private readonly RepartitionerMessageFilter _messageFilter = new(strategyResolver, clusterManifestProvider, timeProvider);
 
     public bool IsAcceptable(Message message, out bool isSenderMigratable, out bool isTargetMigratable) =>
         _messageFilter.IsAcceptable(message, out isSenderMigratable, out isTargetMigratable) &&

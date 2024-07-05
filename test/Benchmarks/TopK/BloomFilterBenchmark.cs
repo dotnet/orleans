@@ -8,7 +8,7 @@ using BenchmarkDotNet.Columns;
 using BenchmarkDotNet.Configs;
 using BenchmarkDotNet.Reports;
 using Benchmarks.Utilities;
-using Orleans.Runtime.Placement.Rebalancing;
+using Orleans.Runtime.Placement.Repartitioning;
 
 namespace Benchmarks.TopK;
 

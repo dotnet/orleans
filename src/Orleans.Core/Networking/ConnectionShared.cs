@@ -1,5 +1,5 @@
 using System;
-using Orleans.Placement.Rebalancing;
+using Orleans.Placement.Repartitioning;
 
 namespace Orleans.Runtime.Messaging
 {

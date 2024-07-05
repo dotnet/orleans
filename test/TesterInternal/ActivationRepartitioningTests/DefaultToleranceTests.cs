@@ -3,17 +3,17 @@ using Microsoft.Extensions.DependencyInjection;
 using Orleans.Configuration;
 using Orleans.Placement;
 using Orleans.Runtime.Placement;
-using Orleans.Runtime.Placement.Rebalancing;
+using Orleans.Runtime.Placement.Repartitioning;
 using Orleans.Streams;
 using Orleans.TestingHost;
 using TestExtensions;
 using Xunit;
 
-namespace UnitTests.ActiveRebalancingTests;
+namespace UnitTests.ActivationRepartitioningTests;
 
 // Scenarious can be seen visually here: https://github.com/dotnet/orleans/pull/8877
-[TestCategory("Functional"), TestCategory("ActiveRebalancing")]
-public class DefaultToleranceTests(DefaultToleranceTests.Fixture fixture) : RebalancingTestBase<DefaultToleranceTests.Fixture>(fixture), IClassFixture<DefaultToleranceTests.Fixture>
+[TestCategory("Functional"), TestCategory("ActivationRepartitioning")]
+public class DefaultToleranceTests(DefaultToleranceTests.Fixture fixture) : RepartitioningTestBase<DefaultToleranceTests.Fixture>(fixture), IClassFixture<DefaultToleranceTests.Fixture>
 {
     [Fact]
     public async Task A_ShouldMoveToSilo2__B_And_C_ShouldStayOnSilo2()
@@ -42,7 +42,7 @@ public class DefaultToleranceTests(DefaultToleranceTests.Fixture fixture) : Reba
         Assert.Equal(Silo2, b_host);
         Assert.Equal(Silo2, c_host);
 
-        await Silo1Rebalancer.TriggerExchangeRequest();
+        await Silo1Repartitioner.TriggerExchangeRequest();
 
         do
         {
@@ -92,7 +92,7 @@ public class DefaultToleranceTests(DefaultToleranceTests.Fixture fixture) : Reba
         Assert.Equal(Silo1, b_host);
         Assert.Equal(Silo2, c_host);
 
-        await Silo1Rebalancer.TriggerExchangeRequest();
+        await Silo1Repartitioner.TriggerExchangeRequest();
 
         do
         {
@@ -142,7 +142,7 @@ public class DefaultToleranceTests(DefaultToleranceTests.Fixture fixture) : Reba
         Assert.Equal(Silo1, b_host);
         Assert.Equal(Silo2, c_host);
 
-        await Silo1Rebalancer.TriggerExchangeRequest();
+        await Silo1Repartitioner.TriggerExchangeRequest();
 
         do
         {
@@ -194,7 +194,7 @@ public class DefaultToleranceTests(DefaultToleranceTests.Fixture fixture) : Reba
         Assert.Equal(Silo2, c_host);
         Assert.Equal(Silo2, d_host);
 
-        await Silo1Rebalancer.TriggerExchangeRequest();
+        await Silo1Repartitioner.TriggerExchangeRequest();
 
         do
         {
@@ -279,7 +279,7 @@ public class DefaultToleranceTests(DefaultToleranceTests.Fixture fixture) : Reba
         Assert.Equal(Silo1, sr2_host);
         Assert.Equal(Silo2, sr3_host);
 
-        await Silo1Rebalancer.TriggerExchangeRequest();
+        await Silo1Repartitioner.TriggerExchangeRequest();
         await Task.Delay(100); // leave some breathing room - may not be enough though, thats why this test is skippable
 
         var allowedDuration = TimeSpan.FromSeconds(3);
@@ -544,11 +544,11 @@ public class DefaultToleranceTests(DefaultToleranceTests.Fixture fixture) : Reba
                         o.AssumeHomogenousSilosForTesting = true;
                         o.ClientGatewayShutdownNotificationTimeout = default;
                     })
-                    .Configure<ActiveRebalancingOptions>(o =>
+                    .Configure<ActivationRepartitionerOptions>(o =>
                     {
                         // Make these so that the timers practically never fire! We will invoke the protocol manually.
-                        o.MinRebalancingPeriod = TimeSpan.FromSeconds(299);
-                        o.MaxRebalancingPeriod = TimeSpan.FromSeconds(300);
+                        o.MinRoundPeriod = TimeSpan.FromSeconds(299);
+                        o.MaxRoundPeriod = TimeSpan.FromSeconds(300);
                         // Make this practically zero, so we can invoke the protocol more than once without needing to put a delay in the tests. 
                         o.RecoveryPeriod = TimeSpan.FromMilliseconds(1);
                     })
@@ -557,8 +557,8 @@ public class DefaultToleranceTests(DefaultToleranceTests.Fixture fixture) : Reba
                         c.ConfigurePartitioning(1);
                         c.ConfigureStreamPubSub(StreamPubSubType.ImplicitOnly);
                     })
-                    .AddActiveRebalancing()
-                    .ConfigureServices(service => service.AddSingleton<IRebalancingMessageFilter, TestMessageFilter>());
+                    .AddActivationRepartitioner()
+                    .ConfigureServices(service => service.AddSingleton<IRepartitionerMessageFilter, TestMessageFilter>());
 #pragma warning restore ORLEANSEXP001 // Type is for evaluation purposes only and is subject to change or removal in future updates. Suppress this diagnostic to proceed.
         }
     }

@@ -1,4 +1,4 @@
-namespace Orleans.Placement.Rebalancing;
+namespace Orleans.Placement.Repartitioning;
 
 /// <summary>
 /// Represents a rule that controls the degree of imbalance between the number of grain activations (that is considered tolerable), when any pair of silos are exchanging activations.

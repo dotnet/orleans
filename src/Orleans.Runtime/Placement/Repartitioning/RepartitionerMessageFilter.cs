@@ -1,21 +1,22 @@
 #nullable enable
+using Orleans;
 using Orleans.Metadata;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Frozen;
 using System.Runtime.CompilerServices;
 
-namespace Orleans.Runtime.Placement.Rebalancing;
+namespace Orleans.Runtime.Placement.Repartitioning;
 
-internal interface IRebalancingMessageFilter
+internal interface IRepartitionerMessageFilter
 {
     bool IsAcceptable(Message message, out bool isSenderMigratable, out bool isTargetMigratable);
 }
 
-internal sealed class RebalancingMessageFilter(
+internal sealed class RepartitionerMessageFilter(
     PlacementStrategyResolver strategyResolver,
     IClusterManifestProvider clusterManifestProvider,
-    TimeProvider timeProvider) : IRebalancingMessageFilter
+    TimeProvider timeProvider) : IRepartitionerMessageFilter
 {
     private readonly GrainManifest _localManifest = clusterManifestProvider.LocalGrainManifest;
     private readonly PlacementStrategyResolver _strategyResolver = strategyResolver;

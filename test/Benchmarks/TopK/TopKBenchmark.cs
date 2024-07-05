@@ -2,8 +2,8 @@ using System.Diagnostics;
 using System.Net;
 using System.Runtime.CompilerServices;
 using BenchmarkDotNet.Attributes;
-using Orleans.Placement.Rebalancing;
-using Orleans.Runtime.Placement.Rebalancing;
+using Orleans.Placement.Repartitioning;
+using Orleans.Runtime.Placement.Repartitioning;
 
 namespace Benchmarks.TopK;
 

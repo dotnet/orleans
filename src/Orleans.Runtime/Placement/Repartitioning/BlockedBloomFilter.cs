@@ -4,7 +4,7 @@ using System.IO.Hashing;
 using System.Numerics;
 using System.Runtime.CompilerServices;
 
-namespace Orleans.Runtime.Placement.Rebalancing;
+namespace Orleans.Runtime.Placement.Repartitioning;
 
 /// <summary>
 /// A tuned version of a blocked bloom filter implementation.

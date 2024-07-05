@@ -5,13 +5,13 @@ using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System;
 
-namespace Orleans.Placement.Rebalancing;
+namespace Orleans.Placement.Repartitioning;
 
-[Alias("IActivationRebalancerSystemTarget")]
-internal interface IActivationRebalancerSystemTarget : ISystemTarget
+[Alias("IActivationRepartitionerSystemTarget")]
+internal interface IActivationRepartitionerSystemTarget : ISystemTarget
 {
-    static IActivationRebalancerSystemTarget GetReference(IGrainFactory grainFactory, SiloAddress targetSilo)
-        => grainFactory.GetGrain<IActivationRebalancerSystemTarget>(SystemTargetGrainId.Create(Constants.ActivationRebalancerType, targetSilo).GrainId);
+    static IActivationRepartitionerSystemTarget GetReference(IGrainFactory grainFactory, SiloAddress targetSilo)
+        => grainFactory.GetGrain<IActivationRepartitionerSystemTarget>(SystemTargetGrainId.Create(Constants.ActivationRepartitionerType, targetSilo).GrainId);
 
     [ResponseTimeout("00:10:00")]
     ValueTask TriggerExchangeRequest();
@@ -66,7 +66,7 @@ internal readonly struct Edge(EdgeVertex source, EdgeVertex target) : IEquatable
     /// </summary>
     public Edge Flip() => new(source: Target, target: Source);
 
-    public override string ToString() => $"[{Source} -> {Target}]"; 
+    public override string ToString() => $"[{Source} -> {Target}]";
 }
 
 /// <summary>

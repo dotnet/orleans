@@ -1,12 +1,11 @@
-using Orleans.Placement.Rebalancing;
-using Orleans.Runtime;
-using Orleans.Runtime.Placement.Rebalancing;
+using Orleans.Placement.Repartitioning;
+using Orleans.Runtime.Placement.Repartitioning;
 using Xunit;
 
-namespace UnitTests.ActiveRebalancingTests;
+namespace UnitTests.ActivationRepartitioningTests;
 
-[Alias("UnitTests.ActiveRebalancingTests.IMyGrain")]
-public interface IMyActiveBalancingGrain : IGrainWithStringKey
+[Alias("UnitTests.ActivationRepartitioningTests.IMyPartitionableGrain")]
+public interface IMyPartitionableGrain : IGrainWithStringKey
 {
     [Alias("GetValue")]
     Task<T> GetValue<T>();
@@ -15,13 +14,13 @@ public interface IMyActiveBalancingGrain : IGrainWithStringKey
     Task<T> GetValue<T, H>();
 }
 
-[Alias("UnitTests.ActiveRebalancingTests.IMyGrain`1")]
+[Alias("UnitTests.ActivationRepartitioningTests.IMyGrain`1")]
 public interface IMyActiveBalancingGrain<T> : IGrainWithStringKey
 {
     Task<T> GetValue();
 }
 
-[TestCategory("Functional"), TestCategory("ActiveRebalancing")]
+[TestCategory("Functional"), TestCategory("ActivationRepartitioning")]
 public class FrequentEdgeCounterTests
 {
     private static readonly GrainId Id_A = GrainId.Create("A", Guid.NewGuid().ToString());

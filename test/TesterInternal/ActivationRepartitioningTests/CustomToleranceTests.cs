@@ -2,18 +2,18 @@ using System.ComponentModel;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Configuration;
 using Orleans.Placement;
-using Orleans.Placement.Rebalancing;
+using Orleans.Placement.Repartitioning;
 using Orleans.Runtime.Placement;
-using Orleans.Runtime.Placement.Rebalancing;
+using Orleans.Runtime.Placement.Repartitioning;
 using Orleans.TestingHost;
 using TestExtensions;
 using Xunit;
 
-namespace UnitTests.ActiveRebalancingTests;
+namespace UnitTests.ActivationRepartitioningTests;
 
-// Scenarious can be seen visually here: https://github.com/dotnet/orleans/pull/8877
-[TestCategory("Functional"), TestCategory("ActiveRebalancing"), Category("BVT")]
-public class CustomToleranceTests(CustomToleranceTests.Fixture fixture) : RebalancingTestBase<CustomToleranceTests.Fixture>(fixture), IClassFixture<CustomToleranceTests.Fixture>
+// Scenarios can be seen visually here: https://github.com/dotnet/orleans/pull/8877
+[TestCategory("Functional"), TestCategory("ActivationRepartitioning"), Category("BVT")]
+public class CustomToleranceTests(CustomToleranceTests.Fixture fixture) : RepartitioningTestBase<CustomToleranceTests.Fixture>(fixture), IClassFixture<CustomToleranceTests.Fixture>
 {
     [Fact]
     public async Task Should_ConvertAllRemoteCalls_ToLocalCalls_WhileRespectingTolerance()
@@ -67,7 +67,7 @@ public class CustomToleranceTests(CustomToleranceTests.Fixture fixture) : Rebala
 
         Assert.Equal(Silo2, await x.GetAddress()); // X remains in silo 2
 
-        await Silo1Rebalancer.TriggerExchangeRequest();
+        await Silo1Repartitioner.TriggerExchangeRequest();
 
         do
         {
@@ -99,7 +99,7 @@ public class CustomToleranceTests(CustomToleranceTests.Fixture fixture) : Rebala
             i++;
         }
 
-        await Silo1Rebalancer.TriggerExchangeRequest();
+        await Silo1Repartitioner.TriggerExchangeRequest();
         await Test();
 
         // To make extra sure, we now trigger 's2_rebalancer', which again should yield to no further migrations.
@@ -113,7 +113,7 @@ public class CustomToleranceTests(CustomToleranceTests.Fixture fixture) : Rebala
             i++;
         }
 
-        await Silo2Rebalancer.TriggerExchangeRequest();
+        await Silo2Repartitioner.TriggerExchangeRequest();
         await Test();
 
         //await ResetCounters(); uncomment if you add more tests
@@ -204,16 +204,16 @@ public class CustomToleranceTests(CustomToleranceTests.Fixture fixture) : Rebala
                         o.AssumeHomogenousSilosForTesting = true;
                         o.ClientGatewayShutdownNotificationTimeout = default;
                     })
-                    .Configure<ActiveRebalancingOptions>(o =>
+                    .Configure<ActivationRepartitionerOptions>(o =>
                     {
                         // Make these so that the timers practically never fire! We will invoke the protocol manually.
-                        o.MinRebalancingPeriod = TimeSpan.FromSeconds(299);
-                        o.MaxRebalancingPeriod = TimeSpan.FromSeconds(300);
+                        o.MinRoundPeriod = TimeSpan.FromSeconds(299);
+                        o.MaxRoundPeriod = TimeSpan.FromSeconds(300);
                         // Make this practically zero, so we can invoke the protocol more than once without needing to put a delay in the tests. 
                         o.RecoveryPeriod = TimeSpan.FromMilliseconds(1);
                     })
-                    .AddActiveRebalancing<HardLimitRule>()
-                    .ConfigureServices(service => service.AddSingleton<IRebalancingMessageFilter, TestMessageFilter>());
+                    .AddActivationRepartitioner<HardLimitRule>()
+                    .ConfigureServices(service => service.AddSingleton<IRepartitionerMessageFilter, TestMessageFilter>());
 #pragma warning restore ORLEANSEXP001 // Type is for evaluation purposes only and is subject to change or removal in future updates. Suppress this diagnostic to proceed.
         }
 

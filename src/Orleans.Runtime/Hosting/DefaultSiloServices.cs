@@ -42,7 +42,7 @@ using System.Collections.Generic;
 using Microsoft.Extensions.Configuration;
 using Orleans.Serialization.Internal;
 using Orleans.Core;
-using Orleans.Placement.Rebalancing;
+using Orleans.Placement.Repartitioning;
 
 namespace Orleans.Hosting
 {

@@ -3,9 +3,9 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Diagnostics;
-using Orleans.Placement.Rebalancing;
+using Orleans.Placement.Repartitioning;
 
-namespace Orleans.Runtime.Placement.Rebalancing;
+namespace Orleans.Runtime.Placement.Repartitioning;
 
 internal sealed class FrequentEdgeCounter(int capacity) : FrequentItemCollection<ulong, Edge>(capacity)
 {
@@ -175,7 +175,7 @@ internal abstract class FrequentItemCollection<TKey, TElement>(int capacity) whe
         // Round to nearest power of 2 for cheaper binning without modulo
         const int SketchEntriesPerHeapEntry = 6;
 
-        return 1 << (32 - int.LeadingZeroCount(capacity * SketchEntriesPerHeapEntry));
+        return 1 << 32 - int.LeadingZeroCount(capacity * SketchEntriesPerHeapEntry);
     }
 
     /// <summary>
@@ -229,7 +229,7 @@ internal abstract class FrequentItemCollection<TKey, TElement>(int capacity) whe
     /// <summary>
     /// Gets the index of an element's parent.
     /// </summary>
-    private static int GetParentIndex(int index) => (index - 1) >> Log2Arity;
+    private static int GetParentIndex(int index) => index - 1 >> Log2Arity;
 
     /// <summary>
     /// Gets the index of the first child of an element.

@@ -5,7 +5,7 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Orleans.Concurrency;
 using Orleans.Metadata;
-using Orleans.Placement.Rebalancing;
+using Orleans.Placement.Repartitioning;
 using Orleans.Providers;
 using Orleans.Runtime.GrainDirectory;
 using Orleans.Runtime.MembershipService;
@@ -384,7 +384,7 @@ namespace Orleans.Runtime.Management
             var results = new List<GrainCallFrequency>();
             foreach (var host in hostsIds)
             {
-                var siloBalancer = IActivationRebalancerSystemTarget.GetReference(internalGrainFactory, host);
+                var siloBalancer = IActivationRepartitionerSystemTarget.GetReference(internalGrainFactory, host);
                 var frequencies = await siloBalancer.GetGrainCallFrequencies();
                 foreach (var frequency in frequencies)
                 {
@@ -412,7 +412,7 @@ namespace Orleans.Runtime.Management
 
             foreach (var host in hostsIds)
             {
-                var siloBalancer = IActivationRebalancerSystemTarget.GetReference(internalGrainFactory, host);
+                var siloBalancer = IActivationRepartitionerSystemTarget.GetReference(internalGrainFactory, host);
                 await siloBalancer.ResetCounters();
             }
         }

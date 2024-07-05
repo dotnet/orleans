@@ -3,20 +3,20 @@ using Orleans.Runtime;
 using Orleans.Configuration;
 using Xunit;
 
-namespace UnitTests.ActiveRebalancingTests;
+namespace UnitTests.ActivationRepartitioningTests;
 
-[TestCategory("Functional"), TestCategory("ActiveRebalancing")]
+[TestCategory("Functional"), TestCategory("ActivationRepartitioning")]
 public class OptionsTests
 {
     [Fact]
     public void ConstantsShouldNotChange()
     {
-        Assert.True(ActiveRebalancingOptions.DEFAULT_ANCHORING_FILTER_ENABLED);
-        Assert.Equal(0.01d, ActiveRebalancingOptions.DEFAULT_PROBABILISTIC_FILTERING_MAX_ALLOWED_ERROR);
-        Assert.Equal(10_000, ActiveRebalancingOptions.DEFAULT_MAX_EDGE_COUNT);
-        Assert.Equal(TimeSpan.FromMinutes(1), ActiveRebalancingOptions.DEFAULT_MINUMUM_REBALANCING_PERIOD);
-        Assert.Equal(TimeSpan.FromMinutes(2), ActiveRebalancingOptions.DEFAULT_MAXIMUM_REBALANCING_PERIOD);
-        Assert.Equal(TimeSpan.FromMinutes(1), ActiveRebalancingOptions.DEFAULT_RECOVERY_PERIOD);
+        Assert.True(ActivationRepartitionerOptions.DEFAULT_ANCHORING_FILTER_ENABLED);
+        Assert.Equal(0.01d, ActivationRepartitionerOptions.DEFAULT_PROBABILISTIC_FILTERING_MAX_ALLOWED_ERROR);
+        Assert.Equal(10_000, ActivationRepartitionerOptions.DEFAULT_MAX_EDGE_COUNT);
+        Assert.Equal(TimeSpan.FromMinutes(1), ActivationRepartitionerOptions.DEFAULT_MINUMUM_ROUND_PERIOD);
+        Assert.Equal(TimeSpan.FromMinutes(2), ActivationRepartitionerOptions.DEFAULT_MAXIMUM_ROUND_PERIOD);
+        Assert.Equal(TimeSpan.FromMinutes(1), ActivationRepartitionerOptions.DEFAULT_RECOVERY_PERIOD);
     }
 
     [Theory]
@@ -36,17 +36,17 @@ public class OptionsTests
         int recoveryPeriodMinutes,
         double probabilisticFilteringMaxAllowedErrorRate)
     {
-        var options = new ActiveRebalancingOptions
+        var options = new ActivationRepartitionerOptions
         {
             MaxEdgeCount = topHeaviestCommunicationLinks,
-            MinRebalancingPeriod = TimeSpan.FromMinutes(minRebalancingPeriodMinutes),
-            MaxRebalancingPeriod = TimeSpan.FromMinutes(maxRebalancingPeriodMinutes),
+            MinRoundPeriod = TimeSpan.FromMinutes(minRebalancingPeriodMinutes),
+            MaxRoundPeriod = TimeSpan.FromMinutes(maxRebalancingPeriodMinutes),
             RecoveryPeriod = TimeSpan.FromMinutes(recoveryPeriodMinutes),
             MaxUnprocessedEdges = maxUnprocessedEdges,
             ProbabilisticFilteringMaxAllowedErrorRate = probabilisticFilteringMaxAllowedErrorRate
         };
 
-        var validator = new ActiveRebalancingOptionsValidator(Options.Create(options));
+        var validator = new ActivationRepartitionerOptionsValidator(Options.Create(options));
         Assert.Throws<OrleansConfigurationException>(validator.ValidateConfiguration);
     }
 }

@@ -1,18 +1,18 @@
 using DashboardToy.Frontend.Data;
 using Microsoft.AspNetCore.Mvc;
 using Orleans.Configuration;
-using Orleans.Placement.Rebalancing;
+using Orleans.Placement.Repartitioning;
 
 var builder = WebApplication.CreateBuilder(args);
 builder.AddKeyedRedisClient("orleans-redis");
 #pragma warning disable ORLEANSEXP001 // Type is for evaluation purposes only and is subject to change or removal in future updates. Suppress this diagnostic to proceed.
 builder.UseOrleans(orleans =>
 {
-    orleans.AddActiveRebalancing<HardLimitRule>();
-    orleans.Configure<ActiveRebalancingOptions>(o =>
+    orleans.AddActivationRepartitioner<HardLimitRule>();
+    orleans.Configure<ActivationRepartitionerOptions>(o =>
     {
-        o.MinRebalancingPeriod = TimeSpan.FromSeconds(5);
-        o.MaxRebalancingPeriod = TimeSpan.FromSeconds(15);
+        o.MinRoundPeriod = TimeSpan.FromSeconds(5);
+        o.MaxRoundPeriod = TimeSpan.FromSeconds(15);
         o.RecoveryPeriod = TimeSpan.FromSeconds(2);
     });
 });

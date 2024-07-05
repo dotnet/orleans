@@ -1,7 +1,7 @@
-using Orleans.Runtime.Placement.Rebalancing;
+using Orleans.Runtime.Placement.Repartitioning;
 using Xunit;
 
-namespace UnitTests.ActiveRebalancingTests;
+namespace UnitTests.ActivationRepartitioningTests;
 
 public sealed class MaxHeapTests
 {

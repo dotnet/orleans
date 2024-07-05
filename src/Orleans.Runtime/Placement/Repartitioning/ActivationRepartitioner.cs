@@ -9,7 +9,6 @@ using System.Runtime.CompilerServices;
 using System.Diagnostics;
 using System.Collections.Immutable;
 using System.Data;
-using Orleans.Placement.Rebalancing;
 using System.Threading;
 using Orleans.Internal;
 using Orleans.Configuration;
@@ -17,21 +16,22 @@ using Orleans.Runtime.Utilities;
 using System.Runtime.InteropServices;
 using System.Diagnostics.CodeAnalysis;
 using Microsoft.CodeAnalysis;
+using Orleans.Placement.Repartitioning;
 
-namespace Orleans.Runtime.Placement.Rebalancing;
+namespace Orleans.Runtime.Placement.Repartitioning;
 
 // See: https://www.microsoft.com/en-us/research/wp-content/uploads/2016/06/eurosys16loca_camera_ready-1.pdf
-internal sealed partial class ActivationRebalancer : SystemTarget, IActivationRebalancerSystemTarget, ILifecycleParticipant<ISiloLifecycle>, IDisposable, ISiloStatusListener
+internal sealed partial class ActivationRepartitioner : SystemTarget, IActivationRepartitionerSystemTarget, ILifecycleParticipant<ISiloLifecycle>, IDisposable, ISiloStatusListener
 {
     private readonly ILogger _logger;
     private readonly ISiloStatusOracle _siloStatusOracle;
     private readonly IInternalGrainFactory _grainFactory;
-    private readonly IRebalancingMessageFilter _messageFilter;
+    private readonly IRepartitionerMessageFilter _messageFilter;
     private readonly IImbalanceToleranceRule _toleranceRule;
     private readonly IActivationMigrationManager _migrationManager;
     private readonly ActivationDirectory _activationDirectory;
     private readonly TimeProvider _timeProvider;
-    private readonly ActiveRebalancingOptions _options;
+    private readonly ActivationRepartitionerOptions _options;
     private readonly StripedMpscBuffer<Message> _pendingMessages;
     private readonly SingleWaiterAutoResetEvent _pendingMessageEvent = new() { RunContinuationsAsynchronously = true };
     private readonly FrequentEdgeCounter _edgeWeights;
@@ -41,21 +41,21 @@ internal sealed partial class ActivationRebalancer : SystemTarget, IActivationRe
     private int _activationCountOffset;
     private bool _enableMessageSampling;
 
-    public ActivationRebalancer(
+    public ActivationRepartitioner(
         ISiloStatusOracle siloStatusOracle,
         ILocalSiloDetails localSiloDetails,
         ILoggerFactory loggerFactory,
         IInternalGrainFactory internalGrainFactory,
-        IRebalancingMessageFilter messageFilter,
+        IRepartitionerMessageFilter messageFilter,
         IImbalanceToleranceRule toleranceRule,
         IActivationMigrationManager migrationManager,
         ActivationDirectory activationDirectory,
         Catalog catalog,
-        IOptions<ActiveRebalancingOptions> options,
+        IOptions<ActivationRepartitionerOptions> options,
         TimeProvider timeProvider)
-        : base(Constants.ActivationRebalancerType, localSiloDetails.SiloAddress, loggerFactory)
+        : base(Constants.ActivationRepartitionerType, localSiloDetails.SiloAddress, loggerFactory)
     {
-        _logger = loggerFactory.CreateLogger<ActivationRebalancer>();
+        _logger = loggerFactory.CreateLogger<ActivationRepartitioner>();
         _options = options.Value;
         _siloStatusOracle = siloStatusOracle;
         _grainFactory = internalGrainFactory;
@@ -96,18 +96,18 @@ internal sealed partial class ActivationRebalancer : SystemTarget, IActivationRe
         return ValueTask.CompletedTask;
     }
 
-    ValueTask<int> IActivationRebalancerSystemTarget.GetActivationCount() => new(_activationDirectory.Count);
-    ValueTask IActivationRebalancerSystemTarget.SetActivationCountOffset(int activationCountOffset)
+    ValueTask<int> IActivationRepartitionerSystemTarget.GetActivationCount() => new(_activationDirectory.Count);
+    ValueTask IActivationRepartitionerSystemTarget.SetActivationCountOffset(int activationCountOffset)
     {
         _activationCountOffset = activationCountOffset;
         return ValueTask.CompletedTask;
     }
 
-    private void UpdateTimer() => UpdateTimer(RandomTimeSpan.Next(_options.MinRebalancingPeriod, _options.MaxRebalancingPeriod));
+    private void UpdateTimer() => UpdateTimer(RandomTimeSpan.Next(_options.MinRoundPeriod, _options.MaxRoundPeriod));
     private void UpdateTimer(TimeSpan dueTime)
     {
         _timer.Change(dueTime, dueTime);
-        LogPeriodicallyInvokeProtocol(_options.MinRebalancingPeriod, _options.MaxRebalancingPeriod, dueTime);
+        LogPeriodicallyInvokeProtocol(_options.MinRoundPeriod, _options.MaxRoundPeriod, dueTime);
     }
 
     public async ValueTask TriggerExchangeRequest()
@@ -159,7 +159,7 @@ internal sealed partial class ActivationRebalancer : SystemTarget, IActivationRe
                 _currentExchangeSilo = candidateSilo;
 
                 LogBeginningProtocol(Silo, candidateSilo);
-                var remoteRef = IActivationRebalancerSystemTarget.GetReference(_grainFactory, candidateSilo);
+                var remoteRef = IActivationRepartitionerSystemTarget.GetReference(_grainFactory, candidateSilo);
                 var response = await remoteRef.AcceptExchangeRequest(new(Silo, [.. offeredGrains], GetLocalActivationCount()));
 
                 switch (response.Type)
@@ -203,7 +203,7 @@ internal sealed partial class ActivationRebalancer : SystemTarget, IActivationRe
 
             // We pick some random time between 'min' and 'max' and than subtract from it 'min'. We do this so this silo doesn't have to wait for 'min + random',
             // as it did the very first time this was started. It is guaranteed that 'random - min' >= 0; as 'random' will be at the least equal to 'min'.
-            UpdateTimer(RandomTimeSpan.Next(_options.MinRebalancingPeriod, _options.MaxRebalancingPeriod) - _options.MinRebalancingPeriod);
+            UpdateTimer(RandomTimeSpan.Next(_options.MinRoundPeriod, _options.MaxRoundPeriod) - _options.MinRoundPeriod);
             LogMutualExchangeAttempt(request.SendingSilo);
 
             return AcceptExchangeResponse.CachedMutualExchangeAttempt;
@@ -722,14 +722,14 @@ internal sealed partial class ActivationRebalancer : SystemTarget, IActivationRe
     {
         // Start when the silo becomes active.
         observer.Subscribe(
-            nameof(ActivationRebalancer),
+            nameof(ActivationRepartitioner),
             ServiceLifecycleStage.Active,
             OnActiveStart,
             ct => Task.CompletedTask);
 
         // Stop when the silo stops application services.
         observer.Subscribe(
-            nameof(ActivationRebalancer),
+            nameof(ActivationRepartitioner),
             ServiceLifecycleStage.ApplicationServices,
             ct => Task.CompletedTask,
             StopProcessingEdgesAsync);
