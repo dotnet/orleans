@@ -90,6 +90,7 @@ namespace UnitTests.ActivationsLifeCycleTests
             await Initialize(DEFAULT_IDLE_TIMEOUT);
 
             const int grainCount = 1000;
+            var fullGrainTypeName = RuntimeTypeNameFormatter.Format(typeof(IdleActivationGcTestGrain1));
 
             List<Task> tasks = new List<Task>();
             logger.LogInformation("ActivationCollectorForceCollection: activating {Count} grains.", grainCount);
@@ -106,7 +107,7 @@ namespace UnitTests.ActivationsLifeCycleTests
 
             await grain.ForceActivationCollection(TimeSpan.FromSeconds(4));
 
-            int activationsNotCollected = await TestUtils.GetActivationCount(this.testCluster.GrainFactory, "idleactivationgctestgrain1");
+            int activationsNotCollected = await TestUtils.GetActivationCount(this.testCluster.GrainFactory, fullGrainTypeName);
             Assert.Equal(0, activationsNotCollected);
 
             await grain.ForceActivationCollection(TimeSpan.FromSeconds(4));
@@ -118,7 +119,7 @@ namespace UnitTests.ActivationsLifeCycleTests
             await Initialize(DEFAULT_IDLE_TIMEOUT);
 
             const int grainCount = 1000;
-            var fullGrainTypeName = "idleactivationgctestgrain1";
+            var fullGrainTypeName = RuntimeTypeNameFormatter.Format(typeof(IdleActivationGcTestGrain1));
 
             List<Task> tasks = new List<Task>();
             logger.LogInformation("IdleActivationCollectorShouldCollectIdleActivations: activating {Count} grains.", grainCount);
@@ -149,8 +150,8 @@ namespace UnitTests.ActivationsLifeCycleTests
 
             const int idleGrainCount = 500;
             const int busyGrainCount = 500;
-            var idleGrainTypeName = "idleactivationgctestgrain1";
-            var busyGrainTypeName = "busyactivationgctestgrain1";
+            var idleGrainTypeName = RuntimeTypeNameFormatter.Format(typeof(IdleActivationGcTestGrain1));
+            var busyGrainTypeName = RuntimeTypeNameFormatter.Format(typeof(BusyActivationGcTestGrain1));
 
             List<Task> tasks0 = new List<Task>();
             List<IBusyActivationGcTestGrain1> busyGrains = new List<IBusyActivationGcTestGrain1>();
@@ -211,8 +212,8 @@ namespace UnitTests.ActivationsLifeCycleTests
             TimeSpan shortIdleTimeout = TimeSpan.FromSeconds(1);
             const int idleGrainCount = 500;
             const int busyGrainCount = 500;
-            var idleGrainTypeName = "idleactivationgctestgrain1";
-            var busyGrainTypeName = "busyactivationgctestgrain1";
+            var idleGrainTypeName = RuntimeTypeNameFormatter.Format(typeof(IdleActivationGcTestGrain1));
+            var busyGrainTypeName = RuntimeTypeNameFormatter.Format(typeof(BusyActivationGcTestGrain1));
 
             List<Task> tasks0 = new List<Task>();
             List<IBusyActivationGcTestGrain1> busyGrains = new List<IBusyActivationGcTestGrain1>();
@@ -285,7 +286,7 @@ namespace UnitTests.ActivationsLifeCycleTests
             await Initialize(defaultCollectionAgeLimit);
 
             const int grainCount = 1000;
-            var fullGrainTypeName = "idleactivationgctestgrain2";
+            var fullGrainTypeName = RuntimeTypeNameFormatter.Format(typeof(IdleActivationGcTestGrain2));
 
             List<Task> tasks = new List<Task>();
             logger.LogInformation("ActivationCollectorShouldCollectIdleActivationsSpecifiedInPerTypeConfiguration: activating {Count} grains.", grainCount);
@@ -318,8 +319,8 @@ namespace UnitTests.ActivationsLifeCycleTests
 
             const int idleGrainCount = 500;
             const int busyGrainCount = 500;
-            var idleGrainTypeName = "idleactivationgctestgrain2";
-            var busyGrainTypeName = "busyactivationgctestgrain2";
+            var idleGrainTypeName = RuntimeTypeNameFormatter.Format(typeof(IdleActivationGcTestGrain2));
+            var busyGrainTypeName = RuntimeTypeNameFormatter.Format(typeof(BusyActivationGcTestGrain2));
 
             List<Task> tasks0 = new List<Task>();
             List<IBusyActivationGcTestGrain2> busyGrains = new List<IBusyActivationGcTestGrain2>();
@@ -389,7 +390,7 @@ namespace UnitTests.ActivationsLifeCycleTests
             //   7. ensure that test steps 2-6 are repeatable.
 
             const int grainCount = 1;
-            var grainTypeName = "statelessworkeractivationcollectortestgrain1";
+            var grainTypeName = RuntimeTypeNameFormatter.Format(typeof(StatelessWorkerActivationCollectorTestGrain1));
             const int burstLength = 1000;
 
             List<Task> tasks0 = new List<Task>();
@@ -495,8 +496,8 @@ namespace UnitTests.ActivationsLifeCycleTests
 
             const int idleGrainCount = 0;
             const int busyGrainCount = 500;
-            var idleGrainTypeName = "idleactivationgctestgrain1";
-            var busyGrainTypeName = "busyactivationgctestgrain1";
+            var idleGrainTypeName = RuntimeTypeNameFormatter.Format(typeof(IdleActivationGcTestGrain1));
+            var busyGrainTypeName = RuntimeTypeNameFormatter.Format(typeof(BusyActivationGcTestGrain1));
             const int burstCount = 100;
 
             List<Task> tasks0 = new List<Task>();
@@ -549,7 +550,7 @@ namespace UnitTests.ActivationsLifeCycleTests
             const int grainCount = 1000;
 
             // CollectionAgeLimit = 12 seconds
-            var fullGrainTypeName = "collectionspecificAgelimitfortensecondsactivationgctest";
+            var fullGrainTypeName = RuntimeTypeNameFormatter.Format(typeof(CollectionSpecificAgeLimitForTenSecondsActivationGcTestGrain));
 
             List<Task> tasks = new List<Task>();
             logger.LogInformation("ActivationCollectorShouldCollectByCollectionSpecificAgeLimit: activating {GrainCount} grains.", grainCount);

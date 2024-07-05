@@ -1746,7 +1746,7 @@ internal sealed class ActivationData : IGrainContext, ICollectibleGrainContext, 
         }
         else if (_isInWorkingSet)
         {
-            CatalogInstruments.ActivationShutdownViaApplication();
+            CatalogInstruments.ActivationShutdownViaDeactivateOnIdle();
         }
         else
         {

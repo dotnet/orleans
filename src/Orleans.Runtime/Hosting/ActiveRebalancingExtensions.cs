@@ -5,12 +5,15 @@ using Orleans.Runtime;
 using Orleans.Configuration;
 using Orleans.Runtime.Placement.Rebalancing;
 using System.Diagnostics.CodeAnalysis;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace Orleans.Hosting;
 
 #nullable enable
 public static class ActiveRebalancingExtensions
 {
+    private static readonly ServiceDescriptor ActivationRebalancerServiceDescriptor = new(typeof(ActivationRebalancer), typeof(ActivationRebalancer));
+
     /// <summary>
     /// Adds support for active-rebalancing in this silo.
     /// </summary>
@@ -21,6 +24,7 @@ public static class ActiveRebalancingExtensions
     /// <summary>
     /// Adds support for active-rebalancing in this silo.
     /// </summary>
+    /// <typeparam name="TRule">The type of the imbalance rule to use.</typeparam>
     [Experimental("ORLEANSEXP001")]
     public static ISiloBuilder AddActiveRebalancing<TRule>(this ISiloBuilder builder) where TRule : class, IImbalanceToleranceRule
         => builder
@@ -28,23 +32,21 @@ public static class ActiveRebalancingExtensions
 
     private static IServiceCollection AddActiveRebalancing<TRule>(this IServiceCollection services) where TRule : class, IImbalanceToleranceRule
     {
-        services.AddTransient<IConfigurationValidator, ActiveRebalancingOptionsValidator>();
-        
-        if (typeof(TRule) == typeof(DefaultImbalanceRule))
+        if (!services.Contains(ActivationRebalancerServiceDescriptor))
         {
-            services.AddSingleton<DefaultImbalanceRule>();
-            services.AddFromExisting<IImbalanceToleranceRule, DefaultImbalanceRule>();
-            services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, DefaultImbalanceRule>();
-        }
-        else
-        {
-            services.AddSingleton<IImbalanceToleranceRule, TRule>();
+            services.Add(ActivationRebalancerServiceDescriptor);
+            services.AddSingleton<IRebalancingMessageFilter, RebalancingMessageFilter>();
+            services.AddFromExisting<IMessageStatisticsSink, ActivationRebalancer>();
+            services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, ActivationRebalancer>();
+            services.AddTransient<IConfigurationValidator, ActiveRebalancingOptionsValidator>();
         }
 
-        services.AddSingleton<IRebalancingMessageFilter, RebalancingMessageFilter>();
-        services.AddSingleton<ActivationRebalancer>();
-        services.AddFromExisting<IMessageStatisticsSink, ActivationRebalancer>();
-        services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, ActivationRebalancer>();
+        services.AddSingleton<TRule>();
+        services.AddFromExisting<IImbalanceToleranceRule, TRule>();
+        if (typeof(TRule).IsAssignableTo(typeof(ILifecycleParticipant<ISiloLifecycle>)))
+        {
+            services.AddFromExisting(typeof(ILifecycleParticipant<ISiloLifecycle>), typeof(TRule));
+        }
 
         return services;
     }
