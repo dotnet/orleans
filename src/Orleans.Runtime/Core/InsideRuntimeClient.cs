@@ -191,12 +191,7 @@ namespace Orleans.Runtime
         /// </summary>
         private void UnregisterCallback(GrainId grainId, CorrelationId correlationId)
         {
-            if (!callbacks.TryRemove((grainId, correlationId), out _))
-                this.logger.LogError(
-                    (int)ErrorCode.Dispatcher_FailedToUnregisterCallback,
-                    "Failed to unregister callback for {GrainId} with correlation {CorrelationId}",
-                    grainId,
-                    correlationId);
+            callbacks.TryRemove((grainId, correlationId), out _);
         }
 
         public void SniffIncomingMessage(Message message)

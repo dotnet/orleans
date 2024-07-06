@@ -335,11 +335,7 @@ namespace Orleans
 
         private void UnregisterCallback(CorrelationId id)
         {
-            if (!callbacks.TryRemove(id, out _))
-                this.logger.LogError(
-                    (int)ErrorCode.ProxyClient_FailedToUnregisterCallback,
-                    "Failed to unregister callback with correlation {CorrelationId}",
-                    id);
+            callbacks.TryRemove(id, out _);
         }
 
         private void ConstructorReset()
