@@ -1,13 +1,15 @@
+#nullable enable
+using System;
 using Orleans.Runtime;
 
 namespace Orleans.Placement.Repartitioning;
 
 internal interface IMessageStatisticsSink
 {
-    void RecordMessage(Message message);
+    Action<Message>? GetMessageObserver();
 }
 
 internal sealed class NoOpMessageStatisticsSink : IMessageStatisticsSink
 {
-    public void RecordMessage(Message message) { }
+    public Action<Message>? GetMessageObserver() => null;
 }

@@ -1,3 +1,4 @@
+#nullable enable
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -22,12 +23,12 @@ namespace Orleans.Runtime.Messaging
         private readonly SiloMessagingOptions messagingOptions;
         private readonly PlacementService placementService;
         private readonly GrainLocator _grainLocator;
-        private readonly IMessageStatisticsSink _messageStatisticsSink;
+        private readonly Action<Message>? _messageObserver;
         private readonly ILogger log;
         private readonly Catalog catalog;
         private bool stopped;
-        private HostedClient hostedClient;
-        private Action<Message> sniffIncomingMessageHandler;
+        private HostedClient? hostedClient;
+        private Action<Message>? sniffIncomingMessageHandler;
 
         public MessageCenter(
             ILocalSiloDetails siloDetails,
@@ -50,7 +51,7 @@ namespace Orleans.Runtime.Messaging
             this.messagingTrace = messagingTrace;
             this.placementService = placementService;
             _grainLocator = grainLocator;
-            _messageStatisticsSink = messageStatisticsSink;
+            _messageObserver = messageStatisticsSink.GetMessageObserver();
             this.log = logger;
             this.messageFactory = messageFactory;
             this._siloAddress = siloDetails.SiloAddress;
@@ -61,11 +62,11 @@ namespace Orleans.Runtime.Messaging
             }
         }
 
-        public Gateway Gateway { get; }
+        public Gateway? Gateway { get; }
 
         internal bool IsBlockingApplicationMessages { get; private set; }
 
-        public void SetHostedClient(HostedClient client) => this.hostedClient = client;
+        public void SetHostedClient(HostedClient? client) => this.hostedClient = client;
 
         public bool TryDeliverToProxy(Message msg)
         {
@@ -73,7 +74,7 @@ namespace Orleans.Runtime.Messaging
             if (this.Gateway is Gateway gateway && gateway.TryDeliverToProxy(msg)
                 || this.hostedClient is HostedClient client && client.TryDispatchToClient(msg))
             {
-                _messageStatisticsSink.RecordMessage(msg);
+                _messageObserver?.Invoke(msg);
                 return true;
             }
 
@@ -125,7 +126,7 @@ namespace Orleans.Runtime.Messaging
             }
         }
 
-        public Action<Message> SniffIncomingMessage
+        public Action<Message>? SniffIncomingMessage
         {
             set
             {
@@ -251,8 +252,8 @@ namespace Orleans.Runtime.Messaging
         public void RejectMessage(
             Message message,
             Message.RejectionTypes rejectionType,
-            Exception exc,
-            string rejectInfo = null)
+            Exception? exc,
+            string? rejectInfo = null)
         {
             if (message.Direction == Message.Directions.Request
                 || (message.Direction == Message.Directions.OneWay && message.HasCacheInvalidationHeader))
@@ -271,20 +272,20 @@ namespace Orleans.Runtime.Messaging
 
         internal void ProcessRequestsToInvalidActivation(
             List<Message> messages,
-            GrainAddress oldAddress,
-            SiloAddress forwardingAddress,
-            string failedOperation = null,
-            Exception exc = null,
+            GrainAddress? oldAddress,
+            SiloAddress? forwardingAddress,
+            string? failedOperation = null,
+            Exception? exc = null,
             bool rejectMessages = false)
         {
             if (rejectMessages)
             {
-                GrainAddress validAddress = forwardingAddress switch
+                GrainAddress? validAddress = forwardingAddress switch
                 {
                     null => null,
                     _ => new()
                     {
-                        GrainId = oldAddress.GrainId,
+                        GrainId = oldAddress?.GrainId ?? default,
                         SiloAddress = forwardingAddress,
                     }
                 };
@@ -304,12 +305,12 @@ namespace Orleans.Runtime.Messaging
             else
             {
                 this.messagingTrace.OnDispatcherForwardingMultiple(messages.Count, oldAddress, forwardingAddress, failedOperation, exc);
-                GrainAddress destination = forwardingAddress switch
+                GrainAddress? destination = forwardingAddress switch
                 {
                     null => null,
                     _ => new()
                     {
-                        GrainId = oldAddress.GrainId,
+                        GrainId = oldAddress?.GrainId ?? default,
                         SiloAddress = forwardingAddress,
                     }
                 };
@@ -323,10 +324,10 @@ namespace Orleans.Runtime.Messaging
 
         private void ProcessRequestToInvalidActivation(
             Message message,
-            GrainAddress oldAddress,
-            SiloAddress forwardingAddress,
+            GrainAddress? oldAddress,
+            SiloAddress? forwardingAddress,
             string failedOperation,
-            Exception exc = null,
+            Exception? exc = null,
             bool rejectMessages = false)
         {
             Debug.Assert(!message.IsLocalOnly);
@@ -344,12 +345,12 @@ namespace Orleans.Runtime.Messaging
             }
             else
             {
-                GrainAddress destination = forwardingAddress switch
+                GrainAddress? destination = forwardingAddress switch
                 {
                     null => null,
                     _ => new()
                     {
-                        GrainId = oldAddress.GrainId,
+                        GrainId = oldAddress?.GrainId ?? default,
                         SiloAddress = forwardingAddress,
                     }
                 };
@@ -357,7 +358,7 @@ namespace Orleans.Runtime.Messaging
             }
         }
 
-        private void TryForwardRequest(Message message, GrainAddress oldAddress, GrainAddress destination, string failedOperation = null, Exception exc = null)
+        private void TryForwardRequest(Message message, GrainAddress? oldAddress, GrainAddress? destination, string? failedOperation = null, Exception? exc = null)
         {
             Debug.Assert(!message.IsLocalOnly);
 
@@ -415,7 +416,7 @@ namespace Orleans.Runtime.Messaging
             ResendMessageImpl(message);
         }
 
-        private bool TryForwardMessage(Message message, SiloAddress forwardingAddress)
+        private bool TryForwardMessage(Message message, SiloAddress? forwardingAddress)
         {
             if (!MayForward(message, this.messagingOptions)) return false;
 
@@ -425,7 +426,7 @@ namespace Orleans.Runtime.Messaging
             return true;
         }
 
-        private void ResendMessageImpl(Message message, SiloAddress forwardingAddress = null)
+        private void ResendMessageImpl(Message message, SiloAddress? forwardingAddress = null)
         {
             if (log.IsEnabled(LogLevel.Debug)) log.LogDebug("Resend {Message}", message);
 
@@ -543,7 +544,7 @@ namespace Orleans.Runtime.Messaging
                     }
 
                     targetActivation.ReceiveMessage(msg);
-                    _messageStatisticsSink.RecordMessage(msg);
+                    _messageObserver?.Invoke(msg);
                 }
             }
             catch (Exception ex)
