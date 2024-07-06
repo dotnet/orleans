@@ -26,8 +26,6 @@ namespace UnitTests.Grains
         private readonly ActivationCollector activationCollector;
         private readonly IGrainContext _grainContext;
 
-        private int burstCount = 0;
-
         public BusyActivationGcTestGrain1(ActivationCollector activationCollector, IGrainContext grainContext)
         {
             this.activationCollector = activationCollector;
@@ -47,32 +45,6 @@ namespace UnitTests.Grains
         public Task<string> IdentifyActivation()
         {
             return Task.FromResult(_id);
-        }
-
-        public Task EnableBurstOnCollection(int count)
-        {
-            if (0 == count)
-            {
-                throw new ArgumentOutOfRangeException(nameof(count));
-            }
-
-            burstCount = count;
-            this.activationCollector.Debug_OnDecideToCollectActivation = OnCollectActivation;
-            return Task.CompletedTask;
-        }
-
-        private void OnCollectActivation(GrainId grainId)
-        {
-            var other = grainId.Type;
-            var self = _grainContext.Address.GrainId.Type;
-            if (other == self)
-            {
-                IBusyActivationGcTestGrain1 g = GrainFactory.GetGrain<IBusyActivationGcTestGrain1>(grainId);
-                for (int i = 0; i < burstCount; ++i)
-                {
-                    g.Delay(TimeSpan.FromMilliseconds(10)).Ignore();
-                }
-            }
         }
     }
 

@@ -1,9 +1,8 @@
 using DistributedTests.GrainInterfaces;
 
-namespace DistributedTests.Grains
+namespace DistributedTests.Grains;
+
+public class PingGrain : Grain, IPingGrain
 {
-    public class PingGrain : Grain, IPingGrain
-    {
-        public ValueTask Ping() => default;
-    }
+    public ValueTask Ping() => default;
 }

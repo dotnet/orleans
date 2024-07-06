@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
+using Orleans.Placement.Repartitioning;
 using Orleans.Runtime.GrainDirectory;
 using Orleans.Runtime.Placement;
 using Orleans.Serialization.Invocation;
@@ -21,6 +22,7 @@ namespace Orleans.Runtime.Messaging
         private readonly SiloMessagingOptions messagingOptions;
         private readonly PlacementService placementService;
         private readonly GrainLocator _grainLocator;
+        private readonly IMessageStatisticsSink _messageStatisticsSink;
         private readonly ILogger log;
         private readonly Catalog catalog;
         private bool stopped;
@@ -38,7 +40,8 @@ namespace Orleans.Runtime.Messaging
             RuntimeMessagingTrace messagingTrace,
             IOptions<SiloMessagingOptions> messagingOptions,
             PlacementService placementService,
-            GrainLocator grainLocator)
+            GrainLocator grainLocator,
+            IMessageStatisticsSink messageStatisticsSink)
         {
             this.catalog = catalog;
             this.messagingOptions = messagingOptions.Value;
@@ -47,6 +50,7 @@ namespace Orleans.Runtime.Messaging
             this.messagingTrace = messagingTrace;
             this.placementService = placementService;
             _grainLocator = grainLocator;
+            _messageStatisticsSink = messageStatisticsSink;
             this.log = logger;
             this.messageFactory = messageFactory;
             this._siloAddress = siloDetails.SiloAddress;
@@ -66,8 +70,14 @@ namespace Orleans.Runtime.Messaging
         public bool TryDeliverToProxy(Message msg)
         {
             if (!msg.TargetGrain.IsClient()) return false;
-            if (this.Gateway is Gateway gateway && gateway.TryDeliverToProxy(msg)) return true;
-            return this.hostedClient is HostedClient client && client.TryDispatchToClient(msg);
+            if (this.Gateway is Gateway gateway && gateway.TryDeliverToProxy(msg)
+                || this.hostedClient is HostedClient client && client.TryDispatchToClient(msg))
+            {
+                _messageStatisticsSink.RecordMessage(msg);
+                return true;
+            }
+
+            return false;
         }
 
         public async Task StopAsync()
@@ -173,6 +183,7 @@ namespace Orleans.Runtime.Messaging
                 }
 
                 messagingTrace.OnSendMessage(msg);
+
                 if (targetSilo.Matches(_siloAddress))
                 {
                     if (log.IsEnabled(LogLevel.Trace))
@@ -532,6 +543,7 @@ namespace Orleans.Runtime.Messaging
                     }
 
                     targetActivation.ReceiveMessage(msg);
+                    _messageStatisticsSink.RecordMessage(msg);
                 }
             }
             catch (Exception ex)

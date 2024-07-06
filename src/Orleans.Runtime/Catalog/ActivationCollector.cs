@@ -17,7 +17,6 @@ namespace Orleans.Runtime
     /// </summary>
     internal class ActivationCollector : IActivationWorkingSetObserver, ILifecycleParticipant<ISiloLifecycle>
     {
-        internal Action<GrainId> Debug_OnDecideToCollectActivation;
         private readonly TimeSpan quantum;
         private readonly TimeSpan shortestAgeLimit;
         private readonly ConcurrentDictionary<DateTime, Bucket> buckets = new();
@@ -322,10 +321,8 @@ namespace Orleans.Runtime
 
         private void AddActivationToList(ICollectibleGrainContext activation, ref List<ICollectibleGrainContext> condemned)
         {
-            condemned ??= new();
+            condemned ??= [];
             condemned.Add(activation);
-
-            this.Debug_OnDecideToCollectActivation?.Invoke(activation.GrainId);
         }
 
         private void ThrowIfTicketIsInvalid(DateTime ticket)
@@ -512,7 +509,7 @@ namespace Orleans.Runtime
             var mtcs = new MultiTaskCompletionSource(list.Count);
 
             logger.LogInformation((int)ErrorCode.Catalog_ShutdownActivations_1, "DeactivateActivationsFromCollector: total {Count} to promptly Destroy.", list.Count);
-            CatalogInstruments.ActiviationShutdownViaCollection();
+            CatalogInstruments.ActivationShutdownViaCollection();
 
             void signalCompletion(Task task) => mtcs.SetOneResult();
             var reason = GetDeactivationReason();

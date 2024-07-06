@@ -111,7 +111,7 @@ namespace Tester
             ServicePointManager.UseNagleAlgorithm = false;
         }
 
-        public static async Task<int> GetActivationCount(IGrainFactory grainFactory, string fullTypeName)
+        public static async Task<int> GetActivationCount(IGrainFactory grainFactory, string grainTypeName)
         {
             int result = 0;
 
@@ -119,8 +119,10 @@ namespace Tester
             SimpleGrainStatistic[] stats = await mgmtGrain.GetSimpleGrainStatistics();
             foreach (var stat in stats)
             {
-                if (stat.GrainType == fullTypeName)
+                if (string.Equals(stat.GrainType, grainTypeName, StringComparison.Ordinal))
+                {
                     result += stat.ActivationCount;
+                }
             }
             return result;
         }

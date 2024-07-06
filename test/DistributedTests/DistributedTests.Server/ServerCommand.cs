@@ -19,6 +19,7 @@ namespace DistributedTests.Server
             AddOption(OptionHelper.CreateOption("--siloPort", defaultValue: 11111));
             AddOption(OptionHelper.CreateOption("--gatewayPort", defaultValue: 30000));
             AddOption(OptionHelper.CreateOption("--secretSource", defaultValue: SecretConfiguration.SecretSource.File));
+            AddOption(OptionHelper.CreateOption("--ActivationRepartitioning", defaultValue: true));
 
             foreach (var opt in siloConfigurator.Options)
             {

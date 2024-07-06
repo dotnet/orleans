@@ -1738,19 +1738,19 @@ internal sealed class ActivationData : IGrainContext, ICollectibleGrainContext, 
 
         if (IsStuckDeactivating)
         {
-            CatalogInstruments.ActiviationShutdownViaDeactivateStuckActivation();
+            CatalogInstruments.ActivationShutdownViaDeactivateStuckActivation();
         }
         else if (migrated)
         {
-            CatalogInstruments.ActiviationShutdownViaMigration();
+            CatalogInstruments.ActivationShutdownViaMigration();
         }
         else if (_isInWorkingSet)
         {
-            CatalogInstruments.ActiviationShutdownViaDeactivateOnIdle();
+            CatalogInstruments.ActivationShutdownViaDeactivateOnIdle();
         }
         else
         {
-            CatalogInstruments.ActiviationShutdownViaCollection();
+            CatalogInstruments.ActivationShutdownViaCollection();
         }
 
         _shared.InternalRuntime.ActivationWorkingSet.OnDeactivated(this);
@@ -1761,7 +1761,7 @@ internal sealed class ActivationData : IGrainContext, ICollectibleGrainContext, 
         }
         catch (Exception exception)
         {
-            _shared.Logger.LogWarning(exception, "Exception disposing activation {Activation}", (ActivationData)this);
+            _shared.Logger.LogWarning(exception, "Exception disposing activation {Activation}", this);
         }
 
         UnregisterMessageTarget();
