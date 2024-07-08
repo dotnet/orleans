@@ -14,6 +14,31 @@ using Orleans.Serialization.WireProtocol;
 namespace Orleans.Serialization
 {
     /// <summary>
+    /// Serializer for <see cref="Unit"/>
+    /// </summary>
+    [RegisterSerializer]
+    public sealed class FSharpUnitCodec : IFieldCodec<Unit>
+    {
+        public void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, Unit value) where TBufferWriter : IBufferWriter<byte> =>
+            ReferenceCodec.WriteNullReference(ref writer, fieldIdDelta);
+
+        public Unit ReadValue<TInput>(ref Reader<TInput> reader, Field field)
+        {
+            field.EnsureWireType(WireType.Reference);
+            ReferenceCodec.MarkValueField(reader.Session);
+            var reference = reader.ReadVarUInt32();
+            if (reference != 0) throw new ReferenceNotFoundException(typeof(Unit), reference);
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// Copier for <see cref="Unit"/>
+    /// </summary>
+    [RegisterCopier]
+    public sealed class FSharpUnitCopier : ShallowCopier<Unit>;
+
+    /// <summary>
     /// Serializer for <see cref="FSharpOption{T}"/>.
     /// </summary>
     /// <typeparam name="T">The underlying type.</typeparam>
