@@ -123,7 +123,7 @@ namespace Orleans.Runtime
             ResponseCallback(response, this.context);
         }
 
-        public static void ResponseCallback(Message message, IResponseCompletionSource context)
+        private static void ResponseCallback(Message message, IResponseCompletionSource context)
         {
             try
             {
