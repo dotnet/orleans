@@ -1,10 +1,10 @@
 using System.Net;
 using Cassandra;
-using Microsoft.Extensions.Options;
+using Microsoft.Extensions.DependencyInjection;
 using Orleans.Clustering.Cassandra;
+using Orleans.Clustering.Cassandra.Hosting;
 using Orleans.Configuration;
 using Orleans.Messaging;
-using Orleans.Runtime;
 using Tester.Cassandra.Utility;
 using Xunit;
 using Xunit.Abstractions;
@@ -519,13 +519,17 @@ public sealed class CassandraClusteringTableTests : IClassFixture<CassandraConta
     {
         var session = await CreateSession();
 
-        var cassandraClusteringOptions = new ClusterOptions { ServiceId = serviceId, ClusterId = clusterId };
-        var options = Options.Create(cassandraClusteringOptions);
-        IMembershipTable membershipTable = new CassandraClusteringTable(options, session);
+        var services = new ServiceCollection()
+            .AddSingleton<CassandraClusteringTable>()
+            .AddSingleton<CassandraGatewayListProvider>()
+            .Configure<ClusterOptions>(o => { o.ServiceId = serviceId; o.ClusterId = clusterId; })
+            .Configure<CassandraClusteringOptions>(o => o.ConfigureClient(async _ => await CreateSession()))
+            .Configure<GatewayOptions>(o => o.GatewayListRefreshPeriod = TimeSpan.FromSeconds(15))
+            .BuildServiceProvider();
+        IMembershipTable membershipTable = services.GetRequiredService<CassandraClusteringTable>();
         await membershipTable.InitializeMembershipTable(true);
 
-        IGatewayListProvider gatewayProvider = new CassandraGatewayListProvider(options,
-            Options.Create(new GatewayOptions { GatewayListRefreshPeriod = TimeSpan.FromSeconds(15) }), session);
+        IGatewayListProvider gatewayProvider = services.GetRequiredService < CassandraGatewayListProvider>();
         await gatewayProvider.InitializeGatewayListProvider();
 
         return (membershipTable, gatewayProvider);

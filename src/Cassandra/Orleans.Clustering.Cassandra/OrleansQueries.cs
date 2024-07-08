@@ -10,7 +10,7 @@ namespace Orleans.Clustering.Cassandra;
 /// knowing their parameters (including type and conversion to the target 
 /// type).
 /// </summary>
-public class OrleansQueries
+internal sealed class OrleansQueries
 {
     public ISession Session { get; }
 
@@ -59,9 +59,7 @@ public class OrleansQueries
 
     public ConsistencyLevel MembershipReadConsistencyLevel { get; set; }
 
-    public IStatement EnsureTableExists()
-    {
-        return new SimpleStatement("""
+    public IStatement EnsureTableExists() => new SimpleStatement("""
             CREATE TABLE IF NOT EXISTS membership
             (
                 partition_key ascii,
@@ -83,13 +81,10 @@ public class OrleansQueries
                 'enabled' : true
             };
             """);
-    }
-    public IStatement EnsureIndexExists()
-    {
-        return new SimpleStatement("""
+
+    public IStatement EnsureIndexExists => new SimpleStatement("""
             CREATE INDEX IF NOT EXISTS ix_membership_status ON membership(status);
             """);
-    }
 
     public async ValueTask<IStatement> InsertMembership(string clusterIdentifier, MembershipEntry membershipEntry, int version)
     {
@@ -127,6 +122,7 @@ public class OrleansQueries
             expected_version = version
         });
     }
+
     public async ValueTask<IStatement> InsertMembershipVersion(string clusterIdentifier)
     {
         _insertMembershipVersionPreparedStatement ??= await PrepareStatementAsync("""
@@ -142,7 +138,6 @@ public class OrleansQueries
             """, MembershipWriteConsistencyLevel);
         return _insertMembershipVersionPreparedStatement.Bind(clusterIdentifier);
     }
-
 
     public async ValueTask<IStatement> DeleteMembershipTableEntries(string clusterIdentifier)
     {

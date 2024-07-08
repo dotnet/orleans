@@ -17,4 +17,8 @@
     <PackageReference Include="CassandraCSharpDriver" />
   </ItemGroup>
 
+  <ItemGroup>
+    <InternalsVisibleTo Include="Tester.Cassandra"/>
+  </ItemGroup>
+
 </Project>

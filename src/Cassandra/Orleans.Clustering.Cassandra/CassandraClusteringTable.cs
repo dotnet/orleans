@@ -5,32 +5,46 @@ using System.Net;
 using System.Threading.Tasks;
 using Cassandra;
 using Microsoft.Extensions.Options;
+using Orleans.Clustering.Cassandra.Hosting;
 using Orleans.Configuration;
 using Orleans.Runtime;
 
 namespace Orleans.Clustering.Cassandra;
 
-public class CassandraClusteringTable : IMembershipTable
+internal sealed class CassandraClusteringTable : IMembershipTable
 {
-    private readonly ClusterOptions _options;
-    private readonly ISession _session;
+    private const string NotInitializedMessage = $"This instance has not been initialized. Ensure that {nameof(IMembershipTable.InitializeMembershipTable)} is called to initialize this instance before use.";
+    private readonly ClusterOptions _clusterOptions;
+    private readonly CassandraClusteringOptions _options;
+    private readonly IServiceProvider _serviceProvider;
+    private ISession? _session;
     private OrleansQueries? _queries;
     private readonly string _identifier;
 
-
-    public CassandraClusteringTable(IOptions<ClusterOptions> options, ISession session)
+    public CassandraClusteringTable(IOptions<ClusterOptions> clusterOptions, IOptions<CassandraClusteringOptions> options, IServiceProvider serviceProvider)
     {
+        _clusterOptions = clusterOptions.Value;
         _options = options.Value;
-        _identifier = $"{_options.ServiceId}-{_options.ClusterId}";
-        _session = session;
+        _identifier = $"{_clusterOptions.ServiceId}-{_clusterOptions.ClusterId}";
+        _serviceProvider = serviceProvider;
     }
+
+    private ISession Session => _session ?? throw new InvalidOperationException(NotInitializedMessage);
+
+    private OrleansQueries Queries => _queries ?? throw new InvalidOperationException(NotInitializedMessage);
 
     async Task IMembershipTable.InitializeMembershipTable(bool tryInitTableVersion)
     {
+        _session = await _options.CreateSessionAsync(_serviceProvider);
+        if (_session is null)
+        {
+            throw new InvalidOperationException($"Session created from configuration '{nameof(CassandraClusteringOptions)}' is null.");
+        }
+
         _queries = await OrleansQueries.CreateInstance(_session);
 
         await _session.ExecuteAsync(_queries.EnsureTableExists());
-        await _session.ExecuteAsync(_queries.EnsureIndexExists());
+        await _session.ExecuteAsync(_queries.EnsureIndexExists);
 
         if (!tryInitTableVersion)
             return;
@@ -40,25 +54,25 @@ public class CassandraClusteringTable : IMembershipTable
 
     async Task IMembershipTable.DeleteMembershipTableEntries(string clusterId)
     {
-        if (string.Compare(clusterId, _options.ClusterId,
-                StringComparison.InvariantCultureIgnoreCase) != 0)
+        if (string.Compare(clusterId, _clusterOptions.ClusterId, StringComparison.InvariantCultureIgnoreCase) != 0)
         {
             throw new ArgumentException(
-                $"cluster id {clusterId} does not match CassandraClusteringTable value of {_options.ClusterId}",
+                $"Cluster id {clusterId} does not match CassandraClusteringTable value of '{_clusterOptions.ClusterId}'.",
                 nameof(clusterId));
         }
-        await _session.ExecuteAsync(await _queries!.DeleteMembershipTableEntries(_identifier));
+
+        await Session.ExecuteAsync(await _queries!.DeleteMembershipTableEntries(_identifier));
     }
 
     async Task<bool> IMembershipTable.InsertRow(MembershipEntry entry, TableVersion tableVersion)
     {
-        var query = await _session.ExecuteAsync(await _queries!.InsertMembership(_identifier, entry, tableVersion.Version - 1));
+        var query = await Session.ExecuteAsync(await _queries!.InsertMembership(_identifier, entry, tableVersion.Version - 1));
         return (bool)query.First()["[applied]"];
     }
 
     async Task<bool> IMembershipTable.UpdateRow(MembershipEntry entry, string etag, TableVersion tableVersion)
     {
-        var query = await _session.ExecuteAsync(await _queries!.UpdateMembership(_identifier, entry, tableVersion.Version - 1));
+        var query = await Session.ExecuteAsync(await _queries!.UpdateMembership(_identifier, entry, tableVersion.Version - 1));
         return (bool)query.First()["[applied]"];
     }
 
@@ -81,12 +95,14 @@ public class CassandraClusteringTable : IMembershipTable
         var suspectingSilos = (string)row["suspect_times"];
         if (!string.IsNullOrWhiteSpace(suspectingSilos))
         {
-            result.SuspectTimes = new List<Tuple<SiloAddress, DateTime>>();
-            result.SuspectTimes.AddRange(suspectingSilos.Split('|').Select(s =>
-            {
-                var split = s.Split(',');
-                return new Tuple<SiloAddress, DateTime>(SiloAddress.FromParsableString(split[0]), LogFormatter.ParseDate(split[1]));
-            }));
+            result.SuspectTimes =
+            [
+                .. suspectingSilos.Split('|').Select(s =>
+                {
+                    var split = s.Split(',');
+                    return new Tuple<SiloAddress, DateTime>(SiloAddress.FromParsableString(split[0]), LogFormatter.ParseDate(split[1]));
+                }),
+            ];
         }
 
         return result;
@@ -94,60 +110,65 @@ public class CassandraClusteringTable : IMembershipTable
 
     private async Task<MembershipTableData> GetMembershipTableData(RowSet rows, SiloAddress? forAddress = null)
     {
-        int version;
-
         var firstRow = rows.FirstOrDefault();
         if (firstRow != null)
         {
-            version = (int)firstRow["version"];
+            var version = (int)firstRow["version"];
 
             var entries = new List<Tuple<MembershipEntry, string>>();
             foreach (var row in new[] { firstRow }.Concat(rows))
             {
                 var entry = GetMembershipEntry(row, forAddress);
                 if (entry != null)
+                {
                     entries.Add(new Tuple<MembershipEntry, string>(entry, string.Empty));
+                }
             }
 
             return new MembershipTableData(entries, new TableVersion(version, version.ToString()));
         }
         else
         {
-            var result = (await _session.ExecuteAsync(await _queries!.MembershipReadVersion(_identifier))).FirstOrDefault();
+            var result = (await Session.ExecuteAsync(await _queries!.MembershipReadVersion(_identifier))).FirstOrDefault();
             if (result is null)
             {
-                return new MembershipTableData(new List<Tuple<MembershipEntry, string>>(), new TableVersion(0, "0"));
+                return new MembershipTableData([], new TableVersion(0, "0"));
             }
-            version = (int)result["version"];
-            return new MembershipTableData(new List<Tuple<MembershipEntry, string>>(), new TableVersion(version, version.ToString()));
+
+            var version = (int)result["version"];
+            return new MembershipTableData([], new TableVersion(version, version.ToString()));
         }
     }
 
     async Task<MembershipTableData> IMembershipTable.ReadAll()
     {
-        return await GetMembershipTableData(await _session.ExecuteAsync(await _queries!.MembershipReadAll(_identifier)));
+        return await GetMembershipTableData(await Session.ExecuteAsync(await _queries!.MembershipReadAll(_identifier)));
     }
 
     async Task<MembershipTableData> IMembershipTable.ReadRow(SiloAddress key)
     {
-        return await GetMembershipTableData(await _session.ExecuteAsync(await _queries!.MembershipReadRow(_identifier, key)), key);
+        return await GetMembershipTableData(await Session.ExecuteAsync(await _queries!.MembershipReadRow(_identifier, key)), key);
     }
 
     async Task IMembershipTable.UpdateIAmAlive(MembershipEntry entry)
     {
-        await _session.ExecuteAsync(await _queries!.UpdateIAmAliveTime(_identifier, entry));
+        await Session.ExecuteAsync(await _queries!.UpdateIAmAliveTime(_identifier, entry));
     }
 
     public async Task CleanupDefunctSiloEntries(DateTimeOffset beforeDate)
     {
         var allEntries =
-            (await _session.ExecuteAsync(await _queries!.MembershipReadAll(_identifier)))
+            (await Session.ExecuteAsync(await _queries!.MembershipReadAll(_identifier)))
             .Select(r => GetMembershipEntry(r))
             .Where(e => e is not null)
             .Cast<MembershipEntry>();
 
         foreach (var e in allEntries)
+        {
             if (e is not { Status: SiloStatus.Active } && new DateTime(Math.Max(e.IAmAliveTime.Ticks, e.StartTime.Ticks)) < beforeDate)
-                await _session.ExecuteAsync(await _queries.DeleteMembershipEntry(_identifier, e));
+            {
+                await Session.ExecuteAsync(await Queries.DeleteMembershipEntry(_identifier, e));
+            }
+        }
     }
 }
