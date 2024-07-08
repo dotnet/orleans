@@ -1,0 +1,24 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <PackageId>Microsoft.Orleans.Clustering.Cassandra</PackageId>
+    <Title>Microsoft Orleans Cassandra Clustering Provider</Title>
+    <Description>Microsoft Orleans clustering provider backed by Cassandra</Description>
+    <PackageTags>$(PackageTags) Cassandra</PackageTags>
+    <TargetFrameworks>$(DefaultTargetFrameworks)</TargetFrameworks>
+    <AssemblyName>Orleans.Clustering.Cassandra</AssemblyName>
+    <RootNamespace>Orleans.Clustering.Cassandra</RootNamespace>
+    <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
+    <DefineConstants>$(DefineConstants);ORLEANS_CLUSTERING</DefineConstants>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="$(SourceRoot)src\Orleans.Runtime\Orleans.Runtime.csproj" />
+    <PackageReference Include="CassandraCSharpDriver" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Tester.Cassandra"/>
+  </ItemGroup>
+
+</Project>
