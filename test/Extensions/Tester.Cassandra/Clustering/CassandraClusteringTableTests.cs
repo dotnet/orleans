@@ -100,8 +100,7 @@ public sealed class CassandraClusteringTableTests : IClassFixture<CassandraConta
         Assert.Single(data.Members);
     }
 
-    // Cassandra doesn't have the capability to prevent a duplicate insert in the way this test requires
-    /*[Fact]
+    [Fact]
     public async Task MembershipTable_ReadRow_Insert_Read()
     {
         var (membershipTable, gatewayProvider) = await CreateNewMembershipTableAsync("Phalanx", "blu");
@@ -121,7 +120,6 @@ public sealed class CassandraClusteringTableTests : IClassFixture<CassandraConta
         ok = await membershipTable.InsertRow(newEntry, newTableVersion);
         Assert.False(ok, "InsertRow should have failed - same entry, old table version");
 
-    
         ok = await membershipTable.InsertRow(CreateMembershipEntryForTest(), newTableVersion);
         Assert.False(ok, "InsertRow should have failed - new entry, old table version");
 
@@ -154,7 +152,7 @@ public sealed class CassandraClusteringTableTests : IClassFixture<CassandraConta
 
         Assert.NotNull(eTag);
         Assert.NotNull(membershipEntry);
-    }*/
+    }
 
     [Fact]
     public async Task MembershipTable_ReadRow_Insert_Read_modified()

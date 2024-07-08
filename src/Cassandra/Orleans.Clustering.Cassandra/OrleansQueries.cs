@@ -22,6 +22,8 @@ internal sealed class OrleansQueries
     private PreparedStatement? _updateIAmAlivePreparedStatement;
     private PreparedStatement? _deleteMembershipEntryPreparedStatement;
     private PreparedStatement? _updateMembershipPreparedStatement;
+    private PreparedStatement? _membershipReadRowPreparedStatement;
+    private PreparedStatement? _membershipGatewaysQueryPreparedStatement;
 
     public static Task<OrleansQueries> CreateInstance(ISession session)
     {
@@ -268,9 +270,12 @@ internal sealed class OrleansQueries
 
     public async ValueTask<IStatement> MembershipReadRow(string clusterIdentifier, SiloAddress siloAddress)
     {
-        _membershipReadAllPreparedStatement ??= await PrepareStatementAsync("""
+        _membershipReadRowPreparedStatement ??= await PrepareStatementAsync("""
             SELECT
                 version,
+                address,
+                port,
+                generation,
                 silo_name,
                 host_name,
                 status,
@@ -287,7 +292,7 @@ internal sealed class OrleansQueries
                 AND generation = :generation;
             """,
             MembershipReadConsistencyLevel);
-        return _membershipReadAllPreparedStatement.Bind(new
+        return _membershipReadRowPreparedStatement.Bind(new
         {
             partition_key = clusterIdentifier,
             address = siloAddress.Endpoint.Address.ToString(),
@@ -300,7 +305,7 @@ internal sealed class OrleansQueries
     {
         // Filtering is only for the `proxy_port` filtering. We're already hitting the partition
         // and secondary index on status which both don't need "ALLOW FILTERING"
-        _membershipReadAllPreparedStatement ??= await PrepareStatementAsync("""
+        _membershipGatewaysQueryPreparedStatement ??= await PrepareStatementAsync("""
             SELECT
                 address,
                 proxy_port,
@@ -314,7 +319,7 @@ internal sealed class OrleansQueries
             ALLOW FILTERING;
             """,
             MembershipReadConsistencyLevel);
-        return _membershipReadAllPreparedStatement.Bind(new
+        return _membershipGatewaysQueryPreparedStatement.Bind(new
         {
             partition_key = clusterIdentifier,
             status = status
