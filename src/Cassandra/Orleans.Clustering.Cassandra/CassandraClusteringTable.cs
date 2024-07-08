@@ -72,11 +72,13 @@ internal sealed class CassandraClusteringTable : IMembershipTable
         {
             if (existingRow.Version.Version >= tableVersion.Version)
             {
+                // Table version mismatch.
                 return false;
             }
 
             if (existingRow.Members.Any(m => m.Item1.SiloAddress.Equals(entry.SiloAddress)))
             {
+                // Row exists.
                 return false;
             }
         }
@@ -87,15 +89,15 @@ internal sealed class CassandraClusteringTable : IMembershipTable
 
     async Task<bool> IMembershipTable.UpdateRow(MembershipEntry entry, string etag, TableVersion tableVersion)
     {
-        var query = await Session.ExecuteAsync(await Queries.UpdateMembership(_identifier, entry, tableVersion.Version - 1));
+        var query = await Session.ExecuteAsync(await Queries.UpdateMembership(_identifier, entry, etag, tableVersion.Version - 1));
         return (bool)query.First()["[applied]"];
     }
 
-    private static MembershipEntry? GetMembershipEntry(Row row)
+    private static (MembershipEntry? Entry, string? ETag) GetMembershipEntry(Row row)
     {
         if (row["start_time"] == null)
         {
-            return null;
+            return (null, null);
         }
 
         var result = new MembershipEntry
@@ -122,7 +124,7 @@ internal sealed class CassandraClusteringTable : IMembershipTable
             ];
         }
 
-        return result;
+        return (result, (string?)row["etag"]);
     }
 
     private async Task<MembershipTableData> GetMembershipTableData(RowSet rows)
@@ -136,9 +138,9 @@ internal sealed class CassandraClusteringTable : IMembershipTable
             foreach (var row in new[] { firstRow }.Concat(rows))
             {
                 var entry = GetMembershipEntry(row);
-                if (entry != null)
+                if (entry.Entry != null)
                 {
-                    entries.Add(new Tuple<MembershipEntry, string>(entry, string.Empty));
+                    entries.Add(new Tuple<MembershipEntry, string>(entry.Entry, entry.ETag!));
                 }
             }
 
@@ -176,7 +178,7 @@ internal sealed class CassandraClusteringTable : IMembershipTable
     {
         var allEntries =
             (await Session.ExecuteAsync(await Queries.MembershipReadAll(_identifier)))
-            .Select(r => GetMembershipEntry(r))
+            .Select(r => GetMembershipEntry(r).Entry)
             .Where(e => e is not null)
             .Cast<MembershipEntry>();
 

@@ -1,5 +1,6 @@
 using Cassandra;
 using Orleans.Runtime;
+using System;
 using System.Linq;
 using System.Threading.Tasks;
 
@@ -76,7 +77,7 @@ internal sealed class OrleansQueries
                 suspect_times ascii,
                 start_time timestamp,
                 i_am_alive_time timestamp,
-
+                etag text,
                 PRIMARY KEY(partition_key, address, port, generation)
             ) WITH compression = {
                 'class' : 'LZ4Compressor',
@@ -99,7 +100,8 @@ internal sealed class OrleansQueries
              silo_name = :silo_name,
              host_name = :host_name,
              proxy_port = :proxy_port,
-             i_am_alive_time = :i_am_alive_time
+             i_am_alive_time = :i_am_alive_time,
+             etag = :etag
            WHERE
              partition_key = :partition_key
              AND address = :address
@@ -121,7 +123,8 @@ internal sealed class OrleansQueries
             start_time = membershipEntry.StartTime,
             i_am_alive_time = membershipEntry.IAmAliveTime,
             new_version = version + 1,
-            expected_version = version
+            expected_version = version,
+            etag = Guid.NewGuid().ToString("N")
         });
     }
 
@@ -194,7 +197,7 @@ internal sealed class OrleansQueries
         });
     }
 
-    public async ValueTask<IStatement> UpdateMembership(string clusterIdentifier, MembershipEntry membershipEntry, int version)
+    public async ValueTask<IStatement> UpdateMembership(string clusterIdentifier, MembershipEntry membershipEntry, string etag, int version)
     {
         _updateMembershipPreparedStatement ??= await PrepareStatementAsync("""
             UPDATE membership
@@ -202,14 +205,16 @@ internal sealed class OrleansQueries
             	version = :new_version,
             	status = :status,
             	suspect_times = :suspect_times,
-            	i_am_alive_time = :i_am_alive_time  
+            	i_am_alive_time = :i_am_alive_time, 
+                etag = :new_etag
             WHERE
             	partition_key = :partition_key
             	AND address = :address
             	AND port = :port
             	AND generation = :generation
             IF 
-            	version = :expected_version;
+            	version = :expected_version
+                AND etag = :expected_etag;
             """, MembershipWriteConsistencyLevel);
         return _updateMembershipPreparedStatement.Bind(new
         {
@@ -226,7 +231,9 @@ internal sealed class OrleansQueries
             i_am_alive_time = membershipEntry.IAmAliveTime,
             address = membershipEntry.SiloAddress.Endpoint.Address.ToString(),
             port = membershipEntry.SiloAddress.Endpoint.Port,
-            generation = membershipEntry.SiloAddress.Generation
+            generation = membershipEntry.SiloAddress.Generation,
+            expected_etag = etag,
+            new_etag = Guid.NewGuid().ToString("N")
         });
     }
 
@@ -258,7 +265,8 @@ internal sealed class OrleansQueries
                 proxy_port,
                 suspect_times,
                 start_time,
-                i_am_alive_time
+                i_am_alive_time,
+                etag
             FROM
                 membership
             WHERE
@@ -282,7 +290,8 @@ internal sealed class OrleansQueries
                 proxy_port,
                 suspect_times,
                 start_time,
-                i_am_alive_time
+                i_am_alive_time,
+                etag
             FROM
                 membership
             WHERE

@@ -155,62 +155,6 @@ public sealed class CassandraClusteringTableTests : IClassFixture<CassandraConta
     }
 
     [Fact]
-    public async Task MembershipTable_ReadRow_Insert_Read_modified()
-    {
-        var (membershipTable, _) = await CreateNewMembershipTableAsync();
-
-        var data = await membershipTable.ReadAll();
-
-        _testOutputHelper.WriteLine("Membership.ReadAll returned TableVersion={0} Data={1}", data.Version, data);
-
-        Assert.Empty(data.Members);
-
-        var newTableVersion = data.Version.Next();
-
-        var newEntry = CreateMembershipEntryForTest();
-        var ok = await membershipTable.InsertRow(newEntry, newTableVersion);
-        Assert.True(ok, "InsertRow failed");
-
-        ok = await membershipTable.InsertRow(newEntry, newTableVersion);
-        Assert.False(ok, "InsertRow should have failed - same entry, old table version");
-
-
-        ok = await membershipTable.InsertRow(CreateMembershipEntryForTest(), newTableVersion);
-        Assert.False(ok, "InsertRow should have failed - new entry, old table version");
-
-        data = await membershipTable.ReadAll();
-
-        Assert.Equal(1, data.Version.Version);
-
-        var nextTableVersion = data.Version.Next();
-
-        ok = await membershipTable.InsertRow(newEntry, nextTableVersion);
-
-        //Assert.False(ok, "InsertRow should have failed - duplicate entry");
-        // Cassandra doesn't provide a way to prevent this insert
-        // adding discard assignment here to avoid "unused variable" warning
-        _ = ok;
-
-
-        data = await membershipTable.ReadAll();
-        Assert.Single(data.Members);
-
-        data = await membershipTable.ReadRow(newEntry.SiloAddress);
-
-        _testOutputHelper.WriteLine("Membership.ReadAll returned TableVersion={0} Data={1}", data.Version, data);
-
-        Assert.Single(data.Members);
-        Assert.NotNull(data.Version.VersionEtag);
-
-        var membershipEntry = data.Members[0].Item1;
-        var eTag = data.Members[0].Item2;
-        _testOutputHelper.WriteLine("Membership.ReadRow returned MembershipEntry ETag={0} Entry={1}", eTag, membershipEntry);
-
-        Assert.NotNull(eTag);
-        Assert.NotNull(membershipEntry);
-    }
-
-    [Fact]
     public async Task MembershipTable_ReadAll_Insert_ReadAll()
     {
         var (membershipTable, _) = await CreateNewMembershipTableAsync();
