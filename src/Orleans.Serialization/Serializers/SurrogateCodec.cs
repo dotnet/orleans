@@ -1,3 +1,4 @@
+#nullable enable
 using System;
 using System.Buffers;
 using System.Diagnostics.CodeAnalysis;
@@ -24,7 +25,7 @@ public sealed class SurrogateCodec<TField, TSurrogate, TConverter>
     private readonly Type _fieldType = typeof(TField);
     private readonly IValueSerializer<TSurrogate> _surrogateSerializer;
     private readonly IDeepCopier<TSurrogate> _surrogateCopier;
-    private readonly IPopulator<TField, TSurrogate> _populator;
+    private readonly IPopulator<TField, TSurrogate>? _populator;
     private readonly TConverter _converter;
 
     /// <summary>
