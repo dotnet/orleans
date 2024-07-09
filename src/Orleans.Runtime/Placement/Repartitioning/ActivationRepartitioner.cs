@@ -115,7 +115,7 @@ internal sealed partial class ActivationRepartitioner : SystemTarget, IActivatio
         var coolDown = _options.RecoveryPeriod - _lastExchangedStopwatch.Elapsed;
         if (coolDown > TimeSpan.Zero)
         {
-            _logger.LogDebug("Waiting an additional {CoolDown} to cool down before initiating the exchange protocol.", coolDown);
+            LogCoolingDown(coolDown);
             await Task.Delay(coolDown, _timeProvider);
         }
 
@@ -143,7 +143,7 @@ internal sealed partial class ActivationRepartitioner : SystemTarget, IActivatio
         var migrationCandidates = GetMigrationCandidates();
         var sets = CreateCandidateSets(migrationCandidates, silos);
         var anchoredSet = ComputeAnchoredGrains(migrationCandidates);
-        _logger.LogInformation("Candidate sets computed in {Elapsed} ms.", sw.Elapsed.TotalMilliseconds);
+        LogComputedCandidateSets(sw.Elapsed);
         foreach ((var candidateSilo, var offeredGrains, var _) in sets)
         {
             if (offeredGrains.Count == 0)
@@ -241,7 +241,7 @@ internal sealed partial class ActivationRepartitioner : SystemTarget, IActivatio
 
             var stopwatch = ValueStopwatch.StartNew();
             var (localHeap, remoteHeap) = CreateCandidateHeaps(localSet, remoteSet);
-            _logger.LogInformation("Candidate heaps created in {Elapsed} ms.", stopwatch.Elapsed.TotalMilliseconds);
+            LogComputedCandidateHeaps(stopwatch.Elapsed);
             stopwatch.Restart();
 
             var iterations = 0;
@@ -464,13 +464,17 @@ internal sealed partial class ActivationRepartitioner : SystemTarget, IActivatio
         try
         {
             Dictionary<string, object> migrationRequestContext = new() { [IPlacementDirector.PlacementHintKey] = targetSilo };
+            var deactivationTasks = new List<Task>();
             foreach (var grainId in giving)
             {
                 if (_activationDirectory.FindTarget(grainId) is { } localActivation)
                 {
                     localActivation.Migrate(migrationRequestContext);
+                    deactivationTasks.Add(localActivation.Deactivated);
                 }
             }
+
+            await Task.WhenAll(deactivationTasks);
         }
         catch (Exception exception)
         {
@@ -484,9 +488,9 @@ internal sealed partial class ActivationRepartitioner : SystemTarget, IActivatio
         var toRemove = new List<Edge>();
         var affected = new HashSet<GrainId>(giving.Length + accepting.Length);
 
-        _logger.LogInformation("Adding {NewlyAnchoredGrains} newly anchored grains to set on host {Silo}. EdgeWeights contains {EdgeWeightCount} elements.", newlyAnchoredGrains.Count, Silo, _edgeWeights.Count);
         if (_anchoredFilter is { } filter)
         {
+            LogAddingAnchoredGrains(newlyAnchoredGrains.Count, Silo, _edgeWeights.Count);
             foreach (var id in newlyAnchoredGrains)
             {
                 filter.Add(id);
@@ -531,7 +535,14 @@ internal sealed partial class ActivationRepartitioner : SystemTarget, IActivatio
 
         // Stamp this silos exchange for a potential next pair exchange request.
         _lastExchangedStopwatch.Restart();
-        LogProtocolFinalized(giving.Length, accepting.Length);
+        if (_logger.IsEnabled(LogLevel.Trace))
+        {
+            LogProtocolFinalizedTrace(string.Join(", ", giving), string.Join(", ", accepting));
+        }
+        else if (_logger.IsEnabled(LogLevel.Debug))
+        {
+            LogProtocolFinalized(giving.Length, accepting.Length);
+        }
     }
 
     private List<(SiloAddress Silo, List<CandidateVertex> Candidates, long TransferScore)> CreateCandidateSets(List<IGrouping<GrainId, VertexEdge>> migrationCandidates, ImmutableArray<SiloAddress> silos)

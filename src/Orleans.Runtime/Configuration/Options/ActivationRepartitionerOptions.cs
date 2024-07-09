@@ -116,9 +116,9 @@ internal sealed class ActivationRepartitionerOptionsValidator(IOptions<Activatio
             ThrowMustBeGreaterThanZero(nameof(ActivationRepartitionerOptions.MaxUnprocessedEdges));
         }
 
-        if (_options.MinRoundPeriod <= TimeSpan.Zero)
+        if (_options.MinRoundPeriod < TimeSpan.Zero)
         {
-            ThrowMustBeGreaterThanZero(nameof(ActivationRepartitionerOptions.MinRoundPeriod));
+            ThrowMustBeGreaterThanOrEqualToZero(nameof(ActivationRepartitionerOptions.MinRoundPeriod));
         }
 
         if (_options.MaxRoundPeriod <= TimeSpan.Zero)
@@ -126,9 +126,9 @@ internal sealed class ActivationRepartitionerOptionsValidator(IOptions<Activatio
             ThrowMustBeGreaterThanZero(nameof(ActivationRepartitionerOptions.MaxRoundPeriod));
         }
 
-        if (_options.RecoveryPeriod <= TimeSpan.Zero)
+        if (_options.RecoveryPeriod < TimeSpan.Zero)
         {
-            ThrowMustBeGreaterThanZero(nameof(ActivationRepartitionerOptions.RecoveryPeriod));
+            ThrowMustBeGreaterThanOrEqualToZero(nameof(ActivationRepartitionerOptions.RecoveryPeriod));
         }
 
         if (_options.MaxRoundPeriod < _options.MinRoundPeriod)
@@ -147,9 +147,12 @@ internal sealed class ActivationRepartitionerOptionsValidator(IOptions<Activatio
         }
     }
 
+    private static void ThrowMustBeGreaterThanOrEqualToZero(string propertyName)
+        => throw new OrleansConfigurationException($"{propertyName} must be greater than or equal to 0.");
+
     private static void ThrowMustBeGreaterThanZero(string propertyName)
-        => throw new OrleansConfigurationException($"{propertyName} must be greater than 0");
+        => throw new OrleansConfigurationException($"{propertyName} must be greater than 0.");
 
     private static void ThrowMustBeGreaterThanOrEqualTo(string name1, string name2)
-        => throw new OrleansConfigurationException($"{name1} must be greater than or equal to {name2}");
+        => throw new OrleansConfigurationException($"{name1} must be greater than or equal to {name2}.");
 }

@@ -452,6 +452,9 @@ namespace Orleans.Runtime.GrainDirectory
                 DirectoryInstruments.RegistrationsSingleActLocal.Add(1);
 
                 var result = DirectoryPartition.AddSingleActivation(address, previousAddress);
+
+                // update the cache so next local lookup will find this ActivationAddress in the cache and we will save full lookup.
+                DirectoryCache.AddOrUpdate(result.Address, result.VersionTag);
                 return result;
             }
             else
@@ -469,7 +472,7 @@ namespace Orleans.Runtime.GrainDirectory
                 if (!address.Equals(result.Address) || !IsValidSilo(address.SiloAddress)) return result;
 
                 // update the cache so next local lookup will find this ActivationAddress in the cache and we will save full lookup.
-                DirectoryCache.AddOrUpdate(address, result.VersionTag);
+                DirectoryCache.AddOrUpdate(result.Address, result.VersionTag);
 
                 return result;
             }

@@ -1,5 +1,6 @@
 #nullable enable
 using System;
+using System.Diagnostics;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
@@ -89,7 +90,7 @@ internal partial class ActivationRepartitioner : IMessageStatisticsSink
                         // Ignore edges between two non-migratable grains.
                         continue;
                     }
-                    
+
                     Edge edge = new(sourceVertex, destinationVertex);
                     _edgeWeights.Add(edge);
                 }
@@ -130,6 +131,14 @@ internal partial class ActivationRepartitioner : IMessageStatisticsSink
         if (_pendingMessages.TryAdd(message) == Utilities.BufferStatus.Success)
         {
             _pendingMessageEvent.Signal();
+        }
+    }
+
+    async ValueTask IActivationRepartitionerSystemTarget.FlushBuffers()
+    {
+        while (_pendingMessages.Count > 0)
+        {
+            await Task.Delay(TimeSpan.FromMilliseconds(30));
         }
     }
 }
