@@ -38,6 +38,11 @@ internal interface IActivationRepartitionerSystemTarget : ISystemTarget
     /// For diagnostics only.
     /// </summary>
     ValueTask<ImmutableArray<(Edge, ulong)>> GetGrainCallFrequencies();
+
+    /// <summary>
+    /// For sue in testing only! Flushes buffered messages.
+    /// </summary>
+    ValueTask FlushBuffers();
 }
 
 // We use a readonly struct so that we can fully decouple the message-passing and potentially modifications to the Silo fields.

@@ -32,6 +32,9 @@ internal partial class ActivationRepartitioner
     [LoggerMessage(Level = LogLevel.Debug, Message = "Finalized exchange protocol: migrating {GivingActivationCount} activations, receiving {TakingActivationCount} activations.")]
     private partial void LogProtocolFinalized(int givingActivationCount, int takingActivationCount);
 
+    [LoggerMessage(Level = LogLevel.Trace, Message = "Finalized exchange protocol: migrating [{GivingActivations}], receiving [{TakingActivations}].")]
+    private partial void LogProtocolFinalizedTrace(string givingActivations, string takingActivations);
+
     [LoggerMessage(Level = LogLevel.Warning, Message = "Error performing exchange request from {ThisSilo} to {CandidateSilo}. I will try the next best candidate (if one is available), otherwise I will wait for my next period to come.")]
     private partial void LogErrorOnProtocolExecution(Exception exception, SiloAddress thisSilo, SiloAddress candidateSilo);
 
@@ -49,4 +52,16 @@ internal partial class ActivationRepartitioner
 
     [LoggerMessage(Level = LogLevel.Warning, Message = "Error accepting exchange request from {SendingSilo}.")]
     private partial void LogErrorAcceptingExchangeRequest(Exception exception, SiloAddress sendingSilo);
+
+    [LoggerMessage(Level = LogLevel.Debug, Message = "Waiting an additional {CoolDown} to cool down before initiating the exchange protocol.")]
+    private partial void LogCoolingDown(TimeSpan coolDown);
+
+    [LoggerMessage(Level = LogLevel.Debug, Message = "Adding {NewlyAnchoredGrains} newly anchored grains to set on host {Silo}. EdgeWeights contains {EdgeWeightCount} elements.")]
+    private partial void LogAddingAnchoredGrains(int newlyAnchoredGrains, SiloAddress silo, int edgeWeightCount);
+
+    [LoggerMessage(Level = LogLevel.Trace, Message = "Candidate sets computed in {Elapsed}.")]
+    private partial void LogComputedCandidateSets(TimeSpan elapsed);
+
+    [LoggerMessage(Level = LogLevel.Trace, Message = "Candidate heaps created in {Elapsed}.")]
+    private partial void LogComputedCandidateHeaps(TimeSpan elapsed);
 }

@@ -9,7 +9,7 @@ namespace Orleans.Runtime.Placement.Repartitioning;
 
 internal sealed class FrequentEdgeCounter(int capacity) : FrequentItemCollection<ulong, Edge>(capacity)
 {
-    protected override ulong GetKey(in Edge element) => (ulong)element.Source.Id.GetUniformHashCode() << 32 | element.Target.Id.GetUniformHashCode();
+    protected override ulong GetKey(in Edge element) => ((ulong)element.Source.Id.GetUniformHashCode()) << 32 | element.Target.Id.GetUniformHashCode();
     public void Clear() => ClearCore();
     public void Remove(in Edge element) => RemoveCore(GetKey(element));
 }

@@ -1,5 +1,8 @@
 using System.ComponentModel;
+using System.Diagnostics;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Orleans.Configuration;
 using Orleans.Placement;
 using Orleans.Placement.Repartitioning;
@@ -8,17 +11,18 @@ using Orleans.Runtime.Placement.Repartitioning;
 using Orleans.TestingHost;
 using TestExtensions;
 using Xunit;
+using Xunit.Abstractions;
 
 namespace UnitTests.ActivationRepartitioningTests;
 
 // Scenarios can be seen visually here: https://github.com/dotnet/orleans/pull/8877
 [TestCategory("Functional"), TestCategory("ActivationRepartitioning"), Category("BVT")]
-public class CustomToleranceTests(CustomToleranceTests.Fixture fixture) : RepartitioningTestBase<CustomToleranceTests.Fixture>(fixture), IClassFixture<CustomToleranceTests.Fixture>
+public class CustomToleranceTests(CustomToleranceTests.Fixture fixture, ITestOutputHelper output) : RepartitioningTestBase<CustomToleranceTests.Fixture>(fixture), IClassFixture<CustomToleranceTests.Fixture>
 {
     [Fact]
     public async Task Should_ConvertAllRemoteCalls_ToLocalCalls_WhileRespectingTolerance()
     {
-        using var cts = new CancellationTokenSource(TimeSpan.FromMinutes(10));
+        using var cts = new CancellationTokenSource(TimeSpan.FromMinutes(1));
         await AdjustActivationCountOffsets();
 
         var e1 = GrainFactory.GetGrain<IE>(1);
@@ -69,14 +73,6 @@ public class CustomToleranceTests(CustomToleranceTests.Fixture fixture) : Repart
 
         await Silo1Repartitioner.TriggerExchangeRequest();
 
-        do
-        {
-            e2_host = await e2.GetAddress();
-            f1_host = await f1.GetAddress();
-            cts.Token.ThrowIfCancellationRequested();
-        }
-        while (e2_host == Silo1 || f1_host == Silo2);
-
         // At this point the layout is like follows:
 
         // S1: E1-F1, E3-F3, sys.svc.clustering.dev, rest (default activations, present in both silos)
@@ -99,6 +95,8 @@ public class CustomToleranceTests(CustomToleranceTests.Fixture fixture) : Repart
             i++;
         }
 
+        await LogEdgesAsync(Silo1Repartitioner);
+        await LogEdgesAsync(Silo2Repartitioner);
         await Silo1Repartitioner.TriggerExchangeRequest();
         await Test();
 
@@ -114,9 +112,8 @@ public class CustomToleranceTests(CustomToleranceTests.Fixture fixture) : Repart
         }
 
         await Silo2Repartitioner.TriggerExchangeRequest();
-        await Test();
 
-        //await ResetCounters(); uncomment if you add more tests
+        await Test();
 
         async Task Test()
         {
@@ -128,15 +125,26 @@ public class CustomToleranceTests(CustomToleranceTests.Fixture fixture) : Repart
             f2_host = await f2.GetAddress();
             f3_host = await f3.GetAddress();
 
-            Assert.Equal(Silo1, e1_host);  // E1 is still in silo 1
-            Assert.Equal(Silo2, e2_host);  // E2 is now in silo 2
-            Assert.Equal(Silo1, e3_host);  // E3 is still in silo 1
+            // Check that each grain is collocated with its pair
+            Assert.Equal(f1_host, e1_host);
+            Assert.Equal(f2_host, e2_host);
+            Assert.Equal(f3_host, e3_host);
 
-            Assert.Equal(Silo1, f1_host);  // F1 is now in silo 1
-            Assert.Equal(Silo2, f2_host);  // F2 is still in silo 2
-            Assert.Equal(Silo1, f3_host);  // F3 is now in silo 1
+            var locations = new SiloAddress[] { e1_host, e2_host, e3_host };
+            Assert.False(locations.All(h => h.Equals(Silo1)), "Grains should not all be located on silo 1.");
+            Assert.False(locations.All(h => h.Equals(Silo2)), "Grains should not all be located on silo 2.");
 
             Assert.Equal(Silo2, await x.GetAddress()); // X remains in silo 2
+        }
+    }
+
+    private async Task LogEdgesAsync(IActivationRepartitionerSystemTarget repartitioner)
+    {
+        var edgeCounts = await repartitioner.GetGrainCallFrequencies();
+        output.WriteLine($"{repartitioner.GetGrainId()} call frequencies:");
+        foreach (var (edge, freq) in edgeCounts)
+        {
+            output.WriteLine($"\t{edge} x {freq}");
         }
     }
 
@@ -146,11 +154,13 @@ public class CustomToleranceTests(CustomToleranceTests.Fixture fixture) : Repart
         Task Ping();
         Task<SiloAddress> GetAddress();
     }
+
     public interface IF : IGrainWithIntegerKey
     {
         Task Ping();
         Task<SiloAddress> GetAddress();
     }
+
     public interface IX : IGrainWithIntegerKey
     {
         Task Ping();
@@ -167,16 +177,40 @@ public class CustomToleranceTests(CustomToleranceTests.Fixture fixture) : Repart
 
         public Task Ping() => GrainFactory.GetGrain<IF>(this.GetPrimaryKeyLong()).Ping();
         public Task<SiloAddress> GetAddress() => Task.FromResult(GrainContext.Address.SiloAddress);
+        public override Task OnActivateAsync(CancellationToken cancellationToken)
+        {
+            ServiceProvider.GetRequiredService<ILogger<E>>().LogInformation("Activating {GrainId} on silo {SiloAddress}", this.GrainId, this.Runtime.SiloAddress);
+            return base.OnActivateAsync(cancellationToken);
+        }
+
+        public override Task OnDeactivateAsync(DeactivationReason reason, CancellationToken cancellationToken)
+        {
+            ServiceProvider.GetRequiredService<ILogger<E>>().LogInformation("Deactivating {GrainId} on silo {SiloAddress}. Reason: {Reason}", this.GrainId, this.Runtime.SiloAddress, reason);
+            return base.OnDeactivateAsync(reason, cancellationToken);
+        }
     }
 
     public class F : Grain, IF
     {
         public Task Ping() => Task.CompletedTask;
+
         public Task<SiloAddress> GetAddress() => Task.FromResult(GrainContext.Address.SiloAddress);
+
+        public override Task OnActivateAsync(CancellationToken cancellationToken)
+        {
+            ServiceProvider.GetRequiredService<ILogger<F>>().LogInformation("Activating {GrainId} on silo {SiloAddress}", this.GrainId, this.Runtime.SiloAddress);
+            return base.OnActivateAsync(cancellationToken);
+        }
+
+        public override Task OnDeactivateAsync(DeactivationReason reason, CancellationToken cancellationToken)
+        {
+            ServiceProvider.GetRequiredService<ILogger<F>>().LogInformation("Deactivating {GrainId} on silo {SiloAddress}. Reason: {Reason}", this.GrainId, this.Runtime.SiloAddress, reason);
+            return base.OnDeactivateAsync(reason, cancellationToken);
+        }
     }
 
     /// <summary>
-    /// This is simply to achive initial balance between the 2 silos, as by default the primary
+    /// This is simply to achieve initial balance between the 2 silos, as by default the primary
     /// will have 1 more activation than the secondary. That activations is 'sys.svc.clustering.dev'
     /// </summary>
     [Immovable]
@@ -184,6 +218,18 @@ public class CustomToleranceTests(CustomToleranceTests.Fixture fixture) : Repart
     {
         public Task Ping() => Task.CompletedTask;
         public Task<SiloAddress> GetAddress() => Task.FromResult(GrainContext.Address.SiloAddress);
+
+        public override Task OnActivateAsync(CancellationToken cancellationToken)
+        {
+            ServiceProvider.GetRequiredService<ILogger<X>>().LogInformation("Activating {GrainId} on silo {SiloAddress}", this.GrainId, this.Runtime.SiloAddress);
+            return base.OnActivateAsync(cancellationToken);
+        }
+
+        public override Task OnDeactivateAsync(DeactivationReason reason, CancellationToken cancellationToken)
+        {
+            ServiceProvider.GetRequiredService<ILogger<X>>().LogInformation("Deactivating {GrainId} on silo {SiloAddress}. Reason: {Reason}", this.GrainId, this.Runtime.SiloAddress, reason);
+            return base.OnDeactivateAsync(reason, cancellationToken);
+        }
     }
 
     public class Fixture : BaseTestClusterFixture
@@ -192,6 +238,7 @@ public class CustomToleranceTests(CustomToleranceTests.Fixture fixture) : Repart
         {
             builder.Options.InitialSilosCount = 2;
             builder.AddSiloBuilderConfigurator<SiloConfigurator>();
+            builder.AddClientBuilderConfigurator<ClientConfigurator>();
         }
 
         private class SiloConfigurator : ISiloConfigurator
@@ -209,10 +256,14 @@ public class CustomToleranceTests(CustomToleranceTests.Fixture fixture) : Repart
                         // Make these so that the timers practically never fire! We will invoke the protocol manually.
                         o.MinRoundPeriod = TimeSpan.FromSeconds(299);
                         o.MaxRoundPeriod = TimeSpan.FromSeconds(300);
-                        // Make this practically zero, so we can invoke the protocol more than once without needing to put a delay in the tests. 
-                        o.RecoveryPeriod = TimeSpan.FromMilliseconds(1);
+                        // Make this zero, so we can invoke the protocol more than once without needing to put a delay in the tests. 
+                        o.RecoveryPeriod = TimeSpan.Zero;
+
+                        // To remove the remote possibility of false positives caused by the probabilistic filtering in tests.
+                        o.AnchoringFilterEnabled = false;
                     })
                     .AddActivationRepartitioner<HardLimitRule>()
+                    .ConfigureLogging(logging => logging.AddFilter("Orleans.Runtime.Placement.Repartitioning", LogLevel.Trace))
                     .ConfigureServices(service => service.AddSingleton<IRepartitionerMessageFilter, TestMessageFilter>());
 #pragma warning restore ORLEANSEXP001 // Type is for evaluation purposes only and is subject to change or removal in future updates. Suppress this diagnostic to proceed.
         }
@@ -220,6 +271,14 @@ public class CustomToleranceTests(CustomToleranceTests.Fixture fixture) : Repart
         private class HardLimitRule : IImbalanceToleranceRule
         {
             public bool IsSatisfiedBy(uint imbalance) => imbalance <= 2;
+        }
+
+        private class ClientConfigurator : IClientBuilderConfigurator
+        {
+            public void Configure(IConfiguration configuration, IClientBuilder clientBuilder)
+            {
+                clientBuilder.Configure<GatewayOptions>(o => o.PreferredGatewayIndex = 0);
+            }
         }
     }
 }
