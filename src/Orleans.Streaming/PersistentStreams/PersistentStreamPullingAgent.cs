@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics.Metrics;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Orleans.Configuration;
@@ -13,10 +14,10 @@ namespace Orleans.Streams
 {
     internal class PersistentStreamPullingAgent : SystemTarget, IPersistentStreamPullingAgent
     {
-        private static readonly IBackoffProvider DeliveryBackoffProvider = new ExponentialBackoff(TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(30), TimeSpan.FromSeconds(1));
-        private static readonly IBackoffProvider ReadLoopBackoff = new ExponentialBackoff(TimeSpan.FromSeconds(10), TimeSpan.FromSeconds(20), TimeSpan.FromSeconds(1));
         private const int ReadLoopRetryMax = 6;
         private const int StreamInactivityCheckFrequency = 10;
+        private readonly IBackoffProvider deliveryBackoffProvider;
+        private readonly IBackoffProvider queueReaderBackoffProvider;
         private readonly string streamProviderName;
         private readonly IStreamPubSub pubSub;
         private readonly IStreamFilter streamFilter;
@@ -49,7 +50,9 @@ namespace Orleans.Streams
             SiloAddress siloAddress,
             IQueueAdapter queueAdapter,
             IQueueAdapterCache queueAdapterCache,
-            IStreamFailureHandler streamFailureHandler)
+            IStreamFailureHandler streamFailureHandler,
+            IBackoffProvider deliveryBackoffProvider,
+            IBackoffProvider queueReaderBackoffProvider)
             : base(id, siloAddress, loggerFactory)
         {
             if (strProviderName == null) throw new ArgumentNullException("runtime", "PersistentStreamPullingAgent: strProviderName should not be null");
@@ -63,6 +66,8 @@ namespace Orleans.Streams
             this.queueAdapter = queueAdapter ?? throw new ArgumentNullException(nameof(queueAdapter));
             this.streamFailureHandler = streamFailureHandler ?? throw new ArgumentNullException(nameof(streamFailureHandler));
             this.queueAdapterCache = queueAdapterCache;
+            this.deliveryBackoffProvider = deliveryBackoffProvider;
+            this.queueReaderBackoffProvider = queueReaderBackoffProvider;
             numMessages = 0;
 
             logger = loggerFactory.CreateLogger($"{this.GetType().Namespace}.{streamProviderName}");
@@ -140,9 +145,9 @@ namespace Orleans.Streams
             }
 
             // Setup a reader for a new receiver.
-            // Even if the receiver failed to initialise, treat it as OK and start pumping it. It's receiver responsibility to retry initialization.
+            // Even if the receiver failed to initialize, treat it as OK and start pumping it. It's receiver responsibility to retry initialization.
             var randomTimerOffset = RandomTimeSpan.Next(this.options.GetQueueMsgsTimerPeriod);
-            timer = RegisterGrainTimer(AsyncTimerCallback, QueueId, randomTimerOffset, this.options.GetQueueMsgsTimerPeriod);
+            timer = RegisterTimer(AsyncTimerCallback, QueueId, randomTimerOffset, this.options.GetQueueMsgsTimerPeriod);
 
             StreamInstruments.RegisterPersistentStreamPubSubCacheSizeObserve(() => new Measurement<int>(pubSubCache.Count, new KeyValuePair<string, object>("name", StatisticUniquePostfix)));
 
@@ -154,37 +159,17 @@ namespace Orleans.Streams
             // Stop pulling from queues that are not in my range anymore.
             logger.LogInformation((int)ErrorCode.PersistentStreamPullingAgent_05, "Shutdown of {Name} responsible for queue: {Queue}", GetType().Name, QueueId.ToStringWithHashCode());
 
-            if (timer != null)
-            {
-                var tmp = timer;
-                timer = null;
-                Utils.SafeExecute(tmp.Dispose, this.logger);
-
-                try
-                {
-                    await tmp.GetCurrentlyExecutingTickTask().WithTimeout(TimeSpan.FromSeconds(5));
-                }
-                catch (Exception ex)
-                {
-                    this.logger.LogWarning(ex, "Waiting for the last timer tick failed");
-                }
-            }
+            var asyncTimer = timer;
+            timer = null;
+            asyncTimer.Dispose();
 
             this.queueCache = null;
 
             Task localReceiverInitTask = receiverInitTask;
             if (localReceiverInitTask != null)
             {
-                try
-                {
-                    await localReceiverInitTask;
-                    receiverInitTask = null;
-                }
-                catch (Exception)
-                {
-                    receiverInitTask = null;
-                    // squelch
-                }
+                await localReceiverInitTask.ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing);
+                receiverInitTask = null;
             }
 
             try
@@ -293,7 +278,7 @@ namespace Orleans.Streams
                          // Do not retry if the agent is shutting down, or if the exception is ClientNotAvailableException
                          (exception, i) => exception is not ClientNotAvailableException && !IsShutdown,
                          this.options.MaxEventDeliveryTime,
-                         DeliveryBackoffProvider);
+                         deliveryBackoffProvider);
 
                     if (requestedHandshakeToken != null)
                     {
@@ -379,7 +364,7 @@ namespace Orleans.Streams
                 if (IsShutdown) return; // timer was already removed, last tick
 
                 // loop through the queue until it is empty.
-                while (!IsShutdown) // timer will be set to null when we are asked to shudown.
+                while (!IsShutdown) // timer will be set to null when we are asked to shutdown.
                 {
                     int maxCacheAddCount = queueCache?.GetMaxAddCount() ?? QueueAdapterConstants.UNLIMITED_GET_QUEUE_MSG;
                     if (maxCacheAddCount != QueueAdapterConstants.UNLIMITED_GET_QUEUE_MSG && maxCacheAddCount <= 0)
@@ -393,8 +378,8 @@ namespace Orleans.Streams
                         i => ReadFromQueue(queueId, receiver, maxCacheAddCount),
                         ReadLoopRetryMax,
                         ReadLoopRetryExceptionFilter,
-                        Constants.INFINITE_TIMESPAN,
-                        ReadLoopBackoff);
+                        Timeout.InfiniteTimeSpan,
+                        queueReaderBackoffProvider);
                     if (!moreData)
                         return;
                 }
@@ -614,7 +599,7 @@ namespace Orleans.Streams
                                 // Do not retry if the agent is shutting down, or if the exception is ClientNotAvailableException
                                 (exception, i) => exception is not ClientNotAvailableException && !IsShutdown,
                                 this.options.MaxEventDeliveryTime,
-                                DeliveryBackoffProvider);
+                                deliveryBackoffProvider);
                             if (newToken != null)
                             {
                                 consumerData.LastToken = newToken;
@@ -836,8 +821,8 @@ namespace Orleans.Streams
                                     await PubsubRegisterProducer(pubSub, streamId, GrainId, logger); },
                                 AsyncExecutorWithRetries.INFINITE_RETRIES,
                                 (exception, i) => !IsShutdown,
-                                Constants.INFINITE_TIMESPAN,
-                                DeliveryBackoffProvider);
+                                Timeout.InfiniteTimeSpan,
+                                deliveryBackoffProvider);
 
 
                 if (logger.IsEnabled(LogLevel.Debug))

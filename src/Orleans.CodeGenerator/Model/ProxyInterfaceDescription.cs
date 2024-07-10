@@ -72,33 +72,27 @@ namespace Orleans.CodeGenerator
 
         public CodeGenerator CodeGenerator { get; }
 
-        private List<ProxyMethodDescription> GetMethods(INamedTypeSymbol symbol)
+        private List<ProxyMethodDescription> GetMethods()
         {
-#pragma warning disable RS1024 // Symbols should be compared for equality
-            var methods = new Dictionary<IMethodSymbol, bool>(MethodSignatureComparer.Default);
-#pragma warning restore RS1024 // Symbols should be compared for equality
-            foreach (var iface in GetAllInterfaces(symbol))
+            var result = new List<ProxyMethodDescription>();
+            foreach (var iface in GetAllInterfaces(InterfaceType))
             {
                 foreach (var method in iface.GetDeclaredInstanceMembers<IMethodSymbol>())
                 {
-                    if (methods.TryGetValue(method, out _))
+                    if (method.MethodKind == MethodKind.ExplicitInterfaceImplementation)
                     {
-                        methods[method] = true;
+                        // Explicit implementations can be ignored when generating a proxy.
+                        // Proxies must implement every method explicitly to ensure faithful reproduction of the interface behavior.
+                        // At the calling side, the explicit implementation will be called if it was not overridden by a derived type.
                         continue;
                     }
 
-                    methods.Add(method, false);
+                    var methodDescription = CodeGenerator.GetProxyMethodDescription(InterfaceType, method: method);
+                    result.Add(methodDescription);
                 }
             }
 
-            var res = new List<ProxyMethodDescription>();
-            foreach (var pair in methods)
-            {
-                var methodDescription = CodeGenerator.GetProxyMethodDescription(symbol, method: pair.Key, hasCollision: pair.Value);
-                res.Add(methodDescription);
-            }
-
-            return res;
+            return result;
 
             static IEnumerable<INamedTypeSymbol> GetAllInterfaces(INamedTypeSymbol s)
             {
@@ -117,7 +111,7 @@ namespace Orleans.CodeGenerator
 
         public string Name { get; }
         public INamedTypeSymbol InterfaceType { get; }
-        public List<ProxyMethodDescription> Methods => _methods ??= GetMethods(InterfaceType); 
+        public List<ProxyMethodDescription> Methods => _methods ??= GetMethods(); 
         public SemanticModel SemanticModel { get; }
         public string GeneratedNamespace { get; }
         public List<(string Name, ITypeParameterSymbol Parameter)> TypeParameters { get; }

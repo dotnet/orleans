@@ -729,7 +729,6 @@ namespace Orleans.EventSourcing.Common
                     if (submissionEntry.ResultPromise != null)
                         submissionEntry.ResultPromise.SetResult(false);
                 }
-                pos++;
             }
 
             if (foundFailedConditionalUpdates)

@@ -51,19 +51,24 @@ namespace Orleans.Runtime
                 await context.Invoke();
                 if (activity is not null && activity.IsAllDataRequested)
                 {
-                    activity.SetTag("status", "Ok");
+                    activity.SetStatus(ActivityStatusCode.Ok);
                 }
             }
             catch (Exception e)
             {
                 if (activity is not null && activity.IsAllDataRequested)
                 {
+                    activity.SetStatus(ActivityStatusCode.Error);
+
                     // exception attributes from https://github.com/open-telemetry/opentelemetry-specification/blob/main/specification/trace/semantic_conventions/exceptions.md
                     activity.SetTag("exception.type", e.GetType().FullName);
                     activity.SetTag("exception.message", e.Message);
-                    activity.SetTag("exception.stacktrace", e.StackTrace);
+
+                    // Note that "exception.stacktrace" is the full exception detail, not just the StackTrace property. 
+                    // See https://opentelemetry.io/docs/specs/semconv/attributes-registry/exception/
+                    // and https://github.com/open-telemetry/opentelemetry-specification/pull/697#discussion_r453662519
+                    activity.SetTag("exception.stacktrace", e.ToString());
                     activity.SetTag("exception.escaped", true);
-                    activity.SetTag("status", "Error");
                 }
                 
                 throw;
@@ -139,7 +144,16 @@ namespace Orleans.Runtime
             var source = GetActivitySource(context);
             if (!string.IsNullOrEmpty(traceParent))
             {
-                activity = source.CreateActivity(context.Request.GetActivityName(), ActivityKind.Server, traceParent);
+                if (ActivityContext.TryParse(traceParent, traceState, isRemote: true, out ActivityContext parentContext))
+                {
+                    // traceParent is a W3CId
+                    activity = source.CreateActivity(context.Request.GetActivityName(), ActivityKind.Server, parentContext);
+                }
+                else
+                {
+                    // Most likely, traceParent uses ActivityIdFormat.Hierarchical
+                    activity = source.CreateActivity(context.Request.GetActivityName(), ActivityKind.Server, traceParent);
+                }
 
                 if (activity is not null)
                 {

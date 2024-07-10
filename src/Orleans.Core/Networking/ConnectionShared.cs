@@ -1,24 +1,19 @@
-﻿using System;
+using System;
+using Orleans.Placement.Repartitioning;
 
 namespace Orleans.Runtime.Messaging
 {
-    internal sealed class ConnectionCommon
+    internal sealed class ConnectionCommon(
+        IServiceProvider serviceProvider,
+        MessageFactory messageFactory,
+        MessagingTrace messagingTrace,
+        NetworkingTrace networkingTrace,
+        IMessageStatisticsSink messageStatisticsSink)
     {
-        public ConnectionCommon(
-            IServiceProvider serviceProvider,
-            MessageFactory messageFactory,
-            MessagingTrace messagingTrace,
-            NetworkingTrace networkingTrace)
-        {
-            this.ServiceProvider = serviceProvider;
-            this.MessageFactory = messageFactory;
-            this.MessagingTrace = messagingTrace;
-            this.NetworkingTrace = networkingTrace;
-        }
-
-        public MessageFactory MessageFactory { get; }
-        public IServiceProvider ServiceProvider { get; }
-        public NetworkingTrace NetworkingTrace { get; }
-        public MessagingTrace MessagingTrace { get; }
+        public MessageFactory MessageFactory { get; } = messageFactory;
+        public IServiceProvider ServiceProvider { get; } = serviceProvider;
+        public NetworkingTrace NetworkingTrace { get; } = networkingTrace;
+        public IMessageStatisticsSink MessageStatisticsSink { get; } = messageStatisticsSink;
+        public MessagingTrace MessagingTrace { get; } = messagingTrace;
     }
 }

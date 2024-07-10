@@ -2,6 +2,7 @@ using DistributedTests.Server.Configurator;
 using Microsoft.Extensions.Hosting;
 using Orleans.Configuration;
 using DistributedTests.Common.MessageChannel;
+using Microsoft.Extensions.Logging;
 
 namespace DistributedTests.Server
 {
@@ -12,6 +13,7 @@ namespace DistributedTests.Server
         public int SiloPort { get; set; }
         public int GatewayPort { get; set; }
         public SecretConfiguration.SecretSource SecretSource {  get; set; }
+        public bool ActivationRepartitioning { get; set; }
     }
 
     public class ServerRunner<T>
@@ -38,6 +40,10 @@ namespace DistributedTests.Server
             {
                 var host = Host
                     .CreateDefaultBuilder()
+                    .ConfigureLogging(logging =>
+                    {
+                        logging.AddFilter("Orleans.Runtime.Placement.Repartitioning", LogLevel.Debug);
+                    })
                     .UseOrleans((ctx, siloBuilder) => ConfigureOrleans(siloBuilder, commonParameters, configuratorParameters))
                     .Build();
 
@@ -69,6 +75,13 @@ namespace DistributedTests.Server
                 .Configure<ClusterOptions>(options => { options.ClusterId = commonParameters.ClusterId; options.ServiceId = commonParameters.ServiceId; })
                 .ConfigureEndpoints(siloPort: commonParameters.SiloPort, gatewayPort: commonParameters.GatewayPort)
                 .UseAzureStorageClustering(options => options.TableServiceClient = new(_secrets.ClusteringConnectionString));
+
+            if (commonParameters.ActivationRepartitioning)
+            {
+#pragma warning disable ORLEANSEXP001 // Type is for evaluation purposes only and is subject to change or removal in future updates. Suppress this diagnostic to proceed.
+                siloBuilder.AddActivationRepartitioner();
+#pragma warning restore ORLEANSEXP001 // Type is for evaluation purposes only and is subject to change or removal in future updates. Suppress this diagnostic to proceed.
+            }
 
             _siloConfigurator.Configure(siloBuilder, configuratorParameters);
         }

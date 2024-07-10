@@ -13,6 +13,7 @@ namespace UnitTests.General
                 {AdoNetInvariants.InvariantNameMySql, cs => new MySqlStorageForTesting(cs)},
                 {AdoNetInvariants.InvariantNamePostgreSql, cs => new PostgreSqlStorageForTesting(cs)}
             };
+
         public IRelationalStorage Storage { get; private set; }
 
         public string CurrentConnectionString
@@ -32,11 +33,14 @@ namespace UnitTests.General
 
         public abstract string CreateStreamTestTable { get; }
 
-        public virtual string DeleteStreamTestTable { get { return "DELETE StreamingTest;"; } }
+        public virtual string DeleteStreamTestTable
+        { get { return "DELETE StreamingTest;"; } }
 
-        public virtual string StreamTestSelect { get { return "SELECT Id, StreamData FROM StreamingTest WHERE Id = @streamId;"; } }
+        public virtual string StreamTestSelect
+        { get { return "SELECT Id, StreamData FROM StreamingTest WHERE Id = @streamId;"; } }
 
-        public virtual string StreamTestInsert { get { return "INSERT INTO StreamingTest(Id, StreamData) VALUES(@id, @streamData);"; } }
+        public virtual string StreamTestInsert
+        { get { return "INSERT INTO StreamingTest(Id, StreamData) VALUES(@id, @streamData);"; } }
 
         /// <summary>
         /// The script that creates Orleans schema in the database, usually CreateOrleansTables_xxxx.sql
@@ -46,9 +50,11 @@ namespace UnitTests.General
                                 $"{this.ProviderMoniker}-Clustering.sql",
                                 $"{this.ProviderMoniker}-Persistence.sql",
                                 $"{this.ProviderMoniker}-Reminders.sql",
+                                $"{this.ProviderMoniker}-Streaming.sql",
                                 }.Concat(Directory.GetFiles(Environment.CurrentDirectory, $"{this.ProviderMoniker}-Clustering-*.sql")
                                 .Concat(Directory.GetFiles(Environment.CurrentDirectory, $"{this.ProviderMoniker}-Persistence-*.sql"))
                                 .Concat(Directory.GetFiles(Environment.CurrentDirectory, $"{this.ProviderMoniker}-Reminders-*.sql"))
+                                .Concat(Directory.GetFiles(Environment.CurrentDirectory, $"{this.ProviderMoniker}-Streaming-*.sql"))
                                 .Select(f => Path.GetFileName(f))
                                 .OrderBy(f => f)).ToArray();
 
@@ -185,15 +191,14 @@ namespace UnitTests.General
             await Storage.ExecuteAsync(string.Format(CreateDatabaseTemplate, databaseName), command => { }).ConfigureAwait(continueOnCapturedContext: false);
         }
 
-
         /// <summary>
         /// Drops a database with a given name.
         /// </summary>
         /// <param name="databaseName">The name of the database to drop.</param>
         /// <returns>The call will be successful if the DDL query is successful. Otherwise an exception will be thrown.</returns>
-        private Task DropDatabaseAsync(string databaseName)
+        private async Task DropDatabaseAsync(string databaseName)
         {
-            return Storage.ExecuteAsync(string.Format(DropDatabaseTemplate, databaseName), command => { });
+            await Storage.ExecuteAsync(string.Format(DropDatabaseTemplate, databaseName), command => { });
         }
 
         /// <summary>
@@ -208,6 +213,5 @@ namespace UnitTests.General
             csb["Database"] = newDatabaseName;
             return CreateTestInstance(Storage.InvariantName, csb.ConnectionString);
         }
-
     }
 }

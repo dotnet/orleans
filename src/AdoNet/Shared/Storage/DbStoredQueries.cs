@@ -15,6 +15,8 @@ namespace Orleans.Reminders.AdoNet.Storage
 namespace Orleans.Persistence.AdoNet.Storage
 #elif REMINDERS_ADONET
 namespace Orleans.Reminders.AdoNet.Storage
+#elif STREAMING_ADONET
+namespace Orleans.Streaming.AdoNet.Storage
 #elif TESTER_SQLUTILS
 namespace Orleans.Tests.SqlUtils
 #else
@@ -136,6 +138,40 @@ namespace Orleans.Tests.SqlUtils
 
 #endif
 
+#if STREAMING_ADONET || TESTER_SQLUTILS
+
+        /// <summary>
+        /// A query template to enqueue a message into the stream table.
+        /// </summary>
+        internal string QueueStreamMessageKey => queries[nameof(QueueStreamMessageKey)];
+
+        /// <summary>
+        /// A query template to dequeue messages from the stream table.
+        /// </summary>
+        internal string GetStreamMessagesKey => queries[nameof(GetStreamMessagesKey)];
+
+        /// <summary>
+        /// A query template to confirm message delivery from the stream table.
+        /// </summary>
+        internal string ConfirmStreamMessagesKey => queries[nameof(ConfirmStreamMessagesKey)];
+
+        /// <summary>
+        /// A query template to evict a single message (by moving it to dead letters).
+        /// </summary>
+        internal string FailStreamMessageKey => queries[nameof(FailStreamMessageKey)];
+
+        /// <summary>
+        /// A query template to batch evict messages (by moving them to dead letters).
+        /// </summary>
+        internal string EvictStreamMessagesKey => queries[nameof(EvictStreamMessagesKey)];
+
+        /// <summary>
+        /// A query template to evict expired dead letters (by deleting them).
+        /// </summary>
+        internal string EvictStreamDeadLettersKey => queries[nameof(EvictStreamDeadLettersKey)];
+
+#endif
+
         internal static class Converters
         {
             internal static KeyValuePair<string, string> GetQueryKeyAndValue(IDataRecord record)
@@ -144,7 +180,7 @@ namespace Orleans.Tests.SqlUtils
                     record.GetValue<string>("QueryText"));
             }
 
-    
+
             internal static Tuple<MembershipEntry, int> GetMembershipEntry(IDataRecord record)
             {
                 //TODO: This is a bit of hack way to check in the current version if there's membership data or not, but if there's a start time, there's member.            
@@ -241,7 +277,7 @@ namespace Orleans.Tests.SqlUtils
             {
                 command.AddParameter(paramName, paramValue, dbType: dbType);
             }
-            
+
             private void AddAddress(string name, IPAddress address)
             {
                 Add(name, address.ToString(), dbType: DbType.AnsiString);
@@ -373,7 +409,8 @@ namespace Orleans.Tests.SqlUtils
 
             internal TimeSpan Period
             {
-                set {
+                set
+                {
                     if (value.TotalMilliseconds <= int.MaxValue)
                     {
                         // Original casting when old schema is used.  Here to maintain backwards compatibility
@@ -405,6 +442,71 @@ namespace Orleans.Tests.SqlUtils
                         : string.Join("|", value.Select(
                             s => $"{s.Item1.ToParsableString()},{LogFormatter.PrintDate(s.Item2)}")));
                 }
+            }
+
+            internal string QueueId
+            {
+                set => Add(nameof(QueueId), value);
+            }
+
+            internal long MessageId
+            {
+                set => Add(nameof(MessageId), value);
+            }
+
+            internal byte[] Payload
+            {
+                set => Add(nameof(Payload), value);
+            }
+
+            internal int ExpiryTimeout
+            {
+                set => Add(nameof(ExpiryTimeout), value);
+            }
+
+            internal int MaxCount
+            {
+                set => Add(nameof(MaxCount), value);
+            }
+
+            internal int MaxAttempts
+            {
+                set => Add(nameof(MaxAttempts), value);
+            }
+
+            internal int RemovalTimeout
+            {
+                set => Add(nameof(RemovalTimeout), value);
+            }
+
+            internal int VisibilityTimeout
+            {
+                set => Add(nameof(VisibilityTimeout), value);
+            }
+
+            internal int EvictionInterval
+            {
+                set => Add(nameof(EvictionInterval), value);
+            }
+
+            internal int EvictionBatchSize
+            {
+                set => Add(nameof(EvictionBatchSize), value);
+            }
+
+            internal string EventIds
+            {
+                set => Add(nameof(EventIds), value);
+            }
+
+            internal string ProviderId
+            {
+                set => Add(nameof(ProviderId), value);
+            }
+
+            internal string Items
+            {
+                set => Add(nameof(Items), value);
             }
         }
     }

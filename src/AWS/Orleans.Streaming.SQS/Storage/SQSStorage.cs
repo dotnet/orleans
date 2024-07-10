@@ -20,7 +20,7 @@ namespace OrleansAWSUtils.Storage
         /// <summary>
         /// Maximum number of messages allowed by SQS to peak per request
         /// </summary>
-        public const int MAX_NUMBER_OF_MESSAGE_TO_PEAK = 10;
+        public const int MAX_NUMBER_OF_MESSAGE_TO_PEEK = 10;
         private const string AccessKeyPropertyName = "AccessKey";
         private const string SecretKeyPropertyName = "SecretKey";
         private const string ServicePropertyName = "Service";
@@ -53,28 +53,28 @@ namespace OrleansAWSUtils.Storage
 
         private void ParseDataConnectionString(string dataConnectionString)
         {
-            var parameters = dataConnectionString.Split(new[] { ';' }, StringSplitOptions.RemoveEmptyEntries);
+            var parameters = dataConnectionString.Split(';', StringSplitOptions.RemoveEmptyEntries);
 
-            var serviceConfig = parameters.Where(p => p.Contains(ServicePropertyName)).FirstOrDefault();
+            var serviceConfig = parameters.FirstOrDefault(p => p.Contains(ServicePropertyName));
             if (!string.IsNullOrWhiteSpace(serviceConfig))
             {
-                var value = serviceConfig.Split(new[] { '=' }, StringSplitOptions.RemoveEmptyEntries);
+                var value = serviceConfig.Split('=', StringSplitOptions.RemoveEmptyEntries);
                 if (value.Length == 2 && !string.IsNullOrWhiteSpace(value[1]))
                     service = value[1];
             }
 
-            var secretKeyConfig = parameters.Where(p => p.Contains(SecretKeyPropertyName)).FirstOrDefault();
+            var secretKeyConfig = parameters.FirstOrDefault(p => p.Contains(SecretKeyPropertyName));
             if (!string.IsNullOrWhiteSpace(secretKeyConfig))
             {
-                var value = secretKeyConfig.Split(new[] { '=' }, StringSplitOptions.RemoveEmptyEntries);
+                var value = secretKeyConfig.Split('=', StringSplitOptions.RemoveEmptyEntries);
                 if (value.Length == 2 && !string.IsNullOrWhiteSpace(value[1]))
                     secretKey = value[1];
             }
 
-            var accessKeyConfig = parameters.Where(p => p.Contains(AccessKeyPropertyName)).FirstOrDefault();
+            var accessKeyConfig = parameters.FirstOrDefault(p => p.Contains(AccessKeyPropertyName));
             if (!string.IsNullOrWhiteSpace(accessKeyConfig))
             {
-                var value = accessKeyConfig.Split(new[] { '=' }, StringSplitOptions.RemoveEmptyEntries);
+                var value = accessKeyConfig.Split('=', StringSplitOptions.RemoveEmptyEntries);
                 if (value.Length == 2 && !string.IsNullOrWhiteSpace(value[1]))
                     accessKey = value[1];
             }
@@ -192,7 +192,7 @@ namespace OrleansAWSUtils.Storage
                 if (count < 1)
                     throw new ArgumentOutOfRangeException(nameof(count));
 
-                var request = new ReceiveMessageRequest { QueueUrl = queueUrl, MaxNumberOfMessages = count <= MAX_NUMBER_OF_MESSAGE_TO_PEAK ? count : MAX_NUMBER_OF_MESSAGE_TO_PEAK };
+                var request = new ReceiveMessageRequest { QueueUrl = queueUrl, MaxNumberOfMessages = count <= MAX_NUMBER_OF_MESSAGE_TO_PEEK ? count : MAX_NUMBER_OF_MESSAGE_TO_PEEK };
                 var response = await sqsClient.ReceiveMessageAsync(request);
                 return response.Messages;
             }
@@ -226,7 +226,7 @@ namespace OrleansAWSUtils.Storage
             }
             catch (Exception exc)
             {
-                ReportErrorAndRethrow(exc, "GetMessages", ErrorCode.StreamProviderManagerBase);
+                ReportErrorAndRethrow(exc, "DeleteMessage", ErrorCode.StreamProviderManagerBase);
             }
         }
 

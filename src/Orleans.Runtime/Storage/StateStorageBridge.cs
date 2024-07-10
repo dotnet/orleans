@@ -1,8 +1,10 @@
 #nullable enable
 using System;
+using System.Collections.Concurrent;
 using System.Diagnostics.CodeAnalysis;
 using System.Runtime.ExceptionServices;
 using System.Threading.Tasks;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Orleans.Runtime;
 using Orleans.Serialization.Activators;
@@ -19,11 +21,8 @@ namespace Orleans.Core
     /// <seealso cref="IStorage{TState}" />
     public class StateStorageBridge<TState> : IStorage<TState>, IGrainMigrationParticipant
     {
-        private readonly string _name;
         private readonly IGrainContext _grainContext;
-        private readonly IGrainStorage _store;
-        private readonly ILogger _logger;
-        private readonly IActivator<TState> _activator;
+        private readonly StateStorageBridgeShared<TState> _shared;
         private GrainState<TState>? _grainState;
 
         /// <inheritdoc/>
@@ -32,7 +31,12 @@ namespace Orleans.Core
             get
             {
                 GrainRuntime.CheckRuntimeContext(RuntimeContext.Current);
-                return GrainState.State;
+                if (_grainState is { } grainState)
+                {
+                    return grainState.State;
+                }
+
+                return default!;
             }
 
             set
@@ -42,28 +46,32 @@ namespace Orleans.Core
             }
         }
 
-        private GrainState<TState> GrainState => _grainState ??= new GrainState<TState>(_activator.Create());
-        internal bool IsStateInitialized => _grainState != null;
+        private GrainState<TState> GrainState => _grainState ??= new GrainState<TState>(_shared.Activator.Create());
+        internal bool IsStateInitialized { get; private set; }
 
         /// <inheritdoc/>
-        public string? Etag { get => GrainState.ETag; set => GrainState.ETag = value; }
+        public string? Etag { get => _grainState?.ETag; set => GrainState.ETag = value; }
 
         /// <inheritdoc/>
-        public bool RecordExists => GrainState.RecordExists;
+        public bool RecordExists => IsStateInitialized switch
+        {
+            true => GrainState.RecordExists,
+            _ => throw new InvalidOperationException("State has not yet been loaded")
+        };
 
-        public StateStorageBridge(string name, IGrainContext grainContext, IGrainStorage store, ILoggerFactory loggerFactory, IActivatorProvider activatorProvider)
+        [Obsolete("Use StateStorageBridge(string, IGrainContext, IGrainStorage) instead.")]
+        public StateStorageBridge(string name, IGrainContext grainContext, IGrainStorage store, ILoggerFactory loggerFactory, IActivatorProvider activatorProvider) : this(name, grainContext, store)
+        { }
+
+        public StateStorageBridge(string name, IGrainContext grainContext, IGrainStorage store)
         {
             ArgumentNullException.ThrowIfNull(name);
             ArgumentNullException.ThrowIfNull(grainContext);
             ArgumentNullException.ThrowIfNull(store);
-            ArgumentNullException.ThrowIfNull(loggerFactory);
-            ArgumentNullException.ThrowIfNull(activatorProvider);
 
-            _logger = loggerFactory.CreateLogger(store.GetType());
-            _name = name;
             _grainContext = grainContext;
-            _store = store;
-            _activator = activatorProvider.GetActivator<TState>();
+            var sharedInstances = ActivatorUtilities.GetServiceOrCreateInstance<StateStorageBridgeSharedMap>(grainContext.ActivationServices);
+            _shared = sharedInstances.Get<TState>(name, store);
         }
 
         /// <inheritdoc />
@@ -74,7 +82,8 @@ namespace Orleans.Core
                 GrainRuntime.CheckRuntimeContext(RuntimeContext.Current);
 
                 var sw = ValueStopwatch.StartNew();
-                await _store.ReadStateAsync(_name, _grainContext.GrainId, GrainState);
+                await _shared.Store.ReadStateAsync(_shared.Name, _grainContext.GrainId, GrainState);
+                IsStateInitialized = true;
                 StorageInstruments.OnStorageRead(sw.Elapsed);
             }
             catch (Exception exc)
@@ -92,7 +101,7 @@ namespace Orleans.Core
                 GrainRuntime.CheckRuntimeContext(RuntimeContext.Current);
 
                 var sw = ValueStopwatch.StartNew();
-                await _store.WriteStateAsync(_name, _grainContext.GrainId, GrainState);
+                await _shared.Store.WriteStateAsync(_shared.Name, _grainContext.GrainId, GrainState);
                 StorageInstruments.OnStorageWrite(sw.Elapsed);
             }
             catch (Exception exc)
@@ -110,12 +119,13 @@ namespace Orleans.Core
                 GrainRuntime.CheckRuntimeContext(RuntimeContext.Current);
 
                 var sw = ValueStopwatch.StartNew();
+
                 // Clear (most likely Delete) state from external storage
-                await _store.ClearStateAsync(_name, _grainContext.GrainId, GrainState);
+                await _shared.Store.ClearStateAsync(_shared.Name, _grainContext.GrainId, GrainState);
                 sw.Stop();
 
                 // Reset the in-memory copy of the state
-                GrainState.State = _activator.Create();
+                GrainState.State = _shared.Activator.Create();
 
                 // Update counters
                 StorageInstruments.OnStorageDelete(sw.Elapsed);
@@ -131,11 +141,11 @@ namespace Orleans.Core
         {
             try
             {
-                dehydrationContext.TryAddValue($"state.{_name}", _grainState);
+                dehydrationContext.TryAddValue(_shared.MigrationContextKey, _grainState);
             }
             catch (Exception exception)
             {
-                _logger.LogError(exception, "Failed to dehydrate state named {StateName} for grain {GrainId}", _name, _grainContext.GrainId);
+                _shared.Logger.LogError(exception, "Failed to dehydrate state named {StateName} for grain {GrainId}", _shared.Name, _grainContext.GrainId);
 
                 // We must throw here since we do not know that the dehydration context is in a clean state after this.
                 throw;
@@ -146,12 +156,16 @@ namespace Orleans.Core
         {
             try
             {
-                rehydrationContext.TryGetValue($"state.{_name}", out _grainState);
+                if (rehydrationContext.TryGetValue<GrainState<TState>>(_shared.MigrationContextKey, out var grainState))
+                {
+                    _grainState = grainState;
+                    IsStateInitialized = true;
+                }
             }
             catch (Exception exception)
             {
                 // It is ok to swallow this exception, since state rehydration is best-effort.
-                _logger.LogError(exception, "Failed to rehydrate state named {StateName} for grain {GrainId}", _name, _grainContext.GrainId);
+                _shared.Logger.LogError(exception, "Failed to rehydrate state named {StateName} for grain {GrainId}", _shared.Name, _grainContext.GrainId);
             }
         }
 
@@ -159,21 +173,49 @@ namespace Orleans.Core
         private void OnError(Exception exception, ErrorCode id, string operation)
         {
             string? errorCode = null;
-            (_store as IRestExceptionDecoder)?.DecodeException(exception, out _, out errorCode, true);
+            (_shared.Store as IRestExceptionDecoder)?.DecodeException(exception, out _, out errorCode, true);
             var errorString = errorCode is { Length: > 0 } ? $" Error: {errorCode}" : null;
 
             var grainId = _grainContext.GrainId;
-            var providerName = _store.GetType().Name;
-            _logger.LogError((int)id, exception, "Error from storage provider {ProviderName}.{StateName} during {Operation} for grain {GrainId}{ErrorCode}", providerName, _name, operation, grainId, errorString);
+            var providerName = _shared.Store.GetType().Name;
+            _shared.Logger.LogError((int)id, exception, "Error from storage provider {ProviderName}.{StateName} during {Operation} for grain {GrainId}{ErrorCode}", providerName, _shared.Name, operation, grainId, errorString);
 
             // If error is not specialization of OrleansException, wrap it
             if (exception is not OrleansException)
             {
-                var errMsg = $"Error from storage provider {providerName}.{_name} during {operation} for grain {grainId}{errorString}{Environment.NewLine} {LogFormatter.PrintException(exception)}";
+                var errMsg = $"Error from storage provider {providerName}.{_shared.Name} during {operation} for grain {grainId}{errorString}{Environment.NewLine} {LogFormatter.PrintException(exception)}";
                 throw new OrleansException(errMsg, exception);
             }
 
             ExceptionDispatchInfo.Throw(exception);
         }
+    }
+
+    internal sealed class StateStorageBridgeSharedMap(ILoggerFactory loggerFactory, IActivatorProvider activatorProvider)
+    {
+        private readonly ConcurrentDictionary<(string Name, IGrainStorage Store, Type StateType), object> _instances = new();
+        private readonly ILoggerFactory _loggerFactory = loggerFactory;
+        private readonly IActivatorProvider _activatorProvider = activatorProvider;
+
+        public StateStorageBridgeShared<TState> Get<TState>(string name, IGrainStorage store)
+            => (StateStorageBridgeShared<TState>)_instances.GetOrAdd(
+                (name, store, typeof(TState)),
+                static (key, self) => new StateStorageBridgeShared<TState>(
+                    key.Name,
+                    key.Store,
+                    self._loggerFactory.CreateLogger(key.Store.GetType()),
+                    self._activatorProvider.GetActivator<TState>()),
+                this);
+    }
+
+    internal sealed class StateStorageBridgeShared<TState>(string name, IGrainStorage store, ILogger logger, IActivator<TState> activator)
+    {
+        private string? _migrationContextKey;
+
+        public readonly string Name = name;
+        public readonly IGrainStorage Store = store;
+        public readonly ILogger Logger = logger;
+        public readonly IActivator<TState> Activator = activator;
+        public string MigrationContextKey => _migrationContextKey ??= $"state.{Name}";
     }
 }

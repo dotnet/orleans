@@ -1,6 +1,7 @@
 using System.Threading.Channels;
 using System.Diagnostics;
 using Microsoft.Extensions.Logging;
+using Microsoft.Crank.EventSources;
 
 namespace DistributedTests.Client
 {
@@ -126,6 +127,11 @@ namespace DistributedTests.Client
                 if (!more) break;
                 while (completedBlockReader.TryRead(out var block))
                 {
+                    // Register the measurement values
+                    BenchmarksEventSource.Measure("requests", block.Completed);
+                    BenchmarksEventSource.Measure("failures", block.Failures);
+                    BenchmarksEventSource.Measure("rps", block.RequestsPerSecond);
+
                     blocks.Add(block);
                 }
 

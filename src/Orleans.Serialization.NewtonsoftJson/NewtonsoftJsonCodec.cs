@@ -6,6 +6,7 @@ using System.Linq;
 using System.Reflection;
 using Microsoft.Extensions.Options;
 using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 using Orleans.Metadata;
 using Orleans.Serialization.Buffers;
 using Orleans.Serialization.Buffers.Adaptors;
@@ -132,6 +133,11 @@ public class NewtonsoftJsonCodec : IGeneralizedCodec, IGeneralizedCopier, ITypeF
             return false;
         }
 
+        if (IsNativelySupportedType(type))
+        {
+            return true;
+        }
+
         foreach (var selector in _serializableTypeSelectors)
         {
             if (selector.IsSupportedType(type))
@@ -186,6 +192,11 @@ public class NewtonsoftJsonCodec : IGeneralizedCodec, IGeneralizedCopier, ITypeF
             return false;
         }
 
+        if (IsNativelySupportedType(type))
+        {
+            return true;
+        }
+
         foreach (var selector in _copyableTypeSelectors)
         {
             if (selector.IsSupportedType(type))
@@ -200,6 +211,18 @@ public class NewtonsoftJsonCodec : IGeneralizedCodec, IGeneralizedCopier, ITypeF
         }
 
         return false;
+    }
+
+    private static bool IsNativelySupportedType(Type type)
+    {
+        return type == typeof(JObject)
+                    || type == typeof(JArray)
+                    || type == typeof(JProperty)
+                    || type == typeof(JRaw)
+                    || type == typeof(JValue)
+                    || type == typeof(JConstructor)
+                    || typeof(JContainer).IsAssignableFrom(type)
+                    || typeof(JToken).IsAssignableFrom(type);
     }
 
     private static void ThrowTypeFieldMissing() => throw new RequiredFieldMissingException("Serialized value is missing its type field.");

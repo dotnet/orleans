@@ -1,3 +1,4 @@
+#nullable enable
 using System;
 using System.Collections.Generic;
 using System.Threading;
@@ -24,7 +25,7 @@ namespace Orleans.Runtime
         /// <summary>
         /// Gets the grain instance, or <see langword="null"/> if the grain instance has not been set yet.
         /// </summary>
-        object GrainInstance { get; }
+        object? GrainInstance { get; }
 
         /// <summary>
         /// Gets the activation id.
@@ -61,7 +62,7 @@ namespace Orleans.Runtime
         /// </summary>
         /// <typeparam name="TComponent">The type used to lookup this component.</typeparam>
         /// <param name="value">The component instance.</param>
-        void SetComponent<TComponent>(TComponent value) where TComponent : class;
+        void SetComponent<TComponent>(TComponent? value) where TComponent : class;
 
         /// <summary>
         /// Submits an incoming message to this instance.
@@ -74,14 +75,14 @@ namespace Orleans.Runtime
         /// </summary>
         /// <param name="requestContext">The request context of the request which is causing this instance to be activated, if any.</param>
         /// <param name="cancellationToken">A cancellation token which, when canceled, indicates that the process should complete promptly.</param>
-        void Activate(Dictionary<string, object> requestContext, CancellationToken? cancellationToken = default);
+        void Activate(Dictionary<string, object>? requestContext, CancellationToken cancellationToken = default);
 
         /// <summary>
         /// Start deactivating this instance.
         /// </summary>
         /// <param name="deactivationReason">The reason for deactivation, for informational purposes.</param>
         /// <param name="cancellationToken">A cancellation token which, when canceled, indicates that the process should complete promptly.</param>
-        void Deactivate(DeactivationReason deactivationReason, CancellationToken? cancellationToken = default);
+        void Deactivate(DeactivationReason deactivationReason, CancellationToken cancellationToken = default);
 
         /// <summary>
         /// Start rehydrating this instance from the provided rehydration context.
@@ -95,7 +96,7 @@ namespace Orleans.Runtime
         /// </summary>
         /// <param name="requestContext">The request context, which is provided to the placement director so that it can be examined when selecting a new location.</param>
         /// <param name="cancellationToken">A cancellation token which, when canceled, indicates that the process should complete promptly.</param>
-        void Migrate(Dictionary<string, object> requestContext, CancellationToken? cancellationToken = default);
+        void Migrate(Dictionary<string, object>? requestContext, CancellationToken cancellationToken = default);
     }
 
     /// <summary>
@@ -116,7 +117,7 @@ namespace Orleans.Runtime
         /// <returns>
         /// A <see cref="Task"/> which will complete once the grain has deactivated.
         /// </returns>
-        public static Task DeactivateAsync(this IGrainContext grainContext, DeactivationReason deactivationReason, CancellationToken? cancellationToken = default)
+        public static Task DeactivateAsync(this IGrainContext grainContext, DeactivationReason deactivationReason, CancellationToken cancellationToken = default)
         {
             grainContext.Deactivate(deactivationReason, cancellationToken);
             return grainContext.Deactivated;
@@ -180,28 +181,6 @@ namespace Orleans.Runtime
     }
 
     /// <summary>
-    /// Provides functionality to record the creation and deletion of grain timers.
-    /// </summary>
-    internal interface IGrainTimerRegistry
-    {
-        /// <summary>
-        /// Signals to the registry that a timer was created.
-        /// </summary>
-        /// <param name="timer">
-        /// The timer.
-        /// </param>
-        void OnTimerCreated(IGrainTimer timer);
-
-        /// <summary>
-        /// Signals to the registry that a timer was disposed.
-        /// </summary>
-        /// <param name="timer">
-        /// The timer.
-        /// </param>
-        void OnTimerDisposed(IGrainTimer timer);
-    }
-
-    /// <summary>
     /// Functionality to schedule tasks on a grain.
     /// </summary>
     public interface IWorkItemScheduler
@@ -223,8 +202,9 @@ namespace Orleans.Runtime
         /// <summary>
         /// Schedules a work item for execution by this instance.
         /// </summary>
-        /// <param name="workItem">The work item.</param>
-        void QueueWorkItem(IThreadPoolWorkItem workItem);
+        /// <param name="action">The work item.</param>
+        /// <param name="state">The state passed when invoking the item.</param>
+        void QueueAction(Action<object> action, object state);
     }
 
     /// <summary>

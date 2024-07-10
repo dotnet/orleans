@@ -263,6 +263,7 @@ namespace Orleans.Runtime.Messaging
 
         public virtual void Send(Message message)
         {
+            Debug.Assert(!message.IsLocalOnly);
             if (!this.outgoingMessageWriter.TryWrite(message))
             {
                 this.RerouteMessage(message);
@@ -273,9 +274,7 @@ namespace Orleans.Runtime.Messaging
 
         protected abstract void RecordMessageReceive(Message msg, int numTotalBytes, int headerBytes);
         protected abstract void RecordMessageSend(Message msg, int numTotalBytes, int headerBytes);
-
         protected abstract void OnReceivedMessage(Message message);
-
         protected abstract void OnSendMessageFailure(Message message, string error);
 
         private async Task ProcessIncoming()
@@ -354,6 +353,7 @@ namespace Orleans.Runtime.Messaging
 
             Exception error = default;
             var serializer = this.shared.ServiceProvider.GetRequiredService<MessageSerializer>();
+            var messageObserver = this.shared.MessageStatisticsSink.GetMessageObserver();
             try
             {
                 var output = this._transport.Output;
@@ -375,6 +375,7 @@ namespace Orleans.Runtime.Messaging
                             inflight.Add(message);
                             var (headerLength, bodyLength) = serializer.Write(output, message);
                             RecordMessageSend(message, headerLength + bodyLength, headerLength);
+                            messageObserver?.Invoke(message);
                             message = null;
                         }
                     }

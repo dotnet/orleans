@@ -14,12 +14,12 @@ namespace Orleans.CodeGenerator
     /// </summary>
     internal sealed class InvokableMethodDescription : IEquatable<InvokableMethodDescription>
     {
-        public static InvokableMethodDescription Create(InvokableMethodId method, INamedTypeSymbol containingType = null) => new(method, containingType);
+        public static InvokableMethodDescription Create(InvokableMethodId method, INamedTypeSymbol containingType) => new(method, containingType);
 
         private InvokableMethodDescription(InvokableMethodId invokableId, INamedTypeSymbol containingType)
         {
             Key = invokableId;
-            ContainingInterface = containingType ?? invokableId.Method.ContainingType;
+            ContainingInterface = containingType;
             GeneratedMethodId = CodeGenerator.CreateHashedMethodId(Method);
             MethodId = CodeGenerator.GetId(Method)?.ToString(CultureInfo.InvariantCulture) ?? CodeGenerator.GetAlias(Method) ?? GeneratedMethodId;
 
@@ -209,6 +209,6 @@ namespace Orleans.CodeGenerator
         public bool Equals(InvokableMethodDescription other) => Key.Equals(other.Key);
         public override bool Equals(object obj) => obj is InvokableMethodDescription imd && Equals(imd);
         public override int GetHashCode() => Key.GetHashCode();
-        public override string ToString() => $"{ProxyBase}/{Method.ContainingType.Name}/{Method.Name}";
+        public override string ToString() => $"{ProxyBase}/{ContainingInterface.Name}/{Method.Name}";
     }
 }

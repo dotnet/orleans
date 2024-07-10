@@ -20,13 +20,11 @@ namespace Orleans.Streams
     internal sealed class PubSubGrainStateStorageFactory
     {
         private readonly IServiceProvider _serviceProvider;
-        private readonly ILoggerFactory _loggerFactory;
         private readonly ILogger<PubSubGrainStateStorageFactory> _logger;
 
         public PubSubGrainStateStorageFactory(IServiceProvider serviceProvider, ILoggerFactory loggerFactory)
         {
             _serviceProvider = serviceProvider;
-            _loggerFactory = loggerFactory;
             _logger = loggerFactory.CreateLogger<PubSubGrainStateStorageFactory>();
         }
 
@@ -57,8 +55,7 @@ namespace Orleans.Streams
                 storage = _serviceProvider.GetRequiredKeyedService<IGrainStorage>(ProviderConstants.DEFAULT_PUBSUB_PROVIDER_NAME);
             }
 
-            var activatorProvider = _serviceProvider.GetRequiredService<IActivatorProvider>();
-            return new(nameof(PubSubRendezvousGrain), grain.GrainContext, storage, _loggerFactory, activatorProvider);
+            return new(nameof(PubSubRendezvousGrain), grain.GrainContext, storage);
         }
     }
 

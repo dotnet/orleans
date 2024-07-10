@@ -1,5 +1,6 @@
 using System;
 using System.Runtime.ExceptionServices;
+using System.Threading;
 using System.Threading.Tasks;
 using Orleans.Runtime;
 
@@ -211,7 +212,7 @@ namespace Orleans.Internal
             {
                 retry = false;
 
-                if (maxExecutionTime != Constants.INFINITE_TIMESPAN && maxExecutionTime != default)
+                if (maxExecutionTime != Timeout.InfiniteTimeSpan && maxExecutionTime != default)
                 {
                     DateTime now = DateTime.UtcNow;
                     if (now - startExecutionTime > maxExecutionTime)

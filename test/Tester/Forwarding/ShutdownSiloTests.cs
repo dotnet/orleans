@@ -4,8 +4,9 @@ using UnitTests.GrainInterfaces;
 using Xunit;
 using Orleans.Configuration;
 using System.Diagnostics;
-using Orleans.Runtime;
 using Microsoft.Extensions.DependencyInjection;
+using Azure.Data.Tables;
+using Azure.Identity;
 
 namespace Tester.Forwarding
 {
@@ -23,13 +24,20 @@ namespace Tester.Forwarding
                     {
                         options.DeactivationTimeout = DeactivationTimeout;
                     })
-                    .UseAzureStorageClustering(options => options.TableServiceClient = new(TestDefaultConfiguration.DataConnectionString))
+                    .UseAzureStorageClustering(options => options.TableServiceClient = GetTableServiceClient())
                     .ConfigureServices(services => services.AddSingleton<PlacementStrategy, ActivationCountBasedPlacement>())
                     .Configure<ClusterMembershipOptions>(options =>
                     {
                         options.NumMissedProbesLimit = 1;
                         options.NumVotesForDeathDeclaration = 1;
                     });
+            }
+
+            private static TableServiceClient GetTableServiceClient()
+            {
+                return TestDefaultConfiguration.UseAadAuthentication
+                    ? new(TestDefaultConfiguration.TableEndpoint, new DefaultAzureCredential())
+                    : new(TestDefaultConfiguration.DataConnectionString);
             }
         }
 

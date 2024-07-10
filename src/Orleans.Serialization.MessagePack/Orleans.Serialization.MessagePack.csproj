@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <PackageId>Microsoft.Orleans.Serialization.MessagePack</PackageId>
+    <TargetFrameworks>$(DefaultTargetFrameworks);netstandard2.1</TargetFrameworks>
+    <PackageDescription>MessagePack integration for Orleans.Serialization</PackageDescription>
+    <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="MessagePack" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Orleans.Serialization\Orleans.Serialization.csproj" />
+  </ItemGroup>
+
+</Project>

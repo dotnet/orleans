@@ -347,7 +347,7 @@ namespace Orleans.Hosting.Kubernetes
                         await Task.Delay(5000);
                     }
                 }
-                catch (Exception exception)
+                catch (Exception exception) when (!(_shutdownToken.IsCancellationRequested && exception is OperationCanceledException))
                 {
                     _logger.LogError(exception, "Error monitoring Kubernetes pods");
                     if (!_shutdownToken.IsCancellationRequested)

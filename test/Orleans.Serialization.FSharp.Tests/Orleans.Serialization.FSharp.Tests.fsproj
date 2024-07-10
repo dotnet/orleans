@@ -1,0 +1,23 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <LangVersion>latest</LangVersion>
+    <TargetFrameworks>$(TestTargetFrameworks)</TargetFrameworks>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk"/>
+    <PackageReference Include="FSharp.Core"/>
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="$(SourceRoot)src/Orleans.Serialization.FSharp/Orleans.Serialization.FSharp.csproj"/>
+    <ProjectReference Include="$(SourceRoot)test/TestInfrastructure/TestExtensions/TestExtensions.csproj"/>
+    <ProjectReference Include="$(SourceRoot)test/Grains/TestFSharp/TestFSharp.fsproj"/>
+    <ProjectReference Include="$(SourceRoot)test/Grains/TestFSharpGrainInterfaces/TestFSharpGrainInterfaces.csproj"/>
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Include="SerializationTests.fs" />
+  </ItemGroup>
+
+</Project>

@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Options;
+using Orleans.Runtime;
 
-namespace Orleans.Runtime.Configuration.Options;
+namespace Orleans.Configuration;
 
 /// <summary>
 /// Settings which regulate the placement of grains across a cluster when using <see cref="ResourceOptimizedPlacement"/>.
@@ -34,7 +35,7 @@ public sealed class ResourceOptimizedPlacementOptions
     /// <summary>
     /// The default value of <see cref="MemoryUsageWeight"/>.
     /// </summary>
-    public const int DEFAULT_MEMORY_USAGE_WEIGHT = 30;
+    public const int DEFAULT_MEMORY_USAGE_WEIGHT = 20;
 
     /// <summary>
     /// The importance of the available memory to the silo.
@@ -64,13 +65,27 @@ public sealed class ResourceOptimizedPlacementOptions
     /// <summary>
     /// The default value of <see cref="MaxAvailableMemoryWeight"/>.
     /// </summary>
-    public const int DEFAULT_MAX_AVAILABLE_MEMORY_WEIGHT = 10;
+    public const int DEFAULT_MAX_AVAILABLE_MEMORY_WEIGHT = 5;
+
+    /// <summary>
+    /// The importance of the current activation count to the silo.
+    /// </summary>
+    /// <remarks><i>
+    /// <para>A <u>higher</u> values results in the placement favoring silos with <u>lower</u> activation count.</para>
+    /// <para>Valid range is [0-100]</para>
+    /// </i></remarks>
+    public int ActivationCountWeight { get; set; } = DEFAULT_ACTIVATION_COUNT_WEIGHT;
+
+    /// <summary>
+    /// The default value of <see cref="ActivationCountWeight"/>.
+    /// </summary>
+    public const int DEFAULT_ACTIVATION_COUNT_WEIGHT = 15;
 
     /// <summary>
     /// The specified margin for which: if two silos (one of them being the local to the current pending activation), have a utilization score that should be considered "the same" within this margin.
     /// <list type="bullet">
-    /// <item>When this value is 0, then the policy will always favor the silo with the lower resource utilization, even if that silo is remote to the current pending activation.</item>
-    /// <item>When this value is 100, then the policy will always favor the local silo, regardless of its relative utilization score. This policy essentially becomes equivalent to <see cref="PreferLocalPlacement"/>.</item>
+    /// <item><description>When this value is 0, then the policy will always favor the silo with the lower resource utilization, even if that silo is remote to the current pending activation.</description></item>
+    /// <item><description>When this value is 100, then the policy will always favor the local silo, regardless of its relative utilization score. This policy essentially becomes equivalent to <see cref="PreferLocalPlacement"/>.</description></item>
     /// </list>
     /// </summary>
     /// <remarks><i>
@@ -110,6 +125,11 @@ internal sealed class ResourceOptimizedPlacementOptionsValidator
         if (_options.MaxAvailableMemoryWeight < 0 || _options.MaxAvailableMemoryWeight > 100)
         {
             ThrowOutOfRange(nameof(ResourceOptimizedPlacementOptions.MaxAvailableMemoryWeight));
+        }
+
+        if (_options.ActivationCountWeight < 0 || _options.ActivationCountWeight > 100)
+        {
+            ThrowOutOfRange(nameof(ResourceOptimizedPlacementOptions.ActivationCountWeight));
         }
 
         if (_options.LocalSiloPreferenceMargin < 0 || _options.LocalSiloPreferenceMargin > 100)

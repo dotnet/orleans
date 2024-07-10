@@ -55,8 +55,8 @@ public readonly struct EnvironmentStatistics
     /// <remarks>
     /// This value is computed as the lower of two amounts:
     /// <list type="bullet">
-    ///   <item>The amount of memory after which the garbage collector will begin aggressively collecting memory, defined by <see cref="GCMemoryInfo.HighMemoryLoadThresholdBytes"/>.</item>
-    ///   <item>The process' configured memory limit, defined by <see cref="GCMemoryInfo.TotalAvailableMemoryBytes"/>.</item>
+    ///   <item><description>The amount of memory after which the garbage collector will begin aggressively collecting memory, defined by <see cref="GCMemoryInfo.HighMemoryLoadThresholdBytes"/>.</description></item>
+    ///   <item><description>The process' configured memory limit, defined by <see cref="GCMemoryInfo.TotalAvailableMemoryBytes"/>.</description></item>
     /// </list>
     /// Memory limits are common in containerized environments. For more information on configuring memory limits, see <see href="https://learn.microsoft.com/en-us/dotnet/core/runtime-config/garbage-collector#heap-limit"/>
     /// </remarks>

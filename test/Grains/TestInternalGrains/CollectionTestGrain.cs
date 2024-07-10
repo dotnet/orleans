@@ -89,15 +89,15 @@ namespace UnitTests.Grains
             Logger().LogInformation("GetGrainReference.");
             return Task.FromResult(this.AsReference<ICollectionTestGrain>());
         }
+
         public Task StartTimer(TimeSpan timerPeriod, TimeSpan delayPeriod)
         {
-            RegisterTimer(TimerCallback, delayPeriod, TimeSpan.Zero, timerPeriod);
+            this.RegisterGrainTimer(TimerCallback, delayPeriod, TimeSpan.Zero, timerPeriod);
             return Task.CompletedTask;
         }
 
-        private async Task TimerCallback(object state)
+        private async Task TimerCallback(TimeSpan delayPeriod, CancellationToken cancellationToken)
         {
-            TimeSpan delayPeriod = (TimeSpan)state;
             staticCounter++;
             counter++;
             int tmpCounter = counter;

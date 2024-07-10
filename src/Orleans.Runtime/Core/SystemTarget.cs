@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
@@ -7,17 +8,19 @@ using Microsoft.Extensions.Logging;
 using Orleans.GrainReferences;
 using Orleans.Runtime.Scheduler;
 using Orleans.Serialization.Invocation;
+using Orleans.Timers;
 
 namespace Orleans.Runtime
 {
     /// <summary>
     /// Base class for various system services, such as grain directory, reminder service, etc.
-    /// Made public for GrainSerive to inherit from it.
+    /// Made public for GrainService to inherit from it.
     /// Can be turned to internal after a refactoring that would remove the inheritance relation.
     /// </summary>
-    public abstract class SystemTarget : ISystemTarget, ISystemTargetBase, IGrainContext, IGrainExtensionBinder, ISpanFormattable, IDisposable
+    public abstract class SystemTarget : ISystemTarget, ISystemTargetBase, IGrainContext, IGrainExtensionBinder, ISpanFormattable, IDisposable, IGrainTimerRegistry
     {
         private readonly SystemTargetGrainId id;
+        private readonly HashSet<IGrainTimer> _timers = [];
         private GrainReference selfReference;
         private Message running;
         private Dictionary<Type, object> _components = new Dictionary<Type, object>();
@@ -29,7 +32,6 @@ namespace Orleans.Runtime
         internal ActivationId ActivationId { get; set; }
         private InsideRuntimeClient runtimeClient;
         private RuntimeMessagingTrace messagingTrace;
-        private readonly ILogger timerLogger;
         private readonly ILogger logger;
 
         internal InsideRuntimeClient RuntimeClient
@@ -66,8 +68,8 @@ namespace Orleans.Runtime
         {
         }
 
-        internal SystemTarget(GrainType grainType, SiloAddress silo, ILoggerFactory loggerFactory)
-            : this(SystemTargetGrainId.Create(grainType, silo), silo, loggerFactory)
+        internal SystemTarget(GrainType grainType, SiloAddress siloAddress, ILoggerFactory loggerFactory)
+            : this(SystemTargetGrainId.Create(grainType, siloAddress), siloAddress, loggerFactory)
         {
         }
 
@@ -77,7 +79,6 @@ namespace Orleans.Runtime
             this.Silo = silo;
             this.ActivationId = ActivationId.GetDeterministic(grainId.GrainId);
             this.ActivationAddress = GrainAddress.GetAddress(this.Silo, this.id.GrainId, this.ActivationId);
-            this.timerLogger = loggerFactory.CreateLogger<GrainTimer>();
             this.logger = loggerFactory.CreateLogger(this.GetType());
 
             if (!Constants.IsSingletonSystemTarget(GrainId.Type))
@@ -159,34 +160,26 @@ namespace Orleans.Runtime
         /// Registers a timer to send regular callbacks to this grain.
         /// This timer will keep the current grain from being deactivated.
         /// </summary>
-        /// <param name="asyncCallback">The timer callback, which will fire whenever the timer becomes due.</param>
+        /// <param name="callback">The timer callback, which will fire whenever the timer becomes due.</param>
         /// <param name="state">The state object passed to the callback.</param>
         /// <param name="dueTime">
-        /// The amount of time to delay before the <paramref name="asyncCallback"/> is invoked.
+        /// The amount of time to delay before the <paramref name="callback"/> is invoked.
         /// Specify <see cref="System.Threading.Timeout.InfiniteTimeSpan"/> to prevent the timer from starting.
         /// Specify <see cref="TimeSpan.Zero"/> to invoke the callback promptly.
         /// </param>
         /// <param name="period">
-        /// The time interval between invocations of <paramref name="asyncCallback"/>.
-        /// Specify <see cref="System.Threading.Timeout.InfiniteTimeSpan"/> to disable periodic signalling.
+        /// The time interval between invocations of <paramref name="callback"/>.
+        /// Specify <see cref="System.Threading.Timeout.InfiniteTimeSpan"/> to disable periodic signaling.
         /// </param>
-        /// <param name="name">The timer name.</param>
         /// <returns>
         /// An <see cref="IDisposable"/> object which will cancel the timer upon disposal.
         /// </returns>
-        public IDisposable RegisterTimer(Func<object, Task> asyncCallback, object state, TimeSpan dueTime, TimeSpan period, string name = null)
-            => RegisterGrainTimer(asyncCallback, state, dueTime, period, name);
-
-        /// <summary>
-        /// Internal version of <see cref="RegisterTimer(Func{object, Task}, object, TimeSpan, TimeSpan, string)"/> that returns the inner IGrainTimer
-        /// </summary>
-        internal IGrainTimer RegisterGrainTimer(Func<object, Task> asyncCallback, object state, TimeSpan dueTime, TimeSpan period, string name = null)
+        public IGrainTimer RegisterTimer(Func<object, Task> callback, object state, TimeSpan dueTime, TimeSpan period)
         {
             var ctxt = RuntimeContext.Current;
-            name = name ?? ctxt.GrainId + "Timer";
-
-            var timer = GrainTimer.FromTaskCallback(this.timerLogger, asyncCallback, state, dueTime, period, name);
-            timer.Start();
+            ArgumentNullException.ThrowIfNull(callback);
+            var timer = this.ActivationServices.GetRequiredService<ITimerRegistry>()
+                .RegisterGrainTimer(this, static (state, _) => state.Callback(state.State), (Callback: callback, State: state), new() { DueTime = dueTime, Period = period, Interleave = true });
             return timer;
         }
 
@@ -280,7 +273,7 @@ namespace Orleans.Runtime
                     {
                         this.MessagingTrace.OnEnqueueMessageOnActivation(msg, this);
                         var workItem = new RequestWorkItem(this, msg);
-                        this.WorkItemGroup.TaskScheduler.QueueWorkItem(workItem);
+                        this.WorkItemGroup.QueueWorkItem(workItem);
                         break;
                     }
 
@@ -294,10 +287,10 @@ namespace Orleans.Runtime
         public TTarget GetTarget<TTarget>() where TTarget : class => (TTarget)(object)this;
 
         /// <inheritdoc/>
-        public void Activate(Dictionary<string, object> requestContext, CancellationToken? cancellationToken = null) { }
+        public void Activate(Dictionary<string, object> requestContext, CancellationToken cancellationToken) { }
 
         /// <inheritdoc/>
-        public void Deactivate(DeactivationReason deactivationReason, CancellationToken? cancellationToken = null) { }
+        public void Deactivate(DeactivationReason deactivationReason, CancellationToken cancellationToken) { }
 
         /// <inheritdoc/>
         public Task Deactivated => Task.CompletedTask;
@@ -308,6 +301,8 @@ namespace Orleans.Runtime
             {
                 GrainInstruments.DecrementSystemTargetCounts(Constants.SystemTargetName(GrainId.Type));
             }
+
+            StopAllTimers();
         }
 
         public void Rehydrate(IRehydrationContext context)
@@ -316,9 +311,26 @@ namespace Orleans.Runtime
             (context as IDisposable)?.Dispose();
         }
 
-        public void Migrate(Dictionary<string, object> requestContext, CancellationToken? cancellationToken = null)
+        public void Migrate(Dictionary<string, object> requestContext, CancellationToken cancellationToken)
         {
             // Migration is not supported. Do nothing: the contract is that this method attempts migration, but does not guarantee it will occur.
+        }
+
+        void IGrainTimerRegistry.OnTimerCreated(IGrainTimer timer) { lock (_timers) { _timers.Add(timer); } }
+        void IGrainTimerRegistry.OnTimerDisposed(IGrainTimer timer) { lock (_timers) { _timers.Remove(timer); } }
+        private void StopAllTimers()
+        {
+            List<IGrainTimer> timers;
+            lock (_timers)
+            {
+                timers = _timers.ToList();
+                _timers.Clear();
+            }
+
+            foreach (var timer in timers)
+            {
+                timer.Dispose();
+            }
         }
     }
 }

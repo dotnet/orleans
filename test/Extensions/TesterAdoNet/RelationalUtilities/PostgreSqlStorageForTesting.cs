@@ -1,3 +1,4 @@
+using Npgsql;
 using Orleans.Tests.SqlUtils;
 using TestExtensions;
 using UnitTests.General;
@@ -26,18 +27,7 @@ namespace Tester.RelationalUtilities
             }
         }
 
-        protected override string DropDatabaseTemplate
-        {
-            get
-            {
-                return @"SELECT pg_terminate_backend(pg_stat_activity.pid)
-FROM pg_stat_activity
-WHERE pg_stat_activity.datname = '{0}'
-  AND pid <> pg_backend_pid();
-DROP DATABASE ""{0}"";";
-            }
-        }
-        
+        protected override string DropDatabaseTemplate => @"DROP DATABASE ""{0}"" WITH (FORCE);";
 
         protected override string ExistsDatabaseTemplate
         {

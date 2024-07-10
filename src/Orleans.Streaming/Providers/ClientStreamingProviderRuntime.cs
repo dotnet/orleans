@@ -17,7 +17,6 @@ namespace Orleans.Providers
         private readonly ImplicitStreamSubscriberTable implicitSubscriberTable;
         private readonly ClientGrainContext clientContext;
         private readonly IRuntimeClient runtimeClient;
-        private readonly ILogger timerLogger;
 
         public ClientStreamingProviderRuntime(
             IInternalGrainFactory grainFactory,
@@ -31,8 +30,6 @@ namespace Orleans.Providers
             this.implicitSubscriberTable = implicitSubscriberTable;
             this.clientContext = clientContext;
             this.runtimeClient = serviceProvider.GetService<IRuntimeClient>();
-            //all async timer created through current class all share this logger for perf reasons
-            this.timerLogger = loggerFactory.CreateLogger<AsyncTaskSafeTimer>();
             grainBasedPubSub = new GrainBasedPubSubRuntime(GrainFactory);
             var tmp = new ImplicitStreamPubSub(this.grainFactory, this.implicitSubscriberTable);
             implicitPubSub = tmp;
@@ -41,6 +38,7 @@ namespace Orleans.Providers
         }
 
         public IGrainFactory GrainFactory => this.grainFactory;
+
         public IServiceProvider ServiceProvider { get; }
 
         public StreamDirectory GetStreamDirectory()

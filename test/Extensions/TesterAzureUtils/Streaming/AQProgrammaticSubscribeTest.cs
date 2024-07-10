@@ -12,7 +12,7 @@ using Xunit.Abstractions;
 namespace Tester.AzureUtils.Streaming
 {
     [TestCategory("BVT"), TestCategory("Streaming"), TestCategory("AQStreaming")]
-    public class AQProgrammaticSubscribeTest : ProgrammaticSubcribeTestsRunner, IClassFixture<AQProgrammaticSubscribeTest.Fixture>
+    public class AQProgrammaticSubscribeTest : ProgrammaticSubscribeTestsRunner, IClassFixture<AQProgrammaticSubscribeTest.Fixture>
     {
         private const int queueCount = 8;
         public class Fixture : BaseAzureTestClusterFixture
@@ -53,12 +53,17 @@ namespace Tester.AzureUtils.Streaming
                 await base.DisposeAsync();
 
                 // Only perform cleanup if this suite was not skipped.
-                if (!string.IsNullOrWhiteSpace(TestDefaultConfiguration.DataConnectionString))
+                try
                 {
+                    TestUtils.CheckForAzureStorage();
                     await AzureQueueStreamProviderUtils.DeleteAllUsedAzureQueues(NullLoggerFactory.Instance,
                         AzureQueueUtilities.GenerateQueueNames(this.HostedCluster.Options.ClusterId, queueCount), new AzureQueueOptions().ConfigureTestDefaults());
                     await AzureQueueStreamProviderUtils.DeleteAllUsedAzureQueues(NullLoggerFactory.Instance,
                         AzureQueueUtilities.GenerateQueueNames($"{this.HostedCluster.Options.ClusterId}2", queueCount), new AzureQueueOptions().ConfigureTestDefaults());
+                }
+                catch (SkipException)
+                {
+                    // ignore
                 }
             }
         }

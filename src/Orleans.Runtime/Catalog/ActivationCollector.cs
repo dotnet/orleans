@@ -8,22 +8,22 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 using Orleans.Internal;
+using Orleans.Runtime.Internal;
 
 namespace Orleans.Runtime
 {
     /// <summary>
     /// Identifies activations that have been idle long enough to be deactivated.
     /// </summary>
-    internal class ActivationCollector : IActivationWorkingSetObserver, IHealthCheckParticipant, ILifecycleParticipant<ISiloLifecycle>
+    internal class ActivationCollector : IActivationWorkingSetObserver, ILifecycleParticipant<ISiloLifecycle>
     {
-        internal Action<GrainId> Debug_OnDecideToCollectActivation;
         private readonly TimeSpan quantum;
         private readonly TimeSpan shortestAgeLimit;
         private readonly ConcurrentDictionary<DateTime, Bucket> buckets = new();
         private DateTime nextTicket;
         private static readonly List<ICollectibleGrainContext> nothing = new(0);
         private readonly ILogger logger;
-        private readonly IAsyncTimer _collectionTimer;
+        private readonly PeriodicTimer _collectionTimer;
         private Task _collectionLoopTask;
         private int collectionNumber;
         private int _activationCount;
@@ -45,7 +45,7 @@ namespace Orleans.Runtime
             shortestAgeLimit = new(options.Value.ClassSpecificCollectionAge.Values.Aggregate(options.Value.CollectionAge.Ticks, (a, v) => Math.Min(a, v.Ticks)));
             nextTicket = MakeTicketFromDateTime(DateTime.UtcNow);
             this.logger = logger;
-            _collectionTimer = timerFactory.Create(quantum, "ActivationCollector");
+            _collectionTimer = new PeriodicTimer(quantum);
         }
 
         // Return the number of activations that were used (touched) in the last recencyPeriod.
@@ -321,10 +321,8 @@ namespace Orleans.Runtime
 
         private void AddActivationToList(ICollectibleGrainContext activation, ref List<ICollectibleGrainContext> condemned)
         {
-            condemned ??= new();
+            condemned ??= [];
             condemned.Add(activation);
-
-            this.Debug_OnDecideToCollectActivation?.Invoke(activation.GrainId);
         }
 
         private void ThrowIfTicketIsInvalid(DateTime ticket)
@@ -421,13 +419,14 @@ namespace Orleans.Runtime
 
         private Task Start(CancellationToken cancellationToken)
         {
+            using var _ = new ExecutionContextSuppressor();
             _collectionLoopTask = RunActivationCollectionLoop();
             return Task.CompletedTask;
         }
 
         private async Task Stop(CancellationToken cancellationToken)
         {
-            _collectionTimer?.Dispose();
+            _collectionTimer.Dispose();
 
             if (_collectionLoopTask is Task task)
             {
@@ -446,8 +445,8 @@ namespace Orleans.Runtime
 
         private async Task RunActivationCollectionLoop()
         {
-            while (await _collectionTimer.NextTick())
-
+            await Task.CompletedTask.ConfigureAwait(ConfigureAwaitOptions.ForceYielding);
+            while (await _collectionTimer.WaitForNextTickAsync())
             {
                 try
                 {
@@ -455,7 +454,7 @@ namespace Orleans.Runtime
                 }
                 catch (Exception exception)
                 {
-                    this.logger.LogError(exception, "Exception while collecting activations");
+                    this.logger.LogError(exception, "Error while collecting activations.");
                 }
             }
         }
@@ -510,7 +509,7 @@ namespace Orleans.Runtime
             var mtcs = new MultiTaskCompletionSource(list.Count);
 
             logger.LogInformation((int)ErrorCode.Catalog_ShutdownActivations_1, "DeactivateActivationsFromCollector: total {Count} to promptly Destroy.", list.Count);
-            CatalogInstruments.ActiviationShutdownViaCollection();
+            CatalogInstruments.ActivationShutdownViaCollection();
 
             void signalCompletion(Task task) => mtcs.SetOneResult();
             var reason = GetDeactivationReason();
@@ -523,18 +522,6 @@ namespace Orleans.Runtime
             }
 
             await mtcs.Task;
-        }
-
-        /// <inheritdoc/>
-        public bool CheckHealth(DateTime lastCheckTime, out string reason)
-        {
-            if (_collectionTimer is IAsyncTimer timer)
-            {
-                return timer.CheckHealth(lastCheckTime, out reason);
-            }
-
-            reason = default;
-            return true;
         }
 
         private class Bucket

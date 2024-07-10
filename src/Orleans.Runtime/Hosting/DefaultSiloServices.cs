@@ -41,7 +41,8 @@ using Orleans.Serialization.Cloning;
 using System.Collections.Generic;
 using Microsoft.Extensions.Configuration;
 using Orleans.Serialization.Internal;
-using Orleans.Runtime.Configuration.Options;
+using Orleans.Core;
+using Orleans.Placement.Repartitioning;
 
 namespace Orleans.Hosting
 {
@@ -59,12 +60,16 @@ namespace Orleans.Hosting
 
             services.Add(ServiceDescriptor);
 
+            // Common services
+            services.AddLogging();
             services.AddOptions();
+            services.TryAddSingleton<TimeProvider>(TimeProvider.System);
 
             services.TryAddSingleton(typeof(IOptionFormatter<>), typeof(DefaultOptionsFormatter<>));
             services.TryAddSingleton(typeof(IOptionFormatterResolver<>), typeof(DefaultOptionsFormatterResolver<>));
 
             services.AddSingleton<Silo>();
+            services.AddSingleton<Watchdog>();
             services.AddHostedService<SiloHostedService>();
             services.PostConfigure<SiloOptions>(options => options.SiloName ??= $"Silo_{Guid.NewGuid().ToString("N")[..5]}");
             services.TryAddSingleton<ILocalSiloDetails, LocalSiloDetails>();
@@ -87,7 +92,6 @@ namespace Orleans.Hosting
             services.TryAddSingleton<FallbackSystemTarget>();
             services.TryAddSingleton<LifecycleSchedulingSystemTarget>();
 
-            services.AddLogging();
             services.TryAddSingleton<ITimerRegistry, TimerRegistry>();
             
             services.TryAddSingleton<GrainRuntime>();
@@ -96,6 +100,7 @@ namespace Orleans.Hosting
             services.AddTransient<CancellationSourcesExtension>();
             services.AddKeyedTransient<IGrainExtension>(typeof(ICancellationSourcesExtension), (sp, _) => sp.GetRequiredService<CancellationSourcesExtension>());
             services.TryAddSingleton<GrainFactory>(sp => sp.GetRequiredService<InsideRuntimeClient>().ConcreteGrainFactory);
+            services.TryAddSingleton<InterfaceToImplementationMappingCache>();
             services.TryAddSingleton<GrainInterfaceTypeToGrainTypeResolver>();
             services.TryAddFromExisting<IGrainFactory, GrainFactory>();
             services.TryAddFromExisting<IInternalGrainFactory, GrainFactory>();
@@ -112,7 +117,6 @@ namespace Orleans.Hosting
             services.TryAddSingleton<ActivationDirectory>();
             services.TryAddSingleton<GrainCountStatistics>();
             services.AddSingleton<ActivationCollector>();
-            services.AddFromExisting<IHealthCheckParticipant, ActivationCollector>();
             services.AddFromExisting<IActivationWorkingSetObserver, ActivationCollector>();
             services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, ActivationCollector>();
 
@@ -135,7 +139,7 @@ namespace Orleans.Hosting
             services.TryAddSingleton<MessageCenter>();
             services.TryAddFromExisting<IMessageCenter, MessageCenter>();
             services.TryAddSingleton(FactoryUtility.Create<MessageCenter, Gateway>);
-            services.TryAddSingleton<IConnectedClientCollection>(sp => (IConnectedClientCollection)sp.GetRequiredService<MessageCenter>().Gateway ?? new EmptyConnectedClientCollection());
+            services.TryAddSingleton<IConnectedClientCollection>(sp => sp.GetRequiredService<MessageCenter>().Gateway as IConnectedClientCollection ?? new EmptyConnectedClientCollection());
             services.TryAddSingleton<InternalGrainRuntime>();
             services.TryAddSingleton<InsideRuntimeClient>();
             services.TryAddFromExisting<IRuntimeClient, InsideRuntimeClient>();
@@ -200,8 +204,7 @@ namespace Orleans.Hosting
             // Placement directors
             services.AddPlacementDirector<RandomPlacement, RandomPlacementDirector>();
             services.AddPlacementDirector<PreferLocalPlacement, PreferLocalPlacementDirector>();
-            services.AddPlacementDirector<StatelessWorkerPlacement, StatelessWorkerDirector>();
-            services.Replace(new ServiceDescriptor(typeof(StatelessWorkerPlacement), sp => new StatelessWorkerPlacement(), ServiceLifetime.Singleton));
+            services.AddPlacementDirector<StatelessWorkerPlacement, StatelessWorkerDirector>(ServiceLifetime.Transient);
             services.AddPlacementDirector<ActivationCountBasedPlacement, ActivationCountPlacementDirector>();
             services.AddPlacementDirector<HashBasedPlacement, HashBasedPlacementDirector>();
             services.AddPlacementDirector<ClientObserversPlacement, ClientObserversPlacementDirector>();
@@ -261,12 +264,13 @@ namespace Orleans.Hosting
                     var consistentRingOptions = sp.GetRequiredService<IOptions<ConsistentRingOptions>>().Value;
                     var siloDetails = sp.GetRequiredService<ILocalSiloDetails>();
                     var loggerFactory = sp.GetRequiredService<ILoggerFactory>();
+                    var siloStatusOracle = sp.GetRequiredService<ISiloStatusOracle>();
                     if (consistentRingOptions.UseVirtualBucketsConsistentRing)
                     {
-                        return new VirtualBucketsRingProvider(siloDetails.SiloAddress, loggerFactory, consistentRingOptions.NumVirtualBucketsConsistentRing);
+                        return new VirtualBucketsRingProvider(siloDetails.SiloAddress, loggerFactory, consistentRingOptions.NumVirtualBucketsConsistentRing, siloStatusOracle);
                     }
 
-                    return new ConsistentRingProvider(siloDetails.SiloAddress, loggerFactory);
+                    return new ConsistentRingProvider(siloDetails.SiloAddress, loggerFactory, siloStatusOracle);
                 });
 
             services.AddSingleton<IConfigureOptions<GrainTypeOptions>, DefaultGrainTypeOptionsProvider>();
@@ -348,6 +352,7 @@ namespace Orleans.Hosting
             services.TryAddSingleton<IGrainStorageSerializer, JsonGrainStorageSerializer>();
             services.TryAddSingleton<IPersistentStateFactory, PersistentStateFactory>();
             services.TryAddSingleton(typeof(IAttributeToFactoryMapper<PersistentStateAttribute>), typeof(PersistentStateAttributeMapper));
+            services.TryAddSingleton<StateStorageBridgeSharedMap>();
 
             // IAsyncEnumerable support
             services.AddScoped<IAsyncEnumerableGrainExtension, AsyncEnumerableGrainExtension>();
@@ -356,6 +361,7 @@ namespace Orleans.Hosting
                 (sp, _) => sp.GetRequiredService<IAsyncEnumerableGrainExtension>());
 
             // Networking
+            services.TryAddSingleton<IMessageStatisticsSink, NoOpMessageStatisticsSink>();
             services.TryAddSingleton<ConnectionCommon>();
             services.TryAddSingleton<ConnectionManager>();
             services.TryAddSingleton<ConnectionPreambleHelper>();
@@ -399,6 +405,7 @@ namespace Orleans.Hosting
             services.AddSingleton<MigrationContext.SerializationHooks>();
             services.AddSingleton<ActivationMigrationManager>();
             services.AddFromExisting<IActivationMigrationManager, ActivationMigrationManager>();
+            services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, ActivationMigrationManager>();
 
             ApplyConfiguration(builder);
         }

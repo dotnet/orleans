@@ -37,13 +37,7 @@ namespace Orleans.Streams
             return Equals((StreamHandshakeToken)obj);
         }
 
-        public override int GetHashCode()
-        {
-            unchecked
-            {
-                return (GetType().GetHashCode() * 397) ^ (Token != null ? Token.GetHashCode() : 0);
-            }
-        }
+        public override int GetHashCode() => HashCode.Combine(GetType(), Token);
     }
 
     [Serializable]

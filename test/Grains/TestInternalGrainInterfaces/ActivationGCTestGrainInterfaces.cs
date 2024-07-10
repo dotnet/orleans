@@ -1,4 +1,4 @@
-﻿namespace UnitTests.GrainInterfaces
+namespace UnitTests.GrainInterfaces
 {
     public interface IIdleActivationGcTestGrain1 : IGrainWithGuidKey
     {
@@ -15,7 +15,6 @@
         Task Nop();
         Task Delay(TimeSpan dt);
         Task<string> IdentifyActivation();
-        Task EnableBurstOnCollection(int count);
     }
 
     public interface IBusyActivationGcTestGrain2 : IGrainWithGuidKey

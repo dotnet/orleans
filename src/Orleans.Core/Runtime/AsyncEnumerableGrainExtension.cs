@@ -33,12 +33,17 @@ internal sealed class AsyncEnumerableGrainExtension : IAsyncEnumerableGrainExten
         _grainContext = grainContext;
         _messagingOptions = messagingOptions.Value;
         var registry = _grainContext.GetComponent<ITimerRegistry>();
-        _timer = registry.RegisterTimer(
+        _timer = registry.RegisterGrainTimer(
             _grainContext,
-            static async state => await ((AsyncEnumerableGrainExtension)state).RemoveExpiredAsync(),
+            static async (state, cancellationToken) => await state.RemoveExpiredAsync(cancellationToken),
             this,
-            TimeSpan.FromSeconds(EnumeratorExpirationMilliseconds),
-            TimeSpan.FromSeconds(EnumeratorExpirationMilliseconds));
+            new()
+            {
+                DueTime = TimeSpan.FromSeconds(EnumeratorExpirationMilliseconds),
+                Period = TimeSpan.FromSeconds(EnumeratorExpirationMilliseconds),
+                Interleave = true,
+                KeepAlive = false
+            });
     }
 
     /// <inheritdoc/>
@@ -52,7 +57,7 @@ internal sealed class AsyncEnumerableGrainExtension : IAsyncEnumerableGrainExten
         return default;
     }
 
-    public async ValueTask RemoveExpiredAsync()
+    private async ValueTask RemoveExpiredAsync(CancellationToken cancellationToken)
     {
         List<Guid> toRemove = default;
         foreach (var (requestId, state) in _enumerators)
@@ -83,7 +88,7 @@ internal sealed class AsyncEnumerableGrainExtension : IAsyncEnumerableGrainExten
 
         if (tasks is { Count: > 0 })
         {
-            await Task.WhenAll(tasks);
+            await Task.WhenAll(tasks).WaitAsync(cancellationToken);
         }
     }
 

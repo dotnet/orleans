@@ -12,10 +12,10 @@ internal static class CatalogInstruments
 
     internal static Counter<int> ActivationShutdown = Instruments.Meter.CreateCounter<int>(InstrumentNames.CATALOG_ACTIVATION_SHUTDOWN);
 
-    internal static void ActiviationShutdownViaCollection() => ActivationShutdown.Add(1, new KeyValuePair<string, object>("via", "collection"));
-    internal static void ActiviationShutdownViaDeactivateOnIdle() => ActivationShutdown.Add(1, new KeyValuePair<string, object>("via", "deactivateOnIdle"));
-    internal static void ActiviationShutdownViaMigration() => ActivationShutdown.Add(1, new KeyValuePair<string, object>("via", "migration"));
-    internal static void ActiviationShutdownViaDeactivateStuckActivation() => ActivationShutdown.Add(1, new KeyValuePair<string, object>("via", "deactivateStuckActivation"));
+    internal static void ActivationShutdownViaCollection() => ActivationShutdown.Add(1, new KeyValuePair<string, object>("via", "collection"));
+    internal static void ActivationShutdownViaDeactivateOnIdle() => ActivationShutdown.Add(1, new KeyValuePair<string, object>("via", "deactivateOnIdle"));
+    internal static void ActivationShutdownViaMigration() => ActivationShutdown.Add(1, new KeyValuePair<string, object>("via", "migration"));
+    internal static void ActivationShutdownViaDeactivateStuckActivation() => ActivationShutdown.Add(1, new KeyValuePair<string, object>("via", "deactivateStuckActivation"));
 
     internal static Counter<int> NonExistentActivations = Instruments.Meter.CreateCounter<int>(InstrumentNames.CATALOG_ACTIVATION_NON_EXISTENT_ACTIVATIONS);
 

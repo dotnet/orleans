@@ -1,6 +1,8 @@
+#nullable enable
 using System;
 using System.Buffers;
 using System.Collections.Generic;
+using System.Linq;
 using System.Reflection;
 using Orleans.Serialization.Buffers;
 using Orleans.Serialization.Cloning;
@@ -17,7 +19,7 @@ namespace Orleans.Serialization.Codecs
     /// <typeparam name="TKey">The key type.</typeparam>
     /// <typeparam name="TValue">The value type.</typeparam>
     [RegisterSerializer]
-    public sealed class DictionaryCodec<TKey, TValue> : IFieldCodec<Dictionary<TKey, TValue>>
+    public sealed class DictionaryCodec<TKey, TValue> : IFieldCodec<Dictionary<TKey, TValue>> where TKey : notnull
     {
         private readonly Type _keyFieldType = typeof(TKey);
         private readonly Type _valueFieldType = typeof(TValue);
@@ -83,10 +85,10 @@ namespace Orleans.Serialization.Codecs
             field.EnsureWireTypeTagDelimited();
 
             var placeholderReferenceId = ReferenceCodec.CreateRecordPlaceholder(reader.Session);
-            TKey key = default;
+            TKey? key = default;
             var valueExpected = false;
-            Dictionary<TKey, TValue> result = null;
-            IEqualityComparer<TKey> comparer = null;
+            Dictionary<TKey, TValue>? result = null;
+            IEqualityComparer<TKey>? comparer = null;
             uint fieldId = 0;
             while (true)
             {
@@ -122,7 +124,7 @@ namespace Orleans.Serialization.Codecs
                         }
                         else
                         {
-                            result.Add(key, _valueCodec.ReadValue(ref reader, header));
+                            result!.Add(key!, _valueCodec.ReadValue(ref reader, header));
                             valueExpected = false;
                         }
                         break;
@@ -136,7 +138,7 @@ namespace Orleans.Serialization.Codecs
             return result;
         }
 
-        private Dictionary<TKey, TValue> CreateInstance(int length, IEqualityComparer<TKey> comparer, SerializerSession session, uint placeholderReferenceId)
+        private Dictionary<TKey, TValue> CreateInstance(int length, IEqualityComparer<TKey>? comparer, SerializerSession session, uint placeholderReferenceId)
         {
             var result = new Dictionary<TKey, TValue>(length, comparer);
             ReferenceCodec.RecordObject(session, result, placeholderReferenceId);
@@ -155,10 +157,11 @@ namespace Orleans.Serialization.Codecs
     /// <typeparam name="TKey">The type of the t key.</typeparam>
     /// <typeparam name="TValue">The type of the t value.</typeparam>
     [RegisterCopier]
-    public sealed class DictionaryCopier<TKey, TValue> : IDeepCopier<Dictionary<TKey, TValue>>, IBaseCopier<Dictionary<TKey, TValue>>
+    public sealed class DictionaryCopier<TKey, TValue> : IDeepCopier<Dictionary<TKey, TValue>>, IBaseCopier<Dictionary<TKey, TValue>> where TKey : notnull
     {
         private readonly IDeepCopier<TKey> _keyCopier;
         private readonly IDeepCopier<TValue> _valueCopier;
+        private readonly ConstructorInfo _baseConstructor;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="DictionaryCopier{TKey, TValue}"/> class.
@@ -169,6 +172,7 @@ namespace Orleans.Serialization.Codecs
         {
             _keyCopier = keyCopier;
             _valueCopier = valueCopier;
+            _baseConstructor = typeof(Dictionary<TKey, TValue>).GetConstructor([typeof(int), typeof(IEqualityComparer<TKey>)])!;
         }
 
         /// <inheritdoc/>
@@ -197,6 +201,16 @@ namespace Orleans.Serialization.Codecs
         /// <inheritdoc/>
         public void DeepCopy(Dictionary<TKey, TValue> input, Dictionary<TKey, TValue> output, CopyContext context)
         {
+            output.Clear();
+            if (input.Comparer != EqualityComparer<TKey>.Default)
+            {
+                _baseConstructor.Invoke(output, [input.Count, input.Comparer]);
+            }
+            else
+            {
+                output.EnsureCapacity(input.Count);
+            }
+
             foreach (var pair in input)
             {
                 output[_keyCopier.DeepCopy(pair.Key, context)] = _valueCopier.DeepCopy(pair.Value, context);
@@ -210,7 +224,7 @@ namespace Orleans.Serialization.Codecs
     /// <typeparam name="TKey">The key type.</typeparam>
     /// <typeparam name="TValue">The value type.</typeparam>
     [RegisterSerializer]
-    public sealed class DictionaryBaseCodec<TKey, TValue> : IBaseCodec<Dictionary<TKey, TValue>>
+    public sealed class DictionaryBaseCodec<TKey, TValue> : IBaseCodec<Dictionary<TKey, TValue>> where TKey : notnull
     {
         private readonly Type _keyFieldType = typeof(TKey);
         private readonly Type _valueFieldType = typeof(TValue);
@@ -234,7 +248,7 @@ namespace Orleans.Serialization.Codecs
             _keyCodec = OrleansGeneratedCodeHelper.UnwrapService(this, keyCodec);
             _valueCodec = OrleansGeneratedCodeHelper.UnwrapService(this, valueCodec);
             _comparerCodec = OrleansGeneratedCodeHelper.UnwrapService(this, comparerCodec);
-            _baseConstructor = typeof(Dictionary<TKey, TValue>).GetConstructor(new Type[] { typeof(int), typeof(IEqualityComparer<TKey>) });
+            _baseConstructor = typeof(Dictionary<TKey, TValue>).GetConstructor([typeof(int), typeof(IEqualityComparer<TKey>)])!;
         }
 
         void IBaseCodec<Dictionary<TKey, TValue>>.Serialize<TBufferWriter>(ref Writer<TBufferWriter> writer, Dictionary<TKey, TValue> value)
@@ -259,9 +273,13 @@ namespace Orleans.Serialization.Codecs
 
         void IBaseCodec<Dictionary<TKey, TValue>>.Deserialize<TInput>(ref Reader<TInput> reader, Dictionary<TKey, TValue> value)
         {
-            TKey key = default;
+            // If the dictionary has some values added by the default constructor, clear them.
+            // If those values are in the serialized payload, they will be added below.
+            value.Clear();
+
+            TKey? key = default;
             var valueExpected = false;
-            IEqualityComparer<TKey> comparer = null;
+            IEqualityComparer<TKey>? comparer = null;
             uint fieldId = 0;
             bool hasLengthField = false;
             while (true)
@@ -286,7 +304,15 @@ namespace Orleans.Serialization.Codecs
                         }
 
                         hasLengthField = true;
-                        _baseConstructor.Invoke(value, new object[] { length, comparer });
+                        if (comparer is not null)
+                        {
+                            _baseConstructor.Invoke(value, [length, comparer]);
+                        }
+                        else
+                        {
+                            value.EnsureCapacity(length);
+                        }
+
                         break;
                     case 2:
                         if (!hasLengthField)
@@ -301,7 +327,7 @@ namespace Orleans.Serialization.Codecs
                         }
                         else
                         {
-                            value.Add(key, _valueCodec.ReadValue(ref reader, header));
+                            value.Add(key!, _valueCodec.ReadValue(ref reader, header));
                             valueExpected = false;
                         }
                         break;

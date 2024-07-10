@@ -6,6 +6,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Orleans.Configuration;
 using Orleans.Streams.Filtering;
+using Orleans.Internal;
 
 namespace Orleans.Runtime.Providers
 {
@@ -66,6 +67,7 @@ namespace Orleans.Runtime.Providers
             IQueueAdapter queueAdapter)
         {
             IStreamQueueBalancer queueBalancer = CreateQueueBalancer(streamProviderName);
+            (var deliveryProvider, var queueReaderProvider) = CreateBackoffProviders(streamProviderName);
             var managerId = SystemTargetGrainId.Create(Constants.StreamPullingAgentManagerType, this.siloDetails.SiloAddress, streamProviderName);
             var pubsubOptions = this.ServiceProvider.GetOptionsByName<StreamPubSubOptions>(streamProviderName);
             var pullingAgentOptions = this.ServiceProvider.GetOptionsByName<StreamPullingAgentOptions>(streamProviderName);
@@ -80,7 +82,9 @@ namespace Orleans.Runtime.Providers
                 pullingAgentOptions,
                 this.loggerFactory,
                 this.siloDetails.SiloAddress,
-                queueAdapter);
+                queueAdapter,
+                deliveryProvider,
+                queueReaderProvider);
 
             var catalog = this.ServiceProvider.GetRequiredService<Catalog>();
             catalog.RegisterSystemTarget(manager);
@@ -91,6 +95,17 @@ namespace Orleans.Runtime.Providers
             // Need to call it as a grain reference though.
             await pullingAgentManager.Initialize();
             return pullingAgentManager;
+        }
+
+        private (IBackoffProvider, IBackoffProvider) CreateBackoffProviders(string streamProviderName)
+        {
+            var deliveryProvider = (IBackoffProvider)ServiceProvider.GetKeyedService<IMessageDeliveryBackoffProvider>(streamProviderName) ??
+                new ExponentialBackoff(TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(30), TimeSpan.FromSeconds(1));
+
+            var queueReaderProvider = (IBackoffProvider)ServiceProvider.GetKeyedService<IQueueReaderBackoffProvider>(streamProviderName) ??
+                new ExponentialBackoff(TimeSpan.FromSeconds(10), TimeSpan.FromSeconds(20), TimeSpan.FromSeconds(1));
+
+            return new(deliveryProvider, queueReaderProvider);
         }
 
         private IStreamQueueBalancer CreateQueueBalancer(string streamProviderName)
