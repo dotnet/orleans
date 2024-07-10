@@ -80,7 +80,7 @@ namespace Orleans.Streams
         public override bool Equals(object? obj) => obj is QueueId queueId && Equals(queueId);
 
         /// <inheritdoc/>
-        public override int GetHashCode() => (int)queueId ^ (int)uniformHashCache ^ (queueNamePrefix?.GetHashCode() ?? 0);
+        public override int GetHashCode() => HashCode.Combine(queueId, uniformHashCache, queueNamePrefix);
 
         public static bool operator ==(QueueId left, QueueId right) => left.Equals(right);
 

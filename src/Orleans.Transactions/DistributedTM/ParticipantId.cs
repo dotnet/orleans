@@ -49,15 +49,7 @@ namespace Orleans.Transactions
                 return string.CompareOrdinal(x.Name, y.Name) == 0 && Equals(x.Reference, y.Reference);
             }
 
-            public int GetHashCode(ParticipantId obj)
-            {
-                unchecked
-                {
-                    var idHashCode = (obj.Name != null) ? obj.Name.GetHashCode() : 0;
-                    var referenceHashCode = (obj.Reference != null) ? obj.Reference.GetHashCode() : 0;
-                    return (idHashCode * 397) ^ (referenceHashCode);
-                }
-            }
+            public int GetHashCode(ParticipantId obj) => HashCode.Combine(obj.Name, obj.Reference);
         }
     }
 
