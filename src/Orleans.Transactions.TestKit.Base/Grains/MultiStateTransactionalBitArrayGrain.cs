@@ -39,10 +39,7 @@ namespace Orleans.Transactions.TestKit.Correctnesss
             return Equals((BitArrayState) obj);
         }
 
-        public override int GetHashCode()
-        {
-            return (value != null ? value.GetHashCode() : 0);
-        }
+        public override int GetHashCode() => HashCode.Combine(value);
 
         private static readonly int BitsInInt = sizeof(int) * 8;
 

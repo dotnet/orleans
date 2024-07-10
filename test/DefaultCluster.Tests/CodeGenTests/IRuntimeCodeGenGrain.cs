@@ -278,17 +278,7 @@ namespace Tester.CodeGenTests
             return this.Equals((@event)obj);
         }
 
-        public override int GetHashCode()
-        {
-            unchecked
-            {
-                var hashCode = (this.@if != null ? this.@if.GetHashCode() : 0);
-                hashCode = (hashCode * 397) ^ (this.@public != null ? this.@public.GetHashCode() : 0);
-                hashCode = (hashCode * 397) ^ this.privateId.GetHashCode();
-                hashCode = (hashCode * 397) ^ this.Id.GetHashCode();
-                return hashCode;
-            }
-        }
+        public override int GetHashCode() => HashCode.Combine(@if, @public, privateId, Id, Enum);
 
         public bool Equals(@event other)
         {

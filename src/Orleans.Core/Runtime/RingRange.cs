@@ -55,6 +55,7 @@ namespace Orleans.Runtime
     {
         [Id(0)]
         private readonly uint begin;
+
         [Id(1)]
         private readonly uint end;
 
@@ -105,7 +106,7 @@ namespace Orleans.Runtime
 
         public override bool Equals(object? obj) => Equals(obj as SingleRange);
 
-        public override int GetHashCode() => (int)(begin ^ end);
+        public override int GetHashCode() => HashCode.Combine(GetType(), begin, end);
 
         public override string ToString() => begin == 0 && end == 0 ? "<(0 0], Size=x100000000, %Ring=100%>" : $"{this}";
 
@@ -175,7 +176,7 @@ namespace Orleans.Runtime
         /// <summary>
         /// The ring size.
         /// </summary>
-        public const long RING_SIZE = ((long)uint.MaxValue) + 1;
+        public const long RING_SIZE = (long)uint.MaxValue + 1;
 
         /// <summary>
         /// Represents an empty range.
@@ -240,6 +241,7 @@ namespace Orleans.Runtime
     {
         [Id(0)]
         private readonly List<SingleRange> ranges;
+
         [Id(1)]
         private readonly long rangeSize;
 
@@ -319,7 +321,7 @@ namespace Orleans.Runtime
             for (int i = 0; i < numSubRanges; i++)
             {
                 // (Begin, End]
-                uint end = (unchecked(start + portion));
+                uint end = unchecked(start + portion);
                 // I want it to overflow on purpose. It will do the right thing.
                 if (remainder > 0)
                 {
@@ -333,11 +335,11 @@ namespace Orleans.Runtime
             throw new ArgumentException(nameof(mySubRangeIndex));
         }
 
-        // Takes a range and devides it into numSubRanges equal ranges and returns the subrange at mySubRangeIndex.
+        // Takes a range and divides it into numSubRanges equal ranges and returns the subrange at mySubRangeIndex.
         public static IRingRange GetEquallyDividedSubRange(IRingRange range, int numSubRanges, int mySubRangeIndex)
         {
-            if (numSubRanges <= 0) throw new ArgumentException(nameof(numSubRanges));
-            if ((uint)mySubRangeIndex >= (uint)numSubRanges) throw new ArgumentException(nameof(mySubRangeIndex));
+            if (numSubRanges <= 0) throw new ArgumentOutOfRangeException(nameof(numSubRanges));
+            if ((uint)mySubRangeIndex >= (uint)numSubRanges) throw new ArgumentOutOfRangeException(nameof(mySubRangeIndex));
 
             if (numSubRanges == 1) return range;
 
@@ -358,7 +360,7 @@ namespace Orleans.Runtime
                             return new GeneralMultiRange(singlesForThisIndex);
                     }
 
-                default: throw new ArgumentException(nameof(range));
+                default: throw new ArgumentOutOfRangeException(nameof(range));
             }
         }
     }
