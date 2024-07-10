@@ -6,6 +6,7 @@ using System.Runtime.Serialization;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
+using MessagePack;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using Orleans;
@@ -846,7 +847,7 @@ namespace Orleans.Serialization.UnitTests
 
     public class MyFirstForeignLibraryType
     {
-        
+
         public int Num { get; set; }
         public string String { get; set; }
         public DateTimeOffset DateTimeOffset { get; set; }
@@ -917,4 +918,25 @@ namespace Orleans.Serialization.UnitTests
         public MySecondForeignLibraryTypeSurrogate ConvertToSurrogate(in MySecondForeignLibraryType value)
             => new () { Name = value.Name, Value = value.Value, Timestamp = value.Timestamp };
     }
+
+    [MessagePackObject]
+    public sealed record MyMessagePackClass
+    {
+        [Key(0)]
+        public int IntProperty { get; init; }
+
+        [Key(1)]
+        public string StringProperty { get; init; }
+
+        [Key(2)]
+        public MyMessagePackSubClass SubClass { get; init; }
+    }
+
+    [MessagePackObject]
+    public sealed record MyMessagePackSubClass
+    {
+        [Key(0)]
+        public Guid Id { get; init; }
+    }
+
 }
