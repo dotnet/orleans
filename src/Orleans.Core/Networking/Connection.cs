@@ -353,7 +353,7 @@ namespace Orleans.Runtime.Messaging
 
             Exception error = default;
             var serializer = this.shared.ServiceProvider.GetRequiredService<MessageSerializer>();
-            var messageStatisticsSink = this.shared.MessageStatisticsSink;
+            var messageObserver = this.shared.MessageStatisticsSink.GetMessageObserver();
             try
             {
                 var output = this._transport.Output;
@@ -375,7 +375,7 @@ namespace Orleans.Runtime.Messaging
                             inflight.Add(message);
                             var (headerLength, bodyLength) = serializer.Write(output, message);
                             RecordMessageSend(message, headerLength + bodyLength, headerLength);
-                            messageStatisticsSink.RecordMessage(message);
+                            messageObserver?.Invoke(message);
                             message = null;
                         }
                     }

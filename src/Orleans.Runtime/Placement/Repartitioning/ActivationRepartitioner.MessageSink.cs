@@ -1,6 +1,7 @@
 #nullable enable
 using System;
 using System.Diagnostics;
+using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
@@ -109,7 +110,9 @@ internal partial class ActivationRepartitioner : IMessageStatisticsSink
         }
     }
 
-    public void RecordMessage(Message message)
+    public Action<Message>? GetMessageObserver() => RecordMessage;
+
+    private void RecordMessage(Message message)
     {
         if (!_enableMessageSampling || message.IsSystemMessage)
         {
