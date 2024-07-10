@@ -73,6 +73,7 @@ namespace Orleans
             services.TryAddSingleton<GrainBindingsResolver>();
             services.TryAddSingleton<LocalClientDetails>();
             services.TryAddSingleton<OutsideRuntimeClient>();
+            services.TryAddSingleton<InterfaceToImplementationMappingCache>();
             services.TryAddSingleton<ClientGrainContext>();
             services.AddFromExisting<IGrainContextAccessor, ClientGrainContext>();
             services.TryAddFromExisting<IRuntimeClient, OutsideRuntimeClient>();

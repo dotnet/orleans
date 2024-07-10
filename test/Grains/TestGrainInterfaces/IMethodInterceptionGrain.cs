@@ -20,6 +20,22 @@ namespace UnitTests.GrainInterfaces
         Task SystemWideCallFilterMarker();
     }
 
+    [GrainInterfaceType("obs-method-interception-custom-name")]
+    public interface IMethodInterceptionGrainObserver : IGrainObserver, IMethodFromAnotherInterface
+    {
+        [Id(14142)]
+        Task<string> One();
+
+        [Id(4142)]
+        Task<string> Echo(string someArg);
+        Task<string> NotIntercepted();
+        Task<string> Throw();
+        Task<string> IncorrectResultType();
+        Task FilterThrows();
+
+        Task SystemWideCallFilterMarker();
+    }
+
     [GrainInterfaceType("custom-outgoing-interception-grain")]
     public interface IOutgoingMethodInterceptionGrain : IGrainWithIntegerKey
     {
@@ -34,14 +50,27 @@ namespace UnitTests.GrainInterfaces
         Task<string> GetInputAsString(T input);
     }
 
+    [Alias("UnitTests.GrainInterfaces.IGenericMethodInterceptionGrainObserver`1")]
+    public interface IGenericMethodInterceptionGrainObserver<in T> : IGrainObserver, IMethodFromAnotherInterface
+    {
+        [Alias("GetInputAsString")]
+        Task<string> GetInputAsString(T input);
+    }
+
     public interface IMethodFromAnotherInterface
     {
         Task<string> SayHello();
     }
-    
 
     [Alias("UnitTests.GrainInterfaces.ITrickyMethodInterceptionGrain")]
     public interface ITrickyMethodInterceptionGrain : IGenericMethodInterceptionGrain<string>, IGenericMethodInterceptionGrain<bool>
+    {
+        [Alias("GetBestNumber")]
+        Task<int> GetBestNumber();
+    }
+
+    [Alias("UnitTests.GrainInterfaces.ITrickyMethodInterceptionGrainObserver")]
+    public interface ITrickyMethodInterceptionGrainObserver : IGenericMethodInterceptionGrainObserver<string>, IGenericMethodInterceptionGrainObserver<bool>
     {
         [Alias("GetBestNumber")]
         Task<int> GetBestNumber();
@@ -58,6 +87,17 @@ namespace UnitTests.GrainInterfaces
     }
 
     public interface IGrainCallFilterTestGrain : IGrainWithIntegerKey
+    {
+        Task<string> ThrowIfGreaterThanZero(int value);
+        Task<string> GetRequestContext();
+
+        Task<int> SumSet(HashSet<int> numbers);
+
+        Task SystemWideCallFilterMarker();
+        Task GrainSpecificCallFilterMarker();
+    }
+
+    public interface IGrainCallFilterTestGrainObserver : IGrainObserver
     {
         Task<string> ThrowIfGreaterThanZero(int value);
         Task<string> GetRequestContext();
