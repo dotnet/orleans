@@ -59,12 +59,17 @@ namespace Orleans.Runtime.GrainDirectory
             // Immediately yield back to the caller
             await Task.CompletedTask.ConfigureAwait(ConfigureAwaitOptions.ForceYielding | ConfigureAwaitOptions.ContinueOnCapturedContext);
 
-            while (!_shutdownCts.IsCancellationRequested)
+            var cancellationToken = _shutdownCts.Token;
+            while (!cancellationToken.IsCancellationRequested)
             {
                 try
                 {
                     // recheck every X seconds (Consider making it a configurable parameter)
-                    await Task.Delay(SLEEP_TIME_BETWEEN_REFRESHES);
+                    await Task.Delay(SLEEP_TIME_BETWEEN_REFRESHES, cancellationToken).ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing | ConfigureAwaitOptions.ContinueOnCapturedContext);
+                    if (cancellationToken.IsCancellationRequested)
+                    {
+                        break;
+                    }
 
                     // Run through all cache entries and do the following:
                     // 1. If the entry is not expired, skip it
@@ -101,19 +106,19 @@ namespace Orleans.Runtime.GrainDirectory
                         if (entry == null)
                         {
                             // 0. If the entry was deleted in parallel, presumably due to cleanup after silo death
-                            cache.Remove(grain);            // for debug
-                            removedCount++;
+                            cache.Remove(grain);
+                            removedCount++; // for debug
                         }
                         else if (!entry.IsExpired())
                         {
                             // 1. If the entry is not expired, skip it
-                            keptCount++;                         // for debug
+                            keptCount++; // for debug
                         }
                         else if (entry.NumAccesses == 0)
                         {
                             // 2. If the entry is expired and was not accessed in the last time interval -- throw it away
-                            cache.Remove(grain);            // for debug
-                            removedCount++;
+                            cache.Remove(grain);
+                            removedCount++; // for debug
                         }
                         else
                         {
@@ -122,10 +127,11 @@ namespace Orleans.Runtime.GrainDirectory
                             {
                                 fetchInBatchList[owner] = list = new List<GrainId>();
                             }
+
                             list.Add(grain);
                             // And reset the entry's access count for next time
                             entry.NumAccesses = 0;
-                            refreshedCount++;                         // for debug
+                            refreshedCount++; // for debug
                         }
                     }
 
@@ -138,12 +144,12 @@ namespace Orleans.Runtime.GrainDirectory
                             removedCount,
                             refreshedCount);
 
-                    // send batch requests
+                    // Send batch requests
                     SendBatchCacheRefreshRequests(fetchInBatchList);
 
                     ProduceStats();
                 }
-                catch (Exception ex) when (!_shutdownCts.IsCancellationRequested)
+                catch (Exception ex) when (!cancellationToken.IsCancellationRequested)
                 {
                     Log.LogError(ex, $"Error in {nameof(AdaptiveDirectoryCacheMaintainer)}.");
                 }
