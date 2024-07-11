@@ -722,7 +722,7 @@ internal sealed class ActivationData : IGrainContext, ICollectibleGrainContext, 
 
         try
         {
-            var activator = GetComponent<IGrainActivator>();
+            var activator = _shared.GetComponent<IGrainActivator>();
             if (activator != null)
             {
                 await activator.DisposeInstance(this, GrainInstance);
