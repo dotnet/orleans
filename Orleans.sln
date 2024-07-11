@@ -180,6 +180,9 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution 
 	EndProjectSection
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "DistributedTests", "DistributedTests", "{FFEC9FEE-FEDF-4510-B7D2-0B0B3374ED2F}"
+	ProjectSection(SolutionItems) = preProject
+		test\DistributedTests\README.md = test\DistributedTests\README.md
+	EndProjectSection
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "DistributedTests.Common", "test\DistributedTests\DistributedTests.Common\DistributedTests.Common.csproj", "{E8FFBF2E-80FE-4D80-B79A-2097180D203A}"
 EndProject
@@ -222,6 +225,7 @@ EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Orleans.Clustering.Cassandra", "src\Cassandra\Orleans.Clustering.Cassandra\Orleans.Clustering.Cassandra.csproj", "{7A1A2ECE-DC4B-4DE7-AEF7-855C50895171}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Tester.Cassandra", "test\Extensions\Tester.Cassandra\Tester.Cassandra.csproj", "{15A1777E-D1B6-4DC8-81D4-998A4CBA63FE}"
+EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Orleans.Streaming.AdoNet", "src\AdoNet\Orleans.Streaming.AdoNet\Orleans.Streaming.AdoNet.csproj", "{2B994F33-16CF-4679-936A-5AEABC529D2C}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Benchmarks.AdoNet", "test\Benchmarks.AdoNet\Benchmarks.AdoNet.csproj", "{B8F43537-2D2E-42A0-BE67-5E07E4313AEA}"
@@ -234,7 +238,7 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "DashboardToy.Frontend", "pl
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "DashboardToy.AppHost", "playground\DashboardToy\DashboardToy.AppHost\DashboardToy.AppHost.csproj", "{84B44F1D-B7FE-40E3-82F0-730A55AC8613}"
 EndProject
-Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "Orleans.Serialization.FSharp.Tests", "test\Orleans.Serialization.FSharp.Tests\Orleans.Serialization.FSharp.Tests.fsproj", "{B2D53D3C-E44A-4C9B-AAEE-28FB8C1BDF62}"
+Project("{6EC3EE1D-3C4E-46DD-8F32-0CC8E7565705}") = "Orleans.Serialization.FSharp.Tests", "test\Orleans.Serialization.FSharp.Tests\Orleans.Serialization.FSharp.Tests.fsproj", "{B2D53D3C-E44A-4C9B-AAEE-28FB8C1BDF62}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Orleans.Serialization.MessagePack", "src\Orleans.Serialization.MessagePack\Orleans.Serialization.MessagePack.csproj", "{F50F81B6-E9B5-4143-B66B-A1AD913F6E9C}"
 EndProject
