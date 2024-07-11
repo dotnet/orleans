@@ -108,7 +108,7 @@ namespace UnitTests.Directory
             throw new NotImplementedException();
         }
 
-        public void Stop()
+        public Task StopAsync()
         {
             throw new NotImplementedException();
         }
