@@ -66,7 +66,7 @@ namespace Orleans.Runtime
             get
             {
                 var completion = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
-                _workItems.Enqueue(new(WorkItemType.DeactivatedTask, new DeactivatedTaskWorkItemState(completion)));
+                EnqueueWorkItem(WorkItemType.DeactivatedTask, new DeactivatedTaskWorkItemState(completion));
                 return completion.Task;
             }
         }
@@ -77,21 +77,25 @@ namespace Orleans.Runtime
 
         public void ReceiveMessage(object message)
         {
-            _workItems.Enqueue(new(WorkItemType.Message, message));
-            _workSignal.Signal();
+            EnqueueWorkItem(WorkItemType.Message, message);
         }
 
         public void Deactivate(DeactivationReason deactivationReason, CancellationToken cancellationToken)
         {
-            _workItems.Enqueue(new(WorkItemType.Deactivate, new DeactivateWorkItemState(deactivationReason, cancellationToken)));
-            _workSignal.Signal();
+            EnqueueWorkItem(WorkItemType.Deactivate, new DeactivateWorkItemState(deactivationReason, cancellationToken));
         }
 
         public async ValueTask DisposeAsync()
         {
             var completion = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
-            _workItems.Enqueue(new(WorkItemType.DisposeAsync, new DisposeAsyncWorkItemState(completion)));
+            EnqueueWorkItem(WorkItemType.DisposeAsync, new DisposeAsyncWorkItemState(completion));
             await completion.Task;
+        }
+
+        private void EnqueueWorkItem(WorkItemType type, object state)
+        {
+            _workItems.Enqueue(new(type, state));
+            _workSignal.Signal();
         }
 
         public bool Equals([AllowNull] IGrainContext other) => other is not null && ActivationId.Equals(other.ActivationId);
@@ -305,8 +309,7 @@ namespace Orleans.Runtime
 
         public void OnDestroyActivation(IGrainContext grainContext)
         {
-            _workItems.Enqueue((WorkItemType.OnDestroyActivation, grainContext));
-            _workSignal.Signal();
+            EnqueueWorkItem(WorkItemType.OnDestroyActivation, grainContext);
             if (_workers.Count == 0)
             {
                 _shared.InternalRuntime.Catalog.UnregisterMessageTarget(this);
