@@ -16,7 +16,7 @@ namespace Orleans.Runtime.GrainDirectory
         /// <summary>
         /// Stops the local portion of the directory service.
         /// </summary>
-        void Stop();
+        Task StopAsync();
 
         RemoteGrainDirectory RemoteGrainDirectory { get; }
         RemoteGrainDirectory CacheValidator { get; }

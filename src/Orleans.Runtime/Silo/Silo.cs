@@ -269,11 +269,11 @@ namespace Orleans.Runtime
             //TODO: Setup all (or as many as possible) of the class started in this call to work directly with lifecyce
             var stopWatch = Stopwatch.StartNew();
 
-            StartTaskWithPerfAnalysis("Start local grain directory", LocalGrainDirectory.Start, stopWatch);
-
             // This has to follow the above steps that start the runtime components
             CreateSystemTargets();
             InjectDependencies();
+
+            StartTaskWithPerfAnalysis("Start local grain directory", LocalGrainDirectory.Start, stopWatch);
 
             return Task.CompletedTask;
         }
@@ -519,20 +519,7 @@ namespace Orleans.Runtime
                 if (gracefully)
                 {
                     // Stop LocalGrainDirectory
-                    var resolver = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
-                    localGrainDirectory.CacheValidator.WorkItemGroup.QueueAction(() =>
-                    {
-                        try
-                        {
-                            localGrainDirectory.Stop();
-                            resolver.TrySetResult(true);
-                        }
-                        catch (Exception exc)
-                        {
-                            resolver.TrySetException(exc);
-                        }
-                    });
-                    await resolver.Task;
+                    await localGrainDirectory.CacheValidator.RunOrQueueTask(localGrainDirectory.StopAsync);
 
                     try
                     {

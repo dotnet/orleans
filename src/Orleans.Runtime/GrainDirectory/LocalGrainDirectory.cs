@@ -7,6 +7,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 using Orleans.GrainDirectory;
+using Orleans.Runtime.Scheduler;
 
 #nullable enable
 namespace Orleans.Runtime.GrainDirectory
@@ -99,7 +100,7 @@ namespace Orleans.Runtime.GrainDirectory
             Running = true;
             if (maintainer != null)
             {
-                maintainer.Start();
+                CacheValidator.WorkItemGroup.QueueAction(maintainer.Start);
             }
         }
 
@@ -109,7 +110,7 @@ namespace Orleans.Runtime.GrainDirectory
         // The alternative would be to allow the silo to process requests after it has handed off its partition, in which case those changes
         // would receive successful responses but would not be reflected in the eventual state of the directory.
         // It's easy to change this, if we think the trade-off is better the other way.
-        public void Stop()
+        public async Task StopAsync()
         {
             // This will cause remote write requests to be forwarded to the silo that will become the new owner.
             // Requests might bounce back and forth for a while as membership stabilizes, but they will either be served by the
@@ -119,7 +120,10 @@ namespace Orleans.Runtime.GrainDirectory
             //mark Running as false will exclude myself from CalculateGrainDirectoryPartition(grainId)
             Running = false;
 
-            maintainer?.Stop();
+            if (maintainer is { } directoryCacheMaintainer)
+            {
+                await CacheValidator.QueueTask(directoryCacheMaintainer.StopAsync);
+            }
 
             DirectoryPartition.Clear();
             DirectoryCache.Clear();
