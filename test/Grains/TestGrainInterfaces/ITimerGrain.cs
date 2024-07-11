@@ -26,6 +26,7 @@ namespace UnitTests.GrainInterfaces
         Task RestartTimer(string name, TimeSpan dueTime);
         Task RestartTimer(string name, TimeSpan dueTime, TimeSpan period);
         Task StopTimer(string name);
+        Task RunSelfDisposingTimer();
     }
 
     public interface IPocoTimerCallGrain : ITimerCallGrain

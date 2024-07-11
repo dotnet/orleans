@@ -159,7 +159,7 @@ namespace UnitTestGrains
         {
             logger.LogInformation("StartTimer Name={Name} Delay={Delay}", name, delay);
             if (timer is not null) throw new InvalidOperationException("Expected timer to be null");
-            this.timer = this.RegisterGrainTimer(TimerTick, name, new(delay, Timeout.InfiniteTimeSpan)); // One shot timer
+            this.timer = this.RegisterGrainTimer(TimerTick, name, new(delay, Timeout.InfiniteTimeSpan) { Interleave = true }); // One shot timer
             this.timerName = name;
 
             return Task.CompletedTask;
@@ -170,7 +170,7 @@ namespace UnitTestGrains
             logger.LogInformation("StartTimer Name={Name} Delay={Delay}", name, delay);
             if (timer is not null) throw new InvalidOperationException("Expected timer to be null");
             var state = Tuple.Create<string, object>(operationType, name);
-            this.timer = this.RegisterGrainTimer(TimerTickAdvanced, state, delay, Timeout.InfiniteTimeSpan); // One shot timer
+            this.timer = this.RegisterGrainTimer(TimerTickAdvanced, state, new(delay, Timeout.InfiniteTimeSpan) { Interleave = true }); // One shot timer
             this.timerName = name;
 
             return Task.CompletedTask;
@@ -206,6 +206,34 @@ namespace UnitTestGrains
             timer = null;
             timerName = null;
             return Task.CompletedTask;
+        }
+
+        public async Task RunSelfDisposingTimer()
+        {
+            var tcs = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            var timer = new IGrainTimer[1];
+            timer[0] = this.RegisterGrainTimer(async (ct) =>
+            {
+                try
+                {
+                    Assert.False(ct.IsCancellationRequested);
+                    Assert.NotNull(timer[0]);
+                    timer[0].Dispose();
+                    Assert.True(ct.IsCancellationRequested);
+                    await Task.Delay(100);
+                    tcs.SetResult();
+                }
+                catch (Exception ex)
+                {
+                    tcs.TrySetException(ex);
+                }
+            },
+            new GrainTimerCreationOptions(TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(1))
+            {
+                Interleave = true
+            });
+
+            await tcs.Task;
         }
 
         private async Task TimerTick(object data)
@@ -837,6 +865,34 @@ namespace UnitTestGrains
             return Task.CompletedTask;
         }
 
+        public async Task RunSelfDisposingTimer()
+        {
+            var tcs = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            var timer = new IGrainTimer[1];
+            timer[0] = this.RegisterGrainTimer(async (ct) =>
+            {
+                try
+                {
+                    Assert.False(ct.IsCancellationRequested);
+                    Assert.NotNull(timer[0]);
+                    timer[0].Dispose();
+                    Assert.True(ct.IsCancellationRequested);
+                    await Task.Delay(100);
+                    tcs.SetResult();
+                }
+                catch (Exception ex)
+                {
+                    tcs.TrySetException(ex);
+                }
+            },
+            new GrainTimerCreationOptions(TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(1))
+            {
+                Interleave = true
+            });
+
+            await tcs.Task;
+        }
+
         private async Task TimerTick(object data)
         {
             try
@@ -1138,6 +1194,32 @@ namespace UnitTestGrains
             _context = RuntimeContext.Current;
             _activationTaskScheduler = TaskScheduler.Current;
             return Task.CompletedTask;
+        }
+
+        public async Task RunSelfDisposingTimer()
+        {
+            var tcs = new TaskCompletionSource();
+            var timer = new IGrainTimer[1];
+            timer[0] = this.RegisterGrainTimer(async () =>
+            {
+                try
+                {
+                    Assert.NotNull(timer[0]);
+                    timer[0].Dispose();
+                    tcs.SetResult();
+                    await Task.Delay(100);
+                }
+                catch (Exception ex)
+                {
+                    tcs.TrySetException(ex);
+                }
+            },
+            new GrainTimerCreationOptions(TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(1))
+            {
+                Interleave = true
+            });
+
+            await tcs.Task;
         }
 
         public Task StartTimer(string name, TimeSpan delay, bool keepAlive)

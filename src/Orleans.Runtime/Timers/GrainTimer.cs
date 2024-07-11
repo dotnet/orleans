@@ -146,6 +146,12 @@ internal abstract class GrainTimer : IGrainTimer
         // Schedule the next tick.
         try
         {
+            if (_cts.IsCancellationRequested)
+            {
+                // The instance has been disposed. No further ticks should be fired.
+                return;
+            }
+
             if (!_changed)
             {
                 // If the timer was not modified during the tick, schedule the next tick based on the period.
@@ -160,8 +166,10 @@ internal abstract class GrainTimer : IGrainTimer
         catch (ObjectDisposedException)
         {
         }
-
-        _firing = false;
+        finally
+        {
+            _firing = false;
+        }
     }
 
     private Response OnCallbackException(Exception exc)
