@@ -198,6 +198,17 @@ namespace DefaultCluster.Tests.TimerTests
         }
 
         [Fact, TestCategory("SlowBVT"), TestCategory("Timers")]
+        public async Task GrainTimer_DisposeFromCallback()
+        {
+            // Schedule a timer which disposes itself from its own callback.
+            var grain = GrainFactory.GetGrain<ITimerCallGrain>(GetRandomGrainId());
+            await grain.RunSelfDisposingTimer();
+
+            var pocoGrain = GrainFactory.GetGrain<IPocoTimerCallGrain>(GetRandomGrainId());
+            await pocoGrain.RunSelfDisposingTimer();
+        }
+
+        [Fact, TestCategory("SlowBVT"), TestCategory("Timers")]
         public async Task NonReentrantGrainTimer_Test()
         {
             const string testName = "NonReentrantGrainTimer_Test";
