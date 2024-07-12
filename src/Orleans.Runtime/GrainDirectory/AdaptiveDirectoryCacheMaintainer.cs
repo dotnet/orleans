@@ -145,44 +145,54 @@ namespace Orleans.Runtime.GrainDirectory
                             refreshedCount);
 
                     // Send batch requests
-                    SendBatchCacheRefreshRequests(fetchInBatchList);
+                    await SendBatchCacheRefreshRequests(fetchInBatchList, cancellationToken);
 
                     ProduceStats();
                 }
-                catch (Exception ex) when (!cancellationToken.IsCancellationRequested)
+                catch (Exception ex)
                 {
-                    Log.LogError(ex, $"Error in {nameof(AdaptiveDirectoryCacheMaintainer)}.");
+                    if (!cancellationToken.IsCancellationRequested)
+                    {
+                        Log.LogError(ex, $"Error in {nameof(AdaptiveDirectoryCacheMaintainer)}.");
+                    }
+                    else
+                    {
+                        Log.LogDebug(ex, $"Error in {nameof(AdaptiveDirectoryCacheMaintainer)}.");
+                    }
                 }
             }
         }
 
-        private void SendBatchCacheRefreshRequests(Dictionary<SiloAddress, List<GrainId>> refreshRequests)
+        private async Task SendBatchCacheRefreshRequests(Dictionary<SiloAddress, List<GrainId>> refreshRequests, CancellationToken cancellationToken)
         {
-            foreach (var kv in refreshRequests)
+            var tasks = new List<Task>(refreshRequests.Count);
+            foreach (var (silo, grainIds) in refreshRequests)
             {
-                var cachedGrainAndETagList = BuildGrainAndETagList(kv.Value);
-
-                var silo = kv.Key;
-
-                DirectoryInstruments.ValidationsCacheSent.Add(1);
-                // Send all of the items in one large request
-                var validator = this.grainFactory.GetSystemTarget<IRemoteGrainDirectory>(Constants.DirectoryCacheValidatorType, silo);
-
-                router.CacheValidator.QueueTask(async () =>
-                {
-                    var response = await validator.LookUpMany(cachedGrainAndETagList);
-                    ProcessCacheRefreshResponse(silo, response);
-                }).Ignore();
-
-                if (Log.IsEnabled(LogLevel.Trace)) Log.LogTrace("Silo {SiloAddress} is sending request to silo {OwnerSilo} with {Count} entries", router.MyAddress, silo, cachedGrainAndETagList.Count);
+                tasks.Add(RefreshSiloDirectoryCache(silo, grainIds, cancellationToken));
             }
+
+            await Task.WhenAll(tasks).WaitAsync(cancellationToken);
         }
 
-        private void ProcessCacheRefreshResponse(
+        private async Task RefreshSiloDirectoryCache(
             SiloAddress silo,
-            List<AddressAndTag> refreshResponse)
+            List<GrainId> grainIds,
+            CancellationToken cancellationToken)
         {
-            if (Log.IsEnabled(LogLevel.Trace)) Log.LogTrace("Silo {SiloAddress} received ProcessCacheRefreshResponse. #Response entries {Count}.", router.MyAddress, refreshResponse.Count);
+            if (cancellationToken.IsCancellationRequested)
+            {
+                return;
+            }
+
+            var cachedGrainAndETagList = BuildGrainAndETagList(grainIds);
+            DirectoryInstruments.ValidationsCacheSent.Add(1);
+
+            // Send all of the items in one large request
+            var validator = this.grainFactory.GetSystemTarget<IRemoteGrainDirectory>(Constants.DirectoryCacheValidatorType, silo);
+
+            if (Log.IsEnabled(LogLevel.Trace)) Log.LogTrace("Silo {SiloAddress} is sending refresh request to silo {OwnerSilo} with {Count} entries", router.MyAddress, silo, cachedGrainAndETagList.Count);
+            var refreshResponse = await validator.LookUpMany(cachedGrainAndETagList);
+            if (Log.IsEnabled(LogLevel.Trace)) Log.LogTrace("Silo {SiloAddress} received refresh response. #Response entries {Count}.", router.MyAddress, refreshResponse.Count);
 
             int otherSiloCount = 0, updatedCount = 0, unchangedCount = 0;
 
