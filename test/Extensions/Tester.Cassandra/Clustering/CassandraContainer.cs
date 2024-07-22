@@ -1,9 +1,7 @@
 using System.Net;
-using System.Text;
 using Cassandra;
 using DotNet.Testcontainers.Builders;
 using DotNet.Testcontainers.Containers;
-using DotNet.Testcontainers.Images;
 
 namespace Tester.Cassandra.Clustering;
 
