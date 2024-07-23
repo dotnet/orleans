@@ -18,7 +18,11 @@ namespace Orleans.Runtime
         /// <summary>
         /// Creates a <see cref="GrainInterfaceType"/> instance.
         /// </summary>
-        public GrainInterfaceType(string value) => _value = IdSpan.Create(value);
+        public GrainInterfaceType(string value)
+        {
+            ArgumentNullException.ThrowIfNullOrWhiteSpace(value);
+            _value = IdSpan.Create(value);
+        }
 
         /// <summary>
         /// Creates a <see cref="GrainInterfaceType"/> instance.

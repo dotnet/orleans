@@ -18,7 +18,7 @@ namespace Tester.Redis.GrainDirectory
         {
         }
 
-        protected override RedisGrainDirectory GetGrainDirectory()
+        protected override RedisGrainDirectory CreateGrainDirectory()
         {
             TestUtils.CheckForRedis();
             var configuration = TestDefaultConfiguration.RedisConnectionString;

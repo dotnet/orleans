@@ -68,6 +68,7 @@
     <PackageVersion Include="KubernetesClient" Version="12.1.1" />
     <PackageVersion Include="CassandraCSharpDriver" Version="3.20.1" />
     <!-- Test related packages -->
+    <PackageVersion Include="coverlet.collector" Version="6.0.2" />
     <PackageVersion Include="FluentAssertions" Version="6.7.0" />
     <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="17.9.0-preview-23503-02" />
     <PackageVersion Include="BenchmarkDotNet" Version="0.13.12" />

@@ -7,18 +7,18 @@ namespace Orleans.Transactions.Tests
     {
         public static ISiloBuilder ConfigureTracingForTransactionTests(this ISiloBuilder clientBuilder)
         {
-            clientBuilder.Services.ConfiguretracingForTransactionTests();
+            clientBuilder.Services.ConfigureTracingForTransactionTests();
             return clientBuilder;
         }
 
         public static IClientBuilder ConfigureTracingForTransactionTests(this IClientBuilder clientBuilder)
         {
-            clientBuilder.Services.ConfiguretracingForTransactionTests();
+            clientBuilder.Services.ConfigureTracingForTransactionTests();
             return clientBuilder;
         }
 
         // control the tracing of the various components of the transaction mechanism
-        public static IServiceCollection ConfiguretracingForTransactionTests(this IServiceCollection services)
+        public static IServiceCollection ConfigureTracingForTransactionTests(this IServiceCollection services)
         {
             return services.AddLogging(loggingBuilder =>
             {

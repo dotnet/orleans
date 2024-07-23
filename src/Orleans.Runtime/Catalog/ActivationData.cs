@@ -3,7 +3,6 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
-using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Threading;
@@ -807,7 +806,7 @@ internal sealed class ActivationData : IGrainContext, ICollectibleGrainContext, 
         CancelPendingOperations();
         lock (this)
         {
-            State = ActivationState.Invalid;
+            SetState(ActivationState.Invalid);
         }
 
         DisposeTimers();
@@ -1177,13 +1176,10 @@ internal sealed class ActivationData : IGrainContext, ICollectibleGrainContext, 
                             await ActivateAsync(command.RequestContext, command.CancellationToken).SuppressThrowing();
                             break;
                         case Command.Deactivate command:
-                            await FinishDeactivating(command.CancellationToken, command.PreviousState).SuppressThrowing();
+                            await FinishDeactivating(command.PreviousState, command.CancellationToken).SuppressThrowing();
                             break;
                         case Command.Delay command:
                             await Task.Delay(command.Duration, GrainRuntime.TimeProvider, command.CancellationToken);
-                            break;
-                        case Command.UnregisterFromCatalog:
-                            UnregisterMessageTarget();
                             break;
                         default:
                             throw new NotSupportedException($"Encountered unknown operation of type {op?.GetType().ToString() ?? "null"} {op}.");
@@ -1462,6 +1458,15 @@ internal sealed class ActivationData : IGrainContext, ICollectibleGrainContext, 
                 return;
             }
 
+            // If deactivation was caused by a transient failure, allow messages to be forwarded.
+            if (DeactivationReason.ReasonCode.IsTransientError())
+            {
+                foreach (var msg in msgs)
+                {
+                    msg.ForwardCount = Math.Max(msg.ForwardCount - 1, 0);
+                }
+            }
+
             if (_shared.Logger.IsEnabled(LogLevel.Debug))
             {
                 if (ForwardingAddress is { } address)
@@ -1497,7 +1502,6 @@ internal sealed class ActivationData : IGrainContext, ICollectibleGrainContext, 
     {
         // A chain of promises that will have to complete in order to complete the activation
         // Register with the grain directory and call the Activate method on the new activation.
-        var stopwatch = ValueStopwatch.StartNew();
         try
         {
             // Currently, the only grain type that is not registered in the Grain Directory is StatelessWorker.
@@ -1637,8 +1641,8 @@ internal sealed class ActivationData : IGrainContext, ICollectibleGrainContext, 
                     }
                 }
 
-               _shared.InternalRuntime.ActivationWorkingSet.OnActivated(this);
- 
+                _shared.InternalRuntime.ActivationWorkingSet.OnActivated(this);
+
                 if (_shared.Logger.IsEnabled(LogLevel.Debug))
                 {
                     _shared.Logger.LogDebug((int)ErrorCode.Catalog_AfterCallingActivate, "Finished activating grain {Grain}", this);
@@ -1676,11 +1680,6 @@ internal sealed class ActivationData : IGrainContext, ICollectibleGrainContext, 
         }
         finally
         {
-            if (cancellationToken.IsCancellationRequested && stopwatch.Elapsed.TotalMilliseconds > 50)
-            {
-                _shared.Logger.LogInformation("Cancellation requested for activation {Activation} took {ElapsedMilliseconds:0.0}ms.", this, stopwatch.Elapsed.TotalMilliseconds);
-            }
-
             _workSignal.Signal();
         }
     }
@@ -1691,10 +1690,8 @@ internal sealed class ActivationData : IGrainContext, ICollectibleGrainContext, 
     /// <summary>
     /// Completes the deactivation process.
     /// </summary>
-    /// <param name="cancellationToken">A cancellation which terminates graceful deactivation when cancelled.</param>
-    private async Task FinishDeactivating(CancellationToken cancellationToken, ActivationState previousState)
+    private async Task FinishDeactivating(ActivationState previousState, CancellationToken cancellationToken)
     {
-        var stopwatch = ValueStopwatch.StartNew();
         var migrated = false;
         var encounteredError = false;
         try
@@ -1832,6 +1829,8 @@ internal sealed class ActivationData : IGrainContext, ICollectibleGrainContext, 
 
         _shared.InternalRuntime.ActivationWorkingSet.OnDeactivated(this);
 
+        UnregisterMessageTarget();
+
         try
         {
             await DisposeAsync();
@@ -1841,15 +1840,9 @@ internal sealed class ActivationData : IGrainContext, ICollectibleGrainContext, 
             _shared.Logger.LogWarning(exception, "Exception disposing activation '{Activation}'.", this);
         }
 
-        UnregisterMessageTarget();
-
         // Signal deactivation
         GetDeactivationCompletionSource().TrySetResult(true);
         _workSignal.Signal();
-        if (cancellationToken.IsCancellationRequested && stopwatch.Elapsed.TotalMilliseconds > 50)
-        {
-            _shared.Logger.LogInformation("Cancellation requested for deactivation {Activation} took {ElapsedMilliseconds:0.0}ms.", this, stopwatch.Elapsed.TotalMilliseconds);
-        }
     }
 
     private TaskCompletionSource<bool> GetDeactivationCompletionSource()
@@ -2048,11 +2041,6 @@ internal sealed class ActivationData : IGrainContext, ICollectibleGrainContext, 
         public sealed class Delay(TimeSpan duration) : Command(new())
         {
             public TimeSpan Duration { get; } = duration;
-        }
-
-        public sealed class UnregisterFromCatalog() : Command(new())
-        {
-            public static readonly UnregisterFromCatalog Instance = new();
         }
     }
 

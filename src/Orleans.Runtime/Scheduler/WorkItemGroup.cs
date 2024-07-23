@@ -263,7 +263,7 @@ internal sealed class WorkItemGroup : IThreadPoolWorkItem, IWorkItemScheduler
         _log.LogWarning(
             (int)ErrorCode.SchedulerTurnTooLong3,
             "Task {Task} in WorkGroup {GrainContext} took elapsed time {Duration} for execution, which is longer than {TurnWarningLengthThreshold}. Running on thread {Thread}",
-            task,
+            task.AsyncState ?? task,
             GrainContext.ToString(),
             taskDuration.ToString("g"),
             _schedulingOptions.TurnWarningLengthThreshold,

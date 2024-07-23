@@ -47,7 +47,7 @@ namespace Orleans.Runtime
             ILocalSiloDetails localSiloDetails,
             DeploymentLoadPublisher deploymentLoadPublisher,
             Catalog catalog,
-            CachedVersionSelectorManager cachedVersionSelectorManager, 
+            CachedVersionSelectorManager cachedVersionSelectorManager,
             CompatibilityDirectorManager compatibilityDirectorManager,
             VersionSelectorManager selectorManager,
             IServiceProvider services,
@@ -205,15 +205,17 @@ namespace Orleans.Runtime
                 var a => a?.ToString()
             };
 
-            var directory = services.GetRequiredService<ILocalGrainDirectory>();
+            var directory = services.GetRequiredService<DistributedGrainDirectory>();
+            var grainLocator = services.GetRequiredService<GrainLocator>();
+            grainLocator.TryLookupInCache(grainId, out var cacheAddress);
             var report = new DetailedGrainReport()
             {
                 Grain = grainId,
                 SiloAddress = localSiloDetails.SiloAddress,
                 SiloName = localSiloDetails.Name,
-                LocalCacheActivationAddress = directory.GetLocalCacheData(grainId),
-                LocalDirectoryActivationAddress = directory.GetLocalDirectoryData(grainId).Address,
-                PrimaryForGrain = directory.GetPrimaryForGrain(grainId),
+                LocalCacheActivationAddress = cacheAddress,
+                LocalDirectoryActivationAddress = ((DistributedGrainDirectory.ITestHooks)directory).GetLocalRecord(grainId),
+                PrimaryForGrain = ((DistributedGrainDirectory.ITestHooks)directory).GetPrimaryForGrain(grainId),
                 GrainClassTypeName = grainClassName,
                 LocalActivation = activation,
             };

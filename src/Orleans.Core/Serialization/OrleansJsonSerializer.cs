@@ -309,7 +309,8 @@ namespace Orleans.Serialization
             JObject jo = JObject.Load(reader);
             var id = jo["Id"];
             GrainId grainId = GrainId.Create(id["Type"].ToObject<string>(), id["Key"].ToObject<string>());
-            var iface = GrainInterfaceType.Create(jo["Interface"].ToString());
+            var encodedInterface = jo["Interface"].ToString();
+            var iface = string.IsNullOrWhiteSpace(encodedInterface) ? default : GrainInterfaceType.Create(encodedInterface);
             return this.referenceActivator.CreateReference(grainId, iface);
         }
     }

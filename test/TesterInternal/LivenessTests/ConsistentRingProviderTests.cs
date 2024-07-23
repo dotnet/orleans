@@ -1,44 +1,31 @@
+using System.Collections.Immutable;
+using System.Net;
 using Microsoft.Extensions.Logging.Abstractions;
 using Orleans.Configuration;
-using Orleans.Runtime;
 using Orleans.Runtime.ConsistentRing;
 using Orleans.Streams;
+using TestExtensions;
 using Xunit;
 using Xunit.Abstractions;
-using TestExtensions;
-using System.Net;
-using System.Collections.Immutable;
 
 namespace UnitTests.LivenessTests
 {
-    public class ConsistentRingProviderTests : IClassFixture<ConsistentRingProviderTests.Fixture>
+    public class ConsistentRingProviderTests(ITestOutputHelper output)
     {
-        private readonly ITestOutputHelper output;
-
-        public class Fixture
-        {
-            public Fixture()
-            {
-            }
-        }
-
-        public ConsistentRingProviderTests(ITestOutputHelper output)
-        {
-            this.output = output;
-        }
+        private readonly ITestOutputHelper _output = output;
 
         [Fact, TestCategory("Functional"), TestCategory("Liveness"), TestCategory("Ring"), TestCategory("RingStandalone")]
         public void ConsistentRingProvider_Test1()
         {
             SiloAddress silo1 = SiloAddressUtils.NewLocalSiloAddress(0);
             ConsistentRingProvider ring = new ConsistentRingProvider(silo1, NullLoggerFactory.Instance, new FakeSiloStatusOracle());
-            output.WriteLine("Silo1 range: {0}. The whole ring is: {1}", ring.GetMyRange(), ring.ToString());
+            _output.WriteLine("Silo1 range: {0}. The whole ring is: {1}", ring.GetMyRange(), ring.ToString());
 
             ring.AddServer(SiloAddressUtils.NewLocalSiloAddress(1));
-            output.WriteLine("Silo1 range: {0}. The whole ring is: {1}", ring.GetMyRange(), ring.ToString());
+            _output.WriteLine("Silo1 range: {0}. The whole ring is: {1}", ring.GetMyRange(), ring.ToString());
 
             ring.AddServer(SiloAddressUtils.NewLocalSiloAddress(2));
-            output.WriteLine("Silo1 range: {0}. The whole ring is: {1}", ring.GetMyRange(), ring.ToString());
+            _output.WriteLine("Silo1 range: {0}. The whole ring is: {1}", ring.GetMyRange(), ring.ToString());
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Liveness"), TestCategory("Ring"), TestCategory("RingStandalone")]
@@ -46,12 +33,12 @@ namespace UnitTests.LivenessTests
         {
             SiloAddress silo1 = SiloAddressUtils.NewLocalSiloAddress(0);
             VirtualBucketsRingProvider ring = new VirtualBucketsRingProvider(silo1, NullLoggerFactory.Instance, 30, new FakeSiloStatusOracle());
-            output.WriteLine("\n\n*** Silo1 range: {0}.\n*** The whole ring with 1 silo is:\n{1}\n\n", ring.GetMyRange(), ring.ToString());
+            _output.WriteLine("\n\n*** Silo1 range: {0}.\n*** The whole ring with 1 silo is:\n{1}\n\n", ring.GetMyRange(), ring.ToString());
 
             for (int i = 1; i <= 10; i++)
             {
                 ring.SiloStatusChangeNotification(SiloAddressUtils.NewLocalSiloAddress(i), SiloStatus.Active);
-                output.WriteLine("\n\n*** Silo1 range: {0}.\n*** The whole ring with {1} silos is:\n{2}\n\n", ring.GetMyRange(), i + 1, ring.ToString());
+                _output.WriteLine("\n\n*** Silo1 range: {0}.\n*** The whole ring with {1} silos is:\n{2}\n\n", ring.GetMyRange(), i + 1, ring.ToString());
             }
         }
 
@@ -65,12 +52,12 @@ namespace UnitTests.LivenessTests
             Random random = new Random();
             SiloAddress silo1 = SiloAddressUtils.NewLocalSiloAddress(random.Next(100000));
             VirtualBucketsRingProvider ring = new VirtualBucketsRingProvider(silo1, NullLoggerFactory.Instance, 50, new FakeSiloStatusOracle());
-            
+
             for (int i = 1; i <= NUM_SILOS - 1; i++)
             {
                 ring.SiloStatusChangeNotification(SiloAddressUtils.NewLocalSiloAddress(random.Next(100000)), SiloStatus.Active);
             }
-  
+
             var siloRanges = ring.GetRanges();
             var sortedSiloRanges = siloRanges.ToList();
             sortedSiloRanges.Sort((t1, t2) => t1.Item2.RangePercentage().CompareTo(t2.Item2.RangePercentage()));
@@ -79,7 +66,7 @@ namespace UnitTests.LivenessTests
             foreach (var siloRange in siloRanges)
             {
                 List<IRingRangeInternal> agentRanges = new List<IRingRangeInternal>();
-                for(int i=0; i < NUM_AGENTS; i++)
+                for (int i = 0; i < NUM_AGENTS; i++)
                 {
                     IRingRangeInternal agentRange = (IRingRangeInternal)RangeFactory.GetEquallyDividedSubRange(siloRange.Value, NUM_AGENTS, i);
                     agentRanges.Add(agentRange);
@@ -89,18 +76,18 @@ namespace UnitTests.LivenessTests
 
             Dictionary<SiloAddress, List<int>> queueHistogram = GetQueueHistogram(allAgentRanges, (int)NUM_QUEUES);
             string str = Utils.EnumerableToString(sortedSiloRanges,
-                tuple => string.Format("Silo {0} -> Range {1:0.000}%, {2} queues: {3}", 
+                tuple => string.Format("Silo {0} -> Range {1:0.000}%, {2} queues: {3}",
                     tuple.Item1,
                     tuple.Item2.RangePercentage(),
                     queueHistogram[tuple.Item1].Sum(),
                     Utils.EnumerableToString(queueHistogram[tuple.Item1])), "\n");
 
-            output.WriteLine("\n\n*** The whole ring with {0} silos is:\n{1}\n\n", NUM_SILOS, str);
+            _output.WriteLine("\n\n*** The whole ring with {0} silos is:\n{1}\n\n", NUM_SILOS, str);
 
-            output.WriteLine("Total number of queues is: {0}", queueHistogram.Values.Sum(list => list.Sum()));
-            output.WriteLine("Expected average range per silo is: {0:0.00}%, expected #queues per silo is: {1:0.00}, expected #queues per agent is: {2:0.000}.",
+            _output.WriteLine("Total number of queues is: {0}", queueHistogram.Values.Sum(list => list.Sum()));
+            _output.WriteLine("Expected average range per silo is: {0:0.00}%, expected #queues per silo is: {1:0.00}, expected #queues per agent is: {2:0.000}.",
                 100.0 / NUM_SILOS, NUM_QUEUES / NUM_SILOS, NUM_QUEUES / (NUM_SILOS * NUM_AGENTS));
-            output.WriteLine("Min #queues per silo is: {0}, Max #queues per silo is: {1}.",
+            _output.WriteLine("Min #queues per silo is: {0}, Max #queues per silo is: {1}.",
                 queueHistogram.Values.Min(list => list.Sum()), queueHistogram.Values.Max(list => list.Sum()));
         }
 
@@ -182,7 +169,7 @@ namespace UnitTests.LivenessTests
             }
 
             public bool UnSubscribeFromSiloStatusEvents(ISiloStatusListener observer) => _subscribers.Remove(observer);
-            public ImmutableArray<SiloAddress> GetActiveSilos() => [.. GetApproximateSiloStatuses(onlyActive: true).Keys];  
+            public ImmutableArray<SiloAddress> GetActiveSilos() => [.. GetApproximateSiloStatuses(onlyActive: true).Keys];
         }
     }
 }

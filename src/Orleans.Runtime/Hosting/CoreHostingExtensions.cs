@@ -1,12 +1,17 @@
+#nullable enable
 using System;
 using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
 using System.Net;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 using Orleans.Configuration.Internal;
+using Orleans.GrainDirectory;
 using Orleans.Runtime;
+using Orleans.Runtime.GrainDirectory;
+using Orleans.Runtime.Hosting;
 using Orleans.Runtime.MembershipService;
 
 namespace Orleans.Hosting
@@ -47,7 +52,7 @@ namespace Orleans.Hosting
             this ISiloBuilder builder,
             int siloPort = EndpointOptions.DEFAULT_SILO_PORT,
             int gatewayPort = EndpointOptions.DEFAULT_GATEWAY_PORT,
-            IPEndPoint primarySiloEndpoint = null,
+            IPEndPoint? primarySiloEndpoint = null,
             string serviceId = ClusterOptions.DevelopmentServiceId,
             string clusterId = ClusterOptions.DevelopmentClusterId)
         {
@@ -127,7 +132,7 @@ namespace Orleans.Hosting
                 });
         }
 
-        private static void ConfigurePrimarySiloEndpoint(OptionsBuilder<DevelopmentClusterMembershipOptions> optionsBuilder, IPEndPoint primarySiloEndpoint)
+        private static void ConfigurePrimarySiloEndpoint(OptionsBuilder<DevelopmentClusterMembershipOptions> optionsBuilder, IPEndPoint? primarySiloEndpoint)
         {
             optionsBuilder.Configure((DevelopmentClusterMembershipOptions options, IOptions<EndpointOptions> endpointOptions) =>
             {
@@ -138,6 +143,31 @@ namespace Orleans.Hosting
 
                 options.PrimarySiloEndpoint = primarySiloEndpoint;
             });
+        }
+
+        /// <summary>
+        /// Opts-in to the experimental distributed grain directory.
+        /// </summary>
+        /// <param name="siloBuilder">The silo builder to register the directory implementation with.</param>
+        /// <param name="name">The name of the directory to register, or null to register the directory as the default.</param>
+        /// <returns>The provided silo builder.</returns>
+        [Experimental("ORLEANSEXP002")]
+        public static ISiloBuilder AddDistributedGrainDirectory(this ISiloBuilder siloBuilder, string? name = null)
+        {
+            var services = siloBuilder.Services;
+            if (string.IsNullOrEmpty(name))
+            {
+                name = GrainDirectoryAttribute.DEFAULT_GRAIN_DIRECTORY;
+            }
+
+            // Distributed Grain Directory
+            services.TryAddSingleton<GrainDirectoryReplica>();
+            services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, GrainDirectoryReplica>();
+            services.TryAddSingleton<DistributedGrainDirectory>();
+            services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, DistributedGrainDirectory>();
+            services.AddGrainDirectory<DistributedGrainDirectory>(name, (sp, name) => sp.GetRequiredService<DistributedGrainDirectory>());
+
+            return siloBuilder;
         }
     }
 }

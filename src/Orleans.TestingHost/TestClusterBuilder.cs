@@ -44,6 +44,7 @@ namespace Orleans.TestingHost
                 AssumeHomogenousSilosForTesting = true
             };
 
+            AddSiloBuilderConfigurator<ConfigureDistributedGrainDirectory>();
             this.AddSiloBuilderConfigurator<ConfigureStaticClusterDeploymentOptions>();
             this.ConfigureBuilder(ConfigureDefaultPorts);
         }

@@ -55,6 +55,7 @@ namespace Orleans
         public TGrainInterface GetGrain<TGrainInterface>(string primaryKey, string grainClassNamePrefix = null)
             where TGrainInterface : IGrainWithStringKey
         {
+            ArgumentNullException.ThrowIfNullOrWhiteSpace(primaryKey);
             var grainKey = IdSpan.Create(primaryKey);
             return (TGrainInterface)GetGrain(typeof(TGrainInterface), grainKey, grainClassNamePrefix: grainClassNamePrefix);
         }
@@ -164,6 +165,7 @@ namespace Orleans
         /// <inheritdoc />
         public IGrain GetGrain(Type grainInterfaceType, string key)
         {
+            ArgumentNullException.ThrowIfNullOrWhiteSpace(key);
             var grainKey = IdSpan.Create(key);
             return (IGrain)GetGrain(grainInterfaceType, grainKey, grainClassNamePrefix: null);
         }

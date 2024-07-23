@@ -32,7 +32,7 @@ namespace Orleans.Runtime.MembershipService
 
         public MembershipTableData ReadAll()
         {
-            return new MembershipTableData(siloTable.Values.Select(tuple => 
+            return new MembershipTableData(siloTable.Values.Select(tuple =>
                 new Tuple<MembershipEntry, string>(this.deepCopier.Copy(tuple.Item1), tuple.Item2)).ToList(), tableVersion);
         }
 
@@ -47,7 +47,7 @@ namespace Orleans.Runtime.MembershipService
             siloTable.TryGetValue(entry.SiloAddress, out data);
             if (data != null) return false;
             if (!tableVersion.VersionEtag.Equals(version.VersionEtag)) return false;
-            
+
             siloTable[entry.SiloAddress] = new Tuple<MembershipEntry, string>(
                 entry, lastETagCounter++.ToString(CultureInfo.InvariantCulture));
             tableVersion = new TableVersion(version.Version, NewETag());
@@ -60,7 +60,7 @@ namespace Orleans.Runtime.MembershipService
             siloTable.TryGetValue(entry.SiloAddress, out data);
             if (data == null) return false;
             if (!data.Item2.Equals(etag) || !tableVersion.VersionEtag.Equals(version.VersionEtag)) return false;
-            
+
             siloTable[entry.SiloAddress] = new Tuple<MembershipEntry, string>(
                 entry, lastETagCounter++.ToString(CultureInfo.InvariantCulture));
             tableVersion = new TableVersion(version.Version, NewETag());
@@ -82,6 +82,24 @@ namespace Orleans.Runtime.MembershipService
         private string NewETag()
         {
             return lastETagCounter++.ToString(CultureInfo.InvariantCulture);
+        }
+
+        public void CleanupDefunctSiloEntries(DateTimeOffset beforeDate)
+        {
+            var removedEnties = new List<SiloAddress>();
+            foreach (var (key, (value, etag)) in siloTable)
+            {
+                if (value.Status == SiloStatus.Dead
+                    && new DateTime(Math.Max(value.IAmAliveTime.Ticks, value.StartTime.Ticks), DateTimeKind.Utc) < beforeDate)
+                {
+                    removedEnties.Add(key);
+                }
+            }
+
+            foreach (var removedEntry in removedEnties)
+            {
+                siloTable.Remove(removedEntry);
+            }
         }
     }
 }
