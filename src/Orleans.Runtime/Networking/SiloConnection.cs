@@ -6,6 +6,7 @@ using System.Runtime.CompilerServices;
 using System.Text;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Connections;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Orleans.Configuration;
 using Orleans.Messaging;
@@ -197,8 +198,9 @@ namespace Orleans.Runtime.Messaging
             }
             finally
             {
-                if (!(this.RemoteSiloAddress is null))
+                if (this.RemoteSiloAddress is not null)
                 {
+                    this.Shared.ServiceProvider.GetRequiredService<InsideRuntimeClient>().BreakOutstandingMessagesToSilo(this.RemoteSiloAddress);
                     this.connectionManager.OnConnectionTerminated(this.RemoteSiloAddress, this, error);
                 }
             }

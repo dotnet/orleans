@@ -1,4 +1,5 @@
 using System;
+using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
@@ -10,6 +11,9 @@ namespace Orleans.Internal
     /// </summary>
     internal static class OrleansTaskExtentions
     {
+        public static ConfiguredTaskAwaitable SuppressThrowing(this ValueTask task) => task.AsTask().ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing | ConfigureAwaitOptions.ContinueOnCapturedContext);
+        public static ConfiguredTaskAwaitable SuppressThrowing(this Task task) => task.ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing | ConfigureAwaitOptions.ContinueOnCapturedContext);
+
         public static async Task LogException(this Task task, ILogger logger, ErrorCode errorCode, string message)
         {
             try

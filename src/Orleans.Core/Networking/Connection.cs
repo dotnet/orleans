@@ -58,6 +58,7 @@ namespace Orleans.Runtime.Messaging
             this.LocalEndPoint = NormalizeEndpoint(this.Context.LocalEndPoint);
         }
 
+        public ConnectionCommon Shared => shared;
         public string ConnectionId => this.Context?.ConnectionId;
         public virtual EndPoint RemoteEndPoint { get; }
         public virtual EndPoint LocalEndPoint { get; }

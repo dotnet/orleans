@@ -72,7 +72,7 @@ internal sealed class ActivationData : IGrainContext, ICollectibleGrainContext, 
 
     public IGrainRuntime GrainRuntime => _shared.Runtime;
     public object? GrainInstance { get; private set; }
-    public GrainAddress Address { get; }
+    public GrainAddress Address { get; private set; }
     public GrainReference GrainReference => _selfReference ??= _shared.GrainReferenceActivator.CreateReference(GrainId, default);
     public ActivationState State { get; private set; }
     public PlacementStrategy PlacementStrategy => _shared.PlacementStrategy;
@@ -88,6 +88,8 @@ internal sealed class ActivationData : IGrainContext, ICollectibleGrainContext, 
             lock (this) { return _lifecycle ??= new GrainLifecycle(_shared.Logger); }
         }
     }
+
+    internal GrainTypeSharedContext Shared => _shared;
 
     public GrainId GrainId => Address.GrainId;
     public bool IsExemptFromCollection => _shared.CollectionAgeLimit == Timeout.InfiniteTimeSpan;
@@ -1544,6 +1546,7 @@ internal sealed class ActivationData : IGrainContext, ICollectibleGrainContext, 
                     var result = await _shared.InternalRuntime.GrainLocator.Register(Address, previousRegistration);
                     if (Address.Matches(result))
                     {
+                        Address = result;
                         success = true;
                     }
                     else if (result?.SiloAddress is { } registeredSilo && registeredSilo.Equals(Address.SiloAddress))
