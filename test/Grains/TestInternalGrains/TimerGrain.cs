@@ -221,7 +221,7 @@ namespace UnitTestGrains
                     timer[0].Dispose();
                     Assert.True(ct.IsCancellationRequested);
                     await Task.Delay(100);
-                    tcs.SetResult();
+                    tcs.TrySetResult();
                 }
                 catch (Exception ex)
                 {
@@ -538,7 +538,7 @@ namespace UnitTestGrains
 
         private Task TimerTick()
         {
-            this.completionSource.SetResult(1);
+            this.completionSource.TrySetResult(1);
             return Task.CompletedTask;
         }
 
@@ -556,7 +556,7 @@ namespace UnitTestGrains
             tasks.Add(new());
             timers.Add(this.RegisterGrainTimer(() =>
             {
-                tasks[0].SetResult(("NONE", CancellationToken.None));
+                tasks[0].TrySetResult(("NONE", CancellationToken.None));
                 return Task.CompletedTask;
             }, new GrainTimerCreationOptions(TimeSpan.FromMilliseconds(25), TimeSpan.FromSeconds(10)) { Interleave = true }));
 
@@ -564,7 +564,7 @@ namespace UnitTestGrains
             tasks.Add(new());
             timers.Add(this.RegisterGrainTimer(() =>
             {
-                tasks[1].SetResult(("NONE", CancellationToken.None));
+                tasks[1].TrySetResult(("NONE", CancellationToken.None));
                 return Task.CompletedTask;
             }, TimeSpan.FromMilliseconds(25), TimeSpan.FromSeconds(10)));
 
@@ -572,7 +572,7 @@ namespace UnitTestGrains
             tasks.Add(new());
             timers.Add(this.RegisterGrainTimer(state =>
             {
-                tasks[2].SetResult((state, CancellationToken.None));
+                tasks[2].TrySetResult((state, CancellationToken.None));
                 return Task.CompletedTask;
             },
             "STATE",
@@ -582,7 +582,7 @@ namespace UnitTestGrains
             tasks.Add(new());
             timers.Add(this.RegisterGrainTimer(state =>
             {
-                tasks[3].SetResult((state, CancellationToken.None));
+                tasks[3].TrySetResult((state, CancellationToken.None));
                 return Task.CompletedTask;
             },
             "STATE",
@@ -593,7 +593,7 @@ namespace UnitTestGrains
             tasks.Add(new());
             timers.Add(this.RegisterGrainTimer(ct =>
             {
-                tasks[4].SetResult(("NONE", ct));
+                tasks[4].TrySetResult(("NONE", ct));
                 return Task.CompletedTask;
             }, new GrainTimerCreationOptions(TimeSpan.FromMilliseconds(25), TimeSpan.FromSeconds(10)) { Interleave = true }));
 
@@ -601,7 +601,7 @@ namespace UnitTestGrains
             tasks.Add(new());
             timers.Add(this.RegisterGrainTimer(ct =>
             {
-                tasks[5].SetResult(("NONE", ct));
+                tasks[5].TrySetResult(("NONE", ct));
                 return Task.CompletedTask;
             }, TimeSpan.FromMilliseconds(25), TimeSpan.FromSeconds(10)));
 
@@ -609,7 +609,7 @@ namespace UnitTestGrains
             tasks.Add(new());
             timers.Add(this.RegisterGrainTimer((state, ct) =>
             {
-                tasks[6].SetResult((state, ct));
+                tasks[6].TrySetResult((state, ct));
                 return Task.CompletedTask;
             },
             "STATE",
@@ -619,7 +619,7 @@ namespace UnitTestGrains
             tasks.Add(new());
             timers.Add(this.RegisterGrainTimer((state, ct) =>
             {
-                tasks[7].SetResult((state, ct));
+                tasks[7].TrySetResult((state, ct));
                 return Task.CompletedTask;
             },
             "STATE",
@@ -878,7 +878,7 @@ namespace UnitTestGrains
                     timer[0].Dispose();
                     Assert.True(ct.IsCancellationRequested);
                     await Task.Delay(100);
-                    tcs.SetResult();
+                    tcs.TrySetResult();
                 }
                 catch (Exception ex)
                 {
@@ -1042,7 +1042,7 @@ namespace UnitTestGrains
 
         private Task TimerTick()
         {
-            this.completionSource.SetResult(1);
+            this.completionSource.TrySetResult(1);
             return Task.CompletedTask;
         }
 
@@ -1060,7 +1060,7 @@ namespace UnitTestGrains
             tasks.Add(new());
             timers.Add(this.RegisterGrainTimer(() =>
             {
-                tasks[0].SetResult(("NONE", CancellationToken.None));
+                tasks[0].TrySetResult(("NONE", CancellationToken.None));
                 return Task.CompletedTask;
             }, new GrainTimerCreationOptions(TimeSpan.FromMilliseconds(25), TimeSpan.FromSeconds(10)) { Interleave = true }));
 
@@ -1068,7 +1068,7 @@ namespace UnitTestGrains
             tasks.Add(new());
             timers.Add(this.RegisterGrainTimer(() =>
             {
-                tasks[1].SetResult(("NONE", CancellationToken.None));
+                tasks[1].TrySetResult(("NONE", CancellationToken.None));
                 return Task.CompletedTask;
             }, TimeSpan.FromMilliseconds(25), TimeSpan.FromSeconds(10)));
 
@@ -1076,7 +1076,7 @@ namespace UnitTestGrains
             tasks.Add(new());
             timers.Add(this.RegisterGrainTimer(state =>
             {
-                tasks[2].SetResult((state, CancellationToken.None));
+                tasks[2].TrySetResult((state, CancellationToken.None));
                 return Task.CompletedTask;
             },
             "STATE",
@@ -1086,7 +1086,7 @@ namespace UnitTestGrains
             tasks.Add(new());
             timers.Add(this.RegisterGrainTimer(state =>
             {
-                tasks[3].SetResult((state, CancellationToken.None));
+                tasks[3].TrySetResult((state, CancellationToken.None));
                 return Task.CompletedTask;
             },
             "STATE",
@@ -1097,7 +1097,7 @@ namespace UnitTestGrains
             tasks.Add(new());
             timers.Add(this.RegisterGrainTimer(ct =>
             {
-                tasks[4].SetResult(("NONE", ct));
+                tasks[4].TrySetResult(("NONE", ct));
                 return Task.CompletedTask;
             }, new GrainTimerCreationOptions(TimeSpan.FromMilliseconds(25), TimeSpan.FromSeconds(10)) { Interleave = true }));
 
@@ -1105,7 +1105,7 @@ namespace UnitTestGrains
             tasks.Add(new());
             timers.Add(this.RegisterGrainTimer(ct =>
             {
-                tasks[5].SetResult(("NONE", ct));
+                tasks[5].TrySetResult(("NONE", ct));
                 return Task.CompletedTask;
             }, TimeSpan.FromMilliseconds(25), TimeSpan.FromSeconds(10)));
 
@@ -1113,7 +1113,7 @@ namespace UnitTestGrains
             tasks.Add(new());
             timers.Add(this.RegisterGrainTimer((state, ct) =>
             {
-                tasks[6].SetResult((state, ct));
+                tasks[6].TrySetResult((state, ct));
                 return Task.CompletedTask;
             },
             "STATE",
@@ -1123,7 +1123,7 @@ namespace UnitTestGrains
             tasks.Add(new());
             timers.Add(this.RegisterGrainTimer((state, ct) =>
             {
-                tasks[7].SetResult((state, ct));
+                tasks[7].TrySetResult((state, ct));
                 return Task.CompletedTask;
             },
             "STATE",
@@ -1206,7 +1206,7 @@ namespace UnitTestGrains
                 {
                     Assert.NotNull(timer[0]);
                     timer[0].Dispose();
-                    tcs.SetResult();
+                    tcs.TrySetResult();
                     await Task.Delay(100);
                 }
                 catch (Exception ex)

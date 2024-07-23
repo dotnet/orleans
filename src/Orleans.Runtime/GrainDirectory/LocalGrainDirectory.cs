@@ -34,7 +34,7 @@ namespace Orleans.Runtime.GrainDirectory
         internal SiloAddress MyAddress { get; }
 
         internal IGrainDirectoryCache DirectoryCache { get; }
-        internal GrainDirectoryPartition DirectoryPartition { get; }
+        internal LocalGrainDirectoryPartition DirectoryPartition { get; }
 
         public RemoteGrainDirectory RemoteGrainDirectory { get; }
         public RemoteGrainDirectory CacheValidator { get; }
@@ -46,7 +46,7 @@ namespace Orleans.Runtime.GrainDirectory
             ILocalSiloDetails siloDetails,
             ISiloStatusOracle siloStatusOracle,
             IInternalGrainFactory grainFactory,
-            Factory<GrainDirectoryPartition> grainDirectoryPartitionFactory,
+            Factory<LocalGrainDirectoryPartition> grainDirectoryPartitionFactory,
             IOptions<DevelopmentClusterMembershipOptions> developmentClusterMembershipOptions,
             IOptions<GrainDirectoryOptions> grainDirectoryOptions,
             ILoggerFactory loggerFactory)

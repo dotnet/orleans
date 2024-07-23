@@ -299,4 +299,12 @@ namespace Orleans
         /// </summary>
         Migrating,
     }
+
+    internal static class DeactivationReasonCodeExtensions
+    {
+        public static bool IsTransientError(this DeactivationReasonCode reasonCode)
+        {
+            return reasonCode is DeactivationReasonCode.DirectoryFailure;
+        }
+    }
 }

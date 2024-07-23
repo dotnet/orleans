@@ -21,6 +21,8 @@ namespace Orleans.Runtime
             this.Version = version;
         }
 
+        internal static ClusterMembershipSnapshot Default => new(ImmutableDictionary<SiloAddress, ClusterMember>.Empty, MembershipVersion.MinValue);
+
         /// <summary>
         /// Gets the cluster members.
         /// </summary>

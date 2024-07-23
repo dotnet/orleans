@@ -407,7 +407,7 @@ namespace UnitTests.SchedulerTests
             var filters = new LoggerFilterOptions();
             filters.AddFilter("Scheduler", LogLevel.Trace);
             filters.AddFilter("Scheduler.WorkerPoolThread", LogLevel.Trace);
-            var loggerFactory = TestingUtils.CreateDefaultLoggerFactory(TestingUtils.CreateTraceFileName("Silo", DateTime.Now.ToString("yyyyMMdd_hhmmss")), filters);
+            var loggerFactory = TestingUtils.CreateDefaultLoggerFactory(TestingUtils.CreateTraceFileName("Silo", DateTime.UtcNow.ToString("yyyyMMdd_hhmmss")), filters);
             return loggerFactory;
         }
     }
