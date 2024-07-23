@@ -257,12 +257,12 @@ namespace Orleans
         ActivationFailed,
 
         /// <summary>
-        /// This activation is affected by an internal failure.
+        /// This activation is affected by an internal failure in the distributed grain directory.
         /// </summary>
         /// <remarks>
         /// This could be caused by the failure of a process hosting this activation's grain directory partition, for example.
         /// </remarks>
-        InternalFailure,
+        DirectoryFailure,
 
         /// <summary>
         /// This activation is idle.

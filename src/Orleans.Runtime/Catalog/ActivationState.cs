@@ -5,7 +5,7 @@ namespace Orleans.Runtime
         /// <summary>
         /// Activation is being created
         /// </summary>
-        Create,
+        Creating,
         
         /// <summary>
         /// Activation is in the middle of activation process.
@@ -25,11 +25,6 @@ namespace Orleans.Runtime
         /// <summary>
         /// Tombstone for an activation which has terminated.
         /// </summary>
-        Invalid,
-        
-        /// <summary>
-        /// Tombstone for an activation that threw an exception during activation.
-        /// </summary>
-        FailedToActivate,
+        Invalid
     }
 }

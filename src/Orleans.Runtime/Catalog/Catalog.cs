@@ -476,7 +476,7 @@ namespace Orleans.Runtime
                 if (activationsToShutdown.Count > 0)
                 {
                     var reasonText = $"This activation is being deactivated due to a failure of server {updatedSilo}, since it was responsible for this activation's grain directory registration.";
-                    var reason = new DeactivationReason(DeactivationReasonCode.InternalFailure, reasonText);
+                    var reason = new DeactivationReason(DeactivationReasonCode.DirectoryFailure, reasonText);
                     StartDeactivatingActivations(reason, activationsToShutdown);
                 }
             }
