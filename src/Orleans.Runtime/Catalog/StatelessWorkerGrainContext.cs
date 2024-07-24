@@ -246,7 +246,7 @@ namespace Orleans.Runtime
 
             // If this is a new worker and there is a message in scope, try to get the request context and activate the worker
             var requestContext = (message as Message)?.RequestContextData ?? new Dictionary<string, object>();
-            var cancellation = new CancellationTokenSource(_shared.InternalRuntime.CollectionOptions.Value.ActivationTimeout);
+            using var cancellation = new CancellationTokenSource(_shared.InternalRuntime.CollectionOptions.Value.ActivationTimeout);
             newWorker.Activate(requestContext, cancellation.Token);
 
             _workers.Add(newWorker);

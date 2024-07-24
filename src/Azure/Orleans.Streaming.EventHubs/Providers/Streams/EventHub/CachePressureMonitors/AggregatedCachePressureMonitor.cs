@@ -58,7 +58,7 @@ namespace Orleans.Streaming.EventHubs
         /// <returns></returns>
         public bool IsUnderPressure(DateTime utcNow)
         {
-            bool underPressure = this.Any(monitor => monitor.IsUnderPressure(utcNow));
+            bool underPressure = this.Exists(monitor => monitor.IsUnderPressure(utcNow));
             if (this.isUnderPressure != underPressure)
             {
                 this.isUnderPressure = underPressure;

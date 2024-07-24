@@ -23,7 +23,7 @@ namespace Orleans.Clustering.DynamoDB
         {
             var parameters = dataConnectionString.Split(new[] { ';' }, StringSplitOptions.RemoveEmptyEntries);
 
-            var serviceConfig = parameters.Where(p => p.Contains(ServicePropertyName)).FirstOrDefault();
+            var serviceConfig = Array.Find(parameters, p => p.Contains(ServicePropertyName));
             if (!string.IsNullOrWhiteSpace(serviceConfig))
             {
                 var value = serviceConfig.Split(new[] { '=' }, StringSplitOptions.RemoveEmptyEntries);
@@ -31,7 +31,7 @@ namespace Orleans.Clustering.DynamoDB
                     options.Service = value[1];
             }
 
-            var tableNameConfig = parameters.Where(p => p.Contains(TableNamePropertyName)).FirstOrDefault();
+            var tableNameConfig = Array.Find(parameters, p => p.Contains(TableNamePropertyName));
             if (!string.IsNullOrWhiteSpace(tableNameConfig))
             {
                 var value = tableNameConfig.Split(new[] { '=' }, StringSplitOptions.RemoveEmptyEntries);
@@ -39,7 +39,7 @@ namespace Orleans.Clustering.DynamoDB
                     options.TableName = value[1];
             }
 
-            var secretKeyConfig = parameters.Where(p => p.Contains(SecretKeyPropertyName)).FirstOrDefault();
+            var secretKeyConfig = Array.Find(parameters, p => p.Contains(SecretKeyPropertyName));
             if (!string.IsNullOrWhiteSpace(secretKeyConfig))
             {
                 var value = secretKeyConfig.Split(new[] { '=' }, StringSplitOptions.RemoveEmptyEntries);
@@ -47,7 +47,7 @@ namespace Orleans.Clustering.DynamoDB
                     options.SecretKey = value[1];
             }
 
-            var accessKeyConfig = parameters.Where(p => p.Contains(AccessKeyPropertyName)).FirstOrDefault();
+            var accessKeyConfig = Array.Find(parameters, p => p.Contains(AccessKeyPropertyName));
             if (!string.IsNullOrWhiteSpace(accessKeyConfig))
             {
                 var value = accessKeyConfig.Split(new[] { '=' }, StringSplitOptions.RemoveEmptyEntries);
@@ -55,7 +55,7 @@ namespace Orleans.Clustering.DynamoDB
                     options.AccessKey = value[1];
             }
 
-            var readCapacityUnitsConfig = parameters.Where(p => p.Contains(ReadCapacityUnitsPropertyName)).FirstOrDefault();
+            var readCapacityUnitsConfig = Array.Find(parameters, p => p.Contains(ReadCapacityUnitsPropertyName));
             if (!string.IsNullOrWhiteSpace(readCapacityUnitsConfig))
             {
                 var value = readCapacityUnitsConfig.Split(new[] { '=' }, StringSplitOptions.RemoveEmptyEntries);
@@ -63,7 +63,7 @@ namespace Orleans.Clustering.DynamoDB
                     options.ReadCapacityUnits = int.Parse(value[1]);
             }
 
-            var writeCapacityUnitsConfig = parameters.Where(p => p.Contains(WriteCapacityUnitsPropertyName)).FirstOrDefault();
+            var writeCapacityUnitsConfig = Array.Find(parameters, p => p.Contains(WriteCapacityUnitsPropertyName));
             if (!string.IsNullOrWhiteSpace(writeCapacityUnitsConfig))
             {
                 var value = writeCapacityUnitsConfig.Split(new[] { '=' }, StringSplitOptions.RemoveEmptyEntries);

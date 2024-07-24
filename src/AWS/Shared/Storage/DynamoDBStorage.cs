@@ -429,7 +429,7 @@ namespace Orleans.Transactions.DynamoDB
                 }
 
                 ret = await GetTableDescription(tableName);
-                index = ret.GlobalSecondaryIndexes.FirstOrDefault(index => index.IndexName == indexName);
+                index = ret.GlobalSecondaryIndexes.Find(index => index.IndexName == indexName);
             } while (index.IndexStatus == whileStatus);
 
             if (desiredStatus != null && index.IndexStatus != desiredStatus)

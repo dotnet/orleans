@@ -113,7 +113,7 @@ namespace Tester.Forwarding
 
             await Task.Delay(500);
             var stopwatch = Stopwatch.StartNew();
-            var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
             await HostedCluster.SecondarySilos.First().StopSiloAsync(cts.Token);
             stopwatch.Stop();
             Assert.True(stopwatch.Elapsed < TimeSpan.FromMinutes(1));

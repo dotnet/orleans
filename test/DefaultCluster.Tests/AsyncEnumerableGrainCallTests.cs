@@ -158,7 +158,7 @@ public class AsyncEnumerableGrainCallTests : HostedTestClusterEnsureDefaultStart
         });
 
         var values = new List<string>();
-        var cts = new CancellationTokenSource();
+        using var cts = new CancellationTokenSource();
         await foreach (var entry in grain.GetValues().WithCancellation(cts.Token))
         {
             values.Add(entry);

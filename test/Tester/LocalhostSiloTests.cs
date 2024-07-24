@@ -88,7 +88,7 @@ namespace Tester
             }
             finally
             {
-                var cancelled = new CancellationTokenSource();
+                using var cancelled = new CancellationTokenSource();
                 cancelled.Cancel();
                 Utils.SafeExecute(() => silo1.StopAsync(cancelled.Token));
                 Utils.SafeExecute(() => silo2.StopAsync(cancelled.Token));

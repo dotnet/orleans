@@ -223,7 +223,7 @@ namespace Orleans.Clustering.DynamoDB
                 var keys = new Dictionary<string, AttributeValue> { { $":{SiloInstanceRecord.DEPLOYMENT_ID_PROPERTY_NAME}", new AttributeValue(this.clusterId) } };
                 var records = await this.storage.QueryAllAsync(this.options.TableName, keys, $"{SiloInstanceRecord.DEPLOYMENT_ID_PROPERTY_NAME} = :{SiloInstanceRecord.DEPLOYMENT_ID_PROPERTY_NAME}", item => new SiloInstanceRecord(item));
 
-                if (records.Any(record => record.MembershipVersion > versionRow.MembershipVersion))
+                if (records.Exists(record => record.MembershipVersion > versionRow.MembershipVersion))
                 {
                     this.logger.LogWarning((int)ErrorCode.MembershipBase, "Found an inconsistency while reading all silo entries");
                     //not expecting this to hit often, but if it does, should put in a limit

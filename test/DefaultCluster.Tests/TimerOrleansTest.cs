@@ -181,7 +181,7 @@ namespace DefaultCluster.Tests.TimerTests
         {
             var grain = GrainFactory.GetGrain<ITimerRequestGrain>(GetRandomGrainId());
 
-            var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
             var numTimers = await grain.TestAllTimerOverloads();
             while (true)
             {
@@ -468,7 +468,7 @@ namespace DefaultCluster.Tests.TimerTests
         {
             var grain = GrainFactory.GetGrain<IPocoTimerRequestGrain>(GetRandomGrainId());
 
-            var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
             var numTimers = await grain.TestAllTimerOverloads();
             while (true)
             {

@@ -272,7 +272,7 @@ namespace Orleans.TestingHost
         /// <inheritdoc />
         public override async Task StopSiloAsync(bool stopGracefully)
         {
-            var cancellation = new CancellationTokenSource();
+            using var cancellation = new CancellationTokenSource();
             var ct = cancellation.Token;
 
             if (!stopGracefully) cancellation.Cancel();
@@ -303,7 +303,7 @@ namespace Orleans.TestingHost
                     });
 
                     await this.Process.StandardInput.WriteLineAsync(StandaloneSiloHost.ShutdownCommand);
-                    var linkedCts = new CancellationTokenSource();
+                    using var linkedCts = new CancellationTokenSource();
                     await Task.WhenAny(_runTask, Task.Delay(TimeSpan.FromMinutes(2), linkedCts.Token));
                 }
             }
