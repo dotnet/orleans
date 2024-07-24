@@ -101,7 +101,7 @@ namespace Orleans.Runtime
         void ILifecycleParticipant<ISiloLifecycle>.Participate(ISiloLifecycle lifecycle)
         {
             var tasks = new List<Task>(1);
-            using var cancellation = new CancellationTokenSource();
+            var cancellation = new CancellationTokenSource();
             Task OnRuntimeInitializeStart(CancellationToken _)
             {
                 tasks.Add(Task.Run(() => this.ProcessMembershipUpdates(cancellation.Token)));
