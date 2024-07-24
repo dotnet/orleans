@@ -2,7 +2,6 @@ using System.Net;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Orleans.Internal;
-using Orleans.Runtime;
 using Orleans.TestingHost;
 using UnitTests.GrainInterfaces;
 using Xunit;
@@ -90,9 +89,9 @@ namespace Tester
             {
                 using var cancelled = new CancellationTokenSource();
                 cancelled.Cancel();
-                Utils.SafeExecute(() => silo1.StopAsync(cancelled.Token));
-                Utils.SafeExecute(() => silo2.StopAsync(cancelled.Token));
-                Utils.SafeExecute(() => clientHost.StopAsync(cancelled.Token));
+                await Utils.SafeExecuteAsync(silo1.StopAsync(cancelled.Token));
+                await Utils.SafeExecuteAsync(silo2.StopAsync(cancelled.Token));
+                await Utils.SafeExecuteAsync(clientHost.StopAsync(cancelled.Token));
                 Utils.SafeExecute(() => silo1.Dispose());
                 Utils.SafeExecute(() => silo2.Dispose());
                 Utils.SafeExecute(() => clientHost.Dispose());
