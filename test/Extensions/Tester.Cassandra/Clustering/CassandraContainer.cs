@@ -12,24 +12,14 @@ public class CassandraContainer
     private readonly Lazy<Task<(IContainer container, ushort exposedPort, Cluster cluster, ISession session)>> _innerRunImage =
         new(async () =>
         {
-            var cassandraImage = new ImageFromDockerfileBuilder()
-                .WithDockerfileDirectory(CommonDirectoryPath.GetProjectDirectory(Directory.GetCurrentDirectory()), string.Empty)
-                .WithDockerfile("Cassandra.dockerfile")
-                .WithBuildArgument("CASSANDRAVERSION", Environment.GetEnvironmentVariable("CASSANDRAVERSION"))
-                .Build();
-
-            var imageTask = cassandraImage.CreateAsync();
-
-            await imageTask;
-
             var containerPort = 9042;
 
-            var builder = new ContainerBuilder()
-                .WithImage(cassandraImage)
-                .WithPortBinding(containerPort, true)
-                .WithWaitStrategy(Wait.ForUnixContainer().UntilPortIsAvailable(containerPort));
-
-            var container = builder.Build();
+            var container = new ContainerBuilder()
+                    .WithImage("cassandra:" + Environment.GetEnvironmentVariable("CASSANDRAVERSION"))
+                    .WithPortBinding(containerPort, true)
+                    .WithWaitStrategy(Wait.ForUnixContainer().UntilPortIsAvailable(containerPort))
+                    .Build()
+                ;
 
             await container.StartAsync();
 
