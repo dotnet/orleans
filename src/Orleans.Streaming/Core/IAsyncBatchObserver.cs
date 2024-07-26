@@ -74,7 +74,7 @@ namespace Orleans.Streams
         /// </para>
         /// </summary>
         /// <returns>A Task that is completed when the stream-complete operation has been accepted.</returns>
-        Task OnCompletedAsync();
+        Task OnCompletedAsync() => Task.CompletedTask;
 
         /// <summary>
         /// Notifies the consumer that the stream had an error.
