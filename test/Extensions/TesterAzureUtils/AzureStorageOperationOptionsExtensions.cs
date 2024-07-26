@@ -1,12 +1,14 @@
+using Azure.Core.Diagnostics;
 using Azure.Data.Tables;
 using Azure.Identity;
-using Microsoft.Extensions.Options;
 using TestExtensions;
 
 namespace Tester.AzureUtils
 {
     public static class AzureStorageOperationOptionsExtensions
     {
+        public static DefaultAzureCredential Credential = new DefaultAzureCredential();
+
         public static Orleans.Clustering.AzureStorage.AzureStorageOperationOptions ConfigureTestDefaults(this Orleans.Clustering.AzureStorage.AzureStorageOperationOptions options)
         {
             options.TableServiceClient = GetTableServiceClient();
@@ -17,7 +19,7 @@ namespace Tester.AzureUtils
         public static TableServiceClient GetTableServiceClient()
         {
             return TestDefaultConfiguration.UseAadAuthentication
-                ? new(TestDefaultConfiguration.TableEndpoint, new DefaultAzureCredential())
+                ? new(TestDefaultConfiguration.TableEndpoint, Credential)
                 : new(TestDefaultConfiguration.DataConnectionString);
         }
 
@@ -46,7 +48,7 @@ namespace Tester.AzureUtils
         {
             if (TestDefaultConfiguration.UseAadAuthentication)
             {
-                options.BlobServiceClient = new(TestDefaultConfiguration.DataBlobUri, new DefaultAzureCredential());
+                options.BlobServiceClient = new(TestDefaultConfiguration.DataBlobUri, Credential);
             }
             else
             {
@@ -60,7 +62,7 @@ namespace Tester.AzureUtils
         {
             if (TestDefaultConfiguration.UseAadAuthentication)
             {
-                options.QueueServiceClient = new(TestDefaultConfiguration.DataQueueUri, new DefaultAzureCredential());
+                options.QueueServiceClient = new(TestDefaultConfiguration.DataQueueUri, Credential);
             }
             else
             {
@@ -74,7 +76,7 @@ namespace Tester.AzureUtils
         {
             if (TestDefaultConfiguration.UseAadAuthentication)
             {
-                options.BlobServiceClient = new(TestDefaultConfiguration.DataBlobUri, new DefaultAzureCredential());
+                options.BlobServiceClient = new(TestDefaultConfiguration.DataBlobUri, Credential);
             }
             else
             {
