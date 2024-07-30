@@ -13,7 +13,7 @@ public static class CosmosOptionsExtensions
     {
         if (TestDefaultConfiguration.UseAadAuthentication)
         {
-            options.ConfigureCosmosClient(TestDefaultConfiguration.CosmosDBAccountEndpoint, new DefaultAzureCredential());
+            options.ConfigureCosmosClient(TestDefaultConfiguration.CosmosDBAccountEndpoint, TestDefaultConfiguration.TokenCredential);
         }
         else
         {
@@ -27,7 +27,7 @@ public static class CosmosOptionsExtensions
     {
         if (TestDefaultConfiguration.UseAadAuthentication)
         {
-            options.ConfigureCosmosClient(TestDefaultConfiguration.CosmosDBAccountEndpoint, new DefaultAzureCredential());
+            options.ConfigureCosmosClient(TestDefaultConfiguration.CosmosDBAccountEndpoint, TestDefaultConfiguration.TokenCredential);
         }
         else
         {
@@ -41,7 +41,7 @@ public static class CosmosOptionsExtensions
     {
         if (TestDefaultConfiguration.UseAadAuthentication)
         {
-            options.ConfigureCosmosClient(TestDefaultConfiguration.CosmosDBAccountEndpoint, new DefaultAzureCredential());
+            options.ConfigureCosmosClient(TestDefaultConfiguration.CosmosDBAccountEndpoint, TestDefaultConfiguration.TokenCredential);
         }
         else
         {

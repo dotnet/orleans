@@ -13,7 +13,7 @@
   <PropertyGroup>
     <!-- Set DisableSourceLinkUrlTranslation to true when building a tool for internal use where sources only come from internal URIs -->
     <DisableSourceLinkUrlTranslation Condition="'$(DisableSourceLinkUrlTranslation)' == ''">false</DisableSourceLinkUrlTranslation>
-    <_TranslateUrlPattern>https://.*\.visualstudio\.com/.*/_git/[^/]*</_TranslateUrlPattern>
+    <_TranslateUrlPattern>(https://.*\.visualstudio\.com/.*/_git/[^/]*)|(https://dev\.azure\.com/.*/_git/[^/]*)</_TranslateUrlPattern>
     <_TranslateUrlReplacement>$(PublicRepositoryUrl)</_TranslateUrlReplacement>
   </PropertyGroup>
 
